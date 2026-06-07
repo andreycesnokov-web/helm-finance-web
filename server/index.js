@@ -235,6 +235,25 @@ app.patch('/api/reminders/:id/done', auth, async (req, res) => {
   res.json(data);
 });
 
+// ─── Accounts API ─────────────────────────────────────────────────────────
+
+app.post('/api/accounts', auth, async (req, res) => {
+  const { name, type, balance } = req.body
+  // Save as an "opening balance" transaction
+  const { error } = await supabase.from('transactions').insert({
+    user_id: req.user.userId,
+    type: 'income',
+    amount_original: balance || 0,
+    currency_original: 'IDR',
+    amount_idr: balance || 0,
+    description: `Opening balance · ${name}`,
+    source: name,
+    scope: type || 'personal',
+  })
+  if (error) return res.status(500).json({ error: error.message })
+  res.json({ ok: true })
+})
+
 // ─── Serve React app ───────────────────────────────────────────────────────
 
 app.get('*', (req, res) => {
@@ -243,3 +262,5 @@ app.get('*', (req, res) => {
 
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => console.log(`Helm Finance Web running on port ${PORT}`));
+
+// NOTE: append before the last app.get('*') handler — this is a patch
