@@ -3,6 +3,7 @@ import { AuthProvider, useAuth } from './hooks/useAuth'
 import Login from './pages/Login'
 import Pulse from './pages/Pulse'
 import Accounts from './pages/Accounts'
+import Add from './pages/Add'
 
 const NAV = [
   { path: '/', label: 'Pulse', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg> },
@@ -54,7 +55,7 @@ export default function App() {
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/" element={<ProtectedRoute><Pulse /></ProtectedRoute>} />
-          <Route path="/add" element={<ProtectedRoute><ComingSoon title="Add transaction" /></ProtectedRoute>} />
+          <Route path="/add" element={<ProtectedRoute><Add /></ProtectedRoute>} />
           <Route path="/radar" element={<ProtectedRoute><ComingSoon title="Radar · Cash forecast" /></ProtectedRoute>} />
           <Route path="/accounts" element={<ProtectedRoute><Accounts /></ProtectedRoute>} />
         </Routes>
