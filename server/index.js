@@ -23,7 +23,6 @@ function verifyTelegramAuth(data) {
     .map(k => `${k}=${rest[k]}`).join('\n');
   const hmac = crypto.createHmac('sha256', secret).update(checkString).digest('hex');
   if (hmac !== hash) return false;
-  // Check auth is not older than 1 day
   if (Date.now() / 1000 - parseInt(rest.auth_date) > 86400) return false;
   return true;
 }
@@ -36,7 +35,6 @@ app.post('/api/auth/telegram', async (req, res) => {
     if (!verifyTelegramAuth(data)) {
       return res.status(401).json({ error: 'Invalid Telegram auth' });
     }
-    // Upsert user in Supabase
     const { data: user, error } = await supabase
       .from('users')
       .upsert({
@@ -71,28 +69,22 @@ function auth(req, res, next) {
 app.get('/api/pulse', auth, async (req, res) => {
   try {
     const userId = req.user.userId;
-    const scope = req.query.scope || 'all'; // all | business | personal
+    const scope = req.query.scope || 'all';
     const now = new Date();
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
 
-    // Build scope filter
-    let scopeFilter = {};
-    if (scope !== 'all') scopeFilter = { scope };
+    // ALL transactions ever — for total balance
+    let allTxQuery = supabase.from('transactions').select('*').eq('user_id', userId);
+    if (scope !== 'all') allTxQuery = allTxQuery.eq('scope', scope);
+    const { data: allTxs } = await allTxQuery;
 
-    // Accounts
-    let accQuery = supabase.from('accounts').select('*').eq('user_id', userId).eq('is_active', true);
-    if (scope === 'business') accQuery = accQuery.eq('type', 'business');
-    if (scope === 'personal') accQuery = accQuery.eq('type', 'personal');
-    const { data: accounts } = await accQuery;
-
-    // Transactions this month
+    // This month transactions — for burn rate
     let txQuery = supabase.from('transactions').select('*')
-      .eq('user_id', userId)
-      .gte('created_at', monthStart);
+      .eq('user_id', userId).gte('created_at', monthStart);
     if (scope !== 'all') txQuery = txQuery.eq('scope', scope);
     const { data: txs } = await txQuery;
 
-    // Debts (payables/receivables) — from transactions with future dates
+    // Debts
     const { data: debts } = await supabase.from('debts')
       .select('*').eq('user_id', userId).eq('is_settled', false)
       .order('due_date', { ascending: true });
@@ -102,8 +94,25 @@ app.get('/api/pulse', auth, async (req, res) => {
       .select('*').eq('user_id', userId).eq('is_done', false)
       .order('due_date', { ascending: true });
 
-    // Calculate metrics
-    const totalBalance = (accounts || []).reduce((s, a) => s + Number(a.balance), 0);
+    // ── Balance from transactions ──────────────────────────────────────────
+    const allIncome = (allTxs || []).filter(t => t.type === 'income').reduce((s, t) => s + Number(t.amount_original), 0);
+    const allExpenses = (allTxs || []).filter(t => t.type === 'expense').reduce((s, t) => s + Number(t.amount_original), 0);
+    const totalBalance = allIncome - allExpenses;
+
+    // Virtual accounts from transaction sources
+    const sourceMap = {};
+    (allTxs || []).forEach(t => {
+      const src = t.source || (t.scope === 'business' ? 'Helm Care Pay' : 'Personal');
+      if (!sourceMap[src]) sourceMap[src] = { id: src, name: src, balance: 0, type: t.scope || 'personal' };
+      if (t.type === 'income') sourceMap[src].balance += Number(t.amount_original);
+      else sourceMap[src].balance -= Number(t.amount_original);
+    });
+    const accounts = Object.values(sourceMap)
+      .filter(a => Math.abs(a.balance) > 1000)
+      .sort((a, b) => b.balance - a.balance)
+      .slice(0, 5);
+
+    // ── This month metrics ─────────────────────────────────────────────────
     const income = (txs || []).filter(t => t.type === 'income').reduce((s, t) => s + Number(t.amount_original), 0);
     const expenses = (txs || []).filter(t => t.type === 'expense').reduce((s, t) => s + Number(t.amount_original), 0);
     const daysInMonth = now.getDate();
@@ -114,7 +123,7 @@ app.get('/api/pulse', auth, async (req, res) => {
     const payables = (debts || []).filter(d => d.type === 'payable').reduce((s, d) => s + Number(d.amount), 0);
     const netPosition = totalBalance + receivables - payables;
 
-    // AI status
+    // ── AI status ──────────────────────────────────────────────────────────
     let aiStatus = 'healthy';
     let aiText = '';
     if (runway <= 7) {
@@ -128,7 +137,7 @@ app.get('/api/pulse', auth, async (req, res) => {
       aiText = `Runway ${runway} дней. Поступления перекрывают обязательства. Рисков не обнаружено.`;
     }
 
-    // Today's focus — auto-generated from debts + reminders
+    // ── Today's focus ──────────────────────────────────────────────────────
     const todayFocus = [];
     (debts || []).slice(0, 2).forEach(d => {
       const daysLeft = Math.round((new Date(d.due_date) - now) / 86400000);
@@ -136,8 +145,8 @@ app.get('/api/pulse', auth, async (req, res) => {
         todayFocus.push({
           id: d.id,
           title: d.type === 'receivable'
-            ? `Напомнить ${d.counterparty} про оплату ${(Number(d.amount) / 1e6).toFixed(1)}M`
-            : `Оплатить ${d.counterparty} до ${new Date(d.due_date).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })}`,
+            ? `Напомнить ${d.counterparty} про оплату`
+            : `Оплатить ${d.counterparty}`,
           meta: `${Number(d.amount).toLocaleString('ru-RU')} IDR · ${daysLeft > 0 ? daysLeft + ' дней' : 'сегодня'}`,
           type: d.type === 'receivable' ? 'receivable' : 'payable',
           done: false
@@ -152,11 +161,11 @@ app.get('/api/pulse', auth, async (req, res) => {
       scope, totalBalance, income, expenses, burnRate, runway,
       receivables, payables, netPosition,
       aiStatus, aiText,
-      accounts: accounts || [],
+      accounts,
       debts: debts || [],
       reminders: reminders || [],
       todayFocus,
-      recentTxs: (txs || []).slice(0, 5)
+      recentTxs: (allTxs || []).slice(0, 5)
     });
   } catch (e) {
     res.status(500).json({ error: e.message });
