@@ -345,6 +345,19 @@ app.post('/api/accounts', auth, async (req, res) => {
 
 // ─── Serve React app ───────────────────────────────────────────────────────
 
+
+app.get('/api/profile', auth, async (req, res) => {
+  const { data, error } = await supabase.from('users').select('*').eq('id', req.user.userId).single()
+  if (error) return res.status(500).json({ error: error.message })
+  res.json(data)
+})
+
+app.post('/api/profile', auth, async (req, res) => {
+  const { first_name, last_name, photo_url, language, timezone } = req.body
+  const { data, error } = await supabase.from('users').update({ first_name, last_name, photo_url, language, timezone }).eq('id', req.user.userId).select().single()
+  if (error) return res.status(500).json({ error: error.message })
+  res.json(data)
+})
 app.get('*', (req, res) => {
   res.sendFile('index.html', { root: 'client/dist' });
 });
@@ -352,5 +365,11 @@ app.get('*', (req, res) => {
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => console.log(`Helm Finance Web running on port ${PORT}`));
 
-// NOTE: append before the last app.get('*') handler — this is a patch
+// NOTE: append before the last 
+app.get('*', (req, res) => {
+  res.sendFile('index.html', { root: 'client/dist' });
+});
+
+const PORT = process.env.PORT || 3001;
+app.listen(PORT, () => console.log(Helm Finance Web running on port ${PORT}));
 
