@@ -370,6 +370,5 @@ app.get('*', (req, res) => {
   res.sendFile('index.html', { root: 'client/dist' });
 });
 
-const PORT = process.env.PORT || 3001;
-app.listen(PORT, () => console.log(Helm Finance Web running on port ${PORT}));
+
 

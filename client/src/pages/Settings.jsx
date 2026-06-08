@@ -1,35 +1,84 @@
-import { useState } from 'react'
+$settings = @'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
+import { apiFetch } from '../lib/api'
 
 const LANGUAGES = [
   { code: 'ru', label: 'Русский', flag: '🇷🇺' },
   { code: 'en', label: 'English', flag: '🇬🇧' },
+  { code: 'id', label: 'Bahasa Indonesia', flag: '🇮🇩' },
+  { code: 'zh', label: '中文', flag: '🇨🇳' },
+  { code: 'ar', label: 'العربية', flag: '🇸🇦' },
+  { code: 'es', label: 'Español', flag: '🇪🇸' },
+  { code: 'fr', label: 'Français', flag: '🇫🇷' },
+  { code: 'de', label: 'Deutsch', flag: '🇩🇪' },
+  { code: 'pt', label: 'Português', flag: '🇧🇷' },
+  { code: 'hi', label: 'हिन्दी', flag: '🇮🇳' },
+  { code: 'ja', label: '日本語', flag: '🇯🇵' },
+  { code: 'ko', label: '한국어', flag: '🇰🇷' },
+  { code: 'tr', label: 'Türkçe', flag: '🇹🇷' },
+  { code: 'vi', label: 'Tiếng Việt', flag: '🇻🇳' },
+  { code: 'th', label: 'ภาษาไทย', flag: '🇹🇭' },
 ]
 
 const TIMEZONES = [
   { value: 'Asia/Makassar', label: 'Bali (WITA, UTC+8)' },
   { value: 'Asia/Jakarta', label: 'Jakarta (WIB, UTC+7)' },
+  { value: 'Asia/Singapore', label: 'Singapore (SGT, UTC+8)' },
+  { value: 'Asia/Bangkok', label: 'Bangkok (ICT, UTC+7)' },
+  { value: 'Asia/Ho_Chi_Minh', label: 'Ho Chi Minh (ICT, UTC+7)' },
+  { value: 'Asia/Kuala_Lumpur', label: 'Kuala Lumpur (MYT, UTC+8)' },
+  { value: 'Asia/Dubai', label: 'Dubai (GST, UTC+4)' },
   { value: 'Europe/Moscow', label: 'Moscow (MSK, UTC+3)' },
+  { value: 'Europe/London', label: 'London (GMT, UTC+0)' },
+  { value: 'America/New_York', label: 'New York (EST, UTC-5)' },
   { value: 'UTC', label: 'UTC' },
 ]
 
 export default function Settings() {
-  const { user, logout } = useAuth()
+  const { token, user, logout } = useAuth()
   const navigate = useNavigate()
+  const fileRef = useRef()
 
-  const [lang, setLang] = useState(localStorage.getItem('hf_lang') || 'ru')
-  const [timezone, setTimezone] = useState(localStorage.getItem('hf_tz') || 'Asia/Makassar')
+  const [profile, setProfile] = useState({ first_name: '', last_name: '', photo_url: '', language: 'ru', timezone: 'Asia/Makassar' })
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [showLogout, setShowLogout] = useState(false)
+  const [showLang, setShowLang] = useState(false)
+  const [showTz, setShowTz] = useState(false)
   const [notifications, setNotifications] = useState(localStorage.getItem('hf_notif') !== 'false')
-  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
 
-  const handleLang = (code) => { setLang(code); localStorage.setItem('hf_lang', code) }
-  const handleTz = (val) => { setTimezone(val); localStorage.setItem('hf_tz', val) }
-  const handleNotif = () => { const n = !notifications; setNotifications(n); localStorage.setItem('hf_notif', String(n)) }
+  useEffect(() => {
+    apiFetch('/profile', token).then(data => {
+      setProfile({ first_name: data.first_name || '', last_name: data.last_name || '', photo_url: data.photo_url || '', language: data.language || 'ru', timezone: data.timezone || 'Asia/Makassar' })
+      setLoading(false)
+    }).catch(() => setLoading(false))
+  }, [token])
+
+  const save = async (updates) => {
+    setSaving(true)
+    const updated = { ...profile, ...updates }
+    setProfile(updated)
+    await apiFetch('/profile', token, { method: 'POST', body: updated })
+    setSaving(false)
+  }
+
+  const handlePhoto = (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = (ev) => save({ photo_url: ev.target.result })
+    reader.readAsDataURL(file)
+  }
+
   const handleLogout = () => { logout(); navigate('/login') }
+  const handleNotif = () => { const n = !notifications; setNotifications(n); localStorage.setItem('hf_notif', String(n)) }
 
-  const initials = user?.first_name?.[0] || 'A'
-  const fullName = [user?.first_name, user?.last_name].filter(Boolean).join(' ')
+  const selectedLang = LANGUAGES.find(l => l.code === profile.language) || LANGUAGES[0]
+  const selectedTz = TIMEZONES.find(t => t.value === profile.timezone) || TIMEZONES[0]
+
+  if (loading) return <div style={{ padding: 32, textAlign: 'center', color: 'var(--text-3)' }}>Loading...</div>
 
   return (
     <div className="page">
@@ -37,48 +86,51 @@ export default function Settings() {
         <button onClick={() => navigate(-1)} style={{ width: 32, height: 32, borderRadius: '50%', background: 'var(--bg-2)', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-2)" strokeWidth="2" strokeLinecap="round"><polyline points="15 18 9 12 15 6"/></svg>
         </button>
-        <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--text)' }}>Settings</div>
-        <div style={{ width: 32 }} />
+        <div style={{ fontSize: 16, fontWeight: 600 }}>Settings</div>
+        <div style={{ width: 32 }}/>
       </div>
 
-      {/* Profile */}
-      <div style={{ margin: '4px 16px 20px', background: 'var(--text)', borderRadius: 16, padding: '20px 18px', display: 'flex', alignItems: 'center', gap: 14 }}>
-        {user?.photo_url
-          ? <img src={user.photo_url} alt="" style={{ width: 52, height: 52, borderRadius: '50%', objectFit: 'cover' }} />
-          : <div style={{ width: 52, height: 52, borderRadius: '50%', background: '#B5D4F4', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, fontWeight: 600, color: '#0C447C', flexShrink: 0 }}>{initials}</div>
-        }
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 16, fontWeight: 600, color: '#fff', marginBottom: 2 }}>{fullName || 'User'}</div>
-          {user?.username && <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>@{user.username}</div>}
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, marginTop: 6, background: 'rgba(255,255,255,0.1)', borderRadius: 20, padding: '3px 10px' }}>
-            <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)' }}>✓ Telegram connected</span>
+      {/* Profile card */}
+      <div style={{ margin: '4px 16px 20px', background: 'var(--text)', borderRadius: 16, padding: '20px 18px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 16 }}>
+          <div onClick={() => fileRef.current.click()} style={{ position: 'relative', cursor: 'pointer', flexShrink: 0 }}>
+            {profile.photo_url
+              ? <img src={profile.photo_url} alt="" style={{ width: 56, height: 56, borderRadius: '50%', objectFit: 'cover' }} />
+              : <div style={{ width: 56, height: 56, borderRadius: '50%', background: '#B5D4F4', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, fontWeight: 600, color: '#0C447C' }}>{profile.first_name?.[0] || 'A'}</div>
+            }
+            <div style={{ position: 'absolute', bottom: 0, right: 0, width: 18, height: 18, borderRadius: '50%', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#000" strokeWidth="2.5" strokeLinecap="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+            </div>
           </div>
+          <div style={{ flex: 1, color: 'rgba(255,255,255,0.5)', fontSize: 12 }}>Tap photo to change</div>
+          <input ref={fileRef} type="file" accept="image/*" onChange={handlePhoto} style={{ display: 'none' }} />
         </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <input value={profile.first_name} onChange={e => setProfile(p => ({ ...p, first_name: e.target.value }))} onBlur={() => save({})} placeholder="First name" style={{ flex: 1, padding: '9px 12px', borderRadius: 10, border: 'none', background: 'rgba(255,255,255,0.1)', color: '#fff', fontSize: 14 }} />
+          <input value={profile.last_name} onChange={e => setProfile(p => ({ ...p, last_name: e.target.value }))} onBlur={() => save({})} placeholder="Last name" style={{ flex: 1, padding: '9px 12px', borderRadius: 10, border: 'none', background: 'rgba(255,255,255,0.1)', color: '#fff', fontSize: 14 }} />
+        </div>
+        {saving && <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 8 }}>Saving...</div>}
       </div>
 
       {/* Language */}
       <div style={{ margin: '0 16px 8px', fontSize: 11, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Language</div>
-      <div style={{ margin: '0 16px 16px', background: 'var(--bg-2)', borderRadius: 12, overflow: 'hidden' }}>
-        {LANGUAGES.map((l, i) => (
-          <div key={l.code} onClick={() => handleLang(l.code)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 16px', borderBottom: i < LANGUAGES.length - 1 ? '0.5px solid var(--border)' : 'none', cursor: 'pointer' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <span style={{ fontSize: 20 }}>{l.flag}</span>
-              <span style={{ fontSize: 14, color: 'var(--text)' }}>{l.label}</span>
-            </div>
-            {lang === l.code && <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text)" strokeWidth="2.5" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>}
+      <div style={{ margin: '0 16px 16px', background: 'var(--bg-2)', borderRadius: 12 }}>
+        <div onClick={() => setShowLang(true)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 16px', cursor: 'pointer' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span style={{ fontSize: 20 }}>{selectedLang.flag}</span>
+            <span style={{ fontSize: 14, color: 'var(--text)' }}>{selectedLang.label}</span>
           </div>
-        ))}
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-3)" strokeWidth="2" strokeLinecap="round"><polyline points="9 18 15 12 9 6"/></svg>
+        </div>
       </div>
 
       {/* Timezone */}
       <div style={{ margin: '0 16px 8px', fontSize: 11, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Timezone</div>
-      <div style={{ margin: '0 16px 16px', background: 'var(--bg-2)', borderRadius: 12, overflow: 'hidden' }}>
-        {TIMEZONES.map((tz, i) => (
-          <div key={tz.value} onClick={() => handleTz(tz.value)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 16px', borderBottom: i < TIMEZONES.length - 1 ? '0.5px solid var(--border)' : 'none', cursor: 'pointer' }}>
-            <span style={{ fontSize: 14, color: 'var(--text)' }}>{tz.label}</span>
-            {timezone === tz.value && <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text)" strokeWidth="2.5" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>}
-          </div>
-        ))}
+      <div style={{ margin: '0 16px 16px', background: 'var(--bg-2)', borderRadius: 12 }}>
+        <div onClick={() => setShowTz(true)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 16px', cursor: 'pointer' }}>
+          <span style={{ fontSize: 14, color: 'var(--text)' }}>{selectedTz.label}</span>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-3)" strokeWidth="2" strokeLinecap="round"><polyline points="9 18 15 12 9 6"/></svg>
+        </div>
       </div>
 
       {/* Notifications */}
@@ -95,7 +147,7 @@ export default function Settings() {
         </div>
       </div>
 
-      {/* Telegram bot */}
+      {/* Telegram */}
       <div style={{ margin: '0 16px 8px', fontSize: 11, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Telegram Bot</div>
       <div style={{ margin: '0 16px 16px', background: 'var(--bg-2)', borderRadius: 12 }}>
         <a href="https://t.me/HCfinance_Bot" target="_blank" rel="noreferrer" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 16px', textDecoration: 'none' }}>
@@ -112,26 +164,63 @@ export default function Settings() {
         </a>
       </div>
 
-      {/* Logout */}
-      <div style={{ margin: '0 16px 16px' }}>
-        <button onClick={() => setShowLogoutConfirm(true)} style={{ width: '100%', padding: 13, borderRadius: 12, background: 'none', color: 'var(--red)', border: '0.5px solid var(--red)', fontSize: 14, fontWeight: 500, cursor: 'pointer' }}>
-          Sign out
-        </button>
+      <div style={{ margin: '0 16px 32px' }}>
+        <button onClick={() => setShowLogout(true)} style={{ width: '100%', padding: 13, borderRadius: 12, background: 'none', color: 'var(--red)', border: '0.5px solid var(--red)', fontSize: 14, fontWeight: 500, cursor: 'pointer' }}>Sign out</button>
       </div>
-
       <div style={{ textAlign: 'center', fontSize: 11, color: 'var(--text-3)', paddingBottom: 32 }}>Helm Finance · v1.0</div>
 
-      {showLogoutConfirm && (
-        <div onClick={() => setShowLogoutConfirm(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 200, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', maxWidth: 430, margin: '0 auto' }}>
+      {/* Language picker */}
+      {showLang && (
+        <div onClick={() => setShowLang(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 200, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', maxWidth: 430, margin: '0 auto' }}>
+          <div onClick={e => e.stopPropagation()} style={{ background: 'var(--bg)', borderRadius: '16px 16px 0 0', padding: '20px 0 32px', width: '100%', maxHeight: '70vh', overflow: 'auto' }}>
+            <div style={{ width: 36, height: 3, background: 'var(--border-2)', borderRadius: 2, margin: '0 auto 16px' }} />
+            <div style={{ fontSize: 15, fontWeight: 600, padding: '0 16px 12px' }}>Select language</div>
+            {LANGUAGES.map((l, i) => (
+              <div key={l.code} onClick={() => { save({ language: l.code }); setShowLang(false) }} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', borderBottom: i < LANGUAGES.length - 1 ? '0.5px solid var(--border)' : 'none', cursor: 'pointer' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <span style={{ fontSize: 22 }}>{l.flag}</span>
+                  <span style={{ fontSize: 14, color: 'var(--text)' }}>{l.label}</span>
+                </div>
+                {profile.language === l.code && <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text)" strokeWidth="2.5" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Timezone picker */}
+      {showTz && (
+        <div onClick={() => setShowTz(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 200, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', maxWidth: 430, margin: '0 auto' }}>
+          <div onClick={e => e.stopPropagation()} style={{ background: 'var(--bg)', borderRadius: '16px 16px 0 0', padding: '20px 0 32px', width: '100%', maxHeight: '70vh', overflow: 'auto' }}>
+            <div style={{ width: 36, height: 3, background: 'var(--border-2)', borderRadius: 2, margin: '0 auto 16px' }} />
+            <div style={{ fontSize: 15, fontWeight: 600, padding: '0 16px 12px' }}>Select timezone</div>
+            {TIMEZONES.map((tz, i) => (
+              <div key={tz.value} onClick={() => { save({ timezone: tz.value }); setShowTz(false) }} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', borderBottom: i < TIMEZONES.length - 1 ? '0.5px solid var(--border)' : 'none', cursor: 'pointer' }}>
+                <span style={{ fontSize: 14, color: 'var(--text)' }}>{tz.label}</span>
+                {profile.timezone === tz.value && <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text)" strokeWidth="2.5" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Logout confirm */}
+      {showLogout && (
+        <div onClick={() => setShowLogout(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 200, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', maxWidth: 430, margin: '0 auto' }}>
           <div onClick={e => e.stopPropagation()} style={{ background: 'var(--bg)', borderRadius: '16px 16px 0 0', padding: '20px 16px 32px', width: '100%' }}>
             <div style={{ width: 36, height: 3, background: 'var(--border-2)', borderRadius: 2, margin: '0 auto 16px' }} />
             <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 8 }}>Sign out?</div>
-            <div style={{ fontSize: 13, color: 'var(--text-3)', marginBottom: 20 }}>You'll need to log in via Telegram again.</div>
+            <div style={{ fontSize: 13, color: 'var(--text-3)', marginBottom: 20 }}>You will need to log in via Telegram again.</div>
             <button onClick={handleLogout} style={{ width: '100%', padding: 13, borderRadius: 10, background: 'var(--red)', color: '#fff', border: 'none', fontSize: 14, fontWeight: 500, marginBottom: 8 }}>Sign out</button>
-            <button onClick={() => setShowLogoutConfirm(false)} style={{ width: '100%', padding: 11, borderRadius: 10, background: 'none', color: 'var(--text-3)', border: '0.5px solid var(--border)', fontSize: 13 }}>Cancel</button>
+            <button onClick={() => setShowLogout(false)} style={{ width: '100%', padding: 11, borderRadius: 10, background: 'none', color: 'var(--text-3)', border: '0.5px solid var(--border)', fontSize: 13 }}>Cancel</button>
           </div>
         </div>
       )}
     </div>
   )
 }
+'@
+Set-Content "client\src\pages\Settings.jsx" -Value $settings
+git add .
+git commit -m "settings: edit profile, photo, language, timezone"
+git push
