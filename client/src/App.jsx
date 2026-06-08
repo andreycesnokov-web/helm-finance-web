@@ -5,6 +5,7 @@ import Pulse from './pages/Pulse'
 import Accounts from './pages/Accounts'
 import Add from './pages/Add'
 import Radar from './pages/Radar'
+import Settings from './pages/Settings'
 
 const NAV = [
   { path: '/', label: 'Pulse', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg> },
@@ -58,9 +59,11 @@ export default function App() {
           <Route path="/" element={<ProtectedRoute><Pulse /></ProtectedRoute>} />
           <Route path="/add" element={<ProtectedRoute><Add /></ProtectedRoute>} />
           <Route path="/radar" element={<ProtectedRoute><Radar /></ProtectedRoute>} />
+          <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
           <Route path="/accounts" element={<ProtectedRoute><Accounts /></ProtectedRoute>} />
         </Routes>
       </AuthProvider>
     </BrowserRouter>
   )
 }
+

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { apiFetch, fmt, fmtFull, daysUntil } from '../lib/api'
 
@@ -12,6 +13,7 @@ const STATUS_COLORS = {
 
 export default function Pulse() {
   const { token, user } = useAuth()
+  const navigate = useNavigate()
   const [scope, setScope] = useState('all')
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -244,3 +246,4 @@ export default function Pulse() {
     </div>
   )
 }
+
