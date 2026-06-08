@@ -10,7 +10,7 @@ import Settings from './pages/Settings'
 const NAV = [
   { path: '/', label: 'Pulse', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg> },
   { path: '/add', label: 'Add', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg> },
-  { path: '/radar', label: 'Radar', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/><line x1="12" y1="2" x2="12" y2="6"/><line x1="18.9" y1="5.1" x2="16" y2="8"/></svg> },
+  { path: '/radar', label: 'Radar', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg> },
   { path: '/accounts', label: 'Accounts', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg> },
   { path: '/settings', label: 'Settings', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg> },
 ]
@@ -20,7 +20,10 @@ function Sidebar() {
   const navigate = useNavigate()
   return (
     <div className="sidebar">
-      <div className="sidebar-logo">💰 Helm Finance</div>
+      <div className="sidebar-logo">
+        <span style={{ fontSize: 20 }}>💰</span>
+        <span>Helm Finance</span>
+      </div>
       {NAV.map(item => (
         <button key={item.path} className={`sidebar-nav-btn${location.pathname === item.path ? ' active' : ''}`} onClick={() => navigate(item.path)}>
           {item.icon}
@@ -46,15 +49,83 @@ function BottomNav() {
   )
 }
 
-function ProtectedRoute({ children }) {
+export function RightPanel({ data, scope }) {
+  const d = data || {}
+  const debts = d.debts || []
+  const upcoming = debts.filter(x => !x.is_settled).slice(0, 5)
+
+  return (
+    <div className="desktop-right">
+      {/* AI CFO */}
+      <div style={{ marginBottom: 20 }}>
+        <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 12 }}>AI CFO</div>
+        <div style={{ background: 'var(--bg-2)', borderRadius: 12, padding: 14 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', marginBottom: 8 }}>
+            {d.aiStatus === 'critical' ? '🔴 Critical' : d.aiStatus === 'attention' ? '🟡 Attention' : '🟢 Healthy'}
+          </div>
+          <div style={{ fontSize: 12, color: 'var(--text-2)', lineHeight: 1.6, marginBottom: 12 }}>{d.aiText}</div>
+          <div style={{ borderTop: '0.5px solid var(--border)', paddingTop: 10 }}>
+            <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 4 }}>Recommendation</div>
+            <div style={{ fontSize: 12, color: 'var(--text)', lineHeight: 1.5 }}>
+              {d.runway < 7 ? 'Collect receivables immediately. Delay non-critical expenses.' :
+               d.runway < 14 ? 'Review upcoming payments. Confirm receivables today.' :
+               d.payables > d.totalBalance ? 'Payables exceed cash. Prioritize collections.' :
+               'Finances healthy. Focus on growing income streams.'}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Upcoming */}
+      <div style={{ marginBottom: 20 }}>
+        <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 12 }}>Next 7 Days</div>
+        {upcoming.length === 0 && <div style={{ fontSize: 12, color: 'var(--text-3)' }}>No upcoming events</div>}
+        {upcoming.map(debt => {
+          const days = Math.round((new Date(debt.due_date) - new Date()) / 86400000)
+          return (
+            <div key={debt.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '0.5px solid var(--border)' }}>
+              <div>
+                <div style={{ fontSize: 13, color: 'var(--text)', fontWeight: 500 }}>{debt.counterparty}</div>
+                <div style={{ fontSize: 11, color: days < 0 ? 'var(--red)' : days === 0 ? 'var(--red)' : 'var(--text-3)' }}>
+                  {days < 0 ? 'Overdue' : days === 0 ? 'Today' : `${days}d`}
+                </div>
+              </div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: debt.type === 'receivable' ? 'var(--green)' : 'var(--red)' }}>
+                {debt.type === 'receivable' ? '+' : '-'}{(Number(debt.amount) / 1000000).toFixed(1)}M
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Quick stats */}
+      <div>
+        <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 12 }}>Quick Stats</div>
+        {[
+          { label: 'Runway', value: `${d.runway} days`, color: d.runway > 14 ? 'var(--green-dark)' : d.runway > 7 ? 'var(--amber-dark)' : 'var(--red)' },
+          { label: 'Burn rate', value: `${(d.burnRate / 1000).toFixed(0)}K/day` },
+          { label: 'Net position', value: `${d.netPosition >= 0 ? '+' : ''}${(d.netPosition / 1000000).toFixed(1)}M` },
+        ].map(s => (
+          <div key={s.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '0.5px solid var(--border)' }}>
+            <div style={{ fontSize: 12, color: 'var(--text-3)' }}>{s.label}</div>
+            <div style={{ fontSize: 12, fontWeight: 600, color: s.color || 'var(--text)' }}>{s.value}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function ProtectedRoute({ children, rightPanel }) {
   const { user, loading } = useAuth()
   if (loading) return <div style={{ minHeight: '100dvh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-3)', fontSize: 14 }}>Loading...</div>
   if (!user) return <Navigate to="/login" replace />
   return (
     <>
       <Sidebar />
-      <div className="desktop-content">
-        {children}
+      <div className="desktop-layout">
+        <div className="desktop-main">{children}</div>
+        {rightPanel && <div className="desktop-right-wrapper">{rightPanel}</div>}
       </div>
       <BottomNav />
     </>
