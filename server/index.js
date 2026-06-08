@@ -1,4 +1,4 @@
-const express = require('express');
+﻿const express = require('express');
 const cors = require('cors');
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
@@ -128,13 +128,13 @@ app.get('/api/pulse', auth, async (req, res) => {
     let aiText = '';
     if (runway <= 7) {
       aiStatus = 'critical';
-      aiText = `Денег осталось на ${runway} дн. Требуется входящий платёж для восстановления runway.`;
+      aiText = `Only ${runway} days of runway left. Incoming payment needed.`;
     } else if (runway <= 14) {
       aiStatus = 'attention';
-      aiText = `Runway ${runway} дней. Есть обязательства, которые могут снизить запас. Рекомендую проверить дебиторку.`;
+      aiText = `Runway ${runway} days. Check receivables - some obligations may reduce the buffer.`;
     } else {
       aiStatus = 'healthy';
-      aiText = `Runway ${runway} дней. Поступления перекрывают обязательства. Рисков не обнаружено.`;
+      aiText = `Runway ${runway} days. Income covers obligations. No risks detected.`;
     }
 
     // ── Today's focus ──────────────────────────────────────────────────────
@@ -144,10 +144,8 @@ app.get('/api/pulse', auth, async (req, res) => {
       if (daysLeft <= 14) {
         todayFocus.push({
           id: d.id,
-          title: d.type === 'receivable'
-            ? `Напомнить ${d.counterparty} про оплату`
-            : `Оплатить ${d.counterparty}`,
-          meta: `${Number(d.amount).toLocaleString('ru-RU')} IDR · ${daysLeft > 0 ? daysLeft + ' дней' : 'сегодня'}`,
+         title: d.type === 'receivable' ? `Remind ${d.counterparty} to pay` : `Pay ${d.counterparty}`,
+          meta: `${Number(d.amount).toLocaleString('en-US')} IDR · ${daysLeft > 0 ? daysLeft + ' days' : 'today'}`,
           type: d.type === 'receivable' ? 'receivable' : 'payable',
           done: false
         });
@@ -369,6 +367,7 @@ app.listen(PORT, () => console.log(`Helm Finance Web running on port ${PORT}`));
 app.get('*', (req, res) => {
   res.sendFile('index.html', { root: 'client/dist' });
 });
+
 
 
 
