@@ -1,4 +1,4 @@
-﻿const express = require('express');
+const express = require('express');
 const cors = require('cors');
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
@@ -14,7 +14,7 @@ const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SEC
 const JWT_SECRET = process.env.JWT_SECRET || 'helm-finance-secret';
 const BOT_TOKEN = process.env.BOT_TOKEN;
 
-// ─── Telegram Login verification ──────────────────────────────────────────
+// --- Telegram Login verification ------------------------------------------
 
 function verifyTelegramAuth(data) {
   const { hash, ...rest } = data;
@@ -27,7 +27,7 @@ function verifyTelegramAuth(data) {
   return true;
 }
 
-// ─── Auth ──────────────────────────────────────────────────────────────────
+// --- Auth ------------------------------------------------------------------
 
 app.post('/api/auth/telegram', async (req, res) => {
   try {
@@ -51,7 +51,7 @@ app.post('/api/auth/telegram', async (req, res) => {
   }
 });
 
-// ─── Auth middleware ───────────────────────────────────────────────────────
+// --- Auth middleware -------------------------------------------------------
 
 function auth(req, res, next) {
   const token = req.headers.authorization?.replace('Bearer ', '');
@@ -64,7 +64,7 @@ function auth(req, res, next) {
   }
 }
 
-// ─── Pulse API ─────────────────────────────────────────────────────────────
+// --- Pulse API -------------------------------------------------------------
 
 app.get('/api/pulse', auth, async (req, res) => {
   try {
@@ -73,12 +73,12 @@ app.get('/api/pulse', auth, async (req, res) => {
     const now = new Date();
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
 
-    // ALL transactions ever — for total balance
+    // ALL transactions ever � for total balance
     let allTxQuery = supabase.from('transactions').select('*').eq('user_id', userId);
     if (scope !== 'all') allTxQuery = allTxQuery.eq('scope', scope);
     const { data: allTxs } = await allTxQuery;
 
-    // This month transactions — for burn rate
+    // This month transactions � for burn rate
     let txQuery = supabase.from('transactions').select('*')
       .eq('user_id', userId).gte('created_at', monthStart);
     if (scope !== 'all') txQuery = txQuery.eq('scope', scope);
@@ -94,7 +94,7 @@ app.get('/api/pulse', auth, async (req, res) => {
       .select('*').eq('user_id', userId).eq('is_done', false)
       .order('due_date', { ascending: true });
 
-    // ── Balance from transactions ──────────────────────────────────────────
+    // -- Balance from transactions ------------------------------------------
     const allIncome = (allTxs || []).filter(t => t.type === 'income').reduce((s, t) => s + Number(t.amount_original), 0);
     const allExpenses = (allTxs || []).filter(t => t.type === 'expense').reduce((s, t) => s + Number(t.amount_original), 0);
     const totalBalance = allIncome - allExpenses;
@@ -112,7 +112,7 @@ app.get('/api/pulse', auth, async (req, res) => {
       .sort((a, b) => b.balance - a.balance)
       .slice(0, 10);
 
-    // ── This month metrics ─────────────────────────────────────────────────
+    // -- This month metrics -------------------------------------------------
     const income = (txs || []).filter(t => t.type === 'income').reduce((s, t) => s + Number(t.amount_original), 0);
     const expenses = (txs || []).filter(t => t.type === 'expense').reduce((s, t) => s + Number(t.amount_original), 0);
     const daysInMonth = now.getDate();
@@ -123,7 +123,7 @@ app.get('/api/pulse', auth, async (req, res) => {
     const payables = (debts || []).filter(d => d.type === 'payable').reduce((s, d) => s + Number(d.amount), 0);
     const netPosition = totalBalance + receivables - payables;
 
-    // ── AI status ──────────────────────────────────────────────────────────
+    // -- AI status ----------------------------------------------------------
     let aiStatus = 'healthy';
     let aiText = '';
     if (runway <= 7) {
@@ -137,7 +137,7 @@ app.get('/api/pulse', auth, async (req, res) => {
       aiText = `Runway ${runway} days. Income covers obligations. No risks detected.`;
     }
 
-    // ── Today's focus ──────────────────────────────────────────────────────
+    // -- Today's focus ------------------------------------------------------
     const todayFocus = [];
     (debts || []).slice(0, 2).forEach(d => {
       const daysLeft = Math.round((new Date(d.due_date) - now) / 86400000);
@@ -145,7 +145,7 @@ app.get('/api/pulse', auth, async (req, res) => {
         todayFocus.push({
           id: d.id,
          title: d.type === 'receivable' ? `Remind ${d.counterparty} to pay` : `Pay ${d.counterparty}`,
-          meta: `${Number(d.amount).toLocaleString('en-US')} IDR · ${daysLeft > 0 ? daysLeft + ' days' : 'today'}`,
+          meta: `${Number(d.amount).toLocaleString('en-US')} IDR � ${daysLeft > 0 ? daysLeft + ' days' : 'today'}`,
           type: d.type === 'receivable' ? 'receivable' : 'payable',
           done: false
         });
@@ -170,7 +170,7 @@ app.get('/api/pulse', auth, async (req, res) => {
   }
 });
 
-// ─── Debts API ─────────────────────────────────────────────────────────────
+// --- Debts API -------------------------------------------------------------
 
 app.get('/api/debts', auth, async (req, res) => {
   const { data, error } = await supabase.from('debts')
@@ -195,7 +195,7 @@ app.patch('/api/debts/:id/settle', auth, async (req, res) => {
   res.json(data);
 });
 
-// ─── Transactions API ──────────────────────────────────────────────────────
+// --- Transactions API ------------------------------------------------------
 
 app.get('/api/transactions', auth, async (req, res) => {
   const { scope, period = 'month' } = req.query;
@@ -216,7 +216,7 @@ app.get('/api/transactions', auth, async (req, res) => {
   res.json(data);
 });
 
-// ─── Reminders API ─────────────────────────────────────────────────────────
+// --- Reminders API ---------------------------------------------------------
 
 app.post('/api/reminders', auth, async (req, res) => {
   const { data, error } = await supabase.from('reminders')
@@ -233,7 +233,7 @@ app.patch('/api/reminders/:id/done', auth, async (req, res) => {
   res.json(data);
 });
 
-// ─── Parse API (AI) ────────────────────────────────────────────────────────
+// --- Parse API (AI) --------------------------------------------------------
 
 const Anthropic = require('@anthropic-ai/sdk');
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -246,10 +246,10 @@ app.post('/api/parse', auth, async (req, res) => {
       max_tokens: 1000,
       messages: [{
         role: 'user',
-        content: `Найди ВСЕ транзакции в тексте. Верни ТОЛЬКО JSON массив без markdown:
-[{"type":"expense или income","amount":число,"currency":"IDR","description":"описание","source":"источник или null","scope":"personal или business","project":"Helm Care или null"}]
+        content: `????? ??? ?????????? ? ??????. ????? ?????? JSON ?????? ??? markdown:
+[{"type":"expense ??? income","amount":?????,"currency":"IDR","description":"????????","source":"???????? ??? null","scope":"personal ??? business","project":"Helm Care ??? null"}]
 
-Текст: "${text}"`
+?????: "${text}"`
       }]
     });
     const raw = response.content[0].text.trim().replace(/\`\`\`json\n?/g, '').replace(/\`\`\`\n?/g, '').trim();
@@ -282,7 +282,7 @@ app.post('/api/transactions/batch', auth, async (req, res) => {
   }
 });
 
-// ─── Accounts API ─────────────────────────────────────────────────────────
+// --- Accounts API ---------------------------------------------------------
 
 app.post('/api/accounts/adjust', auth, async (req, res) => {
   const { name, diff, type } = req.body
@@ -293,7 +293,7 @@ app.post('/api/accounts/adjust', auth, async (req, res) => {
     amount_original: Math.abs(diff),
     currency_original: 'IDR',
     amount_idr: Math.abs(diff),
-    description: `Balance adjustment · ${name}`,
+    description: `Balance adjustment � ${name}`,
     source: name,
     scope: type || 'personal',
   })
@@ -333,7 +333,7 @@ app.post('/api/accounts', auth, async (req, res) => {
     amount_original: balance || 0,
     currency_original: 'IDR',
     amount_idr: balance || 0,
-    description: `Opening balance · ${name}`,
+    description: `Opening balance � ${name}`,
     source: name,
     scope: type || 'personal',
   })
@@ -341,7 +341,7 @@ app.post('/api/accounts', auth, async (req, res) => {
   res.json({ ok: true })
 })
 
-// ─── Serve React app ───────────────────────────────────────────────────────
+// --- Serve React app -------------------------------------------------------
 
 
 app.get('/api/profile', auth, async (req, res) => {
@@ -356,6 +356,37 @@ app.post('/api/profile', auth, async (req, res) => {
   if (error) return res.status(500).json({ error: error.message })
   res.json(data)
 })
+
+app.post('/api/debts/:id/pay', auth, async (req, res) => {
+  const { amount, account, date } = req.body
+  if (!amount) return res.status(400).json({ error: 'Missing amount' })
+  const { data: debt, error: debtErr } = await supabase.from('debts')
+    .select('*').eq('id', req.params.id).eq('user_id', req.user.userId).single()
+  if (debtErr) return res.status(500).json({ error: debtErr.message })
+  const paidAmount = Number(amount)
+  const totalAmount = Number(debt.amount)
+  const isFullyPaid = paidAmount >= totalAmount
+  const { error: txErr } = await supabase.from('transactions').insert({
+    user_id: req.user.userId,
+    type: debt.type === 'payable' ? 'expense' : 'income',
+    amount_original: paidAmount,
+    currency_original: 'IDR',
+    amount_idr: paidAmount,
+    description: `Payment: \ � \`,
+    source: account || null,
+    scope: debt.scope || 'business',
+  })
+  if (txErr) return res.status(500).json({ error: txErr.message })
+  if (isFullyPaid) {
+    await supabase.from('debts').update({ is_settled: true, settled_at: new Date().toISOString() })
+      .eq('id', req.params.id)
+  } else {
+    await supabase.from('debts').update({ amount: totalAmount - paidAmount })
+      .eq('id', req.params.id)
+  }
+  res.json({ ok: true, isFullyPaid, remaining: totalAmount - paidAmount })
+})
+
 app.get('*', (req, res) => {
   res.sendFile('index.html', { root: 'client/dist' });
 });
@@ -364,9 +395,39 @@ const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => console.log(`Helm Finance Web running on port ${PORT}`));
 
 // NOTE: append before the last 
+
+  const { data: debt, error: debtErr } = await supabase.from('debts')
+    .select('*').eq('id', req.params.id).eq('user_id', req.user.userId).single()
+  if (debtErr) return res.status(500).json({ error: debtErr.message })
+  const paidAmount = Number(amount)
+  const totalAmount = Number(debt.amount)
+  const isFullyPaid = paidAmount >= totalAmount
+  const { error: txErr } = await supabase.from('transactions').insert({
+    user_id: req.user.userId,
+    type: debt.type === 'payable' ? 'expense' : 'income',
+    amount_original: paidAmount,
+    currency_original: 'IDR',
+    amount_idr: paidAmount,
+    description: `Payment: \ � \`,
+    source: account || null,
+    scope: debt.scope || 'business',
+  })
+  if (txErr) return res.status(500).json({ error: txErr.message })
+  if (isFullyPaid) {
+    await supabase.from('debts').update({ is_settled: true, settled_at: new Date().toISOString() })
+      .eq('id', req.params.id)
+  } else {
+    await supabase.from('debts').update({ amount: totalAmount - paidAmount })
+      .eq('id', req.params.id)
+  }
+  res.json({ ok: true, isFullyPaid, remaining: totalAmount - paidAmount })
+})
+
 app.get('*', (req, res) => {
   res.sendFile('index.html', { root: 'client/dist' });
 });
+
+
 
 
 
