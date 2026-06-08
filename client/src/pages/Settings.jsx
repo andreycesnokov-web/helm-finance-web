@@ -63,7 +63,26 @@ export default function Settings() {
     setSaving(false)
   }
 
-  const handlePhoto = (e) => {
+  const const handlePhoto = (e) => {
+  const file = e.target.files[0]
+  if (!file) return
+  const reader = new FileReader()
+  reader.onload = (ev) => {
+    const img = new Image()
+    img.onload = () => {
+      const canvas = document.createElement('canvas')
+      const max = 200
+      const ratio = Math.min(max / img.width, max / img.height)
+      canvas.width = img.width * ratio
+      canvas.height = img.height * ratio
+      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height)
+      setProfile(p => ({ ...p, photo_url: canvas.toDataURL('image/jpeg', 0.8) }))
+      setDirty(true)
+    }
+    img.src = ev.target.result
+  }
+  reader.readAsDataURL(file)
+} = (e) => {
     const file = e.target.files[0]
     if (!file) return
     const reader = new FileReader()
