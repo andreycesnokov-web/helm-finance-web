@@ -7,7 +7,7 @@ require('dotenv').config();
 
 const app = express();
 app.use(cors({ origin: process.env.CLIENT_URL || 'http://localhost:5173' }));
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
 app.use(express.static('client/dist'));
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SECRET_KEY);
@@ -369,6 +369,7 @@ app.listen(PORT, () => console.log(`Helm Finance Web running on port ${PORT}`));
 app.get('*', (req, res) => {
   res.sendFile('index.html', { root: 'client/dist' });
 });
+
 
 
 
