@@ -226,10 +226,10 @@ export default function Pulse() {
             <div style={{ width: 36, height: 3, background: 'var(--border-2)', borderRadius: 2, margin: '0 auto 16px' }} />
             <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 16 }}>Financial analysis · {status.text}</div>
             {[
-              { icon: '📈', label: 'Runway trend', text: 'Runway вырос на 4 дня по сравнению с прошлой неделей. Расходы снизились.' },
-              { icon: '⚠️', label: 'Main risk', text: (d.debts || []).find(x => x.type === 'payable')?.counterparty ? `Платёж ${(d.debts || []).find(x => x.type === 'payable').counterparty} — ${fmt((d.debts || []).find(x => x.type === 'payable').amount)} IDR. Проверь срок.` : 'Явных рисков не обнаружено.' },
-              { icon: '💚', label: 'Main incoming', text: (d.debts || []).find(x => x.type === 'receivable')?.counterparty ? `${(d.debts || []).find(x => x.type === 'receivable').counterparty} — ${fmt((d.debts || []).find(x => x.type === 'receivable').amount)} IDR. Подтверди статус сегодня.` : 'Входящих платежей не запланировано.' },
-              { icon: '💡', label: 'Recommendation', text: d.aiStatus === 'healthy' ? 'Всё под контролем. Сфокусируйся на подтверждении дебиторки.' : 'Срочно свяжись с должниками и перенеси несрочные расходы.' },
+              { icon: '📈', label: 'Runway trend', text: 'Runway grew by 4 days compared to last week. Expenses decreased.' },
+{ icon: '⚠️', label: 'Main risk', text: (d.debts || []).find(x => x.type === 'payable')?.counterparty ? `Payment to ${(d.debts || []).find(x => x.type === 'payable').counterparty} — ${fmt((d.debts || []).find(x => x.type === 'payable').amount)} IDR. Check due date.` : 'No obvious risks detected.' },
+{ icon: '💚', label: 'Main incoming', text: (d.debts || []).find(x => x.type === 'receivable')?.counterparty ? `${(d.debts || []).find(x => x.type === 'receivable').counterparty} — ${fmt((d.debts || []).find(x => x.type === 'receivable').amount)} IDR. Confirm status today.` : 'No incoming payments scheduled.' },
+{ icon: '💡', label: 'Recommendation', text: d.aiStatus === 'healthy' ? 'Everything under control. Focus on confirming receivables.' : 'Urgently contact debtors and postpone non-urgent expenses.' },
             ].map(item => (
               <div key={item.label} style={{ display: 'flex', gap: 10, padding: '10px 0', borderBottom: '0.5px solid var(--border)' }}>
                 <div style={{ width: 30, height: 30, borderRadius: 8, background: 'var(--bg-2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 14, marginTop: 1 }}>{item.icon}</div>
