@@ -105,10 +105,14 @@ export default function Settings() {
           <input ref={fileRef} type="file" accept="image/*" onChange={handlePhoto} style={{ display: 'none' }} />
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
-          <input value={profile.first_name} onChange={e => setProfile(p => ({ ...p, first_name: e.target.value }))} onBlur={() => save({})} placeholder="First name" style={{ flex: 1, padding: '9px 12px', borderRadius: 10, border: 'none', background: 'rgba(255,255,255,0.1)', color: '#fff', fontSize: 14 }} />
-          <input value={profile.last_name} onChange={e => setProfile(p => ({ ...p, last_name: e.target.value }))} onBlur={() => save({})} placeholder="Last name" style={{ flex: 1, padding: '9px 12px', borderRadius: 10, border: 'none', background: 'rgba(255,255,255,0.1)', color: '#fff', fontSize: 14 }} />
+          <input value={profile.first_name} onChange={e => { setProfile(p => ({ ...p, first_name: e.target.value })); setDirty(true) }} placeholder="First name" style={{ flex: 1, padding: '9px 12px', borderRadius: 10, border: 'none', background: 'rgba(255,255,255,0.1)', color: '#fff', fontSize: 14 }} />
+          <input value={profile.last_name} onChange={e => { setProfile(p => ({ ...p, last_name: e.target.value })); setDirty(true) }} placeholder="Last name" style={{ flex: 1, padding: '9px 12px', borderRadius: 10, border: 'none', background: 'rgba(255,255,255,0.1)', color: '#fff', fontSize: 14 }} />
         </div>
-        {saving && <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 8 }}>Saving...</div>}
+        <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+      <button disabled={!dirty || saving} onClick={() => save({})} style={{ flex: 1, padding: '8px', borderRadius: 10, background: dirty ? '#fff' : 'rgba(255,255,255,0.2)', color: dirty ? '#000' : 'rgba(255,255,255,0.4)', border: 'none', fontSize: 13, fontWeight: 500 }}>
+        {saving ? 'Saving...' : 'Save'}
+      </button>
+    </div>
       </div>
 
       {/* Language */}
@@ -218,3 +222,4 @@ export default function Settings() {
     </div>
   )
 }
+
