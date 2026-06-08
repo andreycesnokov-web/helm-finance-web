@@ -286,7 +286,19 @@ app.post('/api/transactions/batch', auth, async (req, res) => {
 
 // ─── Accounts API ─────────────────────────────────────────────────────────
 
-app.post('/api/accounts', auth, async (req, res) => {
+app.post('/api/accounts/rename', auth, async (req, res) => {
+  const { oldName, newName, type } = req.body
+  if (!oldName || !newName) return res.status(400).json({ error: 'Missing fields' })
+  // Update all transactions where source = oldName
+  const { error } = await supabase.from('transactions')
+    .update({ source: newName, scope: type })
+    .eq('user_id', req.user.userId)
+    .eq('source', oldName)
+  if (error) return res.status(500).json({ error: error.message })
+  res.json({ ok: true })
+})
+
+
   const { name, type, balance } = req.body
   // Save as an "opening balance" transaction
   const { error } = await supabase.from('transactions').insert({
