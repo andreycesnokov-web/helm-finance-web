@@ -235,72 +235,11 @@ app.patch('/api/reminders/:id/done', auth, async (req, res) => {
   res.json(data);
 });
 
-// ─── Parse API (AI) ────────────────────────────────────────────────────────
-
-const Anthropic = require('@anthropic-ai/sdk');
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-
-app.post('/api/parse', auth, async (req, res) => {
-  try {
-    const { text } = req.body;
-    const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-5',
-      max_tokens: 1000,
-      messages: [{
-        role: 'user',
-        content: `Найди ВСЕ транзакции в тексте. Верни ТОЛЬКО JSON массив без markdown:
-[{"type":"expense или income","amount":число,"currency":"IDR","description":"описание","source":"источник или null","scope":"personal или business","project":"Helm Care или null"}]
-
-Текст: "${text}"`
-      }]
-    });
-    const raw = response.content[0].text.trim().replace(/\`\`\`json\n?/g, '').replace(/\`\`\`\n?/g, '').trim();
-    const transactions = JSON.parse(raw);
-    res.json({ transactions: Array.isArray(transactions) ? transactions : [transactions] });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-app.post('/api/transactions/batch', auth, async (req, res) => {
-  try {
-    const { transactions } = req.body;
-    const rows = transactions.map(t => ({
-      user_id: req.user.userId,
-      type: t.type,
-      amount_original: t.amount,
-      currency_original: t.currency || 'IDR',
-      amount_idr: t.currency === 'IDR' ? t.amount : null,
-      description: t.description,
-      source: t.source || null,
-      scope: t.scope || 'personal',
-      project: t.project || null,
-    }));
-    const { error } = await supabase.from('transactions').insert(rows);
-    if (error) throw error;
-    res.json({ saved: rows.length });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
 // ─── Accounts API ─────────────────────────────────────────────────────────
-
-app.post('/api/accounts/rename', auth, async (req, res) => {
-  const { oldName, newName, type } = req.body
-  if (!oldName || !newName) return res.status(400).json({ error: 'Missing fields' })
-  // Update all transactions where source = oldName
-  const { error } = await supabase.from('transactions')
-    .update({ source: newName, scope: type })
-    .eq('user_id', req.user.userId)
-    .eq('source', oldName)
-  if (error) return res.status(500).json({ error: error.message })
-  res.json({ ok: true })
-})
-
 
 app.post('/api/accounts', auth, async (req, res) => {
   const { name, type, balance } = req.body
+  // Save as an "opening balance" transaction
   const { error } = await supabase.from('transactions').insert({
     user_id: req.user.userId,
     type: 'income',
