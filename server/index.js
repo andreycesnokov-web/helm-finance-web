@@ -299,8 +299,8 @@ app.post('/api/accounts/rename', auth, async (req, res) => {
 })
 
 
+app.post('/api/accounts', auth, async (req, res) => {
   const { name, type, balance } = req.body
-  // Save as an "opening balance" transaction
   const { error } = await supabase.from('transactions').insert({
     user_id: req.user.userId,
     type: 'income',
