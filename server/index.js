@@ -236,6 +236,16 @@ app.patch('/api/reminders/:id/done', auth, async (req, res) => {
 });
 
 // ─── Accounts API ─────────────────────────────────────────────────────────
+app.post('/api/accounts/rename', auth, async (req, res) => {
+  const { oldName, newName, type } = req.body
+  if (!oldName || !newName) return res.status(400).json({ error: 'Missing fields' })
+  const { error } = await supabase.from('transactions')
+    .update({ source: newName, scope: type })
+    .eq('user_id', req.user.userId)
+    .eq('source', oldName)
+  if (error) return res.status(500).json({ error: error.message })
+  res.json({ ok: true })
+})
 
 app.post('/api/accounts', auth, async (req, res) => {
   const { name, type, balance } = req.body
