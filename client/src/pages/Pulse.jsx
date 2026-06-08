@@ -226,10 +226,10 @@ export default function Pulse() {
             <div style={{ width: 36, height: 3, background: 'var(--border-2)', borderRadius: 2, margin: '0 auto 16px' }} />
             <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 16 }}>Financial analysis · {status.text}</div>
             {[
-              { icon: '📈', label: 'Runway trend', text: 'Runway grew by 4 days compared to last week. Expenses decreased.' },
-{ icon: '⚠️', label: 'Main risk', text: (d.debts || []).find(x => x.type === 'payable')?.counterparty ? `Payment to ${(d.debts || []).find(x => x.type === 'payable').counterparty} — ${fmt((d.debts || []).find(x => x.type === 'payable').amount)} IDR. Check due date.` : 'No obvious risks detected.' },
-{ icon: '💚', label: 'Main incoming', text: (d.debts || []).find(x => x.type === 'receivable')?.counterparty ? `${(d.debts || []).find(x => x.type === 'receivable').counterparty} — ${fmt((d.debts || []).find(x => x.type === 'receivable').amount)} IDR. Confirm status today.` : 'No incoming payments scheduled.' },
-{ icon: '💡', label: 'Recommendation', text: d.aiStatus === 'healthy' ? 'Everything under control. Focus on confirming receivables.' : 'Urgently contact debtors and postpone non-urgent expenses.' },
+{ icon: '📈', label: 'Runway trend', text: `Runway: ${d.runway} days at current burn rate of ${fmt(d.burnRate)}/day.` },
+{ icon: '⚠️', label: 'Main risk', text: (d.debts || []).find(x => x.type === 'payable') ? `Payment to ${(d.debts || []).find(x => x.type === 'payable').counterparty} — ${fmt((d.debts || []).find(x => x.type === 'payable').amount)} IDR due ${daysUntil((d.debts || []).find(x => x.type === 'payable').due_date) === 0 ? 'today' : daysUntil((d.debts || []).find(x => x.type === 'payable').due_date) + 'd'}.` : 'No outstanding payables.' },
+{ icon: '💚', label: 'Main incoming', text: (d.debts || []).find(x => x.type === 'receivable') ? `${(d.debts || []).find(x => x.type === 'receivable').counterparty} owes ${fmt((d.debts || []).find(x => x.type === 'receivable').amount)} IDR.` : 'No receivables scheduled.' },
+{ icon: '💡', label: 'Recommendation', text: d.runway < 7 ? `Critical: only ${d.runway} days left. Collect receivables immediately.` : d.runway < 14 ? `Attention: runway is ${d.runway} days. Review upcoming expenses.` : d.payables > d.totalBalance ? 'Payables exceed cash balance. Prioritize collections.' : 'Finances healthy. Focus on growing income.' },
             ].map(item => (
               <div key={item.label} style={{ display: 'flex', gap: 10, padding: '10px 0', borderBottom: '0.5px solid var(--border)' }}>
                 <div style={{ width: 30, height: 30, borderRadius: 8, background: 'var(--bg-2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 14, marginTop: 1 }}>{item.icon}</div>
