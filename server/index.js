@@ -73,12 +73,12 @@ app.get('/api/pulse', auth, async (req, res) => {
     const now = new Date();
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
 
-    // ALL transactions ever — for total balance
+    // ALL transactions ever ï¿½ for total balance
     let allTxQuery = supabase.from('transactions').select('*').eq('user_id', userId);
     if (scope !== 'all') allTxQuery = allTxQuery.eq('scope', scope);
     const { data: allTxs } = await allTxQuery;
 
-    // This month transactions — for burn rate
+    // This month transactions ï¿½ for burn rate
     let txQuery = supabase.from('transactions').select('*')
       .eq('user_id', userId).gte('created_at', monthStart);
     if (scope !== 'all') txQuery = txQuery.eq('scope', scope);
@@ -145,7 +145,7 @@ app.get('/api/pulse', auth, async (req, res) => {
         todayFocus.push({
           id: d.id,
          title: d.type === 'receivable' ? `Remind ${d.counterparty} to pay` : `Pay ${d.counterparty}`,
-          meta: `${Number(d.amount).toLocaleString('en-US')} IDR · ${daysLeft > 0 ? daysLeft + ' days' : 'today'}`,
+          meta: `${Number(d.amount).toLocaleString('en-US')} IDR ï¿½ ${daysLeft > 0 ? daysLeft + ' days' : 'today'}`,
           type: d.type === 'receivable' ? 'receivable' : 'payable',
           done: false
         });
@@ -293,7 +293,7 @@ app.post('/api/accounts/adjust', auth, async (req, res) => {
     amount_original: Math.abs(diff),
     currency_original: 'IDR',
     amount_idr: Math.abs(diff),
-    description: `Balance adjustment · ${name}`,
+    description: `Balance adjustment ï¿½ ${name}`,
     source: name,
     scope: type || 'personal',
   })
@@ -333,7 +333,7 @@ app.post('/api/accounts', auth, async (req, res) => {
     amount_original: balance || 0,
     currency_original: 'IDR',
     amount_idr: balance || 0,
-    description: `Opening balance · ${name}`,
+    description: `Opening balance ï¿½ ${name}`,
     source: name,
     scope: type || 'personal',
   })
@@ -372,7 +372,7 @@ app.post('/api/debts/:id/pay', auth, async (req, res) => {
     amount_original: paidAmount,
     currency_original: 'IDR',
     amount_idr: paidAmount,
-    description: `Payment: \ · \`,
+    description: `Payment: ${debt.counterparty}`,
     source: account || null,
     scope: debt.scope || 'business',
   })
@@ -408,7 +408,7 @@ app.listen(PORT, () => console.log(`Helm Finance Web running on port ${PORT}`));
     amount_original: paidAmount,
     currency_original: 'IDR',
     amount_idr: paidAmount,
-    description: `Payment: \ · \`,
+    description: `Payment: \ ï¿½ \`,
     source: account || null,
     scope: debt.scope || 'business',
   })
