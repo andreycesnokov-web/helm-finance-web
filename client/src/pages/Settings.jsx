@@ -1,4 +1,3 @@
-$settings = @'
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
@@ -219,8 +218,3 @@ export default function Settings() {
     </div>
   )
 }
-'@
-Set-Content "client\src\pages\Settings.jsx" -Value $settings
-git add .
-git commit -m "settings: edit profile, photo, language, timezone"
-git push
