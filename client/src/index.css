@@ -1,6 +1,11 @@
-:root { --sidebar-width: 260px; --right-panel: 320px; }
+:root {
+  --sidebar-width: 220px;
+  --right-panel: 300px;
+  --content-max: 800px;
+  --radius: 12px;
+}
 
-/* Mobile base */
+/* ─── Mobile base ──────────────────────────────────── */
 .page { padding-bottom: 72px; min-height: 100dvh; }
 .topbar { padding: 16px 16px 10px; display: flex; justify-content: space-between; align-items: center; }
 .nav { display: flex; border-top: 0.5px solid var(--border); background: var(--bg); position: fixed; bottom: 0; left: 50%; transform: translateX(-50%); width: 100%; max-width: 430px; z-index: 100; }
@@ -11,92 +16,108 @@
 .card { background: var(--bg); border: 0.5px solid var(--border); border-radius: var(--radius); padding: 14px; margin: 0 16px 10px; }
 .fmt { font-variant-numeric: tabular-nums; }
 
-/* Desktop */
+/* ─── Desktop ──────────────────────────────────────── */
 @media (min-width: 1024px) {
-  body { background: var(--bg-2) !important; }
+  * { box-sizing: border-box; }
+  body { background: var(--bg-2) !important; margin: 0; }
   #root { max-width: 100% !important; display: flex; min-height: 100dvh; }
 
+  /* Sidebar */
   .sidebar {
     width: var(--sidebar-width);
-    min-height: 100dvh;
+    min-height: 100vh;
     background: var(--bg);
     border-right: 0.5px solid var(--border);
-    display: flex;
-    flex-direction: column;
-    padding: 0;
     position: fixed;
     left: 0; top: 0;
+    display: flex;
+    flex-direction: column;
     z-index: 100;
   }
-
   .sidebar-logo {
-    padding: 20px 20px 16px;
-    font-size: 15px;
+    padding: 18px 16px 14px;
+    font-size: 14px;
     font-weight: 700;
     color: var(--text);
     border-bottom: 0.5px solid var(--border);
-    margin-bottom: 8px;
     display: flex;
     align-items: center;
     gap: 8px;
+    margin-bottom: 6px;
   }
-
   .sidebar-nav-btn {
     display: flex;
     align-items: center;
     gap: 10px;
-    padding: 9px 20px;
+    padding: 9px 16px;
     background: none;
     border: none;
     color: var(--text-3);
-    font-size: 14px;
+    font-size: 13px;
     cursor: pointer;
     width: 100%;
     text-align: left;
     transition: all .15s;
-    border-radius: 0;
+    margin: 1px 0;
   }
+  .sidebar-nav-btn:hover { background: var(--bg-2); color: var(--text); border-radius: 8px; }
+  .sidebar-nav-btn.active { color: var(--text); background: var(--bg-2); font-weight: 500; border-radius: 8px; }
+  .sidebar-nav-btn svg { width: 15px; height: 15px; flex-shrink: 0; }
 
-  .sidebar-nav-btn:hover { background: var(--bg-2); color: var(--text); }
-  .sidebar-nav-btn.active { color: var(--text); background: var(--bg-2); font-weight: 500; }
-  .sidebar-nav-btn svg { width: 16px; height: 16px; flex-shrink: 0; }
-
+  /* Layout wrapper */
   .desktop-layout {
     margin-left: var(--sidebar-width);
     flex: 1;
     display: flex;
-    min-height: 100dvh;
+    min-height: 100vh;
   }
 
+  /* Main content area */
   .desktop-main {
     flex: 1;
-    max-width: 760px;
     background: var(--bg);
     border-right: 0.5px solid var(--border);
-    min-height: 100dvh;
+    min-height: 100vh;
     overflow-y: auto;
   }
 
+  /* Right panel */
   .desktop-right {
     width: var(--right-panel);
     background: var(--bg);
-    min-height: 100dvh;
+    min-height: 100vh;
     padding: 20px 16px;
     overflow-y: auto;
-    position: sticky;
-    top: 0;
-    height: 100vh;
+    flex-shrink: 0;
   }
 
-  .page { padding-bottom: 32px; }
+  /* Page overrides for desktop */
+  .page {
+    padding: 0 0 40px 0;
+    max-width: 100%;
+  }
+
+  /* Cards get more padding on desktop */
+  .card {
+    margin: 0 24px 10px;
+    padding: 16px;
+  }
+
+  .section-divider { padding: 14px 24px 8px; }
+
+  /* Hide mobile nav */
   .nav { display: none !important; }
-  .card { margin: 0 20px 10px; }
-  .section-divider { padding: 12px 20px 8px; }
+
+  /* Desktop content max width */
+  .desktop-page-content {
+    max-width: 720px;
+    padding: 0;
+  }
 }
 
 @media (max-width: 1023px) {
   .sidebar { display: none; }
   .desktop-layout { margin-left: 0; }
-  .desktop-main { max-width: 430px; margin: 0 auto; }
+  .desktop-main { max-width: 430px; margin: 0 auto; width: 100%; }
   .desktop-right { display: none; }
 }

@@ -11,7 +11,7 @@ const STATUS_COLORS = {
   critical: { bg: '#E24B4A', text: 'Critical' }
 }
 
-export default function Pulse() {
+export default function Pulse({ onDataLoad }) {
   const { token, user } = useAuth()
   const navigate = useNavigate()
   const [scope, setScope] = useState('all')
@@ -28,7 +28,7 @@ export default function Pulse() {
   useEffect(() => {
     setLoading(true)
     apiFetch(`/pulse?scope=${scope}`, token)
-      .then(setData).catch(console.error).finally(() => setLoading(false))
+      .then(d => { setData(d); if (onDataLoad) onDataLoad(d) }).catch(console.error).finally(() => setLoading(false))
   }, [scope, token])
 
   const toggleFocus = (id) => setFocusDone(p => ({ ...p, [id]: !p[id] }))

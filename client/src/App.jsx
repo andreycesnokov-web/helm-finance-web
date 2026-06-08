@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './hooks/useAuth'
 import Login from './pages/Login'
@@ -15,21 +16,30 @@ const NAV = [
   { path: '/settings', label: 'Settings', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg> },
 ]
 
+const fmtShort = (n) => {
+  const abs = Math.abs(Number(n))
+  if (abs >= 1000000) return (abs / 1000000).toFixed(1) + 'M'
+  if (abs >= 1000) return (abs / 1000).toFixed(0) + 'K'
+  return abs.toLocaleString()
+}
+
 function Sidebar() {
   const location = useLocation()
   const navigate = useNavigate()
   return (
     <div className="sidebar">
       <div className="sidebar-logo">
-        <span style={{ fontSize: 20 }}>💰</span>
+        <span style={{ fontSize: 18 }}>💰</span>
         <span>Helm Finance</span>
       </div>
-      {NAV.map(item => (
-        <button key={item.path} className={`sidebar-nav-btn${location.pathname === item.path ? ' active' : ''}`} onClick={() => navigate(item.path)}>
-          {item.icon}
-          <span>{item.label}</span>
-        </button>
-      ))}
+      <div style={{ padding: '4px 8px', flex: 1 }}>
+        {NAV.map(item => (
+          <button key={item.path} className={`sidebar-nav-btn${location.pathname === item.path ? ' active' : ''}`} onClick={() => navigate(item.path)}>
+            {item.icon}<span>{item.label}</span>
+          </button>
+        ))}
+      </div>
+      <div style={{ padding: '12px 16px', borderTop: '0.5px solid var(--border)', fontSize: 11, color: 'var(--text-3)' }}>v1.0</div>
     </div>
   )
 }
@@ -41,70 +51,64 @@ function BottomNav() {
     <nav className="nav">
       {NAV.slice(0, 4).map(item => (
         <button key={item.path} className={`nav-btn${location.pathname === item.path ? ' active' : ''}`} onClick={() => navigate(item.path)}>
-          {item.icon}
-          <span>{item.label}</span>
+          {item.icon}<span>{item.label}</span>
         </button>
       ))}
     </nav>
   )
 }
 
-export function RightPanel({ data, scope }) {
+export function RightPanel({ data }) {
   const d = data || {}
-  const debts = d.debts || []
-  const upcoming = debts.filter(x => !x.is_settled).slice(0, 5)
-
+  const upcoming = (d.debts || []).filter(x => !x.is_settled).slice(0, 5)
   return (
-    <div className="desktop-right">
-      {/* AI CFO */}
+    <div className="desktop-right" style={{ position: 'sticky', top: 0, height: '100vh', overflowY: 'auto' }}>
       <div style={{ marginBottom: 20 }}>
-        <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 12 }}>AI CFO</div>
+        <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 10 }}>AI CFO</div>
         <div style={{ background: 'var(--bg-2)', borderRadius: 12, padding: 14 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', marginBottom: 8 }}>
-            {d.aiStatus === 'critical' ? '🔴 Critical' : d.aiStatus === 'attention' ? '🟡 Attention' : '🟢 Healthy'}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+            <div style={{ width: 8, height: 8, borderRadius: '50%', background: d.aiStatus === 'critical' ? 'var(--red)' : d.aiStatus === 'attention' ? 'var(--amber)' : 'var(--green)', flexShrink: 0 }} />
+            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{d.aiStatus === 'critical' ? 'Critical' : d.aiStatus === 'attention' ? 'Attention' : 'Healthy'}</span>
           </div>
-          <div style={{ fontSize: 12, color: 'var(--text-2)', lineHeight: 1.6, marginBottom: 12 }}>{d.aiText}</div>
+          <div style={{ fontSize: 12, color: 'var(--text-2)', lineHeight: 1.6, marginBottom: 10 }}>{d.aiText}</div>
           <div style={{ borderTop: '0.5px solid var(--border)', paddingTop: 10 }}>
-            <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 4 }}>Recommendation</div>
+            <div style={{ fontSize: 10, color: 'var(--text-3)', marginBottom: 4 }}>Recommendation</div>
             <div style={{ fontSize: 12, color: 'var(--text)', lineHeight: 1.5 }}>
-              {d.runway < 7 ? 'Collect receivables immediately. Delay non-critical expenses.' :
-               d.runway < 14 ? 'Review upcoming payments. Confirm receivables today.' :
-               d.payables > d.totalBalance ? 'Payables exceed cash. Prioritize collections.' :
-               'Finances healthy. Focus on growing income streams.'}
+              {(d.runway || 0) < 7 ? 'Collect receivables immediately.' : (d.runway || 0) < 14 ? 'Review upcoming payments.' : 'Finances healthy. Grow income.'}
             </div>
           </div>
         </div>
       </div>
 
-      {/* Upcoming */}
       <div style={{ marginBottom: 20 }}>
-        <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 12 }}>Next 7 Days</div>
-        {upcoming.length === 0 && <div style={{ fontSize: 12, color: 'var(--text-3)' }}>No upcoming events</div>}
-        {upcoming.map(debt => {
-          const days = Math.round((new Date(debt.due_date) - new Date()) / 86400000)
-          return (
-            <div key={debt.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '0.5px solid var(--border)' }}>
-              <div>
-                <div style={{ fontSize: 13, color: 'var(--text)', fontWeight: 500 }}>{debt.counterparty}</div>
-                <div style={{ fontSize: 11, color: days < 0 ? 'var(--red)' : days === 0 ? 'var(--red)' : 'var(--text-3)' }}>
-                  {days < 0 ? 'Overdue' : days === 0 ? 'Today' : `${days}d`}
+        <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 10 }}>Upcoming</div>
+        {upcoming.length === 0
+          ? <div style={{ fontSize: 12, color: 'var(--text-3)' }}>No upcoming events</div>
+          : upcoming.map(debt => {
+              const days = Math.round((new Date(debt.due_date) - new Date()) / 86400000)
+              return (
+                <div key={debt.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '7px 0', borderBottom: '0.5px solid var(--border)' }}>
+                  <div>
+                    <div style={{ fontSize: 12, color: 'var(--text)', fontWeight: 500 }}>{debt.counterparty}</div>
+                    <div style={{ fontSize: 10, color: days < 0 ? 'var(--red)' : 'var(--text-3)' }}>{days < 0 ? 'Overdue' : days === 0 ? 'Today' : `in ${days}d`}</div>
+                  </div>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: debt.type === 'receivable' ? 'var(--green)' : 'var(--red)' }}>
+                    {debt.type === 'receivable' ? '+' : '-'}{fmtShort(debt.amount)}
+                  </div>
                 </div>
-              </div>
-              <div style={{ fontSize: 13, fontWeight: 600, color: debt.type === 'receivable' ? 'var(--green)' : 'var(--red)' }}>
-                {debt.type === 'receivable' ? '+' : '-'}{(Number(debt.amount) / 1000000).toFixed(1)}M
-              </div>
-            </div>
-          )
-        })}
+              )
+            })
+        }
       </div>
 
-      {/* Quick stats */}
       <div>
-        <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 12 }}>Quick Stats</div>
+        <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 10 }}>Quick Stats</div>
         {[
-          { label: 'Runway', value: `${d.runway} days`, color: d.runway > 14 ? 'var(--green-dark)' : d.runway > 7 ? 'var(--amber-dark)' : 'var(--red)' },
-          { label: 'Burn rate', value: `${(d.burnRate / 1000).toFixed(0)}K/day` },
-          { label: 'Net position', value: `${d.netPosition >= 0 ? '+' : ''}${(d.netPosition / 1000000).toFixed(1)}M` },
+          { label: 'Runway', value: `${d.runway || 0}d`, color: (d.runway || 0) > 14 ? 'var(--green-dark)' : (d.runway || 0) > 7 ? 'var(--amber-dark)' : 'var(--red)' },
+          { label: 'Burn rate', value: `${fmtShort(d.burnRate || 0)}/day` },
+          { label: 'Net position', value: `${(d.netPosition || 0) >= 0 ? '+' : ''}${fmtShort(d.netPosition || 0)}`, color: (d.netPosition || 0) >= 0 ? 'var(--green-dark)' : 'var(--red)' },
+          { label: 'Receivables', value: `+${fmtShort(d.receivables || 0)}`, color: 'var(--green-dark)' },
+          { label: 'Payables', value: `-${fmtShort(d.payables || 0)}`, color: 'var(--red)' },
         ].map(s => (
           <div key={s.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '0.5px solid var(--border)' }}>
             <div style={{ fontSize: 12, color: 'var(--text-3)' }}>{s.label}</div>
@@ -116,19 +120,28 @@ export function RightPanel({ data, scope }) {
   )
 }
 
-function ProtectedRoute({ children, rightPanel }) {
+function Layout({ children, rightPanel }) {
   const { user, loading } = useAuth()
-  if (loading) return <div style={{ minHeight: '100dvh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-3)', fontSize: 14 }}>Loading...</div>
+  if (loading) return <div style={{ minHeight: '100dvh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-3)' }}>Loading...</div>
   if (!user) return <Navigate to="/login" replace />
   return (
     <>
       <Sidebar />
       <div className="desktop-layout">
         <div className="desktop-main">{children}</div>
-        {rightPanel && <div className="desktop-right-wrapper">{rightPanel}</div>}
+        {rightPanel}
       </div>
       <BottomNav />
     </>
+  )
+}
+
+function PulseWrapper() {
+  const [pulseData, setPulseData] = useState(null)
+  return (
+    <Layout rightPanel={<RightPanel data={pulseData} />}>
+      <Pulse onDataLoad={setPulseData} />
+    </Layout>
   )
 }
 
@@ -138,11 +151,11 @@ export default function App() {
       <AuthProvider>
         <Routes>
           <Route path="/login" element={<Login />} />
-          <Route path="/" element={<ProtectedRoute><Pulse /></ProtectedRoute>} />
-          <Route path="/add" element={<ProtectedRoute><Add /></ProtectedRoute>} />
-          <Route path="/radar" element={<ProtectedRoute><Radar /></ProtectedRoute>} />
-          <Route path="/accounts" element={<ProtectedRoute><Accounts /></ProtectedRoute>} />
-          <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+          <Route path="/" element={<PulseWrapper />} />
+          <Route path="/add" element={<Layout><Add /></Layout>} />
+          <Route path="/radar" element={<Layout><Radar /></Layout>} />
+          <Route path="/accounts" element={<Layout><Accounts /></Layout>} />
+          <Route path="/settings" element={<Layout><Settings /></Layout>} />
         </Routes>
       </AuthProvider>
     </BrowserRouter>
