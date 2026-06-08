@@ -43,6 +43,7 @@ export default function Settings() {
   const [profile, setProfile] = useState({ first_name: '', last_name: '', photo_url: '', language: 'ru', timezone: 'Asia/Makassar' })
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [dirty, setDirty] = useState(false)
   const [showLogout, setShowLogout] = useState(false)
   const [showLang, setShowLang] = useState(false)
   const [showTz, setShowTz] = useState(false)
@@ -61,32 +62,27 @@ export default function Settings() {
     setProfile(updated)
     await apiFetch('/profile', token, { method: 'POST', body: updated })
     setSaving(false)
+    setDirty(false)
   }
 
-  const const handlePhoto = (e) => {
-  const file = e.target.files[0]
-  if (!file) return
-  const reader = new FileReader()
-  reader.onload = (ev) => {
-    const img = new Image()
-    img.onload = () => {
-      const canvas = document.createElement('canvas')
-      const max = 200
-      const ratio = Math.min(max / img.width, max / img.height)
-      canvas.width = img.width * ratio
-      canvas.height = img.height * ratio
-      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height)
-      setProfile(p => ({ ...p, photo_url: canvas.toDataURL('image/jpeg', 0.8) }))
-      setDirty(true)
-    }
-    img.src = ev.target.result
-  }
-  reader.readAsDataURL(file)
-} = (e) => {
+  const handlePhoto = (e) => {
     const file = e.target.files[0]
     if (!file) return
     const reader = new FileReader()
-    reader.onload = (ev) => save({ photo_url: ev.target.result })
+    reader.onload = (ev) => {
+      const img = new Image()
+      img.onload = () => {
+        const canvas = document.createElement('canvas')
+        const max = 200
+        const ratio = Math.min(max / img.width, max / img.height)
+        canvas.width = img.width * ratio
+        canvas.height = img.height * ratio
+        canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height)
+        setProfile(p => ({ ...p, photo_url: canvas.toDataURL('image/jpeg', 0.8) }))
+        setDirty(true)
+      }
+      img.src = ev.target.result
+    }
     reader.readAsDataURL(file)
   }
 
@@ -108,7 +104,6 @@ export default function Settings() {
         <div style={{ width: 32 }}/>
       </div>
 
-      {/* Profile card */}
       <div style={{ margin: '4px 16px 20px', background: 'var(--text)', borderRadius: 16, padding: '20px 18px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 16 }}>
           <div onClick={() => fileRef.current.click()} style={{ position: 'relative', cursor: 'pointer', flexShrink: 0 }}>
@@ -123,18 +118,15 @@ export default function Settings() {
           <div style={{ flex: 1, color: 'rgba(255,255,255,0.5)', fontSize: 12 }}>Tap photo to change</div>
           <input ref={fileRef} type="file" accept="image/*" onChange={handlePhoto} style={{ display: 'none' }} />
         </div>
-        <div style={{ display: 'flex', gap: 8 }}>
+        <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
           <input value={profile.first_name} onChange={e => { setProfile(p => ({ ...p, first_name: e.target.value })); setDirty(true) }} placeholder="First name" style={{ flex: 1, padding: '9px 12px', borderRadius: 10, border: 'none', background: 'rgba(255,255,255,0.1)', color: '#fff', fontSize: 14 }} />
           <input value={profile.last_name} onChange={e => { setProfile(p => ({ ...p, last_name: e.target.value })); setDirty(true) }} placeholder="Last name" style={{ flex: 1, padding: '9px 12px', borderRadius: 10, border: 'none', background: 'rgba(255,255,255,0.1)', color: '#fff', fontSize: 14 }} />
         </div>
-        <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-      <button disabled={!dirty || saving} onClick={() => save({})} style={{ flex: 1, padding: '8px', borderRadius: 10, background: dirty ? '#fff' : 'rgba(255,255,255,0.2)', color: dirty ? '#000' : 'rgba(255,255,255,0.4)', border: 'none', fontSize: 13, fontWeight: 500 }}>
-        {saving ? 'Saving...' : 'Save'}
-      </button>
-    </div>
+        <button disabled={!dirty || saving} onClick={() => save({})} style={{ width: '100%', padding: '9px', borderRadius: 10, background: dirty ? '#fff' : 'rgba(255,255,255,0.15)', color: dirty ? '#000' : 'rgba(255,255,255,0.3)', border: 'none', fontSize: 13, fontWeight: 500 }}>
+          {saving ? 'Saving...' : 'Save changes'}
+        </button>
       </div>
 
-      {/* Language */}
       <div style={{ margin: '0 16px 8px', fontSize: 11, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Language</div>
       <div style={{ margin: '0 16px 16px', background: 'var(--bg-2)', borderRadius: 12 }}>
         <div onClick={() => setShowLang(true)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 16px', cursor: 'pointer' }}>
@@ -146,7 +138,6 @@ export default function Settings() {
         </div>
       </div>
 
-      {/* Timezone */}
       <div style={{ margin: '0 16px 8px', fontSize: 11, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Timezone</div>
       <div style={{ margin: '0 16px 16px', background: 'var(--bg-2)', borderRadius: 12 }}>
         <div onClick={() => setShowTz(true)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 16px', cursor: 'pointer' }}>
@@ -155,7 +146,6 @@ export default function Settings() {
         </div>
       </div>
 
-      {/* Notifications */}
       <div style={{ margin: '0 16px 8px', fontSize: 11, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Notifications</div>
       <div style={{ margin: '0 16px 16px', background: 'var(--bg-2)', borderRadius: 12 }}>
         <div onClick={handleNotif} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 16px', cursor: 'pointer' }}>
@@ -169,7 +159,6 @@ export default function Settings() {
         </div>
       </div>
 
-      {/* Telegram */}
       <div style={{ margin: '0 16px 8px', fontSize: 11, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Telegram Bot</div>
       <div style={{ margin: '0 16px 16px', background: 'var(--bg-2)', borderRadius: 12 }}>
         <a href="https://t.me/HCfinance_Bot" target="_blank" rel="noreferrer" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 16px', textDecoration: 'none' }}>
@@ -186,12 +175,11 @@ export default function Settings() {
         </a>
       </div>
 
-      <div style={{ margin: '0 16px 32px' }}>
+      <div style={{ margin: '0 16px 16px' }}>
         <button onClick={() => setShowLogout(true)} style={{ width: '100%', padding: 13, borderRadius: 12, background: 'none', color: 'var(--red)', border: '0.5px solid var(--red)', fontSize: 14, fontWeight: 500, cursor: 'pointer' }}>Sign out</button>
       </div>
       <div style={{ textAlign: 'center', fontSize: 11, color: 'var(--text-3)', paddingBottom: 32 }}>Helm Finance · v1.0</div>
 
-      {/* Language picker */}
       {showLang && (
         <div onClick={() => setShowLang(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 200, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', maxWidth: 430, margin: '0 auto' }}>
           <div onClick={e => e.stopPropagation()} style={{ background: 'var(--bg)', borderRadius: '16px 16px 0 0', padding: '20px 0 32px', width: '100%', maxHeight: '70vh', overflow: 'auto' }}>
@@ -210,7 +198,6 @@ export default function Settings() {
         </div>
       )}
 
-      {/* Timezone picker */}
       {showTz && (
         <div onClick={() => setShowTz(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 200, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', maxWidth: 430, margin: '0 auto' }}>
           <div onClick={e => e.stopPropagation()} style={{ background: 'var(--bg)', borderRadius: '16px 16px 0 0', padding: '20px 0 32px', width: '100%', maxHeight: '70vh', overflow: 'auto' }}>
@@ -226,7 +213,6 @@ export default function Settings() {
         </div>
       )}
 
-      {/* Logout confirm */}
       {showLogout && (
         <div onClick={() => setShowLogout(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 200, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', maxWidth: 430, margin: '0 auto' }}>
           <div onClick={e => e.stopPropagation()} style={{ background: 'var(--bg)', borderRadius: '16px 16px 0 0', padding: '20px 16px 32px', width: '100%' }}>
@@ -241,4 +227,3 @@ export default function Settings() {
     </div>
   )
 }
-
