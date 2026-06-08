@@ -47,7 +47,7 @@ export default function Pulse() {
             {new Date().toLocaleDateString('en-US', { weekday: 'short', day: 'numeric', month: 'short' })} · Bali
           </div>
         </div>
-        <div style={{ width: 32, height: 32, borderRadius: '50%', background: '#B5D4F4', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 600, color: '#0C447C' }}>
+        <div style={{ width: 32, height: 32, borderRadius: '50%', background: '#B5D4F4', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 600, color: '#0C447C', cursor: 'pointer' }} onClick={() => navigate('/settings')}>
           {user?.first_name?.[0] || 'A'}
         </div>
       </div>
@@ -246,4 +246,7 @@ export default function Pulse() {
     </div>
   )
 }
+
+
+
 
