@@ -1,7 +1,35 @@
 :root {
+  /* Layout */
   --sidebar-width: 220px;
   --right-panel: 300px;
   --radius: 12px;
+
+  /* Surfaces — from UI_GUIDELINES.md */
+  --bg:   #FFFFFF;
+  --bg-2: #F8F9FB;
+
+  /* Text — from UI_GUIDELINES.md */
+  --text:   #111111;
+  --text-2: #444444;
+  --text-3: #667085;
+
+  /* Borders — from UI_GUIDELINES.md */
+  --border:   #E4E7EC;
+  --border-2: #D1D5DB;
+
+  /* Success — from UI_GUIDELINES.md */
+  --green:       #16A34A;
+  --green-dark:  #15803D;
+  --green-light: #DCFCE7;
+
+  /* Danger — from UI_GUIDELINES.md */
+  --red:       #DC2626;
+  --red-dark:  #B91C1C;
+  --red-light: #FEE2E2;
+
+  /* Warning — from UI_GUIDELINES.md */
+  --amber:      #D97706;
+  --amber-dark: #B45309;
 }
 
 * { box-sizing: border-box; }
@@ -138,4 +166,22 @@ body {
   .desktop-layout { margin-left: 0; }
   .desktop-main { max-width: 430px; margin: 0 auto; width: 100%; }
   .desktop-right { display: none; }
+}
+
+/* ── Shared UI components ── */
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 16px 12px;
+}
+
+.card {
+  margin: 0 16px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 16px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
 }

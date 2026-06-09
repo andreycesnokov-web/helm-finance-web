@@ -212,7 +212,7 @@ export default function Accounts() {
       {showAdd && (
         <div onClick={() => setShowAdd(false)} style={{
           position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 200,
-          display: 'flex', alignItems: 'flex-end', justifyContent: 'center', maxWidth: 430, margin: '0 auto'
+          display: 'flex', alignItems: 'flex-end', justifyContent: 'center'
         }}>
           <div onClick={e => e.stopPropagation()} style={{
             background: 'var(--bg)', borderRadius: '16px 16px 0 0', padding: '20px 16px 32px', width: '100%'

@@ -9,7 +9,10 @@ export const t = (key) => {
   const keys = key.split('.')
   let val = translations[currentLang]
   for (const k of keys) val = val?.[k]
-  return val || translations['en']?.[key] || key
+  if (val) return val
+  let fallback = translations['en']
+  for (const k of keys) fallback = fallback?.[k]
+  return fallback || key
 }
 
 export const setLang = (lang) => {

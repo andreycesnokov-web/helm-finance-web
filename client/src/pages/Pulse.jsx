@@ -3,7 +3,6 @@ import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { apiFetch, fmt, fmtFull, daysUntil } from '../lib/api'
-import { RightPanel } from '../App'
 
 const SCOPE_LABELS = { all: 'All', business: 'Business', personal: 'Personal' }
 const STATUS = {
@@ -45,6 +44,9 @@ export default function Pulse({ onDataLoad }) {
   const [focusDone, setFocusDone]       = useState({})
   const [payModal, setPayModal]         = useState(null)
   const [snoozeModal, setSnoozeModal]   = useState(null)
+  const [snoozing, setSnoozing]         = useState(false)
+  const [snoozeError, setSnoozeError]   = useState('')
+  const [customDate, setCustomDate]     = useState('')
   const [payForm, setPayForm]           = useState({ amount: '', account: '' })
   const [paying, setPaying]             = useState(false)
 
@@ -71,6 +73,36 @@ export default function Pulse({ onDataLoad }) {
       reload()
     } catch(e) { alert(e.message) }
     finally { setPaying(false) }
+  }
+
+  const openSnooze = (item) => {
+    setSnoozeError('')
+    setCustomDate('')
+    setSnoozeModal(item)
+  }
+
+  const handleSnooze = async (days, untilDate) => {
+    if (!snoozeModal) return
+    // Client-side validation for custom date
+    if (days === 0) {
+      if (!customDate) { setSnoozeError('Pick a date'); return }
+      if (new Date(customDate) <= new Date()) { setSnoozeError('Date must be in the future'); return }
+    }
+    // Only reminders are snoozed via API; debt snooze is future scope
+    if (snoozeModal.entityType !== 'reminder') { setSnoozeModal(null); return }
+    setSnoozing(true)
+    setSnoozeError('')
+    try {
+      const body = days > 0 ? { days } : { until: new Date(customDate).toISOString() }
+      await apiFetch(`/reminders/${snoozeModal.id}/snooze`, token, { method: 'PATCH', body })
+      setSnoozeModal(null)
+      setCustomDate('')
+      reload()
+    } catch(e) {
+      setSnoozeError(e.message)
+    } finally {
+      setSnoozing(false)
+    }
   }
 
   if (loading && !data) return (
@@ -100,7 +132,7 @@ export default function Pulse({ onDataLoad }) {
           <div style={{ fontSize: 11, color: 'var(--text-3)' }}>Bali, Indonesia</div>
         </div>
         <div onClick={() => navigate('/settings')} style={{ width: 28, height: 28, borderRadius: '50%', background: '#B5D4F4', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 600, color: '#0C447C', cursor: 'pointer' }}>
-          {user?.first_name?.[0] || 'A'}
+          {user?.firstName?.[0] || 'A'}
         </div>
       </div>
 
@@ -216,7 +248,7 @@ export default function Pulse({ onDataLoad }) {
                   <div style={{ height: '100%', borderRadius: 2, background: days < 0 ? '#E24B4A' : isOut ? '#D97706' : '#16A34A', width: Math.min(100, Math.max(5, days < 0 ? 100 : 100 - days * 5)) + '%' }} />
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 7 }}>
-                  <button onClick={() => setSnoozeModal(debt)} style={{ padding: '9px 0', borderRadius: 12, fontSize: 12, border: '0.5px solid var(--border)', background: 'none', color: 'var(--text-3)', cursor: 'pointer' }}>
+                  <button onClick={() => openSnooze({ id: debt.id, entityType: 'debt', title: debt.counterparty, subtitle: fmt(debt.amount) + ' IDR' })} style={{ padding: '9px 0', borderRadius: 12, fontSize: 12, border: '0.5px solid var(--border)', background: 'none', color: 'var(--text-3)', cursor: 'pointer' }}>
                     {isOut ? 'Snooze' : 'Remind'}
                   </button>
                   <button onClick={() => { setPayModal(debt); setPayForm({ amount: String(debt.amount), account: '' }) }} style={{ padding: '9px 0', borderRadius: 12, fontSize: 12, border: 'none', background: 'var(--text)', color: '#fff', fontWeight: 500, cursor: 'pointer' }}>
@@ -245,7 +277,15 @@ export default function Pulse({ onDataLoad }) {
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 13, color: focusDone[f.id] ? 'var(--text-3)' : 'var(--text)', textDecoration: focusDone[f.id] ? 'line-through' : 'none', lineHeight: 1.3 }}>{f.title}</div>
                   <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 2 }}>{f.meta}</div>
-                  <div style={{ fontSize: 9, padding: '2px 8px', borderRadius: 8, background: p.bg, color: p.color, display: 'inline-block', marginTop: 5 }}>{p.text}</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 5 }}>
+                    <div style={{ fontSize: 9, padding: '2px 8px', borderRadius: 8, background: p.bg, color: p.color, display: 'inline-block' }}>{p.text}</div>
+                    {f.type === 'reminder' && (
+                      <button onClick={e => { e.stopPropagation(); openSnooze({ id: f.id, entityType: 'reminder', title: f.title, subtitle: f.meta || '' }) }}
+                        style={{ fontSize: 9, padding: '2px 8px', borderRadius: 8, background: 'none', border: '0.5px solid var(--border)', color: 'var(--text-3)', cursor: 'pointer' }}>
+                        Snooze
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             )
@@ -273,8 +313,6 @@ export default function Pulse({ onDataLoad }) {
           </div>
         ))}
       </div>
-
-      <RightPanel data={d} scope={scope} />
 
       {showAnalysis && (
         <Modal onClose={() => setShowAnalysis(false)}>
@@ -345,28 +383,50 @@ export default function Pulse({ onDataLoad }) {
       )}
 
       {snoozeModal && (
-        <Modal onClose={() => setSnoozeModal(null)}>
-          <div style={{ fontSize: 17, fontWeight: 500, color: 'var(--text)', marginBottom: 3 }}>{snoozeModal.type === 'receivable' ? 'Send reminder' : 'Snooze reminder'}</div>
-          <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 16 }}>{snoozeModal.counterparty} · {fmt(snoozeModal.amount)} IDR</div>
+        <Modal onClose={() => { setSnoozeModal(null); setSnoozeError(''); setCustomDate('') }}>
+          <div style={{ fontSize: 17, fontWeight: 500, color: 'var(--text)', marginBottom: 3 }}>Snooze reminder</div>
+          <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 16 }}>
+            {snoozeModal.title}{snoozeModal.subtitle ? ' · ' + snoozeModal.subtitle : ''}
+          </div>
           <div style={{ fontSize: 10, color: 'var(--text-3)', letterSpacing: '0.06em', marginBottom: 8 }}>REMIND ME IN</div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 7, marginBottom: 12 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 7, marginBottom: 10 }}>
             {[
-              { label: '1 day',  sub: new Date(Date.now() + 86400000).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) },
-              { label: '3 days', sub: new Date(Date.now() + 3*86400000).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }), active: true },
-              { label: '1 week', sub: new Date(Date.now() + 7*86400000).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) },
-              { label: 'Custom', sub: 'Pick date' },
+              { label: '1 day',  days: 1, sub: new Date(Date.now() + 86400000).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) },
+              { label: '3 days', days: 3, sub: new Date(Date.now() + 3*86400000).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }), active: true },
+              { label: '7 days', days: 7, sub: new Date(Date.now() + 7*86400000).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) },
+              { label: 'Custom', days: 0, sub: 'Pick date' },
             ].map(opt => (
-              <div key={opt.label} onClick={() => { alert('Snoozed: ' + opt.label); setSnoozeModal(null) }}
-                style={{ background: opt.active ? 'var(--text)' : 'var(--bg-2)', border: opt.active ? 'none' : '0.5px solid var(--border)', borderRadius: 14, padding: 13, textAlign: 'center', cursor: 'pointer' }}>
+              <div key={opt.label} onClick={() => { if (opt.days > 0) handleSnooze(opt.days, null) }}
+                style={{ background: opt.active ? 'var(--text)' : 'var(--bg-2)', border: opt.active ? 'none' : '0.5px solid var(--border)', borderRadius: 14, padding: 13, textAlign: 'center', cursor: snoozing ? 'not-allowed' : 'pointer', opacity: snoozing ? 0.6 : 1 }}>
                 <div style={{ fontSize: 18, fontWeight: 500, color: opt.active ? '#fff' : 'var(--text)' }}>{opt.label}</div>
                 <div style={{ fontSize: 11, color: opt.active ? 'rgba(255,255,255,.6)' : 'var(--text-3)', marginTop: 2 }}>{opt.sub}</div>
               </div>
             ))}
           </div>
-          <div style={{ background: 'rgba(14,165,233,.08)', border: '0.5px solid rgba(14,165,233,.25)', borderRadius: 14, padding: '10px 12px', marginBottom: 14 }}>
-            <div style={{ fontSize: 11, color: '#0369A1', lineHeight: 1.5 }}>Snoozing 3 days deepens deficit by ~{fmt((d.burnRate || 0) * 3)} IDR.</div>
+          <div style={{ marginBottom: 10 }}>
+            <input
+              type="date"
+              value={customDate}
+              min={new Date(Date.now() + 86400000).toISOString().split('T')[0]}
+              onChange={e => { setCustomDate(e.target.value); setSnoozeError('') }}
+              style={{ width: '100%', padding: '10px 13px', borderRadius: 14, border: snoozeError && !customDate ? '1px solid var(--red)' : '0.5px solid var(--border-2)', fontSize: 13, background: 'var(--bg-2)', color: 'var(--text)' }}
+            />
+            {customDate && (
+              <button disabled={snoozing} onClick={() => handleSnooze(0, null)}
+                style={{ marginTop: 7, width: '100%', padding: '11px 0', borderRadius: 14, border: 'none', fontSize: 13, fontWeight: 500, background: 'var(--text)', color: '#fff', cursor: snoozing ? 'not-allowed' : 'pointer', opacity: snoozing ? 0.6 : 1 }}>
+                {snoozing ? 'Saving...' : 'Snooze until ' + new Date(customDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+              </button>
+            )}
           </div>
-          <button onClick={() => setSnoozeModal(null)} style={btnS}>Cancel</button>
+          {snoozeError && (
+            <div style={{ fontSize: 12, color: 'var(--red)', marginBottom: 8, padding: '8px 12px', background: 'var(--red-light)', borderRadius: 10 }}>{snoozeError}</div>
+          )}
+          {snoozeModal.entityType === 'debt' && (
+            <div style={{ background: 'rgba(14,165,233,.08)', border: '0.5px solid rgba(14,165,233,.25)', borderRadius: 14, padding: '10px 12px', marginBottom: 10 }}>
+              <div style={{ fontSize: 11, color: '#0369A1', lineHeight: 1.5 }}>Debt snooze tracking coming soon. This will dismiss for now.</div>
+            </div>
+          )}
+          <button onClick={() => { setSnoozeModal(null); setSnoozeError(''); setCustomDate('') }} style={btnS}>Cancel</button>
         </Modal>
       )}
 
