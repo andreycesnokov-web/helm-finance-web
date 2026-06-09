@@ -16,6 +16,59 @@ const getPill = (type) => ({
   reminder:   { bg: '#FAEEDA', color: '#633806', text: 'Reminder' },
 }[type] || { bg: '#F3F4F6', color: '#6B7280', text: type })
 
+// ── AI CFO Insight helpers ────────────────────────────────────────────────────
+
+function getInsightContent(d) {
+  if (d.aiText) return { text: d.aiText, urgency: d.aiStatus || 'healthy' }
+  const runway = d.runway ?? 999
+  const rec    = d.receivables ?? 0
+  const pay    = d.payables ?? 0
+  if (runway >= 0 && runway < 7)  return { urgency: 'critical',  text: 'Cash risk is high. Focus on collecting receivables and delaying non-critical payments.' }
+  if (runway >= 0 && runway < 14) return { urgency: 'attention', text: 'Runway is limited. Review upcoming payables and secure expected income.' }
+  if (rec > pay && rec > 0)       return { urgency: 'healthy',   text: 'Incoming money covers current obligations. Follow up on receivables to stay on track.' }
+  if (pay > rec && pay > 0)       return { urgency: 'attention', text: 'Upcoming payments are higher than expected income. Review your cash pressure.' }
+  return { urgency: 'healthy', text: 'Finances look stable. Keep tracking income, expenses, and upcoming obligations.' }
+}
+
+const URGENCY = {
+  healthy:   { badge: '#15803D', badgeBg: '#DCFCE7', label: 'Looking good'    },
+  attention: { badge: '#B45309', badgeBg: '#FEF3C7', label: 'Needs attention' },
+  critical:  { badge: '#DC2626', badgeBg: '#FEE2E2', label: 'Critical'        },
+}
+
+const ACTION_COLORS = {
+  green:   { bg: '#DCFCE7', color: '#15803D' },
+  red:     { bg: '#FEE2E2', color: '#DC2626' },
+  amber:   { bg: '#FEF3C7', color: '#B45309' },
+  default: { bg: 'var(--bg-3)', color: 'var(--text-3)' },
+}
+
+function buildNextActions(d, navigate) {
+  const acts   = []
+  const debts  = d.debts || []
+  const txs    = d.recentTxs || []
+  const rec    = d.receivables ?? 0
+  const pay    = d.payables ?? 0
+  const runway = d.runway ?? 999
+  const scrollAct = () => document.getElementById('pulse-actions')?.scrollIntoView({ behavior: 'smooth' })
+
+  if (rec > 0)
+    acts.push({ icon: '↓', colorKey: 'green',   title: 'Follow up receivables', meta: fmt(rec) + ' IDR expected',  action: scrollAct })
+  if (pay > 0)
+    acts.push({ icon: '↑', colorKey: 'red',     title: 'Review payables',       meta: fmt(pay) + ' IDR due',       action: scrollAct })
+  if (runway >= 0 && runway < 14 && runway < 999)
+    acts.push({ icon: '⚡', colorKey: 'amber',  title: 'Protect runway',        meta: runway + ' days left',       action: () => navigate('/transactions') })
+  if (txs.length < 3)
+    acts.push({ icon: '+', colorKey: 'default',  title: 'Add transactions',      meta: 'Keep data up to date',      action: () => navigate('/add') })
+  const overdue = debts.filter(x => !x.is_settled && daysUntil(x.due_date) <= 0)
+  if (overdue.length > 0)
+    acts.push({ icon: '!', colorKey: 'red',      title: 'Resolve urgent items',  meta: overdue.length + ' overdue', action: scrollAct })
+
+  return acts.slice(0, 4)
+}
+
+// ── Modal ─────────────────────────────────────────────────────────────────────
+
 const Modal = ({ onClose, children }) => createPortal(
   <div onClick={onClose} style={{
     position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh',
@@ -116,6 +169,11 @@ export default function Pulse({ onDataLoad }) {
   // Show top accounts by absolute balance — no business-specific name filters
   const topAccounts = (d.accounts || []).slice(0, 5)
 
+  // AI CFO Insight
+  const insight      = getInsightContent(d)
+  const urgencyStyle = URGENCY[insight.urgency] || URGENCY.healthy
+  const nextActions  = buildNextActions(d, navigate)
+
   const btnP = { padding: '12px 0', borderRadius: 14, border: 'none', fontSize: 13, fontWeight: 500, cursor: 'pointer', width: '100%', marginBottom: 8 }
   const btnS = { ...btnP, background: 'none', border: '0.5px solid var(--border)', color: 'var(--text-3)', marginBottom: 0 }
 
@@ -204,176 +262,224 @@ export default function Pulse({ onDataLoad }) {
         </div>
       </div>
 
-      <div style={{ margin: '0 16px 12px', background: st.bg, borderRadius: 24, padding: '18px 18px 16px', position: 'relative', overflow: 'hidden' }}>
-        <div style={{ position: 'absolute', top: -50, right: -50, width: 180, height: 180, borderRadius: '50%', background: 'rgba(255,255,255,.07)' }} />
-        <div style={{ position: 'absolute', bottom: -30, left: 20, width: 120, height: 120, borderRadius: '50%', background: 'rgba(0,0,0,.08)' }} />
-        <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 10 }}>
-          <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'rgba(255,255,255,.55)', flexShrink: 0 }} />
-          <span style={{ fontSize: 13, fontWeight: 500, color: '#fff' }}>{st.label}</span>
-          <span style={{ marginLeft: 'auto', fontSize: 11, color: 'rgba(255,255,255,.6)' }}>AI status</span>
-        </div>
-        <div style={{ fontSize: 10, color: 'rgba(255,255,255,.6)', letterSpacing: '0.08em', marginBottom: 4 }}>
-          TOTAL CASH · {SCOPE_LABELS[scope].toUpperCase()}
-        </div>
-        <div style={{ fontSize: 32, fontWeight: 500, color: '#fff', letterSpacing: -1, lineHeight: 1, marginBottom: 5 }}>
-          {fmtFull(d.totalBalance)} <span style={{ fontSize: 14, color: 'rgba(255,255,255,.55)', fontWeight: 400 }}>IDR</span>
-        </div>
-        <div style={{ fontSize: 11, color: 'rgba(255,255,255,.65)', marginBottom: 12, lineHeight: 1.4 }}>
-          Runway {d.runway} days &middot; {(d.aiText || '').split('.')[0]}
-        </div>
-        {topAccounts.length > 0 && (
-          <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginBottom: 12 }}>
-            {topAccounts.map(a => (
-              <div key={a.id} style={{ background: a.balance < 0 ? 'rgba(0,0,0,.2)' : 'rgba(255,255,255,.15)', border: '0.5px solid rgba(255,255,255,.2)', borderRadius: 20, padding: '3px 10px', fontSize: 10, color: '#fff' }}>
-                {a.name} <span style={{ fontWeight: 600 }}>{fmt(a.balance)}</span>
+      <div className="pulse-desktop-grid">
+
+        {/* ── Main column: hero + net position + actions required ──────── */}
+        <div className="pulse-main-col">
+
+          {/* Hero card */}
+          <div style={{ margin: '0 16px 12px', background: st.bg, borderRadius: 24, padding: '18px 18px 16px', position: 'relative', overflow: 'hidden' }}>
+            <div style={{ position: 'absolute', top: -50, right: -50, width: 180, height: 180, borderRadius: '50%', background: 'rgba(255,255,255,.07)' }} />
+            <div style={{ position: 'absolute', bottom: -30, left: 20, width: 120, height: 120, borderRadius: '50%', background: 'rgba(0,0,0,.08)' }} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 10 }}>
+              <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'rgba(255,255,255,.55)', flexShrink: 0 }} />
+              <span style={{ fontSize: 13, fontWeight: 500, color: '#fff' }}>{st.label}</span>
+              <span style={{ marginLeft: 'auto', fontSize: 11, color: 'rgba(255,255,255,.6)' }}>AI status</span>
+            </div>
+            <div style={{ fontSize: 10, color: 'rgba(255,255,255,.6)', letterSpacing: '0.08em', marginBottom: 4 }}>
+              TOTAL CASH · {SCOPE_LABELS[scope].toUpperCase()}
+            </div>
+            <div style={{ fontSize: 32, fontWeight: 500, color: '#fff', letterSpacing: -1, lineHeight: 1, marginBottom: 5 }}>
+              {fmtFull(d.totalBalance)} <span style={{ fontSize: 14, color: 'rgba(255,255,255,.55)', fontWeight: 400 }}>IDR</span>
+            </div>
+            <div style={{ fontSize: 11, color: 'rgba(255,255,255,.65)', marginBottom: 12, lineHeight: 1.4 }}>
+              Runway {d.runway} days &middot; {(d.aiText || '').split('.')[0]}
+            </div>
+            {topAccounts.length > 0 && (
+              <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginBottom: 12 }}>
+                {topAccounts.map(a => (
+                  <div key={a.id} style={{ background: a.balance < 0 ? 'rgba(0,0,0,.2)' : 'rgba(255,255,255,.15)', border: '0.5px solid rgba(255,255,255,.2)', borderRadius: 20, padding: '3px 10px', fontSize: 10, color: '#fff' }}>
+                    {a.name} <span style={{ fontWeight: 600 }}>{fmt(a.balance)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div style={{ background: 'rgba(0,0,0,.18)', borderRadius: 14, padding: '10px 12px', border: '0.5px solid rgba(255,255,255,.12)', marginBottom: 12 }}>
+              <div style={{ fontSize: 9, color: 'rgba(255,255,255,.5)', letterSpacing: '0.08em', marginBottom: 4 }}>AI CFO INSIGHT</div>
+              <div style={{ fontSize: 12, color: '#fff', lineHeight: 1.5, fontWeight: 500 }}>{d.aiText || 'Analysing your financial position...'}</div>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+              {/* View analysis — opens AI summary / detail modal */}
+              <button onClick={() => setShowAnalysis(true)} style={{ background: 'rgba(255,255,255,.2)', border: '0.5px solid rgba(255,255,255,.35)', borderRadius: 14, padding: '9px 0', fontSize: 12, color: '#fff', cursor: 'pointer' }}>View analysis</button>
+              {/* Take action — scrolls to Actions Required section */}
+              <button
+                onClick={() => document.getElementById('pulse-actions')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+                style={{ background: '#fff', border: 'none', borderRadius: 14, padding: '9px 0', fontSize: 12, fontWeight: 500, color: st.bg, cursor: 'pointer' }}
+              >Take action</button>
+            </div>
+          </div>
+
+          {/* Net Position */}
+          <div style={{ margin: '0 16px 10px', background: 'var(--bg-2)', borderRadius: 16, padding: '12px 14px', border: '0.5px solid var(--border)' }}>
+            <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--text)', marginBottom: 8 }}>Net Position</div>
+            {[
+              { label: 'Cash',         value: fmtFull(d.totalBalance), color: (d.totalBalance||0) >= 0 ? 'var(--green)' : 'var(--red)' },
+              { label: 'They owe you', value: '+' + fmt(d.receivables), color: 'var(--green)' },
+              { label: 'You owe',      value: '-' + fmt(d.payables),    color: 'var(--red)' },
+            ].map(r => (
+              <div key={r.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', borderBottom: '0.5px solid var(--border)' }}>
+                <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{r.label}</span>
+                <span style={{ fontSize: 12, fontWeight: 500, color: r.color }}>{r.value}</span>
+              </div>
+            ))}
+            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0 0' }}>
+              <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--text)' }}>Net Position</span>
+              <span style={{ fontSize: 15, fontWeight: 500, color: (d.netPosition||0) >= 0 ? 'var(--green)' : 'var(--red)' }}>
+                {(d.netPosition||0) >= 0 ? '+' : ''}{fmtFull(d.netPosition)} IDR
+              </span>
+            </div>
+          </div>
+
+          {/* Receivables / Payables mini grid */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, margin: '0 16px 12px' }}>
+            <div style={{ background: '#DCFCE7', borderRadius: 16, padding: '12px 14px' }}>
+              <div style={{ fontSize: 10, color: '#15803D', marginBottom: 4 }}>They owe you</div>
+              <div style={{ fontSize: 24, fontWeight: 500, color: '#16A34A', lineHeight: 1.1 }}>{fmt(d.receivables)}</div>
+              <div style={{ fontSize: 10, color: '#16A34A', marginTop: 3 }}>{debts.filter(x => x.type === 'receivable').length} receivable</div>
+            </div>
+            <div style={{ background: '#FEE2E2', borderRadius: 16, padding: '12px 14px' }}>
+              <div style={{ fontSize: 10, color: '#B91C1C', marginBottom: 4 }}>You owe</div>
+              <div style={{ fontSize: 24, fontWeight: 500, color: '#E24B4A', lineHeight: 1.1 }}>{fmt(d.payables)}</div>
+              <div style={{ fontSize: 10, color: '#E24B4A', marginTop: 3 }}>{debts.filter(x => x.type === 'payable').length} payable</div>
+            </div>
+          </div>
+
+          {/* Actions Required */}
+          {debts.length > 0 && (
+            <div id="pulse-actions">
+              <div style={{ fontSize: 9, fontWeight: 500, color: 'var(--text-3)', letterSpacing: '0.08em', padding: '0 16px', marginBottom: 8 }}>
+                ACTIONS REQUIRED · {debts.length}
+              </div>
+              {debts.slice(0, 4).map(debt => {
+                const days = daysUntil(debt.due_date)
+                const isOut = debt.type === 'payable'
+                return (
+                  <div key={debt.id} style={{ margin: '0 16px 8px', background: 'var(--bg)', border: '0.5px solid var(--border)', borderRadius: 20, padding: '12px 14px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <div style={{ width: 34, height: 34, borderRadius: 10, background: isOut ? '#FCEBEB' : '#EAF3DE', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 15, color: isOut ? '#A32D2D' : '#3B6D11' }}>
+                        {isOut ? '↑' : '↓'}
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text)' }}>{debt.counterparty}</div>
+                        <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 1 }}>{debt.description}</div>
+                      </div>
+                      <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                        <div style={{ fontSize: 15, fontWeight: 500, color: isOut ? '#E24B4A' : '#16A34A' }}>
+                          {isOut ? '-' : '+'}{fmt(debt.amount)}
+                        </div>
+                        <div style={{ fontSize: 9, padding: '2px 7px', borderRadius: 8, background: days < 0 ? '#FCEBEB' : '#FAEEDA', color: days < 0 ? '#A32D2D' : '#633806', display: 'inline-block', marginTop: 3 }}>
+                          {days < 0 ? 'Overdue' : days === 0 ? 'Today' : days + 'd left'}
+                        </div>
+                      </div>
+                    </div>
+                    <div style={{ height: 3, background: 'var(--bg-2)', borderRadius: 2, margin: '10px 0 8px', overflow: 'hidden' }}>
+                      <div style={{ height: '100%', borderRadius: 2, background: days < 0 ? '#E24B4A' : isOut ? '#D97706' : '#16A34A', width: Math.min(100, Math.max(5, days < 0 ? 100 : 100 - days * 5)) + '%' }} />
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 7 }}>
+                      <button onClick={() => openSnooze({ id: debt.id, entityType: 'debt', title: debt.counterparty, subtitle: fmt(debt.amount) + ' IDR' })} style={{ padding: '9px 0', borderRadius: 12, fontSize: 12, border: '0.5px solid var(--border)', background: 'none', color: 'var(--text-3)', cursor: 'pointer' }}>
+                        {isOut ? 'Snooze' : 'Remind'}
+                      </button>
+                      <button onClick={() => { setPayModal(debt); setPayForm({ amount: String(debt.amount), account: '' }) }} style={{ padding: '9px 0', borderRadius: 12, fontSize: 12, border: 'none', background: 'var(--text)', color: '#fff', fontWeight: 500, cursor: 'pointer' }}>
+                        {isOut ? 'Pay now' : 'Mark paid'}
+                      </button>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+
+        </div>{/* end pulse-main-col */}
+
+        {/* ── Side column: AI insight + today's focus + financial vitals ── */}
+        <div className="pulse-side-col">
+
+          {/* AI CFO Insight card */}
+          <div className="ai-insight-card">
+            <div className="ai-insight-header">
+              <span className="ai-insight-title">AI CFO Insight</span>
+              <span className="ai-status-badge" style={{ background: urgencyStyle.badgeBg, color: urgencyStyle.badge }}>
+                {urgencyStyle.label}
+              </span>
+            </div>
+            <p className="ai-insight-text">{insight.text}</p>
+            {nextActions.length > 0 && (
+              <>
+                <div className="ai-insight-actions-label">NEXT BEST ACTIONS</div>
+                <div className="next-actions-grid">
+                  {nextActions.map((act, i) => {
+                    const col = ACTION_COLORS[act.colorKey] || ACTION_COLORS.default
+                    return (
+                      <button key={i} className="next-action-card" onClick={act.action}>
+                        <div className="next-action-icon" style={{ background: col.bg, color: col.color }}>{act.icon}</div>
+                        <div className="next-action-body">
+                          <div className="next-action-title">{act.title}</div>
+                          <div className="next-action-meta">{act.meta}</div>
+                        </div>
+                      </button>
+                    )
+                  })}
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Today's Focus */}
+          {(d.todayFocus || []).length > 0 && (
+            <>
+              <div className="pulse-section-label">TODAY'S FOCUS · {pendingFocus.length} TASKS</div>
+              {(d.todayFocus || []).map(f => {
+                const p = getPill(f.type)
+                return (
+                  <div key={f.id} onClick={() => setFocusDone(prev => ({ ...prev, [f.id]: !prev[f.id] }))}
+                    style={{ margin: '0 16px 7px', background: 'var(--bg-2)', border: '0.5px solid var(--border)', borderRadius: 16, padding: '10px 12px', display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer' }}>
+                    <div style={{ width: 18, height: 18, borderRadius: 6, border: focusDone[f.id] ? 'none' : '1.5px solid var(--border-2)', background: focusDone[f.id] ? 'var(--text)' : 'var(--bg)', flexShrink: 0, marginTop: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      {focusDone[f.id] && <svg width="10" height="10" viewBox="0 0 10 10"><path d="M2 5l2.5 2.5L8 2.5" stroke="white" strokeWidth="1.5" fill="none" strokeLinecap="round"/></svg>}
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 13, color: focusDone[f.id] ? 'var(--text-3)' : 'var(--text)', textDecoration: focusDone[f.id] ? 'line-through' : 'none', lineHeight: 1.3 }}>{f.title}</div>
+                      <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 2 }}>{f.meta}</div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 5 }}>
+                        <div style={{ fontSize: 9, padding: '2px 8px', borderRadius: 8, background: p.bg, color: p.color, display: 'inline-block' }}>{p.text}</div>
+                        {f.type === 'reminder' && (
+                          <button onClick={e => { e.stopPropagation(); openSnooze({ id: f.id, entityType: 'reminder', title: f.title, subtitle: f.meta || '' }) }}
+                            style={{ fontSize: 9, padding: '2px 8px', borderRadius: 8, background: 'none', border: '0.5px solid var(--border)', color: 'var(--text-3)', cursor: 'pointer' }}>
+                            Snooze
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </>
+          )}
+
+          {/* Financial Vitals */}
+          <div className="pulse-section-label" style={{ paddingTop: 12 }}>FINANCIAL VITALS</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 7, padding: '0 16px 24px' }}>
+            {[
+              { label: 'RUNWAY',       value: d.runway + 'd',           sub: 'at current burn',  color: (d.runway||0) > 14 ? '#16A34A' : (d.runway||0) > 7 ? '#D97706' : '#E24B4A', bar: Math.min(100, Math.max(5, (d.runway||0) * 3)), barColor: (d.runway||0) > 14 ? '#16A34A' : (d.runway||0) > 7 ? '#D97706' : '#E24B4A' },
+              { label: 'BURN RATE',    value: fmt(d.burnRate) + '/d',   sub: '30-day avg',       color: 'var(--text)', bar: 40, barColor: '#38BDF8' },
+              { label: 'EXPECTED IN',  value: '+' + fmt(d.receivables), sub: 'receivables',      color: '#16A34A', bar: (d.receivables||0) > 0 ? 60 : 0, barColor: '#16A34A' },
+              { label: 'EXPECTED OUT', value: '-' + fmt(d.payables),    sub: 'payables',         color: (d.payables||0) > 0 ? '#D97706' : 'var(--text-3)', bar: (d.payables||0) > 0 ? 80 : 0, barColor: '#D97706' },
+            ].map(v => (
+              <div key={v.label} style={{ background: 'var(--bg-2)', borderRadius: 16, padding: '12px 13px', border: '0.5px solid var(--border)' }}>
+                <div style={{ fontSize: 9, fontWeight: 500, color: 'var(--text-3)', letterSpacing: '0.06em', marginBottom: 4 }}>{v.label}</div>
+                <div style={{ fontSize: 22, fontWeight: 500, color: v.color, lineHeight: 1, marginBottom: 2 }}>{v.value}</div>
+                <div style={{ fontSize: 10, color: 'var(--text-3)' }}>{v.sub}</div>
+                {v.bar > 0 && (
+                  <div style={{ height: 3, background: 'var(--border)', borderRadius: 2, marginTop: 8, overflow: 'hidden' }}>
+                    <div style={{ height: '100%', width: v.bar + '%', background: v.barColor, borderRadius: 2 }} />
+                  </div>
+                )}
               </div>
             ))}
           </div>
-        )}
-        <div style={{ background: 'rgba(0,0,0,.18)', borderRadius: 14, padding: '10px 12px', border: '0.5px solid rgba(255,255,255,.12)', marginBottom: 12 }}>
-          <div style={{ fontSize: 9, color: 'rgba(255,255,255,.5)', letterSpacing: '0.08em', marginBottom: 4 }}>AI CFO INSIGHT</div>
-          <div style={{ fontSize: 12, color: '#fff', lineHeight: 1.5, fontWeight: 500 }}>{d.aiText || 'Analysing your financial position...'}</div>
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-          {/* View analysis — opens AI summary / detail modal */}
-          <button onClick={() => setShowAnalysis(true)} style={{ background: 'rgba(255,255,255,.2)', border: '0.5px solid rgba(255,255,255,.35)', borderRadius: 14, padding: '9px 0', fontSize: 12, color: '#fff', cursor: 'pointer' }}>View analysis</button>
-          {/* Take action — scrolls to Actions Required section */}
-          <button
-            onClick={() => document.getElementById('pulse-actions')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
-            style={{ background: '#fff', border: 'none', borderRadius: 14, padding: '9px 0', fontSize: 12, fontWeight: 500, color: st.bg, cursor: 'pointer' }}
-          >Take action</button>
-        </div>
-      </div>
 
-      <div style={{ margin: '0 16px 10px', background: 'var(--bg-2)', borderRadius: 16, padding: '12px 14px', border: '0.5px solid var(--border)' }}>
-        <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--text)', marginBottom: 8 }}>Net Position</div>
-        {[
-          { label: 'Cash',         value: fmtFull(d.totalBalance), color: (d.totalBalance||0) >= 0 ? 'var(--green)' : 'var(--red)' },
-          { label: 'They owe you', value: '+' + fmt(d.receivables), color: 'var(--green)' },
-          { label: 'You owe',      value: '-' + fmt(d.payables),    color: 'var(--red)' },
-        ].map(r => (
-          <div key={r.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', borderBottom: '0.5px solid var(--border)' }}>
-            <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{r.label}</span>
-            <span style={{ fontSize: 12, fontWeight: 500, color: r.color }}>{r.value}</span>
-          </div>
-        ))}
-        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0 0' }}>
-          <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--text)' }}>Net Position</span>
-          <span style={{ fontSize: 15, fontWeight: 500, color: (d.netPosition||0) >= 0 ? 'var(--green)' : 'var(--red)' }}>
-            {(d.netPosition||0) >= 0 ? '+' : ''}{fmtFull(d.netPosition)} IDR
-          </span>
-        </div>
-      </div>
+        </div>{/* end pulse-side-col */}
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, margin: '0 16px 12px' }}>
-        <div style={{ background: '#DCFCE7', borderRadius: 16, padding: '12px 14px' }}>
-          <div style={{ fontSize: 10, color: '#15803D', marginBottom: 4 }}>They owe you</div>
-          <div style={{ fontSize: 24, fontWeight: 500, color: '#16A34A', lineHeight: 1.1 }}>{fmt(d.receivables)}</div>
-          <div style={{ fontSize: 10, color: '#16A34A', marginTop: 3 }}>{debts.filter(x => x.type === 'receivable').length} receivable</div>
-        </div>
-        <div style={{ background: '#FEE2E2', borderRadius: 16, padding: '12px 14px' }}>
-          <div style={{ fontSize: 10, color: '#B91C1C', marginBottom: 4 }}>You owe</div>
-          <div style={{ fontSize: 24, fontWeight: 500, color: '#E24B4A', lineHeight: 1.1 }}>{fmt(d.payables)}</div>
-          <div style={{ fontSize: 10, color: '#E24B4A', marginTop: 3 }}>{debts.filter(x => x.type === 'payable').length} payable</div>
-        </div>
-      </div>
-
-      {debts.length > 0 && (
-        <div id="pulse-actions">
-          <div style={{ fontSize: 9, fontWeight: 500, color: 'var(--text-3)', letterSpacing: '0.08em', padding: '0 16px', marginBottom: 8 }}>
-            ACTIONS REQUIRED · {debts.length}
-          </div>
-          {debts.slice(0, 4).map(debt => {
-            const days = daysUntil(debt.due_date)
-            const isOut = debt.type === 'payable'
-            return (
-              <div key={debt.id} style={{ margin: '0 16px 8px', background: 'var(--bg)', border: '0.5px solid var(--border)', borderRadius: 20, padding: '12px 14px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <div style={{ width: 34, height: 34, borderRadius: 10, background: isOut ? '#FCEBEB' : '#EAF3DE', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 15, color: isOut ? '#A32D2D' : '#3B6D11' }}>
-                    {isOut ? '↑' : '↓'}
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text)' }}>{debt.counterparty}</div>
-                    <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 1 }}>{debt.description}</div>
-                  </div>
-                  <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                    <div style={{ fontSize: 15, fontWeight: 500, color: isOut ? '#E24B4A' : '#16A34A' }}>
-                      {isOut ? '-' : '+'}{fmt(debt.amount)}
-                    </div>
-                    <div style={{ fontSize: 9, padding: '2px 7px', borderRadius: 8, background: days < 0 ? '#FCEBEB' : '#FAEEDA', color: days < 0 ? '#A32D2D' : '#633806', display: 'inline-block', marginTop: 3 }}>
-                      {days < 0 ? 'Overdue' : days === 0 ? 'Today' : days + 'd left'}
-                    </div>
-                  </div>
-                </div>
-                <div style={{ height: 3, background: 'var(--bg-2)', borderRadius: 2, margin: '10px 0 8px', overflow: 'hidden' }}>
-                  <div style={{ height: '100%', borderRadius: 2, background: days < 0 ? '#E24B4A' : isOut ? '#D97706' : '#16A34A', width: Math.min(100, Math.max(5, days < 0 ? 100 : 100 - days * 5)) + '%' }} />
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 7 }}>
-                  <button onClick={() => openSnooze({ id: debt.id, entityType: 'debt', title: debt.counterparty, subtitle: fmt(debt.amount) + ' IDR' })} style={{ padding: '9px 0', borderRadius: 12, fontSize: 12, border: '0.5px solid var(--border)', background: 'none', color: 'var(--text-3)', cursor: 'pointer' }}>
-                    {isOut ? 'Snooze' : 'Remind'}
-                  </button>
-                  <button onClick={() => { setPayModal(debt); setPayForm({ amount: String(debt.amount), account: '' }) }} style={{ padding: '9px 0', borderRadius: 12, fontSize: 12, border: 'none', background: 'var(--text)', color: '#fff', fontWeight: 500, cursor: 'pointer' }}>
-                    {isOut ? 'Pay now' : 'Mark paid'}
-                  </button>
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      )}
-
-      {(d.todayFocus || []).length > 0 && (
-        <>
-          <div style={{ fontSize: 9, fontWeight: 500, color: 'var(--text-3)', letterSpacing: '0.08em', padding: '4px 16px 8px' }}>
-            TODAY'S FOCUS · {pendingFocus.length} TASKS
-          </div>
-          {(d.todayFocus || []).map(f => {
-            const p = getPill(f.type)
-            return (
-              <div key={f.id} onClick={() => setFocusDone(prev => ({ ...prev, [f.id]: !prev[f.id] }))}
-                style={{ margin: '0 16px 7px', background: 'var(--bg-2)', border: '0.5px solid var(--border)', borderRadius: 16, padding: '10px 12px', display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer' }}>
-                <div style={{ width: 18, height: 18, borderRadius: 6, border: focusDone[f.id] ? 'none' : '1.5px solid var(--border-2)', background: focusDone[f.id] ? 'var(--text)' : 'var(--bg)', flexShrink: 0, marginTop: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  {focusDone[f.id] && <svg width="10" height="10" viewBox="0 0 10 10"><path d="M2 5l2.5 2.5L8 2.5" stroke="white" strokeWidth="1.5" fill="none" strokeLinecap="round"/></svg>}
-                </div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 13, color: focusDone[f.id] ? 'var(--text-3)' : 'var(--text)', textDecoration: focusDone[f.id] ? 'line-through' : 'none', lineHeight: 1.3 }}>{f.title}</div>
-                  <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 2 }}>{f.meta}</div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 5 }}>
-                    <div style={{ fontSize: 9, padding: '2px 8px', borderRadius: 8, background: p.bg, color: p.color, display: 'inline-block' }}>{p.text}</div>
-                    {f.type === 'reminder' && (
-                      <button onClick={e => { e.stopPropagation(); openSnooze({ id: f.id, entityType: 'reminder', title: f.title, subtitle: f.meta || '' }) }}
-                        style={{ fontSize: 9, padding: '2px 8px', borderRadius: 8, background: 'none', border: '0.5px solid var(--border)', color: 'var(--text-3)', cursor: 'pointer' }}>
-                        Snooze
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )
-          })}
-        </>
-      )}
-
-      <div style={{ fontSize: 9, fontWeight: 500, color: 'var(--text-3)', letterSpacing: '0.08em', padding: '12px 16px 8px' }}>FINANCIAL VITALS</div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 7, padding: '0 16px 24px' }}>
-        {[
-          { label: 'RUNWAY',       value: d.runway + 'd',           sub: 'at current burn',  color: (d.runway||0) > 14 ? '#16A34A' : (d.runway||0) > 7 ? '#D97706' : '#E24B4A', bar: Math.min(100, Math.max(5, (d.runway||0) * 3)), barColor: (d.runway||0) > 14 ? '#16A34A' : (d.runway||0) > 7 ? '#D97706' : '#E24B4A' },
-          { label: 'BURN RATE',    value: fmt(d.burnRate) + '/d',   sub: '30-day avg',       color: 'var(--text)', bar: 40, barColor: '#38BDF8' },
-          { label: 'EXPECTED IN',  value: '+' + fmt(d.receivables), sub: 'receivables',      color: '#16A34A', bar: (d.receivables||0) > 0 ? 60 : 0, barColor: '#16A34A' },
-          { label: 'EXPECTED OUT', value: '-' + fmt(d.payables),    sub: 'payables',         color: (d.payables||0) > 0 ? '#D97706' : 'var(--text-3)', bar: (d.payables||0) > 0 ? 80 : 0, barColor: '#D97706' },
-        ].map(v => (
-          <div key={v.label} style={{ background: 'var(--bg-2)', borderRadius: 16, padding: '12px 13px', border: '0.5px solid var(--border)' }}>
-            <div style={{ fontSize: 9, fontWeight: 500, color: 'var(--text-3)', letterSpacing: '0.06em', marginBottom: 4 }}>{v.label}</div>
-            <div style={{ fontSize: 22, fontWeight: 500, color: v.color, lineHeight: 1, marginBottom: 2 }}>{v.value}</div>
-            <div style={{ fontSize: 10, color: 'var(--text-3)' }}>{v.sub}</div>
-            {v.bar > 0 && (
-              <div style={{ height: 3, background: 'var(--border)', borderRadius: 2, marginTop: 8, overflow: 'hidden' }}>
-                <div style={{ height: '100%', width: v.bar + '%', background: v.barColor, borderRadius: 2 }} />
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
+      </div>{/* end pulse-desktop-grid */}
 
       {showAnalysis && (
         <Modal onClose={() => setShowAnalysis(false)}>
