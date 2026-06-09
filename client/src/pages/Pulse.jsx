@@ -145,6 +145,65 @@ export default function Pulse({ onDataLoad }) {
         ))}
       </div>
 
+      {/* ── KPI Cards Row — desktop only, mobile already shows these in hero + net position ── */}
+      <div className="pulse-kpi-grid">
+        {/* Total Cash */}
+        <div className="pulse-kpi-card">
+          <div className="kpi-label">Total Cash</div>
+          <div
+            className="kpi-value"
+            style={{ color: (d.totalBalance ?? 0) >= 0 ? 'var(--text)' : 'var(--red)' }}
+          >
+            {fmtFull(d.totalBalance ?? 0)}
+            <span className="kpi-currency">IDR</span>
+          </div>
+          <div className="kpi-subtitle">Available now</div>
+        </div>
+
+        {/* Runway */}
+        <div className="pulse-kpi-card">
+          <div className="kpi-label">Runway</div>
+          <div
+            className="kpi-value"
+            style={{
+              color: !d.runway || d.runway >= 999
+                ? 'var(--text-3)'
+                : d.runway > 14 ? 'var(--green-dark)'
+                : d.runway > 7  ? 'var(--amber-dark)'
+                : 'var(--red)',
+            }}
+          >
+            {!d.runway || d.runway >= 999 ? '—' : d.runway}
+            {d.runway && d.runway < 999 && <span className="kpi-unit">days</span>}
+          </div>
+          <div className="kpi-subtitle">Based on current burn</div>
+        </div>
+
+        {/* Receivables */}
+        <div className="pulse-kpi-card">
+          <div className="kpi-label">Receivables</div>
+          <div className="kpi-value" style={{ color: 'var(--green-dark)' }}>
+            {fmtFull(d.receivables ?? 0)}
+            <span className="kpi-currency">IDR</span>
+          </div>
+          <div className="kpi-subtitle">
+            {(d.debts || []).filter(x => x.type === 'receivable' && !x.is_settled).length} incoming
+          </div>
+        </div>
+
+        {/* Payables */}
+        <div className="pulse-kpi-card">
+          <div className="kpi-label">Payables</div>
+          <div className="kpi-value" style={{ color: 'var(--red)' }}>
+            {fmtFull(d.payables ?? 0)}
+            <span className="kpi-currency">IDR</span>
+          </div>
+          <div className="kpi-subtitle">
+            {(d.debts || []).filter(x => x.type === 'payable' && !x.is_settled).length} to pay
+          </div>
+        </div>
+      </div>
+
       <div style={{ margin: '0 16px 12px', background: st.bg, borderRadius: 24, padding: '18px 18px 16px', position: 'relative', overflow: 'hidden' }}>
         <div style={{ position: 'absolute', top: -50, right: -50, width: 180, height: 180, borderRadius: '50%', background: 'rgba(255,255,255,.07)' }} />
         <div style={{ position: 'absolute', bottom: -30, left: 20, width: 120, height: 120, borderRadius: '50%', background: 'rgba(0,0,0,.08)' }} />
