@@ -116,9 +116,14 @@ app.get('/api/pulse', auth, async (req, res) => {
     const totalBalance = allIncome - allExpenses;
 
     // Virtual accounts from transaction sources
+    // Only transactions with a non-null source form a named account.
+    // Null-source transactions (from deleted accounts) still count in totalBalance
+    // but are intentionally excluded from the accounts list so deleted accounts
+    // are not silently re-created on every Pulse load.
     const sourceMap = {};
     (allTxs || []).forEach(t => {
-      const src = t.source || (t.scope === 'business' ? 'Helm Care Pay' : 'Personal');
+      if (!t.source) return; // skip null-source txs — they belong to no account
+      const src = t.source;
       if (!sourceMap[src]) sourceMap[src] = { id: src, name: src, balance: 0, type: t.scope || 'personal' };
       if (t.type === 'income') sourceMap[src].balance += Number(t.amount_original);
       else sourceMap[src].balance -= Number(t.amount_original);
