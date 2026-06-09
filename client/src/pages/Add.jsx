@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
-import { apiFetch, fmt } from '../lib/api'
+import { apiFetch, fmt, daysUntil } from '../lib/api'
 
 const QUICK = [
   { label: 'Еда', emoji: '🍜', type: 'expense', scope: 'personal' },
@@ -9,19 +10,45 @@ const QUICK = [
   { label: 'Доход', emoji: '💚', type: 'income', scope: 'personal' },
 ]
 
+function debtLabel(d) {
+  const days = daysUntil(d.due_date)
+  const tag  = days < 0 ? `${Math.abs(days)}d overdue` : `due in ${days}d`
+  return `${d.counterparty} · ${fmt(d.amount)} IDR · ${tag}`
+}
+
 export default function Add() {
-  const { token } = useAuth()
-  const [text, setText] = useState('')
+  const { token }  = useAuth()
+  const navigate   = useNavigate()
+  const [text, setText]   = useState('')
   const [loading, setLoading] = useState(false)
-  const [result, setResult] = useState(null) // parsed transactions
-  const [error, setError] = useState('')
-  const [saved, setSaved] = useState(false)
+  const [result, setResult]   = useState(null) // parsed transactions
+  const [error, setError]     = useState('')
+  const [saved, setSaved]     = useState(false)
+  const [saveMsg, setSaveMsg] = useState('')
 
   // Debt form
-  const [tab, setTab] = useState('tx') // tx | debt | reminder
-  const [debt, setDebt] = useState({ type: 'receivable', counterparty: '', amount: '', due_date: '', description: '' })
+  const [tab, setTab]         = useState('tx') // tx | debt | reminder
+  const [debt, setDebt]       = useState({ type: 'receivable', counterparty: '', amount: '', due_date: '', description: '' })
   const [reminder, setReminder] = useState({ title: '', due_date: '', meta: '' })
-  const [saving, setSaving] = useState(false)
+  const [saving, setSaving]   = useState(false)
+
+  // Open debts for linking
+  const [openDebts, setOpenDebts] = useState([])   // all unsettled debts
+  const [linkedDebts, setLinkedDebts] = useState({}) // index → debt id or ''
+
+  // Load open debts once on mount
+  useEffect(() => {
+    if (!token) return
+    apiFetch('/pulse', token)
+      .then(d => {
+        const debts = (d.debts || []).filter(x => !x.is_settled)
+        setOpenDebts(debts)
+      })
+      .catch(() => {}) // non-critical — just don't show link UI
+  }, [token])
+
+  const openReceivables = openDebts.filter(d => d.type === 'receivable')
+  const openPayables    = openDebts.filter(d => d.type === 'payable')
 
   const parse = async () => {
     if (!text.trim()) return
@@ -29,6 +56,8 @@ export default function Add() {
     setError('')
     setResult(null)
     setSaved(false)
+    setSaveMsg('')
+    setLinkedDebts({})
     try {
       const data = await apiFetch('/parse', token, { method: 'POST', body: { text } })
       setResult(data.transactions)
@@ -41,11 +70,48 @@ export default function Add() {
 
   const save = async () => {
     setSaving(true)
+    setError('')
     try {
-      await apiFetch('/transactions/batch', token, { method: 'POST', body: { transactions: result } })
+      const linked   = [] // { tx, debtId }
+      const unlinked = [] // tx
+
+      result.forEach((tx, i) => {
+        const debtId = linkedDebts[i]
+        if (debtId) linked.push({ tx, debtId })
+        else        unlinked.push(tx)
+      })
+
+      // Process linked: use /debts/:id/pay — creates transaction + updates debt
+      for (const { tx, debtId } of linked) {
+        await apiFetch(`/debts/${debtId}/pay`, token, {
+          method: 'POST',
+          body: { amount: tx.amount, account: tx.source || undefined },
+        })
+      }
+
+      // Process unlinked: batch save
+      if (unlinked.length > 0) {
+        await apiFetch('/transactions/batch', token, { method: 'POST', body: { transactions: unlinked } })
+      }
+
+      // Build success message
+      const msgs = []
+      if (linked.length > 0) {
+        const closedCount = linked.filter(({ tx, debtId }) => {
+          const debt = openDebts.find(d => d.id === debtId)
+          return debt && tx.amount >= Number(debt.amount)
+        }).length
+        const partialCount = linked.length - closedCount
+        if (closedCount > 0) msgs.push(`${closedCount} item${closedCount > 1 ? 's' : ''} closed`)
+        if (partialCount > 0) msgs.push(`${partialCount} partial payment${partialCount > 1 ? 's' : ''} recorded`)
+      }
+      if (unlinked.length > 0) msgs.push(`${unlinked.length} transaction${unlinked.length > 1 ? 's' : ''} saved`)
+
+      setSaveMsg(msgs.join(' · ') || 'Saved successfully!')
       setSaved(true)
       setResult(null)
       setText('')
+      setLinkedDebts({})
     } catch (e) {
       setError(e.message)
     } finally {
@@ -58,6 +124,7 @@ export default function Add() {
     try {
       await apiFetch('/debts', token, { method: 'POST', body: { ...debt, amount: Number(debt.amount) } })
       setSaved(true)
+      setSaveMsg('Saved successfully!')
       setDebt({ type: 'receivable', counterparty: '', amount: '', due_date: '', description: '' })
     } catch (e) {
       setError(e.message)
@@ -71,12 +138,20 @@ export default function Add() {
     try {
       await apiFetch('/reminders', token, { method: 'POST', body: reminder })
       setSaved(true)
+      setSaveMsg('Saved successfully!')
       setReminder({ title: '', due_date: '', meta: '' })
     } catch (e) {
       setError(e.message)
     } finally {
       setSaving(false)
     }
+  }
+
+  const selectStyle = {
+    width: '100%', padding: '9px 11px', borderRadius: 10,
+    border: '0.5px solid var(--border-2)', fontSize: 12,
+    background: 'var(--bg-2)', color: 'var(--text)',
+    boxSizing: 'border-box', fontFamily: 'inherit',
   }
 
   return (
@@ -92,7 +167,7 @@ export default function Add() {
           { key: 'debt', label: '📋 Debt' },
           { key: 'reminder', label: '🔔 Reminder' },
         ].map(t => (
-          <button key={t.key} onClick={() => { setTab(t.key); setSaved(false); setError('') }} style={{
+          <button key={t.key} onClick={() => { setTab(t.key); setSaved(false); setError(''); setSaveMsg('') }} style={{
             padding: '6px 12px', borderRadius: 20, fontSize: 12, border: '0.5px solid var(--border-2)',
             background: tab === t.key ? 'var(--text)' : 'none',
             color: tab === t.key ? '#fff' : 'var(--text-2)', fontWeight: tab === t.key ? 500 : 400
@@ -102,9 +177,26 @@ export default function Add() {
 
       {/* Success */}
       {saved && (
-        <div style={{ margin: '0 16px 16px', background: 'var(--green-light)', borderRadius: 10, padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
-          <span style={{ fontSize: 18 }}>✅</span>
-          <span style={{ fontSize: 14, color: 'var(--green-dark)', fontWeight: 500 }}>Saved successfully!</span>
+        <div style={{ margin: '0 16px 16px', background: 'var(--green-light)', borderRadius: 10, padding: '12px 14px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+            <span style={{ fontSize: 18 }}>✅</span>
+            <span style={{ fontSize: 14, color: 'var(--green-dark)', fontWeight: 500 }}>{saveMsg || 'Saved successfully!'}</span>
+          </div>
+          <div style={{ display: 'flex', gap: 12, marginTop: 6 }}>
+            <button onClick={() => navigate('/transactions')} style={{ fontSize: 12, color: 'var(--green-dark)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline' }}>
+              View transactions →
+            </button>
+            {Object.values(linkedDebts).some(Boolean) && (
+              <>
+                <button onClick={() => navigate('/receivables')} style={{ fontSize: 12, color: 'var(--green-dark)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline' }}>
+                  Receivables →
+                </button>
+                <button onClick={() => navigate('/payables')} style={{ fontSize: 12, color: 'var(--green-dark)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline' }}>
+                  Payables →
+                </button>
+              </>
+            )}
+          </div>
         </div>
       )}
 
@@ -147,24 +239,71 @@ export default function Add() {
           {/* Parsed result */}
           {result && (
             <div style={{ marginTop: 16 }}>
-              <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 10 }}>Found {result.length} transaction{result.length !== 1 ? 's' : ''}:</div>
-              {result.map((t, i) => (
-                <div key={i} style={{ background: 'var(--bg-2)', borderRadius: 12, padding: '12px 14px', marginBottom: 8 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text)' }}>{t.description}</div>
-                      {t.source && <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 2 }}>💳 {t.source}</div>}
-                      <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 2 }}>
-                        {t.scope === 'business' ? '💼 Business' : '👤 Personal'}
-                        {t.project ? ` · ${t.project}` : ''}
+              <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 10 }}>
+                Found {result.length} transaction{result.length !== 1 ? 's' : ''}:
+              </div>
+
+              {result.map((t, i) => {
+                const relevantDebts = t.type === 'income' ? openReceivables : openPayables
+                const linkedId      = linkedDebts[i] || ''
+
+                return (
+                  <div key={i} style={{ background: 'var(--bg-2)', borderRadius: 12, padding: '12px 14px', marginBottom: 8 }}>
+                    {/* Transaction info */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text)' }}>{t.description}</div>
+                        {t.source && <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 2 }}>💳 {t.source}</div>}
+                        <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 2 }}>
+                          {t.scope === 'business' ? '💼 Business' : '👤 Personal'}
+                          {t.project ? ` · ${t.project}` : ''}
+                        </div>
+                      </div>
+                      <div style={{ fontSize: 16, fontWeight: 600, color: t.type === 'income' ? 'var(--green)' : 'var(--red)', flexShrink: 0, marginLeft: 12 }}>
+                        {t.type === 'income' ? '+' : '-'}{fmt(t.amount)} {t.currency}
                       </div>
                     </div>
-                    <div style={{ fontSize: 16, fontWeight: 600, color: t.type === 'income' ? 'var(--green)' : 'var(--red)', flexShrink: 0, marginLeft: 12 }}>
-                      {t.type === 'income' ? '+' : '-'}{fmt(t.amount)} {t.currency}
-                    </div>
+
+                    {/* Debt link — only shown if relevant open debts exist */}
+                    {relevantDebts.length > 0 && (
+                      <div style={{ marginTop: 10, paddingTop: 10, borderTop: '0.5px solid var(--border)' }}>
+                        <div style={{ fontSize: 10, color: 'var(--text-4)', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                          Link to open {t.type === 'income' ? 'receivable' : 'payable'} (optional)
+                        </div>
+                        <select
+                          value={linkedId}
+                          onChange={e => setLinkedDebts(prev => ({ ...prev, [i]: e.target.value }))}
+                          style={selectStyle}
+                        >
+                          <option value="">— No link, save as standalone —</option>
+                          {relevantDebts.map(d => (
+                            <option key={d.id} value={d.id}>{debtLabel(d)}</option>
+                          ))}
+                        </select>
+
+                        {/* Show partial/close hint if linked */}
+                        {linkedId && (() => {
+                          const d = openDebts.find(x => x.id === linkedId)
+                          if (!d) return null
+                          const isPartial = t.amount < Number(d.amount)
+                          return (
+                            <div style={{
+                              marginTop: 5, fontSize: 11,
+                              color: isPartial ? 'var(--amber-dark)' : 'var(--green-dark)',
+                              display: 'flex', alignItems: 'center', gap: 4,
+                            }}>
+                              {isPartial
+                                ? `⚡ Partial payment — ${fmt(Number(d.amount) - t.amount)} IDR will remain open`
+                                : `✅ Full payment — item will be closed`}
+                            </div>
+                          )
+                        })()}
+                      </div>
+                    )}
                   </div>
-                </div>
-              ))}
+                )
+              })}
+
               <button onClick={save} disabled={saving} style={{
                 width: '100%', padding: 13, borderRadius: 12, background: 'var(--brand)',
                 color: '#fff', border: 'none', fontSize: 14, fontWeight: 500, marginTop: 4
