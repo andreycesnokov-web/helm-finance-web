@@ -6,11 +6,11 @@ import { apiFetch, fmt, fmtFull, daysUntil } from '../lib/api'
 
 const SCOPE_LABELS = { all: 'All', business: 'Business', personal: 'Personal' }
 
-// Hero card palette — premium dark tones for strong visual presence
+// Hero card: always dark navy — status shown as accent/badge only, never full card fill
 const STATUS = {
-  healthy:   { bg: '#027A48', label: 'Healthy'   },
-  attention: { bg: '#B54708', label: 'Attention' },
-  critical:  { bg: '#B42318', label: 'Critical'  },
+  healthy:   { accent: '#12B76A', label: 'Healthy'   },
+  attention: { accent: '#F79009', label: 'Attention' },
+  critical:  { accent: '#F04438', label: 'Critical'  },
 }
 
 // Today's Focus pill colours — use CSS tokens
@@ -278,44 +278,68 @@ export default function Pulse({ onDataLoad }) {
         {/* ── Main column: hero + net position + actions required ──────── */}
         <div className="pulse-main-col">
 
-          {/* Hero card */}
-          <div style={{ margin: '0 16px 12px', background: st.bg, borderRadius: 24, padding: '18px 18px 16px', position: 'relative', overflow: 'hidden' }}>
-            <div style={{ position: 'absolute', top: -50, right: -50, width: 180, height: 180, borderRadius: '50%', background: 'rgba(255,255,255,.07)' }} />
-            <div style={{ position: 'absolute', bottom: -30, left: 20, width: 120, height: 120, borderRadius: '50%', background: 'rgba(0,0,0,.08)' }} />
-            <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 10 }}>
-              <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'rgba(255,255,255,.55)', flexShrink: 0 }} />
-              <span style={{ fontSize: 13, fontWeight: 500, color: '#fff' }}>{st.label}</span>
-              <span style={{ marginLeft: 'auto', fontSize: 11, color: 'rgba(255,255,255,.6)' }}>AI status</span>
+          {/* Hero card — always premium dark navy, status shown via badge + border accent only */}
+          <div style={{
+            margin: '0 16px 12px',
+            background: 'linear-gradient(140deg, #0D1B2E 0%, #162035 100%)',
+            borderRadius: 24,
+            padding: '18px 18px 16px',
+            position: 'relative',
+            overflow: 'hidden',
+            boxShadow: '0 8px 32px rgba(11,18,32,0.28)',
+            borderLeft: `3px solid ${st.accent}`,
+          }}>
+            {/* Decorative blobs */}
+            <div style={{ position: 'absolute', top: -50, right: -50, width: 180, height: 180, borderRadius: '50%', background: 'rgba(255,255,255,.03)' }} />
+            <div style={{ position: 'absolute', bottom: -30, left: 20, width: 120, height: 120, borderRadius: '50%', background: 'rgba(21,94,239,.06)' }} />
+
+            {/* Status badge row */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'rgba(255,255,255,.08)', border: '0.5px solid rgba(255,255,255,.12)', borderRadius: 20, padding: '3px 10px 3px 8px' }}>
+                <div style={{ width: 6, height: 6, borderRadius: '50%', background: st.accent, flexShrink: 0, boxShadow: `0 0 6px ${st.accent}` }} />
+                <span style={{ fontSize: 11, fontWeight: 600, color: '#fff' }}>{st.label}</span>
+              </div>
+              <span style={{ marginLeft: 'auto', fontSize: 10, color: 'rgba(255,255,255,.4)', letterSpacing: '0.04em' }}>AI STATUS</span>
             </div>
-            <div style={{ fontSize: 10, color: 'rgba(255,255,255,.6)', letterSpacing: '0.08em', marginBottom: 4 }}>
+
+            {/* Label */}
+            <div style={{ fontSize: 10, color: 'rgba(255,255,255,.4)', letterSpacing: '0.08em', marginBottom: 4 }}>
               TOTAL CASH · {SCOPE_LABELS[scope].toUpperCase()}
             </div>
-            <div style={{ fontSize: 32, fontWeight: 500, color: '#fff', letterSpacing: -1, lineHeight: 1, marginBottom: 5 }}>
-              {fmtFull(d.totalBalance)} <span style={{ fontSize: 14, color: 'rgba(255,255,255,.55)', fontWeight: 400 }}>IDR</span>
+
+            {/* Big number */}
+            <div style={{ fontSize: 32, fontWeight: 700, color: (d.totalBalance || 0) < 0 ? '#F87171' : '#FFFFFF', letterSpacing: -1, lineHeight: 1, marginBottom: 5 }}>
+              {fmtFull(d.totalBalance)} <span style={{ fontSize: 14, color: 'rgba(255,255,255,.35)', fontWeight: 400 }}>IDR</span>
             </div>
-            <div style={{ fontSize: 11, color: 'rgba(255,255,255,.65)', marginBottom: 12, lineHeight: 1.4 }}>
+
+            {/* Runway tagline */}
+            <div style={{ fontSize: 11, color: 'rgba(255,255,255,.5)', marginBottom: 12, lineHeight: 1.5 }}>
               Runway {d.runway} days &middot; {(d.aiText || '').split('.')[0]}
             </div>
+
+            {/* Account chips */}
             {topAccounts.length > 0 && (
               <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginBottom: 12 }}>
                 {topAccounts.map(a => (
-                  <div key={a.id} style={{ background: a.balance < 0 ? 'rgba(0,0,0,.2)' : 'rgba(255,255,255,.15)', border: '0.5px solid rgba(255,255,255,.2)', borderRadius: 20, padding: '3px 10px', fontSize: 10, color: '#fff' }}>
+                  <div key={a.id} style={{ background: a.balance < 0 ? 'rgba(248,113,113,.12)' : 'rgba(255,255,255,.07)', border: `0.5px solid ${a.balance < 0 ? 'rgba(248,113,113,.25)' : 'rgba(255,255,255,.12)'}`, borderRadius: 20, padding: '3px 10px', fontSize: 10, color: a.balance < 0 ? '#F87171' : 'rgba(255,255,255,.8)' }}>
                     {a.name} <span style={{ fontWeight: 600 }}>{fmt(a.balance)}</span>
                   </div>
                 ))}
               </div>
             )}
-            <div style={{ background: 'rgba(0,0,0,.18)', borderRadius: 14, padding: '10px 12px', border: '0.5px solid rgba(255,255,255,.12)', marginBottom: 12 }}>
-              <div style={{ fontSize: 9, color: 'rgba(255,255,255,.5)', letterSpacing: '0.08em', marginBottom: 4 }}>AI CFO INSIGHT</div>
-              <div style={{ fontSize: 12, color: '#fff', lineHeight: 1.5, fontWeight: 500 }}>{d.aiText || 'Analysing your financial position...'}</div>
+
+            {/* AI CFO Insight strip */}
+            <div style={{ background: 'rgba(21,94,239,.12)', borderRadius: 12, padding: '10px 12px', border: '0.5px solid rgba(21,94,239,.25)', marginBottom: 12 }}>
+              <div style={{ fontSize: 9, color: 'rgba(99,152,255,.75)', letterSpacing: '0.08em', marginBottom: 4, fontWeight: 600 }}>AI CFO INSIGHT</div>
+              <div style={{ fontSize: 12, color: 'rgba(255,255,255,.82)', lineHeight: 1.5, fontWeight: 500 }}>{d.aiText || 'Analysing your financial position...'}</div>
             </div>
+
+            {/* Action buttons */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-              {/* View analysis — opens AI summary / detail modal */}
-              <button onClick={() => setShowAnalysis(true)} style={{ background: 'rgba(255,255,255,.2)', border: '0.5px solid rgba(255,255,255,.35)', borderRadius: 14, padding: '9px 0', fontSize: 12, color: '#fff', cursor: 'pointer' }}>View analysis</button>
-              {/* Take action — scrolls to Actions Required section */}
+              <button onClick={() => setShowAnalysis(true)} style={{ background: 'rgba(255,255,255,.07)', border: '0.5px solid rgba(255,255,255,.18)', borderRadius: 14, padding: '9px 0', fontSize: 12, color: 'rgba(255,255,255,.78)', cursor: 'pointer', fontWeight: 500 }}>View analysis</button>
               <button
                 onClick={() => document.getElementById('pulse-actions')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
-                style={{ background: '#fff', border: 'none', borderRadius: 14, padding: '9px 0', fontSize: 12, fontWeight: 500, color: st.bg, cursor: 'pointer' }}
+                style={{ background: '#fff', border: 'none', borderRadius: 14, padding: '9px 0', fontSize: 12, fontWeight: 600, color: '#0D1B2E', cursor: 'pointer' }}
               >Take action</button>
             </div>
           </div>

@@ -166,46 +166,70 @@ function BottomNav() {
 export function RightPanel({ data }) {
   const d = data || {}
   const upcoming = (d.debts || []).filter(x => !x.is_settled).slice(0, 5)
+  const statusDot = d.aiStatus === 'critical' ? '#F04438' : d.aiStatus === 'attention' ? '#F79009' : '#12B76A'
+  const statusLabel = d.aiStatus === 'critical' ? 'Critical' : d.aiStatus === 'attention' ? 'Attention' : 'Healthy'
+  const runwayColor = (d.runway || 0) > 14 ? 'var(--green-dark)' : (d.runway || 0) > 7 ? 'var(--amber-dark)' : 'var(--red)'
+
+  const SecTitle = ({ children }) => (
+    <div style={{ fontSize: 9, fontWeight: 700, color: 'var(--text-4)', textTransform: 'uppercase', letterSpacing: '0.09em', marginBottom: 10 }}>{children}</div>
+  )
+
   return (
     <div className="desktop-right" style={{ position: 'sticky', top: 0, height: '100vh', overflowY: 'auto' }}>
-      <div style={{ marginBottom: 20 }}>
-        <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 10 }}>AI CFO</div>
-        <div style={{ background: 'var(--bg-2)', borderRadius: 12, padding: 14 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
-            <div style={{ width: 8, height: 8, borderRadius: '50%', background: d.aiStatus === 'critical' ? 'var(--red)' : d.aiStatus === 'attention' ? 'var(--amber)' : 'var(--green)', flexShrink: 0 }} />
-            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{d.aiStatus === 'critical' ? 'Critical' : d.aiStatus === 'attention' ? 'Attention' : 'Healthy'}</span>
+
+      {/* ── AI CFO Card — premium dark navy ─── */}
+      <div style={{ marginBottom: 18 }}>
+        <SecTitle>AI CFO</SecTitle>
+        <div style={{
+          background: 'linear-gradient(140deg, #0D1B2E 0%, #162035 100%)',
+          borderRadius: 14,
+          padding: '14px 14px 12px',
+          borderLeft: `3px solid ${statusDot}`,
+          boxShadow: '0 4px 16px rgba(11,18,32,0.18)',
+        }}>
+          {/* Status row */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'rgba(255,255,255,.08)', border: '0.5px solid rgba(255,255,255,.12)', borderRadius: 20, padding: '2px 8px 2px 7px' }}>
+              <div style={{ width: 5, height: 5, borderRadius: '50%', background: statusDot, flexShrink: 0, boxShadow: `0 0 5px ${statusDot}` }} />
+              <span style={{ fontSize: 10, fontWeight: 600, color: '#fff' }}>{statusLabel}</span>
+            </div>
           </div>
-          <div style={{ fontSize: 12, color: 'var(--text-2)', lineHeight: 1.6, marginBottom: 10 }}>{d.aiText}</div>
-          <div style={{ borderTop: '0.5px solid var(--border)', paddingTop: 10 }}>
-            <div style={{ fontSize: 10, color: 'var(--text-3)', marginBottom: 4 }}>Recommendation</div>
-            <div style={{ fontSize: 12, color: 'var(--text)', lineHeight: 1.5 }}>
-              {/* Use AI-generated text when available; fall back to runway-based hint */}
-              {d.aiText
-                ? d.aiText
-                : (d.runway || 0) < 7
-                  ? 'Collect receivables immediately.'
-                  : (d.runway || 0) < 14
-                    ? 'Review upcoming payments.'
-                    : 'Finances healthy. Grow income.'}
+          {/* AI text */}
+          <div style={{ fontSize: 12, color: 'rgba(255,255,255,.72)', lineHeight: 1.6, marginBottom: 10 }}>
+            {d.aiText || 'Analysing your financial position...'}
+          </div>
+          {/* Recommendation */}
+          <div style={{ borderTop: '0.5px solid rgba(255,255,255,.08)', paddingTop: 9 }}>
+            <div style={{ fontSize: 9, color: 'rgba(99,152,255,.7)', letterSpacing: '0.07em', marginBottom: 4, fontWeight: 600 }}>RECOMMENDATION</div>
+            <div style={{ fontSize: 11, color: 'rgba(255,255,255,.6)', lineHeight: 1.5 }}>
+              {(d.runway || 0) < 7
+                ? 'Collect receivables immediately — cash risk is high.'
+                : (d.runway || 0) < 14
+                  ? 'Review upcoming payments and protect runway.'
+                  : 'Finances look stable. Focus on growing income.'}
             </div>
           </div>
         </div>
       </div>
 
-      <div style={{ marginBottom: 20 }}>
-        <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 10 }}>Upcoming</div>
+      {/* ── Upcoming ─── */}
+      <div style={{ marginBottom: 18 }}>
+        <SecTitle>Upcoming</SecTitle>
         {upcoming.length === 0
-          ? <div style={{ fontSize: 12, color: 'var(--text-3)' }}>No upcoming events</div>
+          ? <div style={{ fontSize: 12, color: 'var(--text-4)', padding: '6px 0' }}>No upcoming events</div>
           : upcoming.map(debt => {
               const days = Math.round((new Date(debt.due_date) - new Date()) / 86400000)
+              const isOverdue = days < 0
               return (
-                <div key={debt.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '7px 0', borderBottom: '0.5px solid var(--border)' }}>
+                <div key={debt.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '0.5px solid var(--border)' }}>
                   <div>
-                    <div style={{ fontSize: 12, color: 'var(--text)', fontWeight: 500 }}>{debt.counterparty}</div>
-                    <div style={{ fontSize: 10, color: days < 0 ? 'var(--red)' : 'var(--text-3)' }}>{days < 0 ? 'Overdue' : days === 0 ? 'Today' : `in ${days}d`}</div>
+                    <div style={{ fontSize: 12, color: 'var(--text)', fontWeight: 500, marginBottom: 2 }}>{debt.counterparty}</div>
+                    <div style={{ fontSize: 10, color: isOverdue ? 'var(--red)' : 'var(--text-4)', fontWeight: isOverdue ? 600 : 400 }}>
+                      {isOverdue ? '⚠ Overdue' : days === 0 ? 'Today' : `in ${days}d`}
+                    </div>
                   </div>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: debt.type === 'receivable' ? 'var(--green)' : 'var(--red)' }}>
-                    {debt.type === 'receivable' ? '+' : '-'}{fmtShort(debt.amount)}
+                  <div style={{ fontSize: 12, fontWeight: 700, color: debt.type === 'receivable' ? 'var(--green-dark)' : 'var(--red-dark)' }}>
+                    {debt.type === 'receivable' ? '+' : '−'}{fmtShort(debt.amount)}
                   </div>
                 </div>
               )
@@ -213,21 +237,25 @@ export function RightPanel({ data }) {
         }
       </div>
 
+      {/* ── Quick Stats ─── */}
       <div>
-        <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 10 }}>Quick Stats</div>
-        {[
-          { label: 'Runway', value: `${d.runway || 0}d`, color: (d.runway || 0) > 14 ? 'var(--green-dark)' : (d.runway || 0) > 7 ? 'var(--amber-dark)' : 'var(--red)' },
-          { label: 'Burn rate', value: `${fmtShort(d.burnRate || 0)}/day` },
-          { label: 'Net position', value: `${(d.netPosition || 0) >= 0 ? '+' : ''}${fmtShort(d.netPosition || 0)}`, color: (d.netPosition || 0) >= 0 ? 'var(--green-dark)' : 'var(--red)' },
-          { label: 'Receivables', value: `+${fmtShort(d.receivables || 0)}`, color: 'var(--green-dark)' },
-          { label: 'Payables', value: `-${fmtShort(d.payables || 0)}`, color: 'var(--red)' },
-        ].map(s => (
-          <div key={s.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '0.5px solid var(--border)' }}>
-            <div style={{ fontSize: 12, color: 'var(--text-3)' }}>{s.label}</div>
-            <div style={{ fontSize: 12, fontWeight: 600, color: s.color || 'var(--text)' }}>{s.value}</div>
-          </div>
-        ))}
+        <SecTitle>Quick Stats</SecTitle>
+        <div style={{ background: 'var(--surface-card)', borderRadius: 12, border: '1px solid var(--border)', overflow: 'hidden' }}>
+          {[
+            { label: 'Runway',       value: `${d.runway || 0} days`,                                                 color: runwayColor },
+            { label: 'Burn rate',    value: `${fmtShort(d.burnRate || 0)} / day`,                                    color: 'var(--text)' },
+            { label: 'Net position', value: `${(d.netPosition || 0) >= 0 ? '+' : ''}${fmtShort(d.netPosition || 0)}`, color: (d.netPosition || 0) >= 0 ? 'var(--green-dark)' : 'var(--red)' },
+            { label: 'Receivables',  value: `+${fmtShort(d.receivables || 0)}`,                                      color: 'var(--green-dark)' },
+            { label: 'Payables',     value: `−${fmtShort(d.payables || 0)}`,                                         color: 'var(--red-dark)' },
+          ].map((s, i, arr) => (
+            <div key={s.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '9px 12px', borderBottom: i < arr.length - 1 ? '0.5px solid var(--border)' : 'none' }}>
+              <div style={{ fontSize: 12, color: 'var(--text-3)' }}>{s.label}</div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: s.color }}>{s.value}</div>
+            </div>
+          ))}
+        </div>
       </div>
+
     </div>
   )
 }
