@@ -7,6 +7,7 @@ import Accounts from './pages/Accounts'
 import Add from './pages/Add'
 import Radar from './pages/Radar'
 import Settings from './pages/Settings'
+import Transactions from './pages/Transactions'
 
 // ── Mobile bottom nav — only existing pages ───────────────────────────────────
 const NAV = [
@@ -35,7 +36,7 @@ const SIDEBAR_GROUPS = [
   {
     title: 'FINANCE',
     items: [
-      { path: '/transactions', label: 'Transactions', active: false,
+      { path: '/transactions', label: 'Transactions', active: true,
         icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6" strokeWidth="2.5"/><line x1="3" y1="12" x2="3.01" y2="12" strokeWidth="2.5"/><line x1="3" y1="18" x2="3.01" y2="18" strokeWidth="2.5"/></svg> },
       { path: '/accounts',    label: 'Accounts',     active: true,
         icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg> },
@@ -265,8 +266,9 @@ export default function App() {
           <Route path="/" element={<PulseWrapper />} />
           <Route path="/add" element={<Layout><Add /></Layout>} />
           <Route path="/radar" element={<Layout><Radar /></Layout>} />
-          <Route path="/accounts" element={<Layout><Accounts /></Layout>} />
-          <Route path="/settings" element={<Layout><Settings /></Layout>} />
+          <Route path="/accounts"      element={<Layout><Accounts /></Layout>} />
+          <Route path="/transactions"  element={<Layout><Transactions /></Layout>} />
+          <Route path="/settings"      element={<Layout><Settings /></Layout>} />
         </Routes>
       </AuthProvider>
     </BrowserRouter>
