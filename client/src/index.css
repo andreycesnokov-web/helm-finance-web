@@ -1085,3 +1085,191 @@ body {
     grid-template-columns: repeat(2, 1fr);
   }
 }
+
+/* ── Shared MVP page utilities ───────────────────────────────────── */
+
+/* Section title — used on all new MVP pages */
+.section-title {
+  font-size: var(--text-xs);
+  font-weight: var(--weight-bold);
+  color: var(--text-3);
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  margin-bottom: var(--space-3);
+  padding-top: var(--space-1);
+}
+
+/* Centered loading / error state */
+.page-loading {
+  min-height: 40vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--text-sm);
+  color: var(--text-3);
+}
+
+/* Inline error banner */
+.page-error {
+  margin: 0 0 var(--space-5);
+  padding: var(--space-3) var(--space-4);
+  background: var(--red-light);
+  color: var(--red-dark);
+  border-radius: var(--radius);
+  font-size: var(--text-sm);
+  border: 1px solid rgba(240, 68, 56, 0.2);
+}
+
+/* Professional empty state */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 48px 24px;
+  background: var(--surface-card);
+  border-radius: var(--radius-lg);
+  border: 1px dashed var(--border-2);
+}
+.empty-state-icon {
+  font-size: 36px;
+  margin-bottom: 14px;
+  opacity: 0.65;
+}
+.empty-state-title {
+  font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
+  color: var(--text);
+  margin-bottom: 6px;
+}
+.empty-state-sub {
+  font-size: var(--text-sm);
+  color: var(--text-3);
+  max-width: 340px;
+  line-height: 1.6;
+  margin-bottom: 20px;
+}
+.empty-state-cta {
+  padding: 10px 24px;
+  border-radius: var(--radius);
+  background: var(--brand);
+  color: #fff;
+  border: none;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.empty-state-cta:hover { background: var(--brand-dark); }
+.empty-state-cta.secondary {
+  background: none;
+  color: var(--text-3);
+  border: 1px solid var(--border-2);
+}
+
+/* Debt / item list card */
+.item-list-card {
+  background: var(--surface-card);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  overflow: hidden;
+  box-shadow: var(--shadow-xs);
+  margin-bottom: var(--space-5);
+}
+.item-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 0.5px solid var(--border);
+  gap: var(--space-3);
+}
+.item-row:last-child { border-bottom: none; }
+.item-row-left { flex: 1; min-width: 0; }
+.item-row-name {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--text);
+  margin-bottom: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.item-row-sub {
+  font-size: var(--text-xs);
+  color: var(--text-4);
+}
+.item-row-right { flex-shrink: 0; text-align: right; }
+.item-row-amount {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-bold);
+}
+.item-row-status {
+  font-size: 10px;
+  color: var(--text-4);
+  margin-top: 2px;
+}
+
+/* Status badge pills */
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 9px;
+  border-radius: 20px;
+  font-size: 10px;
+  font-weight: var(--weight-semibold);
+  white-space: nowrap;
+}
+.status-pill.overdue  { background: var(--red-light);   color: var(--red-dark);   }
+.status-pill.due-soon { background: var(--amber-light);  color: var(--amber-dark); }
+.status-pill.open     { background: var(--blue-light);   color: var(--blue-dark);  }
+.status-pill.paid     { background: var(--green-light);  color: var(--green-dark); }
+
+/* Action CTA link button */
+.link-btn {
+  background: none;
+  border: none;
+  color: var(--brand);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.link-btn:hover { color: var(--brand-dark); }
+
+/* Dark insight card (re-used across new pages) */
+.insight-card-dark {
+  background: linear-gradient(140deg, #0D1B2E 0%, #162035 100%);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  box-shadow: 0 4px 20px rgba(11, 18, 32, 0.18);
+  margin-bottom: var(--space-5);
+}
+
+/* Coming-soon module banner */
+.module-coming-soon {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--brand-light);
+  border: 1px solid rgba(21, 94, 239, 0.18);
+  border-radius: var(--radius);
+  padding: var(--space-3) var(--space-4);
+  margin-bottom: var(--space-5);
+}
+.module-coming-soon-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--brand);
+  flex-shrink: 0;
+}
+.module-coming-soon-text {
+  font-size: var(--text-sm);
+  color: var(--brand-dark);
+  font-weight: var(--weight-medium);
+}

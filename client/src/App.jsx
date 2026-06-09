@@ -8,6 +8,13 @@ import Add from './pages/Add'
 import Radar from './pages/Radar'
 import Settings from './pages/Settings'
 import Transactions from './pages/Transactions'
+import AICFO from './pages/AICFO'
+import Receivables from './pages/Receivables'
+import Payables from './pages/Payables'
+import Invoices from './pages/Invoices'
+import Payroll from './pages/Payroll'
+import Tasks from './pages/Tasks'
+import Approvals from './pages/Approvals'
 
 // ── Mobile bottom nav — only existing pages ───────────────────────────────────
 const NAV = [
@@ -29,7 +36,7 @@ const SIDEBAR_GROUPS = [
         icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg> },
       { path: '/radar', label: 'Radar',  active: true,
         icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg> },
-      { path: '/cfo',   label: 'AI CFO', active: false,
+      { path: '/cfo',   label: 'AI CFO', active: true,
         icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg> },
     ],
   },
@@ -40,22 +47,22 @@ const SIDEBAR_GROUPS = [
         icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6" strokeWidth="2.5"/><line x1="3" y1="12" x2="3.01" y2="12" strokeWidth="2.5"/><line x1="3" y1="18" x2="3.01" y2="18" strokeWidth="2.5"/></svg> },
       { path: '/accounts',    label: 'Accounts',     active: true,
         icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg> },
-      { path: '/invoices',    label: 'Invoices',     active: false,
+      { path: '/invoices',    label: 'Invoices',     active: true,
         icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg> },
-      { path: '/receivables', label: 'Receivables',  active: false,
+      { path: '/receivables', label: 'Receivables',  active: true,
         icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg> },
-      { path: '/payables',    label: 'Payables',     active: false,
+      { path: '/payables',    label: 'Payables',     active: true,
         icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/><polyline points="17 18 23 18 23 12"/></svg> },
     ],
   },
   {
     title: 'OPERATIONS',
     items: [
-      { path: '/payroll',   label: 'Payroll',   active: false,
+      { path: '/payroll',   label: 'Payroll',   active: true,
         icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg> },
-      { path: '/tasks',     label: 'Tasks',     active: false,
+      { path: '/tasks',     label: 'Tasks',     active: true,
         icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg> },
-      { path: '/approvals', label: 'Approvals', active: false,
+      { path: '/approvals', label: 'Approvals', active: true,
         icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg> },
     ],
   },
@@ -292,11 +299,18 @@ export default function App() {
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/" element={<PulseWrapper />} />
-          <Route path="/add" element={<Layout><Add /></Layout>} />
-          <Route path="/radar" element={<Layout><Radar /></Layout>} />
-          <Route path="/accounts"      element={<Layout><Accounts /></Layout>} />
-          <Route path="/transactions"  element={<Layout><Transactions /></Layout>} />
-          <Route path="/settings"      element={<Layout><Settings /></Layout>} />
+          <Route path="/add"          element={<Layout><Add /></Layout>} />
+          <Route path="/radar"        element={<Layout><Radar /></Layout>} />
+          <Route path="/accounts"     element={<Layout><Accounts /></Layout>} />
+          <Route path="/transactions" element={<Layout><Transactions /></Layout>} />
+          <Route path="/settings"     element={<Layout><Settings /></Layout>} />
+          <Route path="/cfo"          element={<Layout><AICFO /></Layout>} />
+          <Route path="/receivables"  element={<Layout><Receivables /></Layout>} />
+          <Route path="/payables"     element={<Layout><Payables /></Layout>} />
+          <Route path="/invoices"     element={<Layout><Invoices /></Layout>} />
+          <Route path="/payroll"      element={<Layout><Payroll /></Layout>} />
+          <Route path="/tasks"        element={<Layout><Tasks /></Layout>} />
+          <Route path="/approvals"    element={<Layout><Approvals /></Layout>} />
         </Routes>
       </AuthProvider>
     </BrowserRouter>
