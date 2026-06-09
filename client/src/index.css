@@ -1,35 +1,93 @@
 :root {
-  /* Layout */
-  --sidebar-width: 220px;
-  --right-panel: 300px;
-  --radius: 12px;
+  /* ── Layout ─────────────────────────────────────────── */
+  --sidebar-width: 240px;
+  --right-panel:   320px;
 
-  /* Surfaces — from UI_GUIDELINES.md */
+  /* ── Border radius ───────────────────────────────────── */
+  --radius-sm: 8px;
+  --radius:    12px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+
+  /* ── Shadows ─────────────────────────────────────────── */
+  --shadow-xs: 0 1px 2px rgba(0,0,0,0.05);
+  --shadow-sm: 0 1px 4px rgba(0,0,0,0.06);
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.08);
+  --shadow-lg: 0 8px 24px rgba(0,0,0,0.12);
+
+  /* ── Typography scale ────────────────────────────────── */
+  --text-xs:   11px;
+  --text-sm:   12px;
+  --text-base: 13px;
+  --text-md:   14px;
+  --text-lg:   16px;
+  --text-xl:   18px;
+  --text-2xl:  22px;
+  --text-3xl:  28px;
+  --text-hero: 36px;
+
+  /* ── Font weights ────────────────────────────────────── */
+  --weight-normal:   400;
+  --weight-medium:   500;
+  --weight-semibold: 600;
+  --weight-bold:     700;
+
+  /* ── Spacing scale ───────────────────────────────────── */
+  --space-1:  4px;
+  --space-2:  8px;
+  --space-3:  12px;
+  --space-4:  16px;
+  --space-5:  20px;
+  --space-6:  24px;
+  --space-8:  32px;
+  --space-10: 40px;
+  --space-12: 48px;
+
+  /* ── Surfaces ────────────────────────────────────────── */
   --bg:   #FFFFFF;
   --bg-2: #F8F9FB;
+  --bg-3: #F1F3F7;
+  --bg-4: #E8EBF0;
 
-  /* Text — from UI_GUIDELINES.md */
+  /* ── Text ────────────────────────────────────────────── */
   --text:   #111111;
   --text-2: #444444;
   --text-3: #667085;
+  --text-4: #9DA8B7;
 
-  /* Borders — from UI_GUIDELINES.md */
+  /* ── Borders ─────────────────────────────────────────── */
   --border:   #E4E7EC;
   --border-2: #D1D5DB;
 
-  /* Success — from UI_GUIDELINES.md */
+  /* ── Success / Green ─────────────────────────────────── */
   --green:       #16A34A;
   --green-dark:  #15803D;
   --green-light: #DCFCE7;
 
-  /* Danger — from UI_GUIDELINES.md */
+  /* ── Danger / Red ────────────────────────────────────── */
   --red:       #DC2626;
   --red-dark:  #B91C1C;
   --red-light: #FEE2E2;
 
-  /* Warning — from UI_GUIDELINES.md */
-  --amber:      #D97706;
-  --amber-dark: #B45309;
+  /* ── Warning / Amber ─────────────────────────────────── */
+  --amber:       #D97706;
+  --amber-dark:  #B45309;
+  --amber-light: #FEF3C7;
+
+  /* ── Info / Blue ─────────────────────────────────────── */
+  --blue:       #2563EB;
+  --blue-dark:  #1D4ED8;
+  --blue-light: #DBEAFE;
+
+  /* ── Financial status tokens ─────────────────────────── */
+  --status-paid:        #16A34A;
+  --status-paid-bg:     #DCFCE7;
+  --status-pending:     #D97706;
+  --status-pending-bg:  #FEF3C7;
+  --status-overdue:     #DC2626;
+  --status-overdue-bg:  #FEE2E2;
+  --status-draft:       #667085;
+  --status-draft-bg:    #F1F3F7;
 }
 
 * { box-sizing: border-box; }
@@ -84,7 +142,7 @@ body {
 .nav-btn.active { color: var(--text); }
 .nav-btn svg { width: 22px; height: 22px; }
 
-/* ── Desktop ── */
+/* ── Desktop (1024px+) ───────────────────────────────────────────── */
 @media (min-width: 1024px) {
   body { background: var(--bg-2) !important; }
 
@@ -139,13 +197,15 @@ body {
     min-height: 100vh;
   }
 
+  /* Main content uses all available space between sidebar and right panel.
+     No artificial mobile-width cap — content expands naturally. */
   .desktop-main {
     flex: 1;
     background: var(--bg);
     border-right: 0.5px solid var(--border);
     min-height: 100vh;
     overflow-y: auto;
-    max-width: 520px;
+    min-width: 0; /* prevent flex overflow */
   }
 
   .desktop-right {
@@ -161,10 +221,56 @@ body {
   .nav { display: none !important; }
 }
 
-@media (max-width: 1023px) {
+/* ── Tablet (768px–1023px) ───────────────────────────────────────── */
+@media (min-width: 768px) and (max-width: 1023px) {
+  body { background: var(--bg) !important; }
+
+  /* Sidebar stays hidden on tablet for now — no drawer yet */
+  .sidebar { display: none; }
+
+  /* Layout takes full width, no sidebar offset */
+  .desktop-layout { margin-left: 0; }
+
+  /* Main content uses full screen width with comfortable padding */
+  .desktop-main {
+    max-width: 100%;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+  }
+
+  /* Right panel hidden on tablet — accessible via AI CFO button in future */
+  .desktop-right { display: none; }
+
+  /* Wider content inside pages */
+  .page { max-width: 100%; padding-bottom: 80px; }
+
+  /* 2-column grid utility for tablet */
+  .tablet-grid-2 {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 12px !important;
+  }
+
+  /* Cards use more horizontal space */
+  .card { margin: 0 20px; }
+
+  /* Topbar gets more padding */
+  .topbar { padding: 18px 20px 14px; }
+}
+
+/* ── Mobile (<768px) ─────────────────────────────────────────────── */
+@media (max-width: 767px) {
   .sidebar { display: none; }
   .desktop-layout { margin-left: 0; }
   .desktop-main { max-width: 430px; margin: 0 auto; width: 100%; }
+  .desktop-right { display: none; }
+}
+
+/* ── Legacy mobile fallback (768-1023 without sidebar) ───────────── */
+@media (max-width: 1023px) {
+  .sidebar { display: none; }
+  .desktop-layout { margin-left: 0; }
   .desktop-right { display: none; }
 }
 

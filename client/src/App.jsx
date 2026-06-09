@@ -49,7 +49,7 @@ function BottomNav() {
   const navigate = useNavigate()
   return (
     <nav className="nav">
-      {NAV.slice(0, 4).map(item => (
+      {NAV.map(item => (
         <button key={item.path} className={`nav-btn${location.pathname === item.path ? ' active' : ''}`} onClick={() => navigate(item.path)}>
           {item.icon}<span>{item.label}</span>
         </button>
@@ -74,7 +74,14 @@ export function RightPanel({ data }) {
           <div style={{ borderTop: '0.5px solid var(--border)', paddingTop: 10 }}>
             <div style={{ fontSize: 10, color: 'var(--text-3)', marginBottom: 4 }}>Recommendation</div>
             <div style={{ fontSize: 12, color: 'var(--text)', lineHeight: 1.5 }}>
-              {(d.runway || 0) < 7 ? 'Collect receivables immediately.' : (d.runway || 0) < 14 ? 'Review upcoming payments.' : 'Finances healthy. Grow income.'}
+              {/* Use AI-generated text when available; fall back to runway-based hint */}
+              {d.aiText
+                ? d.aiText
+                : (d.runway || 0) < 7
+                  ? 'Collect receivables immediately.'
+                  : (d.runway || 0) < 14
+                    ? 'Review upcoming payments.'
+                    : 'Finances healthy. Grow income.'}
             </div>
           </div>
         </div>

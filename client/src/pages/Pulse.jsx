@@ -113,10 +113,8 @@ export default function Pulse({ onDataLoad }) {
   const st = STATUS[d.aiStatus] || STATUS.healthy
   const debts = d.debts || []
   const pendingFocus = (d.todayFocus || []).filter(f => !focusDone[f.id])
-  const bankAccounts = (d.accounts || []).filter(a => {
-    const n = (a.name || '').toLowerCase()
-    return n.includes('permata') || n.includes('bca') || n.includes('bni') || n.includes('helm care') || n.includes('wise')
-  }).slice(0, 5)
+  // Show top accounts by absolute balance — no business-specific name filters
+  const topAccounts = (d.accounts || []).slice(0, 5)
 
   const btnP = { padding: '12px 0', borderRadius: 14, border: 'none', fontSize: 13, fontWeight: 500, cursor: 'pointer', width: '100%', marginBottom: 8 }
   const btnS = { ...btnP, background: 'none', border: '0.5px solid var(--border)', color: 'var(--text-3)', marginBottom: 0 }
@@ -129,7 +127,6 @@ export default function Pulse({ onDataLoad }) {
           <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text)' }}>
             {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
           </div>
-          <div style={{ fontSize: 11, color: 'var(--text-3)' }}>Bali, Indonesia</div>
         </div>
         <div onClick={() => navigate('/settings')} style={{ width: 28, height: 28, borderRadius: '50%', background: '#B5D4F4', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 600, color: '#0C447C', cursor: 'pointer' }}>
           {user?.firstName?.[0] || 'A'}
@@ -165,9 +162,9 @@ export default function Pulse({ onDataLoad }) {
         <div style={{ fontSize: 11, color: 'rgba(255,255,255,.65)', marginBottom: 12, lineHeight: 1.4 }}>
           Runway {d.runway} days &middot; {(d.aiText || '').split('.')[0]}
         </div>
-        {bankAccounts.length > 0 && (
+        {topAccounts.length > 0 && (
           <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginBottom: 12 }}>
-            {bankAccounts.map(a => (
+            {topAccounts.map(a => (
               <div key={a.id} style={{ background: a.balance < 0 ? 'rgba(0,0,0,.2)' : 'rgba(255,255,255,.15)', border: '0.5px solid rgba(255,255,255,.2)', borderRadius: 20, padding: '3px 10px', fontSize: 10, color: '#fff' }}>
                 {a.name} <span style={{ fontWeight: 600 }}>{fmt(a.balance)}</span>
               </div>
@@ -179,8 +176,13 @@ export default function Pulse({ onDataLoad }) {
           <div style={{ fontSize: 12, color: '#fff', lineHeight: 1.5, fontWeight: 500 }}>{d.aiText || 'Analysing your financial position...'}</div>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+          {/* View analysis — opens AI summary / detail modal */}
           <button onClick={() => setShowAnalysis(true)} style={{ background: 'rgba(255,255,255,.2)', border: '0.5px solid rgba(255,255,255,.35)', borderRadius: 14, padding: '9px 0', fontSize: 12, color: '#fff', cursor: 'pointer' }}>View analysis</button>
-          <button onClick={() => setShowAnalysis(true)} style={{ background: '#fff', border: 'none', borderRadius: 14, padding: '9px 0', fontSize: 12, fontWeight: 500, color: st.bg, cursor: 'pointer' }}>Take action</button>
+          {/* Take action — scrolls to Actions Required section */}
+          <button
+            onClick={() => document.getElementById('pulse-actions')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+            style={{ background: '#fff', border: 'none', borderRadius: 14, padding: '9px 0', fontSize: 12, fontWeight: 500, color: st.bg, cursor: 'pointer' }}
+          >Take action</button>
         </div>
       </div>
 
@@ -218,7 +220,7 @@ export default function Pulse({ onDataLoad }) {
       </div>
 
       {debts.length > 0 && (
-        <>
+        <div id="pulse-actions">
           <div style={{ fontSize: 9, fontWeight: 500, color: 'var(--text-3)', letterSpacing: '0.08em', padding: '0 16px', marginBottom: 8 }}>
             ACTIONS REQUIRED · {debts.length}
           </div>
@@ -258,7 +260,7 @@ export default function Pulse({ onDataLoad }) {
               </div>
             )
           })}
-        </>
+        </div>
       )}
 
       {(d.todayFocus || []).length > 0 && (
