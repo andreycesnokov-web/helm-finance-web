@@ -166,7 +166,7 @@ export default function Add() {
                 </div>
               ))}
               <button onClick={save} disabled={saving} style={{
-                width: '100%', padding: 13, borderRadius: 12, background: '#1D9E75',
+                width: '100%', padding: 13, borderRadius: 12, background: 'var(--brand)',
                 color: '#fff', border: 'none', fontSize: 14, fontWeight: 500, marginTop: 4
               }}>
                 {saving ? 'Saving...' : `✅ Save ${result.length} transaction${result.length !== 1 ? 's' : ''}`}
