@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { apiFetch, fmt, daysUntil } from '../lib/api'
 import DebtPaymentModal from '../components/DebtPaymentModal'
+import DebtFormModal from '../components/DebtFormModal'
 
 function getStatusPill(days, isSettled) {
   if (isSettled) return { cls: 'paid',     label: 'Received' }
@@ -78,9 +79,10 @@ function DebtRow({ debt, accounts, token, onRefresh }) {
 export default function Receivables() {
   const { token } = useAuth()
   const navigate  = useNavigate()
-  const [data, setData]       = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError]     = useState('')
+  const [data, setData]         = useState(null)
+  const [loading, setLoading]   = useState(true)
+  const [error, setError]       = useState('')
+  const [showForm, setShowForm] = useState(false)
 
   const load = useCallback(() => {
     setLoading(true)
@@ -113,7 +115,7 @@ export default function Receivables() {
           <div className="page-header-title">Receivables</div>
           <div className="page-header-sub">Money expected from clients and partners</div>
         </div>
-        <button className="page-header-action" onClick={() => navigate('/transactions')}>Transactions</button>
+        <button className="page-header-action" onClick={() => setShowForm(true)}>+ New</button>
       </div>
 
       {error && <div className="page-error">{error}</div>}
@@ -206,6 +208,16 @@ export default function Receivables() {
         <div style={{ textAlign: 'center', paddingBottom: 16 }}>
           <button className="link-btn" onClick={() => navigate('/transactions')}>View all transactions →</button>
         </div>
+      )}
+
+      {/* ── Create modal ─── */}
+      {showForm && (
+        <DebtFormModal
+          mode="receivable"
+          token={token}
+          onClose={() => setShowForm(false)}
+          onSuccess={() => { setShowForm(false); load() }}
+        />
       )}
 
     </div>
