@@ -5,13 +5,29 @@ const jwt = require('jsonwebtoken');
 const { createClient } = require('@supabase/supabase-js');
 require('dotenv').config();
 
+// --- Environment validation (fail fast, never log secret values) -----------
+
+const REQUIRED_ENV = [
+  'SUPABASE_URL',
+  'SUPABASE_SECRET_KEY',
+  'BOT_TOKEN',
+  'JWT_SECRET',
+];
+
+const missing = REQUIRED_ENV.filter(k => !process.env[k]);
+if (missing.length > 0) {
+  console.error(`FATAL: Missing required environment variables: ${missing.join(', ')}`);
+  console.error('Set these variables before starting the server.');
+  process.exit(1);
+}
+
 const app = express();
 app.use(cors({ origin: process.env.CLIENT_URL || 'http://localhost:5173' }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.static('client/dist'));
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SECRET_KEY);
-const JWT_SECRET = process.env.JWT_SECRET || 'helm-finance-secret';
+const JWT_SECRET = process.env.JWT_SECRET;
 const BOT_TOKEN = process.env.BOT_TOKEN;
 
 // --- Telegram Login verification ------------------------------------------
@@ -73,12 +89,12 @@ app.get('/api/pulse', auth, async (req, res) => {
     const now = new Date();
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
 
-    // ALL transactions ever � for total balance
+    // ALL transactions ever · for total balance
     let allTxQuery = supabase.from('transactions').select('*').eq('user_id', userId);
     if (scope !== 'all') allTxQuery = allTxQuery.eq('scope', scope);
     const { data: allTxs } = await allTxQuery;
 
-    // This month transactions � for burn rate
+    // This month transactions · for burn rate
     let txQuery = supabase.from('transactions').select('*')
       .eq('user_id', userId).gte('created_at', monthStart);
     if (scope !== 'all') txQuery = txQuery.eq('scope', scope);
@@ -145,7 +161,7 @@ app.get('/api/pulse', auth, async (req, res) => {
         todayFocus.push({
           id: d.id,
          title: d.type === 'receivable' ? `Remind ${d.counterparty} to pay` : `Pay ${d.counterparty}`,
-          meta: `${Number(d.amount).toLocaleString('en-US')} IDR � ${daysLeft > 0 ? daysLeft + ' days' : 'today'}`,
+          meta: `${Number(d.amount).toLocaleString('en-US')} IDR · ${daysLeft > 0 ? daysLeft + ' days' : 'today'}`,
           type: d.type === 'receivable' ? 'receivable' : 'payable',
           done: false
         });
@@ -205,7 +221,7 @@ app.get('/api/transactions', auth, async (req, res) => {
   else if (period === 'week') { from = new Date(now); from.setDate(now.getDate() - 7); }
   else from = new Date(now.getFullYear(), now.getMonth(), 1);
 
-  let query = supabase.from('transactions').select('*, categories(name, emoji)')
+  let query = supabase.from('transactions').select('*')
     .eq('user_id', req.user.userId)
     .gte('created_at', from.toISOString())
     .order('created_at', { ascending: false });
@@ -233,6 +249,32 @@ app.patch('/api/reminders/:id/done', auth, async (req, res) => {
   res.json(data);
 });
 
+app.patch('/api/reminders/:id/snooze', auth, async (req, res) => {
+  const { days, until } = req.body;
+  let snoozedUntil;
+
+  if (until !== undefined) {
+    const d = new Date(until);
+    if (isNaN(d.getTime())) return res.status(400).json({ error: 'Invalid date format' });
+    if (d <= new Date()) return res.status(400).json({ error: 'Snooze date must be in the future' });
+    snoozedUntil = d.toISOString();
+  } else if (days !== undefined) {
+    const n = Number(days);
+    if (![1, 3, 7].includes(n)) return res.status(400).json({ error: 'days must be 1, 3, or 7' });
+    snoozedUntil = new Date(Date.now() + n * 86400000).toISOString();
+  } else {
+    return res.status(400).json({ error: 'Provide days (1, 3, or 7) or until (ISO date string)' });
+  }
+
+  const { data, error } = await supabase.from('reminders')
+    .update({ snoozed_until: snoozedUntil })
+    .eq('id', req.params.id)
+    .eq('user_id', req.user.userId)
+    .select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data);
+});
+
 // --- Parse API (AI) --------------------------------------------------------
 
 const Anthropic = require('@anthropic-ai/sdk');
@@ -246,10 +288,18 @@ app.post('/api/parse', auth, async (req, res) => {
       max_tokens: 1000,
       messages: [{
         role: 'user',
-        content: `????? ??? ?????????? ? ??????. ????? ?????? JSON ?????? ??? markdown:
-[{"type":"expense ??? income","amount":?????,"currency":"IDR","description":"????????","source":"???????? ??? null","scope":"personal ??? business","project":"Helm Care ??? null"}]
+        content: `Ты финансовый ассистент. Найди ВСЕ транзакции в тексте.
 
-?????: "${text}"`
+Верни ТОЛЬКО JSON массив без markdown, без пояснений:
+[{"type":"expense или income","amount":число,"currency":"IDR по умолчанию","description":"краткое описание","source":"счёт или null","scope":"personal или business","project":"проект или null","category":"категория или null"}]
+
+Правила:
+- Суммы всегда положительные. Тип определяет знак.
+- source: название счёта/кошелька если упомянуто, иначе null.
+- scope: "personal" если не ясно.
+- Валюта: IDR если не указана.
+
+Текст: "${text}"`
       }]
     });
     const raw = response.content[0].text.trim().replace(/\`\`\`json\n?/g, '').replace(/\`\`\`\n?/g, '').trim();
@@ -264,15 +314,16 @@ app.post('/api/transactions/batch', auth, async (req, res) => {
   try {
     const { transactions } = req.body;
     const rows = transactions.map(t => ({
-      user_id: req.user.userId,
-      type: t.type,
-      amount_original: t.amount,
+      user_id:           req.user.userId,
+      type:              t.type,
+      amount_original:   t.amount,
       currency_original: t.currency || 'IDR',
-      amount_idr: t.currency === 'IDR' ? t.amount : null,
-      description: t.description,
-      source: t.source || null,
-      scope: t.scope || 'personal',
-      project: t.project || null,
+      amount_idr:        t.currency === 'IDR' ? t.amount : (t.amount_idr || t.amount),
+      description:       t.description,
+      source:            t.source   || null,
+      scope:             t.scope    || 'personal',
+      project:           t.project  || null,
+      category:          t.category || null,
     }));
     const { error } = await supabase.from('transactions').insert(rows);
     if (error) throw error;
@@ -293,7 +344,7 @@ app.post('/api/accounts/adjust', auth, async (req, res) => {
     amount_original: Math.abs(diff),
     currency_original: 'IDR',
     amount_idr: Math.abs(diff),
-    description: `Balance adjustment � ${name}`,
+    description: `Balance adjustment · ${name}`,
     source: name,
     scope: type || 'personal',
   })
@@ -316,8 +367,10 @@ app.post('/api/accounts/rename', auth, async (req, res) => {
   const { oldName, newName, type } = req.body
   if (!oldName || !newName) return res.status(400).json({ error: 'Missing fields' })
   // Update all transactions where source = oldName
+  const updates = { source: newName }
+  if (type !== undefined) updates.scope = type
   const { error } = await supabase.from('transactions')
-    .update({ source: newName, scope: type })
+    .update(updates)
     .eq('user_id', req.user.userId)
     .eq('source', oldName)
   if (error) return res.status(500).json({ error: error.message })
@@ -333,7 +386,7 @@ app.post('/api/accounts', auth, async (req, res) => {
     amount_original: balance || 0,
     currency_original: 'IDR',
     amount_idr: balance || 0,
-    description: `Opening balance � ${name}`,
+    description: `Opening balance · ${name}`,
     source: name,
     scope: type || 'personal',
   })

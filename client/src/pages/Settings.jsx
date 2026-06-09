@@ -183,7 +183,7 @@ export default function Settings() {
       <div style={{ textAlign: 'center', fontSize: 11, color: 'var(--text-3)', paddingBottom: 32 }}>{t('settings.version')}</div>
 
       {showLang && (
-        <div onClick={() => setShowLang(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 200, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', maxWidth: 430, margin: '0 auto' }}>
+        <div onClick={() => setShowLang(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 200, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
           <div onClick={e => e.stopPropagation()} style={{ background: 'var(--bg)', borderRadius: '16px 16px 0 0', padding: '20px 0 32px', width: '100%', maxHeight: '70vh', overflow: 'auto' }}>
             <div style={{ width: 36, height: 3, background: 'var(--border-2)', borderRadius: 2, margin: '0 auto 16px' }} />
             <div style={{ fontSize: 15, fontWeight: 600, padding: '0 16px 12px' }}>{t('settings.selectLanguage')}</div>
@@ -201,7 +201,7 @@ export default function Settings() {
       )}
 
       {showTz && (
-        <div onClick={() => setShowTz(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 200, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', maxWidth: 430, margin: '0 auto' }}>
+        <div onClick={() => setShowTz(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 200, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
           <div onClick={e => e.stopPropagation()} style={{ background: 'var(--bg)', borderRadius: '16px 16px 0 0', padding: '20px 0 32px', width: '100%', maxHeight: '70vh', overflow: 'auto' }}>
             <div style={{ width: 36, height: 3, background: 'var(--border-2)', borderRadius: 2, margin: '0 auto 16px' }} />
             <div style={{ fontSize: 15, fontWeight: 600, padding: '0 16px 12px' }}>{t('settings.selectTimezone')}</div>
@@ -216,7 +216,7 @@ export default function Settings() {
       )}
 
       {showLogout && (
-        <div onClick={() => setShowLogout(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 200, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', maxWidth: 430, margin: '0 auto' }}>
+        <div onClick={() => setShowLogout(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 200, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
           <div onClick={e => e.stopPropagation()} style={{ background: 'var(--bg)', borderRadius: '16px 16px 0 0', padding: '20px 16px 32px', width: '100%' }}>
             <div style={{ width: 36, height: 3, background: 'var(--border-2)', borderRadius: 2, margin: '0 auto 16px' }} />
             <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 8 }}>{t('settings.signOutConfirm')}</div>
