@@ -876,9 +876,11 @@ body {
 }
 
 @media (min-width: 1024px) {
-  .pulse-desktop-grid {
+  /* 1fr : 300px ≈ 1.8× ratio on typical 880px desktop-main */
+  .pulse-desktop-grid,
+  .pulse-dashboard-grid {
     display: grid;
-    grid-template-columns: 1fr 320px;
+    grid-template-columns: 1fr 300px;
     align-items: start;
     gap: 0;
   }

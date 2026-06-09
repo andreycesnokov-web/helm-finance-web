@@ -5,16 +5,20 @@ import { useAuth } from '../hooks/useAuth'
 import { apiFetch, fmt, fmtFull, daysUntil } from '../lib/api'
 
 const SCOPE_LABELS = { all: 'All', business: 'Business', personal: 'Personal' }
+
+// Hero card palette — premium dark tones for strong visual presence
 const STATUS = {
-  healthy:   { bg: '#16A34A', label: 'Healthy' },
-  attention: { bg: '#D97706', label: 'Attention' },
-  critical:  { bg: '#E24B4A', label: 'Critical' },
+  healthy:   { bg: '#027A48', label: 'Healthy'   },
+  attention: { bg: '#B54708', label: 'Attention' },
+  critical:  { bg: '#B42318', label: 'Critical'  },
 }
+
+// Today's Focus pill colours — use CSS tokens
 const getPill = (type) => ({
-  payable:    { bg: '#FCEBEB', color: '#A32D2D', text: 'Payable' },
-  receivable: { bg: '#EAF3DE', color: '#3B6D11', text: 'Receivable' },
-  reminder:   { bg: '#FAEEDA', color: '#633806', text: 'Reminder' },
-}[type] || { bg: '#F3F4F6', color: '#6B7280', text: type })
+  payable:    { bg: 'var(--red-light)',   color: 'var(--red-dark)',   text: 'Payable'    },
+  receivable: { bg: 'var(--green-light)', color: 'var(--green-dark)', text: 'Receivable' },
+  reminder:   { bg: 'var(--amber-light)', color: 'var(--amber-dark)', text: 'Reminder'   },
+}[type] || { bg: 'var(--bg-3)', color: 'var(--text-3)', text: type })
 
 // ── AI CFO Insight helpers ────────────────────────────────────────────────────
 
@@ -30,17 +34,20 @@ function getInsightContent(d) {
   return { urgency: 'healthy', text: 'Finances look stable. Keep tracking income, expenses, and upcoming obligations.' }
 }
 
+// AI status badge colours — use CSS tokens
 const URGENCY = {
-  healthy:   { badge: '#15803D', badgeBg: '#DCFCE7', label: 'Looking good'    },
-  attention: { badge: '#B45309', badgeBg: '#FEF3C7', label: 'Needs attention' },
-  critical:  { badge: '#DC2626', badgeBg: '#FEE2E2', label: 'Critical'        },
+  healthy:   { badge: 'var(--green-dark)',  badgeBg: 'var(--green-light)',  label: 'Looking good'    },
+  attention: { badge: 'var(--amber-dark)',  badgeBg: 'var(--amber-light)', label: 'Needs attention' },
+  critical:  { badge: 'var(--red-dark)',    badgeBg: 'var(--red-light)',   label: 'Critical'        },
 }
 
+// Next Best Action card colours — use CSS tokens
 const ACTION_COLORS = {
-  green:   { bg: '#DCFCE7', color: '#15803D' },
-  red:     { bg: '#FEE2E2', color: '#DC2626' },
-  amber:   { bg: '#FEF3C7', color: '#B45309' },
-  default: { bg: 'var(--bg-3)', color: 'var(--text-3)' },
+  green:   { bg: 'var(--green-light)', color: 'var(--green-dark)' },
+  red:     { bg: 'var(--red-light)',   color: 'var(--red-dark)'   },
+  amber:   { bg: 'var(--amber-light)', color: 'var(--amber-dark)' },
+  blue:    { bg: 'var(--blue-light)',  color: 'var(--blue-dark)'  },
+  default: { bg: 'var(--bg-3)',        color: 'var(--text-3)'     },
 }
 
 function buildNextActions(d, navigate) {
@@ -63,6 +70,10 @@ function buildNextActions(d, navigate) {
   const overdue = debts.filter(x => !x.is_settled && daysUntil(x.due_date) <= 0)
   if (overdue.length > 0)
     acts.push({ icon: '!', colorKey: 'red',      title: 'Resolve urgent items',  meta: overdue.length + ' overdue', action: scrollAct })
+
+  // Always offer Review transactions as a safe default action
+  if (acts.length < 4)
+    acts.push({ icon: '→', colorKey: 'blue',     title: 'Review transactions',   meta: 'View all money movements', action: () => navigate('/transactions') })
 
   return acts.slice(0, 4)
 }
@@ -186,7 +197,7 @@ export default function Pulse({ onDataLoad }) {
             {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
           </div>
         </div>
-        <div onClick={() => navigate('/settings')} style={{ width: 28, height: 28, borderRadius: '50%', background: '#B5D4F4', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 600, color: '#0C447C', cursor: 'pointer' }}>
+        <div onClick={() => navigate('/settings')} style={{ width: 28, height: 28, borderRadius: '50%', background: 'var(--brand-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 600, color: 'var(--brand-dark)', cursor: 'pointer', border: '1px solid rgba(21,94,239,.15)' }}>
           {user?.firstName?.[0] || 'A'}
         </div>
       </div>
@@ -196,7 +207,7 @@ export default function Pulse({ onDataLoad }) {
           <button key={k} onClick={() => setScope(k)} style={{
             padding: '5px 16px', borderRadius: 20, fontSize: 12, cursor: 'pointer',
             border: scope === k ? 'none' : '0.5px solid var(--border)',
-            background: scope === k ? 'var(--text)' : 'none',
+            background: scope === k ? 'var(--brand)' : 'none',
             color: scope === k ? '#fff' : 'var(--text-3)',
             fontWeight: scope === k ? 500 : 400,
           }}>{v}</button>
@@ -332,15 +343,15 @@ export default function Pulse({ onDataLoad }) {
 
           {/* Receivables / Payables mini grid */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, margin: '0 16px 12px' }}>
-            <div style={{ background: '#DCFCE7', borderRadius: 16, padding: '12px 14px' }}>
-              <div style={{ fontSize: 10, color: '#15803D', marginBottom: 4 }}>They owe you</div>
-              <div style={{ fontSize: 24, fontWeight: 500, color: '#16A34A', lineHeight: 1.1 }}>{fmt(d.receivables)}</div>
-              <div style={{ fontSize: 10, color: '#16A34A', marginTop: 3 }}>{debts.filter(x => x.type === 'receivable').length} receivable</div>
+            <div style={{ background: 'var(--green-light)', borderRadius: 16, padding: '12px 14px' }}>
+              <div style={{ fontSize: 10, color: 'var(--green-dark)', marginBottom: 4 }}>They owe you</div>
+              <div style={{ fontSize: 24, fontWeight: 500, color: 'var(--green-dark)', lineHeight: 1.1 }}>{fmt(d.receivables)}</div>
+              <div style={{ fontSize: 10, color: 'var(--green)', marginTop: 3 }}>{debts.filter(x => x.type === 'receivable').length} receivable</div>
             </div>
-            <div style={{ background: '#FEE2E2', borderRadius: 16, padding: '12px 14px' }}>
-              <div style={{ fontSize: 10, color: '#B91C1C', marginBottom: 4 }}>You owe</div>
-              <div style={{ fontSize: 24, fontWeight: 500, color: '#E24B4A', lineHeight: 1.1 }}>{fmt(d.payables)}</div>
-              <div style={{ fontSize: 10, color: '#E24B4A', marginTop: 3 }}>{debts.filter(x => x.type === 'payable').length} payable</div>
+            <div style={{ background: 'var(--red-light)', borderRadius: 16, padding: '12px 14px' }}>
+              <div style={{ fontSize: 10, color: 'var(--red-dark)', marginBottom: 4 }}>You owe</div>
+              <div style={{ fontSize: 24, fontWeight: 500, color: 'var(--red-dark)', lineHeight: 1.1 }}>{fmt(d.payables)}</div>
+              <div style={{ fontSize: 10, color: 'var(--red)', marginTop: 3 }}>{debts.filter(x => x.type === 'payable').length} payable</div>
             </div>
           </div>
 
@@ -356,7 +367,7 @@ export default function Pulse({ onDataLoad }) {
                 return (
                   <div key={debt.id} style={{ margin: '0 16px 8px', background: 'var(--bg)', border: '0.5px solid var(--border)', borderRadius: 20, padding: '12px 14px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <div style={{ width: 34, height: 34, borderRadius: 10, background: isOut ? '#FCEBEB' : '#EAF3DE', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 15, color: isOut ? '#A32D2D' : '#3B6D11' }}>
+                      <div style={{ width: 34, height: 34, borderRadius: 10, background: isOut ? 'var(--red-light)' : 'var(--green-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 15, color: isOut ? 'var(--red-dark)' : 'var(--green-dark)' }}>
                         {isOut ? '↑' : '↓'}
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
@@ -364,22 +375,22 @@ export default function Pulse({ onDataLoad }) {
                         <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 1 }}>{debt.description}</div>
                       </div>
                       <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                        <div style={{ fontSize: 15, fontWeight: 500, color: isOut ? '#E24B4A' : '#16A34A' }}>
+                        <div style={{ fontSize: 15, fontWeight: 500, color: isOut ? 'var(--red-dark)' : 'var(--green-dark)' }}>
                           {isOut ? '-' : '+'}{fmt(debt.amount)}
                         </div>
-                        <div style={{ fontSize: 9, padding: '2px 7px', borderRadius: 8, background: days < 0 ? '#FCEBEB' : '#FAEEDA', color: days < 0 ? '#A32D2D' : '#633806', display: 'inline-block', marginTop: 3 }}>
+                        <div style={{ fontSize: 9, padding: '2px 7px', borderRadius: 8, background: days < 0 ? 'var(--red-light)' : 'var(--amber-light)', color: days < 0 ? 'var(--red-dark)' : 'var(--amber-dark)', display: 'inline-block', marginTop: 3 }}>
                           {days < 0 ? 'Overdue' : days === 0 ? 'Today' : days + 'd left'}
                         </div>
                       </div>
                     </div>
                     <div style={{ height: 3, background: 'var(--bg-2)', borderRadius: 2, margin: '10px 0 8px', overflow: 'hidden' }}>
-                      <div style={{ height: '100%', borderRadius: 2, background: days < 0 ? '#E24B4A' : isOut ? '#D97706' : '#16A34A', width: Math.min(100, Math.max(5, days < 0 ? 100 : 100 - days * 5)) + '%' }} />
+                      <div style={{ height: '100%', borderRadius: 2, background: days < 0 ? 'var(--red)' : isOut ? 'var(--amber)' : 'var(--green)', width: Math.min(100, Math.max(5, days < 0 ? 100 : 100 - days * 5)) + '%' }} />
                     </div>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 7 }}>
                       <button onClick={() => openSnooze({ id: debt.id, entityType: 'debt', title: debt.counterparty, subtitle: fmt(debt.amount) + ' IDR' })} style={{ padding: '9px 0', borderRadius: 12, fontSize: 12, border: '0.5px solid var(--border)', background: 'none', color: 'var(--text-3)', cursor: 'pointer' }}>
                         {isOut ? 'Snooze' : 'Remind'}
                       </button>
-                      <button onClick={() => { setPayModal(debt); setPayForm({ amount: String(debt.amount), account: '' }) }} style={{ padding: '9px 0', borderRadius: 12, fontSize: 12, border: 'none', background: 'var(--text)', color: '#fff', fontWeight: 500, cursor: 'pointer' }}>
+                      <button onClick={() => { setPayModal(debt); setPayForm({ amount: String(debt.amount), account: '' }) }} style={{ padding: '9px 0', borderRadius: 12, fontSize: 12, border: 'none', background: 'var(--brand)', color: '#fff', fontWeight: 500, cursor: 'pointer' }}>
                         {isOut ? 'Pay now' : 'Mark paid'}
                       </button>
                     </div>
@@ -459,10 +470,10 @@ export default function Pulse({ onDataLoad }) {
           <div className="pulse-section-label" style={{ paddingTop: 12 }}>FINANCIAL VITALS</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 7, padding: '0 16px 24px' }}>
             {[
-              { label: 'RUNWAY',       value: d.runway + 'd',           sub: 'at current burn',  color: (d.runway||0) > 14 ? '#16A34A' : (d.runway||0) > 7 ? '#D97706' : '#E24B4A', bar: Math.min(100, Math.max(5, (d.runway||0) * 3)), barColor: (d.runway||0) > 14 ? '#16A34A' : (d.runway||0) > 7 ? '#D97706' : '#E24B4A' },
-              { label: 'BURN RATE',    value: fmt(d.burnRate) + '/d',   sub: '30-day avg',       color: 'var(--text)', bar: 40, barColor: '#38BDF8' },
-              { label: 'EXPECTED IN',  value: '+' + fmt(d.receivables), sub: 'receivables',      color: '#16A34A', bar: (d.receivables||0) > 0 ? 60 : 0, barColor: '#16A34A' },
-              { label: 'EXPECTED OUT', value: '-' + fmt(d.payables),    sub: 'payables',         color: (d.payables||0) > 0 ? '#D97706' : 'var(--text-3)', bar: (d.payables||0) > 0 ? 80 : 0, barColor: '#D97706' },
+              { label: 'RUNWAY',       value: d.runway + 'd',           sub: 'at current burn',  color: (d.runway||0) > 14 ? 'var(--green-dark)' : (d.runway||0) > 7 ? 'var(--amber-dark)' : 'var(--red-dark)', bar: Math.min(100, Math.max(5, (d.runway||0) * 3)), barColor: (d.runway||0) > 14 ? 'var(--green)' : (d.runway||0) > 7 ? 'var(--amber)' : 'var(--red)' },
+              { label: 'BURN RATE',    value: fmt(d.burnRate) + '/d',   sub: '30-day avg',       color: 'var(--text)', bar: 40, barColor: 'var(--blue)' },
+              { label: 'EXPECTED IN',  value: '+' + fmt(d.receivables), sub: 'receivables',      color: 'var(--green-dark)', bar: (d.receivables||0) > 0 ? 60 : 0, barColor: 'var(--green)' },
+              { label: 'EXPECTED OUT', value: '-' + fmt(d.payables),    sub: 'payables',         color: (d.payables||0) > 0 ? 'var(--amber-dark)' : 'var(--text-3)', bar: (d.payables||0) > 0 ? 80 : 0, barColor: 'var(--amber)' },
             ].map(v => (
               <div key={v.label} style={{ background: 'var(--bg-2)', borderRadius: 16, padding: '12px 13px', border: '0.5px solid var(--border)' }}>
                 <div style={{ fontSize: 9, fontWeight: 500, color: 'var(--text-3)', letterSpacing: '0.06em', marginBottom: 4 }}>{v.label}</div>
@@ -485,8 +496,8 @@ export default function Pulse({ onDataLoad }) {
         <Modal onClose={() => setShowAnalysis(false)}>
           <div style={{ fontSize: 17, fontWeight: 500, color: 'var(--text)', marginBottom: 4 }}>Financial Analysis</div>
           <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 14 }}>{st.label} · {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</div>
-          <div style={{ background: 'rgba(14,165,233,.08)', border: '0.5px solid rgba(14,165,233,.25)', borderRadius: 14, padding: '11px 13px', marginBottom: 10 }}>
-            <div style={{ fontSize: 9, color: '#0369A1', letterSpacing: '0.06em', marginBottom: 4 }}>AI CFO SUMMARY</div>
+          <div style={{ background: 'var(--blue-light)', border: '0.5px solid rgba(21,94,239,.2)', borderRadius: 14, padding: '11px 13px', marginBottom: 10 }}>
+            <div style={{ fontSize: 9, color: 'var(--brand-dark)', letterSpacing: '0.06em', marginBottom: 4 }}>AI CFO SUMMARY</div>
             <div style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.5, fontWeight: 500 }}>{d.aiText}</div>
           </div>
           {[
@@ -502,12 +513,12 @@ export default function Pulse({ onDataLoad }) {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 7, marginBottom: 12 }}>
             <div style={{ background: 'var(--bg-2)', borderRadius: 12, padding: 10, border: '0.5px solid var(--border)' }}>
               <div style={{ fontSize: 9, color: 'var(--text-3)', letterSpacing: '0.06em', marginBottom: 3 }}>IF INCOME TODAY</div>
-              <div style={{ fontSize: 16, fontWeight: 500, color: '#16A34A' }}>+{Math.round(5000000 / ((d.burnRate||1)))} days</div>
+              <div style={{ fontSize: 16, fontWeight: 500, color: 'var(--green-dark)' }}>+{Math.round(5000000 / ((d.burnRate||1)))} days</div>
               <div style={{ fontSize: 10, color: 'var(--text-3)' }}>runway impact</div>
             </div>
             <div style={{ background: 'var(--bg-2)', borderRadius: 12, padding: 10, border: '0.5px solid var(--border)' }}>
               <div style={{ fontSize: 9, color: 'var(--text-3)', letterSpacing: '0.06em', marginBottom: 3 }}>IF NO ACTION</div>
-              <div style={{ fontSize: 16, fontWeight: 500, color: '#E24B4A' }}>{fmt(d.netPosition)}</div>
+              <div style={{ fontSize: 16, fontWeight: 500, color: 'var(--red-dark)' }}>{fmt(d.netPosition)}</div>
               <div style={{ fontSize: 10, color: 'var(--text-3)' }}>in 30 days</div>
             </div>
           </div>
@@ -538,7 +549,7 @@ export default function Pulse({ onDataLoad }) {
           </select>
           <button disabled={!payForm.amount || paying} onClick={handlePay} style={{
             ...btnP,
-            background: payForm.amount ? (payModal.type === 'receivable' ? '#16A34A' : 'var(--text)') : 'var(--bg-2)',
+            background: payForm.amount ? (payModal.type === 'receivable' ? 'var(--green-dark)' : 'var(--brand)') : 'var(--bg-2)',
             color: payForm.amount ? '#fff' : 'var(--text-3)'
           }}>
             {paying ? 'Processing...' : Number(payForm.amount) >= Number(payModal.amount)
@@ -589,8 +600,8 @@ export default function Pulse({ onDataLoad }) {
             <div style={{ fontSize: 12, color: 'var(--red)', marginBottom: 8, padding: '8px 12px', background: 'var(--red-light)', borderRadius: 10 }}>{snoozeError}</div>
           )}
           {snoozeModal.entityType === 'debt' && (
-            <div style={{ background: 'rgba(14,165,233,.08)', border: '0.5px solid rgba(14,165,233,.25)', borderRadius: 14, padding: '10px 12px', marginBottom: 10 }}>
-              <div style={{ fontSize: 11, color: '#0369A1', lineHeight: 1.5 }}>Debt snooze tracking coming soon. This will dismiss for now.</div>
+            <div style={{ background: 'var(--blue-light)', border: '0.5px solid rgba(21,94,239,.2)', borderRadius: 14, padding: '10px 12px', marginBottom: 10 }}>
+              <div style={{ fontSize: 11, color: 'var(--brand-dark)', lineHeight: 1.5 }}>Debt snooze tracking coming soon. This will dismiss for now.</div>
             </div>
           )}
           <button onClick={() => { setSnoozeModal(null); setSnoozeError(''); setCustomDate('') }} style={btnS}>Cancel</button>
