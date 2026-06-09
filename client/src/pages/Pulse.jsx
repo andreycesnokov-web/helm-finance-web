@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { apiFetch, fmt, fmtFull, daysUntil } from '../lib/api'
@@ -16,21 +17,22 @@ const getPill = (type) => ({
   reminder:   { bg: '#FAEEDA', color: '#633806', text: 'Reminder' },
 }[type] || { bg: '#F3F4F6', color: '#6B7280', text: type })
 
-const Modal = ({ onClose, children }) => (
+const Modal = ({ onClose, children }) => createPortal(
   <div onClick={onClose} style={{
-    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-    background: 'rgba(0,0,0,.55)', zIndex: 9999,
+    position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh',
+    background: 'rgba(0,0,0,.6)', zIndex: 99999,
     display: 'flex', alignItems: 'flex-end', justifyContent: 'center'
   }}>
     <div onClick={e => e.stopPropagation()} style={{
       background: 'var(--bg)', borderRadius: '24px 24px 0 0',
-      padding: '16px 18px 36px', width: '100%', maxWidth: 480,
-      boxShadow: '0 -4px 40px rgba(0,0,0,.2)'
+      padding: '16px 18px 36px', width: '100%', maxWidth: 520,
+      boxShadow: '0 -8px 40px rgba(0,0,0,.3)'
     }}>
       <div style={{ width: 36, height: 4, background: 'var(--border-2)', borderRadius: 2, margin: '0 auto 16px' }} />
       {children}
     </div>
-  </div>
+  </div>,
+  document.body
 )
 
 export default function Pulse({ onDataLoad }) {
@@ -84,8 +86,8 @@ export default function Pulse({ onDataLoad }) {
     return n.includes('permata') || n.includes('bca') || n.includes('bni') || n.includes('helm care') || n.includes('wise')
   }).slice(0, 5)
 
-  const btnPrimary = { padding: '12px 0', borderRadius: 14, border: 'none', fontSize: 13, fontWeight: 500, cursor: 'pointer', width: '100%', marginBottom: 8 }
-  const btnSecondary = { ...btnPrimary, background: 'none', border: '0.5px solid var(--border)', color: 'var(--text-3)', marginBottom: 0 }
+  const btnP = { padding: '12px 0', borderRadius: 14, border: 'none', fontSize: 13, fontWeight: 500, cursor: 'pointer', width: '100%', marginBottom: 8 }
+  const btnS = { ...btnP, background: 'none', border: '0.5px solid var(--border)', color: 'var(--text-3)', marginBottom: 0 }
 
   return (
     <div className="page">
@@ -304,7 +306,7 @@ export default function Pulse({ onDataLoad }) {
               <div style={{ fontSize: 10, color: 'var(--text-3)' }}>in 30 days</div>
             </div>
           </div>
-          <button onClick={() => setShowAnalysis(false)} style={{ ...btnPrimary, background: 'var(--text)', color: '#fff' }}>Close</button>
+          <button onClick={() => setShowAnalysis(false)} style={{ ...btnP, background: 'var(--text)', color: '#fff' }}>Close</button>
         </Modal>
       )}
 
@@ -330,7 +332,7 @@ export default function Pulse({ onDataLoad }) {
             {(d.accounts || []).map(a => <option key={a.name} value={a.name}>{a.name} · {fmt(a.balance)}</option>)}
           </select>
           <button disabled={!payForm.amount || paying} onClick={handlePay} style={{
-            ...btnPrimary,
+            ...btnP,
             background: payForm.amount ? (payModal.type === 'receivable' ? '#16A34A' : 'var(--text)') : 'var(--bg-2)',
             color: payForm.amount ? '#fff' : 'var(--text-3)'
           }}>
@@ -338,7 +340,7 @@ export default function Pulse({ onDataLoad }) {
               ? 'Pay in full · ' + fmt(Number(payForm.amount)) + ' IDR'
               : 'Pay ' + fmt(Number(payForm.amount)) + ' IDR'}
           </button>
-          <button onClick={() => setPayModal(null)} style={btnSecondary}>Cancel</button>
+          <button onClick={() => setPayModal(null)} style={btnS}>Cancel</button>
         </Modal>
       )}
 
@@ -364,7 +366,7 @@ export default function Pulse({ onDataLoad }) {
           <div style={{ background: 'rgba(14,165,233,.08)', border: '0.5px solid rgba(14,165,233,.25)', borderRadius: 14, padding: '10px 12px', marginBottom: 14 }}>
             <div style={{ fontSize: 11, color: '#0369A1', lineHeight: 1.5 }}>Snoozing 3 days deepens deficit by ~{fmt((d.burnRate || 0) * 3)} IDR.</div>
           </div>
-          <button onClick={() => setSnoozeModal(null)} style={btnSecondary}>Cancel</button>
+          <button onClick={() => setSnoozeModal(null)} style={btnS}>Cancel</button>
         </Modal>
       )}
 
