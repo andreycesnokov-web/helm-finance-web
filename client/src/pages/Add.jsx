@@ -147,51 +147,62 @@ export default function Add() {
     }
   }
 
-  const selectStyle = {
-    width: '100%', padding: '9px 11px', borderRadius: 10,
-    border: '0.5px solid var(--border-2)', fontSize: 12,
+  const inputSt = {
+    width: '100%', padding: '12px 14px', borderRadius: 12,
+    border: '0.5px solid var(--border-2)', fontSize: 'var(--text-base)',
     background: 'var(--bg-2)', color: 'var(--text)',
-    boxSizing: 'border-box', fontFamily: 'inherit',
+    boxSizing: 'border-box', fontFamily: 'inherit', outline: 'none', minHeight: 46,
+  }
+  const selectStyle = {
+    ...inputSt, cursor: 'pointer',
+  }
+  const labelSt = {
+    display: 'block', fontSize: 'var(--text-xs)', color: 'var(--text-3)',
+    textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600, marginBottom: 6,
   }
 
   return (
     <div className="page">
-      <div className="topbar">
-        <div style={{ fontSize: 18, fontWeight: 600, color: 'var(--text)' }}>Add</div>
+      <div className="topbar" style={{ padding: '20px 20px 14px' }}>
+        <div>
+          <div style={{ fontSize: 'var(--text-xl)', fontWeight: 700, color: 'var(--text)', letterSpacing: -0.3 }}>Add</div>
+          <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-3)', marginTop: 3 }}>Log transactions, debts, reminders</div>
+        </div>
       </div>
 
       {/* Tab switcher */}
-      <div style={{ display: 'flex', gap: 6, padding: '0 16px 16px' }}>
+      <div style={{ display: 'flex', gap: 6, padding: '0 16px 18px' }}>
         {[
           { key: 'tx', label: '💳 Transaction' },
           { key: 'debt', label: '📋 Debt' },
           { key: 'reminder', label: '🔔 Reminder' },
         ].map(t => (
           <button key={t.key} onClick={() => { setTab(t.key); setSaved(false); setError(''); setSaveMsg('') }} style={{
-            padding: '6px 12px', borderRadius: 20, fontSize: 12, border: '0.5px solid var(--border-2)',
+            padding: '9px 16px', borderRadius: 20, fontSize: 'var(--text-sm)', border: '0.5px solid var(--border-2)',
             background: tab === t.key ? 'var(--text)' : 'none',
-            color: tab === t.key ? '#fff' : 'var(--text-2)', fontWeight: tab === t.key ? 500 : 400
+            color: tab === t.key ? '#fff' : 'var(--text-2)', fontWeight: tab === t.key ? 600 : 400,
+            cursor: 'pointer', fontFamily: 'inherit', transition: 'background .12s',
           }}>{t.label}</button>
         ))}
       </div>
 
       {/* Success */}
       {saved && (
-        <div style={{ margin: '0 16px 16px', background: 'var(--green-light)', borderRadius: 10, padding: '12px 14px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
-            <span style={{ fontSize: 18 }}>✅</span>
-            <span style={{ fontSize: 14, color: 'var(--green-dark)', fontWeight: 500 }}>{saveMsg || 'Saved successfully!'}</span>
+        <div style={{ margin: '0 16px 16px', background: 'var(--green-light)', borderRadius: 14, padding: '14px 16px', border: '1px solid rgba(2,122,72,.12)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
+            <span style={{ fontSize: 20 }}>✅</span>
+            <span style={{ fontSize: 'var(--text-base)', color: 'var(--green-dark)', fontWeight: 600 }}>{saveMsg || 'Saved successfully!'}</span>
           </div>
-          <div style={{ display: 'flex', gap: 12, marginTop: 6 }}>
-            <button onClick={() => navigate('/transactions')} style={{ fontSize: 12, color: 'var(--green-dark)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline' }}>
+          <div style={{ display: 'flex', gap: 16, marginTop: 4 }}>
+            <button onClick={() => navigate('/transactions')} style={{ fontSize: 'var(--text-sm)', color: 'var(--green-dark)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline', fontFamily: 'inherit' }}>
               View transactions →
             </button>
             {Object.values(linkedDebts).some(Boolean) && (
               <>
-                <button onClick={() => navigate('/receivables')} style={{ fontSize: 12, color: 'var(--green-dark)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline' }}>
+                <button onClick={() => navigate('/receivables')} style={{ fontSize: 'var(--text-sm)', color: 'var(--green-dark)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline', fontFamily: 'inherit' }}>
                   Receivables →
                 </button>
-                <button onClick={() => navigate('/payables')} style={{ fontSize: 12, color: 'var(--green-dark)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline' }}>
+                <button onClick={() => navigate('/payables')} style={{ fontSize: 'var(--text-sm)', color: 'var(--green-dark)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline', fontFamily: 'inherit' }}>
                   Payables →
                 </button>
               </>
@@ -202,45 +213,48 @@ export default function Add() {
 
       {/* Error */}
       {error && (
-        <div style={{ margin: '0 16px 16px', background: 'var(--red-light)', borderRadius: 10, padding: '12px 14px' }}>
-          <span style={{ fontSize: 13, color: 'var(--red)' }}>{error}</span>
+        <div style={{ margin: '0 16px 16px', background: 'var(--red-light)', borderRadius: 14, padding: '14px 16px', border: '1px solid rgba(180,35,24,.12)' }}>
+          <span style={{ fontSize: 'var(--text-sm)', color: 'var(--red-dark)' }}>{error}</span>
         </div>
       )}
 
       {/* TRANSACTION TAB */}
       {tab === 'tx' && (
         <div style={{ padding: '0 16px' }}>
-          <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 8 }}>Write naturally in Russian or English</div>
+          <label style={labelSt}>What happened?</label>
           <textarea
             value={text}
             onChange={e => { setText(e.target.value); setSaved(false); setResult(null) }}
             placeholder={'Заплатил 300к за бензин в Убуде\nПолучил 5М с клиента за проект\nКофе 35000 наличными'}
-            style={{ width: '100%', minHeight: 100, borderRadius: 12, border: '0.5px solid var(--border-2)', padding: '12px', fontSize: 14, fontFamily: 'inherit', color: 'var(--text)', background: 'var(--bg)', resize: 'none', lineHeight: 1.6 }}
+            style={{ ...inputSt, minHeight: 110, resize: 'none', lineHeight: 1.6, marginBottom: 10 }}
           />
 
-          {/* Quick tags */}
-          <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
+          {/* Quick chips */}
+          <div style={{ display: 'flex', gap: 6, marginBottom: 14, flexWrap: 'wrap' }}>
             {QUICK.map(q => (
               <button key={q.label} onClick={() => setText(p => p + (p ? '\n' : '') + q.emoji + ' ')} style={{
-                padding: '5px 11px', borderRadius: 20, fontSize: 12, border: '0.5px solid var(--border)',
-                background: 'var(--bg-2)', color: 'var(--text-2)'
+                padding: '7px 14px', borderRadius: 20, fontSize: 'var(--text-sm)', border: '0.5px solid var(--border)',
+                background: 'var(--bg-2)', color: 'var(--text-2)', cursor: 'pointer', fontFamily: 'inherit',
               }}>{q.emoji} {q.label}</button>
             ))}
           </div>
 
           <button onClick={parse} disabled={!text.trim() || loading} style={{
-            width: '100%', marginTop: 12, padding: 13, borderRadius: 12,
-            background: text.trim() ? 'var(--text)' : 'var(--bg-2)',
-            color: text.trim() ? '#fff' : 'var(--text-3)', border: 'none', fontSize: 14, fontWeight: 500
+            width: '100%', marginBottom: 4, padding: '15px 24px', borderRadius: 14,
+            background: text.trim() ? 'var(--brand)' : 'var(--bg-3)',
+            color: text.trim() ? '#fff' : 'var(--text-4)', border: 'none',
+            fontSize: 'var(--text-base)', fontWeight: 700, cursor: text.trim() ? 'pointer' : 'not-allowed',
+            fontFamily: 'inherit', letterSpacing: 0.1, transition: 'background .12s',
+            boxShadow: text.trim() ? '0 2px 8px rgba(21,94,239,.2)' : 'none',
           }}>
-            {loading ? '🤔 Analyzing...' : 'Parse & preview →'}
+            {loading ? '🤔 Analyzing with AI...' : '✦ Parse & preview →'}
           </button>
 
           {/* Parsed result */}
           {result && (
-            <div style={{ marginTop: 16 }}>
-              <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 10 }}>
-                Found {result.length} transaction{result.length !== 1 ? 's' : ''}:
+            <div style={{ marginTop: 18 }}>
+              <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-3)', marginBottom: 12 }}>
+                Found <strong style={{ color: 'var(--text)' }}>{result.length}</strong> transaction{result.length !== 1 ? 's' : ''}:
               </div>
 
               {result.map((t, i) => {
@@ -248,28 +262,30 @@ export default function Add() {
                 const linkedId      = linkedDebts[i] || ''
 
                 return (
-                  <div key={i} style={{ background: 'var(--bg-2)', borderRadius: 12, padding: '12px 14px', marginBottom: 8 }}>
+                  <div key={i} style={{ background: 'var(--bg-2)', borderRadius: 14, padding: '14px 16px', marginBottom: 10, border: '0.5px solid var(--border)' }}>
                     {/* Transaction info */}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: relevantDebts.length > 0 ? 10 : 0 }}>
                       <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text)' }}>{t.description}</div>
-                        {t.source && <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 2 }}>💳 {t.source}</div>}
-                        <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 2 }}>
-                          {t.scope === 'business' ? '💼 Business' : '👤 Personal'}
-                          {t.project ? ` · ${t.project}` : ''}
+                        <div style={{ fontSize: 'var(--text-base)', fontWeight: 600, color: 'var(--text)' }}>{t.description}</div>
+                        <div style={{ display: 'flex', gap: 10, marginTop: 5, flexWrap: 'wrap' }}>
+                          {t.source && <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-3)' }}>💳 {t.source}</span>}
+                          <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-3)' }}>
+                            {t.scope === 'business' ? '💼 Business' : '👤 Personal'}
+                          </span>
+                          {t.project && <span style={{ fontSize: 'var(--text-xs)', color: 'var(--brand)' }}>{t.project}</span>}
                         </div>
                       </div>
-                      <div style={{ fontSize: 16, fontWeight: 600, color: t.type === 'income' ? 'var(--green)' : 'var(--red)', flexShrink: 0, marginLeft: 12 }}>
-                        {t.type === 'income' ? '+' : '-'}{fmt(t.amount)} {t.currency}
+                      <div style={{ fontSize: 'var(--text-md)', fontWeight: 700, color: t.type === 'income' ? 'var(--green-dark)' : 'var(--red-dark)', flexShrink: 0, marginLeft: 14 }}>
+                        {t.type === 'income' ? '+' : '−'}{fmt(t.amount)} {t.currency}
                       </div>
                     </div>
 
-                    {/* Debt link — only shown if relevant open debts exist */}
+                    {/* Debt link */}
                     {relevantDebts.length > 0 && (
-                      <div style={{ marginTop: 10, paddingTop: 10, borderTop: '0.5px solid var(--border)' }}>
-                        <div style={{ fontSize: 10, color: 'var(--text-4)', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                      <div style={{ paddingTop: 10, borderTop: '0.5px solid var(--border)' }}>
+                        <label style={{ ...labelSt, marginBottom: 6 }}>
                           Link to open {t.type === 'income' ? 'receivable' : 'payable'} (optional)
-                        </div>
+                        </label>
                         <select
                           value={linkedId}
                           onChange={e => setLinkedDebts(prev => ({ ...prev, [i]: e.target.value }))}
@@ -281,20 +297,21 @@ export default function Add() {
                           ))}
                         </select>
 
-                        {/* Show partial/close hint if linked */}
                         {linkedId && (() => {
                           const d = openDebts.find(x => x.id === linkedId)
                           if (!d) return null
                           const isPartial = t.amount < Number(d.amount)
                           return (
                             <div style={{
-                              marginTop: 5, fontSize: 11,
+                              marginTop: 8, fontSize: 'var(--text-xs)',
                               color: isPartial ? 'var(--amber-dark)' : 'var(--green-dark)',
-                              display: 'flex', alignItems: 'center', gap: 4,
+                              display: 'flex', alignItems: 'center', gap: 6,
+                              background: isPartial ? 'var(--amber-light)' : 'var(--green-light)',
+                              borderRadius: 8, padding: '7px 10px',
                             }}>
                               {isPartial
-                                ? `⚡ Partial payment — ${fmt(Number(d.amount) - t.amount)} IDR will remain open`
-                                : `✅ Full payment — item will be closed`}
+                                ? `⚡ Partial — ${fmt(Number(d.amount) - t.amount)} IDR remains open`
+                                : `✅ Full payment — this item will be closed`}
                             </div>
                           )
                         })()}
@@ -305,14 +322,18 @@ export default function Add() {
               })}
 
               <button onClick={save} disabled={saving} style={{
-                width: '100%', padding: 13, borderRadius: 12, background: 'var(--brand)',
-                color: '#fff', border: 'none', fontSize: 14, fontWeight: 500, marginTop: 4
+                width: '100%', padding: '15px 24px', borderRadius: 14, background: 'var(--brand)',
+                color: '#fff', border: 'none', fontSize: 'var(--text-base)', fontWeight: 700, marginTop: 4,
+                cursor: 'pointer', fontFamily: 'inherit',
+                boxShadow: '0 2px 8px rgba(21,94,239,.2)',
               }}>
                 {saving ? 'Saving...' : `✅ Save ${result.length} transaction${result.length !== 1 ? 's' : ''}`}
               </button>
               <button onClick={() => setResult(null)} style={{
-                width: '100%', padding: 11, borderRadius: 12, background: 'none',
-                color: 'var(--text-3)', border: '0.5px solid var(--border)', fontSize: 13, marginTop: 8
+                width: '100%', padding: '12px 24px', borderRadius: 14, background: 'none',
+                color: 'var(--text-3)', border: '0.5px solid var(--border)',
+                fontSize: 'var(--text-sm)', fontWeight: 500, marginTop: 8,
+                cursor: 'pointer', fontFamily: 'inherit',
               }}>Cancel</button>
             </div>
           )}
@@ -322,15 +343,18 @@ export default function Add() {
       {/* DEBT TAB */}
       {tab === 'debt' && (
         <div style={{ padding: '0 16px' }}>
-          <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 18 }}>
             {[
               { key: 'receivable', label: '💚 They owe me' },
               { key: 'payable', label: '❤️ I owe them' },
             ].map(t => (
               <button key={t.key} onClick={() => setDebt(p => ({ ...p, type: t.key }))} style={{
-                flex: 1, padding: '10px', borderRadius: 12, fontSize: 13, border: '0.5px solid var(--border-2)',
+                flex: 1, padding: '12px', borderRadius: 12, fontSize: 'var(--text-sm)',
+                border: '0.5px solid var(--border-2)',
                 background: debt.type === t.key ? 'var(--text)' : 'none',
-                color: debt.type === t.key ? '#fff' : 'var(--text-2)', fontWeight: debt.type === t.key ? 500 : 400
+                color: debt.type === t.key ? '#fff' : 'var(--text-2)',
+                fontWeight: debt.type === t.key ? 600 : 400,
+                cursor: 'pointer', fontFamily: 'inherit',
               }}>{t.label}</button>
             ))}
           </div>
@@ -339,30 +363,33 @@ export default function Add() {
             { key: 'counterparty', label: debt.type === 'receivable' ? 'Who owes you?' : 'Who do you owe?', placeholder: 'e.g. Client Ivan, Spa Factory Bali' },
             { key: 'description', label: 'Description', placeholder: 'e.g. Invoice #004, disinfectant order' },
           ].map(f => (
-            <div key={f.key} style={{ marginBottom: 12 }}>
-              <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 6 }}>{f.label}</div>
+            <div key={f.key} style={{ marginBottom: 14 }}>
+              <label style={labelSt}>{f.label}</label>
               <input value={debt[f.key]} onChange={e => setDebt(p => ({ ...p, [f.key]: e.target.value }))}
-                placeholder={f.placeholder} style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: '0.5px solid var(--border-2)', fontSize: 14, background: 'var(--bg)', color: 'var(--text)' }} />
+                placeholder={f.placeholder} style={inputSt} />
             </div>
           ))}
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 16 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 18 }}>
             <div>
-              <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 6 }}>Amount (IDR)</div>
+              <label style={labelSt}>Amount (IDR)</label>
               <input type="number" value={debt.amount} onChange={e => setDebt(p => ({ ...p, amount: e.target.value }))}
-                placeholder="5000000" style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: '0.5px solid var(--border-2)', fontSize: 14, background: 'var(--bg)', color: 'var(--text)' }} />
+                placeholder="5000000" style={inputSt} />
             </div>
             <div>
-              <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 6 }}>Due date</div>
+              <label style={labelSt}>Due date</label>
               <input type="date" value={debt.due_date} onChange={e => setDebt(p => ({ ...p, due_date: e.target.value }))}
-                style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: '0.5px solid var(--border-2)', fontSize: 14, background: 'var(--bg)', color: 'var(--text)' }} />
+                style={inputSt} />
             </div>
           </div>
 
           <button onClick={saveDebt} disabled={!debt.counterparty || !debt.amount || saving} style={{
-            width: '100%', padding: 13, borderRadius: 12,
-            background: debt.counterparty && debt.amount ? 'var(--text)' : 'var(--bg-2)',
-            color: debt.counterparty && debt.amount ? '#fff' : 'var(--text-3)', border: 'none', fontSize: 14, fontWeight: 500
+            width: '100%', padding: '15px 24px', borderRadius: 14,
+            background: debt.counterparty && debt.amount ? 'var(--brand)' : 'var(--bg-3)',
+            color: debt.counterparty && debt.amount ? '#fff' : 'var(--text-4)',
+            border: 'none', fontSize: 'var(--text-base)', fontWeight: 700,
+            cursor: debt.counterparty && debt.amount ? 'pointer' : 'not-allowed',
+            fontFamily: 'inherit',
           }}>
             {saving ? 'Saving...' : `Add ${debt.type === 'receivable' ? 'receivable' : 'payable'}`}
           </button>
@@ -372,25 +399,27 @@ export default function Add() {
       {/* REMINDER TAB */}
       {tab === 'reminder' && (
         <div style={{ padding: '0 16px' }}>
-          <div style={{ marginBottom: 12 }}>
-            <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 6 }}>What to remind?</div>
+          <div style={{ marginBottom: 14 }}>
+            <label style={labelSt}>What to remind?</label>
             <input value={reminder.title} onChange={e => setReminder(p => ({ ...p, title: e.target.value }))}
-              placeholder="e.g. Check Gojek settlement" style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: '0.5px solid var(--border-2)', fontSize: 14, background: 'var(--bg)', color: 'var(--text)' }} />
+              placeholder="e.g. Check Gojek settlement" style={inputSt} />
           </div>
-          <div style={{ marginBottom: 12 }}>
-            <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 6 }}>Note (optional)</div>
+          <div style={{ marginBottom: 14 }}>
+            <label style={labelSt}>Note (optional)</label>
             <input value={reminder.meta} onChange={e => setReminder(p => ({ ...p, meta: e.target.value }))}
-              placeholder="e.g. every 2 weeks, IDR 2,500,000" style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: '0.5px solid var(--border-2)', fontSize: 14, background: 'var(--bg)', color: 'var(--text)' }} />
+              placeholder="e.g. every 2 weeks, IDR 2,500,000" style={inputSt} />
           </div>
-          <div style={{ marginBottom: 16 }}>
-            <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 6 }}>Due date</div>
+          <div style={{ marginBottom: 20 }}>
+            <label style={labelSt}>Due date</label>
             <input type="date" value={reminder.due_date} onChange={e => setReminder(p => ({ ...p, due_date: e.target.value }))}
-              style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: '0.5px solid var(--border-2)', fontSize: 14, background: 'var(--bg)', color: 'var(--text)' }} />
+              style={inputSt} />
           </div>
           <button onClick={saveReminder} disabled={!reminder.title || saving} style={{
-            width: '100%', padding: 13, borderRadius: 12,
-            background: reminder.title ? 'var(--text)' : 'var(--bg-2)',
-            color: reminder.title ? '#fff' : 'var(--text-3)', border: 'none', fontSize: 14, fontWeight: 500
+            width: '100%', padding: '15px 24px', borderRadius: 14,
+            background: reminder.title ? 'var(--brand)' : 'var(--bg-3)',
+            color: reminder.title ? '#fff' : 'var(--text-4)',
+            border: 'none', fontSize: 'var(--text-base)', fontWeight: 700,
+            cursor: reminder.title ? 'pointer' : 'not-allowed', fontFamily: 'inherit',
           }}>
             {saving ? 'Saving...' : 'Set reminder'}
           </button>

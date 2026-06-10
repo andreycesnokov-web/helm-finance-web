@@ -93,25 +93,25 @@ export default function Accounts() {
 
   return (
     <div className="page">
-      <div className="topbar">
+      <div className="topbar" style={{ padding: '20px 20px 14px' }}>
         <div>
-          <div style={{ fontSize: 18, fontWeight: 600, color: 'var(--text)' }}>Accounts</div>
-          <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>All sources</div>
+          <div style={{ fontSize: 'var(--text-xl)', fontWeight: 700, color: 'var(--text)', letterSpacing: -0.3 }}>Accounts</div>
+          <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-3)', marginTop: 3 }}>All sources</div>
         </div>
         <button onClick={openAdd} style={{
-          width: 32, height: 32, borderRadius: '50%', background: 'var(--text)',
-          color: '#fff', border: 'none', fontSize: 20, display: 'flex',
-          alignItems: 'center', justifyContent: 'center'
-        }}>+</button>
+          height: 38, padding: '0 16px', borderRadius: 20, background: 'var(--brand)',
+          color: '#fff', border: 'none', fontSize: 'var(--text-sm)', fontWeight: 600,
+          display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontFamily: 'inherit',
+        }}>+ Add</button>
       </div>
 
       {/* Total */}
-      <div style={{ margin: '4px 16px 16px', background: 'var(--text)', borderRadius: 14, padding: '16px 18px' }}>
-        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', marginBottom: 4 }}>Total across all accounts</div>
-        <div style={{ fontSize: 28, fontWeight: 600, color: '#fff', letterSpacing: -0.5 }}>
+      <div style={{ margin: '4px 16px 16px', background: 'linear-gradient(135deg, var(--text) 0%, #1e2d4a 100%)', borderRadius: 18, padding: '20px 22px', boxShadow: '0 6px 24px rgba(11,18,32,.18)' }}>
+        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', letterSpacing: '0.07em', textTransform: 'uppercase', marginBottom: 8 }}>Total across all accounts</div>
+        <div style={{ fontSize: 'var(--text-3xl)', fontWeight: 700, color: '#fff', letterSpacing: -0.8 }}>
           {fmtFull(totalBalance)}
         </div>
-        <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', marginTop: 3 }}>IDR</div>
+        <div style={{ fontSize: 'var(--text-xs)', color: 'rgba(255,255,255,0.4)', marginTop: 6 }}>IDR · {accounts.length} account{accounts.length !== 1 ? 's' : ''}</div>
       </div>
 
       {loading && <div style={{ padding: 32, textAlign: 'center', color: 'var(--text-3)', fontSize: 13 }}>Loading...</div>}
@@ -135,7 +135,7 @@ export default function Accounts() {
           <div key={acc.id || i} className="card" style={{ marginBottom: 8 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               {/* Icon */}
-              <div style={{ width: 40, height: 40, borderRadius: 12, background: colors.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <div style={{ width: 46, height: 46, borderRadius: 14, background: colors.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={colors.color} strokeWidth="1.8" strokeLinecap="round">
                   {acc.type === 'business'
                     ? <><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></>
@@ -146,7 +146,7 @@ export default function Accounts() {
 
               {/* Info */}
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{acc.name}</div>
+                <div style={{ fontSize: 'var(--text-base)', fontWeight: 600, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{acc.name}</div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 3 }}>
                   <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 10, background: colors.bg, color: colors.color }}>
                     {acc.type === 'business' ? 'Business' : 'Personal'}
@@ -157,7 +157,7 @@ export default function Accounts() {
 
               {/* Balance */}
               <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                <div style={{ fontSize: 16, fontWeight: 600, color: isNeg ? 'var(--red)' : 'var(--text)' }}>
+                <div style={{ fontSize: 'var(--text-lg)', fontWeight: 700, color: isNeg ? 'var(--red)' : 'var(--text)' }}>
                   {isNeg ? '-' : ''}{fmt(Math.abs(acc.balance))}
                 </div>
                 <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 2 }}>IDR</div>

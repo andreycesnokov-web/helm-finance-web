@@ -2,15 +2,15 @@ import { useState, useEffect } from 'react'
 import { useAuth } from '../hooks/useAuth'
 import { apiFetch, fmt, fmtFull, daysUntil } from '../lib/api'
 
-function TimelineItem({ dot, desc, date, amount, isIn }) {
+function KeyDateRow({ dot, desc, date, amount, isIn }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '8px 0', borderBottom: '0.5px solid var(--border)' }}>
-      <div style={{ width: 10, height: 10, borderRadius: '50%', background: dot, flexShrink: 0, marginTop: 4, zIndex: 1 }} />
-      <div style={{ flex: 1 }}>
-        <div style={{ fontSize: 13, color: 'var(--text)' }}>{desc}</div>
-        <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 2 }}>{date}</div>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '12px 0', borderBottom: '0.5px solid var(--border)' }}>
+      <div style={{ width: 10, height: 10, borderRadius: '50%', background: dot, flexShrink: 0 }} />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 'var(--text-base)', fontWeight: 500, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{desc}</div>
+        <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-3)', marginTop: 3 }}>{date}</div>
       </div>
-      <div style={{ fontSize: 13, fontWeight: 600, color: isIn ? 'var(--green)' : 'var(--red)', flexShrink: 0 }}>
+      <div style={{ fontSize: 'var(--text-base)', fontWeight: 700, color: isIn ? 'var(--green-dark)' : 'var(--red-dark)', flexShrink: 0 }}>
         {isIn ? '+' : '-'}{fmt(Math.abs(amount))}
       </div>
     </div>
@@ -23,96 +23,140 @@ export default function Radar() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    Promise.all([
-      apiFetch('/pulse?scope=all', token),
-    ]).then(([pulse]) => {
-      setData(pulse)
-    }).catch(console.error).finally(() => setLoading(false))
+    apiFetch('/pulse?scope=all', token)
+      .then(setData)
+      .catch(console.error)
+      .finally(() => setLoading(false))
   }, [])
 
-  if (loading) return <div style={{ padding: 32, textAlign: 'center', color: 'var(--text-3)', fontSize: 14 }}>Loading...</div>
+  if (loading) return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 64 }}>
+      <div style={{ width: 28, height: 28, border: '2.5px solid var(--border-2)', borderTopColor: 'var(--brand)', borderRadius: '50%', animation: 'tx-spin 0.7s linear infinite' }} />
+    </div>
+  )
 
   const d = data || {}
-  const balance = d.totalBalance || 0
+  const balance  = d.totalBalance || 0
   const burnRate = d.burnRate || 0
-  const debts = d.debts || []
+  const debts    = d.debts || []
   const receivables = debts.filter(x => x.type === 'receivable')
-  const payables = debts.filter(x => x.type === 'payable')
-  const totalIn = receivables.reduce((s, x) => s + Number(x.amount), 0)
+  const payables    = debts.filter(x => x.type === 'payable')
+  const totalIn  = receivables.reduce((s, x) => s + Number(x.amount), 0)
   const totalOut = payables.reduce((s, x) => s + Number(x.amount), 0)
 
-  // Projections
-  const proj30 = balance + totalIn - totalOut - burnRate * 30
-  const projBest = balance + totalIn - totalOut * 0.5
+  const proj30    = balance + totalIn - totalOut - burnRate * 30
+  const projBest  = balance + totalIn - totalOut * 0.5
   const projWorst = balance - totalOut - burnRate * 30
-
-  // Monthly burn from transactions
   const monthlyBurn = burnRate * 30
+  const runway    = burnRate > 0 ? Math.round(balance / burnRate) : null
+
+  const isHealthy = proj30 >= 0
 
   return (
     <div className="page">
-      <div className="topbar">
+      {/* Page header */}
+      <div className="topbar" style={{ padding: '20px 20px 14px' }}>
         <div>
-          <div style={{ fontSize: 18, fontWeight: 600, color: 'var(--text)' }}>Radar</div>
-          <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>30-day cash forecast</div>
+          <div style={{ fontSize: 'var(--text-xl)', fontWeight: 700, color: 'var(--text)', letterSpacing: -0.3 }}>Radar</div>
+          <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-3)', marginTop: 3 }}>30-day cash forecast</div>
+        </div>
+        <div style={{
+          fontSize: 'var(--text-xs)', fontWeight: 600, padding: '5px 12px', borderRadius: 20,
+          background: isHealthy ? 'var(--green-light)' : 'var(--red-light)',
+          color: isHealthy ? 'var(--green-dark)' : 'var(--red-dark)',
+          border: `1px solid ${isHealthy ? 'rgba(2,122,72,.15)' : 'rgba(180,35,24,.15)'}`,
+          letterSpacing: '0.03em',
+        }}>
+          {isHealthy ? '✓ Healthy' : '⚠ At Risk'}
         </div>
       </div>
 
-      {/* Projected balance */}
-      <div style={{ margin: '0 16px 14px', background: proj30 >= 0 ? 'var(--green)' : 'var(--red)', borderRadius: 14, padding: '16px 18px' }}>
-        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', marginBottom: 4 }}>Projected balance · 30 days</div>
-        <div style={{ fontSize: 28, fontWeight: 600, color: '#fff', letterSpacing: -0.5 }}>
-          {proj30 >= 0 ? '+' : ''}{fmtFull(Math.round(proj30))}
+      {/* Hero projected balance — dark navy premium card */}
+      <div style={{ margin: '0 16px 16px' }}>
+        <div style={{
+          background: 'linear-gradient(135deg, var(--text) 0%, #1e2d4a 100%)',
+          borderRadius: 20,
+          padding: '24px 24px 20px',
+          position: 'relative',
+          overflow: 'hidden',
+          boxShadow: '0 8px 32px rgba(11,18,32,0.22)',
+        }}>
+          {/* Subtle grid texture */}
+          <div style={{
+            position: 'absolute', inset: 0, opacity: 0.04,
+            backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 24px, #fff 24px, #fff 25px), repeating-linear-gradient(90deg, transparent, transparent 24px, #fff 24px, #fff 25px)',
+          }} />
+
+          <div style={{ position: 'relative' }}>
+            <div style={{ fontSize: 'var(--text-xs)', color: 'rgba(255,255,255,0.5)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 10 }}>
+              Projected balance · 30 days
+            </div>
+            <div style={{ fontSize: 'var(--text-hero)', fontWeight: 700, color: '#fff', letterSpacing: -1, lineHeight: 1 }}>
+              {proj30 >= 0 ? '+' : ''}{fmtFull(Math.round(proj30))}
+            </div>
+            <div style={{ fontSize: 'var(--text-xs)', color: 'rgba(255,255,255,0.4)', marginTop: 8 }}>IDR · if all planned transactions go through</div>
+
+            {/* Mini stats row */}
+            <div style={{ display: 'flex', gap: 20, marginTop: 20, paddingTop: 16, borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+              {[
+                { label: 'Current balance', val: fmtFull(balance) + ' IDR' },
+                { label: 'Monthly burn',    val: fmtFull(monthlyBurn) + ' IDR' },
+                { label: 'Runway',          val: runway != null ? runway + ' days' : '∞' },
+              ].map(s => (
+                <div key={s.label}>
+                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: 4 }}>{s.label}</div>
+                  <div style={{ fontSize: 'var(--text-sm)', fontWeight: 600, color: '#fff' }}>{s.val}</div>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
-        <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', marginTop: 3 }}>IDR · if all planned transactions go through</div>
       </div>
 
       {/* Scenario cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, padding: '0 16px', marginBottom: 14 }}>
-        <div style={{ background: 'var(--green-light)', borderRadius: 12, padding: '12px' }}>
-          <div style={{ fontSize: 10, color: 'var(--green-dark)', marginBottom: 4 }}>Best case</div>
-          <div style={{ fontSize: 18, fontWeight: 600, color: 'var(--green-dark)' }}>{fmt(Math.round(projBest))}</div>
-          <div style={{ fontSize: 10, color: 'var(--green)', marginTop: 2 }}>all income received</div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, padding: '0 16px', marginBottom: 16 }}>
+        <div style={{ background: 'var(--green-light)', borderRadius: 16, padding: '16px 18px', border: '1px solid rgba(2,122,72,.12)' }}>
+          <div style={{ fontSize: 'var(--text-xs)', color: 'var(--green-dark)', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: 8 }}>Best case</div>
+          <div style={{ fontSize: 'var(--text-xl)', fontWeight: 700, color: 'var(--green-dark)', letterSpacing: -0.5 }}>{fmt(Math.round(projBest))}</div>
+          <div style={{ fontSize: 'var(--text-xs)', color: 'var(--green)', marginTop: 5 }}>All income received</div>
         </div>
-        <div style={{ background: 'var(--red-light)', borderRadius: 12, padding: '12px' }}>
-          <div style={{ fontSize: 10, color: 'var(--red-dark)', marginBottom: 4 }}>Worst case</div>
-          <div style={{ fontSize: 18, fontWeight: 600, color: 'var(--red-dark)' }}>{fmt(Math.round(projWorst))}</div>
-          <div style={{ fontSize: 10, color: 'var(--red)', marginTop: 2 }}>delays in receivables</div>
+        <div style={{ background: 'var(--red-light)', borderRadius: 16, padding: '16px 18px', border: '1px solid rgba(180,35,24,.12)' }}>
+          <div style={{ fontSize: 'var(--text-xs)', color: 'var(--red-dark)', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: 8 }}>Worst case</div>
+          <div style={{ fontSize: 'var(--text-xl)', fontWeight: 700, color: 'var(--red-dark)', letterSpacing: -0.5 }}>{fmt(Math.round(projWorst))}</div>
+          <div style={{ fontSize: 'var(--text-xs)', color: 'var(--red)', marginTop: 5 }}>Delays in receivables</div>
         </div>
       </div>
 
-      {/* Burn rate card */}
-      <div style={{ margin: '0 16px 14px', background: 'var(--bg-2)', borderRadius: 12, padding: '12px 14px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-          <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text)' }}>Monthly burn</div>
-          <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text)' }}>{fmt(monthlyBurn)} IDR</div>
-        </div>
-        <div style={{ display: 'flex', gap: 12 }}>
+      {/* Burn rate metrics card */}
+      <div className="card" style={{ marginBottom: 12 }}>
+        <div style={{ fontSize: 'var(--text-sm)', fontWeight: 700, color: 'var(--text)', marginBottom: 16, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-3)' }}>Monthly burn breakdown</div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
           {[
-            { label: 'Daily avg', val: fmt(burnRate) + '/day' },
-            { label: 'Runway', val: burnRate > 0 ? Math.round(balance / burnRate) + ' days' : '∞' },
-            { label: 'Current bal', val: fmt(balance) },
+            { label: 'Monthly burn', val: fmtFull(monthlyBurn), sub: 'IDR / month', color: 'var(--red-dark)' },
+            { label: 'Daily average', val: fmt(burnRate), sub: 'IDR / day', color: 'var(--text)' },
+            { label: 'Runway left', val: runway != null ? runway + 'd' : '∞', sub: burnRate > 0 ? 'at current burn' : 'no burn data', color: runway != null && runway < 14 ? 'var(--red-dark)' : runway != null && runway < 30 ? 'var(--amber-dark)' : 'var(--green-dark)' },
           ].map(s => (
-            <div key={s.label} style={{ flex: 1 }}>
-              <div style={{ fontSize: 10, color: 'var(--text-3)' }}>{s.label}</div>
-              <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--text)', marginTop: 2 }}>{s.val}</div>
+            <div key={s.label} style={{ background: 'var(--bg-2)', borderRadius: 14, padding: '14px 16px', border: '0.5px solid var(--border)' }}>
+              <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-3)', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: 8 }}>{s.label}</div>
+              <div style={{ fontSize: 'var(--text-xl)', fontWeight: 700, color: s.color, letterSpacing: -0.3 }}>{s.val}</div>
+              <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-4)', marginTop: 4 }}>{s.sub}</div>
             </div>
           ))}
         </div>
       </div>
 
-      {/* Timeline */}
+      {/* Key dates timeline */}
       {debts.length > 0 && (
         <div className="card" style={{ marginBottom: 12 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', marginBottom: 12 }}>Key dates</div>
+          <div style={{ fontSize: 'var(--text-base)', fontWeight: 700, color: 'var(--text)', marginBottom: 14 }}>Key dates</div>
 
           {receivables.length > 0 && (
             <>
-              <div style={{ fontSize: 11, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>Incoming</div>
+              <div style={{ fontSize: 'var(--text-xs)', color: 'var(--green-dark)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8, fontWeight: 600 }}>Incoming</div>
               {receivables.map(d => (
-                <TimelineItem key={d.id}
+                <KeyDateRow key={d.id}
                   dot="var(--green)" desc={d.counterparty} isIn={true} amount={d.amount}
-                  date={d.due_date ? new Date(d.due_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) + (daysUntil(d.due_date) >= 0 ? ` · ${daysUntil(d.due_date)}d` : ' · overdue') : 'No date'}
+                  date={d.due_date ? new Date(d.due_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) + (daysUntil(d.due_date) >= 0 ? ` · in ${daysUntil(d.due_date)}d` : ' · overdue') : 'No date'}
                 />
               ))}
             </>
@@ -120,11 +164,11 @@ export default function Radar() {
 
           {payables.length > 0 && (
             <>
-              <div style={{ fontSize: 11, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '10px 0 6px' }}>Outgoing</div>
+              <div style={{ fontSize: 'var(--text-xs)', color: 'var(--red-dark)', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '14px 0 8px', fontWeight: 600 }}>Outgoing</div>
               {payables.map(d => (
-                <TimelineItem key={d.id}
+                <KeyDateRow key={d.id}
                   dot="var(--red)" desc={d.counterparty} isIn={false} amount={d.amount}
-                  date={d.due_date ? new Date(d.due_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) + (daysUntil(d.due_date) >= 0 ? ` · ${daysUntil(d.due_date)}d` : ' · overdue') : 'No date'}
+                  date={d.due_date ? new Date(d.due_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) + (daysUntil(d.due_date) >= 0 ? ` · in ${daysUntil(d.due_date)}d` : ' · overdue') : 'No date'}
                 />
               ))}
             </>
@@ -133,32 +177,32 @@ export default function Radar() {
       )}
 
       {debts.length === 0 && (
-        <div style={{ padding: '24px 16px', textAlign: 'center' }}>
-          <div style={{ fontSize: 28, marginBottom: 10 }}>📡</div>
-          <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--text)', marginBottom: 6 }}>No planned transactions</div>
-          <div style={{ fontSize: 13, color: 'var(--text-3)', lineHeight: 1.6 }}>
-            Add debts and receivables in the<br/>Add tab to see your cash forecast.
+        <div style={{ padding: '32px 20px', textAlign: 'center' }}>
+          <div style={{ fontSize: 36, marginBottom: 12 }}>📡</div>
+          <div style={{ fontSize: 'var(--text-md)', fontWeight: 600, color: 'var(--text)', marginBottom: 8 }}>No planned transactions</div>
+          <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-3)', lineHeight: 1.6 }}>
+            Add receivables and payables to see your 30-day cash forecast.
           </div>
         </div>
       )}
 
-      {/* Net flow summary */}
+      {/* 30-day net flow summary */}
       <div className="card">
-        <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 12 }}>30-day net flow</div>
+        <div style={{ fontSize: 'var(--text-base)', fontWeight: 700, color: 'var(--text)', marginBottom: 14 }}>30-day net flow</div>
         {[
-          { label: 'Current balance', val: fmtFull(balance), color: 'var(--text)' },
-          { label: '+ Expected income', val: '+' + fmtFull(totalIn), color: 'var(--green)' },
-          { label: '- Expected payments', val: '-' + fmtFull(totalOut), color: 'var(--red)' },
-          { label: '- Monthly burn', val: '-' + fmtFull(monthlyBurn), color: 'var(--red)' },
+          { label: 'Current balance',    val: fmtFull(balance),    color: 'var(--text)',      sign: '' },
+          { label: '+ Expected income',  val: fmtFull(totalIn),    color: 'var(--green-dark)', sign: '+' },
+          { label: '− Expected payments',val: fmtFull(totalOut),   color: 'var(--red-dark)',   sign: '−' },
+          { label: '− Monthly burn',     val: fmtFull(monthlyBurn),color: 'var(--red-dark)',   sign: '−' },
         ].map((row, i) => (
-          <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '7px 0', borderBottom: i < 3 ? '0.5px solid var(--border)' : 'none' }}>
-            <span style={{ fontSize: 13, color: 'var(--text-2)' }}>{row.label}</span>
-            <span style={{ fontSize: 13, fontWeight: 500, color: row.color }}>{row.val}</span>
+          <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: i < 3 ? '0.5px solid var(--border)' : 'none' }}>
+            <span style={{ fontSize: 'var(--text-sm)', color: 'var(--text-2)' }}>{row.label}</span>
+            <span style={{ fontSize: 'var(--text-sm)', fontWeight: 600, color: row.color }}>{row.sign}{row.val}</span>
           </div>
         ))}
-        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0 2px', borderTop: '1px solid var(--border-2)', marginTop: 4 }}>
-          <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>Projected</span>
-          <span style={{ fontSize: 14, fontWeight: 600, color: proj30 >= 0 ? 'var(--green)' : 'var(--red)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 0 2px', borderTop: '2px solid var(--border-2)', marginTop: 4 }}>
+          <span style={{ fontSize: 'var(--text-base)', fontWeight: 700, color: 'var(--text)' }}>Projected balance</span>
+          <span style={{ fontSize: 'var(--text-base)', fontWeight: 700, color: isHealthy ? 'var(--green-dark)' : 'var(--red-dark)' }}>
             {proj30 >= 0 ? '+' : ''}{fmtFull(Math.round(proj30))} IDR
           </span>
         </div>

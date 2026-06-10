@@ -198,17 +198,17 @@ export function RightPanel({ data }) {
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'rgba(255,255,255,.08)', border: '0.5px solid rgba(255,255,255,.12)', borderRadius: 20, padding: '2px 8px 2px 7px' }}>
               <div style={{ width: 5, height: 5, borderRadius: '50%', background: statusDot, flexShrink: 0, boxShadow: `0 0 5px ${statusDot}` }} />
-              <span style={{ fontSize: 10, fontWeight: 600, color: '#fff' }}>{statusLabel}</span>
+              <span style={{ fontSize: 11, fontWeight: 600, color: '#fff' }}>{statusLabel}</span>
             </div>
           </div>
           {/* AI text */}
-          <div style={{ fontSize: 12, color: 'rgba(255,255,255,.72)', lineHeight: 1.6, marginBottom: 10 }}>
+          <div style={{ fontSize: 13, color: 'rgba(255,255,255,.72)', lineHeight: 1.6, marginBottom: 10 }}>
             {d.aiText || 'Analysing your financial position...'}
           </div>
           {/* Recommendation */}
-          <div style={{ borderTop: '0.5px solid rgba(255,255,255,.08)', paddingTop: 9 }}>
-            <div style={{ fontSize: 9, color: 'rgba(99,152,255,.7)', letterSpacing: '0.07em', marginBottom: 4, fontWeight: 600 }}>RECOMMENDATION</div>
-            <div style={{ fontSize: 11, color: 'rgba(255,255,255,.6)', lineHeight: 1.5 }}>
+          <div style={{ borderTop: '0.5px solid rgba(255,255,255,.08)', paddingTop: 10 }}>
+            <div style={{ fontSize: 10, color: 'rgba(99,152,255,.7)', letterSpacing: '0.07em', marginBottom: 5, fontWeight: 700 }}>RECOMMENDATION</div>
+            <div style={{ fontSize: 12, color: 'rgba(255,255,255,.6)', lineHeight: 1.55 }}>
               {(d.runway || 0) < 7
                 ? 'Collect receivables immediately — cash risk is high.'
                 : (d.runway || 0) < 14
@@ -223,19 +223,19 @@ export function RightPanel({ data }) {
       <div style={{ marginBottom: 18 }}>
         <SecTitle>Upcoming</SecTitle>
         {upcoming.length === 0
-          ? <div style={{ fontSize: 12, color: 'var(--text-4)', padding: '6px 0' }}>No upcoming events</div>
+          ? <div style={{ fontSize: 13, color: 'var(--text-4)', padding: '8px 0' }}>No upcoming events</div>
           : upcoming.map(debt => {
               const days = Math.round((new Date(debt.due_date) - new Date()) / 86400000)
               const isOverdue = days < 0
               return (
                 <div key={debt.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '0.5px solid var(--border)' }}>
                   <div>
-                    <div style={{ fontSize: 12, color: 'var(--text)', fontWeight: 500, marginBottom: 2 }}>{debt.counterparty}</div>
-                    <div style={{ fontSize: 10, color: isOverdue ? 'var(--red)' : 'var(--text-4)', fontWeight: isOverdue ? 600 : 400 }}>
+                    <div style={{ fontSize: 13, color: 'var(--text)', fontWeight: 600, marginBottom: 2 }}>{debt.counterparty}</div>
+                    <div style={{ fontSize: 11, color: isOverdue ? 'var(--red)' : 'var(--text-4)', fontWeight: isOverdue ? 600 : 400 }}>
                       {isOverdue ? '⚠ Overdue' : days === 0 ? 'Today' : `in ${days}d`}
                     </div>
                   </div>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: debt.type === 'receivable' ? 'var(--green-dark)' : 'var(--red-dark)' }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: debt.type === 'receivable' ? 'var(--green-dark)' : 'var(--red-dark)' }}>
                     {debt.type === 'receivable' ? '+' : '−'}{fmtShort(debt.amount)}
                   </div>
                 </div>
@@ -256,8 +256,8 @@ export function RightPanel({ data }) {
             { label: 'Payables',     value: `−${fmtShort(d.payables || 0)}`,                                         color: 'var(--red-dark)' },
           ].map((s, i, arr) => (
             <div key={s.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '9px 12px', borderBottom: i < arr.length - 1 ? '0.5px solid var(--border)' : 'none' }}>
-              <div style={{ fontSize: 12, color: 'var(--text-3)' }}>{s.label}</div>
-              <div style={{ fontSize: 12, fontWeight: 700, color: s.color }}>{s.value}</div>
+              <div style={{ fontSize: 13, color: 'var(--text-3)' }}>{s.label}</div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: s.color }}>{s.value}</div>
             </div>
           ))}
         </div>
