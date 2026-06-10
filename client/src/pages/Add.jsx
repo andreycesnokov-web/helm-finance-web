@@ -10,10 +10,36 @@ const QUICK = [
   { label: 'Доход', emoji: '💚', type: 'income', scope: 'personal' },
 ]
 
+const TX_TYPES = ['income', 'expense', 'payroll', 'transfer']
+
 function debtLabel(d) {
   const days = daysUntil(d.due_date)
   const tag  = days < 0 ? `${Math.abs(days)}d overdue` : `due in ${days}d`
   return `${d.counterparty} · ${fmt(d.amount)} IDR · ${tag}`
+}
+
+// Badge config per type
+function typeBadge(type) {
+  switch (type) {
+    case 'income':   return { label: 'Income',   bg: '#E1F5EE', color: '#085041' }
+    case 'expense':  return { label: 'Expense',  bg: '#FEE2E2', color: '#991B1B' }
+    case 'payroll':  return { label: 'Payroll',  bg: '#FEF3C7', color: '#92400E' }
+    case 'transfer': return { label: 'Transfer', bg: '#E8EDFB', color: '#1e3a6e' }
+    default:         return { label: type || 'Unknown', bg: '#F1F5F9', color: '#475569' }
+  }
+}
+
+// Amount display per type
+function amountDisplay(type, amount, currency) {
+  const n = fmt(Number(amount) || 0)
+  const cur = currency || 'IDR'
+  switch (type) {
+    case 'income':   return { sign: '+', value: `+${n} ${cur}`, color: '#085041' }
+    case 'expense':  return { sign: '-', value: `−${n} ${cur}`, color: '#991B1B' }
+    case 'payroll':  return { sign: '-', value: `−${n} ${cur}`, color: '#92400E' }
+    case 'transfer': return { sign: '',  value: `${n} ${cur}`,  color: '#1e3a6e' }
+    default:         return { sign: '',  value: `${n} ${cur}`,  color: 'var(--text)' }
+  }
 }
 
 export default function Add() {
@@ -21,46 +47,66 @@ export default function Add() {
   const navigate   = useNavigate()
   const [text, setText]   = useState('')
   const [loading, setLoading] = useState(false)
-  const [result, setResult]   = useState(null) // parsed transactions
+  const [result, setResult]   = useState(null)   // raw parsed transactions
+  const [editedTxs, setEditedTxs] = useState([]) // mutable copies for editing
   const [error, setError]     = useState('')
   const [saved, setSaved]     = useState(false)
   const [saveMsg, setSaveMsg] = useState('')
 
-  // Debt form
-  const [tab, setTab]         = useState('tx') // tx | debt | reminder
-  const [debt, setDebt]       = useState({ type: 'receivable', counterparty: '', amount: '', due_date: '', description: '' })
+  // Debt / Reminder form
+  const [tab, setTab]           = useState('tx')
+  const [debt, setDebt]         = useState({ type: 'receivable', counterparty: '', amount: '', due_date: '', description: '' })
   const [reminder, setReminder] = useState({ title: '', due_date: '', meta: '' })
-  const [saving, setSaving]   = useState(false)
+  const [saving, setSaving]     = useState(false)
 
-  // Open debts for linking
-  const [openDebts, setOpenDebts] = useState([])   // all unsettled debts
-  const [linkedDebts, setLinkedDebts] = useState({}) // index → debt id or ''
+  // Open debts for linking + accounts for source picker
+  const [openDebts, setOpenDebts]   = useState([])
+  const [accounts, setAccounts]     = useState([])
+  const [linkedDebts, setLinkedDebts] = useState({})
 
-  // Load open debts once on mount
   useEffect(() => {
     if (!token) return
     apiFetch('/pulse', token)
       .then(d => {
         const debts = (d.debts || []).filter(x => !x.is_settled)
         setOpenDebts(debts)
+        // accounts come from pulse as virtual source list
+        const accs = (d.accounts || []).map(a => a.name).filter(Boolean)
+        setAccounts(accs)
       })
-      .catch(() => {}) // non-critical — just don't show link UI
+      .catch(() => {})
   }, [token])
 
   const openReceivables = openDebts.filter(d => d.type === 'receivable')
   const openPayables    = openDebts.filter(d => d.type === 'payable')
+
+  // Update a single field of a single edited transaction
+  const updateTx = (i, field, value) => {
+    setEditedTxs(prev => {
+      const next = [...prev]
+      next[i] = { ...next[i], [field]: value }
+      return next
+    })
+  }
 
   const parse = async () => {
     if (!text.trim()) return
     setLoading(true)
     setError('')
     setResult(null)
+    setEditedTxs([])
     setSaved(false)
     setSaveMsg('')
     setLinkedDebts({})
     try {
       const data = await apiFetch('/parse', token, { method: 'POST', body: { text } })
-      setResult(data.transactions)
+      const txs = data.transactions || []
+      setResult(txs)
+      // Deep-copy for editing; apply default category for payroll
+      setEditedTxs(txs.map(t => ({
+        ...t,
+        category: t.category || (t.type === 'payroll' ? 'Payroll' : ''),
+      })))
     } catch (e) {
       setError(e.message)
     } finally {
@@ -72,16 +118,17 @@ export default function Add() {
     setSaving(true)
     setError('')
     try {
-      const linked   = [] // { tx, debtId }
-      const unlinked = [] // tx
+      const linked   = []
+      const unlinked = []
 
-      result.forEach((tx, i) => {
+      editedTxs.forEach((tx, i) => {
         const debtId = linkedDebts[i]
-        if (debtId) linked.push({ tx, debtId })
-        else        unlinked.push(tx)
+        // transfer cannot link to debt
+        if (debtId && tx.type !== 'transfer') linked.push({ tx, debtId })
+        else                                  unlinked.push(tx)
       })
 
-      // Process linked: use /debts/:id/pay — creates transaction + updates debt
+      // Linked: debt pay endpoint (creates tx + settles debt)
       for (const { tx, debtId } of linked) {
         await apiFetch(`/debts/${debtId}/pay`, token, {
           method: 'POST',
@@ -89,20 +136,30 @@ export default function Add() {
         })
       }
 
-      // Process unlinked: batch save
+      // Unlinked: batch save with all edited fields
       if (unlinked.length > 0) {
-        await apiFetch('/transactions/batch', token, { method: 'POST', body: { transactions: unlinked } })
+        const payload = unlinked.map(tx => ({
+          type:        tx.type,
+          amount:      Number(tx.amount) || 0,
+          currency:    tx.currency || 'IDR',
+          description: tx.description || '',
+          source:      tx.source || null,
+          scope:       tx.scope || 'personal',
+          project:     tx.project || null,
+          category:    tx.category || null,
+        }))
+        await apiFetch('/transactions/batch', token, { method: 'POST', body: { transactions: payload } })
       }
 
       // Build success message
       const msgs = []
       if (linked.length > 0) {
         const closedCount = linked.filter(({ tx, debtId }) => {
-          const debt = openDebts.find(d => d.id === debtId)
-          return debt && tx.amount >= Number(debt.amount)
+          const d = openDebts.find(x => x.id === debtId)
+          return d && tx.amount >= Number(d.amount)
         }).length
         const partialCount = linked.length - closedCount
-        if (closedCount > 0) msgs.push(`${closedCount} item${closedCount > 1 ? 's' : ''} closed`)
+        if (closedCount > 0)  msgs.push(`${closedCount} debt${closedCount > 1 ? 's' : ''} closed`)
         if (partialCount > 0) msgs.push(`${partialCount} partial payment${partialCount > 1 ? 's' : ''} recorded`)
       }
       if (unlinked.length > 0) msgs.push(`${unlinked.length} transaction${unlinked.length > 1 ? 's' : ''} saved`)
@@ -110,6 +167,7 @@ export default function Add() {
       setSaveMsg(msgs.join(' · ') || 'Saved successfully!')
       setSaved(true)
       setResult(null)
+      setEditedTxs([])
       setText('')
       setLinkedDebts({})
     } catch (e) {
@@ -148,15 +206,17 @@ export default function Add() {
   }
 
   const inputSt = {
-    width: '100%', padding: '12px 14px', borderRadius: 12,
-    border: '0.5px solid var(--border-2)', fontSize: 'var(--text-base)',
-    background: 'var(--bg-2)', color: 'var(--text)',
-    boxSizing: 'border-box', fontFamily: 'inherit', outline: 'none', minHeight: 46,
+    width: '100%', padding: '10px 12px', borderRadius: 10,
+    border: '0.5px solid var(--border-2)', fontSize: 'var(--text-sm)',
+    background: 'var(--bg-3)', color: 'var(--text)',
+    boxSizing: 'border-box', fontFamily: 'inherit', outline: 'none', minHeight: 40,
   }
-  const selectStyle = {
-    ...inputSt, cursor: 'pointer',
-  }
+  const selectStyle = { ...inputSt, cursor: 'pointer' }
   const labelSt = {
+    display: 'block', fontSize: 11, color: 'var(--text-3)',
+    textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 700, marginBottom: 5,
+  }
+  const mainLabelSt = {
     display: 'block', fontSize: 'var(--text-xs)', color: 'var(--text-3)',
     textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600, marginBottom: 6,
   }
@@ -221,12 +281,12 @@ export default function Add() {
       {/* TRANSACTION TAB */}
       {tab === 'tx' && (
         <div style={{ padding: '0 16px' }}>
-          <label style={labelSt}>What happened?</label>
+          <label style={mainLabelSt}>What happened?</label>
           <textarea
             value={text}
-            onChange={e => { setText(e.target.value); setSaved(false); setResult(null) }}
+            onChange={e => { setText(e.target.value); setSaved(false); setResult(null); setEditedTxs([]) }}
             placeholder={'Заплатил 300к за бензин в Убуде\nПолучил 5М с клиента за проект\nКофе 35000 наличными'}
-            style={{ ...inputSt, minHeight: 110, resize: 'none', lineHeight: 1.6, marginBottom: 10 }}
+            style={{ ...inputSt, minHeight: 110, resize: 'none', lineHeight: 1.6, marginBottom: 10, padding: '12px 14px', background: 'var(--bg-2)', fontSize: 'var(--text-base)' }}
           />
 
           {/* Quick chips */}
@@ -250,39 +310,194 @@ export default function Add() {
             {loading ? '🤔 Analyzing with AI...' : '✦ Parse & preview →'}
           </button>
 
-          {/* Parsed result */}
-          {result && (
+          {/* ── Parsed preview ── */}
+          {result && editedTxs.length > 0 && (
             <div style={{ marginTop: 18 }}>
-              <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-3)', marginBottom: 12 }}>
-                Found <strong style={{ color: 'var(--text)' }}>{result.length}</strong> transaction{result.length !== 1 ? 's' : ''}:
+
+              {/* Header */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-3)' }}>
+                  Found <strong style={{ color: 'var(--text)' }}>{result.length}</strong> transaction{result.length !== 1 ? 's' : ''}
+                </div>
+                <div style={{
+                  fontSize: 11, color: '#1e40af', background: '#EFF6FF',
+                  padding: '3px 10px', borderRadius: 20, fontWeight: 600, letterSpacing: 0.1
+                }}>
+                  ✦ AI parsed · Review before saving
+                </div>
               </div>
 
-              {result.map((t, i) => {
-                const relevantDebts = t.type === 'income' ? openReceivables : openPayables
-                const linkedId      = linkedDebts[i] || ''
+              {editedTxs.map((t, i) => {
+                const badge  = typeBadge(t.type)
+                const amtDisp = amountDisplay(t.type, t.amount, t.currency)
+                const isTransfer = t.type === 'transfer'
+                const sourceMissing = !t.source || !t.source.trim()
+
+                // Debt options: transfer has none
+                const relevantDebts = isTransfer ? []
+                  : t.type === 'income' ? openReceivables : openPayables
+                const linkedId = linkedDebts[i] || ''
 
                 return (
-                  <div key={i} style={{ background: 'var(--bg-2)', borderRadius: 14, padding: '14px 16px', marginBottom: 10, border: '0.5px solid var(--border)' }}>
-                    {/* Transaction info */}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: relevantDebts.length > 0 ? 10 : 0 }}>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: 'var(--text-base)', fontWeight: 600, color: 'var(--text)' }}>{t.description}</div>
-                        <div style={{ display: 'flex', gap: 10, marginTop: 5, flexWrap: 'wrap' }}>
-                          {t.source && <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-3)' }}>💳 {t.source}</span>}
-                          <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-3)' }}>
-                            {t.scope === 'business' ? '💼 Business' : '👤 Personal'}
+                  <div key={i} style={{
+                    background: 'var(--bg-2)', borderRadius: 16,
+                    border: `1px solid ${isTransfer ? '#c7d2fe' : 'var(--border)'}`,
+                    marginBottom: 14, overflow: 'hidden',
+                  }}>
+
+                    {/* ── Card header: badge + amount ── */}
+                    <div style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                      padding: '14px 16px 12px', borderBottom: '0.5px solid var(--border)',
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{
+                          fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 20,
+                          background: badge.bg, color: badge.color, letterSpacing: 0.2
+                        }}>
+                          {badge.label}
+                        </span>
+                        {sourceMissing && (
+                          <span style={{
+                            fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 20,
+                            background: '#FEF3C7', color: '#92400E',
+                          }}>
+                            ⚠ No source
                           </span>
-                          {t.project && <span style={{ fontSize: 'var(--text-xs)', color: 'var(--brand)' }}>{t.project}</span>}
-                        </div>
+                        )}
                       </div>
-                      <div style={{ fontSize: 'var(--text-md)', fontWeight: 700, color: t.type === 'income' ? 'var(--green-dark)' : 'var(--red-dark)', flexShrink: 0, marginLeft: 14 }}>
-                        {t.type === 'income' ? '+' : '−'}{fmt(t.amount)} {t.currency}
+                      <div style={{ fontSize: 'var(--text-md)', fontWeight: 800, color: amtDisp.color, letterSpacing: -0.3 }}>
+                        {amtDisp.value}
                       </div>
                     </div>
 
-                    {/* Debt link */}
-                    {relevantDebts.length > 0 && (
-                      <div style={{ paddingTop: 10, borderTop: '0.5px solid var(--border)' }}>
+                    {/* ── Transfer helper text ── */}
+                    {isTransfer && (
+                      <div style={{ background: '#EEF2FF', padding: '9px 16px', borderBottom: '0.5px solid #c7d2fe' }}>
+                        <span style={{ fontSize: 'var(--text-xs)', color: '#3730a3' }}>
+                          ↔ Transfers do not change total cash until account-to-account transfer support is implemented.
+                        </span>
+                      </div>
+                    )}
+
+                    {/* ── Editable fields ── */}
+                    <div style={{ padding: '14px 16px' }}>
+
+                      {/* Row 1: Type + Scope */}
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
+                        <div>
+                          <label style={labelSt}>Type</label>
+                          <select value={t.type} onChange={e => updateTx(i, 'type', e.target.value)} style={selectStyle}>
+                            {TX_TYPES.map(ty => (
+                              <option key={ty} value={ty}>{ty.charAt(0).toUpperCase() + ty.slice(1)}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label style={labelSt}>Scope</label>
+                          <select value={t.scope || 'personal'} onChange={e => updateTx(i, 'scope', e.target.value)} style={selectStyle}>
+                            <option value="personal">👤 Personal</option>
+                            <option value="business">💼 Business</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      {/* Row 2: Amount + Currency */}
+                      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 10, marginBottom: 12 }}>
+                        <div>
+                          <label style={labelSt}>Amount</label>
+                          <input
+                            type="number"
+                            min="0"
+                            value={t.amount}
+                            onChange={e => updateTx(i, 'amount', e.target.value)}
+                            style={inputSt}
+                          />
+                        </div>
+                        <div>
+                          <label style={labelSt}>Currency</label>
+                          <select value={t.currency || 'IDR'} onChange={e => updateTx(i, 'currency', e.target.value)} style={selectStyle}>
+                            <option value="IDR">IDR</option>
+                            <option value="USD">USD</option>
+                            <option value="SGD">SGD</option>
+                            <option value="EUR">EUR</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      {/* Row 3: Description */}
+                      <div style={{ marginBottom: 12 }}>
+                        <label style={labelSt}>Description</label>
+                        <input
+                          type="text"
+                          value={t.description || ''}
+                          onChange={e => updateTx(i, 'description', e.target.value)}
+                          placeholder="What was this for?"
+                          style={inputSt}
+                        />
+                      </div>
+
+                      {/* Row 4: Source / Account */}
+                      <div style={{ marginBottom: 12 }}>
+                        <label style={labelSt}>
+                          {isTransfer ? 'Source account (optional)' : 'Account / Source'}
+                          {sourceMissing && !isTransfer && (
+                            <span style={{ color: '#D97706', marginLeft: 6, textTransform: 'none', fontStyle: 'italic' }}>
+                              — please select before saving
+                            </span>
+                          )}
+                        </label>
+                        {accounts.length > 0 ? (
+                          <select
+                            value={t.source || ''}
+                            onChange={e => updateTx(i, 'source', e.target.value)}
+                            style={{
+                              ...selectStyle,
+                              borderColor: sourceMissing && !isTransfer ? '#F59E0B' : undefined,
+                              background: sourceMissing && !isTransfer ? '#FFFBEB' : undefined,
+                            }}
+                          >
+                            <option value="">— Select account —</option>
+                            {accounts.map(a => (
+                              <option key={a} value={a}>{a}</option>
+                            ))}
+                          </select>
+                        ) : (
+                          <input
+                            type="text"
+                            value={t.source || ''}
+                            onChange={e => updateTx(i, 'source', e.target.value)}
+                            placeholder="e.g. Permata, Cash, BCA"
+                            style={{
+                              ...inputSt,
+                              borderColor: sourceMissing && !isTransfer ? '#F59E0B' : undefined,
+                              background: sourceMissing && !isTransfer ? '#FFFBEB' : undefined,
+                            }}
+                          />
+                        )}
+                        {sourceMissing && !isTransfer && (
+                          <div style={{ fontSize: 11, color: '#D97706', marginTop: 4 }}>
+                            ⚠ No source selected — transaction will be saved without account link
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Row 5: Category */}
+                      <div>
+                        <label style={labelSt}>Category</label>
+                        <input
+                          type="text"
+                          value={t.category || ''}
+                          onChange={e => updateTx(i, 'category', e.target.value)}
+                          placeholder={t.type === 'payroll' ? 'Payroll' : t.type === 'transfer' ? 'Transfer' : 'e.g. Food, Transport, Revenue…'}
+                          style={inputSt}
+                        />
+                      </div>
+                    </div>
+
+                    {/* ── Debt linking (not for transfer) ── */}
+                    {!isTransfer && relevantDebts.length > 0 && (
+                      <div style={{ padding: '12px 16px 14px', borderTop: '0.5px solid var(--border)' }}>
                         <label style={{ ...labelSt, marginBottom: 6 }}>
                           Link to open {t.type === 'income' ? 'receivable' : 'payable'} (optional)
                         </label>
@@ -300,7 +515,7 @@ export default function Add() {
                         {linkedId && (() => {
                           const d = openDebts.find(x => x.id === linkedId)
                           if (!d) return null
-                          const isPartial = t.amount < Number(d.amount)
+                          const isPartial = Number(t.amount) < Number(d.amount)
                           return (
                             <div style={{
                               marginTop: 8, fontSize: 'var(--text-xs)',
@@ -310,11 +525,20 @@ export default function Add() {
                               borderRadius: 8, padding: '7px 10px',
                             }}>
                               {isPartial
-                                ? `⚡ Partial — ${fmt(Number(d.amount) - t.amount)} IDR remains open`
+                                ? `⚡ Partial — ${fmt(Number(d.amount) - Number(t.amount))} IDR remains open`
                                 : `✅ Full payment — this item will be closed`}
                             </div>
                           )
                         })()}
+                      </div>
+                    )}
+
+                    {/* Transfer: no debt link message */}
+                    {isTransfer && (
+                      <div style={{ padding: '10px 16px 12px', borderTop: '0.5px solid #c7d2fe' }}>
+                        <span style={{ fontSize: 11, color: '#6366f1', fontStyle: 'italic' }}>
+                          ↔ Transfers cannot be linked to receivables or payables
+                        </span>
                       </div>
                     )}
                   </div>
@@ -324,12 +548,12 @@ export default function Add() {
               <button onClick={save} disabled={saving} style={{
                 width: '100%', padding: '15px 24px', borderRadius: 14, background: 'var(--brand)',
                 color: '#fff', border: 'none', fontSize: 'var(--text-base)', fontWeight: 700, marginTop: 4,
-                cursor: 'pointer', fontFamily: 'inherit',
+                cursor: saving ? 'not-allowed' : 'pointer', fontFamily: 'inherit',
                 boxShadow: '0 2px 8px rgba(21,94,239,.2)',
               }}>
-                {saving ? 'Saving...' : `✅ Save ${result.length} transaction${result.length !== 1 ? 's' : ''}`}
+                {saving ? 'Saving...' : `✅ Save ${editedTxs.length} transaction${editedTxs.length !== 1 ? 's' : ''}`}
               </button>
-              <button onClick={() => setResult(null)} style={{
+              <button onClick={() => { setResult(null); setEditedTxs([]) }} style={{
                 width: '100%', padding: '12px 24px', borderRadius: 14, background: 'none',
                 color: 'var(--text-3)', border: '0.5px solid var(--border)',
                 fontSize: 'var(--text-sm)', fontWeight: 500, marginTop: 8,
@@ -364,22 +588,22 @@ export default function Add() {
             { key: 'description', label: 'Description', placeholder: 'e.g. Invoice #004, disinfectant order' },
           ].map(f => (
             <div key={f.key} style={{ marginBottom: 14 }}>
-              <label style={labelSt}>{f.label}</label>
+              <label style={mainLabelSt}>{f.label}</label>
               <input value={debt[f.key]} onChange={e => setDebt(p => ({ ...p, [f.key]: e.target.value }))}
-                placeholder={f.placeholder} style={inputSt} />
+                placeholder={f.placeholder} style={{ ...inputSt, padding: '12px 14px', background: 'var(--bg-2)', fontSize: 'var(--text-base)' }} />
             </div>
           ))}
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 18 }}>
             <div>
-              <label style={labelSt}>Amount (IDR)</label>
+              <label style={mainLabelSt}>Amount (IDR)</label>
               <input type="number" value={debt.amount} onChange={e => setDebt(p => ({ ...p, amount: e.target.value }))}
-                placeholder="5000000" style={inputSt} />
+                placeholder="5000000" style={{ ...inputSt, padding: '12px 14px', background: 'var(--bg-2)', fontSize: 'var(--text-base)' }} />
             </div>
             <div>
-              <label style={labelSt}>Due date</label>
+              <label style={mainLabelSt}>Due date</label>
               <input type="date" value={debt.due_date} onChange={e => setDebt(p => ({ ...p, due_date: e.target.value }))}
-                style={inputSt} />
+                style={{ ...inputSt, padding: '12px 14px', background: 'var(--bg-2)', fontSize: 'var(--text-base)' }} />
             </div>
           </div>
 
@@ -400,19 +624,19 @@ export default function Add() {
       {tab === 'reminder' && (
         <div style={{ padding: '0 16px' }}>
           <div style={{ marginBottom: 14 }}>
-            <label style={labelSt}>What to remind?</label>
+            <label style={mainLabelSt}>What to remind?</label>
             <input value={reminder.title} onChange={e => setReminder(p => ({ ...p, title: e.target.value }))}
-              placeholder="e.g. Check Gojek settlement" style={inputSt} />
+              placeholder="e.g. Check Gojek settlement" style={{ ...inputSt, padding: '12px 14px', background: 'var(--bg-2)', fontSize: 'var(--text-base)' }} />
           </div>
           <div style={{ marginBottom: 14 }}>
-            <label style={labelSt}>Note (optional)</label>
+            <label style={mainLabelSt}>Note (optional)</label>
             <input value={reminder.meta} onChange={e => setReminder(p => ({ ...p, meta: e.target.value }))}
-              placeholder="e.g. every 2 weeks, IDR 2,500,000" style={inputSt} />
+              placeholder="e.g. every 2 weeks, IDR 2,500,000" style={{ ...inputSt, padding: '12px 14px', background: 'var(--bg-2)', fontSize: 'var(--text-base)' }} />
           </div>
           <div style={{ marginBottom: 20 }}>
-            <label style={labelSt}>Due date</label>
+            <label style={mainLabelSt}>Due date</label>
             <input type="date" value={reminder.due_date} onChange={e => setReminder(p => ({ ...p, due_date: e.target.value }))}
-              style={inputSt} />
+              style={{ ...inputSt, padding: '12px 14px', background: 'var(--bg-2)', fontSize: 'var(--text-base)' }} />
           </div>
           <button onClick={saveReminder} disabled={!reminder.title || saving} style={{
             width: '100%', padding: '15px 24px', borderRadius: 14,
