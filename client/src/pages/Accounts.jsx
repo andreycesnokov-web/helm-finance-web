@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { useAuth } from '../hooks/useAuth'
 import { apiFetch, fmt, fmtFull } from '../lib/api'
 
@@ -209,97 +210,108 @@ export default function Accounts() {
       </div>
 
       {/* Add / Edit modal */}
-      {showAdd && (
-        <div onClick={() => setShowAdd(false)} style={{
-          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 200,
-          display: 'flex', alignItems: 'flex-end', justifyContent: 'center'
-        }}>
-          <div onClick={e => e.stopPropagation()} style={{
-            background: 'var(--bg)', borderRadius: '16px 16px 0 0', padding: '20px 16px 32px', width: '100%'
-          }}>
-            <div style={{ width: 36, height: 3, background: 'var(--border-2)', borderRadius: 2, margin: '0 auto 16px' }} />
-            <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 16 }}>
+      {showAdd && createPortal(
+        <div className="modal-overlay" onClick={() => setShowAdd(false)}>
+          <div className="modal-sheet" onClick={e => e.stopPropagation()}>
+            <div className="modal-drag-handle" />
+            <button className="modal-close-btn" onClick={() => setShowAdd(false)}>✕</button>
+
+            <div style={{ fontSize: 'var(--text-lg)', fontWeight: 600, color: 'var(--text)', marginBottom: 18 }}>
               {editAccount ? `Edit · ${editAccount.name}` : 'Add account'}
             </div>
 
-            <div style={{ marginBottom: 12 }}>
-              <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 6 }}>Account name</div>
-              <input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))}
-                placeholder="e.g. Permata Personal" style={{
-                  width: '100%', padding: '10px 12px', borderRadius: 10,
-                  border: '0.5px solid var(--border-2)', fontSize: 14, background: 'var(--bg)', color: 'var(--text)'
-                }} />
-            </div>
+            <label className="modal-label">Account name</label>
+            <input
+              className="modal-input"
+              value={form.name}
+              onChange={e => setForm(p => ({ ...p, name: e.target.value }))}
+              placeholder="e.g. Permata Personal"
+              style={{ marginBottom: 14 }}
+              autoFocus
+            />
 
-            <div style={{ marginBottom: 12 }}>
-              <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 6 }}>Type</div>
-              <div style={{ display: 'flex', gap: 8 }}>
-                {['personal', 'business'].map(t => (
-                  <button key={t} onClick={() => setForm(p => ({ ...p, type: t }))} style={{
-                    flex: 1, padding: '9px', borderRadius: 10, fontSize: 13,
-                    border: '0.5px solid var(--border-2)',
-                    background: form.type === t ? 'var(--text)' : 'none',
-                    color: form.type === t ? '#fff' : 'var(--text-2)'
-                  }}>{t === 'personal' ? '👤 Personal' : '💼 Business'}</button>
-                ))}
-              </div>
+            <label className="modal-label">Type</label>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+              {['personal', 'business'].map(t => (
+                <button key={t} onClick={() => setForm(p => ({ ...p, type: t }))} style={{
+                  flex: 1, padding: '10px', borderRadius: 10, fontSize: 'var(--text-sm)',
+                  border: '0.5px solid var(--border-2)', fontFamily: 'inherit',
+                  background: form.type === t ? 'var(--text)' : 'none',
+                  color: form.type === t ? '#fff' : 'var(--text-2)',
+                  cursor: 'pointer', transition: 'background .12s',
+                }}>{t === 'personal' ? '👤 Personal' : '💼 Business'}</button>
+              ))}
             </div>
 
             {!editAccount && (
-              <div style={{ marginBottom: 20 }}>
-                <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 6 }}>Opening balance (IDR)</div>
-                <input type="number" value={form.balance} onChange={e => setForm(p => ({ ...p, balance: e.target.value }))}
-                  placeholder="0" style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: '0.5px solid var(--border-2)', fontSize: 14, background: 'var(--bg)', color: 'var(--text)' }} />
-              </div>
+              <>
+                <label className="modal-label">Opening balance (IDR)</label>
+                <input
+                  type="number"
+                  className="modal-input"
+                  value={form.balance}
+                  onChange={e => setForm(p => ({ ...p, balance: e.target.value }))}
+                  placeholder="0"
+                  style={{ marginBottom: 18 }}
+                />
+              </>
             )}
 
             {editAccount && (
-              <div style={{ marginBottom: 12 }}>
-                <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 6 }}>
-                  Current balance: <strong>{fmtFull(form.balance)} IDR</strong>
-                </div>
-                <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 6 }}>Set new balance (IDR)</div>
-                <input type="number" value={form.newBalance}
+              <>
+                <label className="modal-label">
+                  Set new balance (IDR) — current: {fmtFull(form.balance)}
+                </label>
+                <input
+                  type="number"
+                  className="modal-input"
+                  value={form.newBalance}
                   onChange={e => setForm(p => ({ ...p, newBalance: e.target.value }))}
                   placeholder={String(form.balance)}
-                  style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: '0.5px solid var(--border-2)', fontSize: 14, background: 'var(--bg)', color: 'var(--text)' }} />
+                  style={{ marginBottom: 6 }}
+                />
                 {Number(form.newBalance) !== Number(form.balance) && (
-                  <div style={{ fontSize: 11, color: Number(form.newBalance) > Number(form.balance) ? 'var(--green)' : 'var(--red)', marginTop: 5 }}>
+                  <div style={{ fontSize: 'var(--text-sm)', color: Number(form.newBalance) > Number(form.balance) ? 'var(--green-dark)' : 'var(--red-dark)', marginBottom: 8 }}>
                     Adjustment: {Number(form.newBalance) > Number(form.balance) ? '+' : ''}{fmtFull(Number(form.newBalance) - Number(form.balance))} IDR
                   </div>
                 )}
-              </div>
-            )}
-
-            {editAccount && (
-              <div style={{ marginBottom: 16, background: 'var(--bg-2)', borderRadius: 10, padding: '10px 12px' }}>
-                <div style={{ fontSize: 11, color: 'var(--text-3)', lineHeight: 1.5 }}>
-                  ℹ️ Renaming will update all transactions linked to this account source.
+                <div style={{ marginBottom: 18, background: 'var(--bg-2)', borderRadius: 10, padding: '10px 13px' }}>
+                  <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-3)', lineHeight: 1.5 }}>
+                    ℹ️ Renaming will update all transactions linked to this account source.
+                  </div>
                 </div>
-              </div>
+              </>
             )}
 
-            <button disabled={!form.name || saving} onClick={handleSave} style={{
-              width: '100%', padding: 13, borderRadius: 10,
-              background: form.name ? 'var(--text)' : 'var(--bg-2)',
-              color: form.name ? '#fff' : 'var(--text-3)', border: 'none', fontSize: 14, fontWeight: 500
-            }}>
-              {saving ? 'Saving...' : editAccount ? 'Save changes' : 'Add account'}
+            <button
+              disabled={!form.name || saving}
+              onClick={handleSave}
+              className="btn btn-primary btn-block btn-lg"
+              style={{ marginBottom: 8 }}
+            >
+              {saving ? 'Saving…' : editAccount ? 'Save changes' : 'Add account'}
             </button>
 
-            <button onClick={() => setShowAdd(false)} style={{
-              width: '100%', padding: 11, borderRadius: 10, background: 'none',
-              color: 'var(--text-3)', border: '0.5px solid var(--border)', fontSize: 13, marginTop: 8
-            }}>Cancel</button>
+            <button
+              onClick={() => setShowAdd(false)}
+              className="btn btn-ghost btn-block btn-lg"
+              style={{ marginBottom: editAccount ? 8 : 0 }}
+            >
+              Cancel
+            </button>
 
             {editAccount && (
-              <button onClick={handleDelete} disabled={saving} style={{
-                width: '100%', padding: 11, borderRadius: 10, background: 'none',
-                color: 'var(--red)', border: '0.5px solid var(--red)', fontSize: 13, marginTop: 8
-              }}>🗑 Delete account</button>
+              <button
+                onClick={handleDelete}
+                disabled={saving}
+                className="btn btn-danger btn-block btn-lg"
+              >
+                🗑 Delete account
+              </button>
             )}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   )

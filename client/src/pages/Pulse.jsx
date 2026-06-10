@@ -99,17 +99,10 @@ function buildNextActions(d, navigate) {
 // ── Modal ─────────────────────────────────────────────────────────────────────
 
 const Modal = ({ onClose, children }) => createPortal(
-  <div onClick={onClose} style={{
-    position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh',
-    background: 'rgba(0,0,0,.6)', zIndex: 99999,
-    display: 'flex', alignItems: 'flex-end', justifyContent: 'center'
-  }}>
-    <div onClick={e => e.stopPropagation()} style={{
-      background: 'var(--bg)', borderRadius: '24px 24px 0 0',
-      padding: '16px 18px 36px', width: '100%', maxWidth: 520,
-      boxShadow: '0 -8px 40px rgba(0,0,0,.3)'
-    }}>
-      <div style={{ width: 36, height: 4, background: 'var(--border-2)', borderRadius: 2, margin: '0 auto 16px' }} />
+  <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-sheet" onClick={e => e.stopPropagation()}>
+      <div className="modal-drag-handle" />
+      <button className="modal-close-btn" onClick={onClose}>✕</button>
       {children}
     </div>
   </div>,
@@ -244,8 +237,8 @@ export default function Pulse({ onDataLoad }) {
   const nextActions       = buildNextActions(d, navigate)
   const recommendedAction = getRecommendedAction(d, navigate)
 
-  const btnP = { padding: '12px 0', borderRadius: 14, border: 'none', fontSize: 13, fontWeight: 500, cursor: 'pointer', width: '100%', marginBottom: 8 }
-  const btnS = { ...btnP, background: 'none', border: '0.5px solid var(--border)', color: 'var(--text-3)', marginBottom: 0 }
+  const btnP = 'btn btn-block btn-lg'
+  const btnS = 'btn btn-ghost btn-block btn-lg'
 
   return (
     <div className="page">
@@ -625,11 +618,11 @@ export default function Pulse({ onDataLoad }) {
 
       {showAnalysis && (
         <Modal onClose={() => setShowAnalysis(false)}>
-          <div style={{ fontSize: 17, fontWeight: 500, color: 'var(--text)', marginBottom: 4 }}>Financial Analysis</div>
-          <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 14 }}>{st.label} · {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</div>
+          <div style={{ fontSize: 'var(--text-lg)', fontWeight: 600, color: 'var(--text)', marginBottom: 4 }}>Financial Analysis</div>
+          <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-3)', marginBottom: 14 }}>{st.label} · {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</div>
           <div style={{ background: 'var(--blue-light)', border: '0.5px solid rgba(21,94,239,.2)', borderRadius: 14, padding: '11px 13px', marginBottom: 10 }}>
-            <div style={{ fontSize: 9, color: 'var(--brand-dark)', letterSpacing: '0.06em', marginBottom: 4 }}>AI CFO SUMMARY</div>
-            <div style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.5, fontWeight: 500 }}>{d.aiText}</div>
+            <div style={{ fontSize: 'var(--text-xs)', color: 'var(--brand-dark)', letterSpacing: '0.06em', marginBottom: 4 }}>AI CFO SUMMARY</div>
+            <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text)', lineHeight: 1.5, fontWeight: 500 }}>{d.aiText}</div>
           </div>
           {[
             { label: 'RUNWAY TREND',    text: (d.runway||0) + ' days at ' + fmt(d.burnRate) + '/day burn rate.' + ((d.runway||0) < 0 ? ' Deepens by ' + fmt(d.burnRate) + ' daily without income.' : '') },
@@ -637,67 +630,69 @@ export default function Pulse({ onDataLoad }) {
             { label: 'RECOMMENDATION', text: (d.runway||0) < 7 ? 'Collect receivables immediately. Delay non-critical expenses.' : (d.runway||0) < 14 ? 'Review upcoming payments. Confirm receivables today.' : 'Finances healthy. Focus on growing income.' },
           ].map(item => (
             <div key={item.label} style={{ background: 'var(--bg-2)', borderRadius: 14, padding: '10px 12px', border: '0.5px solid var(--border)', marginBottom: 8 }}>
-              <div style={{ fontSize: 9, color: 'var(--text-3)', letterSpacing: '0.06em', marginBottom: 4 }}>{item.label}</div>
-              <div style={{ fontSize: 12, color: 'var(--text)', lineHeight: 1.5 }}>{item.text}</div>
+              <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-3)', letterSpacing: '0.06em', marginBottom: 4 }}>{item.label}</div>
+              <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text)', lineHeight: 1.5 }}>{item.text}</div>
             </div>
           ))}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 7, marginBottom: 12 }}>
-            <div style={{ background: 'var(--bg-2)', borderRadius: 12, padding: 10, border: '0.5px solid var(--border)' }}>
-              <div style={{ fontSize: 9, color: 'var(--text-3)', letterSpacing: '0.06em', marginBottom: 3 }}>IF INCOME TODAY</div>
-              <div style={{ fontSize: 16, fontWeight: 500, color: 'var(--green-dark)' }}>+{Math.round(5000000 / ((d.burnRate||1)))} days</div>
-              <div style={{ fontSize: 10, color: 'var(--text-3)' }}>runway impact</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 7, marginBottom: 14 }}>
+            <div style={{ background: 'var(--bg-2)', borderRadius: 12, padding: 12, border: '0.5px solid var(--border)' }}>
+              <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-3)', letterSpacing: '0.06em', marginBottom: 3 }}>IF INCOME TODAY</div>
+              <div style={{ fontSize: 'var(--text-xl)', fontWeight: 500, color: 'var(--green-dark)' }}>+{Math.round(5000000 / ((d.burnRate||1)))} days</div>
+              <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-3)' }}>runway impact</div>
             </div>
-            <div style={{ background: 'var(--bg-2)', borderRadius: 12, padding: 10, border: '0.5px solid var(--border)' }}>
-              <div style={{ fontSize: 9, color: 'var(--text-3)', letterSpacing: '0.06em', marginBottom: 3 }}>IF NO ACTION</div>
-              <div style={{ fontSize: 16, fontWeight: 500, color: 'var(--red-dark)' }}>{fmt(d.netPosition)}</div>
-              <div style={{ fontSize: 10, color: 'var(--text-3)' }}>in 30 days</div>
+            <div style={{ background: 'var(--bg-2)', borderRadius: 12, padding: 12, border: '0.5px solid var(--border)' }}>
+              <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-3)', letterSpacing: '0.06em', marginBottom: 3 }}>IF NO ACTION</div>
+              <div style={{ fontSize: 'var(--text-xl)', fontWeight: 500, color: 'var(--red-dark)' }}>{fmt(d.netPosition)}</div>
+              <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-3)' }}>in 30 days</div>
             </div>
           </div>
-          <button onClick={() => setShowAnalysis(false)} style={{ ...btnP, background: 'var(--text)', color: '#fff' }}>Close</button>
+          <button onClick={() => setShowAnalysis(false)} className={btnP} style={{ background: 'var(--text)', color: '#fff' }}>Close</button>
         </Modal>
       )}
 
       {payModal && (
         <Modal onClose={() => setPayModal(null)}>
-          <div style={{ fontSize: 17, fontWeight: 500, color: 'var(--text)', marginBottom: 3 }}>{payModal.type === 'receivable' ? 'Mark as received' : 'Mark as paid'}</div>
-          <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 14 }}>{payModal.counterparty} · {fmt(payModal.amount)} IDR total</div>
-          <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 5 }}>AMOUNT (IDR)</div>
+          <div style={{ fontSize: 'var(--text-lg)', fontWeight: 600, color: 'var(--text)', marginBottom: 3 }}>{payModal.type === 'receivable' ? 'Mark as received' : 'Mark as paid'}</div>
+          <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-3)', marginBottom: 14 }}>{payModal.counterparty} · {fmt(payModal.amount)} IDR total</div>
+          <label className="modal-label">Amount (IDR)</label>
           <input type="number" value={payForm.amount} onChange={e => setPayForm(p => ({ ...p, amount: e.target.value }))}
-            style={{ width: '100%', padding: '11px 13px', borderRadius: 14, border: '0.5px solid var(--border-2)', fontSize: 14, background: 'var(--bg-2)', color: 'var(--text)', marginBottom: 8 }} />
+            className="modal-input" style={{ marginBottom: 10 }} />
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 6, marginBottom: 12 }}>
             {[25, 50, 75, 100].map(pct => (
               <button key={pct} onClick={() => setPayForm(p => ({ ...p, amount: String(Math.round(payModal.amount * pct / 100)) }))}
-                style={{ padding: '8px 0', borderRadius: 10, fontSize: 11, border: '0.5px solid var(--border)', background: 'none', color: 'var(--text-3)', cursor: 'pointer' }}>
+                className="btn btn-ghost btn-sm">
                 {pct}%
               </button>
             ))}
           </div>
-          <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 5 }}>ACCOUNT</div>
+          <label className="modal-label">Account</label>
           <select value={payForm.account} onChange={e => setPayForm(p => ({ ...p, account: e.target.value }))}
-            style={{ width: '100%', padding: '11px 13px', borderRadius: 14, border: '0.5px solid var(--border-2)', fontSize: 13, background: 'var(--bg-2)', color: 'var(--text)', marginBottom: 12 }}>
+            className="modal-input" style={{ marginBottom: 14 }}>
             <option value="">Select account</option>
             {(d.accounts || []).map(a => <option key={a.name} value={a.name}>{a.name} · {fmt(a.balance)}</option>)}
           </select>
-          <button disabled={!payForm.amount || paying} onClick={handlePay} style={{
-            ...btnP,
-            background: payForm.amount ? (payModal.type === 'receivable' ? 'var(--green-dark)' : 'var(--brand)') : 'var(--bg-2)',
-            color: payForm.amount ? '#fff' : 'var(--text-3)'
-          }}>
+          <button disabled={!payForm.amount || paying} onClick={handlePay}
+            className={btnP}
+            style={{
+              background: payForm.amount ? (payModal.type === 'receivable' ? 'var(--green-dark)' : 'var(--brand)') : 'var(--bg-3)',
+              color: payForm.amount ? '#fff' : 'var(--text-4)',
+              marginBottom: 8,
+            }}>
             {paying ? 'Processing...' : Number(payForm.amount) >= Number(payModal.amount)
               ? 'Pay in full · ' + fmt(Number(payForm.amount)) + ' IDR'
               : 'Pay ' + fmt(Number(payForm.amount)) + ' IDR'}
           </button>
-          <button onClick={() => setPayModal(null)} style={btnS}>Cancel</button>
+          <button onClick={() => setPayModal(null)} className={btnS}>Cancel</button>
         </Modal>
       )}
 
       {snoozeModal && (
         <Modal onClose={() => { setSnoozeModal(null); setSnoozeError(''); setCustomDate('') }}>
-          <div style={{ fontSize: 17, fontWeight: 500, color: 'var(--text)', marginBottom: 3 }}>Snooze reminder</div>
-          <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 16 }}>
+          <div style={{ fontSize: 'var(--text-lg)', fontWeight: 600, color: 'var(--text)', marginBottom: 3 }}>Snooze reminder</div>
+          <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-3)', marginBottom: 16 }}>
             {snoozeModal.title}{snoozeModal.subtitle ? ' · ' + snoozeModal.subtitle : ''}
           </div>
-          <div style={{ fontSize: 10, color: 'var(--text-3)', letterSpacing: '0.06em', marginBottom: 8 }}>REMIND ME IN</div>
+          <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-3)', letterSpacing: '0.06em', marginBottom: 8 }}>REMIND ME IN</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 7, marginBottom: 10 }}>
             {[
               { label: '1 day',  days: 1, sub: new Date(Date.now() + 86400000).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) },
@@ -706,9 +701,9 @@ export default function Pulse({ onDataLoad }) {
               { label: 'Custom', days: 0, sub: 'Pick date' },
             ].map(opt => (
               <div key={opt.label} onClick={() => { if (opt.days > 0) handleSnooze(opt.days, null) }}
-                style={{ background: opt.active ? 'var(--text)' : 'var(--bg-2)', border: opt.active ? 'none' : '0.5px solid var(--border)', borderRadius: 14, padding: 13, textAlign: 'center', cursor: snoozing ? 'not-allowed' : 'pointer', opacity: snoozing ? 0.6 : 1 }}>
-                <div style={{ fontSize: 18, fontWeight: 500, color: opt.active ? '#fff' : 'var(--text)' }}>{opt.label}</div>
-                <div style={{ fontSize: 11, color: opt.active ? 'rgba(255,255,255,.6)' : 'var(--text-3)', marginTop: 2 }}>{opt.sub}</div>
+                style={{ background: opt.active ? 'var(--text)' : 'var(--bg-2)', border: opt.active ? 'none' : '0.5px solid var(--border)', borderRadius: 14, padding: 14, textAlign: 'center', cursor: snoozing ? 'not-allowed' : 'pointer', opacity: snoozing ? 0.6 : 1 }}>
+                <div style={{ fontSize: 'var(--text-xl)', fontWeight: 500, color: opt.active ? '#fff' : 'var(--text)' }}>{opt.label}</div>
+                <div style={{ fontSize: 'var(--text-sm)', color: opt.active ? 'rgba(255,255,255,.6)' : 'var(--text-3)', marginTop: 2 }}>{opt.sub}</div>
               </div>
             ))}
           </div>
@@ -718,24 +713,25 @@ export default function Pulse({ onDataLoad }) {
               value={customDate}
               min={new Date(Date.now() + 86400000).toISOString().split('T')[0]}
               onChange={e => { setCustomDate(e.target.value); setSnoozeError('') }}
-              style={{ width: '100%', padding: '10px 13px', borderRadius: 14, border: snoozeError && !customDate ? '1px solid var(--red)' : '0.5px solid var(--border-2)', fontSize: 13, background: 'var(--bg-2)', color: 'var(--text)' }}
+              className="modal-input"
+              style={{ border: snoozeError && !customDate ? '1px solid var(--red)' : undefined }}
             />
             {customDate && (
               <button disabled={snoozing} onClick={() => handleSnooze(0, null)}
-                style={{ marginTop: 7, width: '100%', padding: '11px 0', borderRadius: 14, border: 'none', fontSize: 13, fontWeight: 500, background: 'var(--text)', color: '#fff', cursor: snoozing ? 'not-allowed' : 'pointer', opacity: snoozing ? 0.6 : 1 }}>
+                className={btnP} style={{ marginTop: 7, background: 'var(--text)', color: '#fff', opacity: snoozing ? 0.6 : 1 }}>
                 {snoozing ? 'Saving...' : 'Snooze until ' + new Date(customDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
               </button>
             )}
           </div>
           {snoozeError && (
-            <div style={{ fontSize: 12, color: 'var(--red)', marginBottom: 8, padding: '8px 12px', background: 'var(--red-light)', borderRadius: 10 }}>{snoozeError}</div>
+            <div style={{ fontSize: 'var(--text-sm)', color: 'var(--red)', marginBottom: 8, padding: '9px 13px', background: 'var(--red-light)', borderRadius: 10 }}>{snoozeError}</div>
           )}
           {snoozeModal.entityType === 'debt' && (
-            <div style={{ background: 'var(--blue-light)', border: '0.5px solid rgba(21,94,239,.2)', borderRadius: 14, padding: '10px 12px', marginBottom: 10 }}>
-              <div style={{ fontSize: 11, color: 'var(--brand-dark)', lineHeight: 1.5 }}>Debt snooze tracking coming soon. This will dismiss for now.</div>
+            <div style={{ background: 'var(--blue-light)', border: '0.5px solid rgba(21,94,239,.2)', borderRadius: 14, padding: '10px 13px', marginBottom: 10 }}>
+              <div style={{ fontSize: 'var(--text-sm)', color: 'var(--brand-dark)', lineHeight: 1.5 }}>Debt snooze tracking coming soon. This will dismiss for now.</div>
             </div>
           )}
-          <button onClick={() => { setSnoozeModal(null); setSnoozeError(''); setCustomDate('') }} style={btnS}>Cancel</button>
+          <button onClick={() => { setSnoozeModal(null); setSnoozeError(''); setCustomDate('') }} className={btnS}>Cancel</button>
         </Modal>
       )}
 

@@ -46,68 +46,37 @@ export default function DebtPaymentModal({ debt, accounts, token, onClose, onSuc
     }
   }
 
-  const btnP = {
-    padding: '12px 0', borderRadius: 14, border: 'none',
-    fontSize: 13, fontWeight: 500, cursor: 'pointer', width: '100%', marginBottom: 8,
-  }
-  const btnS = {
-    ...btnP, background: 'none', border: '0.5px solid var(--border)',
-    color: 'var(--text-3)', marginBottom: 0, cursor: 'pointer',
-  }
-
   return createPortal(
-    <div
-      onClick={onClose}
-      style={{
-        position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh',
-        background: 'rgba(0,0,0,.6)', zIndex: 99999,
-        display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
-      }}
-    >
-      <div
-        onClick={e => e.stopPropagation()}
-        style={{
-          background: 'var(--bg)', borderRadius: '24px 24px 0 0',
-          padding: '16px 18px 36px', width: '100%', maxWidth: 520,
-          boxShadow: '0 -8px 40px rgba(0,0,0,.3)',
-        }}
-      >
-        {/* Drag handle */}
-        <div style={{ width: 36, height: 4, background: 'var(--border-2)', borderRadius: 2, margin: '0 auto 16px' }} />
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-sheet" onClick={e => e.stopPropagation()}>
+        <div className="modal-drag-handle" />
+        <button className="modal-close-btn" onClick={onClose}>✕</button>
 
         {/* Title */}
-        <div style={{ fontSize: 17, fontWeight: 500, color: 'var(--text)', marginBottom: 3 }}>
+        <div style={{ fontSize: 'var(--text-lg)', fontWeight: 600, color: 'var(--text)', marginBottom: 3 }}>
           {isReceivable ? 'Mark as received' : 'Mark as paid'}
         </div>
-        <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 14 }}>
+        <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-3)', marginBottom: 16 }}>
           {debt.counterparty} · {fmt(debt.amount)} IDR total
         </div>
 
         {/* Amount field */}
-        <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 5 }}>AMOUNT (IDR)</div>
+        <label className="modal-label">Amount (IDR)</label>
         <input
           type="number"
+          className="modal-input"
           value={amount}
           onChange={e => { setAmount(e.target.value); setError('') }}
-          style={{
-            width: '100%', padding: '11px 13px', borderRadius: 14,
-            border: '0.5px solid var(--border-2)', fontSize: 14,
-            background: 'var(--bg-2)', color: 'var(--text)', marginBottom: 8,
-            boxSizing: 'border-box',
-          }}
+          style={{ marginBottom: 10 }}
         />
 
         {/* % quick-fill */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 6, marginBottom: 12 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 6, marginBottom: 14 }}>
           {[25, 50, 75, 100].map(pct => (
             <button
               key={pct}
               onClick={() => setAmount(String(Math.round(Number(debt.amount) * pct / 100)))}
-              style={{
-                padding: '8px 0', borderRadius: 10, fontSize: 11,
-                border: '0.5px solid var(--border)', background: 'none',
-                color: 'var(--text-3)', cursor: 'pointer',
-              }}
+              className="btn btn-ghost btn-sm"
             >
               {pct}%
             </button>
@@ -115,18 +84,14 @@ export default function DebtPaymentModal({ debt, accounts, token, onClose, onSuc
         </div>
 
         {/* Account selector */}
-        <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 5 }}>ACCOUNT</div>
+        <label className="modal-label">Account (optional)</label>
         <select
           value={account}
           onChange={e => setAccount(e.target.value)}
-          style={{
-            width: '100%', padding: '11px 13px', borderRadius: 14,
-            border: '0.5px solid var(--border-2)', fontSize: 13,
-            background: 'var(--bg-2)', color: 'var(--text)', marginBottom: 12,
-            boxSizing: 'border-box',
-          }}
+          className="modal-input"
+          style={{ marginBottom: 14 }}
         >
-          <option value="">Select account (optional)</option>
+          <option value="">Select account</option>
           {(accounts || []).map(a => (
             <option key={a.name} value={a.name}>{a.name} · {fmt(a.balance)}</option>
           ))}
@@ -136,7 +101,7 @@ export default function DebtPaymentModal({ debt, accounts, token, onClose, onSuc
         {error && (
           <div style={{
             background: 'var(--red-light)', color: 'var(--red-dark)',
-            borderRadius: 10, padding: '8px 12px', fontSize: 12, marginBottom: 10,
+            borderRadius: 10, padding: '9px 13px', fontSize: 'var(--text-sm)', marginBottom: 12,
             border: '1px solid rgba(240,68,56,.2)',
           }}>
             {error}
@@ -147,12 +112,13 @@ export default function DebtPaymentModal({ debt, accounts, token, onClose, onSuc
         <button
           disabled={!canSubmit}
           onClick={handlePay}
+          className="btn btn-block btn-lg"
           style={{
-            ...btnP,
             background: canSubmit
               ? (isReceivable ? 'var(--green-dark)' : 'var(--brand)')
-              : 'var(--bg-2)',
-            color: canSubmit ? '#fff' : 'var(--text-3)',
+              : 'var(--bg-3)',
+            color: canSubmit ? '#fff' : 'var(--text-4)',
+            marginBottom: 8,
             opacity: paying ? 0.7 : 1,
           }}
         >
@@ -163,7 +129,9 @@ export default function DebtPaymentModal({ debt, accounts, token, onClose, onSuc
               : `${isReceivable ? 'Record received' : 'Pay'} · ${fmt(amountNum)} IDR`}
         </button>
 
-        <button onClick={onClose} style={btnS} disabled={paying}>Cancel</button>
+        <button onClick={onClose} disabled={paying} className="btn btn-ghost btn-block btn-lg">
+          Cancel
+        </button>
       </div>
     </div>,
     document.body
