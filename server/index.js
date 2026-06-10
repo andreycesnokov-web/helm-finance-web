@@ -1850,64 +1850,388 @@ async function buildAiCfoContext(userId) {
   if (payTotal > recvTotal && payTotal > 0) risks.push({ type:'payables_exceed_receivables', severity:'medium', title:'Payables exceed receivables', description:'Net cash pressure ahead', amount: payTotal - recvTotal });
   if (risks.length === 0) risks.push({ type:'healthy', severity:'low', title:'No significant risks', description:'Finances look healthy', amount: 0 });
 
-  // ── Next actions ──────────────────────────────────────────────────────────
-  const nextActions = [];
-  if (recvOverdue.length > 0) nextActions.push({ title: `Follow up on ${recvOverdue.length} overdue receivable${recvOverdue.length>1?'s':''}`, description: `Collect ${recvOverdue.reduce((s,d)=>s+Number(d.remaining_amount||0),0).toLocaleString()} IDR from clients`, action_type: 'receivables', priority: 1 });
-  if (payOverdue.length > 0)  nextActions.push({ title: `Pay ${payOverdue.length} overdue payable${payOverdue.length>1?'s':''}`, description: `${payOverdue.reduce((s,d)=>s+Number(d.remaining_amount||0),0).toLocaleString()} IDR overdue — pay urgently`, action_type: 'payables', priority: 1 });
-  if (payDueSoon.length > 0)  nextActions.push({ title: `Prepare ${payDueSoon.length} payment${payDueSoon.length>1?'s':''} due this week`, description: `${payDueSoon.reduce((s,d)=>s+Number(d.remaining_amount||0),0).toLocaleString()} IDR due within 7 days`, action_type: 'payables', priority: 2 });
-  if (nextActions.length === 0 && totalBalance > 0) nextActions.push({ title: 'Keep tracking transactions', description: 'Finances look healthy. Stay consistent.', action_type: 'pulse', priority: 3 });
+  // ── Build partial context for engines (before final return) ──────────────
+  const partialCtx = {
+    business:      { name: (accessData?.business || {}).name || 'My Business', base_currency: (accessData?.business || {}).base_currency || 'IDR', plan: (accessData?.business || {}).plan || 'free', effective_plan: (accessData?.accessState || {}).effectivePlan || 'free', trial_status: (accessData?.business || {}).trial_status || 'inactive', days_left_in_trial: (accessData?.accessState || {}).daysLeft || 0 },
+    cash:          { total_balance: totalBalance, wallets_count: (wallets||[]).length, wallets: walletList.slice(0,5) },
+    current_month: { income: monthIncome, expenses: monthExpenses, net_flow: monthIncome - monthExpenses, transactions_count: (monthTxs||[]).length, burn_rate: Math.round(burnRate) },
+    receivables:   { total_remaining: recvTotal, overdue_total: recvOverdue.reduce((s,d)=>s+Number(d.remaining_amount||0),0), overdue_count: recvOverdue.length, partial_total: recvList.filter(d=>d.status==='partial').reduce((s,d)=>s+Number(d.remaining_amount||0),0), due_soon_total: recvDueSoon.reduce((s,d)=>s+Number(d.remaining_amount||0),0), top: recvList.slice(0,5).map(d=>({counterparty:d.counterparty,remaining_amount:d.remaining_amount,due_date:d.due_date,status:d.status,days_overdue:d.days_overdue})) },
+    payables:      { total_remaining: payTotal, overdue_total: payOverdue.reduce((s,d)=>s+Number(d.remaining_amount||0),0), overdue_count: payOverdue.length, partial_total: payList.filter(d=>d.status==='partial').reduce((s,d)=>s+Number(d.remaining_amount||0),0), due_soon_total: payDueSoon.reduce((s,d)=>s+Number(d.remaining_amount||0),0), top: payList.slice(0,5).map(d=>({counterparty:d.counterparty,remaining_amount:d.remaining_amount,due_date:d.due_date,status:d.status,days_overdue:d.days_overdue})) },
+    risks,
+    runway_days: runway,
+  };
+
+  // ── Decision layer engines ────────────────────────────────────────────────
+  const cfoScore        = calculateCfoScore(partialCtx);
+  const aiAlert         = calculateAiAlertStatus(partialCtx, cfoScore);
+  const hiringReadiness = calculateHiringReadiness(partialCtx);
+  const nextActions     = buildNextActionsV2(partialCtx, hiringReadiness);
 
   // ── Access info ───────────────────────────────────────────────────────────
-  const biz = accessData?.business || {};
-  const accessState = accessData?.accessState || {};
   const limits = accessData?.limits || {};
 
   return {
-    business: {
-      name:              biz.name || 'My Business',
-      base_currency:     biz.base_currency || 'IDR',
-      plan:              biz.plan || 'free',
-      effective_plan:    accessState.effectivePlan || 'free',
-      trial_status:      biz.trial_status || 'inactive',
-      days_left_in_trial: accessState.daysLeft || 0,
-    },
-    cash: {
-      total_balance:  totalBalance,
-      wallets_count:  (wallets || []).length,
-      wallets:        walletList.slice(0, 5),
-    },
-    current_month: {
-      income:             monthIncome,
-      expenses:           monthExpenses,
-      net_flow:           monthIncome - monthExpenses,
-      transactions_count: (monthTxs || []).length,
-      burn_rate:          Math.round(burnRate),
-    },
-    receivables: {
-      total_remaining: recvTotal,
-      overdue_total:   recvOverdue.reduce((s,d)=>s+Number(d.remaining_amount||0),0),
-      overdue_count:   recvOverdue.length,
-      partial_total:   recvList.filter(d=>d.status==='partial').reduce((s,d)=>s+Number(d.remaining_amount||0),0),
-      due_soon_total:  recvDueSoon.reduce((s,d)=>s+Number(d.remaining_amount||0),0),
-      top: recvList.slice(0, 5).map(d => ({ counterparty: d.counterparty, remaining_amount: d.remaining_amount, due_date: d.due_date, status: d.status, days_overdue: d.days_overdue })),
-    },
-    payables: {
-      total_remaining: payTotal,
-      overdue_total:   payOverdue.reduce((s,d)=>s+Number(d.remaining_amount||0),0),
-      overdue_count:   payOverdue.length,
-      partial_total:   payList.filter(d=>d.status==='partial').reduce((s,d)=>s+Number(d.remaining_amount||0),0),
-      due_soon_total:  payDueSoon.reduce((s,d)=>s+Number(d.remaining_amount||0),0),
-      top: payList.slice(0, 5).map(d => ({ counterparty: d.counterparty, remaining_amount: d.remaining_amount, due_date: d.due_date, status: d.status, days_overdue: d.days_overdue })),
-    },
-    risks,
-    next_actions: nextActions,
-    runway_days: runway,
+    ...partialCtx,
+    next_actions:     nextActions,
+    cfo_score:        cfoScore,
+    ai_alert:         aiAlert,
+    hiring_readiness: hiringReadiness,
     usage: {
-      ai_questions_this_month:   0,   // not tracked in DB yet — V2 limitation
+      ai_questions_this_month:    0,   // not tracked in DB yet — V2 limitation
       max_ai_questions_per_month: limits.max_ai_questions_per_month ?? null,
-      remaining_ai_questions:    limits.max_ai_questions_per_month ?? null,
+      remaining_ai_questions:     limits.max_ai_questions_per_month ?? null,
     },
   };
+}
+
+// ── CFO Score Engine ─────────────────────────────────────────────────────────
+function calculateCfoScore(ctx) {
+  const cash   = ctx.cash     || {};
+  const month  = ctx.current_month || {};
+  const recv   = ctx.receivables   || {};
+  const pay    = ctx.payables      || {};
+  const runway = ctx.runway_days;
+
+  const bal      = Number(cash.total_balance  || 0);
+  const mExpense = Number(month.expenses      || 0);
+  const mIncome  = Number(month.income        || 0);
+  const netFlow  = Number(month.net_flow      || 0);
+  const recvTotal    = Number(recv.total_remaining || 0);
+  const recvOverdue  = Number(recv.overdue_total   || 0);
+  const payTotal     = Number(pay.total_remaining  || 0);
+  const payOverdue   = Number(pay.overdue_total    || 0);
+  const payDueSoon   = Number(pay.due_soon_total   || 0);
+
+  // ── Cash Health (25%) ───────────────────────────────────────────────────
+  let cashScore, cashLabel, cashImpact;
+  if (mExpense === 0) {
+    cashScore = 70; cashLabel = 'Not enough expense history'; cashImpact = 'neutral';
+  } else {
+    const ratio = bal / mExpense;
+    if (ratio >= 3)       { cashScore = 90; cashLabel = 'Strong cash position'; cashImpact = 'positive'; }
+    else if (ratio >= 1)  { cashScore = 78; cashLabel = 'Adequate cash reserves'; cashImpact = 'positive'; }
+    else if (ratio >= 0.5){ cashScore = 58; cashLabel = 'Cash below 1 month expenses'; cashImpact = 'warning'; }
+    else                  { cashScore = 30; cashLabel = 'Cash critically low'; cashImpact = 'negative'; }
+  }
+
+  // ── Runway (25%) ────────────────────────────────────────────────────────
+  let runwayScore, runwayLabel, runwayImpact;
+  if (runway === null || runway === 999) {
+    runwayScore = 60; runwayLabel = 'Runway unknown — add expenses'; runwayImpact = 'neutral';
+  } else if (runway >= 90)  { runwayScore = 100; runwayLabel = 'Runway excellent (90+ days)'; runwayImpact = 'positive'; }
+  else if (runway >= 60)    { runwayScore = 85;  runwayLabel = 'Runway healthy (60+ days)';   runwayImpact = 'positive'; }
+  else if (runway >= 30)    { runwayScore = 70;  runwayLabel = 'Runway adequate (30+ days)';  runwayImpact = 'neutral'; }
+  else if (runway >= 15)    { runwayScore = 45;  runwayLabel = 'Runway short — needs attention'; runwayImpact = 'warning'; }
+  else                      { runwayScore = 20;  runwayLabel = 'Runway critical (<15 days)';  runwayImpact = 'negative'; }
+
+  // ── Receivables (15%) ───────────────────────────────────────────────────
+  let recvScore, recvLabel, recvImpact;
+  if (recvTotal === 0) {
+    recvScore = 80; recvLabel = 'No receivables'; recvImpact = 'neutral';
+  } else {
+    const overdueRatio = recvOverdue / recvTotal;
+    if (recvOverdue === 0)       { recvScore = 85; recvLabel = 'All receivables on time';    recvImpact = 'positive'; }
+    else if (overdueRatio < 0.25){ recvScore = 70; recvLabel = 'Minor overdue receivables';  recvImpact = 'neutral'; }
+    else if (overdueRatio < 0.5) { recvScore = 50; recvLabel = 'Significant overdue receivables'; recvImpact = 'warning'; }
+    else                         { recvScore = 30; recvLabel = 'Most receivables overdue';   recvImpact = 'negative'; }
+  }
+
+  // ── Payables (20%) ──────────────────────────────────────────────────────
+  let payScore, payLabel, payImpact;
+  if (payTotal === 0) {
+    payScore = 90; payLabel = 'No payables'; payImpact = 'positive';
+  } else if (bal > 0 && payOverdue > bal) {
+    payScore = 20; payLabel = 'Overdue payables exceed cash'; payImpact = 'negative';
+  } else if (bal > 0 && payDueSoon > bal) {
+    payScore = 35; payLabel = 'Upcoming payments exceed cash'; payImpact = 'negative';
+  } else if (bal > 0 && payDueSoon <= bal * 0.3) {
+    payScore = 80; payLabel = 'Payables under control'; payImpact = 'positive';
+  } else {
+    payScore = 60; payLabel = 'Payables manageable'; payImpact = 'neutral';
+  }
+
+  // ── Expense Control (15%) ───────────────────────────────────────────────
+  let expScore, expLabel, expImpact;
+  if (mIncome === 0 && mExpense === 0) {
+    expScore = 60; expLabel = 'No monthly data yet'; expImpact = 'neutral';
+  } else if (netFlow >= 0) {
+    const margin = mIncome > 0 ? netFlow / mIncome : 0;
+    expScore = margin > 0.2 ? 92 : margin > 0.05 ? 80 : 72;
+    expLabel = 'Net flow positive'; expImpact = 'positive';
+  } else if (cashScore >= 70) {
+    expScore = 62; expLabel = 'Monthly expenses exceed income'; expImpact = 'warning';
+  } else {
+    expScore = mExpense > mIncome * 1.5 ? 32 : 48;
+    expLabel = 'Expenses significantly exceed income'; expImpact = 'negative';
+  }
+
+  // ── Weighted total ──────────────────────────────────────────────────────
+  const score = Math.round(
+    cashScore   * 0.25 +
+    runwayScore * 0.25 +
+    recvScore   * 0.15 +
+    payScore    * 0.20 +
+    expScore    * 0.15
+  );
+
+  const status = score >= 75 ? 'healthy' : score >= 50 ? 'warning' : 'critical';
+  const statusLabel = score >= 75 ? 'Healthy' : score >= 50 ? 'Needs Attention' : 'Critical';
+
+  // Summary sentence
+  const positives = [cashLabel, runwayLabel, recvLabel, payLabel, expLabel].filter((_, i) => [cashImpact,runwayImpact,recvImpact,payImpact,expImpact][i] === 'positive');
+  const warnings  = [cashLabel, runwayLabel, recvLabel, payLabel, expLabel].filter((_, i) => ['warning','negative'].includes([cashImpact,runwayImpact,recvImpact,payImpact,expImpact][i]));
+  let summary;
+  if (status === 'healthy') summary = positives.length > 0 ? `${positives[0]}. ${warnings.length > 0 ? warnings[0] + '.' : 'All key metrics are positive.'}` : 'Business is financially stable.';
+  else if (status === 'warning') summary = warnings.length > 0 ? `${warnings[0]}. Monitor closely and take action.` : 'Some areas need attention.';
+  else summary = warnings.length > 0 ? `${warnings[0]}. Immediate action required.` : 'Financial health is critical. Prioritize cash flow.';
+
+  return {
+    score,
+    status,
+    label: statusLabel,
+    summary,
+    factors: {
+      cash_health:      { score: cashScore,   label: cashLabel,   impact: cashImpact },
+      runway:           { score: runwayScore, label: runwayLabel, impact: runwayImpact },
+      receivables:      { score: recvScore,   label: recvLabel,   impact: recvImpact },
+      payables:         { score: payScore,    label: payLabel,    impact: payImpact },
+      expense_control:  { score: expScore,    label: expLabel,    impact: expImpact },
+    },
+  };
+}
+
+// ── AI Alert Status ───────────────────────────────────────────────────────────
+function calculateAiAlertStatus(ctx, cfoScore) {
+  const cash   = ctx.cash     || {};
+  const pay    = ctx.payables || {};
+  const runway = ctx.runway_days;
+  const score  = cfoScore?.score ?? 70;
+
+  const bal         = Number(cash.total_balance  || 0);
+  const payOverdue  = Number(pay.overdue_total   || 0);
+  const payDueSoon  = Number(pay.due_soon_total  || 0);
+
+  const isCritical =
+    (runway !== null && runway < 15) ||
+    (bal > 0 && payOverdue > bal) ||
+    bal < 0 ||
+    score < 40;
+
+  const isWarning = !isCritical && (
+    (runway !== null && runway < 30) ||
+    (ctx.receivables?.overdue_count || 0) > 0 ||
+    (bal > 0 && payDueSoon > bal * 0.3) ||
+    score < 70
+  );
+
+  if (isCritical) return {
+    status: 'critical', label: 'Critical', color: 'red',
+    headline: 'Immediate cash action required',
+    description: bal < 0
+      ? 'Cash balance is negative. Review all transactions and stop non-essential spending.'
+      : runway !== null && runway < 7
+        ? `Cash runway is ${runway} days. Prioritize collecting receivables and reducing expenses now.`
+        : payOverdue > bal
+          ? 'Overdue payables exceed available cash. Renegotiate or arrange payment immediately.'
+          : 'Financial health score is below safe threshold. Review all key metrics.',
+  };
+
+  if (isWarning) return {
+    status: 'warning', label: 'Warning', color: 'amber',
+    headline: 'Some areas need attention',
+    description: runway !== null && runway < 30
+      ? `Cash runway is ${runway} days. This requires active cash planning — collect receivables on time.`
+      : (ctx.receivables?.overdue_count || 0) > 0
+        ? `${ctx.receivables.overdue_count} receivable${ctx.receivables.overdue_count > 1 ? 's are' : ' is'} overdue. Follow up to protect cash flow.`
+        : 'Cash position is adequate but some metrics need monitoring.',
+  };
+
+  return {
+    status: 'healthy', label: 'Healthy', color: 'green',
+    headline: 'Business is financially stable',
+    description: 'Cash is strong with no urgent payment risks detected. Keep monitoring monthly.',
+  };
+}
+
+// ── Hiring Readiness Engine ───────────────────────────────────────────────────
+function calculateHiringReadiness(ctx) {
+  const cash   = ctx.cash          || {};
+  const month  = ctx.current_month || {};
+  const pay    = ctx.payables      || {};
+  const runway = ctx.runway_days;
+
+  const bal        = Number(cash.total_balance     || 0);
+  const mExpense   = Number(month.expenses         || 0);
+  const netFlow    = Number(month.net_flow         || 0);
+  const burnRate   = Number(month.burn_rate        || 0);
+  const dueSoon    = Number(pay.due_soon_total     || 0);
+  const currency   = ctx.business?.base_currency   || 'IDR';
+
+  if (mExpense === 0 && bal === 0) return {
+    status: 'insufficient_data', label: 'Not enough data',
+    recommendation: 'Add wallets, transactions and expenses to calculate safe hiring budget.',
+    safe_monthly_salary: 0, max_safe_monthly_salary: 0, currency,
+    reasoning: ['No expense or balance data available.'],
+    assumptions: [],
+  };
+
+  const BUFFER_DAYS   = 30;
+  const bufferCash    = burnRate * BUFFER_DAYS;
+  const safeCashPool  = Math.max(0, bal - bufferCash - dueSoon);
+  const safeSalary    = Math.max(0, Math.round(safeCashPool / 3));
+
+  const reasoning = [];
+  if (runway !== null) reasoning.push(`Current runway is ${runway} days.`);
+  reasoning.push(netFlow >= 0 ? 'Monthly net flow is positive.' : 'Monthly expenses currently exceed income.');
+  if (dueSoon > 0) reasoning.push(`${dueSoon.toLocaleString()} ${currency} in payables due within 7 days.`);
+  reasoning.push(`Safe salary = (cash − 30d buffer − due-soon payables) ÷ 3 months.`);
+
+  let status, label, recommendation;
+  if (runway === null && mExpense === 0) {
+    status = 'insufficient_data'; label = 'Not enough data';
+    recommendation = 'Add expense transactions to calculate burn rate and hiring capacity.';
+  } else if (runway !== null && runway >= 60 && netFlow >= 0) {
+    status = 'ready'; label = 'Ready to hire';
+    recommendation = safeSalary > 0
+      ? `You can hire within the safe salary limit. Keep at least ${BUFFER_DAYS} days runway after onboarding.`
+      : 'Runway and flow are healthy, but most cash is tied up in upcoming payments.';
+  } else if (runway === null || (runway >= 30 && runway < 60)) {
+    status = 'caution'; label = 'Proceed with caution';
+    recommendation = 'Runway is moderate. A hire is possible but keep the salary conservative and monitor cash weekly.';
+  } else {
+    status = 'not_ready'; label = 'Not recommended';
+    recommendation = `Runway is ${runway !== null ? runway + ' days' : 'unknown'}. Delay hiring until runway exceeds 45 days and cash flow stabilises.`;
+    return { status, label, recommendation, safe_monthly_salary: 0, max_safe_monthly_salary: 0, currency, reasoning, assumptions: ['Requires 45+ days runway before hiring.'] };
+  }
+
+  return {
+    status, label, recommendation,
+    safe_monthly_salary: safeSalary,
+    max_safe_monthly_salary: safeSalary,
+    currency, reasoning,
+    assumptions: [
+      `Keeps at least ${BUFFER_DAYS} days cash buffer after withdrawal.`,
+      'Based on current monthly burn rate.',
+      'Covers upcoming payables due within 7 days.',
+    ],
+  };
+}
+
+// ── Next Best Actions V2 ──────────────────────────────────────────────────────
+function buildNextActionsV2(ctx, hiringReadiness) {
+  const recv   = ctx.receivables   || {};
+  const pay    = ctx.payables      || {};
+  const month  = ctx.current_month || {};
+  const runway = ctx.runway_days;
+  const currency = ctx.business?.base_currency || 'IDR';
+
+  const actions = [];
+  const fmt = n => Number(n || 0).toLocaleString('id-ID');
+
+  // ── Overdue receivables ──────────────────────────────────────────────────
+  const recvOverdueList = (recv.top || []).filter(d => d.status === 'overdue');
+  if (recvOverdueList.length > 0) {
+    const top = recvOverdueList[0];
+    actions.push({
+      title: `Follow up: ${top.counterparty}`,
+      description: `${fmt(top.remaining_amount)} ${currency} overdue${top.days_overdue > 0 ? ` — ${top.days_overdue}d past due` : ''}. Send a payment reminder.`,
+      action_type: 'receivable_followup', priority: 'high',
+      amount: top.remaining_amount, route: '/receivables',
+    });
+    if (recvOverdueList.length > 1) {
+      const total = recvOverdueList.reduce((s, d) => s + Number(d.remaining_amount || 0), 0);
+      actions.push({
+        title: `${recvOverdueList.length - 1} more overdue receivable${recvOverdueList.length > 2 ? 's' : ''}`,
+        description: `${fmt(total - Number(top.remaining_amount || 0))} ${currency} also overdue. Review and follow up.`,
+        action_type: 'receivable_followup', priority: 'high',
+        amount: total - Number(top.remaining_amount || 0), route: '/receivables',
+      });
+    }
+  } else if ((recv.due_soon_total || 0) > 0) {
+    const topDueSoon = (recv.top || []).find(d => d.status !== 'paid' && d.status !== 'cancelled');
+    actions.push({
+      title: topDueSoon ? `Confirm payment: ${topDueSoon.counterparty}` : 'Receivable due soon',
+      description: `${fmt(recv.due_soon_total)} ${currency} expected within 7 days. Confirm collection date.`,
+      action_type: 'receivable_due_soon', priority: 'medium',
+      amount: recv.due_soon_total, route: '/receivables',
+    });
+  }
+
+  // ── Overdue payables ─────────────────────────────────────────────────────
+  const payOverdueList = (pay.top || []).filter(d => d.status === 'overdue');
+  if (payOverdueList.length > 0) {
+    const top = payOverdueList[0];
+    actions.push({
+      title: `Pay or renegotiate: ${top.counterparty}`,
+      description: `${fmt(top.remaining_amount)} ${currency} overdue${top.days_overdue > 0 ? ` — ${top.days_overdue}d past due` : ''}. Resolve to protect vendor relationship.`,
+      action_type: 'payable_overdue', priority: 'high',
+      amount: top.remaining_amount, route: '/payables',
+    });
+  }
+
+  // ── Payables due soon ────────────────────────────────────────────────────
+  const payDueSoonList = (pay.top || []).filter(d => {
+    const days = d.due_date ? Math.ceil((new Date(d.due_date) - new Date()) / 86400000) : null;
+    return days !== null && days >= 0 && days <= 7 && d.status !== 'paid';
+  });
+  if (payDueSoonList.length > 0 && payOverdueList.length === 0) {
+    const top = payDueSoonList[0];
+    actions.push({
+      title: `Prepare payment: ${top.counterparty}`,
+      description: `${fmt(top.remaining_amount)} ${currency} due within 7 days. Ensure funds are ready.`,
+      action_type: 'payable_due_soon', priority: 'medium',
+      amount: top.remaining_amount, route: '/payables',
+    });
+  }
+
+  // ── Cash / runway actions ────────────────────────────────────────────────
+  if (runway !== null && runway < 30) {
+    actions.push({
+      title: 'Protect runway: review non-critical spending',
+      description: `Runway is ${runway} days. Delay or cancel non-essential expenses to extend cash runway.`,
+      action_type: 'cash_protection', priority: runway < 15 ? 'high' : 'medium',
+      amount: 0, route: '/transactions',
+    });
+  }
+  if (Number(month.net_flow || 0) < 0 && (runway === null || runway >= 30)) {
+    actions.push({
+      title: 'Review top expenses this month',
+      description: `Monthly expenses exceed income by ${fmt(Math.abs(month.net_flow))} ${currency}. Identify which categories can be reduced.`,
+      action_type: 'expense_review', priority: 'medium',
+      amount: Math.abs(month.net_flow || 0), route: '/transactions',
+    });
+  }
+
+  // ── Hiring readiness action ──────────────────────────────────────────────
+  if (hiringReadiness) {
+    if (hiringReadiness.status === 'not_ready' && (runway || 0) > 0) {
+      actions.push({
+        title: 'Delay hiring — build runway first',
+        description: `Runway of ${runway} days is below safe threshold. Focus on extending runway before adding fixed costs.`,
+        action_type: 'hiring_delay', priority: 'medium',
+        amount: 0, route: '/ai-cfo',
+      });
+    } else if (hiringReadiness.status === 'ready' && hiringReadiness.safe_monthly_salary > 0) {
+      actions.push({
+        title: 'Hiring capacity available',
+        description: `Safe monthly salary budget: ${fmt(hiringReadiness.safe_monthly_salary)} ${currency}. You can hire conservatively.`,
+        action_type: 'hiring_ready', priority: 'low',
+        amount: hiringReadiness.safe_monthly_salary, route: '/ai-cfo',
+      });
+    }
+  }
+
+  // ── Fallback ─────────────────────────────────────────────────────────────
+  if (actions.length === 0) {
+    actions.push({
+      title: 'Finances look stable',
+      description: 'No urgent actions detected. Keep adding transactions daily and review cash weekly.',
+      action_type: 'pulse', priority: 'low',
+      amount: 0, route: '/transactions',
+    });
+  }
+
+  return actions.slice(0, 5);
 }
 
 /**
@@ -2019,13 +2343,21 @@ function generateLocalCfoAnswer(question, ctx) {
     return ans;
   }
 
-  // Hire / headcount
-  if (/hire|нанять|employee|salary|staff|headcount/.test(q)) {
+  // Hire / headcount — use hiring_readiness engine result if available
+  if (/hire|нанять|employee|salary(?! to)|staff|headcount|hiring/.test(q)) {
+    const hr = ctx.hiring_readiness;
+    if (hr) {
+      if (hr.status === 'insufficient_data') return `Not enough financial data to calculate a safe hiring budget.\n\n${hr.recommendation}`;
+      if (hr.status === 'not_ready') return `**${hr.label}** — ${hr.recommendation}\n\n${hr.reasoning.join('\n')}`;
+      const salaryStr = hr.safe_monthly_salary > 0 ? `\n\n**Safe monthly salary budget:** ${fmt(hr.safe_monthly_salary)} ${currency}/month` : '';
+      return `**${hr.label}**\n\n${hr.recommendation}${salaryStr}\n\n${hr.reasoning.join('\n')}\n\n_Note: This is a conservative estimate. Confirm with your accountant._`;
+    }
+    // Fallback if hiring_readiness not in ctx
     const bal = cash.total_balance || 0;
     if (bal <= 0) return `Current cash balance is ${fmt(bal)} ${currency}. Hiring is not recommended until cash position improves.`;
-    if (runway !== null && runway < 30) return `Cash runway is only ${runway} days. Hiring now would increase burn rate and is risky. Focus on improving cash position first.`;
-    const safeBudget = Math.round(bal * 0.15);
-    return `With ${fmt(bal)} ${currency} in cash${runway !== null ? ` and ${runway} days runway` : ''}, you could consider a monthly salary of up to **${fmt(safeBudget)} ${currency}** (15% of cash as a conservative guideline).\n\nCheck upcoming payables (${fmt(pay.total_remaining)} ${currency}) before committing to fixed costs.`;
+    if (runway !== null && runway < 30) return `Cash runway is only ${runway} days. Delay hiring until runway is above 45 days and cash flow is stable.`;
+    const safeBudget = Math.round(bal * 0.12);
+    return `Cash position is ${fmt(bal)} ${currency}${runway !== null ? ` with ${runway} days runway` : ''}. A conservative monthly salary budget would be around **${fmt(safeBudget)} ${currency}** (12% of cash).\n\nCheck upcoming payables (${fmt(pay.total_remaining)} ${currency}) before committing to fixed costs.`;
   }
 
   // What to do today
@@ -2209,32 +2541,28 @@ app.post('/api/ai-cfo/ask', auth, async (req, res) => {
     if (hasApiKey) {
       try {
         const ownerWithdrawal = isOwnerWithdrawalQuestion(question);
+        const cfo   = ctx.cfo_score        || {};
+        const alert = ctx.ai_alert         || {};
+        const hire  = ctx.hiring_readiness || {};
         const systemPrompt = `You are CFO AI, a financial decision assistant for ${ctx.business.name} — a ${ctx.business.effective_plan} plan business using ${currency} as base currency.
+Answer like a calm, direct CFO speaking to a CEO. Be specific, conservative, action-oriented, and not dramatic.
 
-YOUR ROLE:
-You are an AI CFO consultant for business owners. You ONLY answer questions related to:
-business finance, cash flow, runway, receivables, payables, expenses, income, payroll,
-hiring readiness, invoices, financial risks, budgeting and business-owner financial decisions.
+YOUR ROLE: You ONLY answer questions about business finance: cash flow, runway, receivables, payables,
+expenses, income, payroll, hiring readiness, invoices, financial risks, budgeting, owner financial decisions.
+Refuse unrelated topics (cooking, entertainment, politics, sports, relationships, medical, poems, jokes).
 
-If the user asks anything unrelated (cooking, entertainment, politics, sports, relationships,
-medical questions, poems, jokes or other lifestyle topics), politely refuse and explain you
-are only able to help as an AI CFO consultant for business finance. Do not engage with the topic.
+OWNER WITHDRAWAL POLICY: If user asks about taking money from business for personal/family use,
+do NOT give lifestyle advice. Assess cash-flow impact: cash before/after, runway before/after,
+payables coverage, rating (safe/caution/not recommended). Recommend classification (owner withdrawal,
+salary, or dividend). Say "confirm tax treatment with your accountant." Do NOT comment on how to spend.
 
-OWNER WITHDRAWAL POLICY:
-If the user asks about taking money from the business for personal or family use (owner draw,
-dividend, salary to self, personal spending from business cash), do NOT give lifestyle advice.
-Instead, assess the BUSINESS CASH-FLOW IMPACT:
-- Cash balance before and after withdrawal
-- Runway before and after withdrawal (days)
-- Whether payroll and upcoming payables are covered
-- Liquidity buffer remaining
-- Whether the withdrawal looks safe, needs caution, or is not recommended
-State clearly: safe / caution / not recommended, with brief reasoning using actual numbers.
-Recommend the owner record it as: owner withdrawal, salary, or dividend — not a business expense.
-Add: "Confirm tax treatment with your accountant" — but do NOT give tax or legal advice.
-Do NOT advise how to spend the money personally or comment on lifestyle choices.
+DECISION LAYER (today ${new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}):
+- CFO Score: ${cfo.score ?? '?'}/100 — ${cfo.label ?? 'unknown'} (${cfo.summary ?? ''})
+- AI Alert: ${alert.label ?? 'unknown'} — ${alert.headline ?? ''}
+- Hiring: ${hire.label ?? 'unknown'} — safe salary ${hire.safe_monthly_salary ? hire.safe_monthly_salary.toLocaleString() + ' ' + currency + '/mo' : 'unknown'}
+  ${(hire.reasoning || []).join(' ')}
 
-FINANCIAL CONTEXT (today ${new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}):
+FINANCIAL CONTEXT:
 - Total cash: ${ctx.cash.total_balance.toLocaleString()} ${currency}
 - Cash runway: ${ctx.runway_days !== null ? ctx.runway_days + ' days' : 'unknown'}
 - This month: +${ctx.current_month.income.toLocaleString()} income / -${ctx.current_month.expenses.toLocaleString()} expenses (net: ${ctx.current_month.net_flow.toLocaleString()})
@@ -2245,20 +2573,20 @@ ${ctx.receivables.top.length > 0 ? `- Top receivables: ${ctx.receivables.top.map
 ${ctx.payables.top.length > 0 ? `- Top payables: ${ctx.payables.top.map(p => `${p.counterparty} ${p.remaining_amount.toLocaleString()} (${p.status})`).join(', ')}` : ''}
 - Wallets: ${ctx.cash.wallets.map(w => `${w.name} ${w.balance.toLocaleString()} ${w.currency}`).join(', ') || 'none'}
 - Risk signals: ${ctx.risks.map(r => r.title).join('; ') || 'none'}
-${ownerWithdrawal ? `\nNOTE: This question is about an owner withdrawal. Apply the OWNER WITHDRAWAL POLICY above.` : ''}
+- Top actions: ${(ctx.next_actions || []).slice(0,3).map(a => a.title).join(' | ') || 'none'}
+${ownerWithdrawal ? '\nNOTE: This is an owner withdrawal question. Apply OWNER WITHDRAWAL POLICY.' : ''}
 
 ANSWER RULES:
-- Answer concisely and directly (3-8 sentences max)
-- Always use actual numbers from the context above
-- If data is missing, say what is missing — never make up numbers
-- Give actionable advice specific to this business's situation
-- Use the owner's currency (${currency}) in all amounts
-- Be direct and calm — like a real CFO, not a generic chatbot
-- Do not hallucinate business data
-- Do NOT use panic language or dramatic phrases like "this isn't a drill", "crisis", "emergency"
-- For moderate risk situations use: "This needs attention", "This requires active cash planning", "This is manageable if income is collected on time"
-- Reserve strong warnings only for truly critical situations (runway < 7 days, negative cash)
-- Do not hallucinate business data`;
+- Concise, direct, 3-8 sentences max — like a real CFO
+- Use ONLY the actual numbers above — never invent data
+- If data is missing, say what is missing
+- Use ${currency} in all amounts
+- NEVER use: "this isn't a drill", "crisis", "emergency" for moderate situations
+- For moderate risk: "This needs attention" / "This requires active cash planning" / "This is manageable if income is collected on time"
+- Reserve strong warnings for truly critical: runway < 7 days or negative cash
+- When asked about hiring → use the Hiring Readiness data above
+- When asked what to do today → use the Top Actions above
+- When asked about biggest risk → use Risk signals + AI Alert above`;
 
         const response = await anthropic.messages.create({
           model:      'claude-haiku-4-5',
