@@ -254,6 +254,7 @@ export default function Add() {
         activity_type_id:      null,
         // Wallet
         wallet_id:             null,
+        to_wallet_id:          null,   // transfer destination (UI only — no DB column yet)
       })))
     } catch (e) {
       setError(e.message)
@@ -591,10 +592,10 @@ export default function Add() {
                           placeholder="What was this for?" style={inputSt} />
                       </div>
 
-                      {/* Row 4: Wallet / Account */}
+                      {/* Row 4: Wallet / Account (From wallet for transfers) */}
                       <div style={{ marginBottom: 12 }}>
                         <label style={labelSt}>
-                          {isTransfer ? 'Source wallet (optional)' : 'Wallet / Account'}
+                          {isTransfer ? 'From wallet' : 'Wallet / Account'}
                           {sourceMissing && !isTransfer && (
                             <span style={{ color: '#D97706', marginLeft: 6, textTransform: 'none', fontStyle: 'italic' }}>
                               — please select before saving
@@ -602,30 +603,63 @@ export default function Add() {
                           )}
                         </label>
                         {wallets.length > 0 ? (
-                          <select
-                            value={t.wallet_id || ''}
-                            onChange={e => {
-                              const wId = e.target.value || null
-                              const w   = wallets.find(x => x.id === wId)
-                              updateTx(i, 'wallet_id', wId)
-                              updateTx(i, 'source',    w ? w.name : '')
-                              // Sync currency from wallet if not IDR
-                              if (w && w.currency && w.currency !== 'IDR') updateTx(i, 'currency', w.currency)
-                            }}
-                            style={{ ...selectStyle, borderColor: sourceMissing && !isTransfer ? '#F59E0B' : undefined, background: sourceMissing && !isTransfer ? '#FFFBEB' : undefined }}
-                          >
-                            <option value="">— Select wallet —</option>
-                            {wallets.map(w => (
-                              <option key={w.id} value={w.id}>
-                                {w.name}{w.currency && w.currency !== 'IDR' ? ` · ${w.currency}` : ''}
-                                {w.entity_name ? ` (${w.entity_name})` : ''}
-                              </option>
-                            ))}
-                          </select>
+                          <>
+                            <select
+                              value={t.wallet_id || ''}
+                              onChange={e => {
+                                const wId = e.target.value || null
+                                const w   = wallets.find(x => x.id === wId)
+                                updateTx(i, 'wallet_id', wId)
+                                updateTx(i, 'source',    w ? w.name : '')
+                                if (w && w.currency && w.currency !== 'IDR') updateTx(i, 'currency', w.currency)
+                                // For transfers: rebuild description to include from/to
+                                if (isTransfer && w) {
+                                  const toW = t.to_wallet_id ? wallets.find(x => x.id === t.to_wallet_id) : null
+                                  updateTx(i, 'description', `Transfer: ${w.name} → ${toW ? toW.name : '…'}`)
+                                }
+                              }}
+                              style={{ ...selectStyle, borderColor: sourceMissing && !isTransfer ? '#F59E0B' : undefined, background: sourceMissing && !isTransfer ? '#FFFBEB' : undefined }}
+                            >
+                              <option value="">— Select wallet —</option>
+                              {wallets.map(w => (
+                                <option key={w.id} value={w.id}>
+                                  {w.name}{w.currency && w.currency !== 'IDR' ? ` · ${w.currency}` : ''}
+                                  {w.entity_name ? ` (${w.entity_name})` : ''}
+                                </option>
+                              ))}
+                            </select>
+                            {/* Wallet metadata hint */}
+                            {t.wallet_id && (() => {
+                              const selW = wallets.find(x => x.id === t.wallet_id)
+                              if (!selW) return null
+                              return (
+                                <div style={{ display: 'flex', gap: 6, marginTop: 5, flexWrap: 'wrap' }}>
+                                  <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 20, background: '#E1F5EE', color: '#085041', fontWeight: 600 }}>
+                                    {selW.currency || 'IDR'}
+                                  </span>
+                                  {selW.type && (
+                                    <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 20, background: 'var(--bg-3)', color: 'var(--text-3)', fontWeight: 600 }}>
+                                      {selW.type}
+                                    </span>
+                                  )}
+                                  {selW.entity_name && (
+                                    <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 20, background: 'var(--bg-3)', color: 'var(--text-3)' }}>
+                                      {selW.entity_name}
+                                    </span>
+                                  )}
+                                </div>
+                              )
+                            })()}
+                          </>
                         ) : (
-                          <input type="text" value={t.source || ''} onChange={e => updateTx(i, 'source', e.target.value)}
-                            placeholder="e.g. BCA, Cash, GoPay"
-                            style={{ ...inputSt, borderColor: sourceMissing && !isTransfer ? '#F59E0B' : undefined, background: sourceMissing && !isTransfer ? '#FFFBEB' : undefined }} />
+                          <>
+                            <input type="text" value={t.source || ''} onChange={e => updateTx(i, 'source', e.target.value)}
+                              placeholder="e.g. BCA, Cash, GoPay"
+                              style={{ ...inputSt, borderColor: sourceMissing && !isTransfer ? '#F59E0B' : undefined, background: sourceMissing && !isTransfer ? '#FFFBEB' : undefined }} />
+                            <div style={{ fontSize: 11, color: 'var(--text-4)', marginTop: 4 }}>
+                              No wallets yet — <button onClick={() => window.location.href='/accounts'} style={{ fontSize: 11, color: 'var(--brand)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'inherit' }}>add wallets in Accounts →</button>
+                            </div>
+                          </>
                         )}
                         {sourceMissing && !isTransfer && (
                           <div style={{ fontSize: 11, color: '#D97706', marginTop: 4 }}>
@@ -633,6 +667,35 @@ export default function Add() {
                           </div>
                         )}
                       </div>
+
+                      {/* Row 4b: To wallet (transfers only) */}
+                      {isTransfer && wallets.length > 0 && (
+                        <div style={{ marginBottom: 12 }}>
+                          <label style={labelSt}>To wallet</label>
+                          <select
+                            value={t.to_wallet_id || ''}
+                            onChange={e => {
+                              const wId = e.target.value || null
+                              const w   = wallets.find(x => x.id === wId)
+                              updateTx(i, 'to_wallet_id', wId)
+                              // Rebuild description with both names
+                              const fromW = t.wallet_id ? wallets.find(x => x.id === t.wallet_id) : null
+                              updateTx(i, 'description', `Transfer: ${fromW ? fromW.name : '…'} → ${w ? w.name : '…'}`)
+                            }}
+                            style={selectStyle}
+                          >
+                            <option value="">— Select destination —</option>
+                            {wallets.filter(w => w.id !== t.wallet_id).map(w => (
+                              <option key={w.id} value={w.id}>
+                                {w.name}{w.currency && w.currency !== 'IDR' ? ` · ${w.currency}` : ''}
+                              </option>
+                            ))}
+                          </select>
+                          <div style={{ fontSize: 11, color: 'var(--text-4)', marginTop: 4 }}>
+                            ℹ Destination wallet is saved in description. Full debit/credit model in TASK 30.
+                          </div>
+                        </div>
+                      )}
 
                       {/* Row 5: Cashflow Category (grouped select) */}
                       <div style={{ marginBottom: 12 }}>

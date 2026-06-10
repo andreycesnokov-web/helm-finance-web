@@ -375,27 +375,62 @@ app.post('/api/parse', auth, async (req, res) => {
 
 app.post('/api/transactions/batch', auth, async (req, res) => {
   try {
+    const userId = req.user.userId;
     const { transactions } = req.body;
-    const rows = transactions.map(t => ({
-      user_id:                req.user.userId,
-      type:                   t.type,
-      amount_original:        t.amount,
-      currency_original:      t.currency || 'IDR',
-      amount_idr:             t.currency === 'IDR' ? t.amount : (t.amount_idr || t.amount),
-      description:            t.description,
-      source:                 t.source                || null,
-      scope:                  t.scope                 || 'personal',
-      project:                t.project               || null,
-      category:               t.category              || null,
-      // Reference data (Phase 1 — all nullable, backward compatible)
-      cashflow_category_id:   t.cashflow_category_id  || null,
-      counterparty_id:        t.counterparty_id        || null,
-      counterparty_name:      t.counterparty_name      || null,
-      business_direction_id:  t.business_direction_id  || null,
-      activity_type_id:       t.activity_type_id       || null,
-      // Wallet (TASK 29B — nullable, backward compatible)
-      wallet_id:              t.wallet_id              || null,
-    }));
+
+    // ── Wallet validation ────────────────────────────────────────────────────
+    // Collect distinct wallet_ids supplied in this batch
+    const requestedWalletIds = [...new Set(
+      transactions.map(t => t.wallet_id).filter(Boolean)
+    )];
+
+    let walletMap = {}; // id → { id, name, currency }
+    if (requestedWalletIds.length > 0) {
+      const { data: ownedWallets, error: wErr } = await supabase
+        .from('wallets')
+        .select('id, name, currency')
+        .eq('user_id', userId)
+        .in('id', requestedWalletIds);
+      if (wErr) throw wErr;
+
+      // All supplied wallet_ids must belong to this user
+      const ownedIds = new Set((ownedWallets || []).map(w => w.id));
+      const invalidId = requestedWalletIds.find(id => !ownedIds.has(id));
+      if (invalidId) {
+        return res.status(400).json({ error: `Invalid or inaccessible wallet_id: ${invalidId}` });
+      }
+
+      walletMap = Object.fromEntries((ownedWallets || []).map(w => [w.id, w]));
+    }
+
+    // ── Build rows ───────────────────────────────────────────────────────────
+    const rows = transactions.map(t => {
+      // Auto-fill source from wallet name if wallet_id provided but source is empty
+      const wallet        = t.wallet_id ? walletMap[t.wallet_id] : null;
+      const resolvedSource = t.source || (wallet ? wallet.name : null);
+
+      return {
+        user_id:                userId,
+        type:                   t.type,
+        amount_original:        t.amount,
+        currency_original:      t.currency || 'IDR',
+        amount_idr:             t.currency === 'IDR' ? t.amount : (t.amount_idr || t.amount),
+        description:            t.description,
+        source:                 resolvedSource            || null,
+        scope:                  t.scope                   || 'personal',
+        project:                t.project                 || null,
+        category:               t.category                || null,
+        // Reference data (Phase 1 — all nullable, backward compatible)
+        cashflow_category_id:   t.cashflow_category_id    || null,
+        counterparty_id:        t.counterparty_id          || null,
+        counterparty_name:      t.counterparty_name        || null,
+        business_direction_id:  t.business_direction_id    || null,
+        activity_type_id:       t.activity_type_id         || null,
+        // Wallet (TASK 29B — nullable, backward compatible)
+        wallet_id:              t.wallet_id                || null,
+      };
+    });
+
     const { error } = await supabase.from('transactions').insert(rows);
     if (error) throw error;
     res.json({ saved: rows.length });
