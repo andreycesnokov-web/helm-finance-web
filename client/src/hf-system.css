@@ -1,18 +1,41 @@
 
 /* ════════════════════════════════════════════════════════════
-   HELM FINANCE DESIGN SYSTEM — Corporate Fintech
+   CFO AI — Corporate Fintech Design System
+   Product brand: CFO AI / Financial OS
+   Internal project: Helm Finance
    ════════════════════════════════════════════════════════════ */
 
-/* ── HF Page wrapper ──────────────────────────────────────── */
+/* ── CFO AI Logo mark (CSS-only, used in sidebar) ────────── */
+.cfo-logo-mark {
+  width: 40px;
+  height: 40px;
+  border-radius: 11px;
+  background: linear-gradient(135deg, #1D4ED8 0%, #2563EB 60%, #3B82F6 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  position: relative;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.35), inset 0 1px 0 rgba(255,255,255,0.15);
+  border: 1px solid rgba(255,255,255,0.12);
+}
+.cfo-logo-mark svg {
+  width: 22px;
+  height: 22px;
+}
+
+/* ── Page wrapper ─────────────────────────────────────────── */
+.cfo-page,
 .hf-page {
   padding: 28px 28px 48px;
   max-width: 100%;
 }
 @media (max-width: 767px) {
-  .hf-page { padding: 16px 16px 80px; }
+  .cfo-page, .hf-page { padding: 16px 16px 80px; }
 }
 
-/* ── HF Page header ───────────────────────────────────────── */
+/* ── Page header ──────────────────────────────────────────── */
+.cfo-page-header,
 .hf-page-header {
   display: flex;
   align-items: flex-start;
@@ -20,6 +43,7 @@
   gap: 16px;
   margin-bottom: 24px;
 }
+.cfo-page-title,
 .hf-page-title {
   font-size: var(--text-2xl);
   font-weight: 800;
@@ -27,12 +51,14 @@
   letter-spacing: -0.6px;
   line-height: 1.1;
 }
+.cfo-page-subtitle,
 .hf-page-subtitle {
   font-size: var(--text-sm);
   color: var(--text-3);
   margin-top: 4px;
   font-weight: 400;
 }
+.cfo-page-actions,
 .hf-page-actions {
   display: flex;
   align-items: center;
@@ -41,7 +67,8 @@
   padding-top: 4px;
 }
 
-/* ── HF Card ──────────────────────────────────────────────── */
+/* ── Card ─────────────────────────────────────────────────── */
+.cfo-card,
 .hf-card {
   background: var(--surface-card);
   border: 1px solid var(--border);
@@ -50,21 +77,27 @@
   box-shadow: 0 1px 4px rgba(15, 23, 42, 0.06);
   transition: box-shadow 0.15s;
 }
+.cfo-card:hover,
 .hf-card:hover { box-shadow: 0 4px 12px rgba(15, 23, 42, 0.10); }
 
-/* ── HF Card grids ────────────────────────────────────────── */
+/* ── Card grids ───────────────────────────────────────────── */
+.cfo-card-grid,
 .hf-card-grid { display: grid; gap: 16px; }
-.hf-card-grid-2 { grid-template-columns: repeat(2, 1fr); }
-.hf-card-grid-3 { grid-template-columns: repeat(3, 1fr); }
-.hf-card-grid-4 { grid-template-columns: repeat(4, 1fr); }
+.cfo-card-grid-2, .hf-card-grid-2 { grid-template-columns: repeat(2, 1fr); }
+.cfo-card-grid-3, .hf-card-grid-3 { grid-template-columns: repeat(3, 1fr); }
+.cfo-card-grid-4, .hf-card-grid-4 { grid-template-columns: repeat(4, 1fr); }
 @media (max-width: 767px) {
-  .hf-card-grid-2, .hf-card-grid-3, .hf-card-grid-4 { grid-template-columns: 1fr; }
+  .cfo-card-grid-2, .hf-card-grid-2,
+  .cfo-card-grid-3, .hf-card-grid-3,
+  .cfo-card-grid-4, .hf-card-grid-4 { grid-template-columns: 1fr; }
 }
 @media (min-width: 768px) and (max-width: 1023px) {
-  .hf-card-grid-3, .hf-card-grid-4 { grid-template-columns: repeat(2, 1fr); }
+  .cfo-card-grid-3, .hf-card-grid-3,
+  .cfo-card-grid-4, .hf-card-grid-4 { grid-template-columns: repeat(2, 1fr); }
 }
 
-/* ── HF Section title ─────────────────────────────────────── */
+/* ── Section title ────────────────────────────────────────── */
+.cfo-section-title,
 .hf-section-title {
   font-size: 11px;
   font-weight: 800;
@@ -74,13 +107,15 @@
   margin-bottom: 14px;
 }
 
-/* ── HF KPI ───────────────────────────────────────────────── */
+/* ── KPI ──────────────────────────────────────────────────── */
+.cfo-kpi-value,
 .hf-kpi-value {
   font-size: var(--text-2xl);
   font-weight: 800;
   letter-spacing: -0.5px;
   line-height: 1.1;
 }
+.cfo-kpi-label,
 .hf-kpi-label {
   font-size: 11px;
   font-weight: 700;
@@ -90,7 +125,8 @@
   margin-bottom: 6px;
 }
 
-/* ── HF Badge ─────────────────────────────────────────────── */
+/* ── Badge ────────────────────────────────────────────────── */
+.cfo-badge,
 .hf-badge {
   display: inline-flex;
   align-items: center;
@@ -101,13 +137,15 @@
   font-weight: 700;
   white-space: nowrap;
 }
-.hf-badge-green { background: var(--green-light); color: var(--green-dark); border: 1px solid rgba(2,122,72,.12); }
-.hf-badge-red   { background: var(--red-light);   color: var(--red-dark);   border: 1px solid rgba(180,35,24,.12); }
-.hf-badge-amber { background: var(--amber-light);  color: var(--amber-dark); border: 1px solid rgba(181,71,8,.12); }
-.hf-badge-blue  { background: var(--brand-light);  color: var(--brand-dark); border: 1px solid rgba(37,99,235,.12); }
-.hf-badge-muted { background: var(--bg-3);         color: var(--text-3);     border: 1px solid var(--border); }
+.cfo-badge-green, .hf-badge-green { background: var(--green-light); color: var(--green-dark); border: 1px solid rgba(2,122,72,.12); }
+.cfo-badge-red,   .hf-badge-red   { background: var(--red-light);   color: var(--red-dark);   border: 1px solid rgba(180,35,24,.12); }
+.cfo-badge-amber, .hf-badge-amber { background: var(--amber-light);  color: var(--amber-dark); border: 1px solid rgba(181,71,8,.12); }
+.cfo-badge-blue,  .hf-badge-blue  { background: var(--brand-light);  color: var(--brand-dark); border: 1px solid rgba(37,99,235,.12); }
+.cfo-badge-muted, .hf-badge-muted { background: var(--bg-3);         color: var(--text-3);     border: 1px solid var(--border); }
+.cfo-badge-navy { background: rgba(15,23,42,.08); color: var(--text); border: 1px solid rgba(15,23,42,.12); }
 
-/* ── HF Toolbar ───────────────────────────────────────────── */
+/* ── Toolbar ──────────────────────────────────────────────── */
+.cfo-toolbar,
 .hf-toolbar {
   display: flex;
   align-items: center;
@@ -120,6 +158,7 @@
 }
 
 /* ── View toggle (Cards / List / Kanban) ──────────────────── */
+.cfo-view-toggle,
 .view-toggle {
   display: inline-flex;
   align-items: center;
@@ -129,6 +168,7 @@
   border-radius: 10px;
   padding: 3px;
 }
+.cfo-view-toggle-btn,
 .view-toggle-btn {
   padding: 6px 14px;
   border-radius: 7px;
@@ -142,14 +182,26 @@
   font-family: inherit;
   white-space: nowrap;
 }
+.cfo-view-toggle-btn:hover,
 .view-toggle-btn:hover { color: var(--text); background: rgba(0,0,0,.04); }
+.cfo-view-toggle-btn.active,
 .view-toggle-btn.active {
   background: var(--surface-card);
   color: var(--text);
   box-shadow: 0 1px 4px rgba(15,23,42,.10);
 }
 
+/* ── Action panel ─────────────────────────────────────────── */
+.cfo-action-panel {
+  background: var(--surface-card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 20px 22px;
+  margin-bottom: 16px;
+}
+
 /* ── Dark hero card (AI CFO / Radar) ─────────────────────── */
+.cfo-dark-card,
 .hf-dark-card {
   background: linear-gradient(135deg, #0F172A 0%, #1e293b 100%);
   border-radius: 20px;
@@ -159,6 +211,7 @@
   overflow: hidden;
   margin-bottom: 20px;
 }
+.cfo-dark-card::before,
 .hf-dark-card::before {
   content: '';
   position: absolute;
@@ -259,6 +312,31 @@
   text-align: center;
   padding: 20px 0;
 }
+
+/* ── CFO AI Table ─────────────────────────────────────────── */
+.cfo-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+}
+.cfo-table th {
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--text-3);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 10px 16px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-2);
+}
+.cfo-table td {
+  padding: 14px 16px;
+  border-bottom: 0.5px solid var(--border);
+  vertical-align: middle;
+}
+.cfo-table tr:last-child td { border-bottom: none; }
+.cfo-table tr:hover td { background: var(--bg-2); }
 
 /* ── Scale-up overrides for existing shared classes ──────── */
 .status-pill { font-size: 12px; padding: 3px 10px; }

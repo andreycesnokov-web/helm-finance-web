@@ -112,15 +112,17 @@ export default function Payables() {
   const totalAmount = open.reduce((s, x) => s + Number(x.amount || 0), 0)
 
   return (
-    <div className="page">
+    <div className="hf-page">
 
       {/* ── Header ─── */}
-      <div className="page-header">
-        <div className="page-header-left">
-          <div className="page-header-title">Payables</div>
-          <div className="page-header-sub">Money your business needs to pay</div>
+      <div className="hf-page-header">
+        <div>
+          <div className="hf-page-title">Payables</div>
+          <div className="hf-page-subtitle">Money your business needs to pay</div>
         </div>
-        <button className="btn btn-primary btn-md" onClick={() => setShowForm(true)}>+ New Payable</button>
+        <div className="hf-page-actions">
+          <button className="btn btn-primary btn-md" onClick={() => setShowForm(true)}>+ New Payable</button>
+        </div>
       </div>
 
       {error && <div className="page-error">{error}</div>}

@@ -124,14 +124,16 @@ export default function Transactions() {
     <div className="page tx-page">
 
       {/* ── Page header ─── */}
-      <div className="page-header">
-        <div className="page-header-left">
-          <div className="page-header-title">Transactions</div>
-          <div className="page-header-sub">All money movements</div>
+      <div className="hf-page-header" style={{ padding: '28px 28px 0', marginBottom: 0 }}>
+        <div>
+          <div className="hf-page-title">Transactions</div>
+          <div className="hf-page-subtitle">All money movements</div>
         </div>
-        <button className="page-header-action" onClick={() => navigate('/add')}>
-          <PlusIcon /> Add
-        </button>
+        <div className="hf-page-actions">
+          <button className="btn btn-primary btn-md" onClick={() => navigate('/add')}>
+            + Add
+          </button>
+        </div>
       </div>
 
       {/* ── Summary cards ─── */}

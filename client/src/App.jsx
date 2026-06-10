@@ -95,12 +95,23 @@ function Sidebar() {
   return (
     <div className="sidebar">
 
-      {/* ── Business block ─── */}
+      {/* ── CFO AI brand block ─── */}
       <div className="sidebar-business-block">
-        <div className="sidebar-business-logo">💰</div>
+        {/* CSS-only logo mark — no external images */}
+        <div className="cfo-logo-mark">
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            {/* Bar chart bars */}
+            <rect x="2" y="14" width="4" height="7" rx="1" fill="rgba(255,255,255,0.55)"/>
+            <rect x="8" y="9"  width="4" height="12" rx="1" fill="rgba(255,255,255,0.80)"/>
+            <rect x="14" y="5" width="4" height="16" rx="1" fill="#fff"/>
+            {/* AI spark line */}
+            <path d="M18.5 5L20 3" stroke="rgba(255,255,255,0.65)" strokeWidth="1.5" strokeLinecap="round"/>
+            <circle cx="20.5" cy="2.5" r="1" fill="rgba(255,255,255,0.5)"/>
+          </svg>
+        </div>
         <div>
-          <div className="sidebar-business-name">Helm Finance</div>
-          <div className="sidebar-business-sub">My Business</div>
+          <div className="sidebar-business-name">CFO AI</div>
+          <div className="sidebar-business-sub">Financial OS</div>
         </div>
       </div>
 
@@ -178,7 +189,7 @@ export function RightPanel({ data }) {
   const runwayColor = (d.runway || 0) > 14 ? 'var(--green-dark)' : (d.runway || 0) > 7 ? 'var(--amber-dark)' : 'var(--red)'
 
   const SecTitle = ({ children }) => (
-    <div style={{ fontSize: 9, fontWeight: 700, color: 'var(--text-4)', textTransform: 'uppercase', letterSpacing: '0.09em', marginBottom: 10 }}>{children}</div>
+    <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.09em', marginBottom: 10 }}>{children}</div>
   )
 
   return (
@@ -202,13 +213,13 @@ export function RightPanel({ data }) {
             </div>
           </div>
           {/* AI text */}
-          <div style={{ fontSize: 13, color: 'rgba(255,255,255,.72)', lineHeight: 1.6, marginBottom: 10 }}>
+          <div style={{ fontSize: 14, color: 'rgba(255,255,255,.80)', lineHeight: 1.6, marginBottom: 10 }}>
             {d.aiText || 'Analysing your financial position...'}
           </div>
           {/* Recommendation */}
           <div style={{ borderTop: '0.5px solid rgba(255,255,255,.08)', paddingTop: 10 }}>
-            <div style={{ fontSize: 10, color: 'rgba(99,152,255,.7)', letterSpacing: '0.07em', marginBottom: 5, fontWeight: 700 }}>RECOMMENDATION</div>
-            <div style={{ fontSize: 12, color: 'rgba(255,255,255,.6)', lineHeight: 1.55 }}>
+            <div style={{ fontSize: 11, color: 'rgba(99,152,255,.8)', letterSpacing: '0.07em', marginBottom: 5, fontWeight: 800 }}>RECOMMENDATION</div>
+            <div style={{ fontSize: 13, color: 'rgba(255,255,255,.65)', lineHeight: 1.55 }}>
               {(d.runway || 0) < 7
                 ? 'Collect receivables immediately — cash risk is high.'
                 : (d.runway || 0) < 14
@@ -228,14 +239,14 @@ export function RightPanel({ data }) {
               const days = Math.round((new Date(debt.due_date) - new Date()) / 86400000)
               const isOverdue = days < 0
               return (
-                <div key={debt.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '0.5px solid var(--border)' }}>
+                <div key={debt.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '9px 0', borderBottom: '0.5px solid var(--border)' }}>
                   <div>
-                    <div style={{ fontSize: 13, color: 'var(--text)', fontWeight: 600, marginBottom: 2 }}>{debt.counterparty}</div>
-                    <div style={{ fontSize: 11, color: isOverdue ? 'var(--red)' : 'var(--text-4)', fontWeight: isOverdue ? 600 : 400 }}>
+                    <div style={{ fontSize: 14, color: 'var(--text)', fontWeight: 600, marginBottom: 2 }}>{debt.counterparty}</div>
+                    <div style={{ fontSize: 12, color: isOverdue ? 'var(--red)' : 'var(--text-4)', fontWeight: isOverdue ? 600 : 400 }}>
                       {isOverdue ? '⚠ Overdue' : days === 0 ? 'Today' : `in ${days}d`}
                     </div>
                   </div>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: debt.type === 'receivable' ? 'var(--green-dark)' : 'var(--red-dark)' }}>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: debt.type === 'receivable' ? 'var(--green-dark)' : 'var(--red-dark)' }}>
                     {debt.type === 'receivable' ? '+' : '−'}{fmtShort(debt.amount)}
                   </div>
                 </div>
@@ -255,9 +266,9 @@ export function RightPanel({ data }) {
             { label: 'Receivables',  value: `+${fmtShort(d.receivables || 0)}`,                                      color: 'var(--green-dark)' },
             { label: 'Payables',     value: `−${fmtShort(d.payables || 0)}`,                                         color: 'var(--red-dark)' },
           ].map((s, i, arr) => (
-            <div key={s.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '9px 12px', borderBottom: i < arr.length - 1 ? '0.5px solid var(--border)' : 'none' }}>
+            <div key={s.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', borderBottom: i < arr.length - 1 ? '0.5px solid var(--border)' : 'none' }}>
               <div style={{ fontSize: 13, color: 'var(--text-3)' }}>{s.label}</div>
-              <div style={{ fontSize: 13, fontWeight: 700, color: s.color }}>{s.value}</div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: s.color }}>{s.value}</div>
             </div>
           ))}
         </div>
