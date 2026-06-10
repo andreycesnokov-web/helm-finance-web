@@ -2004,6 +2004,69 @@ function generateLocalCfoAnswer(question, ctx) {
   return `**Financial summary for ${biz.name}:**\n\nCash: ${fmt(cash.total_balance)} ${currency}${runway !== null ? ` · ${runway}d runway` : ''}\nThis month: +${fmt(month.income)} income / −${fmt(month.expenses)} expenses\nReceivables: ${fmt(recv.total_remaining)} ${currency} outstanding\nPayables: ${fmt(pay.total_remaining)} ${currency} pending\n\n${topRisk ? `Main insight: ${topRisk.title}` : 'No major risks detected.'}`;
 }
 
+// ── Domain guardrail for AI CFO ───────────────────────────────────────────────
+// Returns true  → question is within CFO/business-finance scope → allow
+// Returns false → out-of-scope → refuse
+function isBusinessFinanceQuestion(question) {
+  const q = question.toLowerCase().trim();
+
+  // 1. Explicit non-business blocklist (fast reject for obvious lifestyle questions)
+  const BLOCKED = [
+    /cook|recipe|пельмен|борщ|блин|суп|еда|готов/,
+    /poem|стих|стихотворен|write me a (song|poem|story|rap)/,
+    /movie|film|фильм|сериал|netflix|кино/,
+    /football|soccer|match|game score|sport.*result|who won/,
+    /relationship|romantic|love|dating|boyfriend|girlfriend|marriage|отношен/,
+    /politic|election|президент|vote|партия|война|war(?! on cost)/,
+    /weather|погод|forecast|температур/,
+    /medical|doctor|medicine|болезн|симптом|лекарств|diagnos/,
+    /joke|funny|анекдот|humor/,
+    /horoscope|гороскоп|astrology/,
+  ];
+  if (BLOCKED.some(re => re.test(q))) return false;
+
+  // 2. Finance/business allowlist — if any keyword matches, always allow
+  const ALLOWED = [
+    /cash|деньги|наличн/,
+    /balance|баланс/,
+    /runway|рунвей/,
+    /receiv|дебитор/,
+    /payable|кредитор/,
+    /invoice|счёт|счет/,
+    /expense|расход|затрат/,
+    /income|revenue|доход|выручк/,
+    /profit|прибыл/,
+    /hire|нанять|employee|salary|зарплат|payroll|staff|headcount/,
+    /debt|долг/,
+    /risk|риск/,
+    /budget|бюджет/,
+    /business|company|бизнес|компани/,
+    /spend|потратить|payment|платеж|заплатить/,
+    /collect|взыскать|получить.*деньги/,
+    /financial|финанс/,
+    /tax|налог/,
+    /burn rate|burn/,
+    /wallet|кошелек/,
+    /transaction|транзакц/,
+    /overdue|просроч/,
+    /what should (i|we) do/,
+    /can i (hire|spend|pay|afford)/,
+    /how much (cash|money|do i have)/,
+    /what.*biggest.*risk/,
+    /today.*priorit|priorit.*today/,
+  ];
+  if (ALLOWED.some(re => re.test(q))) return true;
+
+  // 3. Very short questions (<= 5 words) that are ambiguous → allow (fail open)
+  const wordCount = q.split(/\s+/).filter(Boolean).length;
+  if (wordCount <= 5) return true;
+
+  // 4. Default: allow (fail open — better to answer than over-block)
+  return true;
+}
+
+const CFO_OUT_OF_SCOPE_RESPONSE = "Sorry, I can't help with that. I'm CFO AI — a financial consultant for business owners. I only answer questions related to business finance: cash flow, receivables, payables, expenses, runway, hiring readiness, payroll and financial decisions.";
+
 // GET /api/ai-cfo/context — full financial context for AI CFO page
 app.get('/api/ai-cfo/context', auth, async (req, res) => {
   try {
@@ -2020,6 +2083,11 @@ app.post('/api/ai-cfo/ask', auth, async (req, res) => {
     const userId   = req.user.userId;
     const { question } = req.body;
     if (!question || !question.trim()) return res.status(400).json({ error: 'question required' });
+
+    // ── Domain guardrail: reject out-of-scope questions ───────────────────────
+    if (!isBusinessFinanceQuestion(question)) {
+      return res.json({ answer: CFO_OUT_OF_SCOPE_RESPONSE, out_of_scope: true });
+    }
 
     // ── Usage limit check (soft — not yet tracked in DB) ─────────────────────
     let access;
@@ -2045,7 +2113,16 @@ app.post('/api/ai-cfo/ask', auth, async (req, res) => {
 
     if (hasApiKey) {
       try {
-        const systemPrompt = `You are an expert CFO assistant for ${ctx.business.name}, a ${ctx.business.effective_plan} plan business using ${currency} as base currency.
+        const systemPrompt = `You are CFO AI, a financial decision assistant for ${ctx.business.name} — a ${ctx.business.effective_plan} plan business using ${currency} as base currency.
+
+YOUR ROLE:
+You are an AI CFO consultant for business owners. You ONLY answer questions related to:
+business finance, cash flow, runway, receivables, payables, expenses, income, payroll,
+hiring readiness, invoices, financial risks, budgeting and business-owner financial decisions.
+
+If the user asks anything unrelated (cooking, entertainment, politics, sports, relationships,
+medical questions, poems, jokes or other lifestyle topics), politely refuse and explain you
+are only able to help as an AI CFO consultant for business finance. Do not engage with the topic.
 
 FINANCIAL CONTEXT (today ${new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}):
 - Total cash: ${ctx.cash.total_balance.toLocaleString()} ${currency}
@@ -2057,15 +2134,16 @@ FINANCIAL CONTEXT (today ${new Date().toLocaleDateString('en-GB', { day: 'numeri
 ${ctx.receivables.top.length > 0 ? `- Top receivables: ${ctx.receivables.top.map(r => `${r.counterparty} ${r.remaining_amount.toLocaleString()} (${r.status})`).join(', ')}` : ''}
 ${ctx.payables.top.length > 0 ? `- Top payables: ${ctx.payables.top.map(p => `${p.counterparty} ${p.remaining_amount.toLocaleString()} (${p.status})`).join(', ')}` : ''}
 - Wallets: ${ctx.cash.wallets.map(w => `${w.name} ${w.balance.toLocaleString()} ${w.currency}`).join(', ') || 'none'}
-- Risk signals: ${ctx.risks.map(r => r.title).join('; ')}
+- Risk signals: ${ctx.risks.map(r => r.title).join('; ') || 'none'}
 
-RULES:
+ANSWER RULES:
 - Answer concisely and directly (3-8 sentences max)
-- Always use actual numbers from the context
-- If data is missing, say so clearly — never make up numbers
+- Always use actual numbers from the context above
+- If data is missing, say what is missing — never make up numbers
 - Give actionable advice specific to this business's situation
 - Use the owner's currency (${currency}) in all amounts
-- Be direct like a real CFO, not a generic chatbot`;
+- Be direct like a real CFO, not a generic chatbot
+- Do not hallucinate business data`;
 
         const response = await anthropic.messages.create({
           model:      'claude-haiku-4-5',

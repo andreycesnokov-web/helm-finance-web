@@ -60,14 +60,22 @@ function Bubble({ msg }) {
           ✦
         </div>
       )}
-      <div style={{
-        maxWidth: '80%', padding: '10px 14px', borderRadius: isUser ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
-        background: isUser ? 'linear-gradient(135deg, #1D4ED8, #2563EB)' : 'var(--bg-2)',
-        color: isUser ? '#fff' : 'var(--text)',
-        border: isUser ? 'none' : '0.5px solid var(--border)',
-        fontSize: 13, lineHeight: 1.6,
-      }}>
-        {isUser ? msg.content : <MarkdownText text={msg.content} />}
+      <div style={{ maxWidth: '80%' }}>
+        <div style={{
+          padding: '10px 14px', borderRadius: isUser ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
+          background: isUser ? 'linear-gradient(135deg, #1D4ED8, #2563EB)' : msg.outOfScope ? 'var(--bg-3)' : 'var(--bg-2)',
+          color: isUser ? '#fff' : 'var(--text)',
+          border: isUser ? 'none' : msg.outOfScope ? '0.5px solid var(--border-2)' : '0.5px solid var(--border)',
+          fontSize: 13, lineHeight: 1.6,
+        }}>
+          {isUser ? msg.content : <MarkdownText text={msg.content} />}
+        </div>
+        {!isUser && msg.outOfScope && (
+          <div style={{ marginTop: 4, fontSize: 10, color: 'var(--text-4)', display: 'flex', alignItems: 'center', gap: 4, paddingLeft: 4 }}>
+            <span style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--text-4)', display: 'inline-block' }} />
+            Out of CFO scope
+          </div>
+        )}
       </div>
     </div>
   )
@@ -93,7 +101,7 @@ export default function AICFO() {
   const [ctx,      setCtx]      = useState(null)
   const [ctxLoad,  setCtxLoad]  = useState(true)
   const [ctxErr,   setCtxErr]   = useState('')
-  const [messages, setMessages] = useState([])   // { role: 'user'|'assistant', content }
+  const [messages, setMessages] = useState([])   // { role: 'user'|'assistant', content, outOfScope? }
   const [input,    setInput]    = useState('')
   const [asking,   setAsking]   = useState(false)
   const [askErr,   setAskErr]   = useState('')
@@ -132,7 +140,7 @@ export default function AICFO() {
         method: 'POST',
         body: { question },
       })
-      setMessages(prev => [...prev, { role: 'assistant', content: res.answer }])
+      setMessages(prev => [...prev, { role: 'assistant', content: res.answer, outOfScope: !!res.out_of_scope }])
     } catch (e) {
       if (e.upgrade_required || e.message?.includes('limit')) {
         setLimitHit(true)
