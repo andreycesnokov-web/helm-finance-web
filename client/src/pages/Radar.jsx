@@ -151,15 +151,15 @@ export default function Radar() {
       </div>
 
       {/* Burn rate metrics card */}
-      <div className="hf-card" style={{ marginBottom: 16 }}>
-        <div style={{ fontSize: 'var(--text-sm)', fontWeight: 700, color: 'var(--text-3)', marginBottom: 16, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Monthly burn breakdown</div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+      <div className="hf-card" style={{ marginBottom: 16, padding: '16px 14px' }}>
+        <div style={{ fontSize: 'var(--text-sm)', fontWeight: 700, color: 'var(--text-3)', marginBottom: 12, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Monthly burn breakdown</div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 }}>
           {[
             { label: 'Monthly burn', val: fmt(monthlyBurn), sub: 'IDR / month', color: 'var(--red-dark)' },
             { label: 'Daily average', val: fmt(burnRate), sub: d.burnWindowDays >= 30 ? '30-day rolling avg' : d.burnWindowDays > 0 ? `${d.burnWindowDays}d avg` : 'avg', color: 'var(--text)' },
             { label: 'Runway left', val: runway != null ? runway + 'd' : '∞', sub: burnRate > 0 ? 'at current burn' : 'no burn data', color: runway != null && runway < 14 ? 'var(--red-dark)' : runway != null && runway < 30 ? 'var(--amber-dark)' : 'var(--green-dark)' },
           ].map(s => (
-            <div key={s.label} style={{ background: 'var(--bg-2)', borderRadius: 14, padding: '14px 16px', border: '0.5px solid var(--border)' }}>
+            <div key={s.label} style={{ background: 'var(--bg-2)', borderRadius: 12, padding: '12px 10px', border: '0.5px solid var(--border)' }}>
               <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-3)', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: 8 }}>{s.label}</div>
               <div style={{ fontSize: 'var(--text-xl)', fontWeight: 700, color: s.color, letterSpacing: -0.3 }}>{s.val}</div>
               <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-4)', marginTop: 4 }}>{s.sub}</div>

@@ -237,7 +237,7 @@ export default function Payables() {
 
       {/* ── Filter tabs ─── */}
       {payables.length > 0 && (
-        <div style={{ display: 'flex', gap: 6, overflowX: 'auto', marginBottom: 16, paddingBottom: 2 }}>
+        <div className="filter-tabs" style={{ marginBottom: 16 }}>
           {FILTERS.map(f => (
             <button
               key={f.key}
