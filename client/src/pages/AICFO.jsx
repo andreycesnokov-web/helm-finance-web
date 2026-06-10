@@ -239,16 +239,16 @@ export default function AICFO() {
                 <div style={{ fontSize: 10, color: 'rgba(255,255,255,.3)' }}>remaining</div>
               </div>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 10 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8 }}>
               {[
-                { label: 'TOTAL CASH',  value: fmtFull(cash.total_balance), suffix: currency, color: (cash.total_balance||0) < 0 ? '#F87171' : '#fff' },
-                { label: 'RUNWAY',      value: runway === null ? '—' : runway >= 999 ? '∞' : String(runway), suffix: 'days', color: runwayColor },
-                { label: 'NET FLOW',    value: (month.net_flow >= 0 ? '+' : '') + fmt(month.net_flow), suffix: `${currency}/mo`, color: (month.net_flow||0) >= 0 ? '#34D399' : '#F87171' },
+                { label: 'CASH',    value: fmt(cash.total_balance), suffix: currency, color: (cash.total_balance||0) < 0 ? '#F87171' : '#fff' },
+                { label: 'RUNWAY',  value: runway === null ? '—' : runway >= 999 ? '∞' : String(runway), suffix: 'days', color: runwayColor },
+                { label: 'NET/MO',  value: (month.net_flow >= 0 ? '+' : '') + fmt(month.net_flow), suffix: currency, color: (month.net_flow||0) >= 0 ? '#34D399' : '#F87171' },
               ].map(m => (
-                <div key={m.label} style={{ background: 'rgba(255,255,255,.06)', borderRadius: 12, padding: '12px 14px', border: '0.5px solid rgba(255,255,255,.08)' }}>
-                  <div style={{ fontSize: 9, color: 'rgba(255,255,255,.3)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 6, fontWeight: 700 }}>{m.label}</div>
-                  <div style={{ fontSize: 'var(--text-xl)', fontWeight: 800, color: m.color, letterSpacing: -0.5, lineHeight: 1.1 }}>{m.value}</div>
-                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,.25)', marginTop: 3 }}>{m.suffix}</div>
+                <div key={m.label} style={{ background: 'rgba(255,255,255,.06)', borderRadius: 10, padding: '10px 8px', border: '0.5px solid rgba(255,255,255,.08)', minWidth: 0, overflow: 'hidden' }}>
+                  <div style={{ fontSize: 8, color: 'rgba(255,255,255,.3)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 5, fontWeight: 700 }}>{m.label}</div>
+                  <div style={{ fontSize: 'clamp(14px, 4vw, 20px)', fontWeight: 800, color: m.color, letterSpacing: -0.3, lineHeight: 1.1, wordBreak: 'break-word' }}>{m.value}</div>
+                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,.25)', marginTop: 3 }}>{m.suffix}</div>
                 </div>
               ))}
             </div>
