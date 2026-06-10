@@ -1945,8 +1945,52 @@ function generateLocalCfoAnswer(question, ctx) {
   // Runway / cash risk
   if (/runway|run out|когда закончится|риск/.test(q)) {
     if (runway === null || runway === 999) return `Runway cannot be calculated — no regular expenses tracked yet. Add expense transactions to get a burn rate estimate.`;
-    const status = runway < 7 ? '🔴 Critical' : runway < 14 ? '🟡 Short' : '🟢 Healthy';
-    return `${status} — approximately **${runway} days** of cash runway remaining.\n\nCurrent balance: ${fmt(cash.total_balance)} ${currency}\nDaily burn rate: ~${fmt(month.burn_rate)} ${currency}/day\n\n${runway < 14 ? 'Recommendation: focus on collecting receivables and reducing non-critical expenses immediately.' : 'Runway looks healthy. Keep monitoring monthly expenses.'}`;
+    const status = runway < 7 ? '🔴 Critical' : runway < 14 ? '⚠️ Short' : '✅ Healthy';
+    const advice = runway < 7
+      ? 'This needs immediate attention — focus on collecting receivables and cutting non-essential expenses.'
+      : runway < 14
+        ? 'This needs active cash planning. Focus on collecting receivables on time and reviewing upcoming expenses.'
+        : 'Runway looks healthy. Keep monitoring monthly expenses and incoming payments.';
+    return `${status} — approximately **${runway} days** of cash runway remaining.\n\nCurrent balance: ${fmt(cash.total_balance)} ${currency}\nDaily burn rate: ~${fmt(month.burn_rate)} ${currency}/day\n\n${advice}`;
+  }
+
+  // Owner withdrawal / personal draw
+  if (isOwnerWithdrawalQuestion(q)) {
+    const bal      = Number(cash.total_balance || 0);
+    const burnRate = Number(month.burn_rate || 0);
+    const currency = biz.base_currency || 'IDR';
+
+    // Try to parse an amount from the question (e.g. "15M", "10,000,000", "5 juta")
+    let amount = 0;
+    const mM  = q.match(/(\d[\d,.]*)[\s]*m(?:illion)?(?:\s*idr)?/);
+    const mK  = q.match(/(\d[\d,.]*)[\s]*k(?:\s*idr)?/);
+    const mN  = q.match(/(\d[\d,.]+)\s*(idr|juta|jt|rb|ribu)?/);
+    if (mM)       amount = parseFloat(mM[1].replace(/,/g,'')) * 1_000_000;
+    else if (mK)  amount = parseFloat(mK[1].replace(/,/g,'')) * 1_000;
+    else if (mN)  amount = parseFloat(mN[1].replace(/,/g,''));
+
+    if (amount <= 0) {
+      return `I won't advise on how to spend money personally.\n\nBut as your CFO, I can assess whether an owner withdrawal is safe for the business. **How much are you planning to take out?** (e.g. "Can I take 15M IDR?")`;
+    }
+
+    const cashAfter   = bal - amount;
+    const runwayAfter = burnRate > 0 ? Math.floor(cashAfter / burnRate) : null;
+    const pctOfCash   = bal > 0 ? Math.round((amount / bal) * 100) : 100;
+    const hasOverdue  = (pay.overdue_count || 0) > 0;
+
+    let rating, advice;
+    if (cashAfter < 0) {
+      rating = '🔴 Not recommended';
+      advice = `This withdrawal exceeds current cash balance. It would leave the business with a negative cash position.`;
+    } else if (runwayAfter !== null && runwayAfter < 15 || pctOfCash > 70 || hasOverdue) {
+      rating = '⚠️ Caution';
+      advice = `${hasOverdue ? `You have ${pay.overdue_count} overdue payable${pay.overdue_count > 1 ? 's' : ''} (${fmt(pay.overdue_total || 0)} ${currency}) that should be resolved first. ` : ''}${runwayAfter !== null && runwayAfter < 15 ? `Runway after withdrawal would be only ${runwayAfter} days. ` : ''}Consider a smaller amount or wait until receivables are collected.`;
+    } else {
+      rating = '✅ Appears safe';
+      advice = `Payroll and upcoming payables (${fmt(pay.total_remaining)} ${currency}) appear coverable from remaining cash.`;
+    }
+
+    return `I won't advise on personal spending decisions.\n\nAs CFO, here is the **business cash-flow assessment** for a ${fmt(amount)} ${currency} owner withdrawal:\n\n**${rating}**\n\nCash before: ${fmt(bal)} ${currency}\nCash after: ${fmt(Math.max(0, cashAfter))} ${currency}\n${runwayAfter !== null ? `Runway after: ~${Math.max(0, runwayAfter)} days (vs ${runway ?? '?'} days now)\n` : ''}\n${advice}\n\n**Classification:** Record this as owner withdrawal, salary, or dividend — not as a business expense. Confirm tax treatment with your accountant.`;
   }
 
   // Receivables
@@ -2001,31 +2045,80 @@ function generateLocalCfoAnswer(question, ctx) {
 
   // Default — financial summary
   const topRisk = (ctx.risks || []).find(r => r.severity === 'critical') || (ctx.risks || [])[0];
-  return `**Financial summary for ${biz.name}:**\n\nCash: ${fmt(cash.total_balance)} ${currency}${runway !== null ? ` · ${runway}d runway` : ''}\nThis month: +${fmt(month.income)} income / −${fmt(month.expenses)} expenses\nReceivables: ${fmt(recv.total_remaining)} ${currency} outstanding\nPayables: ${fmt(pay.total_remaining)} ${currency} pending\n\n${topRisk ? `Main insight: ${topRisk.title}` : 'No major risks detected.'}`;
+  const runwayNote = runway !== null
+    ? runway < 7  ? `\n\n⚠️ Runway is ${runway} days — this needs immediate attention.`
+    : runway < 14 ? `\n\n⚠️ Runway is ${runway} days — this requires active cash planning.`
+    : runway < 30 ? `\n\nRunway is ${runway} days. Keep monitoring cash flow carefully.`
+    : ''
+    : '';
+  return `**Financial summary for ${biz.name}:**\n\nCash: ${fmt(cash.total_balance)} ${currency}${runway !== null ? ` · ${runway}d runway` : ''}\nThis month: +${fmt(month.income)} income / −${fmt(month.expenses)} expenses\nReceivables: ${fmt(recv.total_remaining)} ${currency} outstanding\nPayables: ${fmt(pay.total_remaining)} ${currency} pending\n\n${topRisk ? `Key insight: ${topRisk.title}` : 'No major risks detected.'}${runwayNote}`;
 }
 
 // ── Domain guardrail for AI CFO ───────────────────────────────────────────────
-// Returns true  → question is within CFO/business-finance scope → allow
-// Returns false → out-of-scope → refuse
+
+/**
+ * isOwnerWithdrawalQuestion — detects questions about taking money from business
+ * for personal/family use (owner draw, salary, dividend, personal spend).
+ * These are ALLOWED as CFO cash-impact questions, not lifestyle advice.
+ */
+function isOwnerWithdrawalQuestion(question) {
+  const q = question.toLowerCase().trim();
+  const OWNER_PATTERNS = [
+    /owner.{0,10}draw/,
+    /withdraw/,
+    /take.{0,15}(money|cash|funds|out)/,
+    /pay (my)?self/,
+    /for (my)?self/,
+    /personal.{0,15}(spend|withdraw|use|take)/,
+    /family.{0,20}(spend|use|take|weekend|money|cash)/,
+    /dividend/,
+    /director.{0,10}(draw|withdrawal|salary)/,
+    /founder.{0,10}(draw|withdrawal|salary)/,
+    /use.{0,15}(business|company).{0,15}(cash|money|funds)/,
+    /company.{0,15}(money|cash|funds).{0,15}(personal|myself|family)/,
+    /transfer.{0,15}(to myself|personal)/,
+    /i want to spend/,
+    /can i spend/,
+    /i (need|want).{0,10}(take|use|withdraw)/,
+    /вывести|вывод денег|зарплата себе|дивиденд|личные расходы/,
+  ];
+  return OWNER_PATTERNS.some(re => re.test(q));
+}
+
+/**
+ * isBusinessFinanceQuestion — returns true if question is within CFO scope.
+ * Flow: owner_withdrawal → always allow
+ *       blocklist → false (lifestyle / unrelated)
+ *       allowlist → true  (explicit finance keywords)
+ *       short / ambiguous → fail open (true)
+ */
 function isBusinessFinanceQuestion(question) {
   const q = question.toLowerCase().trim();
 
-  // 1. Explicit non-business blocklist (fast reject for obvious lifestyle questions)
+  // 0. Owner withdrawal is always allowed — it's a business cash-impact question
+  if (isOwnerWithdrawalQuestion(q)) return true;
+
+  // 1. Blocklist — obvious lifestyle / out-of-scope topics
+  //    NOTE: "family" alone is NOT blocked — "family" + spend/withdraw is owner_withdrawal (caught above)
+  //    Only block pure lifestyle uses of family: "where to go with family", "family trip"
   const BLOCKED = [
-    /cook|recipe|пельмен|борщ|блин|суп|еда|готов/,
-    /poem|стих|стихотворен|write me a (song|poem|story|rap)/,
-    /movie|film|фильм|сериал|netflix|кино/,
-    /football|soccer|match|game score|sport.*result|who won/,
-    /relationship|romantic|love|dating|boyfriend|girlfriend|marriage|отношен/,
-    /politic|election|президент|vote|партия|война|war(?! on cost)/,
-    /weather|погод|forecast|температур/,
-    /medical|doctor|medicine|болезн|симптом|лекарств|diagnos/,
-    /joke|funny|анекдот|humor/,
+    /cook|recipe|пельмен|борщ|блин|суп|готов(?!ить бизнес)/,
+    /poem|стих(?!и о деньгах)|write me a (song|poem|story|rap)/,
+    /\bmovie\b|\bfilm\b|фильм|сериал|netflix|кино/,
+    /\bfootball\b|\bsoccer\b|game score|sport.*result|who won the/,
+    /romantic|dating|boyfriend|girlfriend|marriage/,
+    /politic|election|президент|vote|партия(?! в бизнесе)|война|war(?! on cost)/,
+    /weather|погод(?!а в бизнесе)|forecast(?! cash)|температур/,
+    /\bmedical\b|\bdoctor\b|\bmedicine\b|болезн|симптом|лекарств|diagnos/,
+    /\bjoke\b|funny|анекдот|\bhumor\b/,
     /horoscope|гороскоп|astrology/,
+    /where (should|to) (i|we) go.{0,20}(weekend|vacation|holiday|trip|family)/,
+    /recommend.{0,20}(restaurant|place|hotel|travel|movie|show)/,
+    /where is my (sister|brother|mom|dad|friend|wife|husband)/,
   ];
   if (BLOCKED.some(re => re.test(q))) return false;
 
-  // 2. Finance/business allowlist — if any keyword matches, always allow
+  // 2. Finance/business allowlist — explicit finance keywords always pass
   const ALLOWED = [
     /cash|деньги|наличн/,
     /balance|баланс/,
@@ -2037,35 +2130,37 @@ function isBusinessFinanceQuestion(question) {
     /income|revenue|доход|выручк/,
     /profit|прибыл/,
     /hire|нанять|employee|salary|зарплат|payroll|staff|headcount/,
-    /debt|долг/,
-    /risk|риск/,
+    /\bdebt\b|долг/,
+    /\brisk\b|риск/,
     /budget|бюджет/,
     /business|company|бизнес|компани/,
-    /spend|потратить|payment|платеж|заплатить/,
-    /collect|взыскать|получить.*деньги/,
+    /payment|платеж|заплатить/,
+    /collect|взыскать/,
     /financial|финанс/,
-    /tax|налог/,
-    /burn rate|burn/,
+    /\btax\b|налог/,
+    /burn rate|\bburn\b/,
     /wallet|кошелек/,
     /transaction|транзакц/,
     /overdue|просроч/,
     /what should (i|we) do/,
-    /can i (hire|spend|pay|afford)/,
-    /how much (cash|money|do i have)/,
+    /can i (hire|afford)/,
+    /how much (cash|do i have)/,
     /what.*biggest.*risk/,
     /today.*priorit|priorit.*today/,
+    /liquidity|ликвидн/,
+    /cash flow|кэш.?флоу/,
   ];
   if (ALLOWED.some(re => re.test(q))) return true;
 
-  // 3. Very short questions (<= 5 words) that are ambiguous → allow (fail open)
+  // 3. Very short questions (<= 5 words) — ambiguous, fail open
   const wordCount = q.split(/\s+/).filter(Boolean).length;
   if (wordCount <= 5) return true;
 
-  // 4. Default: allow (fail open — better to answer than over-block)
+  // 4. Default: fail open — better to answer than over-block a legitimate question
   return true;
 }
 
-const CFO_OUT_OF_SCOPE_RESPONSE = "Sorry, I can't help with that. I'm CFO AI — a financial consultant for business owners. I only answer questions related to business finance: cash flow, receivables, payables, expenses, runway, hiring readiness, payroll and financial decisions.";
+const CFO_OUT_OF_SCOPE_RESPONSE = "Sorry, I can't help with that. I'm CFO AI — a financial consultant for business owners. I only answer questions about business finance: cash flow, receivables, payables, expenses, runway, hiring readiness, payroll and owner financial decisions.";
 
 // GET /api/ai-cfo/context — full financial context for AI CFO page
 app.get('/api/ai-cfo/context', auth, async (req, res) => {
@@ -2113,6 +2208,7 @@ app.post('/api/ai-cfo/ask', auth, async (req, res) => {
 
     if (hasApiKey) {
       try {
+        const ownerWithdrawal = isOwnerWithdrawalQuestion(question);
         const systemPrompt = `You are CFO AI, a financial decision assistant for ${ctx.business.name} — a ${ctx.business.effective_plan} plan business using ${currency} as base currency.
 
 YOUR ROLE:
@@ -2123,6 +2219,20 @@ hiring readiness, invoices, financial risks, budgeting and business-owner financ
 If the user asks anything unrelated (cooking, entertainment, politics, sports, relationships,
 medical questions, poems, jokes or other lifestyle topics), politely refuse and explain you
 are only able to help as an AI CFO consultant for business finance. Do not engage with the topic.
+
+OWNER WITHDRAWAL POLICY:
+If the user asks about taking money from the business for personal or family use (owner draw,
+dividend, salary to self, personal spending from business cash), do NOT give lifestyle advice.
+Instead, assess the BUSINESS CASH-FLOW IMPACT:
+- Cash balance before and after withdrawal
+- Runway before and after withdrawal (days)
+- Whether payroll and upcoming payables are covered
+- Liquidity buffer remaining
+- Whether the withdrawal looks safe, needs caution, or is not recommended
+State clearly: safe / caution / not recommended, with brief reasoning using actual numbers.
+Recommend the owner record it as: owner withdrawal, salary, or dividend — not a business expense.
+Add: "Confirm tax treatment with your accountant" — but do NOT give tax or legal advice.
+Do NOT advise how to spend the money personally or comment on lifestyle choices.
 
 FINANCIAL CONTEXT (today ${new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}):
 - Total cash: ${ctx.cash.total_balance.toLocaleString()} ${currency}
@@ -2135,6 +2245,7 @@ ${ctx.receivables.top.length > 0 ? `- Top receivables: ${ctx.receivables.top.map
 ${ctx.payables.top.length > 0 ? `- Top payables: ${ctx.payables.top.map(p => `${p.counterparty} ${p.remaining_amount.toLocaleString()} (${p.status})`).join(', ')}` : ''}
 - Wallets: ${ctx.cash.wallets.map(w => `${w.name} ${w.balance.toLocaleString()} ${w.currency}`).join(', ') || 'none'}
 - Risk signals: ${ctx.risks.map(r => r.title).join('; ') || 'none'}
+${ownerWithdrawal ? `\nNOTE: This question is about an owner withdrawal. Apply the OWNER WITHDRAWAL POLICY above.` : ''}
 
 ANSWER RULES:
 - Answer concisely and directly (3-8 sentences max)
@@ -2142,7 +2253,11 @@ ANSWER RULES:
 - If data is missing, say what is missing — never make up numbers
 - Give actionable advice specific to this business's situation
 - Use the owner's currency (${currency}) in all amounts
-- Be direct like a real CFO, not a generic chatbot
+- Be direct and calm — like a real CFO, not a generic chatbot
+- Do not hallucinate business data
+- Do NOT use panic language or dramatic phrases like "this isn't a drill", "crisis", "emergency"
+- For moderate risk situations use: "This needs attention", "This requires active cash planning", "This is manageable if income is collected on time"
+- Reserve strong warnings only for truly critical situations (runway < 7 days, negative cash)
 - Do not hallucinate business data`;
 
         const response = await anthropic.messages.create({
