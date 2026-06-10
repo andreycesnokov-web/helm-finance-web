@@ -80,6 +80,66 @@ function auth(req, res, next) {
   }
 }
 
+// ── Shared burn rate & runway helper ─────────────────────────────────────────
+//
+// Single source of truth for burn rate and runway across Pulse, AI CFO,
+// Radar and Hiring Readiness.
+//
+// Algorithm: rolling 30-day window (preferred) → falls back to all-time / actual days.
+// Why rolling 30-day?
+//   expenses_this_month / days_elapsed is volatile: a large payroll on day 1
+//   makes burn rate look 3–5× higher for the rest of the month.
+//   A fixed 30-day rolling window smooths out single-day spikes and gives
+//   a stable, representative daily burn rate.
+//
+// @param allTxs — all-time transactions array (must include `created_at`)
+// @param totalBalance — computed total cash balance (all-time income − expenses + corrections)
+// @returns { burn_rate_daily, runway_days, burn_window_days }
+function computeBurnAndRunway(allTxs, totalBalance) {
+  const CASH_OUT = ['expense', 'payroll'];
+  const now      = new Date();
+  const cutoff30 = new Date(now.getTime() - 30 * 86400000);
+
+  // All expense transactions with a valid date
+  const allExpTxs = (allTxs || []).filter(t => CASH_OUT.includes(t.type) && t.created_at);
+
+  if (allExpTxs.length === 0) {
+    // No expense data — cannot compute burn rate
+    return { burn_rate_daily: 0, runway_days: null, burn_window_days: 0 };
+  }
+
+  // Days since oldest expense transaction (data window we actually have)
+  const oldestDate  = allExpTxs.reduce((oldest, t) => {
+    const d = new Date(t.created_at);
+    return d < oldest ? d : oldest;
+  }, now);
+  const daysOfData  = Math.max(1, Math.round((now - oldestDate) / 86400000));
+
+  let dailyBurn, windowDays;
+
+  if (daysOfData >= 30) {
+    // ── Full rolling 30-day window ────────────────────────────────────────
+    const last30Exp = allExpTxs
+      .filter(t => new Date(t.created_at) >= cutoff30)
+      .reduce((s, t) => s + Number(t.amount_original || 0), 0);
+    dailyBurn  = last30Exp / 30;
+    windowDays = 30;
+  } else {
+    // ── Partial window — use all available data ───────────────────────────
+    const totalExp = allExpTxs.reduce((s, t) => s + Number(t.amount_original || 0), 0);
+    dailyBurn  = totalExp / daysOfData;
+    windowDays = daysOfData;
+  }
+
+  const runwayDays = dailyBurn > 0 ? Math.round(totalBalance / dailyBurn) : null;
+
+  return {
+    burn_rate_daily:  Math.round(dailyBurn),
+    runway_days:      runwayDays,
+    burn_window_days: windowDays,   // how many days of data used (for UI transparency)
+  };
+}
+
 // --- Pulse API -------------------------------------------------------------
 
 app.get('/api/pulse', auth, async (req, res) => {
@@ -182,13 +242,16 @@ app.get('/api/pulse', auth, async (req, res) => {
         .slice(0, 10);
     }
 
-    // -- This month metrics -------------------------------------------------
+    // -- This month metrics (display only — income/expenses KPIs) -----------
     // Uses the same CASH_IN / CASH_OUT model for consistency.
     const income   = (txs || []).filter(t => CASH_IN.includes(t.type)).reduce((s, t) => s + Number(t.amount_original), 0);
     const expenses = (txs || []).filter(t => CASH_OUT.includes(t.type)).reduce((s, t) => s + Number(t.amount_original), 0);
-    const daysInMonth = now.getDate();
-    const burnRate = daysInMonth > 0 ? Math.round(expenses / daysInMonth) : 0;
-    const runway = burnRate > 0 ? Math.round(totalBalance / burnRate) : 999;
+
+    // -- Burn rate & runway via rolling 30-day window ----------------------
+    // allTxs has created_at (select('*')), so computeBurnAndRunway works here.
+    const burnMetrics = computeBurnAndRunway(allTxs, totalBalance);
+    const burnRate = burnMetrics.burn_rate_daily;
+    const runway   = burnMetrics.runway_days ?? 999;
 
     // Use remaining_amount (not original amount) and exclude paid/cancelled
     const openDebts    = (debts || []).filter(d => !['paid', 'cancelled'].includes(d.status));
@@ -230,6 +293,7 @@ app.get('/api/pulse', auth, async (req, res) => {
 
     res.json({
       scope, totalBalance, income, expenses, burnRate, runway,
+      burnWindowDays: burnMetrics.burn_window_days,
       receivables, payables, netPosition,
       aiStatus, aiText,
       accounts,
@@ -1790,8 +1854,8 @@ async function buildAiCfoContext(userId) {
     { data: wallets   },
     accessData,
   ] = await Promise.all([
-    supabase.from('transactions').select('type,amount_original,amount_idr,currency_original').eq('user_id', userId),
-    supabase.from('transactions').select('type,amount_original,amount_idr').eq('user_id', userId).gte('created_at', monthStart),
+    supabase.from('transactions').select('type,amount_original,amount_idr,currency_original,created_at').eq('user_id', userId),
+    supabase.from('transactions').select('type,amount_original,amount_idr,created_at').eq('user_id', userId).gte('created_at', monthStart),
     supabase.from('debts').select('*').eq('user_id', userId),
     supabase.from('wallets').select('id,name,currency,type').eq('user_id', userId).eq('is_active', true),
     getCurrentAccess(userId),
@@ -1810,8 +1874,11 @@ async function buildAiCfoContext(userId) {
   // ── This month ────────────────────────────────────────────────────────────
   const monthIncome   = (monthTxs || []).filter(t => CASH_IN.includes(t.type)).reduce((s,t) => s + Number(t.amount_original||0), 0);
   const monthExpenses = (monthTxs || []).filter(t => CASH_OUT.includes(t.type)).reduce((s,t) => s + Number(t.amount_original||0), 0);
-  const daysIntoMonth = now.getDate();
-  const burnRate      = daysIntoMonth > 0 ? monthExpenses / daysIntoMonth : 0;
+
+  // ── Burn rate & runway — rolling 30-day window (same source as Pulse) ────
+  // allTxs now includes created_at so computeBurnAndRunway works correctly.
+  const burnMetrics = computeBurnAndRunway(allTxs, totalBalance);
+  const burnRate    = burnMetrics.burn_rate_daily;
 
   // ── Wallet balances ───────────────────────────────────────────────────────
   const walletList = (wallets || []).map(w => {
@@ -1839,8 +1906,8 @@ async function buildAiCfoContext(userId) {
   const payDueSoon   = payList.filter(d => { const days = Math.ceil((new Date(d.due_date)-now)/86400000); return days>=0 && days<=7; });
 
   // ── Risks ─────────────────────────────────────────────────────────────────
-  const risks = [];
-  const runway = burnRate > 0 ? Math.round(totalBalance / burnRate) : null;
+  const risks  = [];
+  const runway = burnMetrics.runway_days;
   if (totalBalance < 0) risks.push({ type:'negative_balance', severity:'critical', title:'Negative cash balance', description:'Total cash is below zero', amount: totalBalance });
   if (runway !== null && runway < 7)  risks.push({ type:'runway_critical', severity:'critical', title:`Only ${runway} days runway`, description:'Cash will run out very soon', amount: totalBalance });
   else if (runway !== null && runway < 14) risks.push({ type:'runway_low', severity:'high', title:`Short runway: ${runway} days`, description:'Monitor cash carefully', amount: totalBalance });
@@ -1854,7 +1921,7 @@ async function buildAiCfoContext(userId) {
   const partialCtx = {
     business:      { name: (accessData?.business || {}).name || 'My Business', base_currency: (accessData?.business || {}).base_currency || 'IDR', plan: (accessData?.business || {}).plan || 'free', effective_plan: (accessData?.accessState || {}).effectivePlan || 'free', trial_status: (accessData?.business || {}).trial_status || 'inactive', days_left_in_trial: (accessData?.accessState || {}).daysLeft || 0 },
     cash:          { total_balance: totalBalance, wallets_count: (wallets||[]).length, wallets: walletList.slice(0,5) },
-    current_month: { income: monthIncome, expenses: monthExpenses, net_flow: monthIncome - monthExpenses, transactions_count: (monthTxs||[]).length, burn_rate: Math.round(burnRate) },
+    current_month: { income: monthIncome, expenses: monthExpenses, net_flow: monthIncome - monthExpenses, transactions_count: (monthTxs||[]).length, burn_rate: burnRate, burn_window_days: burnMetrics.burn_window_days },
     receivables:   { total_remaining: recvTotal, overdue_total: recvOverdue.reduce((s,d)=>s+Number(d.remaining_amount||0),0), overdue_count: recvOverdue.length, partial_total: recvList.filter(d=>d.status==='partial').reduce((s,d)=>s+Number(d.remaining_amount||0),0), due_soon_total: recvDueSoon.reduce((s,d)=>s+Number(d.remaining_amount||0),0), top: recvList.slice(0,5).map(d=>({counterparty:d.counterparty,remaining_amount:d.remaining_amount,due_date:d.due_date,status:d.status,days_overdue:d.days_overdue})) },
     payables:      { total_remaining: payTotal, overdue_total: payOverdue.reduce((s,d)=>s+Number(d.remaining_amount||0),0), overdue_count: payOverdue.length, partial_total: payList.filter(d=>d.status==='partial').reduce((s,d)=>s+Number(d.remaining_amount||0),0), due_soon_total: payDueSoon.reduce((s,d)=>s+Number(d.remaining_amount||0),0), top: payList.slice(0,5).map(d=>({counterparty:d.counterparty,remaining_amount:d.remaining_amount,due_date:d.due_date,status:d.status,days_overdue:d.days_overdue})) },
     risks,

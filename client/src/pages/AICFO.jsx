@@ -365,7 +365,7 @@ export default function AICFO() {
             { label: 'Receivables', value: '+' + fmt(recv.total_remaining), sub: recv.overdue_count > 0 ? `${recv.overdue_count} overdue` : `${currency} expected`, color: 'var(--green-dark)', route: '/receivables' },
             { label: 'Payables',    value: '−' + fmt(pay.total_remaining),  sub: pay.overdue_count > 0  ? `${pay.overdue_count} overdue`  : `${currency} to pay`,    color: 'var(--red-dark)',   route: '/payables' },
             { label: 'Income',      value: '+' + fmt(month.income),         sub: `${month.transactions_count} transactions`, color: 'var(--green-dark)', route: null },
-            { label: 'Expenses',    value: '−' + fmt(month.expenses),       sub: `~${fmt(month.burn_rate)} ${currency}/day`, color: 'var(--text)',       route: '/transactions' },
+            { label: 'Expenses',    value: '−' + fmt(month.expenses),       sub: `${fmt(month.burn_rate)} ${currency}/day · ${month.burn_window_days >= 30 ? '30d avg' : `${month.burn_window_days || 0}d avg`}`, color: 'var(--text)',       route: '/transactions' },
           ].map(m => (
             <div key={m.label} className="hf-card" style={{ cursor: m.route ? 'pointer' : 'default' }} onClick={() => m.route && navigate(m.route)}>
               <div className="hf-kpi-label">{m.label}</div>

@@ -595,7 +595,7 @@ export default function Pulse({ onDataLoad }) {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 7, padding: '0 16px 24px' }}>
             {[
               { label: 'RUNWAY',       value: d.runway + 'd',           sub: 'at current burn',  color: (d.runway||0) > 14 ? 'var(--green-dark)' : (d.runway||0) > 7 ? 'var(--amber-dark)' : 'var(--red-dark)', bar: Math.min(100, Math.max(5, (d.runway||0) * 3)), barColor: (d.runway||0) > 14 ? 'var(--green)' : (d.runway||0) > 7 ? 'var(--amber)' : 'var(--red)' },
-              { label: 'BURN RATE',    value: fmt(d.burnRate) + '/d',   sub: '30-day avg',       color: 'var(--text)', bar: 40, barColor: 'var(--blue)' },
+              { label: 'BURN RATE',    value: fmt(d.burnRate) + '/d',   sub: d.burnWindowDays >= 30 ? '30-day avg' : `${d.burnWindowDays || 0}d avg`,  color: 'var(--text)', bar: 40, barColor: 'var(--blue)' },
               { label: 'EXPECTED IN',  value: '+' + fmt(d.receivables), sub: 'receivables',      color: 'var(--green-dark)', bar: (d.receivables||0) > 0 ? 60 : 0, barColor: 'var(--green)' },
               { label: 'EXPECTED OUT', value: '-' + fmt(d.payables),    sub: 'payables',         color: (d.payables||0) > 0 ? 'var(--amber-dark)' : 'var(--text-3)', bar: (d.payables||0) > 0 ? 80 : 0, barColor: 'var(--amber)' },
             ].map(v => (
