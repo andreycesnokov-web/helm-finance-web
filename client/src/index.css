@@ -1273,3 +1273,140 @@ body {
   color: var(--brand-dark);
   font-weight: var(--weight-medium);
 }
+
+/* ── Pulse: Contextual Alert Bar ───────────────────────────────────────────── */
+.pulse-alert-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 0 16px 10px;
+}
+.pulse-alert-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--bg-2);
+  border: 0.5px solid var(--border);
+  border-radius: 14px;
+  padding: 10px 13px;
+  /* border-left set inline per alert accent colour */
+}
+.pulse-alert-icon {
+  width: 24px;
+  height: 24px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.pulse-alert-text {
+  flex: 1;
+  font-size: 12px;
+  color: var(--text);
+  line-height: 1.4;
+}
+.pulse-alert-action {
+  background: none;
+  border: none;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  padding: 0;
+  font-family: inherit;
+  /* color set inline */
+}
+
+/* ── Pulse: Hero Quick Actions ─────────────────────────────────────────────── */
+.pulse-quick-actions {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 7px;
+  margin-bottom: 0;
+}
+.pulse-quick-action-btn {
+  background: rgba(255, 255, 255, 0.06);
+  border: 0.5px solid rgba(255, 255, 255, 0.14);
+  border-radius: 12px;
+  padding: 8px 4px;
+  font-size: 10px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.75);
+  cursor: pointer;
+  text-align: center;
+  font-family: inherit;
+  transition: background 0.12s;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pulse-quick-action-btn:hover {
+  background: rgba(255, 255, 255, 0.11);
+  color: #fff;
+}
+@media (max-width: 380px) {
+  .pulse-quick-actions {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── Pulse: Recommended Action card ───────────────────────────────────────── */
+.pulse-recommended-action {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  background: var(--bg-2);
+  border: 0.5px solid var(--border);
+  border-radius: 14px;
+  padding: 11px 13px;
+  margin-bottom: 12px;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+  transition: background 0.12s;
+}
+.pulse-recommended-action:hover {
+  background: var(--bg-3);
+}
+.pulse-rec-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.pulse-rec-body {
+  flex: 1;
+  min-width: 0;
+}
+.pulse-rec-label {
+  font-size: 9px;
+  font-weight: 600;
+  color: var(--text-4);
+  letter-spacing: 0.06em;
+  margin-bottom: 2px;
+}
+.pulse-rec-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+  line-height: 1.2;
+}
+.pulse-rec-meta {
+  font-size: 11px;
+  color: var(--text-3);
+  margin-top: 1px;
+}
+.pulse-rec-arrow {
+  font-size: 16px;
+  font-weight: 600;
+  flex-shrink: 0;
+}

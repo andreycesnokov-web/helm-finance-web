@@ -50,6 +50,24 @@ const ACTION_COLORS = {
   default: { bg: 'var(--bg-3)',        color: 'var(--text-3)'     },
 }
 
+function getRecommendedAction(d, navigate) {
+  const debts   = d.debts || []
+  const runway  = d.runway ?? 999
+  const rec     = d.receivables ?? 0
+  const overP   = debts.filter(x => !x.is_settled && x.type === 'payable'  && daysUntil(x.due_date) < 0)
+  const scroll  = () => document.getElementById('pulse-actions')?.scrollIntoView({ behavior: 'smooth' })
+
+  if (overP.length > 0)
+    return { icon: '!', title: 'Review overdue payables', meta: `${overP.length} past due — act now`, colorKey: 'red',   action: () => navigate('/payables') }
+  if (runway >= 0 && runway < 7 && runway < 999)
+    return { icon: '⚡', title: 'Protect runway',         meta: `Only ${runway} days left`,          colorKey: 'amber', action: () => navigate('/transactions') }
+  if (rec > 0)
+    return { icon: '↓', title: 'Follow up receivables',  meta: `${fmt(rec)} IDR expected`,           colorKey: 'green', action: () => navigate('/receivables') }
+  if (debts.length === 0)
+    return { icon: '+', title: 'Add a transaction',       meta: 'Keep your data current',             colorKey: 'blue',  action: () => navigate('/add') }
+  return   { icon: '→', title: 'Review transactions',    meta: 'View all money movements',            colorKey: 'blue',  action: () => navigate('/transactions') }
+}
+
 function buildNextActions(d, navigate) {
   const acts   = []
   const debts  = d.debts || []
@@ -180,10 +198,51 @@ export default function Pulse({ onDataLoad }) {
   // Show top accounts by absolute balance — no business-specific name filters
   const topAccounts = (d.accounts || []).slice(0, 5)
 
+  // ── Contextual alert bar ─────────────────────────────────────────────────────
+  const runway = d.runway ?? 999
+  const overdueDebts   = debts.filter(x => !x.is_settled && daysUntil(x.due_date) < 0)
+  const overduePayable = overdueDebts.filter(x => x.type === 'payable')
+  const alerts = []
+  if (overduePayable.length > 0)
+    alerts.push({
+      key: 'overdue',
+      icon: '!',
+      text: `${overduePayable.length} overdue payable${overduePayable.length > 1 ? 's' : ''} require${overduePayable.length === 1 ? 's' : ''} action`,
+      cta: 'View Payables →',
+      action: () => navigate('/payables'),
+      accent: 'var(--red)',
+      accentBg: 'var(--red-light)',
+      accentText: 'var(--red-dark)',
+    })
+  if (runway >= 0 && runway < 7 && runway < 999)
+    alerts.push({
+      key: 'runway',
+      icon: '⚡',
+      text: `Only ${runway} days runway left`,
+      cta: 'Review →',
+      action: () => navigate('/transactions'),
+      accent: 'var(--amber)',
+      accentBg: 'var(--amber-light)',
+      accentText: 'var(--amber-dark)',
+    })
+  if ((d.payables || 0) > (d.receivables || 0) && runway >= 0 && runway < 14 && runway < 999 && !alerts.find(a => a.key === 'runway'))
+    alerts.push({
+      key: 'pressure',
+      icon: '↑',
+      text: 'Upcoming payments exceed expected income',
+      cta: 'Resolve →',
+      action: () => document.getElementById('pulse-actions')?.scrollIntoView({ behavior: 'smooth' }),
+      accent: 'var(--amber)',
+      accentBg: 'var(--amber-light)',
+      accentText: 'var(--amber-dark)',
+    })
+  const visibleAlerts = alerts.slice(0, 2)
+
   // AI CFO Insight
-  const insight      = getInsightContent(d)
-  const urgencyStyle = URGENCY[insight.urgency] || URGENCY.healthy
-  const nextActions  = buildNextActions(d, navigate)
+  const insight           = getInsightContent(d)
+  const urgencyStyle      = URGENCY[insight.urgency] || URGENCY.healthy
+  const nextActions       = buildNextActions(d, navigate)
+  const recommendedAction = getRecommendedAction(d, navigate)
 
   const btnP = { padding: '12px 0', borderRadius: 14, border: 'none', fontSize: 13, fontWeight: 500, cursor: 'pointer', width: '100%', marginBottom: 8 }
   const btnS = { ...btnP, background: 'none', border: '0.5px solid var(--border)', color: 'var(--text-3)', marginBottom: 0 }
@@ -213,6 +272,19 @@ export default function Pulse({ onDataLoad }) {
           }}>{v}</button>
         ))}
       </div>
+
+      {/* ── Contextual Alert Bar — only when urgent conditions exist ── */}
+      {visibleAlerts.length > 0 && (
+        <div className="pulse-alert-bar">
+          {visibleAlerts.map(a => (
+            <div key={a.key} className="pulse-alert-item" style={{ borderLeft: `3px solid ${a.accent}` }}>
+              <div className="pulse-alert-icon" style={{ color: a.accentText, background: a.accentBg }}>{a.icon}</div>
+              <span className="pulse-alert-text">{a.text}</span>
+              <button className="pulse-alert-action" onClick={a.action} style={{ color: a.accentText }}>{a.cta}</button>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* ── KPI Cards Row — desktop only, mobile already shows these in hero + net position ── */}
       <div className="pulse-kpi-grid">
@@ -334,8 +406,15 @@ export default function Pulse({ onDataLoad }) {
               <div style={{ fontSize: 12, color: 'rgba(255,255,255,.82)', lineHeight: 1.5, fontWeight: 500 }}>{d.aiText || 'Analysing your financial position...'}</div>
             </div>
 
-            {/* Action buttons */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+            {/* Quick Actions — 3 navigation shortcuts */}
+            <div className="pulse-quick-actions">
+              <button className="pulse-quick-action-btn" onClick={() => navigate('/add')}>+ Add transaction</button>
+              <button className="pulse-quick-action-btn" onClick={() => navigate('/receivables?new=1')}>+ New receivable</button>
+              <button className="pulse-quick-action-btn" onClick={() => navigate('/payables?new=1')}>+ New payable</button>
+            </div>
+
+            {/* Analysis / Take action buttons */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 10 }}>
               <button onClick={() => setShowAnalysis(true)} style={{ background: 'rgba(255,255,255,.07)', border: '0.5px solid rgba(255,255,255,.18)', borderRadius: 14, padding: '9px 0', fontSize: 12, color: 'rgba(255,255,255,.78)', cursor: 'pointer', fontWeight: 500 }}>View analysis</button>
               <button
                 onClick={() => document.getElementById('pulse-actions')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
@@ -438,6 +517,22 @@ export default function Pulse({ onDataLoad }) {
               </span>
             </div>
             <p className="ai-insight-text">{insight.text}</p>
+            {/* Recommended Next Action — single featured card */}
+            {recommendedAction && (() => {
+              const col = ACTION_COLORS[recommendedAction.colorKey] || ACTION_COLORS.default
+              return (
+                <button className="pulse-recommended-action" onClick={recommendedAction.action}>
+                  <div className="pulse-rec-icon" style={{ background: col.bg, color: col.color }}>{recommendedAction.icon}</div>
+                  <div className="pulse-rec-body">
+                    <div className="pulse-rec-label">RECOMMENDED</div>
+                    <div className="pulse-rec-title">{recommendedAction.title}</div>
+                    <div className="pulse-rec-meta">{recommendedAction.meta}</div>
+                  </div>
+                  <div className="pulse-rec-arrow" style={{ color: col.color }}>→</div>
+                </button>
+              )
+            })()}
+
             {nextActions.length > 0 && (
               <>
                 <div className="ai-insight-actions-label">NEXT BEST ACTIONS</div>
@@ -459,36 +554,48 @@ export default function Pulse({ onDataLoad }) {
             )}
           </div>
 
-          {/* Today's Focus */}
-          {(d.todayFocus || []).length > 0 && (
-            <>
-              <div className="pulse-section-label">TODAY'S FOCUS · {pendingFocus.length} TASKS</div>
-              {(d.todayFocus || []).map(f => {
-                const p = getPill(f.type)
-                return (
-                  <div key={f.id} onClick={() => setFocusDone(prev => ({ ...prev, [f.id]: !prev[f.id] }))}
-                    style={{ margin: '0 16px 7px', background: 'var(--bg-2)', border: '0.5px solid var(--border)', borderRadius: 16, padding: '10px 12px', display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer' }}>
-                    <div style={{ width: 18, height: 18, borderRadius: 6, border: focusDone[f.id] ? 'none' : '1.5px solid var(--border-2)', background: focusDone[f.id] ? 'var(--text)' : 'var(--bg)', flexShrink: 0, marginTop: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      {focusDone[f.id] && <svg width="10" height="10" viewBox="0 0 10 10"><path d="M2 5l2.5 2.5L8 2.5" stroke="white" strokeWidth="1.5" fill="none" strokeLinecap="round"/></svg>}
-                    </div>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 13, color: focusDone[f.id] ? 'var(--text-3)' : 'var(--text)', textDecoration: focusDone[f.id] ? 'line-through' : 'none', lineHeight: 1.3 }}>{f.title}</div>
-                      <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 2 }}>{f.meta}</div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 5 }}>
-                        <div style={{ fontSize: 9, padding: '2px 8px', borderRadius: 8, background: p.bg, color: p.color, display: 'inline-block' }}>{p.text}</div>
-                        {f.type === 'reminder' && (
-                          <button onClick={e => { e.stopPropagation(); openSnooze({ id: f.id, entityType: 'reminder', title: f.title, subtitle: f.meta || '' }) }}
-                            style={{ fontSize: 9, padding: '2px 8px', borderRadius: 8, background: 'none', border: '0.5px solid var(--border)', color: 'var(--text-3)', cursor: 'pointer' }}>
-                            Snooze
-                          </button>
-                        )}
-                      </div>
+          {/* Today's Focus — always shown; empty state when no items */}
+          <>
+            <div className="pulse-section-label">
+              TODAY'S FOCUS{(d.todayFocus || []).length > 0 ? ` · ${pendingFocus.length} TASKS` : ''}
+            </div>
+            {(d.todayFocus || []).length === 0 ? (
+              <div style={{ margin: '0 16px 12px', background: 'var(--bg-2)', border: '0.5px solid var(--border)', borderRadius: 16, padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span style={{ fontSize: 18 }}>✓</span>
+                <span style={{ fontSize: 13, color: 'var(--text-3)' }}>No urgent focus items today.</span>
+              </div>
+            ) : (d.todayFocus || []).map(f => {
+              const p = getPill(f.type)
+              const focusRoute = f.type === 'payable' ? '/payables' : f.type === 'receivable' ? '/receivables' : null
+              return (
+                <div key={f.id} onClick={() => setFocusDone(prev => ({ ...prev, [f.id]: !prev[f.id] }))}
+                  style={{ margin: '0 16px 7px', background: 'var(--bg-2)', border: '0.5px solid var(--border)', borderRadius: 16, padding: '10px 12px', display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer' }}>
+                  <div style={{ width: 18, height: 18, borderRadius: 6, border: focusDone[f.id] ? 'none' : '1.5px solid var(--border-2)', background: focusDone[f.id] ? 'var(--text)' : 'var(--bg)', flexShrink: 0, marginTop: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    {focusDone[f.id] && <svg width="10" height="10" viewBox="0 0 10 10"><path d="M2 5l2.5 2.5L8 2.5" stroke="white" strokeWidth="1.5" fill="none" strokeLinecap="round"/></svg>}
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 13, color: focusDone[f.id] ? 'var(--text-3)' : 'var(--text)', textDecoration: focusDone[f.id] ? 'line-through' : 'none', lineHeight: 1.3 }}>{f.title}</div>
+                    <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 2 }}>{f.meta}</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 5 }}>
+                      <div style={{ fontSize: 9, padding: '2px 8px', borderRadius: 8, background: p.bg, color: p.color, display: 'inline-block' }}>{p.text}</div>
+                      {focusRoute && !focusDone[f.id] && (
+                        <button onClick={e => { e.stopPropagation(); navigate(focusRoute) }}
+                          style={{ fontSize: 9, padding: '2px 8px', borderRadius: 8, background: 'none', border: `0.5px solid ${p.color}`, color: p.color, cursor: 'pointer' }}>
+                          {f.type === 'payable' ? 'Pay now →' : 'Follow up →'}
+                        </button>
+                      )}
+                      {f.type === 'reminder' && (
+                        <button onClick={e => { e.stopPropagation(); openSnooze({ id: f.id, entityType: 'reminder', title: f.title, subtitle: f.meta || '' }) }}
+                          style={{ fontSize: 9, padding: '2px 8px', borderRadius: 8, background: 'none', border: '0.5px solid var(--border)', color: 'var(--text-3)', cursor: 'pointer' }}>
+                          Snooze
+                        </button>
+                      )}
                     </div>
                   </div>
-                )
-              })}
-            </>
-          )}
+                </div>
+              )
+            })}
+          </>
 
           {/* Financial Vitals */}
           <div className="pulse-section-label" style={{ paddingTop: 12 }}>FINANCIAL VITALS</div>

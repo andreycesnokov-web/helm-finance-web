@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { apiFetch, fmt, daysUntil } from '../lib/api'
 import DebtPaymentModal from '../components/DebtPaymentModal'
@@ -78,10 +78,16 @@ function DebtRow({ debt, accounts, token, onRefresh }) {
 export default function Payables() {
   const { token } = useAuth()
   const navigate  = useNavigate()
+  const [searchParams] = useSearchParams()
   const [data, setData]         = useState(null)
   const [loading, setLoading]   = useState(true)
   const [error, setError]       = useState('')
   const [showForm, setShowForm] = useState(false)
+
+  // Auto-open form when navigated with ?new=1 (e.g. from Pulse quick actions)
+  useEffect(() => {
+    if (searchParams.get('new') === '1') setShowForm(true)
+  }, [searchParams])
 
   const load = useCallback(() => {
     setLoading(true)
