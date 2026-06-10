@@ -9,11 +9,15 @@ const WALLET_TYPES = [
   { value: 'bank',            label: 'Bank account' },
   { value: 'cash',            label: 'Cash' },
   { value: 'ewallet',         label: 'E-Wallet' },
+  { value: 'alipay',          label: 'Alipay' },
+  { value: 'wechat_pay',      label: 'WeChat Pay' },
+  { value: 'crypto',          label: 'Crypto wallet' },
   { value: 'payment_gateway', label: 'Payment gateway' },
   { value: 'other',           label: 'Other' },
+  { value: '__custom__',      label: '✏️ Custom type…', adminOnly: true },
 ]
 
-const CURRENCIES = ['IDR', 'USD', 'EUR', 'SGD', 'MYR', 'THB']
+const CURRENCIES = ['IDR', 'USD', 'EUR', 'SGD', 'MYR', 'THB', 'CNY']
 
 const TYPE_ICON = {
   bank: (color) => (
@@ -36,6 +40,27 @@ const TYPE_ICON = {
       <line x1="12" y1="18" x2="12.01" y2="18"/>
     </svg>
   ),
+  alipay: (color) => (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round">
+      <circle cx="12" cy="12" r="10"/>
+      <path d="M9 9h6M9 12h6"/>
+      <path d="M7 15c2 1 8 2 10 0"/>
+    </svg>
+  ),
+  wechat_pay: (color) => (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round">
+      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+      <line x1="9" y1="10" x2="9.01" y2="10"/>
+      <line x1="15" y1="10" x2="15.01" y2="10"/>
+    </svg>
+  ),
+  crypto: (color) => (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round">
+      <circle cx="12" cy="12" r="10"/>
+      <path d="M9 8h4a2 2 0 0 1 0 4H9zm0 4h4.5a2 2 0 0 1 0 4H9z"/>
+      <line x1="12" y1="6" x2="12" y2="8"/><line x1="12" y1="16" x2="12" y2="18"/>
+    </svg>
+  ),
   payment_gateway: (color) => (
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round">
       <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
@@ -56,13 +81,14 @@ const CURRENCY_STYLE = {
   SGD: { bg: '#FDE8FF', color: '#7E22CE' },
   MYR: { bg: '#FFF1F2', color: '#9F1239' },
   THB: { bg: '#F0F9FF', color: '#0369A1' },
+  CNY: { bg: '#FFF1F0', color: '#991B1B' },
 }
 
 const getCurrencyStyle = (currency) => CURRENCY_STYLE[currency] || { bg: '#F1F5F9', color: '#475569' }
 const getTypeIcon      = (type, color) => (TYPE_ICON[type] || TYPE_ICON.other)(color)
 
 // ── Default form state ────────────────────────────────────────────────────────
-const EMPTY_FORM = { name: '', currency: 'IDR', type: '', entity_name: '', opening_balance: '', sort_order: 0 }
+const EMPTY_FORM = { name: '', currency: 'IDR', type: '', entity_name: '', opening_balance: '', sort_order: 0, custom_type: '' }
 
 export default function Accounts() {
   const { token } = useAuth()
@@ -147,7 +173,13 @@ export default function Accounts() {
 
   const openEdit = (w) => {
     setEditWallet(w)
-    setForm({ name: w.name, currency: w.currency || 'IDR', type: w.type || '', entity_name: w.entity_name || '', opening_balance: '', sort_order: w.sort_order || 0 })
+    const knownType = WALLET_TYPES.find(t => t.value === w.type && t.value !== '__custom__')
+    setForm({
+      name: w.name, currency: w.currency || 'IDR',
+      type: knownType ? w.type : (w.type ? '__custom__' : ''),
+      custom_type: knownType ? '' : (w.type || ''),
+      entity_name: w.entity_name || '', opening_balance: '', sort_order: w.sort_order || 0,
+    })
     setShowForm(true)
   }
 
@@ -155,10 +187,15 @@ export default function Accounts() {
     if (!form.name.trim()) return
     setSaving(true)
     try {
+      // Resolve custom type: if __custom__ selected, use the custom_type text
+      const resolvedType = form.type === '__custom__'
+        ? (form.custom_type.trim() || null)
+        : (form.type || null)
+
       if (editWallet) {
         await apiFetch(`/wallets/${editWallet.id}`, token, {
           method: 'PUT',
-          body: { name: form.name, currency: form.currency, type: form.type || null, entity_name: form.entity_name || null },
+          body: { name: form.name, currency: form.currency, type: resolvedType, entity_name: form.entity_name || null },
         })
       } else {
         await apiFetch('/wallets', token, {
@@ -166,7 +203,7 @@ export default function Accounts() {
           body: {
             name:            form.name,
             currency:        form.currency,
-            type:            form.type        || null,
+            type:            resolvedType,
             entity_name:     form.entity_name || null,
             opening_balance: Number(form.opening_balance) || 0,
             sort_order:      wallets.length,
@@ -309,7 +346,7 @@ export default function Accounts() {
             const cs    = getCurrencyStyle(w.currency)
             const isNeg = (w.balance || 0) < 0
             const pct   = totalBalance > 0 ? Math.round(((w.balance || 0) / totalBalance) * 100) : 0
-            const typeLabel = WALLET_TYPES.find(t => t.value === w.type)?.label || null
+            const typeLabel = WALLET_TYPES.find(t => t.value === w.type && t.value !== '__custom__')?.label || (w.type ? w.type : null)
 
             return (
               <div key={w.id} className="hf-card" style={{ cursor: 'default' }}>
@@ -567,12 +604,32 @@ export default function Accounts() {
             <select
               className="modal-input"
               value={form.type}
-              onChange={e => setForm(p => ({ ...p, type: e.target.value }))}
-              style={{ marginBottom: 14 }}
+              onChange={e => setForm(p => ({ ...p, type: e.target.value, custom_type: '' }))}
+              style={{ marginBottom: form.type === '__custom__' ? 8 : 14 }}
             >
               <option value="">— Select type —</option>
-              {WALLET_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+              {WALLET_TYPES
+                .filter(t => t.value !== '__custom__' || canAdjust)
+                .map(t => <option key={t.value} value={t.value}>{t.label}</option>)
+              }
             </select>
+
+            {/* Custom type input — visible only when __custom__ selected (owner/admin only) */}
+            {form.type === '__custom__' && canAdjust && (
+              <>
+                <input
+                  className="modal-input"
+                  value={form.custom_type}
+                  onChange={e => setForm(p => ({ ...p, custom_type: e.target.value }))}
+                  placeholder="e.g. Stripe, Dana, PayPal, USDT wallet…"
+                  style={{ marginBottom: 6 }}
+                  autoFocus
+                />
+                <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 14 }}>
+                  Custom type is saved as-is. It will appear as a badge on the wallet card.
+                </div>
+              </>
+            )}
 
             {/* Entity name */}
             <label className="modal-label">Company / Entity <span style={{ fontWeight: 400, color: 'var(--text-3)' }}>(optional)</span></label>
