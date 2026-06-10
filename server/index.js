@@ -433,8 +433,121 @@ app.post('/api/accounts', auth, async (req, res) => {
   res.json({ ok: true })
 })
 
-// --- Serve React app -------------------------------------------------------
+// --- Platform Admin guard -------------------------------------------------
 
+function isAdminUser(userId) {
+  const ids = (process.env.ADMIN_TELEGRAM_IDS || '')
+    .split(',')
+    .map(x => x.trim())
+    .filter(Boolean);
+  return ids.includes(String(userId));
+}
+
+function requireAdmin(req, res, next) {
+  if (!req.user?.userId) return res.status(401).json({ error: 'Unauthorized' });
+  if (!isAdminUser(req.user.userId)) return res.status(403).json({ error: 'Admin access required' });
+  next();
+}
+
+// --- Admin endpoints -------------------------------------------------------
+
+app.get('/api/admin/users', auth, requireAdmin, async (req, res) => {
+  try {
+    // Fetch raw data — counts only, no financial amounts
+    const [
+      { data: users,        error: uErr },
+      { data: transactions, error: tErr },
+      { data: debts,        error: dErr },
+      { data: reminders,    error: rErr },
+    ] = await Promise.all([
+      supabase.from('users').select('*').order('id', { ascending: true }),
+      supabase.from('transactions').select('user_id, created_at'),
+      supabase.from('debts').select('user_id, created_at'),
+      supabase.from('reminders').select('user_id, created_at'),
+    ]);
+
+    if (uErr) throw uErr;
+
+    // Build per-user aggregates in JS
+    const txMap  = {};
+    const dbMap  = {};
+    const rmMap  = {};
+
+    (transactions || []).forEach(t => {
+      const uid = String(t.user_id);
+      if (!txMap[uid]) txMap[uid] = { count: 0, last: null };
+      txMap[uid].count++;
+      if (!txMap[uid].last || t.created_at > txMap[uid].last) txMap[uid].last = t.created_at;
+    });
+
+    (debts || []).forEach(d => {
+      const uid = String(d.user_id);
+      if (!dbMap[uid]) dbMap[uid] = { count: 0, last: null };
+      dbMap[uid].count++;
+      if (!dbMap[uid].last || d.created_at > dbMap[uid].last) dbMap[uid].last = d.created_at;
+    });
+
+    (reminders || []).forEach(r => {
+      const uid = String(r.user_id);
+      if (!rmMap[uid]) rmMap[uid] = { count: 0, last: null };
+      rmMap[uid].count++;
+      if (!rmMap[uid].last || r.created_at > rmMap[uid].last) rmMap[uid].last = r.created_at;
+    });
+
+    const now30 = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+
+    const enriched = (users || []).map(u => {
+      const uid  = String(u.id);
+      const txD  = txMap[uid]  || { count: 0, last: null };
+      const dbD  = dbMap[uid]  || { count: 0, last: null };
+      const rmD  = rmMap[uid]  || { count: 0, last: null };
+
+      // Last activity = most recent across all tables
+      const lastActivity = [txD.last, dbD.last, rmD.last]
+        .filter(Boolean)
+        .sort()
+        .pop() || null;
+
+      return {
+        id:                   u.id,
+        username:             u.username   || null,
+        first_name:           u.first_name || null,
+        last_name:            u.last_name  || null,
+        photo_url:            u.photo_url  || null,
+        language:             u.language   || null,
+        timezone:             u.timezone   || null,
+        created_at:           u.created_at || null,
+        is_telegram_connected: true, // always — auth is Telegram-only
+        transaction_count:    txD.count,
+        debt_count:           dbD.count,
+        reminder_count:       rmD.count,
+        last_transaction_date: txD.last,
+        last_debt_date:        dbD.last,
+        last_reminder_date:    rmD.last,
+        last_activity_date:    lastActivity,
+      };
+    });
+
+    // Summary stats
+    const activeLast30Days = enriched.filter(u =>
+      u.last_activity_date && u.last_activity_date >= now30
+    ).length;
+
+    const summary = {
+      totalUsers:             enriched.length,
+      usersWithTransactions:  enriched.filter(u => u.transaction_count > 0).length,
+      usersWithDebts:         enriched.filter(u => u.debt_count > 0).length,
+      usersWithReminders:     enriched.filter(u => u.reminder_count > 0).length,
+      activeLast30Days,
+    };
+
+    res.json({ summary, users: enriched });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// --- Profile ---------------------------------------------------------------
 
 app.get('/api/profile', auth, async (req, res) => {
   const { data, error } = await supabase.from('users').select('*').eq('id', req.user.userId).single()
