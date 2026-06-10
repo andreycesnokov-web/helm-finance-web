@@ -1,3 +1,5 @@
+@import './hf-system.css';
+
 :root {
   /* ── Layout ─────────────────────────────────────────── */
   --sidebar-width: 288px;
@@ -18,13 +20,13 @@
   /* ── Typography scale ────────────────────────────────── */
   --text-xs:   13px;
   --text-sm:   14px;
-  --text-base: 15px;
-  --text-md:   16px;
-  --text-lg:   18px;
-  --text-xl:   22px;
-  --text-2xl:  26px;
-  --text-3xl:  34px;
-  --text-hero: 44px;
+  --text-base: 16px;
+  --text-md:   17px;
+  --text-lg:   20px;
+  --text-xl:   24px;
+  --text-2xl:  30px;
+  --text-3xl:  38px;
+  --text-hero: 48px;
 
   /* ── Font weights ────────────────────────────────────── */
   --weight-normal:   400;
@@ -44,19 +46,30 @@
   --space-12: 48px;
 
   /* ── Brand ───────────────────────────────────────────── */
-  --brand:       #155EEF;
-  --brand-dark:  #0F3D91;
-  --brand-light: #EAF1FF;
+  --brand:       #2563EB;
+  --brand-dark:  #1D4ED8;
+  --brand-light: #EFF6FF;
+
+  /* ── Helm Finance corporate palette ─────────────────── */
+  --hf-navy:     #0F172A;
+  --hf-graphite: #18181B;
+  --hf-blue:     #2563EB;
+  --hf-blue-dark:#1D4ED8;
+
+  /* ── Surface system ─────────────────────────────────── */
+  --surface-main:   #F8FAFC;
+  --surface-muted:  #F1F5F9;
+  --border-soft:    #E2E8F0;
 
   /* ── Dark sidebar tokens (Option A — premium navy) ───── */
-  --sidebar-bg:          #0B1220;
+  --sidebar-bg:          #0A0F1E;
   --sidebar-bg-2:        #111827;
   --sidebar-text:        #E5EAF1;
-  --sidebar-muted:       #6B7280;
+  --sidebar-muted:       #64748B;
   --sidebar-border:      rgba(255, 255, 255, 0.07);
-  --sidebar-active-bg:   rgba(21, 94, 239, 0.18);
+  --sidebar-active-bg:   rgba(37, 99, 235, 0.22);
   --sidebar-active-text: #FFFFFF;
-  --sidebar-hover-bg:    rgba(255, 255, 255, 0.05);
+  --sidebar-hover-bg:    rgba(255, 255, 255, 0.055);
 
   /* ── App surfaces ────────────────────────────────────── */
   --bg:   #FFFFFF;
@@ -99,9 +112,9 @@
   --amber-light: #FFFAEB;
 
   /* ── Info / Blue (= Brand) ───────────────────────────── */
-  --blue:       #155EEF;
-  --blue-dark:  #0F3D91;
-  --blue-light: #EAF1FF;
+  --blue:       #2563EB;
+  --blue-dark:  #1D4ED8;
+  --blue-light: #EFF6FF;
 
   /* ── Financial status tokens ─────────────────────────── */
   --status-paid:        #027A48;

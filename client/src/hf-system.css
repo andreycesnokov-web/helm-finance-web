@@ -1,0 +1,278 @@
+
+/* ════════════════════════════════════════════════════════════
+   HELM FINANCE DESIGN SYSTEM — Corporate Fintech
+   ════════════════════════════════════════════════════════════ */
+
+/* ── HF Page wrapper ──────────────────────────────────────── */
+.hf-page {
+  padding: 28px 28px 48px;
+  max-width: 100%;
+}
+@media (max-width: 767px) {
+  .hf-page { padding: 16px 16px 80px; }
+}
+
+/* ── HF Page header ───────────────────────────────────────── */
+.hf-page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+.hf-page-title {
+  font-size: var(--text-2xl);
+  font-weight: 800;
+  color: var(--text);
+  letter-spacing: -0.6px;
+  line-height: 1.1;
+}
+.hf-page-subtitle {
+  font-size: var(--text-sm);
+  color: var(--text-3);
+  margin-top: 4px;
+  font-weight: 400;
+}
+.hf-page-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  padding-top: 4px;
+}
+
+/* ── HF Card ──────────────────────────────────────────────── */
+.hf-card {
+  background: var(--surface-card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 20px 22px;
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.06);
+  transition: box-shadow 0.15s;
+}
+.hf-card:hover { box-shadow: 0 4px 12px rgba(15, 23, 42, 0.10); }
+
+/* ── HF Card grids ────────────────────────────────────────── */
+.hf-card-grid { display: grid; gap: 16px; }
+.hf-card-grid-2 { grid-template-columns: repeat(2, 1fr); }
+.hf-card-grid-3 { grid-template-columns: repeat(3, 1fr); }
+.hf-card-grid-4 { grid-template-columns: repeat(4, 1fr); }
+@media (max-width: 767px) {
+  .hf-card-grid-2, .hf-card-grid-3, .hf-card-grid-4 { grid-template-columns: 1fr; }
+}
+@media (min-width: 768px) and (max-width: 1023px) {
+  .hf-card-grid-3, .hf-card-grid-4 { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* ── HF Section title ─────────────────────────────────────── */
+.hf-section-title {
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--text-3);
+  text-transform: uppercase;
+  letter-spacing: 0.10em;
+  margin-bottom: 14px;
+}
+
+/* ── HF KPI ───────────────────────────────────────────────── */
+.hf-kpi-value {
+  font-size: var(--text-2xl);
+  font-weight: 800;
+  letter-spacing: -0.5px;
+  line-height: 1.1;
+}
+.hf-kpi-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-3);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  margin-bottom: 6px;
+}
+
+/* ── HF Badge ─────────────────────────────────────────────── */
+.hf-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.hf-badge-green { background: var(--green-light); color: var(--green-dark); border: 1px solid rgba(2,122,72,.12); }
+.hf-badge-red   { background: var(--red-light);   color: var(--red-dark);   border: 1px solid rgba(180,35,24,.12); }
+.hf-badge-amber { background: var(--amber-light);  color: var(--amber-dark); border: 1px solid rgba(181,71,8,.12); }
+.hf-badge-blue  { background: var(--brand-light);  color: var(--brand-dark); border: 1px solid rgba(37,99,235,.12); }
+.hf-badge-muted { background: var(--bg-3);         color: var(--text-3);     border: 1px solid var(--border); }
+
+/* ── HF Toolbar ───────────────────────────────────────────── */
+.hf-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 24px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-card);
+  flex-wrap: wrap;
+}
+
+/* ── View toggle (Cards / List / Kanban) ──────────────────── */
+.view-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 3px;
+}
+.view-toggle-btn {
+  padding: 6px 14px;
+  border-radius: 7px;
+  border: none;
+  background: none;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-3);
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+  font-family: inherit;
+  white-space: nowrap;
+}
+.view-toggle-btn:hover { color: var(--text); background: rgba(0,0,0,.04); }
+.view-toggle-btn.active {
+  background: var(--surface-card);
+  color: var(--text);
+  box-shadow: 0 1px 4px rgba(15,23,42,.10);
+}
+
+/* ── Dark hero card (AI CFO / Radar) ─────────────────────── */
+.hf-dark-card {
+  background: linear-gradient(135deg, #0F172A 0%, #1e293b 100%);
+  border-radius: 20px;
+  padding: 28px 28px 24px;
+  box-shadow: 0 8px 32px rgba(15, 23, 42, 0.22);
+  position: relative;
+  overflow: hidden;
+  margin-bottom: 20px;
+}
+.hf-dark-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  opacity: 0.03;
+  background-image:
+    repeating-linear-gradient(0deg, transparent, transparent 28px, #fff 28px, #fff 29px),
+    repeating-linear-gradient(90deg, transparent, transparent 28px, #fff 28px, #fff 29px);
+  pointer-events: none;
+}
+
+/* ── Task card ────────────────────────────────────────────── */
+.task-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: var(--surface-card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 14px 18px;
+  box-shadow: 0 1px 3px rgba(15,23,42,.06);
+  transition: box-shadow 0.15s;
+  margin-bottom: 8px;
+}
+.task-card:hover { box-shadow: 0 4px 12px rgba(15,23,42,.10); }
+.task-card-urgent { border-left: 3px solid var(--red); }
+.task-card-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 17px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.task-card-body { flex: 1; min-width: 0; }
+.task-card-title {
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.task-card-sub { font-size: var(--text-xs); color: var(--text-3); }
+.task-card-btn {
+  padding: 8px 16px;
+  border-radius: 9px;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-2);
+  cursor: pointer;
+  font-family: inherit;
+  flex-shrink: 0;
+  transition: background 0.12s;
+  white-space: nowrap;
+  min-height: 36px;
+}
+.task-card-btn:hover { background: var(--bg-3); color: var(--text); }
+
+/* ── Invoice module cards ─────────────────────────────────── */
+.invoice-module-card {
+  background: var(--surface-card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 24px 22px;
+  transition: box-shadow 0.15s;
+  position: relative;
+  overflow: hidden;
+}
+.invoice-module-card:hover { box-shadow: 0 4px 16px rgba(15,23,42,.10); }
+.invoice-kanban-col {
+  background: var(--bg-2);
+  border-radius: 14px;
+  padding: 14px;
+  min-height: 180px;
+  border: 1px solid var(--border);
+}
+.invoice-kanban-header {
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--text-3);
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.invoice-kanban-empty {
+  font-size: 13px;
+  color: var(--text-4);
+  text-align: center;
+  padding: 20px 0;
+}
+
+/* ── Scale-up overrides for existing shared classes ──────── */
+.status-pill { font-size: 12px; padding: 3px 10px; }
+
+.item-row { padding: 14px 18px; gap: 14px; min-height: 56px; }
+.item-row-name { font-size: var(--text-base); font-weight: 600; margin-bottom: 3px; }
+.item-row-sub { font-size: var(--text-xs); }
+.item-row-amount { font-size: var(--text-base); font-weight: 700; }
+.item-row-status { font-size: 12px; }
+
+.section-title { font-size: 11px; letter-spacing: 0.10em; margin-bottom: 14px; }
+
+.empty-state-title { font-size: var(--text-lg); font-weight: 700; }
+.empty-state-sub { font-size: var(--text-sm); }
+.empty-state-cta { font-size: var(--text-sm); padding: 12px 28px; min-height: 44px; }
+
+.insight-card-dark { padding: 24px; border-radius: 18px; margin-bottom: 20px; }

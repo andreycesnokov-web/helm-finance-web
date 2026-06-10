@@ -11,13 +11,13 @@ export default function Approvals() {
   const navigate = useNavigate()
 
   return (
-    <div className="page">
+    <div className="hf-page">
 
       {/* ── Header ─── */}
-      <div className="page-header">
-        <div className="page-header-left">
-          <div className="page-header-title">Approvals</div>
-          <div className="page-header-sub">Review and approve financial actions before they affect cash</div>
+      <div className="hf-page-header">
+        <div>
+          <div className="hf-page-title">Approvals</div>
+          <div className="hf-page-subtitle">Review and approve financial actions before they affect cash</div>
         </div>
       </div>
 

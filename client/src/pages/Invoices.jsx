@@ -1,59 +1,157 @@
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
-const SECTIONS = [
-  { icon: '↓', label: 'Receivable Invoices', sub: 'Money clients owe you',        color: 'var(--green-light)', textColor: 'var(--green-dark)' },
-  { icon: '↑', label: 'Payable Invoices',    sub: 'Bills you need to pay',         color: 'var(--red-light)',   textColor: 'var(--red-dark)'   },
-  { icon: '⚠', label: 'Overdue Invoices',    sub: 'Past due date — needs action',  color: 'var(--amber-light)', textColor: 'var(--amber-dark)'  },
+const MODULE_CARDS = [
+  {
+    icon: '↓',
+    label: 'Receivable Invoices',
+    sub: 'Money clients owe you',
+    color: 'var(--green-dark)',
+    bg: 'var(--green-light)',
+    border: 'rgba(2,122,72,.12)',
+    count: '—',
+    path: '/receivables',
+  },
+  {
+    icon: '↑',
+    label: 'Payable Invoices',
+    sub: 'Bills you need to pay',
+    color: 'var(--red-dark)',
+    bg: 'var(--red-light)',
+    border: 'rgba(180,35,24,.12)',
+    count: '—',
+    path: '/payables',
+  },
+  {
+    icon: '⚠',
+    label: 'Overdue Invoices',
+    sub: 'Past due — needs action',
+    color: 'var(--amber-dark)',
+    bg: 'var(--amber-light)',
+    border: 'rgba(181,71,8,.12)',
+    count: '—',
+    path: '/receivables',
+  },
+]
+
+const KANBAN_COLS = [
+  { key: 'draft',   label: 'Draft',   dot: 'var(--text-4)' },
+  { key: 'sent',    label: 'Sent',    dot: 'var(--brand)' },
+  { key: 'overdue', label: 'Overdue', dot: 'var(--red)' },
+  { key: 'paid',    label: 'Paid',    dot: 'var(--green)' },
 ]
 
 export default function Invoices() {
   const navigate = useNavigate()
+  const [view, setView] = useState('cards') // 'cards' | 'list' | 'kanban'
 
   return (
-    <div className="page">
+    <div className="hf-page">
 
       {/* ── Header ─── */}
-      <div className="page-header">
-        <div className="page-header-left">
-          <div className="page-header-title">Invoices</div>
-          <div className="page-header-sub">Create and track money owed to or by your business</div>
+      <div className="hf-page-header">
+        <div>
+          <div className="hf-page-title">Invoices</div>
+          <div className="hf-page-subtitle">Create and track invoices owed to or by your business</div>
+        </div>
+        <div className="hf-page-actions">
+          {/* View toggle */}
+          <div className="view-toggle">
+            {[
+              { key: 'cards',  label: '⊞ Cards' },
+              { key: 'list',   label: '≡ List' },
+              { key: 'kanban', label: '⣶ Kanban' },
+            ].map(v => (
+              <button key={v.key} className={`view-toggle-btn${view === v.key ? ' active' : ''}`} onClick={() => setView(v.key)}>
+                {v.label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
-      {/* ── Coming soon banner ─── */}
-      <div className="module-coming-soon" style={{ marginBottom: 24 }}>
-        <div className="module-coming-soon-dot" />
-        <div className="module-coming-soon-text">
-          Invoices module is ready for setup — full invoice creation and payment tracking coming soon.
+      {/* ── Coming soon notice ─── */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'var(--brand-light)', border: '1px solid rgba(37,99,235,.15)', borderRadius: 14, padding: '12px 18px', marginBottom: 24 }}>
+        <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--brand)', flexShrink: 0 }} />
+        <div style={{ fontSize: 'var(--text-sm)', color: 'var(--brand-dark)', fontWeight: 500 }}>
+          Invoice module is in development — full creation and payment tracking coming soon.
         </div>
       </div>
 
-      {/* ── Section previews ─── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12, marginBottom: 28 }}>
-        {SECTIONS.map(s => (
-          <div key={s.label} style={{ background: s.color, borderRadius: 14, padding: '18px 16px', opacity: 0.75, cursor: 'default' }}>
-            <div style={{ fontSize: 22, marginBottom: 8 }}>{s.icon}</div>
-            <div style={{ fontSize: 14, fontWeight: 600, color: s.textColor, marginBottom: 4 }}>{s.label}</div>
-            <div style={{ fontSize: 12, color: s.textColor, opacity: 0.75 }}>{s.sub}</div>
-            <div style={{ marginTop: 14 }}>
-              <span style={{ fontSize: 10, fontWeight: 600, background: 'rgba(255,255,255,.6)', color: s.textColor, padding: '3px 10px', borderRadius: 20 }}>Coming soon</span>
+      {/* ── CARDS VIEW ─── */}
+      {view === 'cards' && (
+        <>
+          <div className="hf-card-grid hf-card-grid-3" style={{ marginBottom: 32 }}>
+            {MODULE_CARDS.map(c => (
+              <div key={c.label} className="invoice-module-card" style={{ border: `1px solid ${c.border}`, background: c.bg, opacity: 0.88 }}>
+                <div style={{ width: 48, height: 48, borderRadius: 14, background: 'rgba(255,255,255,.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, fontWeight: 700, color: c.color, marginBottom: 14 }}>{c.icon}</div>
+                <div style={{ fontSize: 'var(--text-md)', fontWeight: 700, color: c.color, marginBottom: 5 }}>{c.label}</div>
+                <div style={{ fontSize: 'var(--text-sm)', color: c.color, opacity: 0.75, marginBottom: 18 }}>{c.sub}</div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span className="hf-badge hf-badge-muted" style={{ fontSize: 12 }}>Coming soon</span>
+                  <button onClick={() => navigate(c.path)} style={{ fontSize: 'var(--text-xs)', color: c.color, background: 'rgba(255,255,255,.5)', border: `1px solid ${c.border}`, borderRadius: 8, padding: '5px 12px', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600 }}>
+                    View →
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Empty state */}
+          <div className="empty-state">
+            <div className="empty-state-icon">🧾</div>
+            <div className="empty-state-title">Invoice module ready for setup</div>
+            <div className="empty-state-sub">
+              Full invoice creation and payment tracking coming soon. Use Receivables and Payables to track what's owed right now.
+            </div>
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'center' }}>
+              <button className="empty-state-cta" onClick={() => navigate('/receivables')}>View Receivables</button>
+              <button className="empty-state-cta secondary" onClick={() => navigate('/payables')}>View Payables</button>
             </div>
           </div>
-        ))}
-      </div>
+        </>
+      )}
 
-      {/* ── Empty state ─── */}
-      <div className="empty-state">
-        <div className="empty-state-icon">🧾</div>
-        <div className="empty-state-title">Invoices module is ready for setup</div>
-        <div className="empty-state-sub">
-          The next step is connecting invoice creation and payment tracking. Until then, use Receivables and Payables to track what's owed.
+      {/* ── LIST VIEW ─── */}
+      {view === 'list' && (
+        <div className="hf-card" style={{ padding: 0, overflow: 'hidden' }}>
+          <table className="hf-table" style={{ width: '100%' }}>
+            <thead>
+              <tr>
+                <th>Invoice</th>
+                <th>Client / Vendor</th>
+                <th>Amount</th>
+                <th>Due Date</th>
+                <th>Status</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td colSpan={6} style={{ textAlign: 'center', padding: '48px 24px', color: 'var(--text-4)', fontSize: 'var(--text-sm)' }}>
+                  <div style={{ fontSize: 28, marginBottom: 10 }}>🧾</div>
+                  No invoices yet — module coming soon
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
-        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'center' }}>
-          <button className="empty-state-cta" onClick={() => navigate('/receivables')}>View Receivables</button>
-          <button className="empty-state-cta secondary" onClick={() => navigate('/payables')}>View Payables</button>
+      )}
+
+      {/* ── KANBAN VIEW ─── */}
+      {view === 'kanban' && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14 }}>
+          {KANBAN_COLS.map(col => (
+            <div key={col.key} className="invoice-kanban-col">
+              <div className="invoice-kanban-header">
+                <div style={{ width: 8, height: 8, borderRadius: '50%', background: col.dot }} />
+                {col.label}
+              </div>
+              <div className="invoice-kanban-empty">No invoices</div>
+            </div>
+          ))}
         </div>
-      </div>
+      )}
 
     </div>
   )

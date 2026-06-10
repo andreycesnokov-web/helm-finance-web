@@ -17,89 +17,56 @@ function fmtDate(str) {
   return new Date(str).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
-// Build task items from Pulse data sources
 function buildTasks(d) {
   const tasks = []
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-
-  // From todayFocus
   for (const f of (d.todayFocus || [])) {
     const days = f.due_date ? daysUntil(f.due_date) : 0
-    tasks.push({
-      id:     `focus-${f.id}`,
-      title:  f.description || f.counterparty || 'Action required',
-      sub:    f.amount ? `${fmt(f.amount)} IDR · ${fmtDate(f.due_date)}` : fmtDate(f.due_date),
-      type:   f.entityType || f.type || 'task',
-      days,
-      urgent: days <= 0,
-      source: 'focus',
-    })
+    tasks.push({ id: `focus-${f.id}`, title: f.description || f.counterparty || 'Action required', sub: f.amount ? `${fmt(f.amount)} IDR · ${fmtDate(f.due_date)}` : fmtDate(f.due_date), type: f.entityType || f.type || 'task', days, urgent: days <= 0, source: 'focus' })
   }
-
-  // From reminders
   for (const r of (d.reminders || [])) {
     const days = r.remind_at ? daysUntil(r.remind_at) : 0
-    if (days > 30) continue  // skip far-future
-    tasks.push({
-      id:     `reminder-${r.id}`,
-      title:  r.title || r.description || 'Reminder',
-      sub:    fmtDate(r.remind_at),
-      type:   'reminder',
-      days,
-      urgent: days <= 0,
-      source: 'reminder',
-    })
+    if (days > 30) continue
+    tasks.push({ id: `reminder-${r.id}`, title: r.title || r.description || 'Reminder', sub: fmtDate(r.remind_at), type: 'reminder', days, urgent: days <= 0, source: 'reminder' })
   }
-
-  // From overdue debts
   for (const debt of (d.debts || []).filter(x => !x.is_settled && daysUntil(x.due_date) <= 0)) {
-    tasks.push({
-      id:     `debt-${debt.id}`,
-      title:  debt.type === 'receivable' ? `Collect from ${debt.counterparty}` : `Pay ${debt.counterparty}`,
-      sub:    `${fmt(debt.amount)} IDR · ${Math.abs(daysUntil(debt.due_date))}d overdue`,
-      type:   debt.type,
-      days:   daysUntil(debt.due_date),
-      urgent: true,
-      source: 'debt',
-    })
+    tasks.push({ id: `debt-${debt.id}`, title: debt.type === 'receivable' ? `Collect from ${debt.counterparty}` : `Pay ${debt.counterparty}`, sub: `${fmt(debt.amount)} IDR · ${Math.abs(daysUntil(debt.due_date))}d overdue`, type: debt.type, days: daysUntil(debt.due_date), urgent: true, source: 'debt' })
   }
-
-  // From due-soon debts (next 7 days)
   for (const debt of (d.debts || []).filter(x => !x.is_settled && daysUntil(x.due_date) > 0 && daysUntil(x.due_date) <= 7)) {
-    tasks.push({
-      id:     `upcoming-${debt.id}`,
-      title:  debt.type === 'receivable' ? `Follow up with ${debt.counterparty}` : `Prepare payment: ${debt.counterparty}`,
-      sub:    `${fmt(debt.amount)} IDR · ${fmtDate(debt.due_date)}`,
-      type:   debt.type,
-      days:   daysUntil(debt.due_date),
-      urgent: false,
-      source: 'debt',
-    })
+    tasks.push({ id: `upcoming-${debt.id}`, title: debt.type === 'receivable' ? `Follow up with ${debt.counterparty}` : `Prepare payment: ${debt.counterparty}`, sub: `${fmt(debt.amount)} IDR · ${fmtDate(debt.due_date)}`, type: debt.type, days: daysUntil(debt.due_date), urgent: false, source: 'debt' })
   }
-
   return tasks
 }
 
-const TYPE_ICON = {
-  receivable: '↓',
-  payable:    '↑',
-  reminder:   '🔔',
-  task:       '✓',
-  payroll:    '💼',
+const TYPE_CFG = {
+  receivable: { icon: '↓', bg: 'var(--green-light)', color: 'var(--green-dark)' },
+  payable:    { icon: '↑', bg: 'var(--red-light)',   color: 'var(--red-dark)' },
+  reminder:   { icon: '🔔', bg: 'var(--amber-light)', color: 'var(--amber-dark)' },
+  task:       { icon: '✓', bg: 'var(--brand-light)',  color: 'var(--brand-dark)' },
+  payroll:    { icon: '💼', bg: 'var(--bg-3)',         color: 'var(--text-3)' },
 }
 
-const TYPE_COLOR = {
-  receivable: { bg: 'var(--green-light)', color: 'var(--green-dark)' },
-  payable:    { bg: 'var(--red-light)',   color: 'var(--red-dark)'   },
-  reminder:   { bg: 'var(--amber-light)', color: 'var(--amber-dark)' },
-  task:       { bg: 'var(--blue-light)',  color: 'var(--blue-dark)'  },
-  payroll:    { bg: 'var(--bg-3)',        color: 'var(--text-3)'     },
+function TaskCard({ task, onDone }) {
+  const tc = TYPE_CFG[task.type] || TYPE_CFG.task
+  return (
+    <div className={`task-card${task.urgent ? ' task-card-urgent' : ''}`}>
+      <div className="task-card-icon" style={{ background: tc.bg, color: tc.color }}>{tc.icon}</div>
+      <div className="task-card-body">
+        <div className="task-card-title">{task.title}</div>
+        <div className="task-card-sub" style={{ color: task.urgent ? 'var(--red-dark)' : undefined }}>
+          {task.sub}
+        </div>
+      </div>
+      {task.urgent && (
+        <div className="hf-badge hf-badge-red" style={{ fontSize: 11 }}>Urgent</div>
+      )}
+      <button className="task-card-btn" onClick={onDone}>Done</button>
+    </div>
+  )
 }
 
 export default function Tasks() {
-  const { token } = useAuth()
-  const navigate  = useNavigate()
+  const { token }  = useAuth()
+  const navigate   = useNavigate()
   const [data, setData]       = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError]     = useState('')
@@ -112,104 +79,91 @@ export default function Tasks() {
       .finally(() => setLoading(false))
   }, [token])
 
-  if (loading && !data) return <div className="page-loading">Loading tasks…</div>
+  if (loading && !data) return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 80 }}>
+      <div style={{ width: 28, height: 28, border: '2.5px solid var(--border-2)', borderTopColor: 'var(--brand)', borderRadius: '50%', animation: 'tx-spin 0.7s linear infinite' }} />
+    </div>
+  )
 
   const d     = data || {}
   const tasks = buildTasks(d).filter(t => !done[t.id])
 
-  const todayTasks    = tasks.filter(t => t.days <= 0 && t.urgent)
-  const upcomingTasks = tasks.filter(t => t.days > 0)
+  const urgentTasks   = tasks.filter(t => t.urgent)
+  const todayTasks    = tasks.filter(t => !t.urgent && t.days === 0)
+  const upcomingTasks = tasks.filter(t => !t.urgent && t.days > 0)
+
+  const markDone = (id) => setDone(p => ({ ...p, [id]: true }))
 
   return (
-    <div className="page">
+    <div className="hf-page">
 
       {/* ── Header ─── */}
-      <div className="page-header">
-        <div className="page-header-left">
-          <div className="page-header-title">Tasks</div>
-          <div className="page-header-sub">Today's operational and financial focus</div>
+      <div className="hf-page-header">
+        <div>
+          <div className="hf-page-title">Tasks</div>
+          <div className="hf-page-subtitle">Operational and financial focus — auto-generated by AI CFO</div>
         </div>
+        {tasks.length > 0 && (
+          <div className="hf-badge hf-badge-blue" style={{ fontSize: 13, padding: '6px 14px' }}>
+            {tasks.length} open
+          </div>
+        )}
       </div>
 
-      {error && <div className="page-error">{error}</div>}
+      {error && <div className="page-error" style={{ marginBottom: 20 }}>{error}</div>}
 
       {tasks.length === 0 && Object.keys(done).length === 0 ? (
         <div className="empty-state">
           <div className="empty-state-icon">✅</div>
-          <div className="empty-state-title">No tasks yet</div>
-          <div className="empty-state-sub">AI CFO will create tasks when financial actions need your attention — overdue items, upcoming payments, and follow-ups appear here automatically.</div>
+          <div className="empty-state-title">All clear</div>
+          <div className="empty-state-sub">AI CFO will create tasks when financial actions need attention — overdue items, upcoming payments, and follow-ups appear here automatically.</div>
           <button className="empty-state-cta" onClick={() => navigate('/')}>Back to Pulse</button>
         </div>
       ) : (
         <>
-          {/* Today / Urgent */}
-          {todayTasks.length > 0 && (
-            <div style={{ marginBottom: 24 }}>
-              <div className="section-title" style={{ color: 'var(--red-dark)' }}>Today · {todayTasks.length} urgent</div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {todayTasks.map(task => {
-                  const tc = TYPE_COLOR[task.type] || TYPE_COLOR.task
-                  return (
-                    <div key={task.id} style={{ display: 'flex', alignItems: 'center', gap: 12, background: 'var(--surface-card)', border: '1px solid rgba(240,68,56,.15)', borderRadius: 12, padding: '12px 14px', boxShadow: 'var(--shadow-xs)' }}>
-                      <div style={{ width: 34, height: 34, borderRadius: 9, background: tc.bg, color: tc.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 700, flexShrink: 0 }}>
-                        {TYPE_ICON[task.type] || '!'}
-                      </div>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text)', marginBottom: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{task.title}</div>
-                        <div style={{ fontSize: 11, color: 'var(--red)' }}>{task.sub}</div>
-                      </div>
-                      <button onClick={() => setDone(p => ({ ...p, [task.id]: true }))}
-                        style={{ padding: '5px 12px', borderRadius: 8, background: 'none', border: '1px solid var(--border-2)', fontSize: 11, color: 'var(--text-3)', cursor: 'pointer', flexShrink: 0 }}>
-                        Done
-                      </button>
-                    </div>
-                  )
-                })}
+          {/* Urgent */}
+          {urgentTasks.length > 0 && (
+            <div style={{ marginBottom: 28 }}>
+              <div className="hf-section-title" style={{ color: 'var(--red-dark)' }}>
+                🔴 Urgent · {urgentTasks.length}
               </div>
+              {urgentTasks.map(t => <TaskCard key={t.id} task={t} onDone={() => markDone(t.id)} />)}
+            </div>
+          )}
+
+          {/* Today */}
+          {todayTasks.length > 0 && (
+            <div style={{ marginBottom: 28 }}>
+              <div className="hf-section-title">Today · {todayTasks.length}</div>
+              {todayTasks.map(t => <TaskCard key={t.id} task={t} onDone={() => markDone(t.id)} />)}
             </div>
           )}
 
           {/* Upcoming */}
           {upcomingTasks.length > 0 && (
-            <div style={{ marginBottom: 24 }}>
-              <div className="section-title">Upcoming · {upcomingTasks.length}</div>
-              <div className="item-list-card">
-                {upcomingTasks.map(task => {
-                  const tc = TYPE_COLOR[task.type] || TYPE_COLOR.task
-                  return (
-                    <div key={task.id} className="item-row">
-                      <div style={{ width: 30, height: 30, borderRadius: 8, background: tc.bg, color: tc.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, flexShrink: 0 }}>
-                        {TYPE_ICON[task.type] || '→'}
-                      </div>
-                      <div className="item-row-left">
-                        <div className="item-row-name">{task.title}</div>
-                        <div className="item-row-sub">{task.sub}</div>
-                      </div>
-                      <button onClick={() => setDone(p => ({ ...p, [task.id]: true }))}
-                        style={{ padding: '4px 10px', borderRadius: 7, background: 'none', border: '1px solid var(--border)', fontSize: 10, color: 'var(--text-4)', cursor: 'pointer', flexShrink: 0 }}>
-                        Done
-                      </button>
-                    </div>
-                  )
-                })}
-              </div>
+            <div style={{ marginBottom: 28 }}>
+              <div className="hf-section-title">Upcoming · {upcomingTasks.length}</div>
+              {upcomingTasks.map(t => <TaskCard key={t.id} task={t} onDone={() => markDone(t.id)} />)}
             </div>
           )}
 
           {/* Completed this session */}
           {Object.keys(done).length > 0 && (
-            <div style={{ marginBottom: 24 }}>
-              <div className="section-title" style={{ color: 'var(--green-dark)' }}>Completed this session · {Object.keys(done).length}</div>
-              <div style={{ fontSize: 12, color: 'var(--text-4)', padding: '8px 0' }}>Tasks are marked done for this session. They will reappear if still outstanding on next load.</div>
+            <div style={{ marginBottom: 20 }}>
+              <div className="hf-section-title" style={{ color: 'var(--green-dark)' }}>
+                ✅ Completed this session · {Object.keys(done).length}
+              </div>
+              <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-4)', padding: '4px 0' }}>
+                Tasks are marked done for this session and will reappear if still outstanding on next load.
+              </div>
             </div>
           )}
         </>
       )}
 
-      <div style={{ textAlign: 'center', paddingBottom: 12 }}>
+      <div style={{ textAlign: 'center', paddingBottom: 8 }}>
         <button className="link-btn" onClick={() => navigate('/')}>View Pulse dashboard →</button>
       </div>
-
     </div>
   )
 }

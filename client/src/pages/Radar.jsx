@@ -53,26 +53,20 @@ export default function Radar() {
   const isHealthy = proj30 >= 0
 
   return (
-    <div className="page">
+    <div className="hf-page">
       {/* Page header */}
-      <div className="topbar" style={{ padding: '20px 20px 14px' }}>
+      <div className="hf-page-header">
         <div>
-          <div style={{ fontSize: 'var(--text-xl)', fontWeight: 700, color: 'var(--text)', letterSpacing: -0.3 }}>Radar</div>
-          <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-3)', marginTop: 3 }}>30-day cash forecast</div>
+          <div className="hf-page-title">Radar</div>
+          <div className="hf-page-subtitle">30-day cash forecast · scenario analysis</div>
         </div>
-        <div style={{
-          fontSize: 'var(--text-xs)', fontWeight: 600, padding: '5px 12px', borderRadius: 20,
-          background: isHealthy ? 'var(--green-light)' : 'var(--red-light)',
-          color: isHealthy ? 'var(--green-dark)' : 'var(--red-dark)',
-          border: `1px solid ${isHealthy ? 'rgba(2,122,72,.15)' : 'rgba(180,35,24,.15)'}`,
-          letterSpacing: '0.03em',
-        }}>
+        <div className={`hf-badge ${isHealthy ? 'hf-badge-green' : 'hf-badge-red'}`} style={{ fontSize: 13, padding: '6px 14px' }}>
           {isHealthy ? '✓ Healthy' : '⚠ At Risk'}
         </div>
       </div>
 
       {/* Hero projected balance — dark navy premium card */}
-      <div style={{ margin: '0 16px 16px' }}>
+      <div style={{ marginBottom: 20 }}>
         <div style={{
           background: 'linear-gradient(135deg, var(--text) 0%, #1e2d4a 100%)',
           borderRadius: 20,
@@ -114,7 +108,7 @@ export default function Radar() {
       </div>
 
       {/* Scenario cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, padding: '0 16px', marginBottom: 16 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 20 }}>
         <div style={{ background: 'var(--green-light)', borderRadius: 16, padding: '16px 18px', border: '1px solid rgba(2,122,72,.12)' }}>
           <div style={{ fontSize: 'var(--text-xs)', color: 'var(--green-dark)', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: 8 }}>Best case</div>
           <div style={{ fontSize: 'var(--text-xl)', fontWeight: 700, color: 'var(--green-dark)', letterSpacing: -0.5 }}>{fmt(Math.round(projBest))}</div>
@@ -128,8 +122,8 @@ export default function Radar() {
       </div>
 
       {/* Burn rate metrics card */}
-      <div className="card" style={{ marginBottom: 12 }}>
-        <div style={{ fontSize: 'var(--text-sm)', fontWeight: 700, color: 'var(--text)', marginBottom: 16, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-3)' }}>Monthly burn breakdown</div>
+      <div className="hf-card" style={{ marginBottom: 16 }}>
+        <div style={{ fontSize: 'var(--text-sm)', fontWeight: 700, color: 'var(--text-3)', marginBottom: 16, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Monthly burn breakdown</div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
           {[
             { label: 'Monthly burn', val: fmtFull(monthlyBurn), sub: 'IDR / month', color: 'var(--red-dark)' },
@@ -147,7 +141,7 @@ export default function Radar() {
 
       {/* Key dates timeline */}
       {debts.length > 0 && (
-        <div className="card" style={{ marginBottom: 12 }}>
+        <div className="hf-card" style={{ marginBottom: 16 }}>
           <div style={{ fontSize: 'var(--text-base)', fontWeight: 700, color: 'var(--text)', marginBottom: 14 }}>Key dates</div>
 
           {receivables.length > 0 && (
@@ -187,7 +181,7 @@ export default function Radar() {
       )}
 
       {/* 30-day net flow summary */}
-      <div className="card">
+      <div className="hf-card">
         <div style={{ fontSize: 'var(--text-base)', fontWeight: 700, color: 'var(--text)', marginBottom: 14 }}>30-day net flow</div>
         {[
           { label: 'Current balance',    val: fmtFull(balance),    color: 'var(--text)',      sign: '' },

@@ -121,7 +121,7 @@ export default function Receivables() {
           <div className="page-header-title">Receivables</div>
           <div className="page-header-sub">Money expected from clients and partners</div>
         </div>
-        <button className="page-header-action" onClick={() => setShowForm(true)}>+ New</button>
+        <button className="btn btn-primary btn-md" onClick={() => setShowForm(true)}>+ New Receivable</button>
       </div>
 
       {error && <div className="page-error">{error}</div>}
