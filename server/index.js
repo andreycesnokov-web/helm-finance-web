@@ -1042,12 +1042,24 @@ app.post('/api/wallets/:id/adjust-balance', auth, async (req, res) => {
       return res.status(400).json({ error: 'reason is required' });
     }
 
+    // Role check: only owner/admin can adjust balance
+    const { data: membership } = await supabase
+      .from('business_members')
+      .select('role')
+      .eq('user_id', userId)
+      .eq('status', 'active')
+      .in('role', ['owner', 'admin'])
+      .limit(1);
+    if (!membership || membership.length === 0) {
+      return res.status(403).json({ error: 'Only business owner or admin can adjust wallet balances' });
+    }
+
     // Load wallet — ownership enforced via user_id filter
     const { data: wallet, error: wErr } = await supabase
       .from('wallets')
       .select('id, user_id, name, currency')
       .eq('id', walletId)
-      .eq('user_id', userId)   // ownership check: can only adjust own wallets
+      .eq('user_id', userId)
       .single();
     if (wErr || !wallet) return res.status(404).json({ error: 'Wallet not found' });
 

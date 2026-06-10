@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useAuth } from '../hooks/useAuth'
+import { useAccess } from '../hooks/useAccess'
 import { apiFetch, fmt, fmtFull } from '../lib/api'
 
 // ── Wallet type config ────────────────────────────────────────────────────────
@@ -65,6 +66,10 @@ const EMPTY_FORM = { name: '', currency: 'IDR', type: '', entity_name: '', openi
 
 export default function Accounts() {
   const { token } = useAuth()
+  const { access } = useAccess()
+
+  // Only owner/admin can adjust wallet balances
+  const canAdjust = ['owner', 'admin'].includes(access?.membership?.role)
 
   const [wallets,      setWallets]      = useState([])
   const [legacySources,setLegacySources]= useState([]) // source-based accounts not yet in wallets
@@ -321,16 +326,18 @@ export default function Accounts() {
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-                    <button
-                      onClick={() => openAdjust(w)}
-                      title="Adjust balance"
-                      style={{ height: 34, padding: '0 10px', borderRadius: 10, background: 'var(--bg-2)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer', fontSize: 11, fontWeight: 700, color: 'var(--text-2)', fontFamily: 'inherit' }}
-                    >
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                        <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-                      </svg>
-                      Adjust
-                    </button>
+                    {canAdjust && (
+                      <button
+                        onClick={() => openAdjust(w)}
+                        title="Adjust balance"
+                        style={{ height: 34, padding: '0 10px', borderRadius: 10, background: 'var(--bg-2)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer', fontSize: 11, fontWeight: 700, color: 'var(--text-2)', fontFamily: 'inherit' }}
+                      >
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                          <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+                        </svg>
+                        Adjust
+                      </button>
+                    )}
                     <button onClick={() => openEdit(w)} style={{ width: 34, height: 34, borderRadius: 10, background: 'var(--bg-2)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, cursor: 'pointer' }}>
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-2)" strokeWidth="2" strokeLinecap="round">
                         <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
@@ -607,7 +614,7 @@ export default function Accounts() {
               Cancel
             </button>
 
-            {editWallet && (
+            {editWallet && canAdjust && (
               <button
                 onClick={() => { setShowForm(false); openAdjust(editWallet) }}
                 disabled={saving}
