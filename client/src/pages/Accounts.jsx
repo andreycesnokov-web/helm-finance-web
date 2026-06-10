@@ -76,6 +76,13 @@ export default function Accounts() {
   const [backfilling,  setBackfilling]  = useState(false)
   const [backfillDone, setBackfillDone] = useState(false)
 
+  // ── Admin ─────────────────────────────────────────────────────────────────
+  const [isAdmin,      setIsAdmin]      = useState(false)
+  const [adjustWallet, setAdjustWallet] = useState(null) // wallet being adjusted
+  const today = new Date().toISOString().slice(0, 10)
+  const [adjustForm,   setAdjustForm]   = useState({ target_balance: '', reason: '', transaction_date: today })
+  const [adjusting,    setAdjusting]    = useState(false)
+
   // ── Load wallets + legacy sources ─────────────────────────────────────────
   const load = async () => {
     setLoading(true)
@@ -99,7 +106,11 @@ export default function Accounts() {
     }
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => {
+    load()
+    // Load admin status silently — non-blocking, never errors visibly
+    apiFetch('/admin/status', token).then(d => setIsAdmin(d.is_admin === true)).catch(() => {})
+  }, [])
 
   // ── Computed totals ───────────────────────────────────────────────────────
   const totalBalance = wallets.reduce((s, w) => s + (w.balance || 0), 0)
@@ -161,6 +172,42 @@ export default function Accounts() {
       alert(e.message)
     } finally {
       setSaving(false)
+    }
+  }
+
+  // ── Adjust balance (admin only) ───────────────────────────────────────────
+  const openAdjust = (w) => {
+    setAdjustWallet(w)
+    setAdjustForm({ target_balance: '', reason: '', transaction_date: today })
+  }
+
+  const handleAdjust = async () => {
+    if (!adjustWallet) return
+    const targetNum = Number(adjustForm.target_balance)
+    if (isNaN(targetNum) || adjustForm.target_balance === '') return
+    if (!adjustForm.reason.trim()) return
+    setAdjusting(true)
+    try {
+      const r = await apiFetch(`/admin/wallets/${adjustWallet.id}/adjust-balance`, token, {
+        method: 'POST',
+        body: {
+          target_balance:   targetNum,
+          reason:           adjustForm.reason.trim(),
+          transaction_date: adjustForm.transaction_date || undefined,
+        },
+      })
+      if (r.delta === 0) {
+        alert('Balance is already at target — no correction needed.')
+      } else {
+        const sign = r.delta > 0 ? '+' : ''
+        alert(`Done. Delta: ${sign}${r.delta.toLocaleString('id')} ${adjustWallet.currency}.\nTransaction ID: ${r.transaction_id}`)
+      }
+      setAdjustWallet(null)
+      await load()
+    } catch (e) {
+      alert(e.message)
+    } finally {
+      setAdjusting(false)
     }
   }
 
@@ -271,12 +318,26 @@ export default function Accounts() {
                       {typeLabel && <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 20, background: 'var(--bg-2)', color: 'var(--text-2)', fontWeight: 600 }}>{typeLabel}</span>}
                     </div>
                   </div>
-                  <button onClick={() => openEdit(w)} style={{ width: 34, height: 34, borderRadius: 10, background: 'var(--bg-2)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, cursor: 'pointer' }}>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-2)" strokeWidth="2" strokeLinecap="round">
-                      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                    </svg>
-                  </button>
+                  <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                    {isAdmin && (
+                      <button
+                        onClick={() => openAdjust(w)}
+                        title="Adjust balance (admin)"
+                        style={{ height: 34, padding: '0 10px', borderRadius: 10, background: '#FEF3C7', border: '1px solid #FDE68A', display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer', fontSize: 11, fontWeight: 700, color: '#92400E', fontFamily: 'inherit' }}
+                      >
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                          <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+                        </svg>
+                        Adjust
+                      </button>
+                    )}
+                    <button onClick={() => openEdit(w)} style={{ width: 34, height: 34, borderRadius: 10, background: 'var(--bg-2)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, cursor: 'pointer' }}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-2)" strokeWidth="2" strokeLinecap="round">
+                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                      </svg>
+                    </button>
+                  </div>
                 </div>
 
                 {/* Entity name */}
@@ -353,6 +414,107 @@ export default function Accounts() {
           Balances are calculated from your transactions automatically.
         </div>
       </div>
+
+      {/* ── Adjust Balance modal (admin only) ──────────────────────────────── */}
+      {adjustWallet && createPortal(
+        <div className="modal-overlay" onClick={() => setAdjustWallet(null)}>
+          <div className="modal-sheet" onClick={e => e.stopPropagation()}>
+            <div className="modal-drag-handle" />
+            <button className="modal-close-btn" onClick={() => setAdjustWallet(null)}>✕</button>
+
+            {/* Header */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+              <div style={{ width: 36, height: 36, borderRadius: 10, background: '#FEF3C7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#92400E" strokeWidth="2.5" strokeLinecap="round">
+                  <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+                </svg>
+              </div>
+              <div>
+                <div style={{ fontSize: 'var(--text-base)', fontWeight: 700, color: 'var(--text)' }}>Adjust Balance</div>
+                <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-3)' }}>{adjustWallet.name}</div>
+              </div>
+            </div>
+
+            {/* Admin badge */}
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 700, color: '#92400E', background: '#FEF3C7', border: '1px solid #FDE68A', borderRadius: 20, padding: '3px 10px', marginBottom: 18 }}>
+              ⚡ Super Admin · creates a correction transaction
+            </div>
+
+            {/* Current balance */}
+            <div style={{ background: 'var(--bg-2)', borderRadius: 12, padding: '12px 14px', marginBottom: 16 }}>
+              <div style={{ fontSize: 11, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 700, marginBottom: 4 }}>Current balance</div>
+              <div style={{ fontSize: 'var(--text-xl)', fontWeight: 800, color: 'var(--text)' }}>
+                {fmtFull(adjustWallet.balance || 0)}
+                <span style={{ fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--text-3)', marginLeft: 6 }}>{adjustWallet.currency}</span>
+              </div>
+            </div>
+
+            {/* Target balance */}
+            <label className="modal-label">Target balance ({adjustWallet.currency})</label>
+            <input
+              type="number"
+              className="modal-input"
+              value={adjustForm.target_balance}
+              onChange={e => setAdjustForm(p => ({ ...p, target_balance: e.target.value }))}
+              placeholder="Enter target balance"
+              style={{ marginBottom: 8 }}
+              autoFocus
+            />
+
+            {/* Delta preview */}
+            {adjustForm.target_balance !== '' && !isNaN(Number(adjustForm.target_balance)) && (() => {
+              const delta = Number(adjustForm.target_balance) - (adjustWallet.balance || 0)
+              if (delta === 0) return (
+                <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-3)', marginBottom: 12 }}>No change needed — balance already at target.</div>
+              )
+              const isPos = delta > 0
+              return (
+                <div style={{ fontSize: 'var(--text-xs)', fontWeight: 700, color: isPos ? '#085041' : '#991B1B', background: isPos ? '#E1F5EE' : '#FEE2E2', borderRadius: 8, padding: '6px 12px', marginBottom: 12 }}>
+                  Correction: {isPos ? '+' : ''}{delta.toLocaleString('id')} {adjustWallet.currency}
+                </div>
+              )
+            })()}
+
+            {/* Reason */}
+            <label className="modal-label">Reason <span style={{ color: 'var(--red)', fontWeight: 700 }}>*</span></label>
+            <input
+              className="modal-input"
+              value={adjustForm.reason}
+              onChange={e => setAdjustForm(p => ({ ...p, reason: e.target.value }))}
+              placeholder="e.g. Bank reconciliation, Opening balance fix"
+              style={{ marginBottom: 14 }}
+            />
+
+            {/* Date */}
+            <label className="modal-label">Transaction date</label>
+            <input
+              type="date"
+              className="modal-input"
+              value={adjustForm.transaction_date}
+              onChange={e => setAdjustForm(p => ({ ...p, transaction_date: e.target.value }))}
+              style={{ marginBottom: 20 }}
+            />
+
+            <button
+              disabled={
+                adjusting ||
+                adjustForm.target_balance === '' ||
+                isNaN(Number(adjustForm.target_balance)) ||
+                !adjustForm.reason.trim()
+              }
+              onClick={handleAdjust}
+              className="btn btn-primary btn-block btn-lg"
+              style={{ marginBottom: 8, background: '#92400E', borderColor: '#92400E' }}
+            >
+              {adjusting ? 'Creating correction…' : 'Create correction transaction'}
+            </button>
+            <button onClick={() => setAdjustWallet(null)} className="btn btn-ghost btn-block btn-lg">
+              Cancel
+            </button>
+          </div>
+        </div>,
+        document.body
+      )}
 
       {/* Add / Edit modal */}
       {showForm && createPortal(

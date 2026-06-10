@@ -131,9 +131,11 @@ app.get('/api/pulse', auth, async (req, res) => {
     const CASH_OUT = ['expense', 'payroll'];
     // 'transfer', 'correction', unknown types → NEUTRAL (no effect)
 
-    const allIncome   = (allTxs || []).filter(t => CASH_IN.includes(t.type)).reduce((s, t) => s + Number(t.amount_original), 0);
-    const allExpenses = (allTxs || []).filter(t => CASH_OUT.includes(t.type)).reduce((s, t) => s + Number(t.amount_original), 0);
-    const totalBalance = allIncome - allExpenses;
+    const allIncome      = (allTxs || []).filter(t => CASH_IN.includes(t.type)).reduce((s, t) => s + Number(t.amount_original), 0);
+    const allExpenses    = (allTxs || []).filter(t => CASH_OUT.includes(t.type)).reduce((s, t) => s + Number(t.amount_original), 0);
+    // correction: signed delta — positive = add cash, negative = remove cash. Excluded from income/expense KPIs.
+    const allCorrections = (allTxs || []).filter(t => t.type === 'correction').reduce((s, t) => s + Number(t.amount_original), 0);
+    const totalBalance = allIncome - allExpenses + allCorrections;
 
     // Virtual accounts from transaction sources.
     // Uses the same CASH_IN / CASH_OUT model as totalBalance so that
@@ -146,6 +148,7 @@ app.get('/api/pulse', auth, async (req, res) => {
       if (!sourceMap[src]) sourceMap[src] = { id: src, name: src, balance: 0, type: t.scope || 'personal' };
       if      (CASH_IN.includes(t.type))  sourceMap[src].balance += Number(t.amount_original);
       else if (CASH_OUT.includes(t.type)) sourceMap[src].balance -= Number(t.amount_original);
+      else if (t.type === 'correction')   sourceMap[src].balance += Number(t.amount_original); // signed delta
       // transfer / unknown → neutral: no effect on account balance (Phase 1)
     });
     // Wallet-aware accounts:
@@ -165,6 +168,7 @@ app.get('/api/pulse', auth, async (req, res) => {
         const balance = related.reduce((sum, t) => {
           if (CASH_IN.includes(t.type))  return sum + Number(t.amount_original || 0);
           if (CASH_OUT.includes(t.type)) return sum - Number(t.amount_original || 0);
+          if (t.type === 'correction')   return sum + Number(t.amount_original || 0); // signed delta
           return sum;
         }, 0);
         return { id: w.id, name: w.name, balance, currency: w.currency || 'IDR', type: w.type || 'bank', entity_name: w.entity_name || null };
@@ -626,6 +630,7 @@ app.get('/api/wallets', auth, async (req, res) => {
       const balance = related.reduce((sum, t) => {
         if (WALLET_CASH_IN.includes(t.type))  return sum + Number(t.amount_idr || 0);
         if (WALLET_CASH_OUT.includes(t.type)) return sum - Number(t.amount_idr || 0);
+        if (t.type === 'correction')           return sum + Number(t.amount_idr || 0); // signed delta
         return sum;
       }, 0);
       return { ...w, balance };
@@ -1035,6 +1040,107 @@ app.get('/api/admin/users/:id', auth, requireAdmin, async (req, res) => {
       },
       monthly_activity,
       recent_activity,
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// GET /api/admin/status  — any authenticated user can call; returns is_admin boolean
+// Used by frontend to conditionally show admin-only UI elements.
+app.get('/api/admin/status', auth, (req, res) => {
+  res.json({ is_admin: isAdminUser(req.user.userId) });
+});
+
+// POST /api/admin/wallets/:id/adjust-balance
+// Super-admin only. Creates a signed correction transaction to bring the wallet
+// balance to target_balance.  NEVER modifies wallet.balance directly.
+// correction type: affects wallet balance + total cash, excluded from income/expense KPIs.
+app.post('/api/admin/wallets/:id/adjust-balance', auth, requireAdmin, async (req, res) => {
+  try {
+    const adminUserId = req.user.userId;
+    const walletId    = req.params.id;
+    const { target_balance, reason, transaction_date } = req.body;
+
+    if (target_balance === undefined || target_balance === null) {
+      return res.status(400).json({ error: 'target_balance is required' });
+    }
+    const targetNum = Number(target_balance);
+    if (isNaN(targetNum)) {
+      return res.status(400).json({ error: 'target_balance must be a number' });
+    }
+    if (!reason || !String(reason).trim()) {
+      return res.status(400).json({ error: 'reason is required' });
+    }
+
+    // Load wallet (no user_id filter — admin can adjust any wallet)
+    const { data: wallet, error: wErr } = await supabase
+      .from('wallets')
+      .select('id, user_id, name, currency')
+      .eq('id', walletId)
+      .single();
+    if (wErr || !wallet) return res.status(404).json({ error: 'Wallet not found' });
+
+    // Compute current balance using same logic as GET /api/wallets
+    const { data: txs, error: tErr } = await supabase
+      .from('transactions')
+      .select('wallet_id, source, type, amount_idr')
+      .eq('user_id', wallet.user_id);
+    if (tErr) throw tErr;
+
+    const related = (txs || []).filter(t =>
+      t.wallet_id === wallet.id || (!t.wallet_id && t.source === wallet.name)
+    );
+    const currentBalance = related.reduce((sum, t) => {
+      if (WALLET_CASH_IN.includes(t.type))  return sum + Number(t.amount_idr || 0);
+      if (WALLET_CASH_OUT.includes(t.type)) return sum - Number(t.amount_idr || 0);
+      if (t.type === 'correction')           return sum + Number(t.amount_idr || 0);
+      return sum;
+    }, 0);
+
+    const delta = targetNum - currentBalance;
+
+    if (delta === 0) {
+      return res.json({
+        ok: true,
+        message: 'Balance is already at target — no correction needed.',
+        current_balance: currentBalance,
+        delta: 0,
+      });
+    }
+
+    // Create correction transaction (signed delta stored in amount fields)
+    const txDate = transaction_date
+      ? new Date(transaction_date).toISOString()
+      : new Date().toISOString();
+
+    const corrRow = {
+      user_id:           wallet.user_id,
+      type:              'correction',
+      amount_original:   delta,                              // signed: + increase, − decrease
+      currency_original: wallet.currency || 'IDR',
+      amount_idr:        delta,                              // signed
+      description:       `Balance correction: ${String(reason).trim()} [admin:${adminUserId}]`,
+      source:            wallet.name,
+      wallet_id:         wallet.id,
+      scope:             'business',
+      category:          'Balance Correction',
+      created_at:        txDate,
+    };
+
+    const { data: corrTx, error: cErr } = await supabase
+      .from('transactions')
+      .insert(corrRow)
+      .select('id')
+      .single();
+    if (cErr) throw cErr;
+
+    res.json({
+      ok:               true,
+      previous_balance: currentBalance,
+      delta,
+      new_balance:      targetNum,
+      transaction_id:   corrTx.id,
     });
   } catch (e) {
     res.status(500).json({ error: e.message });
