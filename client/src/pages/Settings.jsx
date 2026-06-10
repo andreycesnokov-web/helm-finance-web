@@ -177,6 +177,16 @@ export default function Settings() {
         </a>
       </div>
 
+      {/* Repeat setup wizard */}
+      <div style={{ margin: '0 16px 10px' }}>
+        <button
+          onClick={() => { localStorage.removeItem('cfo_onboarded'); navigate('/onboarding') }}
+          style={{ width: '100%', padding: 12, borderRadius: 12, background: 'none', color: 'var(--brand)', border: '0.5px solid var(--border-2)', fontSize: 13, fontWeight: 500, cursor: 'pointer' }}
+        >
+          ✦ Repeat setup wizard
+        </button>
+      </div>
+
       <div style={{ margin: '0 16px 16px' }}>
         <button onClick={() => setShowLogout(true)} style={{ width: '100%', padding: 13, borderRadius: 12, background: 'none', color: 'var(--red)', border: '0.5px solid var(--red)', fontSize: 14, fontWeight: 500, cursor: 'pointer' }}>{t('settings.signOut')}</button>
       </div>

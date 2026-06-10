@@ -17,6 +17,7 @@ import Tasks from './pages/Tasks'
 import Approvals from './pages/Approvals'
 import Admin from './pages/Admin'
 import AdminUser from './pages/AdminUser'
+import Onboarding from './pages/Onboarding'
 
 // ── Mobile bottom nav — only existing pages ───────────────────────────────────
 const NAV = [
@@ -297,11 +298,45 @@ function Layout({ children, rightPanel }) {
 }
 
 function PulseWrapper() {
-  const [pulseData, setPulseData] = useState(null)
+  const [pulseData, setPulseData]       = useState(null)
+  const [showOnboarding, setOnboarding] = useState(false)
+
+  // After pulse loads, decide whether to show onboarding
+  const handleDataLoad = (d) => {
+    setPulseData(d)
+    // Show onboarding if:
+    //   1. Not previously completed (no localStorage flag)
+    //   2. User has no accounts AND no transactions yet (truly new)
+    const alreadyOnboarded = localStorage.getItem('cfo_onboarded')
+    if (!alreadyOnboarded) {
+      const hasAccounts     = (d.accounts     || []).length > 0
+      const hasTxs          = (d.totalBalance != null && d.totalBalance !== 0) ||
+                              (d.income  > 0) || (d.expenses > 0)
+      const hasDebts        = (d.debts || []).filter(x => !x.is_settled).length > 0
+      const isNewUser       = !hasAccounts && !hasTxs && !hasDebts
+      if (isNewUser) setOnboarding(true)
+    }
+  }
+
+  if (showOnboarding) {
+    return <Onboarding onComplete={() => setOnboarding(false)} />
+  }
+
   return (
     <Layout rightPanel={<RightPanel data={pulseData} />}>
-      <Pulse onDataLoad={setPulseData} />
+      <Pulse onDataLoad={handleDataLoad} />
     </Layout>
+  )
+}
+
+// Standalone onboarding route — clears flag and shows wizard, then redirects home
+function OnboardingRoute() {
+  const { user, loading } = useAuth()
+  const navigate = useNavigate()
+  if (loading) return null
+  if (!user)   return <Navigate to="/login" replace />
+  return (
+    <Onboarding onComplete={() => navigate('/', { replace: true })} />
   )
 }
 
@@ -324,6 +359,8 @@ export default function App() {
           <Route path="/payroll"      element={<Layout><Payroll /></Layout>} />
           <Route path="/tasks"        element={<Layout><Tasks /></Layout>} />
           <Route path="/approvals"    element={<Layout><Approvals /></Layout>} />
+          {/* Standalone onboarding — accessible directly to re-run setup */}
+          <Route path="/onboarding" element={<OnboardingRoute />} />
           {/* Hidden admin routes — not in sidebar, protected by ADMIN_TELEGRAM_IDS on backend */}
           <Route path="/admin"           element={<Layout><Admin /></Layout>} />
           <Route path="/admin/users/:id" element={<Layout><AdminUser /></Layout>} />
