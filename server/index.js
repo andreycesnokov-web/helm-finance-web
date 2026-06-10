@@ -111,8 +111,13 @@ app.get('/api/pulse', auth, async (req, res) => {
       .order('due_date', { ascending: true });
 
     // -- Balance from transactions ------------------------------------------
-    const allIncome = (allTxs || []).filter(t => t.type === 'income').reduce((s, t) => s + Number(t.amount_original), 0);
-    const allExpenses = (allTxs || []).filter(t => t.type === 'expense').reduce((s, t) => s + Number(t.amount_original), 0);
+    // OUTGOING_TYPES: types that reduce cash.
+    //   'payroll' is a real cash outflow — must be included or balance is inflated.
+    //   'transfer' is excluded: transfers between own accounts are cash-neutral
+    //   for net worth; each transfer leg is already reflected in account balances.
+    const OUTGOING_TYPES = ['expense', 'payroll'];
+    const allIncome   = (allTxs || []).filter(t => t.type === 'income').reduce((s, t) => s + Number(t.amount_original), 0);
+    const allExpenses = (allTxs || []).filter(t => OUTGOING_TYPES.includes(t.type)).reduce((s, t) => s + Number(t.amount_original), 0);
     const totalBalance = allIncome - allExpenses;
 
     // Virtual accounts from transaction sources
@@ -134,8 +139,10 @@ app.get('/api/pulse', auth, async (req, res) => {
       .slice(0, 10);
 
     // -- This month metrics -------------------------------------------------
-    const income = (txs || []).filter(t => t.type === 'income').reduce((s, t) => s + Number(t.amount_original), 0);
-    const expenses = (txs || []).filter(t => t.type === 'expense').reduce((s, t) => s + Number(t.amount_original), 0);
+    // expenses (for display) includes payroll — it is a real operational cost.
+    // burnRate must include payroll so runway reflects actual cash consumption.
+    const income   = (txs || []).filter(t => t.type === 'income').reduce((s, t) => s + Number(t.amount_original), 0);
+    const expenses = (txs || []).filter(t => OUTGOING_TYPES.includes(t.type)).reduce((s, t) => s + Number(t.amount_original), 0);
     const daysInMonth = now.getDate();
     const burnRate = daysInMonth > 0 ? Math.round(expenses / daysInMonth) : 0;
     const runway = burnRate > 0 ? Math.round(totalBalance / burnRate) : 999;
