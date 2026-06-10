@@ -16,6 +16,7 @@ import Payroll from './pages/Payroll'
 import Tasks from './pages/Tasks'
 import Approvals from './pages/Approvals'
 import Admin from './pages/Admin'
+import AdminUser from './pages/AdminUser'
 
 // ── Mobile bottom nav — only existing pages ───────────────────────────────────
 const NAV = [
@@ -323,8 +324,9 @@ export default function App() {
           <Route path="/payroll"      element={<Layout><Payroll /></Layout>} />
           <Route path="/tasks"        element={<Layout><Tasks /></Layout>} />
           <Route path="/approvals"    element={<Layout><Approvals /></Layout>} />
-          {/* Hidden admin route — not in sidebar, protected by ADMIN_TELEGRAM_IDS on backend */}
-          <Route path="/admin" element={<Layout><Admin /></Layout>} />
+          {/* Hidden admin routes — not in sidebar, protected by ADMIN_TELEGRAM_IDS on backend */}
+          <Route path="/admin"           element={<Layout><Admin /></Layout>} />
+          <Route path="/admin/users/:id" element={<Layout><AdminUser /></Layout>} />
         </Routes>
       </AuthProvider>
     </BrowserRouter>

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { apiFetch } from '../lib/api'
 
@@ -64,6 +65,7 @@ function AdminCard({ label, value, sub, accent }) {
 // ── Main Component ────────────────────────────────────────────────────────────
 export default function Admin() {
   const { token } = useAuth()
+  const navigate = useNavigate()
   const [data, setData]       = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError]     = useState(null)
@@ -321,7 +323,7 @@ export default function Admin() {
                 </div>
 
                 {/* Stats row */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 10 }}>
                   {[
                     { label: 'Joined',    value: fmtDate(u.created_at) },
                     { label: 'Txs',       value: u.transaction_count },
@@ -334,6 +336,21 @@ export default function Admin() {
                     </div>
                   ))}
                 </div>
+
+                {/* View details link */}
+                <button
+                  onClick={() => navigate(`/admin/users/${u.id}`)}
+                  style={{
+                    width: '100%', padding: '9px', borderRadius: 10, fontSize: 13, fontWeight: 600,
+                    border: '1px solid var(--border-2)', background: 'none', color: 'var(--brand)',
+                    cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center',
+                    justifyContent: 'center', gap: 6, transition: 'background 0.1s',
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-3)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'none'}
+                >
+                  View activity →
+                </button>
               </div>
             )
           })}

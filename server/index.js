@@ -547,6 +547,96 @@ app.get('/api/admin/users', auth, requireAdmin, async (req, res) => {
   }
 });
 
+// GET /api/admin/users/:id  — single user detail for admin
+app.get('/api/admin/users/:id', auth, requireAdmin, async (req, res) => {
+  try {
+    const targetId = req.params.id;
+
+    const [
+      { data: user,         error: uErr  },
+      { data: transactions, error: tErr  },
+      { data: debts,        error: dErr  },
+      { data: reminders,    error: rErr  },
+    ] = await Promise.all([
+      supabase.from('users').select('*').eq('id', targetId).single(),
+      supabase.from('transactions').select('created_at, description, type').eq('user_id', targetId).order('created_at', { ascending: false }),
+      supabase.from('debts').select('created_at, counterparty, type, due_date').eq('user_id', targetId).order('created_at', { ascending: false }),
+      supabase.from('reminders').select('created_at, title, due_date').eq('user_id', targetId).order('created_at', { ascending: false }),
+    ]);
+
+    if (uErr || !user) return res.status(404).json({ error: 'User not found' });
+
+    const txs  = transactions || [];
+    const dbs  = debts        || [];
+    const rms  = reminders    || [];
+
+    // --- Summary ---
+    const allDates = [
+      ...txs.map(x => x.created_at),
+      ...dbs.map(x => x.created_at),
+      ...rms.map(x => x.created_at),
+    ].filter(Boolean).sort();
+
+    const first_activity_at  = allDates[0]  || null;
+    const last_activity_at   = allDates[allDates.length - 1] || null;
+
+    // Count distinct calendar days with any activity
+    const activeDaySet = new Set(allDates.map(d => d.slice(0, 10)));
+    const active_days_count = activeDaySet.size;
+
+    // --- Monthly activity ---
+    const monthMap = {};
+    const bucket = (date, field) => {
+      if (!date) return;
+      const m = date.slice(0, 7); // "2026-06"
+      if (!monthMap[m]) monthMap[m] = { month: m, transactions: 0, debts: 0, reminders: 0 };
+      monthMap[m][field]++;
+    };
+    txs.forEach(t => bucket(t.created_at, 'transactions'));
+    dbs.forEach(d => bucket(d.created_at, 'debts'));
+    rms.forEach(r => bucket(r.created_at, 'reminders'));
+
+    const monthly_activity = Object.values(monthMap)
+      .sort((a, b) => a.month > b.month ? 1 : -1);
+
+    // --- Recent activity (last 10, NO amounts) ---
+    const events = [
+      ...txs.map(t => ({ type: 'transaction', title: t.description || `${t.type} transaction`, date: t.created_at, meta: t.type })),
+      ...dbs.map(d => ({ type: 'debt',        title: d.counterparty || 'Debt',                  date: d.created_at, meta: d.type })),
+      ...rms.map(r => ({ type: 'reminder',    title: r.title || 'Reminder',                     date: r.created_at, meta: r.due_date ? `due ${r.due_date.slice(0,10)}` : null })),
+    ];
+    const recent_activity = events
+      .sort((a, b) => (b.date || '') > (a.date || '') ? 1 : -1)
+      .slice(0, 10);
+
+    res.json({
+      user: {
+        id:                   user.id,
+        username:             user.username   || null,
+        first_name:           user.first_name || null,
+        last_name:            user.last_name  || null,
+        photo_url:            user.photo_url  || null,
+        language:             user.language   || null,
+        timezone:             user.timezone   || null,
+        created_at:           user.created_at || null,
+        is_telegram_connected: true,
+      },
+      summary: {
+        transaction_count: txs.length,
+        debt_count:        dbs.length,
+        reminder_count:    rms.length,
+        first_activity_at,
+        last_activity_at,
+        active_days_count,
+      },
+      monthly_activity,
+      recent_activity,
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // --- Profile ---------------------------------------------------------------
 
 app.get('/api/profile', auth, async (req, res) => {
