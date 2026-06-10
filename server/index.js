@@ -219,18 +219,27 @@ app.patch('/api/debts/:id/settle', auth, async (req, res) => {
 // --- Transactions API ------------------------------------------------------
 
 app.get('/api/transactions', auth, async (req, res) => {
-  const { scope, period = 'month' } = req.query;
+  const { scope, period = 'month', type } = req.query;
   const now = new Date();
-  let from;
-  if (period === 'today') from = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  else if (period === 'week') { from = new Date(now); from.setDate(now.getDate() - 7); }
-  else from = new Date(now.getFullYear(), now.getMonth(), 1);
 
   let query = supabase.from('transactions').select('*')
     .eq('user_id', req.user.userId)
-    .gte('created_at', from.toISOString())
     .order('created_at', { ascending: false });
+
+  // Period filter — 'all' skips date filter entirely (used by Payroll page)
+  if (period !== 'all') {
+    let from;
+    if (period === 'today') from = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    else if (period === 'week') { from = new Date(now); from.setDate(now.getDate() - 7); }
+    else from = new Date(now.getFullYear(), now.getMonth(), 1); // default: this month
+    query = query.gte('created_at', from.toISOString());
+  }
+
+  // Scope filter
   if (scope && scope !== 'all') query = query.eq('scope', scope);
+
+  // Type filter — allows Payroll page to fetch only payroll transactions
+  if (type && type !== 'all') query = query.eq('type', type);
 
   const { data, error } = await query;
   if (error) return res.status(500).json({ error: error.message });
@@ -296,12 +305,16 @@ app.post('/api/parse', auth, async (req, res) => {
         content: `Ты финансовый ассистент. Найди ВСЕ транзакции в тексте.
 
 Верни ТОЛЬКО JSON массив без markdown, без пояснений:
-[{"type":"expense или income","amount":число,"currency":"IDR по умолчанию","description":"краткое описание","source":"счёт или null","scope":"personal или business","project":"проект или null","category":"категория или null"}]
+[{"type":"expense или income или payroll или transfer","amount":число,"currency":"IDR по умолчанию","description":"краткое описание","source":"счёт или null","scope":"personal или business","project":"проект или null","category":"категория или null"}]
 
 Правила:
 - Суммы всегда положительные. Тип определяет знак.
+- type="payroll" если это зарплата, salary, gaji, bonus сотруднику, commission, payroll — даже если написано как expense. Используй payroll, не expense.
+- type="transfer" если деньги переводятся между своими счётами.
+- type="income" если деньги поступают извне.
+- type="expense" для обычных расходов (еда, транспорт, сервисы, аренда и т.д.).
 - source: название счёта/кошелька если упомянуто, иначе null.
-- scope: "personal" если не ясно.
+- scope: "business" если упомянут сотрудник, компания, бизнес-расход. "personal" если не ясно.
 - Валюта: IDR если не указана.
 
 Текст: "${text}"`

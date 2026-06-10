@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { apiFetch, fmt } from '../lib/api'
@@ -8,17 +8,56 @@ function fmtDate(str) {
   return new Date(str).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
+/**
+ * isPayrollTx — strict guard, returns true only for genuine payroll transactions.
+ *
+ * A transaction is payroll if:
+ *   tx.type === 'payroll'
+ *   OR tx.category is a payroll category
+ *   OR tx.description matches explicit payroll keywords
+ *
+ * NOT payroll:
+ *   Opening balance, Balance adjustment, server payment, food, transport,
+ *   ordinary income, ordinary expense, transfers, corrections, etc.
+ */
+function isPayrollTx(tx) {
+  // Primary: explicit type field (set when created via /add with type:payroll)
+  if (tx.type === 'payroll') return true
+
+  const cat  = (tx.category    || '').toLowerCase().trim()
+  const desc = (tx.description || '').toLowerCase().trim()
+
+  // Category-based
+  if (['payroll', 'salary', 'gaji', 'bonus', 'commission'].includes(cat)) return true
+
+  // Description-based — only explicit payroll keywords
+  const KEYWORDS = ['payroll', 'salary', 'gaji', 'bonus', 'commission', 'thr', 'employee payment', 'employee salary', 'staff salary', 'worker salary']
+  if (KEYWORDS.some(kw => desc.includes(kw))) return true
+
+  // "Payment: <name>" pattern is created by the debt payment flow — NOT payroll
+  // Explicitly exclude common non-payroll patterns
+  const EXCLUDE = ['opening balance', 'balance adjustment', 'adjustment', 'correction', 'server', 'food', 'transport', 'ticket', 'coffee', 'kopi']
+  if (EXCLUDE.some(kw => desc.includes(kw))) return false
+
+  return false
+}
+
 export default function Payroll() {
-  const { token } = useAuth()
-  const navigate  = useNavigate()
+  const { token }  = useAuth()
+  const navigate   = useNavigate()
   const [txs, setTxs]         = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError]     = useState('')
 
   useEffect(() => {
-    // Use existing transactions endpoint — filter payroll type
-    apiFetch('/transactions?type=payroll', token)
-      .then(data => setTxs(Array.isArray(data) ? data : []))
+    // Request type=payroll (now filtered by backend) + period=all (full history)
+    // Client-side isPayrollTx() acts as a defense-in-depth guard
+    apiFetch('/transactions?type=payroll&period=all', token)
+      .then(data => {
+        const all = Array.isArray(data) ? data : []
+        // Defense-in-depth: even if backend returns extras, filter strictly
+        setTxs(all.filter(isPayrollTx))
+      })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false))
   }, [token])
@@ -32,7 +71,7 @@ export default function Payroll() {
   })
 
   const totalPaidThisMonth = thisMonth.reduce((s, t) => s + Number(t.amount_original || t.amount_idr || 0), 0)
-  const totalAll           = txs.reduce((s, t) => s + Number(t.amount_original || t.amount_idr || 0), 0)
+  const totalAll           = txs.reduce((s, t)      => s + Number(t.amount_original || t.amount_idr || 0), 0)
 
   return (
     <div className="hf-page">
@@ -41,77 +80,102 @@ export default function Payroll() {
       <div className="hf-page-header">
         <div>
           <div className="hf-page-title">Payroll</div>
-          <div className="hf-page-subtitle">Salary obligations and payment tracking</div>
+          <div className="hf-page-subtitle">Salary payments and payroll history</div>
         </div>
         <div className="hf-page-actions">
+          {/* Routes to /add with payroll context — AI parser creates type:payroll if user describes salary */}
           <button className="btn btn-primary btn-md" onClick={() => navigate('/add')}>+ Add Payroll</button>
         </div>
       </div>
 
-      {error && <div className="page-error">{error}</div>}
+      {error && <div className="page-error" style={{ marginBottom: 16 }}>{error}</div>}
 
-      {/* ── Summary ─── */}
-      <div className="summary-grid" style={{ marginBottom: 20 }}>
-        <div className="summary-card">
-          <div className="summary-card-label">Paid This Month</div>
-          <div className="summary-card-value" style={{ color: 'var(--text)' }}>{fmt(totalPaidThisMonth)}</div>
-          <div className="summary-card-sub">IDR · {thisMonth.length} payment{thisMonth.length !== 1 ? 's' : ''}</div>
-        </div>
-        <div className="summary-card">
-          <div className="summary-card-label">Total Records</div>
-          <div className="summary-card-value" style={{ color: 'var(--text)' }}>{txs.length}</div>
-          <div className="summary-card-sub">All payroll transactions</div>
-        </div>
-        <div className="summary-card">
-          <div className="summary-card-label">Due Today</div>
-          <div className="summary-card-value" style={{ color: 'var(--text-3)' }}>—</div>
-          <div className="summary-card-sub">Scheduled payroll</div>
-        </div>
-        <div className="summary-card">
-          <div className="summary-card-label">Total Paid</div>
-          <div className="summary-card-value" style={{ color: 'var(--red-dark)' }}>{fmt(totalAll)}</div>
-          <div className="summary-card-sub">IDR all time</div>
-        </div>
-      </div>
-
-      {/* ── List or empty state ─── */}
-      {txs.length === 0 ? (
+      {/* ── Empty state — honest, no fake data ─── */}
+      {!loading && txs.length === 0 && (
         <div className="empty-state">
           <div className="empty-state-icon">💼</div>
           <div className="empty-state-title">No payroll records yet</div>
-          <div className="empty-state-sub">Add payroll transactions to track salary obligations and payment history. Use the "Payroll" type when adding a transaction.</div>
+          <div className="empty-state-sub">
+            Payroll records appear here when you log a salary or payroll payment.<br /><br />
+            To add a payroll transaction, go to <strong>Add</strong> and describe it as a salary or payroll payment — the AI parser will classify it as payroll automatically.<br /><br />
+            <span style={{ color: 'var(--text-4)', fontStyle: 'italic', fontSize: 'var(--text-xs)' }}>
+              Example: "paid salary to employee 5 million" or "gaji karyawan 5 juta"
+            </span>
+          </div>
           <button className="empty-state-cta" onClick={() => navigate('/add')}>Add Payroll Transaction</button>
-        </div>
-      ) : (
-        <div style={{ marginBottom: 24 }}>
-          <div className="section-title">Payroll History · {txs.length}</div>
-          <div className="item-list-card">
-            {txs.map((t, i, arr) => {
-              const amount = Number(t.amount_original || t.amount_idr || 0)
-              const cur = t.currency_original && t.currency_original !== 'IDR' ? t.currency_original : 'IDR'
-              return (
-                <div key={t.id} className="item-row">
-                  <div style={{ width: 32, height: 32, borderRadius: 8, background: 'var(--bg-3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, flexShrink: 0 }}>
-                    💼
-                  </div>
-                  <div className="item-row-left">
-                    <div className="item-row-name">{t.description || t.category || 'Payroll'}</div>
-                    <div className="item-row-sub">{fmtDate(t.created_at)}{t.source ? ` · ${t.source}` : ''}</div>
-                  </div>
-                  <div className="item-row-right">
-                    <div className="item-row-amount" style={{ color: 'var(--red-dark)' }}>−{fmt(amount)} {cur}</div>
-                    <div className="item-row-status">Payroll</div>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-          <div style={{ textAlign: 'center' }}>
-            <button className="link-btn" onClick={() => navigate('/transactions')}>View all transactions →</button>
-          </div>
         </div>
       )}
 
+      {/* ── Summary — only shown when payroll data exists ─── */}
+      {txs.length > 0 && (
+        <>
+          <div className="summary-grid" style={{ marginBottom: 20 }}>
+            <div className="summary-card">
+              <div className="summary-card-label">Paid This Month</div>
+              <div className="summary-card-value" style={{ color: 'var(--text)' }}>{fmt(totalPaidThisMonth)}</div>
+              <div className="summary-card-sub">IDR · {thisMonth.length} payment{thisMonth.length !== 1 ? 's' : ''}</div>
+            </div>
+            <div className="summary-card">
+              <div className="summary-card-label">Total Records</div>
+              <div className="summary-card-value" style={{ color: 'var(--text)' }}>{txs.length}</div>
+              <div className="summary-card-sub">All payroll transactions</div>
+            </div>
+            <div className="summary-card">
+              <div className="summary-card-label">Due Today</div>
+              <div className="summary-card-value" style={{ color: 'var(--text-3)' }}>—</div>
+              <div className="summary-card-sub">Scheduled payroll</div>
+            </div>
+            <div className="summary-card">
+              <div className="summary-card-label">Total Paid</div>
+              <div className="summary-card-value" style={{ color: 'var(--red-dark)' }}>{fmt(totalAll)}</div>
+              <div className="summary-card-sub">IDR all time</div>
+            </div>
+          </div>
+
+          {/* ── Payroll history ─── */}
+          <div style={{ marginBottom: 24 }}>
+            <div className="section-title">Payroll History · {txs.length}</div>
+            <div className="item-list-card">
+              {txs.map(t => {
+                const amount = Number(t.amount_original || t.amount_idr || 0)
+                const cur    = t.currency_original && t.currency_original !== 'IDR' ? t.currency_original : 'IDR'
+                return (
+                  <div key={t.id} className="item-row">
+                    <div style={{ width: 36, height: 36, borderRadius: 10, background: 'var(--amber-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, flexShrink: 0 }}>
+                      💼
+                    </div>
+                    <div className="item-row-left">
+                      <div className="item-row-name">{t.description || t.category || 'Payroll'}</div>
+                      <div className="item-row-sub">
+                        {fmtDate(t.created_at)}
+                        {t.source ? ` · ${t.source}` : ''}
+                        {t.category && t.category !== t.description ? ` · ${t.category}` : ''}
+                      </div>
+                    </div>
+                    <div className="item-row-right">
+                      <div className="item-row-amount" style={{ color: 'var(--red-dark)' }}>−{fmt(amount)} {cur}</div>
+                      <span className="status-pill open">Payroll</span>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+
+            <div style={{ textAlign: 'center', marginTop: 12 }}>
+              <button className="link-btn" onClick={() => navigate('/transactions')}>View all transactions →</button>
+            </div>
+          </div>
+
+          {/* ── AI parser hint ─── */}
+          <div className="hf-card" style={{ background: 'var(--bg-2)', border: '1px solid var(--border)' }}>
+            <div style={{ fontSize: 11, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 800, marginBottom: 8 }}>How to add payroll</div>
+            <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-2)', lineHeight: 1.6 }}>
+              Use <strong>Add</strong> and describe the payment as a salary or payroll transaction. The AI parser will classify it correctly.<br />
+              <span style={{ color: 'var(--text-3)', fontStyle: 'italic' }}>Example: "paid salary to Ahmad 5 million" or "gaji karyawan 5 juta"</span>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   )
 }
