@@ -353,20 +353,178 @@ app.post('/api/transactions/batch', auth, async (req, res) => {
   try {
     const { transactions } = req.body;
     const rows = transactions.map(t => ({
-      user_id:           req.user.userId,
-      type:              t.type,
-      amount_original:   t.amount,
-      currency_original: t.currency || 'IDR',
-      amount_idr:        t.currency === 'IDR' ? t.amount : (t.amount_idr || t.amount),
-      description:       t.description,
-      source:            t.source   || null,
-      scope:             t.scope    || 'personal',
-      project:           t.project  || null,
-      category:          t.category || null,
+      user_id:                req.user.userId,
+      type:                   t.type,
+      amount_original:        t.amount,
+      currency_original:      t.currency || 'IDR',
+      amount_idr:             t.currency === 'IDR' ? t.amount : (t.amount_idr || t.amount),
+      description:            t.description,
+      source:                 t.source                || null,
+      scope:                  t.scope                 || 'personal',
+      project:                t.project               || null,
+      category:               t.category              || null,
+      // Reference data (Phase 1 — all nullable, backward compatible)
+      cashflow_category_id:   t.cashflow_category_id  || null,
+      counterparty_id:        t.counterparty_id        || null,
+      counterparty_name:      t.counterparty_name      || null,
+      business_direction_id:  t.business_direction_id  || null,
+      activity_type_id:       t.activity_type_id       || null,
     }));
     const { error } = await supabase.from('transactions').insert(rows);
     if (error) throw error;
     res.json({ saved: rows.length });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// --- Reference Data API ---------------------------------------------------
+// Phase 1: user_id-scoped reference tables.
+// Future: migrate to business_id-scoped model.
+
+// GET /api/cashflow-categories — system + user custom categories
+app.get('/api/cashflow-categories', auth, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { data, error } = await supabase
+      .from('cashflow_categories')
+      .select('*')
+      .eq('is_active', true)
+      .or(`is_system.eq.true,user_id.eq.${userId}`)
+      .order('sort_order', { ascending: true })
+      .order('name', { ascending: true });
+    if (error) throw error;
+    res.json({ categories: data || [] });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// POST /api/cashflow-categories — create user custom category
+app.post('/api/cashflow-categories', auth, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { name, group_type, activity_type, sub_category, description } = req.body;
+    if (!name || !group_type) return res.status(400).json({ error: 'name and group_type required' });
+    const { data, error } = await supabase
+      .from('cashflow_categories')
+      .insert({ user_id: userId, name, group_type, activity_type: activity_type || null, sub_category: sub_category || null, description: description || null, is_system: false })
+      .select()
+      .single();
+    if (error) throw error;
+    res.json({ category: data });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// PATCH /api/cashflow-categories/:id — update user's own custom category
+app.patch('/api/cashflow-categories/:id', auth, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { name, group_type, activity_type, sub_category, description, is_active } = req.body;
+    const { data, error } = await supabase
+      .from('cashflow_categories')
+      .update({ name, group_type, activity_type, sub_category, description, is_active, updated_at: new Date().toISOString() })
+      .eq('id', req.params.id)
+      .eq('user_id', userId)   // can only edit own categories, not system ones
+      .eq('is_system', false)
+      .select()
+      .single();
+    if (error) throw error;
+    if (!data) return res.status(404).json({ error: 'Category not found or not editable' });
+    res.json({ category: data });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// GET /api/counterparties — user's counterparties, optional ?q=search
+app.get('/api/counterparties', auth, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    let query = supabase
+      .from('counterparties')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('is_active', true)
+      .order('name', { ascending: true });
+    if (req.query.q) query = query.ilike('name', `%${req.query.q}%`);
+    const { data, error } = await query;
+    if (error) throw error;
+    res.json({ counterparties: data || [] });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// POST /api/counterparties — create counterparty
+app.post('/api/counterparties', auth, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { name, group_name, type, email, phone, notes } = req.body;
+    if (!name) return res.status(400).json({ error: 'name required' });
+    const { data, error } = await supabase
+      .from('counterparties')
+      .insert({ user_id: userId, name, group_name: group_name || null, type: type || null, email: email || null, phone: phone || null, notes: notes || null })
+      .select()
+      .single();
+    if (error) throw error;
+    res.json({ counterparty: data });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// PATCH /api/counterparties/:id
+app.patch('/api/counterparties/:id', auth, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { name, group_name, type, email, phone, notes, is_active } = req.body;
+    const { data, error } = await supabase
+      .from('counterparties')
+      .update({ name, group_name, type, email, phone, notes, is_active, updated_at: new Date().toISOString() })
+      .eq('id', req.params.id)
+      .eq('user_id', userId)
+      .select()
+      .single();
+    if (error) throw error;
+    if (!data) return res.status(404).json({ error: 'Counterparty not found' });
+    res.json({ counterparty: data });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// GET /api/business-directions — system + user directions
+app.get('/api/business-directions', auth, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { data, error } = await supabase
+      .from('business_directions')
+      .select('*')
+      .eq('is_active', true)
+      .or(`is_system.eq.true,user_id.eq.${userId}`)
+      .order('sort_order', { ascending: true });
+    if (error) throw error;
+    res.json({ directions: data || [] });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// GET /api/activity-types — system + user activity types
+app.get('/api/activity-types', auth, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { data, error } = await supabase
+      .from('activity_types')
+      .select('*')
+      .eq('is_active', true)
+      .or(`is_system.eq.true,user_id.eq.${userId}`)
+      .order('sort_order', { ascending: true });
+    if (error) throw error;
+    res.json({ activityTypes: data || [] });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }

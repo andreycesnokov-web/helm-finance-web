@@ -75,7 +75,7 @@ function DetailRow({ label, value, valueStyle }) {
 }
 
 // ── Transaction Details Drawer ────────────────────────────────────────────────
-function TransactionDetailsDrawer({ tx, onClose }) {
+function TransactionDetailsDrawer({ tx, onClose, refDirections = [], refActivityTypes = [] }) {
   // Escape key
   useEffect(() => {
     const handler = (e) => { if (e.key === 'Escape') onClose() }
@@ -177,6 +177,26 @@ function TransactionDetailsDrawer({ tx, onClose }) {
           </div>
         </div>
 
+        {/* ── Reference data (Phase 1) — show if any field is set ── */}
+        {(tx.counterparty_name || tx.counterparty_id || tx.business_direction_id || tx.activity_type_id) && (() => {
+          const dirName = tx.business_direction_id
+            ? (refDirections.find(d => d.id === tx.business_direction_id)?.name || tx.business_direction_id)
+            : null
+          const actName = tx.activity_type_id
+            ? (refActivityTypes.find(a => a.id === tx.activity_type_id)?.name || tx.activity_type_id)
+            : null
+          return (
+            <div className="tx-detail-section">
+              <div className="tx-detail-section-title">Classification</div>
+              <div className="tx-detail-card">
+                {tx.counterparty_name && <DetailRow label="Counterparty" value={tx.counterparty_name} />}
+                {dirName && <DetailRow label="Business Direction" value={dirName} />}
+                {actName && <DetailRow label="Activity Type" value={actName} />}
+              </div>
+            </div>
+          )
+        })()}
+
         {/* ── Account / source ── */}
         <div className="tx-detail-section">
           <div className="tx-detail-section-title">{isTransfer ? 'Transfer Route' : 'Account'}</div>
@@ -233,8 +253,11 @@ export default function Transactions() {
 
   // Drawer state
   const [selectedTx, setSelectedTx] = useState(null)
-
   const closeDrawer = useCallback(() => setSelectedTx(null), [])
+
+  // Reference data for resolving IDs → names in drawer
+  const [refDirections,   setRefDirections]   = useState([])
+  const [refActivityTypes, setRefActivityTypes] = useState([])
 
   // ── Load from API ─────────────────────────────────────────────────────────
   const load = () => {
@@ -251,6 +274,13 @@ export default function Transactions() {
   }
 
   useEffect(() => { load() }, [period, scope]) // eslint-disable-line
+
+  // Load reference data for resolving IDs in drawer (non-blocking)
+  useEffect(() => {
+    if (!token) return
+    apiFetch('/business-directions', token).then(d => setRefDirections(d.directions || [])).catch(() => {})
+    apiFetch('/activity-types', token).then(d => setRefActivityTypes(d.activityTypes || [])).catch(() => {})
+  }, [token])
 
   // ── Client-side filters ───────────────────────────────────────────────────
   const filtered = useMemo(() => {
@@ -499,7 +529,7 @@ export default function Transactions() {
 
       {/* ── Transaction details drawer ─── */}
       {selectedTx && (
-        <TransactionDetailsDrawer tx={selectedTx} onClose={closeDrawer} />
+        <TransactionDetailsDrawer tx={selectedTx} onClose={closeDrawer} refDirections={refDirections} refActivityTypes={refActivityTypes} />
       )}
 
     </div>

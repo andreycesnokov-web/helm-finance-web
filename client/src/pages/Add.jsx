@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { apiFetch, fmt, daysUntil } from '../lib/api'
@@ -12,13 +12,20 @@ const QUICK = [
 
 const TX_TYPES = ['income', 'expense', 'payroll', 'transfer']
 
+// Activity type code → colour
+const ACTIVITY_COLORS = {
+  operating:  { bg: '#E1F5EE', color: '#085041' },
+  investing:  { bg: '#EEF2FF', color: '#3730a3' },
+  financing:  { bg: '#FEF3C7', color: '#92400E' },
+  technical:  { bg: '#F1F5F9', color: '#475569' },
+}
+
 function debtLabel(d) {
   const days = daysUntil(d.due_date)
   const tag  = days < 0 ? `${Math.abs(days)}d overdue` : `due in ${days}d`
   return `${d.counterparty} · ${fmt(d.amount)} IDR · ${tag}`
 }
 
-// Badge config per type
 function typeBadge(type) {
   switch (type) {
     case 'income':   return { label: 'Income',   bg: '#E1F5EE', color: '#085041' }
@@ -29,7 +36,6 @@ function typeBadge(type) {
   }
 }
 
-// Amount display per type
 function amountDisplay(type, amount, currency) {
   const n = fmt(Number(amount) || 0)
   const cur = currency || 'IDR'
@@ -42,13 +48,124 @@ function amountDisplay(type, amount, currency) {
   }
 }
 
+// Group categories by activity_type for <optgroup> rendering
+function groupCategories(categories, transactionType) {
+  // Filter: inflow categories for income, outflow for expense/payroll, all for transfer
+  const filtered = categories.filter(c => {
+    if (transactionType === 'income')   return c.group_type === 'inflow'
+    if (transactionType === 'expense')  return c.group_type === 'outflow'
+    if (transactionType === 'payroll')  return c.group_type === 'outflow'
+    return true // transfer — show all
+  })
+
+  const ORDER = ['operating', 'investing', 'financing', 'technical']
+  const LABELS = {
+    operating: 'Операционная',
+    investing:  'Инвестиционная',
+    financing:  'Финансовая',
+    technical:  'Технические операции',
+  }
+  const groups = {}
+  ORDER.forEach(k => { groups[k] = [] })
+  filtered.forEach(c => {
+    const key = c.activity_type || 'operating'
+    if (!groups[key]) groups[key] = []
+    groups[key].push(c)
+  })
+  return ORDER.filter(k => groups[k].length > 0).map(k => ({
+    label: LABELS[k] || k,
+    code:  k,
+    items: groups[k],
+  }))
+}
+
+// Counterparty autocomplete component
+function CounterpartyInput({ value, onChange, suggestions, onCreateNew, inputSt }) {
+  const [open, setOpen] = useState(false)
+  const [q, setQ]       = useState(value || '')
+  const wrapRef         = useRef(null)
+
+  // Sync controlled value → local input
+  useEffect(() => { setQ(value || '') }, [value])
+
+  // Close on outside click
+  useEffect(() => {
+    const fn = e => { if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false) }
+    document.addEventListener('mousedown', fn)
+    return () => document.removeEventListener('mousedown', fn)
+  }, [])
+
+  const filtered = q.trim()
+    ? suggestions.filter(s => s.name.toLowerCase().includes(q.toLowerCase()))
+    : suggestions.slice(0, 8)
+
+  const handleChange = v => {
+    setQ(v)
+    onChange(v, null) // text value, no id yet
+    setOpen(true)
+  }
+
+  const handleSelect = cp => {
+    setQ(cp.name)
+    onChange(cp.name, cp.id)
+    setOpen(false)
+  }
+
+  const showCreate = q.trim() && !suggestions.find(s => s.name.toLowerCase() === q.toLowerCase())
+
+  return (
+    <div ref={wrapRef} style={{ position: 'relative' }}>
+      <input
+        type="text"
+        value={q}
+        onChange={e => handleChange(e.target.value)}
+        onFocus={() => setOpen(true)}
+        placeholder="e.g. Google, Indosat, Marina Linkova"
+        style={inputSt}
+      />
+      {open && (filtered.length > 0 || showCreate) && (
+        <div style={{
+          position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 200,
+          background: 'var(--bg-2)', border: '1px solid var(--border)',
+          borderRadius: 10, marginTop: 4, boxShadow: '0 4px 16px rgba(0,0,0,.1)',
+          maxHeight: 200, overflowY: 'auto',
+        }}>
+          {filtered.map(cp => (
+            <div key={cp.id} onMouseDown={() => handleSelect(cp)} style={{
+              padding: '9px 12px', cursor: 'pointer', fontSize: 'var(--text-sm)',
+              color: 'var(--text)', borderBottom: '0.5px solid var(--border)',
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            }}>
+              <span>{cp.name}</span>
+              {cp.type && (
+                <span style={{ fontSize: 11, color: 'var(--text-3)', background: 'var(--bg-3)', padding: '2px 8px', borderRadius: 10 }}>
+                  {cp.type}
+                </span>
+              )}
+            </div>
+          ))}
+          {showCreate && (
+            <div onMouseDown={() => { onCreateNew(q); setOpen(false) }} style={{
+              padding: '9px 12px', cursor: 'pointer', fontSize: 'var(--text-sm)',
+              color: 'var(--brand)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6,
+            }}>
+              <span>＋</span>
+              <span>Save "{q}" as new counterparty</span>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function Add() {
   const { token }  = useAuth()
   const navigate   = useNavigate()
   const [text, setText]   = useState('')
   const [loading, setLoading] = useState(false)
-  const [result, setResult]   = useState(null)   // raw parsed transactions
-  const [editedTxs, setEditedTxs] = useState([]) // mutable copies for editing
+  const [result, setResult]   = useState(null)
+  const [editedTxs, setEditedTxs] = useState([])
   const [error, setError]     = useState('')
   const [saved, setSaved]     = useState(false)
   const [saveMsg, setSaveMsg] = useState('')
@@ -59,34 +176,56 @@ export default function Add() {
   const [reminder, setReminder] = useState({ title: '', due_date: '', meta: '' })
   const [saving, setSaving]     = useState(false)
 
-  // Open debts for linking + accounts for source picker
-  const [openDebts, setOpenDebts]   = useState([])
-  const [accounts, setAccounts]     = useState([])
+  // Open debts + accounts
+  const [openDebts, setOpenDebts]     = useState([])
+  const [accounts, setAccounts]       = useState([])
   const [linkedDebts, setLinkedDebts] = useState({})
+
+  // Reference data
+  const [categories,   setCategories]   = useState([])
+  const [counterparties, setCounterparties] = useState([])
+  const [directions,   setDirections]   = useState([])
+  const [activityTypes, setActivityTypes] = useState([])
 
   useEffect(() => {
     if (!token) return
+    // Load pulse data (debts + accounts)
     apiFetch('/pulse', token)
       .then(d => {
-        const debts = (d.debts || []).filter(x => !x.is_settled)
-        setOpenDebts(debts)
-        // accounts come from pulse as virtual source list
-        const accs = (d.accounts || []).map(a => a.name).filter(Boolean)
-        setAccounts(accs)
+        setOpenDebts((d.debts || []).filter(x => !x.is_settled))
+        setAccounts((d.accounts || []).map(a => a.name).filter(Boolean))
       })
       .catch(() => {})
+
+    // Load reference data in parallel — all non-blocking
+    apiFetch('/cashflow-categories', token).then(d => setCategories(d.categories || [])).catch(() => {})
+    apiFetch('/counterparties', token).then(d => setCounterparties(d.counterparties || [])).catch(() => {})
+    apiFetch('/business-directions', token).then(d => setDirections(d.directions || [])).catch(() => {})
+    apiFetch('/activity-types', token).then(d => setActivityTypes(d.activityTypes || [])).catch(() => {})
   }, [token])
 
   const openReceivables = openDebts.filter(d => d.type === 'receivable')
   const openPayables    = openDebts.filter(d => d.type === 'payable')
 
-  // Update a single field of a single edited transaction
   const updateTx = (i, field, value) => {
     setEditedTxs(prev => {
       const next = [...prev]
       next[i] = { ...next[i], [field]: value }
       return next
     })
+  }
+
+  // Quick-create counterparty inline and auto-select it on a card
+  const createCounterparty = async (name, txIndex) => {
+    try {
+      const data = await apiFetch('/counterparties', token, { method: 'POST', body: { name } })
+      const cp = data.counterparty
+      setCounterparties(prev => [...prev, cp])
+      updateTx(txIndex, 'counterparty_name', cp.name)
+      updateTx(txIndex, 'counterparty_id', cp.id)
+    } catch (_) {
+      // Silently keep the text value — not critical
+    }
   }
 
   const parse = async () => {
@@ -102,10 +241,15 @@ export default function Add() {
       const data = await apiFetch('/parse', token, { method: 'POST', body: { text } })
       const txs = data.transactions || []
       setResult(txs)
-      // Deep-copy for editing; apply default category for payroll
       setEditedTxs(txs.map(t => ({
         ...t,
         category: t.category || (t.type === 'payroll' ? 'Payroll' : ''),
+        // Reference fields — blank until user fills them
+        cashflow_category_id:  null,
+        counterparty_id:       null,
+        counterparty_name:     '',
+        business_direction_id: null,
+        activity_type_id:      null,
       })))
     } catch (e) {
       setError(e.message)
@@ -123,12 +267,10 @@ export default function Add() {
 
       editedTxs.forEach((tx, i) => {
         const debtId = linkedDebts[i]
-        // transfer cannot link to debt
         if (debtId && tx.type !== 'transfer') linked.push({ tx, debtId })
         else                                  unlinked.push(tx)
       })
 
-      // Linked: debt pay endpoint (creates tx + settles debt)
       for (const { tx, debtId } of linked) {
         await apiFetch(`/debts/${debtId}/pay`, token, {
           method: 'POST',
@@ -136,7 +278,6 @@ export default function Add() {
         })
       }
 
-      // Unlinked: batch save with all edited fields
       if (unlinked.length > 0) {
         const payload = unlinked.map(tx => ({
           type:        tx.type,
@@ -147,11 +288,16 @@ export default function Add() {
           scope:       tx.scope || 'personal',
           project:     tx.project || null,
           category:    tx.category || null,
+          // Reference fields (Phase 1 — all optional)
+          cashflow_category_id:  tx.cashflow_category_id  || null,
+          counterparty_id:       tx.counterparty_id        || null,
+          counterparty_name:     tx.counterparty_name      || null,
+          business_direction_id: tx.business_direction_id  || null,
+          activity_type_id:      tx.activity_type_id       || null,
         }))
         await apiFetch('/transactions/batch', token, { method: 'POST', body: { transactions: payload } })
       }
 
-      // Build success message
       const msgs = []
       if (linked.length > 0) {
         const closedCount = linked.filter(({ tx, debtId }) => {
@@ -328,15 +474,24 @@ export default function Add() {
               </div>
 
               {editedTxs.map((t, i) => {
-                const badge  = typeBadge(t.type)
+                const badge   = typeBadge(t.type)
                 const amtDisp = amountDisplay(t.type, t.amount, t.currency)
-                const isTransfer = t.type === 'transfer'
+                const isTransfer    = t.type === 'transfer'
                 const sourceMissing = !t.source || !t.source.trim()
-
-                // Debt options: transfer has none
                 const relevantDebts = isTransfer ? []
                   : t.type === 'income' ? openReceivables : openPayables
-                const linkedId = linkedDebts[i] || ''
+                const linkedId      = linkedDebts[i] || ''
+
+                // Category groups filtered to this transaction type
+                const catGroups = groupCategories(categories, t.type)
+
+                // Selected category object (for badge)
+                const selectedCat = t.cashflow_category_id
+                  ? categories.find(c => c.id === t.cashflow_category_id)
+                  : null
+                const actColor = selectedCat
+                  ? ACTIVITY_COLORS[selectedCat.activity_type] || ACTIVITY_COLORS.operating
+                  : null
 
                 return (
                   <div key={i} style={{
@@ -350,7 +505,7 @@ export default function Add() {
                       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                       padding: '14px 16px 12px', borderBottom: '0.5px solid var(--border)',
                     }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                         <span style={{
                           fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 20,
                           background: badge.bg, color: badge.color, letterSpacing: 0.2
@@ -358,11 +513,13 @@ export default function Add() {
                           {badge.label}
                         </span>
                         {sourceMissing && (
-                          <span style={{
-                            fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 20,
-                            background: '#FEF3C7', color: '#92400E',
-                          }}>
+                          <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 20, background: '#FEF3C7', color: '#92400E' }}>
                             ⚠ No source
+                          </span>
+                        )}
+                        {selectedCat && (
+                          <span style={{ fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 20, background: actColor.bg, color: actColor.color }}>
+                            {selectedCat.name}
                           </span>
                         )}
                       </div>
@@ -406,13 +563,8 @@ export default function Add() {
                       <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 10, marginBottom: 12 }}>
                         <div>
                           <label style={labelSt}>Amount</label>
-                          <input
-                            type="number"
-                            min="0"
-                            value={t.amount}
-                            onChange={e => updateTx(i, 'amount', e.target.value)}
-                            style={inputSt}
-                          />
+                          <input type="number" min="0" value={t.amount}
+                            onChange={e => updateTx(i, 'amount', e.target.value)} style={inputSt} />
                         </div>
                         <div>
                           <label style={labelSt}>Currency</label>
@@ -428,13 +580,9 @@ export default function Add() {
                       {/* Row 3: Description */}
                       <div style={{ marginBottom: 12 }}>
                         <label style={labelSt}>Description</label>
-                        <input
-                          type="text"
-                          value={t.description || ''}
+                        <input type="text" value={t.description || ''}
                           onChange={e => updateTx(i, 'description', e.target.value)}
-                          placeholder="What was this for?"
-                          style={inputSt}
-                        />
+                          placeholder="What was this for?" style={inputSt} />
                       </div>
 
                       {/* Row 4: Source / Account */}
@@ -448,32 +596,15 @@ export default function Add() {
                           )}
                         </label>
                         {accounts.length > 0 ? (
-                          <select
-                            value={t.source || ''}
-                            onChange={e => updateTx(i, 'source', e.target.value)}
-                            style={{
-                              ...selectStyle,
-                              borderColor: sourceMissing && !isTransfer ? '#F59E0B' : undefined,
-                              background: sourceMissing && !isTransfer ? '#FFFBEB' : undefined,
-                            }}
-                          >
+                          <select value={t.source || ''} onChange={e => updateTx(i, 'source', e.target.value)}
+                            style={{ ...selectStyle, borderColor: sourceMissing && !isTransfer ? '#F59E0B' : undefined, background: sourceMissing && !isTransfer ? '#FFFBEB' : undefined }}>
                             <option value="">— Select account —</option>
-                            {accounts.map(a => (
-                              <option key={a} value={a}>{a}</option>
-                            ))}
+                            {accounts.map(a => <option key={a} value={a}>{a}</option>)}
                           </select>
                         ) : (
-                          <input
-                            type="text"
-                            value={t.source || ''}
-                            onChange={e => updateTx(i, 'source', e.target.value)}
+                          <input type="text" value={t.source || ''} onChange={e => updateTx(i, 'source', e.target.value)}
                             placeholder="e.g. Permata, Cash, BCA"
-                            style={{
-                              ...inputSt,
-                              borderColor: sourceMissing && !isTransfer ? '#F59E0B' : undefined,
-                              background: sourceMissing && !isTransfer ? '#FFFBEB' : undefined,
-                            }}
-                          />
+                            style={{ ...inputSt, borderColor: sourceMissing && !isTransfer ? '#F59E0B' : undefined, background: sourceMissing && !isTransfer ? '#FFFBEB' : undefined }} />
                         )}
                         {sourceMissing && !isTransfer && (
                           <div style={{ fontSize: 11, color: '#D97706', marginTop: 4 }}>
@@ -482,17 +613,97 @@ export default function Add() {
                         )}
                       </div>
 
-                      {/* Row 5: Category */}
-                      <div>
-                        <label style={labelSt}>Category</label>
-                        <input
-                          type="text"
-                          value={t.category || ''}
-                          onChange={e => updateTx(i, 'category', e.target.value)}
-                          placeholder={t.type === 'payroll' ? 'Payroll' : t.type === 'transfer' ? 'Transfer' : 'e.g. Food, Transport, Revenue…'}
-                          style={inputSt}
+                      {/* Row 5: Cashflow Category (grouped select) */}
+                      <div style={{ marginBottom: 12 }}>
+                        <label style={labelSt}>
+                          Cashflow Category
+                          {categories.length === 0 && (
+                            <span style={{ color: 'var(--text-4)', fontWeight: 400, marginLeft: 6, textTransform: 'none' }}>
+                              (loading…)
+                            </span>
+                          )}
+                        </label>
+                        {categories.length > 0 ? (
+                          <select
+                            value={t.cashflow_category_id || ''}
+                            onChange={e => {
+                              const id = e.target.value || null
+                              const cat = categories.find(c => c.id === id)
+                              updateTx(i, 'cashflow_category_id', id)
+                              // Also sync legacy category text field
+                              if (cat) updateTx(i, 'category', cat.name)
+                            }}
+                            style={selectStyle}
+                          >
+                            <option value="">— Select category —</option>
+                            {catGroups.map(g => (
+                              <optgroup key={g.code} label={g.label}>
+                                {g.items.map(c => (
+                                  <option key={c.id} value={c.id}>{c.name}</option>
+                                ))}
+                              </optgroup>
+                            ))}
+                          </select>
+                        ) : (
+                          // Fallback: plain text if categories not loaded
+                          <input type="text" value={t.category || ''}
+                            onChange={e => updateTx(i, 'category', e.target.value)}
+                            placeholder={t.type === 'payroll' ? 'Payroll' : t.type === 'transfer' ? 'Transfer' : 'e.g. Food, Transport, Revenue…'}
+                            style={inputSt} />
+                        )}
+                        {/* Sub-description hint */}
+                        {selectedCat?.sub_category && (
+                          <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 4, lineHeight: 1.4 }}>
+                            {selectedCat.sub_category}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Row 6: Counterparty */}
+                      <div style={{ marginBottom: 12 }}>
+                        <label style={labelSt}>Counterparty (optional)</label>
+                        <CounterpartyInput
+                          value={t.counterparty_name || ''}
+                          onChange={(name, id) => {
+                            updateTx(i, 'counterparty_name', name)
+                            updateTx(i, 'counterparty_id', id || null)
+                          }}
+                          suggestions={counterparties}
+                          onCreateNew={name => createCounterparty(name, i)}
+                          inputSt={inputSt}
                         />
                       </div>
+
+                      {/* Row 7: Business Direction + Activity Type */}
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                        <div>
+                          <label style={labelSt}>Direction</label>
+                          <select
+                            value={t.business_direction_id || ''}
+                            onChange={e => updateTx(i, 'business_direction_id', e.target.value || null)}
+                            style={selectStyle}
+                          >
+                            <option value="">— Any —</option>
+                            {directions.map(d => (
+                              <option key={d.id} value={d.id}>{d.name}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label style={labelSt}>Activity</label>
+                          <select
+                            value={t.activity_type_id || ''}
+                            onChange={e => updateTx(i, 'activity_type_id', e.target.value || null)}
+                            style={selectStyle}
+                          >
+                            <option value="">— Any —</option>
+                            {activityTypes.map(a => (
+                              <option key={a.id} value={a.id}>{a.name}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+
                     </div>
 
                     {/* ── Debt linking (not for transfer) ── */}

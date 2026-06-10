@@ -50,12 +50,20 @@ export default function Settings() {
   const [showLang, setShowLang] = useState(false)
   const [showTz, setShowTz] = useState(false)
   const [notifications, setNotifications] = useState(localStorage.getItem('hf_notif') !== 'false')
+  const [refData, setRefData] = useState({ categories: 0, counterparties: 0 })
 
   useEffect(() => {
     apiFetch('/profile', token).then(data => {
       setProfile({ first_name: data.first_name || '', last_name: data.last_name || '', photo_url: data.photo_url || '', language: data.language || 'ru', timezone: data.timezone || 'Asia/Makassar' })
       setLoading(false)
     }).catch(() => setLoading(false))
+    // Load reference data counts for display
+    Promise.all([
+      apiFetch('/cashflow-categories', token).catch(() => ({ categories: [] })),
+      apiFetch('/counterparties', token).catch(() => ({ counterparties: [] })),
+    ]).then(([cats, cps]) => {
+      setRefData({ categories: (cats.categories || []).length, counterparties: (cps.counterparties || []).length })
+    })
   }, [token])
 
   const save = async (updates) => {
@@ -175,6 +183,26 @@ export default function Settings() {
           </div>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-3)" strokeWidth="2" strokeLinecap="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 0 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
         </a>
+      </div>
+
+      {/* Reference Data */}
+      <div style={{ margin: '0 16px 8px', fontSize: 11, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Reference Data</div>
+      <div style={{ margin: '0 16px 16px', background: 'var(--surface-card)', borderRadius: 14, border: '0.5px solid var(--border)', overflow: 'hidden' }}>
+        {[
+          { label: 'Cashflow Categories', value: `${refData.categories} loaded`, note: '46 system articles from DDS model', icon: '📂' },
+          { label: 'Counterparties', value: `${refData.counterparties} saved`, note: 'Vendors, clients, franchisees', icon: '🏢' },
+          { label: 'Business Directions', value: '3 system', note: 'Vending · Franchise · General', icon: '📊' },
+          { label: 'Activity Types', value: '4 system', note: 'Operating · Investing · Financing · Technical', icon: '🏷️' },
+        ].map((row, idx, arr) => (
+          <div key={row.label} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderBottom: idx < arr.length - 1 ? '0.5px solid var(--border)' : 'none' }}>
+            <span style={{ fontSize: 20, flexShrink: 0 }}>{row.icon}</span>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 14, color: 'var(--text)', fontWeight: 500 }}>{row.label}</div>
+              <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 1 }}>{row.note}</div>
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--brand)', fontWeight: 600, flexShrink: 0 }}>{row.value}</div>
+          </div>
+        ))}
       </div>
 
       {/* Repeat setup wizard */}
