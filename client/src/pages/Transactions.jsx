@@ -1,4 +1,5 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { apiFetch, fmt, fmtFull } from '../lib/api'
@@ -17,26 +18,38 @@ function fmtDateShort(dateStr) {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
+function fmtDateTime(dateStr) {
+  if (!dateStr) return '—'
+  const d = new Date(dateStr)
+  return d.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+}
+
 // Badge colours per transaction type
 const TYPE_BADGE = {
   income:   { label: 'Income',   bg: 'var(--status-paid-bg)',    color: 'var(--status-paid)'    },
   expense:  { label: 'Expense',  bg: 'var(--status-overdue-bg)', color: 'var(--status-overdue)' },
-  transfer: { label: 'Transfer', bg: 'var(--bg-3)',              color: 'var(--text-3)'          },
+  transfer: { label: 'Transfer', bg: '#E8EDFB',                  color: '#1e3a6e'                },
   payroll:  { label: 'Payroll',  bg: 'var(--amber-light)',       color: 'var(--amber-dark)'      },
 }
 function getTypeBadge(type) {
   return TYPE_BADGE[type] || { label: type || 'Other', bg: 'var(--bg-3)', color: 'var(--text-3)' }
 }
 
+// Cash impact description per type
+const CASH_IMPACT = {
+  income:   { label: 'Increases total cash',   color: '#085041', bg: '#E1F5EE', icon: '↑' },
+  expense:  { label: 'Decreases total cash',   color: '#991B1B', bg: '#FEE2E2', icon: '↓' },
+  payroll:  { label: 'Decreases total cash',   color: '#92400E', bg: '#FEF3C7', icon: '↓' },
+  transfer: { label: 'No effect on total cash', color: '#1e3a6e', bg: '#E8EDFB', icon: '↔' },
+}
+function getCashImpact(type) {
+  return CASH_IMPACT[type] || { label: 'Unknown impact', color: 'var(--text-3)', bg: 'var(--bg-3)', icon: '?' }
+}
+
 // ── Icons ─────────────────────────────────────────────────────────────────────
 const SearchIcon = () => (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
     <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-  </svg>
-)
-const PlusIcon = () => (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-    <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
   </svg>
 )
 
@@ -51,23 +64,177 @@ function SummaryCard({ label, value, sub, color }) {
   )
 }
 
+// ── Detail row helper ─────────────────────────────────────────────────────────
+function DetailRow({ label, value, valueStyle }) {
+  return (
+    <div className="tx-detail-row">
+      <span className="tx-detail-label">{label}</span>
+      <span className="tx-detail-value" style={valueStyle}>{value || <span className="tx-detail-empty">Not set</span>}</span>
+    </div>
+  )
+}
+
+// ── Transaction Details Drawer ────────────────────────────────────────────────
+function TransactionDetailsDrawer({ tx, onClose }) {
+  // Escape key
+  useEffect(() => {
+    const handler = (e) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [onClose])
+
+  if (!tx) return null
+
+  const badge     = getTypeBadge(tx.type)
+  const impact    = getCashImpact(tx.type)
+  const isTransfer = tx.type === 'transfer'
+  const isIncome   = tx.type === 'income'
+  const isExpense  = tx.type === 'expense'
+  const isPayroll  = tx.type === 'payroll'
+
+  const amount    = Number(tx.amount_original ?? tx.amount_idr ?? 0)
+  const currency  = tx.currency_original || 'IDR'
+
+  // Amount display
+  const amountSign  = isIncome ? '+' : (isExpense || isPayroll) ? '−' : ''
+  const amountColor = isIncome ? '#085041' : (isExpense) ? '#991B1B' : isPayroll ? '#92400E' : '#1e3a6e'
+
+  // Try to parse destination from description for transfers
+  // Format saved by Add page: "Transfer → BCA" or just description
+  let destination = null
+  if (isTransfer && tx.description) {
+    const m = tx.description.match(/→\s*(.+)$/)
+    if (m) destination = m[1].trim()
+  }
+
+  return createPortal(
+    <>
+      {/* Backdrop */}
+      <div className="tx-drawer-backdrop" onClick={onClose} />
+
+      {/* Drawer panel */}
+      <div className="tx-drawer" role="dialog" aria-modal="true" aria-label="Transaction details">
+
+        {/* ── Header ── */}
+        <div className="tx-drawer-header">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span
+              className="type-badge"
+              style={{ background: badge.bg, color: badge.color, fontSize: 12, padding: '4px 12px' }}
+            >
+              {badge.label}
+            </span>
+            <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-3)', letterSpacing: '0.04em' }}>
+              {fmtDate(tx.created_at)}
+            </span>
+          </div>
+          <button className="tx-drawer-close" onClick={onClose} aria-label="Close">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
+        </div>
+
+        {/* ── Big amount ── */}
+        <div className="tx-drawer-amount-block">
+          <div className="tx-drawer-desc">{tx.description || 'No description'}</div>
+          <div className="tx-drawer-amount" style={{ color: amountColor }}>
+            {amountSign}{fmtFull(amount)}
+            <span className="tx-drawer-currency">{currency}</span>
+          </div>
+        </div>
+
+        {/* ── Cash impact ── */}
+        <div className="tx-detail-section">
+          <div className="tx-detail-section-title">Cash Impact</div>
+          <div className="tx-cash-impact" style={{ background: impact.bg, color: impact.color }}>
+            <span className="tx-cash-impact-icon">{impact.icon}</span>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: 'var(--text-sm)' }}>{impact.label}</div>
+              {isTransfer && (
+                <div style={{ fontSize: 'var(--text-xs)', marginTop: 3, opacity: 0.8 }}>
+                  Transfer is neutral for total cash. Account movement requires source and destination.
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* ── Transaction details ── */}
+        <div className="tx-detail-section">
+          <div className="tx-detail-section-title">Details</div>
+          <div className="tx-detail-card">
+            <DetailRow label="Description" value={tx.description} />
+            <DetailRow label="Category"    value={tx.category} />
+            <DetailRow label="Scope"       value={tx.scope === 'business' ? '💼 Business' : '👤 Personal'} />
+            <DetailRow label="Project"     value={tx.project} />
+            <DetailRow label="Date"        value={fmtDateTime(tx.created_at)} />
+            <DetailRow
+              label="Amount"
+              value={`${amountSign}${fmtFull(amount)} ${currency}`}
+              valueStyle={{ color: amountColor, fontWeight: 700 }}
+            />
+          </div>
+        </div>
+
+        {/* ── Account / source ── */}
+        <div className="tx-detail-section">
+          <div className="tx-detail-section-title">{isTransfer ? 'Transfer Route' : 'Account'}</div>
+          <div className="tx-detail-card">
+            {isTransfer ? (
+              <>
+                <DetailRow
+                  label="From"
+                  value={tx.source}
+                />
+                <DetailRow
+                  label="To"
+                  value={destination}
+                />
+              </>
+            ) : (
+              <DetailRow label="Source / Account" value={tx.source} />
+            )}
+          </div>
+        </div>
+
+        {/* ── Meta ── */}
+        <div className="tx-detail-section">
+          <div className="tx-detail-section-title">Record Info</div>
+          <div className="tx-detail-card">
+            <DetailRow label="Transaction ID" value={tx.id} valueStyle={{ fontFamily: 'monospace', fontSize: 12 }} />
+            <DetailRow label="Created at" value={fmtDateTime(tx.created_at)} />
+          </div>
+        </div>
+
+      </div>
+    </>,
+    document.body
+  )
+}
+
 // ── Main Component ────────────────────────────────────────────────────────────
 export default function Transactions() {
   const { token } = useAuth()
   const navigate = useNavigate()
 
-  // Server-side filter state (triggers API call)
-  const [period, setPeriod]     = useState('month')    // today | week | month
-  const [scope, setScope]       = useState('all')       // all | business | personal
+  // Server-side filter state
+  const [period, setPeriod]     = useState('month')
+  const [scope, setScope]       = useState('all')
 
-  // Client-side filter state (applied to loaded data)
+  // Client-side filter state
   const [search, setSearch]     = useState('')
-  const [typeFilter, setType]   = useState('all')       // all | income | expense | transfer | payroll
+  const [typeFilter, setType]   = useState('all')
 
   // Data state
   const [txs, setTxs]           = useState([])
   const [loading, setLoading]   = useState(true)
   const [error, setError]       = useState('')
+
+  // Drawer state
+  const [selectedTx, setSelectedTx] = useState(null)
+
+  const closeDrawer = useCallback(() => setSelectedTx(null), [])
 
   // ── Load from API ─────────────────────────────────────────────────────────
   const load = () => {
@@ -100,14 +267,14 @@ export default function Transactions() {
     return list
   }, [txs, typeFilter, search])
 
-  // ── Summary metrics (from filtered list) ──────────────────────────────────
+  // ── Summary metrics ───────────────────────────────────────────────────────
   const totalIncome   = filtered.filter(t => t.type === 'income' ).reduce((s, t) => s + Number(t.amount_original || t.amount_idr || 0), 0)
   const totalExpenses = filtered.filter(t => t.type === 'expense').reduce((s, t) => s + Number(t.amount_original || t.amount_idr || 0), 0)
   const netFlow       = totalIncome - totalExpenses
 
   // ── Amount display helper ──────────────────────────────────────────────────
   function displayAmount(t) {
-    const sign   = t.type === 'income' ? '+' : t.type === 'expense' ? '−' : ''
+    const sign   = t.type === 'income' ? '+' : (t.type === 'expense' || t.type === 'payroll') ? '−' : ''
     const amount = t.amount_original ?? t.amount_idr ?? 0
     const cur    = t.currency_original && t.currency_original !== 'IDR' ? t.currency_original : 'IDR'
     return `${sign}${fmt(amount)} ${cur}`
@@ -116,6 +283,7 @@ export default function Transactions() {
   function amountClass(t) {
     if (t.type === 'income')  return 'amount-positive'
     if (t.type === 'expense') return 'amount-negative'
+    if (t.type === 'payroll') return 'amount-payroll'
     return 'amount-neutral'
   }
 
@@ -138,35 +306,14 @@ export default function Transactions() {
 
       {/* ── Summary cards ─── */}
       <div className="summary-grid">
-        <SummaryCard
-          label="Total Income"
-          value={fmt(totalIncome)}
-          sub={`${filtered.filter(t => t.type === 'income').length} transactions`}
-          color="var(--green)"
-        />
-        <SummaryCard
-          label="Total Expenses"
-          value={fmt(totalExpenses)}
-          sub={`${filtered.filter(t => t.type === 'expense').length} transactions`}
-          color="var(--red)"
-        />
-        <SummaryCard
-          label="Net Flow"
-          value={(netFlow >= 0 ? '+' : '') + fmt(netFlow)}
-          sub="income − expenses"
-          color={netFlow >= 0 ? 'var(--green)' : 'var(--red)'}
-        />
-        <SummaryCard
-          label="Showing"
-          value={filtered.length}
-          sub="transactions"
-          color="var(--text)"
-        />
+        <SummaryCard label="Total Income"   value={fmt(totalIncome)}   sub={`${filtered.filter(t => t.type === 'income').length} transactions`}  color="var(--green)" />
+        <SummaryCard label="Total Expenses" value={fmt(totalExpenses)} sub={`${filtered.filter(t => t.type === 'expense').length} transactions`} color="var(--red)"   />
+        <SummaryCard label="Net Flow"       value={(netFlow >= 0 ? '+' : '') + fmt(netFlow)} sub="income − expenses" color={netFlow >= 0 ? 'var(--green)' : 'var(--red)'} />
+        <SummaryCard label="Showing"        value={filtered.length}    sub="transactions"    color="var(--text)" />
       </div>
 
       {/* ── Filter bar ─── */}
       <div className="filter-bar">
-        {/* Search */}
         <div className="filter-search-wrap">
           <span className="filter-search-icon"><SearchIcon /></span>
           <input
@@ -175,12 +322,8 @@ export default function Transactions() {
             value={search}
             onChange={e => setSearch(e.target.value)}
           />
-          {search && (
-            <button className="filter-search-clear" onClick={() => setSearch('')}>×</button>
-          )}
+          {search && <button className="filter-search-clear" onClick={() => setSearch('')}>×</button>}
         </div>
-
-        {/* Type */}
         <select className="filter-select" value={typeFilter} onChange={e => setType(e.target.value)}>
           <option value="all">All types</option>
           <option value="income">Income</option>
@@ -188,15 +331,11 @@ export default function Transactions() {
           <option value="transfer">Transfer</option>
           <option value="payroll">Payroll</option>
         </select>
-
-        {/* Scope */}
         <select className="filter-select" value={scope} onChange={e => setScope(e.target.value)}>
           <option value="all">All scopes</option>
           <option value="business">Business</option>
           <option value="personal">Personal</option>
         </select>
-
-        {/* Period */}
         <select className="filter-select" value={period} onChange={e => setPeriod(e.target.value)}>
           <option value="month">This month</option>
           <option value="week">Last 7 days</option>
@@ -204,7 +343,7 @@ export default function Transactions() {
         </select>
       </div>
 
-      {/* ── Mobile filter chips (type) ─── */}
+      {/* ── Mobile filter chips ─── */}
       <div className="filter-chips">
         {['all', 'income', 'expense'].map(t => (
           <button
@@ -251,14 +390,10 @@ export default function Transactions() {
               : 'Add your first transaction to get started.'}
           </div>
           {!search && typeFilter === 'all' && (
-            <button className="tx-retry-btn" onClick={() => navigate('/add')}>
-              + Add Transaction
-            </button>
+            <button className="tx-retry-btn" onClick={() => navigate('/add')}>+ Add Transaction</button>
           )}
           {(search || typeFilter !== 'all') && (
-            <button className="tx-retry-btn" onClick={() => { setSearch(''); setType('all') }}>
-              Clear filters
-            </button>
+            <button className="tx-retry-btn" onClick={() => { setSearch(''); setType('all') }}>Clear filters</button>
           )}
         </div>
       )}
@@ -281,8 +416,13 @@ export default function Transactions() {
             <tbody>
               {filtered.map(t => {
                 const badge = getTypeBadge(t.type)
+                const isSelected = selectedTx?.id === t.id
                 return (
-                  <tr key={t.id}>
+                  <tr
+                    key={t.id}
+                    className={`tx-row-clickable${isSelected ? ' tx-row-selected' : ''}`}
+                    onClick={() => setSelectedTx(isSelected ? null : t)}
+                  >
                     <td className="tx-col-date">{fmtDate(t.created_at)}</td>
                     <td className="tx-col-desc">
                       <div className="tx-desc-text">{t.description || '—'}</div>
@@ -292,7 +432,7 @@ export default function Transactions() {
                       <span className="tx-cat-text">{t.category || 'Uncategorized'}</span>
                     </td>
                     <td className="tx-col-source">
-                      <span className="tx-source-text">{t.source || 'No source'}</span>
+                      <span className="tx-source-text">{t.source || '—'}</span>
                     </td>
                     <td>
                       <span className="tx-scope-badge" data-scope={t.scope || 'personal'}>
@@ -303,10 +443,7 @@ export default function Transactions() {
                       {displayAmount(t)}
                     </td>
                     <td>
-                      <span
-                        className="type-badge"
-                        style={{ background: badge.bg, color: badge.color }}
-                      >
+                      <span className="type-badge" style={{ background: badge.bg, color: badge.color }}>
                         {badge.label}
                       </span>
                     </td>
@@ -323,16 +460,19 @@ export default function Transactions() {
         <div className="tx-card-list">
           {filtered.map(t => {
             const badge = getTypeBadge(t.type)
+            const isSelected = selectedTx?.id === t.id
+            const dotBg    = t.type === 'income'  ? 'var(--green-light)' : t.type === 'expense' ? 'var(--red-light)'  : t.type === 'payroll' ? 'var(--amber-light)' : 'var(--bg-3)'
+            const dotColor = t.type === 'income'  ? 'var(--green)'       : t.type === 'expense' ? 'var(--red)'        : t.type === 'payroll' ? 'var(--amber-dark)'  : 'var(--text-3)'
+            const dotIcon  = t.type === 'income'  ? '↓'                  : t.type === 'expense' ? '↑'                 : t.type === 'payroll' ? '💼'                 : '↔'
             return (
-              <div key={t.id} className="tx-card">
+              <div
+                key={t.id}
+                className={`tx-card tx-row-clickable${isSelected ? ' tx-row-selected' : ''}`}
+                onClick={() => setSelectedTx(isSelected ? null : t)}
+              >
                 <div className="tx-card-left">
-                  <div
-                    className="tx-card-dot"
-                    style={{ background: t.type === 'income' ? 'var(--green-light)' : t.type === 'expense' ? 'var(--red-light)' : 'var(--bg-3)' }}
-                  >
-                    <span style={{ fontSize: 14, color: t.type === 'income' ? 'var(--green)' : t.type === 'expense' ? 'var(--red)' : 'var(--text-3)' }}>
-                      {t.type === 'income' ? '↓' : t.type === 'expense' ? '↑' : '↔'}
-                    </span>
+                  <div className="tx-card-dot" style={{ background: dotBg }}>
+                    <span style={{ fontSize: 14, color: dotColor }}>{dotIcon}</span>
                   </div>
                 </div>
                 <div className="tx-card-body">
@@ -347,10 +487,7 @@ export default function Transactions() {
                   <div className={amountClass(t)} style={{ fontSize: 14, fontWeight: 600 }}>
                     {displayAmount(t)}
                   </div>
-                  <span
-                    className="type-badge"
-                    style={{ background: badge.bg, color: badge.color, marginTop: 4 }}
-                  >
+                  <span className="type-badge" style={{ background: badge.bg, color: badge.color, marginTop: 4 }}>
                     {badge.label}
                   </span>
                 </div>
@@ -358,6 +495,11 @@ export default function Transactions() {
             )
           })}
         </div>
+      )}
+
+      {/* ── Transaction details drawer ─── */}
+      {selectedTx && (
+        <TransactionDetailsDrawer tx={selectedTx} onClose={closeDrawer} />
       )}
 
     </div>

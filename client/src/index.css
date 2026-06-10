@@ -1116,6 +1116,181 @@ body {
   .page-header-title { font-size: var(--text-xl); }
 }
 
+/* ── Transaction row click ───────────────────────────────────────── */
+.tx-row-clickable { cursor: pointer; transition: background 0.1s; }
+.tx-row-clickable:hover { background: var(--surface-card-hover) !important; }
+.tx-row-selected  { background: #EFF6FF !important; }
+.amount-payroll   { color: var(--amber-dark) !important; font-weight: 700; }
+
+/* ── Transaction Details Drawer ──────────────────────────────────── */
+.tx-drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.35);
+  backdrop-filter: blur(2px);
+  z-index: 500;
+  animation: txFadeIn 0.18s ease;
+}
+@keyframes txFadeIn { from { opacity: 0 } to { opacity: 1 } }
+
+/* Desktop: right-side drawer */
+.tx-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 460px;
+  max-width: 100vw;
+  background: var(--bg);
+  border-left: 1px solid var(--border);
+  box-shadow: -8px 0 40px rgba(15, 23, 42, 0.14);
+  z-index: 501;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  animation: txSlideIn 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes txSlideIn { from { transform: translateX(100%) } to { transform: translateX(0) } }
+
+.tx-drawer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px 18px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  background: var(--bg-2);
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+.tx-drawer-close {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text-2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s;
+  flex-shrink: 0;
+}
+.tx-drawer-close:hover { background: var(--bg-3); color: var(--text); }
+
+.tx-drawer-amount-block {
+  padding: 24px 24px 20px;
+  border-bottom: 1px solid var(--border);
+}
+.tx-drawer-desc {
+  font-size: var(--text-base);
+  color: var(--text-2);
+  margin-bottom: 10px;
+  line-height: 1.5;
+}
+.tx-drawer-amount {
+  font-size: 38px;
+  font-weight: 800;
+  letter-spacing: -1.5px;
+  line-height: 1;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.tx-drawer-currency {
+  font-size: var(--text-base);
+  font-weight: 500;
+  letter-spacing: 0;
+  color: var(--text-3);
+  margin-left: 4px;
+}
+
+.tx-detail-section {
+  padding: 20px 24px 4px;
+}
+.tx-detail-section-title {
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--text-3);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 10px;
+}
+.tx-detail-card {
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+.tx-detail-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 11px 16px;
+  border-bottom: 0.5px solid var(--border);
+  gap: 12px;
+}
+.tx-detail-row:last-child { border-bottom: none; }
+.tx-detail-label {
+  font-size: var(--text-sm);
+  color: var(--text-3);
+  font-weight: 500;
+  flex-shrink: 0;
+  min-width: 130px;
+}
+.tx-detail-value {
+  font-size: var(--text-sm);
+  color: var(--text);
+  font-weight: 600;
+  text-align: right;
+  word-break: break-all;
+}
+.tx-detail-empty {
+  color: var(--text-4);
+  font-weight: 400;
+  font-style: italic;
+}
+
+.tx-cash-impact {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  margin-bottom: 16px;
+}
+.tx-cash-impact-icon {
+  font-size: 20px;
+  flex-shrink: 0;
+  font-style: normal;
+  line-height: 1.2;
+}
+
+/* Mobile: bottom sheet */
+@media (max-width: 767px) {
+  .tx-drawer {
+    top: auto;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    height: 85vh;
+    border-left: none;
+    border-top: 1px solid var(--border);
+    border-radius: 20px 20px 0 0;
+    box-shadow: 0 -8px 40px rgba(15, 23, 42, 0.18);
+    animation: txSlideUp 0.24s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  @keyframes txSlideUp { from { transform: translateY(100%) } to { transform: translateY(0) } }
+  .tx-drawer-header { border-radius: 20px 20px 0 0; }
+  .tx-drawer-amount { font-size: 28px; }
+  .tx-detail-label { min-width: 100px; }
+}
+
 /* ── Pulse Desktop 2-column Layout ───────────────────────────────── */
 .pulse-desktop-grid {
   display: block; /* mobile: main-col stacks above side-col */
