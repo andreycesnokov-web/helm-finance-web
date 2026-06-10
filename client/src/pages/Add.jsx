@@ -657,7 +657,7 @@ export default function Add() {
                               placeholder="e.g. BCA, Cash, GoPay"
                               style={{ ...inputSt, borderColor: sourceMissing && !isTransfer ? '#F59E0B' : undefined, background: sourceMissing && !isTransfer ? '#FFFBEB' : undefined }} />
                             <div style={{ fontSize: 11, color: 'var(--text-4)', marginTop: 4 }}>
-                              No wallets yet — <button onClick={() => window.location.href='/accounts'} style={{ fontSize: 11, color: 'var(--brand)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'inherit' }}>add wallets in Accounts →</button>
+                              No wallets yet — <button onClick={() => navigate('/accounts')} style={{ fontSize: 11, color: 'var(--brand)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'inherit' }}>add wallets in Accounts →</button>
                             </div>
                           </>
                         )}

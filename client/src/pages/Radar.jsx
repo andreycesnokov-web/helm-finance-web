@@ -156,7 +156,7 @@ export default function Radar() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
           {[
             { label: 'Monthly burn', val: fmtFull(monthlyBurn), sub: 'IDR / month', color: 'var(--red-dark)' },
-            { label: 'Daily average', val: fmt(burnRate), sub: d.burnWindowDays >= 30 ? '30-day rolling avg' : `${d.burnWindowDays || 0}d avg`, color: 'var(--text)' },
+            { label: 'Daily average', val: fmt(burnRate), sub: d.burnWindowDays >= 30 ? '30-day rolling avg' : d.burnWindowDays > 0 ? `${d.burnWindowDays}d avg` : 'avg', color: 'var(--text)' },
             { label: 'Runway left', val: runway != null ? runway + 'd' : '∞', sub: burnRate > 0 ? 'at current burn' : 'no burn data', color: runway != null && runway < 14 ? 'var(--red-dark)' : runway != null && runway < 30 ? 'var(--amber-dark)' : 'var(--green-dark)' },
           ].map(s => (
             <div key={s.label} style={{ background: 'var(--bg-2)', borderRadius: 14, padding: '14px 16px', border: '0.5px solid var(--border)' }}>

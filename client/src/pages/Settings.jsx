@@ -188,7 +188,7 @@ export default function Settings() {
   }
 
   const closeReset = () => { setShowReset(false); setResetStep(1); setResetError('') }
-  const resetAndReload = () => { closeReset(); navigate('/pulse') }
+  const resetAndReload = () => { closeReset(); navigate('/') }
   const handleNotif = () => { const n = !notifications; setNotifications(n); localStorage.setItem('hf_notif', String(n)) }
 
   const selectedLang = LANGUAGES.find(l => l.code === profile.language) || LANGUAGES[0]

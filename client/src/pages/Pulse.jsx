@@ -311,7 +311,7 @@ export default function Pulse({ onDataLoad }) {
               {!runway || runway >= 999 ? '∞' : runway}
             </div>
             <div style={{ fontSize: 10, color: 'rgba(255,255,255,.35)', marginTop: 3 }}>
-              {!runway || runway >= 999 ? 'no burn data' : `days · ${p.burnWindowDays >= 30 ? '30d avg' : `${p.burnWindowDays || 0}d avg`}`}
+              {!runway || runway >= 999 ? 'no burn data' : `days · ${p.burnWindowDays >= 30 ? '30-day avg' : p.burnWindowDays > 0 ? `${p.burnWindowDays}d avg` : 'current burn'}`}
             </div>
           </div>
         </div>
@@ -452,7 +452,7 @@ export default function Pulse({ onDataLoad }) {
               },
               {
                 label: 'Runway', unit: (!runway || runway >= 999) ? '' : 'days',
-                sub: p.burnWindowDays >= 30 ? '30d avg' : `${p.burnWindowDays || 0}d avg`,
+                sub: p.burnWindowDays >= 30 ? '30-day avg' : p.burnWindowDays > 0 ? `${p.burnWindowDays}d avg` : 'Based on burn',
                 value: (!runway || runway >= 999) ? '∞' : String(runway),
                 color: (!runway || runway >= 999) ? 'var(--text-3)'
                   : runway > 30 ? 'var(--green-dark)'

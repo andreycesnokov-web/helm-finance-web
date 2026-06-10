@@ -289,7 +289,7 @@ export function RightPanel({ data }) {
         <SecTitle>Quick Stats</SecTitle>
         <div style={{ background: 'var(--surface-card)', borderRadius: 12, border: '1px solid var(--border)', overflow: 'hidden' }}>
           {[
-            { label: 'Runway',       value: `${d.runway || 0} days`,                                                 color: runwayColor },
+            { label: 'Runway',       value: (!d.runway || d.runway >= 999) ? '—' : `${d.runway} days`,             color: runwayColor },
             { label: 'Burn rate',    value: `${fmtShort(d.burnRate || 0)} / day`,                                    color: 'var(--text)' },
             { label: 'Net position', value: `${(d.netPosition || 0) >= 0 ? '+' : ''}${fmtShort(d.netPosition || 0)}`, color: (d.netPosition || 0) >= 0 ? 'var(--green-dark)' : 'var(--red)' },
             { label: 'Receivables',  value: `+${fmtShort(d.receivables || 0)}`,                                      color: 'var(--green-dark)' },

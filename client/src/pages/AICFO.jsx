@@ -365,7 +365,7 @@ export default function AICFO() {
             { label: 'Receivables', value: '+' + fmt(recv.total_remaining), sub: recv.overdue_count > 0 ? `${recv.overdue_count} overdue` : `${currency} expected`, color: 'var(--green-dark)', route: '/receivables' },
             { label: 'Payables',    value: '−' + fmt(pay.total_remaining),  sub: pay.overdue_count > 0  ? `${pay.overdue_count} overdue`  : `${currency} to pay`,    color: 'var(--red-dark)',   route: '/payables' },
             { label: 'Income',      value: '+' + fmt(month.income),         sub: `${month.transactions_count} transactions`, color: 'var(--green-dark)', route: null },
-            { label: 'Expenses',    value: '−' + fmt(month.expenses),       sub: `${fmt(month.burn_rate)} ${currency}/day · ${month.burn_window_days >= 30 ? '30d avg' : `${month.burn_window_days || 0}d avg`}`, color: 'var(--text)',       route: '/transactions' },
+            { label: 'Expenses',    value: '−' + fmt(month.expenses),       sub: `${fmt(month.burn_rate)} ${currency}/day · ${month.burn_window_days >= 30 ? '30-day avg' : month.burn_window_days > 0 ? `${month.burn_window_days}d avg` : 'avg'}`, color: 'var(--text)',       route: '/transactions' },
           ].map(m => (
             <div key={m.label} className="hf-card" style={{ cursor: m.route ? 'pointer' : 'default' }} onClick={() => m.route && navigate(m.route)}>
               <div className="hf-kpi-label">{m.label}</div>
@@ -408,8 +408,8 @@ export default function AICFO() {
               const icon = ACTION_ICONS[a.action_type] || '✦'
               return (
                 <div key={i}
-                  style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', background: 'var(--bg-2)', borderRadius: 12, border: '0.5px solid var(--border)', cursor: a.route && a.route !== '/ai-cfo' ? 'pointer' : 'default' }}
-                  onClick={() => a.route && a.route !== '/ai-cfo' && navigate(a.route)}>
+                  style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', background: 'var(--bg-2)', borderRadius: 12, border: '0.5px solid var(--border)', cursor: a.route && a.route !== '/cfo' ? 'pointer' : 'default' }}
+                  onClick={() => a.route && a.route !== '/cfo' && navigate(a.route)}>
                   <div style={{ width: 34, height: 34, borderRadius: 10, background: pc.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, flexShrink: 0 }}>
                     {icon}
                   </div>

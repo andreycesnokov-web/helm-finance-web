@@ -25,7 +25,10 @@ export function fmt(n) {
 }
 
 export function fmtFull(n) {
-  return Number(n).toLocaleString('ru-RU')
+  if (n === null || n === undefined) return '—'
+  const num = Number(n)
+  if (isNaN(num)) return '—'
+  return num.toLocaleString('ru-RU')
 }
 
 export function daysUntil(dateStr) {
