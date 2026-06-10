@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
+import { useAccess } from '../hooks/useAccess'
 import { useTranslation } from '../hooks/useTranslation'
 import { apiFetch } from '../lib/api'
 
@@ -38,6 +39,7 @@ const TIMEZONES = [
 
 export default function Settings() {
   const { token, logout } = useAuth()
+  const { access, planLabel, isTrialActive, effectivePlan } = useAccess()
   const navigate = useNavigate()
   const fileRef = useRef()
   const { t, changeLang } = useTranslation()
@@ -210,6 +212,88 @@ export default function Settings() {
           </div>
         ))}
       </div>
+
+      {/* ── Plan & Access ── */}
+      {access && (() => {
+        const { plan, limits, usage } = access
+        const PLAN_LABELS = { free: 'Free Plan', starter: 'Starter', business: 'Business', founder: 'Founder', enterprise: 'Enterprise' }
+        const planName = PLAN_LABELS[plan.effective_plan] || plan.effective_plan
+
+        // Badge color for effective plan chip
+        const chipStyle = plan.is_trial_active
+          ? { background: '#FEF3C7', color: '#92400E', border: '1px solid #FDE68A' }
+          : plan.effective_plan === 'free'
+            ? { background: 'var(--bg-3)', color: 'var(--text-3)', border: '1px solid var(--border)' }
+            : { background: '#E1F5EE', color: '#085041', border: '1px solid #A7F3D0' }
+
+        const fmtLimit = (v) => (v === null || v === undefined) ? '∞' : String(v)
+
+        const rows = [
+          { label: 'Current plan',    value: plan.name.charAt(0).toUpperCase() + plan.name.slice(1) },
+          { label: 'Trial status',    value: plan.trial_status },
+          ...(plan.is_trial_active ? [
+            { label: 'Trial ends',    value: new Date(plan.trial_ends_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) },
+            { label: 'Days left',     value: `${plan.days_left_in_trial} days` },
+          ] : []),
+          { label: 'Wallets',              value: `${usage.wallets_count} / ${fmtLimit(limits.max_wallets)}` },
+          { label: 'Transactions (month)', value: `${usage.transactions_this_month} / ${fmtLimit(limits.max_transactions_per_month)}` },
+          { label: 'AI questions (month)', value: `${usage.ai_questions_this_month} / ${fmtLimit(limits.max_ai_questions_per_month)}` },
+        ]
+
+        return (
+          <>
+            <div style={{ margin: '0 16px 8px', fontSize: 11, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Plan & Access</div>
+            <div style={{ margin: '0 16px 16px', background: 'var(--bg-2)', borderRadius: 12, overflow: 'hidden' }}>
+
+              {/* Effective plan chip header */}
+              <div style={{ padding: '14px 16px 10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '0.5px solid var(--border)' }}>
+                <div>
+                  <div style={{ fontSize: 13, color: 'var(--text)', fontWeight: 600, marginBottom: 3 }}>Effective access</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-3)' }}>{access.business?.name}</div>
+                </div>
+                <span style={{ fontSize: 12, fontWeight: 700, padding: '4px 12px', borderRadius: 20, ...chipStyle }}>
+                  {planLabel}
+                </span>
+              </div>
+
+              {/* Rows */}
+              {rows.map((row, idx) => (
+                <div key={row.label} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '11px 16px', borderBottom: idx < rows.length - 1 ? '0.5px solid var(--border)' : 'none' }}>
+                  <span style={{ fontSize: 13, color: 'var(--text-2)' }}>{row.label}</span>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{row.value}</span>
+                </div>
+              ))}
+
+              {/* Feature flags row */}
+              <div style={{ padding: '10px 16px', borderTop: '0.5px solid var(--border)', display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                {[
+                  ['Payroll',      limits.payroll_enabled],
+                  ['Team',         limits.team_access_enabled],
+                  ['Approvals',    limits.approval_flow_enabled],
+                  ['Radar',        limits.advanced_radar_enabled],
+                  ['Export',       limits.export_enabled],
+                  ['Integrations', limits.integrations_enabled],
+                ].map(([label, enabled]) => (
+                  <span key={label} style={{ fontSize: 11, padding: '3px 9px', borderRadius: 20, fontWeight: 600,
+                    background: enabled ? '#E1F5EE' : 'var(--bg-3)',
+                    color:      enabled ? '#085041' : 'var(--text-3)',
+                    border:     enabled ? '1px solid #A7F3D0' : '1px solid var(--border)',
+                  }}>
+                    {enabled ? '✓' : '—'} {label}
+                  </span>
+                ))}
+              </div>
+
+              {/* Upgrade CTA placeholder */}
+              <div style={{ padding: '12px 16px', borderTop: '0.5px solid var(--border)' }}>
+                <button style={{ width: '100%', padding: '10px', borderRadius: 10, background: 'none', color: 'var(--brand)', border: '0.5px solid var(--border-2)', fontSize: 13, fontWeight: 500, cursor: 'default', opacity: 0.7 }}>
+                  ✨ Upgrade plans — coming soon
+                </button>
+              </div>
+            </div>
+          </>
+        )
+      })()}
 
       {/* Repeat setup wizard */}
       <div style={{ margin: '0 16px 10px' }}>

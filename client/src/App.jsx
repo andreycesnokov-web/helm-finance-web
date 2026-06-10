@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './hooks/useAuth'
+import { useAccess } from './hooks/useAccess'
 import Login from './pages/Login'
 import Pulse from './pages/Pulse'
 import Accounts from './pages/Accounts'
@@ -91,9 +92,17 @@ function Sidebar() {
   const location = useLocation()
   const navigate = useNavigate()
   const { user } = useAuth()
+  const { planLabel, isTrialActive, effectivePlan } = useAccess()
 
   const initials = (user?.firstName?.[0] || user?.first_name?.[0] || 'A').toUpperCase()
   const displayName = user?.firstName || user?.first_name || 'Account'
+
+  // Badge style: amber for trial, green for paid, default for free
+  const badgeStyle = isTrialActive
+    ? { background: 'rgba(254,243,199,0.15)', color: '#FCD34D', border: '1px solid rgba(252,211,77,0.3)' }
+    : effectivePlan !== 'free'
+      ? { background: 'rgba(209,250,229,0.12)', color: '#6EE7B7', border: '1px solid rgba(110,231,183,0.25)' }
+      : {}
 
   return (
     <div className="sidebar">
@@ -158,7 +167,7 @@ function Sidebar() {
           <div className="sidebar-user-avatar">{initials}</div>
           <div className="sidebar-user-details">
             <div className="sidebar-user-name">{displayName}</div>
-            <span className="sidebar-plan-badge">Free Plan</span>
+            <span className="sidebar-plan-badge" style={badgeStyle}>{planLabel}</span>
           </div>
         </div>
         <button className="sidebar-settings-btn" onClick={() => navigate('/settings')} title="Settings">

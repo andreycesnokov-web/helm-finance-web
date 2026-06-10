@@ -595,6 +595,146 @@ app.get('/api/activity-types', auth, async (req, res) => {
   }
 });
 
+// ── SaaS Foundation Helpers ──────────────────────────────────────────────────
+//
+// Phase 1 bridge: existing financial data remains user_id-scoped.
+// Future migration: transactions/wallets/debts/reminders will move
+// to business_id-scoped model.
+
+/**
+ * Ensure every authenticated user has a default business + owner membership.
+ * Idempotent: safe to call on every request that needs access context.
+ */
+async function ensureDefaultBusiness(userId, firstName) {
+  // Look for existing active membership
+  const { data: memberships } = await supabase
+    .from('business_members')
+    .select('role, status, business_id, businesses(*)')
+    .eq('user_id', userId)
+    .eq('status', 'active')
+    .limit(1);
+
+  if (memberships && memberships.length > 0) {
+    const m = memberships[0];
+    return { business: m.businesses, membership: { role: m.role, status: m.status } };
+  }
+
+  // No business — bootstrap default with 7-day trial
+  const now = new Date();
+  const trialEnd = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+  const name = `${firstName || 'My'} Business`;
+
+  const { data: business, error: bErr } = await supabase
+    .from('businesses')
+    .insert({
+      owner_user_id:       userId,
+      name,
+      base_currency:       'IDR',
+      plan:                'free',
+      trial_status:        'active',
+      trial_started_at:    now.toISOString(),
+      trial_ends_at:       trialEnd.toISOString(),
+      subscription_status: 'trialing',
+    })
+    .select()
+    .single();
+  if (bErr) throw bErr;
+
+  await supabase.from('business_members').insert({
+    business_id: business.id,
+    user_id:     userId,
+    role:        'owner',
+    status:      'active',
+  });
+
+  return { business, membership: { role: 'owner', status: 'active' } };
+}
+
+/**
+ * Compute effective access state from a business row.
+ * Effective plan rules:
+ *   trial active           → founder-level access (full features)
+ *   subscription active    → business.plan
+ *   expired / no sub       → free
+ */
+function getAccessState(business) {
+  const now = new Date();
+  const trialEnd = business.trial_ends_at ? new Date(business.trial_ends_at) : null;
+  const isTrialActive =
+    business.trial_status === 'active' &&
+    trialEnd !== null &&
+    now < trialEnd;
+
+  const daysLeft = isTrialActive && trialEnd
+    ? Math.max(0, Math.ceil((trialEnd - now) / (1000 * 60 * 60 * 24)))
+    : 0;
+
+  let effectivePlan;
+  if (isTrialActive) {
+    effectivePlan = 'founder'; // Full access during trial
+  } else if (business.subscription_status === 'active') {
+    effectivePlan = business.plan;
+  } else {
+    effectivePlan = 'free'; // Expired trial, no paid sub
+  }
+
+  return { isTrialActive, daysLeft, effectivePlan };
+}
+
+/**
+ * Load full access context for a userId.
+ * Returns null if no business found (before ensureDefaultBusiness call).
+ */
+async function getCurrentAccess(userId) {
+  const { data: memberships } = await supabase
+    .from('business_members')
+    .select('role, status, businesses(*)')
+    .eq('user_id', userId)
+    .eq('status', 'active')
+    .limit(1);
+
+  if (!memberships || memberships.length === 0) return null;
+
+  const m = memberships[0];
+  const business = m.businesses;
+  const accessState = getAccessState(business);
+
+  const { data: limits } = await supabase
+    .from('plan_limits')
+    .select('*')
+    .eq('plan', accessState.effectivePlan)
+    .single();
+
+  return {
+    business,
+    membership: { role: m.role, status: m.status },
+    accessState,
+    limits: limits || {},
+  };
+}
+
+/** Returns true if the feature boolean flag is enabled in the access context. */
+function hasFeature(access, featureName) {
+  if (!access) return false;
+  return access.limits[featureName] === true;
+}
+
+/**
+ * Assert feature is available; sends 403 and returns false if not.
+ * Usage: if (!assertFeature(access, 'payroll_enabled', res)) return;
+ */
+function assertFeature(access, featureName, res) {
+  if (!hasFeature(access, featureName)) {
+    res.status(403).json({
+      error: 'Feature not available on your current plan',
+      feature: featureName,
+      upgrade_required: true,
+    });
+    return false;
+  }
+  return true;
+}
+
 // --- Wallets API ----------------------------------------------------------
 // Phase 1: user-scoped. Balance computed from transactions (wallet_id match
 // OR legacy source-name match for backward compat with pre-wallet transactions).
@@ -647,6 +787,29 @@ app.post('/api/wallets', auth, async (req, res) => {
   const { name, currency, type, entity_name, color, opening_balance, sort_order } = req.body;
   if (!name) return res.status(400).json({ error: 'name required' });
   try {
+    // ── Feature gate: wallet limit ───────────────────────────────────────────
+    const access = await getCurrentAccess(userId);
+    if (access) {
+      const maxWallets = access.limits.max_wallets;
+      if (maxWallets !== null && maxWallets !== undefined) {
+        const { count: currentCount } = await supabase
+          .from('wallets')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', userId)
+          .eq('is_active', true);
+        if ((currentCount || 0) >= maxWallets) {
+          return res.status(403).json({
+            error: 'Plan limit reached',
+            feature: 'wallets',
+            limit: maxWallets,
+            current: currentCount,
+            upgrade_required: true,
+          });
+        }
+      }
+    }
+    // ── End gate ─────────────────────────────────────────────────────────────
+
     const { data: wallet, error: wErr } = await supabase
       .from('wallets')
       .insert({
@@ -1191,6 +1354,79 @@ app.post('/api/debts/:id/pay', auth, async (req, res) => {
   }
   res.json({ ok: true, isFullyPaid, remaining: totalAmount - paidAmount })
 })
+
+// ── Access Status Endpoint ───────────────────────────────────────────────────
+// GET /api/access/status
+// Returns current plan, trial info, limits, and usage for the authenticated user.
+// Also bootstraps default business+trial on first call (idempotent).
+app.get('/api/access/status', auth, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+
+    // Fetch user profile for business name bootstrap
+    const { data: user } = await supabase
+      .from('users')
+      .select('first_name, username')
+      .eq('id', userId)
+      .single();
+    const firstName = user?.first_name || user?.username || 'My';
+
+    // Ensure business exists (creates on first call)
+    const { business, membership } = await ensureDefaultBusiness(userId, firstName);
+
+    // Compute access state
+    const accessState = getAccessState(business);
+
+    // Fetch plan limits for effective plan
+    const { data: limits } = await supabase
+      .from('plan_limits')
+      .select('*')
+      .eq('plan', accessState.effectivePlan)
+      .single();
+
+    // Usage counts
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+
+    const [walletsRes, txRes] = await Promise.all([
+      supabase.from('wallets').select('id', { count: 'exact', head: true })
+        .eq('user_id', userId).eq('is_active', true),
+      supabase.from('transactions').select('id', { count: 'exact', head: true })
+        .eq('user_id', userId).gte('created_at', monthStart),
+    ]);
+
+    res.json({
+      business: {
+        id:            business.id,
+        name:          business.name,
+        base_currency: business.base_currency,
+        timezone:      business.timezone  || null,
+        country:       business.country   || null,
+      },
+      membership,
+      plan: {
+        name:               business.plan,
+        subscription_status: business.subscription_status,
+        trial_status:        business.trial_status,
+        trial_started_at:    business.trial_started_at,
+        trial_ends_at:       business.trial_ends_at,
+        days_left_in_trial:  accessState.daysLeft,
+        is_trial_active:     accessState.isTrialActive,
+        effective_plan:      accessState.effectivePlan,
+      },
+      limits: limits || {},
+      usage: {
+        wallets_count:             walletsRes.count  || 0,
+        transactions_this_month:   txRes.count       || 0,
+        invoices_this_month:       0,   // invoice table not yet implemented
+        ai_questions_this_month:   0,   // not tracked yet
+        voice_inputs_this_month:   0,   // not tracked yet
+      },
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
 
 app.get('*', (req, res) => {
   res.sendFile('index.html', { root: 'client/dist' });
