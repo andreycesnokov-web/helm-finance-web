@@ -109,7 +109,9 @@ export default function Accounts() {
   useEffect(() => {
     load()
     // Load admin status silently — non-blocking, never errors visibly
-    apiFetch('/admin/status', token).then(d => setIsAdmin(d.is_admin === true)).catch(() => {})
+    apiFetch('/admin/status', token)
+      .then(d => { setIsAdmin(d.is_admin === true); console.log('[admin/status]', d) })
+      .catch(e => console.warn('[admin/status] failed:', e.message))
   }, [])
 
   // ── Computed totals ───────────────────────────────────────────────────────
@@ -607,9 +609,20 @@ export default function Accounts() {
               Cancel
             </button>
 
+            {editWallet && isAdmin && (
+              <button
+                onClick={() => { setShowForm(false); openAdjust(editWallet) }}
+                disabled={saving}
+                className="btn btn-block btn-lg"
+                style={{ marginBottom: 8, background: '#FEF3C7', border: '1px solid #FDE68A', color: '#92400E', fontWeight: 700 }}
+              >
+                ⚡ Adjust Balance (admin)
+              </button>
+            )}
+
             {editWallet && (
               <button onClick={handleDelete} disabled={saving} className="btn btn-danger btn-block btn-lg">
-                Archive wallet
+                Archive / Delete wallet
               </button>
             )}
           </div>
