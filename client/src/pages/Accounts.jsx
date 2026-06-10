@@ -291,7 +291,7 @@ export default function Accounts() {
           <div style={{ position: 'absolute', inset: 0, opacity: 0.03, backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 28px, #fff 28px, #fff 29px), repeating-linear-gradient(90deg, transparent, transparent 28px, #fff 28px, #fff 29px)', pointerEvents: 'none' }} />
           <div style={{ position: 'relative' }}>
             <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 10, fontWeight: 700 }}>Total balance · all wallets</div>
-            <div style={{ fontSize: 'var(--text-3xl)', fontWeight: 800, color: '#fff', letterSpacing: -1, lineHeight: 1 }}>
+            <div style={{ fontSize: 'clamp(28px, 9vw, 38px)', fontWeight: 800, color: '#fff', letterSpacing: -1, lineHeight: 1, wordBreak: 'break-word' }}>
               {fmtFull(totalBalance)}
             </div>
             <div style={{ fontSize: 'var(--text-xs)', color: 'rgba(255,255,255,0.4)', marginTop: 8 }}>IDR · {wallets.length} wallet{wallets.length !== 1 ? 's' : ''}</div>

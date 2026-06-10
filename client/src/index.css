@@ -539,9 +539,21 @@ body {
 /* ── Mobile (<768px) ─────────────────────────────────────────────── */
 @media (max-width: 767px) {
   .sidebar { display: none; }
-  .desktop-layout { margin-left: 0; }
-  .desktop-main { max-width: 430px; margin: 0 auto; width: 100%; }
+  .desktop-layout { margin-left: 0; width: 100%; overflow-x: hidden; }
+  .desktop-main { max-width: 100vw; margin: 0; width: 100%; overflow-x: hidden; }
   .desktop-right { display: none; }
+
+  /* Page header — wrap on mobile so button doesn't overflow */
+  .hf-page-header, .cfo-page-header {
+    flex-wrap: wrap;
+    gap: 8px 12px;
+  }
+  .hf-page-title, .cfo-page-title {
+    font-size: var(--text-xl); /* 24px instead of 30px */
+  }
+  .hf-page-actions, .cfo-page-actions {
+    padding-top: 0;
+  }
 }
 
 /* ── Legacy mobile fallback (768-1023 without sidebar) ───────────── */

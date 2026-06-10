@@ -206,7 +206,7 @@ export default function Settings() {
         <div style={{ width: 32 }}/>
       </div>
 
-      <div style={{ margin: '4px 16px 20px', background: 'var(--text)', borderRadius: 16, padding: '20px 18px' }}>
+      <div style={{ margin: '4px 16px 20px', background: 'var(--text)', borderRadius: 16, padding: '20px 18px', overflow: 'hidden', minWidth: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 16 }}>
           <div onClick={() => fileRef.current.click()} style={{ position: 'relative', cursor: 'pointer', flexShrink: 0 }}>
             {profile.photo_url
@@ -220,9 +220,9 @@ export default function Settings() {
           <div style={{ flex: 1, color: 'rgba(255,255,255,0.5)', fontSize: 12 }}>{t('settings.tapPhotoToChange')}</div>
           <input ref={fileRef} type="file" accept="image/*" onChange={handlePhoto} style={{ display: 'none' }} />
         </div>
-        <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
-          <input value={profile.first_name} onChange={e => { setProfile(p => ({ ...p, first_name: e.target.value })); setDirty(true) }} placeholder={t('settings.firstName')} style={{ flex: 1, padding: '9px 12px', borderRadius: 10, border: 'none', background: 'rgba(255,255,255,0.1)', color: '#fff', fontSize: 14 }} />
-          <input value={profile.last_name} onChange={e => { setProfile(p => ({ ...p, last_name: e.target.value })); setDirty(true) }} placeholder={t('settings.lastName')} style={{ flex: 1, padding: '9px 12px', borderRadius: 10, border: 'none', background: 'rgba(255,255,255,0.1)', color: '#fff', fontSize: 14 }} />
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 8 }}>
+          <input value={profile.first_name} onChange={e => { setProfile(p => ({ ...p, first_name: e.target.value })); setDirty(true) }} placeholder={t('settings.firstName')} style={{ flex: '1 1 120px', minWidth: 0, padding: '9px 12px', borderRadius: 10, border: 'none', background: 'rgba(255,255,255,0.1)', color: '#fff', fontSize: 14 }} />
+          <input value={profile.last_name} onChange={e => { setProfile(p => ({ ...p, last_name: e.target.value })); setDirty(true) }} placeholder={t('settings.lastName')} style={{ flex: '1 1 120px', minWidth: 0, padding: '9px 12px', borderRadius: 10, border: 'none', background: 'rgba(255,255,255,0.1)', color: '#fff', fontSize: 14 }} />
         </div>
         <button disabled={!dirty || saving} onClick={() => save({})} style={{ width: '100%', padding: '9px', borderRadius: 10, background: dirty ? '#fff' : 'rgba(255,255,255,0.15)', color: dirty ? '#000' : 'rgba(255,255,255,0.3)', border: 'none', fontSize: 13, fontWeight: 500 }}>
           {saving ? t('common.saving') : t('settings.saveChanges')}
