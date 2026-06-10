@@ -67,12 +67,21 @@ const FACTOR_LABELS = {
 
 const FACTOR_ORDER = ['cash_health', 'runway', 'payables', 'receivables', 'expense_control']
 
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+/** Safely round a CFO factor value; returns null if input is not a finite number */
+function safeScore(v) {
+  const n = Number(v)
+  return isFinite(n) ? Math.round(n) : null
+}
+
 // ── Sub-components ────────────────────────────────────────────────────────────
 
 function ScoreBar({ score, color }) {
+  const pct = score != null && isFinite(score) ? Math.min(100, Math.max(0, score)) : 0
   return (
     <div style={{ height: 4, background: 'var(--border)', borderRadius: 4, overflow: 'hidden', marginTop: 6 }}>
-      <div style={{ height: '100%', width: `${Math.min(100, Math.max(0, score))}%`, background: color, borderRadius: 4, transition: 'width .6s ease' }} />
+      <div style={{ height: '100%', width: `${pct}%`, background: color, borderRadius: 4, transition: 'width .6s ease' }} />
     </div>
   )
 }
@@ -293,10 +302,10 @@ export default function Pulse({ onDataLoad }) {
 
         {/* cash + runway KPIs */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16, position: 'relative' }}>
-          <div>
+          <div style={{ minWidth: 0 }}>
             <div style={{ fontSize: 9, color: 'rgba(255,255,255,.4)', letterSpacing: '0.08em', marginBottom: 3 }}>TOTAL CASH</div>
-            <div style={{ fontSize: 28, fontWeight: 700, color: totalBalance < 0 ? '#F87171' : '#fff', letterSpacing: -0.5, lineHeight: 1 }}>
-              {fmtFull(totalBalance)}
+            <div style={{ fontSize: 'clamp(22px, 6.5vw, 28px)', fontWeight: 700, color: totalBalance < 0 ? '#F87171' : '#fff', letterSpacing: -0.5, lineHeight: 1, wordBreak: 'break-word' }}>
+              {fmt(totalBalance)}
             </div>
             <div style={{ fontSize: 10, color: 'rgba(255,255,255,.35)', marginTop: 3 }}>IDR</div>
           </div>
@@ -381,13 +390,13 @@ export default function Pulse({ onDataLoad }) {
                 {cfoScore.factors && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                     {FACTOR_ORDER.filter(k => cfoScore.factors[k] != null).map(k => {
-                      const val = Math.round(cfoScore.factors[k])
-                      const col = CFO_SCORE_COLOR(val)
+                      const val = safeScore(cfoScore.factors[k])
+                      const col = val != null ? CFO_SCORE_COLOR(val) : 'var(--text-4)'
                       return (
                         <div key={k}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                             <span style={{ fontSize: 11, color: 'var(--text-2)' }}>{FACTOR_LABELS[k]}</span>
-                            <span style={{ fontSize: 11, fontWeight: 600, color: col }}>{val}</span>
+                            <span style={{ fontSize: 11, fontWeight: 600, color: col }}>{val != null ? val : '—'}</span>
                           </div>
                           <ScoreBar score={val} color={col} />
                         </div>
@@ -447,7 +456,7 @@ export default function Pulse({ onDataLoad }) {
             {[
               {
                 label: 'Total Cash', unit: 'IDR', sub: 'Available now',
-                value: fmtFull(totalBalance),
+                value: fmt(totalBalance),
                 color: totalBalance >= 0 ? 'var(--text)' : 'var(--red)',
               },
               {
@@ -466,7 +475,7 @@ export default function Pulse({ onDataLoad }) {
               },
               {
                 label: 'Net Position', unit: 'IDR', sub: 'Cash + rec − pay',
-                value: fmtFull(netPosition),
+                value: fmt(netPosition),
                 color: netPosition >= 0 ? 'var(--green-dark)' : 'var(--red-dark)',
               },
             ].map(k => (
@@ -499,7 +508,7 @@ export default function Pulse({ onDataLoad }) {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '0.5px solid var(--border)', paddingTop: 10 }}>
               <span style={{ fontSize: 12, color: 'var(--text-3)' }}>Net flow this month</span>
               <span style={{ fontSize: 16, fontWeight: 700, color: netFlowColor }}>
-                {netFlow >= 0 ? '+' : ''}{fmtFull(netFlow)} IDR
+                {netFlow >= 0 ? '+' : ''}{fmt(netFlow)} IDR
               </span>
             </div>
             {income === 0 && expenses === 0 && (
@@ -612,7 +621,7 @@ export default function Pulse({ onDataLoad }) {
                       <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 1, textTransform: 'uppercase' }}>{a.currency || 'IDR'} · {a.type || 'bank'}</div>
                     </div>
                     <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                      <div style={{ fontSize: 14, fontWeight: 700, color: isNeg ? 'var(--red)' : 'var(--text)' }}>{fmtFull(a.balance)}</div>
+                      <div style={{ fontSize: 14, fontWeight: 700, color: isNeg ? 'var(--red)' : 'var(--text)' }}>{fmt(a.balance)}</div>
                       <div style={{ fontSize: 9, color: 'var(--text-4)', marginTop: 1 }}>IDR</div>
                     </div>
                   </div>

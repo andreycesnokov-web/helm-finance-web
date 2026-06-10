@@ -114,21 +114,21 @@ export default function Radar() {
             <div style={{ fontSize: 'var(--text-xs)', color: 'rgba(255,255,255,0.5)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 10 }}>
               Projected balance · 30 days
             </div>
-            <div style={{ fontSize: 'var(--text-hero)', fontWeight: 700, color: '#fff', letterSpacing: -1, lineHeight: 1 }}>
-              {proj30 >= 0 ? '+' : ''}{fmtFull(Math.round(proj30))}
+            <div style={{ fontSize: 'clamp(28px, 9vw, 48px)', fontWeight: 700, color: '#fff', letterSpacing: -1, lineHeight: 1, wordBreak: 'break-word' }}>
+              {proj30 >= 0 ? '+' : ''}{fmt(Math.round(proj30))}
             </div>
             <div style={{ fontSize: 'var(--text-xs)', color: 'rgba(255,255,255,0.4)', marginTop: 8 }}>IDR · if all planned transactions go through</div>
 
             {/* Mini stats row */}
-            <div style={{ display: 'flex', gap: 20, marginTop: 20, paddingTop: 16, borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px 20px', marginTop: 20, paddingTop: 16, borderTop: '1px solid rgba(255,255,255,0.1)' }}>
               {[
-                { label: 'Current balance', val: fmtFull(balance) + ' IDR' },
-                { label: 'Monthly burn',    val: fmtFull(monthlyBurn) + ' IDR' },
-                { label: 'Runway',          val: runway != null ? runway + ' days' : '∞' },
+                { label: 'Balance', val: fmt(balance) + ' IDR' },
+                { label: 'Burn/mo', val: fmt(monthlyBurn) + ' IDR' },
+                { label: 'Runway',  val: runway != null ? runway + ' days' : '∞' },
               ].map(s => (
-                <div key={s.label}>
-                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: 4 }}>{s.label}</div>
-                  <div style={{ fontSize: 'var(--text-sm)', fontWeight: 600, color: '#fff' }}>{s.val}</div>
+                <div key={s.label} style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: 4 }}>{s.label}</div>
+                  <div style={{ fontSize: 'var(--text-sm)', fontWeight: 600, color: '#fff', whiteSpace: 'nowrap' }}>{s.val}</div>
                 </div>
               ))}
             </div>
@@ -153,9 +153,9 @@ export default function Radar() {
       {/* Burn rate metrics card */}
       <div className="hf-card" style={{ marginBottom: 16 }}>
         <div style={{ fontSize: 'var(--text-sm)', fontWeight: 700, color: 'var(--text-3)', marginBottom: 16, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Monthly burn breakdown</div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
           {[
-            { label: 'Monthly burn', val: fmtFull(monthlyBurn), sub: 'IDR / month', color: 'var(--red-dark)' },
+            { label: 'Monthly burn', val: fmt(monthlyBurn), sub: 'IDR / month', color: 'var(--red-dark)' },
             { label: 'Daily average', val: fmt(burnRate), sub: d.burnWindowDays >= 30 ? '30-day rolling avg' : d.burnWindowDays > 0 ? `${d.burnWindowDays}d avg` : 'avg', color: 'var(--text)' },
             { label: 'Runway left', val: runway != null ? runway + 'd' : '∞', sub: burnRate > 0 ? 'at current burn' : 'no burn data', color: runway != null && runway < 14 ? 'var(--red-dark)' : runway != null && runway < 30 ? 'var(--amber-dark)' : 'var(--green-dark)' },
           ].map(s => (
@@ -213,10 +213,10 @@ export default function Radar() {
       <div className="hf-card">
         <div style={{ fontSize: 'var(--text-base)', fontWeight: 700, color: 'var(--text)', marginBottom: 14 }}>30-day net flow</div>
         {[
-          { label: 'Current balance',    val: fmtFull(balance),    color: 'var(--text)',      sign: '' },
-          { label: '+ Expected income',  val: fmtFull(totalIn),    color: 'var(--green-dark)', sign: '+' },
-          { label: '− Expected payments',val: fmtFull(totalOut),   color: 'var(--red-dark)',   sign: '−' },
-          { label: '− Monthly burn',     val: fmtFull(monthlyBurn),color: 'var(--red-dark)',   sign: '−' },
+          { label: 'Current balance',    val: fmt(balance),    color: 'var(--text)',      sign: '' },
+          { label: '+ Expected income',  val: fmt(totalIn),    color: 'var(--green-dark)', sign: '+' },
+          { label: '− Expected payments',val: fmt(totalOut),   color: 'var(--red-dark)',   sign: '−' },
+          { label: '− Monthly burn',     val: fmt(monthlyBurn),color: 'var(--red-dark)',   sign: '−' },
         ].map((row, i) => (
           <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: i < 3 ? '0.5px solid var(--border)' : 'none' }}>
             <span style={{ fontSize: 'var(--text-sm)', color: 'var(--text-2)' }}>{row.label}</span>
@@ -226,7 +226,7 @@ export default function Radar() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 0 2px', borderTop: '2px solid var(--border-2)', marginTop: 4 }}>
           <span style={{ fontSize: 'var(--text-base)', fontWeight: 700, color: 'var(--text)' }}>Projected balance</span>
           <span style={{ fontSize: 'var(--text-base)', fontWeight: 700, color: isHealthy ? 'var(--green-dark)' : 'var(--red-dark)' }}>
-            {proj30 >= 0 ? '+' : ''}{fmtFull(Math.round(proj30))} IDR
+            {proj30 >= 0 ? '+' : ''}{fmt(Math.round(proj30))} IDR
           </span>
         </div>
       </div>

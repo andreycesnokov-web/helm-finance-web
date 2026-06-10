@@ -148,6 +148,12 @@
 
 * { box-sizing: border-box; }
 
+/* ── Prevent horizontal overflow on all devices ── */
+html, body {
+  overflow-x: hidden;
+  max-width: 100%;
+}
+
 body {
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, 'Inter', sans-serif;
@@ -157,15 +163,23 @@ body {
 
 #root {
   max-width: 100% !important;
+  overflow-x: hidden;
   display: flex;
   min-height: 100dvh;
 }
 
 /* ── Mobile base ── */
 .page {
-  padding-bottom: 72px;
+  padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px));
   min-height: 100dvh;
   background: var(--bg);
+  min-width: 0;
+  max-width: 100%;
+}
+
+.hf-page {
+  min-width: 0;
+  max-width: 100%;
 }
 
 .nav {
@@ -180,6 +194,7 @@ body {
   width: 100%;
   max-width: 430px;
   z-index: 100;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
 .nav-btn {
