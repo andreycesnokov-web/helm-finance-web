@@ -190,7 +190,7 @@ export default function Accounts() {
     if (!adjustForm.reason.trim()) return
     setAdjusting(true)
     try {
-      const r = await apiFetch(`/admin/wallets/${adjustWallet.id}/adjust-balance`, token, {
+      const r = await apiFetch(`/wallets/${adjustWallet.id}/adjust-balance`, token, {
         method: 'POST',
         body: {
           target_balance:   targetNum,
@@ -321,18 +321,16 @@ export default function Accounts() {
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-                    {isAdmin && (
-                      <button
-                        onClick={() => openAdjust(w)}
-                        title="Adjust balance (admin)"
-                        style={{ height: 34, padding: '0 10px', borderRadius: 10, background: '#FEF3C7', border: '1px solid #FDE68A', display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer', fontSize: 11, fontWeight: 700, color: '#92400E', fontFamily: 'inherit' }}
-                      >
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                          <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-                        </svg>
-                        Adjust
-                      </button>
-                    )}
+                    <button
+                      onClick={() => openAdjust(w)}
+                      title="Adjust balance"
+                      style={{ height: 34, padding: '0 10px', borderRadius: 10, background: 'var(--bg-2)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer', fontSize: 11, fontWeight: 700, color: 'var(--text-2)', fontFamily: 'inherit' }}
+                    >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                        <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+                      </svg>
+                      Adjust
+                    </button>
                     <button onClick={() => openEdit(w)} style={{ width: 34, height: 34, borderRadius: 10, background: 'var(--bg-2)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, cursor: 'pointer' }}>
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-2)" strokeWidth="2" strokeLinecap="round">
                         <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
@@ -437,9 +435,9 @@ export default function Accounts() {
               </div>
             </div>
 
-            {/* Admin badge */}
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 700, color: '#92400E', background: '#FEF3C7', border: '1px solid #FDE68A', borderRadius: 20, padding: '3px 10px', marginBottom: 18 }}>
-              ⚡ Super Admin · creates a correction transaction
+            {/* Info badge */}
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 600, color: 'var(--text-3)', background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: 20, padding: '3px 10px', marginBottom: 18 }}>
+              Creates a correction transaction · balance recalculated automatically
             </div>
 
             {/* Current balance */}
@@ -609,14 +607,14 @@ export default function Accounts() {
               Cancel
             </button>
 
-            {editWallet && isAdmin && (
+            {editWallet && (
               <button
                 onClick={() => { setShowForm(false); openAdjust(editWallet) }}
                 disabled={saving}
                 className="btn btn-block btn-lg"
-                style={{ marginBottom: 8, background: '#FEF3C7', border: '1px solid #FDE68A', color: '#92400E', fontWeight: 700 }}
+                style={{ marginBottom: 8, background: 'var(--bg-2)', border: '1px solid var(--border)', color: 'var(--text-2)', fontWeight: 600 }}
               >
-                ⚡ Adjust Balance (admin)
+                Adjust Balance
               </button>
             )}
 

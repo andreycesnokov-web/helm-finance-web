@@ -1021,6 +1021,99 @@ function requireAdmin(req, res, next) {
   next();
 }
 
+// POST /api/wallets/:id/adjust-balance
+// Any authenticated user — ownership-checked. Creates a signed correction
+// transaction to bring the wallet balance to target_balance.
+// NEVER modifies wallet.balance directly.
+app.post('/api/wallets/:id/adjust-balance', auth, async (req, res) => {
+  try {
+    const userId   = req.user.userId;
+    const walletId = req.params.id;
+    const { target_balance, reason, transaction_date } = req.body;
+
+    if (target_balance === undefined || target_balance === null) {
+      return res.status(400).json({ error: 'target_balance is required' });
+    }
+    const targetNum = Number(target_balance);
+    if (isNaN(targetNum)) {
+      return res.status(400).json({ error: 'target_balance must be a number' });
+    }
+    if (!reason || !String(reason).trim()) {
+      return res.status(400).json({ error: 'reason is required' });
+    }
+
+    // Load wallet — ownership enforced via user_id filter
+    const { data: wallet, error: wErr } = await supabase
+      .from('wallets')
+      .select('id, user_id, name, currency')
+      .eq('id', walletId)
+      .eq('user_id', userId)   // ownership check: can only adjust own wallets
+      .single();
+    if (wErr || !wallet) return res.status(404).json({ error: 'Wallet not found' });
+
+    // Compute current balance
+    const { data: txs, error: tErr } = await supabase
+      .from('transactions')
+      .select('wallet_id, source, type, amount_idr')
+      .eq('user_id', userId);
+    if (tErr) throw tErr;
+
+    const related = (txs || []).filter(t =>
+      t.wallet_id === wallet.id || (!t.wallet_id && t.source === wallet.name)
+    );
+    const currentBalance = related.reduce((sum, t) => {
+      if (WALLET_CASH_IN.includes(t.type))  return sum + Number(t.amount_idr || 0);
+      if (WALLET_CASH_OUT.includes(t.type)) return sum - Number(t.amount_idr || 0);
+      if (t.type === 'correction')           return sum + Number(t.amount_idr || 0);
+      return sum;
+    }, 0);
+
+    const delta = targetNum - currentBalance;
+
+    if (delta === 0) {
+      return res.json({
+        ok: true,
+        message: 'Balance is already at target — no correction needed.',
+        current_balance: currentBalance,
+        delta: 0,
+      });
+    }
+
+    const txDate = transaction_date
+      ? new Date(transaction_date).toISOString()
+      : new Date().toISOString();
+
+    const { data: corrTx, error: cErr } = await supabase
+      .from('transactions')
+      .insert({
+        user_id:           userId,
+        type:              'correction',
+        amount_original:   delta,
+        currency_original: wallet.currency || 'IDR',
+        amount_idr:        delta,
+        description:       `Balance correction: ${String(reason).trim()}`,
+        source:            wallet.name,
+        wallet_id:         wallet.id,
+        scope:             'business',
+        category:          'Balance Correction',
+        created_at:        txDate,
+      })
+      .select('id')
+      .single();
+    if (cErr) throw cErr;
+
+    res.json({
+      ok:               true,
+      previous_balance: currentBalance,
+      delta,
+      new_balance:      targetNum,
+      transaction_id:   corrTx.id,
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // --- Admin endpoints -------------------------------------------------------
 
 app.get('/api/admin/users', auth, requireAdmin, async (req, res) => {
