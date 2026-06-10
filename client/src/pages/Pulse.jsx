@@ -8,6 +8,10 @@ import { apiFetch, fmt, fmtFull, daysUntil } from '../lib/api'
 
 const SCOPE_LABELS = { all: 'All', business: 'Business', personal: 'Personal' }
 
+// All real routes registered in App.jsx
+const ALLOWED_ROUTES = ['/', '/add', '/radar', '/accounts', '/settings', '/cfo',
+  '/transactions', '/receivables', '/payables', '/invoices', '/payroll', '/tasks', '/approvals']
+
 const CFO_SCORE_COLOR = (score) =>
   score >= 75 ? '#12B76A' : score >= 50 ? '#F79009' : '#F04438'
 
@@ -107,6 +111,12 @@ const Modal = ({ onClose, children }) => createPortal(
 export default function Pulse({ onDataLoad }) {
   const { token, user } = useAuth()
   const navigate = useNavigate()
+
+  // Safe navigation — ignores unknown/empty routes to prevent blank pages
+  const safeNav = (route, fallback = '/') => {
+    const target = route && ALLOWED_ROUTES.includes(route) ? route : fallback
+    navigate(target)
+  }
 
   const [scope, setScope]         = useState('all')
   const [pulse, setPulse]         = useState(null)
@@ -344,7 +354,7 @@ export default function Pulse({ onDataLoad }) {
           <button onClick={() => navigate('/add')} style={{ background: '#fff', border: 'none', borderRadius: 14, padding: '10px 0', fontSize: 12, fontWeight: 600, color: '#0D1B2E', cursor: 'pointer' }}>
             + Add transaction
           </button>
-          <button onClick={() => navigate('/ai-cfo')} style={{ background: 'rgba(255,255,255,.1)', border: '0.5px solid rgba(255,255,255,.2)', borderRadius: 14, padding: '10px 0', fontSize: 12, color: '#fff', cursor: 'pointer', fontWeight: 500 }}>
+          <button onClick={() => navigate('/cfo')} style={{ background: 'rgba(255,255,255,.1)', border: '0.5px solid rgba(255,255,255,.2)', borderRadius: 14, padding: '10px 0', fontSize: 12, color: '#fff', cursor: 'pointer', fontWeight: 500 }}>
             Ask AI CFO →
           </button>
         </div>
@@ -421,7 +431,7 @@ export default function Pulse({ onDataLoad }) {
                         Safe salary: {fmt(hiringR.safe_monthly_salary)} {hiringR.currency || 'IDR'}/mo
                       </div>
                     )}
-                    <button onClick={() => navigate('/ai-cfo')}
+                    <button onClick={() => navigate('/cfo')}
                       style={{ marginTop: 10, fontSize: 10, padding: '5px 10px', borderRadius: 10, background: 'none', border: '0.5px solid var(--border)', color: 'var(--brand)', cursor: 'pointer' }}>
                       Ask CFO →
                     </button>
@@ -564,7 +574,7 @@ export default function Pulse({ onDataLoad }) {
                 const icon = ACTION_ICONS[act.action_type]  || ACTION_ICONS.default
                 const route = act.route || null
                 return (
-                  <button key={i} onClick={() => route && navigate(route)}
+                  <button key={i} onClick={() => route && safeNav(route)}
                     style={{ display: 'flex', alignItems: 'center', gap: 12, background: 'var(--bg-2)', border: '0.5px solid var(--border)', borderRadius: 16, padding: '12px 14px', cursor: route ? 'pointer' : 'default', textAlign: 'left', width: '100%' }}>
                     <div style={{ width: 34, height: 34, borderRadius: 10, background: col.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, color: col.color, flexShrink: 0, fontWeight: 700 }}>
                       {icon}
@@ -608,7 +618,7 @@ export default function Pulse({ onDataLoad }) {
                   </div>
                 )
               })}
-              <button onClick={() => navigate('/wallets')}
+              <button onClick={() => navigate('/accounts')}
                 style={{ padding: '9px 0', borderRadius: 14, fontSize: 12, border: '0.5px solid var(--border)', background: 'none', color: 'var(--brand)', cursor: 'pointer', fontWeight: 500 }}>
                 Manage wallets →
               </button>
@@ -659,14 +669,14 @@ export default function Pulse({ onDataLoad }) {
           <SectionLabel>QUICK ACTIONS</SectionLabel>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, margin: '0 16px 28px' }}>
             {[
-              { icon: '+',  label: 'Add Transaction', route: '/add',               bg: 'var(--brand)',       color: '#fff' },
-              { icon: '↓',  label: 'New Receivable',  route: '/receivables?new=1', bg: 'var(--green-light)', color: 'var(--green-dark)' },
-              { icon: '↑',  label: 'New Payable',     route: '/payables?new=1',    bg: 'var(--red-light)',   color: 'var(--red-dark)'   },
-              { icon: '🤖', label: 'Ask AI CFO',      route: '/ai-cfo',            bg: 'var(--blue-light)',  color: 'var(--blue-dark)'  },
-              { icon: '💳', label: 'Add Wallet',      route: '/wallets',           bg: 'var(--bg-3)',        color: 'var(--text-2)'     },
-              { icon: '📊', label: 'View Radar',      route: '/radar',             bg: 'var(--bg-3)',        color: 'var(--text-2)'     },
+              { icon: '+',  label: 'Add Transaction', route: '/add',          bg: 'var(--brand)',       color: '#fff' },
+              { icon: '↓',  label: 'New Receivable',  route: '/receivables',  bg: 'var(--green-light)', color: 'var(--green-dark)' },
+              { icon: '↑',  label: 'New Payable',     route: '/payables',     bg: 'var(--red-light)',   color: 'var(--red-dark)'   },
+              { icon: '🤖', label: 'Ask AI CFO',      route: '/cfo',          bg: 'var(--blue-light)',  color: 'var(--blue-dark)'  },
+              { icon: '💳', label: 'Accounts',        route: '/accounts',     bg: 'var(--bg-3)',        color: 'var(--text-2)'     },
+              { icon: '📊', label: 'View Radar',      route: '/radar',        bg: 'var(--bg-3)',        color: 'var(--text-2)'     },
             ].map(a => (
-              <button key={a.label} onClick={() => navigate(a.route)}
+              <button key={a.label} onClick={() => safeNav(a.route)}
                 style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '12px 14px', borderRadius: 16, border: 'none', background: a.bg, color: a.color, cursor: 'pointer', fontWeight: 500, fontSize: 12, minHeight: 44 }}>
                 <span style={{ fontSize: 16 }}>{a.icon}</span>
                 {a.label}

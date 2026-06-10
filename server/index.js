@@ -2276,14 +2276,14 @@ function buildNextActionsV2(ctx, hiringReadiness) {
         title: 'Delay hiring — build runway first',
         description: `Runway of ${runway} days is below safe threshold. Focus on extending runway before adding fixed costs.`,
         action_type: 'hiring_delay', priority: 'medium',
-        amount: 0, route: '/ai-cfo',
+        amount: 0, route: '/cfo',
       });
     } else if (hiringReadiness.status === 'ready' && hiringReadiness.safe_monthly_salary > 0) {
       actions.push({
         title: 'Hiring capacity available',
         description: `Safe monthly salary budget: ${fmt(hiringReadiness.safe_monthly_salary)} ${currency}. You can hire conservatively.`,
         action_type: 'hiring_ready', priority: 'low',
-        amount: hiringReadiness.safe_monthly_salary, route: '/ai-cfo',
+        amount: hiringReadiness.safe_monthly_salary, route: '/cfo',
       });
     }
   }
