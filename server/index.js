@@ -2684,6 +2684,43 @@ ANSWER RULES:
   }
 });
 
+// ── DELETE /api/user/reset-data ───────────────────────────────────────────────
+// Deletes all financial data for the current user.
+// Keeps: users row, business, business_members, access/plan.
+// Deletes: transactions, debts, wallets, reminders.
+// Requires confirmation token in body: { confirm: "RESET" }
+app.delete('/api/user/reset-data', auth, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { confirm } = req.body || {};
+
+    if (confirm !== 'RESET') {
+      return res.status(400).json({ error: 'Send { "confirm": "RESET" } to confirm data reset.' });
+    }
+
+    const errors = [];
+
+    // Delete in safe order (no FK issues — all scoped to user_id)
+    const tables = ['transactions', 'debts', 'reminders', 'wallets'];
+    for (const table of tables) {
+      const { error } = await supabase.from(table).delete().eq('user_id', userId);
+      if (error) errors.push(`${table}: ${error.message}`);
+    }
+
+    if (errors.length > 0) {
+      return res.status(500).json({ error: 'Partial reset — some tables failed', details: errors });
+    }
+
+    res.json({
+      success: true,
+      message: 'All financial data deleted. Account, business and plan settings are preserved.',
+      deleted: tables,
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 app.get('*', (req, res) => {
   res.sendFile('index.html', { root: 'client/dist' });
 });

@@ -73,7 +73,11 @@ export default function Settings() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [dirty, setDirty] = useState(false)
-  const [showLogout, setShowLogout] = useState(false)
+  const [showLogout,    setShowLogout]    = useState(false)
+  const [showReset,     setShowReset]     = useState(false)
+  const [resetStep,     setResetStep]     = useState(1)   // 1=confirm, 2=done
+  const [resetLoading,  setResetLoading]  = useState(false)
+  const [resetError,    setResetError]    = useState('')
   const [showLang, setShowLang] = useState(false)
   const [showTz, setShowTz] = useState(false)
   const [notifications, setNotifications] = useState(localStorage.getItem('hf_notif') !== 'false')
@@ -164,6 +168,27 @@ export default function Settings() {
   }
 
   const handleLogout = () => { logout(); navigate('/login') }
+
+  const handleResetData = async () => {
+    setResetLoading(true); setResetError('')
+    try {
+      const res = await fetch('/api/user/reset-data', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ confirm: 'RESET' }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Reset failed')
+      setResetStep(2)
+    } catch (e) {
+      setResetError(e.message)
+    } finally {
+      setResetLoading(false)
+    }
+  }
+
+  const closeReset = () => { setShowReset(false); setResetStep(1); setResetError('') }
+  const resetAndReload = () => { closeReset(); navigate('/pulse') }
   const handleNotif = () => { const n = !notifications; setNotifications(n); localStorage.setItem('hf_notif', String(n)) }
 
   const selectedLang = LANGUAGES.find(l => l.code === profile.language) || LANGUAGES[0]
@@ -433,6 +458,15 @@ export default function Settings() {
         </button>
       </div>
 
+      {/* Reset all data */}
+      <div style={{ margin: '0 16px 8px' }}>
+        <button
+          onClick={() => { setShowReset(true); setResetStep(1); setResetError('') }}
+          style={{ width: '100%', padding: 13, borderRadius: 12, background: 'none', color: 'var(--amber-dark)', border: '0.5px solid var(--amber-dark)', fontSize: 14, fontWeight: 500, cursor: 'pointer' }}>
+          🗑 Reset all financial data
+        </button>
+      </div>
+
       <div style={{ margin: '0 16px 16px' }}>
         <button onClick={() => setShowLogout(true)} style={{ width: '100%', padding: 13, borderRadius: 12, background: 'none', color: 'var(--red)', border: '0.5px solid var(--red)', fontSize: 14, fontWeight: 500, cursor: 'pointer' }}>{t('settings.signOut')}</button>
       </div>
@@ -479,6 +513,61 @@ export default function Settings() {
             <div style={{ fontSize: 13, color: 'var(--text-3)', marginBottom: 20 }}>{t('settings.signOutNote')}</div>
             <button onClick={handleLogout} style={{ width: '100%', padding: 13, borderRadius: 10, background: 'var(--red)', color: '#fff', border: 'none', fontSize: 14, fontWeight: 500, marginBottom: 8 }}>{t('settings.signOut')}</button>
             <button onClick={() => setShowLogout(false)} style={{ width: '100%', padding: 11, borderRadius: 10, background: 'none', color: 'var(--text-3)', border: '0.5px solid var(--border)', fontSize: 13 }}>{t('common.cancel')}</button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Reset all data modal ── */}
+      {showReset && (
+        <div onClick={resetStep === 1 ? closeReset : undefined} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 200, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+          <div onClick={e => e.stopPropagation()} style={{ background: 'var(--bg)', borderRadius: '16px 16px 0 0', padding: '20px 16px 36px', width: '100%', maxWidth: 480 }}>
+            <div style={{ width: 36, height: 3, background: 'var(--border-2)', borderRadius: 2, margin: '0 auto 20px' }} />
+
+            {resetStep === 1 && (
+              <>
+                <div style={{ fontSize: 22, textAlign: 'center', marginBottom: 10 }}>🗑</div>
+                <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 8, textAlign: 'center' }}>Reset all financial data?</div>
+                <div style={{ fontSize: 13, color: 'var(--text-3)', marginBottom: 6, lineHeight: 1.6 }}>
+                  This will permanently delete:
+                </div>
+                <div style={{ background: 'var(--red-light)', borderRadius: 10, padding: '10px 14px', marginBottom: 20, fontSize: 13, color: 'var(--red-dark)', lineHeight: 1.8 }}>
+                  ✕ All transactions<br />
+                  ✕ All debts & invoices (receivables / payables)<br />
+                  ✕ All wallets<br />
+                  ✕ All reminders
+                </div>
+                <div style={{ background: 'var(--green-light)', borderRadius: 10, padding: '10px 14px', marginBottom: 20, fontSize: 13, color: 'var(--green-dark)', lineHeight: 1.8 }}>
+                  ✓ Account stays active<br />
+                  ✓ Business & plan settings preserved<br />
+                  ✓ You can start fresh immediately
+                </div>
+                {resetError && (
+                  <div style={{ fontSize: 12, color: 'var(--red-dark)', marginBottom: 12, padding: '8px 12px', background: 'var(--red-light)', borderRadius: 8 }}>{resetError}</div>
+                )}
+                <button
+                  onClick={handleResetData}
+                  disabled={resetLoading}
+                  style={{ width: '100%', padding: 13, borderRadius: 10, background: 'var(--amber-dark)', color: '#fff', border: 'none', fontSize: 14, fontWeight: 600, marginBottom: 8, cursor: resetLoading ? 'not-allowed' : 'pointer', opacity: resetLoading ? 0.7 : 1 }}>
+                  {resetLoading ? 'Deleting data…' : 'Yes, reset all data'}
+                </button>
+                <button onClick={closeReset} style={{ width: '100%', padding: 11, borderRadius: 10, background: 'none', color: 'var(--text-3)', border: '0.5px solid var(--border)', fontSize: 13, cursor: 'pointer' }}>
+                  Cancel
+                </button>
+              </>
+            )}
+
+            {resetStep === 2 && (
+              <>
+                <div style={{ fontSize: 32, textAlign: 'center', marginBottom: 12 }}>✅</div>
+                <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 8, textAlign: 'center' }}>Data reset complete</div>
+                <div style={{ fontSize: 13, color: 'var(--text-3)', marginBottom: 24, textAlign: 'center', lineHeight: 1.6 }}>
+                  All transactions, debts, wallets and reminders have been deleted.<br />Your account is ready for fresh data.
+                </div>
+                <button onClick={resetAndReload} style={{ width: '100%', padding: 13, borderRadius: 10, background: 'var(--brand)', color: '#fff', border: 'none', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
+                  Go to Dashboard
+                </button>
+              </>
+            )}
           </div>
         </div>
       )}
