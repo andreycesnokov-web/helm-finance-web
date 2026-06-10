@@ -110,28 +110,43 @@ app.get('/api/pulse', auth, async (req, res) => {
       .select('*').eq('user_id', userId).eq('is_done', false)
       .order('due_date', { ascending: true });
 
-    // -- Balance from transactions ------------------------------------------
-    // OUTGOING_TYPES: types that reduce cash.
-    //   'payroll' is a real cash outflow — must be included or balance is inflated.
-    //   'transfer' is excluded: transfers between own accounts are cash-neutral
-    //   for net worth; each transfer leg is already reflected in account balances.
-    const OUTGOING_TYPES = ['expense', 'payroll'];
-    const allIncome   = (allTxs || []).filter(t => t.type === 'income').reduce((s, t) => s + Number(t.amount_original), 0);
-    const allExpenses = (allTxs || []).filter(t => OUTGOING_TYPES.includes(t.type)).reduce((s, t) => s + Number(t.amount_original), 0);
+    // ── Cash impact model (Phase 1) ─────────────────────────────────────────
+    // Single source of truth for which transaction types affect cash.
+    // Used for BOTH totalBalance and per-account sourceMap so the two
+    // figures always agree.
+    //
+    // CASH_IN:  types that increase total cash / account balance
+    // CASH_OUT: types that decrease total cash / account balance
+    // NEUTRAL:  types with no net cash effect (Phase 1 limitation noted below)
+    //
+    // Phase 1 known limitation:
+    //   'transfer' is NEUTRAL for both total cash AND account balances.
+    //   Reason: we store only one transaction leg (source account), not
+    //   a double-entry from/to pair.  Without a reliable to_account field
+    //   we cannot credit the destination account, so we treat transfers
+    //   as cash-neutral to avoid phantom debits.
+    //   TODO: when from_account / to_account schema fields are added,
+    //         transfer should debit source account and credit destination.
+    const CASH_IN  = ['income'];
+    const CASH_OUT = ['expense', 'payroll'];
+    // 'transfer', 'correction', unknown types → NEUTRAL (no effect)
+
+    const allIncome   = (allTxs || []).filter(t => CASH_IN.includes(t.type)).reduce((s, t) => s + Number(t.amount_original), 0);
+    const allExpenses = (allTxs || []).filter(t => CASH_OUT.includes(t.type)).reduce((s, t) => s + Number(t.amount_original), 0);
     const totalBalance = allIncome - allExpenses;
 
-    // Virtual accounts from transaction sources
-    // Only transactions with a non-null source form a named account.
-    // Null-source transactions (from deleted accounts) still count in totalBalance
-    // but are intentionally excluded from the accounts list so deleted accounts
-    // are not silently re-created on every Pulse load.
+    // Virtual accounts from transaction sources.
+    // Uses the same CASH_IN / CASH_OUT model as totalBalance so that
+    // sum(account balances) == totalBalance for all source-linked transactions.
+    // Null-source transactions are excluded from accounts but still count in totalBalance.
     const sourceMap = {};
     (allTxs || []).forEach(t => {
-      if (!t.source) return; // skip null-source txs — they belong to no account
+      if (!t.source) return; // null-source txs counted in totalBalance but belong to no named account
       const src = t.source;
       if (!sourceMap[src]) sourceMap[src] = { id: src, name: src, balance: 0, type: t.scope || 'personal' };
-      if (t.type === 'income') sourceMap[src].balance += Number(t.amount_original);
-      else sourceMap[src].balance -= Number(t.amount_original);
+      if      (CASH_IN.includes(t.type))  sourceMap[src].balance += Number(t.amount_original);
+      else if (CASH_OUT.includes(t.type)) sourceMap[src].balance -= Number(t.amount_original);
+      // transfer / unknown → neutral: no effect on account balance (Phase 1)
     });
     const accounts = Object.values(sourceMap)
       .filter(a => a.balance !== 0 || true) // show all accounts
@@ -139,10 +154,9 @@ app.get('/api/pulse', auth, async (req, res) => {
       .slice(0, 10);
 
     // -- This month metrics -------------------------------------------------
-    // expenses (for display) includes payroll — it is a real operational cost.
-    // burnRate must include payroll so runway reflects actual cash consumption.
-    const income   = (txs || []).filter(t => t.type === 'income').reduce((s, t) => s + Number(t.amount_original), 0);
-    const expenses = (txs || []).filter(t => OUTGOING_TYPES.includes(t.type)).reduce((s, t) => s + Number(t.amount_original), 0);
+    // Uses the same CASH_IN / CASH_OUT model for consistency.
+    const income   = (txs || []).filter(t => CASH_IN.includes(t.type)).reduce((s, t) => s + Number(t.amount_original), 0);
+    const expenses = (txs || []).filter(t => CASH_OUT.includes(t.type)).reduce((s, t) => s + Number(t.amount_original), 0);
     const daysInMonth = now.getDate();
     const burnRate = daysInMonth > 0 ? Math.round(expenses / daysInMonth) : 0;
     const runway = burnRate > 0 ? Math.round(totalBalance / burnRate) : 999;
