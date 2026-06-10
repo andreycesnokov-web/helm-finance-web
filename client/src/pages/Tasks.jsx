@@ -41,8 +41,11 @@ function buildTasks(d) {
   const debtIdsAdded = new Set()
 
   // ── 1. Overdue debts (urgent) ─────────────────────────────────────────────
-  for (const debt of (d.debts || []).filter(x => !x.is_settled && daysUntil(x.due_date) <= 0)) {
+  const isOpenDebt = x => !['paid', 'cancelled'].includes(x.status) && !x.is_settled
+  for (const debt of (d.debts || []).filter(x => isOpenDebt(x) && daysUntil(x.due_date) <= 0)) {
     debtIdsAdded.add(debt.id)
+    const remaining = Number(debt.remaining_amount ?? debt.amount ?? 0)
+    const isPartial = debt.status === 'partial'
     tasks.push({
       id: `debt-overdue-${debt.id}`,
       sourceId: debt.id,
@@ -53,7 +56,7 @@ function buildTasks(d) {
       title: debt.type === 'receivable'
         ? `Collect from ${debt.counterparty}`
         : `Pay ${debt.counterparty}`,
-      sub: `${fmt(debt.amount)} IDR · ${Math.abs(daysUntil(debt.due_date))}d overdue`,
+      sub: `${fmt(remaining)} IDR remaining${isPartial ? ' (partial)' : ''} · ${Math.abs(daysUntil(debt.due_date))}d overdue`,
       type: debt.type,
       days: daysUntil(debt.due_date),
       urgent: true,
@@ -62,9 +65,11 @@ function buildTasks(d) {
 
   // ── 2. Upcoming debts (1–7 days) ──────────────────────────────────────────
   for (const debt of (d.debts || []).filter(x =>
-    !x.is_settled && daysUntil(x.due_date) > 0 && daysUntil(x.due_date) <= 7
+    isOpenDebt(x) && daysUntil(x.due_date) > 0 && daysUntil(x.due_date) <= 7
   )) {
     debtIdsAdded.add(debt.id)
+    const remaining = Number(debt.remaining_amount ?? debt.amount ?? 0)
+    const isPartial = debt.status === 'partial'
     tasks.push({
       id: `debt-upcoming-${debt.id}`,
       sourceId: debt.id,
@@ -75,7 +80,7 @@ function buildTasks(d) {
       title: debt.type === 'receivable'
         ? `Follow up with ${debt.counterparty}`
         : `Prepare payment: ${debt.counterparty}`,
-      sub: `${fmt(debt.amount)} IDR · due ${fmtDate(debt.due_date)}`,
+      sub: `${fmt(remaining)} IDR${isPartial ? ' remaining (partial)' : ''} · due ${fmtDate(debt.due_date)}`,
       type: debt.type,
       days: daysUntil(debt.due_date),
       urgent: false,

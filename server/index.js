@@ -100,10 +100,11 @@ app.get('/api/pulse', auth, async (req, res) => {
     if (scope !== 'all') txQuery = txQuery.eq('scope', scope);
     const { data: txs } = await txQuery;
 
-    // Debts
-    const { data: debts } = await supabase.from('debts')
-      .select('*').eq('user_id', userId).eq('is_settled', false)
+    // Debts — fetch all (including settled) so UI can show history; enrich with status
+    const { data: rawDebts } = await supabase.from('debts')
+      .select('*').eq('user_id', userId)
       .order('due_date', { ascending: true });
+    const debts = enrichDebts(rawDebts);
 
     // Reminders
     const { data: reminders } = await supabase.from('reminders')
@@ -189,8 +190,10 @@ app.get('/api/pulse', auth, async (req, res) => {
     const burnRate = daysInMonth > 0 ? Math.round(expenses / daysInMonth) : 0;
     const runway = burnRate > 0 ? Math.round(totalBalance / burnRate) : 999;
 
-    const receivables = (debts || []).filter(d => d.type === 'receivable').reduce((s, d) => s + Number(d.amount), 0);
-    const payables = (debts || []).filter(d => d.type === 'payable').reduce((s, d) => s + Number(d.amount), 0);
+    // Use remaining_amount (not original amount) and exclude paid/cancelled
+    const openDebts    = (debts || []).filter(d => !['paid', 'cancelled'].includes(d.status));
+    const receivables  = openDebts.filter(d => d.type === 'receivable').reduce((s, d) => s + Number(d.remaining_amount || d.amount || 0), 0);
+    const payables     = openDebts.filter(d => d.type === 'payable').reduce((s, d) => s + Number(d.remaining_amount || d.amount || 0), 0);
     const netPosition = totalBalance + receivables - payables;
 
     // -- AI status ----------------------------------------------------------
@@ -242,12 +245,63 @@ app.get('/api/pulse', auth, async (req, res) => {
 
 // --- Debts API -------------------------------------------------------------
 
+// ── Debt status helpers ────────────────────────────────────────────────────────
+/**
+ * computeDebtStatus — derive status + extra fields from a debt row.
+ *
+ * Status rules:
+ *   cancelled   → stays cancelled
+ *   is_settled  → paid
+ *   paid_amount >= effective_amount → paid
+ *   paid_amount > 0                 → partial
+ *   due_date < today                → overdue
+ *   otherwise                      → open
+ *
+ * Returns plain object with extra derived fields merged into debt.
+ */
+function computeDebtStatus(debt) {
+  const effectiveAmount = Number(debt.original_amount || debt.amount || 0);
+  const paidAmount      = Number(debt.paid_amount     || 0);
+  const remaining       = Math.max(0, effectiveAmount - paidAmount);
+  const now             = new Date();
+  const dueDate         = debt.due_date ? new Date(debt.due_date) : null;
+  const daysOverdue     = dueDate ? Math.floor((now - dueDate) / 86400000) : 0;
+
+  let status;
+  if (debt.status === 'cancelled')             status = 'cancelled';
+  else if (debt.is_settled || remaining <= 0)  status = 'paid';
+  else if (paidAmount > 0)                     status = 'partial';
+  else if (dueDate && now > dueDate)           status = 'overdue';
+  else                                         status = 'open';
+
+  return {
+    ...debt,
+    // Normalised amounts
+    original_amount: effectiveAmount,
+    paid_amount:     paidAmount,
+    remaining_amount: remaining,
+    // Status
+    status,
+    days_overdue: status === 'overdue' ? daysOverdue : 0,
+  };
+}
+
+/** Enrich an array of debts with computed status fields. */
+function enrichDebts(debts) {
+  return (debts || []).map(computeDebtStatus);
+}
+
 app.get('/api/debts', auth, async (req, res) => {
-  const { data, error } = await supabase.from('debts')
-    .select('*').eq('user_id', req.user.userId).eq('is_settled', false)
+  const { type } = req.query;
+  let query = supabase.from('debts')
+    .select('*').eq('user_id', req.user.userId)
     .order('due_date', { ascending: true });
+  // Optional type filter (receivable / payable)
+  if (type) query = query.eq('type', type);
+  // By default include all (not just unsettled) so UI can show paid history
+  const { data, error } = await query;
   if (error) return res.status(500).json({ error: error.message });
-  res.json(data);
+  res.json(enrichDebts(data));
 });
 
 app.post('/api/debts', auth, async (req, res) => {
@@ -278,18 +332,35 @@ app.post('/api/debts', auth, async (req, res) => {
   } catch (limitErr) {
     console.warn('[debts] limit check failed:', limitErr.message);
   }
+  const amount = Number(req.body.amount || 0);
+  const insertRow = {
+    ...req.body,
+    user_id:         userId,
+    original_amount: amount,  // lock original amount; never mutate this
+    paid_amount:     0,
+    status:          'open',
+  };
   const { data, error } = await supabase.from('debts')
-    .insert({ ...req.body, user_id: userId }).select().single();
+    .insert(insertRow).select().single();
   if (error) return res.status(500).json({ error: error.message });
-  res.json(data);
+  res.json(computeDebtStatus(data));
 });
 
 app.patch('/api/debts/:id/settle', auth, async (req, res) => {
+  // Fetch debt first to know original_amount
+  const { data: debt } = await supabase.from('debts')
+    .select('*').eq('id', req.params.id).eq('user_id', req.user.userId).single();
+  const fullAmount = Number(debt?.original_amount || debt?.amount || 0);
   const { data, error } = await supabase.from('debts')
-    .update({ is_settled: true, settled_at: new Date().toISOString() })
+    .update({
+      is_settled:   true,
+      settled_at:   new Date().toISOString(),
+      status:       'paid',
+      paid_amount:  fullAmount,
+    })
     .eq('id', req.params.id).eq('user_id', req.user.userId).select().single();
   if (error) return res.status(500).json({ error: error.message });
-  res.json(data);
+  res.json(computeDebtStatus(data));
 });
 
 // --- Transactions API ------------------------------------------------------
@@ -1518,33 +1589,64 @@ app.post('/api/profile', auth, async (req, res) => {
 })
 
 app.post('/api/debts/:id/pay', auth, async (req, res) => {
-  const { amount, account, date } = req.body
-  if (!amount) return res.status(400).json({ error: 'Missing amount' })
+  const { amount, account, date, wallet_id } = req.body;
+  if (!amount || Number(amount) <= 0) return res.status(400).json({ error: 'amount must be > 0' });
+
   const { data: debt, error: debtErr } = await supabase.from('debts')
-    .select('*').eq('id', req.params.id).eq('user_id', req.user.userId).single()
-  if (debtErr) return res.status(500).json({ error: debtErr.message })
-  const paidAmount = Number(amount)
-  const totalAmount = Number(debt.amount)
-  const isFullyPaid = paidAmount >= totalAmount
-  const { error: txErr } = await supabase.from('transactions').insert({
-    user_id: req.user.userId,
-    type: debt.type === 'payable' ? 'expense' : 'income',
-    amount_original: paidAmount,
-    currency_original: 'IDR',
-    amount_idr: paidAmount,
-    description: `Payment: ${debt.counterparty}`,
-    source: account || null,
-    scope: debt.scope || 'business',
-  })
-  if (txErr) return res.status(500).json({ error: txErr.message })
-  if (isFullyPaid) {
-    await supabase.from('debts').update({ is_settled: true, settled_at: new Date().toISOString() })
-      .eq('id', req.params.id)
-  } else {
-    await supabase.from('debts').update({ amount: totalAmount - paidAmount })
-      .eq('id', req.params.id)
+    .select('*').eq('id', req.params.id).eq('user_id', req.user.userId).single();
+  if (debtErr || !debt) return res.status(404).json({ error: 'Debt not found' });
+
+  const paymentAmount  = Number(amount);
+  const effectiveTotal = Number(debt.original_amount || debt.amount || 0);
+  const alreadyPaid    = Number(debt.paid_amount || 0);
+  const remaining      = Math.max(0, effectiveTotal - alreadyPaid);
+
+  if (paymentAmount > remaining + 0.01) {
+    return res.status(400).json({ error: `Payment amount exceeds remaining balance (${remaining})` });
   }
-  res.json({ ok: true, isFullyPaid, remaining: totalAmount - paidAmount })
+
+  const newPaidAmount = alreadyPaid + paymentAmount;
+  const isFullyPaid   = newPaidAmount >= effectiveTotal - 0.01;
+  const newStatus     = isFullyPaid ? 'paid' : 'partial';
+
+  // 1. Create transaction
+  const txType = debt.type === 'payable' ? 'expense' : 'income';
+  const { data: tx, error: txErr } = await supabase.from('transactions').insert({
+    user_id:           req.user.userId,
+    type:              txType,
+    amount_original:   paymentAmount,
+    currency_original: 'IDR',
+    amount_idr:        paymentAmount,
+    description:       `Payment: ${debt.counterparty}`,
+    source:            account || null,
+    wallet_id:         wallet_id || null,
+    scope:             debt.scope || 'business',
+    created_at:        date ? new Date(date).toISOString() : new Date().toISOString(),
+  }).select('id').single();
+  if (txErr) return res.status(500).json({ error: txErr.message });
+
+  // 2. Update debt — track paid_amount; NEVER modify original amount
+  const debtUpdates = {
+    paid_amount:            newPaidAmount,
+    last_payment_at:        new Date().toISOString(),
+    status:                 newStatus,
+    linked_transaction_id:  tx?.id || null,
+  };
+  if (isFullyPaid) {
+    debtUpdates.is_settled = true;
+    debtUpdates.settled_at = new Date().toISOString();
+  }
+
+  const { data: updatedDebt, error: updateErr } = await supabase.from('debts')
+    .update(debtUpdates).eq('id', req.params.id).select().single();
+  if (updateErr) return res.status(500).json({ error: updateErr.message });
+
+  res.json({
+    ok:           true,
+    isFullyPaid,
+    remaining:    Math.max(0, effectiveTotal - newPaidAmount),
+    debt:         computeDebtStatus(updatedDebt),
+  });
 })
 
 // ── Business Settings Endpoint ───────────────────────────────────────────────
