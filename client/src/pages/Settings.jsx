@@ -180,7 +180,7 @@ export default function Settings() {
       {/* Repeat setup wizard */}
       <div style={{ margin: '0 16px 10px' }}>
         <button
-          onClick={() => { localStorage.removeItem('cfo_onboarded'); navigate('/onboarding') }}
+          onClick={() => navigate('/onboarding')}
           style={{ width: '100%', padding: 12, borderRadius: 12, background: 'none', color: 'var(--brand)', border: '0.5px solid var(--border-2)', fontSize: 13, fontWeight: 500, cursor: 'pointer' }}
         >
           ✦ Repeat setup wizard

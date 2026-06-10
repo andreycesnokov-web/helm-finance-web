@@ -17,7 +17,7 @@ import Tasks from './pages/Tasks'
 import Approvals from './pages/Approvals'
 import Admin from './pages/Admin'
 import AdminUser from './pages/AdminUser'
-import Onboarding from './pages/Onboarding'
+import Onboarding, { shouldShowOnboarding, clearOnboardingFlags } from './pages/Onboarding'
 
 // ── Mobile bottom nav — only existing pages ───────────────────────────────────
 const NAV = [
@@ -301,25 +301,19 @@ function PulseWrapper() {
   const [pulseData, setPulseData]       = useState(null)
   const [showOnboarding, setOnboarding] = useState(false)
 
-  // After pulse loads, decide whether to show onboarding
+  // After pulse loads, run detection via exported shouldShowOnboarding()
   const handleDataLoad = (d) => {
     setPulseData(d)
-    // Show onboarding if:
-    //   1. Not previously completed (no localStorage flag)
-    //   2. User has no accounts AND no transactions yet (truly new)
-    const alreadyOnboarded = localStorage.getItem('cfo_onboarded')
-    if (!alreadyOnboarded) {
-      const hasAccounts     = (d.accounts     || []).length > 0
-      const hasTxs          = (d.totalBalance != null && d.totalBalance !== 0) ||
-                              (d.income  > 0) || (d.expenses > 0)
-      const hasDebts        = (d.debts || []).filter(x => !x.is_settled).length > 0
-      const isNewUser       = !hasAccounts && !hasTxs && !hasDebts
-      if (isNewUser) setOnboarding(true)
-    }
+    if (shouldShowOnboarding(d)) setOnboarding(true)
   }
 
+  // Skip: stores cfo_onboarding_skipped, hides wizard
+  const handleSkip     = () => setOnboarding(false)
+  // Complete: stores cfo_onboarded, hides wizard
+  const handleComplete = () => setOnboarding(false)
+
   if (showOnboarding) {
-    return <Onboarding onComplete={() => setOnboarding(false)} />
+    return <Onboarding onSkip={handleSkip} onComplete={handleComplete} />
   }
 
   return (
@@ -329,14 +323,19 @@ function PulseWrapper() {
   )
 }
 
-// Standalone onboarding route — clears flag and shows wizard, then redirects home
+// Standalone onboarding route — clears both flags, shows wizard, then redirects home
 function OnboardingRoute() {
   const { user, loading } = useAuth()
   const navigate = useNavigate()
   if (loading) return null
   if (!user)   return <Navigate to="/login" replace />
+  // Clear both flags so the full wizard runs fresh
+  clearOnboardingFlags()
   return (
-    <Onboarding onComplete={() => navigate('/', { replace: true })} />
+    <Onboarding
+      onSkip={() => navigate('/', { replace: true })}
+      onComplete={() => navigate('/', { replace: true })}
+    />
   )
 }
 
