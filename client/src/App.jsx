@@ -92,7 +92,7 @@ function Sidebar() {
   const location = useLocation()
   const navigate = useNavigate()
   const { user } = useAuth()
-  const { planLabel, isTrialActive, effectivePlan } = useAccess()
+  const { planLabel, isTrialActive, effectivePlan, hasFeature } = useAccess()
 
   const initials = (user?.firstName?.[0] || user?.first_name?.[0] || 'A').toUpperCase()
   const displayName = user?.firstName || user?.first_name || 'Account'
@@ -146,6 +146,14 @@ function Sidebar() {
                 )
               }
 
+              // Determine if this item requires a locked feature
+              const FEATURE_MAP = {
+                '/payroll':   'payroll_enabled',
+                '/approvals': 'approval_flow_enabled',
+              }
+              const featureKey = FEATURE_MAP[item.path]
+              const isLocked   = featureKey ? !hasFeature(featureKey) : false
+
               return (
                 <button
                   key={item.path}
@@ -154,6 +162,15 @@ function Sidebar() {
                 >
                   <span className="sidebar-nav-item-icon">{item.icon}</span>
                   <span className="sidebar-nav-item-label">{item.label}</span>
+                  {isLocked && (
+                    <span style={{
+                      fontSize: 9, fontWeight: 700, lineHeight: 1,
+                      background: 'rgba(107,114,128,0.15)',
+                      color: 'var(--text-3)',
+                      padding: '2px 6px', borderRadius: 6,
+                      letterSpacing: '0.03em',
+                    }}>🔒</span>
+                  )}
                 </button>
               )
             })}

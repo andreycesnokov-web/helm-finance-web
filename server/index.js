@@ -251,8 +251,35 @@ app.get('/api/debts', auth, async (req, res) => {
 });
 
 app.post('/api/debts', auth, async (req, res) => {
+  const userId = req.user.userId;
+  // ── Plan limit: max_invoices_per_month (debts are the MVP invoice proxy) ──
+  try {
+    const access = await getCurrentAccess(userId);
+    if (access) {
+      const maxInvoices = access.limits.max_invoices_per_month;
+      if (maxInvoices !== null && maxInvoices !== undefined) {
+        const monthStart = new Date();
+        monthStart.setDate(1);
+        monthStart.setHours(0, 0, 0, 0);
+        const { count: usedCount } = await supabase
+          .from('debts')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', userId)
+          .gte('created_at', monthStart.toISOString());
+        const used = usedCount || 0;
+        if (isLimitReached(maxInvoices, used)) {
+          return sendUpgradeRequired(res, 'invoices',
+            `Monthly invoice/debt limit reached (${maxInvoices}/month on ${access.accessState.effectivePlan} plan)`,
+            { limit: maxInvoices, usage: used, current_plan: access.accessState.effectivePlan }
+          );
+        }
+      }
+    }
+  } catch (limitErr) {
+    console.warn('[debts] limit check failed:', limitErr.message);
+  }
   const { data, error } = await supabase.from('debts')
-    .insert({ ...req.body, user_id: req.user.userId }).select().single();
+    .insert({ ...req.body, user_id: userId }).select().single();
   if (error) return res.status(500).json({ error: error.message });
   res.json(data);
 });
@@ -381,6 +408,45 @@ app.post('/api/transactions/batch', auth, async (req, res) => {
   try {
     const userId = req.user.userId;
     const { transactions } = req.body;
+
+    // ── Plan limit: max_transactions_per_month ───────────────────────────────
+    // Corrections by type are counted but super-admin bypass is handled by
+    // the /api/admin/ path which uses requireAdmin middleware.
+    try {
+      const access = await getCurrentAccess(userId);
+      if (access) {
+        const maxTx = access.limits.max_transactions_per_month;
+        if (maxTx !== null && maxTx !== undefined) {
+          // Count non-correction transactions this calendar month
+          const monthStart = new Date();
+          monthStart.setDate(1);
+          monthStart.setHours(0, 0, 0, 0);
+          const { count: usedCount } = await supabase
+            .from('transactions')
+            .select('id', { count: 'exact', head: true })
+            .eq('user_id', userId)
+            .gte('created_at', monthStart.toISOString());
+          const used = usedCount || 0;
+          const batchSize = (transactions || []).length;
+          if (isLimitReached(maxTx, used)) {
+            return sendUpgradeRequired(res, 'transactions',
+              `Monthly transaction limit reached (${maxTx}/month on ${access.accessState.effectivePlan} plan)`,
+              { limit: maxTx, usage: used, current_plan: access.accessState.effectivePlan }
+            );
+          }
+          // Partial batch: reject entire batch if it would exceed limit
+          if (used + batchSize > maxTx) {
+            return sendUpgradeRequired(res, 'transactions',
+              `This batch of ${batchSize} would exceed your monthly limit. You have ${maxTx - used} transaction${maxTx - used === 1 ? '' : 's'} remaining this month.`,
+              { limit: maxTx, usage: used, remaining: maxTx - used, current_plan: access.accessState.effectivePlan }
+            );
+          }
+        }
+      }
+    } catch (limitErr) {
+      // Fail open — don't block transactions if limit check itself errors
+      console.warn('[transactions/batch] limit check failed:', limitErr.message);
+    }
 
     // ── Wallet validation ────────────────────────────────────────────────────
     // Collect distinct wallet_ids supplied in this batch
@@ -720,19 +786,40 @@ function hasFeature(access, featureName) {
 }
 
 /**
+ * Send a standardised 403 upgrade_required response.
+ * requiredPlan is advisory — no billing logic here.
+ */
+function sendUpgradeRequired(res, feature, message, extra = {}) {
+  res.status(403).json({
+    error: message || 'Plan limit reached',
+    feature,
+    upgrade_required: true,
+    ...extra,
+  });
+}
+
+/**
  * Assert feature is available; sends 403 and returns false if not.
  * Usage: if (!assertFeature(access, 'payroll_enabled', res)) return;
  */
 function assertFeature(access, featureName, res) {
   if (!hasFeature(access, featureName)) {
-    res.status(403).json({
-      error: 'Feature not available on your current plan',
-      feature: featureName,
-      upgrade_required: true,
+    sendUpgradeRequired(res, featureName, 'Feature not available on your current plan', {
+      current_plan: access?.accessState?.effectivePlan || 'free',
     });
     return false;
   }
   return true;
+}
+
+/**
+ * Check if a numeric usage limit is reached.
+ * Returns true (limit reached) when currentUsage >= limit.
+ * A null/undefined limit means unlimited → returns false.
+ */
+function isLimitReached(limitValue, currentUsage) {
+  if (limitValue === null || limitValue === undefined) return false;
+  return currentUsage >= limitValue;
 }
 
 // --- Wallets API ----------------------------------------------------------

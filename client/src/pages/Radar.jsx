@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../hooks/useAuth'
+import { useAccess } from '../hooks/useAccess'
 import { apiFetch, fmt, fmtFull, daysUntil } from '../lib/api'
 
 function KeyDateRow({ dot, desc, date, amount, isIn }) {
@@ -19,6 +20,7 @@ function KeyDateRow({ dot, desc, date, amount, isIn }) {
 
 export default function Radar() {
   const { token } = useAuth()
+  const { hasFeature, effectivePlan } = useAccess()
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
 
@@ -64,6 +66,33 @@ export default function Radar() {
           {isHealthy ? '✓ Healthy' : '⚠ At Risk'}
         </div>
       </div>
+
+      {/* Advanced Radar upgrade banner — shown only when feature not enabled */}
+      {!hasFeature('advanced_radar_enabled') && (
+        <div style={{
+          margin: '0 0 16px',
+          padding: '11px 16px',
+          borderRadius: 12,
+          background: 'rgba(37,99,235,0.07)',
+          border: '1px solid rgba(37,99,235,0.18)',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span style={{ fontSize: 16 }}>📡</span>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', marginBottom: 1 }}>Basic Radar</div>
+              <div style={{ fontSize: 11, color: 'var(--text-3)' }}>Advanced Radar — multi-scenario AI forecast — available on Founder plan</div>
+            </div>
+          </div>
+          <span style={{
+            fontSize: 11, fontWeight: 700,
+            background: 'rgba(37,99,235,0.12)', color: '#2563EB',
+            padding: '3px 10px', borderRadius: 20, whiteSpace: 'nowrap', flexShrink: 0,
+          }}>
+            Founder+
+          </span>
+        </div>
+      )}
 
       {/* Hero projected balance — dark navy premium card */}
       <div style={{ marginBottom: 20 }}>

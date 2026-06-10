@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
+import { useAccess } from '../hooks/useAccess'
 import { apiFetch, fmt } from '../lib/api'
+import LockedFeature from '../components/LockedFeature'
 
 function fmtDate(str) {
   if (!str) return '—'
@@ -45,6 +47,7 @@ function isPayrollTx(tx) {
 export default function Payroll() {
   const { token }  = useAuth()
   const navigate   = useNavigate()
+  const { hasFeature, effectivePlan, loading: accessLoading } = useAccess()
   const [txs, setTxs]         = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError]     = useState('')
@@ -72,6 +75,33 @@ export default function Payroll() {
 
   const totalPaidThisMonth = thisMonth.reduce((s, t) => s + Number(t.amount_original || t.amount_idr || 0), 0)
   const totalAll           = txs.reduce((s, t)      => s + Number(t.amount_original || t.amount_idr || 0), 0)
+
+  // ── Feature gate ──────────────────────────────────────────────────────────
+  if (!accessLoading && !hasFeature('payroll_enabled')) {
+    return (
+      <div className="hf-page">
+        <div className="hf-page-header">
+          <div>
+            <div className="hf-page-title">Payroll</div>
+            <div className="hf-page-subtitle">Salary payments and payroll history</div>
+          </div>
+        </div>
+        <LockedFeature
+          title="Payroll"
+          description="Track and manage employee salary payments, bonuses and payroll history — all connected to your cash flow."
+          requiredPlan="business"
+          currentPlan={effectivePlan}
+          icon="💼"
+          bullets={[
+            'Log salary and bonus payments',
+            'Payroll automatically affects Pulse cash flow',
+            'Monthly payroll cost summary',
+            'Payroll history per employee',
+          ]}
+        />
+      </div>
+    )
+  }
 
   return (
     <div className="hf-page">
