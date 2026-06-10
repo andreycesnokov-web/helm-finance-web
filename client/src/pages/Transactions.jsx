@@ -75,7 +75,7 @@ function DetailRow({ label, value, valueStyle }) {
 }
 
 // ── Transaction Details Drawer ────────────────────────────────────────────────
-function TransactionDetailsDrawer({ tx, onClose, refDirections = [], refActivityTypes = [] }) {
+function TransactionDetailsDrawer({ tx, onClose, refDirections = [], refActivityTypes = [], refWallets = [] }) {
   // Escape key
   useEffect(() => {
     const handler = (e) => { if (e.key === 'Escape') onClose() }
@@ -198,25 +198,37 @@ function TransactionDetailsDrawer({ tx, onClose, refDirections = [], refActivity
         })()}
 
         {/* ── Account / source ── */}
-        <div className="tx-detail-section">
-          <div className="tx-detail-section-title">{isTransfer ? 'Transfer Route' : 'Account'}</div>
-          <div className="tx-detail-card">
-            {isTransfer ? (
-              <>
-                <DetailRow
-                  label="From"
-                  value={tx.source}
-                />
-                <DetailRow
-                  label="To"
-                  value={destination}
-                />
-              </>
-            ) : (
-              <DetailRow label="Source / Account" value={tx.source} />
-            )}
-          </div>
-        </div>
+        {(() => {
+          const walletName = tx.wallet_id
+            ? (refWallets.find(w => w.id === tx.wallet_id)?.name || tx.wallet_id)
+            : null
+          const walletObj = tx.wallet_id
+            ? refWallets.find(w => w.id === tx.wallet_id)
+            : null
+          return (
+            <div className="tx-detail-section">
+              <div className="tx-detail-section-title">{isTransfer ? 'Transfer Route' : 'Account'}</div>
+              <div className="tx-detail-card">
+                {isTransfer ? (
+                  <>
+                    <DetailRow label="From" value={walletName || tx.source} />
+                    <DetailRow label="To"   value={destination} />
+                  </>
+                ) : (
+                  <>
+                    <DetailRow
+                      label="Wallet"
+                      value={walletName
+                        ? `${walletName}${walletObj?.currency && walletObj.currency !== 'IDR' ? ` · ${walletObj.currency}` : ''}`
+                        : null}
+                    />
+                    {tx.source && <DetailRow label="Legacy source" value={tx.source} />}
+                  </>
+                )}
+              </div>
+            </div>
+          )
+        })()}
 
         {/* ── Meta ── */}
         <div className="tx-detail-section">
@@ -256,8 +268,9 @@ export default function Transactions() {
   const closeDrawer = useCallback(() => setSelectedTx(null), [])
 
   // Reference data for resolving IDs → names in drawer
-  const [refDirections,   setRefDirections]   = useState([])
+  const [refDirections,    setRefDirections]   = useState([])
   const [refActivityTypes, setRefActivityTypes] = useState([])
+  const [refWallets,       setRefWallets]       = useState([])
 
   // ── Load from API ─────────────────────────────────────────────────────────
   const load = () => {
@@ -280,6 +293,7 @@ export default function Transactions() {
     if (!token) return
     apiFetch('/business-directions', token).then(d => setRefDirections(d.directions || [])).catch(() => {})
     apiFetch('/activity-types', token).then(d => setRefActivityTypes(d.activityTypes || [])).catch(() => {})
+    apiFetch('/wallets', token).then(d => setRefWallets(d.wallets || [])).catch(() => {})
   }, [token])
 
   // ── Client-side filters ───────────────────────────────────────────────────
@@ -529,7 +543,7 @@ export default function Transactions() {
 
       {/* ── Transaction details drawer ─── */}
       {selectedTx && (
-        <TransactionDetailsDrawer tx={selectedTx} onClose={closeDrawer} refDirections={refDirections} refActivityTypes={refActivityTypes} />
+        <TransactionDetailsDrawer tx={selectedTx} onClose={closeDrawer} refDirections={refDirections} refActivityTypes={refActivityTypes} refWallets={refWallets} />
       )}
 
     </div>

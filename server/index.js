@@ -148,10 +148,34 @@ app.get('/api/pulse', auth, async (req, res) => {
       else if (CASH_OUT.includes(t.type)) sourceMap[src].balance -= Number(t.amount_original);
       // transfer / unknown → neutral: no effect on account balance (Phase 1)
     });
-    const accounts = Object.values(sourceMap)
-      .filter(a => a.balance !== 0 || true) // show all accounts
-      .sort((a, b) => b.balance - a.balance)
-      .slice(0, 10);
+    // Wallet-aware accounts:
+    // If user has real wallets → use them with computed balance (wallet_id match OR legacy source name).
+    // Otherwise fall back to virtual source-based accounts for full backward compatibility.
+    const { data: userWallets } = await supabase
+      .from('wallets').select('id, name, currency, type, entity_name')
+      .eq('user_id', userId).eq('is_active', true)
+      .order('sort_order', { ascending: true });
+
+    let accounts;
+    if (userWallets && userWallets.length > 0) {
+      accounts = userWallets.map(w => {
+        const related = (allTxs || []).filter(t =>
+          t.wallet_id === w.id || (!t.wallet_id && t.source === w.name)
+        );
+        const balance = related.reduce((sum, t) => {
+          if (CASH_IN.includes(t.type))  return sum + Number(t.amount_original || 0);
+          if (CASH_OUT.includes(t.type)) return sum - Number(t.amount_original || 0);
+          return sum;
+        }, 0);
+        return { id: w.id, name: w.name, balance, currency: w.currency || 'IDR', type: w.type || 'bank', entity_name: w.entity_name || null };
+      });
+    } else {
+      // Legacy mode: virtual accounts derived from transactions.source
+      accounts = Object.values(sourceMap)
+        .filter(a => a.balance !== 0 || true)
+        .sort((a, b) => b.balance - a.balance)
+        .slice(0, 10);
+    }
 
     // -- This month metrics -------------------------------------------------
     // Uses the same CASH_IN / CASH_OUT model for consistency.
@@ -369,6 +393,8 @@ app.post('/api/transactions/batch', auth, async (req, res) => {
       counterparty_name:      t.counterparty_name      || null,
       business_direction_id:  t.business_direction_id  || null,
       activity_type_id:       t.activity_type_id       || null,
+      // Wallet (TASK 29B — nullable, backward compatible)
+      wallet_id:              t.wallet_id              || null,
     }));
     const { error } = await supabase.from('transactions').insert(rows);
     if (error) throw error;

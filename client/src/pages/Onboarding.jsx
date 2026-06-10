@@ -207,26 +207,35 @@ export default function Onboarding({ onSkip, onComplete }) {
     }
   }
 
-  // ── Step 2: Save account ──────────────────────────────────────────────────
+  // ── Step 2: Save wallet ───────────────────────────────────────────────────
   const saveAccount = async () => {
-    // If account name empty, skip to done
+    // If wallet name empty, skip to done
     if (!accountName.trim()) { setStep(3); return }
     setSaving(true)
     setError('')
     try {
-      // POST /api/accounts creates an "Opening balance · {name}" income transaction
-      // Currency note: backend always stores IDR. Selected currency is informational.
-      await apiFetch('/accounts', token, {
+      // POST /api/wallets creates a real wallet record + optional opening balance transaction
+      await apiFetch('/wallets', token, {
         method: 'POST',
         body: {
-          name:    accountName.trim(),
-          type:    accountType,
-          balance: Number(openBalance) || 0,
+          name:            accountName.trim(),
+          currency,
+          type:            accountType === 'business' ? 'bank' : 'other',
+          opening_balance: Number(openBalance) || 0,
         },
       })
       setStep(3)
     } catch (e) {
-      setError(e.message)
+      // Fallback to legacy /api/accounts if wallets table not yet available
+      try {
+        await apiFetch('/accounts', token, {
+          method: 'POST',
+          body: { name: accountName.trim(), type: accountType, balance: Number(openBalance) || 0 },
+        })
+        setStep(3)
+      } catch (e2) {
+        setError(e2.message)
+      }
     } finally {
       setSaving(false)
     }
@@ -378,13 +387,13 @@ export default function Onboarding({ onSkip, onComplete }) {
           </>
         )}
 
-        {/* ─── STEP 2: FIRST ACCOUNT ─── */}
+        {/* ─── STEP 2: FIRST WALLET ─── */}
         {step === 2 && (
           <>
             <div style={{ marginBottom: 22, textAlign: 'center' }}>
-              <div style={{ fontSize: 24, marginBottom: 8 }}>💳</div>
+              <div style={{ fontSize: 24, marginBottom: 8 }}>🏦</div>
               <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--text)', letterSpacing: -0.3, marginBottom: 5 }}>
-                Add your first account
+                Add your first wallet
               </div>
               <div style={{ fontSize: 13, color: 'var(--text-3)', lineHeight: 1.6 }}>
                 A bank account, e-wallet, or cash — where your money sits. You can add more later.
@@ -392,17 +401,17 @@ export default function Onboarding({ onSkip, onComplete }) {
             </div>
 
             <Field
-              label="Account name"
+              label="Wallet name"
               value={accountName}
               onChange={setAccountName}
-              placeholder="e.g. BCA Business, GoPay, Cash"
+              placeholder="e.g. BCA Business, GoPay, Cash Office"
               autoFocus
             />
 
             {/* Account type */}
             <div style={{ marginBottom: 14 }}>
               <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>
-                Account type
+                Type
               </label>
               <div style={{ display: 'flex', gap: 8 }}>
                 {[{ k: 'business', l: '💼 Business' }, { k: 'personal', l: '👤 Personal' }].map(({ k, l }) => (
@@ -446,8 +455,8 @@ export default function Onboarding({ onSkip, onComplete }) {
               </div>
             </div>
             {currency !== 'IDR' && (
-              <div style={{ fontSize: 11, color: 'var(--amber-dark)', background: 'var(--amber-light)', borderRadius: 7, padding: '6px 10px', marginBottom: 12 }}>
-                ⚠ Balance will be recorded in IDR. Multi-currency opening balance coming soon.
+              <div style={{ fontSize: 11, color: '#085041', background: '#E1F5EE', borderRadius: 7, padding: '6px 10px', marginBottom: 12 }}>
+                ✓ Wallet will be created in {currency}.
               </div>
             )}
 
@@ -458,7 +467,7 @@ export default function Onboarding({ onSkip, onComplete }) {
               loading={saving}
               disabled={!accountName.trim()}
             >
-              {accountName.trim() ? 'Add account →' : 'Enter an account name'}
+              {accountName.trim() ? 'Add wallet →' : 'Enter a wallet name'}
             </PrimaryBtn>
             <GhostBtn onClick={() => setStep(3)}>Skip — add later</GhostBtn>
           </>

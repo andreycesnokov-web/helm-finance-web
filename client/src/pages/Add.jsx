@@ -176,9 +176,9 @@ export default function Add() {
   const [reminder, setReminder] = useState({ title: '', due_date: '', meta: '' })
   const [saving, setSaving]     = useState(false)
 
-  // Open debts + accounts
+  // Open debts + wallets
   const [openDebts, setOpenDebts]     = useState([])
-  const [accounts, setAccounts]       = useState([])
+  const [wallets, setWallets]         = useState([])   // real wallets from /api/wallets
   const [linkedDebts, setLinkedDebts] = useState({})
 
   // Reference data
@@ -189,13 +189,15 @@ export default function Add() {
 
   useEffect(() => {
     if (!token) return
-    // Load pulse data (debts + accounts)
+    // Load pulse data (debts only)
     apiFetch('/pulse', token)
       .then(d => {
         setOpenDebts((d.debts || []).filter(x => !x.is_settled))
-        setAccounts((d.accounts || []).map(a => a.name).filter(Boolean))
       })
       .catch(() => {})
+
+    // Load real wallets (non-blocking)
+    apiFetch('/wallets', token).then(d => setWallets(d.wallets || [])).catch(() => {})
 
     // Load reference data in parallel — all non-blocking
     apiFetch('/cashflow-categories', token).then(d => setCategories(d.categories || [])).catch(() => {})
@@ -250,6 +252,8 @@ export default function Add() {
         counterparty_name:     '',
         business_direction_id: null,
         activity_type_id:      null,
+        // Wallet
+        wallet_id:             null,
       })))
     } catch (e) {
       setError(e.message)
@@ -294,6 +298,8 @@ export default function Add() {
           counterparty_name:     tx.counterparty_name      || null,
           business_direction_id: tx.business_direction_id  || null,
           activity_type_id:      tx.activity_type_id       || null,
+          // Wallet (TASK 29B)
+          wallet_id:             tx.wallet_id              || null,
         }))
         await apiFetch('/transactions/batch', token, { method: 'POST', body: { transactions: payload } })
       }
@@ -585,30 +591,45 @@ export default function Add() {
                           placeholder="What was this for?" style={inputSt} />
                       </div>
 
-                      {/* Row 4: Source / Account */}
+                      {/* Row 4: Wallet / Account */}
                       <div style={{ marginBottom: 12 }}>
                         <label style={labelSt}>
-                          {isTransfer ? 'Source account (optional)' : 'Account / Source'}
+                          {isTransfer ? 'Source wallet (optional)' : 'Wallet / Account'}
                           {sourceMissing && !isTransfer && (
                             <span style={{ color: '#D97706', marginLeft: 6, textTransform: 'none', fontStyle: 'italic' }}>
                               — please select before saving
                             </span>
                           )}
                         </label>
-                        {accounts.length > 0 ? (
-                          <select value={t.source || ''} onChange={e => updateTx(i, 'source', e.target.value)}
-                            style={{ ...selectStyle, borderColor: sourceMissing && !isTransfer ? '#F59E0B' : undefined, background: sourceMissing && !isTransfer ? '#FFFBEB' : undefined }}>
-                            <option value="">— Select account —</option>
-                            {accounts.map(a => <option key={a} value={a}>{a}</option>)}
+                        {wallets.length > 0 ? (
+                          <select
+                            value={t.wallet_id || ''}
+                            onChange={e => {
+                              const wId = e.target.value || null
+                              const w   = wallets.find(x => x.id === wId)
+                              updateTx(i, 'wallet_id', wId)
+                              updateTx(i, 'source',    w ? w.name : '')
+                              // Sync currency from wallet if not IDR
+                              if (w && w.currency && w.currency !== 'IDR') updateTx(i, 'currency', w.currency)
+                            }}
+                            style={{ ...selectStyle, borderColor: sourceMissing && !isTransfer ? '#F59E0B' : undefined, background: sourceMissing && !isTransfer ? '#FFFBEB' : undefined }}
+                          >
+                            <option value="">— Select wallet —</option>
+                            {wallets.map(w => (
+                              <option key={w.id} value={w.id}>
+                                {w.name}{w.currency && w.currency !== 'IDR' ? ` · ${w.currency}` : ''}
+                                {w.entity_name ? ` (${w.entity_name})` : ''}
+                              </option>
+                            ))}
                           </select>
                         ) : (
                           <input type="text" value={t.source || ''} onChange={e => updateTx(i, 'source', e.target.value)}
-                            placeholder="e.g. Permata, Cash, BCA"
+                            placeholder="e.g. BCA, Cash, GoPay"
                             style={{ ...inputSt, borderColor: sourceMissing && !isTransfer ? '#F59E0B' : undefined, background: sourceMissing && !isTransfer ? '#FFFBEB' : undefined }} />
                         )}
                         {sourceMissing && !isTransfer && (
                           <div style={{ fontSize: 11, color: '#D97706', marginTop: 4 }}>
-                            ⚠ No source selected — transaction will be saved without account link
+                            ⚠ No wallet selected — transaction will be saved without account link
                           </div>
                         )}
                       </div>
