@@ -1460,6 +1460,57 @@ app.post('/api/debts/:id/pay', auth, async (req, res) => {
   res.json({ ok: true, isFullyPaid, remaining: totalAmount - paidAmount })
 })
 
+// ── Business Settings Endpoint ───────────────────────────────────────────────
+// PATCH /api/business/current — owner/admin can update safe fields
+const BUSINESS_ALLOWED_CURRENCIES = ['IDR', 'USD', 'EUR', 'SGD', 'MYR', 'THB', 'CNY'];
+
+app.patch('/api/business/current', auth, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { name, base_currency, timezone, country } = req.body;
+
+    if (base_currency && !BUSINESS_ALLOWED_CURRENCIES.includes(base_currency)) {
+      return res.status(400).json({ error: `Invalid currency: ${base_currency}. Allowed: ${BUSINESS_ALLOWED_CURRENCIES.join(', ')}` });
+    }
+    if (!name && !base_currency && timezone === undefined && country === undefined) {
+      return res.status(400).json({ error: 'At least one field required: name, base_currency, timezone, country' });
+    }
+
+    // Only owner or admin can update business settings
+    const { data: memberships } = await supabase
+      .from('business_members')
+      .select('business_id, role')
+      .eq('user_id', userId)
+      .eq('status', 'active')
+      .in('role', ['owner', 'admin'])
+      .limit(1);
+
+    let businessId;
+    if (!memberships || memberships.length === 0) {
+      // No business yet — bootstrap then update
+      const { data: userRow } = await supabase.from('users').select('first_name, username').eq('id', userId).single();
+      const firstName = userRow?.first_name || userRow?.username || 'My';
+      const { business: newBiz } = await ensureDefaultBusiness(userId, firstName);
+      businessId = newBiz.id;
+    } else {
+      businessId = memberships[0].business_id;
+    }
+    const updates = { updated_at: new Date().toISOString() };
+    if (name?.trim())           updates.name          = name.trim();
+    if (base_currency)          updates.base_currency = base_currency;
+    if (timezone !== undefined) updates.timezone      = timezone || null;
+    if (country  !== undefined) updates.country       = country  || null;
+
+    const { data: business, error: bErr } = await supabase
+      .from('businesses').update(updates).eq('id', businessId).select().single();
+    if (bErr) throw bErr;
+
+    res.json({ business });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // ── Access Status Endpoint ───────────────────────────────────────────────────
 // GET /api/access/status
 // Returns current plan, trial info, limits, and usage for the authenticated user.

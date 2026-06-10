@@ -1,28 +1,29 @@
 /**
- * CFO AI — First-time Onboarding Wizard
+ * CFO AI — Onboarding V2
  *
- * Detection (in App.jsx PulseWrapper):
- *   Show if: no accounts + no transactions + no debts on server
+ * 5-step flow:
+ *   0. Welcome        — product intro, Start setup / Skip
+ *   1. Trial Welcome  — 7-day full trial explained, trial info from /api/access/status
+ *   2. Business Setup — name, base_currency, timezone, country → PATCH /api/business/current
+ *   3. First Wallet   — name, currency, type, opening balance  → POST /api/wallets
+ *   4. Ready          — action cards, Go to Pulse / Add transaction
+ *
+ * Detection logic (shouldShowOnboarding):
+ *   Show if: no accounts + no significant data on server
  *            AND not skipped/completed via localStorage flags
  *
- * localStorage keys (UI convenience only — real state is server data):
- *   cfo_onboarding_skipped  → user explicitly skipped
- *   cfo_onboarded           → user completed setup successfully
+ * localStorage keys:
+ *   cfo_onboarding_skipped — user explicitly skipped
+ *   cfo_onboarded          — user completed setup
  *
- * Steps: Welcome → Profile → First Account → Done
- *
- * Known limitations:
- *   - No dedicated business_name field in DB. Stored in users.last_name as workaround.
- *   - Currency is informational only — backend stores amounts in IDR.
- *     Opening balance always saved as IDR regardless of selected currency.
- *   - No business/workspace table exists yet.
+ * Backward compat: existing users with data are never forced into onboarding.
  */
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { apiFetch } from '../lib/api'
 
-// ── localStorage helpers ──────────────────────────────────────────────────────
+// ── localStorage helpers (exported for App.jsx) ───────────────────────────────
 export function markOnboardingSkipped()   { localStorage.setItem('cfo_onboarding_skipped', '1') }
 export function markOnboardingCompleted() { localStorage.setItem('cfo_onboarded', '1') }
 export function clearOnboardingFlags()    {
@@ -32,58 +33,60 @@ export function clearOnboardingFlags()    {
 
 /**
  * shouldShowOnboarding — pure function, call with pulse API response.
- * Returns true only for genuinely new users.
- *
- * @param {object} pulseData  — response from GET /api/pulse
- * @returns {boolean}
+ * Returns true only for genuinely new users with no data.
  */
 export function shouldShowOnboarding(pulseData) {
-  // 1. If user explicitly skipped — never show again on this device
   if (localStorage.getItem('cfo_onboarding_skipped')) return false
-  // 2. If user already completed onboarding — never show again
   if (localStorage.getItem('cfo_onboarded'))          return false
-  // 3. If user already has real server-side data — they're not new
   const hasAccounts = (pulseData?.accounts || []).length > 0
   const hasTxs      = (pulseData?.income > 0) || (pulseData?.expenses > 0) ||
                       (pulseData?.totalBalance != null && pulseData?.totalBalance !== 0)
   const hasDebts    = (pulseData?.debts || []).filter(d => !d.is_settled).length > 0
   if (hasAccounts || hasTxs || hasDebts) return false
-  // 4. Truly new user — show onboarding
   return true
 }
 
-// ── Step indicator ────────────────────────────────────────────────────────────
-const STEPS = ['welcome', 'profile', 'account', 'done']
-const STEP_LABELS = ['Welcome', 'Profile', 'Account', 'Done']
+// ── Constants ─────────────────────────────────────────────────────────────────
+const STEPS       = ['welcome', 'trial', 'business', 'wallet', 'done']
+const STEP_LABELS = ['Welcome', 'Trial', 'Business', 'Wallet', 'Done']
 
-function StepBar({ current }) {
-  return (
-    <div style={{ marginBottom: 30 }}>
-      <div style={{ display: 'flex', gap: 5, justifyContent: 'center', marginBottom: 8 }}>
-        {STEPS.map((_, i) => (
-          <div
-            key={i}
-            style={{
-              height: 4,
-              width: i === current ? 28 : 14,
-              borderRadius: 3,
-              background: i < current  ? '#2563EB' :
-                          i === current ? '#2563EB' : 'var(--border-2)',
-              opacity: i < current ? 0.4 : 1,
-              transition: 'all 0.25s',
-            }}
-          />
-        ))}
-      </div>
-      <div style={{ textAlign: 'center', fontSize: 11, color: 'var(--text-4)', fontWeight: 600, letterSpacing: '0.06em' }}>
-        {current < STEPS.length - 1 ? `STEP ${current + 1} OF ${STEPS.length - 1}` : 'COMPLETE'}
-        {' · '}{STEP_LABELS[current].toUpperCase()}
-      </div>
-    </div>
-  )
-}
+const CURRENCIES = [
+  { value: 'IDR', label: 'IDR — Indonesian Rupiah' },
+  { value: 'USD', label: 'USD — US Dollar' },
+  { value: 'EUR', label: 'EUR — Euro' },
+  { value: 'SGD', label: 'SGD — Singapore Dollar' },
+  { value: 'MYR', label: 'MYR — Malaysian Ringgit' },
+  { value: 'THB', label: 'THB — Thai Baht' },
+  { value: 'CNY', label: 'CNY — Chinese Yuan' },
+]
 
-// ── Input helpers ─────────────────────────────────────────────────────────────
+const TIMEZONES = [
+  { value: 'Asia/Makassar',    label: 'Bali / Makassar (WITA UTC+8)' },
+  { value: 'Asia/Jakarta',     label: 'Jakarta (WIB UTC+7)' },
+  { value: 'Asia/Jayapura',    label: 'Papua (WIT UTC+9)' },
+  { value: 'Asia/Singapore',   label: 'Singapore (SGT UTC+8)' },
+  { value: 'Asia/Bangkok',     label: 'Bangkok / Ho Chi Minh (ICT UTC+7)' },
+  { value: 'Asia/Kuala_Lumpur',label: 'Kuala Lumpur (MYT UTC+8)' },
+  { value: 'Asia/Shanghai',    label: 'Beijing / Shanghai (CST UTC+8)' },
+  { value: 'Asia/Dubai',       label: 'Dubai (GST UTC+4)' },
+  { value: 'Europe/Moscow',    label: 'Moscow (MSK UTC+3)' },
+  { value: 'Europe/London',    label: 'London (GMT UTC+0)' },
+  { value: 'America/New_York', label: 'New York (EST UTC-5)' },
+  { value: 'UTC',              label: 'UTC' },
+]
+
+const WALLET_TYPES = [
+  { value: 'bank',            label: '🏦 Bank account' },
+  { value: 'cash',            label: '💵 Cash' },
+  { value: 'ewallet',         label: '📱 E-Wallet' },
+  { value: 'alipay',          label: '🔵 Alipay' },
+  { value: 'wechat_pay',      label: '💬 WeChat Pay' },
+  { value: 'crypto',          label: '₿  Crypto wallet' },
+  { value: 'payment_gateway', label: '⚡ Payment gateway' },
+  { value: 'other',           label: '🗂  Other' },
+]
+
+// ── Shared UI helpers ─────────────────────────────────────────────────────────
 const inputSt = {
   width: '100%', padding: '12px 14px', borderRadius: 11,
   border: '1px solid var(--border-2)', fontSize: 14,
@@ -91,20 +94,28 @@ const inputSt = {
   boxSizing: 'border-box', fontFamily: 'inherit', outline: 'none', minHeight: 44,
 }
 
-function Field({ label, value, onChange, placeholder, type = 'text', hint, autoFocus }) {
+function Field({ label, value, onChange, placeholder, type = 'text', hint, autoFocus, required }) {
+  return (
+    <div style={{ marginBottom: 14 }}>
+      <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 5 }}>
+        {label}{required && <span style={{ color: '#EF4444', marginLeft: 3 }}>*</span>}
+      </label>
+      <input autoFocus={autoFocus} type={type} value={value} onChange={e => onChange(e.target.value)}
+        placeholder={placeholder} style={inputSt} />
+      {hint && <div style={{ fontSize: 11, color: 'var(--text-4)', marginTop: 4, lineHeight: 1.5 }}>{hint}</div>}
+    </div>
+  )
+}
+
+function SelectField({ label, value, onChange, options, hint }) {
   return (
     <div style={{ marginBottom: 14 }}>
       <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 5 }}>
         {label}
       </label>
-      <input
-        autoFocus={autoFocus}
-        type={type}
-        value={value}
-        onChange={e => onChange(e.target.value)}
-        placeholder={placeholder}
-        style={inputSt}
-      />
+      <select value={value} onChange={e => onChange(e.target.value)} style={{ ...inputSt, cursor: 'pointer' }}>
+        {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+      </select>
       {hint && <div style={{ fontSize: 11, color: 'var(--text-4)', marginTop: 4, lineHeight: 1.5 }}>{hint}</div>}
     </div>
   )
@@ -112,19 +123,16 @@ function Field({ label, value, onChange, placeholder, type = 'text', hint, autoF
 
 function PrimaryBtn({ children, onClick, disabled, loading, style: extra }) {
   return (
-    <button
-      onClick={onClick}
-      disabled={disabled || loading}
-      style={{
-        width: '100%', padding: '13px', borderRadius: 12, border: 'none',
-        background: disabled || loading ? 'var(--bg-3)' : '#2563EB',
-        color: disabled || loading ? 'var(--text-4)' : '#fff',
-        fontSize: 14, fontWeight: 700,
-        cursor: disabled || loading ? 'not-allowed' : 'pointer',
-        fontFamily: 'inherit', transition: 'background 0.15s',
-        ...extra,
-      }}
-    >
+    <button onClick={onClick} disabled={disabled || loading} style={{
+      width: '100%', padding: '14px', borderRadius: 12, border: 'none',
+      background: disabled || loading ? 'var(--bg-3)' : 'linear-gradient(135deg, #1D4ED8, #2563EB)',
+      color: disabled || loading ? 'var(--text-4)' : '#fff',
+      fontSize: 14, fontWeight: 700,
+      cursor: disabled || loading ? 'not-allowed' : 'pointer',
+      fontFamily: 'inherit', transition: 'all 0.15s',
+      boxShadow: disabled || loading ? 'none' : '0 4px 14px rgba(37,99,235,0.35)',
+      ...extra,
+    }}>
       {loading ? 'Saving…' : children}
     </button>
   )
@@ -152,54 +160,115 @@ function ErrorBox({ msg }) {
   )
 }
 
+// ── Step bar ──────────────────────────────────────────────────────────────────
+function StepBar({ current }) {
+  const total = STEPS.length
+  return (
+    <div style={{ marginBottom: 28 }}>
+      <div style={{ display: 'flex', gap: 4, justifyContent: 'center', marginBottom: 7 }}>
+        {STEPS.map((_, i) => (
+          <div key={i} style={{
+            height: 3, borderRadius: 3, transition: 'all 0.25s',
+            width: i === current ? 32 : 12,
+            background: i < current ? '#2563EB' : i === current ? '#2563EB' : 'var(--border-2)',
+            opacity: i < current ? 0.35 : 1,
+          }} />
+        ))}
+      </div>
+      <div style={{ textAlign: 'center', fontSize: 10, color: 'var(--text-4)', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+        {current < total - 1 ? `Step ${current + 1} of ${total - 1}` : 'Complete'} · {STEP_LABELS[current]}
+      </div>
+    </div>
+  )
+}
+
+// ── Logo mark ─────────────────────────────────────────────────────────────────
+function LogoMark() {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 32 }}>
+      <div style={{ width: 38, height: 38, borderRadius: 11, background: 'linear-gradient(135deg, #1D4ED8, #2563EB)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+          <rect x="2"  y="14" width="4"  height="7" rx="1" fill="rgba(255,255,255,0.5)"/>
+          <rect x="8"  y="9"  width="4"  height="12" rx="1" fill="rgba(255,255,255,0.75)"/>
+          <rect x="14" y="5"  width="4"  height="16" rx="1" fill="#fff"/>
+        </svg>
+      </div>
+      <div>
+        <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--text)', letterSpacing: -0.3 }}>CFO AI</div>
+        <div style={{ fontSize: 10, color: 'var(--text-3)', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Financial OS</div>
+      </div>
+    </div>
+  )
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 export default function Onboarding({ onSkip, onComplete }) {
   const { token, user } = useAuth()
   const navigate        = useNavigate()
 
-  const [step,   setStep]   = useState(0)  // 0=welcome, 1=profile, 2=account, 3=done
+  const [step,   setStep]   = useState(0)
   const [saving, setSaving] = useState(false)
   const [error,  setError]  = useState('')
 
-  // Step 1 — profile fields
-  const [firstName,    setFirstName]    = useState(user?.firstName || user?.first_name || '')
-  const [businessName, setBusinessName] = useState('')
-  const [timezone,     setTimezone]     = useState('Asia/Makassar')
-  const [language,     setLanguage]     = useState('en')
+  // Trial info — loaded from /api/access/status
+  const [access,      setAccess]      = useState(null)
+  const [accessLoaded,setAccessLoaded]= useState(false)
 
-  // Step 2 — account fields
-  const [accountName, setAccountName] = useState('')
-  const [accountType, setAccountType] = useState('business')
-  const [openBalance, setOpenBalance] = useState('')
-  const [currency,    setCurrency]    = useState('IDR')
+  // Step 2 — Business setup
+  const [bizName,     setBizName]     = useState('')
+  const [bizCurrency, setBizCurrency] = useState('IDR')
+  const [bizTimezone, setBizTimezone] = useState('Asia/Makassar')
+  const [bizCountry,  setBizCountry]  = useState('Indonesia')
 
-  // ── Skip ─────────────────────────────────────────────────────────────────
-  const skip = () => {
-    markOnboardingSkipped()
-    if (onSkip) onSkip()
-  }
+  // Step 3 — Wallet
+  const [walletName, setWalletName] = useState('')
+  const [walletType, setWalletType] = useState('bank')
+  const [walletCur,  setWalletCur]  = useState('IDR')
+  const [openBal,    setOpenBal]    = useState('')
+  const [entityName, setEntityName] = useState('')
+  const [hasWallets, setHasWallets] = useState(false)
 
-  // ── Complete ──────────────────────────────────────────────────────────────
-  const complete = () => {
+  // ── Load access status on mount ──────────────────────────────────────────
+  useEffect(() => {
+    if (!token) return
+    apiFetch('/access/status', token)
+      .then(data => {
+        setAccess(data)
+        // Pre-fill business fields from existing data
+        if (data?.business?.name && data.business.name !== `${user?.firstName || 'My'} Business`) {
+          setBizName(data.business.name)
+        }
+        if (data?.business?.base_currency) setBizCurrency(data.business.base_currency)
+        if (data?.business?.timezone)      setBizTimezone(data.business.timezone)
+        if (data?.business?.country)       setBizCountry(data.business.country)
+        if (data?.usage?.wallets_count > 0) setHasWallets(true)
+      })
+      .catch(() => {}) // graceful — trial info optional
+      .finally(() => setAccessLoaded(true))
+  }, [token])
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
+  const skip = () => { markOnboardingSkipped(); if (onSkip) onSkip() }
+  const complete = (path) => {
     markOnboardingCompleted()
     if (onComplete) onComplete()
+    if (path) navigate(path, { replace: true })
   }
 
-  // ── Step 1: Save profile ──────────────────────────────────────────────────
-  const saveProfile = async () => {
-    setSaving(true)
-    setError('')
+  // ── Step 2: Save business ─────────────────────────────────────────────────
+  const saveBusiness = async () => {
+    setSaving(true); setError('')
     try {
-      const body = {}
-      if (firstName.trim())    body.first_name = firstName.trim()
-      // Limitation: no business_name column. Storing in last_name as workaround.
-      if (businessName.trim()) body.last_name  = businessName.trim()
-      if (timezone)            body.timezone   = timezone
-      if (language)            body.language   = language
-      if (Object.keys(body).length > 0) {
-        await apiFetch('/profile', token, { method: 'POST', body })
-      }
-      setStep(2)
+      await apiFetch('/business/current', token, {
+        method: 'PATCH',
+        body: {
+          name:          bizName.trim() || undefined,
+          base_currency: bizCurrency,
+          timezone:      bizTimezone,
+          country:       bizCountry.trim() || undefined,
+        },
+      })
+      setStep(3)
     } catch (e) {
       setError(e.message)
     } finally {
@@ -207,101 +276,70 @@ export default function Onboarding({ onSkip, onComplete }) {
     }
   }
 
-  // ── Step 2: Save wallet ───────────────────────────────────────────────────
-  const saveAccount = async () => {
-    // If wallet name empty, skip to done
-    if (!accountName.trim()) { setStep(3); return }
-    setSaving(true)
-    setError('')
+  // ── Step 3: Save wallet ───────────────────────────────────────────────────
+  const saveWallet = async () => {
+    if (!walletName.trim()) { setStep(4); return }
+    setSaving(true); setError('')
     try {
-      // POST /api/wallets creates a real wallet record + optional opening balance transaction
       await apiFetch('/wallets', token, {
         method: 'POST',
         body: {
-          name:            accountName.trim(),
-          currency,
-          type:            accountType === 'business' ? 'bank' : 'other',
-          opening_balance: Number(openBalance) || 0,
+          name:            walletName.trim(),
+          currency:        walletCur,
+          type:            walletType,
+          entity_name:     entityName.trim() || undefined,
+          opening_balance: Number(openBal) || 0,
         },
       })
-      setStep(3)
+      setStep(4)
     } catch (e) {
-      // Fallback to legacy /api/accounts if wallets table not yet available
-      try {
-        await apiFetch('/accounts', token, {
-          method: 'POST',
-          body: { name: accountName.trim(), type: accountType, balance: Number(openBalance) || 0 },
-        })
-        setStep(3)
-      } catch (e2) {
-        setError(e2.message)
-      }
+      setError(e.message)
     } finally {
       setSaving(false)
     }
   }
 
+  // Trial helpers
+  const isTrialActive  = access?.plan?.is_trial_active  ?? false
+  const daysLeft       = access?.plan?.days_left_in_trial ?? 7
+  const trialEndsAt    = access?.plan?.trial_ends_at
+  const effectivePlan  = access?.plan?.effective_plan ?? 'founder'
+  const trialEndLabel  = trialEndsAt
+    ? new Date(trialEndsAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+    : null
+
   // ── Shell ─────────────────────────────────────────────────────────────────
   return (
-    <div style={{
-      minHeight: '100dvh', display: 'flex', flexDirection: 'column',
-      alignItems: 'center', justifyContent: 'center',
-      padding: '24px 16px', background: 'var(--bg)',
-    }}>
+    <div style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px 16px', background: 'var(--bg)' }}>
 
-      {/* Logo */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 32 }}>
-        <div style={{
-          width: 38, height: 38, borderRadius: 11,
-          background: 'linear-gradient(135deg, #1D4ED8, #2563EB)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-        }}>
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-            <rect x="2"  y="14" width="4"  height="7" rx="1" fill="rgba(255,255,255,0.5)"/>
-            <rect x="8"  y="9"  width="4"  height="12" rx="1" fill="rgba(255,255,255,0.75)"/>
-            <rect x="14" y="5"  width="4"  height="16" rx="1" fill="#fff"/>
-          </svg>
-        </div>
-        <div>
-          <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--text)', letterSpacing: -0.3 }}>CFO AI</div>
-          <div style={{ fontSize: 10, color: 'var(--text-3)', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Financial OS</div>
-        </div>
-      </div>
+      <LogoMark />
 
-      {/* Card */}
-      <div style={{
-        background: 'var(--bg-2)', borderRadius: 20, padding: '28px 24px',
-        border: '1px solid var(--border)',
-        boxShadow: '0 8px 32px rgba(15,23,42,0.08)',
-        width: '100%', maxWidth: 440,
-      }}>
+      <div style={{ background: 'var(--bg-2)', borderRadius: 20, padding: '28px 24px', border: '1px solid var(--border)', boxShadow: '0 8px 32px rgba(15,23,42,0.08)', width: '100%', maxWidth: 460 }}>
+
         <StepBar current={step} />
 
-        {/* ─── STEP 0: WELCOME ─── */}
+        {/* ───────── STEP 0: WELCOME ───────── */}
         {step === 0 && (
           <>
-            {/* Dark hero */}
-            <div style={{
-              background: 'linear-gradient(135deg, #0F172A, #1e293b)',
-              borderRadius: 16, padding: '24px 20px', marginBottom: 22,
-              textAlign: 'center',
-            }}>
-              <div style={{ fontSize: 36, marginBottom: 12 }}>✦</div>
-              <div style={{ fontSize: 20, fontWeight: 800, color: '#fff', letterSpacing: -0.3, marginBottom: 8 }}>
-                Welcome to CFO AI
-              </div>
-              <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.55)', lineHeight: 1.7 }}>
-                Your AI financial operating system. Track cash, debts, payroll and runway — all in one place.
+            <div style={{ background: 'linear-gradient(135deg, #0F172A 0%, #1e293b 100%)', borderRadius: 16, padding: '28px 22px', marginBottom: 22, textAlign: 'center', position: 'relative', overflow: 'hidden' }}>
+              <div style={{ position: 'absolute', inset: 0, opacity: 0.04, backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 24px, #fff 24px, #fff 25px)', pointerEvents: 'none' }} />
+              <div style={{ position: 'relative' }}>
+                <div style={{ fontSize: 40, marginBottom: 14 }}>✦</div>
+                <div style={{ fontSize: 22, fontWeight: 800, color: '#fff', letterSpacing: -0.5, marginBottom: 10 }}>
+                  Welcome to CFO AI
+                </div>
+                <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.55)', lineHeight: 1.7 }}>
+                  Your AI financial operating system for cash, debts,<br />payroll, runway and decisions.
+                </div>
               </div>
             </div>
 
-            {/* Feature list */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 22 }}>
               {[
-                { icon: '📊', title: 'Pulse dashboard',     sub: 'Real-time cash position and runway' },
-                { icon: '💳', title: 'Smart transactions',  sub: 'Add in plain language — AI parses it' },
-                { icon: '📋', title: 'Debts & receivables', sub: 'Track who owes what and when' },
-                { icon: '🤖', title: 'AI CFO insights',     sub: 'Financial analysis and recommendations' },
+                { icon: '📊', title: 'Pulse dashboard',      sub: 'Real-time cash position and runway' },
+                { icon: '💳', title: 'Smart transactions',   sub: 'Add in plain language — AI parses it' },
+                { icon: '📋', title: 'Debts & receivables',  sub: 'Track who owes what and when' },
+                { icon: '🤖', title: 'AI CFO insights',      sub: 'Financial analysis and recommendations' },
               ].map(f => (
                 <div key={f.title} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 12px', background: 'var(--bg-3)', borderRadius: 10 }}>
                   <span style={{ fontSize: 16, flexShrink: 0, marginTop: 1 }}>{f.icon}</span>
@@ -318,179 +356,214 @@ export default function Onboarding({ onSkip, onComplete }) {
           </>
         )}
 
-        {/* ─── STEP 1: PROFILE ─── */}
+        {/* ───────── STEP 1: TRIAL WELCOME ───────── */}
         {step === 1 && (
           <>
-            <div style={{ marginBottom: 22, textAlign: 'center' }}>
-              <div style={{ fontSize: 24, marginBottom: 8 }}>👤</div>
-              <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--text)', letterSpacing: -0.3, marginBottom: 5 }}>Your profile</div>
-              <div style={{ fontSize: 13, color: 'var(--text-3)', lineHeight: 1.6 }}>
-                Tell us a bit about yourself and your workspace.
+            {/* Trial hero card */}
+            <div style={{ background: 'linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%)', borderRadius: 16, padding: '22px 20px', marginBottom: 20, border: '1px solid #FCD34D' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+                <div style={{ width: 44, height: 44, borderRadius: 14, background: '#F59E0B', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round">
+                    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                  </svg>
+                </div>
+                <div>
+                  <div style={{ fontSize: 16, fontWeight: 800, color: '#78350F', letterSpacing: -0.3 }}>
+                    Your 7-day full trial has started
+                  </div>
+                  <div style={{ fontSize: 12, color: '#92400E', marginTop: 2 }}>
+                    {accessLoaded && isTrialActive
+                      ? `${daysLeft} days left · ends ${trialEndLabel}`
+                      : 'Full access for 7 days from today'}
+                  </div>
+                </div>
+              </div>
+              <div style={{ fontSize: 13, color: '#78350F', lineHeight: 1.6 }}>
+                You have full access to all current CFO AI features during your trial. After 7 days, your account automatically moves to Free Plan unless you upgrade.
+                <strong> Your data will always stay safe.</strong>
               </div>
             </div>
 
-            <Field
-              label="Your name"
-              value={firstName}
-              onChange={setFirstName}
-              placeholder="e.g. Alex"
-              autoFocus
-            />
-            <Field
-              label="Business / workspace name (optional)"
-              value={businessName}
-              onChange={setBusinessName}
-              placeholder="e.g. Bali Spa, Freelance Studio"
-              hint="Shown in the sidebar. You can change this later in Settings."
-            />
-
-            {/* Timezone */}
-            <div style={{ marginBottom: 14 }}>
-              <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 5 }}>
-                Timezone
-              </label>
-              <select value={timezone} onChange={e => setTimezone(e.target.value)} style={{ ...inputSt, cursor: 'pointer' }}>
-                <option value="Asia/Makassar">WITA — Bali, Makassar (UTC+8)</option>
-                <option value="Asia/Jakarta">WIB — Jakarta (UTC+7)</option>
-                <option value="Asia/Jayapura">WIT — Papua (UTC+9)</option>
-                <option value="Asia/Singapore">SGT — Singapore (UTC+8)</option>
-                <option value="Europe/Moscow">MSK — Moscow (UTC+3)</option>
-                <option value="UTC">UTC</option>
-              </select>
+            {/* Feature cards */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 20 }}>
+              {[
+                { icon: '🚀', title: 'Full access', sub: 'All features' },
+                { icon: '💳', title: 'No card', sub: 'Required' },
+                { icon: '🔒', title: 'Free Plan', sub: 'After trial' },
+              ].map(c => (
+                <div key={c.title} style={{ background: 'var(--bg-3)', borderRadius: 12, padding: '14px 10px', textAlign: 'center', border: '1px solid var(--border)' }}>
+                  <div style={{ fontSize: 20, marginBottom: 6 }}>{c.icon}</div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)', marginBottom: 2 }}>{c.title}</div>
+                  <div style={{ fontSize: 10, color: 'var(--text-3)' }}>{c.sub}</div>
+                </div>
+              ))}
             </div>
 
-            {/* Language */}
-            <div style={{ marginBottom: 18 }}>
-              <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 5 }}>
-                Language
-              </label>
-              <div style={{ display: 'flex', gap: 8 }}>
-                {[{ k: 'en', l: '🇬🇧 English' }, { k: 'ru', l: '🇷🇺 Русский' }, { k: 'id', l: '🇮🇩 Bahasa' }].map(({ k, l }) => (
-                  <button key={k} onClick={() => setLanguage(k)} style={{
-                    flex: 1, padding: '9px 6px', borderRadius: 9, fontFamily: 'inherit', fontSize: 12,
-                    border: language === k ? '2px solid #2563EB' : '1px solid var(--border-2)',
-                    background: language === k ? '#EFF6FF' : 'none',
-                    color: language === k ? '#1D4ED8' : 'var(--text-2)',
-                    fontWeight: language === k ? 700 : 500, cursor: 'pointer',
-                  }}>
-                    {l}
-                  </button>
-                ))}
-              </div>
+            {/* Effective plan badge */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: '#E1F5EE', borderRadius: 10, marginBottom: 20, border: '1px solid #A7F3D0' }}>
+              <span style={{ fontSize: 13, color: '#085041', fontWeight: 600 }}>Effective access during trial</span>
+              <span style={{ fontSize: 12, fontWeight: 800, color: '#085041', background: '#A7F3D0', padding: '3px 10px', borderRadius: 20 }}>
+                {effectivePlan.charAt(0).toUpperCase() + effectivePlan.slice(1)} Plan
+              </span>
             </div>
 
-            <ErrorBox msg={error} />
-            <PrimaryBtn onClick={saveProfile} loading={saving}>
-              Save & continue →
-            </PrimaryBtn>
-            <GhostBtn onClick={() => setStep(2)}>Skip this step</GhostBtn>
+            <PrimaryBtn onClick={() => setStep(2)}>Continue →</PrimaryBtn>
           </>
         )}
 
-        {/* ─── STEP 2: FIRST WALLET ─── */}
+        {/* ───────── STEP 2: BUSINESS SETUP ───────── */}
         {step === 2 && (
           <>
             <div style={{ marginBottom: 22, textAlign: 'center' }}>
-              <div style={{ fontSize: 24, marginBottom: 8 }}>🏦</div>
-              <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--text)', letterSpacing: -0.3, marginBottom: 5 }}>
-                Add your first wallet
-              </div>
+              <div style={{ fontSize: 32, marginBottom: 8 }}>🏢</div>
+              <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--text)', letterSpacing: -0.3, marginBottom: 6 }}>Business setup</div>
               <div style={{ fontSize: 13, color: 'var(--text-3)', lineHeight: 1.6 }}>
-                A bank account, e-wallet, or cash — where your money sits. You can add more later.
+                Tell us about your business. This helps personalise your financial workspace.
               </div>
             </div>
 
             <Field
-              label="Wallet name"
-              value={accountName}
-              onChange={setAccountName}
-              placeholder="e.g. BCA Business, GoPay, Cash Office"
+              label="Business name"
+              value={bizName}
+              onChange={setBizName}
+              placeholder="e.g. Bali Spa, Freelance Studio, PT Maju"
+              hint="Shown in the sidebar and reports."
               autoFocus
             />
 
-            {/* Account type */}
-            <div style={{ marginBottom: 14 }}>
-              <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>
-                Type
-              </label>
-              <div style={{ display: 'flex', gap: 8 }}>
-                {[{ k: 'business', l: '💼 Business' }, { k: 'personal', l: '👤 Personal' }].map(({ k, l }) => (
-                  <button key={k} onClick={() => setAccountType(k)} style={{
-                    flex: 1, padding: '10px 8px', borderRadius: 10, fontFamily: 'inherit', fontSize: 13,
-                    border: accountType === k ? '2px solid #2563EB' : '1px solid var(--border-2)',
-                    background: accountType === k ? '#EFF6FF' : 'none',
-                    color: accountType === k ? '#1D4ED8' : 'var(--text-2)',
-                    fontWeight: accountType === k ? 700 : 500, cursor: 'pointer',
-                  }}>
-                    {l}
-                  </button>
-                ))}
-              </div>
-            </div>
+            <SelectField
+              label="Base currency"
+              value={bizCurrency}
+              onChange={setBizCurrency}
+              options={CURRENCIES}
+              hint="Used for totals and reporting."
+            />
 
-            {/* Opening balance + currency side by side */}
-            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 10, marginBottom: 4 }}>
-              <div>
-                <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 5 }}>
-                  Opening balance
-                </label>
-                <input
-                  type="number"
-                  value={openBalance}
-                  onChange={e => setOpenBalance(e.target.value)}
-                  placeholder="0"
-                  style={inputSt}
-                />
-              </div>
-              <div>
-                <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 5 }}>
-                  Currency
-                </label>
-                <select value={currency} onChange={e => setCurrency(e.target.value)} style={{ ...inputSt, cursor: 'pointer' }}>
-                  <option value="IDR">IDR</option>
-                  <option value="USD">USD</option>
-                  <option value="SGD">SGD</option>
-                  <option value="EUR">EUR</option>
-                </select>
-              </div>
-            </div>
-            {currency !== 'IDR' && (
-              <div style={{ fontSize: 11, color: '#085041', background: '#E1F5EE', borderRadius: 7, padding: '6px 10px', marginBottom: 12 }}>
-                ✓ Wallet will be created in {currency}.
-              </div>
-            )}
+            <SelectField
+              label="Timezone"
+              value={bizTimezone}
+              onChange={setBizTimezone}
+              options={TIMEZONES}
+            />
 
-            <div style={{ marginBottom: 14 }} />
+            <Field
+              label="Country"
+              value={bizCountry}
+              onChange={setBizCountry}
+              placeholder="e.g. Indonesia"
+            />
+
             <ErrorBox msg={error} />
-            <PrimaryBtn
-              onClick={saveAccount}
-              loading={saving}
-              disabled={!accountName.trim()}
-            >
-              {accountName.trim() ? 'Add wallet →' : 'Enter a wallet name'}
+            <PrimaryBtn onClick={saveBusiness} loading={saving} disabled={saving}>
+              Save & continue →
             </PrimaryBtn>
-            <GhostBtn onClick={() => setStep(3)}>Skip — add later</GhostBtn>
+            <GhostBtn onClick={() => setStep(3)}>Skip for now</GhostBtn>
           </>
         )}
 
-        {/* ─── STEP 3: DONE ─── */}
+        {/* ───────── STEP 3: FIRST WALLET ───────── */}
         {step === 3 && (
           <>
-            <div style={{ textAlign: 'center', marginBottom: 26 }}>
-              <div style={{ fontSize: 48, marginBottom: 14 }}>🎉</div>
-              <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--text)', letterSpacing: -0.3, marginBottom: 8 }}>
-                You're all set!
+            <div style={{ marginBottom: 20, textAlign: 'center' }}>
+              <div style={{ fontSize: 32, marginBottom: 8 }}>🏦</div>
+              <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--text)', letterSpacing: -0.3, marginBottom: 6 }}>
+                Add your first wallet
               </div>
-              <div style={{ fontSize: 13, color: 'var(--text-3)', lineHeight: 1.7 }}>
-                Your CFO AI workspace is ready. Start by adding your first transaction or open the Pulse dashboard.
+              <div style={{ fontSize: 13, color: 'var(--text-3)', lineHeight: 1.6 }}>
+                A bank account, e-wallet, or cash account — where your money sits.
               </div>
             </div>
 
+            {hasWallets ? (
+              <div style={{ background: '#E1F5EE', border: '1px solid #A7F3D0', borderRadius: 12, padding: '14px 16px', marginBottom: 18, textAlign: 'center' }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: '#085041', marginBottom: 4 }}>✓ You already have wallets</div>
+                <div style={{ fontSize: 12, color: '#047857' }}>You can manage them in Accounts. Skip this step.</div>
+              </div>
+            ) : (
+              <>
+                <Field
+                  label="Wallet name"
+                  value={walletName}
+                  onChange={setWalletName}
+                  placeholder="e.g. BCA Business, GoPay, Cash Office"
+                  autoFocus
+                />
+
+                <SelectField
+                  label="Type"
+                  value={walletType}
+                  onChange={setWalletType}
+                  options={WALLET_TYPES}
+                />
+
+                <SelectField
+                  label="Currency"
+                  value={walletCur}
+                  onChange={setWalletCur}
+                  options={CURRENCIES}
+                />
+
+                <Field
+                  label="Company / Entity name"
+                  value={entityName}
+                  onChange={setEntityName}
+                  placeholder="e.g. PT Maju Bersama (optional)"
+                  hint="Optional. Useful for multi-entity setups."
+                />
+
+                <div style={{ marginBottom: 14 }}>
+                  <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 5 }}>
+                    Opening balance <span style={{ fontWeight: 400, textTransform: 'none' }}>(optional)</span>
+                  </label>
+                  <input
+                    type="number"
+                    value={openBal}
+                    onChange={e => setOpenBal(e.target.value)}
+                    placeholder="0"
+                    style={inputSt}
+                  />
+                  <div style={{ fontSize: 11, color: 'var(--text-4)', marginTop: 4 }}>
+                    Current real balance to set the starting point.
+                  </div>
+                </div>
+              </>
+            )}
+
+            <ErrorBox msg={error} />
+            {hasWallets ? (
+              <PrimaryBtn onClick={() => setStep(4)}>Continue →</PrimaryBtn>
+            ) : (
+              <>
+                <PrimaryBtn onClick={saveWallet} loading={saving} disabled={saving || !walletName.trim()}>
+                  {walletName.trim() ? 'Add wallet & continue →' : 'Enter wallet name'}
+                </PrimaryBtn>
+                <GhostBtn onClick={() => setStep(4)}>Skip — add later in Accounts</GhostBtn>
+              </>
+            )}
+          </>
+        )}
+
+        {/* ───────── STEP 4: READY ───────── */}
+        {step === 4 && (
+          <>
+            {/* Success hero */}
+            <div style={{ background: 'linear-gradient(135deg, #0F172A 0%, #1e293b 100%)', borderRadius: 16, padding: '28px 20px', marginBottom: 22, textAlign: 'center' }}>
+              <div style={{ fontSize: 44, marginBottom: 12 }}>🎉</div>
+              <div style={{ fontSize: 22, fontWeight: 800, color: '#fff', letterSpacing: -0.5, marginBottom: 8 }}>
+                You're ready!
+              </div>
+              <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', lineHeight: 1.7 }}>
+                Your CFO AI workspace is set up. Here's what to do next.
+              </div>
+            </div>
+
+            {/* Next steps */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 22 }}>
               {[
-                { icon: '✦', title: 'Add a transaction', sub: 'Describe it in plain text — AI does the rest', path: '/add' },
-                { icon: '📊', title: 'View Pulse',        sub: 'Your live financial health overview',         path: '/'    },
-                { icon: '📋', title: 'Log a debt',        sub: 'Track who owes you or who you owe',           path: '/add' },
+                { icon: '📊', title: 'Open Pulse',           sub: 'Your live financial health overview',     path: '/' },
+                { icon: '✦',  title: 'Add a transaction',    sub: 'Describe it — AI fills in the details',   path: '/add' },
+                { icon: '📋', title: 'Log a debt',           sub: 'Track receivables and payables',          path: '/receivables' },
+                { icon: '🤖', title: 'Ask AI CFO',           sub: 'Get instant financial analysis',          path: '/cfo' },
               ].map(f => (
                 <div key={f.title} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 12px', background: 'var(--bg-3)', borderRadius: 10 }}>
                   <span style={{ fontSize: 15, flexShrink: 0, marginTop: 1 }}>{f.icon}</span>
@@ -503,23 +576,23 @@ export default function Onboarding({ onSkip, onComplete }) {
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-              <PrimaryBtn onClick={complete}>
+              <PrimaryBtn onClick={() => complete('/')}>
                 Open Pulse →
               </PrimaryBtn>
               <PrimaryBtn
-                onClick={() => { markOnboardingCompleted(); navigate('/add') }}
-                style={{ background: '#0F172A' }}
+                onClick={() => complete('/add')}
+                style={{ background: 'linear-gradient(135deg, #0F172A, #1e293b)', boxShadow: 'none' }}
               >
                 Add transaction
               </PrimaryBtn>
             </div>
           </>
         )}
+
       </div>
 
-      {/* Step counter below card */}
-      {step < 3 && (
-        <div style={{ marginTop: 16, fontSize: 11, color: 'var(--text-4)' }}>
+      {step < 4 && (
+        <div style={{ marginTop: 14, fontSize: 11, color: 'var(--text-4)', textAlign: 'center' }}>
           You can always re-run setup from Settings.
         </div>
       )}

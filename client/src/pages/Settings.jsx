@@ -37,9 +37,34 @@ const TIMEZONES = [
   { value: 'UTC', label: 'UTC' },
 ]
 
+const BIZ_CURRENCIES = [
+  { value: 'IDR', label: 'IDR — Indonesian Rupiah' },
+  { value: 'USD', label: 'USD — US Dollar' },
+  { value: 'EUR', label: 'EUR — Euro' },
+  { value: 'SGD', label: 'SGD — Singapore Dollar' },
+  { value: 'MYR', label: 'MYR — Malaysian Ringgit' },
+  { value: 'THB', label: 'THB — Thai Baht' },
+  { value: 'CNY', label: 'CNY — Chinese Yuan' },
+]
+
+const BIZ_TIMEZONES = [
+  { value: 'Asia/Makassar',     label: 'Bali / Makassar (WITA UTC+8)' },
+  { value: 'Asia/Jakarta',      label: 'Jakarta (WIB UTC+7)' },
+  { value: 'Asia/Jayapura',     label: 'Papua (WIT UTC+9)' },
+  { value: 'Asia/Singapore',    label: 'Singapore (SGT UTC+8)' },
+  { value: 'Asia/Bangkok',      label: 'Bangkok (ICT UTC+7)' },
+  { value: 'Asia/Kuala_Lumpur', label: 'Kuala Lumpur (MYT UTC+8)' },
+  { value: 'Asia/Shanghai',     label: 'Beijing / Shanghai (CST UTC+8)' },
+  { value: 'Asia/Dubai',        label: 'Dubai (GST UTC+4)' },
+  { value: 'Europe/Moscow',     label: 'Moscow (MSK UTC+3)' },
+  { value: 'Europe/London',     label: 'London (GMT UTC+0)' },
+  { value: 'America/New_York',  label: 'New York (EST UTC-5)' },
+  { value: 'UTC',               label: 'UTC' },
+]
+
 export default function Settings() {
   const { token, logout } = useAuth()
-  const { access, planLabel, isTrialActive, effectivePlan } = useAccess()
+  const { access, planLabel, isTrialActive, effectivePlan, refreshAccess } = useAccess()
   const navigate = useNavigate()
   const fileRef = useRef()
   const { t, changeLang } = useTranslation()
@@ -53,6 +78,41 @@ export default function Settings() {
   const [showTz, setShowTz] = useState(false)
   const [notifications, setNotifications] = useState(localStorage.getItem('hf_notif') !== 'false')
   const [refData, setRefData] = useState({ categories: 0, counterparties: 0, wallets: 0 })
+
+  // Business settings state
+  const [bizEdit, setBizEdit] = useState(false)
+  const [bizName, setBizName] = useState('')
+  const [bizCurrency, setBizCurrency] = useState('IDR')
+  const [bizTimezone, setBizTimezone] = useState('Asia/Makassar')
+  const [bizCountry, setBizCountry] = useState('')
+  const [bizSaving, setBizSaving] = useState(false)
+  const [bizError, setBizError] = useState('')
+
+  // Sync biz fields from access when it loads
+  useEffect(() => {
+    if (access?.business) {
+      setBizName(access.business.name || '')
+      setBizCurrency(access.business.base_currency || 'IDR')
+      setBizTimezone(access.business.timezone || 'Asia/Makassar')
+      setBizCountry(access.business.country || '')
+    }
+  }, [access])
+
+  const saveBusiness = async () => {
+    setBizSaving(true); setBizError('')
+    try {
+      await apiFetch('/business/current', token, {
+        method: 'PATCH',
+        body: { name: bizName.trim() || undefined, base_currency: bizCurrency, timezone: bizTimezone, country: bizCountry.trim() || undefined },
+      })
+      await refreshAccess()
+      setBizEdit(false)
+    } catch (e) {
+      setBizError(e.message)
+    } finally {
+      setBizSaving(false)
+    }
+  }
 
   useEffect(() => {
     apiFetch('/profile', token).then(data => {
@@ -212,6 +272,74 @@ export default function Settings() {
           </div>
         ))}
       </div>
+
+      {/* ── Business Settings ── */}
+      {access?.business && (() => {
+        const canEdit = ['owner', 'admin'].includes(access?.membership?.role)
+        const biz = access.business
+        const inputSt = { width: '100%', padding: '9px 12px', borderRadius: 10, border: '1px solid var(--border-2)', fontSize: 13, background: 'var(--bg-3)', color: 'var(--text)', boxSizing: 'border-box', fontFamily: 'inherit', outline: 'none' }
+        return (
+          <>
+            <div style={{ margin: '0 16px 8px', fontSize: 11, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Business Settings</div>
+            <div style={{ margin: '0 16px 16px', background: 'var(--bg-2)', borderRadius: 12, overflow: 'hidden' }}>
+              {!bizEdit ? (
+                <>
+                  {[
+                    { label: 'Business name',  value: biz.name || '—' },
+                    { label: 'Base currency',  value: biz.base_currency || 'IDR' },
+                    { label: 'Timezone',       value: biz.timezone || '—' },
+                    { label: 'Country',        value: biz.country || '—' },
+                  ].map((row, idx, arr) => (
+                    <div key={row.label} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', borderBottom: idx < arr.length - 1 ? '0.5px solid var(--border)' : 'none' }}>
+                      <span style={{ fontSize: 13, color: 'var(--text-3)' }}>{row.label}</span>
+                      <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{row.value}</span>
+                    </div>
+                  ))}
+                  {canEdit && (
+                    <div style={{ padding: '12px 16px', borderTop: '0.5px solid var(--border)' }}>
+                      <button onClick={() => { setBizName(biz.name || ''); setBizCurrency(biz.base_currency || 'IDR'); setBizTimezone(biz.timezone || 'Asia/Makassar'); setBizCountry(biz.country || ''); setBizEdit(true); setBizError('') }} style={{ width: '100%', padding: '9px', borderRadius: 10, background: 'none', color: 'var(--brand)', border: '0.5px solid var(--border-2)', fontSize: 13, fontWeight: 500, cursor: 'pointer' }}>
+                        ✏️ Edit business info
+                      </button>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div style={{ padding: '16px' }}>
+                  <div style={{ marginBottom: 12 }}>
+                    <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 5 }}>Business name</label>
+                    <input value={bizName} onChange={e => setBizName(e.target.value)} placeholder="e.g. Bali Spa" style={inputSt} autoFocus />
+                  </div>
+                  <div style={{ marginBottom: 12 }}>
+                    <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 5 }}>Base currency</label>
+                    <select value={bizCurrency} onChange={e => setBizCurrency(e.target.value)} style={{ ...inputSt, cursor: 'pointer' }}>
+                      {BIZ_CURRENCIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+                    </select>
+                  </div>
+                  <div style={{ marginBottom: 12 }}>
+                    <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 5 }}>Timezone</label>
+                    <select value={bizTimezone} onChange={e => setBizTimezone(e.target.value)} style={{ ...inputSt, cursor: 'pointer' }}>
+                      {BIZ_TIMEZONES.map(tz => <option key={tz.value} value={tz.value}>{tz.label}</option>)}
+                    </select>
+                  </div>
+                  <div style={{ marginBottom: 14 }}>
+                    <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 5 }}>Country</label>
+                    <input value={bizCountry} onChange={e => setBizCountry(e.target.value)} placeholder="e.g. Indonesia" style={inputSt} />
+                  </div>
+                  {bizError && <div style={{ fontSize: 12, color: '#991B1B', background: '#FEE2E2', borderRadius: 8, padding: '7px 10px', marginBottom: 10 }}>{bizError}</div>}
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button onClick={saveBusiness} disabled={bizSaving} style={{ flex: 1, padding: '10px', borderRadius: 10, background: '#2563EB', color: '#fff', border: 'none', fontSize: 13, fontWeight: 700, cursor: bizSaving ? 'not-allowed' : 'pointer', opacity: bizSaving ? 0.6 : 1 }}>
+                      {bizSaving ? 'Saving…' : 'Save'}
+                    </button>
+                    <button onClick={() => { setBizEdit(false); setBizError('') }} style={{ flex: 1, padding: '10px', borderRadius: 10, background: 'none', color: 'var(--text-3)', border: '0.5px solid var(--border-2)', fontSize: 13, cursor: 'pointer' }}>
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </>
+        )
+      })()}
 
       {/* ── Plan & Access ── */}
       {access && (() => {
