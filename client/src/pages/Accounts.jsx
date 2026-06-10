@@ -3,87 +3,160 @@ import { createPortal } from 'react-dom'
 import { useAuth } from '../hooks/useAuth'
 import { apiFetch, fmt, fmtFull } from '../lib/api'
 
+// ── Wallet type config ────────────────────────────────────────────────────────
+const WALLET_TYPES = [
+  { value: 'bank',            label: 'Bank account' },
+  { value: 'cash',            label: 'Cash' },
+  { value: 'ewallet',         label: 'E-Wallet' },
+  { value: 'payment_gateway', label: 'Payment gateway' },
+  { value: 'other',           label: 'Other' },
+]
+
+const CURRENCIES = ['IDR', 'USD', 'EUR', 'SGD', 'MYR', 'THB']
+
+const TYPE_ICON = {
+  bank: (color) => (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round">
+      <rect x="2" y="7" width="20" height="14" rx="2"/>
+      <path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/>
+      <line x1="12" y1="12" x2="12" y2="16"/><line x1="10" y1="14" x2="14" y2="14"/>
+    </svg>
+  ),
+  cash: (color) => (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round">
+      <rect x="2" y="6" width="20" height="12" rx="2"/>
+      <circle cx="12" cy="12" r="3"/>
+      <path d="M6 12h.01M18 12h.01"/>
+    </svg>
+  ),
+  ewallet: (color) => (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round">
+      <rect x="5" y="2" width="14" height="20" rx="2"/>
+      <line x1="12" y1="18" x2="12.01" y2="18"/>
+    </svg>
+  ),
+  payment_gateway: (color) => (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round">
+      <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+    </svg>
+  ),
+  other: (color) => (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round">
+      <rect x="1" y="4" width="22" height="16" rx="2"/>
+      <line x1="1" y1="10" x2="23" y2="10"/>
+    </svg>
+  ),
+}
+
+const CURRENCY_STYLE = {
+  IDR: { bg: '#E1F5EE', color: '#085041' },
+  USD: { bg: '#EEF2FF', color: '#3730a3' },
+  EUR: { bg: '#FEF3C7', color: '#92400E' },
+  SGD: { bg: '#FDE8FF', color: '#7E22CE' },
+  MYR: { bg: '#FFF1F2', color: '#9F1239' },
+  THB: { bg: '#F0F9FF', color: '#0369A1' },
+}
+
+const getCurrencyStyle = (currency) => CURRENCY_STYLE[currency] || { bg: '#F1F5F9', color: '#475569' }
+const getTypeIcon      = (type, color) => (TYPE_ICON[type] || TYPE_ICON.other)(color)
+
+// ── Default form state ────────────────────────────────────────────────────────
+const EMPTY_FORM = { name: '', currency: 'IDR', type: '', entity_name: '', opening_balance: '', sort_order: 0 }
+
 export default function Accounts() {
   const { token } = useAuth()
-  const [data, setData] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [showAdd, setShowAdd] = useState(false)
-  const [editAccount, setEditAccount] = useState(null) // account being edited
-  const [form, setForm] = useState({ name: '', type: 'personal', balance: '', newBalance: '' })
-  const [saving, setSaving] = useState(false)
 
-  const load = () => {
+  const [wallets,      setWallets]      = useState([])
+  const [legacySources,setLegacySources]= useState([]) // source-based accounts not yet in wallets
+  const [loading,      setLoading]      = useState(true)
+  const [showForm,     setShowForm]     = useState(false)
+  const [editWallet,   setEditWallet]   = useState(null)
+  const [form,         setForm]         = useState(EMPTY_FORM)
+  const [saving,       setSaving]       = useState(false)
+  const [backfilling,  setBackfilling]  = useState(false)
+  const [backfillDone, setBackfillDone] = useState(false)
+
+  // ── Load wallets + legacy sources ─────────────────────────────────────────
+  const load = async () => {
     setLoading(true)
-    apiFetch('/pulse?scope=all', token)
-      .then(setData)
-      .catch(console.error)
-      .finally(() => setLoading(false))
+    try {
+      const [wData, pData] = await Promise.all([
+        apiFetch('/wallets', token),
+        apiFetch('/pulse?scope=all', token),
+      ])
+
+      const loaded = wData.wallets || []
+      setWallets(loaded)
+
+      // Legacy: source-based virtual accounts not yet migrated to wallets
+      const walletNames = new Set(loaded.map(w => w.name))
+      const legacy = (pData.accounts || []).filter(a => !walletNames.has(a.name))
+      setLegacySources(legacy)
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setLoading(false)
+    }
   }
 
   useEffect(() => { load() }, [])
 
-  const totalBalance = data?.totalBalance || 0
-  const accounts = data?.accounts || []
+  // ── Computed totals ───────────────────────────────────────────────────────
+  const totalBalance = wallets.reduce((s, w) => s + (w.balance || 0), 0)
 
-  const typeColor = (type) => type === 'business'
-    ? { bg: '#E1F5EE', color: '#085041' }
-    : { bg: '#E6F1FB', color: '#185FA5' }
-
-  const openEdit = (acc) => {
-    setEditAccount(acc)
-    setForm({ name: acc.name, type: acc.type, balance: acc.balance, newBalance: acc.balance })
-    setShowAdd(true)
-  }
-
-  const openAdd = () => {
-    setEditAccount(null)
-    setForm({ name: '', type: 'personal', balance: '' })
-    setShowAdd(true)
-  }
-
-  const handleDelete = async () => {
-    if (!editAccount) return
-    if (!window.confirm(`Delete "${editAccount.name}"? All transactions from this source will have their source cleared.`)) return
-    setSaving(true)
+  // ── Backfill handler ──────────────────────────────────────────────────────
+  const handleBackfill = async () => {
+    if (!window.confirm('Import your existing account names as wallets? You can edit them afterwards.')) return
+    setBackfilling(true)
     try {
-      await apiFetch('/accounts/delete', token, {
-        method: 'POST',
-        body: { name: editAccount.name }
-      })
-      setShowAdd(false)
-      setEditAccount(null)
-      load()
+      const r = await apiFetch('/wallets/backfill', token, { method: 'POST', body: {} })
+      setBackfillDone(true)
+      await load()
+      if (r.created === 0) alert('All existing accounts are already in your wallet list.')
     } catch (e) {
       alert(e.message)
     } finally {
-      setSaving(false)
+      setBackfilling(false)
     }
+  }
+
+  // ── Modal helpers ─────────────────────────────────────────────────────────
+  const openAdd = () => {
+    setEditWallet(null)
+    setForm(EMPTY_FORM)
+    setShowForm(true)
+  }
+
+  const openEdit = (w) => {
+    setEditWallet(w)
+    setForm({ name: w.name, currency: w.currency || 'IDR', type: w.type || '', entity_name: w.entity_name || '', opening_balance: '', sort_order: w.sort_order || 0 })
+    setShowForm(true)
   }
 
   const handleSave = async () => {
+    if (!form.name.trim()) return
     setSaving(true)
     try {
-      if (editAccount) {
-        await apiFetch('/accounts/rename', token, {
-          method: 'POST',
-          body: { oldName: editAccount.name, newName: form.name, type: form.type }
+      if (editWallet) {
+        await apiFetch(`/wallets/${editWallet.id}`, token, {
+          method: 'PUT',
+          body: { name: form.name, currency: form.currency, type: form.type || null, entity_name: form.entity_name || null },
         })
-        const diff = Number(form.newBalance) - Number(form.balance)
-        if (diff !== 0) {
-          await apiFetch('/accounts/adjust', token, {
-            method: 'POST',
-            body: { name: form.name, diff, type: form.type }
-          })
-        }
       } else {
-        await apiFetch('/accounts', token, {
+        await apiFetch('/wallets', token, {
           method: 'POST',
-          body: { name: form.name, type: form.type, balance: Number(form.balance) || 0 }
+          body: {
+            name:            form.name,
+            currency:        form.currency,
+            type:            form.type        || null,
+            entity_name:     form.entity_name || null,
+            opening_balance: Number(form.opening_balance) || 0,
+            sort_order:      wallets.length,
+          },
         })
       }
-      setShowAdd(false)
-      setEditAccount(null)
-      load()
+      setShowForm(false)
+      await load()
     } catch (e) {
       alert(e.message)
     } finally {
@@ -91,75 +164,114 @@ export default function Accounts() {
     }
   }
 
+  const handleDelete = async () => {
+    if (!editWallet) return
+    if (!window.confirm(`Archive "${editWallet.name}"? The wallet will be hidden. Transactions are not deleted.`)) return
+    setSaving(true)
+    try {
+      await apiFetch(`/wallets/${editWallet.id}`, token, { method: 'DELETE' })
+      setShowForm(false)
+      await load()
+    } catch (e) {
+      alert(e.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="hf-page">
 
-      {/* ── Page header ─── */}
+      {/* Page header */}
       <div className="hf-page-header">
         <div>
-          <div className="hf-page-title">Accounts</div>
-          <div className="hf-page-subtitle">All financial sources and balances</div>
+          <div className="hf-page-title">Wallets & Accounts</div>
+          <div className="hf-page-subtitle">Manage your bank accounts, cash, and payment wallets</div>
         </div>
         <div className="hf-page-actions">
-          <button onClick={openAdd} className="btn btn-primary btn-md">+ Add Account</button>
+          <button onClick={openAdd} className="btn btn-primary btn-md">+ Add wallet</button>
         </div>
       </div>
 
-      {/* ── Total balance hero ─── */}
-      <div style={{ background: 'linear-gradient(135deg, #0F172A 0%, #1e293b 100%)', borderRadius: 20, padding: '24px 26px 20px', boxShadow: '0 8px 32px rgba(15,23,42,.22)', marginBottom: 20, position: 'relative', overflow: 'hidden' }}>
-        <div style={{ position: 'absolute', inset: 0, opacity: 0.03, backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 28px, #fff 28px, #fff 29px), repeating-linear-gradient(90deg, transparent, transparent 28px, #fff 28px, #fff 29px)', pointerEvents: 'none' }} />
-        <div style={{ position: 'relative' }}>
-          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 10, fontWeight: 700 }}>Total balance · all accounts</div>
-          <div style={{ fontSize: 'var(--text-3xl)', fontWeight: 800, color: '#fff', letterSpacing: -1, lineHeight: 1 }}>
-            {fmtFull(totalBalance)}
+      {/* Total balance hero */}
+      {wallets.length > 0 && (
+        <div style={{ background: 'linear-gradient(135deg, #0F172A 0%, #1e293b 100%)', borderRadius: 20, padding: '24px 26px 20px', boxShadow: '0 8px 32px rgba(15,23,42,.22)', marginBottom: 20, position: 'relative', overflow: 'hidden' }}>
+          <div style={{ position: 'absolute', inset: 0, opacity: 0.03, backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 28px, #fff 28px, #fff 29px), repeating-linear-gradient(90deg, transparent, transparent 28px, #fff 28px, #fff 29px)', pointerEvents: 'none' }} />
+          <div style={{ position: 'relative' }}>
+            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 10, fontWeight: 700 }}>Total balance · all wallets</div>
+            <div style={{ fontSize: 'var(--text-3xl)', fontWeight: 800, color: '#fff', letterSpacing: -1, lineHeight: 1 }}>
+              {fmtFull(totalBalance)}
+            </div>
+            <div style={{ fontSize: 'var(--text-xs)', color: 'rgba(255,255,255,0.4)', marginTop: 8 }}>IDR · {wallets.length} wallet{wallets.length !== 1 ? 's' : ''}</div>
           </div>
-          <div style={{ fontSize: 'var(--text-xs)', color: 'rgba(255,255,255,0.4)', marginTop: 8 }}>IDR · {accounts.length} account{accounts.length !== 1 ? 's' : ''}</div>
-        </div>
-      </div>
-
-      {loading && <div style={{ padding: 32, textAlign: 'center', color: 'var(--text-3)', fontSize: 'var(--text-sm)' }}>Loading accounts…</div>}
-
-      {!loading && accounts.length === 0 && (
-        <div className="empty-state">
-          <div className="empty-state-icon">💳</div>
-          <div className="empty-state-title">No accounts yet</div>
-          <div className="empty-state-sub">Accounts are created automatically when you add transactions with a source. You can also add them manually.</div>
-          <button className="empty-state-cta" onClick={openAdd}>+ Add Account</button>
         </div>
       )}
 
-      {/* ── Accounts grid ─── */}
-      {accounts.length > 0 && (
+      {loading && (
+        <div style={{ padding: 32, textAlign: 'center', color: 'var(--text-3)', fontSize: 'var(--text-sm)' }}>Loading wallets…</div>
+      )}
+
+      {/* Backfill banner — only when legacy accounts exist and no wallets yet */}
+      {!loading && wallets.length === 0 && legacySources.length > 0 && !backfillDone && (
+        <div style={{ background: '#EEF2FF', border: '1px solid #C7D2FE', borderRadius: 14, padding: '16px 18px', marginBottom: 16, display: 'flex', alignItems: 'flex-start', gap: 14 }}>
+          <div style={{ fontSize: 22, lineHeight: 1 }}>💡</div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 'var(--text-sm)', fontWeight: 700, color: '#3730a3', marginBottom: 4 }}>
+              You have {legacySources.length} existing account{legacySources.length !== 1 ? 's' : ''}
+            </div>
+            <div style={{ fontSize: 'var(--text-xs)', color: '#4338ca', lineHeight: 1.5, marginBottom: 12 }}>
+              Import them as wallets to manage currencies, types, and entities.
+              You can edit or delete them after importing.
+            </div>
+            <button
+              onClick={handleBackfill}
+              disabled={backfilling}
+              style={{ padding: '8px 16px', borderRadius: 8, background: '#4338ca', color: '#fff', border: 'none', fontSize: 'var(--text-sm)', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}
+            >
+              {backfilling ? 'Importing…' : `Import ${legacySources.length} account${legacySources.length !== 1 ? 's' : ''} as wallets`}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Empty state — no wallets and no legacy */}
+      {!loading && wallets.length === 0 && legacySources.length === 0 && (
+        <div className="empty-state">
+          <div className="empty-state-icon">🏦</div>
+          <div className="empty-state-title">No wallets yet</div>
+          <div className="empty-state-sub">
+            Create wallets for each bank account, cash box, payment gateway,
+            or company account you use.
+          </div>
+          <button className="empty-state-cta" onClick={openAdd}>+ Add first wallet</button>
+        </div>
+      )}
+
+      {/* Wallet cards */}
+      {wallets.length > 0 && (
         <div className="hf-card-grid hf-card-grid-2" style={{ marginBottom: 16 }}>
-          {accounts.map((acc, i) => {
-            const colors = typeColor(acc.type)
-            const pct = totalBalance > 0 ? Math.round((acc.balance / totalBalance) * 100) : 0
-            const isNeg = acc.balance < 0
+          {wallets.map((w) => {
+            const cs    = getCurrencyStyle(w.currency)
+            const isNeg = (w.balance || 0) < 0
+            const pct   = totalBalance > 0 ? Math.round(((w.balance || 0) / totalBalance) * 100) : 0
+            const typeLabel = WALLET_TYPES.find(t => t.value === w.type)?.label || null
 
             return (
-              <div key={acc.id || i} className="hf-card" style={{ cursor: 'default' }}>
-                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14, marginBottom: 16 }}>
-                  {/* Icon */}
-                  <div style={{ width: 48, height: 48, borderRadius: 14, background: colors.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={colors.color} strokeWidth="1.8" strokeLinecap="round">
-                      {acc.type === 'business'
-                        ? <><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></>
-                        : <><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></>
-                      }
-                    </svg>
+              <div key={w.id} className="hf-card" style={{ cursor: 'default' }}>
+                {/* Card header */}
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14, marginBottom: 14 }}>
+                  <div style={{ width: 48, height: 48, borderRadius: 14, background: cs.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    {getTypeIcon(w.type, cs.color)}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 'var(--text-base)', fontWeight: 700, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginBottom: 4 }}>{acc.name}</div>
-                    <span style={{ fontSize: 12, padding: '2px 9px', borderRadius: 20, background: colors.bg, color: colors.color, fontWeight: 700 }}>
-                      {acc.type === 'business' ? 'Business' : 'Personal'}
-                    </span>
+                    <div style={{ fontSize: 'var(--text-base)', fontWeight: 700, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginBottom: 5 }}>{w.name}</div>
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 20, background: cs.bg, color: cs.color, fontWeight: 700 }}>{w.currency}</span>
+                      {typeLabel && <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 20, background: 'var(--bg-2)', color: 'var(--text-2)', fontWeight: 600 }}>{typeLabel}</span>}
+                    </div>
                   </div>
-                  {/* Edit button */}
-                  <button onClick={() => openEdit(acc)} style={{
-                    width: 34, height: 34, borderRadius: 10, background: 'var(--bg-2)',
-                    border: '1px solid var(--border)', display: 'flex', alignItems: 'center',
-                    justifyContent: 'center', flexShrink: 0, cursor: 'pointer'
-                  }}>
+                  <button onClick={() => openEdit(w)} style={{ width: 34, height: 34, borderRadius: 10, background: 'var(--bg-2)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, cursor: 'pointer' }}>
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-2)" strokeWidth="2" strokeLinecap="round">
                       <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
                       <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
@@ -167,12 +279,17 @@ export default function Accounts() {
                   </button>
                 </div>
 
+                {/* Entity name */}
+                {w.entity_name && (
+                  <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-3)', marginBottom: 12, paddingLeft: 62 }}>{w.entity_name}</div>
+                )}
+
                 {/* Balance */}
                 <div style={{ marginBottom: 14 }}>
                   <div style={{ fontSize: 11, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 700, marginBottom: 4 }}>Balance</div>
                   <div style={{ fontSize: 'var(--text-xl)', fontWeight: 800, color: isNeg ? 'var(--red-dark)' : 'var(--text)', letterSpacing: -0.3 }}>
-                    {isNeg ? '−' : ''}{fmt(Math.abs(acc.balance))}
-                    <span style={{ fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--text-3)', marginLeft: 4 }}>IDR</span>
+                    {isNeg ? '−' : ''}{fmt(Math.abs(w.balance || 0))}
+                    <span style={{ fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--text-3)', marginLeft: 4 }}>{w.currency}</span>
                   </div>
                 </div>
 
@@ -183,14 +300,14 @@ export default function Accounts() {
                     <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-2)' }}>{Math.abs(pct)}%</span>
                   </div>
                   <div style={{ height: 4, background: 'var(--bg-3)', borderRadius: 3, overflow: 'hidden' }}>
-                    <div style={{ height: '100%', borderRadius: 3, background: isNeg ? 'var(--red)' : colors.color, width: `${Math.max(2, Math.min(100, Math.abs(pct)))}%`, transition: 'width .3s' }} />
+                    <div style={{ height: '100%', borderRadius: 3, background: isNeg ? 'var(--red)' : cs.color, width: `${Math.max(2, Math.min(100, Math.abs(pct)))}%`, transition: 'width .3s' }} />
                   </div>
                 </div>
               </div>
             )
           })}
 
-          {/* ── Add account card ─── */}
+          {/* Add wallet card */}
           <div
             className="hf-card"
             onClick={openAdd}
@@ -201,118 +318,136 @@ export default function Accounts() {
                 <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/>
               </svg>
             </div>
-            <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-3)', fontWeight: 500 }}>Add account manually</div>
+            <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-3)', fontWeight: 500 }}>Add wallet</div>
           </div>
         </div>
       )}
 
-      {/* ── Tip card ─── */}
+      {/* Legacy unmatched sources */}
+      {!loading && wallets.length > 0 && legacySources.length > 0 && (
+        <div className="hf-card" style={{ marginBottom: 16, background: 'var(--bg-2)' }}>
+          <div style={{ fontSize: 11, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 800, marginBottom: 10 }}>Legacy accounts not yet linked</div>
+          <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-3)', marginBottom: 12, lineHeight: 1.5 }}>
+            These transaction sources don't match any wallet name. Import them or rename your wallets to match.
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
+            {legacySources.map(a => (
+              <span key={a.id} style={{ fontSize: 12, padding: '4px 10px', borderRadius: 20, background: 'var(--bg-3)', color: 'var(--text-2)', fontWeight: 600 }}>{a.name}</span>
+            ))}
+          </div>
+          <button
+            onClick={handleBackfill}
+            disabled={backfilling}
+            style={{ padding: '8px 14px', borderRadius: 8, background: 'var(--text)', color: 'var(--bg)', border: 'none', fontSize: 'var(--text-sm)', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}
+          >
+            {backfilling ? 'Importing…' : 'Import as wallets'}
+          </button>
+        </div>
+      )}
+
+      {/* Info card */}
       <div className="hf-card" style={{ background: 'var(--bg-2)', border: '1px solid var(--border)' }}>
-        <div style={{ fontSize: 11, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 800, marginBottom: 8 }}>Auto-detection</div>
+        <div style={{ fontSize: 11, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 800, marginBottom: 8 }}>About wallets</div>
         <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-2)', lineHeight: 1.6 }}>
-          Accounts are auto-created from transaction sources via AI parsing.<br/>
-          <span style={{ color: 'var(--text-3)', fontStyle: 'italic' }}>Example: "received 5M from Gojek to Permata card"</span>
+          Create wallets for each bank account, cash box, payment gateway, or company account you use.
+          Balances are calculated from your transactions automatically.
         </div>
       </div>
 
       {/* Add / Edit modal */}
-      {showAdd && createPortal(
-        <div className="modal-overlay" onClick={() => setShowAdd(false)}>
+      {showForm && createPortal(
+        <div className="modal-overlay" onClick={() => setShowForm(false)}>
           <div className="modal-sheet" onClick={e => e.stopPropagation()}>
             <div className="modal-drag-handle" />
-            <button className="modal-close-btn" onClick={() => setShowAdd(false)}>✕</button>
+            <button className="modal-close-btn" onClick={() => setShowForm(false)}>✕</button>
 
             <div style={{ fontSize: 'var(--text-lg)', fontWeight: 600, color: 'var(--text)', marginBottom: 18 }}>
-              {editAccount ? `Edit · ${editAccount.name}` : 'Add account'}
+              {editWallet ? `Edit · ${editWallet.name}` : 'Add wallet'}
             </div>
 
-            <label className="modal-label">Account name</label>
+            {/* Name */}
+            <label className="modal-label">Wallet name</label>
             <input
               className="modal-input"
               value={form.name}
               onChange={e => setForm(p => ({ ...p, name: e.target.value }))}
-              placeholder="e.g. Permata Personal"
+              placeholder="e.g. BCA IDR, Cash Office, Wise USD"
               style={{ marginBottom: 14 }}
               autoFocus
             />
 
-            <label className="modal-label">Type</label>
-            <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
-              {['personal', 'business'].map(t => (
-                <button key={t} onClick={() => setForm(p => ({ ...p, type: t }))} style={{
-                  flex: 1, padding: '10px', borderRadius: 10, fontSize: 'var(--text-sm)',
-                  border: '0.5px solid var(--border-2)', fontFamily: 'inherit',
-                  background: form.type === t ? 'var(--text)' : 'none',
-                  color: form.type === t ? '#fff' : 'var(--text-2)',
-                  cursor: 'pointer', transition: 'background .12s',
-                }}>{t === 'personal' ? '👤 Personal' : '💼 Business'}</button>
-              ))}
+            {/* Currency */}
+            <label className="modal-label">Currency</label>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
+              {CURRENCIES.map(c => {
+                const cs = getCurrencyStyle(c)
+                return (
+                  <button key={c} onClick={() => setForm(p => ({ ...p, currency: c }))} style={{
+                    padding: '8px 14px', borderRadius: 10, fontSize: 'var(--text-sm)',
+                    border: '0.5px solid var(--border-2)', fontFamily: 'inherit', fontWeight: 700,
+                    background: form.currency === c ? cs.bg : 'none',
+                    color:      form.currency === c ? cs.color : 'var(--text-3)',
+                    cursor: 'pointer', transition: 'all .1s',
+                  }}>{c}</button>
+                )
+              })}
             </div>
 
-            {!editAccount && (
+            {/* Type */}
+            <label className="modal-label">Type <span style={{ fontWeight: 400, color: 'var(--text-3)' }}>(optional)</span></label>
+            <select
+              className="modal-input"
+              value={form.type}
+              onChange={e => setForm(p => ({ ...p, type: e.target.value }))}
+              style={{ marginBottom: 14 }}
+            >
+              <option value="">— Select type —</option>
+              {WALLET_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+            </select>
+
+            {/* Entity name */}
+            <label className="modal-label">Company / Entity <span style={{ fontWeight: 400, color: 'var(--text-3)' }}>(optional)</span></label>
+            <input
+              className="modal-input"
+              value={form.entity_name}
+              onChange={e => setForm(p => ({ ...p, entity_name: e.target.value }))}
+              placeholder="e.g. PT Siberian BG, Personal"
+              style={{ marginBottom: 14 }}
+            />
+
+            {/* Opening balance — only for new wallets */}
+            {!editWallet && (
               <>
-                <label className="modal-label">Opening balance (IDR)</label>
+                <label className="modal-label">Opening balance <span style={{ fontWeight: 400, color: 'var(--text-3)' }}>(optional)</span></label>
                 <input
                   type="number"
                   className="modal-input"
-                  value={form.balance}
-                  onChange={e => setForm(p => ({ ...p, balance: e.target.value }))}
+                  value={form.opening_balance}
+                  onChange={e => setForm(p => ({ ...p, opening_balance: e.target.value }))}
                   placeholder="0"
                   style={{ marginBottom: 18 }}
                 />
               </>
             )}
 
-            {editAccount && (
-              <>
-                <label className="modal-label">
-                  Set new balance (IDR) — current: {fmtFull(form.balance)}
-                </label>
-                <input
-                  type="number"
-                  className="modal-input"
-                  value={form.newBalance}
-                  onChange={e => setForm(p => ({ ...p, newBalance: e.target.value }))}
-                  placeholder={String(form.balance)}
-                  style={{ marginBottom: 6 }}
-                />
-                {Number(form.newBalance) !== Number(form.balance) && (
-                  <div style={{ fontSize: 'var(--text-sm)', color: Number(form.newBalance) > Number(form.balance) ? 'var(--green-dark)' : 'var(--red-dark)', marginBottom: 8 }}>
-                    Adjustment: {Number(form.newBalance) > Number(form.balance) ? '+' : ''}{fmtFull(Number(form.newBalance) - Number(form.balance))} IDR
-                  </div>
-                )}
-                <div style={{ marginBottom: 18, background: 'var(--bg-2)', borderRadius: 10, padding: '10px 13px' }}>
-                  <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-3)', lineHeight: 1.5 }}>
-                    ℹ️ Renaming will update all transactions linked to this account source.
-                  </div>
-                </div>
-              </>
-            )}
+            {editWallet && <div style={{ marginBottom: 18 }} />}
 
             <button
-              disabled={!form.name || saving}
+              disabled={!form.name.trim() || saving}
               onClick={handleSave}
               className="btn btn-primary btn-block btn-lg"
               style={{ marginBottom: 8 }}
             >
-              {saving ? 'Saving…' : editAccount ? 'Save changes' : 'Add account'}
+              {saving ? 'Saving…' : editWallet ? 'Save changes' : 'Add wallet'}
             </button>
 
-            <button
-              onClick={() => setShowAdd(false)}
-              className="btn btn-ghost btn-block btn-lg"
-              style={{ marginBottom: editAccount ? 8 : 0 }}
-            >
+            <button onClick={() => setShowForm(false)} className="btn btn-ghost btn-block btn-lg" style={{ marginBottom: editWallet ? 8 : 0 }}>
               Cancel
             </button>
 
-            {editAccount && (
-              <button
-                onClick={handleDelete}
-                disabled={saving}
-                className="btn btn-danger btn-block btn-lg"
-              >
-                🗑 Delete account
+            {editWallet && (
+              <button onClick={handleDelete} disabled={saving} className="btn btn-danger btn-block btn-lg">
+                Archive wallet
               </button>
             )}
           </div>
@@ -322,4 +457,3 @@ export default function Accounts() {
     </div>
   )
 }
-

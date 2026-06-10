@@ -530,6 +530,191 @@ app.get('/api/activity-types', auth, async (req, res) => {
   }
 });
 
+// --- Wallets API ----------------------------------------------------------
+// Phase 1: user-scoped. Balance computed from transactions (wallet_id match
+// OR legacy source-name match for backward compat with pre-wallet transactions).
+
+const WALLET_CASH_IN  = ['income'];
+const WALLET_CASH_OUT = ['expense', 'payroll'];
+
+app.get('/api/wallets', auth, async (req, res) => {
+  const userId = req.user.userId;
+  try {
+    const { data: wallets, error: wErr } = await supabase
+      .from('wallets')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('is_active', true)
+      .order('sort_order', { ascending: true })
+      .order('created_at', { ascending: true });
+    if (wErr) throw wErr;
+
+    if (!wallets || wallets.length === 0) return res.json({ wallets: [] });
+
+    // Fetch transactions to compute per-wallet balances
+    const { data: txs, error: tErr } = await supabase
+      .from('transactions')
+      .select('wallet_id, source, type, amount_idr')
+      .eq('user_id', userId);
+    if (tErr) throw tErr;
+
+    const withBalance = wallets.map(w => {
+      const related = (txs || []).filter(t =>
+        t.wallet_id === w.id || (!t.wallet_id && t.source === w.name)
+      );
+      const balance = related.reduce((sum, t) => {
+        if (WALLET_CASH_IN.includes(t.type))  return sum + Number(t.amount_idr || 0);
+        if (WALLET_CASH_OUT.includes(t.type)) return sum - Number(t.amount_idr || 0);
+        return sum;
+      }, 0);
+      return { ...w, balance };
+    });
+
+    res.json({ wallets: withBalance });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/api/wallets', auth, async (req, res) => {
+  const userId = req.user.userId;
+  const { name, currency, type, entity_name, color, opening_balance, sort_order } = req.body;
+  if (!name) return res.status(400).json({ error: 'name required' });
+  try {
+    const { data: wallet, error: wErr } = await supabase
+      .from('wallets')
+      .insert({
+        user_id:     userId,
+        name,
+        currency:    currency    || 'IDR',
+        type:        type        || null,
+        entity_name: entity_name || null,
+        color:       color       || null,
+        sort_order:  sort_order  || 0,
+      })
+      .select()
+      .single();
+    if (wErr) throw wErr;
+
+    // Insert opening balance transaction if provided and non-zero
+    const ob = Number(opening_balance) || 0;
+    if (ob !== 0) {
+      await supabase.from('transactions').insert({
+        user_id:          userId,
+        type:             ob > 0 ? 'income' : 'expense',
+        amount_original:  Math.abs(ob),
+        currency_original: currency || 'IDR',
+        amount_idr:       Math.abs(ob),
+        description:      `Opening balance · ${name}`,
+        source:           name,
+        wallet_id:        wallet.id,
+        scope:            'business',
+      });
+    }
+
+    res.json({ wallet });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.put('/api/wallets/:id', auth, async (req, res) => {
+  const userId = req.user.userId;
+  const { id } = req.params;
+  const { name, currency, type, entity_name, color, sort_order } = req.body;
+  try {
+    // If renaming, sync source text on legacy transactions for balance continuity
+    if (name) {
+      const { data: existing } = await supabase
+        .from('wallets').select('name').eq('id', id).eq('user_id', userId).single();
+      if (existing && existing.name !== name) {
+        await supabase.from('transactions')
+          .update({ source: name })
+          .eq('user_id', userId)
+          .eq('source', existing.name);
+      }
+    }
+
+    const updates = { updated_at: new Date().toISOString() };
+    if (name         !== undefined) updates.name        = name;
+    if (currency     !== undefined) updates.currency    = currency;
+    if (type         !== undefined) updates.type        = type;
+    if (entity_name  !== undefined) updates.entity_name = entity_name;
+    if (color        !== undefined) updates.color       = color;
+    if (sort_order   !== undefined) updates.sort_order  = sort_order;
+
+    const { data, error } = await supabase
+      .from('wallets')
+      .update(updates)
+      .eq('id', id)
+      .eq('user_id', userId)
+      .select()
+      .single();
+    if (error) throw error;
+    res.json({ wallet: data });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.delete('/api/wallets/:id', auth, async (req, res) => {
+  const userId = req.user.userId;
+  const { id } = req.params;
+  try {
+    const { error } = await supabase
+      .from('wallets')
+      .update({ is_active: false, updated_at: new Date().toISOString() })
+      .eq('id', id)
+      .eq('user_id', userId);
+    if (error) throw error;
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// POST /api/wallets/backfill
+// Creates wallets from distinct transactions.source values for THIS user only.
+// Never touches other users. Skips sources that already exist as wallet names.
+app.post('/api/wallets/backfill', auth, async (req, res) => {
+  const userId = req.user.userId;
+  try {
+    const { data: txs, error: tErr } = await supabase
+      .from('transactions')
+      .select('source')
+      .eq('user_id', userId)
+      .not('source', 'is', null);
+    if (tErr) throw tErr;
+
+    const sources = [...new Set((txs || []).map(t => t.source).filter(Boolean))];
+    if (sources.length === 0) return res.json({ created: 0, wallets: [] });
+
+    const { data: existing } = await supabase
+      .from('wallets').select('name').eq('user_id', userId);
+    const existingNames = new Set((existing || []).map(w => w.name));
+
+    const toCreate = sources.filter(s => !existingNames.has(s));
+    if (toCreate.length === 0) return res.json({ created: 0, wallets: [] });
+
+    const rows = toCreate.map((name, i) => ({
+      user_id:  userId,
+      name,
+      // Heuristic: name contains '$' or 'usd' (case-insensitive) → USD wallet
+      currency: /\$|usd/i.test(name) ? 'USD' : 'IDR',
+      type:     null,
+      sort_order: i,
+    }));
+
+    const { data: created, error: cErr } = await supabase
+      .from('wallets').insert(rows).select();
+    if (cErr) throw cErr;
+
+    res.json({ created: (created || []).length, wallets: created || [] });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // --- Accounts API ---------------------------------------------------------
 
 app.post('/api/accounts/adjust', auth, async (req, res) => {
