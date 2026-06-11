@@ -16,12 +16,13 @@ function fmtDate(str) {
  * Handles the enriched status from backend.
  */
 function getStatusBadge(debt) {
-  const { status, days_overdue } = debt
+  const { status, days_overdue, approval_status } = debt
+  if (approval_status === 'pending_approval') return { cls: 'due-soon', label: '⏳ Pending approval' }
+  if (approval_status === 'rejected')         return { cls: 'open',     label: 'Rejected' }
   if (status === 'paid')      return { cls: 'paid',     label: 'Received ✓' }
   if (status === 'overdue')   return { cls: 'overdue',  label: days_overdue > 0 ? `${days_overdue}d overdue` : 'Overdue' }
   if (status === 'partial')   return { cls: 'due-soon', label: 'Partial' }
   if (status === 'cancelled') return { cls: 'open',     label: 'Cancelled' }
-  // open — check due_date for urgency
   const days = daysUntil(debt.due_date)
   if (days !== null && days <= 3) return { cls: 'due-soon', label: `Due in ${days}d` }
   if (days !== null && days <= 7) return { cls: 'open',     label: `In ${days}d` }
@@ -40,13 +41,33 @@ function getCashRiskLabel(debt) {
 }
 
 function DebtRow({ debt, accounts, token, onRefresh }) {
-  const [modal,   setModal]   = useState(false)
-  const [success, setSuccess] = useState(false)
+  const [modal,           setModal]           = useState(false)
+  const [success,         setSuccess]         = useState(false)
+  const [approvalLoading, setApprovalLoading] = useState(false)
+  const { t } = useTranslation()
 
   const badge     = getStatusBadge(debt)
   const riskLabel = getCashRiskLabel(debt)
   const remaining = Number(debt.remaining_amount ?? debt.amount ?? 0)
   const isOpen    = !['paid', 'cancelled'].includes(debt.status)
+  const isPending = debt.approval_status === 'pending_approval'
+
+  const handleApprove = async () => {
+    setApprovalLoading(true)
+    try {
+      await apiFetch(`/debts/${debt.id}/approve`, token, { method: 'PATCH' })
+      onRefresh()
+    } catch (_) {}
+    setApprovalLoading(false)
+  }
+  const handleReject = async () => {
+    setApprovalLoading(true)
+    try {
+      await apiFetch(`/debts/${debt.id}/reject`, token, { method: 'PATCH', body: { reason: 'Rejected via Web App' } })
+      onRefresh()
+    } catch (_) {}
+    setApprovalLoading(false)
+  }
 
   const handleSuccess = () => {
     setModal(false)
@@ -56,12 +77,29 @@ function DebtRow({ debt, accounts, token, onRefresh }) {
 
   return (
     <>
-      <div className="item-row" style={{ opacity: success || debt.status === 'paid' ? 0.55 : 1, transition: 'opacity .3s', alignItems: 'flex-start', padding: '12px 14px' }}>
+      <div className="item-row" style={{ opacity: success || debt.status === 'paid' ? 0.55 : 1, transition: 'opacity .3s', alignItems: 'flex-start', padding: '12px 14px', borderLeft: isPending ? '3px solid var(--amber-dark)' : undefined }}>
         <div className="item-row-left" style={{ flex: 1, minWidth: 0 }}>
-          <div className="item-row-name">{debt.counterparty || '—'}</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+            <div className="item-row-name">{debt.counterparty || '—'}</div>
+            {debt.source_channel === 'telegram' && (
+              <span style={{ fontSize: 10, fontWeight: 700, background: '#E8F4FF', color: '#1565C0', borderRadius: 6, padding: '2px 6px', letterSpacing: '0.02em' }}>
+                ✈ Telegram
+              </span>
+            )}
+          </div>
           <div className="item-row-sub">
             {fmtDate(debt.due_date)}{debt.description ? ` · ${debt.description}` : ''}
           </div>
+          {debt.created_by_name && debt.source_channel === 'telegram' && (
+            <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 2 }}>
+              By {debt.created_by_name}{debt.created_by_role ? ` · ${debt.created_by_role}` : ''}
+            </div>
+          )}
+          {debt.raw_input_text && (
+            <div style={{ fontSize: 11, color: 'var(--text-4)', marginTop: 2, fontStyle: 'italic' }}>
+              "{debt.raw_input_text}"
+            </div>
+          )}
           {/* Partial progress bar */}
           {debt.status === 'partial' && (
             <div style={{ marginTop: 6 }}>
@@ -98,7 +136,24 @@ function DebtRow({ debt, accounts, token, onRefresh }) {
             )}
             <span className={`status-pill ${badge.cls}`}>{success ? 'Received ✓' : badge.label}</span>
           </div>
-          {isOpen && !success && (
+          {isPending ? (
+            <div style={{ display: 'flex', gap: 5, flexDirection: 'column', alignItems: 'flex-end' }}>
+              <button
+                onClick={handleApprove}
+                disabled={approvalLoading}
+                style={{ padding: '5px 10px', borderRadius: 8, fontSize: 11, fontWeight: 700, background: 'var(--green-light)', color: 'var(--green-dark)', border: '1px solid rgba(18,183,106,.3)', cursor: 'pointer', whiteSpace: 'nowrap' }}
+              >
+                ✓ Approve
+              </button>
+              <button
+                onClick={handleReject}
+                disabled={approvalLoading}
+                style={{ padding: '5px 10px', borderRadius: 8, fontSize: 11, fontWeight: 700, background: 'var(--red-light)', color: 'var(--red-dark)', border: '1px solid rgba(240,68,56,.2)', cursor: 'pointer', whiteSpace: 'nowrap' }}
+              >
+                ✗ Reject
+              </button>
+            </div>
+          ) : isOpen && !success ? (
             <button
               onClick={() => setModal(true)}
               style={{
@@ -111,7 +166,7 @@ function DebtRow({ debt, accounts, token, onRefresh }) {
             >
               {debt.status === 'partial' ? 'More' : 'Mark received'}
             </button>
-          )}
+          ) : null}
         </div>
       </div>
 
@@ -159,6 +214,7 @@ export default function Receivables() {
   // Filter tabs defined inside component so t() is available
   const FILTERS = [
     { key: 'all',     label: t('common.all') },
+    { key: 'pending', label: '⏳ Pending' },
     { key: 'open',    label: t('receivables.open') },
     { key: 'overdue', label: t('receivables.overdue') },
     { key: 'partial', label: t('receivables.partial') },
@@ -173,23 +229,25 @@ export default function Receivables() {
   const receivables  = allDebts.filter(x => x.type === 'receivable')
 
   // Counts for filter tabs
-  const openItems    = receivables.filter(x => x.status === 'open')
-  const overdueItems = receivables.filter(x => x.status === 'overdue')
-  const partialItems = receivables.filter(x => x.status === 'partial')
+  const pendingItems = receivables.filter(x => x.approval_status === 'pending_approval')
+  const openItems    = receivables.filter(x => x.status === 'open'    && x.approval_status !== 'pending_approval')
+  const overdueItems = receivables.filter(x => x.status === 'overdue' && x.approval_status !== 'pending_approval')
+  const partialItems = receivables.filter(x => x.status === 'partial' && x.approval_status !== 'pending_approval')
   const paidItems    = receivables.filter(x => x.status === 'paid')
 
   // Active filter
   const filtered = filter === 'all'     ? receivables
+                 : filter === 'pending' ? pendingItems
                  : filter === 'open'    ? openItems
                  : filter === 'overdue' ? overdueItems
                  : filter === 'partial' ? partialItems
                  :                        paidItems
 
-  // Summary totals — only open (unpaid)
-  const openAll       = receivables.filter(x => !['paid', 'cancelled'].includes(x.status))
+  // Summary totals — only open approved (unpaid)
+  const openAll       = receivables.filter(x => !['paid', 'cancelled'].includes(x.status) && x.approval_status !== 'pending_approval')
   const totalRemaining = openAll.reduce((s, x) => s + Number(x.remaining_amount ?? x.amount ?? 0), 0)
 
-  const FILTER_COUNTS = { all: receivables.length, open: openItems.length, overdue: overdueItems.length, partial: partialItems.length, paid: paidItems.length }
+  const FILTER_COUNTS = { all: receivables.length, pending: pendingItems.length, open: openItems.length, overdue: overdueItems.length, partial: partialItems.length, paid: paidItems.length }
 
   return (
     <div className="hf-page">

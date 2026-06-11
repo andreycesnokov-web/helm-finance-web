@@ -260,9 +260,19 @@ app.get('/api/pulse', auth, async (req, res) => {
     const runway   = burnMetrics.runway_days ?? 999;
 
     // Use remaining_amount (not original amount) and exclude paid/cancelled
-    const openDebts    = (debts || []).filter(d => !['paid', 'cancelled'].includes(d.status));
+    // Only approved/confirmed debts count as real obligations/expected cash.
+    // pending_approval (Telegram drafts) are excluded from balance calculations.
+    const openDebts    = (debts || []).filter(d =>
+      !['paid', 'cancelled'].includes(d.status) &&
+      (d.approval_status === 'approved' || !d.approval_status)
+    );
+    const pendingDebts = (debts || []).filter(d =>
+      d.approval_status === 'pending_approval' && !['paid', 'cancelled'].includes(d.status)
+    );
     const receivables  = openDebts.filter(d => d.type === 'receivable').reduce((s, d) => s + Number(d.remaining_amount || d.amount || 0), 0);
     const payables     = openDebts.filter(d => d.type === 'payable').reduce((s, d) => s + Number(d.remaining_amount || d.amount || 0), 0);
+    const pendingReceivables = pendingDebts.filter(d => d.type === 'receivable').reduce((s, d) => s + Number(d.remaining_amount || d.amount || 0), 0);
+    const pendingPayables    = pendingDebts.filter(d => d.type === 'payable').reduce((s, d) => s + Number(d.remaining_amount || d.amount || 0), 0);
     const netPosition = totalBalance + receivables - payables;
 
     // -- AI status ----------------------------------------------------------
@@ -304,6 +314,8 @@ app.get('/api/pulse', auth, async (req, res) => {
       scope, totalBalance, income, expenses, burnRate, runway,
       burnWindowDays: burnMetrics.burn_window_days,
       receivables, payables, netPosition,
+      // Pending (Telegram drafts) — not in confirmed cash but visible in UI
+      pendingReceivables, pendingPayables,
       aiStatus, aiText,
       accounts,
       debts: debts || [],
@@ -412,6 +424,10 @@ app.post('/api/debts', auth, async (req, res) => {
     original_amount: amount,  // lock original amount; never mutate this
     paid_amount:     0,
     status:          'open',
+    // Web App creations are always approved immediately
+    source_channel:   req.body.source_channel  || 'web',
+    approval_status:  req.body.approval_status || 'approved',
+    created_by_user_id: userId,
   };
   const { data, error } = await supabase.from('debts')
     .insert(insertRow).select().single();
@@ -434,6 +450,151 @@ app.patch('/api/debts/:id/settle', auth, async (req, res) => {
     .eq('id', req.params.id).eq('user_id', req.user.userId).select().single();
   if (error) return res.status(500).json({ error: error.message });
   res.json(computeDebtStatus(data));
+});
+
+// ── PATCH /api/debts/:id/approve ─────────────────────────────────────────────
+// Owner / admin approves a pending_approval debt created from Telegram.
+app.patch('/api/debts/:id/approve', auth, async (req, res) => {
+  const userId = req.user.userId;
+  try {
+    // Only owner/admin can approve
+    const { data: mem } = await supabase.from('business_members')
+      .select('role').eq('user_id', userId).eq('status', 'active')
+      .in('role', ['owner', 'admin', 'cfo']).limit(1);
+    if (!mem || mem.length === 0)
+      return res.status(403).json({ error: 'Only owner, admin or CFO can approve' });
+
+    const { data, error } = await supabase.from('debts')
+      .update({
+        approval_status:    'approved',
+        approved_by_user_id: userId,
+        approved_at:         new Date().toISOString(),
+        status:              'open',   // activate the record
+      })
+      .eq('id', req.params.id).eq('user_id', userId).select().single();
+    if (error) return res.status(500).json({ error: error.message });
+    res.json(computeDebtStatus(data));
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── PATCH /api/debts/:id/reject ──────────────────────────────────────────────
+app.patch('/api/debts/:id/reject', auth, async (req, res) => {
+  const userId = req.user.userId;
+  const { reason } = req.body;
+  try {
+    const { data: mem } = await supabase.from('business_members')
+      .select('role').eq('user_id', userId).eq('status', 'active')
+      .in('role', ['owner', 'admin', 'cfo']).limit(1);
+    if (!mem || mem.length === 0)
+      return res.status(403).json({ error: 'Only owner, admin or CFO can reject' });
+
+    const { data, error } = await supabase.from('debts')
+      .update({
+        approval_status:    'rejected',
+        approved_by_user_id: userId,
+        approved_at:         new Date().toISOString(),
+        rejected_reason:     reason || null,
+        status:              'cancelled',
+      })
+      .eq('id', req.params.id).eq('user_id', userId).select().single();
+    if (error) return res.status(500).json({ error: error.message });
+    res.json(computeDebtStatus(data));
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── POST /api/debts/from-telegram ────────────────────────────────────────────
+// Called by the Telegram bot to create a draft receivable / payable.
+// Requires telegram_id → users.id mapping.
+// Role check: employee creates pending_approval; owner/admin creates approved directly.
+app.post('/api/debts/from-telegram', async (req, res) => {
+  try {
+    const {
+      telegram_id,
+      type,              // 'receivable' | 'payable'
+      counterparty,
+      amount,
+      currency = 'IDR',
+      due_date,
+      description,
+      raw_input_text,
+      raw_input_language,
+      confidence_score,
+      attachment_url,
+      business_owner_telegram_id, // owner's telegram id (to resolve user_id)
+    } = req.body;
+
+    if (!telegram_id) return res.status(400).json({ error: 'telegram_id required' });
+    if (!type || !['receivable', 'payable'].includes(type))
+      return res.status(400).json({ error: 'type must be receivable or payable' });
+    if (!amount || isNaN(Number(amount)))
+      return res.status(400).json({ error: 'amount required' });
+
+    // Resolve submitting user from telegram_id
+    const { data: submitterUser } = await supabase.from('users')
+      .select('id, name, role').eq('telegram_id', telegram_id).single();
+    if (!submitterUser)
+      return res.status(403).json({
+        error: 'not_linked',
+        message: 'Your Telegram is not linked to CFO AI. Contact your administrator.',
+      });
+
+    // Resolve business owner (user_id for the debt record)
+    // If business_owner_telegram_id provided, use that; otherwise submitter is owner
+    let ownerId = submitterUser.id;
+    if (business_owner_telegram_id && business_owner_telegram_id !== telegram_id) {
+      const { data: ownerUser } = await supabase.from('users')
+        .select('id').eq('telegram_id', business_owner_telegram_id).single();
+      if (ownerUser) ownerId = ownerUser.id;
+    }
+
+    // Check membership of submitter in owner's business
+    const { data: membership } = await supabase.from('business_members')
+      .select('role').eq('user_id', submitterUser.id).eq('status', 'active').limit(1);
+    const memberRole = membership?.[0]?.role || 'member';
+
+    // Owner/admin/CFO → approved immediately; others → pending_approval
+    const isPrivileged = ['owner', 'admin', 'cfo'].includes(memberRole);
+    const approvalStatus = isPrivileged ? 'approved' : 'pending_approval';
+    const status         = isPrivileged ? 'open' : 'open'; // always open; pending shown via approval_status
+
+    const amountNum = Number(amount);
+    const insertRow = {
+      user_id:               ownerId,
+      type,
+      counterparty:          counterparty || null,
+      amount:                amountNum,
+      original_amount:       amountNum,
+      paid_amount:           0,
+      currency:              currency || 'IDR',
+      due_date:              due_date || null,
+      description:           description || null,
+      status,
+      // Telegram / approval metadata
+      source_channel:            'telegram',
+      raw_input_text:            raw_input_text || null,
+      raw_input_language:        raw_input_language || null,
+      confidence_score:          confidence_score ? Number(confidence_score) : null,
+      attachment_url:            attachment_url || null,
+      created_by_user_id:        submitterUser.id,
+      created_by_telegram_id:    Number(telegram_id),
+      created_by_name:           submitterUser.name || null,
+      created_by_role:           memberRole,
+      approval_status:           approvalStatus,
+      approved_by_user_id:       isPrivileged ? submitterUser.id : null,
+      approved_at:               isPrivileged ? new Date().toISOString() : null,
+    };
+
+    const { data, error } = await supabase.from('debts').insert(insertRow).select().single();
+    if (error) return res.status(500).json({ error: error.message });
+
+    res.json({
+      debt:            computeDebtStatus(data),
+      approval_status: approvalStatus,
+      needs_approval:  !isPrivileged,
+      created_by:      submitterUser.name || telegram_id,
+      role:            memberRole,
+    });
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 // --- Transactions API ------------------------------------------------------
