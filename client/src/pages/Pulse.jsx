@@ -22,6 +22,12 @@ const ALERT_COLORS = {
   critical: { bg: 'var(--red-light)',    text: 'var(--red-dark)',    border: 'rgba(240,68,56,.2)',   dot: '#F04438' },
 }
 
+const STATUS_LABEL_KEY = {
+  healthy:  'pulse.healthy',
+  warning:  'pulse.attention',
+  critical: 'pulse.critical',
+}
+
 const ACTION_ICONS = {
   collect_receivable: '↓',
   pay_payable:        '↑',
@@ -245,7 +251,7 @@ export default function Pulse({ onDataLoad }) {
 
   const hour    = new Date().getHours()
   const greet   = hour < 12 ? t('pulse.goodMorning') : hour < 17 ? t('pulse.goodAfternoon') : t('pulse.goodEvening')
-  const firstName = user?.firstName || 'there'
+  const firstName = (user?.firstName || 'there').replace(/[\u{1F600}-\u{1FFFF}\u{2700}-\u{27BF}\u{FE00}-\u{FEFF}]/gu, '').trim() || 'there'
 
   const btnP = 'btn btn-block btn-lg'
   const btnS = 'btn btn-ghost btn-block btn-lg'
@@ -298,7 +304,7 @@ export default function Pulse({ onDataLoad }) {
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'rgba(255,255,255,.08)', border: '0.5px solid rgba(255,255,255,.14)', borderRadius: 20, padding: '4px 10px 4px 8px', flexShrink: 0, marginLeft: 10 }}>
             <div style={{ width: 6, height: 6, borderRadius: '50%', background: alertStyle.dot, flexShrink: 0, boxShadow: `0 0 6px ${alertStyle.dot}` }} />
-            <span style={{ fontSize: 11, fontWeight: 600, color: '#fff' }}>{aiAlert?.label || 'CFO AI'}</span>
+            <span style={{ fontSize: 11, fontWeight: 600, color: '#fff' }}>{aiAlert?.status ? t(STATUS_LABEL_KEY[aiAlert.status] || 'pulse.aiStatus') : t('pulse.aiStatus')}</span>
           </div>
         </div>
 
@@ -322,7 +328,7 @@ export default function Pulse({ onDataLoad }) {
               {!runway || runway >= 999 ? '∞' : runway}
             </div>
             <div style={{ fontSize: 10, color: 'rgba(255,255,255,.35)', marginTop: 3 }}>
-              {!runway || runway >= 999 ? 'no burn data' : `days · ${p.burnWindowDays >= 30 ? '30-day avg' : p.burnWindowDays > 0 ? `${p.burnWindowDays}d avg` : 'current burn'}`}
+              {!runway || runway >= 999 ? t('pulse.noData') : `${t('pulse.daysLeft')} · ${p.burnWindowDays >= 30 ? t('pulse.avg30') : p.burnWindowDays > 0 ? `${p.burnWindowDays}d avg` : t('pulse.atCurrentBurn')}`}
             </div>
           </div>
         </div>
@@ -337,7 +343,7 @@ export default function Pulse({ onDataLoad }) {
             <div style={{ height: 4, background: 'rgba(255,255,255,.1)', borderRadius: 4, overflow: 'hidden' }}>
               <div style={{ height: '100%', width: `${scoreVal}%`, background: scoreColor, borderRadius: 4 }} />
             </div>
-            <div style={{ fontSize: 10, color: 'rgba(255,255,255,.4)', marginTop: 5 }}>{cfoScore.label || cfoScore.status}</div>
+            <div style={{ fontSize: 10, color: 'rgba(255,255,255,.4)', marginTop: 5 }}>{t(STATUS_LABEL_KEY[cfoScore.status] || 'pulse.attention')}</div>
           </div>
         )}
 
@@ -382,7 +388,7 @@ export default function Pulse({ onDataLoad }) {
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
                   <div>
                     <div style={{ fontSize: 36, fontWeight: 700, color: scoreColor, lineHeight: 1 }}>{scoreVal}</div>
-                    <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 3 }}>{cfoScore.label || cfoScore.status}</div>
+                    <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 3 }}>{t(STATUS_LABEL_KEY[cfoScore.status] || 'pulse.attention')}</div>
                   </div>
                   <div style={{ width: 56, height: 56, borderRadius: '50%', border: `3px solid ${scoreColor}`, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)', flexShrink: 0 }}>
                     <span style={{ fontSize: 18, fontWeight: 700, color: scoreColor }}>{scoreVal}</span>
