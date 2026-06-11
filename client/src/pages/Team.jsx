@@ -65,58 +65,89 @@ function InviteModal({ token, onClose, onCreated }) {
     setTimeout(() => setCopied(false), 2000)
   }
 
+  const ROLE_DESCS = {
+    employee: 'Can submit requests via Telegram. Needs approval for financial records.',
+    manager:  'Can manage receivables and payables. Submits drafts for owner approval.',
+    cfo:      'Full financial visibility. Can approve records and view all reports.',
+    admin:    'Full access except billing. Can invite and manage team members.',
+  }
+
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}
+    <div
+      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 1000,
+        display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}
       onClick={e => e.target === e.currentTarget && onClose()}
     >
-      <div style={{ background: 'var(--bg)', borderRadius: '20px 20px 0 0', padding: '24px 20px 32px', width: '100%', maxWidth: 480 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-          <div style={{ fontSize: 17, fontWeight: 800, color: 'var(--text)' }}>
-            {result ? '✅ Invite Created' : '➕ Invite Member'}
+      <div style={{
+        background: 'var(--bg)', borderRadius: 20, padding: '28px 28px 24px',
+        width: '100%', maxWidth: 440,
+        boxShadow: '0 24px 64px rgba(0,0,0,0.22)',
+        animation: 'modalIn .18s ease',
+      }}>
+
+        {/* Header */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 22 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ width: 36, height: 36, borderRadius: 10, background: 'var(--bg-2)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 17 }}>
+              {result ? '✅' : '👥'}
+            </div>
+            <div style={{ fontSize: 17, fontWeight: 800, color: 'var(--text)' }}>
+              {result ? 'Invite Ready' : 'Invite Member'}
+            </div>
           </div>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 20, color: 'var(--text-3)', cursor: 'pointer', lineHeight: 1 }}>×</button>
+          <button onClick={onClose}
+            style={{ width: 30, height: 30, borderRadius: 8, background: 'var(--bg-2)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, color: 'var(--text-3)', cursor: 'pointer', lineHeight: 1 }}>
+            ×
+          </button>
         </div>
 
         {!result ? (
           <>
-            {/* Role */}
-            <div style={{ marginBottom: 14 }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-3)', marginBottom: 6 }}>ROLE</div>
-              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {/* Role picker */}
+            <div style={{ marginBottom: 18 }}>
+              <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--text-3)', letterSpacing: '0.07em', textTransform: 'uppercase', marginBottom: 8 }}>Role</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
                 {ROLE_OPTS.map(r => (
                   <button key={r.value} onClick={() => setRole(r.value)}
-                    style={{ padding: '6px 14px', borderRadius: 20, fontSize: 12, fontWeight: 600, cursor: 'pointer', border: 'none',
+                    style={{
+                      padding: '10px 14px', borderRadius: 10, fontSize: 13, fontWeight: 600,
+                      cursor: 'pointer', textAlign: 'left', transition: 'all .12s',
+                      border: role === r.value ? '1.5px solid var(--text)' : '1px solid var(--border)',
                       background: role === r.value ? 'var(--text)' : 'var(--bg-2)',
-                      color:      role === r.value ? 'var(--bg)'   : 'var(--text-3)',
+                      color:      role === r.value ? 'var(--bg)'   : 'var(--text-2)',
                     }}>
                     {r.label}
                   </button>
                 ))}
               </div>
+              {/* Role description */}
+              <div style={{ marginTop: 8, fontSize: 12, color: 'var(--text-3)', lineHeight: 1.5, padding: '8px 12px', background: 'var(--bg-2)', borderRadius: 8 }}>
+                {ROLE_DESCS[role]}
+              </div>
             </div>
 
-            {/* Optional note */}
-            <div style={{ marginBottom: 14 }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-3)', marginBottom: 6 }}>NOTE (optional)</div>
+            {/* Note */}
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--text-3)', letterSpacing: '0.07em', textTransform: 'uppercase', marginBottom: 8 }}>Note <span style={{ fontWeight: 400, opacity: 0.6 }}>(optional)</span></div>
               <input
                 value={label}
                 onChange={e => setLabel(e.target.value)}
                 placeholder='e.g. "For accountant Fenia"'
-                style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--bg-2)', color: 'var(--text)', fontSize: 14, boxSizing: 'border-box' }}
+                style={{ width: '100%', padding: '11px 14px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--bg-2)', color: 'var(--text)', fontSize: 14, boxSizing: 'border-box', outline: 'none' }}
               />
             </div>
 
             {/* Max uses + expiry */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 20 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 22 }}>
               <div>
-                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-3)', marginBottom: 6 }}>MAX USES</div>
+                <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--text-3)', letterSpacing: '0.07em', textTransform: 'uppercase', marginBottom: 7 }}>Max uses</div>
                 <select value={maxUses} onChange={e => setMaxUses(Number(e.target.value))}
                   style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--bg-2)', color: 'var(--text)', fontSize: 14 }}>
                   {[1,2,5,10,50,100].map(n => <option key={n} value={n}>{n} {n === 1 ? 'person' : 'people'}</option>)}
                 </select>
               </div>
               <div>
-                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-3)', marginBottom: 6 }}>EXPIRES IN</div>
+                <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--text-3)', letterSpacing: '0.07em', textTransform: 'uppercase', marginBottom: 7 }}>Expires in</div>
                 <select value={days} onChange={e => setDays(Number(e.target.value))}
                   style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--bg-2)', color: 'var(--text)', fontSize: 14 }}>
                   <option value={1}>1 day</option>
@@ -129,27 +160,32 @@ function InviteModal({ token, onClose, onCreated }) {
             </div>
 
             <button onClick={handleCreate} disabled={loading}
-              style={{ width: '100%', padding: '14px', borderRadius: 12, background: 'var(--text)', color: 'var(--bg)', fontSize: 15, fontWeight: 700, border: 'none', cursor: 'pointer' }}>
-              {loading ? 'Creating...' : 'Create Invite Link'}
+              style={{ width: '100%', padding: '14px', borderRadius: 12, background: 'var(--text)', color: 'var(--bg)', fontSize: 15, fontWeight: 700, border: 'none', cursor: loading ? 'wait' : 'pointer', opacity: loading ? 0.7 : 1, transition: 'opacity .15s' }}>
+              {loading ? 'Creating…' : '🔗 Create Invite Link'}
             </button>
           </>
         ) : (
           <>
-            <div style={{ background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: 12, padding: '14px 16px', marginBottom: 16 }}>
-              <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 4 }}>INVITE LINK</div>
-              <div style={{ fontSize: 14, color: 'var(--text)', wordBreak: 'break-all', marginBottom: 10 }}>{inviteUrl}</div>
-              <div style={{ display: 'flex', gap: 6, fontSize: 12, color: 'var(--text-3)' }}>
-                <span>Role: <b>{result.invite.role}</b></span>
-                <span>·</span>
-                <span>Expires: {fmtDate(result.invite.expires_at)}</span>
-                <span>·</span>
-                <span>Uses: {result.invite.max_uses}</span>
+            {/* Success state */}
+            <div style={{ background: 'linear-gradient(135deg, #E1F5EE 0%, #F0FBF7 100%)', border: '1px solid rgba(18,183,106,.2)', borderRadius: 14, padding: '16px', marginBottom: 16 }}>
+              <div style={{ fontSize: 11, fontWeight: 800, color: '#085041', letterSpacing: '0.07em', textTransform: 'uppercase', marginBottom: 6 }}>Invite link</div>
+              <div style={{ fontSize: 13, color: '#085041', wordBreak: 'break-all', fontFamily: 'monospace', lineHeight: 1.5, marginBottom: 10 }}>{inviteUrl}</div>
+              <div style={{ display: 'flex', gap: 10, fontSize: 12, color: '#085041', flexWrap: 'wrap' }}>
+                <span style={{ background: 'rgba(8,80,65,.1)', padding: '2px 8px', borderRadius: 6 }}>
+                  Role: <b>{result.invite.role}</b>
+                </span>
+                <span style={{ background: 'rgba(8,80,65,.1)', padding: '2px 8px', borderRadius: 6 }}>
+                  Expires: {fmtDate(result.invite.expires_at)}
+                </span>
+                <span style={{ background: 'rgba(8,80,65,.1)', padding: '2px 8px', borderRadius: 6 }}>
+                  Uses: {result.invite.max_uses}
+                </span>
               </div>
             </div>
 
             <button onClick={copyLink}
-              style={{ width: '100%', padding: '14px', borderRadius: 12, background: copied ? '#085041' : 'var(--brand)', color: '#fff', fontSize: 15, fontWeight: 700, border: 'none', cursor: 'pointer', marginBottom: 10 }}>
-              {copied ? '✓ Copied!' : '📋 Copy Link'}
+              style={{ width: '100%', padding: '14px', borderRadius: 12, background: copied ? '#085041' : 'var(--brand)', color: '#fff', fontSize: 15, fontWeight: 700, border: 'none', cursor: 'pointer', marginBottom: 8, transition: 'background .2s' }}>
+              {copied ? '✓ Copied to clipboard!' : '📋 Copy Link'}
             </button>
             <button onClick={onClose}
               style={{ width: '100%', padding: '12px', borderRadius: 12, background: 'var(--bg-2)', color: 'var(--text-3)', fontSize: 14, fontWeight: 600, border: '1px solid var(--border)', cursor: 'pointer' }}>
