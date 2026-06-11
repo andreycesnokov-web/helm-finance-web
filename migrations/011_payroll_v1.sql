@@ -1,18 +1,19 @@
 -- TASK: Payroll V1 — employees + payments tables
 -- Additive only. Does not touch transactions, wallets, or any existing tables.
+-- NOTE: users.id is BIGINT (Telegram user ID), wallets.id is UUID
 
 -- ── payroll_employees ────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS payroll_employees (
-  id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id           UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  name              TEXT NOT NULL,
-  role              TEXT NULL,
+  id                UUID    PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id           BIGINT  NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  name              TEXT    NOT NULL,
+  role              TEXT    NULL,
   default_salary    NUMERIC NULL,
-  currency          TEXT DEFAULT 'IDR',
+  currency          TEXT    DEFAULT 'IDR',
   pay_day           INTEGER NULL,                          -- day of month, 1–31
-  default_wallet_id UUID NULL REFERENCES wallets(id),
-  status            TEXT DEFAULT 'active' CHECK (status IN ('active','inactive','archived')),
-  notes             TEXT NULL,
+  default_wallet_id UUID    NULL REFERENCES wallets(id),
+  status            TEXT    DEFAULT 'active' CHECK (status IN ('active','inactive','archived')),
+  notes             TEXT    NULL,
   created_at        TIMESTAMPTZ DEFAULT now(),
   updated_at        TIMESTAMPTZ DEFAULT now()
 );
@@ -22,7 +23,7 @@ CREATE INDEX IF NOT EXISTS payroll_employees_user_id_idx ON payroll_employees(us
 -- ── payroll_payments ─────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS payroll_payments (
   id             UUID    PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id        UUID    NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  user_id        BIGINT  NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   employee_id    UUID    NULL REFERENCES payroll_employees(id),
   transaction_id BIGINT  NULL REFERENCES transactions(id),
   employee_name  TEXT    NOT NULL,
