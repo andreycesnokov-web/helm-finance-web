@@ -5,6 +5,7 @@ import { useAuth } from '../hooks/useAuth'
 import { useAccess } from '../hooks/useAccess'
 import { useTranslation } from '../hooks/useTranslation'
 import { apiFetch, fmt } from '../lib/api'
+import LockedFeature from '../components/LockedFeature'
 
 function fmtDate(str) {
   if (!str) return '—'
@@ -316,7 +317,6 @@ export default function Payroll() {
   useEffect(() => { if (token) load() }, [token])
 
   // ── Feature gate ──────────────────────────────────────────────────────────
-  const LockedFeature = require('../components/LockedFeature').default
   if (!accessLoading && !hasFeature('payroll_enabled')) {
     return (
       <div className="hf-page">
