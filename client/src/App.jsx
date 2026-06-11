@@ -1,10 +1,11 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './hooks/useAuth'
 import { useAccess } from './hooks/useAccess'
 import { useSwipeBack } from './hooks/useSwipeBack'
 import { useTranslation } from './hooks/useTranslation'
-import { getLang } from './i18n/index'
+import { getLang, setLang } from './i18n/index'
+import { apiFetch } from './lib/api'
 
 // ── Localize text from backend (AI insight strings) ──────────────────────────
 const RU_TEXT_MAP = {
@@ -346,7 +347,20 @@ export function RightPanel({ data }) {
 }
 
 function Layout({ children, rightPanel }) {
-  const { user, loading } = useAuth()
+  const { user, token, loading } = useAuth()
+
+  // Sync language from user profile on startup
+  useEffect(() => {
+    if (!token) return
+    apiFetch('/profile', token)
+      .then(profile => {
+        if (profile?.language && profile.language !== getLang()) {
+          setLang(profile.language)
+        }
+      })
+      .catch(() => {})
+  }, [token])
+
   if (loading) return <div style={{ minHeight: '100dvh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-3)' }}>Loading...</div>
   if (!user) return <Navigate to="/login" replace />
   return (

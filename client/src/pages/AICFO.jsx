@@ -170,7 +170,7 @@ export default function AICFO() {
 
   const loadCtx = useCallback(() => {
     setCtxLoad(true); setCtxErr('')
-    apiFetch('/ai-cfo/context', token)
+    apiFetch(`/ai-cfo/context?language=${getLang()}`, token)
       .then(setCtx)
       .catch(e => setCtxErr(e.message))
       .finally(() => setCtxLoad(false))

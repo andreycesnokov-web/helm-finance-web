@@ -962,6 +962,106 @@ function isLimitReached(limitValue, currentUsage) {
   return currentUsage >= limitValue;
 }
 
+// --- Language helpers -------------------------------------------------------
+
+function normalizeLanguage(lang) {
+  return ['en', 'ru', 'id'].includes(lang) ? lang : 'en'
+}
+
+async function getUserLanguage(userId) {
+  try {
+    const { data } = await supabase
+      .from('users')
+      .select('language')
+      .eq('id', userId)
+      .single()
+    return normalizeLanguage(data?.language)
+  } catch { return 'en' }
+}
+
+const CONTEXT_STRINGS = {
+  en: {
+    financiallyStable: 'Business is financially stable',
+    cashStrong: 'Cash is strong with no urgent payment risks detected. Keep monitoring monthly.',
+    notEnoughExpenseHistory: 'Not enough expense history',
+    runwayUnknown: 'Runway unknown — add expenses',
+    noPayables: 'No payables',
+    noReceivables: 'No receivables',
+    noMonthlyData: 'No monthly data yet',
+    noRisks: 'No significant risks',
+    financesStable: 'Finances look stable',
+    noUrgentActions: 'No urgent actions detected. Keep adding transactions daily and review cash weekly.',
+    needsAttention: 'Needs Attention',
+    someAreasNeedAttention: 'Some areas need attention.',
+  },
+  ru: {
+    financiallyStable: 'Финансы бизнеса стабильны',
+    cashStrong: 'Денежная позиция стабильная, срочных рисков нет. Продолжайте контролировать финансы регулярно.',
+    notEnoughExpenseHistory: 'Недостаточно истории расходов',
+    runwayUnknown: 'Запас денег неизвестен — добавьте расходы',
+    noPayables: 'Обязательств нет',
+    noReceivables: 'Дебиторки нет',
+    noMonthlyData: 'За месяц пока нет данных',
+    noRisks: 'Существенных рисков нет',
+    financesStable: 'Финансы выглядят стабильно',
+    noUrgentActions: 'Срочных действий нет. Продолжайте добавлять операции и проверять деньги еженедельно.',
+    needsAttention: 'Требует внимания',
+    someAreasNeedAttention: 'Есть зоны, которые требуют внимания.',
+  },
+}
+function cx(language, key) {
+  const lang = normalizeLanguage(language)
+  return (CONTEXT_STRINGS[lang] || CONTEXT_STRINGS.en)[key] || CONTEXT_STRINGS.en[key] || key
+}
+
+function getCfoOutOfScopeResponse(language) {
+  if (language === 'ru') {
+    return 'Извините, я не могу помочь с этим вопросом. Я CFO AI-консультант и отвечаю только на вопросы, связанные с финансами бизнеса: cash flow, дебиторкой, обязательствами, расходами, запасом денег, зарплатами и финансовыми решениями владельца бизнеса.'
+  }
+  return "Sorry, I can't help with that. I'm CFO AI — a financial consultant for business owners. I only answer questions related to business finance: cash flow, receivables, payables, expenses, runway, payroll and financial decisions."
+}
+
+const NOTIFICATION_TEMPLATES = {
+  runway_warning: {
+    en: (p) => `Runway: ${p.days} days. Review upcoming payments and protect your cash buffer.`,
+    ru: (p) => `Запас денег: ${p.days} дней. Проверьте ближайшие платежи и защитите денежный буфер.`,
+    id: (p) => `Runway: ${p.days} days. Review upcoming payments and protect your cash buffer.`,
+  },
+  cash_critical: {
+    en: () => 'Cash is critically low. Immediate action required.',
+    ru: () => 'Деньги на критически низком уровне. Требуются немедленные действия.',
+    id: () => 'Cash is critically low. Immediate action required.',
+  },
+  receivable_overdue: {
+    en: (p) => `Receivable overdue: ${p.counterparty} owes ${p.amount} (${p.days} days overdue).`,
+    ru: (p) => `Просрочена дебиторка: ${p.counterparty} должен ${p.amount} (просрочено на ${p.days} дней).`,
+    id: (p) => `Receivable overdue: ${p.counterparty} owes ${p.amount} (${p.days} days overdue).`,
+  },
+  payable_due_soon: {
+    en: (p) => `Payment due soon: ${p.counterparty} — ${p.amount} due in ${p.days} days.`,
+    ru: (p) => `Скоро платёж: ${p.counterparty} — ${p.amount} через ${p.days} дней.`,
+    id: (p) => `Payment due soon: ${p.counterparty} — ${p.amount} due in ${p.days} days.`,
+  },
+  payroll_due: {
+    en: (p) => `Payroll due: ${p.amount} in ${p.days} days.`,
+    ru: (p) => `Зарплата: ${p.amount} через ${p.days} дней.`,
+    id: (p) => `Payroll due: ${p.amount} in ${p.days} days.`,
+  },
+  ai_scope_refusal: {
+    en: () => getCfoOutOfScopeResponse('en'),
+    ru: () => getCfoOutOfScopeResponse('ru'),
+    id: () => getCfoOutOfScopeResponse('en'),
+  },
+}
+
+function notificationText(type, language, params = {}) {
+  const lang = normalizeLanguage(language)
+  const template = NOTIFICATION_TEMPLATES[type]
+  if (!template) return ''
+  const fn = template[lang] || template.en
+  return fn(params)
+}
+
 // --- Wallets API ----------------------------------------------------------
 // Phase 1: user-scoped. Balance computed from transactions (wallet_id match
 // OR legacy source-name match for backward compat with pre-wallet transactions).
@@ -1897,7 +1997,7 @@ app.get('/api/access/status', auth, async (req, res) => {
  * Build rich financial context for AI CFO.
  * Reuses existing data from Pulse + access helpers.
  */
-async function buildAiCfoContext(userId) {
+async function buildAiCfoContext(userId, language = 'en') {
   const now       = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
 
@@ -1990,7 +2090,7 @@ async function buildAiCfoContext(userId) {
   if (payOverdue.length > 0)  risks.push({ type:'overdue_payables', severity:'high', title:`${payOverdue.length} overdue payable${payOverdue.length>1?'s':''}`, description:'Payments overdue — may affect relationships', amount: payOverdue.reduce((s,d)=>s+Number(d.remaining_amount||0),0) });
   if (payDueSoon.length > 0)  risks.push({ type:'payables_due_soon', severity:'medium', title:`${payDueSoon.length} payment${payDueSoon.length>1?'s':''} due within 7 days`, description:'Upcoming cash outflows', amount: payDueSoon.reduce((s,d)=>s+Number(d.remaining_amount||0),0) });
   if (payTotal > recvTotal && payTotal > 0) risks.push({ type:'payables_exceed_receivables', severity:'medium', title:'Payables exceed receivables', description:'Net cash pressure ahead', amount: payTotal - recvTotal });
-  if (risks.length === 0) risks.push({ type:'healthy', severity:'low', title:'No significant risks', description:'Finances look healthy', amount: 0 });
+  if (risks.length === 0) risks.push({ type:'healthy', severity:'low', title: cx(language, 'noRisks'), description: cx(language, 'financesStable'), amount: 0 });
 
   // ── Build partial context for engines (before final return) ──────────────
   const walletsSummary = {
@@ -2013,10 +2113,10 @@ async function buildAiCfoContext(userId) {
   };
 
   // ── Decision layer engines ────────────────────────────────────────────────
-  const cfoScore        = calculateCfoScore(partialCtx);
-  const aiAlert         = calculateAiAlertStatus(partialCtx, cfoScore);
+  const cfoScore        = calculateCfoScore(partialCtx, language);
+  const aiAlert         = calculateAiAlertStatus(partialCtx, cfoScore, language);
   const hiringReadiness = calculateHiringReadiness(partialCtx);
-  const nextActions     = buildNextActionsV2(partialCtx, hiringReadiness);
+  const nextActions     = buildNextActionsV2(partialCtx, hiringReadiness, language);
 
   // ── Access info ───────────────────────────────────────────────────────────
   const limits = accessData?.limits || {};
@@ -2036,7 +2136,7 @@ async function buildAiCfoContext(userId) {
 }
 
 // ── CFO Score Engine ─────────────────────────────────────────────────────────
-function calculateCfoScore(ctx) {
+function calculateCfoScore(ctx, language = 'en') {
   const cash   = ctx.cash     || {};
   const month  = ctx.current_month || {};
   const recv   = ctx.receivables   || {};
@@ -2056,7 +2156,7 @@ function calculateCfoScore(ctx) {
   // ── Cash Health (25%) ───────────────────────────────────────────────────
   let cashScore, cashLabel, cashImpact;
   if (mExpense === 0) {
-    cashScore = 70; cashLabel = 'Not enough expense history'; cashImpact = 'neutral';
+    cashScore = 70; cashLabel = cx(language, 'notEnoughExpenseHistory'); cashImpact = 'neutral';
   } else {
     const ratio = bal / mExpense;
     if (ratio >= 3)       { cashScore = 90; cashLabel = 'Strong cash position'; cashImpact = 'positive'; }
@@ -2068,7 +2168,7 @@ function calculateCfoScore(ctx) {
   // ── Runway (25%) ────────────────────────────────────────────────────────
   let runwayScore, runwayLabel, runwayImpact;
   if (runway === null || runway === 999) {
-    runwayScore = 60; runwayLabel = 'Runway unknown — add expenses'; runwayImpact = 'neutral';
+    runwayScore = 60; runwayLabel = cx(language, 'runwayUnknown'); runwayImpact = 'neutral';
   } else if (runway >= 90)  { runwayScore = 100; runwayLabel = 'Runway excellent (90+ days)'; runwayImpact = 'positive'; }
   else if (runway >= 60)    { runwayScore = 85;  runwayLabel = 'Runway healthy (60+ days)';   runwayImpact = 'positive'; }
   else if (runway >= 30)    { runwayScore = 70;  runwayLabel = 'Runway adequate (30+ days)';  runwayImpact = 'neutral'; }
@@ -2078,7 +2178,7 @@ function calculateCfoScore(ctx) {
   // ── Receivables (15%) ───────────────────────────────────────────────────
   let recvScore, recvLabel, recvImpact;
   if (recvTotal === 0) {
-    recvScore = 80; recvLabel = 'No receivables'; recvImpact = 'neutral';
+    recvScore = 80; recvLabel = cx(language, 'noReceivables'); recvImpact = 'neutral';
   } else {
     const overdueRatio = recvOverdue / recvTotal;
     if (recvOverdue === 0)       { recvScore = 85; recvLabel = 'All receivables on time';    recvImpact = 'positive'; }
@@ -2090,7 +2190,7 @@ function calculateCfoScore(ctx) {
   // ── Payables (20%) ──────────────────────────────────────────────────────
   let payScore, payLabel, payImpact;
   if (payTotal === 0) {
-    payScore = 90; payLabel = 'No payables'; payImpact = 'positive';
+    payScore = 90; payLabel = cx(language, 'noPayables'); payImpact = 'positive';
   } else if (bal > 0 && payOverdue > bal) {
     payScore = 20; payLabel = 'Overdue payables exceed cash'; payImpact = 'negative';
   } else if (bal > 0 && payDueSoon > bal) {
@@ -2104,7 +2204,7 @@ function calculateCfoScore(ctx) {
   // ── Expense Control (15%) ───────────────────────────────────────────────
   let expScore, expLabel, expImpact;
   if (mIncome === 0 && mExpense === 0) {
-    expScore = 60; expLabel = 'No monthly data yet'; expImpact = 'neutral';
+    expScore = 60; expLabel = cx(language, 'noMonthlyData'); expImpact = 'neutral';
   } else if (netFlow >= 0) {
     const margin = mIncome > 0 ? netFlow / mIncome : 0;
     expScore = margin > 0.2 ? 92 : margin > 0.05 ? 80 : 72;
@@ -2126,14 +2226,14 @@ function calculateCfoScore(ctx) {
   );
 
   const status = score >= 75 ? 'healthy' : score >= 50 ? 'warning' : 'critical';
-  const statusLabel = score >= 75 ? 'Healthy' : score >= 50 ? 'Needs Attention' : 'Critical';
+  const statusLabel = score >= 75 ? 'Healthy' : score >= 50 ? cx(language, 'needsAttention') : 'Critical';
 
   // Summary sentence
   const positives = [cashLabel, runwayLabel, recvLabel, payLabel, expLabel].filter((_, i) => [cashImpact,runwayImpact,recvImpact,payImpact,expImpact][i] === 'positive');
   const warnings  = [cashLabel, runwayLabel, recvLabel, payLabel, expLabel].filter((_, i) => ['warning','negative'].includes([cashImpact,runwayImpact,recvImpact,payImpact,expImpact][i]));
   let summary;
-  if (status === 'healthy') summary = positives.length > 0 ? `${positives[0]}. ${warnings.length > 0 ? warnings[0] + '.' : 'All key metrics are positive.'}` : 'Business is financially stable.';
-  else if (status === 'warning') summary = warnings.length > 0 ? `${warnings[0]}. Monitor closely and take action.` : 'Some areas need attention.';
+  if (status === 'healthy') summary = positives.length > 0 ? `${positives[0]}. ${warnings.length > 0 ? warnings[0] + '.' : 'All key metrics are positive.'}` : cx(language, 'financiallyStable');
+  else if (status === 'warning') summary = warnings.length > 0 ? `${warnings[0]}. Monitor closely and take action.` : cx(language, 'someAreasNeedAttention');
   else summary = warnings.length > 0 ? `${warnings[0]}. Immediate action required.` : 'Financial health is critical. Prioritize cash flow.';
 
   return {
@@ -2152,7 +2252,7 @@ function calculateCfoScore(ctx) {
 }
 
 // ── AI Alert Status ───────────────────────────────────────────────────────────
-function calculateAiAlertStatus(ctx, cfoScore) {
+function calculateAiAlertStatus(ctx, cfoScore, language = 'en') {
   const cash   = ctx.cash     || {};
   const pay    = ctx.payables || {};
   const runway = ctx.runway_days;
@@ -2199,8 +2299,8 @@ function calculateAiAlertStatus(ctx, cfoScore) {
 
   return {
     status: 'healthy', label: 'Healthy', color: 'green',
-    headline: 'Business is financially stable',
-    description: 'Cash is strong with no urgent payment risks detected. Keep monitoring monthly.',
+    headline: cx(language, 'financiallyStable'),
+    description: cx(language, 'cashStrong'),
   };
 }
 
@@ -2269,7 +2369,7 @@ function calculateHiringReadiness(ctx) {
 }
 
 // ── Next Best Actions V2 ──────────────────────────────────────────────────────
-function buildNextActionsV2(ctx, hiringReadiness) {
+function buildNextActionsV2(ctx, hiringReadiness, language = 'en') {
   const recv   = ctx.receivables   || {};
   const pay    = ctx.payables      || {};
   const month  = ctx.current_month || {};
@@ -2375,8 +2475,8 @@ function buildNextActionsV2(ctx, hiringReadiness) {
   // ── Fallback ─────────────────────────────────────────────────────────────
   if (actions.length === 0) {
     actions.push({
-      title: 'Finances look stable',
-      description: 'No urgent actions detected. Keep adding transactions daily and review cash weekly.',
+      title: cx(language, 'financesStable'),
+      description: cx(language, 'noUrgentActions'),
       action_type: 'pulse', priority: 'low',
       amount: 0, route: '/transactions',
     });
@@ -2649,7 +2749,8 @@ const CFO_OUT_OF_SCOPE_RESPONSE_RU = "Извините, я не могу пом�
 // GET /api/ai-cfo/context — full financial context for AI CFO page
 app.get('/api/ai-cfo/context', auth, async (req, res) => {
   try {
-    const ctx = await buildAiCfoContext(req.user.userId);
+    const language = normalizeLanguage(req.query.language || await getUserLanguage(req.user.userId));
+    const ctx = await buildAiCfoContext(req.user.userId, language);
     res.json(ctx);
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -2660,13 +2761,15 @@ app.get('/api/ai-cfo/context', auth, async (req, res) => {
 app.post('/api/ai-cfo/ask', auth, async (req, res) => {
   try {
     const userId   = req.user.userId;
-    const { question, language } = req.body;
+    const { question } = req.body;
+    const rawLang = req.body.language || await getUserLanguage(userId);
+    const language = normalizeLanguage(rawLang);
     const isRu = language === 'ru';
     if (!question || !question.trim()) return res.status(400).json({ error: 'question required' });
 
     // ── Domain guardrail: reject out-of-scope questions ───────────────────────
     if (!isBusinessFinanceQuestion(question)) {
-      return res.json({ answer: isRu ? CFO_OUT_OF_SCOPE_RESPONSE_RU : CFO_OUT_OF_SCOPE_RESPONSE, out_of_scope: true });
+      return res.json({ answer: getCfoOutOfScopeResponse(language), out_of_scope: true });
     }
 
     // ── Usage limit check (soft — not yet tracked in DB) ─────────────────────
@@ -2684,7 +2787,7 @@ app.post('/api/ai-cfo/ask', auth, async (req, res) => {
     } catch (_) { /* fail open */ }
 
     // ── Build context ─────────────────────────────────────────────────────────
-    const ctx = await buildAiCfoContext(userId);
+    const ctx = await buildAiCfoContext(userId, language);
     const currency = ctx.business?.base_currency || 'IDR';
 
     // ── Try Anthropic first, fall back to local analyzer ─────────────────────
@@ -2697,8 +2800,14 @@ app.post('/api/ai-cfo/ask', auth, async (req, res) => {
         const cfo   = ctx.cfo_score        || {};
         const alert = ctx.ai_alert         || {};
         const hire  = ctx.hiring_readiness || {};
+        const langInstruction = language === 'ru'
+          ? 'IMPORTANT: The user speaks Russian. Answer ENTIRELY in Russian. All text, headings, recommendations, and refusals must be in Russian. You may keep product terms like CFO AI, AI CFO, cash flow, runway in their original form.'
+          : language === 'id'
+          ? 'IMPORTANT: Answer in Indonesian if possible, otherwise use English.'
+          : 'Answer in English.'
         const systemPrompt = `You are CFO AI, a financial decision assistant for ${ctx.business.name} — a ${ctx.business.effective_plan} plan business using ${currency} as base currency.
-Answer like a calm, direct CFO speaking to a CEO. Be specific, conservative, action-oriented, and not dramatic.${isRu ? '\nALWAYS respond in Russian language.' : ''}
+Answer like a calm, direct CFO speaking to a CEO. Be specific, conservative, action-oriented, and not dramatic.
+${langInstruction}
 
 YOUR ROLE: You ONLY answer questions about business finance: cash flow, runway, receivables, payables,
 expenses, income, payroll, hiring readiness, invoices, financial risks, budgeting, owner financial decisions.

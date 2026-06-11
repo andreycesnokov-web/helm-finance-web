@@ -176,7 +176,7 @@ export default function Pulse({ onDataLoad }) {
     setLoading(true)
     Promise.all([
       apiFetch(`/pulse?scope=${sc}`, token),
-      apiFetch('/ai-cfo/context', token),
+      apiFetch(`/ai-cfo/context?language=${getLang()}`, token),
     ]).then(([p, c]) => {
       setPulse(p)
       setCfo(c)
