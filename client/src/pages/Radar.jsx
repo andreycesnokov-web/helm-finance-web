@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../hooks/useAuth'
 import { useAccess } from '../hooks/useAccess'
+import { useTranslation } from '../hooks/useTranslation'
 import { apiFetch, fmt, fmtFull, daysUntil } from '../lib/api'
 
 function KeyDateRow({ dot, desc, date, amount, isIn }) {
@@ -21,6 +22,7 @@ function KeyDateRow({ dot, desc, date, amount, isIn }) {
 export default function Radar() {
   const { token } = useAuth()
   const { hasFeature, effectivePlan } = useAccess()
+  const { t } = useTranslation()
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
 
@@ -59,11 +61,11 @@ export default function Radar() {
       {/* Page header */}
       <div className="hf-page-header">
         <div>
-          <div className="hf-page-title">Radar</div>
-          <div className="hf-page-subtitle">30-day cash forecast · scenario analysis</div>
+          <div className="hf-page-title">{t('radar.title')}</div>
+          <div className="hf-page-subtitle">{t('radar.projectedBalance30')} · {t('aicfo.subtitle')}</div>
         </div>
         <div className={`hf-badge ${isHealthy ? 'hf-badge-green' : 'hf-badge-red'}`} style={{ fontSize: 13, padding: '6px 14px' }}>
-          {isHealthy ? '✓ Healthy' : '⚠ At Risk'}
+          {isHealthy ? t('radar.healthy') : t('radar.atRisk')}
         </div>
       </div>
 
@@ -80,8 +82,8 @@ export default function Radar() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <span style={{ fontSize: 16 }}>📡</span>
             <div>
-              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', marginBottom: 1 }}>Basic Radar</div>
-              <div style={{ fontSize: 11, color: 'var(--text-3)' }}>Advanced Radar — multi-scenario AI forecast — available on Founder plan</div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', marginBottom: 1 }}>{t('radar.basicRadar')}</div>
+              <div style={{ fontSize: 11, color: 'var(--text-3)' }}>{t('radar.advancedRadarNote')}</div>
             </div>
           </div>
           <span style={{
@@ -89,7 +91,7 @@ export default function Radar() {
             background: 'rgba(37,99,235,0.12)', color: '#2563EB',
             padding: '3px 10px', borderRadius: 20, whiteSpace: 'nowrap', flexShrink: 0,
           }}>
-            Founder+
+            {t('radar.founderPlus')}
           </span>
         </div>
       )}
@@ -112,19 +114,19 @@ export default function Radar() {
 
           <div style={{ position: 'relative' }}>
             <div style={{ fontSize: 'var(--text-xs)', color: 'rgba(255,255,255,0.5)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 10 }}>
-              Projected balance · 30 days
+              {t('radar.projectedBalance30')}
             </div>
             <div style={{ fontSize: 'clamp(28px, 9vw, 48px)', fontWeight: 700, color: '#fff', letterSpacing: -1, lineHeight: 1, wordBreak: 'break-word' }}>
               {proj30 >= 0 ? '+' : ''}{fmt(Math.round(proj30))}
             </div>
-            <div style={{ fontSize: 'var(--text-xs)', color: 'rgba(255,255,255,0.4)', marginTop: 8 }}>IDR · if all planned transactions go through</div>
+            <div style={{ fontSize: 'var(--text-xs)', color: 'rgba(255,255,255,0.4)', marginTop: 8 }}>{t('radar.ifAllPlanned')}</div>
 
             {/* Mini stats row */}
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px 20px', marginTop: 20, paddingTop: 16, borderTop: '1px solid rgba(255,255,255,0.1)' }}>
               {[
-                { label: 'Balance', val: fmt(balance) + ' IDR' },
-                { label: 'Burn/mo', val: fmt(monthlyBurn) + ' IDR' },
-                { label: 'Runway',  val: runway != null ? runway + ' days' : '∞' },
+                { label: t('radar.balance'), val: fmt(balance) + ' IDR' },
+                { label: t('radar.monthlyBurn'), val: fmt(monthlyBurn) + ' IDR' },
+                { label: t('radar.runway'),  val: runway != null ? runway + ' ' + t('radar.days') : '∞' },
               ].map(s => (
                 <div key={s.label} style={{ minWidth: 0 }}>
                   <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: 4 }}>{s.label}</div>
@@ -139,25 +141,25 @@ export default function Radar() {
       {/* Scenario cards */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 20 }}>
         <div style={{ background: 'var(--green-light)', borderRadius: 16, padding: '16px 18px', border: '1px solid rgba(2,122,72,.12)' }}>
-          <div style={{ fontSize: 'var(--text-xs)', color: 'var(--green-dark)', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: 8 }}>Best case</div>
+          <div style={{ fontSize: 'var(--text-xs)', color: 'var(--green-dark)', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: 8 }}>{t('radar.bestCaseFull')}</div>
           <div style={{ fontSize: 'var(--text-xl)', fontWeight: 700, color: 'var(--green-dark)', letterSpacing: -0.5 }}>{fmt(Math.round(projBest))}</div>
-          <div style={{ fontSize: 'var(--text-xs)', color: 'var(--green)', marginTop: 5 }}>All income received</div>
+          <div style={{ fontSize: 'var(--text-xs)', color: 'var(--green)', marginTop: 5 }}>{t('radar.allIncomeReceived')}</div>
         </div>
         <div style={{ background: 'var(--red-light)', borderRadius: 16, padding: '16px 18px', border: '1px solid rgba(180,35,24,.12)' }}>
-          <div style={{ fontSize: 'var(--text-xs)', color: 'var(--red-dark)', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: 8 }}>Worst case</div>
+          <div style={{ fontSize: 'var(--text-xs)', color: 'var(--red-dark)', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: 8 }}>{t('radar.worstCaseFull')}</div>
           <div style={{ fontSize: 'var(--text-xl)', fontWeight: 700, color: 'var(--red-dark)', letterSpacing: -0.5 }}>{fmt(Math.round(projWorst))}</div>
-          <div style={{ fontSize: 'var(--text-xs)', color: 'var(--red)', marginTop: 5 }}>Delays in receivables</div>
+          <div style={{ fontSize: 'var(--text-xs)', color: 'var(--red)', marginTop: 5 }}>{t('radar.delaysInReceivables')}</div>
         </div>
       </div>
 
       {/* Burn rate metrics card */}
       <div className="hf-card" style={{ marginBottom: 16, padding: '16px 14px' }}>
-        <div style={{ fontSize: 'var(--text-sm)', fontWeight: 700, color: 'var(--text-3)', marginBottom: 12, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Monthly burn breakdown</div>
+        <div style={{ fontSize: 'var(--text-sm)', fontWeight: 700, color: 'var(--text-3)', marginBottom: 12, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{t('radar.monthlyBurnBreakdown')}</div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 }}>
           {[
-            { label: 'Monthly burn', val: fmt(monthlyBurn), sub: 'IDR / month', color: 'var(--red-dark)' },
-            { label: 'Daily average', val: fmt(burnRate), sub: d.burnWindowDays >= 30 ? '30-day rolling avg' : d.burnWindowDays > 0 ? `${d.burnWindowDays}d avg` : 'avg', color: 'var(--text)' },
-            { label: 'Runway left', val: runway != null ? runway + 'd' : '∞', sub: burnRate > 0 ? 'at current burn' : 'no burn data', color: runway != null && runway < 14 ? 'var(--red-dark)' : runway != null && runway < 30 ? 'var(--amber-dark)' : 'var(--green-dark)' },
+            { label: t('radar.monthlyBurn'), val: fmt(monthlyBurn), sub: t('radar.perMonth'), color: 'var(--red-dark)' },
+            { label: t('radar.dailyAverage'), val: fmt(burnRate), sub: d.burnWindowDays >= 30 ? t('pulse.avg30') : d.burnWindowDays > 0 ? `${d.burnWindowDays}d avg` : 'avg', color: 'var(--text)' },
+            { label: t('radar.runwayLeft'), val: runway != null ? runway + 'd' : '∞', sub: burnRate > 0 ? t('radar.atCurrentBurn') : t('radar.noBurnData'), color: runway != null && runway < 14 ? 'var(--red-dark)' : runway != null && runway < 30 ? 'var(--amber-dark)' : 'var(--green-dark)' },
           ].map(s => (
             <div key={s.label} style={{ background: 'var(--bg-2)', borderRadius: 12, padding: '12px 10px', border: '0.5px solid var(--border)' }}>
               <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-3)', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: 8 }}>{s.label}</div>
@@ -171,15 +173,15 @@ export default function Radar() {
       {/* Key dates timeline */}
       {debts.length > 0 && (
         <div className="hf-card" style={{ marginBottom: 16 }}>
-          <div style={{ fontSize: 'var(--text-base)', fontWeight: 700, color: 'var(--text)', marginBottom: 14 }}>Key dates</div>
+          <div style={{ fontSize: 'var(--text-base)', fontWeight: 700, color: 'var(--text)', marginBottom: 14 }}>{t('radar.keyDates')}</div>
 
           {receivables.length > 0 && (
             <>
-              <div style={{ fontSize: 'var(--text-xs)', color: 'var(--green-dark)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8, fontWeight: 600 }}>Incoming</div>
+              <div style={{ fontSize: 'var(--text-xs)', color: 'var(--green-dark)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8, fontWeight: 600 }}>{t('radar.incoming')}</div>
               {receivables.map(d => (
                 <KeyDateRow key={d.id}
                   dot="var(--green)" desc={d.counterparty} isIn={true} amount={d.amount}
-                  date={d.due_date ? new Date(d.due_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) + (daysUntil(d.due_date) >= 0 ? ` · in ${daysUntil(d.due_date)}d` : ' · overdue') : 'No date'}
+                  date={d.due_date ? new Date(d.due_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) + (daysUntil(d.due_date) >= 0 ? `${t('radar.inDays')}${daysUntil(d.due_date)}d` : t('radar.overdueLabel')) : t('radar.noDate')}
                 />
               ))}
             </>
@@ -187,11 +189,11 @@ export default function Radar() {
 
           {payables.length > 0 && (
             <>
-              <div style={{ fontSize: 'var(--text-xs)', color: 'var(--red-dark)', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '14px 0 8px', fontWeight: 600 }}>Outgoing</div>
+              <div style={{ fontSize: 'var(--text-xs)', color: 'var(--red-dark)', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '14px 0 8px', fontWeight: 600 }}>{t('radar.outgoing')}</div>
               {payables.map(d => (
                 <KeyDateRow key={d.id}
                   dot="var(--red)" desc={d.counterparty} isIn={false} amount={d.amount}
-                  date={d.due_date ? new Date(d.due_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) + (daysUntil(d.due_date) >= 0 ? ` · in ${daysUntil(d.due_date)}d` : ' · overdue') : 'No date'}
+                  date={d.due_date ? new Date(d.due_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) + (daysUntil(d.due_date) >= 0 ? `${t('radar.inDays')}${daysUntil(d.due_date)}d` : t('radar.overdueLabel')) : t('radar.noDate')}
                 />
               ))}
             </>
@@ -202,21 +204,21 @@ export default function Radar() {
       {debts.length === 0 && (
         <div style={{ padding: '32px 20px', textAlign: 'center' }}>
           <div style={{ fontSize: 36, marginBottom: 12 }}>📡</div>
-          <div style={{ fontSize: 'var(--text-md)', fontWeight: 600, color: 'var(--text)', marginBottom: 8 }}>No planned transactions</div>
+          <div style={{ fontSize: 'var(--text-md)', fontWeight: 600, color: 'var(--text)', marginBottom: 8 }}>{t('radar.noPlannedTransactions')}</div>
           <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-3)', lineHeight: 1.6 }}>
-            Add receivables and payables to see your 30-day cash forecast.
+            {t('radar.noPlannedSub')}
           </div>
         </div>
       )}
 
       {/* 30-day net flow summary */}
       <div className="hf-card">
-        <div style={{ fontSize: 'var(--text-base)', fontWeight: 700, color: 'var(--text)', marginBottom: 14 }}>30-day net flow</div>
+        <div style={{ fontSize: 'var(--text-base)', fontWeight: 700, color: 'var(--text)', marginBottom: 14 }}>{t('radar.netFlow30')}</div>
         {[
-          { label: 'Current balance',    val: fmt(balance),    color: 'var(--text)',      sign: '' },
-          { label: '+ Expected income',  val: fmt(totalIn),    color: 'var(--green-dark)', sign: '+' },
-          { label: '− Expected payments',val: fmt(totalOut),   color: 'var(--red-dark)',   sign: '−' },
-          { label: '− Monthly burn',     val: fmt(monthlyBurn),color: 'var(--red-dark)',   sign: '−' },
+          { label: t('radar.currentBalance'),    val: fmt(balance),    color: 'var(--text)',      sign: '' },
+          { label: t('radar.expectedIncome'),    val: fmt(totalIn),    color: 'var(--green-dark)', sign: '+' },
+          { label: t('radar.expectedPayments'),  val: fmt(totalOut),   color: 'var(--red-dark)',   sign: '−' },
+          { label: t('radar.monthlyBurnRow'),    val: fmt(monthlyBurn),color: 'var(--red-dark)',   sign: '−' },
         ].map((row, i) => (
           <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: i < 3 ? '0.5px solid var(--border)' : 'none' }}>
             <span style={{ fontSize: 'var(--text-sm)', color: 'var(--text-2)' }}>{row.label}</span>
@@ -224,7 +226,7 @@ export default function Radar() {
           </div>
         ))}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 0 2px', borderTop: '2px solid var(--border-2)', marginTop: 4 }}>
-          <span style={{ fontSize: 'var(--text-base)', fontWeight: 700, color: 'var(--text)' }}>Projected balance</span>
+          <span style={{ fontSize: 'var(--text-base)', fontWeight: 700, color: 'var(--text)' }}>{t('radar.projectedBalanceRow')}</span>
           <span style={{ fontSize: 'var(--text-base)', fontWeight: 700, color: isHealthy ? 'var(--green-dark)' : 'var(--red-dark)' }}>
             {proj30 >= 0 ? '+' : ''}{fmt(Math.round(proj30))} IDR
           </span>

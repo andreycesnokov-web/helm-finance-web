@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
+import { useTranslation } from '../hooks/useTranslation'
 import { apiFetch, fmt, daysUntil } from '../lib/api'
 import DebtPaymentModal from '../components/DebtPaymentModal'
 import DebtFormModal from '../components/DebtFormModal'
@@ -37,6 +38,7 @@ function getCashPressureLabel(debt) {
 function DebtRow({ debt, accounts, token, onRefresh }) {
   const [modal,   setModal]   = useState(false)
   const [success, setSuccess] = useState(false)
+  const { t } = useTranslation()
 
   const badge         = getStatusBadge(debt)
   const pressureLabel = getCashPressureLabel(debt)
@@ -63,8 +65,8 @@ function DebtRow({ debt, accounts, token, onRefresh }) {
           {debt.status === 'partial' && (
             <div style={{ marginTop: 6 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'var(--text-3)', marginBottom: 3 }}>
-                <span>Paid {fmt(debt.paid_amount || 0)}</span>
-                <span>Remaining {fmt(remaining)}</span>
+                <span>{t('payables.paidAmount')}{fmt(debt.paid_amount || 0)}</span>
+                <span>{t('payables.remaining')}{fmt(remaining)}</span>
               </div>
               <div style={{ height: 4, background: 'var(--border-2)', borderRadius: 2, overflow: 'hidden' }}>
                 <div style={{
@@ -104,7 +106,7 @@ function DebtRow({ debt, accounts, token, onRefresh }) {
                 color: '#fff', border: 'none', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
               }}
             >
-              {debt.status === 'partial' ? 'Pay more' : 'Pay now'}
+              {debt.status === 'partial' ? t('payables.payMore') : t('payables.payNow')}
             </button>
           )}
         </div>
@@ -124,19 +126,13 @@ function DebtRow({ debt, accounts, token, onRefresh }) {
 }
 
 // ── Filter tabs ────────────────────────────────────────────────────────────────
-const FILTERS = [
-  { key: 'all',      label: 'All' },
-  { key: 'open',     label: 'Open' },
-  { key: 'due_soon', label: 'Due soon' },
-  { key: 'overdue',  label: 'Overdue' },
-  { key: 'partial',  label: 'Partial' },
-  { key: 'paid',     label: 'Paid' },
-]
+const FILTER_KEYS = ['all', 'open', 'due_soon', 'overdue', 'partial', 'paid']
 
 // ── Main Component ─────────────────────────────────────────────────────────────
 export default function Payables() {
   const { token } = useAuth()
   const navigate  = useNavigate()
+  const { t } = useTranslation()
   const [searchParams] = useSearchParams()
 
   const [data,     setData]     = useState(null)
@@ -159,7 +155,7 @@ export default function Payables() {
 
   useEffect(() => { load() }, [load])
 
-  if (loading && !data) return <div className="page-loading">Loading payables…</div>
+  if (loading && !data) return <div className="page-loading">{t('payables.loading')}</div>
 
   const d        = data || {}
   const accounts = d.accounts || []
@@ -197,11 +193,11 @@ export default function Payables() {
       {/* ── Header ─── */}
       <div className="hf-page-header">
         <div>
-          <div className="hf-page-title">Payables</div>
-          <div className="hf-page-subtitle">Money your business needs to pay</div>
+          <div className="hf-page-title">{t('payables.title')}</div>
+          <div className="hf-page-subtitle">{t('payables.subtitle')}</div>
         </div>
         <div className="hf-page-actions">
-          <button className="btn btn-primary btn-md" onClick={() => setShowForm(true)}>+ New</button>
+          <button className="btn btn-primary btn-md" onClick={() => setShowForm(true)}>{t('payables.newPayable')}</button>
         </div>
       </div>
 
@@ -210,47 +206,47 @@ export default function Payables() {
       {/* ── Summary cards ─── */}
       <div className="summary-grid" style={{ marginBottom: 16 }}>
         <div className="summary-card">
-          <div className="summary-card-label">Total Remaining</div>
+          <div className="summary-card-label">{t('payables.totalRemaining')}</div>
           <div className="summary-card-value" style={{ color: 'var(--red-dark)' }}>−{fmt(totalRemaining)}</div>
-          <div className="summary-card-sub">IDR to pay</div>
+          <div className="summary-card-sub">{t('payables.idrToPay')}</div>
         </div>
         <div className="summary-card">
-          <div className="summary-card-label">Open</div>
+          <div className="summary-card-label">{t('payables.open')}</div>
           <div className="summary-card-value">{openItems.length + partialItems.length}</div>
-          <div className="summary-card-sub">Awaiting payment</div>
+          <div className="summary-card-sub">{t('payables.awaitingPayment')}</div>
         </div>
         <div className="summary-card">
-          <div className="summary-card-label">Overdue</div>
+          <div className="summary-card-label">{t('payables.overdue')}</div>
           <div className="summary-card-value" style={{ color: overdueItems.length > 0 ? 'var(--red)' : 'var(--green-dark)' }}>
             {overdueItems.length}
           </div>
-          <div className="summary-card-sub">{overdueItems.length > 0 ? 'Past due date' : 'None overdue'}</div>
+          <div className="summary-card-sub">{overdueItems.length > 0 ? t('payables.pastDueDate') : t('payables.noneOverdue')}</div>
         </div>
         <div className="summary-card">
-          <div className="summary-card-label">Due Soon</div>
+          <div className="summary-card-label">{t('payables.dueSoon')}</div>
           <div className="summary-card-value" style={{ color: dueSoonItems.length > 0 ? 'var(--amber-dark)' : 'var(--text)' }}>
             {dueSoonItems.length}
           </div>
-          <div className="summary-card-sub">Within 7 days</div>
+          <div className="summary-card-sub">{t('payables.within7Days')}</div>
         </div>
       </div>
 
       {/* ── Filter tabs ─── */}
       {payables.length > 0 && (
         <div className="filter-tabs" style={{ marginBottom: 16 }}>
-          {FILTERS.map(f => (
+          {FILTER_KEYS.map(key => (
             <button
-              key={f.key}
-              onClick={() => setFilter(f.key)}
+              key={key}
+              onClick={() => setFilter(key)}
               style={{
                 padding: '6px 14px', borderRadius: 20, fontSize: 12, fontWeight: 600,
                 whiteSpace: 'nowrap', cursor: 'pointer', transition: 'all .12s',
-                background: filter === f.key ? 'var(--text)' : 'var(--bg-2)',
-                color:      filter === f.key ? 'var(--bg)'  : 'var(--text-3)',
-                border:     filter === f.key ? 'none'       : '0.5px solid var(--border)',
+                background: filter === key ? 'var(--text)' : 'var(--bg-2)',
+                color:      filter === key ? 'var(--bg)'  : 'var(--text-3)',
+                border:     filter === key ? 'none'       : '0.5px solid var(--border)',
               }}
             >
-              {f.label}{FILTER_COUNTS[f.key] > 0 ? ` · ${FILTER_COUNTS[f.key]}` : ''}
+              {({ all: t('common.all'), open: t('payables.open'), due_soon: t('payables.dueSoon'), overdue: t('payables.overdue'), partial: t('payables.partial'), paid: t('payables.paid') })[key]}{FILTER_COUNTS[key] > 0 ? ` · ${FILTER_COUNTS[key]}` : ''}
             </button>
           ))}
         </div>
@@ -260,9 +256,9 @@ export default function Payables() {
       {payables.length === 0 && (
         <div className="empty-state">
           <div className="empty-state-icon">📤</div>
-          <div className="empty-state-title">No payables yet</div>
-          <div className="empty-state-sub">Track money your business owes to vendors, contractors, or partners.</div>
-          <button className="empty-state-cta" onClick={() => setShowForm(true)}>+ New Payable</button>
+          <div className="empty-state-title">{t('payables.noPayables')}</div>
+          <div className="empty-state-sub">{t('payables.noPayablesSub')}</div>
+          <button className="empty-state-cta" onClick={() => setShowForm(true)}>{t('payables.newPayableCta')}</button>
         </div>
       )}
 
@@ -287,7 +283,7 @@ export default function Payables() {
 
       {payables.length > 0 && (
         <div style={{ textAlign: 'center', paddingBottom: 16 }}>
-          <button className="link-btn" onClick={() => navigate('/transactions')}>View all transactions →</button>
+          <button className="link-btn" onClick={() => navigate('/transactions')}>{t('payables.viewAllTransactions')}</button>
         </div>
       )}
 

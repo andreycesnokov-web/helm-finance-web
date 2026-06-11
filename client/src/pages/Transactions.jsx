@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
+import { useTranslation } from '../hooks/useTranslation'
 import { apiFetch, fmt, fmtFull } from '../lib/api'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -26,24 +27,24 @@ function fmtDateTime(dateStr) {
 
 // Badge colours per transaction type
 const TYPE_BADGE = {
-  income:   { label: 'Income',   bg: 'var(--status-paid-bg)',    color: 'var(--status-paid)'    },
-  expense:  { label: 'Expense',  bg: 'var(--status-overdue-bg)', color: 'var(--status-overdue)' },
-  transfer: { label: 'Transfer', bg: '#E8EDFB',                  color: '#1e3a6e'                },
-  payroll:  { label: 'Payroll',  bg: 'var(--amber-light)',       color: 'var(--amber-dark)'      },
+  income:   { labelKey: 'transactions.income',   bg: 'var(--status-paid-bg)',    color: 'var(--status-paid)'    },
+  expense:  { labelKey: 'transactions.expense',  bg: 'var(--status-overdue-bg)', color: 'var(--status-overdue)' },
+  transfer: { labelKey: 'transactions.transfer', bg: '#E8EDFB',                  color: '#1e3a6e'                },
+  payroll:  { labelKey: 'transactions.payroll',  bg: 'var(--amber-light)',       color: 'var(--amber-dark)'      },
 }
 function getTypeBadge(type) {
-  return TYPE_BADGE[type] || { label: type || 'Other', bg: 'var(--bg-3)', color: 'var(--text-3)' }
+  return TYPE_BADGE[type] || { labelKey: null, label: type || 'Other', bg: 'var(--bg-3)', color: 'var(--text-3)' }
 }
 
-// Cash impact description per type
-const CASH_IMPACT = {
-  income:   { label: 'Increases total cash',   color: '#085041', bg: '#E1F5EE', icon: '↑' },
-  expense:  { label: 'Decreases total cash',   color: '#991B1B', bg: '#FEE2E2', icon: '↓' },
-  payroll:  { label: 'Decreases total cash',   color: '#92400E', bg: '#FEF3C7', icon: '↓' },
-  transfer: { label: 'No effect on total cash', color: '#1e3a6e', bg: '#E8EDFB', icon: '↔' },
+// Cash impact — labels are translated inside TransactionDetailsDrawer using tr()
+const CASH_IMPACT_KEYS = {
+  income:   { labelKey: 'transactions.increasesTotal', color: '#085041', bg: '#E1F5EE', icon: '↑' },
+  expense:  { labelKey: 'transactions.decreasesTotal', color: '#991B1B', bg: '#FEE2E2', icon: '↓' },
+  payroll:  { labelKey: 'transactions.decreasesTotal', color: '#92400E', bg: '#FEF3C7', icon: '↓' },
+  transfer: { labelKey: 'transactions.noEffect',       color: '#1e3a6e', bg: '#E8EDFB', icon: '↔' },
 }
 function getCashImpact(type) {
-  return CASH_IMPACT[type] || { label: 'Unknown impact', color: 'var(--text-3)', bg: 'var(--bg-3)', icon: '?' }
+  return CASH_IMPACT_KEYS[type] || { labelKey: 'transactions.unknownImpact', color: 'var(--text-3)', bg: 'var(--bg-3)', icon: '?' }
 }
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
@@ -66,16 +67,18 @@ function SummaryCard({ label, value, sub, color }) {
 
 // ── Detail row helper ─────────────────────────────────────────────────────────
 function DetailRow({ label, value, valueStyle }) {
+  const { t: tr } = useTranslation()
   return (
     <div className="tx-detail-row">
       <span className="tx-detail-label">{label}</span>
-      <span className="tx-detail-value" style={valueStyle}>{value || <span className="tx-detail-empty">Not set</span>}</span>
+      <span className="tx-detail-value" style={valueStyle}>{value || <span className="tx-detail-empty">{tr('transactions.notSet')}</span>}</span>
     </div>
   )
 }
 
 // ── Transaction Details Drawer ────────────────────────────────────────────────
 function TransactionDetailsDrawer({ tx, onClose, refDirections = [], refActivityTypes = [], refWallets = [] }) {
+  const { t: tr } = useTranslation()
   // Escape key
   useEffect(() => {
     const handler = (e) => { if (e.key === 'Escape') onClose() }
@@ -122,7 +125,7 @@ function TransactionDetailsDrawer({ tx, onClose, refDirections = [], refActivity
               className="type-badge"
               style={{ background: badge.bg, color: badge.color, fontSize: 12, padding: '4px 12px' }}
             >
-              {badge.label}
+              {badge.labelKey ? tr(badge.labelKey) : badge.label}
             </span>
             <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-3)', letterSpacing: '0.04em' }}>
               {fmtDate(tx.created_at)}
@@ -137,7 +140,7 @@ function TransactionDetailsDrawer({ tx, onClose, refDirections = [], refActivity
 
         {/* ── Big amount ── */}
         <div className="tx-drawer-amount-block">
-          <div className="tx-drawer-desc">{tx.description || 'No description'}</div>
+          <div className="tx-drawer-desc">{tx.description || tr('transactions.noDescription')}</div>
           <div className="tx-drawer-amount" style={{ color: amountColor }}>
             {amountSign}{fmtFull(amount)}
             <span className="tx-drawer-currency">{currency}</span>
@@ -146,14 +149,14 @@ function TransactionDetailsDrawer({ tx, onClose, refDirections = [], refActivity
 
         {/* ── Cash impact ── */}
         <div className="tx-detail-section">
-          <div className="tx-detail-section-title">Cash Impact</div>
+          <div className="tx-detail-section-title">{tr('transactions.cashImpact')}</div>
           <div className="tx-cash-impact" style={{ background: impact.bg, color: impact.color }}>
             <span className="tx-cash-impact-icon">{impact.icon}</span>
             <div>
-              <div style={{ fontWeight: 700, fontSize: 'var(--text-sm)' }}>{impact.label}</div>
+              <div style={{ fontWeight: 700, fontSize: 'var(--text-sm)' }}>{tr(impact.labelKey)}</div>
               {isTransfer && (
                 <div style={{ fontSize: 'var(--text-xs)', marginTop: 3, opacity: 0.8 }}>
-                  Transfer is neutral for total cash. Account movement requires source and destination.
+                  {tr('transactions.transferNeutral')}
                 </div>
               )}
             </div>
@@ -162,15 +165,15 @@ function TransactionDetailsDrawer({ tx, onClose, refDirections = [], refActivity
 
         {/* ── Transaction details ── */}
         <div className="tx-detail-section">
-          <div className="tx-detail-section-title">Details</div>
+          <div className="tx-detail-section-title">{tr('transactions.details')}</div>
           <div className="tx-detail-card">
-            <DetailRow label="Description" value={tx.description} />
-            <DetailRow label="Category"    value={tx.category} />
-            <DetailRow label="Scope"       value={tx.scope === 'business' ? '💼 Business' : '👤 Personal'} />
-            <DetailRow label="Project"     value={tx.project} />
-            <DetailRow label="Date"        value={fmtDateTime(tx.created_at)} />
+            <DetailRow label={tr('transactions.description')} value={tx.description} />
+            <DetailRow label={tr('transactions.category')}    value={tx.category} />
+            <DetailRow label={tr('transactions.scope')}       value={tx.scope === 'business' ? '💼 Business' : '👤 Personal'} />
+            <DetailRow label={tr('transactions.project') || 'Project'}     value={tx.project} />
+            <DetailRow label={tr('transactions.date')}        value={fmtDateTime(tx.created_at)} />
             <DetailRow
-              label="Amount"
+              label={tr('transactions.amount')}
               value={`${amountSign}${fmtFull(amount)} ${currency}`}
               valueStyle={{ color: amountColor, fontWeight: 700 }}
             />
@@ -187,11 +190,11 @@ function TransactionDetailsDrawer({ tx, onClose, refDirections = [], refActivity
             : null
           return (
             <div className="tx-detail-section">
-              <div className="tx-detail-section-title">Classification</div>
+              <div className="tx-detail-section-title">{tr('transactions.classification')}</div>
               <div className="tx-detail-card">
-                {tx.counterparty_name && <DetailRow label="Counterparty" value={tx.counterparty_name} />}
-                {dirName && <DetailRow label="Business Direction" value={dirName} />}
-                {actName && <DetailRow label="Activity Type" value={actName} />}
+                {tx.counterparty_name && <DetailRow label={tr('transactions.counterparty')} value={tx.counterparty_name} />}
+                {dirName && <DetailRow label={tr('transactions.businessDirection')} value={dirName} />}
+                {actName && <DetailRow label={tr('transactions.activityType')} value={actName} />}
               </div>
             </div>
           )
@@ -207,22 +210,22 @@ function TransactionDetailsDrawer({ tx, onClose, refDirections = [], refActivity
             : null
           return (
             <div className="tx-detail-section">
-              <div className="tx-detail-section-title">{isTransfer ? 'Transfer Route' : 'Account'}</div>
+              <div className="tx-detail-section-title">{isTransfer ? tr('transactions.transferRoute') : tr('transactions.account')}</div>
               <div className="tx-detail-card">
                 {isTransfer ? (
                   <>
-                    <DetailRow label="From" value={walletName || tx.source} />
-                    <DetailRow label="To"   value={destination} />
+                    <DetailRow label={tr('transactions.from')} value={walletName || tx.source} />
+                    <DetailRow label={tr('transactions.to')}   value={destination} />
                   </>
                 ) : (
                   <>
                     <DetailRow
-                      label="Wallet"
+                      label={tr('transactions.wallet')}
                       value={walletName
                         ? `${walletName}${walletObj?.currency && walletObj.currency !== 'IDR' ? ` · ${walletObj.currency}` : ''}`
                         : null}
                     />
-                    {tx.source && <DetailRow label="Legacy source" value={tx.source} />}
+                    {tx.source && <DetailRow label={tr('transactions.legacySource')} value={tx.source} />}
                   </>
                 )}
               </div>
@@ -232,10 +235,10 @@ function TransactionDetailsDrawer({ tx, onClose, refDirections = [], refActivity
 
         {/* ── Meta ── */}
         <div className="tx-detail-section">
-          <div className="tx-detail-section-title">Record Info</div>
+          <div className="tx-detail-section-title">{tr('transactions.recordInfo')}</div>
           <div className="tx-detail-card">
-            <DetailRow label="Transaction ID" value={tx.id} valueStyle={{ fontFamily: 'monospace', fontSize: 12 }} />
-            <DetailRow label="Created at" value={fmtDateTime(tx.created_at)} />
+            <DetailRow label={tr('transactions.transactionID')} value={tx.id} valueStyle={{ fontFamily: 'monospace', fontSize: 12 }} />
+            <DetailRow label={tr('transactions.createdAt')} value={fmtDateTime(tx.created_at)} />
           </div>
         </div>
 
@@ -249,6 +252,7 @@ function TransactionDetailsDrawer({ tx, onClose, refDirections = [], refActivity
 export default function Transactions() {
   const { token } = useAuth()
   const navigate = useNavigate()
+  const { t: tr } = useTranslation()
 
   // Server-side filter state
   const [period, setPeriod]     = useState('month')
@@ -338,22 +342,22 @@ export default function Transactions() {
       {/* ── Page header ─── */}
       <div className="hf-page-header" style={{ padding: '28px 28px 0', marginBottom: 0 }}>
         <div>
-          <div className="hf-page-title">Transactions</div>
-          <div className="hf-page-subtitle">All money movements</div>
+          <div className="hf-page-title">{tr('transactions.title')}</div>
+          <div className="hf-page-subtitle">{tr('transactions.subtitle')}</div>
         </div>
         <div className="hf-page-actions">
           <button className="btn btn-primary btn-md" onClick={() => navigate('/add')}>
-            + Add
+            {tr('transactions.addBtn')}
           </button>
         </div>
       </div>
 
       {/* ── Summary cards ─── */}
       <div className="summary-grid">
-        <SummaryCard label="Total Income"   value={fmt(totalIncome)}   sub={`${filtered.filter(t => t.type === 'income').length} transactions`}  color="var(--green)" />
-        <SummaryCard label="Total Expenses" value={fmt(totalExpenses)} sub={`${filtered.filter(t => t.type === 'expense').length} transactions`} color="var(--red)"   />
-        <SummaryCard label="Net Flow"       value={(netFlow >= 0 ? '+' : '') + fmt(netFlow)} sub="income − expenses" color={netFlow >= 0 ? 'var(--green)' : 'var(--red)'} />
-        <SummaryCard label="Showing"        value={filtered.length}    sub="transactions"    color="var(--text)" />
+        <SummaryCard label={tr('transactions.totalIncome')}   value={fmt(totalIncome)}   sub={`${filtered.filter(tx => tx.type === 'income').length} ${tr('transactions.transactionsLabel')}`}  color="var(--green)" />
+        <SummaryCard label={tr('transactions.totalExpenses')} value={fmt(totalExpenses)} sub={`${filtered.filter(tx => tx.type === 'expense').length} ${tr('transactions.transactionsLabel')}`} color="var(--red)"   />
+        <SummaryCard label={tr('transactions.netFlow')}       value={(netFlow >= 0 ? '+' : '') + fmt(netFlow)} sub={tr('transactions.incomeExpenses')} color={netFlow >= 0 ? 'var(--green)' : 'var(--red)'} />
+        <SummaryCard label={tr('transactions.showing')}        value={filtered.length}    sub={tr('transactions.transactionsLabel')}    color="var(--text)" />
       </div>
 
       {/* ── Filter bar ─── */}
@@ -362,46 +366,46 @@ export default function Transactions() {
           <span className="filter-search-icon"><SearchIcon /></span>
           <input
             className="filter-search"
-            placeholder="Search description, category, source…"
+            placeholder={tr('transactions.searchPlaceholder')}
             value={search}
             onChange={e => setSearch(e.target.value)}
           />
           {search && <button className="filter-search-clear" onClick={() => setSearch('')}>×</button>}
         </div>
         <select className="filter-select" value={typeFilter} onChange={e => setType(e.target.value)}>
-          <option value="all">All types</option>
-          <option value="income">Income</option>
-          <option value="expense">Expense</option>
-          <option value="transfer">Transfer</option>
-          <option value="payroll">Payroll</option>
+          <option value="all">{tr('transactions.allTypes')}</option>
+          <option value="income">{tr('transactions.income')}</option>
+          <option value="expense">{tr('transactions.expense')}</option>
+          <option value="transfer">{tr('transactions.transfer')}</option>
+          <option value="payroll">{tr('transactions.payroll')}</option>
         </select>
         <select className="filter-select" value={scope} onChange={e => setScope(e.target.value)}>
-          <option value="all">All scopes</option>
-          <option value="business">Business</option>
-          <option value="personal">Personal</option>
+          <option value="all">{tr('transactions.allScopes')}</option>
+          <option value="business">{tr('common.business')}</option>
+          <option value="personal">{tr('common.personal')}</option>
         </select>
         <select className="filter-select" value={period} onChange={e => setPeriod(e.target.value)}>
-          <option value="month">This month</option>
-          <option value="week">Last 7 days</option>
-          <option value="today">Today</option>
+          <option value="month">{tr('transactions.thisMonth')}</option>
+          <option value="week">{tr('transactions.last7Days')}</option>
+          <option value="today">{tr('transactions.today')}</option>
         </select>
       </div>
 
       {/* ── Mobile filter chips ─── */}
       <div className="filter-chips">
-        {['all', 'income', 'expense'].map(t => (
+        {['all', 'income', 'expense'].map(tp => (
           <button
-            key={t}
-            className={`filter-chip${typeFilter === t ? ' active' : ''}`}
-            onClick={() => setType(t)}
+            key={tp}
+            className={`filter-chip${typeFilter === tp ? ' active' : ''}`}
+            onClick={() => setType(tp)}
           >
-            {t === 'all' ? 'All' : t === 'income' ? '↓ Income' : '↑ Expense'}
+            {tp === 'all' ? tr('transactions.allScopesMobile') : tp === 'income' ? `↓ ${tr('transactions.income')}` : `↑ ${tr('transactions.expense')}`}
           </button>
         ))}
         <select className="filter-chip-select" value={period} onChange={e => setPeriod(e.target.value)}>
-          <option value="month">This month</option>
-          <option value="week">Last 7d</option>
-          <option value="today">Today</option>
+          <option value="month">{tr('transactions.thisMonth')}</option>
+          <option value="week">{tr('transactions.last7DaysShort')}</option>
+          <option value="today">{tr('transactions.today')}</option>
         </select>
       </div>
 
@@ -409,7 +413,7 @@ export default function Transactions() {
       {loading && (
         <div className="tx-state-center">
           <div className="tx-loading-spinner" />
-          <div className="tx-state-text">Loading transactions…</div>
+          <div className="tx-state-text">{tr('transactions.loadingTransactions')}</div>
         </div>
       )}
 
@@ -417,9 +421,9 @@ export default function Transactions() {
       {!loading && error && (
         <div className="tx-state-center">
           <div className="tx-state-icon">⚠️</div>
-          <div className="tx-state-text" style={{ color: 'var(--red)' }}>Could not load transactions.</div>
+          <div className="tx-state-text" style={{ color: 'var(--red)' }}>{tr('transactions.couldNotLoad')}</div>
           <div className="tx-state-sub">{error}</div>
-          <button className="tx-retry-btn" onClick={load}>Retry</button>
+          <button className="tx-retry-btn" onClick={load}>{tr('common.retry')}</button>
         </div>
       )}
 
@@ -427,17 +431,17 @@ export default function Transactions() {
       {!loading && !error && filtered.length === 0 && (
         <div className="tx-state-center">
           <div className="tx-state-icon">💸</div>
-          <div className="tx-state-text">No transactions found.</div>
+          <div className="tx-state-text">{tr('transactions.noTransactions')}</div>
           <div className="tx-state-sub">
             {search || typeFilter !== 'all'
-              ? 'Try adjusting your filters.'
-              : 'Add your first transaction to get started.'}
+              ? tr('transactions.tryAdjusting')
+              : tr('transactions.addFirst')}
           </div>
           {!search && typeFilter === 'all' && (
-            <button className="tx-retry-btn" onClick={() => navigate('/add')}>+ Add Transaction</button>
+            <button className="tx-retry-btn" onClick={() => navigate('/add')}>{tr('transactions.addTransaction')}</button>
           )}
           {(search || typeFilter !== 'all') && (
-            <button className="tx-retry-btn" onClick={() => { setSearch(''); setType('all') }}>Clear filters</button>
+            <button className="tx-retry-btn" onClick={() => { setSearch(''); setType('all') }}>{tr('transactions.clearFilters')}</button>
           )}
         </div>
       )}
@@ -448,13 +452,13 @@ export default function Transactions() {
           <table className="tx-table">
             <thead>
               <tr>
-                <th>Date</th>
-                <th>Description</th>
-                <th>Category</th>
-                <th>Source</th>
-                <th>Scope</th>
-                <th className="tx-col-amount">Amount</th>
-                <th>Type</th>
+                <th>{tr('transactions.date')}</th>
+                <th>{tr('transactions.description')}</th>
+                <th>{tr('transactions.category')}</th>
+                <th>{tr('transactions.source')}</th>
+                <th>{tr('transactions.scope')}</th>
+                <th className="tx-col-amount">{tr('transactions.amount')}</th>
+                <th>{tr('transactions.type')}</th>
               </tr>
             </thead>
             <tbody>
@@ -473,7 +477,7 @@ export default function Transactions() {
                       {t.project && <div className="tx-desc-sub">{t.project}</div>}
                     </td>
                     <td className="tx-col-cat">
-                      <span className="tx-cat-text">{t.category || 'Uncategorized'}</span>
+                      <span className="tx-cat-text">{t.category || tr('transactions.uncategorized')}</span>
                     </td>
                     <td className="tx-col-source">
                       <span className="tx-source-text">{t.source || '—'}</span>
@@ -488,7 +492,7 @@ export default function Transactions() {
                     </td>
                     <td>
                       <span className="type-badge" style={{ background: badge.bg, color: badge.color }}>
-                        {badge.label}
+                        {badge.labelKey ? tr(badge.labelKey) : badge.label}
                       </span>
                     </td>
                   </tr>
@@ -532,7 +536,7 @@ export default function Transactions() {
                     {displayAmount(t)}
                   </div>
                   <span className="type-badge" style={{ background: badge.bg, color: badge.color, marginTop: 4 }}>
-                    {badge.label}
+                    {badge.labelKey ? tr(badge.labelKey) : badge.label}
                   </span>
                 </div>
               </div>

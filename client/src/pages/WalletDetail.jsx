@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
+import { useTranslation } from '../hooks/useTranslation'
 import { apiFetch, fmt } from '../lib/api'
 
 function fmtDate(str) {
@@ -24,17 +25,18 @@ const WALLET_TYPES = {
   payment_gateway: 'Payment gateway', other: 'Other',
 }
 
-const PERIODS = [
-  { key: 'all',   label: 'All time' },
-  { key: 'month', label: 'This month' },
-  { key: '3m',    label: '3 months' },
-  { key: 'week',  label: 'This week' },
-]
-
 export default function WalletDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
   const { token } = useAuth()
+  const { t } = useTranslation()
+
+  const PERIODS = [
+    { key: 'all',   label: t('accounts.allTime') },
+    { key: 'month', label: t('accounts.thisMonth') },
+    { key: '3m',    label: t('accounts.threeMonths') },
+    { key: 'week',  label: t('accounts.thisWeek') },
+  ]
 
   const [wallet, setWallet]   = useState(null)
   const [txs,    setTxs]      = useState([])
@@ -83,9 +85,9 @@ export default function WalletDetail() {
       {!loading && txs.length > 0 && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 16 }}>
           {[
-            { label: 'Income',   value: '+' + fmt(income),   color: 'var(--green-dark)' },
-            { label: 'Expenses', value: '−' + fmt(expenses), color: 'var(--red-dark)' },
-            { label: 'Net',      value: (net >= 0 ? '+' : '−') + fmt(Math.abs(net)), color: net >= 0 ? 'var(--green-dark)' : 'var(--red-dark)' },
+            { label: t('transactions.income'),   value: '+' + fmt(income),   color: 'var(--green-dark)' },
+            { label: t('aicfo.expenses'), value: '−' + fmt(expenses), color: 'var(--red-dark)' },
+            { label: t('radar.netFlow'),      value: (net >= 0 ? '+' : '−') + fmt(Math.abs(net)), color: net >= 0 ? 'var(--green-dark)' : 'var(--red-dark)' },
           ].map(s => (
             <div key={s.label} className="summary-card" style={{ textAlign: 'center' }}>
               <div className="summary-card-label">{s.label}</div>
@@ -150,9 +152,9 @@ export default function WalletDetail() {
       {!loading && txs.length === 0 && (
         <div style={{ textAlign: 'center', padding: '48px 20px' }}>
           <div style={{ fontSize: 36, marginBottom: 12 }}>💳</div>
-          <div style={{ fontSize: 'var(--text-md)', fontWeight: 600, color: 'var(--text)', marginBottom: 6 }}>No transactions</div>
+          <div style={{ fontSize: 'var(--text-md)', fontWeight: 600, color: 'var(--text)', marginBottom: 6 }}>{t('accounts.noTransactions')}</div>
           <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-3)' }}>
-            No transactions found for this wallet{period !== 'all' ? ' in this period' : ''}.
+            {t('accounts.noTransactionsSub')}{period !== 'all' ? t('accounts.inThisPeriod') : ''}.
           </div>
         </div>
       )}

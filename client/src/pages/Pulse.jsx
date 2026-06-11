@@ -2,11 +2,12 @@ import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
+import { useTranslation } from '../hooks/useTranslation'
 import { apiFetch, fmt, fmtFull, daysUntil } from '../lib/api'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const SCOPE_LABELS = { all: 'All', business: 'Business', personal: 'Personal' }
+const SCOPE_KEYS = ['all', 'business', 'personal']
 
 // All real routes registered in App.jsx
 const ALLOWED_ROUTES = ['/', '/add', '/radar', '/accounts', '/settings', '/cfo',
@@ -120,6 +121,7 @@ const Modal = ({ onClose, children }) => createPortal(
 export default function Pulse({ onDataLoad }) {
   const { token, user } = useAuth()
   const navigate = useNavigate()
+  const { t } = useTranslation()
 
   // Safe navigation — ignores unknown/empty routes to prevent blank pages
   const safeNav = (route, fallback = '/') => {
@@ -179,8 +181,8 @@ export default function Pulse({ onDataLoad }) {
   const handleSnooze = async (days) => {
     if (!snoozeModal) return
     if (days === 0) {
-      if (!customDate) { setSnoozeError('Pick a date'); return }
-      if (new Date(customDate) <= new Date()) { setSnoozeError('Date must be in the future'); return }
+      if (!customDate) { setSnoozeError(t('pulse.pickADate')); return }
+      if (new Date(customDate) <= new Date()) { setSnoozeError(t('pulse.dateFuture')); return }
     }
     if (snoozeModal.entityType !== 'reminder') { setSnoozeModal(null); return }
     setSnoozing(true)
@@ -196,7 +198,7 @@ export default function Pulse({ onDataLoad }) {
 
   if (loading && !pulse) return (
     <div style={{ minHeight: '100dvh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-3)', fontSize: 14 }}>
-      Loading...
+      {t('common.loading')}
     </div>
   )
 
@@ -242,7 +244,7 @@ export default function Pulse({ onDataLoad }) {
   const netFlowColor = netFlow >= 0 ? 'var(--green-dark)' : 'var(--red-dark)'
 
   const hour    = new Date().getHours()
-  const greet   = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'
+  const greet   = hour < 12 ? t('pulse.goodMorning') || 'Good morning' : hour < 17 ? t('pulse.goodAfternoon') || 'Good afternoon' : t('pulse.goodEvening') || 'Good evening'
   const firstName = user?.firstName || 'there'
 
   const btnP = 'btn btn-block btn-lg'
@@ -264,14 +266,14 @@ export default function Pulse({ onDataLoad }) {
 
       {/* ── Scope filter ─────────────────────────────────────────────────────── */}
       <div style={{ padding: '0 16px 10px', display: 'flex', gap: 6 }}>
-        {Object.entries(SCOPE_LABELS).map(([k, v]) => (
+        {SCOPE_KEYS.map((k) => (
           <button key={k} onClick={() => setScope(k)} style={{
             padding: '5px 16px', borderRadius: 20, fontSize: 12, cursor: 'pointer',
             border: scope === k ? 'none' : '0.5px solid var(--border)',
             background: scope === k ? 'var(--brand)' : 'none',
             color: scope === k ? '#fff' : 'var(--text-3)',
             fontWeight: scope === k ? 500 : 400,
-          }}>{v}</button>
+          }}>{t(`common.${k}`)}</button>
         ))}
       </div>
 
@@ -361,10 +363,10 @@ export default function Pulse({ onDataLoad }) {
         {/* Hero CTA buttons */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, position: 'relative' }}>
           <button onClick={() => navigate('/add')} style={{ background: '#fff', border: 'none', borderRadius: 14, padding: '10px 0', fontSize: 12, fontWeight: 600, color: '#0D1B2E', cursor: 'pointer' }}>
-            + Add transaction
+            {t('pulse.addTransaction')}
           </button>
           <button onClick={() => navigate('/cfo')} style={{ background: 'rgba(255,255,255,.1)', border: '0.5px solid rgba(255,255,255,.2)', borderRadius: 14, padding: '10px 0', fontSize: 12, color: '#fff', cursor: 'pointer', fontWeight: 500 }}>
-            Ask AI CFO →
+            {t('pulse.askAICFO')}
           </button>
         </div>
       </div>
@@ -375,7 +377,7 @@ export default function Pulse({ onDataLoad }) {
           {/* ── CFO Score card ─────────────────────────────────────────────── */}
           {cfoScore && (
             <>
-              <SectionLabel>CFO SCORE</SectionLabel>
+              <SectionLabel>{t('pulse.cfoScore')}</SectionLabel>
               <div style={{ margin: '0 16px 16px', background: 'var(--bg-2)', border: '0.5px solid var(--border)', borderRadius: 20, padding: '16px 16px 14px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
                   <div>
@@ -417,7 +419,7 @@ export default function Pulse({ onDataLoad }) {
           {/* ── AI Alert + Hiring Readiness (2-col) ────────────────────────── */}
           {(aiAlert || hiringR) && (
             <>
-              <SectionLabel>BUSINESS STATUS</SectionLabel>
+              <SectionLabel>{t('pulse.businessStatus')}</SectionLabel>
               <div style={{ display: 'grid', gridTemplateColumns: aiAlert && hiringR ? '1fr 1fr' : '1fr', gap: 10, margin: '0 16px 16px' }}>
                 {aiAlert && (
                   <div style={{ background: alertStyle.bg, border: `0.5px solid ${alertStyle.border}`, borderRadius: 16, padding: '14px 14px' }}>
@@ -451,17 +453,17 @@ export default function Pulse({ onDataLoad }) {
           )}
 
           {/* ── Cash Snapshot (4 KPIs) ─────────────────────────────────────── */}
-          <SectionLabel>CASH SNAPSHOT</SectionLabel>
+          <SectionLabel>{t('pulse.cashSnapshot')}</SectionLabel>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, margin: '0 16px 16px' }}>
             {[
               {
-                label: 'Total Cash', unit: 'IDR', sub: 'Available now',
+                label: t('pulse.totalCash'), unit: 'IDR', sub: t('pulse.availableNow'),
                 value: fmt(totalBalance),
                 color: totalBalance >= 0 ? 'var(--text)' : 'var(--red)',
               },
               {
-                label: 'Runway', unit: (!runway || runway >= 999) ? '' : 'days',
-                sub: p.burnWindowDays >= 30 ? '30-day avg' : p.burnWindowDays > 0 ? `${p.burnWindowDays}d avg` : 'Based on burn',
+                label: t('pulse.runway'), unit: (!runway || runway >= 999) ? '' : t('radar.days'),
+                sub: p.burnWindowDays >= 30 ? t('pulse.avg30') : p.burnWindowDays > 0 ? `${p.burnWindowDays}d avg` : t('pulse.basedOnBurn'),
                 value: (!runway || runway >= 999) ? '∞' : String(runway),
                 color: (!runway || runway >= 999) ? 'var(--text-3)'
                   : runway > 30 ? 'var(--green-dark)'
@@ -469,12 +471,12 @@ export default function Pulse({ onDataLoad }) {
                   : 'var(--red)',
               },
               {
-                label: 'Burn Rate', unit: '/day', sub: 'Cash outflow',
+                label: t('pulse.burnRate'), unit: '/day', sub: t('pulse.cashOutflow'),
                 value: fmt(burnRate),
                 color: 'var(--text)',
               },
               {
-                label: 'Net Position', unit: 'IDR', sub: 'Cash + rec − pay',
+                label: t('pulse.netPosition'), unit: 'IDR', sub: t('pulse.cashRecPay'),
                 value: fmt(netPosition),
                 color: netPosition >= 0 ? 'var(--green-dark)' : 'var(--red-dark)',
               },
@@ -491,79 +493,79 @@ export default function Pulse({ onDataLoad }) {
           </div>
 
           {/* ── Net Flow this month ─────────────────────────────────────────── */}
-          <SectionLabel>NET FLOW · THIS MONTH</SectionLabel>
+          <SectionLabel>{t('pulse.netFlowMonth')}</SectionLabel>
           <div style={{ margin: '0 16px 16px', background: 'var(--bg-2)', border: '0.5px solid var(--border)', borderRadius: 20, padding: '14px 16px' }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
               <div style={{ background: 'var(--green-light)', borderRadius: 14, padding: '12px 13px' }}>
-                <div style={{ fontSize: 9, fontWeight: 700, color: 'var(--green-dark)', letterSpacing: '0.07em', marginBottom: 4 }}>INCOME</div>
+                <div style={{ fontSize: 9, fontWeight: 700, color: 'var(--green-dark)', letterSpacing: '0.07em', marginBottom: 4 }}>{t('pulse.income')}</div>
                 <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--green-dark)', lineHeight: 1 }}>+{fmt(income)}</div>
-                <div style={{ fontSize: 10, color: 'var(--green)', marginTop: 3 }}>IDR earned</div>
+                <div style={{ fontSize: 10, color: 'var(--green)', marginTop: 3 }}>{t('pulse.idrEarned')}</div>
               </div>
               <div style={{ background: 'var(--red-light)', borderRadius: 14, padding: '12px 13px' }}>
-                <div style={{ fontSize: 9, fontWeight: 700, color: 'var(--red-dark)', letterSpacing: '0.07em', marginBottom: 4 }}>EXPENSES</div>
+                <div style={{ fontSize: 9, fontWeight: 700, color: 'var(--red-dark)', letterSpacing: '0.07em', marginBottom: 4 }}>{t('pulse.expenses')}</div>
                 <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--red-dark)', lineHeight: 1 }}>−{fmt(expenses)}</div>
-                <div style={{ fontSize: 10, color: 'var(--red)', marginTop: 3 }}>IDR spent</div>
+                <div style={{ fontSize: 10, color: 'var(--red)', marginTop: 3 }}>{t('pulse.idrSpent')}</div>
               </div>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '0.5px solid var(--border)', paddingTop: 10 }}>
-              <span style={{ fontSize: 12, color: 'var(--text-3)' }}>Net flow this month</span>
+              <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{t('pulse.netFlowThisMonth')}</span>
               <span style={{ fontSize: 16, fontWeight: 700, color: netFlowColor }}>
                 {netFlow >= 0 ? '+' : ''}{fmt(netFlow)} IDR
               </span>
             </div>
             {income === 0 && expenses === 0 && (
-              <div style={{ marginTop: 10, fontSize: 11, color: 'var(--text-4)', textAlign: 'center' }}>No transactions recorded this month yet</div>
+              <div style={{ marginTop: 10, fontSize: 11, color: 'var(--text-4)', textAlign: 'center' }}>{t('pulse.noTransactionsMonth')}</div>
             )}
           </div>
 
           {/* ── Receivables / Payables Pressure ────────────────────────────── */}
-          <SectionLabel>CASH PRESSURE</SectionLabel>
+          <SectionLabel>{t('pulse.cashPressure')}</SectionLabel>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, margin: '0 16px 16px' }}>
             {/* Receivables */}
             <div style={{ background: 'var(--bg-2)', border: '0.5px solid var(--border)', borderRadius: 16, padding: '13px 14px' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-                <span style={{ fontSize: 9, fontWeight: 700, color: 'var(--green-dark)', letterSpacing: '0.07em' }}>RECEIVABLES</span>
+                <span style={{ fontSize: 9, fontWeight: 700, color: 'var(--green-dark)', letterSpacing: '0.07em' }}>{t('pulse.receivablesSect')}</span>
                 {overdueRecv.length > 0 && (
-                  <span style={{ fontSize: 9, padding: '2px 7px', borderRadius: 8, background: 'var(--red-light)', color: 'var(--red-dark)' }}>{overdueRecv.length} overdue</span>
+                  <span style={{ fontSize: 9, padding: '2px 7px', borderRadius: 8, background: 'var(--red-light)', color: 'var(--red-dark)' }}>{overdueRecv.length} {t('common.overdue')}</span>
                 )}
               </div>
               <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--green-dark)', lineHeight: 1 }}>{fmt(receivables)}</div>
               <div style={{ fontSize: 10, color: 'var(--green)', marginTop: 3 }}>
-                {openDebts.filter(d => d.type === 'receivable').length} incoming · IDR
+                {openDebts.filter(d => d.type === 'receivable').length} {t('common.incoming')} · IDR
               </div>
               {topRecv && (
                 <div style={{ marginTop: 8, fontSize: 11, color: 'var(--text-3)', borderTop: '0.5px solid var(--border)', paddingTop: 7 }}>
-                  Top: <span style={{ color: 'var(--text)', fontWeight: 500 }}>{topRecv.counterparty}</span><br />
+                  {t('pulse.top')} <span style={{ color: 'var(--text)', fontWeight: 500 }}>{topRecv.counterparty}</span><br />
                   {fmt(topRecv.remaining_amount || topRecv.amount)} IDR
                 </div>
               )}
               <button onClick={() => navigate('/receivables')}
                 style={{ marginTop: 10, width: '100%', padding: '7px 0', borderRadius: 10, fontSize: 11, border: '0.5px solid var(--border)', background: 'none', color: 'var(--brand)', cursor: 'pointer' }}>
-                View all →
+                {t('pulse.viewAllReceivables')}
               </button>
             </div>
 
             {/* Payables */}
             <div style={{ background: 'var(--bg-2)', border: '0.5px solid var(--border)', borderRadius: 16, padding: '13px 14px' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-                <span style={{ fontSize: 9, fontWeight: 700, color: 'var(--red-dark)', letterSpacing: '0.07em' }}>PAYABLES</span>
+                <span style={{ fontSize: 9, fontWeight: 700, color: 'var(--red-dark)', letterSpacing: '0.07em' }}>{t('pulse.payablesSect')}</span>
                 {overduePayables.length > 0 && (
-                  <span style={{ fontSize: 9, padding: '2px 7px', borderRadius: 8, background: 'var(--red-light)', color: 'var(--red-dark)' }}>{overduePayables.length} overdue</span>
+                  <span style={{ fontSize: 9, padding: '2px 7px', borderRadius: 8, background: 'var(--red-light)', color: 'var(--red-dark)' }}>{overduePayables.length} {t('common.overdue')}</span>
                 )}
               </div>
               <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--red-dark)', lineHeight: 1 }}>{fmt(payables)}</div>
               <div style={{ fontSize: 10, color: 'var(--red)', marginTop: 3 }}>
-                {openDebts.filter(d => d.type === 'payable').length} outgoing · IDR
+                {openDebts.filter(d => d.type === 'payable').length} {t('common.outgoing')} · IDR
               </div>
               {topPay && (
                 <div style={{ marginTop: 8, fontSize: 11, color: 'var(--text-3)', borderTop: '0.5px solid var(--border)', paddingTop: 7 }}>
-                  Next: <span style={{ color: 'var(--text)', fontWeight: 500 }}>{topPay.counterparty}</span><br />
-                  {daysUntil(topPay.due_date) < 0 ? 'Overdue' : daysUntil(topPay.due_date) + 'd left'}
+                  {t('pulse.next')} <span style={{ color: 'var(--text)', fontWeight: 500 }}>{topPay.counterparty}</span><br />
+                  {daysUntil(topPay.due_date) < 0 ? t('pulse.overdue') : daysUntil(topPay.due_date) + t('pulse.daysLeft')}
                 </div>
               )}
               <button onClick={() => navigate('/payables')}
                 style={{ marginTop: 10, width: '100%', padding: '7px 0', borderRadius: 10, fontSize: 11, border: '0.5px solid var(--border)', background: 'none', color: 'var(--brand)', cursor: 'pointer' }}>
-                View all →
+                {t('pulse.viewAllPayables')}
               </button>
             </div>
           </div>
@@ -573,9 +575,9 @@ export default function Pulse({ onDataLoad }) {
         <div className="pulse-side-col">
 
           {/* ── Today's Actions (AI CFO V2 next_actions) ─────────────────── */}
-          <SectionLabel count={nextActs.length}>TODAY'S ACTIONS</SectionLabel>
+          <SectionLabel count={nextActs.length}>{t('pulse.todaysActions')}</SectionLabel>
           {nextActs.length === 0 ? (
-            <EmptyState icon="✓" title="All clear" sub="No urgent actions right now. Keep tracking your transactions." />
+            <EmptyState icon="✓" title={t('pulse.allClear')} sub={t('pulse.allClearSub')} />
           ) : (
             <div style={{ margin: '0 16px 16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
               {nextActs.map((act, i) => {
@@ -603,9 +605,9 @@ export default function Pulse({ onDataLoad }) {
           )}
 
           {/* ── Wallet Breakdown ─────────────────────────────────────────── */}
-          <SectionLabel count={accounts.length}>WALLETS</SectionLabel>
+          <SectionLabel count={accounts.length}>{t('pulse.wallets')}</SectionLabel>
           {accounts.length === 0 ? (
-            <EmptyState icon="💳" title="No wallets yet" sub="Add a wallet to track balances per account." />
+            <EmptyState icon="💳" title={t('pulse.noWallets')} sub={t('pulse.noWalletsSub')} />
           ) : (
             <div style={{ margin: '0 16px 16px', display: 'flex', flexDirection: 'column', gap: 7 }}>
               {accounts.map(a => {
@@ -629,15 +631,15 @@ export default function Pulse({ onDataLoad }) {
               })}
               <button onClick={() => navigate('/accounts')}
                 style={{ padding: '9px 0', borderRadius: 14, fontSize: 12, border: '0.5px solid var(--border)', background: 'none', color: 'var(--brand)', cursor: 'pointer', fontWeight: 500 }}>
-                Manage wallets →
+                {t('pulse.manageWallets')}
               </button>
             </div>
           )}
 
           {/* ── Recent Activity ───────────────────────────────────────────── */}
-          <SectionLabel>RECENT ACTIVITY</SectionLabel>
+          <SectionLabel>{t('pulse.recentActivity')}</SectionLabel>
           {recentTxs.length === 0 ? (
-            <EmptyState icon="📊" title="No transactions yet" sub="Start by adding your first income or expense." />
+            <EmptyState icon="📊" title={t('pulse.noTransactions')} sub={t('pulse.noTransactionsSub')} />
           ) : (
             <div style={{ margin: '0 16px 16px', background: 'var(--bg-2)', border: '0.5px solid var(--border)', borderRadius: 20, overflow: 'hidden' }}>
               {recentTxs.slice(0, 8).map((tx, i) => {
@@ -669,26 +671,26 @@ export default function Pulse({ onDataLoad }) {
               })}
               <button onClick={() => navigate('/transactions')}
                 style={{ display: 'block', width: '100%', padding: '11px 0', fontSize: 12, border: 'none', borderTop: '0.5px solid var(--border)', background: 'none', color: 'var(--brand)', cursor: 'pointer', fontWeight: 500 }}>
-                View all transactions →
+                {t('pulse.viewAllTransactions')}
               </button>
             </div>
           )}
 
           {/* ── Quick Actions ─────────────────────────────────────────────── */}
-          <SectionLabel>QUICK ACTIONS</SectionLabel>
+          <SectionLabel>{t('pulse.quickActions')}</SectionLabel>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, margin: '0 16px 28px' }}>
             {[
-              { icon: '+',  label: 'Add Transaction', route: '/add',          bg: 'var(--brand)',       color: '#fff' },
-              { icon: '↓',  label: 'New Receivable',  route: '/receivables',  bg: 'var(--green-light)', color: 'var(--green-dark)' },
-              { icon: '↑',  label: 'New Payable',     route: '/payables',     bg: 'var(--red-light)',   color: 'var(--red-dark)'   },
-              { icon: '🤖', label: 'Ask AI CFO',      route: '/cfo',          bg: 'var(--blue-light)',  color: 'var(--blue-dark)'  },
-              { icon: '💳', label: 'Accounts',        route: '/accounts',     bg: 'var(--bg-3)',        color: 'var(--text-2)'     },
-              { icon: '📊', label: 'View Radar',      route: '/radar',        bg: 'var(--bg-3)',        color: 'var(--text-2)'     },
+              { icon: '+',  labelKey: 'pulse.addTransaction', route: '/add',          bg: 'var(--brand)',       color: '#fff' },
+              { icon: '↓',  labelKey: 'pulse.addReceivable',  route: '/receivables',  bg: 'var(--green-light)', color: 'var(--green-dark)' },
+              { icon: '↑',  labelKey: 'pulse.addPayable',     route: '/payables',     bg: 'var(--red-light)',   color: 'var(--red-dark)'   },
+              { icon: '🤖', labelKey: 'pulse.askAICFO',       route: '/cfo',          bg: 'var(--blue-light)',  color: 'var(--blue-dark)'  },
+              { icon: '💳', labelKey: 'pulse.accounts',       route: '/accounts',     bg: 'var(--bg-3)',        color: 'var(--text-2)'     },
+              { icon: '📊', labelKey: 'pulse.viewRadar',      route: '/radar',        bg: 'var(--bg-3)',        color: 'var(--text-2)'     },
             ].map(a => (
-              <button key={a.label} onClick={() => safeNav(a.route)}
+              <button key={a.labelKey} onClick={() => safeNav(a.route)}
                 style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '12px 14px', borderRadius: 16, border: 'none', background: a.bg, color: a.color, cursor: 'pointer', fontWeight: 500, fontSize: 12, minHeight: 44 }}>
                 <span style={{ fontSize: 16 }}>{a.icon}</span>
-                {a.label}
+                {t(a.labelKey)}
               </button>
             ))}
           </div>
@@ -700,12 +702,12 @@ export default function Pulse({ onDataLoad }) {
       {payModal && (
         <Modal onClose={() => setPayModal(null)}>
           <div style={{ fontSize: 'var(--text-lg)', fontWeight: 600, color: 'var(--text)', marginBottom: 3 }}>
-            {payModal.type === 'receivable' ? 'Mark as received' : 'Mark as paid'}
+            {payModal.type === 'receivable' ? t('pulse.markAsReceived') : t('pulse.markAsPaid')}
           </div>
           <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-3)', marginBottom: 14 }}>
             {payModal.counterparty} · {fmt(payModal.amount)} IDR total
           </div>
-          <label className="modal-label">Amount (IDR)</label>
+          <label className="modal-label">{t('pulse.amountIDR')}</label>
           <input type="number" value={payForm.amount}
             onChange={e => setPayForm(p => ({ ...p, amount: e.target.value }))}
             className="modal-input" style={{ marginBottom: 10 }} />
@@ -716,38 +718,38 @@ export default function Pulse({ onDataLoad }) {
                 className="btn btn-ghost btn-sm">{pct}%</button>
             ))}
           </div>
-          <label className="modal-label">Account</label>
+          <label className="modal-label">{t('add.source')}</label>
           <select value={payForm.account}
             onChange={e => setPayForm(p => ({ ...p, account: e.target.value }))}
             className="modal-input" style={{ marginBottom: 14 }}>
-            <option value="">Select account</option>
+            <option value="">{t('pulse.selectAccount')}</option>
             {accounts.map(a => <option key={a.name} value={a.name}>{a.name} · {fmt(a.balance)}</option>)}
           </select>
           <button disabled={!payForm.amount || paying} onClick={handlePay} className={btnP}
             style={{ background: payForm.amount ? (payModal.type === 'receivable' ? 'var(--green-dark)' : 'var(--brand)') : 'var(--bg-3)', color: payForm.amount ? '#fff' : 'var(--text-4)', marginBottom: 8 }}>
-            {paying ? 'Processing...'
+            {paying ? t('pulse.processing')
               : Number(payForm.amount) >= Number(payModal.amount)
-                ? 'Pay in full · ' + fmt(Number(payForm.amount)) + ' IDR'
-                : 'Pay ' + fmt(Number(payForm.amount)) + ' IDR'}
+                ? t('pulse.payInFull') + fmt(Number(payForm.amount)) + ' IDR'
+                : t('pulse.pay') + fmt(Number(payForm.amount)) + ' IDR'}
           </button>
-          <button onClick={() => setPayModal(null)} className={btnS}>Cancel</button>
+          <button onClick={() => setPayModal(null)} className={btnS}>{t('common.cancel')}</button>
         </Modal>
       )}
 
       {/* ── Snooze modal ─────────────────────────────────────────────────────── */}
       {snoozeModal && (
         <Modal onClose={() => { setSnoozeModal(null); setSnoozeError(''); setCustomDate('') }}>
-          <div style={{ fontSize: 'var(--text-lg)', fontWeight: 600, color: 'var(--text)', marginBottom: 3 }}>Snooze reminder</div>
+          <div style={{ fontSize: 'var(--text-lg)', fontWeight: 600, color: 'var(--text)', marginBottom: 3 }}>{t('pulse.snoozeReminder')}</div>
           <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-3)', marginBottom: 16 }}>
             {snoozeModal.title}{snoozeModal.subtitle ? ' · ' + snoozeModal.subtitle : ''}
           </div>
-          <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-3)', letterSpacing: '0.06em', marginBottom: 8 }}>REMIND ME IN</div>
+          <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-3)', letterSpacing: '0.06em', marginBottom: 8 }}>{t('pulse.remindMeIn')}</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 7, marginBottom: 10 }}>
             {[
-              { label: '1 day',  days: 1, sub: new Date(Date.now() + 86400000).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) },
-              { label: '3 days', days: 3, sub: new Date(Date.now() + 3*86400000).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }), active: true },
-              { label: '7 days', days: 7, sub: new Date(Date.now() + 7*86400000).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) },
-              { label: 'Custom', days: 0, sub: 'Pick date' },
+              { label: t('pulse.oneDay'),    days: 1, sub: new Date(Date.now() + 86400000).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) },
+              { label: t('pulse.threeDays'), days: 3, sub: new Date(Date.now() + 3*86400000).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }), active: true },
+              { label: t('pulse.sevenDays'), days: 7, sub: new Date(Date.now() + 7*86400000).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) },
+              { label: t('pulse.custom'),    days: 0, sub: t('pulse.pickDate') },
             ].map(opt => (
               <div key={opt.label} onClick={() => { if (opt.days > 0) handleSnooze(opt.days) }}
                 style={{ background: opt.active ? 'var(--text)' : 'var(--bg-2)', border: opt.active ? 'none' : '0.5px solid var(--border)', borderRadius: 14, padding: 14, textAlign: 'center', cursor: snoozing ? 'not-allowed' : 'pointer', opacity: snoozing ? 0.6 : 1 }}>
@@ -765,7 +767,7 @@ export default function Pulse({ onDataLoad }) {
             {customDate && (
               <button disabled={snoozing} onClick={() => handleSnooze(0)} className={btnP}
                 style={{ marginTop: 7, background: 'var(--text)', color: '#fff', opacity: snoozing ? 0.6 : 1 }}>
-                {snoozing ? 'Saving...' : 'Snooze until ' + new Date(customDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                {snoozing ? t('common.saving') : t('pulse.snoozeUntil') + new Date(customDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
               </button>
             )}
           </div>
@@ -774,10 +776,10 @@ export default function Pulse({ onDataLoad }) {
           )}
           {snoozeModal.entityType === 'debt' && (
             <div style={{ background: 'var(--blue-light)', border: '0.5px solid rgba(21,94,239,.2)', borderRadius: 14, padding: '10px 13px', marginBottom: 10 }}>
-              <div style={{ fontSize: 'var(--text-sm)', color: 'var(--brand-dark)', lineHeight: 1.5 }}>Debt snooze tracking coming soon. This will dismiss for now.</div>
+              <div style={{ fontSize: 'var(--text-sm)', color: 'var(--brand-dark)', lineHeight: 1.5 }}>{t('pulse.debtSnoozeSoon')}</div>
             </div>
           )}
-          <button onClick={() => { setSnoozeModal(null); setSnoozeError(''); setCustomDate('') }} className={btnS}>Cancel</button>
+          <button onClick={() => { setSnoozeModal(null); setSnoozeError(''); setCustomDate('') }} className={btnS}>{t('common.cancel')}</button>
         </Modal>
       )}
 

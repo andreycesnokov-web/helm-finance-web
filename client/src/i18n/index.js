@@ -1,7 +1,8 @@
 import ru from './ru'
 import en from './en'
+import id from './id'
 
-const translations = { ru, en }
+const translations = { ru, en, id }
 
 let currentLang = localStorage.getItem('hf_lang') || 'ru'
 

@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { useAccess } from '../hooks/useAccess'
+import { useTranslation } from '../hooks/useTranslation'
 import { apiFetch, fmt, fmtFull } from '../lib/api'
 
 // ── Suggested questions ───────────────────────────────────────────────────────
@@ -103,6 +104,7 @@ function Bubble({ msg }) {
         {!isUser && msg.outOfScope && (
           <div style={{ marginTop: 4, fontSize: 10, color: 'var(--text-4)', display: 'flex', alignItems: 'center', gap: 4, paddingLeft: 4 }}>
             <span style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--text-4)', display: 'inline-block' }} />
+            {/* Note: Bubble is a sub-component outside main AICFO, so outOfScope text stays hardcoded */}
             Out of CFO scope
           </div>
         )}
@@ -121,6 +123,7 @@ export default function AICFO() {
   const { token }  = useAuth()
   const navigate   = useNavigate()
   const { access, planLabel, isTrialActive, effectivePlan } = useAccess()
+  const { t } = useTranslation()
 
   const [ctx,      setCtx]      = useState(null)
   const [ctxLoad,  setCtxLoad]  = useState(true)
@@ -210,11 +213,11 @@ export default function AICFO() {
       {/* ── Header ─── */}
       <div className="hf-page-header">
         <div>
-          <div className="hf-page-title">AI CFO</div>
-          <div className="hf-page-subtitle">Financial decision assistant</div>
+          <div className="hf-page-title">{t('aicfo.title')}</div>
+          <div className="hf-page-subtitle">{t('aicfo.subtitle')}</div>
         </div>
         <button onClick={loadCtx} style={{ background: 'var(--bg-2)', border: '0.5px solid var(--border)', borderRadius: 8, padding: '6px 10px', cursor: 'pointer', color: 'var(--text-3)', fontSize: 12 }}>
-          ↻ Refresh
+          {t('aicfo.refresh')}
         </button>
       </div>
 
@@ -223,27 +226,27 @@ export default function AICFO() {
         {ctxLoad && !ctx ? (
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <Spin size={22} />
-            <span style={{ color: 'rgba(255,255,255,.5)', fontSize: 13 }}>Loading financial context…</span>
+            <span style={{ color: 'rgba(255,255,255,.5)', fontSize: 13 }}>{t('aicfo.loadingContext')}</span>
           </div>
         ) : (
           <>
             <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20, gap: 12 }}>
               <div>
-                <div style={{ fontSize: 11, color: 'rgba(255,255,255,.4)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 5 }}>AI CFO ASSISTANT</div>
-                <div style={{ fontSize: 18, fontWeight: 800, color: '#fff', letterSpacing: -0.3, marginBottom: 4 }}>{biz.name || 'My Business'}</div>
+                <div style={{ fontSize: 11, color: 'rgba(255,255,255,.4)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 5 }}>{t('aicfo.aiCfoAssistant')}</div>
+                <div style={{ fontSize: 18, fontWeight: 800, color: '#fff', letterSpacing: -0.3, marginBottom: 4 }}>{biz.name || t('aicfo.myBusiness')}</div>
                 <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 20, ...badgeStyle }}>{planLabel}</span>
               </div>
               <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                <div style={{ fontSize: 11, color: 'rgba(255,255,255,.4)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 5 }}>AI Questions</div>
+                <div style={{ fontSize: 11, color: 'rgba(255,255,255,.4)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 5 }}>{t('aicfo.aiQuestions')}</div>
                 <div style={{ fontSize: 20, fontWeight: 800, color: aiQLeft === 0 ? '#F87171' : '#34D399' }}>{aiQLeft !== null ? aiQLeft : '∞'}</div>
-                <div style={{ fontSize: 10, color: 'rgba(255,255,255,.3)' }}>remaining</div>
+                <div style={{ fontSize: 10, color: 'rgba(255,255,255,.3)' }}>{t('aicfo.remaining')}</div>
               </div>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8 }}>
               {[
-                { label: 'CASH',    value: fmt(cash.total_balance), suffix: currency, color: (cash.total_balance||0) < 0 ? '#F87171' : '#fff' },
-                { label: 'RUNWAY',  value: runway === null ? '—' : runway >= 999 ? '∞' : String(runway), suffix: 'days', color: runwayColor },
-                { label: 'NET/MO',  value: (month.net_flow >= 0 ? '+' : '') + fmt(month.net_flow), suffix: currency, color: (month.net_flow||0) >= 0 ? '#34D399' : '#F87171' },
+                { label: t('aicfo.cash'),    value: fmt(cash.total_balance), suffix: currency, color: (cash.total_balance||0) < 0 ? '#F87171' : '#fff' },
+                { label: t('aicfo.runway'),  value: runway === null ? '—' : runway >= 999 ? '∞' : String(runway), suffix: t('radar.days'), color: runwayColor },
+                { label: t('aicfo.netPerMonth'),  value: (month.net_flow >= 0 ? '+' : '') + fmt(month.net_flow), suffix: currency, color: (month.net_flow||0) >= 0 ? '#34D399' : '#F87171' },
               ].map(m => (
                 <div key={m.label} style={{ background: 'rgba(255,255,255,.06)', borderRadius: 10, padding: '10px 8px', border: '0.5px solid rgba(255,255,255,.08)', minWidth: 0, overflow: 'hidden' }}>
                   <div style={{ fontSize: 8, color: 'rgba(255,255,255,.3)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 5, fontWeight: 700 }}>{m.label}</div>
@@ -262,14 +265,14 @@ export default function AICFO() {
       {!ctxLoad && ctx && (
         <>
           {/* ── CFO Score ─── */}
-          <SectionTitle>CFO Score</SectionTitle>
+          <SectionTitle>{t('aicfo.cfoScore')}</SectionTitle>
           <div className="hf-card" style={{ marginBottom: 16 }}>
             {cfoScore ? (
               <>
                 {/* Score header */}
                 <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 14 }}>
                   <div>
-                    <div style={{ fontSize: 11, color: 'var(--text-4)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>Overall health</div>
+                    <div style={{ fontSize: 11, color: 'var(--text-4)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>{t('aicfo.overallHealth')}</div>
                     <div style={{ fontSize: 12, color: 'var(--text-3)', lineHeight: 1.5 }}>{cfoScore.summary}</div>
                   </div>
                   <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: 16 }}>
@@ -303,7 +306,7 @@ export default function AICFO() {
               </>
             ) : (
               <div style={{ fontSize: 13, color: 'var(--text-3)' }}>
-                CFO Score is limited. Add wallets, transactions, receivables and payables to improve accuracy.
+                {t('aicfo.cfoScoreNote')}
               </div>
             )}
           </div>
@@ -313,7 +316,7 @@ export default function AICFO() {
 
             {/* AI Alert */}
             <div>
-              <SectionTitle>AI Alert</SectionTitle>
+              <SectionTitle>{t('aicfo.aiAlert')}</SectionTitle>
               {aiAlert && alertCfg ? (
                 <div style={{ background: alertCfg.bg, border: `1px solid ${alertCfg.border}`, borderRadius: 14, padding: '14px 16px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
@@ -324,13 +327,13 @@ export default function AICFO() {
                   <div style={{ fontSize: 11, color: alertCfg.text, opacity: 0.8, lineHeight: 1.5 }}>{aiAlert.description}</div>
                 </div>
               ) : (
-                <div className="hf-card" style={{ fontSize: 12, color: 'var(--text-3)' }}>Not enough data for a reliable alert.</div>
+                <div className="hf-card" style={{ fontSize: 12, color: 'var(--text-3)' }}>{t('aicfo.notEnoughDataAlert')}</div>
               )}
             </div>
 
             {/* Hiring Readiness */}
             <div>
-              <SectionTitle>Hiring Readiness</SectionTitle>
+              <SectionTitle>{t('aicfo.hiringReadiness')}</SectionTitle>
               {hireReady && hireCfg ? (
                 <div style={{ background: hireCfg.bg, border: `1px solid ${hireCfg.color}22`, borderRadius: 14, padding: '14px 16px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
@@ -339,19 +342,19 @@ export default function AICFO() {
                   </div>
                   {hireReady.safe_monthly_salary > 0 && (
                     <div style={{ marginBottom: 8 }}>
-                      <div style={{ fontSize: 10, color: hireCfg.color, opacity: 0.7, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 2 }}>Safe salary</div>
-                      <div style={{ fontSize: 16, fontWeight: 800, color: hireCfg.color }}>{fmt(hireReady.safe_monthly_salary)} <span style={{ fontSize: 11, fontWeight: 500 }}>{currency}/mo</span></div>
+                      <div style={{ fontSize: 10, color: hireCfg.color, opacity: 0.7, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 2 }}>{t('aicfo.safeSalary')}</div>
+                      <div style={{ fontSize: 16, fontWeight: 800, color: hireCfg.color }}>{fmt(hireReady.safe_monthly_salary)} <span style={{ fontSize: 11, fontWeight: 500 }}>{currency}{t('aicfo.perMonth')}</span></div>
                     </div>
                   )}
                   <div style={{ fontSize: 11, color: hireCfg.color, opacity: 0.8, lineHeight: 1.5, marginBottom: 10 }}>{hireReady.recommendation}</div>
                   <button
                     onClick={() => ask('Can I hire someone?')}
                     style={{ fontSize: 11, fontWeight: 600, padding: '5px 12px', borderRadius: 16, border: `1px solid ${hireCfg.color}44`, background: 'rgba(255,255,255,.6)', color: hireCfg.color, cursor: 'pointer', fontFamily: 'inherit' }}>
-                    Ask CFO →
+                    {t('aicfo.askCFO')}
                   </button>
                 </div>
               ) : (
-                <div className="hf-card" style={{ fontSize: 12, color: 'var(--text-3)' }}>Not enough data to calculate safe hiring budget.</div>
+                <div className="hf-card" style={{ fontSize: 12, color: 'var(--text-3)' }}>{t('aicfo.notEnoughDataHiring')}</div>
               )}
             </div>
           </div>
@@ -362,10 +365,10 @@ export default function AICFO() {
       {!ctxLoad && ctx && (
         <div className="hf-card-grid hf-card-grid-4" style={{ marginBottom: 20 }}>
           {[
-            { label: 'Receivables', value: '+' + fmt(recv.total_remaining), sub: recv.overdue_count > 0 ? `${recv.overdue_count} overdue` : `${currency} expected`, color: 'var(--green-dark)', route: '/receivables' },
-            { label: 'Payables',    value: '−' + fmt(pay.total_remaining),  sub: pay.overdue_count > 0  ? `${pay.overdue_count} overdue`  : `${currency} to pay`,    color: 'var(--red-dark)',   route: '/payables' },
-            { label: 'Income',      value: '+' + fmt(month.income),         sub: `${month.transactions_count} transactions`, color: 'var(--green-dark)', route: null },
-            { label: 'Expenses',    value: '−' + fmt(month.expenses),       sub: `${fmt(month.burn_rate)} ${currency}/day · ${month.burn_window_days >= 30 ? '30-day avg' : month.burn_window_days > 0 ? `${month.burn_window_days}d avg` : 'avg'}`, color: 'var(--text)',       route: '/transactions' },
+            { label: t('aicfo.receivables'), value: '+' + fmt(recv.total_remaining), sub: recv.overdue_count > 0 ? `${recv.overdue_count} ${t('common.overdue')}` : `${currency}${t('aicfo.outstanding')}`, color: 'var(--green-dark)', route: '/receivables' },
+            { label: t('aicfo.payables'),    value: '−' + fmt(pay.total_remaining),  sub: pay.overdue_count > 0  ? `${pay.overdue_count} ${t('common.overdue')}`  : `${currency}${t('aicfo.toPay')}`,    color: 'var(--red-dark)',   route: '/payables' },
+            { label: t('aicfo.income'),      value: '+' + fmt(month.income),         sub: `${month.transactions_count} ${t('aicfo.transactions')}`, color: 'var(--green-dark)', route: null },
+            { label: t('aicfo.expenses'),    value: '−' + fmt(month.expenses),       sub: `${fmt(month.burn_rate)} ${currency}/day · ${month.burn_window_days >= 30 ? '30-day avg' : month.burn_window_days > 0 ? `${month.burn_window_days}d avg` : 'avg'}`, color: 'var(--text)',       route: '/transactions' },
           ].map(m => (
             <div key={m.label} className="hf-card" style={{ cursor: m.route ? 'pointer' : 'default' }} onClick={() => m.route && navigate(m.route)}>
               <div className="hf-kpi-label">{m.label}</div>
@@ -379,7 +382,7 @@ export default function AICFO() {
       {/* ── Risk Summary ─── */}
       {!ctxLoad && risks.filter(r => r.severity !== 'low' || r.type === 'healthy').length > 0 && (
         <div style={{ marginBottom: 20 }}>
-          <SectionTitle>Risk Summary</SectionTitle>
+          <SectionTitle>{t('aicfo.riskSummary')}</SectionTitle>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {risks.map((r, i) => {
               const cfg = SEV_CFG[r.severity] || SEV_CFG.low
@@ -401,7 +404,7 @@ export default function AICFO() {
       {/* ── Next Best Actions V2 ─── */}
       {!ctxLoad && nextActs.length > 0 && (
         <div style={{ marginBottom: 20 }}>
-          <SectionTitle>Next Best Actions</SectionTitle>
+          <SectionTitle>{t('aicfo.nextBestActions')}</SectionTitle>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {nextActs.map((a, i) => {
               const pc = ACTION_PRIORITY[a.priority] || ACTION_PRIORITY.low
@@ -430,7 +433,7 @@ export default function AICFO() {
 
       {/* ── Suggested questions ─── */}
       <div style={{ marginBottom: 16 }}>
-        <SectionTitle>Ask AI CFO</SectionTitle>
+        <SectionTitle>{t('aicfo.askAICFO')}</SectionTitle>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
           {SUGGESTED.map(s => (
             <button key={s.text} onClick={() => ask(s.text)} disabled={asking}
@@ -460,12 +463,12 @@ export default function AICFO() {
           {messages.length === 0 && (
             <div style={{ padding: '20px 16px', textAlign: 'center', color: 'var(--text-4)', fontSize: 13 }}>
               <div style={{ fontSize: 28, marginBottom: 8 }}>✦</div>
-              Ask anything about your finances — cash, risks, receivables, payables, or what to do next.
+              {t('aicfo.emptyChat')}
             </div>
           )}
           <div style={{ padding: '10px 12px', borderTop: messages.length > 0 ? '0.5px solid var(--border)' : 'none', display: 'flex', gap: 8, alignItems: 'flex-end' }}>
             <textarea ref={inputRef} value={input} onChange={e => setInput(e.target.value)} onKeyDown={onKey}
-              placeholder="Ask your CFO AI a question…" rows={1} disabled={asking || limitHit}
+              placeholder={t('aicfo.placeholder')} rows={1} disabled={asking || limitHit}
               style={{ flex: 1, padding: '10px 12px', borderRadius: 10, border: '0.5px solid var(--border-2)', background: 'var(--bg-3)', color: 'var(--text)', fontSize: 13, resize: 'none', fontFamily: 'inherit', outline: 'none', lineHeight: 1.5, maxHeight: 100, overflowY: 'auto' }} />
             <button onClick={() => ask()} disabled={!input.trim() || asking || limitHit}
               style={{ width: 38, height: 38, borderRadius: 10, border: 'none', flexShrink: 0, background: (!input.trim() || asking || limitHit) ? 'var(--bg-3)' : 'linear-gradient(135deg,#1D4ED8,#2563EB)', color: (!input.trim() || asking) ? 'var(--text-4)' : '#fff', cursor: (!input.trim() || asking || limitHit) ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>
@@ -477,7 +480,7 @@ export default function AICFO() {
 
         {aiQLeft === 0 && (
           <div style={{ marginTop: 10, padding: '10px 14px', borderRadius: 10, background: 'var(--bg-2)', border: '0.5px solid var(--border)', fontSize: 12, color: 'var(--text-3)', textAlign: 'center' }}>
-            🔒 Monthly AI question limit reached · Upgrade coming soon
+            {t('aicfo.limitReached')}
           </div>
         )}
       </div>
@@ -485,10 +488,10 @@ export default function AICFO() {
       {/* ── Quick navigation ─── */}
       <div className="hf-card-grid hf-card-grid-2" style={{ marginBottom: 24, gap: 10 }}>
         {[
-          { label: 'Receivables',     sub: fmt(recv.total_remaining) + ' ' + currency + ' outstanding', path: '/receivables', bg: '#F0FDF4', color: 'var(--green-dark)', icon: '📥' },
-          { label: 'Payables',        sub: fmt(pay.total_remaining) + ' ' + currency + ' to pay',       path: '/payables',    bg: 'var(--red-light)', color: 'var(--red-dark)', icon: '📤' },
-          { label: 'Radar',           sub: '30-day cash forecast',                                        path: '/radar',       bg: 'var(--brand-light)', color: 'var(--brand-dark)', icon: '📡' },
-          { label: 'Add Transaction', sub: 'Keep data up to date',                                        path: '/add',         bg: 'var(--bg-2)', color: 'var(--text)', icon: '➕' },
+          { label: t('aicfo.receivables'),     sub: fmt(recv.total_remaining) + ' ' + currency + t('aicfo.outstanding'), path: '/receivables', bg: '#F0FDF4', color: 'var(--green-dark)', icon: '📥' },
+          { label: t('aicfo.payables'),        sub: fmt(pay.total_remaining) + ' ' + currency + t('aicfo.toPay'),       path: '/payables',    bg: 'var(--red-light)', color: 'var(--red-dark)', icon: '📤' },
+          { label: t('nav.radar'),           sub: t('aicfo.forecast30'),                                        path: '/radar',       bg: 'var(--brand-light)', color: 'var(--brand-dark)', icon: '📡' },
+          { label: t('aicfo.addTransaction'), sub: t('aicfo.keepDataUpdated'),                                        path: '/add',         bg: 'var(--bg-2)', color: 'var(--text)', icon: '➕' },
         ].map(a => (
           <button key={a.label} onClick={() => navigate(a.path)}
             style={{ background: a.bg, borderRadius: 14, padding: '14px 16px', cursor: 'pointer', border: `1px solid ${a.color}22`, textAlign: 'left', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 12 }}

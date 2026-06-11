@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { useAccess } from '../hooks/useAccess'
+import { useTranslation } from '../hooks/useTranslation'
 import { apiFetch, fmt, fmtFull } from '../lib/api'
 
 // ── Wallet type config ────────────────────────────────────────────────────────
@@ -95,6 +96,7 @@ export default function Accounts() {
   const { token } = useAuth()
   const { access } = useAccess()
   const navigate = useNavigate()
+  const { t } = useTranslation()
 
   // Only owner/admin can adjust wallet balances
   const canAdjust = ['owner', 'admin'].includes(access?.membership?.role)
@@ -279,11 +281,11 @@ export default function Accounts() {
       {/* Page header */}
       <div className="hf-page-header">
         <div>
-          <div className="hf-page-title">Wallets & Accounts</div>
-          <div className="hf-page-subtitle">Manage your bank accounts, cash, and payment wallets</div>
+          <div className="hf-page-title">{t('accounts.walletsAccounts')}</div>
+          <div className="hf-page-subtitle">{t('accounts.walletsSubtitle')}</div>
         </div>
         <div className="hf-page-actions">
-          <button onClick={openAdd} className="btn btn-primary btn-md">+ Add wallet</button>
+          <button onClick={openAdd} className="btn btn-primary btn-md">{t('accounts.addWallet')}</button>
         </div>
       </div>
 
@@ -292,7 +294,7 @@ export default function Accounts() {
         <div style={{ background: 'linear-gradient(135deg, #0F172A 0%, #1e293b 100%)', borderRadius: 20, padding: '24px 26px 20px', boxShadow: '0 8px 32px rgba(15,23,42,.22)', marginBottom: 20, position: 'relative', overflow: 'hidden' }}>
           <div style={{ position: 'absolute', inset: 0, opacity: 0.03, backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 28px, #fff 28px, #fff 29px), repeating-linear-gradient(90deg, transparent, transparent 28px, #fff 28px, #fff 29px)', pointerEvents: 'none' }} />
           <div style={{ position: 'relative' }}>
-            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 10, fontWeight: 700 }}>Total balance · all wallets</div>
+            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 10, fontWeight: 700 }}>{t('accounts.totalBalance')}</div>
             <div style={{ fontSize: 'clamp(28px, 9vw, 38px)', fontWeight: 800, color: '#fff', letterSpacing: -1, lineHeight: 1, wordBreak: 'break-word' }}>
               {fmtFull(totalBalance)}
             </div>
@@ -302,7 +304,7 @@ export default function Accounts() {
       )}
 
       {loading && (
-        <div style={{ padding: 32, textAlign: 'center', color: 'var(--text-3)', fontSize: 'var(--text-sm)' }}>Loading wallets…</div>
+        <div style={{ padding: 32, textAlign: 'center', color: 'var(--text-3)', fontSize: 'var(--text-sm)' }}>{t('accounts.loadingWallets')}</div>
       )}
 
       {/* Backfill banner — only when legacy accounts exist and no wallets yet */}
@@ -311,18 +313,17 @@ export default function Accounts() {
           <div style={{ fontSize: 22, lineHeight: 1 }}>💡</div>
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 'var(--text-sm)', fontWeight: 700, color: '#3730a3', marginBottom: 4 }}>
-              You have {legacySources.length} existing account{legacySources.length !== 1 ? 's' : ''}
+              {t('accounts.youHaveAccounts').replace('{n}', legacySources.length).replace('{s}', legacySources.length !== 1 ? 's' : '')}
             </div>
             <div style={{ fontSize: 'var(--text-xs)', color: '#4338ca', lineHeight: 1.5, marginBottom: 12 }}>
-              Import them as wallets to manage currencies, types, and entities.
-              You can edit or delete them after importing.
+              {t('accounts.importSub')}
             </div>
             <button
               onClick={handleBackfill}
               disabled={backfilling}
               style={{ padding: '8px 16px', borderRadius: 8, background: '#4338ca', color: '#fff', border: 'none', fontSize: 'var(--text-sm)', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}
             >
-              {backfilling ? 'Importing…' : `Import ${legacySources.length} account${legacySources.length !== 1 ? 's' : ''} as wallets`}
+              {backfilling ? t('accounts.importing') : t('accounts.importAccounts').replace('{n}', legacySources.length).replace('{s}', legacySources.length !== 1 ? 's' : '')}
             </button>
           </div>
         </div>
@@ -332,12 +333,11 @@ export default function Accounts() {
       {!loading && wallets.length === 0 && legacySources.length === 0 && (
         <div className="empty-state">
           <div className="empty-state-icon">🏦</div>
-          <div className="empty-state-title">No wallets yet</div>
+          <div className="empty-state-title">{t('accounts.noWallets')}</div>
           <div className="empty-state-sub">
-            Create wallets for each bank account, cash box, payment gateway,
-            or company account you use.
+            {t('accounts.noWalletsSub')}
           </div>
-          <button className="empty-state-cta" onClick={openAdd}>+ Add first wallet</button>
+          <button className="empty-state-cta" onClick={openAdd}>{t('accounts.addFirstWallet')}</button>
         </div>
       )}
 
@@ -372,7 +372,7 @@ export default function Accounts() {
                     <div style={{ fontSize: 'var(--text-base)', fontWeight: 800, color: isNeg ? 'var(--red-dark)' : 'var(--text)', letterSpacing: -0.3, lineHeight: 1, whiteSpace: 'nowrap' }}>
                       {isNeg ? '−' : ''}{fmt(Math.abs(w.balance || 0))}
                     </div>
-                    <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 3, whiteSpace: 'nowrap' }}>{Math.abs(pct)}% share</div>
+                    <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 3, whiteSpace: 'nowrap' }}>{Math.abs(pct)}{t('accounts.share')}</div>
                   </div>
 
                   {/* Actions */}
@@ -410,7 +410,7 @@ export default function Accounts() {
                 <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
               </svg>
             </div>
-            <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-3)', fontWeight: 500 }}>Add wallet</div>
+            <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-3)', fontWeight: 500 }}>{t('accounts.addWallet')}</div>
           </div>
         </div>
       )}
@@ -418,9 +418,9 @@ export default function Accounts() {
       {/* Legacy unmatched sources */}
       {!loading && wallets.length > 0 && legacySources.length > 0 && (
         <div className="hf-card" style={{ marginBottom: 16, background: 'var(--bg-2)' }}>
-          <div style={{ fontSize: 11, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 800, marginBottom: 10 }}>Legacy accounts not yet linked</div>
+          <div style={{ fontSize: 11, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 800, marginBottom: 10 }}>{t('accounts.legacyTitle')}</div>
           <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-3)', marginBottom: 12, lineHeight: 1.5 }}>
-            These transaction sources don't match any wallet name. Import them or rename your wallets to match.
+            {t('accounts.legacySub')}
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
             {legacySources.map(a => (
@@ -432,17 +432,16 @@ export default function Accounts() {
             disabled={backfilling}
             style={{ padding: '8px 14px', borderRadius: 8, background: 'var(--text)', color: 'var(--bg)', border: 'none', fontSize: 'var(--text-sm)', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}
           >
-            {backfilling ? 'Importing…' : 'Import as wallets'}
+            {backfilling ? t('accounts.importing') : t('accounts.importAsWallets')}
           </button>
         </div>
       )}
 
       {/* Info card */}
       <div className="hf-card" style={{ background: 'var(--bg-2)', border: '1px solid var(--border)' }}>
-        <div style={{ fontSize: 11, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 800, marginBottom: 8 }}>About wallets</div>
+        <div style={{ fontSize: 11, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 800, marginBottom: 8 }}>{t('accounts.aboutWallets')}</div>
         <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-2)', lineHeight: 1.6 }}>
-          Create wallets for each bank account, cash box, payment gateway, or company account you use.
-          Balances are calculated from your transactions automatically.
+          {t('accounts.aboutWalletsSub')}
         </div>
       </div>
 
@@ -461,19 +460,19 @@ export default function Accounts() {
                 </svg>
               </div>
               <div>
-                <div style={{ fontSize: 'var(--text-base)', fontWeight: 700, color: 'var(--text)' }}>Adjust Balance</div>
+                <div style={{ fontSize: 'var(--text-base)', fontWeight: 700, color: 'var(--text)' }}>{t('accounts.adjustBalance')}</div>
                 <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-3)' }}>{adjustWallet.name}</div>
               </div>
             </div>
 
             {/* Info badge */}
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 600, color: 'var(--text-3)', background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: 20, padding: '3px 10px', marginBottom: 18 }}>
-              Creates a correction transaction · balance recalculated automatically
+              {t('accounts.correctionInfo')}
             </div>
 
             {/* Current balance */}
             <div style={{ background: 'var(--bg-2)', borderRadius: 12, padding: '12px 14px', marginBottom: 16 }}>
-              <div style={{ fontSize: 11, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 700, marginBottom: 4 }}>Current balance</div>
+              <div style={{ fontSize: 11, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 700, marginBottom: 4 }}>{t('accounts.currentBalance')}</div>
               <div style={{ fontSize: 'var(--text-xl)', fontWeight: 800, color: 'var(--text)' }}>
                 {fmtFull(adjustWallet.balance || 0)}
                 <span style={{ fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--text-3)', marginLeft: 6 }}>{adjustWallet.currency}</span>
@@ -481,7 +480,7 @@ export default function Accounts() {
             </div>
 
             {/* Target balance */}
-            <label className="modal-label">Target balance ({adjustWallet.currency})</label>
+            <label className="modal-label">{t('accounts.targetBalance')} ({adjustWallet.currency})</label>
             <input
               type="number"
               className="modal-input"
@@ -507,7 +506,7 @@ export default function Accounts() {
             })()}
 
             {/* Reason */}
-            <label className="modal-label">Reason <span style={{ color: 'var(--red)', fontWeight: 700 }}>*</span></label>
+            <label className="modal-label">{t('accounts.reason')} <span style={{ color: 'var(--red)', fontWeight: 700 }}>*</span></label>
             <input
               className="modal-input"
               value={adjustForm.reason}
@@ -517,7 +516,7 @@ export default function Accounts() {
             />
 
             {/* Date */}
-            <label className="modal-label">Transaction date</label>
+            <label className="modal-label">{t('accounts.transactionDate')}</label>
             <input
               type="date"
               className="modal-input"
@@ -537,10 +536,10 @@ export default function Accounts() {
               className="btn btn-primary btn-block btn-lg"
               style={{ marginBottom: 8, background: '#92400E', borderColor: '#92400E' }}
             >
-              {adjusting ? 'Creating correction…' : 'Create correction transaction'}
+              {adjusting ? t('accounts.creatingCorrection') : t('accounts.createCorrection')}
             </button>
             <button onClick={() => setAdjustWallet(null)} className="btn btn-ghost btn-block btn-lg">
-              Cancel
+              {t('common.cancel')}
             </button>
           </div>
         </div>,
@@ -555,11 +554,11 @@ export default function Accounts() {
             <button className="modal-close-btn" onClick={() => setShowForm(false)}>✕</button>
 
             <div style={{ fontSize: 'var(--text-lg)', fontWeight: 600, color: 'var(--text)', marginBottom: 18 }}>
-              {editWallet ? `Edit · ${editWallet.name}` : 'Add wallet'}
+              {editWallet ? `${t('accounts.editWallet')}${editWallet.name}` : t('accounts.addWallet')}
             </div>
 
             {/* Name */}
-            <label className="modal-label">Wallet name</label>
+            <label className="modal-label">{t('accounts.walletName')}</label>
             <input
               className="modal-input"
               value={form.name}
@@ -570,7 +569,7 @@ export default function Accounts() {
             />
 
             {/* Currency */}
-            <label className="modal-label">Currency</label>
+            <label className="modal-label">{t('accounts.currency')}</label>
             <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
               {CURRENCIES.map(c => {
                 const cs = getCurrencyStyle(c)
@@ -587,14 +586,14 @@ export default function Accounts() {
             </div>
 
             {/* Type */}
-            <label className="modal-label">Type <span style={{ fontWeight: 400, color: 'var(--text-3)' }}>(optional)</span></label>
+            <label className="modal-label">{t('accounts.type')} <span style={{ fontWeight: 400, color: 'var(--text-3)' }}>(optional)</span></label>
             <select
               className="modal-input"
               value={form.type}
               onChange={e => setForm(p => ({ ...p, type: e.target.value, custom_type: '' }))}
               style={{ marginBottom: form.type === '__custom__' ? 8 : 14 }}
             >
-              <option value="">— Select type —</option>
+              <option value="">{t('accounts.selectType')}</option>
               {WALLET_TYPES
                 .filter(t => t.value !== '__custom__' || canAdjust)
                 .map(t => <option key={t.value} value={t.value}>{t.label}</option>)
@@ -613,13 +612,13 @@ export default function Accounts() {
                   autoFocus
                 />
                 <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 14 }}>
-                  Custom type is saved as-is. It will appear as a badge on the wallet card.
+                  {t('accounts.customType')}
                 </div>
               </>
             )}
 
             {/* Entity name */}
-            <label className="modal-label">Company / Entity <span style={{ fontWeight: 400, color: 'var(--text-3)' }}>(optional)</span></label>
+            <label className="modal-label">{t('accounts.company')} <span style={{ fontWeight: 400, color: 'var(--text-3)' }}>(optional)</span></label>
             <input
               className="modal-input"
               value={form.entity_name}
@@ -631,7 +630,7 @@ export default function Accounts() {
             {/* Opening balance — only for new wallets */}
             {!editWallet && (
               <>
-                <label className="modal-label">Opening balance <span style={{ fontWeight: 400, color: 'var(--text-3)' }}>(optional)</span></label>
+                <label className="modal-label">{t('accounts.openingBalanceOpt')} <span style={{ fontWeight: 400, color: 'var(--text-3)' }}>(optional)</span></label>
                 <input
                   type="number"
                   className="modal-input"
@@ -651,11 +650,11 @@ export default function Accounts() {
               className="btn btn-primary btn-block btn-lg"
               style={{ marginBottom: 8 }}
             >
-              {saving ? 'Saving…' : editWallet ? 'Save changes' : 'Add wallet'}
+              {saving ? t('accounts.saving') : editWallet ? t('accounts.saveChanges') : t('accounts.addWallet')}
             </button>
 
             <button onClick={() => setShowForm(false)} className="btn btn-ghost btn-block btn-lg" style={{ marginBottom: editWallet ? 8 : 0 }}>
-              Cancel
+              {t('common.cancel')}
             </button>
 
             {editWallet && canAdjust && (
@@ -665,13 +664,13 @@ export default function Accounts() {
                 className="btn btn-block btn-lg"
                 style={{ marginBottom: 8, background: 'var(--bg-2)', border: '1px solid var(--border)', color: 'var(--text-2)', fontWeight: 600 }}
               >
-                Adjust Balance
+                {t('accounts.adjustBalance')}
               </button>
             )}
 
             {editWallet && (
               <button onClick={handleDelete} disabled={saving} className="btn btn-danger btn-block btn-lg">
-                Archive / Delete wallet
+                {t('accounts.archiveDelete')}
               </button>
             )}
           </div>
