@@ -55,6 +55,8 @@ const ID_TEXT_MAP = {
   'Ready to hire': 'Siap merekrut',
   'Caution': 'Hati-hati',
   'Proceed with caution': 'Hati-hati',
+  'Finances look stable. Focus on growing income.': 'Keuangan terlihat stabil. Fokus pada pertumbuhan pemasukan.',
+  'Finances look stable. Keep adding transactions daily to maintain accurate insights.': 'Keuangan terlihat stabil. Tetap tambah transaksi harian untuk data yang akurat.',
 }
 function localizeText(text, lang) {
   if (!text) return text

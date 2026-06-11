@@ -276,9 +276,9 @@ app.get('/api/pulse', auth, async (req, res) => {
       aiText = `Runway ${runway} days. Check receivables - some obligations may reduce the buffer.`;
     } else {
       aiStatus = 'healthy';
-      const runwayPart = language === 'ru' ? `Запас денег: ${runway} дней.` : `Runway ${runway} days.`
-      const incomePart = language === 'ru' ? 'Доход покрывает обязательства.' : 'Income covers obligations.'
-      const riskPart   = language === 'ru' ? 'Рисков не обнаружено.' : 'No risks detected.'
+      const runwayPart = language === 'ru' ? `Запас денег: ${runway} дней.` : language === 'id' ? `Cadangan kas: ${runway} hari.` : `Runway ${runway} days.`
+      const incomePart = cx(language, 'incomeCoversObligations')
+      const riskPart   = cx(language, 'noRisksDetected')
       aiText = `${runwayPart} ${incomePart} ${riskPart}`;
     }
 
@@ -2658,7 +2658,11 @@ function generateLocalCfoAnswer(question, ctx) {
   // What to do today
   if (/today|сегодня|do now|next action|что делать|priority/.test(q)) {
     const actions = ctx.next_actions || [];
-    if (actions.length === 0) return `Finances look stable. Keep adding transactions daily to maintain accurate insights.`;
+    if (actions.length === 0) {
+      if (language === 'ru') return 'Финансы стабильны. Продолжайте добавлять операции ежедневно для точных данных.'
+      if (language === 'id') return 'Keuangan terlihat stabil. Tetap tambah transaksi harian untuk menjaga data yang akurat.'
+      return 'Finances look stable. Keep adding transactions daily to maintain accurate insights.'
+    }
     let ans = `**Today's priorities for ${biz.name}:**\n\n`;
     actions.slice(0, 3).forEach((a, i) => { ans += `${i+1}. ${a.title}\n   ${a.description}\n\n`; });
     return ans.trim();
