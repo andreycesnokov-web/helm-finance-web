@@ -145,6 +145,7 @@ function computeBurnAndRunway(allTxs, totalBalance) {
 app.get('/api/pulse', auth, async (req, res) => {
   try {
     const userId = req.user.userId;
+    const language = normalizeLanguage(req.query.language || await getUserLanguage(req.user.userId));
     const scope = req.query.scope || 'all';
     const now = new Date();
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
@@ -275,7 +276,10 @@ app.get('/api/pulse', auth, async (req, res) => {
       aiText = `Runway ${runway} days. Check receivables - some obligations may reduce the buffer.`;
     } else {
       aiStatus = 'healthy';
-      aiText = `Runway ${runway} days. Income covers obligations. No risks detected.`;
+      const runwayPart = language === 'ru' ? `Запас денег: ${runway} дней.` : `Runway ${runway} days.`
+      const incomePart = language === 'ru' ? 'Доход покрывает обязательства.' : 'Income covers obligations.'
+      const riskPart   = language === 'ru' ? 'Рисков не обнаружено.' : 'No risks detected.'
+      aiText = `${runwayPart} ${incomePart} ${riskPart}`;
     }
 
     // -- Today's focus ------------------------------------------------------
@@ -993,6 +997,13 @@ const CONTEXT_STRINGS = {
     noUrgentActions: 'No urgent actions detected. Keep adding transactions daily and review cash weekly.',
     needsAttention: 'Needs Attention',
     someAreasNeedAttention: 'Some areas need attention.',
+    healthy: 'Healthy',
+    critical: 'Critical',
+    notEnoughData: 'Not enough data',
+    addWalletsHint: 'Add wallets, transactions and expenses to calculate safe hiring budget.',
+    readyToHire: 'Ready to hire',
+    hireCaution: 'Proceed with caution',
+    notRecommended: 'Not recommended',
   },
   ru: {
     financiallyStable: 'Финансы бизнеса стабильны',
@@ -1007,6 +1018,13 @@ const CONTEXT_STRINGS = {
     noUrgentActions: 'Срочных действий нет. Продолжайте добавлять операции и проверять деньги еженедельно.',
     needsAttention: 'Требует внимания',
     someAreasNeedAttention: 'Есть зоны, которые требуют внимания.',
+    healthy: 'Хорошо',
+    critical: 'Критично',
+    notEnoughData: 'Недостаточно данных',
+    addWalletsHint: 'Добавьте кошельки, операции и расходы, чтобы рассчитать безопасный бюджет на найм.',
+    readyToHire: 'Можно нанимать',
+    hireCaution: 'Осторожно',
+    notRecommended: 'Не рекомендуется',
   },
 }
 function cx(language, key) {
@@ -2115,7 +2133,7 @@ async function buildAiCfoContext(userId, language = 'en') {
   // ── Decision layer engines ────────────────────────────────────────────────
   const cfoScore        = calculateCfoScore(partialCtx, language);
   const aiAlert         = calculateAiAlertStatus(partialCtx, cfoScore, language);
-  const hiringReadiness = calculateHiringReadiness(partialCtx);
+  const hiringReadiness = calculateHiringReadiness(partialCtx, language);
   const nextActions     = buildNextActionsV2(partialCtx, hiringReadiness, language);
 
   // ── Access info ───────────────────────────────────────────────────────────
@@ -2226,7 +2244,7 @@ function calculateCfoScore(ctx, language = 'en') {
   );
 
   const status = score >= 75 ? 'healthy' : score >= 50 ? 'warning' : 'critical';
-  const statusLabel = score >= 75 ? 'Healthy' : score >= 50 ? cx(language, 'needsAttention') : 'Critical';
+  const statusLabel = score >= 75 ? cx(language, 'healthy') : score >= 50 ? cx(language, 'needsAttention') : cx(language, 'critical');
 
   // Summary sentence
   const positives = [cashLabel, runwayLabel, recvLabel, payLabel, expLabel].filter((_, i) => [cashImpact,runwayImpact,recvImpact,payImpact,expImpact][i] === 'positive');
@@ -2298,14 +2316,14 @@ function calculateAiAlertStatus(ctx, cfoScore, language = 'en') {
   };
 
   return {
-    status: 'healthy', label: 'Healthy', color: 'green',
+    status: 'healthy', label: cx(language, 'healthy'), color: 'green',
     headline: cx(language, 'financiallyStable'),
     description: cx(language, 'cashStrong'),
   };
 }
 
 // ── Hiring Readiness Engine ───────────────────────────────────────────────────
-function calculateHiringReadiness(ctx) {
+function calculateHiringReadiness(ctx, language = 'en') {
   const cash   = ctx.cash          || {};
   const month  = ctx.current_month || {};
   const pay    = ctx.payables      || {};
@@ -2319,8 +2337,8 @@ function calculateHiringReadiness(ctx) {
   const currency   = ctx.business?.base_currency   || 'IDR';
 
   if (mExpense === 0 && bal === 0) return {
-    status: 'insufficient_data', label: 'Not enough data',
-    recommendation: 'Add wallets, transactions and expenses to calculate safe hiring budget.',
+    status: 'insufficient_data', label: cx(language, 'notEnoughData'),
+    recommendation: cx(language, 'addWalletsHint'),
     safe_monthly_salary: 0, max_safe_monthly_salary: 0, currency,
     reasoning: ['No expense or balance data available.'],
     assumptions: [],
@@ -2339,18 +2357,18 @@ function calculateHiringReadiness(ctx) {
 
   let status, label, recommendation;
   if (runway === null && mExpense === 0) {
-    status = 'insufficient_data'; label = 'Not enough data';
-    recommendation = 'Add expense transactions to calculate burn rate and hiring capacity.';
+    status = 'insufficient_data'; label = cx(language, 'notEnoughData');
+    recommendation = cx(language, 'addWalletsHint');
   } else if (runway !== null && runway >= 60 && netFlow >= 0) {
-    status = 'ready'; label = 'Ready to hire';
+    status = 'ready'; label = cx(language, 'readyToHire');
     recommendation = safeSalary > 0
       ? `You can hire within the safe salary limit. Keep at least ${BUFFER_DAYS} days runway after onboarding.`
       : 'Runway and flow are healthy, but most cash is tied up in upcoming payments.';
   } else if (runway === null || (runway >= 30 && runway < 60)) {
-    status = 'caution'; label = 'Proceed with caution';
-    recommendation = 'Runway is moderate. A hire is possible but keep the salary conservative and monitor cash weekly.';
+    status = 'caution'; label = cx(language, 'hireCaution');
+    recommendation = language === 'ru' ? 'Запас денег умеренный. Найм возможен, но держите зарплату консервативной и проверяйте деньги еженедельно.' : 'Runway is moderate. A hire is possible but keep the salary conservative and monitor cash weekly.';
   } else {
-    status = 'not_ready'; label = 'Not recommended';
+    status = 'not_ready'; label = cx(language, 'notRecommended');
     recommendation = `Runway is ${runway !== null ? runway + ' days' : 'unknown'}. Delay hiring until runway exceeds 45 days and cash flow stabilises.`;
     return { status, label, recommendation, safe_monthly_salary: 0, max_safe_monthly_salary: 0, currency, reasoning, assumptions: ['Requires 45+ days runway before hiring.'] };
   }

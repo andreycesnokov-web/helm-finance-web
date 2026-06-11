@@ -21,6 +21,15 @@ const RU_TEXT_MAP = {
   'No urgent actions detected. Keep adding transactions daily and review cash weekly.': 'Срочных действий нет. Продолжайте добавлять операции и проверять деньги еженедельно.',
   'Needs Attention': 'Требует внимания',
   'Some areas need attention': 'Некоторые области требуют внимания',
+  'Healthy': 'Хорошо',
+  'Critical': 'Критично',
+  'Not enough data': 'Недостаточно данных',
+  'Add wallets, transactions and expenses to calculate safe hiring budget.': 'Добавьте кошельки, операции и расходы, чтобы рассчитать безопасный бюджет на найм.',
+  'No risks detected.': 'Рисков не обнаружено.',
+  'Income covers obligations.': 'Доход покрывает обязательства.',
+  'Not recommended': 'Не рекомендуется',
+  'Ready to hire': 'Можно нанимать',
+  'Proceed with caution': 'Осторожно',
 }
 function localizeText(text, lang) {
   if (!text) return text
@@ -474,7 +483,7 @@ export default function Pulse({ onDataLoad }) {
                       <div style={{ width: 7, height: 7, borderRadius: '50%', background: alertStyle.dot, boxShadow: `0 0 5px ${alertStyle.dot}` }} />
                       <span style={{ fontSize: 9, fontWeight: 700, color: alertStyle.text, letterSpacing: '0.06em' }}>AI ALERT</span>
                     </div>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: alertStyle.text, lineHeight: 1.3, marginBottom: 4 }}>{aiAlert.label}</div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: alertStyle.text, lineHeight: 1.3, marginBottom: 4 }}>{localizeText(aiAlert.label, getLang())}</div>
                     {aiAlert.description && (
                       <div style={{ fontSize: 11, color: alertStyle.text, opacity: 0.75, lineHeight: 1.45 }}>{aiAlert.description}</div>
                     )}
@@ -483,7 +492,7 @@ export default function Pulse({ onDataLoad }) {
                 {hiringR && (
                   <div style={{ background: 'var(--bg-2)', border: '0.5px solid var(--border)', borderRadius: 16, padding: '14px 14px' }}>
                     <div style={{ fontSize: 9, fontWeight: 700, color: 'var(--text-3)', letterSpacing: '0.06em', marginBottom: 8 }}>{t('pulse.hiringReadiness')}</div>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', lineHeight: 1.3, marginBottom: 4 }}>{hiringR.label}</div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', lineHeight: 1.3, marginBottom: 4 }}>{localizeText(hiringR.label, getLang())}</div>
                     {hiringR.safe_monthly_salary > 0 && (
                       <div style={{ fontSize: 11, color: 'var(--text-3)', lineHeight: 1.4 }}>
                         {t('pulse.safeSalary')} {fmt(hiringR.safe_monthly_salary)} {hiringR.currency || 'IDR'}/mo

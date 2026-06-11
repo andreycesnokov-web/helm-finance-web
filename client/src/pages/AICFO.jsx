@@ -22,6 +22,15 @@ const RU_TEXT_MAP_AICFO = {
   'Needs Attention': 'Требует внимания',
   'Some areas need attention.': 'Есть зоны, которые требуют внимания.',
   'No urgent actions detected.': 'Срочных действий нет.',
+  'Healthy': 'Хорошо',
+  'Critical': 'Критично',
+  'Not enough data': 'Недостаточно данных',
+  'Add wallets, transactions and expenses to calculate safe hiring budget.': 'Добавьте кошельки, операции и расходы, чтобы рассчитать безопасный бюджет на найм.',
+  'No risks detected.': 'Рисков не обнаружено.',
+  'Income covers obligations.': 'Доход покрывает обязательства.',
+  'Not recommended': 'Не рекомендуется',
+  'Ready to hire': 'Можно нанимать',
+  'Proceed with caution': 'Осторожно',
 }
 function localizeInsight(text) {
   if (!text) return text
@@ -377,7 +386,7 @@ export default function AICFO() {
                       <div style={{ fontSize: 16, fontWeight: 800, color: hireCfg.color }}>{fmt(hireReady.safe_monthly_salary)} <span style={{ fontSize: 11, fontWeight: 500 }}>{currency}{t('aicfo.perMonth')}</span></div>
                     </div>
                   )}
-                  <div style={{ fontSize: 11, color: hireCfg.color, opacity: 0.8, lineHeight: 1.5, marginBottom: 10 }}>{hireReady.recommendation}</div>
+                  <div style={{ fontSize: 11, color: hireCfg.color, opacity: 0.8, lineHeight: 1.5, marginBottom: 10 }}>{localizeInsight(hireReady.recommendation)}</div>
                   <button
                     onClick={() => ask('Can I hire someone?')}
                     style={{ fontSize: 11, fontWeight: 600, padding: '5px 12px', borderRadius: 16, border: `1px solid ${hireCfg.color}44`, background: 'rgba(255,255,255,.6)', color: hireCfg.color, cursor: 'pointer', fontFamily: 'inherit' }}>

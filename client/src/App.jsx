@@ -20,6 +20,11 @@ const RU_TEXT_MAP = {
   'No significant risks': 'Существенных рисков нет',
   'Finances look stable': 'Финансы выглядят стабильно',
   'No urgent actions detected. Keep adding transactions daily and review cash weekly.': 'Срочных действий нет. Продолжайте добавлять операции и проверять деньги еженедельно.',
+  'Healthy': 'Хорошо',
+  'Critical': 'Критично',
+  'Not enough data': 'Недостаточно данных',
+  'No risks detected.': 'Рисков не обнаружено.',
+  'Income covers obligations.': 'Доход покрывает обязательства.',
 }
 function localizeText(text, lang) {
   if (!text) return text
