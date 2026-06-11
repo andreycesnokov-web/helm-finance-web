@@ -682,6 +682,24 @@ const id = {
     step4desc: 'Item yang disetujui otomatis tercermin di Pulse',
     backToPulse: 'Kembali ke Pulse',
   },
+  payroll: {
+    title: 'Gaji',
+    subtitle: 'Pembayaran gaji dan riwayat payroll',
+    addPayroll: 'Tambah Gaji',
+    noRecords: 'Belum ada catatan gaji',
+    noRecordsSub: 'Transaksi gaji akan muncul di sini setelah Anda mencatat pembayaran gaji atau bonus.',
+    addCta: 'Tambah Transaksi Gaji',
+    paidThisMonth: 'Dibayar Bulan Ini',
+    totalRecords: 'Total Catatan',
+    allPayrollTx: 'transaksi gaji',
+    dueToday: 'Jatuh Tempo Hari Ini',
+    scheduledPayroll: 'gaji terjadwal',
+    totalPaid: 'Total Dibayar (Semua Waktu)',
+    allTime: 'IDR · semua waktu',
+    history: 'Riwayat Gaji',
+    howToAdd: 'Cara menambah transaksi gaji',
+    viewAllTx: 'Lihat semua transaksi →',
+  },
 }
 
 export default id

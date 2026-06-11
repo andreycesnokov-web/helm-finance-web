@@ -116,7 +116,7 @@ export default function Payroll() {
         </div>
         <div className="hf-page-actions">
           {/* Routes to /add with payroll context — AI parser creates type:payroll if user describes salary */}
-          <button className="btn btn-primary btn-md" onClick={() => navigate('/add')}>{t('payroll.addPayroll')}</button>
+          <button className="btn btn-primary btn-md" onClick={() => navigate('/add?type=payroll')}>{t('payroll.addPayroll')}</button>
         </div>
       </div>
 
@@ -128,7 +128,7 @@ export default function Payroll() {
           <div className="empty-state-icon">💼</div>
           <div className="empty-state-title">{t('payroll.noRecords')}</div>
           <div className="empty-state-sub">{t('payroll.noRecordsSub')}</div>
-          <button className="empty-state-cta" onClick={() => navigate('/add')}>{t('payroll.addCta')}</button>
+          <button className="empty-state-cta" onClick={() => navigate('/add?type=payroll')}>{t('payroll.addCta')}</button>
         </div>
       )}
 

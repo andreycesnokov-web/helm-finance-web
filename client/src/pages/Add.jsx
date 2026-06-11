@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { useTranslation } from '../hooks/useTranslation'
 import { apiFetch, fmt, daysUntil } from '../lib/api'
@@ -178,6 +178,8 @@ function CounterpartyInput({ value, onChange, suggestions, onCreateNew, inputSt 
 export default function Add() {
   const { token }  = useAuth()
   const navigate   = useNavigate()
+  const [searchParams]     = useSearchParams()
+  const presetType         = searchParams.get('type') // e.g. 'payroll'
   const { t: tr }  = useTranslation()
   const QUICK = QUICK_LABELS[getLang()] || QUICK_LABELS.en
   const [text, setText]   = useState('')
@@ -452,15 +454,28 @@ export default function Add() {
       {/* TRANSACTION TAB */}
       {tab === 'tx' && (
         <div style={{ padding: '0 16px' }}>
+          {presetType === 'payroll' && (
+            <div style={{ background: 'var(--amber-light)', border: '1px solid rgba(180,130,0,.2)', borderRadius: 10, padding: '10px 13px', marginBottom: 12, fontSize: 'var(--text-sm)', color: 'var(--amber-dark, #92400E)' }}>
+              💼 {getLang() === 'ru' ? 'Опишите зарплатную выплату — сумму, сотрудника и кошелёк'
+                 : getLang() === 'id' ? 'Jelaskan pembayaran gaji — jumlah, karyawan, dan dompet'
+                 : 'Describe the salary payment — amount, employee name, and wallet'}
+            </div>
+          )}
           <label style={mainLabelSt}>{tr('add.whatHappened')}</label>
           <textarea
             value={text}
             onChange={e => { setText(e.target.value); setSaved(false); setResult(null); setEditedTxs([]) }}
-            placeholder={getLang() === 'ru'
-              ? 'Заплатил 300к за бензин в Убуде\nПолучил 5М с клиента за проект\nКофе 35000 наличными'
-              : getLang() === 'id'
-              ? 'Bayar 300k bensin di Ubud\nTerima 5M dari klien untuk proyek\nKopi 35000 tunai'
-              : 'Paid 300k for petrol in Ubud\nReceived 5M from client for project\nCoffee 35000 cash'}
+            placeholder={presetType === 'payroll'
+              ? (getLang() === 'ru'
+                  ? 'Заплатил зарплату Ahmad 5 млн с BCA\nБонус сотруднику 2 млн наличными'
+                  : getLang() === 'id'
+                  ? 'Gaji Ahmad 5 juta dari BCA\nBonus karyawan 2 juta tunai'
+                  : 'Paid salary to Ahmad 5M from BCA\nEmployee bonus 2M cash')
+              : (getLang() === 'ru'
+                  ? 'Заплатил 300к за бензин в Убуде\nПолучил 5М с клиента за проект\nКофе 35000 наличными'
+                  : getLang() === 'id'
+                  ? 'Bayar 300k bensin di Ubud\nTerima 5M dari klien untuk proyek\nKopi 35000 tunai'
+                  : 'Paid 300k for petrol in Ubud\nReceived 5M from client for project\nCoffee 35000 cash')}
             style={{ ...inputSt, minHeight: 110, resize: 'none', lineHeight: 1.6, marginBottom: 10, padding: '12px 14px', background: 'var(--bg-2)', fontSize: 'var(--text-base)' }}
           />
 

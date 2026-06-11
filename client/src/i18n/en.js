@@ -661,6 +661,24 @@ const en = {
     step4desc: 'Approved items affect your Pulse automatically',
     backToPulse: 'Back to Pulse',
   },
+  payroll: {
+    title: 'Payroll',
+    subtitle: 'Salary payments and payroll history',
+    addPayroll: 'Add Payroll',
+    noRecords: 'No payroll records yet',
+    noRecordsSub: 'Payroll transactions will appear here once you log a salary or bonus payment.',
+    addCta: 'Add Payroll Transaction',
+    paidThisMonth: 'Paid This Month',
+    totalRecords: 'Total Records',
+    allPayrollTx: 'payroll transactions',
+    dueToday: 'Due Today',
+    scheduledPayroll: 'scheduled payroll',
+    totalPaid: 'Total Paid (All Time)',
+    allTime: 'IDR · all time',
+    history: 'Payroll History',
+    howToAdd: 'How to add payroll',
+    viewAllTx: 'View all transactions →',
+  },
 }
 
 export default en
