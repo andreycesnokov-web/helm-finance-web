@@ -1026,6 +1026,29 @@ const CONTEXT_STRINGS = {
     hireCaution: 'Осторожно',
     notRecommended: 'Не рекомендуется',
   },
+  id: {
+    financiallyStable: 'Keuangan bisnis stabil',
+    cashStrong: 'Posisi kas stabil dan tidak ada risiko pembayaran mendesak. Tetap pantau keuangan secara rutin.',
+    notEnoughExpenseHistory: 'Riwayat pengeluaran belum cukup',
+    runwayUnknown: 'Cadangan kas belum diketahui — tambahkan pengeluaran',
+    noPayables: 'Tidak ada kewajiban',
+    noReceivables: 'Tidak ada piutang',
+    noMonthlyData: 'Belum ada data bulanan',
+    noRisks: 'Tidak ada risiko signifikan',
+    financesStable: 'Keuangan terlihat stabil',
+    noUrgentActions: 'Tidak ada tindakan mendesak. Tetap tambah transaksi harian dan tinjau cash flow setiap minggu.',
+    needsAttention: 'Perlu perhatian',
+    someAreasNeedAttention: 'Ada beberapa area yang perlu diperhatikan.',
+    healthy: 'Baik',
+    critical: 'Kritis',
+    notEnoughData: 'Data belum cukup',
+    addWalletsHint: 'Tambahkan dompet, transaksi, dan pengeluaran untuk menghitung anggaran rekrutmen yang aman.',
+    readyToHire: 'Siap merekrut',
+    hireCaution: 'Hati-hati',
+    notRecommended: 'Tidak disarankan',
+    noRisksDetected: 'Tidak ada risiko terdeteksi.',
+    incomeCoversObligations: 'Pemasukan menutup kewajiban.',
+  },
 }
 function cx(language, key) {
   const lang = normalizeLanguage(language)
@@ -1036,6 +1059,9 @@ function getCfoOutOfScopeResponse(language) {
   if (language === 'ru') {
     return 'Извините, я не могу помочь с этим вопросом. Я CFO AI-консультант и отвечаю только на вопросы, связанные с финансами бизнеса: cash flow, дебиторкой, обязательствами, расходами, запасом денег, зарплатами и финансовыми решениями владельца бизнеса.'
   }
+  if (language === 'id') {
+    return 'Maaf, saya tidak bisa membantu pertanyaan itu. Saya adalah CFO AI — konsultan keuangan untuk pemilik bisnis. Saya hanya menjawab pertanyaan yang terkait dengan keuangan bisnis: cash flow, piutang, kewajiban, pengeluaran, cadangan kas, payroll, dan keputusan keuangan pemilik bisnis.'
+  }
   return "Sorry, I can't help with that. I'm CFO AI — a financial consultant for business owners. I only answer questions related to business finance: cash flow, receivables, payables, expenses, runway, payroll and financial decisions."
 }
 
@@ -1043,32 +1069,32 @@ const NOTIFICATION_TEMPLATES = {
   runway_warning: {
     en: (p) => `Runway: ${p.days} days. Review upcoming payments and protect your cash buffer.`,
     ru: (p) => `Запас денег: ${p.days} дней. Проверьте ближайшие платежи и защитите денежный буфер.`,
-    id: (p) => `Runway: ${p.days} days. Review upcoming payments and protect your cash buffer.`,
+    id: (p) => `Cadangan kas: ${p.days} hari. Periksa pembayaran yang akan datang dan lindungi kas bisnis Anda.`,
   },
   cash_critical: {
     en: () => 'Cash is critically low. Immediate action required.',
     ru: () => 'Деньги на критически низком уровне. Требуются немедленные действия.',
-    id: () => 'Cash is critically low. Immediate action required.',
+    id: () => 'Kas berada di level kritis. Diperlukan tindakan segera.',
   },
   receivable_overdue: {
     en: (p) => `Receivable overdue: ${p.counterparty} owes ${p.amount} (${p.days} days overdue).`,
     ru: (p) => `Просрочена дебиторка: ${p.counterparty} должен ${p.amount} (просрочено на ${p.days} дней).`,
-    id: (p) => `Receivable overdue: ${p.counterparty} owes ${p.amount} (${p.days} days overdue).`,
+    id: (p) => `Piutang terlambat: ${p.counterparty} berutang ${p.amount} (terlambat ${p.days} hari).`,
   },
   payable_due_soon: {
     en: (p) => `Payment due soon: ${p.counterparty} — ${p.amount} due in ${p.days} days.`,
     ru: (p) => `Скоро платёж: ${p.counterparty} — ${p.amount} через ${p.days} дней.`,
-    id: (p) => `Payment due soon: ${p.counterparty} — ${p.amount} due in ${p.days} days.`,
+    id: (p) => `Pembayaran segera jatuh tempo: ${p.counterparty} — ${p.amount} dalam ${p.days} hari.`,
   },
   payroll_due: {
     en: (p) => `Payroll due: ${p.amount} in ${p.days} days.`,
     ru: (p) => `Зарплата: ${p.amount} через ${p.days} дней.`,
-    id: (p) => `Payroll due: ${p.amount} in ${p.days} days.`,
+    id: (p) => `Gaji jatuh tempo: ${p.amount} dalam ${p.days} hari.`,
   },
   ai_scope_refusal: {
     en: () => getCfoOutOfScopeResponse('en'),
     ru: () => getCfoOutOfScopeResponse('ru'),
-    id: () => getCfoOutOfScopeResponse('en'),
+    id: () => getCfoOutOfScopeResponse('id'),
   },
 }
 
@@ -2821,7 +2847,7 @@ app.post('/api/ai-cfo/ask', auth, async (req, res) => {
         const langInstruction = language === 'ru'
           ? 'IMPORTANT: The user speaks Russian. Answer ENTIRELY in Russian. All text, headings, recommendations, and refusals must be in Russian. You may keep product terms like CFO AI, AI CFO, cash flow, runway in their original form.'
           : language === 'id'
-          ? 'IMPORTANT: Answer in Indonesian if possible, otherwise use English.'
+          ? 'PENTING: Pengguna berbicara Bahasa Indonesia. Jawab SELURUHNYA dalam Bahasa Indonesia. Gunakan Bahasa Indonesia bisnis yang sederhana dan jelas. Anda boleh menggunakan istilah produk seperti CFO AI, AI CFO, CFO Score dalam bentuk aslinya. Untuk istilah keuangan, gunakan: arus kas (cash flow), cadangan kas (runway), piutang (receivables), kewajiban (payables).'
           : 'Answer in English.'
         const systemPrompt = `You are CFO AI, a financial decision assistant for ${ctx.business.name} — a ${ctx.business.effective_plan} plan business using ${currency} as base currency.
 Answer like a calm, direct CFO speaking to a CEO. Be specific, conservative, action-oriented, and not dramatic.

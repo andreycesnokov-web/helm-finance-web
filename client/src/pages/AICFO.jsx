@@ -32,11 +32,38 @@ const RU_TEXT_MAP_AICFO = {
   'Ready to hire': 'Можно нанимать',
   'Proceed with caution': 'Осторожно',
 }
+const ID_TEXT_MAP_AICFO = {
+  'Business is financially stable': 'Keuangan bisnis stabil',
+  'Immediate cash action required': 'Perlu tindakan kas segera',
+  'Cash is strong with no urgent payment risks detected. Keep monitoring monthly.': 'Posisi kas stabil dan tidak ada risiko pembayaran mendesak. Tetap pantau keuangan secara rutin.',
+  'Not enough expense history': 'Riwayat pengeluaran belum cukup',
+  'Runway unknown — add expenses': 'Cadangan kas belum diketahui — tambahkan pengeluaran',
+  'No payables': 'Tidak ada kewajiban',
+  'No receivables': 'Tidak ada piutang',
+  'No monthly data yet': 'Belum ada data bulanan',
+  'No significant risks': 'Tidak ada risiko signifikan',
+  'Finances look stable': 'Keuangan terlihat stabil',
+  'No urgent actions detected. Keep adding transactions daily and review cash weekly.': 'Tidak ada tindakan mendesak. Tetap tambah transaksi harian dan tinjau cash flow setiap minggu.',
+  'Needs Attention': 'Perlu perhatian',
+  'Some areas need attention.': 'Ada beberapa area yang perlu diperhatikan.',
+  'No urgent actions detected.': 'Tidak ada tindakan mendesak.',
+  'Healthy': 'Baik',
+  'Critical': 'Kritis',
+  'Not enough data': 'Data belum cukup',
+  'Add wallets, transactions and expenses to calculate safe hiring budget.': 'Tambahkan dompet, transaksi, dan pengeluaran untuk menghitung anggaran rekrutmen yang aman.',
+  'No risks detected.': 'Tidak ada risiko terdeteksi.',
+  'Income covers obligations.': 'Pemasukan menutup kewajiban.',
+  'Not recommended': 'Tidak disarankan',
+  'Ready to hire': 'Siap merekrut',
+  'Caution': 'Hati-hati',
+  'Proceed with caution': 'Hati-hati',
+}
 function localizeInsight(text) {
   if (!text) return text
   const lang = getLang()
-  if (lang !== 'ru') return text
-  return RU_TEXT_MAP_AICFO[text] || text
+  if (lang === 'ru') return RU_TEXT_MAP_AICFO[text] || text
+  if (lang === 'id') return ID_TEXT_MAP_AICFO[text] || text
+  return text
 }
 
 // ── Suggested questions — keys resolved via t() at render time ────────────────

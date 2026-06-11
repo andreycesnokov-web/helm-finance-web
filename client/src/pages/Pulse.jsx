@@ -31,10 +31,36 @@ const RU_TEXT_MAP = {
   'Ready to hire': 'Можно нанимать',
   'Proceed with caution': 'Осторожно',
 }
+const ID_TEXT_MAP = {
+  'Business is financially stable': 'Keuangan bisnis stabil',
+  'Immediate cash action required': 'Perlu tindakan kas segera',
+  'Cash is strong with no urgent payment risks detected. Keep monitoring monthly.': 'Posisi kas stabil dan tidak ada risiko pembayaran mendesak. Tetap pantau keuangan secara rutin.',
+  'Not enough expense history': 'Riwayat pengeluaran belum cukup',
+  'Runway unknown — add expenses': 'Cadangan kas belum diketahui — tambahkan pengeluaran',
+  'No payables': 'Tidak ada kewajiban',
+  'No receivables': 'Tidak ada piutang',
+  'No monthly data yet': 'Belum ada data bulanan',
+  'No significant risks': 'Tidak ada risiko signifikan',
+  'Finances look stable': 'Keuangan terlihat stabil',
+  'No urgent actions detected. Keep adding transactions daily and review cash weekly.': 'Tidak ada tindakan mendesak. Tetap tambah transaksi harian dan tinjau cash flow setiap minggu.',
+  'Needs Attention': 'Perlu perhatian',
+  'Some areas need attention': 'Ada beberapa area yang perlu diperhatikan',
+  'Healthy': 'Baik',
+  'Critical': 'Kritis',
+  'Not enough data': 'Data belum cukup',
+  'Add wallets, transactions and expenses to calculate safe hiring budget.': 'Tambahkan dompet, transaksi, dan pengeluaran untuk menghitung anggaran rekrutmen yang aman.',
+  'No risks detected.': 'Tidak ada risiko terdeteksi.',
+  'Income covers obligations.': 'Pemasukan menutup kewajiban.',
+  'Not recommended': 'Tidak disarankan',
+  'Ready to hire': 'Siap merekrut',
+  'Caution': 'Hati-hati',
+  'Proceed with caution': 'Hati-hati',
+}
 function localizeText(text, lang) {
   if (!text) return text
-  if (lang !== 'ru') return text
-  return RU_TEXT_MAP[text] || text
+  if (lang === 'ru') return RU_TEXT_MAP[text] || text
+  if (lang === 'id') return ID_TEXT_MAP[text] || text
+  return text
 }
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -295,7 +321,7 @@ export default function Pulse({ onDataLoad }) {
       <div style={{ padding: '14px 16px 8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div style={{ fontSize: 12, color: 'var(--text-3)' }}>
           {(() => {
-            const dateLocale = getLang() === 'ru' ? 'ru-RU' : 'en-US'
+            const dateLocale = getLang() === 'ru' ? 'ru-RU' : getLang() === 'id' ? 'id-ID' : 'en-US'
             const str = new Date().toLocaleDateString(dateLocale, { weekday: 'long', month: 'short', day: 'numeric' })
             return str.charAt(0).toUpperCase() + str.slice(1)
           })()}
