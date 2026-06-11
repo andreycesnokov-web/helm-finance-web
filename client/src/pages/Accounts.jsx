@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { useAccess } from '../hooks/useAccess'
 import { apiFetch, fmt, fmtFull } from '../lib/api'
@@ -93,6 +94,7 @@ const EMPTY_FORM = { name: '', currency: 'IDR', type: '', entity_name: '', openi
 export default function Accounts() {
   const { token } = useAuth()
   const { access } = useAccess()
+  const navigate = useNavigate()
 
   // Only owner/admin can adjust wallet balances
   const canAdjust = ['owner', 'admin'].includes(access?.membership?.role)
@@ -349,7 +351,7 @@ export default function Accounts() {
             const typeLabel = WALLET_TYPES.find(t => t.value === w.type && t.value !== '__custom__')?.label || (w.type ? w.type : null)
 
             return (
-              <div key={w.id} className="hf-card" style={{ cursor: 'default', padding: '12px 14px' }}>
+              <div key={w.id} className="hf-card" onClick={() => navigate(`/accounts/${w.id}`)} style={{ cursor: 'pointer', padding: '12px 14px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   {/* Icon */}
                   <div style={{ width: 34, height: 34, borderRadius: 10, background: cs.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -376,11 +378,11 @@ export default function Accounts() {
                   {/* Actions */}
                   <div style={{ display: 'flex', gap: 5, flexShrink: 0, marginLeft: 4 }}>
                     {canAdjust && (
-                      <button onClick={() => openAdjust(w)} title="Adjust balance" style={{ width: 28, height: 28, borderRadius: 8, background: 'var(--bg-2)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3, cursor: 'pointer', fontSize: 10, fontWeight: 700, color: 'var(--text-2)', fontFamily: 'inherit' }}>
+                      <button onClick={(e) => { e.stopPropagation(); openAdjust(w) }} title="Adjust balance" style={{ width: 28, height: 28, borderRadius: 8, background: 'var(--bg-2)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3, cursor: 'pointer', fontSize: 10, fontWeight: 700, color: 'var(--text-2)', fontFamily: 'inherit' }}>
                         <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                       </button>
                     )}
-                    <button onClick={() => openEdit(w)} style={{ width: 28, height: 28, borderRadius: 8, background: 'var(--bg-2)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+                    <button onClick={(e) => { e.stopPropagation(); openEdit(w) }} style={{ width: 28, height: 28, borderRadius: 8, background: 'var(--bg-2)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
                       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--text-2)" strokeWidth="2" strokeLinecap="round">
                         <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
                         <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>

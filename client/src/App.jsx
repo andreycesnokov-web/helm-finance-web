@@ -18,6 +18,7 @@ import Tasks from './pages/Tasks'
 import Approvals from './pages/Approvals'
 import Admin from './pages/Admin'
 import AdminUser from './pages/AdminUser'
+import WalletDetail from './pages/WalletDetail'
 import Onboarding, { shouldShowOnboarding, clearOnboardingFlags } from './pages/Onboarding'
 
 // ── Mobile bottom nav — only existing pages ───────────────────────────────────
@@ -376,6 +377,7 @@ export default function App() {
           <Route path="/add"          element={<Layout><Add /></Layout>} />
           <Route path="/radar"        element={<Layout><Radar /></Layout>} />
           <Route path="/accounts"     element={<Layout><Accounts /></Layout>} />
+          <Route path="/accounts/:id" element={<Layout><WalletDetail /></Layout>} />
           <Route path="/transactions" element={<Layout><Transactions /></Layout>} />
           <Route path="/settings"     element={<Layout><Settings /></Layout>} />
           <Route path="/cfo"          element={<Layout><AICFO /></Layout>} />

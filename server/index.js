@@ -1069,6 +1069,47 @@ app.post('/api/wallets', auth, async (req, res) => {
   }
 });
 
+// ── Wallet transactions ──────────────────────────────────────────────────────
+app.get('/api/wallets/:id/transactions', auth, async (req, res) => {
+  const userId = req.user.userId;
+  const { id } = req.params;
+  const { period = 'all', limit = 200 } = req.query;
+
+  try {
+    const { data: wallet, error: wErr } = await supabase
+      .from('wallets').select('id, name, currency, type')
+      .eq('id', id).eq('user_id', userId).single();
+    if (wErr || !wallet) return res.status(404).json({ error: 'Wallet not found' });
+
+    let query = supabase.from('transactions')
+      .select('*')
+      .eq('user_id', userId)
+      .order('transaction_date', { ascending: false })
+      .order('created_at', { ascending: false })
+      .limit(Number(limit));
+
+    if (period !== 'all') {
+      const now = new Date();
+      let from;
+      if (period === 'week')  { from = new Date(now); from.setDate(now.getDate() - 7); }
+      else if (period === 'month') from = new Date(now.getFullYear(), now.getMonth(), 1);
+      else if (period === '3m')    { from = new Date(now); from.setMonth(now.getMonth() - 3); }
+      if (from) query = query.gte('transaction_date', from.toISOString().slice(0, 10));
+    }
+
+    const { data: txs, error: tErr } = await query;
+    if (tErr) throw tErr;
+
+    const filtered = (txs || []).filter(t =>
+      t.wallet_id === wallet.id || (!t.wallet_id && t.source === wallet.name)
+    );
+
+    res.json({ wallet, transactions: filtered });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 app.put('/api/wallets/:id', auth, async (req, res) => {
   const userId = req.user.userId;
   const { id } = req.params;
