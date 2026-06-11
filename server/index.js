@@ -2582,7 +2582,7 @@ async function buildAiCfoContext(userId, language = 'en') {
     { data: wallets   },
     accessData,
   ] = await Promise.all([
-    supabase.from('transactions').select('type,amount_original,amount_idr,currency_original,created_at,wallet_id,source,scope').eq('user_id', userId),
+    supabase.from('transactions').select('type,amount_original,amount_idr,currency_original,created_at,wallet_id,source,scope').eq('user_id', userId).order('created_at', { ascending: false }),
     supabase.from('transactions').select('type,amount_original,amount_idr,created_at,wallet_id,source,scope').eq('user_id', userId).gte('created_at', monthStart),
     supabase.from('debts').select('*').eq('user_id', userId),
     supabase.from('wallets').select('id,name,currency,type,scope').eq('user_id', userId).eq('is_active', true),
@@ -2601,13 +2601,16 @@ async function buildAiCfoContext(userId, language = 'en') {
   const CASH_IN  = ['income'];
   const CASH_OUT = ['expense', 'payroll'];
 
-  // Helper to sum tx that belong to a given set of wallet IDs (or legacy source match)
-  function txBelongsToWallets(t, walletSet, walletIdSet) {
+  // Helper to sum tx that belong to a given set of wallet IDs (or legacy source match or scope field)
+  function txBelongsToWallets(t, walletSet, walletIdSet, scopeValue) {
     if (t.wallet_id) return walletIdSet.has(t.wallet_id);
-    return walletSet.some(w => w.name === t.source);
+    if (walletSet.some(w => w.name === t.source)) return true;
+    // Fallback: use the scope column (same logic as Pulse endpoint)
+    if (scopeValue) return (t.scope || 'business') === scopeValue;
+    return false;
   }
 
-  const bizTxs = (allTxs || []).filter(t => txBelongsToWallets(t, businessWallets, businessWalletIds));
+  const bizTxs = (allTxs || []).filter(t => txBelongsToWallets(t, businessWallets, businessWalletIds, 'business'));
 
   const allIncome    = bizTxs.filter(t => CASH_IN.includes(t.type)).reduce((s,t) => s + Number(t.amount_original||0), 0);
   const allExpenses  = bizTxs.filter(t => CASH_OUT.includes(t.type)).reduce((s,t) => s + Number(t.amount_original||0), 0);
@@ -2615,13 +2618,13 @@ async function buildAiCfoContext(userId, language = 'en') {
   const totalBalance = allIncome - allExpenses + allCorrections;
 
   // Personal cash (informational only — not used in CFO score)
-  const persTxs = (allTxs || []).filter(t => txBelongsToWallets(t, personalWallets, new Set(personalWallets.map(w => w.id))));
+  const persTxs = (allTxs || []).filter(t => txBelongsToWallets(t, personalWallets, new Set(personalWallets.map(w => w.id)), 'personal'));
   const personalBalance = persTxs.filter(t => CASH_IN.includes(t.type)).reduce((s,t) => s + Number(t.amount_original||0), 0)
     - persTxs.filter(t => CASH_OUT.includes(t.type)).reduce((s,t) => s + Number(t.amount_original||0), 0)
     + persTxs.filter(t => t.type === 'correction').reduce((s,t) => s + Number(t.amount_original||0), 0);
 
   // ── This month (business wallets only) ────────────────────────────────────
-  const bizMonthTxs   = (monthTxs || []).filter(t => txBelongsToWallets(t, businessWallets, businessWalletIds));
+  const bizMonthTxs   = (monthTxs || []).filter(t => txBelongsToWallets(t, businessWallets, businessWalletIds, 'business'));
   const monthIncome   = bizMonthTxs.filter(t => CASH_IN.includes(t.type)).reduce((s,t) => s + Number(t.amount_original||0), 0);
   const monthExpenses = bizMonthTxs.filter(t => CASH_OUT.includes(t.type)).reduce((s,t) => s + Number(t.amount_original||0), 0);
 
