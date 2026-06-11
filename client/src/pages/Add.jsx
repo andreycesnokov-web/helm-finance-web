@@ -887,8 +887,8 @@ export default function Add() {
         <div style={{ padding: '0 16px' }}>
           <div style={{ display: 'flex', gap: 8, marginBottom: 18 }}>
             {[
-              { key: 'receivable', label: '💚 They owe me' },
-              { key: 'payable', label: '❤️ I owe them' },
+              { key: 'receivable', label: getLang() === 'ru' ? '💚 Они должны мне' : getLang() === 'id' ? '💚 Mereka berutang' : '💚 They owe me' },
+              { key: 'payable',    label: getLang() === 'ru' ? '❤️ Я должен им'   : getLang() === 'id' ? '❤️ Saya berutang'  : '❤️ I owe them' },
             ].map(t => (
               <button key={t.key} onClick={() => setDebt(p => ({ ...p, type: t.key }))} style={{
                 flex: 1, padding: '12px', borderRadius: 12, fontSize: 'var(--text-sm)',
@@ -902,8 +902,18 @@ export default function Add() {
           </div>
 
           {[
-            { key: 'counterparty', label: debt.type === 'receivable' ? 'Who owes you?' : 'Who do you owe?', placeholder: 'e.g. Client Ivan, Spa Factory Bali' },
-            { key: 'description', label: 'Description', placeholder: 'e.g. Invoice #004, disinfectant order' },
+            {
+              key: 'counterparty',
+              label: debt.type === 'receivable'
+                ? (getLang() === 'ru' ? 'Кто вам должен?' : getLang() === 'id' ? 'Siapa yang berutang?' : 'Who owes you?')
+                : (getLang() === 'ru' ? 'Кому вы должны?' : getLang() === 'id' ? 'Kepada siapa Anda berutang?' : 'Who do you owe?'),
+              placeholder: getLang() === 'id' ? 'mis. Klien Ivan, Spa Factory Bali' : 'e.g. Client Ivan, Spa Factory Bali',
+            },
+            {
+              key: 'description',
+              label: getLang() === 'ru' ? 'Описание' : getLang() === 'id' ? 'Deskripsi' : 'Description',
+              placeholder: getLang() === 'id' ? 'mis. Invoice #004, pesanan disinfektan' : 'e.g. Invoice #004, disinfectant order',
+            },
           ].map(f => (
             <div key={f.key} style={{ marginBottom: 14 }}>
               <label style={mainLabelSt}>{f.label}</label>
@@ -933,7 +943,14 @@ export default function Add() {
             cursor: debt.counterparty && debt.amount ? 'pointer' : 'not-allowed',
             fontFamily: 'inherit',
           }}>
-            {saving ? 'Saving...' : `Add ${debt.type === 'receivable' ? 'receivable' : 'payable'}`}
+            {saving
+              ? (getLang() === 'ru' ? 'Сохранение...' : getLang() === 'id' ? 'Menyimpan...' : 'Saving...')
+              : getLang() === 'ru'
+                ? (debt.type === 'receivable' ? 'Добавить дебиторку' : 'Добавить обязательство')
+                : getLang() === 'id'
+                ? (debt.type === 'receivable' ? 'Tambah piutang' : 'Tambah kewajiban')
+                : (debt.type === 'receivable' ? 'Add receivable' : 'Add payable')
+            }
           </button>
         </div>
       )}
