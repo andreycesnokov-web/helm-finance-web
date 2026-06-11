@@ -1313,7 +1313,7 @@ app.post('/api/wallets', auth, async (req, res) => {
         description:      `Opening balance · ${name}`,
         source:           name,
         wallet_id:        wallet.id,
-        scope:            'business',
+        scope:            scope || 'business',
       });
     }
 
@@ -1589,7 +1589,7 @@ app.post('/api/wallets/:id/adjust-balance', auth, async (req, res) => {
     // Load wallet — ownership enforced via user_id filter
     const { data: wallet, error: wErr } = await supabase
       .from('wallets')
-      .select('id, user_id, name, currency')
+      .select('id, user_id, name, currency, scope')
       .eq('id', walletId)
       .eq('user_id', userId)
       .single();
@@ -1638,7 +1638,7 @@ app.post('/api/wallets/:id/adjust-balance', auth, async (req, res) => {
         description:       `Balance correction: ${String(reason).trim()}`,
         source:            wallet.name,
         wallet_id:         wallet.id,
-        scope:             'business',
+        scope:             wallet.scope || 'business',
         category:          'Balance Correction',
         created_at:        txDate,
       })
@@ -1876,7 +1876,7 @@ app.post('/api/admin/wallets/:id/adjust-balance', auth, requireAdmin, async (req
     // Load wallet (no user_id filter — admin can adjust any wallet)
     const { data: wallet, error: wErr } = await supabase
       .from('wallets')
-      .select('id, user_id, name, currency')
+      .select('id, user_id, name, currency, scope')
       .eq('id', walletId)
       .single();
     if (wErr || !wallet) return res.status(404).json({ error: 'Wallet not found' });
@@ -1923,7 +1923,7 @@ app.post('/api/admin/wallets/:id/adjust-balance', auth, requireAdmin, async (req
       description:       `Balance correction: ${String(reason).trim()} [admin:${adminUserId}]`,
       source:            wallet.name,
       wallet_id:         wallet.id,
-      scope:             'business',
+      scope:             wallet.scope || 'business',
       category:          'Balance Correction',
       created_at:        txDate,
     };

@@ -1,5 +1,4 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
-import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { useTranslation } from '../hooks/useTranslation'
@@ -76,7 +75,104 @@ function DetailRow({ label, value, valueStyle }) {
   )
 }
 
-// ── Transaction Details Drawer ────────────────────────────────────────────────
+// ── Inline Detail Panel (non-payroll) ─────────────────────────────────────────
+function TxInlinePanel({ tx, refDirections = [], refActivityTypes = [], refWallets = [], t: tr }) {
+  if (!tx) return null
+
+  const badge      = getTypeBadge(tx.type)
+  const impact     = getCashImpact(tx.type)
+  const isTransfer = tx.type === 'transfer'
+  const isIncome   = tx.type === 'income'
+  const isExpense  = tx.type === 'expense'
+  const isPayroll  = tx.type === 'payroll'
+
+  const amount    = Number(tx.amount_original ?? tx.amount_idr ?? 0)
+  const currency  = tx.currency_original || 'IDR'
+  const amountSign  = isIncome ? '+' : (isExpense || isPayroll) ? '−' : ''
+  const amountColor = isIncome ? '#085041' : isExpense ? '#991B1B' : isPayroll ? '#92400E' : '#1e3a6e'
+
+  let destination = null
+  if (isTransfer && tx.description) {
+    const m = tx.description.match(/→\s*(.+)$/)
+    if (m) destination = m[1].trim()
+  }
+
+  const walletObj  = tx.wallet_id ? refWallets.find(w => w.id === tx.wallet_id) : null
+  const walletName = walletObj?.name || (tx.wallet_id ? tx.wallet_id : null)
+  const dirName    = tx.business_direction_id ? (refDirections.find(d => d.id === tx.business_direction_id)?.name || tx.business_direction_id) : null
+  const actName    = tx.activity_type_id ? (refActivityTypes.find(a => a.id === tx.activity_type_id)?.name || tx.activity_type_id) : null
+
+  const panelSt = { padding: '16px 20px', background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: 16, margin: '6px 12px 10px' }
+  const lbSt    = { fontSize: 10, fontWeight: 800, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'var(--text-3)' }
+  const vlSt    = { fontSize: 13, color: 'var(--text-2)', marginTop: 1 }
+
+  return (
+    <div style={panelSt}>
+      {/* Amount + description header */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 14, gap: 12 }}>
+        <div>
+          <div style={{ fontSize: 15, fontWeight: 800, color: amountColor }}>
+            {amountSign}{fmtFull(amount)}
+            <span style={{ fontSize: 12, fontWeight: 600, marginLeft: 5, color: 'var(--text-3)' }}>{currency}</span>
+          </div>
+          <div style={{ fontSize: 13, color: 'var(--text-2)', marginTop: 3 }}>{tx.description || tr('transactions.noDescription')}</div>
+        </div>
+        <span className="type-badge" style={{ background: badge.bg, color: badge.color, fontSize: 11, flexShrink: 0 }}>
+          {badge.labelKey ? tr(badge.labelKey) : badge.label}
+        </span>
+      </div>
+
+      {/* Detail grid */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '10px 20px', marginBottom: 14 }}>
+        {tx.category && (
+          <div><div style={lbSt}>{tr('transactions.category')}</div><div style={vlSt}>{tx.category}</div></div>
+        )}
+        <div>
+          <div style={lbSt}>{tr('transactions.scope')}</div>
+          <div style={vlSt}>{tx.scope === 'business' ? '💼 Business' : '👤 Personal'}</div>
+        </div>
+        {tx.project && (
+          <div><div style={lbSt}>{tr('transactions.project') || 'Project'}</div><div style={vlSt}>{tx.project}</div></div>
+        )}
+        {isTransfer ? (
+          <>
+            <div><div style={lbSt}>{tr('transactions.from')}</div><div style={vlSt}>{walletName || tx.source || '—'}</div></div>
+            <div><div style={lbSt}>{tr('transactions.to')}</div><div style={vlSt}>{destination || '—'}</div></div>
+          </>
+        ) : walletName ? (
+          <div>
+            <div style={lbSt}>{tr('transactions.wallet')}</div>
+            <div style={vlSt}>{walletName}{walletObj?.currency && walletObj.currency !== 'IDR' ? ` · ${walletObj.currency}` : ''}</div>
+          </div>
+        ) : tx.source ? (
+          <div><div style={lbSt}>{tr('transactions.legacySource')}</div><div style={vlSt}>{tx.source}</div></div>
+        ) : null}
+        {tx.counterparty_name && (
+          <div><div style={lbSt}>{tr('transactions.counterparty')}</div><div style={vlSt}>{tx.counterparty_name}</div></div>
+        )}
+        {dirName && (
+          <div><div style={lbSt}>{tr('transactions.businessDirection')}</div><div style={vlSt}>{dirName}</div></div>
+        )}
+        {actName && (
+          <div><div style={lbSt}>{tr('transactions.activityType')}</div><div style={vlSt}>{actName}</div></div>
+        )}
+      </div>
+
+      {/* Cash impact */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', background: impact.bg, borderRadius: 8, fontSize: 12, color: impact.color, fontWeight: 600, marginBottom: 10 }}>
+        <span>{impact.icon}</span>
+        <span>{tr(impact.labelKey)}</span>
+      </div>
+
+      {/* Meta */}
+      <div style={{ fontSize: 11, color: 'var(--text-4)', fontFamily: 'monospace' }}>
+        ID: {tx.id} · {fmtDateTime(tx.created_at)}
+      </div>
+    </div>
+  )
+}
+
+// ── Transaction Details Drawer (kept for reference, no longer rendered) ────────
 function TransactionDetailsDrawer({ tx, onClose, refDirections = [], refActivityTypes = [], refWallets = [] }) {
   const { t: tr } = useTranslation()
   // Escape key
@@ -393,24 +489,20 @@ export default function Transactions() {
   const [loading, setLoading]   = useState(true)
   const [error, setError]       = useState('')
 
-  // Drawer state (non-payroll transactions)
-  const [selectedTx, setSelectedTx] = useState(null)
-  const closeDrawer = useCallback(() => setSelectedTx(null), [])
-
-  // Inline payroll expand state
-  const [expandedPayrollTxId,  setExpandedPayrollTxId]  = useState(null)
+  // Inline expand state (all transaction types)
+  const [expandedTxId,         setExpandedTxId]         = useState(null)
   const [payrollDetailsByTxId, setPayrollDetailsByTxId] = useState({})
   const [loadingPayrollTxId,   setLoadingPayrollTxId]   = useState(null)
 
-  const togglePayrollExpanded = useCallback(async (tx) => {
+  const toggleExpanded = useCallback(async (tx) => {
     // Collapse if already open
-    if (expandedPayrollTxId === tx.id) {
-      setExpandedPayrollTxId(null)
+    if (expandedTxId === tx.id) {
+      setExpandedTxId(null)
       return
     }
-    setExpandedPayrollTxId(tx.id)
-    // Load if not cached
-    if (!payrollDetailsByTxId[tx.id]) {
+    setExpandedTxId(tx.id)
+    // For payroll: also fetch linked payroll details if not cached
+    if (tx.type === 'payroll' && !payrollDetailsByTxId[tx.id]) {
       setLoadingPayrollTxId(tx.id)
       try {
         const data = await apiFetch(`/payroll/by-transaction/${tx.id}`, token)
@@ -421,7 +513,7 @@ export default function Transactions() {
         setLoadingPayrollTxId(null)
       }
     }
-  }, [expandedPayrollTxId, payrollDetailsByTxId, token])
+  }, [expandedTxId, payrollDetailsByTxId, token])
 
   // Reference data for resolving IDs → names in drawer
   const [refDirections,    setRefDirections]   = useState([])
@@ -615,28 +707,16 @@ export default function Transactions() {
             </thead>
             <tbody>
               {filtered.map(t => {
-                const badge       = getTypeBadge(t.type)
-                const isPayroll   = t.type === 'payroll'
-                const isExpanded  = expandedPayrollTxId === t.id
-                const isSelected  = selectedTx?.id === t.id
-
-                const handleClick = () => {
-                  if (isPayroll) {
-                    // Close drawer if open, then toggle payroll panel
-                    setSelectedTx(null)
-                    togglePayrollExpanded(t)
-                  } else {
-                    setExpandedPayrollTxId(null)
-                    setSelectedTx(isSelected ? null : t)
-                  }
-                }
+                const badge      = getTypeBadge(t.type)
+                const isPayroll  = t.type === 'payroll'
+                const isExpanded = expandedTxId === t.id
 
                 return (
                   <>
                     <tr
                       key={t.id}
-                      className={`tx-row-clickable${isSelected ? ' tx-row-selected' : ''}${isExpanded ? ' tx-row-expanded' : ''}`}
-                      onClick={handleClick}
+                      className={`tx-row-clickable${isExpanded ? ' tx-row-expanded' : ''}`}
+                      onClick={() => toggleExpanded(t)}
                     >
                       <td className="tx-col-date">{fmtDate(t.created_at)}</td>
                       <td className="tx-col-desc">
@@ -661,18 +741,16 @@ export default function Transactions() {
                         <span className="type-badge" style={{ background: badge.bg, color: badge.color }}>
                           {badge.labelKey ? tr(badge.labelKey) : badge.label}
                         </span>
-                        {isPayroll && <span style={{ fontSize: 10, color: 'var(--text-4)', display: 'block', marginTop: 2 }}>{isExpanded ? '▲' : '▼'}</span>}
+                        <span style={{ fontSize: 10, color: 'var(--text-4)', display: 'block', marginTop: 2 }}>{isExpanded ? '▲' : '▼'}</span>
                       </td>
                     </tr>
-                    {isPayroll && isExpanded && (
+                    {isExpanded && (
                       <tr key={`${t.id}-detail`} style={{ background: 'var(--bg)' }}>
                         <td colSpan="7" style={{ padding: 0, border: 'none' }}>
-                          <PayrollInlinePanel
-                            txId={t.id}
-                            detailsMap={payrollDetailsByTxId}
-                            loadingId={loadingPayrollTxId}
-                            t={tr}
-                          />
+                          {isPayroll
+                            ? <PayrollInlinePanel txId={t.id} detailsMap={payrollDetailsByTxId} loadingId={loadingPayrollTxId} t={tr} />
+                            : <TxInlinePanel tx={t} refDirections={refDirections} refActivityTypes={refActivityTypes} refWallets={refWallets} t={tr} />
+                          }
                         </td>
                       </tr>
                     )}
@@ -690,27 +768,16 @@ export default function Transactions() {
           {filtered.map(t => {
             const badge      = getTypeBadge(t.type)
             const isPayroll  = t.type === 'payroll'
-            const isExpanded = expandedPayrollTxId === t.id
-            const isSelected = selectedTx?.id === t.id
+            const isExpanded = expandedTxId === t.id
             const dotBg    = t.type === 'income'  ? 'var(--green-light)' : t.type === 'expense' ? 'var(--red-light)'  : isPayroll ? 'var(--amber-light)' : 'var(--bg-3)'
             const dotColor = t.type === 'income'  ? 'var(--green)'       : t.type === 'expense' ? 'var(--red)'        : isPayroll ? 'var(--amber-dark)'  : 'var(--text-3)'
             const dotIcon  = t.type === 'income'  ? '↓'                  : t.type === 'expense' ? '↑'                 : isPayroll ? '💼'                 : '↔'
 
-            const handleClick = () => {
-              if (isPayroll) {
-                setSelectedTx(null)
-                togglePayrollExpanded(t)
-              } else {
-                setExpandedPayrollTxId(null)
-                setSelectedTx(isSelected ? null : t)
-              }
-            }
-
             return (
               <div key={t.id}>
                 <div
-                  className={`tx-card tx-row-clickable${isSelected ? ' tx-row-selected' : ''}${isExpanded ? ' tx-row-expanded' : ''}`}
-                  onClick={handleClick}
+                  className={`tx-card tx-row-clickable${isExpanded ? ' tx-row-expanded' : ''}`}
+                  onClick={() => toggleExpanded(t)}
                 >
                   <div className="tx-card-left">
                     <div className="tx-card-dot" style={{ background: dotBg }}>
@@ -732,26 +799,18 @@ export default function Transactions() {
                     <span className="type-badge" style={{ background: badge.bg, color: badge.color, marginTop: 4 }}>
                       {badge.labelKey ? tr(badge.labelKey) : badge.label}
                     </span>
-                    {isPayroll && <span style={{ fontSize: 10, color: 'var(--text-4)', marginTop: 2 }}>{isExpanded ? '▲' : '▼'}</span>}
+                    <span style={{ fontSize: 10, color: 'var(--text-4)', marginTop: 2 }}>{isExpanded ? '▲' : '▼'}</span>
                   </div>
                 </div>
-                {isPayroll && isExpanded && (
-                  <PayrollInlinePanel
-                    txId={t.id}
-                    detailsMap={payrollDetailsByTxId}
-                    loadingId={loadingPayrollTxId}
-                    t={tr}
-                  />
+                {isExpanded && (
+                  isPayroll
+                    ? <PayrollInlinePanel txId={t.id} detailsMap={payrollDetailsByTxId} loadingId={loadingPayrollTxId} t={tr} />
+                    : <TxInlinePanel tx={t} refDirections={refDirections} refActivityTypes={refActivityTypes} refWallets={refWallets} t={tr} />
                 )}
               </div>
             )
           })}
         </div>
-      )}
-
-      {/* ── Transaction details drawer ─── */}
-      {selectedTx && (
-        <TransactionDetailsDrawer tx={selectedTx} onClose={closeDrawer} refDirections={refDirections} refActivityTypes={refActivityTypes} refWallets={refWallets} />
       )}
 
     </div>
