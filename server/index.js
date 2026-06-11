@@ -2164,8 +2164,8 @@ async function buildAiCfoContext(userId, language = 'en') {
     { data: wallets   },
     accessData,
   ] = await Promise.all([
-    supabase.from('transactions').select('type,amount_original,amount_idr,currency_original,created_at').eq('user_id', userId),
-    supabase.from('transactions').select('type,amount_original,amount_idr,created_at').eq('user_id', userId).gte('created_at', monthStart),
+    supabase.from('transactions').select('type,amount_original,amount_idr,currency_original,created_at,wallet_id,source,scope').eq('user_id', userId),
+    supabase.from('transactions').select('type,amount_original,amount_idr,created_at,wallet_id,source,scope').eq('user_id', userId).gte('created_at', monthStart),
     supabase.from('debts').select('*').eq('user_id', userId),
     supabase.from('wallets').select('id,name,currency,type,scope').eq('user_id', userId).eq('is_active', true),
     getCurrentAccess(userId),
