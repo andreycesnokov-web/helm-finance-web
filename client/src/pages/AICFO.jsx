@@ -25,6 +25,13 @@ const SEV_CFG = {
   low:      { bg: 'var(--green-light)', border: 'rgba(6,95,70,.15)',   dot: 'var(--green-dark)', text: 'var(--green-dark)', labelKey: 'aicfo.priorityLow' },
 }
 
+// Status label keys — translate server-sent status strings
+const STATUS_LABEL_KEY = {
+  healthy:  'pulse.healthy',
+  warning:  'pulse.attention',
+  critical: 'pulse.critical',
+}
+
 const ALERT_CFG = {
   healthy:  { icon: '🟢', bg: 'var(--green-light)', border: 'rgba(6,95,70,.15)',   text: 'var(--green-dark)' },
   warning:  { icon: '🟡', bg: 'var(--amber-light)', border: 'rgba(217,119,6,.2)',  text: 'var(--amber-dark)' },
@@ -277,7 +284,7 @@ export default function AICFO() {
                   </div>
                   <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: 16 }}>
                     <div style={{ fontSize: 32, fontWeight: 900, color: cfoScore.score >= 75 ? 'var(--green-dark)' : cfoScore.score >= 50 ? 'var(--amber-dark)' : 'var(--red-dark)', lineHeight: 1 }}>{cfoScore.score}</div>
-                    <div style={{ fontSize: 10, color: 'var(--text-4)', marginTop: 2 }}>/ 100 · {cfoScore.label}</div>
+                    <div style={{ fontSize: 10, color: 'var(--text-4)', marginTop: 2 }}>/ 100 · {t(STATUS_LABEL_KEY[cfoScore.status] || 'pulse.attention')}</div>
                   </div>
                 </div>
                 {/* Factor rows */}
@@ -321,7 +328,7 @@ export default function AICFO() {
                 <div style={{ background: alertCfg.bg, border: `1px solid ${alertCfg.border}`, borderRadius: 14, padding: '14px 16px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                     <span style={{ fontSize: 16 }}>{alertCfg.icon}</span>
-                    <span style={{ fontSize: 14, fontWeight: 800, color: alertCfg.text }}>{aiAlert.label}</span>
+                    <span style={{ fontSize: 14, fontWeight: 800, color: alertCfg.text }}>{t(STATUS_LABEL_KEY[aiAlert.status] || 'pulse.attention')}</span>
                   </div>
                   <div style={{ fontSize: 12, fontWeight: 600, color: alertCfg.text, marginBottom: 4 }}>{aiAlert.headline}</div>
                   <div style={{ fontSize: 11, color: alertCfg.text, opacity: 0.8, lineHeight: 1.5 }}>{aiAlert.description}</div>
