@@ -342,7 +342,7 @@ export default function Pulse({ onDataLoad }) {
               {!runway || runway >= 999 ? '∞' : runway}
             </div>
             <div style={{ fontSize: 10, color: 'rgba(255,255,255,.35)', marginTop: 3 }}>
-              {!runway || runway >= 999 ? t('pulse.noData') : `${t('pulse.daysLeft')} · ${p.burnWindowDays >= 30 ? t('pulse.avg30') : p.burnWindowDays > 0 ? `${p.burnWindowDays}d avg` : t('pulse.atCurrentBurn')}`}
+              {!runway || runway >= 999 ? t('pulse.noData') : `${t('pulse.daysLeft')} · ${p.burnWindowDays >= 30 ? t('pulse.avg30') : p.burnWindowDays > 0 ? `${p.burnWindowDays}${t('pulse.dAvg')}` : t('pulse.atCurrentBurn')}`}
             </div>
           </div>
         </div>
@@ -455,16 +455,16 @@ export default function Pulse({ onDataLoad }) {
                 )}
                 {hiringR && (
                   <div style={{ background: 'var(--bg-2)', border: '0.5px solid var(--border)', borderRadius: 16, padding: '14px 14px' }}>
-                    <div style={{ fontSize: 9, fontWeight: 700, color: 'var(--text-3)', letterSpacing: '0.06em', marginBottom: 8 }}>HIRING READINESS</div>
+                    <div style={{ fontSize: 9, fontWeight: 700, color: 'var(--text-3)', letterSpacing: '0.06em', marginBottom: 8 }}>{t('pulse.hiringReadiness')}</div>
                     <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', lineHeight: 1.3, marginBottom: 4 }}>{hiringR.label}</div>
                     {hiringR.safe_monthly_salary > 0 && (
                       <div style={{ fontSize: 11, color: 'var(--text-3)', lineHeight: 1.4 }}>
-                        Safe salary: {fmt(hiringR.safe_monthly_salary)} {hiringR.currency || 'IDR'}/mo
+                        {t('pulse.safeSalary')} {fmt(hiringR.safe_monthly_salary)} {hiringR.currency || 'IDR'}/mo
                       </div>
                     )}
                     <button onClick={() => navigate('/cfo')}
                       style={{ marginTop: 10, fontSize: 10, padding: '5px 10px', borderRadius: 10, background: 'none', border: '0.5px solid var(--border)', color: 'var(--brand)', cursor: 'pointer' }}>
-                      Ask CFO →
+                      {t('pulse.askCFO')}
                     </button>
                   </div>
                 )}
@@ -483,7 +483,7 @@ export default function Pulse({ onDataLoad }) {
               },
               {
                 label: t('pulse.runway'), unit: (!runway || runway >= 999) ? '' : t('radar.days'),
-                sub: p.burnWindowDays >= 30 ? t('pulse.avg30') : p.burnWindowDays > 0 ? `${p.burnWindowDays}d avg` : t('pulse.basedOnBurn'),
+                sub: p.burnWindowDays >= 30 ? t('pulse.avg30') : p.burnWindowDays > 0 ? `${p.burnWindowDays}${t('pulse.dAvg')}` : t('pulse.basedOnBurn'),
                 value: (!runway || runway >= 999) ? '∞' : String(runway),
                 color: (!runway || runway >= 999) ? 'var(--text-3)'
                   : runway > 30 ? 'var(--green-dark)'
@@ -491,7 +491,7 @@ export default function Pulse({ onDataLoad }) {
                   : 'var(--red)',
               },
               {
-                label: t('pulse.burnRate'), unit: '/day', sub: t('pulse.cashOutflow'),
+                label: t('pulse.burnRate'), unit: t('pulse.perDay'), sub: t('pulse.cashOutflow'),
                 value: fmt(burnRate),
                 color: 'var(--text)',
               },

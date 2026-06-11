@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { useAccess } from '../hooks/useAccess'
+import { useTranslation } from '../hooks/useTranslation'
 import { apiFetch, fmt } from '../lib/api'
 import LockedFeature from '../components/LockedFeature'
 
@@ -47,6 +48,7 @@ function isPayrollTx(tx) {
 export default function Payroll() {
   const { token }  = useAuth()
   const navigate   = useNavigate()
+  const { t } = useTranslation()
   const { hasFeature, effectivePlan, loading: accessLoading } = useAccess()
   const [txs, setTxs]         = useState([])
   const [loading, setLoading] = useState(true)
@@ -82,8 +84,8 @@ export default function Payroll() {
       <div className="hf-page">
         <div className="hf-page-header">
           <div>
-            <div className="hf-page-title">Payroll</div>
-            <div className="hf-page-subtitle">Salary payments and payroll history</div>
+            <div className="hf-page-title">{t('payroll.title')}</div>
+            <div className="hf-page-subtitle">{t('payroll.subtitle')}</div>
           </div>
         </div>
         <LockedFeature
@@ -109,12 +111,12 @@ export default function Payroll() {
       {/* ── Header ─── */}
       <div className="hf-page-header">
         <div>
-          <div className="hf-page-title">Payroll</div>
-          <div className="hf-page-subtitle">Salary payments and payroll history</div>
+          <div className="hf-page-title">{t('payroll.title')}</div>
+          <div className="hf-page-subtitle">{t('payroll.subtitle')}</div>
         </div>
         <div className="hf-page-actions">
           {/* Routes to /add with payroll context — AI parser creates type:payroll if user describes salary */}
-          <button className="btn btn-primary btn-md" onClick={() => navigate('/add')}>+ Add Payroll</button>
+          <button className="btn btn-primary btn-md" onClick={() => navigate('/add')}>{t('payroll.addPayroll')}</button>
         </div>
       </div>
 
@@ -124,15 +126,9 @@ export default function Payroll() {
       {!loading && txs.length === 0 && (
         <div className="empty-state">
           <div className="empty-state-icon">💼</div>
-          <div className="empty-state-title">No payroll records yet</div>
-          <div className="empty-state-sub">
-            Payroll records appear here when you log a salary or payroll payment.<br /><br />
-            To add a payroll transaction, go to <strong>Add</strong> and describe it as a salary or payroll payment — the AI parser will classify it as payroll automatically.<br /><br />
-            <span style={{ color: 'var(--text-4)', fontStyle: 'italic', fontSize: 'var(--text-xs)' }}>
-              Example: "paid salary to employee 5 million" or "gaji karyawan 5 juta"
-            </span>
-          </div>
-          <button className="empty-state-cta" onClick={() => navigate('/add')}>Add Payroll Transaction</button>
+          <div className="empty-state-title">{t('payroll.noRecords')}</div>
+          <div className="empty-state-sub">{t('payroll.noRecordsSub')}</div>
+          <button className="empty-state-cta" onClick={() => navigate('/add')}>{t('payroll.addCta')}</button>
         </div>
       )}
 
@@ -141,30 +137,30 @@ export default function Payroll() {
         <>
           <div className="summary-grid" style={{ marginBottom: 20 }}>
             <div className="summary-card">
-              <div className="summary-card-label">Paid This Month</div>
+              <div className="summary-card-label">{t('payroll.paidThisMonth')}</div>
               <div className="summary-card-value" style={{ color: 'var(--text)' }}>{fmt(totalPaidThisMonth)}</div>
-              <div className="summary-card-sub">IDR · {thisMonth.length} payment{thisMonth.length !== 1 ? 's' : ''}</div>
+              <div className="summary-card-sub">IDR · {thisMonth.length}</div>
             </div>
             <div className="summary-card">
-              <div className="summary-card-label">Total Records</div>
+              <div className="summary-card-label">{t('payroll.totalRecords')}</div>
               <div className="summary-card-value" style={{ color: 'var(--text)' }}>{txs.length}</div>
-              <div className="summary-card-sub">All payroll transactions</div>
+              <div className="summary-card-sub">{t('payroll.allPayrollTx')}</div>
             </div>
             <div className="summary-card">
-              <div className="summary-card-label">Due Today</div>
+              <div className="summary-card-label">{t('payroll.dueToday')}</div>
               <div className="summary-card-value" style={{ color: 'var(--text-3)' }}>—</div>
-              <div className="summary-card-sub">Scheduled payroll</div>
+              <div className="summary-card-sub">{t('payroll.scheduledPayroll')}</div>
             </div>
             <div className="summary-card">
-              <div className="summary-card-label">Total Paid</div>
+              <div className="summary-card-label">{t('payroll.totalPaid')}</div>
               <div className="summary-card-value" style={{ color: 'var(--red-dark)' }}>{fmt(totalAll)}</div>
-              <div className="summary-card-sub">IDR all time</div>
+              <div className="summary-card-sub">{t('payroll.allTime')}</div>
             </div>
           </div>
 
           {/* ── Payroll history ─── */}
           <div style={{ marginBottom: 24 }}>
-            <div className="section-title">Payroll History · {txs.length}</div>
+            <div className="section-title">{t('payroll.history')} · {txs.length}</div>
             <div className="item-list-card">
               {txs.map(t => {
                 const amount = Number(t.amount_original || t.amount_idr || 0)
@@ -192,13 +188,13 @@ export default function Payroll() {
             </div>
 
             <div style={{ textAlign: 'center', marginTop: 12 }}>
-              <button className="link-btn" onClick={() => navigate('/transactions')}>View all transactions →</button>
+              <button className="link-btn" onClick={() => navigate('/transactions')}>{t('payroll.viewAllTx')}</button>
             </div>
           </div>
 
           {/* ── AI parser hint ─── */}
           <div className="hf-card" style={{ background: 'var(--bg-2)', border: '1px solid var(--border)' }}>
-            <div style={{ fontSize: 11, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 800, marginBottom: 8 }}>How to add payroll</div>
+            <div style={{ fontSize: 11, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 800, marginBottom: 8 }}>{t('payroll.howToAdd')}</div>
             <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-2)', lineHeight: 1.6 }}>
               Use <strong>Add</strong> and describe the payment as a salary or payroll transaction. The AI parser will classify it correctly.<br />
               <span style={{ color: 'var(--text-3)', fontStyle: 'italic' }}>Example: "paid salary to Ahmad 5 million" or "gaji karyawan 5 juta"</span>

@@ -1,38 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-
-const MODULE_CARDS = [
-  {
-    icon: '↓',
-    label: 'Receivable Invoices',
-    sub: 'Money clients owe you',
-    color: 'var(--green-dark)',
-    bg: 'var(--green-light)',
-    border: 'rgba(2,122,72,.12)',
-    count: '—',
-    path: '/receivables',
-  },
-  {
-    icon: '↑',
-    label: 'Payable Invoices',
-    sub: 'Bills you need to pay',
-    color: 'var(--red-dark)',
-    bg: 'var(--red-light)',
-    border: 'rgba(180,35,24,.12)',
-    count: '—',
-    path: '/payables',
-  },
-  {
-    icon: '⚠',
-    label: 'Overdue Invoices',
-    sub: 'Past due — needs action',
-    color: 'var(--amber-dark)',
-    bg: 'var(--amber-light)',
-    border: 'rgba(181,71,8,.12)',
-    count: '—',
-    path: '/receivables',
-  },
-]
+import { useTranslation } from '../hooks/useTranslation'
 
 const KANBAN_COLS = [
   { key: 'draft',   label: 'Draft',   dot: 'var(--text-4)' },
@@ -43,7 +11,41 @@ const KANBAN_COLS = [
 
 export default function Invoices() {
   const navigate = useNavigate()
+  const { t } = useTranslation()
   const [view, setView] = useState('cards') // 'cards' | 'list' | 'kanban'
+
+  const MODULE_CARDS = [
+    {
+      icon: '↓',
+      label: t('pulse.addReceivable'),
+      sub: t('pulse.receivablesSect'),
+      color: 'var(--green-dark)',
+      bg: 'var(--green-light)',
+      border: 'rgba(2,122,72,.12)',
+      count: '—',
+      path: '/receivables',
+    },
+    {
+      icon: '↑',
+      label: t('pulse.addPayable'),
+      sub: t('pulse.payablesSect'),
+      color: 'var(--red-dark)',
+      bg: 'var(--red-light)',
+      border: 'rgba(180,35,24,.12)',
+      count: '—',
+      path: '/payables',
+    },
+    {
+      icon: '⚠',
+      label: t('common.overdue'),
+      sub: t('common.overdue'),
+      color: 'var(--amber-dark)',
+      bg: 'var(--amber-light)',
+      border: 'rgba(181,71,8,.12)',
+      count: '—',
+      path: '/receivables',
+    },
+  ]
 
   return (
     <div className="hf-page">
@@ -51,16 +53,16 @@ export default function Invoices() {
       {/* ── Header ─── */}
       <div className="hf-page-header">
         <div>
-          <div className="hf-page-title">Invoices</div>
-          <div className="hf-page-subtitle">Create and track invoices owed to or by your business</div>
+          <div className="hf-page-title">{t('invoices.title')}</div>
+          <div className="hf-page-subtitle">{t('invoices.subtitle')}</div>
         </div>
         <div className="hf-page-actions">
           {/* View toggle */}
           <div className="view-toggle">
             {[
-              { key: 'cards',  label: '⊞ Cards' },
-              { key: 'list',   label: '≡ List' },
-              { key: 'kanban', label: '⣶ Kanban' },
+              { key: 'cards',  label: '⊞' },
+              { key: 'list',   label: '≡' },
+              { key: 'kanban', label: '⣶' },
             ].map(v => (
               <button key={v.key} className={`view-toggle-btn${view === v.key ? ' active' : ''}`} onClick={() => setView(v.key)}>
                 {v.label}
@@ -74,7 +76,7 @@ export default function Invoices() {
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'var(--brand-light)', border: '1px solid rgba(37,99,235,.15)', borderRadius: 14, padding: '12px 18px', marginBottom: 24 }}>
         <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--brand)', flexShrink: 0 }} />
         <div style={{ fontSize: 'var(--text-sm)', color: 'var(--brand-dark)', fontWeight: 500 }}>
-          Invoice module is in development — full creation and payment tracking coming soon.
+          {t('invoices.comingSoon')}
         </div>
       </div>
 
@@ -88,9 +90,9 @@ export default function Invoices() {
                 <div style={{ fontSize: 'var(--text-md)', fontWeight: 700, color: c.color, marginBottom: 5 }}>{c.label}</div>
                 <div style={{ fontSize: 'var(--text-sm)', color: c.color, opacity: 0.75, marginBottom: 18 }}>{c.sub}</div>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <span className="hf-badge hf-badge-muted" style={{ fontSize: 12 }}>Coming soon</span>
+                  <span className="hf-badge hf-badge-muted" style={{ fontSize: 12 }}>{t('invoices.comingSoon')}</span>
                   <button onClick={() => navigate(c.path)} style={{ fontSize: 'var(--text-xs)', color: c.color, background: 'rgba(255,255,255,.5)', border: `1px solid ${c.border}`, borderRadius: 8, padding: '5px 12px', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600 }}>
-                    View →
+                    {t('common.viewAll')}
                   </button>
                 </div>
               </div>
@@ -100,13 +102,11 @@ export default function Invoices() {
           {/* Empty state */}
           <div className="empty-state">
             <div className="empty-state-icon">🧾</div>
-            <div className="empty-state-title">Invoice module ready for setup</div>
-            <div className="empty-state-sub">
-              Full invoice creation and payment tracking coming soon. Use Receivables and Payables to track what's owed right now.
-            </div>
+            <div className="empty-state-title">{t('invoices.moduleReady')}</div>
+            <div className="empty-state-sub">{t('invoices.comingSoon')}</div>
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'center' }}>
-              <button className="empty-state-cta" onClick={() => navigate('/receivables')}>View Receivables</button>
-              <button className="empty-state-cta secondary" onClick={() => navigate('/payables')}>View Payables</button>
+              <button className="empty-state-cta" onClick={() => navigate('/receivables')}>{t('invoices.viewReceivables')}</button>
+              <button className="empty-state-cta secondary" onClick={() => navigate('/payables')}>{t('invoices.viewPayables')}</button>
             </div>
           </div>
         </>
@@ -118,11 +118,11 @@ export default function Invoices() {
           <table className="hf-table" style={{ width: '100%' }}>
             <thead>
               <tr>
-                <th>Invoice</th>
-                <th>Client / Vendor</th>
-                <th>Amount</th>
-                <th>Due Date</th>
-                <th>Status</th>
+                <th>{t('invoices.invoice')}</th>
+                <th></th>
+                <th>{t('invoices.amount')}</th>
+                <th>{t('invoices.dueDate')}</th>
+                <th>{t('invoices.status')}</th>
                 <th></th>
               </tr>
             </thead>
@@ -130,7 +130,7 @@ export default function Invoices() {
               <tr>
                 <td colSpan={6} style={{ textAlign: 'center', padding: '48px 24px', color: 'var(--text-4)', fontSize: 'var(--text-sm)' }}>
                   <div style={{ fontSize: 28, marginBottom: 10 }}>🧾</div>
-                  No invoices yet — module coming soon
+                  {t('invoices.noInvoices')}
                 </td>
               </tr>
             </tbody>
@@ -147,7 +147,7 @@ export default function Invoices() {
                 <div style={{ width: 8, height: 8, borderRadius: '50%', background: col.dot }} />
                 {col.label}
               </div>
-              <div className="invoice-kanban-empty">No invoices</div>
+              <div className="invoice-kanban-empty">{t('invoices.noInvoices')}</div>
             </div>
           ))}
         </div>

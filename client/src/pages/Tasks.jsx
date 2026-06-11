@@ -1,20 +1,21 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
+import { useTranslation } from '../hooks/useTranslation'
 import { apiFetch, fmt, daysUntil } from '../lib/api'
 import DebtPaymentModal from '../components/DebtPaymentModal'
 
 // ── Date formatter ────────────────────────────────────────────────────────────
-function fmtDate(str) {
+function fmtDate(str, t) {
   if (!str) return '—'
   const d = new Date(str)
   const today = new Date()
   today.setHours(0, 0, 0, 0)
   d.setHours(0, 0, 0, 0)
   const diff = Math.round((d - today) / 86400000)
-  if (diff === 0) return 'Today'
-  if (diff === 1) return 'Tomorrow'
-  if (diff < 0) return `${Math.abs(diff)}d overdue`
+  if (diff === 0) return t ? t('tasks.today0') : 'Today'
+  if (diff === 1) return t ? t('tasks.tomorrow') : 'Tomorrow'
+  if (diff < 0) return `${Math.abs(diff)}${t ? t('tasks.overdueLabel') : 'd overdue'}`
   return new Date(str).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
@@ -150,20 +151,20 @@ const TYPE_CFG = {
 }
 
 // ── Source badge ──────────────────────────────────────────────────────────────
-function SourceBadge({ sourceType, debtType }) {
+function SourceBadge({ sourceType, debtType, t }) {
   if (sourceType === 'debt') {
     return debtType === 'payable'
-      ? <span className="hf-badge hf-badge-red" style={{ fontSize: 11 }}>Payable</span>
-      : <span className="hf-badge hf-badge-green" style={{ fontSize: 11 }}>Receivable</span>
+      ? <span className="hf-badge hf-badge-red" style={{ fontSize: 11 }}>{t ? t('tasks.payable') : 'Payable'}</span>
+      : <span className="hf-badge hf-badge-green" style={{ fontSize: 11 }}>{t ? t('tasks.receivable') : 'Receivable'}</span>
   }
   if (sourceType === 'reminder') {
-    return <span className="hf-badge hf-badge-amber" style={{ fontSize: 11 }}>Reminder</span>
+    return <span className="hf-badge hf-badge-amber" style={{ fontSize: 11 }}>{t ? t('tasks.reminder') : 'Reminder'}</span>
   }
   return null
 }
 
 // ── Task card ─────────────────────────────────────────────────────────────────
-function TaskCard({ task, accounts, onPayOpen, onReminderDone, onReminderSnooze, acting }) {
+function TaskCard({ task, accounts, onPayOpen, onReminderDone, onReminderSnooze, acting, t }) {
   const tc = TYPE_CFG[task.type] || TYPE_CFG.task
   const isActing = acting[task.id]
 
@@ -183,7 +184,7 @@ function TaskCard({ task, accounts, onPayOpen, onReminderDone, onReminderSnooze,
       </div>
 
       {/* Source badge */}
-      <SourceBadge sourceType={task.sourceType} debtType={task.debtType} />
+      <SourceBadge sourceType={task.sourceType} debtType={task.debtType} t={t} />
 
       {/* Actions */}
       <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
@@ -194,7 +195,7 @@ function TaskCard({ task, accounts, onPayOpen, onReminderDone, onReminderSnooze,
             onClick={() => onPayOpen(task)}
             disabled={isActing}
           >
-            Pay now
+            {t ? t('tasks.payNow') : 'Pay now'}
           </button>
         )}
 
@@ -205,7 +206,7 @@ function TaskCard({ task, accounts, onPayOpen, onReminderDone, onReminderSnooze,
             onClick={() => onPayOpen(task)}
             disabled={isActing}
           >
-            Mark received
+            {t ? t('tasks.markReceived') : 'Mark received'}
           </button>
         )}
 
@@ -217,7 +218,7 @@ function TaskCard({ task, accounts, onPayOpen, onReminderDone, onReminderSnooze,
               onClick={() => onReminderSnooze(task)}
               disabled={isActing}
             >
-              {isActing ? '…' : 'Snooze 1d'}
+              {isActing ? '…' : (t ? t('tasks.snooze1d') : 'Snooze 1d')}
             </button>
             <button
               className="task-card-btn"
@@ -225,7 +226,7 @@ function TaskCard({ task, accounts, onPayOpen, onReminderDone, onReminderSnooze,
               onClick={() => onReminderDone(task)}
               disabled={isActing}
             >
-              {isActing ? '…' : 'Done'}
+              {isActing ? '…' : (t ? t('tasks.done') : 'Done')}
             </button>
           </>
         )}
@@ -235,22 +236,23 @@ function TaskCard({ task, accounts, onPayOpen, onReminderDone, onReminderSnooze,
 }
 
 // ── Section ───────────────────────────────────────────────────────────────────
-function Section({ label, labelColor, tasks, accounts, onPayOpen, onReminderDone, onReminderSnooze, acting }) {
+function Section({ label, labelColor, tasks, accounts, onPayOpen, onReminderDone, onReminderSnooze, acting, t }) {
   if (!tasks.length) return null
   return (
     <div style={{ marginBottom: 28 }}>
       <div className="hf-section-title" style={labelColor ? { color: labelColor } : undefined}>
         {label} · {tasks.length}
       </div>
-      {tasks.map(t => (
+      {tasks.map(task => (
         <TaskCard
-          key={t.id}
-          task={t}
+          key={task.id}
+          task={task}
           accounts={accounts}
           onPayOpen={onPayOpen}
           onReminderDone={onReminderDone}
           onReminderSnooze={onReminderSnooze}
           acting={acting}
+          t={t}
         />
       ))}
     </div>
@@ -261,6 +263,7 @@ function Section({ label, labelColor, tasks, accounts, onPayOpen, onReminderDone
 export default function Tasks() {
   const { token } = useAuth()
   const navigate  = useNavigate()
+  const { t } = useTranslation()
 
   const [data, setData]       = useState(null)
   const [loading, setLoading] = useState(true)
@@ -340,7 +343,7 @@ export default function Tasks() {
   const todayTasks    = tasks.filter(t => !t.urgent && t.days === 0)
   const upcomingTasks = tasks.filter(t => !t.urgent && t.days > 0)
 
-  const sectionProps = { accounts, onPayOpen: handlePayOpen, onReminderDone: handleReminderDone, onReminderSnooze: handleReminderSnooze, acting }
+  const sectionProps = { accounts, onPayOpen: handlePayOpen, onReminderDone: handleReminderDone, onReminderSnooze: handleReminderSnooze, acting, t }
 
   return (
     <div className="hf-page">
@@ -348,12 +351,12 @@ export default function Tasks() {
       {/* ── Page header ─── */}
       <div className="hf-page-header">
         <div>
-          <div className="hf-page-title">Tasks</div>
-          <div className="hf-page-subtitle">Financial actions sourced from live data — resolves when the underlying item is settled</div>
+          <div className="hf-page-title">{t('tasks.title')}</div>
+          <div className="hf-page-subtitle">{t('tasks.subtitle')}</div>
         </div>
         {tasks.length > 0 && (
           <div className="hf-badge hf-badge-blue" style={{ fontSize: 13, padding: '6px 14px' }}>
-            {tasks.length} open
+            {tasks.length} {t('tasks.open')}
           </div>
         )}
       </div>
@@ -370,22 +373,18 @@ export default function Tasks() {
       {tasks.length === 0 && (
         <div className="empty-state">
           <div className="empty-state-icon">✅</div>
-          <div className="empty-state-title">All clear</div>
-          <div className="empty-state-sub">
-            Tasks appear here automatically when financial actions need attention — overdue debts, upcoming payments, and pending reminders.
-            <br /><br />
-            Tasks disappear only when the underlying source is fully resolved.
-          </div>
-          <button className="empty-state-cta" onClick={() => navigate('/')}>Back to Pulse</button>
+          <div className="empty-state-title">{t('tasks.allClear')}</div>
+          <div className="empty-state-sub">{t('tasks.allClearSub')}</div>
+          <button className="empty-state-cta" onClick={() => navigate('/')}>{t('tasks.backToPulse')}</button>
         </div>
       )}
 
       {/* ── Task sections ─── */}
       {tasks.length > 0 && (
         <>
-          <Section label="🔴 Urgent" labelColor="var(--red-dark)"  tasks={urgentTasks}   {...sectionProps} />
-          <Section label="Today"                                    tasks={todayTasks}    {...sectionProps} />
-          <Section label="Upcoming"                                 tasks={upcomingTasks} {...sectionProps} />
+          <Section label={t('tasks.urgent')}   labelColor="var(--red-dark)"  tasks={urgentTasks}   {...sectionProps} />
+          <Section label={t('tasks.today')}                                    tasks={todayTasks}    {...sectionProps} />
+          <Section label={t('tasks.upcoming')}                                 tasks={upcomingTasks} {...sectionProps} />
 
           {/* Persistence note */}
           <div style={{ marginTop: 8, padding: '12px 16px', background: 'var(--bg-2)', borderRadius: 12, border: '1px solid var(--border)' }}>
@@ -398,7 +397,7 @@ export default function Tasks() {
 
       {/* ── Navigation ─── */}
       <div style={{ textAlign: 'center', paddingTop: 20, paddingBottom: 8 }}>
-        <button className="link-btn" onClick={() => navigate('/')}>View Pulse dashboard →</button>
+        <button className="link-btn" onClick={() => navigate('/')}>{t('tasks.viewPulse')}</button>
       </div>
 
       {/* ── Payment modal ─── */}

@@ -163,7 +163,7 @@ function CounterpartyInput({ value, onChange, suggestions, onCreateNew, inputSt 
 export default function Add() {
   const { token }  = useAuth()
   const navigate   = useNavigate()
-  const { t }      = useTranslation()
+  const { t: tr }  = useTranslation()
   const [text, setText]   = useState('')
   const [loading, setLoading] = useState(false)
   const [result, setResult]   = useState(null)
@@ -380,17 +380,17 @@ export default function Add() {
     <div className="page">
       <div className="topbar" style={{ padding: '20px 20px 14px' }}>
         <div>
-          <div style={{ fontSize: 'var(--text-xl)', fontWeight: 700, color: 'var(--text)', letterSpacing: -0.3 }}>{t('add.title')}</div>
-          <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-3)', marginTop: 3 }}>{t('add.subtitle')}</div>
+          <div style={{ fontSize: 'var(--text-xl)', fontWeight: 700, color: 'var(--text)', letterSpacing: -0.3 }}>{tr('add.title')}</div>
+          <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-3)', marginTop: 3 }}>{tr('add.subtitle')}</div>
         </div>
       </div>
 
       {/* Tab switcher */}
       <div style={{ display: 'flex', gap: 6, padding: '0 16px 18px' }}>
         {[
-          { key: 'tx',       label: t('add.tabTransaction') },
-          { key: 'debt',     label: t('add.tabDebt') },
-          { key: 'reminder', label: t('add.tabReminder') },
+          { key: 'tx',       label: tr('add.tabTransaction') },
+          { key: 'debt',     label: tr('add.tabDebt') },
+          { key: 'reminder', label: tr('add.tabReminder') },
         ].map(tb => (
           <button key={tb.key} onClick={() => { setTab(tb.key); setSaved(false); setError(''); setSaveMsg('') }} style={{
             padding: '9px 16px', borderRadius: 20, fontSize: 'var(--text-sm)', border: '0.5px solid var(--border-2)',
@@ -406,19 +406,19 @@ export default function Add() {
         <div style={{ margin: '0 16px 16px', background: 'var(--green-light)', borderRadius: 14, padding: '14px 16px', border: '1px solid rgba(2,122,72,.12)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
             <span style={{ fontSize: 20 }}>✅</span>
-            <span style={{ fontSize: 'var(--text-base)', color: 'var(--green-dark)', fontWeight: 600 }}>{saveMsg || t('add.savedSuccess')}</span>
+            <span style={{ fontSize: 'var(--text-base)', color: 'var(--green-dark)', fontWeight: 600 }}>{saveMsg || tr('add.savedSuccess')}</span>
           </div>
           <div style={{ display: 'flex', gap: 16, marginTop: 4 }}>
             <button onClick={() => navigate('/transactions')} style={{ fontSize: 'var(--text-sm)', color: 'var(--green-dark)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline', fontFamily: 'inherit' }}>
-              {t('add.viewTransactions')}
+              {tr('add.viewTransactions')}
             </button>
             {Object.values(linkedDebts).some(Boolean) && (
               <>
                 <button onClick={() => navigate('/receivables')} style={{ fontSize: 'var(--text-sm)', color: 'var(--green-dark)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline', fontFamily: 'inherit' }}>
-                  {t('add.receivablesLink')}
+                  {tr('add.receivablesLink')}
                 </button>
                 <button onClick={() => navigate('/payables')} style={{ fontSize: 'var(--text-sm)', color: 'var(--green-dark)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline', fontFamily: 'inherit' }}>
-                  {t('add.payablesLink')}
+                  {tr('add.payablesLink')}
                 </button>
               </>
             )}
@@ -436,7 +436,7 @@ export default function Add() {
       {/* TRANSACTION TAB */}
       {tab === 'tx' && (
         <div style={{ padding: '0 16px' }}>
-          <label style={mainLabelSt}>{t('add.whatHappened')}</label>
+          <label style={mainLabelSt}>{tr('add.whatHappened')}</label>
           <textarea
             value={text}
             onChange={e => { setText(e.target.value); setSaved(false); setResult(null); setEditedTxs([]) }}
@@ -462,7 +462,7 @@ export default function Add() {
             fontFamily: 'inherit', letterSpacing: 0.1, transition: 'background .12s',
             boxShadow: text.trim() ? '0 2px 8px rgba(21,94,239,.2)' : 'none',
           }}>
-            {loading ? '🤔 ' + t('add.aiParsing') : t('add.parseBtn')}
+            {loading ? '🤔 ' + tr('add.aiParsing') : tr('add.parseBtn')}
           </button>
 
           {/* ── Parsed preview ── */}
@@ -552,7 +552,7 @@ export default function Add() {
                       {/* Row 1: Type + Scope */}
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
                         <div>
-                          <label style={labelSt}>Type</label>
+                          <label style={labelSt}>{tr('add.type')}</label>
                           <select value={t.type} onChange={e => updateTx(i, 'type', e.target.value)} style={selectStyle}>
                             {TX_TYPES.map(ty => (
                               <option key={ty} value={ty}>{ty.charAt(0).toUpperCase() + ty.slice(1)}</option>
@@ -560,7 +560,7 @@ export default function Add() {
                           </select>
                         </div>
                         <div>
-                          <label style={labelSt}>Scope</label>
+                          <label style={labelSt}>{tr('add.scope')}</label>
                           <select value={t.scope || 'personal'} onChange={e => updateTx(i, 'scope', e.target.value)} style={selectStyle}>
                             <option value="personal">👤 Personal</option>
                             <option value="business">💼 Business</option>
@@ -571,12 +571,12 @@ export default function Add() {
                       {/* Row 2: Amount + Currency */}
                       <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 10, marginBottom: 12 }}>
                         <div>
-                          <label style={labelSt}>Amount</label>
+                          <label style={labelSt}>{tr('add.amount')}</label>
                           <input type="number" min="0" value={t.amount}
                             onChange={e => updateTx(i, 'amount', e.target.value)} style={inputSt} />
                         </div>
                         <div>
-                          <label style={labelSt}>Currency</label>
+                          <label style={labelSt}>{tr('add.currency')}</label>
                           <select value={t.currency || 'IDR'} onChange={e => updateTx(i, 'currency', e.target.value)} style={selectStyle}>
                             <option value="IDR">IDR</option>
                             <option value="USD">USD</option>
@@ -588,7 +588,7 @@ export default function Add() {
 
                       {/* Row 3: Description */}
                       <div style={{ marginBottom: 12 }}>
-                        <label style={labelSt}>Description</label>
+                        <label style={labelSt}>{tr('add.description')}</label>
                         <input type="text" value={t.description || ''}
                           onChange={e => updateTx(i, 'description', e.target.value)}
                           placeholder="What was this for?" style={inputSt} />
@@ -597,7 +597,7 @@ export default function Add() {
                       {/* Row 4: Wallet / Account (From wallet for transfers) */}
                       <div style={{ marginBottom: 12 }}>
                         <label style={labelSt}>
-                          {isTransfer ? 'From wallet' : 'Wallet / Account'}
+                          {isTransfer ? tr('add.fromWallet') : tr('add.walletAccount')}
                           {sourceMissing && !isTransfer && (
                             <span style={{ color: '#D97706', marginLeft: 6, textTransform: 'none', fontStyle: 'italic' }}>
                               — please select before saving
@@ -674,7 +674,7 @@ export default function Add() {
                       {/* Row 4b: To wallet (transfers only) */}
                       {isTransfer && wallets.length > 0 && (
                         <div style={{ marginBottom: 12 }}>
-                          <label style={labelSt}>To wallet</label>
+                          <label style={labelSt}>{tr('add.toWallet')}</label>
                           <select
                             value={t.to_wallet_id || ''}
                             onChange={e => {
@@ -748,7 +748,7 @@ export default function Add() {
 
                       {/* Row 6: Counterparty */}
                       <div style={{ marginBottom: 12 }}>
-                        <label style={labelSt}>Counterparty (optional)</label>
+                        <label style={labelSt}>{tr('add.counterpartyOpt')}</label>
                         <CounterpartyInput
                           value={t.counterparty_name || ''}
                           onChange={(name, id) => {
@@ -764,7 +764,7 @@ export default function Add() {
                       {/* Row 7: Business Direction + Activity Type */}
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                         <div>
-                          <label style={labelSt}>Direction</label>
+                          <label style={labelSt}>{tr('add.direction')}</label>
                           <select
                             value={t.business_direction_id || ''}
                             onChange={e => updateTx(i, 'business_direction_id', e.target.value || null)}
@@ -777,7 +777,7 @@ export default function Add() {
                           </select>
                         </div>
                         <div>
-                          <label style={labelSt}>Activity</label>
+                          <label style={labelSt}>{tr('add.activity')}</label>
                           <select
                             value={t.activity_type_id || ''}
                             onChange={e => updateTx(i, 'activity_type_id', e.target.value || null)}
@@ -856,7 +856,7 @@ export default function Add() {
                 color: 'var(--text-3)', border: '0.5px solid var(--border)',
                 fontSize: 'var(--text-sm)', fontWeight: 500, marginTop: 8,
                 cursor: 'pointer', fontFamily: 'inherit',
-              }}>Cancel</button>
+              }}>{tr('common.cancel')}</button>
             </div>
           )}
         </div>
@@ -894,12 +894,12 @@ export default function Add() {
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 18 }}>
             <div>
-              <label style={mainLabelSt}>Amount (IDR)</label>
+              <label style={mainLabelSt}>{tr('pulse.amountIDR')}</label>
               <input type="number" value={debt.amount} onChange={e => setDebt(p => ({ ...p, amount: e.target.value }))}
                 placeholder="5000000" style={{ ...inputSt, padding: '12px 14px', background: 'var(--bg-2)', fontSize: 'var(--text-base)' }} />
             </div>
             <div>
-              <label style={mainLabelSt}>Due date</label>
+              <label style={mainLabelSt}>{tr('add.dueDate')}</label>
               <input type="date" value={debt.due_date} onChange={e => setDebt(p => ({ ...p, due_date: e.target.value }))}
                 style={{ ...inputSt, padding: '12px 14px', background: 'var(--bg-2)', fontSize: 'var(--text-base)' }} />
             </div>
@@ -922,17 +922,17 @@ export default function Add() {
       {tab === 'reminder' && (
         <div style={{ padding: '0 16px' }}>
           <div style={{ marginBottom: 14 }}>
-            <label style={mainLabelSt}>What to remind?</label>
+            <label style={mainLabelSt}>{tr('add.reminderTitle')}</label>
             <input value={reminder.title} onChange={e => setReminder(p => ({ ...p, title: e.target.value }))}
               placeholder="e.g. Check Gojek settlement" style={{ ...inputSt, padding: '12px 14px', background: 'var(--bg-2)', fontSize: 'var(--text-base)' }} />
           </div>
           <div style={{ marginBottom: 14 }}>
-            <label style={mainLabelSt}>Note (optional)</label>
+            <label style={mainLabelSt}>{tr('add.notes')}</label>
             <input value={reminder.meta} onChange={e => setReminder(p => ({ ...p, meta: e.target.value }))}
               placeholder="e.g. every 2 weeks, IDR 2,500,000" style={{ ...inputSt, padding: '12px 14px', background: 'var(--bg-2)', fontSize: 'var(--text-base)' }} />
           </div>
           <div style={{ marginBottom: 20 }}>
-            <label style={mainLabelSt}>Due date</label>
+            <label style={mainLabelSt}>{tr('add.dueDate')}</label>
             <input type="date" value={reminder.due_date} onChange={e => setReminder(p => ({ ...p, due_date: e.target.value }))}
               style={{ ...inputSt, padding: '12px 14px', background: 'var(--bg-2)', fontSize: 'var(--text-base)' }} />
           </div>

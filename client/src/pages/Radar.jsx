@@ -164,7 +164,7 @@ export default function Radar() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 }}>
           {[
             { label: t('radar.monthlyBurn'), val: fmt(monthlyBurn), sub: t('radar.perMonth'), color: 'var(--red-dark)' },
-            { label: t('radar.dailyAverage'), val: fmt(burnRate), sub: d.burnWindowDays >= 30 ? t('pulse.avg30') : d.burnWindowDays > 0 ? `${d.burnWindowDays}d avg` : 'avg', color: 'var(--text)' },
+            { label: t('radar.dailyAverage'), val: fmt(burnRate), sub: d.burnWindowDays >= 30 ? t('pulse.avg30') : d.burnWindowDays > 0 ? `${d.burnWindowDays}${t('pulse.dAvg')}` : t('pulse.avg30'), color: 'var(--text)' },
             { label: t('radar.runwayLeft'), val: runway != null ? runway + 'd' : '∞', sub: burnRate > 0 ? t('radar.atCurrentBurn') : t('radar.noBurnData'), color: runway != null && runway < 14 ? 'var(--red-dark)' : runway != null && runway < 30 ? 'var(--amber-dark)' : 'var(--green-dark)' },
           ].map(s => (
             <div key={s.label} style={{ background: 'var(--bg-2)', borderRadius: 12, padding: '12px 10px', border: '0.5px solid var(--border)' }}>

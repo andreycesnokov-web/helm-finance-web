@@ -4,6 +4,7 @@ import { useAuth } from '../hooks/useAuth'
 import { useAccess } from '../hooks/useAccess'
 import { useTranslation } from '../hooks/useTranslation'
 import { apiFetch, fmt, fmtFull } from '../lib/api'
+import { getLang } from '../i18n/index'
 
 // ── Suggested questions — keys resolved via t() at render time ────────────────
 const SUGGESTED_KEYS = [
@@ -90,7 +91,7 @@ function ScoreBar({ score, color }) {
 }
 
 // ── Chat bubble ───────────────────────────────────────────────────────────────
-function Bubble({ msg }) {
+function Bubble({ msg, outOfScopeLabel }) {
   const isUser = msg.role === 'user'
   return (
     <div style={{ display: 'flex', justifyContent: isUser ? 'flex-end' : 'flex-start', marginBottom: 12, gap: 8, alignItems: 'flex-end' }}>
@@ -111,8 +112,7 @@ function Bubble({ msg }) {
         {!isUser && msg.outOfScope && (
           <div style={{ marginTop: 4, fontSize: 10, color: 'var(--text-4)', display: 'flex', alignItems: 'center', gap: 4, paddingLeft: 4 }}>
             <span style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--text-4)', display: 'inline-block' }} />
-            {/* Note: Bubble is a sub-component outside main AICFO, so outOfScope text stays hardcoded */}
-            Out of CFO scope
+            {outOfScopeLabel}
           </div>
         )}
       </div>
@@ -162,7 +162,7 @@ export default function AICFO() {
     setMessages(prev => [...prev, { role: 'user', content: question }])
     setAsking(true)
     try {
-      const res = await apiFetch('/ai-cfo/ask', token, { method: 'POST', body: { question } })
+      const res = await apiFetch('/ai-cfo/ask', token, { method: 'POST', body: { question, language: getLang() } })
       setMessages(prev => [...prev, { role: 'assistant', content: res.answer, outOfScope: !!res.out_of_scope }])
     } catch (e) {
       if (e.upgrade_required || e.message?.includes('limit')) {
@@ -375,7 +375,7 @@ export default function AICFO() {
             { label: t('aicfo.receivables'), value: '+' + fmt(recv.total_remaining), sub: recv.overdue_count > 0 ? `${recv.overdue_count} ${t('common.overdue')}` : `${currency}${t('aicfo.outstanding')}`, color: 'var(--green-dark)', route: '/receivables' },
             { label: t('aicfo.payables'),    value: '−' + fmt(pay.total_remaining),  sub: pay.overdue_count > 0  ? `${pay.overdue_count} ${t('common.overdue')}`  : `${currency}${t('aicfo.toPay')}`,    color: 'var(--red-dark)',   route: '/payables' },
             { label: t('aicfo.income'),      value: '+' + fmt(month.income),         sub: `${month.transactions_count} ${t('aicfo.transactions')}`, color: 'var(--green-dark)', route: null },
-            { label: t('aicfo.expenses'),    value: '−' + fmt(month.expenses),       sub: `${fmt(month.burn_rate)} ${currency}/day · ${month.burn_window_days >= 30 ? '30-day avg' : month.burn_window_days > 0 ? `${month.burn_window_days}d avg` : 'avg'}`, color: 'var(--text)',       route: '/transactions' },
+            { label: t('aicfo.expenses'),    value: '−' + fmt(month.expenses),       sub: `${fmt(month.burn_rate)} ${currency}${t('pulse.perDay')} · ${month.burn_window_days >= 30 ? t('pulse.avg30') : month.burn_window_days > 0 ? `${month.burn_window_days}${t('pulse.dAvg')}` : t('pulse.avg30')}`, color: 'var(--text)',       route: '/transactions' },
           ].map(m => (
             <div key={m.label} className="hf-card" style={{ cursor: m.route ? 'pointer' : 'default' }} onClick={() => m.route && navigate(m.route)}>
               <div className="hf-kpi-label">{m.label}</div>
@@ -455,7 +455,7 @@ export default function AICFO() {
         <div style={{ background: 'var(--bg-2)', borderRadius: 16, border: '0.5px solid var(--border)', overflow: 'hidden' }}>
           {messages.length > 0 && (
             <div style={{ padding: '16px 16px 8px', maxHeight: 420, overflowY: 'auto' }}>
-              {messages.map((msg, i) => <Bubble key={i} msg={msg} />)}
+              {messages.map((msg, i) => <Bubble key={i} msg={msg} outOfScopeLabel={t('aicfo.outOfScope')} />)}
               {asking && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0', marginBottom: 8 }}>
                   <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'linear-gradient(135deg,#1D4ED8,#2563EB)', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12 }}>✦</div>

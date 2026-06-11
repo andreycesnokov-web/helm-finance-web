@@ -2644,6 +2644,7 @@ function isBusinessFinanceQuestion(question) {
 }
 
 const CFO_OUT_OF_SCOPE_RESPONSE = "Sorry, I can't help with that. I'm CFO AI — a financial consultant for business owners. I only answer questions about business finance: cash flow, receivables, payables, expenses, runway, hiring readiness, payroll and owner financial decisions.";
+const CFO_OUT_OF_SCOPE_RESPONSE_RU = "Извините, я не могу помочь с этим вопросом. Я CFO AI-консультант и отвечаю только на вопросы, связанные с финансами бизнеса.";
 
 // GET /api/ai-cfo/context — full financial context for AI CFO page
 app.get('/api/ai-cfo/context', auth, async (req, res) => {
@@ -2659,12 +2660,13 @@ app.get('/api/ai-cfo/context', auth, async (req, res) => {
 app.post('/api/ai-cfo/ask', auth, async (req, res) => {
   try {
     const userId   = req.user.userId;
-    const { question } = req.body;
+    const { question, language } = req.body;
+    const isRu = language === 'ru';
     if (!question || !question.trim()) return res.status(400).json({ error: 'question required' });
 
     // ── Domain guardrail: reject out-of-scope questions ───────────────────────
     if (!isBusinessFinanceQuestion(question)) {
-      return res.json({ answer: CFO_OUT_OF_SCOPE_RESPONSE, out_of_scope: true });
+      return res.json({ answer: isRu ? CFO_OUT_OF_SCOPE_RESPONSE_RU : CFO_OUT_OF_SCOPE_RESPONSE, out_of_scope: true });
     }
 
     // ── Usage limit check (soft — not yet tracked in DB) ─────────────────────
@@ -2696,7 +2698,7 @@ app.post('/api/ai-cfo/ask', auth, async (req, res) => {
         const alert = ctx.ai_alert         || {};
         const hire  = ctx.hiring_readiness || {};
         const systemPrompt = `You are CFO AI, a financial decision assistant for ${ctx.business.name} — a ${ctx.business.effective_plan} plan business using ${currency} as base currency.
-Answer like a calm, direct CFO speaking to a CEO. Be specific, conservative, action-oriented, and not dramatic.
+Answer like a calm, direct CFO speaking to a CEO. Be specific, conservative, action-oriented, and not dramatic.${isRu ? '\nALWAYS respond in Russian language.' : ''}
 
 YOUR ROLE: You ONLY answer questions about business finance: cash flow, runway, receivables, payables,
 expenses, income, payroll, hiring readiness, invoices, financial risks, budgeting, owner financial decisions.
