@@ -259,11 +259,17 @@ export function RightPanel({ data }) {
         : (d.runway || 0) < 14
           ? 'Проверьте ближайшие платежи и защитите запас дней.'
           : 'Финансы стабильны. Сосредоточьтесь на росте дохода.')
-    : ((d.runway || 0) < 7
-        ? 'Collect receivables immediately — cash risk is high.'
-        : (d.runway || 0) < 14
-          ? 'Review upcoming payments and protect runway.'
-          : 'Finances look stable. Focus on growing income.')
+    : lang === 'id'
+      ? ((d.runway || 0) < 7
+          ? 'Segera tagih piutang — risiko kas tinggi.'
+          : (d.runway || 0) < 14
+            ? 'Periksa pembayaran mendatang dan lindungi cadangan kas.'
+            : 'Keuangan terlihat stabil. Fokus pada pertumbuhan pemasukan.')
+      : ((d.runway || 0) < 7
+          ? 'Collect receivables immediately — cash risk is high.'
+          : (d.runway || 0) < 14
+            ? 'Review upcoming payments and protect runway.'
+            : 'Finances look stable. Focus on growing income.')
 
   const SecTitle = ({ children }) => (
     <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.09em', marginBottom: 10 }}>{children}</div>
