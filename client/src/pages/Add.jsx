@@ -3,13 +3,28 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { useTranslation } from '../hooks/useTranslation'
 import { apiFetch, fmt, daysUntil } from '../lib/api'
+import { getLang } from '../i18n/index'
 
-const QUICK = [
-  { label: 'Еда', emoji: '🍜', type: 'expense', scope: 'personal' },
-  { label: 'Транспорт', emoji: '⛽', type: 'expense', scope: 'personal' },
-  { label: 'Helm Care', emoji: '🪖', type: 'expense', scope: 'business' },
-  { label: 'Доход', emoji: '💚', type: 'income', scope: 'personal' },
-]
+const QUICK_LABELS = {
+  en: [
+    { label: 'Food', emoji: '🍜', type: 'expense', scope: 'personal' },
+    { label: 'Transport', emoji: '⛽', type: 'expense', scope: 'personal' },
+    { label: 'Helm Care', emoji: '🪖', type: 'expense', scope: 'business' },
+    { label: 'Income', emoji: '💚', type: 'income', scope: 'personal' },
+  ],
+  ru: [
+    { label: 'Еда', emoji: '🍜', type: 'expense', scope: 'personal' },
+    { label: 'Транспорт', emoji: '⛽', type: 'expense', scope: 'personal' },
+    { label: 'Helm Care', emoji: '🪖', type: 'expense', scope: 'business' },
+    { label: 'Доход', emoji: '💚', type: 'income', scope: 'personal' },
+  ],
+  id: [
+    { label: 'Makanan', emoji: '🍜', type: 'expense', scope: 'personal' },
+    { label: 'Transportasi', emoji: '⛽', type: 'expense', scope: 'personal' },
+    { label: 'Helm Care', emoji: '🪖', type: 'expense', scope: 'business' },
+    { label: 'Pemasukan', emoji: '💚', type: 'income', scope: 'personal' },
+  ],
+}
 
 const TX_TYPES = ['income', 'expense', 'payroll', 'transfer']
 
@@ -164,6 +179,7 @@ export default function Add() {
   const { token }  = useAuth()
   const navigate   = useNavigate()
   const { t: tr }  = useTranslation()
+  const QUICK = QUICK_LABELS[getLang()] || QUICK_LABELS.en
   const [text, setText]   = useState('')
   const [loading, setLoading] = useState(false)
   const [result, setResult]   = useState(null)
@@ -440,7 +456,11 @@ export default function Add() {
           <textarea
             value={text}
             onChange={e => { setText(e.target.value); setSaved(false); setResult(null); setEditedTxs([]) }}
-            placeholder={'Заплатил 300к за бензин в Убуде\nПолучил 5М с клиента за проект\nКофе 35000 наличными'}
+            placeholder={getLang() === 'ru'
+              ? 'Заплатил 300к за бензин в Убуде\nПолучил 5М с клиента за проект\nКофе 35000 наличными'
+              : getLang() === 'id'
+              ? 'Bayar 300k bensin di Ubud\nTerima 5M dari klien untuk proyek\nKopi 35000 tunai'
+              : 'Paid 300k for petrol in Ubud\nReceived 5M from client for project\nCoffee 35000 cash'}
             style={{ ...inputSt, minHeight: 110, resize: 'none', lineHeight: 1.6, marginBottom: 10, padding: '12px 14px', background: 'var(--bg-2)', fontSize: 'var(--text-base)' }}
           />
 
