@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './hooks/useAuth'
 import { useAccess } from './hooks/useAccess'
+import { useSwipeBack } from './hooks/useSwipeBack'
 import Login from './pages/Login'
 import Pulse from './pages/Pulse'
 import Accounts from './pages/Accounts'
@@ -367,10 +368,55 @@ function OnboardingRoute() {
   )
 }
 
+// ── Swipe-back arc indicator ──────────────────────────────────────────────────
+function SwipeBackIndicator() {
+  const { progress, arcY } = useSwipeBack()
+  if (progress <= 0) return null
+
+  const SIZE    = 56                          // max arc diameter
+  const radius  = 20 + progress * 14         // arc grows from 20→34
+  const opacity = 0.35 + progress * 0.55     // fades in
+  const translateX = -SIZE / 2 + progress * (SIZE / 2 + 4) // slides in from left
+
+  return (
+    <div style={{
+      position: 'fixed',
+      left: 0,
+      top: arcY - SIZE / 2,
+      width: SIZE,
+      height: SIZE,
+      zIndex: 9999,
+      pointerEvents: 'none',
+      transform: `translateX(${translateX}px)`,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+    }}>
+      {/* Arc background */}
+      <svg width={SIZE} height={SIZE} viewBox={`0 0 ${SIZE} ${SIZE}`} style={{ position: 'absolute', inset: 0 }}>
+        <circle
+          cx={SIZE / 2} cy={SIZE / 2} r={radius}
+          fill={`rgba(255,255,255,${opacity * 0.18})`}
+          stroke={`rgba(255,255,255,${opacity * 0.6})`}
+          strokeWidth="1.5"
+        />
+      </svg>
+      {/* Arrow chevron */}
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+        stroke={`rgba(255,255,255,${opacity})`} strokeWidth="2.5" strokeLinecap="round"
+        style={{ position: 'relative', transform: `scale(${0.7 + progress * 0.3})` }}
+      >
+        <path d="M15 18l-6-6 6-6"/>
+      </svg>
+    </div>
+  )
+}
+
 export default function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
+        <SwipeBackIndicator />
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/" element={<PulseWrapper />} />
