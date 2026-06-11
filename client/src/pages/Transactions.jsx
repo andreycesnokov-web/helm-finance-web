@@ -248,6 +248,132 @@ function TransactionDetailsDrawer({ tx, onClose, refDirections = [], refActivity
   )
 }
 
+// ── Inline Payroll Panel ──────────────────────────────────────────────────────
+function PayrollInlinePanel({ txId, detailsMap, loadingId, t: tr }) {
+  const isLoading = loadingId === txId
+  const data      = detailsMap[txId]
+
+  if (isLoading) {
+    return (
+      <div style={{ padding: '14px 20px', color: 'var(--text-3)', fontSize: 13, fontStyle: 'italic' }}>
+        ⏳ {tr('payroll.drawerLoading')}
+      </div>
+    )
+  }
+
+  const payment = data?.payroll_payment
+  const items   = data?.items || []
+
+  const panelSt = {
+    padding: '16px 20px',
+    background: 'var(--bg-2)',
+    border: '1px solid var(--border)',
+    borderRadius: 16,
+    margin: '6px 12px 10px',
+  }
+
+  if (!payment) {
+    return (
+      <div style={panelSt}>
+        <div style={{ fontSize: 13, color: 'var(--text-3)' }}>💼 {tr('payroll.drawerNoRecord')}</div>
+      </div>
+    )
+  }
+
+  const gross      = Number(payment.gross_amount      ?? payment.amount ?? 0)
+  const deductions = Number(payment.deduction_amount  ?? 0)
+  const net        = Number(payment.net_amount        ?? payment.amount ?? 0)
+
+  function fmtPeriod(str) {
+    if (!str) return '—'
+    const [y, m] = str.split('-')
+    if (!y || !m) return str
+    return new Date(Number(y), Number(m) - 1, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+  }
+
+  function fmtDate(str) {
+    if (!str) return '—'
+    return new Date(str).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  }
+
+  const labelSt  = { fontSize: 10, fontWeight: 800, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'var(--text-3)' }
+  const valueSt  = { fontSize: 13, color: 'var(--text-2)', marginTop: 1 }
+
+  return (
+    <div style={panelSt}>
+      {/* Title row */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+        <span style={{ fontSize: 16 }}>💼</span>
+        <span style={{ fontSize: 14, fontWeight: 800, color: 'var(--text)' }}>{tr('payroll.drawerTitle')}</span>
+        {payment.status && (
+          <span style={{ fontSize: 11, background: '#E1F5EE', color: '#085041', borderRadius: 8, padding: '2px 8px', fontWeight: 600 }}>
+            {payment.status}
+          </span>
+        )}
+      </div>
+
+      {/* Meta grid */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '10px 20px', marginBottom: 14 }}>
+        <div>
+          <div style={labelSt}>{tr('payroll.drawerEmployee')}</div>
+          <div style={valueSt}>{payment.employee_name || '—'}</div>
+        </div>
+        <div>
+          <div style={labelSt}>{tr('payroll.drawerPeriod')}</div>
+          <div style={valueSt}>{fmtPeriod(payment.period_month)}</div>
+        </div>
+        <div>
+          <div style={labelSt}>{tr('payroll.drawerPaymentDate')}</div>
+          <div style={valueSt}>{fmtDate(payment.payment_date)}</div>
+        </div>
+        {payment.payment_type && (
+          <div>
+            <div style={labelSt}>{tr('payroll.drawerPaymentType')}</div>
+            <div style={valueSt}>{payment.payment_type}</div>
+          </div>
+        )}
+      </div>
+
+      {/* KPI row */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: items.length > 0 ? 14 : 0, background: 'var(--bg)', borderRadius: 10, padding: '10px 12px', border: '1px solid var(--border)' }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#085041', marginBottom: 2 }}>{tr('payroll.drawerGross')}</div>
+          <div style={{ fontSize: 14, fontWeight: 800, color: '#085041' }}>+{fmt(gross)}</div>
+        </div>
+        <div style={{ textAlign: 'center', borderLeft: '1px solid var(--border)', borderRight: '1px solid var(--border)' }}>
+          <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#991B1B', marginBottom: 2 }}>{tr('payroll.drawerDeductions')}</div>
+          <div style={{ fontSize: 14, fontWeight: 800, color: deductions > 0 ? '#991B1B' : 'var(--text-4)' }}>
+            {deductions > 0 ? `−${fmt(deductions)}` : '—'}
+          </div>
+        </div>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--text-3)', marginBottom: 2 }}>{tr('payroll.drawerNet')}</div>
+          <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--text)' }}>{fmt(net)}</div>
+        </div>
+      </div>
+
+      {/* Components */}
+      {items.length > 0 && (
+        <>
+          <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'var(--text-3)', marginBottom: 6 }}>
+            {tr('payroll.drawerComponents')}
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            {items.map(item => (
+              <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 13, padding: '4px 0', borderBottom: '0.5px solid var(--border)' }}>
+                <span style={{ color: 'var(--text-2)' }}>{item.label}</span>
+                <span style={{ fontWeight: 700, color: item.direction === 'addition' ? '#085041' : '#991B1B', fontVariantNumeric: 'tabular-nums' }}>
+                  {item.direction === 'addition' ? '+' : '−'}{fmt(item.amount)}
+                </span>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
 // ── Main Component ────────────────────────────────────────────────────────────
 export default function Transactions() {
   const { token } = useAuth()
@@ -267,9 +393,35 @@ export default function Transactions() {
   const [loading, setLoading]   = useState(true)
   const [error, setError]       = useState('')
 
-  // Drawer state
+  // Drawer state (non-payroll transactions)
   const [selectedTx, setSelectedTx] = useState(null)
   const closeDrawer = useCallback(() => setSelectedTx(null), [])
+
+  // Inline payroll expand state
+  const [expandedPayrollTxId,  setExpandedPayrollTxId]  = useState(null)
+  const [payrollDetailsByTxId, setPayrollDetailsByTxId] = useState({})
+  const [loadingPayrollTxId,   setLoadingPayrollTxId]   = useState(null)
+
+  const togglePayrollExpanded = useCallback(async (tx) => {
+    // Collapse if already open
+    if (expandedPayrollTxId === tx.id) {
+      setExpandedPayrollTxId(null)
+      return
+    }
+    setExpandedPayrollTxId(tx.id)
+    // Load if not cached
+    if (!payrollDetailsByTxId[tx.id]) {
+      setLoadingPayrollTxId(tx.id)
+      try {
+        const data = await apiFetch(`/payroll/by-transaction/${tx.id}`, token)
+        setPayrollDetailsByTxId(prev => ({ ...prev, [tx.id]: data }))
+      } catch (_) {
+        setPayrollDetailsByTxId(prev => ({ ...prev, [tx.id]: { payroll_payment: null, items: [] } }))
+      } finally {
+        setLoadingPayrollTxId(null)
+      }
+    }
+  }, [expandedPayrollTxId, payrollDetailsByTxId, token])
 
   // Reference data for resolving IDs → names in drawer
   const [refDirections,    setRefDirections]   = useState([])
@@ -463,39 +615,68 @@ export default function Transactions() {
             </thead>
             <tbody>
               {filtered.map(t => {
-                const badge = getTypeBadge(t.type)
-                const isSelected = selectedTx?.id === t.id
+                const badge       = getTypeBadge(t.type)
+                const isPayroll   = t.type === 'payroll'
+                const isExpanded  = expandedPayrollTxId === t.id
+                const isSelected  = selectedTx?.id === t.id
+
+                const handleClick = () => {
+                  if (isPayroll) {
+                    // Close drawer if open, then toggle payroll panel
+                    setSelectedTx(null)
+                    togglePayrollExpanded(t)
+                  } else {
+                    setExpandedPayrollTxId(null)
+                    setSelectedTx(isSelected ? null : t)
+                  }
+                }
+
                 return (
-                  <tr
-                    key={t.id}
-                    className={`tx-row-clickable${isSelected ? ' tx-row-selected' : ''}`}
-                    onClick={() => setSelectedTx(isSelected ? null : t)}
-                  >
-                    <td className="tx-col-date">{fmtDate(t.created_at)}</td>
-                    <td className="tx-col-desc">
-                      <div className="tx-desc-text">{t.description || '—'}</div>
-                      {t.project && <div className="tx-desc-sub">{t.project}</div>}
-                    </td>
-                    <td className="tx-col-cat">
-                      <span className="tx-cat-text">{t.category || tr('transactions.uncategorized')}</span>
-                    </td>
-                    <td className="tx-col-source">
-                      <span className="tx-source-text">{t.source || '—'}</span>
-                    </td>
-                    <td>
-                      <span className="tx-scope-badge" data-scope={t.scope || 'personal'}>
-                        {t.scope === 'business' ? 'Business' : 'Personal'}
-                      </span>
-                    </td>
-                    <td className={`tx-col-amount ${amountClass(t)}`}>
-                      {displayAmount(t)}
-                    </td>
-                    <td>
-                      <span className="type-badge" style={{ background: badge.bg, color: badge.color }}>
-                        {badge.labelKey ? tr(badge.labelKey) : badge.label}
-                      </span>
-                    </td>
-                  </tr>
+                  <>
+                    <tr
+                      key={t.id}
+                      className={`tx-row-clickable${isSelected ? ' tx-row-selected' : ''}${isExpanded ? ' tx-row-expanded' : ''}`}
+                      onClick={handleClick}
+                    >
+                      <td className="tx-col-date">{fmtDate(t.created_at)}</td>
+                      <td className="tx-col-desc">
+                        <div className="tx-desc-text">{t.description || '—'}</div>
+                        {t.project && <div className="tx-desc-sub">{t.project}</div>}
+                      </td>
+                      <td className="tx-col-cat">
+                        <span className="tx-cat-text">{t.category || tr('transactions.uncategorized')}</span>
+                      </td>
+                      <td className="tx-col-source">
+                        <span className="tx-source-text">{t.source || '—'}</span>
+                      </td>
+                      <td>
+                        <span className="tx-scope-badge" data-scope={t.scope || 'personal'}>
+                          {t.scope === 'business' ? 'Business' : 'Personal'}
+                        </span>
+                      </td>
+                      <td className={`tx-col-amount ${amountClass(t)}`}>
+                        {displayAmount(t)}
+                      </td>
+                      <td>
+                        <span className="type-badge" style={{ background: badge.bg, color: badge.color }}>
+                          {badge.labelKey ? tr(badge.labelKey) : badge.label}
+                        </span>
+                        {isPayroll && <span style={{ fontSize: 10, color: 'var(--text-4)', display: 'block', marginTop: 2 }}>{isExpanded ? '▲' : '▼'}</span>}
+                      </td>
+                    </tr>
+                    {isPayroll && isExpanded && (
+                      <tr key={`${t.id}-detail`} style={{ background: 'var(--bg)' }}>
+                        <td colSpan="7" style={{ padding: 0, border: 'none' }}>
+                          <PayrollInlinePanel
+                            txId={t.id}
+                            detailsMap={payrollDetailsByTxId}
+                            loadingId={loadingPayrollTxId}
+                            t={tr}
+                          />
+                        </td>
+                      </tr>
+                    )}
+                  </>
                 )
               })}
             </tbody>
@@ -507,38 +688,61 @@ export default function Transactions() {
       {!loading && !error && filtered.length > 0 && (
         <div className="tx-card-list">
           {filtered.map(t => {
-            const badge = getTypeBadge(t.type)
+            const badge      = getTypeBadge(t.type)
+            const isPayroll  = t.type === 'payroll'
+            const isExpanded = expandedPayrollTxId === t.id
             const isSelected = selectedTx?.id === t.id
-            const dotBg    = t.type === 'income'  ? 'var(--green-light)' : t.type === 'expense' ? 'var(--red-light)'  : t.type === 'payroll' ? 'var(--amber-light)' : 'var(--bg-3)'
-            const dotColor = t.type === 'income'  ? 'var(--green)'       : t.type === 'expense' ? 'var(--red)'        : t.type === 'payroll' ? 'var(--amber-dark)'  : 'var(--text-3)'
-            const dotIcon  = t.type === 'income'  ? '↓'                  : t.type === 'expense' ? '↑'                 : t.type === 'payroll' ? '💼'                 : '↔'
+            const dotBg    = t.type === 'income'  ? 'var(--green-light)' : t.type === 'expense' ? 'var(--red-light)'  : isPayroll ? 'var(--amber-light)' : 'var(--bg-3)'
+            const dotColor = t.type === 'income'  ? 'var(--green)'       : t.type === 'expense' ? 'var(--red)'        : isPayroll ? 'var(--amber-dark)'  : 'var(--text-3)'
+            const dotIcon  = t.type === 'income'  ? '↓'                  : t.type === 'expense' ? '↑'                 : isPayroll ? '💼'                 : '↔'
+
+            const handleClick = () => {
+              if (isPayroll) {
+                setSelectedTx(null)
+                togglePayrollExpanded(t)
+              } else {
+                setExpandedPayrollTxId(null)
+                setSelectedTx(isSelected ? null : t)
+              }
+            }
+
             return (
-              <div
-                key={t.id}
-                className={`tx-card tx-row-clickable${isSelected ? ' tx-row-selected' : ''}`}
-                onClick={() => setSelectedTx(isSelected ? null : t)}
-              >
-                <div className="tx-card-left">
-                  <div className="tx-card-dot" style={{ background: dotBg }}>
-                    <span style={{ fontSize: 14, color: dotColor }}>{dotIcon}</span>
+              <div key={t.id}>
+                <div
+                  className={`tx-card tx-row-clickable${isSelected ? ' tx-row-selected' : ''}${isExpanded ? ' tx-row-expanded' : ''}`}
+                  onClick={handleClick}
+                >
+                  <div className="tx-card-left">
+                    <div className="tx-card-dot" style={{ background: dotBg }}>
+                      <span style={{ fontSize: 14, color: dotColor }}>{dotIcon}</span>
+                    </div>
+                  </div>
+                  <div className="tx-card-body">
+                    <div className="tx-card-desc">{t.description || '—'}</div>
+                    <div className="tx-card-meta">
+                      <span>{fmtDateShort(t.created_at)}</span>
+                      {t.category && <><span className="tx-meta-dot">·</span><span>{t.category}</span></>}
+                      {t.source   && <><span className="tx-meta-dot">·</span><span>{t.source}</span></>}
+                    </div>
+                  </div>
+                  <div className="tx-card-right">
+                    <div className={amountClass(t)} style={{ fontSize: 14, fontWeight: 600 }}>
+                      {displayAmount(t)}
+                    </div>
+                    <span className="type-badge" style={{ background: badge.bg, color: badge.color, marginTop: 4 }}>
+                      {badge.labelKey ? tr(badge.labelKey) : badge.label}
+                    </span>
+                    {isPayroll && <span style={{ fontSize: 10, color: 'var(--text-4)', marginTop: 2 }}>{isExpanded ? '▲' : '▼'}</span>}
                   </div>
                 </div>
-                <div className="tx-card-body">
-                  <div className="tx-card-desc">{t.description || '—'}</div>
-                  <div className="tx-card-meta">
-                    <span>{fmtDateShort(t.created_at)}</span>
-                    {t.category && <><span className="tx-meta-dot">·</span><span>{t.category}</span></>}
-                    {t.source   && <><span className="tx-meta-dot">·</span><span>{t.source}</span></>}
-                  </div>
-                </div>
-                <div className="tx-card-right">
-                  <div className={amountClass(t)} style={{ fontSize: 14, fontWeight: 600 }}>
-                    {displayAmount(t)}
-                  </div>
-                  <span className="type-badge" style={{ background: badge.bg, color: badge.color, marginTop: 4 }}>
-                    {badge.labelKey ? tr(badge.labelKey) : badge.label}
-                  </span>
-                </div>
+                {isPayroll && isExpanded && (
+                  <PayrollInlinePanel
+                    txId={t.id}
+                    detailsMap={payrollDetailsByTxId}
+                    loadingId={loadingPayrollTxId}
+                    t={tr}
+                  />
+                )}
               </div>
             )
           })}

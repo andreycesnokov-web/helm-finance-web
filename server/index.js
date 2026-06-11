@@ -3342,6 +3342,46 @@ app.post('/api/payroll/payments', auth, async (req, res) => {
   }
 });
 
+// GET /api/payroll/by-transaction/:transactionId
+// TODO (Telegram): Telegram-created payroll payments should link to
+//   payroll_payments.transaction_id the same way as web-created payments.
+//   Telegram bot should call POST /api/payroll/payments — no separate logic needed.
+app.get('/api/payroll/by-transaction/:transactionId', auth, async (req, res) => {
+  try {
+    const userId        = req.user.userId;
+    const transactionId = Number(req.params.transactionId);
+    if (!transactionId) return res.status(400).json({ error: 'Invalid transaction ID.' });
+
+    // Security: verify transaction belongs to user
+    const { data: tx, error: txErr } = await supabase
+      .from('transactions').select('id, user_id, type').eq('id', transactionId).single();
+    if (txErr || !tx) return res.status(404).json({ error: 'Transaction not found.' });
+    if (String(tx.user_id) !== String(userId)) return res.status(403).json({ error: 'Access denied.' });
+
+    // Fetch payroll_payment linked to this transaction
+    const { data: payment, error: pmtErr } = await supabase
+      .from('payroll_payments')
+      .select('*')
+      .eq('transaction_id', transactionId)
+      .eq('user_id', userId)
+      .single();
+
+    if (pmtErr || !payment) return res.json({ payroll_payment: null, items: [] });
+
+    // Fetch items
+    const { data: items } = await supabase
+      .from('payroll_payment_items')
+      .select('*')
+      .eq('payroll_payment_id', payment.id)
+      .eq('user_id', userId)
+      .order('direction', { ascending: false }); // additions first
+
+    res.json({ payroll_payment: payment, items: items || [] });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // ── END PAYROLL V1 ────────────────────────────────────────────────────────────
 
 app.get('*', (req, res) => {
