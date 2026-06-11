@@ -1,84 +1,322 @@
 import { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { useAccess } from '../hooks/useAccess'
 import { useTranslation } from '../hooks/useTranslation'
 import { apiFetch, fmt } from '../lib/api'
-import LockedFeature from '../components/LockedFeature'
 
 function fmtDate(str) {
   if (!str) return '—'
   return new Date(str).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
-/**
- * isPayrollTx — strict guard, returns true only for genuine payroll transactions.
- *
- * A transaction is payroll if:
- *   tx.type === 'payroll'
- *   OR tx.category is a payroll category
- *   OR tx.description matches explicit payroll keywords
- *
- * NOT payroll:
- *   Opening balance, Balance adjustment, server payment, food, transport,
- *   ordinary income, ordinary expense, transfers, corrections, etc.
- */
-function isPayrollTx(tx) {
-  // Primary: explicit type field (set when created via /add with type:payroll)
-  if (tx.type === 'payroll') return true
-
-  const cat  = (tx.category    || '').toLowerCase().trim()
-  const desc = (tx.description || '').toLowerCase().trim()
-
-  // Category-based
-  if (['payroll', 'salary', 'gaji', 'bonus', 'commission'].includes(cat)) return true
-
-  // Description-based — only explicit payroll keywords
-  const KEYWORDS = ['payroll', 'salary', 'gaji', 'bonus', 'commission', 'thr', 'employee payment', 'employee salary', 'staff salary', 'worker salary']
-  if (KEYWORDS.some(kw => desc.includes(kw))) return true
-
-  // "Payment: <name>" pattern is created by the debt payment flow — NOT payroll
-  // Explicitly exclude common non-payroll patterns
-  const EXCLUDE = ['opening balance', 'balance adjustment', 'adjustment', 'correction', 'server', 'food', 'transport', 'ticket', 'coffee', 'kopi']
-  if (EXCLUDE.some(kw => desc.includes(kw))) return false
-
-  return false
+function fmtPeriod(str) {
+  if (!str) return '—'
+  const [y, m] = str.split('-')
+  if (!y || !m) return str
+  const d = new Date(Number(y), Number(m) - 1, 1)
+  return d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
 }
 
+const PAYMENT_TYPE_COLORS = {
+  salary:     { bg: '#FEF3C7', color: '#92400E' },
+  bonus:      { bg: '#E1F5EE', color: '#085041' },
+  advance:    { bg: '#E8EDFB', color: '#1e3a6e' },
+  commission: { bg: '#F3E8FF', color: '#6b21a8' },
+  other:      { bg: '#F1F5F9', color: '#475569' },
+}
+
+// ── Add Payroll Payment Modal ─────────────────────────────────────────────────
+function PayrollModal({ token, employees, wallets, onClose, onSuccess, t }) {
+  const defaultPeriod = (() => {
+    const n = new Date(); return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}`
+  })()
+
+  const [employeeId,   setEmployeeId]   = useState('')
+  const [employeeName, setEmployeeName] = useState('')
+  const [paymentType,  setPaymentType]  = useState('salary')
+  const [amount,       setAmount]       = useState('')
+  const [walletId,     setWalletId]     = useState('')
+  const [periodMonth,  setPeriodMonth]  = useState(defaultPeriod)
+  const [paymentDate,  setPaymentDate]  = useState(new Date().toISOString().slice(0, 10))
+  const [notes,        setNotes]        = useState('')
+  const [saving,       setSaving]       = useState(false)
+  const [error,        setError]        = useState('')
+
+  // When employee selected from dropdown — prefill name + wallet
+  const handleEmployeeSelect = (empId) => {
+    setEmployeeId(empId)
+    if (!empId) { setEmployeeName(''); return }
+    const emp = employees.find(e => e.id === empId)
+    if (!emp) return
+    setEmployeeName(emp.name)
+    if (emp.default_wallet_id) setWalletId(emp.default_wallet_id)
+    if (emp.default_salary) setAmount(String(emp.default_salary))
+  }
+
+  const canSubmit = employeeName.trim().length > 0 && Number(amount) > 0 && !saving
+
+  const handleSubmit = async () => {
+    if (!canSubmit) return
+    setSaving(true); setError('')
+    try {
+      const body = {
+        employee_id:   employeeId || null,
+        employee_name: employeeName.trim(),
+        payment_type:  paymentType,
+        amount:        Number(amount),
+        currency:      'IDR',
+        wallet_id:     walletId || null,
+        period_month:  periodMonth || null,
+        payment_date:  paymentDate || null,
+        notes:         notes.trim() || null,
+      }
+      const data = await apiFetch('/payroll/payments', token, { method: 'POST', body })
+      onSuccess(data)
+    } catch (e) {
+      setError(e.message || t('payroll.failMsg'))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const inputSt = {
+    width: '100%', padding: '10px 13px', borderRadius: 10, border: '1px solid var(--border)',
+    background: 'var(--bg-2)', color: 'var(--text)', fontSize: 'var(--text-sm)',
+    fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box',
+  }
+  const labelSt = {
+    display: 'block', fontSize: 10, fontWeight: 800, letterSpacing: '0.08em',
+    color: 'var(--text-3)', textTransform: 'uppercase', marginBottom: 5, marginTop: 12,
+  }
+
+  const TYPES = ['salary', 'bonus', 'advance', 'commission', 'other']
+
+  return createPortal(
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-sheet" onClick={e => e.stopPropagation()} style={{ maxHeight: '90vh', overflowY: 'auto' }}>
+        <div className="modal-drag-handle" />
+        <button className="modal-close-btn" onClick={onClose}>✕</button>
+
+        <div style={{ fontSize: 'var(--text-lg)', fontWeight: 600, color: 'var(--text)', marginBottom: 3 }}>{t('payroll.modalTitle')}</div>
+        <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-3)', marginBottom: 18 }}>💼 {t('payroll.subtitle')}</div>
+
+        {/* Employee select (optional) */}
+        {employees.length > 0 && (
+          <>
+            <label style={labelSt}>{t('payroll.employees')}</label>
+            <select style={{ ...inputSt, marginBottom: 4 }} value={employeeId} onChange={e => handleEmployeeSelect(e.target.value)}>
+              <option value="">— {t('payroll.employeeName')} —</option>
+              {employees.map(e => <option key={e.id} value={e.id}>{e.name}{e.role ? ` · ${e.role}` : ''}</option>)}
+            </select>
+          </>
+        )}
+
+        <label style={labelSt}>{t('payroll.employeeName')}</label>
+        <input type="text" style={inputSt} value={employeeName}
+          onChange={e => { setEmployeeName(e.target.value); setError('') }}
+          placeholder="Ahmad, Kevin, Marina…" />
+
+        <label style={labelSt}>{t('payroll.paymentType')}</label>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 6, marginBottom: 4 }}>
+          {TYPES.map(tp => (
+            <button key={tp} type="button" onClick={() => setPaymentType(tp)} style={{
+              padding: '8px 4px', borderRadius: 10, fontSize: 12, fontWeight: 500,
+              border: paymentType === tp ? 'none' : '0.5px solid var(--border)',
+              background: paymentType === tp ? 'var(--brand-light)' : 'none',
+              color: paymentType === tp ? 'var(--brand-dark)' : 'var(--text-3)',
+              cursor: 'pointer', fontFamily: 'inherit',
+            }}>{t(`payroll.${tp}`)}</button>
+          ))}
+        </div>
+
+        <label style={labelSt}>{t('payroll.amount')}</label>
+        <input type="number" style={inputSt} value={amount}
+          onChange={e => { setAmount(e.target.value); setError('') }}
+          placeholder="e.g. 5000000" min="1" />
+
+        {wallets.length > 0 && (
+          <>
+            <label style={labelSt}>{t('payroll.wallet')}</label>
+            <select style={inputSt} value={walletId} onChange={e => setWalletId(e.target.value)}>
+              <option value="">— {t('payroll.wallet')} —</option>
+              {wallets.map(w => <option key={w.id} value={w.id}>{w.name}{w.scope === 'personal' ? ' (Personal)' : ''}</option>)}
+            </select>
+          </>
+        )}
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          <div>
+            <label style={labelSt}>{t('payroll.periodMonth')}</label>
+            <input type="month" style={inputSt} value={periodMonth} onChange={e => setPeriodMonth(e.target.value)} />
+          </div>
+          <div>
+            <label style={labelSt}>{t('payroll.paymentDate')}</label>
+            <input type="date" style={inputSt} value={paymentDate} onChange={e => setPaymentDate(e.target.value)} />
+          </div>
+        </div>
+
+        <label style={labelSt}>{t('payroll.notes')}</label>
+        <input type="text" style={{ ...inputSt, marginBottom: 16 }} value={notes}
+          onChange={e => setNotes(e.target.value)} placeholder="Optional note" />
+
+        {error && (
+          <div style={{ background: 'var(--red-light)', color: 'var(--red-dark)', borderRadius: 10, padding: '9px 13px', fontSize: 'var(--text-sm)', border: '1px solid rgba(240,68,56,.2)', marginBottom: 12 }}>
+            {error}
+          </div>
+        )}
+
+        <button disabled={!canSubmit} onClick={handleSubmit} className="btn btn-block btn-lg"
+          style={{ background: canSubmit ? 'var(--brand)' : 'var(--bg-3)', color: canSubmit ? '#fff' : 'var(--text-4)', marginBottom: 8, opacity: saving ? 0.7 : 1 }}>
+          {saving ? t('payroll.saving') : t('payroll.create')}
+        </button>
+        <button onClick={onClose} disabled={saving} className="btn btn-ghost btn-block btn-lg">{t('payroll.cancel')}</button>
+      </div>
+    </div>,
+    document.body
+  )
+}
+
+// ── Add Employee Modal ────────────────────────────────────────────────────────
+function EmployeeModal({ token, wallets, onClose, onSuccess, t }) {
+  const [name,    setName]    = useState('')
+  const [role,    setRole]    = useState('')
+  const [salary,  setSalary]  = useState('')
+  const [walletId, setWalletId] = useState('')
+  const [payDay,  setPayDay]  = useState('')
+  const [notes,   setNotes]   = useState('')
+  const [saving,  setSaving]  = useState(false)
+  const [error,   setError]   = useState('')
+
+  const canSubmit = name.trim().length > 0 && !saving
+
+  const handleSubmit = async () => {
+    if (!canSubmit) return
+    setSaving(true); setError('')
+    try {
+      const body = {
+        name: name.trim(),
+        role: role.trim() || null,
+        default_salary: salary ? Number(salary) : null,
+        default_wallet_id: walletId || null,
+        pay_day: payDay ? Number(payDay) : null,
+        notes: notes.trim() || null,
+      }
+      const data = await apiFetch('/payroll/employees', token, { method: 'POST', body })
+      onSuccess(data.employee)
+    } catch (e) {
+      setError(e.message || t('payroll.empFail'))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const inputSt = {
+    width: '100%', padding: '10px 13px', borderRadius: 10, border: '1px solid var(--border)',
+    background: 'var(--bg-2)', color: 'var(--text)', fontSize: 'var(--text-sm)',
+    fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box',
+  }
+  const labelSt = {
+    display: 'block', fontSize: 10, fontWeight: 800, letterSpacing: '0.08em',
+    color: 'var(--text-3)', textTransform: 'uppercase', marginBottom: 5, marginTop: 12,
+  }
+
+  return createPortal(
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-sheet" onClick={e => e.stopPropagation()}>
+        <div className="modal-drag-handle" />
+        <button className="modal-close-btn" onClick={onClose}>✕</button>
+
+        <div style={{ fontSize: 'var(--text-lg)', fontWeight: 600, color: 'var(--text)', marginBottom: 16 }}>{t('payroll.employeeModalTitle')}</div>
+
+        <label style={labelSt}>{t('payroll.empName')}</label>
+        <input type="text" style={inputSt} value={name} autoFocus
+          onChange={e => { setName(e.target.value); setError('') }}
+          onKeyDown={e => { if (e.key === 'Enter' && canSubmit) handleSubmit() }}
+          placeholder="Ahmad Rizky, Kevin…" />
+
+        <label style={labelSt}>{t('payroll.empRole')}</label>
+        <input type="text" style={inputSt} value={role}
+          onChange={e => setRole(e.target.value)} placeholder="Developer, Designer, Manager…" />
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          <div>
+            <label style={labelSt}>{t('payroll.empSalary')}</label>
+            <input type="number" style={inputSt} value={salary}
+              onChange={e => setSalary(e.target.value)} placeholder="5000000" />
+          </div>
+          <div>
+            <label style={labelSt}>{t('payroll.empPayDay')}</label>
+            <input type="number" style={inputSt} value={payDay}
+              onChange={e => setPayDay(e.target.value)} placeholder="25" min="1" max="31" />
+          </div>
+        </div>
+
+        {wallets.length > 0 && (
+          <>
+            <label style={labelSt}>{t('payroll.empWallet')}</label>
+            <select style={inputSt} value={walletId} onChange={e => setWalletId(e.target.value)}>
+              <option value="">— {t('payroll.wallet')} —</option>
+              {wallets.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
+            </select>
+          </>
+        )}
+
+        <label style={labelSt}>{t('payroll.empNotes')}</label>
+        <input type="text" style={{ ...inputSt, marginBottom: 16 }} value={notes}
+          onChange={e => setNotes(e.target.value)} placeholder="Optional" />
+
+        {error && (
+          <div style={{ background: 'var(--red-light)', color: 'var(--red-dark)', borderRadius: 10, padding: '9px 13px', fontSize: 'var(--text-sm)', border: '1px solid rgba(240,68,56,.2)', marginBottom: 12 }}>
+            {error}
+          </div>
+        )}
+
+        <button disabled={!canSubmit} onClick={handleSubmit} className="btn btn-block btn-lg"
+          style={{ background: canSubmit ? 'var(--brand)' : 'var(--bg-3)', color: canSubmit ? '#fff' : 'var(--text-4)', marginBottom: 8, opacity: saving ? 0.7 : 1 }}>
+          {saving ? t('payroll.empSaving') : t('payroll.empCreate')}
+        </button>
+        <button onClick={onClose} disabled={saving} className="btn btn-ghost btn-block btn-lg">{t('payroll.cancel')}</button>
+      </div>
+    </div>,
+    document.body
+  )
+}
+
+// ── Main Payroll Page ─────────────────────────────────────────────────────────
 export default function Payroll() {
   const { token }  = useAuth()
   const navigate   = useNavigate()
   const { t } = useTranslation()
   const { hasFeature, effectivePlan, loading: accessLoading } = useAccess()
-  const [txs, setTxs]         = useState([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError]     = useState('')
 
-  useEffect(() => {
-    // Request type=payroll (now filtered by backend) + period=all (full history)
-    // Client-side isPayrollTx() acts as a defense-in-depth guard
-    apiFetch('/transactions?type=payroll&period=all', token)
-      .then(data => {
-        const all = Array.isArray(data) ? data : []
-        // Defense-in-depth: even if backend returns extras, filter strictly
-        setTxs(all.filter(isPayrollTx))
+  const [overview,  setOverview]  = useState(null)
+  const [loading,   setLoading]   = useState(true)
+  const [error,     setError]     = useState('')
+  const [wallets,   setWallets]   = useState([])
+  const [showPaymentModal, setShowPaymentModal] = useState(false)
+  const [showEmployeeModal, setShowEmployeeModal] = useState(false)
+  const [successMsg, setSuccessMsg] = useState('')
+
+  const load = () => {
+    setLoading(true)
+    Promise.all([
+      apiFetch('/payroll/overview', token),
+      apiFetch('/wallets', token),
+    ])
+      .then(([ov, wRes]) => {
+        setOverview(ov)
+        setWallets(wRes.wallets || [])
       })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false))
-  }, [token])
+  }
 
-  if (loading && !txs.length) return <div className="page-loading">Loading payroll…</div>
-
-  const now       = new Date()
-  const thisMonth = txs.filter(t => {
-    const d = new Date(t.created_at)
-    return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()
-  })
-
-  const totalPaidThisMonth = thisMonth.reduce((s, t) => s + Number(t.amount_original || t.amount_idr || 0), 0)
-  const totalAll           = txs.reduce((s, t)      => s + Number(t.amount_original || t.amount_idr || 0), 0)
+  useEffect(() => { if (token) load() }, [token])
 
   // ── Feature gate ──────────────────────────────────────────────────────────
+  const LockedFeature = require('../components/LockedFeature').default
   if (!accessLoading && !hasFeature('payroll_enabled')) {
     return (
       <div className="hf-page">
@@ -95,15 +333,35 @@ export default function Payroll() {
           currentPlan={effectivePlan}
           icon="💼"
           bullets={[
-            'Log salary and bonus payments',
+            'Manage employees and salary schedules',
+            'Log salary, bonus and advance payments',
             'Payroll automatically affects Pulse cash flow',
             'Monthly payroll cost summary',
-            'Payroll history per employee',
           ]}
         />
       </div>
     )
   }
+
+  if (loading) return <div className="page-loading">Loading payroll…</div>
+
+  const employees = overview?.employees || []
+  const payments  = overview?.payments  || []
+  const summary   = overview?.summary   || {}
+
+  const handlePaymentSuccess = (data) => {
+    setShowPaymentModal(false)
+    setSuccessMsg(t('payroll.success'))
+    setTimeout(() => setSuccessMsg(''), 3500)
+    load()
+  }
+
+  const handleEmployeeSuccess = (emp) => {
+    setShowEmployeeModal(false)
+    load()
+  }
+
+  const hasAny = employees.length > 0 || payments.length > 0
 
   return (
     <div className="hf-page">
@@ -114,93 +372,153 @@ export default function Payroll() {
           <div className="hf-page-title">{t('payroll.title')}</div>
           <div className="hf-page-subtitle">{t('payroll.subtitle')}</div>
         </div>
-        <div className="hf-page-actions">
-          {/* Routes to /add with payroll context — AI parser creates type:payroll if user describes salary */}
-          <button className="btn btn-primary btn-md" onClick={() => navigate('/add?type=payroll')}>{t('payroll.addPayroll')}</button>
+        <div className="hf-page-actions" style={{ display: 'flex', gap: 8 }}>
+          <button className="btn btn-secondary btn-md" onClick={() => setShowEmployeeModal(true)}>{t('payroll.addEmployee')}</button>
+          <button className="btn btn-primary btn-md" onClick={() => setShowPaymentModal(true)}>{t('payroll.addPayment')}</button>
         </div>
       </div>
 
       {error && <div className="page-error" style={{ marginBottom: 16 }}>{error}</div>}
-
-      {/* ── Empty state — honest, no fake data ─── */}
-      {!loading && txs.length === 0 && (
-        <div className="empty-state">
-          <div className="empty-state-icon">💼</div>
-          <div className="empty-state-title">{t('payroll.noRecords')}</div>
-          <div className="empty-state-sub">{t('payroll.noRecordsSub')}</div>
-          <button className="empty-state-cta" onClick={() => navigate('/add?type=payroll')}>{t('payroll.addCta')}</button>
+      {successMsg && (
+        <div style={{ background: 'var(--green-light)', color: 'var(--green-dark)', borderRadius: 12, padding: '11px 16px', fontSize: 'var(--text-sm)', fontWeight: 500, marginBottom: 16, border: '1px solid rgba(5,150,105,.2)' }}>
+          ✓ {successMsg}
         </div>
       )}
 
-      {/* ── Summary — only shown when payroll data exists ─── */}
-      {txs.length > 0 && (
+      {/* ── Empty state ─── */}
+      {!hasAny && (
+        <div className="empty-state">
+          <div className="empty-state-icon">💼</div>
+          <div className="empty-state-title">{t('payroll.noEmployees')}</div>
+          <div className="empty-state-sub">{t('payroll.noEmployeesSub')}</div>
+          <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
+            <button className="empty-state-cta" onClick={() => setShowEmployeeModal(true)}>{t('payroll.addEmployeeCta')}</button>
+            <button className="btn btn-secondary btn-md" style={{ borderRadius: 12 }} onClick={() => setShowPaymentModal(true)}>{t('payroll.addCta')}</button>
+          </div>
+        </div>
+      )}
+
+      {hasAny && (
         <>
+          {/* ── Summary cards ─── */}
           <div className="summary-grid" style={{ marginBottom: 20 }}>
             <div className="summary-card">
               <div className="summary-card-label">{t('payroll.paidThisMonth')}</div>
-              <div className="summary-card-value" style={{ color: 'var(--text)' }}>{fmt(totalPaidThisMonth)}</div>
-              <div className="summary-card-sub">IDR · {thisMonth.length}</div>
+              <div className="summary-card-value" style={{ color: 'var(--text)' }}>{fmt(summary.paid_this_month || 0)}</div>
+              <div className="summary-card-sub">IDR · {summary.payments_this_month || 0} payments</div>
+            </div>
+            <div className="summary-card">
+              <div className="summary-card-label">{t('payroll.employees')}</div>
+              <div className="summary-card-value" style={{ color: 'var(--text)' }}>{summary.employee_count || 0}</div>
+              <div className="summary-card-sub">active</div>
             </div>
             <div className="summary-card">
               <div className="summary-card-label">{t('payroll.totalRecords')}</div>
-              <div className="summary-card-value" style={{ color: 'var(--text)' }}>{txs.length}</div>
+              <div className="summary-card-value" style={{ color: 'var(--text)' }}>{payments.length}</div>
               <div className="summary-card-sub">{t('payroll.allPayrollTx')}</div>
             </div>
             <div className="summary-card">
-              <div className="summary-card-label">{t('payroll.dueToday')}</div>
-              <div className="summary-card-value" style={{ color: 'var(--text-3)' }}>—</div>
-              <div className="summary-card-sub">{t('payroll.scheduledPayroll')}</div>
-            </div>
-            <div className="summary-card">
               <div className="summary-card-label">{t('payroll.totalPaid')}</div>
-              <div className="summary-card-value" style={{ color: 'var(--red-dark)' }}>{fmt(totalAll)}</div>
+              <div className="summary-card-value" style={{ color: 'var(--red-dark)' }}>{fmt(summary.total_paid_all || 0)}</div>
               <div className="summary-card-sub">{t('payroll.allTime')}</div>
             </div>
           </div>
 
-          {/* ── Payroll history ─── */}
-          <div style={{ marginBottom: 24 }}>
-            <div className="section-title">{t('payroll.history')} · {txs.length}</div>
-            <div className="item-list-card">
-              {txs.map(t => {
-                const amount = Number(t.amount_original || t.amount_idr || 0)
-                const cur    = t.currency_original && t.currency_original !== 'IDR' ? t.currency_original : 'IDR'
-                return (
-                  <div key={t.id} className="item-row">
-                    <div style={{ width: 36, height: 36, borderRadius: 10, background: 'var(--amber-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, flexShrink: 0 }}>
-                      💼
+          {/* ── Employees ─── */}
+          {employees.length > 0 && (
+            <div style={{ marginBottom: 24 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                <div className="section-title">{t('payroll.employees')} · {employees.length}</div>
+                <button className="link-btn" onClick={() => setShowEmployeeModal(true)}>+ {t('payroll.addEmployee')}</button>
+              </div>
+              <div className="item-list-card">
+                {employees.map(emp => (
+                  <div key={emp.id} className="item-row">
+                    <div style={{ width: 36, height: 36, borderRadius: 10, background: 'var(--brand-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, flexShrink: 0 }}>
+                      👤
                     </div>
                     <div className="item-row-left">
-                      <div className="item-row-name">{t.description || t.category || 'Payroll'}</div>
+                      <div className="item-row-name">{emp.name}</div>
                       <div className="item-row-sub">
-                        {fmtDate(t.created_at)}
-                        {t.source ? ` · ${t.source}` : ''}
-                        {t.category && t.category !== t.description ? ` · ${t.category}` : ''}
+                        {emp.role || '—'}
+                        {emp.pay_day ? ` · Payday: ${emp.pay_day}` : ''}
                       </div>
                     </div>
                     <div className="item-row-right">
-                      <div className="item-row-amount" style={{ color: 'var(--red-dark)' }}>−{fmt(amount)} {cur}</div>
-                      <span className="status-pill open">Payroll</span>
+                      {emp.default_salary
+                        ? <div className="item-row-amount">{fmt(emp.default_salary)} IDR</div>
+                        : <div className="item-row-amount" style={{ color: 'var(--text-4)' }}>—</div>}
+                      <span className="status-pill open">{t('payroll.salary')}</span>
                     </div>
                   </div>
-                )
-              })}
+                ))}
+              </div>
             </div>
+          )}
 
+          {/* ── Payroll payments ─── */}
+          <div style={{ marginBottom: 24 }}>
+            <div className="section-title">{t('payroll.history')} · {payments.length}</div>
+            {payments.length === 0 ? (
+              <div style={{ background: 'var(--bg-2)', borderRadius: 14, padding: '24px 16px', textAlign: 'center', border: '1px solid var(--border)' }}>
+                <div style={{ fontSize: 28, marginBottom: 8 }}>💼</div>
+                <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-3)', marginBottom: 12 }}>{t('payroll.noRecords')}</div>
+                <button className="btn btn-primary btn-md" onClick={() => setShowPaymentModal(true)}>{t('payroll.addCta')}</button>
+              </div>
+            ) : (
+              <div className="item-list-card">
+                {payments.map(p => {
+                  const colors = PAYMENT_TYPE_COLORS[p.payment_type] || PAYMENT_TYPE_COLORS.other
+                  return (
+                    <div key={p.id} className="item-row">
+                      <div style={{ width: 36, height: 36, borderRadius: 10, background: colors.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, flexShrink: 0 }}>
+                        💼
+                      </div>
+                      <div className="item-row-left">
+                        <div className="item-row-name">{p.employee_name}</div>
+                        <div className="item-row-sub">
+                          {fmtDate(p.payment_date)}
+                          {p.period_month ? ` · ${fmtPeriod(p.period_month)}` : ''}
+                          {p.notes ? ` · ${p.notes}` : ''}
+                        </div>
+                      </div>
+                      <div className="item-row-right">
+                        <div className="item-row-amount" style={{ color: 'var(--red-dark)' }}>−{fmt(p.amount)} IDR</div>
+                        <span className="status-pill open" style={{ background: colors.bg, color: colors.color }}>
+                          {t(`payroll.${p.payment_type}`) || p.payment_type}
+                        </span>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
             <div style={{ textAlign: 'center', marginTop: 12 }}>
               <button className="link-btn" onClick={() => navigate('/transactions')}>{t('payroll.viewAllTx')}</button>
             </div>
           </div>
-
-          {/* ── AI parser hint ─── */}
-          <div className="hf-card" style={{ background: 'var(--bg-2)', border: '1px solid var(--border)' }}>
-            <div style={{ fontSize: 11, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 800, marginBottom: 8 }}>{t('payroll.howToAdd')}</div>
-            <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-2)', lineHeight: 1.6 }}>
-              Use <strong>Add</strong> and describe the payment as a salary or payroll transaction. The AI parser will classify it correctly.<br />
-              <span style={{ color: 'var(--text-3)', fontStyle: 'italic' }}>Example: "paid salary to Ahmad 5 million" or "gaji karyawan 5 juta"</span>
-            </div>
-          </div>
         </>
+      )}
+
+      {/* ── Modals ─── */}
+      {showPaymentModal && (
+        <PayrollModal
+          token={token}
+          employees={employees}
+          wallets={wallets}
+          onClose={() => setShowPaymentModal(false)}
+          onSuccess={handlePaymentSuccess}
+          t={t}
+        />
+      )}
+      {showEmployeeModal && (
+        <EmployeeModal
+          token={token}
+          wallets={wallets}
+          onClose={() => setShowEmployeeModal(false)}
+          onSuccess={handleEmployeeSuccess}
+          t={t}
+        />
       )}
     </div>
   )

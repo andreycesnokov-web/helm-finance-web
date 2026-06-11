@@ -3076,6 +3076,225 @@ app.delete('/api/user/reset-data', auth, async (req, res) => {
   }
 });
 
+// ── PAYROLL V1 ───────────────────────────────────────────────────────────────
+
+// GET /api/payroll/employees
+app.get('/api/payroll/employees', auth, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { data, error } = await supabase
+      .from('payroll_employees')
+      .select('*')
+      .eq('user_id', userId)
+      .neq('status', 'archived')
+      .order('name', { ascending: true });
+    if (error) throw error;
+    res.json({ employees: data || [] });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// POST /api/payroll/employees
+app.post('/api/payroll/employees', auth, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { name, role, default_salary, currency, pay_day, default_wallet_id, notes } = req.body;
+    if (!name || !name.trim()) return res.status(400).json({ error: 'Employee name is required.' });
+
+    // Validate wallet belongs to user if supplied
+    if (default_wallet_id) {
+      const { data: w } = await supabase.from('wallets').select('id').eq('id', default_wallet_id).eq('user_id', userId).single();
+      if (!w) return res.status(400).json({ error: 'Invalid wallet.' });
+    }
+
+    const { data, error } = await supabase.from('payroll_employees').insert({
+      user_id: userId,
+      name: name.trim(),
+      role: role?.trim() || null,
+      default_salary: default_salary ? Number(default_salary) : null,
+      currency: currency || 'IDR',
+      pay_day: pay_day ? Number(pay_day) : null,
+      default_wallet_id: default_wallet_id || null,
+      notes: notes?.trim() || null,
+    }).select().single();
+    if (error) throw error;
+    res.json({ employee: data });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// PATCH /api/payroll/employees/:id
+app.patch('/api/payroll/employees/:id', auth, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { id } = req.params;
+    const { name, role, default_salary, currency, pay_day, default_wallet_id, status, notes } = req.body;
+
+    const { data: existing } = await supabase.from('payroll_employees').select('id').eq('id', id).eq('user_id', userId).single();
+    if (!existing) return res.status(404).json({ error: 'Employee not found.' });
+
+    const updates = { updated_at: new Date().toISOString() };
+    if (name !== undefined)              updates.name              = name.trim();
+    if (role !== undefined)              updates.role              = role?.trim() || null;
+    if (default_salary !== undefined)    updates.default_salary    = default_salary ? Number(default_salary) : null;
+    if (currency !== undefined)          updates.currency          = currency;
+    if (pay_day !== undefined)           updates.pay_day           = pay_day ? Number(pay_day) : null;
+    if (default_wallet_id !== undefined) updates.default_wallet_id = default_wallet_id || null;
+    if (status !== undefined)            updates.status            = status;
+    if (notes !== undefined)             updates.notes             = notes?.trim() || null;
+
+    const { data, error } = await supabase.from('payroll_employees').update(updates).eq('id', id).select().single();
+    if (error) throw error;
+    res.json({ employee: data });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// DELETE /api/payroll/employees/:id  — soft delete
+app.delete('/api/payroll/employees/:id', auth, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { id } = req.params;
+    const { data: existing } = await supabase.from('payroll_employees').select('id').eq('id', id).eq('user_id', userId).single();
+    if (!existing) return res.status(404).json({ error: 'Employee not found.' });
+
+    const { error } = await supabase.from('payroll_employees').update({ status: 'archived', updated_at: new Date().toISOString() }).eq('id', id);
+    if (error) throw error;
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// GET /api/payroll/payments
+app.get('/api/payroll/payments', auth, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { data, error } = await supabase
+      .from('payroll_payments')
+      .select('*, payroll_employees(name, role)')
+      .eq('user_id', userId)
+      .order('payment_date', { ascending: false });
+    if (error) throw error;
+    res.json({ payments: data || [] });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// GET /api/payroll/overview
+app.get('/api/payroll/overview', auth, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+
+    const [empRes, payRes] = await Promise.all([
+      supabase.from('payroll_employees').select('id, name, role, default_salary, currency, pay_day').eq('user_id', userId).neq('status', 'archived').order('name'),
+      supabase.from('payroll_payments').select('*').eq('user_id', userId).order('payment_date', { ascending: false }),
+    ]);
+
+    const employees = empRes.data || [];
+    const payments  = payRes.data || [];
+
+    const now = new Date();
+    const thisMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const paidThisMonth = payments
+      .filter(p => (p.period_month || '').startsWith(thisMonth) && p.status === 'paid')
+      .reduce((s, p) => s + Number(p.amount), 0);
+    const totalPaidAll = payments
+      .filter(p => p.status === 'paid')
+      .reduce((s, p) => s + Number(p.amount), 0);
+
+    res.json({
+      employees,
+      payments: payments.slice(0, 20),
+      summary: {
+        employee_count: employees.length,
+        paid_this_month: paidThisMonth,
+        total_paid_all: totalPaidAll,
+        payments_this_month: payments.filter(p => (p.period_month || '').startsWith(thisMonth)).length,
+      },
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// POST /api/payroll/payments
+// Creates payroll_payment + linked transaction (same cash logic as normal transactions)
+app.post('/api/payroll/payments', auth, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const {
+      employee_id,
+      employee_name,
+      amount,
+      currency = 'IDR',
+      payment_type = 'salary',
+      period_month,
+      payment_date,
+      wallet_id,
+      notes,
+    } = req.body;
+
+    if (!employee_name || !employee_name.trim()) return res.status(400).json({ error: 'Employee name is required.' });
+    if (!amount || Number(amount) <= 0)           return res.status(400).json({ error: 'Amount must be positive.' });
+
+    // Validate wallet
+    let wallet = null;
+    if (wallet_id) {
+      const { data: w } = await supabase.from('wallets').select('id, name, scope, currency').eq('id', wallet_id).eq('user_id', userId).single();
+      if (!w) return res.status(400).json({ error: 'Invalid or inaccessible wallet.' });
+      wallet = w;
+    }
+
+    const payDate = payment_date || new Date().toISOString().slice(0, 10);
+    const typeLabel = payment_type.charAt(0).toUpperCase() + payment_type.slice(1);
+    const description = `${typeLabel} for ${employee_name.trim()}`;
+
+    // 1. Create transaction (same logic as batch endpoint)
+    const { data: tx, error: txErr } = await supabase.from('transactions').insert({
+      user_id:          userId,
+      type:             'payroll',
+      amount_original:  Number(amount),
+      amount_idr:       Number(amount),
+      currency_original: currency,
+      description,
+      source:           wallet ? wallet.name : null,
+      wallet_id:        wallet_id || null,
+      scope:            wallet ? (wallet.scope || 'business') : 'business',
+      category:         'payroll',
+      transaction_date: payDate,
+    }).select().single();
+    if (txErr) throw txErr;
+
+    // 2. Create payroll_payment linked to the transaction
+    const { data: payment, error: pmtErr } = await supabase.from('payroll_payments').insert({
+      user_id:       userId,
+      employee_id:   employee_id || null,
+      transaction_id: tx.id,
+      employee_name: employee_name.trim(),
+      amount:        Number(amount),
+      currency,
+      payment_type,
+      period_month:  period_month || null,
+      payment_date:  payDate,
+      wallet_id:     wallet_id || null,
+      status:        'paid',
+      notes:         notes?.trim() || null,
+    }).select().single();
+    if (pmtErr) throw pmtErr;
+
+    res.json({ payment, transaction: tx });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ── END PAYROLL V1 ────────────────────────────────────────────────────────────
+
 app.get('*', (req, res) => {
   res.sendFile('index.html', { root: 'client/dist' });
 });

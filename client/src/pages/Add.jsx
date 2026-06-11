@@ -455,10 +455,17 @@ export default function Add() {
       {tab === 'tx' && (
         <div style={{ padding: '0 16px' }}>
           {presetType === 'payroll' && (
-            <div style={{ background: 'var(--amber-light)', border: '1px solid rgba(180,130,0,.2)', borderRadius: 10, padding: '10px 13px', marginBottom: 12, fontSize: 'var(--text-sm)', color: 'var(--amber-dark, #92400E)' }}>
-              💼 {getLang() === 'ru' ? 'Опишите зарплатную выплату — сумму, сотрудника и кошелёк'
+            <div style={{ background: 'var(--amber-light)', border: '1px solid rgba(180,130,0,.2)', borderRadius: 10, padding: '10px 13px', marginBottom: 12, fontSize: 'var(--text-sm)', color: '#92400E', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+              <span>💼 {getLang() === 'ru' ? 'Опишите зарплатную выплату — сумму, сотрудника и кошелёк'
                  : getLang() === 'id' ? 'Jelaskan pembayaran gaji — jumlah, karyawan, dan dompet'
-                 : 'Describe the salary payment — amount, employee name, and wallet'}
+                 : 'Describe the salary payment — amount, employee name, and wallet'}</span>
+              <button onClick={() => navigate('/payroll')} style={{
+                background: 'rgba(146,64,14,.12)', border: 'none', borderRadius: 8,
+                padding: '5px 10px', fontSize: 11, fontWeight: 700, color: '#92400E',
+                cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'inherit',
+              }}>
+                {getLang() === 'ru' ? 'Модуль Зарплаты →' : getLang() === 'id' ? 'Modul Gaji →' : 'Payroll Module →'}
+              </button>
             </div>
           )}
           <label style={mainLabelSt}>{tr('add.whatHappened')}</label>
