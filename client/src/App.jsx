@@ -4,6 +4,27 @@ import { AuthProvider, useAuth } from './hooks/useAuth'
 import { useAccess } from './hooks/useAccess'
 import { useSwipeBack } from './hooks/useSwipeBack'
 import { useTranslation } from './hooks/useTranslation'
+import { getLang } from './i18n/index'
+
+// ── Localize text from backend (AI insight strings) ──────────────────────────
+const RU_TEXT_MAP = {
+  'Business is financially stable': 'Финансы бизнеса стабильны',
+  'Immediate cash action required': 'Требуются действия по деньгам',
+  'Cash is strong with no urgent payment risks detected. Keep monitoring monthly.': 'Денежная позиция стабильная, срочных рисков нет. Продолжайте контролировать финансы.',
+  'Not enough expense history': 'Недостаточно истории расходов',
+  'Runway unknown — add expenses': 'Запас денег неизвестен — добавьте расходы',
+  'No payables': 'Обязательств нет',
+  'No receivables': 'Дебиторки нет',
+  'No monthly data yet': 'За месяц пока нет данных',
+  'No significant risks': 'Существенных рисков нет',
+  'Finances look stable': 'Финансы выглядят стабильно',
+  'No urgent actions detected. Keep adding transactions daily and review cash weekly.': 'Срочных действий нет. Продолжайте добавлять операции и проверять деньги еженедельно.',
+}
+function localizeText(text, lang) {
+  if (!text) return text
+  if (lang !== 'ru') return text
+  return RU_TEXT_MAP[text] || text
+}
 import Login from './pages/Login'
 import Pulse from './pages/Pulse'
 import Accounts from './pages/Accounts'
@@ -34,43 +55,44 @@ const NAV_KEYS = [
 ]
 
 // ── Desktop sidebar nav groups ────────────────────────────────────────────────
+// Titles resolved at render time via t() in Sidebar component
 // active: true  → page exists, link is clickable
 // active: false → coming soon, rendered as disabled (no navigation, no crash)
 const SIDEBAR_GROUPS = [
   {
-    title: 'OVERVIEW',
+    titleKey: 'nav.sectionOverview',
     items: [
-      { path: '/',      label: 'Pulse',  active: true,
+      { path: '/',      labelKey: 'nav.pulse',  label: 'Pulse',  active: true,
         icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg> },
-      { path: '/radar', label: 'Radar',  active: true,
+      { path: '/radar', labelKey: 'nav.radar',  label: 'Radar',  active: true,
         icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg> },
-      { path: '/cfo',   label: 'AI CFO', active: true,
+      { path: '/cfo',   labelKey: 'nav.cfo',    label: 'AI CFO', active: true,
         icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg> },
     ],
   },
   {
-    title: 'FINANCE',
+    titleKey: 'nav.sectionFinance',
     items: [
-      { path: '/transactions', label: 'Transactions', active: true,
+      { path: '/transactions', labelKey: 'nav.transactions', label: 'Transactions', active: true,
         icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6" strokeWidth="2.5"/><line x1="3" y1="12" x2="3.01" y2="12" strokeWidth="2.5"/><line x1="3" y1="18" x2="3.01" y2="18" strokeWidth="2.5"/></svg> },
-      { path: '/accounts',    label: 'Accounts',     active: true,
+      { path: '/accounts',    labelKey: 'nav.accounts',    label: 'Accounts',     active: true,
         icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg> },
-      { path: '/invoices',    label: 'Invoices',     active: true,
+      { path: '/invoices',    labelKey: 'nav.invoices',    label: 'Invoices',     active: true,
         icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg> },
-      { path: '/receivables', label: 'Receivables',  active: true,
+      { path: '/receivables', labelKey: 'nav.receivables', label: 'Receivables',  active: true,
         icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg> },
-      { path: '/payables',    label: 'Payables',     active: true,
+      { path: '/payables',    labelKey: 'nav.payables',    label: 'Payables',     active: true,
         icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/><polyline points="17 18 23 18 23 12"/></svg> },
     ],
   },
   {
-    title: 'OPERATIONS',
+    titleKey: 'nav.sectionOperations',
     items: [
-      { path: '/payroll',   label: 'Payroll',   active: true,
+      { path: '/payroll',   labelKey: 'nav.payroll',   label: 'Payroll',   active: true,
         icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg> },
-      { path: '/tasks',     label: 'Tasks',     active: true,
+      { path: '/tasks',     labelKey: 'nav.tasks',     label: 'Tasks',     active: true,
         icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg> },
-      { path: '/approvals', label: 'Approvals', active: true,
+      { path: '/approvals', labelKey: 'nav.approvals', label: 'Approvals', active: true,
         icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg> },
     ],
   },
@@ -97,6 +119,7 @@ function Sidebar() {
   const navigate = useNavigate()
   const { user } = useAuth()
   const { planLabel, isTrialActive, effectivePlan, hasFeature } = useAccess()
+  const { t } = useTranslation()
 
   const initials = (user?.firstName?.[0] || user?.first_name?.[0] || 'A').toUpperCase()
   const displayName = user?.firstName || user?.first_name || 'Account'
@@ -134,8 +157,8 @@ function Sidebar() {
       {/* ── Nav groups ─── */}
       <div className="sidebar-nav-scroll">
         {SIDEBAR_GROUPS.map(group => (
-          <div key={group.title} className="sidebar-section">
-            <div className="sidebar-section-title">{group.title}</div>
+          <div key={group.titleKey} className="sidebar-section">
+            <div className="sidebar-section-title">{t(group.titleKey)}</div>
             {group.items.map(item => {
               const isActive = location.pathname === item.path
 
@@ -144,7 +167,7 @@ function Sidebar() {
                 return (
                   <div key={item.path} className="sidebar-nav-item disabled">
                     <span className="sidebar-nav-item-icon">{item.icon}</span>
-                    <span className="sidebar-nav-item-label">{item.label}</span>
+                    <span className="sidebar-nav-item-label">{t(item.labelKey)}</span>
                     <span className="coming-soon-badge">Soon</span>
                   </div>
                 )
@@ -165,7 +188,7 @@ function Sidebar() {
                   onClick={() => navigate(item.path)}
                 >
                   <span className="sidebar-nav-item-icon">{item.icon}</span>
-                  <span className="sidebar-nav-item-label">{item.label}</span>
+                  <span className="sidebar-nav-item-label">{t(item.labelKey)}</span>
                   {isLocked && (
                     <span style={{
                       fontSize: 9, fontWeight: 700, lineHeight: 1,
@@ -216,11 +239,25 @@ function BottomNav() {
 }
 
 export function RightPanel({ data }) {
+  const { t } = useTranslation()
+  const lang = getLang()
   const d = data || {}
   const upcoming = (d.debts || []).filter(x => !x.is_settled).slice(0, 5)
   const statusDot = d.aiStatus === 'critical' ? '#F04438' : d.aiStatus === 'attention' ? '#F79009' : '#12B76A'
-  const statusLabel = d.aiStatus === 'critical' ? 'Critical' : d.aiStatus === 'attention' ? 'Attention' : 'Healthy'
+  const statusLabel = d.aiStatus === 'critical' ? t('pulse.critical') : d.aiStatus === 'attention' ? t('common.attention') : t('pulse.healthy')
   const runwayColor = (d.runway || 0) > 14 ? 'var(--green-dark)' : (d.runway || 0) > 7 ? 'var(--amber-dark)' : 'var(--red)'
+
+  const recRu = lang === 'ru'
+    ? ((d.runway || 0) < 7
+        ? 'Собирайте дебиторку немедленно — высокий риск для денег.'
+        : (d.runway || 0) < 14
+          ? 'Проверьте ближайшие платежи и защитите запас дней.'
+          : 'Финансы стабильны. Сосредоточьтесь на росте дохода.')
+    : ((d.runway || 0) < 7
+        ? 'Collect receivables immediately — cash risk is high.'
+        : (d.runway || 0) < 14
+          ? 'Review upcoming payments and protect runway.'
+          : 'Finances look stable. Focus on growing income.')
 
   const SecTitle = ({ children }) => (
     <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.09em', marginBottom: 10 }}>{children}</div>
@@ -248,17 +285,13 @@ export function RightPanel({ data }) {
           </div>
           {/* AI text */}
           <div style={{ fontSize: 14, color: 'rgba(255,255,255,.80)', lineHeight: 1.6, marginBottom: 10 }}>
-            {d.aiText || 'Analysing your financial position...'}
+            {localizeText(d.aiText, lang) || (lang === 'ru' ? 'Анализируем финансовую позицию...' : 'Analysing your financial position...')}
           </div>
           {/* Recommendation */}
           <div style={{ borderTop: '0.5px solid rgba(255,255,255,.08)', paddingTop: 10 }}>
-            <div style={{ fontSize: 11, color: 'rgba(99,152,255,.8)', letterSpacing: '0.07em', marginBottom: 5, fontWeight: 800 }}>RECOMMENDATION</div>
+            <div style={{ fontSize: 11, color: 'rgba(99,152,255,.8)', letterSpacing: '0.07em', marginBottom: 5, fontWeight: 800 }}>{t('pulse.recommendation2')}</div>
             <div style={{ fontSize: 13, color: 'rgba(255,255,255,.65)', lineHeight: 1.55 }}>
-              {(d.runway || 0) < 7
-                ? 'Collect receivables immediately — cash risk is high.'
-                : (d.runway || 0) < 14
-                  ? 'Review upcoming payments and protect runway.'
-                  : 'Finances look stable. Focus on growing income.'}
+              {recRu}
             </div>
           </div>
         </div>
@@ -266,9 +299,9 @@ export function RightPanel({ data }) {
 
       {/* ── Upcoming ─── */}
       <div style={{ marginBottom: 18 }}>
-        <SecTitle>Upcoming</SecTitle>
+        <SecTitle>{t('pulse.upcoming')}</SecTitle>
         {upcoming.length === 0
-          ? <div style={{ fontSize: 13, color: 'var(--text-4)', padding: '8px 0' }}>No upcoming events</div>
+          ? <div style={{ fontSize: 13, color: 'var(--text-4)', padding: '8px 0' }}>{t('pulse.noUpcoming')}</div>
           : upcoming.map(debt => {
               const days = Math.round((new Date(debt.due_date) - new Date()) / 86400000)
               const isOverdue = days < 0
@@ -277,7 +310,7 @@ export function RightPanel({ data }) {
                   <div>
                     <div style={{ fontSize: 14, color: 'var(--text)', fontWeight: 600, marginBottom: 2 }}>{debt.counterparty}</div>
                     <div style={{ fontSize: 12, color: isOverdue ? 'var(--red)' : 'var(--text-4)', fontWeight: isOverdue ? 600 : 400 }}>
-                      {isOverdue ? '⚠ Overdue' : days === 0 ? 'Today' : `in ${days}d`}
+                      {isOverdue ? `⚠ ${t('pulse.overdue')}` : days === 0 ? t('pulse.today') : `in ${days}d`}
                     </div>
                   </div>
                   <div style={{ fontSize: 14, fontWeight: 700, color: debt.type === 'receivable' ? 'var(--green-dark)' : 'var(--red-dark)' }}>
@@ -291,14 +324,14 @@ export function RightPanel({ data }) {
 
       {/* ── Quick Stats ─── */}
       <div>
-        <SecTitle>Quick Stats</SecTitle>
+        <SecTitle>{t('pulse.quickStats')}</SecTitle>
         <div style={{ background: 'var(--surface-card)', borderRadius: 12, border: '1px solid var(--border)', overflow: 'hidden' }}>
           {[
-            { label: 'Runway',       value: (!d.runway || d.runway >= 999) ? '—' : `${d.runway} days`,             color: runwayColor },
-            { label: 'Burn rate',    value: `${fmtShort(d.burnRate || 0)} / day`,                                    color: 'var(--text)' },
-            { label: 'Net position', value: `${(d.netPosition || 0) >= 0 ? '+' : ''}${fmtShort(d.netPosition || 0)}`, color: (d.netPosition || 0) >= 0 ? 'var(--green-dark)' : 'var(--red)' },
-            { label: 'Receivables',  value: `+${fmtShort(d.receivables || 0)}`,                                      color: 'var(--green-dark)' },
-            { label: 'Payables',     value: `−${fmtShort(d.payables || 0)}`,                                         color: 'var(--red-dark)' },
+            { label: t('pulse.runway'),      value: (!d.runway || d.runway >= 999) ? '—' : `${d.runway} days`,             color: runwayColor },
+            { label: t('pulse.burnRate'),    value: `${fmtShort(d.burnRate || 0)} / ${lang === 'ru' ? 'день' : 'day'}`,     color: 'var(--text)' },
+            { label: t('pulse.netPosition'), value: `${(d.netPosition || 0) >= 0 ? '+' : ''}${fmtShort(d.netPosition || 0)}`, color: (d.netPosition || 0) >= 0 ? 'var(--green-dark)' : 'var(--red)' },
+            { label: t('common.receivables'), value: `+${fmtShort(d.receivables || 0)}`,                                     color: 'var(--green-dark)' },
+            { label: t('common.payables'),    value: `−${fmtShort(d.payables || 0)}`,                                        color: 'var(--red-dark)' },
           ].map((s, i, arr) => (
             <div key={s.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', borderBottom: i < arr.length - 1 ? '0.5px solid var(--border)' : 'none' }}>
               <div style={{ fontSize: 13, color: 'var(--text-3)' }}>{s.label}</div>

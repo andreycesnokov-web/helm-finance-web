@@ -6,6 +6,30 @@ import { useTranslation } from '../hooks/useTranslation'
 import { apiFetch, fmt, fmtFull } from '../lib/api'
 import { getLang } from '../i18n/index'
 
+// ── Localize backend AI text ──────────────────────────────────────────────────
+const RU_TEXT_MAP_AICFO = {
+  'Business is financially stable': 'Финансы бизнеса стабильны',
+  'Immediate cash action required': 'Требуются действия по деньгам',
+  'Cash is strong with no urgent payment risks detected. Keep monitoring monthly.': 'Денежная позиция стабильная, срочных рисков нет. Продолжайте контролировать финансы.',
+  'Not enough expense history': 'Недостаточно истории расходов',
+  'Runway unknown — add expenses': 'Запас денег неизвестен — добавьте расходы',
+  'No payables': 'Обязательств нет',
+  'No receivables': 'Дебиторки нет',
+  'No monthly data yet': 'За месяц пока нет данных',
+  'No significant risks': 'Существенных рисков нет',
+  'Finances look stable': 'Финансы выглядят стабильно',
+  'No urgent actions detected. Keep adding transactions daily and review cash weekly.': 'Срочных действий нет. Продолжайте добавлять операции и проверять деньги еженедельно.',
+  'Needs Attention': 'Требует внимания',
+  'Some areas need attention.': 'Есть зоны, которые требуют внимания.',
+  'No urgent actions detected.': 'Срочных действий нет.',
+}
+function localizeInsight(text) {
+  if (!text) return text
+  const lang = getLang()
+  if (lang !== 'ru') return text
+  return RU_TEXT_MAP_AICFO[text] || text
+}
+
 // ── Suggested questions — keys resolved via t() at render time ────────────────
 const SUGGESTED_KEYS = [
   { icon: '💰', key: 'aicfo.q1' },
@@ -280,7 +304,7 @@ export default function AICFO() {
                 <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 14 }}>
                   <div>
                     <div style={{ fontSize: 11, color: 'var(--text-4)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>{t('aicfo.overallHealth')}</div>
-                    <div style={{ fontSize: 12, color: 'var(--text-3)', lineHeight: 1.5 }}>{cfoScore.summary}</div>
+                    <div style={{ fontSize: 12, color: 'var(--text-3)', lineHeight: 1.5 }}>{localizeInsight(cfoScore.summary)}</div>
                   </div>
                   <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: 16 }}>
                     <div style={{ fontSize: 32, fontWeight: 900, color: cfoScore.score >= 75 ? 'var(--green-dark)' : cfoScore.score >= 50 ? 'var(--amber-dark)' : 'var(--red-dark)', lineHeight: 1 }}>{cfoScore.score}</div>
@@ -330,7 +354,7 @@ export default function AICFO() {
                     <span style={{ fontSize: 16 }}>{alertCfg.icon}</span>
                     <span style={{ fontSize: 14, fontWeight: 800, color: alertCfg.text }}>{t(STATUS_LABEL_KEY[aiAlert.status] || 'pulse.attention')}</span>
                   </div>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: alertCfg.text, marginBottom: 4 }}>{aiAlert.headline}</div>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: alertCfg.text, marginBottom: 4 }}>{localizeInsight(aiAlert.headline)}</div>
                   <div style={{ fontSize: 11, color: alertCfg.text, opacity: 0.8, lineHeight: 1.5 }}>{aiAlert.description}</div>
                 </div>
               ) : (

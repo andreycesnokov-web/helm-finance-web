@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
+import { useTranslation } from '../hooks/useTranslation'
 import { apiFetch, fmt, daysUntil } from '../lib/api'
 import DebtPaymentModal from '../components/DebtPaymentModal'
 import DebtFormModal from '../components/DebtFormModal'
@@ -127,19 +128,11 @@ function DebtRow({ debt, accounts, token, onRefresh }) {
   )
 }
 
-// ── Filter tabs ────────────────────────────────────────────────────────────────
-const FILTERS = [
-  { key: 'all',     label: 'All' },
-  { key: 'open',    label: 'Open' },
-  { key: 'overdue', label: 'Overdue' },
-  { key: 'partial', label: 'Partial' },
-  { key: 'paid',    label: 'Received' },
-]
-
 // ── Main Component ─────────────────────────────────────────────────────────────
 export default function Receivables() {
   const { token } = useAuth()
   const navigate  = useNavigate()
+  const { t } = useTranslation()
   const [searchParams] = useSearchParams()
 
   const [data,     setData]     = useState(null)
@@ -163,7 +156,16 @@ export default function Receivables() {
 
   useEffect(() => { load() }, [load])
 
-  if (loading && !data) return <div className="page-loading">Loading receivables…</div>
+  // Filter tabs defined inside component so t() is available
+  const FILTERS = [
+    { key: 'all',     label: t('common.all') },
+    { key: 'open',    label: t('receivables.open') },
+    { key: 'overdue', label: t('receivables.overdue') },
+    { key: 'partial', label: t('receivables.partial') },
+    { key: 'paid',    label: t('common.paid') },
+  ]
+
+  if (loading && !data) return <div className="page-loading">{t('receivables.loading') || 'Loading receivables…'}</div>
 
   const d            = data || {}
   const accounts     = d.accounts || []
@@ -195,11 +197,11 @@ export default function Receivables() {
       {/* ── Header ─── */}
       <div className="hf-page-header">
         <div>
-          <div className="hf-page-title">Receivables</div>
-          <div className="hf-page-subtitle">Money expected from clients and partners</div>
+          <div className="hf-page-title">{t('receivables.title')}</div>
+          <div className="hf-page-subtitle">{t('receivables.subtitle')}</div>
         </div>
         <div className="hf-page-actions">
-          <button className="btn btn-primary btn-md" onClick={() => setShowForm(true)}>+ New</button>
+          <button className="btn btn-primary btn-md" onClick={() => setShowForm(true)}>{t('receivables.newReceivable')}</button>
         </div>
       </div>
 
@@ -208,28 +210,28 @@ export default function Receivables() {
       {/* ── Summary cards ─── */}
       <div className="summary-grid" style={{ marginBottom: 16 }}>
         <div className="summary-card">
-          <div className="summary-card-label">Total Remaining</div>
+          <div className="summary-card-label">{t('receivables.totalRemaining')}</div>
           <div className="summary-card-value" style={{ color: 'var(--green-dark)' }}>+{fmt(totalRemaining)}</div>
-          <div className="summary-card-sub">IDR expected</div>
+          <div className="summary-card-sub">{t('receivables.expected')}</div>
         </div>
         <div className="summary-card">
-          <div className="summary-card-label">Open</div>
+          <div className="summary-card-label">{t('receivables.open')}</div>
           <div className="summary-card-value">{openItems.length + partialItems.length}</div>
-          <div className="summary-card-sub">Awaiting receipt</div>
+          <div className="summary-card-sub">{t('receivables.awaiting')}</div>
         </div>
         <div className="summary-card">
-          <div className="summary-card-label">Overdue</div>
+          <div className="summary-card-label">{t('receivables.overdue')}</div>
           <div className="summary-card-value" style={{ color: overdueItems.length > 0 ? 'var(--red)' : 'var(--green-dark)' }}>
             {overdueItems.length}
           </div>
-          <div className="summary-card-sub">{overdueItems.length > 0 ? 'Past due date' : 'All on time'}</div>
+          <div className="summary-card-sub">{overdueItems.length > 0 ? t('payables.pastDueDate') : t('receivables.allOnTime')}</div>
         </div>
         <div className="summary-card">
-          <div className="summary-card-label">Partial</div>
+          <div className="summary-card-label">{t('receivables.partial')}</div>
           <div className="summary-card-value" style={{ color: partialItems.length > 0 ? 'var(--amber-dark)' : 'var(--text)' }}>
             {partialItems.length}
           </div>
-          <div className="summary-card-sub">Partially received</div>
+          <div className="summary-card-sub">{t('receivables.partialReceived')}</div>
         </div>
       </div>
 
@@ -258,9 +260,9 @@ export default function Receivables() {
       {receivables.length === 0 && (
         <div className="empty-state">
           <div className="empty-state-icon">📥</div>
-          <div className="empty-state-title">No receivables yet</div>
-          <div className="empty-state-sub">Track money that clients and partners owe you.</div>
-          <button className="empty-state-cta" onClick={() => setShowForm(true)}>+ New Receivable</button>
+          <div className="empty-state-title">{t('receivables.noReceivables')}</div>
+          <div className="empty-state-sub">{t('receivables.noReceivablesSub')}</div>
+          <button className="empty-state-cta" onClick={() => setShowForm(true)}>{t('receivables.newReceivableCta')}</button>
         </div>
       )}
 
@@ -285,7 +287,7 @@ export default function Receivables() {
 
       {receivables.length > 0 && (
         <div style={{ textAlign: 'center', paddingBottom: 16 }}>
-          <button className="link-btn" onClick={() => navigate('/transactions')}>View all transactions →</button>
+          <button className="link-btn" onClick={() => navigate('/transactions')}>{t('payables.viewAllTransactions')}</button>
         </div>
       )}
 

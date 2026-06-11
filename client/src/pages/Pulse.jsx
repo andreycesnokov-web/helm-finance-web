@@ -4,6 +4,29 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { useTranslation } from '../hooks/useTranslation'
 import { apiFetch, fmt, fmtFull, daysUntil } from '../lib/api'
+import { getLang } from '../i18n/index'
+
+// ── Localize backend AI text ──────────────────────────────────────────────────
+const RU_TEXT_MAP = {
+  'Business is financially stable': 'Финансы бизнеса стабильны',
+  'Immediate cash action required': 'Требуются действия по деньгам',
+  'Cash is strong with no urgent payment risks detected. Keep monitoring monthly.': 'Денежная позиция стабильная, срочных рисков нет. Продолжайте контролировать финансы.',
+  'Not enough expense history': 'Недостаточно истории расходов',
+  'Runway unknown — add expenses': 'Запас денег неизвестен — добавьте расходы',
+  'No payables': 'Обязательств нет',
+  'No receivables': 'Дебиторки нет',
+  'No monthly data yet': 'За месяц пока нет данных',
+  'No significant risks': 'Существенных рисков нет',
+  'Finances look stable': 'Финансы выглядят стабильно',
+  'No urgent actions detected. Keep adding transactions daily and review cash weekly.': 'Срочных действий нет. Продолжайте добавлять операции и проверять деньги еженедельно.',
+  'Needs Attention': 'Требует внимания',
+  'Some areas need attention': 'Некоторые области требуют внимания',
+}
+function localizeText(text, lang) {
+  if (!text) return text
+  if (lang !== 'ru') return text
+  return RU_TEXT_MAP[text] || text
+}
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -262,7 +285,11 @@ export default function Pulse({ onDataLoad }) {
       {/* ── Top bar ──────────────────────────────────────────────────────────── */}
       <div style={{ padding: '14px 16px 8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div style={{ fontSize: 12, color: 'var(--text-3)' }}>
-          {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
+          {(() => {
+            const dateLocale = getLang() === 'ru' ? 'ru-RU' : 'en-US'
+            const str = new Date().toLocaleDateString(dateLocale, { weekday: 'long', month: 'short', day: 'numeric' })
+            return str.charAt(0).toUpperCase() + str.slice(1)
+          })()}
         </div>
         <div onClick={() => navigate('/settings')}
           style={{ width: 28, height: 28, borderRadius: '50%', background: 'var(--brand-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: 'var(--brand-dark)', cursor: 'pointer', border: '1px solid rgba(21,94,239,.15)' }}>
@@ -365,7 +392,7 @@ export default function Pulse({ onDataLoad }) {
         {aiAlert?.headline && (
           <div style={{ background: 'rgba(21,94,239,.12)', borderRadius: 12, padding: '10px 12px', border: '0.5px solid rgba(21,94,239,.25)', marginBottom: 14, position: 'relative' }}>
             <div style={{ fontSize: 9, color: 'rgba(99,152,255,.75)', letterSpacing: '0.08em', marginBottom: 4, fontWeight: 600 }}>AI CFO</div>
-            <div style={{ fontSize: 12, color: 'rgba(255,255,255,.82)', lineHeight: 1.5, fontWeight: 500 }}>{aiAlert.headline}</div>
+            <div style={{ fontSize: 12, color: 'rgba(255,255,255,.82)', lineHeight: 1.5, fontWeight: 500 }}>{localizeText(aiAlert.headline, getLang())}</div>
           </div>
         )}
 
@@ -429,7 +456,7 @@ export default function Pulse({ onDataLoad }) {
 
                 {cfoScore.summary && (
                   <div style={{ marginTop: 12, padding: '9px 12px', background: 'var(--bg-3)', borderRadius: 12, fontSize: 12, color: 'var(--text-2)', lineHeight: 1.5 }}>
-                    {cfoScore.summary}
+                    {localizeText(cfoScore.summary, getLang())}
                   </div>
                 )}
               </div>
