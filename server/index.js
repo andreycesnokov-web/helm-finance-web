@@ -2417,10 +2417,11 @@ app.post('/api/debts/:id/pay', auth, async (req, res) => {
   if (txErr) return res.status(500).json({ error: txErr.message });
 
   // 2. Update debt — track paid_amount; NEVER modify original amount
+  // Note: last_payment_at and linked_transaction_id require migration 015
   const debtUpdates = {
     paid_amount:            newPaidAmount,
-    last_payment_at:        new Date().toISOString(),
     status:                 newStatus,
+    last_payment_at:        new Date().toISOString(),
     linked_transaction_id:  tx?.id || null,
   };
   if (isFullyPaid) {
