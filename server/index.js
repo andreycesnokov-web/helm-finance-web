@@ -634,6 +634,8 @@ app.post('/api/transactions/batch', auth, async (req, res) => {
         scope:                  t.scope                   || 'personal',
         project:                t.project                 || null,
         category:               t.category                || null,
+        // Always set transaction_date so period filters work correctly
+        transaction_date:       t.transaction_date        || new Date().toISOString().slice(0, 10),
         // Reference data (Phase 1 — all nullable, backward compatible)
         cashflow_category_id:   t.cashflow_category_id    || null,
         counterparty_id:        t.counterparty_id          || null,
@@ -1237,25 +1239,36 @@ app.get('/api/wallets/:id/transactions', auth, async (req, res) => {
     let query = supabase.from('transactions')
       .select('*')
       .eq('user_id', userId)
-      .order('transaction_date', { ascending: false })
+      .order('transaction_date', { ascending: false, nullsLast: true })
       .order('created_at', { ascending: false })
       .limit(Number(limit));
-
-    if (period !== 'all') {
-      const now = new Date();
-      let from;
-      if (period === 'week')  { from = new Date(now); from.setDate(now.getDate() - 7); }
-      else if (period === 'month') from = new Date(now.getFullYear(), now.getMonth(), 1);
-      else if (period === '3m')    { from = new Date(now); from.setMonth(now.getMonth() - 3); }
-      if (from) query = query.gte('transaction_date', from.toISOString().slice(0, 10));
-    }
 
     const { data: txs, error: tErr } = await query;
     if (tErr) throw tErr;
 
-    const filtered = (txs || []).filter(t =>
-      t.wallet_id === wallet.id || (!t.wallet_id && t.source === wallet.name)
-    );
+    // Compute period boundary (if any)
+    let fromDate = null;
+    if (period !== 'all') {
+      const now = new Date();
+      if (period === 'week')        { fromDate = new Date(now); fromDate.setDate(now.getDate() - 7); }
+      else if (period === 'month')    fromDate = new Date(now.getFullYear(), now.getMonth(), 1);
+      else if (period === '3m')     { fromDate = new Date(now); fromDate.setMonth(now.getMonth() - 3); }
+    }
+    const fromStr = fromDate ? fromDate.toISOString().slice(0, 10) : null;
+
+    const filtered = (txs || []).filter(t => {
+      // Wallet match: prefer wallet_id, fall back to legacy source name
+      const walletMatch = t.wallet_id === wallet.id || (!t.wallet_id && t.source === wallet.name);
+      if (!walletMatch) return false;
+
+      // Period filter: use transaction_date; fall back to created_at date for null transaction_date
+      if (fromStr) {
+        const txDate = t.transaction_date || (t.created_at ? t.created_at.slice(0, 10) : null);
+        if (!txDate || txDate < fromStr) return false;
+      }
+
+      return true;
+    });
 
     res.json({ wallet, transactions: filtered });
   } catch (e) {
