@@ -294,14 +294,16 @@ function PayrollModal({ token, employees, wallets, onClose, onSuccess, t }) {
   )
 }
 
-// ── Add Employee Modal ────────────────────────────────────────────────────────
-function EmployeeModal({ token, wallets, onClose, onSuccess, t }) {
-  const [name,     setName]     = useState('')
-  const [role,     setRole]     = useState('')
-  const [salary,   setSalary]   = useState('')
-  const [walletId, setWalletId] = useState('')
-  const [payDay,   setPayDay]   = useState('')
-  const [notes,    setNotes]    = useState('')
+// ── Add / Edit Employee Modal ─────────────────────────────────────────────────
+function EmployeeModal({ token, wallets, onClose, onSuccess, t, employee }) {
+  // employee prop → edit mode; undefined → add mode
+  const isEdit = !!employee
+  const [name,     setName]     = useState(employee?.name     || '')
+  const [role,     setRole]     = useState(employee?.role     || '')
+  const [salary,   setSalary]   = useState(employee?.default_salary ? String(employee.default_salary) : '')
+  const [walletId, setWalletId] = useState(employee?.default_wallet_id || '')
+  const [payDay,   setPayDay]   = useState(employee?.pay_day  ? String(employee.pay_day) : '')
+  const [notes,    setNotes]    = useState(employee?.notes    || '')
   const [saving,   setSaving]   = useState(false)
   const [error,    setError]    = useState('')
   const lang = getLang()
@@ -313,8 +315,14 @@ function EmployeeModal({ token, wallets, onClose, onSuccess, t }) {
     setSaving(true); setError('')
     try {
       const body = { name: name.trim(), role: role.trim() || null, default_salary: salary ? Number(salary) : null, default_wallet_id: walletId || null, pay_day: payDay ? Number(payDay) : null, notes: notes.trim() || null }
-      const data = await apiFetch('/payroll/employees', token, { method: 'POST', body })
-      onSuccess(data.employee)
+      if (isEdit) {
+        await apiFetch(`/payroll/employees/${employee.id}`, token, { method: 'PATCH', body })
+      } else {
+        const data = await apiFetch('/payroll/employees', token, { method: 'POST', body })
+        onSuccess(data.employee)
+        return
+      }
+      onSuccess()
     } catch (e) {
       setError(e.message || t('payroll.empFail'))
     } finally {
@@ -330,7 +338,11 @@ function EmployeeModal({ token, wallets, onClose, onSuccess, t }) {
       <div className="modal-sheet" onClick={e => e.stopPropagation()}>
         <div className="modal-drag-handle" />
         <button className="modal-close-btn" onClick={onClose}>✕</button>
-        <div style={{ fontSize: 'var(--text-lg)', fontWeight: 600, color: 'var(--text)', marginBottom: 16 }}>{t('payroll.employeeModalTitle')}</div>
+        <div style={{ fontSize: 'var(--text-lg)', fontWeight: 600, color: 'var(--text)', marginBottom: 16 }}>
+          {isEdit
+            ? (lang === 'ru' ? 'Редактировать сотрудника' : lang === 'id' ? 'Edit karyawan' : 'Edit Employee')
+            : t('payroll.employeeModalTitle')}
+        </div>
 
         <label style={labelSt}>{t('payroll.empName')}</label>
         <input type="text" style={inputSt} value={name} autoFocus
@@ -378,7 +390,10 @@ function EmployeeModal({ token, wallets, onClose, onSuccess, t }) {
 
         <button disabled={!canSubmit} onClick={handleSubmit} className="btn btn-block btn-lg"
           style={{ background: canSubmit ? 'var(--brand)' : 'var(--bg-3)', color: canSubmit ? '#fff' : 'var(--text-4)', marginBottom: 8, opacity: saving ? 0.7 : 1 }}>
-          {saving ? t('payroll.empSaving') : t('payroll.empCreate')}
+          {saving ? t('payroll.empSaving')
+            : isEdit
+            ? (lang === 'ru' ? 'Сохранить' : lang === 'id' ? 'Simpan' : 'Save Changes')
+            : t('payroll.empCreate')}
         </button>
         <button onClick={onClose} disabled={saving} className="btn btn-ghost btn-block btn-lg">{t('payroll.cancel')}</button>
       </div>
@@ -463,6 +478,9 @@ export default function Payroll() {
   const [wallets,   setWallets]   = useState([])
   const [showPaymentModal,  setShowPaymentModal]  = useState(false)
   const [showEmployeeModal, setShowEmployeeModal] = useState(false)
+  const [editingEmployee,   setEditingEmployee]   = useState(null)   // employee object for edit
+  const [deletingId,        setDeletingId]        = useState(null)   // employee id for delete confirm
+  const [deleteLoading,     setDeleteLoading]     = useState(false)
   const [successMsg, setSuccessMsg] = useState('')
 
   const load = () => {
@@ -517,6 +535,19 @@ export default function Payroll() {
     setSuccessMsg(t('payroll.success'))
     setTimeout(() => setSuccessMsg(''), 3500)
     load()
+  }
+
+  const handleDeleteEmployee = async (id) => {
+    setDeleteLoading(true)
+    try {
+      await apiFetch(`/payroll/employees/${id}`, token, { method: 'DELETE' })
+      setDeletingId(null)
+      load()
+    } catch (e) {
+      alert(e.message)
+    } finally {
+      setDeleteLoading(false)
+    }
   }
 
   return (
@@ -590,20 +621,40 @@ export default function Payroll() {
               </div>
               <div className="item-list-card">
                 {employees.map(emp => (
-                  <div key={emp.id} className="item-row">
-                    <div style={{ width: 36, height: 36, borderRadius: 10, background: 'var(--brand-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, flexShrink: 0 }}>👤</div>
-                    <div className="item-row-left">
-                      <div className="item-row-name">{emp.name}</div>
-                      <div className="item-row-sub">
-                        {emp.role || '—'}
-                        {emp.pay_day ? ` · ${t('payroll.scheduledPayday')} ${emp.pay_day}` : ''}
+                  <div key={emp.id}>
+                    <div className="item-row">
+                      <div style={{ width: 36, height: 36, borderRadius: 10, background: 'var(--brand-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, flexShrink: 0 }}>👤</div>
+                      <div className="item-row-left">
+                        <div className="item-row-name">{emp.name}</div>
+                        <div className="item-row-sub">
+                          {emp.role || '—'}
+                          {emp.pay_day ? ` · ${t('payroll.scheduledPayday')} ${emp.pay_day}` : ''}
+                        </div>
+                      </div>
+                      <div className="item-row-right" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        {emp.default_salary
+                          ? <div className="item-row-amount">{fmt(emp.default_salary)} IDR</div>
+                          : <div className="item-row-amount" style={{ color: 'var(--text-4)' }}>—</div>}
+                        <button onClick={() => setEditingEmployee(emp)} title="Edit" style={{ background: 'var(--bg-3)', border: 'none', borderRadius: 8, width: 30, height: 30, cursor: 'pointer', fontSize: 14, color: 'var(--text-3)', flexShrink: 0 }}>✏️</button>
+                        <button onClick={() => setDeletingId(emp.id)} title="Delete" style={{ background: '#FEE2E2', border: 'none', borderRadius: 8, width: 30, height: 30, cursor: 'pointer', fontSize: 14, color: '#991B1B', flexShrink: 0 }}>🗑</button>
                       </div>
                     </div>
-                    <div className="item-row-right">
-                      {emp.default_salary
-                        ? <div className="item-row-amount">{fmt(emp.default_salary)} IDR</div>
-                        : <div className="item-row-amount" style={{ color: 'var(--text-4)' }}>—</div>}
-                    </div>
+                    {/* Inline delete confirm */}
+                    {deletingId === emp.id && (
+                      <div style={{ background: '#FEF2F2', border: '1px solid rgba(239,68,68,.2)', borderRadius: 10, padding: '10px 14px', margin: '0 0 8px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+                        <span style={{ fontSize: 'var(--text-sm)', color: '#991B1B' }}>
+                          {getLang() === 'ru' ? `Архивировать «${emp.name}»?` : getLang() === 'id' ? `Arsipkan "${emp.name}"?` : `Archive "${emp.name}"?`}
+                        </span>
+                        <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                          <button onClick={() => setDeletingId(null)} style={{ padding: '5px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'none', cursor: 'pointer', fontSize: 12, fontFamily: 'inherit' }}>
+                            {getLang() === 'ru' ? 'Отмена' : getLang() === 'id' ? 'Batal' : 'Cancel'}
+                          </button>
+                          <button onClick={() => handleDeleteEmployee(emp.id)} disabled={deleteLoading} style={{ padding: '5px 12px', borderRadius: 8, border: 'none', background: '#DC2626', color: '#fff', cursor: 'pointer', fontSize: 12, fontFamily: 'inherit', fontWeight: 600 }}>
+                            {deleteLoading ? '…' : (getLang() === 'ru' ? 'Архивировать' : getLang() === 'id' ? 'Arsipkan' : 'Archive')}
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -638,7 +689,13 @@ export default function Payroll() {
       )}
       {showEmployeeModal && (
         <EmployeeModal token={token} wallets={wallets}
-          onClose={() => setShowEmployeeModal(false)} onSuccess={() => { setShowEmployeeModal(false); load() }} t={t} />
+          onClose={() => setShowEmployeeModal(false)}
+          onSuccess={() => { setShowEmployeeModal(false); load() }} t={t} />
+      )}
+      {editingEmployee && (
+        <EmployeeModal token={token} wallets={wallets} employee={editingEmployee}
+          onClose={() => setEditingEmployee(null)}
+          onSuccess={() => { setEditingEmployee(null); load() }} t={t} />
       )}
     </div>
   )
