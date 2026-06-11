@@ -69,7 +69,16 @@ export default function Settings() {
   const [showLang, setShowLang] = useState(false)
   const [showTz, setShowTz] = useState(false)
   const [notifications, setNotifications] = useState(localStorage.getItem('hf_notif') !== 'false')
-  const [refData, setRefData] = useState({ categories: 0, counterparties: 0, wallets: 0 })
+  // Reference data management state
+  const [categories,     setCategories]     = useState([])
+  const [directions,     setDirections]     = useState([])
+  const [activityTypes,  setActivityTypes]  = useState([])
+  const [newCatName,     setNewCatName]     = useState('')
+  const [newCatType,     setNewCatType]     = useState('outflow')
+  const [newDirName,     setNewDirName]     = useState('')
+  const [newActName,     setNewActName]     = useState('')
+  const [newActCode,     setNewActCode]     = useState('operating')
+  const [refSaving,      setRefSaving]      = useState(false)
 
   // Business settings state
   const [bizEdit, setBizEdit] = useState(false)
@@ -106,24 +115,73 @@ export default function Settings() {
     }
   }
 
+  const loadRefData = () => {
+    apiFetch('/cashflow-categories', token).then(d => setCategories(d.categories || [])).catch(() => {})
+    apiFetch('/business-directions', token).then(d => setDirections(d.directions || [])).catch(() => {})
+    apiFetch('/activity-types', token).then(d => setActivityTypes(d.activityTypes || [])).catch(() => {})
+  }
+
   useEffect(() => {
     apiFetch('/profile', token).then(data => {
       setProfile({ first_name: data.first_name || '', last_name: data.last_name || '', photo_url: data.photo_url || '', language: data.language || 'ru', timezone: data.timezone || 'Asia/Makassar' })
       setLoading(false)
     }).catch(() => setLoading(false))
-    // Load reference data counts for display
-    Promise.all([
-      apiFetch('/cashflow-categories', token).catch(() => ({ categories: [] })),
-      apiFetch('/counterparties', token).catch(() => ({ counterparties: [] })),
-      apiFetch('/wallets', token).catch(() => ({ wallets: [] })),
-    ]).then(([cats, cps, wls]) => {
-      setRefData({
-        categories:    (cats.categories   || []).length,
-        counterparties:(cps.counterparties || []).length,
-        wallets:       (wls.wallets        || []).length,
-      })
-    })
+    loadRefData()
   }, [token])
+
+  const createCategory = async () => {
+    if (!newCatName.trim()) return
+    setRefSaving(true)
+    try {
+      await apiFetch('/cashflow-categories', token, { method: 'POST', body: { name: newCatName.trim(), group_type: newCatType } })
+      setNewCatName('')
+      loadRefData()
+    } catch (e) { /* ignore */ }
+    setRefSaving(false)
+  }
+
+  const archiveCategory = async (id) => {
+    try {
+      await apiFetch(`/cashflow-categories/${id}`, token, { method: 'DELETE' })
+      loadRefData()
+    } catch (e) { /* ignore */ }
+  }
+
+  const createDirection = async () => {
+    if (!newDirName.trim()) return
+    setRefSaving(true)
+    try {
+      await apiFetch('/business-directions', token, { method: 'POST', body: { name: newDirName.trim() } })
+      setNewDirName('')
+      loadRefData()
+    } catch (e) { /* ignore */ }
+    setRefSaving(false)
+  }
+
+  const archiveDirection = async (id) => {
+    try {
+      await apiFetch(`/business-directions/${id}`, token, { method: 'DELETE' })
+      loadRefData()
+    } catch (e) { /* ignore */ }
+  }
+
+  const createActivityType = async () => {
+    if (!newActName.trim()) return
+    setRefSaving(true)
+    try {
+      await apiFetch('/activity-types', token, { method: 'POST', body: { name: newActName.trim(), code: newActCode } })
+      setNewActName('')
+      loadRefData()
+    } catch (e) { /* ignore */ }
+    setRefSaving(false)
+  }
+
+  const archiveActivityType = async (id) => {
+    try {
+      await apiFetch(`/activity-types/${id}`, token, { method: 'DELETE' })
+      loadRefData()
+    } catch (e) { /* ignore */ }
+  }
 
   const save = async (updates) => {
     setSaving(true)
@@ -265,25 +323,118 @@ export default function Settings() {
         </a>
       </div>
 
-      {/* Reference Data */}
-      <div style={{ margin: '0 16px 8px', fontSize: 11, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Reference Data</div>
-      <div style={{ margin: '0 16px 16px', background: 'var(--surface-card)', borderRadius: 14, border: '0.5px solid var(--border)', overflow: 'hidden' }}>
-        {[
-          { label: 'Wallets & Accounts', value: `${refData.wallets} active`, note: 'Manage in Accounts →', icon: '🏦', link: '/accounts' },
-          { label: 'Cashflow Categories', value: `${refData.categories} loaded`, note: '46 system articles from DDS model', icon: '📂' },
-          { label: 'Counterparties', value: `${refData.counterparties} saved`, note: 'Vendors, clients, franchisees', icon: '🏢' },
-          { label: 'Business Directions', value: '3 system', note: 'Vending · Franchise · General', icon: '📊' },
-          { label: 'Activity Types', value: '4 system', note: 'Operating · Investing · Financing · Technical', icon: '🏷️' },
-        ].map((row, idx, arr) => (
-          <div key={row.label} onClick={row.link ? () => navigate(row.link) : undefined} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderBottom: idx < arr.length - 1 ? '0.5px solid var(--border)' : 'none', cursor: row.link ? 'pointer' : 'default' }}>
-            <span style={{ fontSize: 20, flexShrink: 0 }}>{row.icon}</span>
+      {/* Reference Data — Cashflow Categories */}
+      <div style={{ margin: '0 16px 8px', fontSize: 11, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: 0.5 }}>{t('settings.categories')}</div>
+      <div style={{ margin: '0 16px 12px', background: 'var(--bg-2)', borderRadius: 12, overflow: 'hidden' }}>
+        {categories.length === 0 ? (
+          <div style={{ padding: '12px 14px', fontSize: 12, color: 'var(--text-3)' }}>{t('settings.noCategories')}</div>
+        ) : categories.map((cat, idx) => (
+          <div key={cat.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderBottom: idx < categories.length - 1 ? '0.5px solid var(--border)' : 'none' }}>
             <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 14, color: 'var(--text)', fontWeight: 500 }}>{row.label}</div>
-              <div style={{ fontSize: 11, color: row.link ? 'var(--brand)' : 'var(--text-3)', marginTop: 1 }}>{row.note}</div>
+              <span style={{ fontSize: 13, color: 'var(--text)' }}>{cat.name}</span>
+              <span style={{ marginLeft: 8, fontSize: 11, color: 'var(--text-3)' }}>{cat.group_type === 'inflow' ? '↑' : '↓'} {cat.activity_type || ''}</span>
             </div>
-            <div style={{ fontSize: 12, color: 'var(--brand)', fontWeight: 600, flexShrink: 0 }}>{row.value}</div>
+            <button
+              onClick={() => archiveCategory(cat.id)}
+              style={{ fontSize: 11, color: 'var(--text-3)', background: 'none', border: '0.5px solid var(--border)', borderRadius: 6, padding: '3px 8px', cursor: 'pointer' }}
+            >{t('settings.archive')}</button>
           </div>
         ))}
+        <div style={{ padding: '10px 14px', borderTop: categories.length > 0 ? '0.5px solid var(--border)' : 'none', display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          <input
+            value={newCatName}
+            onChange={e => setNewCatName(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && createCategory()}
+            placeholder={t('settings.categoryName')}
+            style={{ flex: '1 1 120px', minWidth: 0, padding: '7px 10px', borderRadius: 8, border: '0.5px solid var(--border-2)', background: 'var(--bg-3)', color: 'var(--text)', fontSize: 13, outline: 'none', fontFamily: 'inherit' }}
+          />
+          <select
+            value={newCatType}
+            onChange={e => setNewCatType(e.target.value)}
+            style={{ padding: '7px 8px', borderRadius: 8, border: '0.5px solid var(--border-2)', background: 'var(--bg-3)', color: 'var(--text)', fontSize: 13, outline: 'none', fontFamily: 'inherit' }}
+          >
+            <option value="outflow">Expense ↓</option>
+            <option value="inflow">Income ↑</option>
+          </select>
+          <button
+            onClick={createCategory}
+            disabled={refSaving || !newCatName.trim()}
+            style={{ padding: '7px 14px', borderRadius: 8, background: 'var(--brand)', color: '#fff', border: 'none', fontSize: 13, fontWeight: 600, cursor: 'pointer', opacity: refSaving || !newCatName.trim() ? 0.5 : 1 }}
+          >{t('settings.addCategory')}</button>
+        </div>
+      </div>
+
+      {/* Reference Data — Business Directions */}
+      <div style={{ margin: '0 16px 8px', fontSize: 11, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: 0.5 }}>{t('settings.businessDirections')}</div>
+      <div style={{ margin: '0 16px 12px', background: 'var(--bg-2)', borderRadius: 12, overflow: 'hidden' }}>
+        {directions.length === 0 ? (
+          <div style={{ padding: '12px 14px', fontSize: 12, color: 'var(--text-3)' }}>{t('settings.noItems')}</div>
+        ) : directions.map((dir, idx) => (
+          <div key={dir.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderBottom: idx < directions.length - 1 ? '0.5px solid var(--border)' : 'none' }}>
+            <span style={{ flex: 1, fontSize: 13, color: 'var(--text)' }}>{dir.name}</span>
+            <button
+              onClick={() => archiveDirection(dir.id)}
+              style={{ fontSize: 11, color: 'var(--text-3)', background: 'none', border: '0.5px solid var(--border)', borderRadius: 6, padding: '3px 8px', cursor: 'pointer' }}
+            >{t('settings.archive')}</button>
+          </div>
+        ))}
+        <div style={{ padding: '10px 14px', borderTop: directions.length > 0 ? '0.5px solid var(--border)' : 'none', display: 'flex', gap: 6 }}>
+          <input
+            value={newDirName}
+            onChange={e => setNewDirName(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && createDirection()}
+            placeholder={t('settings.directionName')}
+            style={{ flex: 1, padding: '7px 10px', borderRadius: 8, border: '0.5px solid var(--border-2)', background: 'var(--bg-3)', color: 'var(--text)', fontSize: 13, outline: 'none', fontFamily: 'inherit' }}
+          />
+          <button
+            onClick={createDirection}
+            disabled={refSaving || !newDirName.trim()}
+            style={{ padding: '7px 14px', borderRadius: 8, background: 'var(--brand)', color: '#fff', border: 'none', fontSize: 13, fontWeight: 600, cursor: 'pointer', opacity: refSaving || !newDirName.trim() ? 0.5 : 1 }}
+          >{t('settings.addCategory')}</button>
+        </div>
+      </div>
+
+      {/* Reference Data — Activity Types */}
+      <div style={{ margin: '0 16px 8px', fontSize: 11, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: 0.5 }}>{t('settings.activityTypes')}</div>
+      <div style={{ margin: '0 16px 16px', background: 'var(--bg-2)', borderRadius: 12, overflow: 'hidden' }}>
+        {activityTypes.length === 0 ? (
+          <div style={{ padding: '12px 14px', fontSize: 12, color: 'var(--text-3)' }}>{t('settings.noItems')}</div>
+        ) : activityTypes.map((act, idx) => (
+          <div key={act.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderBottom: idx < activityTypes.length - 1 ? '0.5px solid var(--border)' : 'none' }}>
+            <div style={{ flex: 1 }}>
+              <span style={{ fontSize: 13, color: 'var(--text)' }}>{act.name}</span>
+              {act.code && <span style={{ marginLeft: 8, fontSize: 11, color: 'var(--text-3)' }}>{act.code}</span>}
+            </div>
+            <button
+              onClick={() => archiveActivityType(act.id)}
+              style={{ fontSize: 11, color: 'var(--text-3)', background: 'none', border: '0.5px solid var(--border)', borderRadius: 6, padding: '3px 8px', cursor: 'pointer' }}
+            >{t('settings.archive')}</button>
+          </div>
+        ))}
+        <div style={{ padding: '10px 14px', borderTop: activityTypes.length > 0 ? '0.5px solid var(--border)' : 'none', display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          <input
+            value={newActName}
+            onChange={e => setNewActName(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && createActivityType()}
+            placeholder={t('settings.activityName')}
+            style={{ flex: '1 1 120px', minWidth: 0, padding: '7px 10px', borderRadius: 8, border: '0.5px solid var(--border-2)', background: 'var(--bg-3)', color: 'var(--text)', fontSize: 13, outline: 'none', fontFamily: 'inherit' }}
+          />
+          <select
+            value={newActCode}
+            onChange={e => setNewActCode(e.target.value)}
+            style={{ padding: '7px 8px', borderRadius: 8, border: '0.5px solid var(--border-2)', background: 'var(--bg-3)', color: 'var(--text)', fontSize: 13, outline: 'none', fontFamily: 'inherit' }}
+          >
+            <option value="operating">Operating</option>
+            <option value="investing">Investing</option>
+            <option value="financing">Financing</option>
+            <option value="technical">Technical</option>
+          </select>
+          <button
+            onClick={createActivityType}
+            disabled={refSaving || !newActName.trim()}
+            style={{ padding: '7px 14px', borderRadius: 8, background: 'var(--brand)', color: '#fff', border: 'none', fontSize: 13, fontWeight: 600, cursor: 'pointer', opacity: refSaving || !newActName.trim() ? 0.5 : 1 }}
+          >{t('settings.addCategory')}</button>
+        </div>
       </div>
 
       {/* ── Business Settings ── */}

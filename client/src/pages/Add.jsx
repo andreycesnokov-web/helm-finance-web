@@ -724,11 +724,6 @@ export default function Add() {
                       <div style={{ marginBottom: 12 }}>
                         <label style={labelSt}>
                           Cashflow Category
-                          {categories.length === 0 && (
-                            <span style={{ color: 'var(--text-4)', fontWeight: 400, marginLeft: 6, textTransform: 'none' }}>
-                              (loading…)
-                            </span>
-                          )}
                         </label>
                         {categories.length > 0 ? (
                           <select
@@ -752,11 +747,20 @@ export default function Add() {
                             ))}
                           </select>
                         ) : (
-                          // Fallback: plain text if categories not loaded
-                          <input type="text" value={t.category || ''}
-                            onChange={e => updateTx(i, 'category', e.target.value)}
-                            placeholder={t.type === 'payroll' ? 'Payroll' : t.type === 'transfer' ? 'Transfer' : 'e.g. Food, Transport, Revenue…'}
-                            style={inputSt} />
+                          // No categories yet — text fallback + link to Settings
+                          <>
+                            <input type="text" value={t.category || ''}
+                              onChange={e => updateTx(i, 'category', e.target.value)}
+                              placeholder={t.type === 'payroll' ? 'Payroll' : t.type === 'transfer' ? 'Transfer' : 'e.g. Food, Transport, Revenue…'}
+                              style={inputSt} />
+                            <button
+                              type="button"
+                              onClick={() => navigate('/settings')}
+                              style={{ marginTop: 5, background: 'none', border: 'none', padding: 0, fontSize: 11, color: 'var(--brand)', cursor: 'pointer', textDecoration: 'underline' }}
+                            >
+                              {tr('add.goToSettings')}
+                            </button>
+                          </>
                         )}
                         {/* Sub-description hint */}
                         {selectedCat?.sub_category && (

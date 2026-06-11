@@ -659,15 +659,15 @@ app.post('/api/transactions/batch', auth, async (req, res) => {
 // Phase 1: user_id-scoped reference tables.
 // Future: migrate to business_id-scoped model.
 
-// GET /api/cashflow-categories — system + user custom categories
+// GET /api/cashflow-categories — user-owned active categories only
 app.get('/api/cashflow-categories', auth, async (req, res) => {
   try {
     const userId = req.user.userId;
     const { data, error } = await supabase
       .from('cashflow_categories')
       .select('*')
+      .eq('user_id', userId)
       .eq('is_active', true)
-      .or(`is_system.eq.true,user_id.eq.${userId}`)
       .order('sort_order', { ascending: true })
       .order('name', { ascending: true });
     if (error) throw error;
@@ -700,16 +700,41 @@ app.patch('/api/cashflow-categories/:id', auth, async (req, res) => {
   try {
     const userId = req.user.userId;
     const { name, group_type, activity_type, sub_category, description, is_active } = req.body;
+    const updates = { updated_at: new Date().toISOString() };
+    if (name !== undefined) updates.name = name;
+    if (group_type !== undefined) updates.group_type = group_type;
+    if (activity_type !== undefined) updates.activity_type = activity_type;
+    if (sub_category !== undefined) updates.sub_category = sub_category;
+    if (description !== undefined) updates.description = description;
+    if (is_active !== undefined) updates.is_active = is_active;
     const { data, error } = await supabase
       .from('cashflow_categories')
-      .update({ name, group_type, activity_type, sub_category, description, is_active, updated_at: new Date().toISOString() })
+      .update(updates)
       .eq('id', req.params.id)
       .eq('user_id', userId)   // can only edit own categories, not system ones
-      .eq('is_system', false)
       .select()
       .single();
     if (error) throw error;
     if (!data) return res.status(404).json({ error: 'Category not found or not editable' });
+    res.json({ category: data });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// DELETE /api/cashflow-categories/:id — soft archive user's own category
+app.delete('/api/cashflow-categories/:id', auth, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { data, error } = await supabase
+      .from('cashflow_categories')
+      .update({ is_active: false, updated_at: new Date().toISOString() })
+      .eq('id', req.params.id)
+      .eq('user_id', userId)
+      .select()
+      .single();
+    if (error) throw error;
+    if (!data) return res.status(404).json({ error: 'Category not found' });
     res.json({ category: data });
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -773,15 +798,15 @@ app.patch('/api/counterparties/:id', auth, async (req, res) => {
   }
 });
 
-// GET /api/business-directions — system + user directions
+// GET /api/business-directions — user-owned active directions only
 app.get('/api/business-directions', auth, async (req, res) => {
   try {
     const userId = req.user.userId;
     const { data, error } = await supabase
       .from('business_directions')
       .select('*')
+      .eq('user_id', userId)
       .eq('is_active', true)
-      .or(`is_system.eq.true,user_id.eq.${userId}`)
       .order('sort_order', { ascending: true });
     if (error) throw error;
     res.json({ directions: data || [] });
@@ -790,18 +815,92 @@ app.get('/api/business-directions', auth, async (req, res) => {
   }
 });
 
-// GET /api/activity-types — system + user activity types
+// POST /api/business-directions — create user direction
+app.post('/api/business-directions', auth, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { name, slug } = req.body;
+    if (!name?.trim()) return res.status(400).json({ error: 'name required' });
+    const { data, error } = await supabase
+      .from('business_directions')
+      .insert({ user_id: userId, name: name.trim(), slug: slug || null, is_system: false, is_active: true, source: 'user' })
+      .select()
+      .single();
+    if (error) throw error;
+    res.json({ direction: data });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// DELETE /api/business-directions/:id — soft archive
+app.delete('/api/business-directions/:id', auth, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { data, error } = await supabase
+      .from('business_directions')
+      .update({ is_active: false })
+      .eq('id', req.params.id)
+      .eq('user_id', userId)
+      .select()
+      .single();
+    if (error) throw error;
+    if (!data) return res.status(404).json({ error: 'Direction not found' });
+    res.json({ direction: data });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// GET /api/activity-types — user-owned active activity types only
 app.get('/api/activity-types', auth, async (req, res) => {
   try {
     const userId = req.user.userId;
     const { data, error } = await supabase
       .from('activity_types')
       .select('*')
+      .eq('user_id', userId)
       .eq('is_active', true)
-      .or(`is_system.eq.true,user_id.eq.${userId}`)
       .order('sort_order', { ascending: true });
     if (error) throw error;
     res.json({ activityTypes: data || [] });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// POST /api/activity-types — create user activity type
+app.post('/api/activity-types', auth, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { name, code } = req.body;
+    if (!name?.trim()) return res.status(400).json({ error: 'name required' });
+    const { data, error } = await supabase
+      .from('activity_types')
+      .insert({ user_id: userId, name: name.trim(), code: code || null, is_system: false, is_active: true, source: 'user' })
+      .select()
+      .single();
+    if (error) throw error;
+    res.json({ activityType: data });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// DELETE /api/activity-types/:id — soft archive
+app.delete('/api/activity-types/:id', auth, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { data, error } = await supabase
+      .from('activity_types')
+      .update({ is_active: false })
+      .eq('id', req.params.id)
+      .eq('user_id', userId)
+      .select()
+      .single();
+    if (error) throw error;
+    if (!data) return res.status(404).json({ error: 'Activity type not found' });
+    res.json({ activityType: data });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
