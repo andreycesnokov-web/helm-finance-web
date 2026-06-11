@@ -43,6 +43,7 @@ const en = {
     payroll: 'Payroll',
     tasks: 'Tasks',
     approvals: 'Approvals',
+    team: 'Team',
     sectionOverview: 'Overview',
     sectionFinance: 'Finance',
     sectionOperations: 'Operations',

@@ -597,6 +597,262 @@ app.post('/api/debts/from-telegram', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// ─────────────────────────────────────────────────────────────────────────────
+// TEAM & INVITE SYSTEM
+// ─────────────────────────────────────────────────────────────────────────────
+
+function generateInviteCode() {
+  return Math.random().toString(36).slice(2, 8).toUpperCase(); // e.g. "A3K9PZ"
+}
+
+// ── GET /api/team ─────────────────────────────────────────────────────────────
+// List all members of the caller's business.
+app.get('/api/team', auth, async (req, res) => {
+  const userId = req.user.userId;
+  try {
+    // Get business_id for this user
+    const { data: memberships } = await supabase.from('business_members')
+      .select('business_id, role').eq('user_id', userId).eq('status', 'active').limit(1);
+    if (!memberships?.length) return res.status(403).json({ error: 'Not a member of any business' });
+    const { business_id, role: myRole } = memberships[0];
+
+    if (!['owner', 'admin', 'cfo'].includes(myRole))
+      return res.status(403).json({ error: 'Only owner, admin or CFO can view team' });
+
+    // Fetch all members + their user info
+    const { data: members, error } = await supabase.from('business_members')
+      .select('id, user_id, role, status, display_name, joined_at, invited_by, invite_code')
+      .eq('business_id', business_id)
+      .neq('status', 'removed')
+      .order('joined_at', { ascending: true });
+    if (error) throw error;
+
+    // Enrich with user names
+    const userIds = members.map(m => m.user_id);
+    const { data: users } = await supabase.from('users')
+      .select('id, name, first_name, last_name, telegram_id')
+      .in('id', userIds);
+    const userMap = Object.fromEntries((users || []).map(u => [u.id, u]));
+
+    const enriched = members.map(m => {
+      const u = userMap[m.user_id] || {};
+      return {
+        ...m,
+        name: m.display_name || u.name || [u.first_name, u.last_name].filter(Boolean).join(' ') || `User ${m.user_id}`,
+        telegram_id: u.telegram_id || null,
+      };
+    });
+
+    // Also fetch active invites
+    const { data: invites } = await supabase.from('business_invites')
+      .select('id, code, role, label, max_uses, uses_count, expires_at, status, created_at')
+      .eq('business_id', business_id).eq('status', 'active')
+      .order('created_at', { ascending: false });
+
+    res.json({ members: enriched, invites: invites || [], my_role: myRole, business_id });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── POST /api/team/invite ─────────────────────────────────────────────────────
+// Generate a new invite code/link.
+app.post('/api/team/invite', auth, async (req, res) => {
+  const userId = req.user.userId;
+  const { role = 'employee', label, max_uses = 1, expires_days = 7 } = req.body;
+
+  const VALID_ROLES = ['employee', 'manager', 'cfo', 'admin'];
+  if (!VALID_ROLES.includes(role))
+    return res.status(400).json({ error: `role must be one of: ${VALID_ROLES.join(', ')}` });
+
+  try {
+    const { data: memberships } = await supabase.from('business_members')
+      .select('business_id, role').eq('user_id', userId).eq('status', 'active').limit(1);
+    if (!memberships?.length) return res.status(403).json({ error: 'Not a member of any business' });
+    const { business_id, role: myRole } = memberships[0];
+
+    if (!['owner', 'admin'].includes(myRole))
+      return res.status(403).json({ error: 'Only owner or admin can create invites' });
+
+    // Cannot invite higher/equal role than yourself (only owner can invite admin)
+    const ROLE_RANK = { employee: 1, manager: 2, cfo: 3, admin: 4, owner: 5 };
+    if (ROLE_RANK[role] >= ROLE_RANK[myRole])
+      return res.status(403).json({ error: `You cannot invite someone with role "${role}" — your role is "${myRole}"` });
+
+    // Generate unique code
+    let code, exists = true;
+    while (exists) {
+      code = generateInviteCode();
+      const { data: check } = await supabase.from('business_invites').select('id').eq('code', code).single();
+      exists = !!check;
+    }
+
+    const expiresAt = new Date(Date.now() + expires_days * 86400000).toISOString();
+    const { data: invite, error } = await supabase.from('business_invites').insert({
+      business_id,
+      invited_by: userId,
+      code,
+      role,
+      label: label || null,
+      max_uses: Number(max_uses) || 1,
+      expires_at: expiresAt,
+    }).select().single();
+    if (error) throw error;
+
+    res.json({ invite, invite_url: `/invite/${code}` });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── DELETE /api/team/invites/:code ────────────────────────────────────────────
+// Revoke an invite (owner/admin only).
+app.delete('/api/team/invites/:code', auth, async (req, res) => {
+  const userId = req.user.userId;
+  try {
+    const { data: memberships } = await supabase.from('business_members')
+      .select('business_id, role').eq('user_id', userId).eq('status', 'active').limit(1);
+    if (!memberships?.length) return res.status(403).json({ error: 'Not a member' });
+    if (!['owner', 'admin'].includes(memberships[0].role))
+      return res.status(403).json({ error: 'Only owner/admin can revoke invites' });
+
+    await supabase.from('business_invites')
+      .update({ status: 'revoked' })
+      .eq('code', req.params.code)
+      .eq('business_id', memberships[0].business_id);
+
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── PATCH /api/team/members/:memberId ────────────────────────────────────────
+// Update role or status.
+app.patch('/api/team/members/:memberId', auth, async (req, res) => {
+  const userId = req.user.userId;
+  const { role, status } = req.body;
+  try {
+    const { data: myMem } = await supabase.from('business_members')
+      .select('business_id, role').eq('user_id', userId).eq('status', 'active').limit(1);
+    if (!myMem?.length) return res.status(403).json({ error: 'Not a member' });
+    if (!['owner', 'admin'].includes(myMem[0].role))
+      return res.status(403).json({ error: 'Only owner/admin can change roles' });
+
+    const update = {};
+    if (role)   update.role   = role;
+    if (status) update.status = status;
+
+    const { data, error } = await supabase.from('business_members')
+      .update(update)
+      .eq('id', req.params.memberId)
+      .eq('business_id', myMem[0].business_id)
+      .select().single();
+    if (error) throw error;
+    res.json(data);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── DELETE /api/team/members/:memberId ───────────────────────────────────────
+// Remove a member (soft: status = removed).
+app.delete('/api/team/members/:memberId', auth, async (req, res) => {
+  const userId = req.user.userId;
+  try {
+    const { data: myMem } = await supabase.from('business_members')
+      .select('business_id, role').eq('user_id', userId).eq('status', 'active').limit(1);
+    if (!myMem?.length) return res.status(403).json({ error: 'Not a member' });
+    if (!['owner', 'admin'].includes(myMem[0].role))
+      return res.status(403).json({ error: 'Only owner/admin can remove members' });
+
+    // Prevent removing yourself
+    const { data: target } = await supabase.from('business_members')
+      .select('user_id, role').eq('id', req.params.memberId).single();
+    if (target?.user_id === userId)
+      return res.status(400).json({ error: 'Cannot remove yourself' });
+    if (target?.role === 'owner')
+      return res.status(403).json({ error: 'Cannot remove business owner' });
+
+    await supabase.from('business_members')
+      .update({ status: 'removed' })
+      .eq('id', req.params.memberId)
+      .eq('business_id', myMem[0].business_id);
+
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── GET /api/invite/:code  (PUBLIC — no auth) ─────────────────────────────────
+// Returns invite info so the join page can show company name + role.
+app.get('/api/invite/:code', async (req, res) => {
+  try {
+    const { data: invite, error } = await supabase.from('business_invites')
+      .select('id, code, role, label, max_uses, uses_count, expires_at, status, business_id')
+      .eq('code', req.params.code.toUpperCase()).single();
+    if (error || !invite) return res.status(404).json({ error: 'Invite not found' });
+    if (invite.status !== 'active') return res.status(410).json({ error: 'Invite has been revoked or expired', status: invite.status });
+    if (new Date(invite.expires_at) < new Date()) return res.status(410).json({ error: 'Invite has expired' });
+    if (invite.uses_count >= invite.max_uses) return res.status(410).json({ error: 'Invite has reached its use limit' });
+
+    // Fetch business name
+    const { data: biz } = await supabase.from('businesses').select('name').eq('id', invite.business_id).single();
+    res.json({
+      code:          invite.code,
+      role:          invite.role,
+      label:         invite.label,
+      business_name: biz?.name || 'CFO AI',
+      expires_at:    invite.expires_at,
+      uses_left:     invite.max_uses - invite.uses_count,
+    });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── POST /api/invite/:code/accept  (auth required) ───────────────────────────
+// Accept invite → create/update business_members row.
+// Called after user authenticates with Telegram on the invite page.
+app.post('/api/invite/:code/accept', auth, async (req, res) => {
+  const userId = req.user.userId;
+  try {
+    const code = req.params.code.toUpperCase();
+    const { data: invite, error: iErr } = await supabase.from('business_invites')
+      .select('*').eq('code', code).single();
+    if (iErr || !invite) return res.status(404).json({ error: 'Invite not found' });
+    if (invite.status !== 'active') return res.status(410).json({ error: 'Invite is no longer active' });
+    if (new Date(invite.expires_at) < new Date()) return res.status(410).json({ error: 'Invite has expired' });
+    if (invite.uses_count >= invite.max_uses) return res.status(410).json({ error: 'Invite limit reached' });
+
+    // Check if user already a member
+    const { data: existing } = await supabase.from('business_members')
+      .select('id, role, status').eq('user_id', userId).eq('business_id', invite.business_id).single();
+
+    if (existing) {
+      if (existing.status === 'active')
+        return res.json({ ok: true, already_member: true, role: existing.role, message: 'Already a member of this business' });
+      // Reactivate if removed
+      await supabase.from('business_members')
+        .update({ status: 'active', role: invite.role, invite_code: code })
+        .eq('id', existing.id);
+    } else {
+      // Get user display name
+      const { data: u } = await supabase.from('users').select('name, first_name, last_name').eq('id', userId).single();
+      const displayName = u?.name || [u?.first_name, u?.last_name].filter(Boolean).join(' ') || null;
+
+      await supabase.from('business_members').insert({
+        business_id:  invite.business_id,
+        user_id:      userId,
+        role:         invite.role,
+        status:       'active',
+        display_name: displayName,
+        joined_at:    new Date().toISOString(),
+        invited_by:   invite.invited_by,
+        invite_code:  code,
+      });
+    }
+
+    // Increment uses_count; mark exhausted if max reached
+    const newCount = invite.uses_count + 1;
+    await supabase.from('business_invites').update({
+      uses_count: newCount,
+      status: newCount >= invite.max_uses ? 'exhausted' : 'active',
+    }).eq('id', invite.id);
+
+    res.json({ ok: true, role: invite.role, business_id: invite.business_id });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // --- Transactions API ------------------------------------------------------
 
 app.get('/api/transactions', auth, async (req, res) => {

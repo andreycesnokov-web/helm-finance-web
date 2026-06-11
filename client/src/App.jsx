@@ -45,6 +45,8 @@ import Invoices from './pages/Invoices'
 import Payroll from './pages/Payroll'
 import Tasks from './pages/Tasks'
 import Approvals from './pages/Approvals'
+import Team from './pages/Team'
+import JoinInvite from './pages/JoinInvite'
 import Admin from './pages/Admin'
 import AdminUser from './pages/AdminUser'
 import WalletDetail from './pages/WalletDetail'
@@ -100,6 +102,8 @@ const SIDEBAR_GROUPS = [
         icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg> },
       { path: '/approvals', labelKey: 'nav.approvals', label: 'Approvals', active: true,
         icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg> },
+      { path: '/team',      labelKey: 'nav.team',      label: 'Team',      active: true,
+        icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg> },
     ],
   },
 ]
@@ -493,6 +497,9 @@ export default function App() {
           <Route path="/payroll"      element={<Layout><Payroll /></Layout>} />
           <Route path="/tasks"        element={<Layout><Tasks /></Layout>} />
           <Route path="/approvals"    element={<Layout><Approvals /></Layout>} />
+          <Route path="/team"         element={<Layout><Team /></Layout>} />
+          {/* Public invite page — no auth required to view, Telegram widget handles login */}
+          <Route path="/invite/:code" element={<JoinInvite />} />
           {/* Standalone onboarding — accessible directly to re-run setup */}
           <Route path="/onboarding" element={<OnboardingRoute />} />
           {/* Hidden admin routes — not in sidebar, protected by ADMIN_TELEGRAM_IDS on backend */}

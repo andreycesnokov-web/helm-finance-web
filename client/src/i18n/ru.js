@@ -43,6 +43,7 @@ const ru = {
     payroll: 'Зарплаты',
     tasks: 'Задачи',
     approvals: 'Согласования',
+    team: 'Команда',
     sectionOverview: 'Обзор',
     sectionFinance: 'Финансы',
     sectionOperations: 'Операции',

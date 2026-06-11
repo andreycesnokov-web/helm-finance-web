@@ -45,6 +45,7 @@ const id = {
     payroll: 'Gaji',
     tasks: 'Tugas',
     approvals: 'Persetujuan',
+    team: 'Tim',
     sectionOverview: 'Ringkasan',
     sectionFinance: 'Keuangan',
     sectionOperations: 'Operasional',
