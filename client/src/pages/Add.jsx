@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
+import { useTranslation } from '../hooks/useTranslation'
 import { apiFetch, fmt, daysUntil } from '../lib/api'
 
 const QUICK = [
@@ -162,6 +163,7 @@ function CounterpartyInput({ value, onChange, suggestions, onCreateNew, inputSt 
 export default function Add() {
   const { token }  = useAuth()
   const navigate   = useNavigate()
+  const { t }      = useTranslation()
   const [text, setText]   = useState('')
   const [loading, setLoading] = useState(false)
   const [result, setResult]   = useState(null)
@@ -378,24 +380,24 @@ export default function Add() {
     <div className="page">
       <div className="topbar" style={{ padding: '20px 20px 14px' }}>
         <div>
-          <div style={{ fontSize: 'var(--text-xl)', fontWeight: 700, color: 'var(--text)', letterSpacing: -0.3 }}>Add</div>
-          <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-3)', marginTop: 3 }}>Log transactions, debts, reminders</div>
+          <div style={{ fontSize: 'var(--text-xl)', fontWeight: 700, color: 'var(--text)', letterSpacing: -0.3 }}>{t('add.title')}</div>
+          <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-3)', marginTop: 3 }}>{t('add.subtitle')}</div>
         </div>
       </div>
 
       {/* Tab switcher */}
       <div style={{ display: 'flex', gap: 6, padding: '0 16px 18px' }}>
         {[
-          { key: 'tx', label: '💳 Transaction' },
-          { key: 'debt', label: '📋 Debt' },
-          { key: 'reminder', label: '🔔 Reminder' },
-        ].map(t => (
-          <button key={t.key} onClick={() => { setTab(t.key); setSaved(false); setError(''); setSaveMsg('') }} style={{
+          { key: 'tx',       label: t('add.tabTransaction') },
+          { key: 'debt',     label: t('add.tabDebt') },
+          { key: 'reminder', label: t('add.tabReminder') },
+        ].map(tb => (
+          <button key={tb.key} onClick={() => { setTab(tb.key); setSaved(false); setError(''); setSaveMsg('') }} style={{
             padding: '9px 16px', borderRadius: 20, fontSize: 'var(--text-sm)', border: '0.5px solid var(--border-2)',
-            background: tab === t.key ? 'var(--text)' : 'none',
-            color: tab === t.key ? '#fff' : 'var(--text-2)', fontWeight: tab === t.key ? 600 : 400,
+            background: tab === tb.key ? 'var(--text)' : 'none',
+            color: tab === tb.key ? '#fff' : 'var(--text-2)', fontWeight: tab === tb.key ? 600 : 400,
             cursor: 'pointer', fontFamily: 'inherit', transition: 'background .12s',
-          }}>{t.label}</button>
+          }}>{tb.label}</button>
         ))}
       </div>
 
@@ -404,19 +406,19 @@ export default function Add() {
         <div style={{ margin: '0 16px 16px', background: 'var(--green-light)', borderRadius: 14, padding: '14px 16px', border: '1px solid rgba(2,122,72,.12)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
             <span style={{ fontSize: 20 }}>✅</span>
-            <span style={{ fontSize: 'var(--text-base)', color: 'var(--green-dark)', fontWeight: 600 }}>{saveMsg || 'Saved successfully!'}</span>
+            <span style={{ fontSize: 'var(--text-base)', color: 'var(--green-dark)', fontWeight: 600 }}>{saveMsg || t('add.savedSuccess')}</span>
           </div>
           <div style={{ display: 'flex', gap: 16, marginTop: 4 }}>
             <button onClick={() => navigate('/transactions')} style={{ fontSize: 'var(--text-sm)', color: 'var(--green-dark)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline', fontFamily: 'inherit' }}>
-              View transactions →
+              {t('add.viewTransactions')}
             </button>
             {Object.values(linkedDebts).some(Boolean) && (
               <>
                 <button onClick={() => navigate('/receivables')} style={{ fontSize: 'var(--text-sm)', color: 'var(--green-dark)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline', fontFamily: 'inherit' }}>
-                  Receivables →
+                  {t('add.receivablesLink')}
                 </button>
                 <button onClick={() => navigate('/payables')} style={{ fontSize: 'var(--text-sm)', color: 'var(--green-dark)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline', fontFamily: 'inherit' }}>
-                  Payables →
+                  {t('add.payablesLink')}
                 </button>
               </>
             )}
@@ -434,7 +436,7 @@ export default function Add() {
       {/* TRANSACTION TAB */}
       {tab === 'tx' && (
         <div style={{ padding: '0 16px' }}>
-          <label style={mainLabelSt}>What happened?</label>
+          <label style={mainLabelSt}>{t('add.whatHappened')}</label>
           <textarea
             value={text}
             onChange={e => { setText(e.target.value); setSaved(false); setResult(null); setEditedTxs([]) }}
@@ -460,7 +462,7 @@ export default function Add() {
             fontFamily: 'inherit', letterSpacing: 0.1, transition: 'background .12s',
             boxShadow: text.trim() ? '0 2px 8px rgba(21,94,239,.2)' : 'none',
           }}>
-            {loading ? '🤔 Analyzing with AI...' : '✦ Parse & preview →'}
+            {loading ? '🤔 ' + t('add.aiParsing') : t('add.parseBtn')}
           </button>
 
           {/* ── Parsed preview ── */}

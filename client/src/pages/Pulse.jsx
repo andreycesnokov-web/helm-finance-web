@@ -58,12 +58,12 @@ const TX_TYPE_COLORS = {
   correction: { bg: 'var(--amber-light)', color: 'var(--amber-dark)',  sign: '±' },
 }
 
-const FACTOR_LABELS = {
-  cash_health:     'Cash Health',
-  runway:          'Runway',
-  payables:        'Payables',
-  receivables:     'Receivables',
-  expense_control: 'Expense Control',
+const FACTOR_KEY = {
+  cash_health:     'pulse.factorCashHealth',
+  runway:          'pulse.factorRunway',
+  payables:        'pulse.factorPayables',
+  receivables:     'pulse.factorReceivables',
+  expense_control: 'pulse.factorExpenseControl',
 }
 
 const FACTOR_ORDER = ['cash_health', 'runway', 'payables', 'receivables', 'expense_control']
@@ -244,7 +244,7 @@ export default function Pulse({ onDataLoad }) {
   const netFlowColor = netFlow >= 0 ? 'var(--green-dark)' : 'var(--red-dark)'
 
   const hour    = new Date().getHours()
-  const greet   = hour < 12 ? t('pulse.goodMorning') || 'Good morning' : hour < 17 ? t('pulse.goodAfternoon') || 'Good afternoon' : t('pulse.goodEvening') || 'Good evening'
+  const greet   = hour < 12 ? t('pulse.goodMorning') : hour < 17 ? t('pulse.goodAfternoon') : t('pulse.goodEvening')
   const firstName = user?.firstName || 'there'
 
   const btnP = 'btn btn-block btn-lg'
@@ -305,14 +305,14 @@ export default function Pulse({ onDataLoad }) {
         {/* cash + runway KPIs */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16, position: 'relative' }}>
           <div style={{ minWidth: 0 }}>
-            <div style={{ fontSize: 9, color: 'rgba(255,255,255,.4)', letterSpacing: '0.08em', marginBottom: 3 }}>TOTAL CASH</div>
+            <div style={{ fontSize: 9, color: 'rgba(255,255,255,.4)', letterSpacing: '0.08em', marginBottom: 3 }}>{t('pulse.totalCashLabel')}</div>
             <div style={{ fontSize: 'clamp(22px, 6.5vw, 28px)', fontWeight: 700, color: totalBalance < 0 ? '#F87171' : '#fff', letterSpacing: -0.5, lineHeight: 1, wordBreak: 'break-word' }}>
               {fmt(totalBalance)}
             </div>
             <div style={{ fontSize: 10, color: 'rgba(255,255,255,.35)', marginTop: 3 }}>IDR</div>
           </div>
           <div>
-            <div style={{ fontSize: 9, color: 'rgba(255,255,255,.4)', letterSpacing: '0.08em', marginBottom: 3 }}>RUNWAY</div>
+            <div style={{ fontSize: 9, color: 'rgba(255,255,255,.4)', letterSpacing: '0.08em', marginBottom: 3 }}>{t('pulse.runwayLabel')}</div>
             <div style={{ fontSize: 28, fontWeight: 700, lineHeight: 1,
               color: !runway || runway >= 999 ? 'rgba(255,255,255,.5)'
                 : runway > 30 ? '#34D399'
@@ -331,7 +331,7 @@ export default function Pulse({ onDataLoad }) {
         {cfoScore && (
           <div style={{ background: 'rgba(255,255,255,.06)', borderRadius: 12, padding: '10px 12px', border: '0.5px solid rgba(255,255,255,.1)', marginBottom: 14, position: 'relative' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-              <div style={{ fontSize: 9, color: 'rgba(255,255,255,.45)', letterSpacing: '0.08em', fontWeight: 600 }}>CFO SCORE</div>
+              <div style={{ fontSize: 9, color: 'rgba(255,255,255,.45)', letterSpacing: '0.08em', fontWeight: 600 }}>{t('pulse.cfoScore')}</div>
               <div style={{ fontSize: 17, fontWeight: 700, color: scoreColor }}>{scoreVal}</div>
             </div>
             <div style={{ height: 4, background: 'rgba(255,255,255,.1)', borderRadius: 4, overflow: 'hidden' }}>
@@ -397,7 +397,7 @@ export default function Pulse({ onDataLoad }) {
                       return (
                         <div key={k}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <span style={{ fontSize: 11, color: 'var(--text-2)' }}>{FACTOR_LABELS[k]}</span>
+                            <span style={{ fontSize: 11, color: 'var(--text-2)' }}>{t(FACTOR_KEY[k] || k)}</span>
                             <span style={{ fontSize: 11, fontWeight: 600, color: col }}>{val != null ? val : '—'}</span>
                           </div>
                           <ScoreBar score={val} color={col} />

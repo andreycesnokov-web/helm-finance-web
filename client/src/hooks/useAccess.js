@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from './useAuth'
 import { apiFetch } from '../lib/api'
+import { t } from '../i18n/index'
 
 /**
  * useAccess — SaaS plan / trial / limits hook
@@ -58,7 +59,7 @@ export function useAccess() {
   }
 
   const planLabel = isTrialActive
-    ? `Trial · ${plan.days_left_in_trial}d left`
+    ? t('aicfo.trialLeft').replace('{n}', plan.days_left_in_trial)
     : (PLAN_LABELS[effectivePlan] || effectivePlan)
 
   /**

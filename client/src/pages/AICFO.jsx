@@ -5,24 +5,24 @@ import { useAccess } from '../hooks/useAccess'
 import { useTranslation } from '../hooks/useTranslation'
 import { apiFetch, fmt, fmtFull } from '../lib/api'
 
-// ── Suggested questions ───────────────────────────────────────────────────────
-const SUGGESTED = [
-  { icon: '💰', text: 'How much cash do I have?' },
-  { icon: '⏰', text: 'What payables are urgent?' },
-  { icon: '📥', text: 'Who owes me money?' },
-  { icon: '📉', text: 'What is my cash runway?' },
-  { icon: '⚠️', text: 'What is my biggest cash risk?' },
-  { icon: '👤', text: 'Can I hire someone?' },
-  { icon: '📋', text: 'What should I do today?' },
-  { icon: '📊', text: 'How are expenses trending this month?' },
+// ── Suggested questions — keys resolved via t() at render time ────────────────
+const SUGGESTED_KEYS = [
+  { icon: '💰', key: 'aicfo.q1' },
+  { icon: '⏰', key: 'aicfo.q2' },
+  { icon: '📥', key: 'aicfo.q3' },
+  { icon: '📉', key: 'aicfo.q4' },
+  { icon: '⚠️', key: 'aicfo.q5' },
+  { icon: '👤', key: 'aicfo.q6' },
+  { icon: '📋', key: 'aicfo.q7' },
+  { icon: '📊', key: 'aicfo.q8' },
 ]
 
 // ── Severity / status configs ─────────────────────────────────────────────────
 const SEV_CFG = {
-  critical: { bg: 'var(--red-light)',   border: 'rgba(220,38,38,.18)',  dot: 'var(--red-dark)',   text: 'var(--red-dark)',   label: 'Critical' },
-  high:     { bg: 'var(--red-light)',   border: 'rgba(220,38,38,.12)',  dot: '#F87171',           text: 'var(--red-dark)',   label: 'High' },
-  medium:   { bg: 'var(--amber-light)', border: 'rgba(217,119,6,.18)', dot: 'var(--amber-dark)', text: 'var(--amber-dark)', label: 'Medium' },
-  low:      { bg: 'var(--green-light)', border: 'rgba(6,95,70,.15)',   dot: 'var(--green-dark)', text: 'var(--green-dark)', label: 'Low' },
+  critical: { bg: 'var(--red-light)',   border: 'rgba(220,38,38,.18)',  dot: 'var(--red-dark)',   text: 'var(--red-dark)',   labelKey: 'pulse.critical' },
+  high:     { bg: 'var(--red-light)',   border: 'rgba(220,38,38,.12)',  dot: '#F87171',           text: 'var(--red-dark)',   labelKey: 'aicfo.priorityHigh' },
+  medium:   { bg: 'var(--amber-light)', border: 'rgba(217,119,6,.18)', dot: 'var(--amber-dark)', text: 'var(--amber-dark)', labelKey: 'aicfo.priorityMedium' },
+  low:      { bg: 'var(--green-light)', border: 'rgba(6,95,70,.15)',   dot: 'var(--green-dark)', text: 'var(--green-dark)', labelKey: 'aicfo.priorityLow' },
 }
 
 const ALERT_CFG = {
@@ -32,16 +32,16 @@ const ALERT_CFG = {
 }
 
 const HIRE_CFG = {
-  ready:             { icon: '✅', color: 'var(--green-dark)', bg: 'var(--green-light)' },
-  caution:           { icon: '⚠️', color: 'var(--amber-dark)', bg: 'var(--amber-light)' },
-  not_ready:         { icon: '🔴', color: 'var(--red-dark)',   bg: 'var(--red-light)' },
-  insufficient_data: { icon: '❓', color: 'var(--text-3)',     bg: 'var(--bg-3)' },
+  ready:             { icon: '✅', color: 'var(--green-dark)', bg: 'var(--green-light)', labelKey: 'aicfo.hireReady' },
+  caution:           { icon: '⚠️', color: 'var(--amber-dark)', bg: 'var(--amber-light)', labelKey: 'aicfo.hireCaution' },
+  not_ready:         { icon: '🔴', color: 'var(--red-dark)',   bg: 'var(--red-light)',   labelKey: 'aicfo.notRecommended' },
+  insufficient_data: { icon: '❓', color: 'var(--text-3)',     bg: 'var(--bg-3)',        labelKey: 'aicfo.hireNoData' },
 }
 
 const ACTION_PRIORITY = {
-  high:   { color: 'var(--red-dark)',   bg: 'var(--red-light)',   label: 'High' },
-  medium: { color: 'var(--amber-dark)', bg: 'var(--amber-light)', label: 'Medium' },
-  low:    { color: 'var(--brand-dark)', bg: 'var(--brand-light)', label: 'Low' },
+  high:   { color: 'var(--red-dark)',   bg: 'var(--red-light)',   labelKey: 'aicfo.priorityHigh' },
+  medium: { color: 'var(--amber-dark)', bg: 'var(--amber-light)', labelKey: 'aicfo.priorityMedium' },
+  low:    { color: 'var(--brand-dark)', bg: 'var(--brand-light)', labelKey: 'aicfo.priorityLow' },
 }
 
 const ACTION_ICONS = {
@@ -291,7 +291,7 @@ export default function AICFO() {
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
                           <div style={{ fontSize: 12, color: 'var(--text-2)', display: 'flex', alignItems: 'center', gap: 6 }}>
                             <span>{factorIcon[key]}</span>
-                            <span style={{ fontWeight: 500 }}>{key.replace(/_/g,' ').replace(/\b\w/g,l=>l.toUpperCase())}</span>
+                            <span style={{ fontWeight: 500 }}>{t('pulse.factor' + key.split('_').map(w=>w[0].toUpperCase()+w.slice(1)).join(''))}</span>
                           </div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                             <span style={{ fontSize: 11, color: fColor }}>{f.label}</span>
@@ -338,7 +338,7 @@ export default function AICFO() {
                 <div style={{ background: hireCfg.bg, border: `1px solid ${hireCfg.color}22`, borderRadius: 14, padding: '14px 16px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                     <span style={{ fontSize: 16 }}>{hireCfg.icon}</span>
-                    <span style={{ fontSize: 13, fontWeight: 800, color: hireCfg.color }}>{hireReady.label}</span>
+                    <span style={{ fontSize: 13, fontWeight: 800, color: hireCfg.color }}>{t(hireCfg.labelKey)}</span>
                   </div>
                   {hireReady.safe_monthly_salary > 0 && (
                     <div style={{ marginBottom: 8 }}>
@@ -393,7 +393,7 @@ export default function AICFO() {
                     <div style={{ fontSize: 13, fontWeight: 600, color: cfg.text }}>{r.title}</div>
                     {r.amount > 0 && <div style={{ fontSize: 11, color: cfg.text, opacity: 0.7, marginTop: 2 }}>{fmt(r.amount)} {currency}</div>}
                   </div>
-                  <span style={{ fontSize: 10, fontWeight: 700, color: cfg.text, opacity: 0.7, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{cfg.label}</span>
+                  <span style={{ fontSize: 10, fontWeight: 700, color: cfg.text, opacity: 0.7, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{t(cfg.labelKey)}</span>
                 </div>
               )
             })}
@@ -421,7 +421,7 @@ export default function AICFO() {
                     <div style={{ fontSize: 11, color: 'var(--text-3)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.description}</div>
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0 }}>
-                    <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 10, background: pc.bg, color: pc.color }}>{pc.label}</span>
+                    <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 10, background: pc.bg, color: pc.color }}>{t(pc.labelKey)}</span>
                     {a.amount > 0 && <span style={{ fontSize: 10, color: 'var(--text-4)' }}>{fmt(a.amount)} {currency}</span>}
                   </div>
                 </div>
@@ -435,11 +435,11 @@ export default function AICFO() {
       <div style={{ marginBottom: 16 }}>
         <SectionTitle>{t('aicfo.askAICFO')}</SectionTitle>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
-          {SUGGESTED.map(s => (
-            <button key={s.text} onClick={() => ask(s.text)} disabled={asking}
+          {SUGGESTED_KEYS.map(s => (
+            <button key={s.key} onClick={() => ask(t(s.key))} disabled={asking}
               style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 12px', borderRadius: 20, fontSize: 12, fontWeight: 500, background: 'var(--bg-2)', border: '0.5px solid var(--border)', color: 'var(--text-2)', cursor: asking ? 'not-allowed' : 'pointer', opacity: asking ? 0.5 : 1, fontFamily: 'inherit' }}>
               <span>{s.icon}</span>
-              <span>{s.text}</span>
+              <span>{t(s.key)}</span>
             </button>
           ))}
         </div>
