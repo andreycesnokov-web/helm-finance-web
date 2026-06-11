@@ -27,7 +27,7 @@ export default function Radar() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    apiFetch('/pulse?scope=all', token)
+    apiFetch('/pulse?scope=business', token)
       .then(setData)
       .catch(console.error)
       .finally(() => setLoading(false))
@@ -67,6 +67,12 @@ export default function Radar() {
         <div className={`hf-badge ${isHealthy ? 'hf-badge-green' : 'hf-badge-red'}`} style={{ fontSize: 13, padding: '6px 14px' }}>
           {isHealthy ? t('radar.healthy') : t('radar.atRisk')}
         </div>
+      </div>
+
+      {/* Business scope label */}
+      <div style={{ margin: '0 0 12px', padding: '7px 14px', borderRadius: 10, background: '#EEF2FF', border: '1px solid #C7D2FE', display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11, color: '#3730a3', fontWeight: 600 }}>
+        <span>🏢</span>
+        <span>{t('radar.businessCashForecast')}</span>
       </div>
 
       {/* Advanced Radar upgrade banner — shown only when feature not enabled */}

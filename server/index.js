@@ -216,13 +216,18 @@ app.get('/api/pulse', auth, async (req, res) => {
     // If user has real wallets → use them with computed balance (wallet_id match OR legacy source name).
     // Otherwise fall back to virtual source-based accounts for full backward compatibility.
     const { data: userWallets } = await supabase
-      .from('wallets').select('id, name, currency, type, entity_name')
+      .from('wallets').select('id, name, currency, type, entity_name, scope')
       .eq('user_id', userId).eq('is_active', true)
       .order('sort_order', { ascending: true });
 
+    // Filter wallets by scope if requested
+    const filteredWallets = (userWallets || []).filter(w =>
+      scope === 'all' || (w.scope || 'business') === scope
+    );
+
     let accounts;
     if (userWallets && userWallets.length > 0) {
-      accounts = userWallets.map(w => {
+      accounts = filteredWallets.map(w => {
         const related = (allTxs || []).filter(t =>
           t.wallet_id === w.id || (!t.wallet_id && t.source === w.name)
         );
@@ -232,7 +237,7 @@ app.get('/api/pulse', auth, async (req, res) => {
           if (t.type === 'correction')   return sum + Number(t.amount_original || 0); // signed delta
           return sum;
         }, 0);
-        return { id: w.id, name: w.name, balance, currency: w.currency || 'IDR', type: w.type || 'bank', entity_name: w.entity_name || null };
+        return { id: w.id, name: w.name, balance, currency: w.currency || 'IDR', type: w.type || 'bank', entity_name: w.entity_name || null, scope: w.scope || 'business' };
       });
     } else {
       // Legacy mode: virtual accounts derived from transactions.source
@@ -1006,8 +1011,11 @@ app.get('/api/wallets', auth, async (req, res) => {
 
 app.post('/api/wallets', auth, async (req, res) => {
   const userId = req.user.userId;
-  const { name, currency, type, entity_name, color, opening_balance, sort_order } = req.body;
+  const { name, currency, type, entity_name, color, opening_balance, sort_order, scope } = req.body;
   if (!name) return res.status(400).json({ error: 'name required' });
+  if (scope && !['business', 'personal'].includes(scope)) {
+    return res.status(400).json({ error: "scope must be 'business' or 'personal'" });
+  }
   try {
     // ── Feature gate: wallet limit ───────────────────────────────────────────
     const access = await getCurrentAccess(userId);
@@ -1042,6 +1050,7 @@ app.post('/api/wallets', auth, async (req, res) => {
         entity_name: entity_name || null,
         color:       color       || null,
         sort_order:  sort_order  || 0,
+        scope:       scope       || 'business',
       })
       .select()
       .single();
@@ -1113,7 +1122,10 @@ app.get('/api/wallets/:id/transactions', auth, async (req, res) => {
 app.put('/api/wallets/:id', auth, async (req, res) => {
   const userId = req.user.userId;
   const { id } = req.params;
-  const { name, currency, type, entity_name, color, sort_order } = req.body;
+  const { name, currency, type, entity_name, color, sort_order, scope } = req.body;
+  if (scope !== undefined && !['business', 'personal'].includes(scope)) {
+    return res.status(400).json({ error: "scope must be 'business' or 'personal'" });
+  }
   try {
     // If renaming, sync source text on legacy transactions for balance continuity
     if (name) {
@@ -1134,6 +1146,7 @@ app.put('/api/wallets/:id', auth, async (req, res) => {
     if (entity_name  !== undefined) updates.entity_name = entity_name;
     if (color        !== undefined) updates.color       = color;
     if (sort_order   !== undefined) updates.sort_order  = sort_order;
+    if (scope        !== undefined) updates.scope       = scope;
 
     const { data, error } = await supabase
       .from('wallets')
@@ -1898,39 +1911,60 @@ async function buildAiCfoContext(userId) {
     supabase.from('transactions').select('type,amount_original,amount_idr,currency_original,created_at').eq('user_id', userId),
     supabase.from('transactions').select('type,amount_original,amount_idr,created_at').eq('user_id', userId).gte('created_at', monthStart),
     supabase.from('debts').select('*').eq('user_id', userId),
-    supabase.from('wallets').select('id,name,currency,type').eq('user_id', userId).eq('is_active', true),
+    supabase.from('wallets').select('id,name,currency,type,scope').eq('user_id', userId).eq('is_active', true),
     getCurrentAccess(userId),
   ]);
 
   const debts = enrichDebts(rawDebts);
 
-  // ── Cash ─────────────────────────────────────────────────────────────────
+  // ── Wallet scope split ────────────────────────────────────────────────────
+  const allWallets      = wallets || [];
+  const businessWallets = allWallets.filter(w => (w.scope || 'business') === 'business');
+  const personalWallets = allWallets.filter(w => w.scope === 'personal');
+  const businessWalletIds = new Set(businessWallets.map(w => w.id));
+
+  // ── Cash (business wallets only for CFO Score / runway) ──────────────────
   const CASH_IN  = ['income'];
   const CASH_OUT = ['expense', 'payroll'];
-  const allIncome    = (allTxs || []).filter(t => CASH_IN.includes(t.type)).reduce((s,t) => s + Number(t.amount_original||0), 0);
-  const allExpenses  = (allTxs || []).filter(t => CASH_OUT.includes(t.type)).reduce((s,t) => s + Number(t.amount_original||0), 0);
-  const allCorrections = (allTxs || []).filter(t => t.type === 'correction').reduce((s,t) => s + Number(t.amount_original||0), 0);
+
+  // Helper to sum tx that belong to a given set of wallet IDs (or legacy source match)
+  function txBelongsToWallets(t, walletSet, walletIdSet) {
+    if (t.wallet_id) return walletIdSet.has(t.wallet_id);
+    return walletSet.some(w => w.name === t.source);
+  }
+
+  const bizTxs = (allTxs || []).filter(t => txBelongsToWallets(t, businessWallets, businessWalletIds));
+
+  const allIncome    = bizTxs.filter(t => CASH_IN.includes(t.type)).reduce((s,t) => s + Number(t.amount_original||0), 0);
+  const allExpenses  = bizTxs.filter(t => CASH_OUT.includes(t.type)).reduce((s,t) => s + Number(t.amount_original||0), 0);
+  const allCorrections = bizTxs.filter(t => t.type === 'correction').reduce((s,t) => s + Number(t.amount_original||0), 0);
   const totalBalance = allIncome - allExpenses + allCorrections;
 
-  // ── This month ────────────────────────────────────────────────────────────
-  const monthIncome   = (monthTxs || []).filter(t => CASH_IN.includes(t.type)).reduce((s,t) => s + Number(t.amount_original||0), 0);
-  const monthExpenses = (monthTxs || []).filter(t => CASH_OUT.includes(t.type)).reduce((s,t) => s + Number(t.amount_original||0), 0);
+  // Personal cash (informational only — not used in CFO score)
+  const persTxs = (allTxs || []).filter(t => txBelongsToWallets(t, personalWallets, new Set(personalWallets.map(w => w.id))));
+  const personalBalance = persTxs.filter(t => CASH_IN.includes(t.type)).reduce((s,t) => s + Number(t.amount_original||0), 0)
+    - persTxs.filter(t => CASH_OUT.includes(t.type)).reduce((s,t) => s + Number(t.amount_original||0), 0)
+    + persTxs.filter(t => t.type === 'correction').reduce((s,t) => s + Number(t.amount_original||0), 0);
 
-  // ── Burn rate & runway — rolling 30-day window (same source as Pulse) ────
-  // allTxs now includes created_at so computeBurnAndRunway works correctly.
-  const burnMetrics = computeBurnAndRunway(allTxs, totalBalance);
+  // ── This month (business wallets only) ────────────────────────────────────
+  const bizMonthTxs   = (monthTxs || []).filter(t => txBelongsToWallets(t, businessWallets, businessWalletIds));
+  const monthIncome   = bizMonthTxs.filter(t => CASH_IN.includes(t.type)).reduce((s,t) => s + Number(t.amount_original||0), 0);
+  const monthExpenses = bizMonthTxs.filter(t => CASH_OUT.includes(t.type)).reduce((s,t) => s + Number(t.amount_original||0), 0);
+
+  // ── Burn rate & runway — rolling 30-day window (business wallets only) ────
+  const burnMetrics = computeBurnAndRunway(bizTxs, totalBalance);
   const burnRate    = burnMetrics.burn_rate_daily;
 
   // ── Wallet balances ───────────────────────────────────────────────────────
-  const walletList = (wallets || []).map(w => {
-    const related = (allTxs || []).filter(t => t.wallet_id === w.id);
+  const walletList = allWallets.map(w => {
+    const related = (allTxs || []).filter(t => t.wallet_id === w.id || (!t.wallet_id && t.source === w.name));
     const bal = related.reduce((s,t) => {
       if (CASH_IN.includes(t.type))  return s + Number(t.amount_original||0);
       if (CASH_OUT.includes(t.type)) return s - Number(t.amount_original||0);
       if (t.type === 'correction')   return s + Number(t.amount_original||0);
       return s;
     }, 0);
-    return { id: w.id, name: w.name, currency: w.currency, type: w.type, balance: bal };
+    return { id: w.id, name: w.name, currency: w.currency, type: w.type, scope: w.scope || 'business', balance: bal };
   });
 
   // ── Debts breakdowns ──────────────────────────────────────────────────────
@@ -1959,9 +1993,18 @@ async function buildAiCfoContext(userId) {
   if (risks.length === 0) risks.push({ type:'healthy', severity:'low', title:'No significant risks', description:'Finances look healthy', amount: 0 });
 
   // ── Build partial context for engines (before final return) ──────────────
+  const walletsSummary = {
+    business_cash:          totalBalance,
+    personal_cash:          personalBalance,
+    total_cash:             totalBalance + personalBalance,
+    business_wallets_count: businessWallets.length,
+    personal_wallets_count: personalWallets.length,
+  };
+
   const partialCtx = {
-    business:      { name: (accessData?.business || {}).name || 'My Business', base_currency: (accessData?.business || {}).base_currency || 'IDR', plan: (accessData?.business || {}).plan || 'free', effective_plan: (accessData?.accessState || {}).effectivePlan || 'free', trial_status: (accessData?.business || {}).trial_status || 'inactive', days_left_in_trial: (accessData?.accessState || {}).daysLeft || 0 },
-    cash:          { total_balance: totalBalance, wallets_count: (wallets||[]).length, wallets: walletList.slice(0,5) },
+    business:        { name: (accessData?.business || {}).name || 'My Business', base_currency: (accessData?.business || {}).base_currency || 'IDR', plan: (accessData?.business || {}).plan || 'free', effective_plan: (accessData?.accessState || {}).effectivePlan || 'free', trial_status: (accessData?.business || {}).trial_status || 'inactive', days_left_in_trial: (accessData?.accessState || {}).daysLeft || 0 },
+    cash:            { total_balance: totalBalance, wallets_count: businessWallets.length, wallets: walletList.filter(w => (w.scope||'business') === 'business').slice(0,5) },
+    wallets_summary: walletsSummary,
     current_month: { income: monthIncome, expenses: monthExpenses, net_flow: monthIncome - monthExpenses, transactions_count: (monthTxs||[]).length, burn_rate: burnRate, burn_window_days: burnMetrics.burn_window_days },
     receivables:   { total_remaining: recvTotal, overdue_total: recvOverdue.reduce((s,d)=>s+Number(d.remaining_amount||0),0), overdue_count: recvOverdue.length, partial_total: recvList.filter(d=>d.status==='partial').reduce((s,d)=>s+Number(d.remaining_amount||0),0), due_soon_total: recvDueSoon.reduce((s,d)=>s+Number(d.remaining_amount||0),0), top: recvList.slice(0,5).map(d=>({counterparty:d.counterparty,remaining_amount:d.remaining_amount,due_date:d.due_date,status:d.status,days_overdue:d.days_overdue})) },
     payables:      { total_remaining: payTotal, overdue_total: payOverdue.reduce((s,d)=>s+Number(d.remaining_amount||0),0), overdue_count: payOverdue.length, partial_total: payList.filter(d=>d.status==='partial').reduce((s,d)=>s+Number(d.remaining_amount||0),0), due_soon_total: payDueSoon.reduce((s,d)=>s+Number(d.remaining_amount||0),0), top: payList.slice(0,5).map(d=>({counterparty:d.counterparty,remaining_amount:d.remaining_amount,due_date:d.due_date,status:d.status,days_overdue:d.days_overdue})) },

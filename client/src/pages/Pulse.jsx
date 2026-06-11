@@ -283,6 +283,20 @@ export default function Pulse({ onDataLoad }) {
         ))}
       </div>
 
+      {/* ── All-scope warning banner ─────────────────────────────────────────── */}
+      {scope === 'all' && (
+        <div style={{ margin: '0 16px 10px', padding: '9px 14px', borderRadius: 10, background: 'rgba(247,144,9,.08)', border: '1px solid rgba(247,144,9,.25)', fontSize: 11, color: 'var(--amber-dark)', lineHeight: 1.4 }}>
+          {t('pulse.allScopeWarning')}
+        </div>
+      )}
+
+      {/* ── Personal Overview header (personal tab only) ──────────────────────── */}
+      {scope === 'personal' && (
+        <div style={{ margin: '0 16px 10px', padding: '9px 14px', borderRadius: 10, background: 'rgba(126,34,206,.07)', border: '1px solid rgba(126,34,206,.2)', fontSize: 11, color: '#7E22CE', fontWeight: 600 }}>
+          {t('pulse.personalOverview')}
+        </div>
+      )}
+
       {/* ── CEO Status Hero ──────────────────────────────────────────────────── */}
       <div style={{
         margin: '0 16px 16px',
@@ -333,8 +347,8 @@ export default function Pulse({ onDataLoad }) {
           </div>
         </div>
 
-        {/* CFO score strip */}
-        {cfoScore && (
+        {/* CFO score strip — business only, not shown in personal tab */}
+        {cfoScore && scope !== 'personal' && (
           <div style={{ background: 'rgba(255,255,255,.06)', borderRadius: 12, padding: '10px 12px', border: '0.5px solid rgba(255,255,255,.1)', marginBottom: 14, position: 'relative' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
               <div style={{ fontSize: 9, color: 'rgba(255,255,255,.45)', letterSpacing: '0.08em', fontWeight: 600 }}>{t('pulse.cfoScore')}</div>
@@ -380,8 +394,8 @@ export default function Pulse({ onDataLoad }) {
       <div className="pulse-desktop-grid">
         <div className="pulse-main-col">
 
-          {/* ── CFO Score card ─────────────────────────────────────────────── */}
-          {cfoScore && (
+          {/* ── CFO Score card — business only, not shown in personal tab ──── */}
+          {cfoScore && scope !== 'personal' && (
             <>
               <SectionLabel>{t('pulse.cfoScore')}</SectionLabel>
               <div style={{ margin: '0 16px 16px', background: 'var(--bg-2)', border: '0.5px solid var(--border)', borderRadius: 20, padding: '16px 16px 14px' }}>

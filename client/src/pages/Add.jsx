@@ -627,6 +627,7 @@ export default function Add() {
                                 <option key={w.id} value={w.id}>
                                   {w.name}{w.currency && w.currency !== 'IDR' ? ` · ${w.currency}` : ''}
                                   {w.entity_name ? ` (${w.entity_name})` : ''}
+                                  {` · ${(w.scope || 'business') === 'business' ? 'Business' : 'Personal'}`}
                                 </option>
                               ))}
                             </select>

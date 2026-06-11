@@ -90,7 +90,7 @@ const getCurrencyStyle = (currency) => CURRENCY_STYLE[currency] || { bg: '#F1F5F
 const getTypeIcon      = (type, color) => (TYPE_ICON[type] || TYPE_ICON.other)(color)
 
 // ── Default form state ────────────────────────────────────────────────────────
-const EMPTY_FORM = { name: '', currency: 'IDR', type: '', entity_name: '', opening_balance: '', sort_order: 0, custom_type: '' }
+const EMPTY_FORM = { name: '', currency: 'IDR', type: '', entity_name: '', opening_balance: '', sort_order: 0, custom_type: '', scope: 'business' }
 
 export default function Accounts() {
   const { token } = useAuth()
@@ -107,6 +107,7 @@ export default function Accounts() {
   const [showForm,     setShowForm]     = useState(false)
   const [editWallet,   setEditWallet]   = useState(null)
   const [form,         setForm]         = useState(EMPTY_FORM)
+  const [scopeTab,     setScopeTab]     = useState('all')
   const [saving,       setSaving]       = useState(false)
   const [backfilling,  setBackfilling]  = useState(false)
   const [backfillDone, setBackfillDone] = useState(false)
@@ -150,7 +151,18 @@ export default function Accounts() {
   }, [])
 
   // ── Computed totals ───────────────────────────────────────────────────────
-  const totalBalance = wallets.reduce((s, w) => s + (w.balance || 0), 0)
+  const totalBalance    = wallets.reduce((s, w) => s + (w.balance || 0), 0)
+  const businessBalance = wallets.filter(w => (w.scope || 'business') === 'business').reduce((s, w) => s + (w.balance || 0), 0)
+  const personalBalance = wallets.filter(w => w.scope === 'personal').reduce((s, w) => s + (w.balance || 0), 0)
+
+  // Filtered wallets per tab
+  const filteredWallets = scopeTab === 'all'
+    ? wallets
+    : wallets.filter(w => (w.scope || 'business') === scopeTab)
+
+  const filteredBalance = scopeTab === 'all' ? totalBalance
+    : scopeTab === 'business' ? businessBalance
+    : personalBalance
 
   // ── Backfill handler ──────────────────────────────────────────────────────
   const handleBackfill = async () => {
@@ -183,6 +195,7 @@ export default function Accounts() {
       type: knownType ? w.type : (w.type ? '__custom__' : ''),
       custom_type: knownType ? '' : (w.type || ''),
       entity_name: w.entity_name || '', opening_balance: '', sort_order: w.sort_order || 0,
+      scope: w.scope || 'business',
     })
     setShowForm(true)
   }
@@ -199,7 +212,7 @@ export default function Accounts() {
       if (editWallet) {
         await apiFetch(`/wallets/${editWallet.id}`, token, {
           method: 'PUT',
-          body: { name: form.name, currency: form.currency, type: resolvedType, entity_name: form.entity_name || null },
+          body: { name: form.name, currency: form.currency, type: resolvedType, entity_name: form.entity_name || null, scope: form.scope || 'business' },
         })
       } else {
         await apiFetch('/wallets', token, {
@@ -211,6 +224,7 @@ export default function Accounts() {
             entity_name:     form.entity_name || null,
             opening_balance: Number(form.opening_balance) || 0,
             sort_order:      wallets.length,
+            scope:           form.scope || 'business',
           },
         })
       }
@@ -289,16 +303,39 @@ export default function Accounts() {
         </div>
       </div>
 
+      {/* Scope tabs */}
+      {wallets.length > 0 && (
+        <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
+          {['all', 'business', 'personal'].map(s => (
+            <button
+              key={s}
+              onClick={() => setScopeTab(s)}
+              style={{
+                padding: '7px 16px', borderRadius: 20, fontSize: 12, fontWeight: 700,
+                border: '1px solid var(--border-2)', fontFamily: 'inherit', cursor: 'pointer',
+                background: scopeTab === s ? 'var(--text)' : 'var(--bg-2)',
+                color:      scopeTab === s ? 'var(--bg)'   : 'var(--text-2)',
+                transition: 'all .15s',
+              }}
+            >
+              {s === 'all' ? t('common.all') : s === 'business' ? t('common.business') : t('common.personal')}
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* Total balance hero */}
       {wallets.length > 0 && (
         <div style={{ background: 'linear-gradient(135deg, #0F172A 0%, #1e293b 100%)', borderRadius: 20, padding: '24px 26px 20px', boxShadow: '0 8px 32px rgba(15,23,42,.22)', marginBottom: 20, position: 'relative', overflow: 'hidden' }}>
           <div style={{ position: 'absolute', inset: 0, opacity: 0.03, backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 28px, #fff 28px, #fff 29px), repeating-linear-gradient(90deg, transparent, transparent 28px, #fff 28px, #fff 29px)', pointerEvents: 'none' }} />
           <div style={{ position: 'relative' }}>
-            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 10, fontWeight: 700 }}>{t('accounts.totalBalance')}</div>
-            <div style={{ fontSize: 'clamp(28px, 9vw, 38px)', fontWeight: 800, color: '#fff', letterSpacing: -1, lineHeight: 1, wordBreak: 'break-word' }}>
-              {fmtFull(totalBalance)}
+            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 10, fontWeight: 700 }}>
+              {scopeTab === 'business' ? t('accounts.totalBusiness') : scopeTab === 'personal' ? t('accounts.totalPersonal') : t('accounts.totalBalance')}
             </div>
-            <div style={{ fontSize: 'var(--text-xs)', color: 'rgba(255,255,255,0.4)', marginTop: 8 }}>IDR · {wallets.length} wallet{wallets.length !== 1 ? 's' : ''}</div>
+            <div style={{ fontSize: 'clamp(28px, 9vw, 38px)', fontWeight: 800, color: '#fff', letterSpacing: -1, lineHeight: 1, wordBreak: 'break-word' }}>
+              {fmtFull(filteredBalance)}
+            </div>
+            <div style={{ fontSize: 'var(--text-xs)', color: 'rgba(255,255,255,0.4)', marginTop: 8 }}>IDR · {filteredWallets.length} wallet{filteredWallets.length !== 1 ? 's' : ''}</div>
           </div>
         </div>
       )}
@@ -344,11 +381,12 @@ export default function Accounts() {
       {/* Wallet cards */}
       {wallets.length > 0 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
-          {wallets.map((w) => {
+          {filteredWallets.map((w) => {
             const cs    = getCurrencyStyle(w.currency)
             const isNeg = (w.balance || 0) < 0
-            const pct   = totalBalance > 0 ? Math.round(((w.balance || 0) / totalBalance) * 100) : 0
+            const pct   = filteredBalance > 0 ? Math.round(((w.balance || 0) / filteredBalance) * 100) : 0
             const typeLabel = WALLET_TYPES.find(t => t.value === w.type && t.value !== '__custom__')?.label || (w.type ? w.type : null)
+            const walletScope = w.scope || 'business'
 
             return (
               <div key={w.id} className="hf-card" onClick={() => navigate(`/accounts/${w.id}`)} style={{ cursor: 'pointer', padding: '12px 14px' }}>
@@ -361,9 +399,16 @@ export default function Accounts() {
                   {/* Name + badges */}
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: 3 }}>{w.name}</div>
-                    <div style={{ display: 'flex', gap: 4 }}>
+                    <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
                       <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 20, background: cs.bg, color: cs.color, fontWeight: 700 }}>{w.currency}</span>
                       {typeLabel && <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 20, background: 'var(--bg-2)', color: 'var(--text-3)', fontWeight: 600 }}>{typeLabel}</span>}
+                      <span style={{
+                        fontSize: 10, padding: '1px 6px', borderRadius: 20, fontWeight: 700,
+                        background: walletScope === 'business' ? '#EEF2FF' : '#FDF2FF',
+                        color:      walletScope === 'business' ? '#3730a3' : '#7E22CE',
+                      }}>
+                        {walletScope === 'business' ? t('accounts.scopeBusiness') : t('accounts.scopePersonal')}
+                      </span>
                     </div>
                   </div>
 
@@ -626,6 +671,30 @@ export default function Accounts() {
               placeholder="e.g. PT Siberian BG, Personal"
               style={{ marginBottom: 14 }}
             />
+
+            {/* Scope selector */}
+            <label className="modal-label">{t('accounts.scopeLabel')}</label>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 6 }}>
+              {['business', 'personal'].map(s => (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => setForm(p => ({ ...p, scope: s }))}
+                  style={{
+                    flex: 1, padding: '9px 0', borderRadius: 10, fontSize: 'var(--text-sm)',
+                    border: '0.5px solid var(--border-2)', fontFamily: 'inherit', fontWeight: 700,
+                    background: form.scope === s ? (s === 'business' ? '#EEF2FF' : '#FDF2FF') : 'none',
+                    color:      form.scope === s ? (s === 'business' ? '#3730a3' : '#7E22CE') : 'var(--text-3)',
+                    cursor: 'pointer', transition: 'all .1s',
+                  }}
+                >
+                  {s === 'business' ? t('accounts.scopeBusiness') : t('accounts.scopePersonal')}
+                </button>
+              ))}
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 14, lineHeight: 1.5 }}>
+              {t('accounts.scopeExplain')}
+            </div>
 
             {/* Opening balance — only for new wallets */}
             {!editWallet && (

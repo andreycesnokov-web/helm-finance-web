@@ -137,6 +137,8 @@ const ru = {
     addPayable: 'Новое обязательство',
     viewRadar: 'Смотреть Радар',
     accounts: 'Счета',
+    allScopeWarning: 'Вид «Все» объединяет бизнес-кассу и личные средства. CFO Score рассчитывается только по бизнес-кошелькам.',
+    personalOverview: 'Личный обзор',
   },
   accounts: {
     title: 'Счета',
@@ -195,6 +197,12 @@ const ru = {
     importAccounts: 'Импортировать {n} счёт{s} как кошельки',
     youHaveAccounts: 'У вас {n} существующий{s} счёт{s}',
     importSub: 'Импортируйте их как кошельки для управления валютами, типами и юрлицами. Вы можете редактировать или удалять их после импорта.',
+    scopeBusiness: 'Бизнес',
+    scopePersonal: 'Личный',
+    scopeLabel: 'Тип кошелька',
+    scopeExplain: 'Бизнес-кошельки учитываются в CFO Score и запасе дней. Личные кошельки отображаются отдельно.',
+    totalBusiness: 'Бизнес-итого',
+    totalPersonal: 'Личное итого',
   },
   add: {
     title: 'Добавить',
@@ -277,6 +285,7 @@ const ru = {
     noBurnData: 'нет данных о расходах',
     perMonth: 'IDR / месяц',
     days: 'дней',
+    businessCashForecast: 'Прогноз бизнес-кассы',
   },
   payables: {
     title: 'Обязательства',

@@ -137,6 +137,8 @@ const en = {
     addPayable: 'New Payable',
     viewRadar: 'View Radar',
     accounts: 'Accounts',
+    allScopeWarning: 'All view combines business and personal cash. CFO Score is based on business wallets only.',
+    personalOverview: 'Personal Overview',
   },
   accounts: {
     title: 'Accounts',
@@ -195,6 +197,12 @@ const en = {
     importAccounts: 'Import {n} account{s} as wallets',
     youHaveAccounts: 'You have {n} existing account{s}',
     importSub: 'Import them as wallets to manage currencies, types, and entities. You can edit or delete them after importing.',
+    scopeBusiness: 'Business',
+    scopePersonal: 'Personal',
+    scopeLabel: 'Wallet usage',
+    scopeExplain: 'Business wallets count toward CFO Score and runway. Personal wallets are shown separately.',
+    totalBusiness: 'Business total',
+    totalPersonal: 'Personal total',
   },
   add: {
     title: 'Add',
@@ -261,6 +269,7 @@ const en = {
     noBurnData: 'no burn data',
     perMonth: 'IDR / month',
     days: 'days',
+    businessCashForecast: 'Business cash forecast',
   },
   payables: {
     title: 'Payables',
