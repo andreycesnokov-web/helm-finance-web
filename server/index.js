@@ -3191,8 +3191,8 @@ app.get('/api/payroll/overview', auth, async (req, res) => {
     const userId = req.user.userId;
 
     const [empRes, payRes] = await Promise.all([
-      supabase.from('payroll_employees').select('id, name, role, default_salary, currency, pay_day').eq('user_id', userId).neq('status', 'archived').order('name'),
-      supabase.from('payroll_payments').select('*').eq('user_id', userId).order('payment_date', { ascending: false }),
+      supabase.from('payroll_employees').select('id, name, role, default_salary, currency, pay_day, default_wallet_id').eq('user_id', userId).neq('status', 'archived').order('name'),
+      supabase.from('payroll_payments').select('*, payroll_payment_items(*)').eq('user_id', userId).order('payment_date', { ascending: false }),
     ]);
 
     const employees = empRes.data || [];
@@ -3200,12 +3200,14 @@ app.get('/api/payroll/overview', auth, async (req, res) => {
 
     const now = new Date();
     const thisMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    // Use net_amount if available, fallback to amount for old records
+    const netOf = p => Number(p.net_amount ?? p.amount ?? 0);
     const paidThisMonth = payments
       .filter(p => (p.period_month || '').startsWith(thisMonth) && p.status === 'paid')
-      .reduce((s, p) => s + Number(p.amount), 0);
+      .reduce((s, p) => s + netOf(p), 0);
     const totalPaidAll = payments
       .filter(p => p.status === 'paid')
-      .reduce((s, p) => s + Number(p.amount), 0);
+      .reduce((s, p) => s + netOf(p), 0);
 
     res.json({
       employees,
@@ -3223,26 +3225,55 @@ app.get('/api/payroll/overview', auth, async (req, res) => {
 });
 
 // POST /api/payroll/payments
-// Creates payroll_payment + linked transaction (same cash logic as normal transactions)
+// TODO (Telegram): When Telegram bot parses "зарплата Kevin 12M + бонус 2M - штраф 300k с BCA",
+//   it should call this same endpoint with the items array. No separate Telegram payroll logic.
+//
+// Creates payroll_payment + payroll_payment_items + linked transaction (net amount only).
 app.post('/api/payroll/payments', auth, async (req, res) => {
   try {
     const userId = req.user.userId;
     const {
       employee_id,
       employee_name,
-      amount,
       currency = 'IDR',
-      payment_type = 'salary',
       period_month,
       payment_date,
       wallet_id,
       notes,
+      items = [],   // NEW: array of { item_type, label, amount, direction }
+      // Legacy single-amount fallback (V1 compatibility)
+      amount: legacyAmount,
+      payment_type: legacyType = 'salary',
     } = req.body;
 
     if (!employee_name || !employee_name.trim()) return res.status(400).json({ error: 'Employee name is required.' });
-    if (!amount || Number(amount) <= 0)           return res.status(400).json({ error: 'Amount must be positive.' });
 
-    // Validate wallet
+    // ── Build items ──────────────────────────────────────────────────────────
+    // If items array provided (V1.1), use it. Otherwise fall back to legacy single amount.
+    let resolvedItems = [];
+    if (items && items.length > 0) {
+      // Validate each item
+      for (const item of items) {
+        if (!item.label || !item.label.trim())            return res.status(400).json({ error: 'Each item must have a label.' });
+        if (!Number(item.amount) || Number(item.amount) <= 0) return res.status(400).json({ error: `Amount for "${item.label}" must be positive.` });
+        if (!['addition', 'deduction'].includes(item.direction)) return res.status(400).json({ error: `Invalid direction for "${item.label}".` });
+      }
+      resolvedItems = items;
+    } else if (legacyAmount && Number(legacyAmount) > 0) {
+      // Legacy V1 fallback: single salary amount
+      resolvedItems = [{ item_type: legacyType, label: 'Salary', amount: Number(legacyAmount), direction: 'addition' }];
+    } else {
+      return res.status(400).json({ error: 'No payroll items provided.' });
+    }
+
+    // ── Calculate gross / deductions / net ───────────────────────────────────
+    const grossAmount     = resolvedItems.filter(i => i.direction === 'addition').reduce((s, i) => s + Number(i.amount), 0);
+    const deductionAmount = resolvedItems.filter(i => i.direction === 'deduction').reduce((s, i) => s + Number(i.amount), 0);
+    const netAmount       = grossAmount - deductionAmount;
+
+    if (netAmount <= 0) return res.status(400).json({ error: `Net amount must be positive. Gross: ${grossAmount}, Deductions: ${deductionAmount}.` });
+
+    // ── Validate wallet ───────────────────────────────────────────────────────
     let wallet = null;
     if (wallet_id) {
       const { data: w } = await supabase.from('wallets').select('id, name, scope, currency').eq('id', wallet_id).eq('user_id', userId).single();
@@ -3250,42 +3281,60 @@ app.post('/api/payroll/payments', auth, async (req, res) => {
       wallet = w;
     }
 
-    const payDate = payment_date || new Date().toISOString().slice(0, 10);
-    const typeLabel = payment_type.charAt(0).toUpperCase() + payment_type.slice(1);
-    const description = `${typeLabel} for ${employee_name.trim()}`;
+    const payDate     = payment_date || new Date().toISOString().slice(0, 10);
+    const periodLabel = period_month ? ` — ${period_month}` : '';
+    const description = `Payroll payment for ${employee_name.trim()}${periodLabel}`;
 
-    // 1. Create transaction (same logic as batch endpoint)
+    // ── 1. Create transaction (net paid only — single cash impact) ───────────
     const { data: tx, error: txErr } = await supabase.from('transactions').insert({
-      user_id:          userId,
-      type:             'payroll',
-      amount_original:  Number(amount),
-      amount_idr:       Number(amount),
+      user_id:           userId,
+      type:              'payroll',
+      amount_original:   netAmount,
+      amount_idr:        netAmount,
       currency_original: currency,
       description,
-      source:           wallet ? wallet.name : null,
-      wallet_id:        wallet_id || null,
-      scope:            wallet ? (wallet.scope || 'business') : 'business',
-      category:         'payroll',
-      transaction_date: payDate,
+      source:            wallet ? wallet.name : null,
+      wallet_id:         wallet_id || null,
+      scope:             wallet ? (wallet.scope || 'business') : 'business',
+      category:          'payroll',
+      transaction_date:  payDate,
     }).select().single();
     if (txErr) throw txErr;
 
-    // 2. Create payroll_payment linked to the transaction
+    // ── 2. Create payroll_payment ─────────────────────────────────────────────
     const { data: payment, error: pmtErr } = await supabase.from('payroll_payments').insert({
-      user_id:       userId,
-      employee_id:   employee_id || null,
-      transaction_id: tx.id,
-      employee_name: employee_name.trim(),
-      amount:        Number(amount),
+      user_id:          userId,
+      employee_id:      employee_id || null,
+      transaction_id:   tx.id,
+      employee_name:    employee_name.trim(),
+      amount:           netAmount,
+      gross_amount:     grossAmount,
+      deduction_amount: deductionAmount,
+      net_amount:       netAmount,
       currency,
-      payment_type,
-      period_month:  period_month || null,
-      payment_date:  payDate,
-      wallet_id:     wallet_id || null,
-      status:        'paid',
-      notes:         notes?.trim() || null,
+      payment_type:     resolvedItems[0]?.item_type || legacyType,
+      period_month:     period_month || null,
+      payment_date:     payDate,
+      wallet_id:        wallet_id || null,
+      status:           'paid',
+      notes:            notes?.trim() || null,
     }).select().single();
     if (pmtErr) throw pmtErr;
+
+    // ── 3. Create payroll_payment_items ───────────────────────────────────────
+    if (resolvedItems.length > 0) {
+      const itemRows = resolvedItems.map(item => ({
+        user_id:            userId,
+        payroll_payment_id: payment.id,
+        item_type:          item.item_type || 'other',
+        label:              item.label.trim(),
+        amount:             Number(item.amount),
+        direction:          item.direction,
+        notes:              item.notes?.trim() || null,
+      }));
+      const { error: itemErr } = await supabase.from('payroll_payment_items').insert(itemRows);
+      if (itemErr) throw itemErr;
+    }
 
     res.json({ payment, transaction: tx });
   } catch (e) {

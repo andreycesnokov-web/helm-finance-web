@@ -456,15 +456,15 @@ export default function Add() {
         <div style={{ padding: '0 16px' }}>
           {presetType === 'payroll' && (
             <div style={{ background: 'var(--amber-light)', border: '1px solid rgba(180,130,0,.2)', borderRadius: 10, padding: '10px 13px', marginBottom: 12, fontSize: 'var(--text-sm)', color: '#92400E', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
-              <span>💼 {getLang() === 'ru' ? 'Опишите зарплатную выплату — сумму, сотрудника и кошелёк'
-                 : getLang() === 'id' ? 'Jelaskan pembayaran gaji — jumlah, karyawan, dan dompet'
-                 : 'Describe the salary payment — amount, employee name, and wallet'}</span>
+              <span>💼 {getLang() === 'ru' ? 'Для детальной зарплаты с бонусами и удержаниями используйте модуль Зарплаты'
+                 : getLang() === 'id' ? 'Untuk gaji detail dengan bonus dan potongan, gunakan modul Gaji'
+                 : 'For salary + bonus + deductions tracking, use the Payroll module'}</span>
               <button onClick={() => navigate('/payroll')} style={{
                 background: 'rgba(146,64,14,.12)', border: 'none', borderRadius: 8,
                 padding: '5px 10px', fontSize: 11, fontWeight: 700, color: '#92400E',
                 cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'inherit',
               }}>
-                {getLang() === 'ru' ? 'Модуль Зарплаты →' : getLang() === 'id' ? 'Modul Gaji →' : 'Payroll Module →'}
+                {getLang() === 'ru' ? 'Зарплаты →' : getLang() === 'id' ? 'Modul Gaji →' : 'Payroll →'}
               </button>
             </div>
           )}
