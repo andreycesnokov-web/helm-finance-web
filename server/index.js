@@ -602,9 +602,8 @@ async function notifyBusinessAdminsViaTelegram(ownerUserId, text, buttons = []) 
         .eq('status', 'active').in('role', ['owner', 'ceo', 'admin', 'cfo']);
       if (admins?.length) adminUserIds = admins.map(a => a.user_id);
     }
-    const { data: users } = await supabase.from('users')
-      .select('telegram_id').in('id', adminUserIds).not('telegram_id', 'is', null);
-    const chatIds = [...new Set((users || []).map(u => u.telegram_id))];
+    // users.id IS the Telegram chat id (no separate telegram_id column).
+    const chatIds = [...new Set(adminUserIds)];
 
     let sent = 0;
     for (const chatId of chatIds) {
@@ -773,12 +772,13 @@ app.post('/api/debts/from-telegram', async (req, res) => {
     // Resolve submitting user. In this app users.id IS the Telegram id
     // (the telegram_id column may be NULL), so match on id first, then fall
     // back to the telegram_id column for any rows that have it populated.
+    // users.id IS the Telegram id in this app — match on id directly.
+    // Table columns: id, username, first_name, role (no name/last_name/telegram_id).
     const { data: submitterRows, error: subErr } = await supabase.from('users')
-      .select('id, username, first_name, last_name').or(`id.eq.${telegram_id},telegram_id.eq.${telegram_id}`).limit(1);
+      .select('id, username, first_name').eq('id', telegram_id).limit(1);
     const submitterUser = submitterRows?.[0];
     if (submitterUser) {
-      submitterUser.name = [submitterUser.first_name, submitterUser.last_name].filter(Boolean).join(' ')
-        || submitterUser.username || String(submitterUser.id);
+      submitterUser.name = submitterUser.first_name || submitterUser.username || String(submitterUser.id);
     }
     console.log('[from-telegram] telegram_id=%s found_user=%s subErr=%s',
       telegram_id, submitterUser?.id ?? 'NONE', subErr?.message || '-');
@@ -938,7 +938,7 @@ app.get('/api/team', auth, async (req, res) => {
     // Enrich with user names
     const userIds = members.map(m => m.user_id);
     const { data: users } = await supabase.from('users')
-      .select('id, first_name, last_name, telegram_id')
+      .select('id, first_name, username')
       .in('id', userIds);
     const userMap = Object.fromEntries((users || []).map(u => [u.id, u]));
 
@@ -946,8 +946,8 @@ app.get('/api/team', auth, async (req, res) => {
       const u = userMap[m.user_id] || {};
       return {
         ...m,
-        name: m.display_name || u.name || [u.first_name, u.last_name].filter(Boolean).join(' ') || `User ${m.user_id}`,
-        telegram_id: u.telegram_id || null,
+        name: m.display_name || u.first_name || u.username || `User ${m.user_id}`,
+        telegram_id: u.id || null,
       };
     });
 
@@ -1135,8 +1135,8 @@ app.post('/api/invite/:code/accept', auth, async (req, res) => {
         .eq('id', existing.id);
     } else {
       // Get user display name
-      const { data: u } = await supabase.from('users').select('first_name, last_name, username').eq('id',userId).single();
-      const displayName = u?.name || [u?.first_name, u?.last_name].filter(Boolean).join(' ') || null;
+      const { data: u } = await supabase.from('users').select('first_name, username').eq('id', userId).single();
+      const displayName = u?.first_name || u?.username || null;
 
       await supabase.from('business_members').insert({
         business_id:  invite.business_id,
@@ -1258,7 +1258,7 @@ app.get('/api/team/onboarding', auth, async (req, res) => {
 
     const userIds = (members || []).map(m => m.user_id);
     const { data: users } = userIds.length
-      ? await supabase.from('users').select('id, first_name, last_name, username, telegram_id').in('id', userIds)
+      ? await supabase.from('users').select('id, first_name, username').in('id', userIds)
       : { data: [] };
     const userMap = Object.fromEntries((users || []).map(u => [u.id, u]));
 
@@ -1278,10 +1278,10 @@ app.get('/api/team/onboarding', auth, async (req, res) => {
         return {
           member_id:                  m.id,
           user_id:                    m.user_id,
-          name:                       m.display_name || u.name || [u.first_name, u.last_name].filter(Boolean).join(' ') || u.username || String(m.user_id),
+          name:                       m.display_name || u.first_name || u.username || String(m.user_id),
           role:                       m.role,
           status:                     m.status,
-          telegram_id:                u.telegram_id || m.user_id, // users.id IS the telegram id in this app
+          telegram_id:                m.user_id, // users.id IS the telegram id in this app
           telegram_connected_at:      m.telegram_connected_at,
           onboarding_status:          m.onboarding_status || 'not_started',
           onboarding_step:            m.onboarding_step,
@@ -1451,8 +1451,7 @@ app.post('/api/team/onboarding/training-submission', async (req, res) => {
       try { actingUserId = jwt.verify(token, JWT_SECRET).userId; } catch { /* fall through */ }
     }
     if (!actingUserId && requireBotSecret(req) && telegram_id) {
-      const { data: u } = await supabase.from('users').select('id').eq('telegram_id', telegram_id).single();
-      actingUserId = u?.id || Number(telegram_id); // users.id == telegram id
+      actingUserId = Number(telegram_id); // users.id == telegram id
     }
     if (!actingUserId) return res.status(401).json({ error: 'Unauthorized' });
 
@@ -1467,9 +1466,8 @@ app.post('/api/team/onboarding/training-submission', async (req, res) => {
     if (!member) return res.status(403).json({ error: 'Not a member of this business' });
 
     const { data: u } = await supabase.from('users')
-      .select('first_name, last_name, username').eq('id',actingUserId).single();
-    const displayName = member.display_name || u?.name ||
-      [u?.first_name, u?.last_name].filter(Boolean).join(' ') || String(actingUserId);
+      .select('first_name, username').eq('id', actingUserId).single();
+    const displayName = member.display_name || u?.first_name || u?.username || String(actingUserId);
 
     const amountNum = Number(amount) || 0;
     const { data: business } = await supabase.from('businesses')
