@@ -656,7 +656,10 @@ async function notifyBusinessAdminsViaTelegram(ownerUserId, text, buttons = []) 
             chat_id: chatId,
             text,
             parse_mode: 'HTML',
-            reply_markup: buttons.length ? { inline_keyboard: [buttons] } : undefined,
+            // buttons may be a flat array (one row) or an array of rows.
+            reply_markup: buttons.length
+              ? { inline_keyboard: Array.isArray(buttons[0]) ? buttons : [buttons] }
+              : undefined,
           }),
         });
         if (resp.ok) sent++;
@@ -769,6 +772,132 @@ app.post('/api/debts/:id/request-info', auth, async (req, res) => {
 
     // TODO: notify the submitter via Telegram (needs bot DM to created_by_telegram_id)
     res.json(computeDebtStatus(data));
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TELEGRAM INLINE APPROVALS — bot-safe endpoints (x-bot-secret + telegram_id)
+// ─────────────────────────────────────────────────────────────────────────────
+// The web approve/reject/request-info endpoints above require a user JWT and
+// stay strict. These mirror them for the bot: identity proven by the shared
+// secret, the acting user resolved from telegram_id, all permission checks
+// done server-side. Approval NEVER moves cash — it only flips approval_status.
+
+// Resolve a Telegram approver against a debt: returns { debt, userId, role }
+// or { error }. Validates membership in the debt's business.
+async function resolveBotApprover(telegram_id, debtId) {
+  const { data: dRows } = await supabase.from('debts')
+    .select('id, business_id, user_id, created_by_user_id, approval_status, status, type, counterparty, amount, original_amount')
+    .eq('id', debtId).limit(1);
+  const debt = dRows?.[0];
+  if (!debt) return { error: 'not_found' };
+
+  // Determine the business: explicit business_id, else the business owned by
+  // the legacy debt.user_id (owner).
+  let businessId = debt.business_id;
+  if (!businessId) {
+    const { data: bRows } = await supabase.from('businesses')
+      .select('id').eq('owner_user_id', debt.user_id).order('created_at', { ascending: true }).limit(1);
+    businessId = bRows?.[0]?.id || null;
+  }
+  if (!businessId) return { error: 'forbidden' };
+
+  const { data: mem } = await supabase.from('business_members')
+    .select('role').eq('user_id', telegram_id).eq('business_id', businessId)
+    .eq('status', 'active').limit(1);
+  const role = mem?.[0]?.role;
+  if (!role) return { error: 'forbidden' };
+
+  return { debt, userId: Number(telegram_id), role };
+}
+
+// POST /api/telegram/debts/:id/approve
+app.post('/api/telegram/debts/:id/approve', async (req, res) => {
+  if (!requireBotSecret(req)) return res.status(401).json({ error: 'Invalid bot credentials' });
+  const { telegram_id } = req.body || {};
+  if (!telegram_id) return res.status(400).json({ error: 'telegram_id required' });
+  try {
+    const r = await resolveBotApprover(telegram_id, req.params.id);
+    if (r.error === 'not_found') return res.status(404).json({ error: 'not_found', message: 'Request not found.' });
+    if (r.error)                 return res.status(403).json({ error: 'forbidden', message: 'You do not have access to this request.' });
+    const { debt, userId, role } = r;
+
+    if (!canApproveFinancialRecord(role))
+      return res.status(403).json({ error: 'forbidden', message: 'Your role cannot approve requests.' });
+    if (debt.created_by_user_id === userId && !['owner', 'ceo'].includes(role))
+      return res.status(403).json({ error: 'forbidden', message: 'You cannot approve your own submission.' });
+
+    // Duplicate-click protection: report current state, never silently flip.
+    if (debt.approval_status === 'approved')
+      return res.json({ already: true, state: 'approved', debt: computeDebtStatus(debt) });
+    if (debt.approval_status === 'rejected')
+      return res.status(409).json({ error: 'already_rejected', message: 'This request was already rejected.' });
+
+    const { data, error } = await supabase.from('debts').update({
+      approval_status: 'approved', approved_by_user_id: userId,
+      approved_at: new Date().toISOString(),
+      approved_via_channel: 'telegram', last_action_channel: 'telegram', status: 'open',
+    }).eq('id', debt.id).select().single();
+    if (error) return res.status(500).json({ error: error.message });
+    res.json({ ok: true, state: 'approved', type: debt.type, debt: computeDebtStatus(data) });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// POST /api/telegram/debts/:id/reject
+app.post('/api/telegram/debts/:id/reject', async (req, res) => {
+  if (!requireBotSecret(req)) return res.status(401).json({ error: 'Invalid bot credentials' });
+  const { telegram_id, reason } = req.body || {};
+  if (!telegram_id) return res.status(400).json({ error: 'telegram_id required' });
+  try {
+    const r = await resolveBotApprover(telegram_id, req.params.id);
+    if (r.error === 'not_found') return res.status(404).json({ error: 'not_found', message: 'Request not found.' });
+    if (r.error)                 return res.status(403).json({ error: 'forbidden', message: 'You do not have access to this request.' });
+    const { debt, userId, role } = r;
+
+    if (!canApproveFinancialRecord(role))
+      return res.status(403).json({ error: 'forbidden', message: 'Your role cannot reject requests.' });
+    if (debt.created_by_user_id === userId && !['owner', 'ceo'].includes(role))
+      return res.status(403).json({ error: 'forbidden', message: 'You cannot act on your own submission.' });
+
+    // Do not silently flip an already-approved record to rejected.
+    if (debt.approval_status === 'approved')
+      return res.status(409).json({ error: 'already_approved', message: 'This request was already approved.' });
+    if (debt.approval_status === 'rejected')
+      return res.json({ already: true, state: 'rejected', debt: computeDebtStatus(debt) });
+
+    const { data, error } = await supabase.from('debts').update({
+      approval_status: 'rejected', approved_by_user_id: userId,
+      approved_at: new Date().toISOString(),
+      approved_via_channel: 'telegram', last_action_channel: 'telegram',
+      rejected_reason: reason || 'Rejected from Telegram', status: 'cancelled',
+    }).eq('id', debt.id).select().single();
+    if (error) return res.status(500).json({ error: error.message });
+    res.json({ ok: true, state: 'rejected', debt: computeDebtStatus(data) });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// POST /api/telegram/debts/:id/request-info
+app.post('/api/telegram/debts/:id/request-info', async (req, res) => {
+  if (!requireBotSecret(req)) return res.status(401).json({ error: 'Invalid bot credentials' });
+  const { telegram_id, note } = req.body || {};
+  if (!telegram_id) return res.status(400).json({ error: 'telegram_id required' });
+  try {
+    const r = await resolveBotApprover(telegram_id, req.params.id);
+    if (r.error === 'not_found') return res.status(404).json({ error: 'not_found', message: 'Request not found.' });
+    if (r.error)                 return res.status(403).json({ error: 'forbidden', message: 'You do not have access to this request.' });
+    const { debt, userId, role } = r;
+
+    if (!canApproveFinancialRecord(role))
+      return res.status(403).json({ error: 'forbidden', message: 'Your role cannot request info.' });
+
+    const { data, error } = await supabase.from('debts').update({
+      info_request_note: note || 'Please provide more details',
+      info_requested_at: new Date().toISOString(),
+      info_requested_by: userId, last_action_channel: 'telegram',
+    }).eq('id', debt.id).select().single();
+    if (error) return res.status(500).json({ error: error.message });
+    // TODO: DM the creator (created_by_telegram_id) once bot DM helper exists.
+    res.json({ ok: true, state: 'info_requested', created_by_telegram_id: debt.created_by_telegram_id || null, debt: computeDebtStatus(data) });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -927,9 +1056,15 @@ app.post('/api/debts/from-telegram', async (req, res) => {
           raw:          raw_input_text || '',
         }
       );
-      const webAppUrl = process.env.WEB_APP_URL || 'https://helm-finance-web-production.up.railway.app';
+      const webAppUrl = process.env.CLIENT_URL || process.env.WEB_APP_URL || 'https://helm-finance-web-production.up.railway.app';
+      const openUrl = `${webAppUrl}/${type === 'receivable' ? 'receivables' : 'payables'}`;
+      // Inline approval keyboard. callback_data `debt_*:<uuid>` ≤ 49 bytes (limit 64).
+      // The bot owns these callbacks and calls /api/telegram/debts/:id/* with x-bot-secret.
       notifyBusinessAdminsViaTelegram(ownerId, text, [
-        { text: '🌐 Open in Web App', url: `${webAppUrl}/${type === 'receivable' ? 'receivables' : 'payables'}` },
+        [ { text: '✅ Approve', callback_data: `debt_approve:${data.id}` },
+          { text: '❌ Reject',  callback_data: `debt_reject:${data.id}` } ],
+        [ { text: 'ℹ️ Ask details', callback_data: `debt_info:${data.id}` },
+          { text: '🌐 Open', url: openUrl } ],
       ]).catch(() => {});
     }
 
