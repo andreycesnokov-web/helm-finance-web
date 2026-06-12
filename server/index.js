@@ -1186,9 +1186,48 @@ app.get('/api/telegram/config', auth, async (req, res) => {
   const botUsername = process.env.TELEGRAM_BOT_USERNAME || null;
   res.json({
     bot_username:       botUsername,
+    bot_url:            botUsername ? `https://t.me/${botUsername}` : null,
     bot_deep_link_base: botUsername ? `https://t.me/${botUsername}` : null,
     is_configured:      !!botUsername,
   });
+});
+
+// ── POST /api/team/onboarding/test-ceo-notification ──────────────────────────
+// Owner/admin/cfo sends themselves a test Telegram alert to confirm the
+// notification channel works. Requires an active membership + connected Telegram.
+app.post('/api/team/onboarding/test-ceo-notification', auth, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canApproveFinancialRecord(biz.role))
+      return res.status(403).json({ error: 'Only owner, admin or CFO can send a CEO test notification' });
+
+    if (!process.env.TELEGRAM_BOT_TOKEN)
+      return res.status(503).json({ error: 'bot_not_ready', message: 'Telegram notifications will be available after bot setup.' });
+
+    const { data: memRows } = await supabase.from('business_members')
+      .select('telegram_connected_at').eq('business_id', biz.business.id)
+      .eq('user_id', userId).eq('status', 'active').limit(1);
+    if (!memRows?.[0]?.telegram_connected_at)
+      return res.status(400).json({ error: 'not_connected', message: 'Connect your Telegram first.' });
+
+    const lang = normalizeLanguage(await getUserLanguage(userId));
+    const text = {
+      ru: '✅ CFO AI test alert\n\nTelegram уведомления подключены.\nТеперь вы сможете получать approvals, cash alerts и daily pulse здесь.',
+      id: '✅ Notifikasi tes CFO AI\n\nNotifikasi Telegram sudah terhubung.\nAnda akan menerima persetujuan, peringatan kas dan ringkasan harian di sini.',
+      en: '✅ CFO AI test alert\n\nTelegram notifications are connected.\nYou will receive approvals, cash alerts and daily pulse here.',
+    }[lang] || '✅ CFO AI test alert\n\nTelegram notifications are connected.';
+
+    // users.id IS the telegram chat id in this app
+    const botToken = process.env.TELEGRAM_BOT_TOKEN;
+    const resp = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: userId, text }),
+    });
+    if (!resp.ok) return res.status(502).json({ error: 'send_failed' });
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 // ── GET /api/team/onboarding — owner/admin/cfo: full team progress ──────────

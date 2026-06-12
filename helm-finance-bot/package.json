@@ -1,0 +1,13 @@
+{
+  "name": "helm-finance-bot",
+  "version": "1.0.0",
+  "description": "CFO AI Telegram bot — team onboarding, training flow and financial submissions",
+  "main": "index.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "node-telegram-bot-api": "^0.66.0"
+  }
+}

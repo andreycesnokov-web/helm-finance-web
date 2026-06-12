@@ -122,8 +122,11 @@ export function MemberTutorial() {
               ✈ {t('onboarding.openBot')}
             </a>
             <div style={{ fontSize: 12.5, color: 'var(--text-3)' }}>
-              <div style={{ fontWeight: 600, marginBottom: 2 }}>{t('onboarding.manualTitle')}:</div>
-              {t('onboarding.manual1')} · {t('onboarding.manual2')} (@{me.bot_username}) · {t('onboarding.manual3')} · {t('onboarding.manual4')}
+              <div style={{ fontWeight: 600, marginBottom: 2 }}>{t('onboarding.ifButtonFails')}</div>
+              {t('onboarding.fallback1')}<br />
+              {t('onboarding.fallback2').replace('{bot}', me.bot_username)}<br />
+              {t('onboarding.fallback3')}<br />
+              {t('onboarding.fallback4')}
             </div>
             {!completed.has('telegram_connected') && (
               <div style={{ fontSize: 12, color: 'var(--amber-dark)', marginTop: 8 }}>⏳ {t('onboarding.waitingTelegram')}</div>
@@ -176,11 +179,62 @@ const PROGRESS_COLS = [
   { key: 'expense_request', label: 'E' },
 ]
 
+// ── CEO / Owner setup section ────────────────────────────────────────────────
+function CeoSetup({ me, botCfg, token, t }) {
+  const [testState, setTestState] = useState(null) // null | 'sending' | 'sent' | 'error'
+  if (!me) return null
+  const connected = me.telegram_connected
+  const botReady = botCfg?.is_configured
+
+  const sendTest = async () => {
+    setTestState('sending')
+    try { await apiFetch('/team/onboarding/test-ceo-notification', token, { method: 'POST' }); setTestState('sent') }
+    catch { setTestState('error') }
+  }
+
+  const FEATURES = ['featDailyPulse', 'featApprovals', 'featCashAlerts', 'featOverdueRecv', 'featDueSoon', 'featPayroll', 'featAiCfo']
+
+  return (
+    <div style={{ background: 'linear-gradient(135deg, #0E1B3D, #1B2C5C)', color: '#fff', borderRadius: 16, padding: '20px 22px', marginBottom: 20 }}>
+      <div style={{ fontSize: 16, fontWeight: 800, marginBottom: 6 }}>👔 {t('onboarding.ceoSetup')}</div>
+      <div style={{ fontSize: 13, lineHeight: 1.6, opacity: 0.88, marginBottom: 14 }}>{t('onboarding.ceoIntro')}</div>
+
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
+        {FEATURES.map(f => (
+          <span key={f} style={{ fontSize: 12, background: 'rgba(255,255,255,.1)', borderRadius: 8, padding: '5px 10px' }}>{t(`onboarding.${f}`)}</span>
+        ))}
+      </div>
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+        {connected ? (
+          <span style={{ fontSize: 13, fontWeight: 700, color: '#7BE5A9' }}>✓ {t('onboarding.ceoConnected')}</span>
+        ) : botReady && me.deep_link ? (
+          <a href={me.deep_link} target="_blank" rel="noreferrer"
+            style={{ background: '#2AABEE', color: '#fff', fontWeight: 700, fontSize: 14, padding: '10px 18px', borderRadius: 10, textDecoration: 'none' }}>
+            ✈ {t('onboarding.connectCeo')}
+          </a>
+        ) : (
+          <span style={{ fontSize: 13, color: '#FFD27A' }}>⚠ {t('onboarding.botNotConfigured')}</span>
+        )}
+
+        <button onClick={sendTest}
+          disabled={!connected || !botReady || testState === 'sending'}
+          title={!connected || !botReady ? t('onboarding.botNotReady') : ''}
+          style={{ fontSize: 13, fontWeight: 700, padding: '9px 16px', borderRadius: 10, border: 'none', cursor: connected && botReady ? 'pointer' : 'not-allowed', background: connected && botReady ? 'rgba(255,255,255,.15)' : 'rgba(255,255,255,.06)', color: connected && botReady ? '#fff' : 'rgba(255,255,255,.4)' }}>
+          {testState === 'sent' ? `✓ ${t('onboarding.testSent')}` : t('onboarding.sendTestCeo')}
+        </button>
+      </div>
+      {testState === 'error' && <div style={{ fontSize: 12, color: '#FFB4A8', marginTop: 8 }}>{t('onboarding.botNotReady')}</div>}
+    </div>
+  )
+}
+
 export default function TeamOnboarding() {
   const { token } = useAuth()
   const { t } = useTranslation()
   const [members, setMembers] = useState([])
   const [botCfg, setBotCfg] = useState(null)
+  const [me, setMe] = useState(null)
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(null)
 
@@ -188,7 +242,8 @@ export default function TeamOnboarding() {
     Promise.all([
       apiFetch('/team/onboarding', token),
       apiFetch('/telegram/config', token),
-    ]).then(([m, c]) => { setMembers(m.members || []); setBotCfg(c) })
+      apiFetch('/team/onboarding/me', token).catch(() => null),
+    ]).then(([m, c, meData]) => { setMembers(m.members || []); setBotCfg(c); setMe(meData) })
       .catch(console.error).finally(() => setLoading(false))
   }, [token])
   useEffect(() => { load() }, [load])
@@ -247,7 +302,11 @@ export default function TeamOnboarding() {
         ))}
       </div>
 
+      {/* CEO / Owner setup */}
+      <CeoSetup me={me} botCfg={botCfg} token={token} t={t} />
+
       {/* Member list */}
+      <div style={{ fontSize: 14, fontWeight: 700, margin: '4px 0 10px', color: 'var(--text-2)' }}>{t('onboarding.teamMembers')}</div>
       {members.map(m => (
         <div key={m.member_id} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, padding: '14px 16px', marginBottom: 10 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>

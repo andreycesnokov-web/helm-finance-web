@@ -226,6 +226,7 @@ export default function Pulse({ onDataLoad }) {
 
   // Team onboarding banner (owner/admin/cfo only — endpoint 403s otherwise)
   const [pendingOnboarding, setPendingOnboarding] = useState(0)
+  const [ceoNeedsTelegram, setCeoNeedsTelegram] = useState(false)
   useEffect(() => {
     apiFetch('/team/onboarding', token)
       .then(d => setPendingOnboarding(
@@ -234,6 +235,12 @@ export default function Pulse({ onDataLoad }) {
         ).length
       ))
       .catch(() => {}) // non-privileged roles → silently skip
+    // CEO/owner Telegram connect prompt
+    apiFetch('/team/onboarding/me', token)
+      .then(d => setCeoNeedsTelegram(
+        ['owner', 'admin', 'cfo'].includes(d.role) && !d.telegram_connected
+      ))
+      .catch(() => {})
   }, [token])
 
   const reload = () => load(scope)
@@ -345,6 +352,15 @@ export default function Pulse({ onDataLoad }) {
           {firstName[0]?.toUpperCase() || 'A'}
         </div>
       </div>
+
+      {/* ── CEO Telegram connect banner ──────────────────────────────────────── */}
+      {ceoNeedsTelegram && (
+        <div onClick={() => navigate('/team-onboarding')}
+          style={{ margin: '0 16px 10px', padding: '10px 14px', background: 'var(--brand-light)', border: '1px solid rgba(21,94,239,.25)', borderRadius: 12, fontSize: 13, color: 'var(--brand-dark)', fontWeight: 600, cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span>✈ {t('onboarding.ceoBanner')}</span>
+          <span style={{ fontWeight: 700 }}>{t('onboarding.connectCeo')} →</span>
+        </div>
+      )}
 
       {/* ── Team onboarding banner (admins only) ─────────────────────────────── */}
       {pendingOnboarding > 0 && (
