@@ -1,6 +1,6 @@
 # CFO AI — Architecture & Source of Truth
 
-> Last updated: 2026-06-12 · Audit pass "Audit and harden CFO AI architecture"
+> Last updated: 2026-06-12 · "Migrate financial data access to business scope" (migration 017)
 
 ## A. Product purpose
 
@@ -28,6 +28,57 @@ an AI CFO as the analysis layer.
 
 **ID convention: `users.id` is BIGINT (= Telegram id). Every new user reference
 must be BIGINT.** All migrations conform (002–016 verified).
+
+## B2. Business-scoped financial data (migration 017)
+
+Since migration 017, **`business_id` is the financial owner** of wallets,
+transactions, debts, payroll (employees/payments/items), reference data and
+reminders. Responsibility fields:
+
+| Field | Meaning |
+|---|---|
+| `business_id` | which workspace owns the record (UUID → businesses) |
+| `user_id` | legacy compatibility: always set to the business **owner's** id on new records |
+| `created_by_user_id` | the person who actually created the record |
+| `approved_by_user_id` | the person who approved (debts) |
+
+**Access resolution** (`resolveActiveBusiness` in server/index.js):
+`x-business-id` header → `?business_id` → `body.business_id` → user's default
+business (`ensureDefaultBusiness`). A requested business where the caller is
+not an active member silently falls back to their default — no cross-business
+leak, and a stale localStorage id after account switching cannot break the app.
+
+**Read filter** (`bizOrFilter`): `business_id = <active>` OR
+(`business_id IS NULL` AND `user_id = <owner>`) — the legacy branch keeps
+pre-migration rows visible to the owner until backfill completes.
+
+**Write rule** (`bizWriteFields`): every new financial record gets
+`business_id`, `user_id = owner`, `created_by_user_id = acting user`.
+
+**Role gates** (backend-first; role-specific frontend UX is a follow-up task):
+
+| Capability | owner | admin | cfo | accountant | manager | employee | auditor |
+|---|---|---|---|---|---|---|---|
+| view finance (pulse, wallets, transactions) | ✓ | ✓ | ✓ | ✓ | — | — | ✓ |
+| create confirmed records (batch, pay, settle) | ✓ | ✓ | ✓ | ✓ | — | — | — |
+| submit requests (debts → pending_approval) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | — |
+| approve / reject / request-info | ✓ | ✓ | ✓ | — | — | — | — |
+| manage payroll | ✓ | ✓ | ✓ | — | — | — | — |
+| manage wallets (create/edit/delete/adjust) | ✓ | ✓ | ✓ | — | — | — | — |
+| use AI CFO | ✓ | ✓ | ✓ | ✓ | — | — | — |
+
+Manager/employee on `GET /api/debts` see **only their own submissions**
+(`created_by_user_id = caller`). Web-created debts by manager/employee are
+forced to `pending_approval` regardless of client payload.
+
+**Frontend**: `apiFetch` sends `x-business-id` from localStorage; `useAccess`
+persists `business.id` after `/access/status`. Single-business users never see
+a switcher; a multi-business switcher is future work.
+
+**Telegram**: `POST /api/debts/from-telegram` accepts optional `business_id`
+(membership validated). Without it: single membership → that business;
+multiple memberships → `409 multiple_businesses` (bot must ask which one);
+no membership → legacy owner-telegram-id path with NULL business_id.
 
 ## C. Source of truth
 
@@ -169,11 +220,11 @@ Same model as Telegram: an interface calling the same endpoints, gated by plan.
 
 ## L. Current limitations (known, accepted)
 
-1. **Single-tenant data**: all financial tables are `user_id`-scoped (owner's id).
-   Team members exist (roles/invites work) but do **not yet see the owner's
-   data** — endpoints filter by caller's user_id. Multi-tenant `business_id`
-   scoping is the largest pending architecture task; requires a product decision
-   and a careful migration plan (documented, NOT changed in this audit).
+1. **Business scoping done at endpoint level, not RLS** — Supabase row-level
+   security is not enabled; all enforcement lives in server/index.js. Reference
+   data PATCH/DELETE and reminders are still legacy user-scoped. Role-specific
+   frontend UX (hide pages from manager/employee) is a follow-up; backend
+   already enforces 403s.
 2. **Transfers are cash-neutral** — single-leg storage, no destination credit.
 3. **Tasks are virtual** — derived from /pulse data, no table, no persistence.
 4. **`/settle` bypasses cash impact** (see §E).
@@ -204,4 +255,14 @@ Same model as Telegram: an interface calling the same endpoints, gated by plan.
 | 015 | debts_payment_tracking | linked_transaction_id, last_payment_at | yes |
 | 016 | action_channels | approved_via_channel, last_action_channel, info_request_* | yes |
 
+| 017 | business_scoped_financial_data | business_id on all financial tables + backfill + indexes | yes |
+
 (004 intentionally absent.) All are idempotent; run order is numeric.
+
+## Personal mode (future)
+
+`businesses.type = 'business' | 'personal'` is the recommended extension —
+a personal workspace reuses the same tables (wallets/transactions/debts) with
+the same business_id ownership. Until then `wallet.scope = personal` continues
+to separate personal cash, which is never mixed into business KPIs or AI CFO
+context unless explicitly requested.

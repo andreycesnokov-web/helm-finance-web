@@ -80,6 +80,90 @@ function auth(req, res, next) {
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// BUSINESS-SCOPED ACCESS MODEL
+// ─────────────────────────────────────────────────────────────────────────────
+// business_id = financial owner (the workspace)
+// user_id     = legacy owner reference (compatibility — see bizOrFilter)
+// created_by_user_id / approved_by_user_id = audit responsibility
+//
+// Never trust business_id from the client without a membership check.
+
+// ── Role access helpers ──────────────────────────────────────────────────────
+function canViewBusinessFinance(role)          { return ['owner', 'admin', 'cfo', 'accountant', 'auditor'].includes(role); }
+function canCreateFinancialRequest(role)       { return ['owner', 'admin', 'cfo', 'accountant', 'manager', 'employee'].includes(role); }
+function canCreateConfirmedFinancialRecord(role) { return ['owner', 'admin', 'cfo', 'accountant'].includes(role); }
+function canApproveFinancialRecord(role)       { return ['owner', 'admin', 'cfo'].includes(role); }
+function canManagePayroll(role)                { return ['owner', 'admin', 'cfo'].includes(role); }
+function canManageWallets(role)                { return ['owner', 'admin', 'cfo'].includes(role); }
+function canUseAiCfo(role)                     { return ['owner', 'admin', 'cfo', 'accountant'].includes(role); }
+
+/**
+ * Resolve the active business for a request and validate membership.
+ * Selection priority: x-business-id header → ?business_id → body.business_id
+ * → user's default business (ensureDefaultBusiness).
+ * Returns { business, role, ownerUserId }.
+ * Throws { status, message } on access violation.
+ */
+async function resolveActiveBusiness(req) {
+  const userId = req.user.userId;
+  const requested =
+    req.headers['x-business-id'] ||
+    req.query?.business_id ||
+    req.body?.business_id ||
+    null;
+
+  if (requested) {
+    const { data } = await supabase.from('business_members')
+      .select('role, status, business_id, businesses(*)')
+      .eq('user_id', userId).eq('business_id', requested).eq('status', 'active')
+      .limit(1);
+    if (data?.length) {
+      const m = data[0];
+      return { business: m.businesses, role: m.role, ownerUserId: m.businesses.owner_user_id };
+    }
+    // Requested business the user is NOT a member of → fall back to their
+    // default business (never leak another workspace; also handles a stale
+    // localStorage id after switching accounts on the same browser).
+  }
+
+  const { business, membership } = await ensureDefaultBusiness(userId);
+  return { business, role: membership.role, ownerUserId: business.owner_user_id };
+}
+
+/**
+ * Supabase .or() filter string: rows belonging to the business OR legacy
+ * rows (business_id NULL) belonging to the business owner. After migration
+ * 017 backfill, the legacy branch only matters for rows created before a
+ * user's first business existed.
+ */
+function bizOrFilter(biz) {
+  return `business_id.eq.${biz.business.id},and(business_id.is.null,user_id.eq.${biz.ownerUserId})`;
+}
+
+/**
+ * Standard write fields for new financial records:
+ * owned by the business, attributed to the acting user, user_id kept as the
+ * business owner for legacy compatibility (admin tooling, old queries).
+ */
+function bizWriteFields(biz, actingUserId) {
+  return {
+    business_id:        biz.business.id,
+    user_id:            biz.ownerUserId,
+    created_by_user_id: actingUserId,
+  };
+}
+
+/** Express-friendly wrapper: resolve business or send the right error. */
+async function requireBusiness(req, res) {
+  try {
+    return await resolveActiveBusiness(req);
+  } catch (e) {
+    res.status(e.status || 500).json({ error: e.message });
+    return null;
+  }
+}
+
 // ── Shared burn rate & runway helper ─────────────────────────────────────────
 //
 // Single source of truth for burn rate and runway across Pulse, AI CFO,
@@ -145,31 +229,37 @@ function computeBurnAndRunway(allTxs, totalBalance) {
 app.get('/api/pulse', auth, async (req, res) => {
   try {
     const userId = req.user.userId;
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canViewBusinessFinance(biz.role)) {
+      return res.status(403).json({ error: 'Your role does not allow viewing the business dashboard' });
+    }
     const language = normalizeLanguage(req.query.language || await getUserLanguage(req.user.userId));
     const scope = req.query.scope || 'all';
     const now = new Date();
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+    const bizOr = bizOrFilter(biz);
 
     // ALL transactions ever · for total balance
-    let allTxQuery = supabase.from('transactions').select('*').eq('user_id', userId);
+    let allTxQuery = supabase.from('transactions').select('*').or(bizOr);
     if (scope !== 'all') allTxQuery = allTxQuery.eq('scope', scope);
     const { data: allTxs } = await allTxQuery;
 
     // This month transactions · for burn rate
     let txQuery = supabase.from('transactions').select('*')
-      .eq('user_id', userId).gte('created_at', monthStart);
+      .or(bizOr).gte('created_at', monthStart);
     if (scope !== 'all') txQuery = txQuery.eq('scope', scope);
     const { data: txs } = await txQuery;
 
     // Debts — fetch all (including settled) so UI can show history; enrich with status
     const { data: rawDebts } = await supabase.from('debts')
-      .select('*').eq('user_id', userId)
+      .select('*').or(bizOr)
       .order('due_date', { ascending: true });
     const debts = enrichDebts(rawDebts);
 
     // Reminders
     const { data: reminders } = await supabase.from('reminders')
-      .select('*').eq('user_id', userId).eq('is_done', false)
+      .select('*').or(bizOr).eq('is_done', false)
       .order('due_date', { ascending: true });
 
     // ── Cash impact model (Phase 1) ─────────────────────────────────────────
@@ -218,7 +308,7 @@ app.get('/api/pulse', auth, async (req, res) => {
     // Otherwise fall back to virtual source-based accounts for full backward compatibility.
     const { data: userWallets } = await supabase
       .from('wallets').select('id, name, currency, type, entity_name, scope')
-      .eq('user_id', userId).eq('is_active', true)
+      .or(bizOr).eq('is_active', true)
       .order('sort_order', { ascending: true });
 
     // Filter wallets by scope if requested
@@ -378,9 +468,15 @@ function enrichDebts(debts) {
 
 app.get('/api/debts', auth, async (req, res) => {
   const { type } = req.query;
+  const biz = await requireBusiness(req, res);
+  if (!biz) return;
   let query = supabase.from('debts')
-    .select('*').eq('user_id', req.user.userId)
+    .select('*').or(bizOrFilter(biz))
     .order('due_date', { ascending: true });
+  // Manager / employee see only their own submissions
+  if (!canViewBusinessFinance(biz.role)) {
+    query = query.eq('created_by_user_id', req.user.userId);
+  }
   // Optional type filter (receivable / payable)
   if (type) query = query.eq('type', type);
   // By default include all (not just unsettled) so UI can show paid history
@@ -417,17 +513,20 @@ app.post('/api/debts', auth, async (req, res) => {
   } catch (limitErr) {
     console.warn('[debts] limit check failed:', limitErr.message);
   }
+  const biz = await requireBusiness(req, res);
+  if (!biz) return;
+  // Privileged roles create confirmed records; manager/employee → pending_approval
+  const confirmed = canCreateConfirmedFinancialRecord(biz.role);
   const amount = Number(req.body.amount || 0);
   const insertRow = {
     ...req.body,
-    user_id:         userId,
+    ...bizWriteFields(biz, userId),
     original_amount: amount,  // lock original amount; never mutate this
     paid_amount:     0,
     status:          'open',
-    // Web App creations are always approved immediately
     source_channel:   req.body.source_channel  || 'web',
-    approval_status:  req.body.approval_status || 'approved',
-    created_by_user_id: userId,
+    approval_status:  confirmed ? (req.body.approval_status || 'approved') : 'pending_approval',
+    created_by_role:  biz.role,
   };
   const { data, error } = await supabase.from('debts')
     .insert(insertRow).select().single();
@@ -436,9 +535,15 @@ app.post('/api/debts', auth, async (req, res) => {
 });
 
 app.patch('/api/debts/:id/settle', auth, async (req, res) => {
-  // Fetch debt first to know original_amount
-  const { data: debt } = await supabase.from('debts')
-    .select('*').eq('id', req.params.id).eq('user_id', req.user.userId).single();
+  const biz = await requireBusiness(req, res);
+  if (!biz) return;
+  if (!canCreateConfirmedFinancialRecord(biz.role))
+    return res.status(403).json({ error: 'Your role does not allow settling records' });
+  // Fetch debt first to know original_amount (business-scoped)
+  const { data: debts } = await supabase.from('debts')
+    .select('*').eq('id', req.params.id).or(bizOrFilter(biz)).limit(1);
+  const debt = debts?.[0];
+  if (!debt) return res.status(404).json({ error: 'Debt not found' });
   const fullAmount = Number(debt?.original_amount || debt?.amount || 0);
   const { data, error } = await supabase.from('debts')
     .update({
@@ -447,7 +552,7 @@ app.patch('/api/debts/:id/settle', auth, async (req, res) => {
       status:       'paid',
       paid_amount:  fullAmount,
     })
-    .eq('id', req.params.id).eq('user_id', req.user.userId).select().single();
+    .eq('id', debt.id).select().single();
   if (error) return res.status(500).json({ error: error.message });
   res.json(computeDebtStatus(data));
 });
@@ -524,18 +629,19 @@ async function approveDebtHandler(req, res) {
   const userId = req.user.userId;
   const channel = normalizeChannel(req.body?.channel);
   try {
-    // Only owner/admin/cfo can approve
-    const { data: mem } = await supabase.from('business_members')
-      .select('role').eq('user_id', userId).eq('status', 'active')
-      .in('role', ['owner', 'admin', 'cfo']).limit(1);
-    if (!mem || mem.length === 0)
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canApproveFinancialRecord(biz.role))
       return res.status(403).json({ error: 'Only owner, admin or CFO can approve' });
-    const approverRole = mem[0].role;
+
+    // Record must belong to the active business
+    const { data: rows } = await supabase.from('debts')
+      .select('id, created_by_user_id').eq('id', req.params.id).or(bizOrFilter(biz)).limit(1);
+    const existing = rows?.[0];
+    if (!existing) return res.status(404).json({ error: 'Debt not found' });
 
     // Self-approval guard: only the owner may approve a record they submitted
-    const { data: existing } = await supabase.from('debts')
-      .select('created_by_user_id').eq('id', req.params.id).eq('user_id', userId).single();
-    if (existing?.created_by_user_id === userId && approverRole !== 'owner')
+    if (existing.created_by_user_id === userId && biz.role !== 'owner')
       return res.status(403).json({ error: 'You cannot approve your own submission' });
 
     const { data, error } = await supabase.from('debts')
@@ -547,7 +653,7 @@ async function approveDebtHandler(req, res) {
         last_action_channel:  channel,
         status:               'open',   // activate the record
       })
-      .eq('id', req.params.id).eq('user_id', userId).select().single();
+      .eq('id', existing.id).select().single();
     if (error) return res.status(500).json({ error: error.message });
     res.json(computeDebtStatus(data));
   } catch (e) { res.status(500).json({ error: e.message }); }
@@ -561,11 +667,14 @@ async function rejectDebtHandler(req, res) {
   const { reason } = req.body || {};
   const channel = normalizeChannel(req.body?.channel);
   try {
-    const { data: mem } = await supabase.from('business_members')
-      .select('role').eq('user_id', userId).eq('status', 'active')
-      .in('role', ['owner', 'admin', 'cfo']).limit(1);
-    if (!mem || mem.length === 0)
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canApproveFinancialRecord(biz.role))
       return res.status(403).json({ error: 'Only owner, admin or CFO can reject' });
+
+    const { data: rows } = await supabase.from('debts')
+      .select('id').eq('id', req.params.id).or(bizOrFilter(biz)).limit(1);
+    if (!rows?.length) return res.status(404).json({ error: 'Debt not found' });
 
     const { data, error } = await supabase.from('debts')
       .update({
@@ -577,7 +686,7 @@ async function rejectDebtHandler(req, res) {
         rejected_reason:      reason || null,
         status:               'cancelled',
       })
-      .eq('id', req.params.id).eq('user_id', userId).select().single();
+      .eq('id', rows[0].id).select().single();
     if (error) return res.status(500).json({ error: error.message });
     res.json(computeDebtStatus(data));
   } catch (e) { res.status(500).json({ error: e.message }); }
@@ -593,11 +702,14 @@ app.post('/api/debts/:id/request-info', auth, async (req, res) => {
   const { note } = req.body || {};
   const channel = normalizeChannel(req.body?.channel);
   try {
-    const { data: mem } = await supabase.from('business_members')
-      .select('role').eq('user_id', userId).eq('status', 'active')
-      .in('role', ['owner', 'admin', 'cfo']).limit(1);
-    if (!mem || mem.length === 0)
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canApproveFinancialRecord(biz.role))
       return res.status(403).json({ error: 'Only owner, admin or CFO can request info' });
+
+    const { data: rows } = await supabase.from('debts')
+      .select('id').eq('id', req.params.id).or(bizOrFilter(biz)).limit(1);
+    if (!rows?.length) return res.status(404).json({ error: 'Debt not found' });
 
     const { data, error } = await supabase.from('debts')
       .update({
@@ -606,7 +718,7 @@ app.post('/api/debts/:id/request-info', auth, async (req, res) => {
         info_requested_by:   userId,
         last_action_channel: channel,
       })
-      .eq('id', req.params.id).eq('user_id', userId).select().single();
+      .eq('id', rows[0].id).select().single();
     if (error) return res.status(500).json({ error: error.message });
 
     // TODO: notify the submitter via Telegram (needs bot DM to created_by_telegram_id)
@@ -643,6 +755,7 @@ app.post('/api/debts/from-telegram', async (req, res) => {
       confidence_score,
       attachment_url,
       business_owner_telegram_id, // owner's telegram id (to resolve user_id)
+      business_id,                // optional: explicit business (validated below)
     } = req.body;
 
     if (!telegram_id) return res.status(400).json({ error: 'telegram_id required' });
@@ -660,19 +773,51 @@ app.post('/api/debts/from-telegram', async (req, res) => {
         message: 'Your Telegram is not linked to CFO AI. Contact your administrator.',
       });
 
-    // Resolve business owner (user_id for the debt record)
-    // If business_owner_telegram_id provided, use that; otherwise submitter is owner
+    // ── Resolve target business + submitter role ────────────────────────────
+    // Priority: explicit business_id (membership validated) → submitter's
+    // single active membership → legacy owner-telegram-id path.
+    let memberRole = null;
+    let targetBusinessId = null;
     let ownerId = submitterUser.id;
-    if (business_owner_telegram_id && business_owner_telegram_id !== telegram_id) {
-      const { data: ownerUser } = await supabase.from('users')
-        .select('id').eq('telegram_id', business_owner_telegram_id).single();
-      if (ownerUser) ownerId = ownerUser.id;
+
+    if (business_id) {
+      const { data: mem } = await supabase.from('business_members')
+        .select('role, business_id, businesses(owner_user_id)')
+        .eq('user_id', submitterUser.id).eq('business_id', business_id)
+        .eq('status', 'active').limit(1);
+      if (!mem?.length)
+        return res.status(403).json({ error: 'not_member', message: 'You are not a member of this business.' });
+      memberRole       = mem[0].role;
+      targetBusinessId = mem[0].business_id;
+      ownerId          = mem[0].businesses?.owner_user_id || submitterUser.id;
+    } else {
+      const { data: mem } = await supabase.from('business_members')
+        .select('role, business_id, businesses(owner_user_id)')
+        .eq('user_id', submitterUser.id).eq('status', 'active').limit(2);
+      if (mem?.length > 1) {
+        // Multiple businesses — bot must ask which one and resend with business_id
+        return res.status(409).json({
+          error: 'multiple_businesses',
+          message: 'User belongs to multiple businesses; specify business_id.',
+          businesses: mem.map(m => m.business_id),
+        });
+      }
+      if (mem?.length === 1) {
+        memberRole       = mem[0].role;
+        targetBusinessId = mem[0].business_id;
+        ownerId          = mem[0].businesses?.owner_user_id || submitterUser.id;
+      }
     }
 
-    // Check membership of submitter in owner's business
-    const { data: membership } = await supabase.from('business_members')
-      .select('role').eq('user_id', submitterUser.id).eq('status', 'active').limit(1);
-    const memberRole = membership?.[0]?.role || 'member';
+    // Legacy fallback: owner's telegram id provided, submitter not yet a member row
+    if (!memberRole) {
+      if (business_owner_telegram_id && business_owner_telegram_id !== telegram_id) {
+        const { data: ownerUser } = await supabase.from('users')
+          .select('id').eq('telegram_id', business_owner_telegram_id).single();
+        if (ownerUser) ownerId = ownerUser.id;
+      }
+      memberRole = 'member';
+    }
 
     // Owner/admin/CFO → approved immediately; others → pending_approval
     const isPrivileged = ['owner', 'admin', 'cfo'].includes(memberRole);
@@ -682,6 +827,7 @@ app.post('/api/debts/from-telegram', async (req, res) => {
     const amountNum = Number(amount);
     const insertRow = {
       user_id:               ownerId,
+      business_id:           targetBusinessId || null,
       type,
       counterparty:          counterparty || null,
       amount:                amountNum,
@@ -1004,8 +1150,13 @@ app.get('/api/transactions', auth, async (req, res) => {
   const { scope, period = 'month', type } = req.query;
   const now = new Date();
 
+  const biz = await requireBusiness(req, res);
+  if (!biz) return;
+  if (!canViewBusinessFinance(biz.role))
+    return res.status(403).json({ error: 'Your role does not allow viewing business transactions' });
+
   let query = supabase.from('transactions').select('*')
-    .eq('user_id', req.user.userId)
+    .or(bizOrFilter(biz))
     .order('created_at', { ascending: false });
 
   // Period filter — 'all' skips date filter entirely (used by Payroll page)
@@ -1115,6 +1266,11 @@ app.post('/api/transactions/batch', auth, async (req, res) => {
     const userId = req.user.userId;
     const { transactions } = req.body;
 
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canCreateConfirmedFinancialRecord(biz.role))
+      return res.status(403).json({ error: 'Your role does not allow creating confirmed transactions. Submit a request instead.' });
+
     // ── Input validation ─────────────────────────────────────────────────────
     if (!Array.isArray(transactions) || transactions.length === 0) {
       return res.status(400).json({ error: 'transactions must be a non-empty array' });
@@ -1151,7 +1307,7 @@ app.post('/api/transactions/batch', auth, async (req, res) => {
           const { count: usedCount } = await supabase
             .from('transactions')
             .select('id', { count: 'exact', head: true })
-            .eq('user_id', userId)
+            .or(bizOrFilter(biz))
             .gte('created_at', monthStart.toISOString());
           const used = usedCount || 0;
           const batchSize = (transactions || []).length;
@@ -1186,11 +1342,11 @@ app.post('/api/transactions/batch', auth, async (req, res) => {
       const { data: ownedWallets, error: wErr } = await supabase
         .from('wallets')
         .select('id, name, currency')
-        .eq('user_id', userId)
+        .or(bizOrFilter(biz))
         .in('id', requestedWalletIds);
       if (wErr) throw wErr;
 
-      // All supplied wallet_ids must belong to this user
+      // All supplied wallet_ids must belong to this business
       const ownedIds = new Set((ownedWallets || []).map(w => w.id));
       const invalidId = requestedWalletIds.find(id => !ownedIds.has(id));
       if (invalidId) {
@@ -1207,7 +1363,7 @@ app.post('/api/transactions/batch', auth, async (req, res) => {
       const resolvedSource = t.source || (wallet ? wallet.name : null);
 
       return {
-        user_id:                userId,
+        ...bizWriteFields(biz, userId),
         type:                   t.type,
         amount_original:        t.amount,
         currency_original:      t.currency || 'IDR',
@@ -1245,11 +1401,12 @@ app.post('/api/transactions/batch', auth, async (req, res) => {
 // GET /api/cashflow-categories — user-owned active categories only
 app.get('/api/cashflow-categories', auth, async (req, res) => {
   try {
-    const userId = req.user.userId;
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
     const { data, error } = await supabase
       .from('cashflow_categories')
       .select('*')
-      .eq('user_id', userId)
+      .or(bizOrFilter(biz))
       .eq('is_active', true)
       .order('sort_order', { ascending: true })
       .order('name', { ascending: true });
@@ -1266,9 +1423,11 @@ app.post('/api/cashflow-categories', auth, async (req, res) => {
     const userId = req.user.userId;
     const { name, group_type, activity_type, sub_category, description } = req.body;
     if (!name || !group_type) return res.status(400).json({ error: 'name and group_type required' });
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
     const { data, error } = await supabase
       .from('cashflow_categories')
-      .insert({ user_id: userId, name, group_type, activity_type: activity_type || null, sub_category: sub_category || null, description: description || null, is_system: false })
+      .insert({ user_id: biz.ownerUserId, business_id: biz.business.id, name, group_type, activity_type: activity_type || null, sub_category: sub_category || null, description: description || null, is_system: false })
       .select()
       .single();
     if (error) throw error;
@@ -1327,11 +1486,12 @@ app.delete('/api/cashflow-categories/:id', auth, async (req, res) => {
 // GET /api/counterparties — user's counterparties, optional ?q=search
 app.get('/api/counterparties', auth, async (req, res) => {
   try {
-    const userId = req.user.userId;
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
     let query = supabase
       .from('counterparties')
       .select('*')
-      .eq('user_id', userId)
+      .or(bizOrFilter(biz))
       .eq('is_active', true)
       .order('name', { ascending: true });
     if (req.query.q) query = query.ilike('name', `%${req.query.q}%`);
@@ -1349,9 +1509,11 @@ app.post('/api/counterparties', auth, async (req, res) => {
     const userId = req.user.userId;
     const { name, group_name, type, email, phone, notes } = req.body;
     if (!name) return res.status(400).json({ error: 'name required' });
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
     const { data, error } = await supabase
       .from('counterparties')
-      .insert({ user_id: userId, name, group_name: group_name || null, type: type || null, email: email || null, phone: phone || null, notes: notes || null })
+      .insert({ user_id: biz.ownerUserId, business_id: biz.business.id, name, group_name: group_name || null, type: type || null, email: email || null, phone: phone || null, notes: notes || null })
       .select()
       .single();
     if (error) throw error;
@@ -1384,11 +1546,12 @@ app.patch('/api/counterparties/:id', auth, async (req, res) => {
 // GET /api/business-directions — user-owned active directions only
 app.get('/api/business-directions', auth, async (req, res) => {
   try {
-    const userId = req.user.userId;
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
     const { data, error } = await supabase
       .from('business_directions')
       .select('*')
-      .eq('user_id', userId)
+      .or(bizOrFilter(biz))
       .eq('is_active', true)
       .order('sort_order', { ascending: true });
     if (error) throw error;
@@ -1401,12 +1564,13 @@ app.get('/api/business-directions', auth, async (req, res) => {
 // POST /api/business-directions — create user direction
 app.post('/api/business-directions', auth, async (req, res) => {
   try {
-    const userId = req.user.userId;
     const { name, slug } = req.body;
     if (!name?.trim()) return res.status(400).json({ error: 'name required' });
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
     const { data, error } = await supabase
       .from('business_directions')
-      .insert({ user_id: userId, name: name.trim(), slug: slug || null, is_system: false, is_active: true, source: 'user' })
+      .insert({ user_id: biz.ownerUserId, business_id: biz.business.id, name: name.trim(), slug: slug || null, is_system: false, is_active: true, source: 'user' })
       .select()
       .single();
     if (error) throw error;
@@ -1438,11 +1602,12 @@ app.delete('/api/business-directions/:id', auth, async (req, res) => {
 // GET /api/activity-types — user-owned active activity types only
 app.get('/api/activity-types', auth, async (req, res) => {
   try {
-    const userId = req.user.userId;
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
     const { data, error } = await supabase
       .from('activity_types')
       .select('*')
-      .eq('user_id', userId)
+      .or(bizOrFilter(biz))
       .eq('is_active', true)
       .order('sort_order', { ascending: true });
     if (error) throw error;
@@ -1455,12 +1620,13 @@ app.get('/api/activity-types', auth, async (req, res) => {
 // POST /api/activity-types — create user activity type
 app.post('/api/activity-types', auth, async (req, res) => {
   try {
-    const userId = req.user.userId;
     const { name, code } = req.body;
     if (!name?.trim()) return res.status(400).json({ error: 'name required' });
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
     const { data, error } = await supabase
       .from('activity_types')
-      .insert({ user_id: userId, name: name.trim(), code: code || null, is_system: false, is_active: true, source: 'user' })
+      .insert({ user_id: biz.ownerUserId, business_id: biz.business.id, name: name.trim(), code: code || null, is_system: false, is_active: true, source: 'user' })
       .select()
       .single();
     if (error) throw error;
@@ -1859,12 +2025,17 @@ const WALLET_CASH_IN  = ['income'];
 const WALLET_CASH_OUT = ['expense', 'payroll'];
 
 app.get('/api/wallets', auth, async (req, res) => {
-  const userId = req.user.userId;
   try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canViewBusinessFinance(biz.role))
+      return res.status(403).json({ error: 'Your role does not allow viewing business wallets' });
+    const bizOr = bizOrFilter(biz);
+
     const { data: wallets, error: wErr } = await supabase
       .from('wallets')
       .select('*')
-      .eq('user_id', userId)
+      .or(bizOr)
       .eq('is_active', true)
       .order('sort_order', { ascending: true })
       .order('created_at', { ascending: true });
@@ -1876,7 +2047,7 @@ app.get('/api/wallets', auth, async (req, res) => {
     const { data: txs, error: tErr } = await supabase
       .from('transactions')
       .select('wallet_id, source, type, amount_idr')
-      .eq('user_id', userId);
+      .or(bizOr);
     if (tErr) throw tErr;
 
     const withBalance = wallets.map(w => {
@@ -1906,6 +2077,11 @@ app.post('/api/wallets', auth, async (req, res) => {
     return res.status(400).json({ error: "scope must be 'business' or 'personal'" });
   }
   try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canManageWallets(biz.role))
+      return res.status(403).json({ error: 'Your role does not allow managing wallets' });
+
     // ── Feature gate: wallet limit ───────────────────────────────────────────
     const access = await getCurrentAccess(userId);
     if (access) {
@@ -1914,7 +2090,7 @@ app.post('/api/wallets', auth, async (req, res) => {
         const { count: currentCount } = await supabase
           .from('wallets')
           .select('id', { count: 'exact', head: true })
-          .eq('user_id', userId)
+          .or(bizOrFilter(biz))
           .eq('is_active', true);
         if ((currentCount || 0) >= maxWallets) {
           return res.status(403).json({
@@ -1932,7 +2108,7 @@ app.post('/api/wallets', auth, async (req, res) => {
     const { data: wallet, error: wErr } = await supabase
       .from('wallets')
       .insert({
-        user_id:     userId,
+        ...bizWriteFields(biz, userId),
         name,
         currency:    currency    || 'IDR',
         type:        type        || null,
@@ -1949,7 +2125,7 @@ app.post('/api/wallets', auth, async (req, res) => {
     const ob = Number(opening_balance) || 0;
     if (ob !== 0) {
       await supabase.from('transactions').insert({
-        user_id:          userId,
+        ...bizWriteFields(biz, userId),
         type:             ob > 0 ? 'income' : 'expense',
         amount_original:  Math.abs(ob),
         currency_original: currency || 'IDR',
@@ -1974,14 +2150,21 @@ app.get('/api/wallets/:id/transactions', auth, async (req, res) => {
   const { period = 'all', limit = 200 } = req.query;
 
   try {
-    const { data: wallet, error: wErr } = await supabase
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canViewBusinessFinance(biz.role))
+      return res.status(403).json({ error: 'Your role does not allow viewing wallet details' });
+    const bizOr = bizOrFilter(biz);
+
+    const { data: wRows } = await supabase
       .from('wallets').select('id, name, currency, type')
-      .eq('id', id).eq('user_id', userId).single();
-    if (wErr || !wallet) return res.status(404).json({ error: 'Wallet not found' });
+      .eq('id', id).or(bizOr).limit(1);
+    const wallet = wRows?.[0];
+    if (!wallet) return res.status(404).json({ error: 'Wallet not found' });
 
     let query = supabase.from('transactions')
       .select('*')
-      .eq('user_id', userId)
+      .or(bizOr)
       .order('transaction_date', { ascending: false, nullsLast: true })
       .order('created_at', { ascending: false })
       .limit(Number(limit));
@@ -2027,14 +2210,20 @@ app.put('/api/wallets/:id', auth, async (req, res) => {
     return res.status(400).json({ error: "scope must be 'business' or 'personal'" });
   }
   try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canManageWallets(biz.role))
+      return res.status(403).json({ error: 'Your role does not allow managing wallets' });
+
     // If renaming, sync source text on legacy transactions for balance continuity
     if (name) {
-      const { data: existing } = await supabase
-        .from('wallets').select('name').eq('id', id).eq('user_id', userId).single();
+      const { data: exRows } = await supabase
+        .from('wallets').select('name').eq('id', id).or(bizOrFilter(biz)).limit(1);
+      const existing = exRows?.[0];
       if (existing && existing.name !== name) {
         await supabase.from('transactions')
           .update({ source: name })
-          .eq('user_id', userId)
+          .or(bizOrFilter(biz))
           .eq('source', existing.name);
       }
     }
@@ -2052,7 +2241,7 @@ app.put('/api/wallets/:id', auth, async (req, res) => {
       .from('wallets')
       .update(updates)
       .eq('id', id)
-      .eq('user_id', userId)
+      .or(bizOrFilter(biz))
       .select()
       .single();
     if (error) throw error;
@@ -2063,14 +2252,17 @@ app.put('/api/wallets/:id', auth, async (req, res) => {
 });
 
 app.delete('/api/wallets/:id', auth, async (req, res) => {
-  const userId = req.user.userId;
   const { id } = req.params;
   try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canManageWallets(biz.role))
+      return res.status(403).json({ error: 'Your role does not allow managing wallets' });
     const { error } = await supabase
       .from('wallets')
       .update({ is_active: false, updated_at: new Date().toISOString() })
       .eq('id', id)
-      .eq('user_id', userId);
+      .or(bizOrFilter(biz));
     if (error) throw error;
     res.json({ ok: true });
   } catch (e) {
@@ -2218,32 +2410,29 @@ app.post('/api/wallets/:id/adjust-balance', auth, async (req, res) => {
       return res.status(400).json({ error: 'reason is required' });
     }
 
-    // Role check: only owner/admin can adjust balance
-    const { data: membership } = await supabase
-      .from('business_members')
-      .select('role')
-      .eq('user_id', userId)
-      .eq('status', 'active')
-      .in('role', ['owner', 'admin'])
-      .limit(1);
-    if (!membership || membership.length === 0) {
-      return res.status(403).json({ error: 'Only business owner or admin can adjust wallet balances' });
+    // Role check: only owner/admin/cfo of the active business can adjust balance
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canManageWallets(biz.role)) {
+      return res.status(403).json({ error: 'Only business owner, admin or CFO can adjust wallet balances' });
     }
+    const bizOr = bizOrFilter(biz);
 
-    // Load wallet — ownership enforced via user_id filter
-    const { data: wallet, error: wErr } = await supabase
+    // Load wallet — business-scoped
+    const { data: wRows } = await supabase
       .from('wallets')
       .select('id, user_id, name, currency, scope')
       .eq('id', walletId)
-      .eq('user_id', userId)
-      .single();
-    if (wErr || !wallet) return res.status(404).json({ error: 'Wallet not found' });
+      .or(bizOr)
+      .limit(1);
+    const wallet = wRows?.[0];
+    if (!wallet) return res.status(404).json({ error: 'Wallet not found' });
 
     // Compute current balance
     const { data: txs, error: tErr } = await supabase
       .from('transactions')
       .select('wallet_id, source, type, amount_idr')
-      .eq('user_id', userId);
+      .or(bizOr);
     if (tErr) throw tErr;
 
     const related = (txs || []).filter(t =>
@@ -2274,7 +2463,7 @@ app.post('/api/wallets/:id/adjust-balance', auth, async (req, res) => {
     const { data: corrTx, error: cErr } = await supabase
       .from('transactions')
       .insert({
-        user_id:           userId,
+        ...bizWriteFields(biz, userId),
         type:              'correction',
         amount_original:   delta,
         currency_original: wallet.currency || 'IDR',
@@ -2610,9 +2799,15 @@ app.post('/api/debts/:id/pay', auth, async (req, res) => {
   const { amount, account, date, wallet_id } = req.body;
   if (!amount || Number(amount) <= 0) return res.status(400).json({ error: 'amount must be > 0' });
 
-  const { data: debt, error: debtErr } = await supabase.from('debts')
-    .select('*').eq('id', req.params.id).eq('user_id', req.user.userId).single();
-  if (debtErr || !debt) return res.status(404).json({ error: 'Debt not found' });
+  const biz = await requireBusiness(req, res);
+  if (!biz) return;
+  if (!canCreateConfirmedFinancialRecord(biz.role))
+    return res.status(403).json({ error: 'Your role does not allow recording payments' });
+
+  const { data: debtRows } = await supabase.from('debts')
+    .select('*').eq('id', req.params.id).or(bizOrFilter(biz)).limit(1);
+  const debt = debtRows?.[0];
+  if (!debt) return res.status(404).json({ error: 'Debt not found' });
 
   const paymentAmount  = Number(amount);
   const effectiveTotal = Number(debt.original_amount || debt.amount || 0);
@@ -2627,19 +2822,19 @@ app.post('/api/debts/:id/pay', auth, async (req, res) => {
   const isFullyPaid   = newPaidAmount >= effectiveTotal - 0.01;
   const newStatus     = isFullyPaid ? 'paid' : 'partial';
 
-  // Wallet must belong to the caller (same rule as transactions/batch)
+  // Wallet must belong to the same business (legacy: owner's user_id)
   let payWallet = null;
   if (wallet_id) {
-    const { data: w } = await supabase.from('wallets')
-      .select('id, name, scope').eq('id', wallet_id).eq('user_id', req.user.userId).single();
-    if (!w) return res.status(400).json({ error: 'Invalid or inaccessible wallet' });
-    payWallet = w;
+    const { data: wRows } = await supabase.from('wallets')
+      .select('id, name, scope').eq('id', wallet_id).or(bizOrFilter(biz)).limit(1);
+    if (!wRows?.length) return res.status(400).json({ error: 'Invalid or inaccessible wallet' });
+    payWallet = wRows[0];
   }
 
   // 1. Create transaction
   const txType = debt.type === 'payable' ? 'expense' : 'income';
   const { data: tx, error: txErr } = await supabase.from('transactions').insert({
-    user_id:           req.user.userId,
+    ...bizWriteFields(biz, req.user.userId),
     type:              txType,
     amount_original:   paymentAmount,
     currency_original: 'IDR',
@@ -2667,7 +2862,7 @@ app.post('/api/debts/:id/pay', auth, async (req, res) => {
   }
 
   const { data: updatedDebt, error: updateErr } = await supabase.from('debts')
-    .update(debtUpdates).eq('id', req.params.id).eq('user_id', req.user.userId).select().single();
+    .update(debtUpdates).eq('id', debt.id).select().single();
   if (updateErr) return res.status(500).json({ error: updateErr.message });
 
   res.json({
@@ -2808,9 +3003,13 @@ app.get('/api/access/status', auth, async (req, res) => {
  * Build rich financial context for AI CFO.
  * Reuses existing data from Pulse + access helpers.
  */
-async function buildAiCfoContext(userId, language = 'en') {
+async function buildAiCfoContext(userId, language = 'en', biz = null) {
   const now       = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+
+  // Business-scoped when biz provided (the normal path); legacy user_id
+  // fallback kept for internal callers that have no business context.
+  const scopeQ = (q) => biz ? q.or(bizOrFilter(biz)) : q.eq('user_id', userId);
 
   const [
     { data: allTxs    },
@@ -2819,11 +3018,11 @@ async function buildAiCfoContext(userId, language = 'en') {
     { data: wallets   },
     accessData,
   ] = await Promise.all([
-    supabase.from('transactions').select('type,amount_original,amount_idr,currency_original,created_at,wallet_id,source,scope').eq('user_id', userId).order('created_at', { ascending: false }),
-    supabase.from('transactions').select('type,amount_original,amount_idr,created_at,wallet_id,source,scope').eq('user_id', userId).gte('created_at', monthStart),
-    supabase.from('debts').select('*').eq('user_id', userId),
-    supabase.from('wallets').select('id,name,currency,type,scope').eq('user_id', userId).eq('is_active', true),
-    getCurrentAccess(userId),
+    scopeQ(supabase.from('transactions').select('type,amount_original,amount_idr,currency_original,created_at,wallet_id,source,scope')).order('created_at', { ascending: false }),
+    scopeQ(supabase.from('transactions').select('type,amount_original,amount_idr,created_at,wallet_id,source,scope')).gte('created_at', monthStart),
+    scopeQ(supabase.from('debts').select('*')),
+    scopeQ(supabase.from('wallets').select('id,name,currency,type,scope')).eq('is_active', true),
+    getCurrentAccess(biz ? biz.ownerUserId : userId),
   ]);
 
   const debts = enrichDebts(rawDebts);
@@ -3584,8 +3783,12 @@ const CFO_OUT_OF_SCOPE_RESPONSE_RU = "Извините, я не могу пом�
 // GET /api/ai-cfo/context — full financial context for AI CFO page
 app.get('/api/ai-cfo/context', auth, async (req, res) => {
   try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canUseAiCfo(biz.role))
+      return res.status(403).json({ error: 'Your role does not allow using AI CFO' });
     const language = normalizeLanguage(req.query.language || await getUserLanguage(req.user.userId));
-    const ctx = await buildAiCfoContext(req.user.userId, language);
+    const ctx = await buildAiCfoContext(req.user.userId, language, biz);
     res.json(ctx);
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -3601,6 +3804,11 @@ app.post('/api/ai-cfo/ask', auth, async (req, res) => {
     const language = normalizeLanguage(rawLang);
     const isRu = language === 'ru';
     if (!question || !question.trim()) return res.status(400).json({ error: 'question required' });
+
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canUseAiCfo(biz.role))
+      return res.status(403).json({ error: 'Your role does not allow using AI CFO' });
 
     // ── Domain guardrail: reject out-of-scope questions ───────────────────────
     if (!isBusinessFinanceQuestion(question)) {
@@ -3622,7 +3830,7 @@ app.post('/api/ai-cfo/ask', auth, async (req, res) => {
     } catch (_) { /* fail open */ }
 
     // ── Build context ─────────────────────────────────────────────────────────
-    const ctx = await buildAiCfoContext(userId, language);
+    const ctx = await buildAiCfoContext(userId, language, biz);
     const currency = ctx.business?.base_currency || 'IDR';
 
     // ── Try Anthropic first, fall back to local analyzer ─────────────────────
@@ -3757,11 +3965,14 @@ app.delete('/api/user/reset-data', auth, async (req, res) => {
 // GET /api/payroll/employees
 app.get('/api/payroll/employees', auth, async (req, res) => {
   try {
-    const userId = req.user.userId;
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canManagePayroll(biz.role))
+      return res.status(403).json({ error: 'Your role does not allow accessing payroll' });
     const { data, error } = await supabase
       .from('payroll_employees')
       .select('*')
-      .eq('user_id', userId)
+      .or(bizOrFilter(biz))
       .neq('status', 'archived')
       .order('name', { ascending: true });
     if (error) throw error;
@@ -3778,14 +3989,19 @@ app.post('/api/payroll/employees', auth, async (req, res) => {
     const { name, role, default_salary, currency, pay_day, default_wallet_id, notes } = req.body;
     if (!name || !name.trim()) return res.status(400).json({ error: 'Employee name is required.' });
 
-    // Validate wallet belongs to user if supplied
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canManagePayroll(biz.role))
+      return res.status(403).json({ error: 'Your role does not allow managing payroll' });
+
+    // Validate wallet belongs to the business if supplied
     if (default_wallet_id) {
-      const { data: w } = await supabase.from('wallets').select('id').eq('id', default_wallet_id).eq('user_id', userId).single();
-      if (!w) return res.status(400).json({ error: 'Invalid wallet.' });
+      const { data: w } = await supabase.from('wallets').select('id').eq('id', default_wallet_id).or(bizOrFilter(biz)).limit(1);
+      if (!w?.length) return res.status(400).json({ error: 'Invalid wallet.' });
     }
 
     const { data, error } = await supabase.from('payroll_employees').insert({
-      user_id: userId,
+      ...bizWriteFields(biz, userId),
       name: name.trim(),
       role: role?.trim() || null,
       default_salary: default_salary ? Number(default_salary) : null,
@@ -3808,8 +4024,13 @@ app.patch('/api/payroll/employees/:id', auth, async (req, res) => {
     const { id } = req.params;
     const { name, role, default_salary, currency, pay_day, default_wallet_id, status, notes } = req.body;
 
-    const { data: existing } = await supabase.from('payroll_employees').select('id').eq('id', id).eq('user_id', userId).single();
-    if (!existing) return res.status(404).json({ error: 'Employee not found.' });
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canManagePayroll(biz.role))
+      return res.status(403).json({ error: 'Your role does not allow managing payroll' });
+
+    const { data: exRows } = await supabase.from('payroll_employees').select('id').eq('id', id).or(bizOrFilter(biz)).limit(1);
+    if (!exRows?.length) return res.status(404).json({ error: 'Employee not found.' });
 
     const updates = { updated_at: new Date().toISOString() };
     if (name !== undefined)              updates.name              = name.trim();
@@ -3832,10 +4053,13 @@ app.patch('/api/payroll/employees/:id', auth, async (req, res) => {
 // DELETE /api/payroll/employees/:id  — soft delete
 app.delete('/api/payroll/employees/:id', auth, async (req, res) => {
   try {
-    const userId = req.user.userId;
     const { id } = req.params;
-    const { data: existing } = await supabase.from('payroll_employees').select('id').eq('id', id).eq('user_id', userId).single();
-    if (!existing) return res.status(404).json({ error: 'Employee not found.' });
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canManagePayroll(biz.role))
+      return res.status(403).json({ error: 'Your role does not allow managing payroll' });
+    const { data: exRows } = await supabase.from('payroll_employees').select('id').eq('id', id).or(bizOrFilter(biz)).limit(1);
+    if (!exRows?.length) return res.status(404).json({ error: 'Employee not found.' });
 
     const { error } = await supabase.from('payroll_employees').update({ status: 'archived', updated_at: new Date().toISOString() }).eq('id', id);
     if (error) throw error;
@@ -3848,11 +4072,14 @@ app.delete('/api/payroll/employees/:id', auth, async (req, res) => {
 // GET /api/payroll/payments
 app.get('/api/payroll/payments', auth, async (req, res) => {
   try {
-    const userId = req.user.userId;
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canManagePayroll(biz.role))
+      return res.status(403).json({ error: 'Your role does not allow accessing payroll' });
     const { data, error } = await supabase
       .from('payroll_payments')
       .select('*, payroll_employees(name, role)')
-      .eq('user_id', userId)
+      .or(bizOrFilter(biz))
       .order('payment_date', { ascending: false });
     if (error) throw error;
     res.json({ payments: data || [] });
@@ -3864,11 +4091,15 @@ app.get('/api/payroll/payments', auth, async (req, res) => {
 // GET /api/payroll/overview
 app.get('/api/payroll/overview', auth, async (req, res) => {
   try {
-    const userId = req.user.userId;
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canManagePayroll(biz.role))
+      return res.status(403).json({ error: 'Your role does not allow accessing payroll' });
+    const bizOr = bizOrFilter(biz);
 
     const [empRes, payRes] = await Promise.all([
-      supabase.from('payroll_employees').select('id, name, role, default_salary, currency, pay_day, default_wallet_id').eq('user_id', userId).neq('status', 'archived').order('name'),
-      supabase.from('payroll_payments').select('*, payroll_payment_items(*)').eq('user_id', userId).order('payment_date', { ascending: false }),
+      supabase.from('payroll_employees').select('id, name, role, default_salary, currency, pay_day, default_wallet_id').or(bizOr).neq('status', 'archived').order('name'),
+      supabase.from('payroll_payments').select('*, payroll_payment_items(*)').or(bizOr).order('payment_date', { ascending: false }),
     ]);
 
     const employees = empRes.data || [];
@@ -3949,12 +4180,17 @@ app.post('/api/payroll/payments', auth, async (req, res) => {
 
     if (netAmount <= 0) return res.status(400).json({ error: `Net amount must be positive. Gross: ${grossAmount}, Deductions: ${deductionAmount}.` });
 
-    // ── Validate wallet ───────────────────────────────────────────────────────
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canManagePayroll(biz.role))
+      return res.status(403).json({ error: 'Your role does not allow managing payroll' });
+
+    // ── Validate wallet (must belong to same business) ───────────────────────
     let wallet = null;
     if (wallet_id) {
-      const { data: w } = await supabase.from('wallets').select('id, name, scope, currency').eq('id', wallet_id).eq('user_id', userId).single();
-      if (!w) return res.status(400).json({ error: 'Invalid or inaccessible wallet.' });
-      wallet = w;
+      const { data: wRows } = await supabase.from('wallets').select('id, name, scope, currency').eq('id', wallet_id).or(bizOrFilter(biz)).limit(1);
+      if (!wRows?.length) return res.status(400).json({ error: 'Invalid or inaccessible wallet.' });
+      wallet = wRows[0];
     }
 
     const payDate     = payment_date || new Date().toISOString().slice(0, 10);
@@ -3963,7 +4199,7 @@ app.post('/api/payroll/payments', auth, async (req, res) => {
 
     // ── 1. Create transaction (net paid only — single cash impact) ───────────
     const { data: tx, error: txErr } = await supabase.from('transactions').insert({
-      user_id:           userId,
+      ...bizWriteFields(biz, userId),
       type:              'payroll',
       amount_original:   netAmount,
       amount_idr:        netAmount,
@@ -3979,7 +4215,7 @@ app.post('/api/payroll/payments', auth, async (req, res) => {
 
     // ── 2. Create payroll_payment ─────────────────────────────────────────────
     const { data: payment, error: pmtErr } = await supabase.from('payroll_payments').insert({
-      user_id:          userId,
+      ...bizWriteFields(biz, userId),
       employee_id:      employee_id || null,
       transaction_id:   tx.id,
       employee_name:    employee_name.trim(),
@@ -4000,7 +4236,8 @@ app.post('/api/payroll/payments', auth, async (req, res) => {
     // ── 3. Create payroll_payment_items ───────────────────────────────────────
     if (resolvedItems.length > 0) {
       const itemRows = resolvedItems.map(item => ({
-        user_id:            userId,
+        user_id:            biz.ownerUserId,
+        business_id:        biz.business.id,
         payroll_payment_id: payment.id,
         item_type:          item.item_type || 'other',
         label:              item.label.trim(),
@@ -4024,32 +4261,35 @@ app.post('/api/payroll/payments', auth, async (req, res) => {
 //   Telegram bot should call POST /api/payroll/payments — no separate logic needed.
 app.get('/api/payroll/by-transaction/:transactionId', auth, async (req, res) => {
   try {
-    const userId        = req.user.userId;
     const transactionId = Number(req.params.transactionId);
     if (!transactionId) return res.status(400).json({ error: 'Invalid transaction ID.' });
 
-    // Security: verify transaction belongs to user
-    const { data: tx, error: txErr } = await supabase
-      .from('transactions').select('id, user_id, type').eq('id', transactionId).single();
-    if (txErr || !tx) return res.status(404).json({ error: 'Transaction not found.' });
-    if (String(tx.user_id) !== String(userId)) return res.status(403).json({ error: 'Access denied.' });
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canManagePayroll(biz.role))
+      return res.status(403).json({ error: 'Your role does not allow accessing payroll' });
+
+    // Security: verify transaction belongs to the business
+    const { data: txRows } = await supabase
+      .from('transactions').select('id, user_id, type').eq('id', transactionId).or(bizOrFilter(biz)).limit(1);
+    if (!txRows?.length) return res.status(404).json({ error: 'Transaction not found.' });
 
     // Fetch payroll_payment linked to this transaction
-    const { data: payment, error: pmtErr } = await supabase
+    const { data: pmtRows } = await supabase
       .from('payroll_payments')
       .select('*')
       .eq('transaction_id', transactionId)
-      .eq('user_id', userId)
-      .single();
+      .or(bizOrFilter(biz))
+      .limit(1);
+    const payment = pmtRows?.[0];
 
-    if (pmtErr || !payment) return res.json({ payroll_payment: null, items: [] });
+    if (!payment) return res.json({ payroll_payment: null, items: [] });
 
     // Fetch items
     const { data: items } = await supabase
       .from('payroll_payment_items')
       .select('*')
       .eq('payroll_payment_id', payment.id)
-      .eq('user_id', userId)
       .order('direction', { ascending: false }); // additions first
 
     res.json({ payroll_payment: payment, items: items || [] });

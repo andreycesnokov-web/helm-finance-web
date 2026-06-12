@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from './useAuth'
-import { apiFetch } from '../lib/api'
+import { apiFetch, setActiveBusinessId } from '../lib/api'
 import { t } from '../i18n/index'
 
 /**
@@ -33,6 +33,8 @@ export function useAccess() {
     try {
       const data = await apiFetch('/access/status', token)
       setAccess(data)
+      // Persist active business so every apiFetch carries x-business-id
+      if (data?.business?.id) setActiveBusinessId(data.business.id)
       setError(null)
     } catch (e) {
       setError(e.message)
