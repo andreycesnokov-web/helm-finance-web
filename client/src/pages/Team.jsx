@@ -271,7 +271,11 @@ export default function Team() {
           <div className="hf-page-subtitle">Manage your team members and invites</div>
         </div>
         {canManage && (
-          <div className="hf-page-actions">
+          <div className="hf-page-actions" style={{ display: 'flex', gap: 8 }}>
+            <button className="btn btn-md" onClick={() => { window.location.href = '/team-onboarding' }}
+              style={{ border: '1px solid var(--border-2)', background: 'var(--surface)' }}>
+              🎓 {t('onboarding.title')}
+            </button>
             <button className="btn btn-primary btn-md" onClick={() => setShowInvite(true)}>+ Invite</button>
           </div>
         )}

@@ -224,6 +224,18 @@ export default function Pulse({ onDataLoad }) {
 
   useEffect(() => { load(scope) }, [scope, token])
 
+  // Team onboarding banner (owner/admin/cfo only — endpoint 403s otherwise)
+  const [pendingOnboarding, setPendingOnboarding] = useState(0)
+  useEffect(() => {
+    apiFetch('/team/onboarding', token)
+      .then(d => setPendingOnboarding(
+        (d.members || []).filter(m =>
+          ['manager', 'employee'].includes(m.role) && !m.telegram_connected_at
+        ).length
+      ))
+      .catch(() => {}) // non-privileged roles → silently skip
+  }, [token])
+
   const reload = () => load(scope)
 
   const handlePay = async () => {
@@ -333,6 +345,15 @@ export default function Pulse({ onDataLoad }) {
           {firstName[0]?.toUpperCase() || 'A'}
         </div>
       </div>
+
+      {/* ── Team onboarding banner (admins only) ─────────────────────────────── */}
+      {pendingOnboarding > 0 && (
+        <div onClick={() => navigate('/team-onboarding')}
+          style={{ margin: '0 16px 10px', padding: '10px 14px', background: '#FFF6E5', border: '1px solid var(--amber-dark)', borderRadius: 12, fontSize: 13, color: 'var(--amber-dark)', fontWeight: 600, cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span>✈ {pendingOnboarding} · {t('onboarding.waitingTelegram')}</span>
+          <span style={{ fontWeight: 700 }}>{t('onboarding.openOnboarding')} →</span>
+        </div>
+      )}
 
       {/* ── Scope filter ─────────────────────────────────────────────────────── */}
       <div style={{ padding: '0 16px 10px', display: 'flex', gap: 6 }}>

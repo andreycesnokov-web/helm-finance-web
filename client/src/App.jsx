@@ -46,6 +46,7 @@ import Payroll from './pages/Payroll'
 import Tasks from './pages/Tasks'
 import Approvals from './pages/Approvals'
 import Team from './pages/Team'
+import TeamOnboarding, { MemberTutorial } from './pages/TeamOnboarding'
 import JoinInvite from './pages/JoinInvite'
 import Admin from './pages/Admin'
 import AdminUser from './pages/AdminUser'
@@ -393,6 +394,18 @@ function Layout({ children, rightPanel }) {
 function PulseWrapper() {
   const [pulseData, setPulseData]       = useState(null)
   const [showOnboarding, setOnboarding] = useState(false)
+  const { access } = useAccess()
+  const memberRole = access?.membership?.role
+
+  // Manager / employee: Web App is a learning & setup surface, not a finance
+  // dashboard (the backend returns 403 on /pulse for these roles anyway).
+  if (memberRole && ['manager', 'employee'].includes(memberRole)) {
+    return (
+      <Layout>
+        <MemberTutorial />
+      </Layout>
+    )
+  }
 
   // After pulse loads, run detection via exported shouldShowOnboarding()
   const handleDataLoad = (d) => {
@@ -498,6 +511,7 @@ export default function App() {
           <Route path="/tasks"        element={<Layout><Tasks /></Layout>} />
           <Route path="/approvals"    element={<Layout><Approvals /></Layout>} />
           <Route path="/team"         element={<Layout><Team /></Layout>} />
+          <Route path="/team-onboarding" element={<Layout><TeamOnboarding /></Layout>} />
           {/* Public invite page — no auth required to view, Telegram widget handles login */}
           <Route path="/invite/:code" element={<JoinInvite />} />
           {/* Standalone onboarding — accessible directly to re-run setup */}
