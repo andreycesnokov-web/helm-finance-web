@@ -1181,14 +1181,16 @@ function requireBotSecret(req) {
   return req.headers['x-bot-secret'] && req.headers['x-bot-secret'] === botSecret;
 }
 
-// ── GET /api/telegram/config ─────────────────────────────────────────────────
-app.get('/api/telegram/config', auth, async (req, res) => {
-  const botUsername = process.env.TELEGRAM_BOT_USERNAME || null;
+// ── GET /api/telegram/config — PUBLIC (no auth) ──────────────────────────────
+// Returns only non-secret bot config. Never exposes any token/secret.
+app.get('/api/telegram/config', (req, res) => {
+  const raw = process.env.TELEGRAM_BOT_USERNAME || process.env.VITE_BOT_USERNAME || null;
+  const botUsername = raw ? raw.replace(/^@/, '') : null;
   res.json({
     bot_username:       botUsername,
     bot_url:            botUsername ? `https://t.me/${botUsername}` : null,
     bot_deep_link_base: botUsername ? `https://t.me/${botUsername}` : null,
-    is_configured:      !!botUsername,
+    is_configured:      Boolean(botUsername),
   });
 });
 
