@@ -620,6 +620,16 @@ app.post('/api/debts/:id/request-info', auth, async (req, res) => {
 // Role check: employee creates pending_approval; owner/admin creates approved directly.
 app.post('/api/debts/from-telegram', async (req, res) => {
   try {
+    // ── Bot authentication ───────────────────────────────────────────────────
+    // This endpoint has no user JWT (called by the bot, not a browser).
+    // The bot must prove its identity with a shared secret header:
+    //   x-bot-secret: <TELEGRAM_WEBHOOK_SECRET or BOT_TOKEN>
+    // Without this check, anyone who knows a telegram_id could inject records.
+    const botSecret = process.env.TELEGRAM_WEBHOOK_SECRET || process.env.BOT_TOKEN;
+    if (!req.headers['x-bot-secret'] || req.headers['x-bot-secret'] !== botSecret) {
+      return res.status(401).json({ error: 'Invalid bot credentials' });
+    }
+
     const {
       telegram_id,
       type,              // 'receivable' | 'payable'
@@ -1104,6 +1114,27 @@ app.post('/api/transactions/batch', auth, async (req, res) => {
   try {
     const userId = req.user.userId;
     const { transactions } = req.body;
+
+    // ── Input validation ─────────────────────────────────────────────────────
+    if (!Array.isArray(transactions) || transactions.length === 0) {
+      return res.status(400).json({ error: 'transactions must be a non-empty array' });
+    }
+    const VALID_TX_TYPES = ['income', 'expense', 'transfer', 'correction', 'payroll'];
+    for (const t of transactions) {
+      if (!VALID_TX_TYPES.includes(t.type)) {
+        return res.status(400).json({ error: `Invalid transaction type: ${t.type}` });
+      }
+      const amt = Number(t.amount);
+      if (isNaN(amt)) return res.status(400).json({ error: 'amount must be a number' });
+      // correction is a signed delta (may be negative, never zero);
+      // all other types must be strictly positive
+      if (t.type === 'correction' ? amt === 0 : amt <= 0) {
+        return res.status(400).json({ error: `amount must be ${t.type === 'correction' ? 'non-zero' : 'positive'} for type ${t.type}` });
+      }
+      if (t.scope && !['business', 'personal'].includes(t.scope)) {
+        return res.status(400).json({ error: "scope must be 'business' or 'personal'" });
+      }
+    }
 
     // ── Plan limit: max_transactions_per_month ───────────────────────────────
     // Corrections by type are counted but super-admin bypass is handled by
@@ -2596,6 +2627,15 @@ app.post('/api/debts/:id/pay', auth, async (req, res) => {
   const isFullyPaid   = newPaidAmount >= effectiveTotal - 0.01;
   const newStatus     = isFullyPaid ? 'paid' : 'partial';
 
+  // Wallet must belong to the caller (same rule as transactions/batch)
+  let payWallet = null;
+  if (wallet_id) {
+    const { data: w } = await supabase.from('wallets')
+      .select('id, name, scope').eq('id', wallet_id).eq('user_id', req.user.userId).single();
+    if (!w) return res.status(400).json({ error: 'Invalid or inaccessible wallet' });
+    payWallet = w;
+  }
+
   // 1. Create transaction
   const txType = debt.type === 'payable' ? 'expense' : 'income';
   const { data: tx, error: txErr } = await supabase.from('transactions').insert({
@@ -2605,9 +2645,10 @@ app.post('/api/debts/:id/pay', auth, async (req, res) => {
     currency_original: 'IDR',
     amount_idr:        paymentAmount,
     description:       `Payment: ${debt.counterparty}`,
-    source:            account || null,
+    source:            account || (payWallet ? payWallet.name : null),
     wallet_id:         wallet_id || null,
-    scope:             debt.scope || 'business',
+    scope:             debt.scope || (payWallet ? payWallet.scope : null) || 'business',
+    transaction_date:  date ? new Date(date).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10),
     created_at:        date ? new Date(date).toISOString() : new Date().toISOString(),
   }).select('id').single();
   if (txErr) return res.status(500).json({ error: txErr.message });
@@ -2626,7 +2667,7 @@ app.post('/api/debts/:id/pay', auth, async (req, res) => {
   }
 
   const { data: updatedDebt, error: updateErr } = await supabase.from('debts')
-    .update(debtUpdates).eq('id', req.params.id).select().single();
+    .update(debtUpdates).eq('id', req.params.id).eq('user_id', req.user.userId).select().single();
   if (updateErr) return res.status(500).json({ error: updateErr.message });
 
   res.json({
