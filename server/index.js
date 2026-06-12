@@ -780,8 +780,7 @@ app.post('/api/debts/from-telegram', async (req, res) => {
     if (submitterUser) {
       submitterUser.name = submitterUser.first_name || submitterUser.username || String(submitterUser.id);
     }
-    console.log('[from-telegram] telegram_id=%s found_user=%s subErr=%s',
-      telegram_id, submitterUser?.id ?? 'NONE', subErr?.message || '-');
+    if (subErr) console.warn('[from-telegram] user lookup error:', subErr.message);
     if (!submitterUser)
       return res.status(403).json({
         error: 'not_linked',
@@ -806,11 +805,9 @@ app.post('/api/debts/from-telegram', async (req, res) => {
       targetBusinessId = mem[0].business_id;
       ownerId          = mem[0].businesses?.owner_user_id || submitterUser.id;
     } else {
-      const { data: mem, error: memErr } = await supabase.from('business_members')
+      const { data: mem } = await supabase.from('business_members')
         .select('role, business_id, businesses(owner_user_id)')
         .eq('user_id', submitterUser.id).eq('status', 'active').limit(2);
-      console.log('[from-telegram] membership user_id=%s count=%s roles=%s err=%s',
-        submitterUser.id, mem?.length ?? 0, JSON.stringify((mem||[]).map(m=>m.role)), memErr?.message || '-');
       if (mem?.length > 1) {
         // Multiple businesses — bot must ask which one and resend with business_id
         return res.status(409).json({
