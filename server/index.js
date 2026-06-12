@@ -540,6 +540,47 @@ app.post('/api/debts', auth, async (req, res) => {
   res.json(computeDebtStatus(data));
 });
 
+// ── PATCH /api/debts/:id — edit a debt's editable fields ─────────────────────
+// Used to fix details (counterparty / amount / due date / description / type)
+// before or after approval. Business-scoped; privileged roles only.
+// original_amount tracks the editable total so status/remaining recompute.
+app.patch('/api/debts/:id', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canCreateConfirmedFinancialRecord(biz.role))
+      return res.status(403).json({ error: 'Your role does not allow editing records' });
+
+    const { data: rows } = await supabase.from('debts')
+      .select('id, paid_amount').eq('id', req.params.id).or(bizOrFilter(biz)).limit(1);
+    const debt = rows?.[0];
+    if (!debt) return res.status(404).json({ error: 'Debt not found' });
+
+    const updates = {};
+    if (req.body.counterparty !== undefined) updates.counterparty = String(req.body.counterparty).trim() || null;
+    if (req.body.description  !== undefined) updates.description  = String(req.body.description).trim() || null;
+    if (req.body.due_date     !== undefined) updates.due_date     = req.body.due_date || null;
+    if (req.body.scope        !== undefined) updates.scope        = req.body.scope;
+    if (req.body.type         !== undefined && ['receivable', 'payable'].includes(req.body.type))
+      updates.type = req.body.type;
+    if (req.body.amount !== undefined) {
+      const amt = Number(req.body.amount);
+      if (isNaN(amt) || amt <= 0) return res.status(400).json({ error: 'amount must be a positive number' });
+      if (amt < Number(debt.paid_amount || 0))
+        return res.status(400).json({ error: 'amount cannot be less than already paid' });
+      updates.amount = amt;
+      updates.original_amount = amt;
+    }
+    if (Object.keys(updates).length === 0)
+      return res.status(400).json({ error: 'No editable fields provided' });
+
+    const { data, error } = await supabase.from('debts')
+      .update(updates).eq('id', debt.id).select().single();
+    if (error) return res.status(500).json({ error: error.message });
+    res.json(computeDebtStatus(data));
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 app.patch('/api/debts/:id/settle', auth, async (req, res) => {
   const biz = await requireBusiness(req, res);
   if (!biz) return;

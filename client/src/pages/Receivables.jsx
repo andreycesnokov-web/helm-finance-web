@@ -42,6 +42,7 @@ function getCashRiskLabel(debt) {
 
 function DebtRow({ debt, accounts, token, onRefresh }) {
   const [modal,           setModal]           = useState(false)
+  const [editModal,       setEditModal]       = useState(false)
   const [success,         setSuccess]         = useState(false)
   const [approvalLoading, setApprovalLoading] = useState(false)
   const { t } = useTranslation()
@@ -151,6 +152,12 @@ function DebtRow({ debt, accounts, token, onRefresh }) {
                 ✓ Approve
               </button>
               <button
+                onClick={() => setEditModal(true)}
+                style={{ padding: '5px 10px', borderRadius: 8, fontSize: 11, fontWeight: 700, background: 'var(--bg-3, #F1F3F5)', color: 'var(--text-2)', border: '1px solid var(--border-2)', cursor: 'pointer', whiteSpace: 'nowrap' }}
+              >
+                ✏️ Edit
+              </button>
+              <button
                 onClick={handleReject}
                 disabled={approvalLoading}
                 style={{ padding: '5px 10px', borderRadius: 8, fontSize: 11, fontWeight: 700, background: 'var(--red-light)', color: 'var(--red-dark)', border: '1px solid rgba(240,68,56,.2)', cursor: 'pointer', whiteSpace: 'nowrap' }}
@@ -159,18 +166,26 @@ function DebtRow({ debt, accounts, token, onRefresh }) {
               </button>
             </div>
           ) : isOpen && !success ? (
-            <button
-              onClick={() => setModal(true)}
-              style={{
-                padding: '6px 12px', borderRadius: 9, fontSize: 11, fontWeight: 600,
-                background: debt.status === 'overdue' ? 'var(--red-light)' : 'var(--green-light)',
-                color: debt.status === 'overdue' ? 'var(--red-dark)' : 'var(--green-dark)',
-                border: debt.status === 'overdue' ? '1px solid rgba(240,68,56,.25)' : '1px solid rgba(18,183,106,.25)',
-                cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
-              }}
-            >
-              {debt.status === 'partial' ? 'More' : 'Mark received'}
-            </button>
+            <div style={{ display: 'flex', gap: 5, flexDirection: 'column', alignItems: 'flex-end' }}>
+              <button
+                onClick={() => setModal(true)}
+                style={{
+                  padding: '6px 12px', borderRadius: 9, fontSize: 11, fontWeight: 600,
+                  background: debt.status === 'overdue' ? 'var(--red-light)' : 'var(--green-light)',
+                  color: debt.status === 'overdue' ? 'var(--red-dark)' : 'var(--green-dark)',
+                  border: debt.status === 'overdue' ? '1px solid rgba(240,68,56,.25)' : '1px solid rgba(18,183,106,.25)',
+                  cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
+                }}
+              >
+                {debt.status === 'partial' ? 'More' : 'Mark received'}
+              </button>
+              <button
+                onClick={() => setEditModal(true)}
+                style={{ padding: '4px 10px', borderRadius: 8, fontSize: 10.5, fontWeight: 600, background: 'none', color: 'var(--text-3)', border: '1px solid var(--border)', cursor: 'pointer', whiteSpace: 'nowrap' }}
+              >
+                ✏️ Edit
+              </button>
+            </div>
           ) : null}
         </div>
       </div>
@@ -182,6 +197,15 @@ function DebtRow({ debt, accounts, token, onRefresh }) {
           token={token}
           onClose={() => setModal(false)}
           onSuccess={handleSuccess}
+        />
+      )}
+      {editModal && (
+        <DebtFormModal
+          mode="receivable"
+          initialDebt={debt}
+          token={token}
+          onClose={() => setEditModal(false)}
+          onSuccess={() => { setEditModal(false); onRefresh && onRefresh() }}
         />
       )}
     </>

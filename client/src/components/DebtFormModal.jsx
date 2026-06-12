@@ -67,15 +67,16 @@ function defaultDueDate() {
   return d.toISOString().slice(0, 10)
 }
 
-export default function DebtFormModal({ mode, token, onClose, onSuccess }) {
+export default function DebtFormModal({ mode, token, onClose, onSuccess, initialDebt = null }) {
+  const isEdit = !!initialDebt
   const c = cfg(mode)
   const l = LABELS[getLang()] || LABELS.en
 
-  const [counterparty, setCounterparty] = useState('')
-  const [description,  setDescription]  = useState('')
-  const [amount,       setAmount]        = useState('')
-  const [dueDate,      setDueDate]       = useState(defaultDueDate())
-  const [scope,        setScope]         = useState('business')
+  const [counterparty, setCounterparty] = useState(initialDebt?.counterparty || '')
+  const [description,  setDescription]  = useState(initialDebt?.description || '')
+  const [amount,       setAmount]        = useState(initialDebt ? String(initialDebt.original_amount || initialDebt.amount || '') : '')
+  const [dueDate,      setDueDate]       = useState(initialDebt?.due_date ? initialDebt.due_date.slice(0, 10) : defaultDueDate())
+  const [scope,        setScope]         = useState(initialDebt?.scope || 'business')
   const [saving,       setSaving]        = useState(false)
   const [error,        setError]         = useState('')
 
@@ -88,8 +89,10 @@ export default function DebtFormModal({ mode, token, onClose, onSuccess }) {
     setError('')
     try {
       const body = { type: mode, counterparty: counterparty.trim(), amount: amountNum, due_date: dueDate || null, scope }
-      if (description.trim()) body.description = description.trim()
-      const debt = await apiFetch('/debts', token, { method: 'POST', body })
+      body.description = description.trim() || null
+      const debt = isEdit
+        ? await apiFetch(`/debts/${initialDebt.id}`, token, { method: 'PATCH', body })
+        : await apiFetch('/debts', token, { method: 'POST', body })
       onSuccess(debt)
     } catch (e) {
       setError(e.message || l.failMsg)
@@ -106,7 +109,9 @@ export default function DebtFormModal({ mode, token, onClose, onSuccess }) {
         <div className="modal-drag-handle" />
         <button className="modal-close-btn" onClick={onClose}>✕</button>
 
-        <div style={{ fontSize: 'var(--text-lg)', fontWeight: 600, color: 'var(--text)', marginBottom: 3 }}>{c.title}</div>
+        <div style={{ fontSize: 'var(--text-lg)', fontWeight: 600, color: 'var(--text)', marginBottom: 3 }}>
+          {isEdit ? ({ en: 'Edit record', ru: 'Редактировать заявку', id: 'Edit catatan' }[getLang()] || 'Edit record') : c.title}
+        </div>
         <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-3)', marginBottom: 20 }}>{c.subtitle}</div>
 
         <label className="modal-label">{c.counterpartyLabel}</label>
