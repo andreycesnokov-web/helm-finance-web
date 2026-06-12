@@ -5,6 +5,7 @@ import { apiFetch } from '../lib/api'
 
 const ROLE_LABELS = {
   owner:    { label: 'Owner',    color: '#1565C0', bg: '#E3F2FD' },
+  ceo:      { label: 'CEO',      color: '#AD1457', bg: '#FCE4EC' },
   admin:    { label: 'Admin',    color: '#6A1B9A', bg: '#F3E5F5' },
   cfo:      { label: 'CFO',      color: '#085041', bg: '#E1F5EE' },
   manager:  { label: 'Manager',  color: '#E65100', bg: '#FFF3E0' },
@@ -16,6 +17,7 @@ const ROLE_OPTS = [
   { value: 'manager',  label: 'Manager'  },
   { value: 'cfo',      label: 'CFO'      },
   { value: 'admin',    label: 'Admin'    },
+  { value: 'ceo',      label: 'CEO'      },
 ]
 
 function RoleBadge({ role }) {
@@ -70,6 +72,7 @@ function InviteModal({ token, onClose, onCreated }) {
     manager:  'Can manage receivables and payables. Submits drafts for owner approval.',
     cfo:      'Full financial visibility. Can approve records and view all reports.',
     admin:    'Full access except billing. Can invite and manage team members.',
+    ceo:      'Executive access. Can approve everything, manage team and receive all alerts.',
   }
 
   return (

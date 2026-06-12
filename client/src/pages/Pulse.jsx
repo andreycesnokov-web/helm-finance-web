@@ -238,7 +238,7 @@ export default function Pulse({ onDataLoad }) {
     // CEO/owner Telegram connect prompt
     apiFetch('/team/onboarding/me', token)
       .then(d => setCeoNeedsTelegram(
-        ['owner', 'admin', 'cfo'].includes(d.role) && !d.telegram_connected
+        ['owner', 'ceo', 'admin', 'cfo'].includes(d.role) && !d.telegram_connected
       ))
       .catch(() => {})
   }, [token])

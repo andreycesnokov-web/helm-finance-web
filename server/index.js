@@ -90,13 +90,13 @@ function auth(req, res, next) {
 // Never trust business_id from the client without a membership check.
 
 // ── Role access helpers ──────────────────────────────────────────────────────
-function canViewBusinessFinance(role)          { return ['owner', 'admin', 'cfo', 'accountant', 'auditor'].includes(role); }
-function canCreateFinancialRequest(role)       { return ['owner', 'admin', 'cfo', 'accountant', 'manager', 'employee'].includes(role); }
-function canCreateConfirmedFinancialRecord(role) { return ['owner', 'admin', 'cfo', 'accountant'].includes(role); }
-function canApproveFinancialRecord(role)       { return ['owner', 'admin', 'cfo'].includes(role); }
-function canManagePayroll(role)                { return ['owner', 'admin', 'cfo'].includes(role); }
-function canManageWallets(role)                { return ['owner', 'admin', 'cfo'].includes(role); }
-function canUseAiCfo(role)                     { return ['owner', 'admin', 'cfo', 'accountant'].includes(role); }
+function canViewBusinessFinance(role)          { return ['owner', 'ceo', 'admin', 'cfo', 'accountant', 'auditor'].includes(role); }
+function canCreateFinancialRequest(role)       { return ['owner', 'ceo', 'admin', 'cfo', 'accountant', 'manager', 'employee'].includes(role); }
+function canCreateConfirmedFinancialRecord(role) { return ['owner', 'ceo', 'admin', 'cfo', 'accountant'].includes(role); }
+function canApproveFinancialRecord(role)       { return ['owner', 'ceo', 'admin', 'cfo'].includes(role); }
+function canManagePayroll(role)                { return ['owner', 'ceo', 'admin', 'cfo'].includes(role); }
+function canManageWallets(role)                { return ['owner', 'ceo', 'admin', 'cfo'].includes(role); }
+function canUseAiCfo(role)                     { return ['owner', 'ceo', 'admin', 'cfo', 'accountant'].includes(role); }
 
 /**
  * Resolve the active business for a request and validate membership.
@@ -599,7 +599,7 @@ async function notifyBusinessAdminsViaTelegram(ownerUserId, text, buttons = []) 
     if (ownerMem?.length) {
       const { data: admins } = await supabase.from('business_members')
         .select('user_id').eq('business_id', ownerMem[0].business_id)
-        .eq('status', 'active').in('role', ['owner', 'admin', 'cfo']);
+        .eq('status', 'active').in('role', ['owner', 'ceo', 'admin', 'cfo']);
       if (admins?.length) adminUserIds = admins.map(a => a.user_id);
     }
     const { data: users } = await supabase.from('users')
@@ -826,7 +826,7 @@ app.post('/api/debts/from-telegram', async (req, res) => {
     }
 
     // Owner/admin/CFO → approved immediately; others → pending_approval
-    const isPrivileged = ['owner', 'admin', 'cfo'].includes(memberRole);
+    const isPrivileged = ['owner', 'ceo', 'admin', 'cfo'].includes(memberRole);
     const approvalStatus = isPrivileged ? 'approved' : 'pending_approval';
     const status         = isPrivileged ? 'open' : 'open'; // always open; pending shown via approval_status
 
@@ -913,7 +913,7 @@ app.get('/api/team', auth, async (req, res) => {
     if (!memberships?.length) return res.status(403).json({ error: 'Not a member of any business' });
     const { business_id, role: myRole } = memberships[0];
 
-    if (!['owner', 'admin', 'cfo'].includes(myRole))
+    if (!['owner', 'ceo', 'admin', 'cfo'].includes(myRole))
       return res.status(403).json({ error: 'Only owner, admin or CFO can view team' });
 
     // Fetch all members + their user info
@@ -956,7 +956,7 @@ app.post('/api/team/invite', auth, async (req, res) => {
   const userId = req.user.userId;
   const { role = 'employee', label, max_uses = 1, expires_days = 7 } = req.body;
 
-  const VALID_ROLES = ['employee', 'manager', 'cfo', 'admin'];
+  const VALID_ROLES = ['employee', 'manager', 'cfo', 'admin', 'ceo'];
   if (!VALID_ROLES.includes(role))
     return res.status(400).json({ error: `role must be one of: ${VALID_ROLES.join(', ')}` });
 
@@ -966,11 +966,11 @@ app.post('/api/team/invite', auth, async (req, res) => {
     if (!memberships?.length) return res.status(403).json({ error: 'Not a member of any business' });
     const { business_id, role: myRole } = memberships[0];
 
-    if (!['owner', 'admin'].includes(myRole))
-      return res.status(403).json({ error: 'Only owner or admin can create invites' });
+    if (!['owner', 'ceo', 'admin'].includes(myRole))
+      return res.status(403).json({ error: 'Only owner, CEO or admin can create invites' });
 
     // Cannot invite higher/equal role than yourself (only owner can invite admin)
-    const ROLE_RANK = { employee: 1, manager: 2, cfo: 3, admin: 4, owner: 5 };
+    const ROLE_RANK = { employee: 1, manager: 2, cfo: 3, admin: 4, ceo: 5, owner: 6 };
     if (ROLE_RANK[role] >= ROLE_RANK[myRole])
       return res.status(403).json({ error: `You cannot invite someone with role "${role}" — your role is "${myRole}"` });
 
