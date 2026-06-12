@@ -773,9 +773,11 @@ app.post('/api/debts/from-telegram', async (req, res) => {
     // Resolve submitting user. In this app users.id IS the Telegram id
     // (the telegram_id column may be NULL), so match on id first, then fall
     // back to the telegram_id column for any rows that have it populated.
-    const { data: submitterRows } = await supabase.from('users')
+    const { data: submitterRows, error: subErr } = await supabase.from('users')
       .select('id, name, role').or(`id.eq.${telegram_id},telegram_id.eq.${telegram_id}`).limit(1);
     const submitterUser = submitterRows?.[0];
+    console.log('[from-telegram] telegram_id=%s found_user=%s subErr=%s',
+      telegram_id, submitterUser?.id ?? 'NONE', subErr?.message || '-');
     if (!submitterUser)
       return res.status(403).json({
         error: 'not_linked',
@@ -800,9 +802,11 @@ app.post('/api/debts/from-telegram', async (req, res) => {
       targetBusinessId = mem[0].business_id;
       ownerId          = mem[0].businesses?.owner_user_id || submitterUser.id;
     } else {
-      const { data: mem } = await supabase.from('business_members')
+      const { data: mem, error: memErr } = await supabase.from('business_members')
         .select('role, business_id, businesses(owner_user_id)')
         .eq('user_id', submitterUser.id).eq('status', 'active').limit(2);
+      console.log('[from-telegram] membership user_id=%s count=%s roles=%s err=%s',
+        submitterUser.id, mem?.length ?? 0, JSON.stringify((mem||[]).map(m=>m.role)), memErr?.message || '-');
       if (mem?.length > 1) {
         // Multiple businesses — bot must ask which one and resend with business_id
         return res.status(409).json({
