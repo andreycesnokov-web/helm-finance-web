@@ -30,15 +30,17 @@ export default function DebtPaymentModal({ debt, accounts, token, onClose, onSuc
   const remaining       = Number(debt.remaining_amount ?? Math.max(0, originalAmount - alreadyPaid))
   const isPartialAlready = alreadyPaid > 0 && alreadyPaid < originalAmount
 
-  const [amount,  setAmount]  = useState(String(remaining || ''))
-  const [account, setAccount] = useState('')
-  const [payDate, setPayDate] = useState(new Date().toISOString().slice(0, 10))
-  const [paying,  setPaying]  = useState(false)
-  const [error,   setError]   = useState('')
+  const [amount,   setAmount]   = useState(String(remaining || ''))
+  const [walletId, setWalletId] = useState('')
+  const [payDate,  setPayDate]  = useState(new Date().toISOString().slice(0, 10))
+  const [paying,   setPaying]   = useState(false)
+  const [error,    setError]    = useState('')
 
-  const amountNum  = Number(amount)
-  const isFullPay  = amountNum >= remaining - 0.01
-  const canSubmit  = amountNum > 0 && amountNum <= remaining + 0.01 && !paying
+  const amountNum   = Number(amount)
+  const isFullPay   = amountNum >= remaining - 0.01
+  const selectedAcc = (accounts || []).find(a => String(a.id) === String(walletId))
+  // Wallet choice is required so the payment debits/credits the right account.
+  const canSubmit   = amountNum > 0 && amountNum <= remaining + 0.01 && !!walletId && !paying
 
   const handlePay = async () => {
     if (!canSubmit) return
@@ -47,9 +49,10 @@ export default function DebtPaymentModal({ debt, accounts, token, onClose, onSuc
       const result = await apiFetch(`/debts/${debt.id}/pay`, token, {
         method: 'POST',
         body: {
-          amount:  amountNum,
-          account: account || undefined,
-          date:    payDate  || undefined,
+          amount:    amountNum,
+          wallet_id: walletId,
+          account:   selectedAcc?.name || undefined,
+          date:      payDate || undefined,
         },
       })
       onSuccess(result)
@@ -140,19 +143,24 @@ export default function DebtPaymentModal({ debt, accounts, token, onClose, onSuc
           style={{ marginBottom: 12 }}
         />
 
-        {/* Account / wallet selector */}
-        <label className="modal-label">Account (optional)</label>
+        {/* Account / wallet selector — required, debits the chosen wallet */}
+        <label className="modal-label">{isReceivable ? 'Receive into account' : 'Pay from account'}</label>
         <select
-          value={account}
-          onChange={e => setAccount(e.target.value)}
+          value={walletId}
+          onChange={e => { setWalletId(e.target.value); setError('') }}
           className="modal-input"
-          style={{ marginBottom: 14 }}
+          style={{ marginBottom: walletId ? 14 : 8 }}
         >
-          <option value="">Select account</option>
+          <option value="">Select account…</option>
           {(accounts || []).map(a => (
-            <option key={a.id || a.name} value={a.name}>{a.name} · {fmt(a.balance)}</option>
+            <option key={a.id || a.name} value={a.id}>{a.name} · {fmt(a.balance)} IDR</option>
           ))}
         </select>
+        {!walletId && (accounts || []).length === 0 && (
+          <div style={{ fontSize: 12, color: 'var(--amber-dark)', marginBottom: 14 }}>
+            No accounts yet — add one in Accounts first.
+          </div>
+        )}
 
         {/* Status preview */}
         {amountNum > 0 && amountNum <= remaining + 0.01 && (

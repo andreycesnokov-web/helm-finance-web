@@ -229,11 +229,16 @@ export default function Receivables() {
     if (searchParams.get('new') === '1') setShowForm(true)
   }, [searchParams])
 
+  const [wallets, setWallets] = useState([])
+
   const load = useCallback(() => {
     setLoading(true)
-    // Load from /api/pulse (includes enriched debts array) for full compatibility
-    apiFetch('/pulse', token)
-      .then(setData)
+    // Load from /api/pulse (includes enriched debts array) + real wallets for the payment selector
+    Promise.all([
+      apiFetch('/pulse', token),
+      apiFetch('/wallets', token).catch(() => ({ wallets: [] })),
+    ])
+      .then(([pulse, w]) => { setData(pulse); setWallets(w.wallets || []) })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false))
   }, [token])
@@ -253,7 +258,8 @@ export default function Receivables() {
   if (loading && !data) return <div className="page-loading">{t('receivables.loading') || 'Loading receivables…'}</div>
 
   const d            = data || {}
-  const accounts     = d.accounts || []
+  // Prefer real wallets (proper wallet_id) for the payment selector; fall back to pulse accounts.
+  const accounts     = wallets.length ? wallets : (d.accounts || [])
   const allDebts     = d.debts || []
   const receivables  = allDebts.filter(x => x.type === 'receivable')
 
