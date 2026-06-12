@@ -770,9 +770,12 @@ app.post('/api/debts/from-telegram', async (req, res) => {
     if (!amount || isNaN(Number(amount)))
       return res.status(400).json({ error: 'amount required' });
 
-    // Resolve submitting user from telegram_id
-    const { data: submitterUser } = await supabase.from('users')
-      .select('id, name, role').eq('telegram_id', telegram_id).single();
+    // Resolve submitting user. In this app users.id IS the Telegram id
+    // (the telegram_id column may be NULL), so match on id first, then fall
+    // back to the telegram_id column for any rows that have it populated.
+    const { data: submitterRows } = await supabase.from('users')
+      .select('id, name, role').or(`id.eq.${telegram_id},telegram_id.eq.${telegram_id}`).limit(1);
+    const submitterUser = submitterRows?.[0];
     if (!submitterUser)
       return res.status(403).json({
         error: 'not_linked',
