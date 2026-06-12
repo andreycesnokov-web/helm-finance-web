@@ -815,14 +815,14 @@ app.post('/api/debts/from-telegram', async (req, res) => {
       }
     }
 
-    // Legacy fallback: owner's telegram id provided, submitter not yet a member row
+    // Membership is REQUIRED — only people tied to a company may submit.
+    // A users row without an active business_members row is an orphan
+    // (e.g. someone who messaged the bot but was never invited): reject.
     if (!memberRole) {
-      if (business_owner_telegram_id && business_owner_telegram_id !== telegram_id) {
-        const { data: ownerUser } = await supabase.from('users')
-          .select('id').eq('telegram_id', business_owner_telegram_id).single();
-        if (ownerUser) ownerId = ownerUser.id;
-      }
-      memberRole = 'member';
+      return res.status(403).json({
+        error: 'not_member',
+        message: 'You are not a member of any business in CFO AI. Ask an owner or admin to invite you.',
+      });
     }
 
     // Owner/admin/CFO → approved immediately; others → pending_approval
