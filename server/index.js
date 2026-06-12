@@ -452,35 +452,114 @@ app.patch('/api/debts/:id/settle', auth, async (req, res) => {
   res.json(computeDebtStatus(data));
 });
 
+// ─────────────────────────────────────────────────────────────────────────────
+// TELEGRAM ROLE MODEL
+// ─────────────────────────────────────────────────────────────────────────────
+// Telegram is an operational channel — behaviour depends on the member's role:
+//   employee / manager  → INPUT channel: submissions become pending_approval
+//                         drafts; they never create confirmed cash-impact
+//                         records and cannot approve anything (incl. their own).
+//   admin / cfo / owner → also NOTIFICATION + APPROVAL channel: they receive
+//                         alerts about pending submissions and can approve /
+//                         reject / request info — through the SAME backend
+//                         endpoints the Web App uses (no Telegram-only logic).
+// Every approval stores: approved_by_user_id, approved_at, approved_via_channel.
+
+const ACTION_CHANNELS = ['web', 'telegram', 'mobile', 'api', 'whatsapp_future'];
+function normalizeChannel(ch) {
+  return ACTION_CHANNELS.includes(ch) ? ch : 'web';
+}
+
+// Send a Telegram message to all admin+ members of the business that owns
+// `ownerUserId`'s data. No-op if TELEGRAM_BOT_TOKEN is not configured
+// (the bot lives in a separate repo / may not be deployed yet).
+// `buttons` — array of [{ text, url }] rows for an inline keyboard.
+// TODO: when the bot supports callback actions, switch url-buttons for
+//       callback_data buttons (Approve / Reject / Ask details) that call
+//       PATCH /api/debts/:id/approve|reject with channel='telegram'.
+async function notifyBusinessAdminsViaTelegram(ownerUserId, text, buttons = []) {
+  const botToken = process.env.TELEGRAM_BOT_TOKEN;
+  if (!botToken) return { sent: 0, skipped: 'no_bot_token' };
+  try {
+    // Find the business this owner belongs to, then all active admin+ members
+    const { data: ownerMem } = await supabase.from('business_members')
+      .select('business_id').eq('user_id', ownerUserId).eq('status', 'active').limit(1);
+    let adminUserIds = [ownerUserId];
+    if (ownerMem?.length) {
+      const { data: admins } = await supabase.from('business_members')
+        .select('user_id').eq('business_id', ownerMem[0].business_id)
+        .eq('status', 'active').in('role', ['owner', 'admin', 'cfo']);
+      if (admins?.length) adminUserIds = admins.map(a => a.user_id);
+    }
+    const { data: users } = await supabase.from('users')
+      .select('telegram_id').in('id', adminUserIds).not('telegram_id', 'is', null);
+    const chatIds = [...new Set((users || []).map(u => u.telegram_id))];
+
+    let sent = 0;
+    for (const chatId of chatIds) {
+      try {
+        const resp = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            chat_id: chatId,
+            text,
+            parse_mode: 'HTML',
+            reply_markup: buttons.length ? { inline_keyboard: [buttons] } : undefined,
+          }),
+        });
+        if (resp.ok) sent++;
+      } catch (_) { /* one failed chat must not break the rest */ }
+    }
+    return { sent };
+  } catch (e) {
+    console.warn('[telegram-notify] failed:', e.message);
+    return { sent: 0, error: e.message };
+  }
+}
+
 // ── PATCH /api/debts/:id/approve ─────────────────────────────────────────────
 // Owner / admin approves a pending_approval debt created from Telegram.
-app.patch('/api/debts/:id/approve', auth, async (req, res) => {
+async function approveDebtHandler(req, res) {
   const userId = req.user.userId;
+  const channel = normalizeChannel(req.body?.channel);
   try {
-    // Only owner/admin can approve
+    // Only owner/admin/cfo can approve
     const { data: mem } = await supabase.from('business_members')
       .select('role').eq('user_id', userId).eq('status', 'active')
       .in('role', ['owner', 'admin', 'cfo']).limit(1);
     if (!mem || mem.length === 0)
       return res.status(403).json({ error: 'Only owner, admin or CFO can approve' });
+    const approverRole = mem[0].role;
+
+    // Self-approval guard: only the owner may approve a record they submitted
+    const { data: existing } = await supabase.from('debts')
+      .select('created_by_user_id').eq('id', req.params.id).eq('user_id', userId).single();
+    if (existing?.created_by_user_id === userId && approverRole !== 'owner')
+      return res.status(403).json({ error: 'You cannot approve your own submission' });
 
     const { data, error } = await supabase.from('debts')
       .update({
-        approval_status:    'approved',
-        approved_by_user_id: userId,
-        approved_at:         new Date().toISOString(),
-        status:              'open',   // activate the record
+        approval_status:      'approved',
+        approved_by_user_id:  userId,
+        approved_at:          new Date().toISOString(),
+        approved_via_channel: channel,
+        last_action_channel:  channel,
+        status:               'open',   // activate the record
       })
       .eq('id', req.params.id).eq('user_id', userId).select().single();
     if (error) return res.status(500).json({ error: error.message });
     res.json(computeDebtStatus(data));
   } catch (e) { res.status(500).json({ error: e.message }); }
-});
+}
+app.patch('/api/debts/:id/approve', auth, approveDebtHandler);
+app.post('/api/debts/:id/approve',  auth, approveDebtHandler); // Telegram bot calls POST
 
 // ── PATCH /api/debts/:id/reject ──────────────────────────────────────────────
-app.patch('/api/debts/:id/reject', auth, async (req, res) => {
+async function rejectDebtHandler(req, res) {
   const userId = req.user.userId;
-  const { reason } = req.body;
+  const { reason } = req.body || {};
+  const channel = normalizeChannel(req.body?.channel);
   try {
     const { data: mem } = await supabase.from('business_members')
       .select('role').eq('user_id', userId).eq('status', 'active')
@@ -490,14 +569,47 @@ app.patch('/api/debts/:id/reject', auth, async (req, res) => {
 
     const { data, error } = await supabase.from('debts')
       .update({
-        approval_status:    'rejected',
-        approved_by_user_id: userId,
-        approved_at:         new Date().toISOString(),
-        rejected_reason:     reason || null,
-        status:              'cancelled',
+        approval_status:      'rejected',
+        approved_by_user_id:  userId,
+        approved_at:          new Date().toISOString(),
+        approved_via_channel: channel,
+        last_action_channel:  channel,
+        rejected_reason:      reason || null,
+        status:               'cancelled',
       })
       .eq('id', req.params.id).eq('user_id', userId).select().single();
     if (error) return res.status(500).json({ error: error.message });
+    res.json(computeDebtStatus(data));
+  } catch (e) { res.status(500).json({ error: e.message }); }
+}
+app.patch('/api/debts/:id/reject', auth, rejectDebtHandler);
+app.post('/api/debts/:id/reject',  auth, rejectDebtHandler); // Telegram bot calls POST
+
+// ── POST /api/debts/:id/request-info ─────────────────────────────────────────
+// Admin+ asks the submitter for clarification instead of approving/rejecting.
+// Record stays pending_approval; note is stored for traceability.
+app.post('/api/debts/:id/request-info', auth, async (req, res) => {
+  const userId = req.user.userId;
+  const { note } = req.body || {};
+  const channel = normalizeChannel(req.body?.channel);
+  try {
+    const { data: mem } = await supabase.from('business_members')
+      .select('role').eq('user_id', userId).eq('status', 'active')
+      .in('role', ['owner', 'admin', 'cfo']).limit(1);
+    if (!mem || mem.length === 0)
+      return res.status(403).json({ error: 'Only owner, admin or CFO can request info' });
+
+    const { data, error } = await supabase.from('debts')
+      .update({
+        info_request_note:   note || null,
+        info_requested_at:   new Date().toISOString(),
+        info_requested_by:   userId,
+        last_action_channel: channel,
+      })
+      .eq('id', req.params.id).eq('user_id', userId).select().single();
+    if (error) return res.status(500).json({ error: error.message });
+
+    // TODO: notify the submitter via Telegram (needs bot DM to created_by_telegram_id)
     res.json(computeDebtStatus(data));
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -582,10 +694,33 @@ app.post('/api/debts/from-telegram', async (req, res) => {
       approval_status:           approvalStatus,
       approved_by_user_id:       isPrivileged ? submitterUser.id : null,
       approved_at:               isPrivileged ? new Date().toISOString() : null,
+      approved_via_channel:      isPrivileged ? 'telegram' : null,
+      last_action_channel:       'telegram',
     };
 
     const { data, error } = await supabase.from('debts').insert(insertRow).select().single();
     if (error) return res.status(500).json({ error: error.message });
+
+    // Notify admin+ members about a pending submission (fire-and-forget)
+    if (!isPrivileged) {
+      const ownerLang = await getUserLanguage(ownerId).catch(() => 'en');
+      const text = notificationText(
+        type === 'receivable' ? 'telegram_receivable_submitted' : 'telegram_payable_submitted',
+        ownerLang,
+        {
+          counterparty: counterparty || '—',
+          amount:       `${amountNum.toLocaleString('en-US')} ${currency || 'IDR'}`,
+          due:          due_date || '—',
+          createdBy:    submitterUser.name || String(telegram_id),
+          role:         memberRole,
+          raw:          raw_input_text || '',
+        }
+      );
+      const webAppUrl = process.env.WEB_APP_URL || 'https://helm-finance-web-production.up.railway.app';
+      notifyBusinessAdminsViaTelegram(ownerId, text, [
+        { text: '🌐 Open in Web App', url: `${webAppUrl}/${type === 'receivable' ? 'receivables' : 'payables'}` },
+      ]).catch(() => {});
+    }
 
     res.json({
       debt:            computeDebtStatus(data),
@@ -1613,6 +1748,67 @@ const NOTIFICATION_TEMPLATES = {
     en: () => getCfoOutOfScopeResponse('en'),
     ru: () => getCfoOutOfScopeResponse('ru'),
     id: () => getCfoOutOfScopeResponse('id'),
+  },
+
+  // ── Telegram notifications for Admin / CFO / Owner ─────────────────────────
+  // Sent via notifyBusinessAdminsViaTelegram(). Params:
+  //   counterparty, amount (formatted with currency), due, createdBy, role, raw
+  telegram_receivable_submitted: {
+    en: (p) => `📥 <b>New receivable request</b>\n\nClient: ${p.counterparty}\nAmount: <b>${p.amount}</b>\nDue: ${p.due}\nCreated by: ${p.createdBy} · ${p.role}\nSource: Telegram · ⏳ Pending approval${p.raw ? `\n\n💬 "${p.raw}"` : ''}`,
+    ru: (p) => `📥 <b>Новая заявка: дебиторка</b>\n\nКлиент: ${p.counterparty}\nСумма: <b>${p.amount}</b>\nСрок: ${p.due}\nСоздал: ${p.createdBy} · ${p.role}\nИсточник: Telegram · ⏳ Ожидает подтверждения${p.raw ? `\n\n💬 «${p.raw}»` : ''}`,
+    id: (p) => `📥 <b>Permintaan piutang baru</b>\n\nKlien: ${p.counterparty}\nJumlah: <b>${p.amount}</b>\nJatuh tempo: ${p.due}\nDibuat oleh: ${p.createdBy} · ${p.role}\nSumber: Telegram · ⏳ Menunggu persetujuan${p.raw ? `\n\n💬 "${p.raw}"` : ''}`,
+  },
+  telegram_payable_submitted: {
+    en: (p) => `📤 <b>New payable request</b>\n\nSupplier: ${p.counterparty}\nAmount: <b>${p.amount}</b>\nDue: ${p.due}\nCreated by: ${p.createdBy} · ${p.role}\nSource: Telegram · ⏳ Pending approval${p.raw ? `\n\n💬 "${p.raw}"` : ''}`,
+    ru: (p) => `📤 <b>Новая заявка: оплата поставщику</b>\n\nПоставщик: ${p.counterparty}\nСумма: <b>${p.amount}</b>\nСрок: ${p.due}\nСоздал: ${p.createdBy} · ${p.role}\nИсточник: Telegram · ⏳ Ожидает подтверждения${p.raw ? `\n\n💬 «${p.raw}»` : ''}`,
+    id: (p) => `📤 <b>Permintaan pembayaran baru</b>\n\nPemasok: ${p.counterparty}\nJumlah: <b>${p.amount}</b>\nJatuh tempo: ${p.due}\nDibuat oleh: ${p.createdBy} · ${p.role}\nSumber: Telegram · ⏳ Menunggu persetujuan${p.raw ? `\n\n💬 "${p.raw}"` : ''}`,
+  },
+  telegram_payment_reported: {
+    en: (p) => `💰 <b>Payment reported</b>\n\n${p.counterparty} reportedly paid <b>${p.amount}</b>.\nReported by: ${p.createdBy} · ${p.role}\nNeeds confirmation before it counts as received.`,
+    ru: (p) => `💰 <b>Сообщение об оплате</b>\n\n${p.counterparty} оплатил <b>${p.amount}</b> (по сообщению).\nСообщил: ${p.createdBy} · ${p.role}\nТребуется подтверждение, прежде чем сумма будет засчитана.`,
+    id: (p) => `💰 <b>Pembayaran dilaporkan</b>\n\n${p.counterparty} dilaporkan membayar <b>${p.amount}</b>.\nDilaporkan oleh: ${p.createdBy} · ${p.role}\nPerlu konfirmasi sebelum dihitung sebagai diterima.`,
+  },
+  telegram_expense_request_submitted: {
+    en: (p) => `🧾 <b>Expense request</b>\n\n${p.description}\nAmount: <b>${p.amount}</b>\nCreated by: ${p.createdBy} · ${p.role}\n⏳ Pending approval`,
+    ru: (p) => `🧾 <b>Заявка на расход</b>\n\n${p.description}\nСумма: <b>${p.amount}</b>\nСоздал: ${p.createdBy} · ${p.role}\n⏳ Ожидает подтверждения`,
+    id: (p) => `🧾 <b>Permintaan pengeluaran</b>\n\n${p.description}\nJumlah: <b>${p.amount}</b>\nDibuat oleh: ${p.createdBy} · ${p.role}\n⏳ Menunggu persetujuan`,
+  },
+  telegram_receivable_overdue: {
+    en: (p) => `🔴 <b>Receivable overdue</b>\n\n${p.counterparty} owes <b>${p.amount}</b> — ${p.days} days overdue.`,
+    ru: (p) => `🔴 <b>Просрочена дебиторка</b>\n\n${p.counterparty} должен <b>${p.amount}</b> — просрочено на ${p.days} дн.`,
+    id: (p) => `🔴 <b>Piutang terlambat</b>\n\n${p.counterparty} berutang <b>${p.amount}</b> — terlambat ${p.days} hari.`,
+  },
+  telegram_payable_due_soon: {
+    en: (p) => `🟡 <b>Payment due soon</b>\n\n${p.counterparty} — <b>${p.amount}</b> due in ${p.days} days.`,
+    ru: (p) => `🟡 <b>Скоро платёж</b>\n\n${p.counterparty} — <b>${p.amount}</b> через ${p.days} дн.`,
+    id: (p) => `🟡 <b>Pembayaran segera jatuh tempo</b>\n\n${p.counterparty} — <b>${p.amount}</b> dalam ${p.days} hari.`,
+  },
+  telegram_payable_overdue: {
+    en: (p) => `🔴 <b>Payable overdue</b>\n\n${p.counterparty} — <b>${p.amount}</b>, ${p.days} days overdue.`,
+    ru: (p) => `🔴 <b>Просрочен платёж</b>\n\n${p.counterparty} — <b>${p.amount}</b>, просрочено на ${p.days} дн.`,
+    id: (p) => `🔴 <b>Pembayaran terlambat</b>\n\n${p.counterparty} — <b>${p.amount}</b>, terlambat ${p.days} hari.`,
+  },
+  telegram_payroll_payment_created: {
+    en: (p) => `👥 <b>Payroll payment recorded</b>\n\nEmployee: ${p.employee}\nAmount: <b>${p.amount}</b>\nBy: ${p.createdBy}`,
+    ru: (p) => `👥 <b>Записана выплата зарплаты</b>\n\nСотрудник: ${p.employee}\nСумма: <b>${p.amount}</b>\nКем: ${p.createdBy}`,
+    id: (p) => `👥 <b>Pembayaran gaji dicatat</b>\n\nKaryawan: ${p.employee}\nJumlah: <b>${p.amount}</b>\nOleh: ${p.createdBy}`,
+  },
+  telegram_cash_risk_alert: {
+    en: (p) => `🚨 <b>Cash risk alert</b>\n\nRunway: ${p.runway} days\nCash: ${p.cash}\n${p.detail || ''}`,
+    ru: (p) => `🚨 <b>Риск по деньгам</b>\n\nЗапас: ${p.runway} дн.\nКасса: ${p.cash}\n${p.detail || ''}`,
+    id: (p) => `🚨 <b>Peringatan risiko kas</b>\n\nCadangan: ${p.runway} hari\nKas: ${p.cash}\n${p.detail || ''}`,
+  },
+  telegram_approval_required: {
+    en: (p) => `⏳ <b>Approval required</b>\n\n${p.count} record${p.count > 1 ? 's' : ''} waiting for your review.`,
+    ru: (p) => `⏳ <b>Требуется подтверждение</b>\n\nЗаписей на проверку: ${p.count}.`,
+    id: (p) => `⏳ <b>Persetujuan diperlukan</b>\n\n${p.count} catatan menunggu tinjauan Anda.`,
+  },
+  // TODO: wire to a scheduler (cron / Railway scheduled job) — template is ready,
+  // no scheduling system exists in this repo yet.
+  telegram_daily_financial_pulse: {
+    en: (p) => `📊 <b>CFO AI Daily Pulse</b>\n\nCash: <b>${p.cash}</b>\nRunway: ${p.runway} days\nReceivables overdue: ${p.recvOverdue}\nPayables due soon: ${p.payDueSoon}\nPending approvals: ${p.pendingApprovals}\n\n${p.topAction ? `Top action:\n${p.topAction}` : ''}`,
+    ru: (p) => `📊 <b>CFO AI: дневная сводка</b>\n\nКасса: <b>${p.cash}</b>\nЗапас: ${p.runway} дн.\nПросроченная дебиторка: ${p.recvOverdue}\nБлижайшие платежи: ${p.payDueSoon}\nОжидают подтверждения: ${p.pendingApprovals}\n\n${p.topAction ? `Главное действие:\n${p.topAction}` : ''}`,
+    id: (p) => `📊 <b>CFO AI Pulse Harian</b>\n\nKas: <b>${p.cash}</b>\nCadangan: ${p.runway} hari\nPiutang terlambat: ${p.recvOverdue}\nPembayaran segera: ${p.payDueSoon}\nMenunggu persetujuan: ${p.pendingApprovals}\n\n${p.topAction ? `Tindakan utama:\n${p.topAction}` : ''}`,
   },
 }
 
@@ -2645,7 +2841,16 @@ async function buildAiCfoContext(userId, language = 'en') {
   });
 
   // ── Debts breakdowns ──────────────────────────────────────────────────────
-  const openDebts  = debts.filter(d => !['paid','cancelled'].includes(d.status));
+  // Only approved records count as real obligations / expected cash.
+  // pending_approval (Telegram submissions awaiting admin review) are tracked
+  // separately as potential cash pressure; rejected are excluded entirely.
+  const openDebts  = debts.filter(d =>
+    !['paid','cancelled'].includes(d.status) &&
+    (d.approval_status === 'approved' || !d.approval_status)
+  );
+  const pendingSubmissions = debts.filter(d =>
+    d.approval_status === 'pending_approval' && !['paid','cancelled'].includes(d.status)
+  );
   const recvList   = openDebts.filter(d => d.type === 'receivable');
   const payList    = openDebts.filter(d => d.type === 'payable');
 
@@ -2685,6 +2890,14 @@ async function buildAiCfoContext(userId, language = 'en') {
     current_month: { income: monthIncome, expenses: monthExpenses, net_flow: monthIncome - monthExpenses, transactions_count: (monthTxs||[]).length, burn_rate: burnRate, burn_window_days: burnMetrics.burn_window_days },
     receivables:   { total_remaining: recvTotal, overdue_total: recvOverdue.reduce((s,d)=>s+Number(d.remaining_amount||0),0), overdue_count: recvOverdue.length, partial_total: recvList.filter(d=>d.status==='partial').reduce((s,d)=>s+Number(d.remaining_amount||0),0), due_soon_total: recvDueSoon.reduce((s,d)=>s+Number(d.remaining_amount||0),0), top: recvList.slice(0,5).map(d=>({counterparty:d.counterparty,remaining_amount:d.remaining_amount,due_date:d.due_date,status:d.status,days_overdue:d.days_overdue})) },
     payables:      { total_remaining: payTotal, overdue_total: payOverdue.reduce((s,d)=>s+Number(d.remaining_amount||0),0), overdue_count: payOverdue.length, partial_total: payList.filter(d=>d.status==='partial').reduce((s,d)=>s+Number(d.remaining_amount||0),0), due_soon_total: payDueSoon.reduce((s,d)=>s+Number(d.remaining_amount||0),0), top: payList.slice(0,5).map(d=>({counterparty:d.counterparty,remaining_amount:d.remaining_amount,due_date:d.due_date,status:d.status,days_overdue:d.days_overdue})) },
+    // Unconfirmed Telegram submissions — NOT included in totals above.
+    // AI should mention these as potential cash pressure awaiting approval.
+    pending_submissions: {
+      count:             pendingSubmissions.length,
+      receivables_total: pendingSubmissions.filter(d=>d.type==='receivable').reduce((s,d)=>s+Number(d.remaining_amount||d.amount||0),0),
+      payables_total:    pendingSubmissions.filter(d=>d.type==='payable').reduce((s,d)=>s+Number(d.remaining_amount||d.amount||0),0),
+      items: pendingSubmissions.slice(0,5).map(d=>({type:d.type,counterparty:d.counterparty,amount:d.remaining_amount||d.amount,due_date:d.due_date,created_by:d.created_by_name,role:d.created_by_role,source:d.source_channel})),
+    },
     risks,
     runway_days: runway,
   };
@@ -3415,6 +3628,7 @@ FINANCIAL CONTEXT:
 ${ctx.receivables.top.length > 0 ? `- Top receivables: ${ctx.receivables.top.map(r => `${r.counterparty} ${r.remaining_amount.toLocaleString()} (${r.status})`).join(', ')}` : ''}
 ${ctx.payables.top.length > 0 ? `- Top payables: ${ctx.payables.top.map(p => `${p.counterparty} ${p.remaining_amount.toLocaleString()} (${p.status})`).join(', ')}` : ''}
 - Wallets: ${ctx.cash.wallets.map(w => `${w.name} ${w.balance.toLocaleString()} ${w.currency}`).join(', ') || 'none'}
+${(ctx.pending_submissions?.count > 0) ? `- Pending team submissions (NOT confirmed — do NOT count in obligations, mention as potential cash pressure): ${ctx.pending_submissions.count} item(s), receivables ${ctx.pending_submissions.receivables_total.toLocaleString()}, payables ${ctx.pending_submissions.payables_total.toLocaleString()} ${currency} — ${ctx.pending_submissions.items.map(i => `${i.counterparty || '—'} ${Number(i.amount||0).toLocaleString()} (${i.type}, by ${i.created_by || 'team'})`).join(', ')}` : ''}
 - Risk signals: ${ctx.risks.map(r => r.title).join('; ') || 'none'}
 - Top actions: ${(ctx.next_actions || []).slice(0,3).map(a => a.title).join(' | ') || 'none'}
 ${ownerWithdrawal ? '\nNOTE: This is an owner withdrawal question. Apply OWNER WITHDRAWAL POLICY.' : ''}

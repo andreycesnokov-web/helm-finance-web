@@ -94,6 +94,11 @@ function DebtRow({ debt, accounts, token, onRefresh }) {
               By {debt.created_by_name}{debt.created_by_role ? ` · ${debt.created_by_role}` : ''}
             </div>
           )}
+          {debt.source_channel === 'telegram' && debt.approval_status === 'approved' && debt.approved_via_channel && (
+            <div style={{ fontSize: 11, color: 'var(--green-dark)', marginTop: 2 }}>
+              ✓ Approved via {debt.approved_via_channel === 'telegram' ? 'Telegram' : 'Web App'}
+            </div>
+          )}
           {debt.raw_input_text && (
             <div style={{ fontSize: 11, color: 'var(--text-4)', marginTop: 2, fontStyle: 'italic' }}>
               "{debt.raw_input_text}"
