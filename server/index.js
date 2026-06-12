@@ -589,7 +589,7 @@ function normalizeChannel(ch) {
 //       callback_data buttons (Approve / Reject / Ask details) that call
 //       PATCH /api/debts/:id/approve|reject with channel='telegram'.
 async function notifyBusinessAdminsViaTelegram(ownerUserId, text, buttons = []) {
-  const botToken = process.env.TELEGRAM_BOT_TOKEN;
+  const botToken = process.env.TELEGRAM_BOT_TOKEN || process.env.BOT_TOKEN;
   if (!botToken) return { sent: 0, skipped: 'no_bot_token' };
   try {
     // Find the business this owner belongs to, then all active admin+ members
@@ -1205,7 +1205,8 @@ app.post('/api/team/onboarding/test-ceo-notification', auth, async (req, res) =>
     if (!canApproveFinancialRecord(biz.role))
       return res.status(403).json({ error: 'Only owner, admin or CFO can send a CEO test notification' });
 
-    if (!process.env.TELEGRAM_BOT_TOKEN)
+    const botToken = process.env.TELEGRAM_BOT_TOKEN || process.env.BOT_TOKEN;
+    if (!botToken)
       return res.status(503).json({ error: 'bot_not_ready', message: 'Telegram notifications will be available after bot setup.' });
 
     const { data: memRows } = await supabase.from('business_members')
@@ -1222,7 +1223,6 @@ app.post('/api/team/onboarding/test-ceo-notification', auth, async (req, res) =>
     }[lang] || '✅ CFO AI test alert\n\nTelegram notifications are connected.';
 
     // users.id IS the telegram chat id in this app
-    const botToken = process.env.TELEGRAM_BOT_TOKEN;
     const resp = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ chat_id: userId, text }),
