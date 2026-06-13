@@ -1085,6 +1085,29 @@ app.post('/api/telegram/debts/:id/decision', async (req, res) => {
 
 const MAX_RECEIPTS = 5;
 
+// Resolve a Telegram submitter → { submitterUser, role, businessId, ownerId,
+// isPrivileged } using the same rules as from-telegram (single business).
+async function resolveTelegramMember(telegram_id) {
+  const { data: rows } = await supabase.from('users').select('id, username, first_name').eq('id', telegram_id).limit(1);
+  const submitterUser = rows?.[0];
+  if (!submitterUser) return { error: 'not_linked' };
+  submitterUser.name = submitterUser.first_name || submitterUser.username || String(submitterUser.id);
+
+  const { data: mem } = await supabase.from('business_members')
+    .select('role, business_id, businesses(owner_user_id)')
+    .eq('user_id', submitterUser.id).eq('status', 'active').limit(2);
+  if (!mem?.length) return { error: 'not_member' };
+  if (mem.length > 1) return { error: 'multiple_businesses', businesses: mem.map(m => m.business_id) };
+
+  const role = mem[0].role;
+  return {
+    submitterUser, role,
+    businessId: mem[0].business_id,
+    ownerId: mem[0].businesses?.owner_user_id || submitterUser.id,
+    isPrivileged: ['owner', 'ceo', 'admin', 'cfo'].includes(role),
+  };
+}
+
 // Download a Telegram file as a base64 buffer + mime via the Bot API.
 async function fetchTelegramFile(fileId) {
   const botToken = process.env.TELEGRAM_BOT_TOKEN || process.env.BOT_TOKEN;
@@ -1180,6 +1203,62 @@ app.post('/api/telegram/debts/attach-receipt', async (req, res) => {
     ).catch(() => {});
 
     res.json({ ok: true, debt_id: data.id, counterparty: data.counterparty, count: attachments.length, receipts_total: receiptsTotal, recognized: !!ocr, item_amount: item.amount });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── POST /api/telegram/debts/from-receipt — create a payable from an invoice ─
+// The creator sends an invoice photo/PDF (e.g. caption "нужно оплатить"). OCR
+// recognizes amount + counterparty, a payable is created and sent to approval,
+// and the file is attached. Bot-safe. Manager/employee → pending_approval.
+app.post('/api/telegram/debts/from-receipt', async (req, res) => {
+  if (!requireBotSecret(req)) return res.status(401).json({ error: 'Invalid bot credentials' });
+  const { telegram_id, file_id, caption } = req.body || {};
+  if (!telegram_id || !file_id) return res.status(400).json({ error: 'telegram_id and file_id required' });
+  try {
+    const m = await resolveTelegramMember(telegram_id);
+    if (m.error) return res.status(m.error === 'multiple_businesses' ? 409 : 403).json({ error: m.error });
+
+    const file = await fetchTelegramFile(file_id).catch(() => null);
+    const ocr = await recognizeReceipt(file).catch(() => null);
+    if (!ocr || !ocr.amount)
+      return res.status(422).json({ error: 'amount_not_recognized', message: 'Не удалось распознать сумму на счёте.' });
+
+    const amountNum = Number(ocr.amount);
+    const approvalStatus = m.isPrivileged ? 'approved' : 'pending_approval';
+    const item = { file_id, mime: file?.mime || null, amount: amountNum, counterparty: ocr.counterparty || null, date: ocr.date || null, recognized: true };
+
+    const insertRow = {
+      user_id: m.ownerId, business_id: m.businessId, type: 'payable',
+      counterparty: ocr.counterparty || m.submitterUser.name || 'Invoice',
+      amount: amountNum, original_amount: amountNum, paid_amount: 0,
+      currency: ocr.currency || 'IDR', due_date: ocr.date || null,
+      description: (caption && caption.trim()) || 'Invoice via Telegram',
+      status: 'open', source_channel: 'telegram',
+      raw_input_text: (caption && caption.trim()) || null,
+      created_by_user_id: m.submitterUser.id, created_by_telegram_id: Number(telegram_id),
+      created_by_name: m.submitterUser.name, created_by_role: m.role,
+      approval_status: approvalStatus,
+      approved_by_user_id: m.isPrivileged ? m.submitterUser.id : null,
+      approved_at: m.isPrivileged ? new Date().toISOString() : null,
+      approved_via_channel: m.isPrivileged ? 'telegram' : null,
+      last_action_channel: 'telegram',
+      attachments: [item], attachment_url: `tg:${file_id}`,
+    };
+    const { data, error } = await supabase.from('debts').insert(insertRow).select().single();
+    if (error) return res.status(500).json({ error: error.message });
+
+    const ccy = data.currency || 'IDR';
+    const webAppUrl = process.env.WEB_APP_URL || 'https://helm-finance-web-production.up.railway.app';
+    if (!m.isPrivileged) {
+      const text = `📤 <b>Счёт на оплату (из Telegram)</b>\n\nПоставщик: ${data.counterparty}\nСумма: <b>${amountNum.toLocaleString('en-US')} ${ccy}</b>\nСрок: ${data.due_date || '—'}\nСоздал: ${m.submitterUser.name} · ${m.role}\n📎 Распознано со счёта · ⏳ ожидает подтверждения`;
+      notifyBusinessAdminsViaTelegram(m.ownerId, text, [
+        [ { text: '📊 View impact', callback_data: `debt_impact:${data.id}` } ],
+        [ { text: '✅ Approve', callback_data: `debt_approve:${data.id}` }, { text: '❌ Reject', callback_data: `debt_reject:${data.id}` } ],
+        [ { text: 'ℹ️ Ask details', callback_data: `debt_info:${data.id}` }, { text: '🌐 Open', url: `${webAppUrl}/payables` } ],
+      ]).catch(() => {});
+    }
+
+    res.json({ ok: true, action: 'created', debt_id: data.id, amount: amountNum, counterparty: data.counterparty, needs_approval: !m.isPrivileged, currency: ccy });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
