@@ -108,6 +108,17 @@ function DebtRow({ debt, accounts, token, onRefresh }) {
               "{debt.raw_input_text}"
             </div>
           )}
+          {debt.info_request_note && (
+            <div style={{ fontSize: 11, color: 'var(--amber-dark)', marginTop: 2 }}>
+              ℹ️ Запрошено: {debt.info_request_note}
+            </div>
+          )}
+          {debt.attachment_url && (
+            <a href={`/api/debts/${debt.id}/receipt?token=${encodeURIComponent(token)}`} target="_blank" rel="noreferrer"
+              style={{ display: 'inline-block', fontSize: 11, fontWeight: 600, color: 'var(--brand)', marginTop: 3 }}>
+              📎 Чек
+            </a>
+          )}
           {/* Partial progress bar */}
           {debt.status === 'partial' && (
             <div style={{ marginTop: 6 }}>

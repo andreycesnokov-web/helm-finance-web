@@ -1083,6 +1083,73 @@ app.post('/api/telegram/debts/:id/decision', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// ── POST /api/telegram/debts/attach-receipt — creator sends a receipt photo ──
+// Attaches a Telegram photo (file_id) to the creator's most recent debt that
+// had info requested, then notifies the admins. Bot-safe.
+app.post('/api/telegram/debts/attach-receipt', async (req, res) => {
+  if (!requireBotSecret(req)) return res.status(401).json({ error: 'Invalid bot credentials' });
+  const { telegram_id, file_id } = req.body || {};
+  if (!telegram_id || !file_id) return res.status(400).json({ error: 'telegram_id and file_id required' });
+  try {
+    // Prefer a debt with an open info request; else the most recent pending one.
+    const { data: candidates } = await supabase.from('debts')
+      .select('*')
+      .or(`created_by_telegram_id.eq.${telegram_id},created_by_user_id.eq.${telegram_id}`)
+      .not('approval_status', 'in', '("rejected")')
+      .not('status', 'in', '("paid","cancelled")')
+      .order('info_requested_at', { ascending: false, nullsLast: true })
+      .order('created_at', { ascending: false })
+      .limit(1);
+    const debt = candidates?.[0];
+    if (!debt) return res.status(404).json({ error: 'no_open_request', message: 'No open request to attach a receipt to.' });
+
+    const { data, error } = await supabase.from('debts')
+      .update({ attachment_url: `tg:${file_id}`, last_action_channel: 'telegram' })
+      .eq('id', debt.id).select().single();
+    if (error) return res.status(500).json({ error: error.message });
+
+    // Notify admins that a receipt arrived.
+    const ownerId = debt.user_id;
+    const name = debt.created_by_name || String(telegram_id);
+    const webAppUrl = process.env.WEB_APP_URL || 'https://helm-finance-web-production.up.railway.app';
+    notifyBusinessAdminsViaTelegram(ownerId,
+      `📎 Чек получен по заявке\n\nОт: ${name}\nКонтрагент: ${debt.counterparty}\nСумма: ${Number(debt.original_amount || debt.amount || 0).toLocaleString('en-US')} ${debt.currency || 'IDR'}`,
+      [[{ text: '🌐 Открыть заявку', url: `${webAppUrl}/${debt.type === 'receivable' ? 'receivables' : 'payables'}` }]]
+    ).catch(() => {});
+
+    res.json({ ok: true, debt_id: data.id, counterparty: data.counterparty });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── GET /api/debts/:id/receipt — view an attached receipt ────────────────────
+// Image is opened via <a href> (no header), so the JWT may arrive as ?token=.
+// If attachment is a Telegram file (tg:<file_id>), proxy it via the Bot API.
+app.get('/api/debts/:id/receipt', async (req, res) => {
+  try {
+    const token = req.headers.authorization?.replace('Bearer ', '') || req.query.token;
+    try { req.user = jwt.verify(token, JWT_SECRET); } catch { return res.status(401).json({ error: 'Unauthorized' }); }
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canViewBusinessFinance(biz.role)) return res.status(403).json({ error: 'Forbidden' });
+    const { data: rows } = await supabase.from('debts').select('attachment_url').eq('id', req.params.id).or(bizOrFilter(biz)).limit(1);
+    const url = rows?.[0]?.attachment_url;
+    if (!url) return res.status(404).json({ error: 'No receipt' });
+    if (!url.startsWith('tg:')) return res.redirect(url);
+
+    const botToken = process.env.TELEGRAM_BOT_TOKEN || process.env.BOT_TOKEN;
+    if (!botToken) return res.status(503).json({ error: 'bot_not_configured' });
+    const fileId = url.slice(3);
+    const meta = await fetch(`https://api.telegram.org/bot${botToken}/getFile?file_id=${encodeURIComponent(fileId)}`).then(r => r.json());
+    const filePath = meta?.result?.file_path;
+    if (!filePath) return res.status(404).json({ error: 'File not found' });
+    const fileResp = await fetch(`https://api.telegram.org/file/bot${botToken}/${filePath}`);
+    res.set('Content-Type', fileResp.headers.get('content-type') || 'image/jpeg');
+    res.set('Cache-Control', 'private, max-age=300');
+    const buf = Buffer.from(await fileResp.arrayBuffer());
+    res.send(buf);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // ── POST /api/debts/from-telegram ────────────────────────────────────────────
 // Called by the Telegram bot to create a draft receivable / payable.
 // Requires telegram_id → users.id mapping.
