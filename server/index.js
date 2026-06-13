@@ -672,6 +672,92 @@ async function notifyBusinessAdminsViaTelegram(ownerUserId, text, buttons = []) 
   }
 }
 
+// ── Single-chat Telegram DM helper (reused by creator notifications) ─────────
+// No-op if no bot token. `buttons` = array of rows for an inline keyboard.
+async function sendTelegramDM(chatId, text, buttons = []) {
+  const botToken = process.env.TELEGRAM_BOT_TOKEN || process.env.BOT_TOKEN;
+  if (!botToken || !chatId) return { ok: false, skipped: true };
+  try {
+    const resp = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: chatId, text, parse_mode: 'HTML',
+        reply_markup: buttons.length ? { inline_keyboard: buttons } : undefined,
+      }),
+    });
+    return { ok: resp.ok };
+  } catch (e) { return { ok: false, error: e.message }; }
+}
+
+async function resolveUserDisplayName(userId) {
+  try {
+    const { data } = await supabase.from('users').select('first_name, username').eq('id', userId).single();
+    return data?.first_name || data?.username || String(userId);
+  } catch { return String(userId); }
+}
+
+// Creator notification templates. p: { type, counterparty, amount, approver, reason, note, raw }
+const CREATOR_TEMPLATES = {
+  request_approved_creator: {
+    ru: (p) => p.type === 'receivable'
+      ? `✅ Ожидаемая оплата подтверждена\n\nКлиент: ${p.counterparty}\nСумма: ${p.amount}\nПодтвердил: ${p.approver}\n\nЗапись стала активной дебиторкой.\nКэш изменится только после фактического получения оплаты.`
+      : `✅ Ваша заявка подтверждена\n\nКонтрагент: ${p.counterparty}\nСумма: ${p.amount}\nПодтвердил: ${p.approver}\n\nЗаявка стала активным обязательством компании.\nДеньги со счёта ещё не списаны.`,
+    en: (p) => p.type === 'receivable'
+      ? `✅ Expected payment approved\n\nClient: ${p.counterparty}\nAmount: ${p.amount}\nApproved by: ${p.approver}\n\nIt is now an active receivable.\nCash changes only when the money is actually received.`
+      : `✅ Your request was approved\n\nCounterparty: ${p.counterparty}\nAmount: ${p.amount}\nApproved by: ${p.approver}\n\nIt is now an active company obligation.\nNo money has left the account yet.`,
+    id: (p) => p.type === 'receivable'
+      ? `✅ Pembayaran yang diharapkan disetujui\n\nKlien: ${p.counterparty}\nJumlah: ${p.amount}\nDisetujui oleh: ${p.approver}\n\nKini menjadi piutang aktif.\nKas berubah hanya saat uang benar-benar diterima.`
+      : `✅ Permintaan Anda disetujui\n\nPemasok: ${p.counterparty}\nJumlah: ${p.amount}\nDisetujui oleh: ${p.approver}\n\nKini menjadi kewajiban aktif perusahaan.\nBelum ada uang yang keluar dari rekening.`,
+  },
+  request_rejected_creator: {
+    ru: (p) => `❌ Ваша заявка отклонена\n\nКонтрагент: ${p.counterparty}\nСумма: ${p.amount}\nОтклонил: ${p.approver}\n\nПричина: ${p.reason || 'Причина не указана.'}`,
+    en: (p) => `❌ Your request was rejected\n\nCounterparty: ${p.counterparty}\nAmount: ${p.amount}\nRejected by: ${p.approver}\n\nReason: ${p.reason || 'No reason provided.'}`,
+    id: (p) => `❌ Permintaan Anda ditolak\n\nPemasok: ${p.counterparty}\nJumlah: ${p.amount}\nDitolak oleh: ${p.approver}\n\nAlasan: ${p.reason || 'Alasan tidak diberikan.'}`,
+  },
+  request_info_creator: {
+    ru: (p) => `ℹ️ Нужна дополнительная информация\n\nПо вашей заявке запросили уточнение:\n${p.raw ? `\n"${p.raw}"\n` : ''}\nКомментарий:\n${p.note || 'Пожалуйста, уточните детали.'}\n\nОтветьте сообщением или откройте заявку в CFO AI.`,
+    en: (p) => `ℹ️ More information needed\n\nClarification was requested on your submission:\n${p.raw ? `\n"${p.raw}"\n` : ''}\nNote:\n${p.note || 'Please clarify the details.'}\n\nReply with a message or open the request in CFO AI.`,
+    id: (p) => `ℹ️ Perlu informasi tambahan\n\nKlarifikasi diminta untuk pengajuan Anda:\n${p.raw ? `\n"${p.raw}"\n` : ''}\nCatatan:\n${p.note || 'Mohon perjelas detailnya.'}\n\nBalas dengan pesan atau buka permintaan di CFO AI.`,
+  },
+};
+
+// Notify the ORIGINAL CREATOR of a debt about a state change. Never throws —
+// the financial action must succeed even if Telegram delivery fails.
+// Creator resolution: created_by_telegram_id → created_by_user_id (= telegram id).
+async function notifyRequestCreatorViaTelegram({ debt, event, actorUserId, actorRole, reason, note }) {
+  try {
+    const chatId = debt.created_by_telegram_id || debt.created_by_user_id || null;
+    if (!chatId) { console.warn('[creator-notify] no telegram identity for debt', debt.id); return; }
+    // Don't notify the actor about their own action (e.g. owner self-approve).
+    if (String(chatId) === String(actorUserId)) return;
+
+    const tplKey = { approved: 'request_approved_creator', rejected: 'request_rejected_creator', request_info: 'request_info_creator' }[event];
+    if (!tplKey) return;
+
+    const lang = await getUserLanguage(chatId).catch(() => 'en');
+    let approver = actorUserId ? await resolveUserDisplayName(actorUserId) : '—';
+    if (actorRole) approver += ` · ${actorRole}`;
+    const tpl = CREATOR_TEMPLATES[tplKey];
+    const fn = tpl[lang] || tpl.en;
+    const text = fn({
+      type:         debt.type,
+      counterparty: debt.counterparty || '—',
+      amount:       `${Number(debt.original_amount || debt.amount || 0).toLocaleString('en-US')} ${debt.currency || 'IDR'}`,
+      approver,
+      reason:       reason || debt.rejected_reason || null,
+      note:         note || debt.info_request_note || null,
+      raw:          debt.raw_input_text || '',
+    });
+
+    const webAppUrl = process.env.CLIENT_URL || process.env.WEB_APP_URL || 'https://helm-finance-web-production.up.railway.app';
+    const openUrl = `${webAppUrl}/${debt.type === 'receivable' ? 'receivables' : 'payables'}`;
+    const res = await sendTelegramDM(chatId, text, [[{ text: '🌐 Открыть заявку', url: openUrl }]]);
+    if (!res.ok && !res.skipped) console.warn('[creator-notify] delivery failed for debt', debt.id, res.error || '');
+  } catch (e) {
+    console.warn('[creator-notify] error:', e.message);
+  }
+}
+
 // ── PATCH /api/debts/:id/approve ─────────────────────────────────────────────
 // Owner / admin approves a pending_approval debt created from Telegram.
 async function approveDebtHandler(req, res) {
@@ -685,12 +771,12 @@ async function approveDebtHandler(req, res) {
 
     // Record must belong to the active business
     const { data: rows } = await supabase.from('debts')
-      .select('id, created_by_user_id').eq('id', req.params.id).or(bizOrFilter(biz)).limit(1);
+      .select('id, created_by_user_id, approval_status').eq('id', req.params.id).or(bizOrFilter(biz)).limit(1);
     const existing = rows?.[0];
     if (!existing) return res.status(404).json({ error: 'Debt not found' });
 
-    // Self-approval guard: only the owner may approve a record they submitted
-    if (existing.created_by_user_id === userId && biz.role !== 'owner')
+    // Self-approval guard: only the owner/ceo may approve a record they submitted
+    if (existing.created_by_user_id === userId && !['owner', 'ceo'].includes(biz.role))
       return res.status(403).json({ error: 'You cannot approve your own submission' });
 
     const { data, error } = await supabase.from('debts')
@@ -704,6 +790,9 @@ async function approveDebtHandler(req, res) {
       })
       .eq('id', existing.id).select().single();
     if (error) return res.status(500).json({ error: error.message });
+    // Notify creator only on a real state change (pending → approved).
+    if (existing.approval_status !== 'approved')
+      notifyRequestCreatorViaTelegram({ debt: data, event: 'approved', actorUserId: userId, actorRole: biz.role });
     res.json(computeDebtStatus(data));
   } catch (e) { res.status(500).json({ error: e.message }); }
 }
@@ -722,7 +811,7 @@ async function rejectDebtHandler(req, res) {
       return res.status(403).json({ error: 'Only owner, admin or CFO can reject' });
 
     const { data: rows } = await supabase.from('debts')
-      .select('id').eq('id', req.params.id).or(bizOrFilter(biz)).limit(1);
+      .select('id, approval_status').eq('id', req.params.id).or(bizOrFilter(biz)).limit(1);
     if (!rows?.length) return res.status(404).json({ error: 'Debt not found' });
 
     const { data, error } = await supabase.from('debts')
@@ -737,6 +826,8 @@ async function rejectDebtHandler(req, res) {
       })
       .eq('id', rows[0].id).select().single();
     if (error) return res.status(500).json({ error: error.message });
+    if (rows[0].approval_status !== 'rejected')
+      notifyRequestCreatorViaTelegram({ debt: data, event: 'rejected', actorUserId: userId, actorRole: biz.role, reason: reason || null });
     res.json(computeDebtStatus(data));
   } catch (e) { res.status(500).json({ error: e.message }); }
 }
@@ -770,7 +861,7 @@ app.post('/api/debts/:id/request-info', auth, async (req, res) => {
       .eq('id', rows[0].id).select().single();
     if (error) return res.status(500).json({ error: error.message });
 
-    // TODO: notify the submitter via Telegram (needs bot DM to created_by_telegram_id)
+    notifyRequestCreatorViaTelegram({ debt: data, event: 'request_info', actorUserId: userId, actorRole: biz.role, note: note || null });
     res.json(computeDebtStatus(data));
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -839,6 +930,7 @@ app.post('/api/telegram/debts/:id/approve', async (req, res) => {
       approved_via_channel: 'telegram', last_action_channel: 'telegram', status: 'open',
     }).eq('id', debt.id).select().single();
     if (error) return res.status(500).json({ error: error.message });
+    notifyRequestCreatorViaTelegram({ debt: data, event: 'approved', actorUserId: userId, actorRole: role });
     res.json({ ok: true, state: 'approved', type: debt.type, debt: computeDebtStatus(data) });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -872,6 +964,7 @@ app.post('/api/telegram/debts/:id/reject', async (req, res) => {
       rejected_reason: reason || 'Rejected from Telegram', status: 'cancelled',
     }).eq('id', debt.id).select().single();
     if (error) return res.status(500).json({ error: error.message });
+    notifyRequestCreatorViaTelegram({ debt: data, event: 'rejected', actorUserId: userId, actorRole: role, reason: reason || 'Rejected from Telegram' });
     res.json({ ok: true, state: 'rejected', debt: computeDebtStatus(data) });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -896,7 +989,7 @@ app.post('/api/telegram/debts/:id/request-info', async (req, res) => {
       info_requested_by: userId, last_action_channel: 'telegram',
     }).eq('id', debt.id).select().single();
     if (error) return res.status(500).json({ error: error.message });
-    // TODO: DM the creator (created_by_telegram_id) once bot DM helper exists.
+    notifyRequestCreatorViaTelegram({ debt: data, event: 'request_info', actorUserId: userId, actorRole: role, note: note || 'Please provide more details' });
     res.json({ ok: true, state: 'info_requested', created_by_telegram_id: debt.created_by_telegram_id || null, debt: computeDebtStatus(data) });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
