@@ -1411,6 +1411,114 @@ app.get('/api/accountant/sources', auth, async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// ── Compliance Calendar — deterministic generation from profile + rules ──────
+// Due dates come only from each rule (never invented). Applicability is decided
+// by the tax profile (PKP for VAT, PT for corporate tax, employees for PPh 21).
+const lastDayOfMonth = (y, m) => new Date(y, m + 1, 0); // m 0-based
+const iso = (d) => d.toISOString().slice(0, 10);
+
+function ruleApplies(rule, profile, hasEmployees) {
+  const w = rule.applies_when || {};
+  if (w.vat_status && (profile?.vat_status || '') !== w.vat_status) return false;
+  if (w.has_employees && !hasEmployees) return false;
+  if (rule.legal_entity_type && profile?.legal_entity_type && rule.legal_entity_type !== profile.legal_entity_type) return false;
+  return true;
+}
+
+// Returns [{ period, due_date }] for a rule over the relevant window.
+function ruleEvents(rule, profile, now) {
+  const out = [];
+  const y = now.getFullYear(), mo = now.getMonth();
+  if (rule.filing_frequency === 'monthly') {
+    // Last 2 completed months + current month → due in the following month.
+    for (let back = 2; back >= 0; back--) {
+      const pm = new Date(y, mo - back, 1);
+      const period = `${pm.getFullYear()}-${String(pm.getMonth() + 1).padStart(2, '0')}`;
+      let due;
+      if (rule.rule_code === 'ID_PPH21_MONTHLY') {
+        due = new Date(pm.getFullYear(), pm.getMonth() + 1, 20); // report by the 20th
+      } else { // PPN and other monthly → end of following month
+        due = lastDayOfMonth(pm.getFullYear(), pm.getMonth() + 1);
+      }
+      out.push({ period, due_date: iso(due) });
+    }
+  } else if (rule.filing_frequency === 'annual') {
+    // Most recent completed FY (assume Dec 31 end unless profile says otherwise).
+    const fyYear = mo >= 4 ? y : y - 1; // if before the deadline period, still last FY
+    const period = String(fyYear - (mo >= 4 ? 0 : 1));
+    const dueYear = Number(period) + 1;
+    out.push({ period, due_date: `${dueYear}-04-30` }); // 4 months after Dec 31 FY end
+  }
+  return out;
+}
+
+function eventStatus(dueDate, now) {
+  const d = Math.ceil((new Date(dueDate) - now) / 86400000);
+  if (d < 0) return 'overdue';
+  if (d <= 14) return 'due_soon';
+  return 'upcoming';
+}
+
+// GET /api/accountant/calendar — generate + persist + return upcoming events
+app.get('/api/accountant/calendar', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canViewBusinessFinance(biz.role)) return res.status(403).json({ error: 'Forbidden' });
+
+    const { data: profRows } = await supabase.from('tax_profiles').select('*').eq('business_id', biz.business.id).limit(1);
+    const profile = profRows?.[0] || null;
+    const jur = profile?.jurisdiction || 'ID';
+    const { data: rules } = await supabase.from('tax_rules')
+      .select('*, official_sources(*)').eq('jurisdiction', jur).eq('status', 'active');
+
+    // Does the business have payroll employees? (for PPh 21 applicability)
+    const { count: empCount } = await supabase.from('payroll_employees')
+      .select('id', { count: 'exact', head: true }).or(bizOrFilter(biz)).neq('status', 'archived');
+    const hasEmployees = (profile?.employee_status === 'has_employees') || (empCount || 0) > 0;
+
+    const now = new Date();
+    const generated = [];
+    for (const rule of (rules || [])) {
+      if (!ruleApplies(rule, profile, hasEmployees)) continue;
+      for (const ev of ruleEvents(rule, profile, now)) {
+        generated.push({
+          business_id: biz.business.id, rule_id: rule.id, rule_code: rule.rule_code,
+          obligation_type: rule.obligation_type, title: rule.title,
+          period: ev.period, due_date: ev.due_date, currency: profile?.reporting_currency || 'IDR',
+          status: eventStatus(ev.due_date, now),
+        });
+      }
+    }
+
+    // Persist (upsert) so tracking columns survive; ignore failures (read still works).
+    if (generated.length) {
+      await supabase.from('compliance_events')
+        .upsert(generated.map(g => ({ ...g, updated_at: new Date().toISOString() })), { onConflict: 'business_id,rule_code,period' })
+        .then(() => {}, () => {});
+    }
+    // Merge stored tracking fields back in.
+    const { data: stored } = await supabase.from('compliance_events').select('*').eq('business_id', biz.business.id);
+    const byKey = Object.fromEntries((stored || []).map(s => [`${s.rule_code}|${s.period}`, s]));
+    const events = generated.map(g => {
+      const s = byKey[`${g.rule_code}|${g.period}`] || {};
+      const rule = (rules || []).find(r => r.rule_code === g.rule_code);
+      return {
+        ...g, id: s.id,
+        status: eventStatus(g.due_date, now),
+        professional_review_status: s.professional_review_status || 'not_started',
+        owner_approval_status: s.owner_approval_status || 'not_required',
+        payment_status: s.payment_status || 'unpaid',
+        official_source: rule?.official_sources || null,
+        calculation_method: rule?.calculation_method || null,
+        filing_frequency: rule?.filing_frequency || null,
+      };
+    }).sort((a, b) => new Date(a.due_date) - new Date(b.due_date));
+
+    res.json({ jurisdiction: jur, profile_complete: !!(profile && profile.country && profile.legal_entity_type), events });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // ── POST /api/debts/from-telegram ────────────────────────────────────────────
 // Called by the Telegram bot to create a draft receivable / payable.
 // Requires telegram_id → users.id mapping.

@@ -46,6 +46,7 @@ const id = {
     tasks: 'Tugas',
     approvals: 'Persetujuan',
     team: 'Tim',
+    accountant: 'AI Akuntan',
     sectionOverview: 'Ringkasan',
     sectionFinance: 'Keuangan',
     sectionOperations: 'Operasional',
