@@ -1195,7 +1195,10 @@ app.post('/api/debts/from-telegram', async (req, res) => {
       user_id:               ownerId,
       business_id:           targetBusinessId || null,
       type,
-      counterparty:          counterparty || null,
+      // counterparty is NOT NULL in DB. For a reimbursement (expense_request)
+      // there is no external party — the company owes the submitter, so default
+      // to the submitter's name; otherwise fall back to a safe placeholder.
+      counterparty:          counterparty || submitterUser.name || 'Reimbursement',
       amount:                amountNum,
       original_amount:       amountNum,
       paid_amount:           0,
