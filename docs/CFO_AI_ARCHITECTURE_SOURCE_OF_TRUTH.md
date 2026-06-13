@@ -315,3 +315,29 @@ deterministic result (and a rule-based explanation) is always available.
 **Limitations (V1):** risk policy not yet business-configurable; payroll due is
 a pay_day estimate (no scheduled-payroll table); no bank balance sync; no
 multi-month scenario planning; no tax/legal payment priority.
+
+## AI Accountant (add-on, Phase 1 — foundation)
+
+A premium compliance add-on. **Not** a substitute for a licensed accountant.
+Model: `DB + versioned rules + deterministic calc = truth; AI explains;
+licensed professional reviews; owner approves`.
+
+**Tables (migration 020, additive):**
+- `official_sources` — jurisdiction reference (authority, title, url, verified_at). Every active rule must cite one.
+- `tax_rules` — **versioned, never overwritten**; a change inserts a new version row. status: draft/under_review/active/deprecated/superseded. Only `active` rules apply. Seeded ID rules: PPN monthly (11%), PPh Badan annual (22%), PPh 21 monthly — all `active` but `last_verified_at = NULL` until a professional confirms in-app.
+- `tax_profiles` — one per business (country, legal_entity_type, NPWP, vat/pkp status, FY dates, regime…). Business-scoped, owner/admin/cfo/ceo edits.
+- `compliance_events` — calendar events generated from profile + active rules (step 2).
+- `business_addons` — entitlement rows (`ai_accountant_*`).
+
+**Entitlement:** `hasAccountantAddon(biz)` — active add-on OR founder/trial plan.
+
+**Endpoints (Phase 1 step 1):** `GET /api/accountant/status` (entitlement + profile completeness + localized disclaimer), `GET|PUT /api/accountant/profile`, `GET /api/accountant/rules` (active, jurisdiction-scoped, joins official source), `GET /api/accountant/sources`.
+
+**Disclaimer** (`AI_ACCOUNTANT_DISCLAIMER`, ru/en/id) accompanies every draft/answer.
+
+**Principle:** the LLM never invents a rate or due date — those come only from
+the Tax Rules Registry; each recommendation carries `rule_code` + official source.
+
+**Next steps:** (2) Compliance Calendar generation + AI Accountant page;
+(3) CFO AI / Decision Engine integration (tax payments in cash forecast) +
+Telegram reminders. Then Phase 2: Bank Statement Import & Reconciliation.

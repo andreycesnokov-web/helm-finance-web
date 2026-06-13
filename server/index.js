@@ -1316,6 +1316,101 @@ app.get('/api/debts/:id/receipt', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// ═════════════════════════════════════════════════════════════════════════════
+// AI ACCOUNTANT — foundation (Phase 1). Deterministic Tax Rules Registry +
+// business Tax Profile + Official Sources. The LLM never invents rates/dates;
+// every recommendation cites a versioned rule + official source.
+// ═════════════════════════════════════════════════════════════════════════════
+
+const AI_ACCOUNTANT_DISCLAIMER = {
+  ru: 'Информация носит рекомендательный характер и не является юридической, налоговой или бухгалтерской консультацией. Перед налоговым платежом или подачей отчётности подтвердите расчёты у лицензированного специалиста.',
+  en: 'This information is advisory only and is not legal, tax or accounting advice. Confirm all calculations with a licensed professional before paying tax or filing.',
+  id: 'Informasi ini bersifat rekomendasi dan bukan nasihat hukum, pajak, atau akuntansi. Konfirmasikan semua perhitungan dengan profesional berlisensi sebelum membayar pajak atau melapor.',
+};
+
+// Entitlement: an active AI Accountant add-on, OR full access during trial/founder.
+async function hasAccountantAddon(biz) {
+  try {
+    const access = await getCurrentAccess(biz.ownerUserId);
+    if (access?.accessState?.effectivePlan === 'founder' || access?.accessState?.isTrialActive) return true;
+    const { data } = await supabase.from('business_addons')
+      .select('addon,status').eq('business_id', biz.business.id)
+      .like('addon', 'ai_accountant%').eq('status', 'active').limit(1);
+    return !!data?.length;
+  } catch { return false; }
+}
+
+// GET /api/accountant/status — entitlement + profile completeness + disclaimer
+app.get('/api/accountant/status', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    const language = normalizeLanguage(req.query.language || await getUserLanguage(req.user.userId));
+    const entitled = await hasAccountantAddon(biz);
+    const { data: profRows } = await supabase.from('tax_profiles').select('*').eq('business_id', biz.business.id).limit(1);
+    const profile = profRows?.[0] || null;
+    res.json({
+      entitled,
+      can_edit: canApproveFinancialRecord(biz.role),
+      profile_complete: !!(profile && profile.country && profile.legal_entity_type),
+      disclaimer: AI_ACCOUNTANT_DISCLAIMER[language] || AI_ACCOUNTANT_DISCLAIMER.en,
+    });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// GET /api/accountant/profile
+app.get('/api/accountant/profile', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canViewBusinessFinance(biz.role)) return res.status(403).json({ error: 'Forbidden' });
+    const { data } = await supabase.from('tax_profiles').select('*').eq('business_id', biz.business.id).limit(1);
+    res.json({ profile: data?.[0] || null });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// PUT /api/accountant/profile — owner/admin/cfo edits the tax profile
+const TAX_PROFILE_FIELDS = ['country','jurisdiction','legal_entity_type','tax_residency','tax_regime','tax_identifier','financial_year_start','financial_year_end','vat_status','pkp_status','employee_status','payroll_tax_status','industry','business_activity_codes','accounting_method','reporting_currency','filing_frequency'];
+app.put('/api/accountant/profile', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canApproveFinancialRecord(biz.role)) return res.status(403).json({ error: 'Only owner, CEO, admin or CFO can edit the tax profile' });
+    const updates = { business_id: biz.business.id, updated_at: new Date().toISOString() };
+    for (const f of TAX_PROFILE_FIELDS) if (req.body[f] !== undefined) updates[f] = req.body[f] || null;
+    const { data, error } = await supabase.from('tax_profiles')
+      .upsert(updates, { onConflict: 'business_id' }).select().single();
+    if (error) return res.status(500).json({ error: error.message });
+    res.json({ profile: data });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// GET /api/accountant/rules — active rules for the profile's jurisdiction
+app.get('/api/accountant/rules', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canViewBusinessFinance(biz.role)) return res.status(403).json({ error: 'Forbidden' });
+    const { data: profRows } = await supabase.from('tax_profiles').select('jurisdiction').eq('business_id', biz.business.id).limit(1);
+    const jur = req.query.jurisdiction || profRows?.[0]?.jurisdiction || 'ID';
+    const { data: rules } = await supabase.from('tax_rules')
+      .select('*, official_sources(*)').eq('jurisdiction', jur).eq('status', 'active')
+      .order('obligation_type');
+    res.json({ jurisdiction: jur, rules: rules || [] });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// GET /api/accountant/sources — official sources (reference)
+app.get('/api/accountant/sources', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canViewBusinessFinance(biz.role)) return res.status(403).json({ error: 'Forbidden' });
+    const { data } = await supabase.from('official_sources').select('*').order('jurisdiction');
+    res.json({ sources: data || [] });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // ── POST /api/debts/from-telegram ────────────────────────────────────────────
 // Called by the Telegram bot to create a draft receivable / payable.
 // Requires telegram_id → users.id mapping.
