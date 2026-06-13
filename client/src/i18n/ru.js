@@ -45,6 +45,7 @@ const ru = {
     approvals: 'Согласования',
     team: 'Команда',
     accountant: 'AI Бухгалтер',
+    bankImport: 'Импорт из банка',
     sectionOverview: 'Обзор',
     sectionFinance: 'Финансы',
     sectionOperations: 'Операции',
