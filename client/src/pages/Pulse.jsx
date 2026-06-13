@@ -513,7 +513,9 @@ export default function Pulse({ onDataLoad }) {
                 {cfoScore.factors && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                     {FACTOR_ORDER.filter(k => cfoScore.factors[k] != null).map(k => {
-                      const val = safeScore(cfoScore.factors[k])
+                      // factor may be a number or an object { score, label, impact }
+                      const raw = cfoScore.factors[k]
+                      const val = safeScore(raw && typeof raw === 'object' ? raw.score : raw)
                       const col = val != null ? CFO_SCORE_COLOR(val) : 'var(--text-4)'
                       return (
                         <div key={k}>
