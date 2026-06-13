@@ -1083,15 +1083,52 @@ app.post('/api/telegram/debts/:id/decision', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// ── POST /api/telegram/debts/attach-receipt — creator sends a receipt photo ──
-// Attaches a Telegram photo (file_id) to the creator's most recent debt that
-// had info requested, then notifies the admins. Bot-safe.
+const MAX_RECEIPTS = 5;
+
+// Download a Telegram file as a base64 buffer + mime via the Bot API.
+async function fetchTelegramFile(fileId) {
+  const botToken = process.env.TELEGRAM_BOT_TOKEN || process.env.BOT_TOKEN;
+  if (!botToken) return null;
+  const meta = await fetch(`https://api.telegram.org/bot${botToken}/getFile?file_id=${encodeURIComponent(fileId)}`).then(r => r.json());
+  const filePath = meta?.result?.file_path;
+  if (!filePath) return null;
+  const resp = await fetch(`https://api.telegram.org/file/bot${botToken}/${filePath}`);
+  const buf = Buffer.from(await resp.arrayBuffer());
+  let mime = resp.headers.get('content-type') || '';
+  if (!mime || mime === 'application/octet-stream') {
+    mime = /\.pdf$/i.test(filePath) ? 'application/pdf' : 'image/jpeg';
+  }
+  return { base64: buf.toString('base64'), mime };
+}
+
+// Recognize amount + counterparty from a receipt image/PDF via Claude vision.
+// Returns { amount, counterparty, currency, date } or null on failure.
+async function recognizeReceipt(file) {
+  if (!process.env.ANTHROPIC_API_KEY || !file) return null;
+  try {
+    const isPdf = /pdf/i.test(file.mime);
+    const block = isPdf
+      ? { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: file.base64 } }
+      : { type: 'image',    source: { type: 'base64', media_type: file.mime.startsWith('image/') ? file.mime : 'image/jpeg', data: file.base64 } };
+    const resp = await anthropic.messages.create({
+      model: 'claude-sonnet-4-5', max_tokens: 300,
+      messages: [{ role: 'user', content: [block, { type: 'text', text:
+        'Это чек/счёт. Верни ТОЛЬКО JSON без markdown: {"amount":число_итоговой_суммы,"currency":"IDR","counterparty":"продавец/магазин или null","date":"YYYY-MM-DD или null"}. amount — итоговая сумма к оплате (total/grand total). Если не уверен — поставь null.' }] }],
+    });
+    const raw = (resp.content?.[0]?.text || '').trim().replace(/```json\n?/g, '').replace(/```/g, '').trim();
+    const j = JSON.parse(raw);
+    return { amount: Number(j.amount) || null, currency: j.currency || 'IDR', counterparty: j.counterparty || null, date: j.date || null };
+  } catch (e) { console.warn('[receipt-ocr] failed:', e.message); return null; }
+}
+
+// ── POST /api/telegram/debts/attach-receipt — creator sends a receipt ────────
+// Attaches a photo/PDF to the creator's open request, runs OCR to recognize the
+// amount + counterparty, recomputes the receipts total. Bot-safe. Up to 5.
 app.post('/api/telegram/debts/attach-receipt', async (req, res) => {
   if (!requireBotSecret(req)) return res.status(401).json({ error: 'Invalid bot credentials' });
   const { telegram_id, file_id } = req.body || {};
   if (!telegram_id || !file_id) return res.status(400).json({ error: 'telegram_id and file_id required' });
   try {
-    // Prefer a debt with an open info request; else the most recent pending one.
     const { data: candidates } = await supabase.from('debts')
       .select('*')
       .or(`created_by_telegram_id.eq.${telegram_id},created_by_user_id.eq.${telegram_id}`)
@@ -1103,21 +1140,46 @@ app.post('/api/telegram/debts/attach-receipt', async (req, res) => {
     const debt = candidates?.[0];
     if (!debt) return res.status(404).json({ error: 'no_open_request', message: 'No open request to attach a receipt to.' });
 
-    const { data, error } = await supabase.from('debts')
-      .update({ attachment_url: `tg:${file_id}`, last_action_channel: 'telegram' })
-      .eq('id', debt.id).select().single();
+    const existing = Array.isArray(debt.attachments) ? debt.attachments : [];
+    if (existing.length >= MAX_RECEIPTS)
+      return res.status(400).json({ error: 'too_many', message: `Maximum ${MAX_RECEIPTS} receipts per request.`, count: existing.length });
+
+    // OCR (best-effort — never blocks the attach)
+    const file = await fetchTelegramFile(file_id).catch(() => null);
+    const ocr = await recognizeReceipt(file).catch(() => null);
+    const item = { file_id, mime: file?.mime || null, amount: ocr?.amount ?? null, counterparty: ocr?.counterparty ?? null, date: ocr?.date ?? null, recognized: !!ocr };
+    const attachments = [...existing, item];
+
+    // Recompute total from recognized receipt amounts (if any recognized).
+    const recognizedAmounts = attachments.map(a => Number(a.amount)).filter(n => isFinite(n) && n > 0);
+    const receiptsTotal = recognizedAmounts.reduce((s, n) => s + n, 0);
+
+    const updates = {
+      attachments,
+      attachment_url: `tg:${attachments[0].file_id}`, // legacy first-receipt pointer
+      last_action_channel: 'telegram',
+    };
+    // Use the receipts total as the obligation amount when we recognized values.
+    if (receiptsTotal > 0) { updates.amount = receiptsTotal; updates.original_amount = receiptsTotal; }
+    // Fill counterparty from a recognized receipt if the debt still has a placeholder.
+    const recogCp = attachments.find(a => a.counterparty)?.counterparty;
+    if (recogCp && (!debt.counterparty || debt.counterparty === debt.created_by_name || debt.counterparty === 'Reimbursement'))
+      updates.counterparty = recogCp;
+
+    const { data, error } = await supabase.from('debts').update(updates).eq('id', debt.id).select().single();
     if (error) return res.status(500).json({ error: error.message });
 
-    // Notify admins that a receipt arrived.
+    const ccy = data.currency || 'IDR';
     const ownerId = debt.user_id;
     const name = debt.created_by_name || String(telegram_id);
     const webAppUrl = process.env.WEB_APP_URL || 'https://helm-finance-web-production.up.railway.app';
+    const lines = attachments.map((a, i) => `${i + 1}. ${a.amount ? Number(a.amount).toLocaleString('en-US') + ' ' + ccy : '— не распознано'}${a.counterparty ? ' · ' + a.counterparty : ''}`).join('\n');
     notifyBusinessAdminsViaTelegram(ownerId,
-      `📎 Чек получен по заявке\n\nОт: ${name}\nКонтрагент: ${debt.counterparty}\nСумма: ${Number(debt.original_amount || debt.amount || 0).toLocaleString('en-US')} ${debt.currency || 'IDR'}`,
+      `📎 Чек получен (${attachments.length}/${MAX_RECEIPTS}) по заявке\n\nОт: ${name}\n${lines}\n\nИтого по чекам: <b>${receiptsTotal.toLocaleString('en-US')} ${ccy}</b>`,
       [[{ text: '🌐 Открыть заявку', url: `${webAppUrl}/${debt.type === 'receivable' ? 'receivables' : 'payables'}` }]]
     ).catch(() => {});
 
-    res.json({ ok: true, debt_id: data.id, counterparty: data.counterparty });
+    res.json({ ok: true, debt_id: data.id, counterparty: data.counterparty, count: attachments.length, receipts_total: receiptsTotal, recognized: !!ocr, item_amount: item.amount });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -1131,14 +1193,27 @@ app.get('/api/debts/:id/receipt', async (req, res) => {
     const biz = await requireBusiness(req, res);
     if (!biz) return;
     if (!canViewBusinessFinance(biz.role)) return res.status(403).json({ error: 'Forbidden' });
-    const { data: rows } = await supabase.from('debts').select('attachment_url').eq('id', req.params.id).or(bizOrFilter(biz)).limit(1);
-    const url = rows?.[0]?.attachment_url;
-    if (!url) return res.status(404).json({ error: 'No receipt' });
-    if (!url.startsWith('tg:')) return res.redirect(url);
+    const { data: rows } = await supabase.from('debts').select('attachment_url, attachments').eq('id', req.params.id).or(bizOrFilter(biz)).limit(1);
+    const row = rows?.[0];
+    if (!row) return res.status(404).json({ error: 'No receipt' });
+
+    // ?i=<index> selects a specific receipt from the attachments array.
+    const idx = req.query.i !== undefined ? Number(req.query.i) : null;
+    let fileId = null, url = row.attachment_url;
+    if (idx !== null && Array.isArray(row.attachments) && row.attachments[idx]) {
+      const a = row.attachments[idx];
+      if (a.file_id) fileId = a.file_id; else if (a.url) url = a.url;
+    } else if (url && url.startsWith('tg:')) {
+      fileId = url.slice(3);
+    }
+    if (!fileId) {
+      if (!url) return res.status(404).json({ error: 'No receipt' });
+      if (!url.startsWith('tg:')) return res.redirect(url);
+      fileId = url.slice(3);
+    }
 
     const botToken = process.env.TELEGRAM_BOT_TOKEN || process.env.BOT_TOKEN;
     if (!botToken) return res.status(503).json({ error: 'bot_not_configured' });
-    const fileId = url.slice(3);
     const meta = await fetch(`https://api.telegram.org/bot${botToken}/getFile?file_id=${encodeURIComponent(fileId)}`).then(r => r.json());
     const filePath = meta?.result?.file_path;
     if (!filePath) return res.status(404).json({ error: 'File not found' });

@@ -5,6 +5,7 @@ import { useTranslation } from '../hooks/useTranslation'
 import { apiFetch, fmt, daysUntil } from '../lib/api'
 import DebtPaymentModal from '../components/DebtPaymentModal'
 import DebtFormModal from '../components/DebtFormModal'
+import ReceiptList from '../components/ReceiptList'
 
 function fmtDate(str) {
   if (!str) return '—'
@@ -112,12 +113,7 @@ function DebtRow({ debt, accounts, token, onRefresh }) {
               ℹ️ Запрошено: {debt.info_request_note}
             </div>
           )}
-          {debt.attachment_url && (
-            <a href={`/api/debts/${debt.id}/receipt?token=${encodeURIComponent(token)}`} target="_blank" rel="noreferrer"
-              style={{ display: 'inline-block', fontSize: 11, fontWeight: 600, color: 'var(--brand)', marginTop: 3 }}>
-              📎 Чек
-            </a>
-          )}
+          <ReceiptList debt={debt} token={token} />
           {/* Partial progress bar */}
           {debt.status === 'partial' && (
             <div style={{ marginTop: 6 }}>
