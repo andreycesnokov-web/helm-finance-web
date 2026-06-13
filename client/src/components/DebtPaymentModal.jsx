@@ -17,9 +17,18 @@
  *   onClose() — called when modal dismissed
  *   onSuccess(result) — called after successful payment
  */
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { apiFetch, fmt } from '../lib/api'
+
+const REC_COLOR = { safe: '#085041', caution: '#92400E', not_recommended: '#B42318', insufficient_data: '#475467' }
+const REC_BG    = { safe: '#E1F5EE', caution: '#FEF9EE', not_recommended: '#FEF3F2', insufficient_data: '#F2F4F7' }
+const REC_LABEL = {
+  safe:               { en: 'SAFE', ru: 'БЕЗОПАСНО', id: 'AMAN' },
+  caution:            { en: 'CAUTION', ru: 'ОСТОРОЖНО', id: 'HATI-HATI' },
+  not_recommended:    { en: 'NOT RECOMMENDED', ru: 'НЕ РЕКОМЕНДУЕТСЯ', id: 'TIDAK DISARANKAN' },
+  insufficient_data:  { en: 'INSUFFICIENT DATA', ru: 'НЕДОСТАТОЧНО ДАННЫХ', id: 'DATA KURANG' },
+}
 
 export default function DebtPaymentModal({ debt, accounts, token, onClose, onSuccess }) {
   const isReceivable = debt.type === 'receivable'
@@ -41,6 +50,27 @@ export default function DebtPaymentModal({ debt, accounts, token, onClose, onSuc
   const selectedAcc = (accounts || []).find(a => String(a.id) === String(walletId))
   // Wallet choice is required so the payment debits/credits the right account.
   const canSubmit   = amountNum > 0 && amountNum <= remaining + 0.01 && !!walletId && !paying
+
+  // ── AI CFO payment check (deterministic simulation, no data change) ────────
+  const [sim, setSim]       = useState(null)
+  const [simLoading, setSimLoading] = useState(false)
+  const [ack, setAck]       = useState(false)
+  const lang = (typeof localStorage !== 'undefined' && localStorage.getItem('hf_lang')) || 'en'
+  useEffect(() => {
+    if (!walletId || !(amountNum > 0)) { setSim(null); return }
+    let cancelled = false
+    setSimLoading(true)
+    const tid = setTimeout(() => {
+      apiFetch(`/decisions/debts/${debt.id}/payment`, token, { method: 'POST', body: { amount: amountNum, wallet_id: walletId, payment_date: payDate } })
+        .then(r => { if (!cancelled) setSim(r) })
+        .catch(() => { if (!cancelled) setSim(null) })
+        .finally(() => { if (!cancelled) setSimLoading(false) })
+    }, 350)
+    return () => { cancelled = true; clearTimeout(tid) }
+  }, [walletId, amountNum, payDate, debt.id, token])
+
+  const blockedNoAck = sim && sim.recommendation === 'not_recommended' && !ack
+  const fmtRunway = (r) => r === null || r === undefined ? '—' : (r >= 999 ? '∞' : `${r}d`)
 
   const handlePay = async () => {
     if (!canSubmit) return
@@ -179,6 +209,41 @@ export default function DebtPaymentModal({ debt, accounts, token, onClose, onSuc
           </div>
         )}
 
+        {/* AI CFO payment check — deterministic before/after, no data change */}
+        {simLoading && !sim && (
+          <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 12 }}>AI CFO: анализирую…</div>
+        )}
+        {sim && (
+          <div style={{ borderRadius: 12, padding: '11px 13px', marginBottom: 12,
+            background: REC_BG[sim.recommendation] || '#F2F4F7',
+            border: `1px solid ${(REC_COLOR[sim.recommendation] || '#475467')}33` }}>
+            <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.04em', color: REC_COLOR[sim.recommendation] || '#475467', marginBottom: 6 }}>
+              AI CFO · {(REC_LABEL[sim.recommendation] || REC_LABEL.insufficient_data)[lang] || (REC_LABEL[sim.recommendation] || {}).en}
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--text-2)', lineHeight: 1.6 }}>
+              {sim.current.wallet_balance !== null && (
+                <div>{selectedAcc?.name}: {fmt(sim.current.wallet_balance)} → <b>{fmt(sim.after.wallet_balance)}</b></div>
+              )}
+              <div>{lang === 'ru' ? 'Касса' : lang === 'id' ? 'Kas' : 'Cash'}: {fmt(sim.current.cash)} → <b>{fmt(sim.after.cash)}</b></div>
+              <div>{lang === 'ru' ? 'Запас' : 'Runway'}: {fmtRunway(sim.current.runway_days)} → <b>{fmtRunway(sim.after.runway_days)}</b></div>
+              {sim.upcoming.payroll_7d > 0 && (
+                <div style={{ color: '#92400E' }}>{lang === 'ru' ? 'Зарплата в течение 7 дней' : 'Payroll in 7 days'}: {fmt(sim.upcoming.payroll_7d)}</div>
+              )}
+            </div>
+            {(sim.factors || []).filter(f => ['high','critical','medium'].includes(f.severity)).slice(0, 2).map((f, i) => (
+              <div key={i} style={{ fontSize: 11.5, color: REC_COLOR[sim.recommendation], marginTop: 5 }}>• {f.label}</div>
+            ))}
+          </div>
+        )}
+
+        {/* not_recommended requires explicit acknowledgement */}
+        {blockedNoAck && (
+          <label style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 12, color: 'var(--red-dark)', marginBottom: 12, cursor: 'pointer' }}>
+            <input type="checkbox" checked={ack} onChange={e => setAck(e.target.checked)} style={{ marginTop: 2 }} />
+            <span>{lang === 'ru' ? 'Я понимаю финансовый риск и хочу продолжить.' : lang === 'id' ? 'Saya memahami risiko keuangan dan ingin lanjut.' : 'I understand the financial risk and want to continue.'}</span>
+          </label>
+        )}
+
         {/* Error */}
         {error && (
           <div style={{
@@ -192,14 +257,14 @@ export default function DebtPaymentModal({ debt, accounts, token, onClose, onSuc
 
         {/* Submit */}
         <button
-          disabled={!canSubmit}
+          disabled={!canSubmit || blockedNoAck}
           onClick={handlePay}
           className="btn btn-block btn-lg"
           style={{
-            background: canSubmit
+            background: (canSubmit && !blockedNoAck)
               ? (isReceivable ? 'var(--green-dark)' : 'var(--brand)')
               : 'var(--bg-3)',
-            color: canSubmit ? '#fff' : 'var(--text-4)',
+            color: (canSubmit && !blockedNoAck) ? '#fff' : 'var(--text-4)',
             marginBottom: 8,
             opacity: paying ? 0.7 : 1,
           }}

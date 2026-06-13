@@ -266,3 +266,52 @@ a personal workspace reuses the same tables (wallets/transactions/debts) with
 the same business_id ownership. Until then `wallet.scope = personal` continues
 to separate personal cash, which is never mixed into business KPIs or AI CFO
 context unless explicitly requested.
+
+## AI CFO Decision Engine (V1)
+
+**Principle:** the deterministic backend engine is the source of truth for every
+financial recommendation; the LLM only explains the result. The LLM never
+recomputes arithmetic and may not contradict the engine.
+
+```
+DB records → buildBusinessFinancialSnapshot() → assess*() → structured result → AI explains → Web/Telegram show
+```
+
+**Snapshot** (`buildBusinessFinancialSnapshot`) reuses the same CASH model and
+`computeBurnAndRunway()` as Pulse/AI CFO — no second cash/runway formula. It
+returns business-only cash (personal wallets excluded), per-wallet balances,
+burn/runway, payable/receivable buckets (overdue / 7 / 14 / 30 days, pending
+separate), and a best-effort payroll estimate from `payroll_employees.pay_day`.
+Training records and rejected/cancelled debts are excluded.
+
+**Approve ≠ Pay.** Two separate assessments:
+- `assessDebtApproval` — confirming an obligation/receivable. **Zero cash
+  change.** Reports obligation change and 30-day coverage. A request can be
+  *safe to approve* yet *not safe to pay today*.
+- `assessDebtPayment` — SIMULATES a payment/receipt: cash/wallet/runway
+  before→after, excluding the debt itself from upcoming obligations to avoid
+  double counting. Never writes data.
+
+**Risk policy** — centralized `DEFAULT_DECISION_POLICY` (V1 defaults, not
+universal accounting rules): critical runway < 15d, caution < 30d, target 60d,
+protected reserve 30d of burn, large payment > 15% of cash. Recommendations:
+`safe | caution | not_recommended | insufficient_data`.
+
+**Endpoints** (auth, business-scoped, view-finance roles; training excluded):
+- `GET  /api/decisions/debts/:id/approval`
+- `POST /api/decisions/debts/:id/payment` (simulation only — no transaction, no debt update)
+- `GET  /api/decisions/payment-priority`
+- `POST /api/telegram/debts/:id/decision` (bot-safe, x-bot-secret + telegram_id)
+
+**Surfaces:** DebtPaymentModal shows an AI CFO payment check (before/after);
+`not_recommended` requires an explicit "I understand the risk" acknowledgement
+(owner/admin/cfo only — managers/employees can't reach payment). Telegram admin
+notifications carry a `📊 View impact` button → bot-safe decision endpoint.
+AI CFO system prompt enforces approve/pay separation and "never redo arithmetic".
+
+**Local fallback:** the engine is pure and runs without Anthropic; the
+deterministic result (and a rule-based explanation) is always available.
+
+**Limitations (V1):** risk policy not yet business-configurable; payroll due is
+a pay_day estimate (no scheduled-payroll table); no bank balance sync; no
+multi-month scenario planning; no tax/legal payment priority.

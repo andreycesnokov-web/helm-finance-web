@@ -996,6 +996,93 @@ app.post('/api/telegram/debts/:id/request-info', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// ─────────────────────────────────────────────────────────────────────────────
+// DECISION ENGINE ENDPOINTS — deterministic assessments (no data mutation)
+// ─────────────────────────────────────────────────────────────────────────────
+
+async function loadBusinessDebt(biz, debtId) {
+  const { data } = await supabase.from('debts').select('*')
+    .eq('id', debtId).or(bizOrFilter(biz))
+    .or('is_training.is.null,is_training.eq.false').limit(1);
+  return data?.[0] ? enrichDebts([data[0]])[0] : null;
+}
+
+// GET /api/decisions/debts/:id/approval — assess approving a pending request
+app.get('/api/decisions/debts/:id/approval', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canViewBusinessFinance(biz.role))
+      return res.status(403).json({ error: 'Your role cannot view decision analysis' });
+    const debt = await loadBusinessDebt(biz, req.params.id);
+    if (!debt) return res.status(404).json({ error: 'Debt not found' });
+    const language = normalizeLanguage(req.query.language || await getUserLanguage(req.user.userId));
+    const snap = await buildBusinessFinancialSnapshot(biz, language);
+    res.json(assessDebtApproval(snap, debt));
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// POST /api/decisions/debts/:id/payment — SIMULATE a payment/receipt (no writes)
+app.post('/api/decisions/debts/:id/payment', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canViewBusinessFinance(biz.role))
+      return res.status(403).json({ error: 'Your role cannot view decision analysis' });
+    const debt = await loadBusinessDebt(biz, req.params.id);
+    if (!debt) return res.status(404).json({ error: 'Debt not found' });
+
+    const { amount, wallet_id } = req.body || {};
+    // Validate wallet belongs to the business if provided
+    if (wallet_id) {
+      const { data: w } = await supabase.from('wallets').select('id').eq('id', wallet_id).or(bizOrFilter(biz)).limit(1);
+      if (!w?.length) return res.status(400).json({ error: 'Invalid or inaccessible wallet' });
+    }
+    const language = normalizeLanguage(req.query.language || await getUserLanguage(req.user.userId));
+    const snap = await buildBusinessFinancialSnapshot(biz, language);
+    res.json(assessDebtPayment(snap, debt, amount, wallet_id));
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// GET /api/decisions/payment-priority — ranked approved unpaid payables
+app.get('/api/decisions/payment-priority', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canViewBusinessFinance(biz.role))
+      return res.status(403).json({ error: 'Your role cannot view decision analysis' });
+    const snap = await buildBusinessFinancialSnapshot(biz, 'en');
+    res.json({ items: buildPaymentPriority(snap) });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// POST /api/telegram/debts/:id/decision — bot-safe compact assessment
+app.post('/api/telegram/debts/:id/decision', async (req, res) => {
+  if (!requireBotSecret(req)) return res.status(401).json({ error: 'Invalid bot credentials' });
+  const { telegram_id } = req.body || {};
+  if (!telegram_id) return res.status(400).json({ error: 'telegram_id required' });
+  try {
+    const r = await resolveBotApprover(telegram_id, req.params.id);
+    if (r.error === 'not_found') return res.status(404).json({ error: 'not_found' });
+    if (r.error)                 return res.status(403).json({ error: 'forbidden' });
+    if (!canViewBusinessFinance(r.role)) return res.status(403).json({ error: 'forbidden' });
+
+    const { data: bizRow } = await supabase.from('businesses').select('*').eq('id', r.debt.business_id || null).limit(1);
+    let business = bizRow?.[0];
+    if (!business) {
+      const { data: ob } = await supabase.from('businesses').select('*').eq('owner_user_id', r.debt.user_id).order('created_at', { ascending: true }).limit(1);
+      business = ob?.[0];
+    }
+    if (!business) return res.status(404).json({ error: 'business_not_found' });
+    const biz = { business, role: r.role, ownerUserId: business.owner_user_id };
+    const language = normalizeLanguage(await getUserLanguage(telegram_id).catch(() => 'en'));
+    const debt = await loadBusinessDebt(biz, req.params.id);
+    if (!debt) return res.status(404).json({ error: 'not_found' });
+    const snap = await buildBusinessFinancialSnapshot(biz, language);
+    res.json({ approval: assessDebtApproval(snap, debt), payment: assessDebtPayment(snap, debt, null, null), currency: snap.currency });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // ── POST /api/debts/from-telegram ────────────────────────────────────────────
 // Called by the Telegram bot to create a draft receivable / payable.
 // Requires telegram_id → users.id mapping.
@@ -1158,6 +1245,7 @@ app.post('/api/debts/from-telegram', async (req, res) => {
       // Inline approval keyboard. callback_data `debt_*:<uuid>` ≤ 49 bytes (limit 64).
       // The bot owns these callbacks and calls /api/telegram/debts/:id/* with x-bot-secret.
       notifyBusinessAdminsViaTelegram(ownerId, text, [
+        [ { text: '📊 View impact', callback_data: `debt_impact:${data.id}` } ],
         [ { text: '✅ Approve', callback_data: `debt_approve:${data.id}` },
           { text: '❌ Reject',  callback_data: `debt_reject:${data.id}` } ],
         [ { text: 'ℹ️ Ask details', callback_data: `debt_info:${data.id}` },
@@ -3816,6 +3904,222 @@ async function buildAiCfoContext(userId, language = 'en', biz = null) {
   };
 }
 
+// ═════════════════════════════════════════════════════════════════════════════
+// AI CFO DECISION ENGINE — deterministic. The LLM never recomputes these.
+// Approval ≠ Payment: approval only confirms an obligation (no cash move);
+// payment/receipt is the only thing that changes cash.
+// ═════════════════════════════════════════════════════════════════════════════
+
+// V1 default risk policy (centralized — not universal accounting rules).
+// Business-configurable policy is a later task.
+const DEFAULT_DECISION_POLICY = {
+  critical_runway_days: 15,
+  caution_runway_days:  30,
+  target_runway_days:   60,
+  protected_cash_days:  30,
+  large_payment_pct:    15,   // % of current business cash
+};
+
+function daysUntilDate(dateStr, now = new Date()) {
+  if (!dateStr) return null;
+  return Math.ceil((new Date(dateStr) - now) / 86400000);
+}
+
+// Build a deterministic business financial snapshot. Reuses the same CASH model
+// and computeBurnAndRunway() used by Pulse and AI CFO — no separate formula.
+async function buildBusinessFinancialSnapshot(biz, language = 'en', asOfDate = null) {
+  const now = asOfDate ? new Date(asOfDate) : new Date();
+  const bizOr = bizOrFilter(biz);
+
+  const [{ data: wallets }, { data: txs }, { data: rawDebts }, { data: employees }] = await Promise.all([
+    supabase.from('wallets').select('id,name,currency,type,scope').or(bizOr).eq('is_active', true),
+    supabase.from('transactions').select('type,amount_original,created_at,wallet_id,source,scope').or(bizOr),
+    supabase.from('debts').select('*').or(bizOr).or('is_training.is.null,is_training.eq.false'),
+    supabase.from('payroll_employees').select('default_salary,pay_day,status').or(bizOr).neq('status', 'archived'),
+  ]);
+
+  const CASH_IN = ['income'], CASH_OUT = ['expense', 'payroll'];
+  const allWallets = wallets || [];
+  const businessWallets = allWallets.filter(w => (w.scope || 'business') === 'business');
+  const bizWalletIds = new Set(businessWallets.map(w => w.id));
+
+  const isBizTx = (t) => t.wallet_id ? bizWalletIds.has(t.wallet_id)
+    : (businessWallets.some(w => w.name === t.source) || (!t.source && (t.scope || 'business') === 'business'));
+  const bizTxs = (txs || []).filter(isBizTx);
+
+  const walletBalance = (w) => (txs || [])
+    .filter(t => t.wallet_id === w.id || (!t.wallet_id && t.source === w.name))
+    .reduce((s, t) => {
+      if (CASH_IN.includes(t.type))  return s + Number(t.amount_original || 0);
+      if (CASH_OUT.includes(t.type)) return s - Number(t.amount_original || 0);
+      if (t.type === 'correction')   return s + Number(t.amount_original || 0);
+      return s;
+    }, 0);
+
+  const byWallet = businessWallets.map(w => ({ id: w.id, name: w.name, currency: w.currency, type: w.type, balance: walletBalance(w) }));
+  const totalCash = bizTxs.reduce((s, t) => {
+    if (CASH_IN.includes(t.type))  return s + Number(t.amount_original || 0);
+    if (CASH_OUT.includes(t.type)) return s - Number(t.amount_original || 0);
+    if (t.type === 'correction')   return s + Number(t.amount_original || 0);
+    return s;
+  }, 0);
+
+  const burn = computeBurnAndRunway(bizTxs, totalCash);
+  const dailyBurn = burn.burn_rate_daily;
+
+  // Debts — only approved/open count as confirmed; pending tracked separately.
+  const debts = enrichDebts(rawDebts);
+  const confirmed = debts.filter(d => !['paid', 'cancelled'].includes(d.status) && (d.approval_status === 'approved' || !d.approval_status));
+  const pending   = debts.filter(d => d.approval_status === 'pending_approval' && !['paid', 'cancelled'].includes(d.status));
+
+  function debtBuckets(list) {
+    const rem = (d) => Number(d.remaining_amount || d.amount || 0);
+    const overdue = list.filter(d => d.status === 'overdue');
+    const within = (n) => list.filter(d => { const dd = daysUntilDate(d.due_date, now); return dd !== null && dd >= 0 && dd <= n; });
+    return {
+      active_remaining: list.reduce((s, d) => s + rem(d), 0),
+      overdue_amount:   overdue.reduce((s, d) => s + rem(d), 0),
+      overdue_count:    overdue.length,
+      due_7_days:       within(7).reduce((s, d) => s + rem(d), 0),
+      due_14_days:      within(14).reduce((s, d) => s + rem(d), 0),
+      due_30_days:      within(30).reduce((s, d) => s + rem(d), 0),
+      top_items:        list.slice(0, 5).map(d => ({ id: d.id, counterparty: d.counterparty, remaining: rem(d), due_date: d.due_date, status: d.status })),
+    };
+  }
+  const payList = confirmed.filter(d => d.type === 'payable');
+  const recvList = confirmed.filter(d => d.type === 'receivable');
+
+  // Payroll — best-effort estimate from employees' pay_day (no scheduled table).
+  const dom = now.getDate();
+  const daysToPayDay = (pd) => { if (!pd) return null; const d = pd - dom; return d >= 0 ? d : d + 30; };
+  const payroll7 = (employees || []).filter(e => { const d = daysToPayDay(e.pay_day); return d !== null && d <= 7; }).reduce((s, e) => s + Number(e.default_salary || 0), 0);
+  const payroll30 = (employees || []).reduce((s, e) => s + Number(e.default_salary || 0), 0);
+
+  return {
+    business_id: biz.business.id,
+    currency: biz.business.base_currency || 'IDR',
+    cash: { total: totalCash, by_wallet: byWallet, available_business_cash: totalCash },
+    burn: { daily_burn: dailyBurn, monthly_expenses: dailyBurn * 30, rolling_window_days: burn.burn_window_days, runway_days: burn.runway_days },
+    payables: { ...debtBuckets(payList), pending_amount: pending.filter(d => d.type === 'payable').reduce((s, d) => s + Number(d.remaining_amount || d.amount || 0), 0) },
+    receivables: { ...debtBuckets(recvList), pending_amount: pending.filter(d => d.type === 'receivable').reduce((s, d) => s + Number(d.remaining_amount || d.amount || 0), 0) },
+    payroll: { due_7_days: payroll7, due_30_days: payroll30 },
+    policy: DEFAULT_DECISION_POLICY,
+    _confirmedPayables: payList,
+  };
+}
+
+function runwayAfter(cash, dailyBurn) {
+  if (!dailyBurn || dailyBurn <= 0) return null;
+  return Math.round(cash / dailyBurn);
+}
+
+// ── Approval assessment: confirms an obligation, no cash movement ────────────
+function assessDebtApproval(snap, debt) {
+  const amount = Number(debt.remaining_amount || debt.original_amount || debt.amount || 0);
+  const cash = snap.cash.total;
+  const isRecv = debt.type === 'receivable';
+  const confirmedBefore = snap.payables.due_30_days;
+  const confirmedAfter = isRecv ? confirmedBefore : confirmedBefore + amount;
+  const coverage = confirmedAfter > 0 ? cash / confirmedAfter : null;
+
+  const factors = [];
+  let recommendation = 'safe', risk = 'low';
+
+  if (!amount || amount <= 0) { recommendation = 'insufficient_data'; risk = 'medium'; factors.push({ key: 'no_amount', severity: 'high', label: 'Amount missing', value: amount }); }
+  if (['paid', 'cancelled'].includes(debt.status) || debt.approval_status === 'rejected') {
+    recommendation = 'not_recommended'; risk = 'high';
+    factors.push({ key: 'invalid_state', severity: 'high', label: 'Already resolved', value: debt.status });
+  }
+
+  if (isRecv) {
+    factors.push({ key: 'expected_cash', severity: 'info', label: 'Expected, not guaranteed cash', value: amount });
+  } else {
+    factors.push({ key: 'obligation_added', severity: 'info', label: 'Confirmed obligation added', value: amount });
+    if (coverage !== null && coverage < 1.2 && recommendation === 'safe') { recommendation = 'caution'; risk = 'medium'; factors.push({ key: 'tight_coverage', severity: 'medium', label: 'Cash barely covers 30d obligations', value: coverage }); }
+    if (snap.burn.runway_days !== null && snap.burn.runway_days < snap.policy.caution_runway_days && recommendation === 'safe') { recommendation = 'caution'; risk = 'medium'; }
+  }
+
+  return {
+    decision_type: isRecv ? 'approve_receivable' : 'approve_payable',
+    recommendation, risk_level: risk,
+    current: { cash, runway_days: snap.burn.runway_days, confirmed_obligations_30d: confirmedBefore },
+    after:   { cash, runway_days: snap.burn.runway_days, confirmed_obligations_30d: confirmedAfter },
+    impact:  { cash_change: 0, runway_change_days: 0, obligation_change: isRecv ? 0 : amount, coverage_after: coverage },
+    upcoming: { payroll_7d: snap.payroll.due_7_days, payables_7d: snap.payables.due_7_days, payables_30d: snap.payables.due_30_days, overdue_payables: snap.payables.overdue_amount, overdue_receivables: snap.receivables.overdue_amount },
+    factors,
+    note: isRecv ? 'Approval marks expected cash. It does not change current cash.' : 'Approval confirms the obligation. It does not pay it or change cash.',
+  };
+}
+
+// ── Payment simulation: real cash impact (simulated, never persisted) ────────
+function assessDebtPayment(snap, debt, paymentAmount, walletId) {
+  const isRecv = debt.type === 'receivable';
+  const amount = Number(paymentAmount || debt.remaining_amount || debt.amount || 0);
+  const cashBefore = snap.cash.total;
+  const cashAfter = isRecv ? cashBefore + amount : cashBefore - amount;
+  const runwayBefore = snap.burn.runway_days;
+  const runwayAfterVal = runwayAfter(cashAfter, snap.burn.daily_burn);
+
+  const wallet = walletId ? snap.cash.by_wallet.find(w => String(w.id) === String(walletId)) : null;
+  const walletBefore = wallet ? wallet.balance : null;
+  const walletAfter = wallet ? (isRecv ? walletBefore + amount : walletBefore - amount) : null;
+
+  // Obligations excluding THIS debt (avoid double counting on payment).
+  const thisRem = Number(debt.remaining_amount || debt.amount || 0);
+  const payables7 = Math.max(0, snap.payables.due_7_days - (isRecv ? 0 : thisRem));
+  const payables30 = Math.max(0, snap.payables.due_30_days - (isRecv ? 0 : thisRem));
+  const protectedCash = snap.burn.daily_burn * snap.policy.protected_cash_days;
+  const pctOfCash = cashBefore > 0 ? (amount / cashBefore) * 100 : 0;
+
+  const factors = [];
+  let recommendation = 'safe', risk = 'low';
+  const flag = (rec, rk) => { const order = { safe: 0, caution: 1, not_recommended: 2 }; if (order[rec] > order[recommendation]) { recommendation = rec; } const rorder = { low: 0, medium: 1, high: 2, critical: 3 }; if (rorder[rk] > rorder[risk]) risk = rk; };
+
+  if (!snap.burn.daily_burn) { recommendation = 'insufficient_data'; risk = 'medium'; factors.push({ key: 'no_burn', severity: 'medium', label: 'No expense history — runway unknown' }); }
+
+  if (!isRecv) {
+    if (amount > cashBefore) { flag('not_recommended', 'critical'); factors.push({ key: 'exceeds_cash', severity: 'critical', label: 'Payment exceeds total business cash', value: amount }); }
+    if (wallet && walletAfter < 0) { flag('not_recommended', 'critical'); factors.push({ key: 'wallet_negative', severity: 'critical', label: `${wallet.name} would go negative`, value: walletAfter }); }
+    if (runwayAfterVal !== null && runwayAfterVal < snap.policy.critical_runway_days) { flag('not_recommended', 'high'); factors.push({ key: 'runway_critical', severity: 'high', label: `Runway after payment below ${snap.policy.critical_runway_days}d`, value: runwayAfterVal }); }
+    else if (runwayAfterVal !== null && runwayAfterVal < snap.policy.caution_runway_days) { flag('caution', 'medium'); factors.push({ key: 'runway_low', severity: 'medium', label: `Runway after payment below ${snap.policy.caution_runway_days}d`, value: runwayAfterVal }); }
+    if (pctOfCash > snap.policy.large_payment_pct) { flag('caution', 'medium'); factors.push({ key: 'large_payment', severity: 'medium', label: `Payment is ${Math.round(pctOfCash)}% of cash`, value: pctOfCash }); }
+    if (snap.payroll.due_7_days > 0 && cashAfter < snap.payroll.due_7_days + payables7) { flag('caution', 'high'); factors.push({ key: 'payroll_pressure', severity: 'high', label: 'Payroll + near-term payables may not be covered after payment', value: snap.payroll.due_7_days }); }
+    if (cashAfter < protectedCash && recommendation === 'safe') { flag('caution', 'medium'); factors.push({ key: 'below_reserve', severity: 'medium', label: `Cash after payment below ${snap.policy.protected_cash_days}d reserve`, value: protectedCash }); }
+  }
+
+  return {
+    decision_type: isRecv ? 'receive_receivable' : 'pay_payable',
+    recommendation, risk_level: risk,
+    current: { cash: cashBefore, wallet_balance: walletBefore, runway_days: runwayBefore },
+    after:   { cash: cashAfter, wallet_balance: walletAfter, runway_days: runwayAfterVal },
+    impact:  { cash_change: isRecv ? amount : -amount, runway_change_days: runwayAfterVal !== null && runwayBefore !== null ? runwayAfterVal - runwayBefore : null, wallet_change: walletAfter !== null ? walletAfter - walletBefore : null, payment_pct_of_cash: Math.round(pctOfCash) },
+    upcoming: { payroll_7d: snap.payroll.due_7_days, payables_7d: payables7, payables_30d: payables30, overdue_payables: snap.payables.overdue_amount, overdue_receivables: snap.receivables.overdue_amount },
+    factors,
+    wallet_known: !!wallet,
+    note: isRecv ? 'Marking received creates an income transaction and increases the selected wallet.' : 'Paying creates an expense transaction and decreases the selected wallet.',
+  };
+}
+
+// Ranked list of approved unpaid payables for "which should I pay first?".
+function buildPaymentPriority(snap) {
+  const now = new Date();
+  return (snap._confirmedPayables || []).map(d => {
+    const rem = Number(d.remaining_amount || d.amount || 0);
+    const dd = daysUntilDate(d.due_date, now);
+    let score = 0;
+    if (d.status === 'overdue') score += 100;
+    if (dd !== null && dd >= 0 && dd <= 7) score += 50;
+    else if (dd !== null && dd >= 0 && dd <= 30) score += 20;
+    if (snap.cash.total > 0 && rem / snap.cash.total > 0.15) score += 10;
+    return {
+      debt_id: d.id, counterparty: d.counterparty, amount: rem, due_date: d.due_date,
+      priority_score: score,
+      reason: d.status === 'overdue' ? 'Overdue' : (dd !== null && dd <= 7 ? 'Due within 7 days' : 'Upcoming'),
+      recommended_action: 'pay',
+    };
+  }).sort((a, b) => b.priority_score - a.priority_score);
+}
+
 // ── CFO Score Engine ─────────────────────────────────────────────────────────
 function calculateCfoScore(ctx, language = 'en') {
   const cash   = ctx.cash     || {};
@@ -4511,6 +4815,11 @@ OWNER WITHDRAWAL POLICY: If user asks about taking money from business for perso
 do NOT give lifestyle advice. Assess cash-flow impact: cash before/after, runway before/after,
 payables coverage, rating (safe/caution/not recommended). Recommend classification (owner withdrawal,
 salary, or dividend). Say "confirm tax treatment with your accountant." Do NOT comment on how to spend.
+
+DECISION RULES (deterministic engine is the source of truth):
+- A backend Decision Engine computes all approval/payment recommendations and before/after cash & runway. NEVER redo this arithmetic and NEVER contradict it.
+- ALWAYS separate two decisions: APPROVE confirms an obligation and changes NO cash; PAY/RECEIVE is the only thing that moves cash and a wallet. A request can be safe to approve but not safe to pay today.
+- A receivable is EXPECTED cash, never current/guaranteed cash. Pending submissions are not confirmed.
 
 DECISION LAYER (today ${new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}):
 - CFO Score: ${cfo.score ?? '?'}/100 — ${cfo.label ?? 'unknown'} (${cfo.summary ?? ''})
