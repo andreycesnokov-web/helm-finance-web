@@ -1547,6 +1547,215 @@ app.post('/api/accountant/calendar/remind', auth, async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// ═════════════════════════════════════════════════════════════════════════════
+// BANK STATEMENT IMPORT & RECONCILIATION V1 (AI Accountant — Module F)
+// Client parses the file (CSV/XLSX) and posts normalized rows. The backend does
+// the deterministic work: dedup, matching against existing transactions, import
+// (each imported row creates a real transaction), and ending-balance reconcile.
+// ═════════════════════════════════════════════════════════════════════════════
+
+const CASH_IN_TYPES = ['income'];
+
+function normalizeDesc(s) {
+  return String(s || '').toLowerCase().replace(/\s+/g, ' ').replace(/[^a-z0-9а-яё ]/gi, '').trim();
+}
+function rowDedupHash(businessId, walletId, r) {
+  const parts = [businessId, walletId || '', r.tx_date || '', Math.abs(Number(r.amount) || 0).toFixed(2), r.direction || '', normalizeDesc(r.description), (r.bank_reference || '')].join('|');
+  return crypto.createHash('sha256').update(parts).digest('hex').slice(0, 32);
+}
+
+// POST /api/bank-import/batches — create a batch from client-parsed rows
+app.post('/api/bank-import/batches', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canCreateConfirmedFinancialRecord(biz.role))
+      return res.status(403).json({ error: 'Your role cannot import bank statements' });
+
+    const { wallet_id, file_name, file_type, currency, opening_balance, closing_balance, rows } = req.body || {};
+    if (!Array.isArray(rows) || rows.length === 0) return res.status(400).json({ error: 'rows required' });
+    if (rows.length > 2000) return res.status(400).json({ error: 'Too many rows (max 2000 per import)' });
+
+    // Wallet must belong to the business
+    let wallet = null;
+    if (wallet_id) {
+      const { data: w } = await supabase.from('wallets').select('id, name').eq('id', wallet_id).or(bizOrFilter(biz)).limit(1);
+      if (!w?.length) return res.status(400).json({ error: 'Invalid or inaccessible wallet' });
+      wallet = w[0];
+    }
+
+    // Date range of the statement
+    const dates = rows.map(r => r.tx_date).filter(Boolean).sort();
+    const statementStart = dates[0] || null;
+    const statementEnd = dates[dates.length - 1] || null;
+
+    // Existing transactions for the wallet in range — for duplicate/matching.
+    let existing = [];
+    if (wallet) {
+      const { data: txs } = await supabase.from('transactions')
+        .select('id, type, amount_original, transaction_date, created_at, description')
+        .or(bizOrFilter(biz))
+        .or(`wallet_id.eq.${wallet_id},source.eq.${JSON.stringify(wallet.name)}`);
+      existing = txs || [];
+    }
+    const txKey = (d, amt, type) => `${(d || '').slice(0, 10)}|${Math.abs(Number(amt) || 0).toFixed(2)}|${type}`;
+    const existingIndex = new Map();
+    for (const t of existing) {
+      const d = t.transaction_date || (t.created_at ? t.created_at.slice(0, 10) : null);
+      existingIndex.set(txKey(d, t.amount_original, t.type), t.id);
+    }
+
+    // Already-imported dedup hashes (avoid re-importing the same statement).
+    const { data: priorRows } = await supabase.from('bank_import_rows')
+      .select('dedup_hash').eq('business_id', biz.business.id);
+    const priorHashes = new Set((priorRows || []).map(r => r.dedup_hash));
+
+    // Create batch
+    const { data: batch, error: bErr } = await supabase.from('bank_import_batches').insert({
+      business_id: biz.business.id, wallet_id: wallet_id || null,
+      uploaded_by_user_id: req.user.userId, source_channel: 'web',
+      file_name: file_name || null, file_type: file_type || null,
+      currency: currency || 'IDR',
+      statement_start: statementStart, statement_end: statementEnd,
+      opening_balance: opening_balance ?? null, closing_balance: closing_balance ?? null,
+      row_count: rows.length, status: 'review_required',
+    }).select().single();
+    if (bErr) return res.status(500).json({ error: bErr.message });
+
+    // Build rows with dedup + matching + suggestions
+    let matched = 0, dup = 0;
+    const rowInserts = rows.map((r, i) => {
+      const amount = Math.abs(Number(r.amount) || 0);
+      const direction = r.direction || (Number(r.amount) >= 0 ? 'in' : 'out');
+      const suggestedType = direction === 'in' ? 'income' : 'expense';
+      const hash = rowDedupHash(biz.business.id, wallet_id, { ...r, amount, direction });
+      const matchId = existingIndex.get(txKey(r.tx_date, amount, suggestedType)) || null;
+      let status = 'review_required';
+      if (priorHashes.has(hash)) { status = 'duplicate'; dup++; }
+      else if (matchId) { status = 'duplicate'; matched++; }  // already in ledger
+      return {
+        batch_id: batch.id, business_id: biz.business.id, row_index: r.row_index ?? i,
+        raw: r.raw || {}, tx_date: r.tx_date || null, description: r.description || null,
+        amount, direction, bank_reference: r.bank_reference || null,
+        balance_after: r.balance_after ?? null, dedup_hash: hash,
+        suggested_type: suggestedType, suggested_category: null, suggested_counterparty: null,
+        match_status: status, matched_transaction_id: matchId,
+      };
+    });
+    const { error: rErr } = await supabase.from('bank_import_rows').insert(rowInserts);
+    if (rErr) return res.status(500).json({ error: rErr.message });
+
+    await supabase.from('bank_import_batches').update({ matched_count: matched, duplicate_count: dup, updated_at: new Date().toISOString() }).eq('id', batch.id);
+
+    const { data: storedRows } = await supabase.from('bank_import_rows').select('*').eq('batch_id', batch.id).order('row_index');
+    res.json({ batch: { ...batch, matched_count: matched, duplicate_count: dup }, rows: storedRows || [] });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// GET /api/bank-import/batches — list batches
+app.get('/api/bank-import/batches', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canViewBusinessFinance(biz.role)) return res.status(403).json({ error: 'Forbidden' });
+    const { data } = await supabase.from('bank_import_batches').select('*').eq('business_id', biz.business.id).order('created_at', { ascending: false }).limit(50);
+    res.json({ batches: data || [] });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// GET /api/bank-import/batches/:id — batch + rows
+app.get('/api/bank-import/batches/:id', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canViewBusinessFinance(biz.role)) return res.status(403).json({ error: 'Forbidden' });
+    const { data: batch } = await supabase.from('bank_import_batches').select('*').eq('id', req.params.id).eq('business_id', biz.business.id).single();
+    if (!batch) return res.status(404).json({ error: 'Batch not found' });
+    const { data: rows } = await supabase.from('bank_import_rows').select('*').eq('batch_id', batch.id).order('row_index');
+    const { data: recon } = await supabase.from('bank_reconciliations').select('*').eq('batch_id', batch.id).limit(1);
+    res.json({ batch, rows: rows || [], reconciliation: recon?.[0] || null });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// PATCH /api/bank-import/rows/:id — edit a row before import
+app.patch('/api/bank-import/rows/:id', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canCreateConfirmedFinancialRecord(biz.role)) return res.status(403).json({ error: 'Forbidden' });
+    const allowed = ['suggested_type', 'suggested_category', 'suggested_counterparty', 'description', 'match_status'];
+    const updates = {};
+    for (const k of allowed) if (req.body[k] !== undefined) updates[k] = req.body[k];
+    if (req.body.amount !== undefined) updates.amount = Math.abs(Number(req.body.amount) || 0);
+    if (!Object.keys(updates).length) return res.status(400).json({ error: 'No editable fields' });
+    const { data, error } = await supabase.from('bank_import_rows').update(updates)
+      .eq('id', req.params.id).eq('business_id', biz.business.id).select().single();
+    if (error) return res.status(500).json({ error: error.message });
+    res.json({ row: data });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// POST /api/bank-import/batches/:id/confirm — import confirmed rows + reconcile
+app.post('/api/bank-import/batches/:id/confirm', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canCreateConfirmedFinancialRecord(biz.role)) return res.status(403).json({ error: 'Forbidden' });
+
+    const { data: batch } = await supabase.from('bank_import_batches').select('*').eq('id', req.params.id).eq('business_id', biz.business.id).single();
+    if (!batch) return res.status(404).json({ error: 'Batch not found' });
+    if (batch.status === 'imported') return res.status(400).json({ error: 'Batch already imported' });
+
+    let wallet = null;
+    if (batch.wallet_id) {
+      const { data: w } = await supabase.from('wallets').select('id, name, scope').eq('id', batch.wallet_id).limit(1);
+      wallet = w?.[0] || null;
+    }
+
+    const { data: rows } = await supabase.from('bank_import_rows').select('*').eq('batch_id', batch.id);
+    // Import rows the user confirmed (not duplicates, not rejected).
+    const toImport = (rows || []).filter(r => r.match_status === 'confirmed' && !r.linked_transaction_id);
+
+    let imported = 0, signedSum = 0;
+    for (const r of toImport) {
+      const isIncome = r.suggested_type === 'income';
+      const { data: tx, error } = await supabase.from('transactions').insert({
+        ...bizWriteFields(biz, req.user.userId),
+        type: r.suggested_type,
+        amount_original: r.amount, amount_idr: r.amount, currency_original: batch.currency || 'IDR',
+        description: r.description || 'Bank import', source: wallet?.name || null,
+        wallet_id: batch.wallet_id || null, scope: wallet?.scope || 'business',
+        category: r.suggested_category || null,
+        counterparty_name: r.suggested_counterparty || null,
+        transaction_date: r.tx_date || new Date().toISOString().slice(0, 10),
+      }).select('id').single();
+      if (error) continue;
+      await supabase.from('bank_import_rows').update({ linked_transaction_id: tx.id, match_status: 'confirmed' }).eq('id', r.id);
+      imported++; signedSum += isIncome ? r.amount : -r.amount;
+    }
+
+    // Reconciliation (if opening/closing provided)
+    let reconciliation = null;
+    if (batch.opening_balance !== null && batch.closing_balance !== null) {
+      const computed = Number(batch.opening_balance) + signedSum;
+      const diff = Number(batch.closing_balance) - computed;
+      const { data: rec } = await supabase.from('bank_reconciliations').insert({
+        batch_id: batch.id, business_id: biz.business.id, wallet_id: batch.wallet_id || null,
+        opening_balance: batch.opening_balance, closing_balance: batch.closing_balance,
+        computed_closing: computed, difference: diff,
+        status: Math.abs(diff) < 1 ? 'balanced' : 'unbalanced',
+      }).select().single();
+      reconciliation = rec || null;
+    }
+
+    const remaining = (rows || []).filter(r => r.match_status === 'review_required').length;
+    const newStatus = remaining > 0 ? 'partially_imported' : 'imported';
+    await supabase.from('bank_import_batches').update({ imported_count: (batch.imported_count || 0) + imported, status: newStatus, updated_at: new Date().toISOString() }).eq('id', batch.id);
+
+    res.json({ ok: true, imported, status: newStatus, reconciliation });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // ── POST /api/debts/from-telegram ────────────────────────────────────────────
 // Called by the Telegram bot to create a draft receivable / payable.
 // Requires telegram_id → users.id mapping.
