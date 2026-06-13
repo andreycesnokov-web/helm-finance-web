@@ -5288,11 +5288,8 @@ app.post('/api/ai-cfo/ask', auth, async (req, res) => {
         const cfo   = ctx.cfo_score        || {};
         const alert = ctx.ai_alert         || {};
         const hire  = ctx.hiring_readiness || {};
-        const langInstruction = language === 'ru'
-          ? 'IMPORTANT: The user speaks Russian. Answer ENTIRELY in Russian. All text, headings, recommendations, and refusals must be in Russian. You may keep product terms like CFO AI, AI CFO, cash flow, runway in their original form.'
-          : language === 'id'
-          ? 'PENTING: Pengguna berbicara Bahasa Indonesia. Jawab SELURUHNYA dalam Bahasa Indonesia. Gunakan Bahasa Indonesia bisnis yang sederhana dan jelas. Anda boleh menggunakan istilah produk seperti CFO AI, AI CFO, CFO Score dalam bentuk aslinya. Untuk istilah keuangan, gunakan: arus kas (cash flow), cadangan kas (runway), piutang (receivables), kewajiban (payables).'
-          : 'Answer in English.'
+        const savedLangName = language === 'ru' ? 'Russian' : language === 'id' ? 'Indonesian' : 'English';
+        const langInstruction = `LANGUAGE: Reply in the SAME language as the user's latest message (Russian, Indonesian, or English). If the language is unclear, default to ${savedLangName}. Write the entire reply — headings, recommendations and refusals — in that one language. Never announce or describe which language you use. Keep product terms like CFO AI, AI CFO, cash flow, runway in their original form.`;
         const systemPrompt = `You are CFO AI, a financial decision assistant for ${ctx.business.name} — a ${ctx.business.effective_plan} plan business using ${currency} as base currency.
 Answer like a calm, direct CFO speaking to a CEO. Be specific, conservative, action-oriented, and not dramatic.
 ${langInstruction}
