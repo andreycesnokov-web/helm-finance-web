@@ -9,6 +9,7 @@ const L = {
   en: { title: 'Bank import', subtitle: 'Import a CSV/XLSX statement — review, then create transactions',
     upload: 'Upload statement (CSV / XLSX)', wallet: 'Target account', map: 'Map columns', date: 'Date', amount: 'Amount',
     desc: 'Description', direction: 'Direction (optional)', ref: 'Reference (optional)', preview: 'Preview & review',
+    debit: 'Debit column (optional)', credit: 'Credit column (optional)', dcHint: 'If the statement has separate Debit/Credit columns, map both — Amount is then ignored.',
     opening: 'Opening balance (optional)', closing: 'Closing balance (optional)', parse: 'Parse file', back: 'Back',
     rows: 'rows', duplicates: 'duplicates', toImport: 'to import', confirmImport: 'Confirm import', imported: 'Imported',
     type: 'Type', income: 'Income', expense: 'Expense', dup: 'Duplicate', include: 'Include', reconciled: 'Reconciliation',
@@ -17,6 +18,7 @@ const L = {
   ru: { title: 'Импорт из банка', subtitle: 'Загрузи выписку CSV/XLSX — проверь, затем создадим транзакции',
     upload: 'Загрузить выписку (CSV / XLSX)', wallet: 'Счёт назначения', map: 'Сопоставь колонки', date: 'Дата', amount: 'Сумма',
     desc: 'Описание', direction: 'Направление (необязательно)', ref: 'Референс (необязательно)', preview: 'Превью и проверка',
+    debit: 'Колонка Debit (необязательно)', credit: 'Колонка Credit (необязательно)', dcHint: 'Если в выписке отдельные колонки Debit/Credit — укажи обе, тогда «Сумма» игнорируется.',
     opening: 'Входящий остаток (необязательно)', closing: 'Исходящий остаток (необязательно)', parse: 'Разобрать файл', back: 'Назад',
     rows: 'строк', duplicates: 'дубликатов', toImport: 'к импорту', confirmImport: 'Подтвердить импорт', imported: 'Импортировано',
     type: 'Тип', income: 'Доход', expense: 'Расход', dup: 'Дубликат', include: 'Включить', reconciled: 'Сверка',
@@ -25,6 +27,7 @@ const L = {
   id: { title: 'Impor bank', subtitle: 'Impor rekening koran CSV/XLSX — tinjau, lalu buat transaksi',
     upload: 'Unggah rekening (CSV / XLSX)', wallet: 'Akun tujuan', map: 'Petakan kolom', date: 'Tanggal', amount: 'Jumlah',
     desc: 'Deskripsi', direction: 'Arah (opsional)', ref: 'Referensi (opsional)', preview: 'Pratinjau & tinjau',
+    debit: 'Kolom Debit (opsional)', credit: 'Kolom Credit (opsional)', dcHint: 'Jika rekening punya kolom Debit/Credit terpisah, petakan keduanya — Jumlah diabaikan.',
     opening: 'Saldo awal (opsional)', closing: 'Saldo akhir (opsional)', parse: 'Urai file', back: 'Kembali',
     rows: 'baris', duplicates: 'duplikat', toImport: 'akan diimpor', confirmImport: 'Konfirmasi impor', imported: 'Terimpor',
     type: 'Tipe', income: 'Pemasukan', expense: 'Pengeluaran', dup: 'Duplikat', include: 'Sertakan', reconciled: 'Rekonsiliasi',
@@ -57,7 +60,7 @@ export default function BankImport() {
   const [headers, setHeaders] = useState([])
   const [rawRows, setRawRows] = useState([])
   const [fileName, setFileName] = useState('')
-  const [map, setMap] = useState({ date: '', amount: '', description: '', direction: '', reference: '' })
+  const [map, setMap] = useState({ date: '', amount: '', debit: '', credit: '', description: '', direction: '', reference: '' })
   const [opening, setOpening] = useState('')
   const [closing, setClosing] = useState('')
   const [batch, setBatch] = useState(null)
@@ -82,36 +85,75 @@ export default function BankImport() {
     const sheet = wb.Sheets[wb.SheetNames[0]]
     const arr = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: true, defval: '' })
     const firstNonEmpty = arr.findIndex(r => r.some(c => String(c).trim() !== ''))
-    const hdr = (arr[firstNonEmpty] || []).map(h => String(h).trim())
-    const body = arr.slice(firstNonEmpty + 1).filter(r => r.some(c => String(c).trim() !== ''))
-    setHeaders(hdr); setRawRows(body); setBatch(null); setRows([]); setRecon(null)
-    // auto-guess mapping
-    const guess = (keys) => hdr.findIndex(h => keys.some(k => h.toLowerCase().includes(k)))
-    setMap({
-      date: hdr[guess(['date','tanggal','дата'])] || '', amount: hdr[guess(['amount','nominal','сумма','debit','kredit','mutasi'])] || '',
-      description: hdr[guess(['desc','keterangan','описание','berita','uraian'])] || '',
-      direction: hdr[guess(['type','dc','dir','c/d'])] || '', reference: hdr[guess(['ref','no.','reference'])] || '',
+    const row1 = (arr[firstNonEmpty] || []).map(h => String(h).trim())
+    const row2 = (arr[firstNonEmpty + 1] || []).map(h => String(h).trim())
+    // Two-header layout (e.g. Permata: "Amount" split into Debit/Credit on the
+    // next row). If row2 looks like sub-headers (has Debit/Credit-style labels,
+    // no parseable date), merge: a non-empty sub-header overrides the main one.
+    const looksSubHeader = row2.length && row2.some(c => /^(debit|credit|kredit|d|c)$/i.test(c)) && !toISO(row2[0])
+    const hdr = looksSubHeader ? row1.map((h, i) => row2[i] && row2[i].trim() ? row2[i].trim() : h) : row1
+    const bodyStart = firstNonEmpty + (looksSubHeader ? 2 : 1)
+
+    // Capture opening/closing balance rows (skipped as transactions, used for reconcile).
+    let openBal = '', closeBal = ''
+    arr.slice(bodyStart).forEach(r => {
+      const first = String(r[0] || '').toLowerCase()
+      const val = r.map(c => num(c)).filter(n => n !== null && n !== 0).pop()
+      if (/opening balance|saldo awal/.test(first) && val) openBal = String(val)
+      if (/closing balance|saldo akhir/.test(first) && val) closeBal = String(val)
     })
+    if (openBal) setOpening(openBal)
+    if (closeBal) setClosing(closeBal)
+
+    const body = arr.slice(bodyStart).filter(r => r.some(c => String(c).trim() !== ''))
+    setHeaders(hdr); setRawRows(body); setBatch(null); setRows([]); setRecon(null)
+
+    const guess = (keys) => hdr.findIndex(h => keys.some(k => h.toLowerCase() === k || h.toLowerCase().includes(k)))
+    setMap({
+      date: hdr[guess(['date','tanggal','дата'])] || '',
+      debit: hdr[guess(['debit'])] || '',
+      credit: hdr[guess(['credit','kredit'])] || '',
+      amount: (hdr[guess(['debit'])] || hdr[guess(['credit','kredit'])]) ? '' : (hdr[guess(['amount','nominal','сумма','mutasi'])] || ''),
+      description: hdr[guess(['description','keterangan','описание','berita','uraian'])] || '',
+      direction: hdr[guess(['transaction type','type','d/c','dc','dir'])] || '',
+      reference: hdr[guess(['reference number','reference','ref'])] || '',
+    })
+  }
+
+  const dirFrom = (v) => {
+    const dv = String(v || '').trim().toLowerCase()
+    if (/^(c|cr|credit|kredit|in|masuk)$/.test(dv) || /(credit|kredit|masuk)/.test(dv)) return 'in'
+    if (/^(d|dr|db|debit|out|keluar)$/.test(dv) || /(debit|keluar)/.test(dv)) return 'out'
+    return null
   }
 
   const buildRows = () => {
     const idx = (name) => headers.indexOf(name)
+    const useDC = map.debit || map.credit
     return rawRows.map((r, i) => {
       const rawObj = {}; headers.forEach((h, j) => { rawObj[h] = r[j] })
-      const amt = num(r[idx(map.amount)])
-      let direction = null
-      if (map.direction && r[idx(map.direction)]) {
-        const dv = String(r[idx(map.direction)]).toLowerCase()
-        direction = /(cr|credit|in|masuk|kredit|\+)/.test(dv) ? 'in' : /(dr|debit|out|keluar|\-)/.test(dv) ? 'out' : null
+      let amount = null, direction = null
+      if (useDC) {
+        const debit = num(r[idx(map.debit)]) || 0
+        const credit = num(r[idx(map.credit)]) || 0
+        amount = debit > 0 ? debit : credit
+        direction = debit > 0 ? 'out' : credit > 0 ? 'in' : null
+      } else {
+        const amt = num(r[idx(map.amount)])
+        amount = amt === null ? null : Math.abs(amt)
+        if (amt !== null) direction = amt >= 0 ? 'in' : 'out'
       }
-      if (!direction && amt !== null) direction = amt >= 0 ? 'in' : 'out'
+      // Transaction Type column refines/overrides direction (D/C).
+      if (map.direction && r[idx(map.direction)]) {
+        const d = dirFrom(r[idx(map.direction)]); if (d) direction = d
+      }
       return {
         row_index: i, raw: rawObj, tx_date: toISO(r[idx(map.date)]),
         description: String(r[idx(map.description)] || '').trim() || null,
-        amount: amt === null ? null : Math.abs(amt), direction,
+        amount, direction,
         bank_reference: map.reference ? String(r[idx(map.reference)] || '').trim() || null : null,
       }
-    }).filter(r => r.amount !== null && r.tx_date)
+    }).filter(r => r.amount !== null && r.amount > 0 && r.tx_date)  // junk/balance rows have no parseable date
   }
 
   const parseAndUpload = async () => {
@@ -174,13 +216,16 @@ export default function BankImport() {
               <div style={{ fontWeight: 700, fontSize: 13, margin: '8px 0' }}>{l.map} · {rawRows.length} {l.rows}</div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                 <div><label className="modal-label">{l.date} *</label>{sel(map.date, v => setMap({ ...map, date: v }), headers)}</div>
-                <div><label className="modal-label">{l.amount} *</label>{sel(map.amount, v => setMap({ ...map, amount: v }), headers)}</div>
                 <div><label className="modal-label">{l.desc}</label>{sel(map.description, v => setMap({ ...map, description: v }), headers)}</div>
+                <div><label className="modal-label">{l.amount}{!(map.debit || map.credit) ? ' *' : ''}</label>{sel(map.amount, v => setMap({ ...map, amount: v }), headers)}</div>
                 <div><label className="modal-label">{l.direction}</label>{sel(map.direction, v => setMap({ ...map, direction: v }), headers)}</div>
+                <div><label className="modal-label">{l.debit}</label>{sel(map.debit, v => setMap({ ...map, debit: v }), headers)}</div>
+                <div><label className="modal-label">{l.credit}</label>{sel(map.credit, v => setMap({ ...map, credit: v }), headers)}</div>
                 <div><label className="modal-label">{l.opening}</label><input className="modal-input" value={opening} onChange={e => setOpening(e.target.value)} /></div>
                 <div><label className="modal-label">{l.closing}</label><input className="modal-input" value={closing} onChange={e => setClosing(e.target.value)} /></div>
               </div>
-              <button className="btn btn-primary btn-md" disabled={busy || !map.date || !map.amount} onClick={parseAndUpload} style={{ marginTop: 12 }}>
+              <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 6 }}>{l.dcHint}</div>
+              <button className="btn btn-primary btn-md" disabled={busy || !map.date || !(map.amount || map.debit || map.credit)} onClick={parseAndUpload} style={{ marginTop: 12 }}>
                 {busy ? '…' : l.parse}
               </button>
             </>
