@@ -1519,6 +1519,34 @@ app.get('/api/accountant/calendar', auth, async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// Localized compliance reminder text (Telegram).
+const COMPLIANCE_REMINDER = {
+  ru: (lines, overdue) => `🧮 <b>Налоговые сроки</b>\n\n${lines}${overdue ? `\n\n⚠️ Просрочено: ${overdue}` : ''}\n\nИнформация рекомендательная — подтвердите у бухгалтера.`,
+  en: (lines, overdue) => `🧮 <b>Tax deadlines</b>\n\n${lines}${overdue ? `\n\n⚠️ Overdue: ${overdue}` : ''}\n\nAdvisory only — confirm with your accountant.`,
+  id: (lines, overdue) => `🧮 <b>Tenggat pajak</b>\n\n${lines}${overdue ? `\n\n⚠️ Terlambat: ${overdue}` : ''}\n\nHanya rekomendasi — konfirmasikan dengan akuntan.`,
+};
+
+// POST /api/accountant/calendar/remind — send a compliance reminder to admins
+// (Telegram reminder foundation; owner-triggered now, scheduler is future work).
+app.post('/api/accountant/calendar/remind', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canApproveFinancialRecord(biz.role)) return res.status(403).json({ error: 'Forbidden' });
+    const language = normalizeLanguage(await getUserLanguage(req.user.userId));
+    const { data: evs } = await supabase.from('compliance_events')
+      .select('title, due_date').eq('business_id', biz.business.id).order('due_date', { ascending: true });
+    const today = new Date();
+    const soon = (evs || []).filter(e => { const d = Math.ceil((new Date(e.due_date) - today) / 86400000); return d >= -30 && d <= 30; });
+    if (!soon.length) return res.json({ ok: true, sent: 0, message: 'No deadlines within the window.' });
+    const lines = soon.slice(0, 8).map(e => `• ${e.title} — ${e.due_date}`).join('\n');
+    const overdue = soon.filter(e => new Date(e.due_date) < today).length;
+    const fn = COMPLIANCE_REMINDER[language] || COMPLIANCE_REMINDER.en;
+    const r = await notifyBusinessAdminsViaTelegram(biz.ownerUserId, fn(lines, overdue || null), []);
+    res.json({ ok: true, sent: r.sent ?? 0 });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // ── POST /api/debts/from-telegram ────────────────────────────────────────────
 // Called by the Telegram bot to create a draft receivable / payable.
 // Requires telegram_id → users.id mapping.
@@ -4326,11 +4354,34 @@ async function buildAiCfoContext(userId, language = 'en', biz = null) {
   const hiringReadiness = calculateHiringReadiness(partialCtx, language);
   const nextActions     = buildNextActionsV2(partialCtx, hiringReadiness, language);
 
+  // ── Compliance obligations (AI Accountant — upcoming/overdue tax filings) ──
+  // V1: dates only (estimated amounts come with the tax calc engine later), so
+  // these are surfaced as compliance pressure, not numeric cash forecast.
+  let compliance = { upcoming: [], overdue_count: 0 };
+  try {
+    if (biz) {
+      const { data: evRows } = await supabase.from('compliance_events')
+        .select('title, due_date, obligation_type, status, period')
+        .eq('business_id', biz.business.id)
+        .order('due_date', { ascending: true });
+      const today = new Date();
+      const evs = (evRows || []).map(e => ({ ...e, days: Math.ceil((new Date(e.due_date) - today) / 86400000) }));
+      compliance = {
+        overdue_count: evs.filter(e => e.days < 0).length,
+        next_90: evs.filter(e => e.days >= 0 && e.days <= 90),
+        upcoming: evs.filter(e => e.days >= -30 && e.days <= 90).slice(0, 8),
+      };
+      if (compliance.overdue_count > 0)
+        partialCtx.risks.push({ type: 'overdue_filing', severity: 'high', title: `${compliance.overdue_count} overdue tax filing${compliance.overdue_count > 1 ? 's' : ''}`, description: 'Compliance deadlines passed — confirm with your accountant', amount: 0 });
+    }
+  } catch (_) { /* compliance is optional context */ }
+
   // ── Access info ───────────────────────────────────────────────────────────
   const limits = accessData?.limits || {};
 
   return {
     ...partialCtx,
+    compliance,
     next_actions:     nextActions,
     cfo_score:        cfoScore,
     ai_alert:         aiAlert,
@@ -5277,6 +5328,7 @@ ${ctx.receivables.top.length > 0 ? `- Top receivables: ${ctx.receivables.top.map
 ${ctx.payables.top.length > 0 ? `- Top payables: ${ctx.payables.top.map(p => `${p.counterparty} ${p.remaining_amount.toLocaleString()} (${p.status})`).join(', ')}` : ''}
 - Wallets: ${ctx.cash.wallets.map(w => `${w.name} ${w.balance.toLocaleString()} ${w.currency}`).join(', ') || 'none'}
 ${(ctx.pending_submissions?.count > 0) ? `- Pending team submissions (NOT confirmed — do NOT count in obligations, mention as potential cash pressure): ${ctx.pending_submissions.count} item(s), receivables ${ctx.pending_submissions.receivables_total.toLocaleString()}, payables ${ctx.pending_submissions.payables_total.toLocaleString()} ${currency} — ${ctx.pending_submissions.items.map(i => `${i.counterparty || '—'} ${Number(i.amount||0).toLocaleString()} (${i.type}, by ${i.created_by || 'team'})`).join(', ')}` : ''}
+${(ctx.compliance?.upcoming?.length) ? `- Upcoming tax/compliance deadlines (dates from the Tax Rules Registry; estimated amounts not yet computed in V1 — treat as compliance pressure, advise confirming with the accountant): ${ctx.compliance.upcoming.map(e => `${e.title} due ${e.due_date} (${e.status})`).join('; ')}${ctx.compliance.overdue_count ? ` · ${ctx.compliance.overdue_count} OVERDUE` : ''}` : ''}
 - Risk signals: ${ctx.risks.map(r => r.title).join('; ') || 'none'}
 - Top actions: ${(ctx.next_actions || []).slice(0,3).map(a => a.title).join(' | ') || 'none'}
 ${ownerWithdrawal ? '\nNOTE: This is an owner withdrawal question. Apply OWNER WITHDRAWAL POLICY.' : ''}

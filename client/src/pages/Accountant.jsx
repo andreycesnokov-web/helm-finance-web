@@ -12,21 +12,24 @@ const L = {
     npwp: 'Tax ID (NPWP)', vat: 'VAT status', employees: 'Employees', fyStart: 'Financial year start (MM-DD)', fyEnd: 'Financial year end (MM-DD)',
     regime: 'Tax regime', noEvents: 'No upcoming obligations. Complete the tax profile to build the calendar.',
     due: 'Due', period: 'Period', verifyRule: 'Verification recommended', locked: 'AI Accountant is a premium add-on.',
-    upcoming: 'Upcoming', due_soon: 'Due soon', overdue: 'Overdue', incomplete: 'Complete your tax profile to generate the calendar.' },
+    upcoming: 'Upcoming', due_soon: 'Due soon', overdue: 'Overdue', incomplete: 'Complete your tax profile to generate the calendar.',
+    remind: 'Remind in Telegram', reminded: 'Reminder sent' },
   ru: { title: 'AI Бухгалтер', subtitle: 'Налоги и отчётность — рекомендательно, подтвердите у лицензированного специалиста',
     profile: 'Налоговый профиль', calendar: 'Календарь обязательств', rules: 'Налоговые правила', source: 'Официальный источник',
     save: 'Сохранить профиль', edit: 'Изменить', country: 'Страна', jurisdiction: 'Юрисдикция', entity: 'Форма компании',
     npwp: 'Налоговый номер (NPWP)', vat: 'Статус НДС', employees: 'Сотрудники', fyStart: 'Начало фин. года (ММ-ДД)', fyEnd: 'Конец фин. года (ММ-ДД)',
     regime: 'Налоговый режим', noEvents: 'Нет ближайших обязательств. Заполните профиль, чтобы построить календарь.',
     due: 'Срок', period: 'Период', verifyRule: 'Рекомендуется проверка', locked: 'AI Бухгалтер — премиальный модуль.',
-    upcoming: 'Предстоит', due_soon: 'Скоро срок', overdue: 'Просрочено', incomplete: 'Заполните налоговый профиль, чтобы построить календарь.' },
+    upcoming: 'Предстоит', due_soon: 'Скоро срок', overdue: 'Просрочено', incomplete: 'Заполните налоговый профиль, чтобы построить календарь.',
+    remind: 'Напомнить в Telegram', reminded: 'Напоминание отправлено' },
   id: { title: 'AI Akuntan', subtitle: 'Pajak & kepatuhan — bersifat rekomendasi, konfirmasi dengan profesional berlisensi',
     profile: 'Profil pajak', calendar: 'Kalender kewajiban', rules: 'Aturan pajak', source: 'Sumber resmi',
     save: 'Simpan profil', edit: 'Ubah', country: 'Negara', jurisdiction: 'Yurisdiksi', entity: 'Jenis badan usaha',
     npwp: 'NPWP', vat: 'Status PPN', employees: 'Karyawan', fyStart: 'Awal tahun fiskal (MM-DD)', fyEnd: 'Akhir tahun fiskal (MM-DD)',
     regime: 'Rezim pajak', noEvents: 'Belum ada kewajiban. Lengkapi profil untuk membuat kalender.',
     due: 'Jatuh tempo', period: 'Periode', verifyRule: 'Disarankan verifikasi', locked: 'AI Akuntan adalah add-on premium.',
-    upcoming: 'Akan datang', due_soon: 'Segera', overdue: 'Terlambat', incomplete: 'Lengkapi profil pajak untuk membuat kalender.' },
+    upcoming: 'Akan datang', due_soon: 'Segera', overdue: 'Terlambat', incomplete: 'Lengkapi profil pajak untuk membuat kalender.',
+    remind: 'Ingatkan di Telegram', reminded: 'Pengingat terkirim' },
 }
 const STATUS_COLOR = { upcoming: 'var(--text-3)', due_soon: 'var(--amber-dark)', overdue: 'var(--red-dark)' }
 
@@ -44,6 +47,12 @@ export default function Accountant() {
   const [form, setForm]       = useState({})
   const [saving, setSaving]   = useState(false)
   const [loading, setLoading] = useState(true)
+  const [reminded, setReminded] = useState(false)
+
+  const sendReminder = async () => {
+    try { await apiFetch('/accountant/calendar/remind', token, { method: 'POST' }); setReminded(true); setTimeout(() => setReminded(false), 3000) }
+    catch (e) { alert(e.message) }
+  }
 
   const load = useCallback(() => {
     setLoading(true)
@@ -136,7 +145,14 @@ export default function Accountant() {
 
           {/* Compliance calendar */}
           <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, padding: '16px 18px', marginBottom: 16 }}>
-            <div style={{ fontWeight: 700, marginBottom: 10 }}>{l.calendar}</div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+              <div style={{ fontWeight: 700 }}>{l.calendar}</div>
+              {events.length > 0 && status.can_edit && (
+                <button onClick={sendReminder} style={{ fontSize: 12, fontWeight: 600, color: reminded ? 'var(--green-dark)' : 'var(--brand)', background: 'none', border: 'none', cursor: 'pointer' }}>
+                  {reminded ? `✓ ${l.reminded}` : `✈ ${l.remind}`}
+                </button>
+              )}
+            </div>
             {events.length === 0 ? (
               <div style={{ fontSize: 13, color: 'var(--text-3)' }}>{l.noEvents}</div>
             ) : events.map((e, i) => (

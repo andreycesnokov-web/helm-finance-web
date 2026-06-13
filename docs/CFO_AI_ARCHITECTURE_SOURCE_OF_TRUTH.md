@@ -341,3 +341,10 @@ the Tax Rules Registry; each recommendation carries `rule_code` + official sourc
 **Next steps:** (2) Compliance Calendar generation + AI Accountant page;
 (3) CFO AI / Decision Engine integration (tax payments in cash forecast) +
 Telegram reminders. Then Phase 2: Bank Statement Import & Reconciliation.
+
+**Step 3 (CFO + Telegram):** AI CFO context gains a `compliance` block
+(upcoming/overdue tax deadlines from compliance_events); overdue filings add a
+compliance risk and the system prompt lists deadlines (V1: dates only — amounts
+arrive with the tax calc engine, so treated as compliance pressure, not numeric
+forecast). `POST /api/accountant/calendar/remind` sends a localized Telegram
+reminder to admins (owner-triggered; scheduler is future work).
