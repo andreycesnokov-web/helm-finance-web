@@ -61,9 +61,11 @@ function DebtRow({ debt, accounts, token, onRefresh }) {
     setApprovalLoading(false)
   }
   const handleReject = async () => {
+    const reason = window.prompt('Причина отклонения (необязательно):', '')
+    if (reason === null) return // cancelled
     setApprovalLoading(true)
     try {
-      await apiFetch(`/debts/${debt.id}/reject`, token, { method: 'PATCH', body: { reason: 'Rejected via Web App' } })
+      await apiFetch(`/debts/${debt.id}/reject`, token, { method: 'PATCH', body: { reason: reason.trim() || 'Rejected via Web App' } })
       onRefresh()
     } catch (_) {}
     setApprovalLoading(false)
