@@ -749,7 +749,9 @@ async function notifyRequestCreatorViaTelegram({ debt, event, actorUserId, actor
       raw:          debt.raw_input_text || '',
     });
 
-    const webAppUrl = process.env.CLIENT_URL || process.env.WEB_APP_URL || 'https://helm-finance-web-production.up.railway.app';
+    // Public deep-link base. Prefer WEB_APP_URL; CLIENT_URL is the CORS origin
+    // and may point at a stale/non-public domain, so it is not used here.
+    const webAppUrl = process.env.WEB_APP_URL || 'https://helm-finance-web-production.up.railway.app';
     const openUrl = `${webAppUrl}/${debt.type === 'receivable' ? 'receivables' : 'payables'}`;
     const res = await sendTelegramDM(chatId, text, [[{ text: '🌐 Открыть заявку', url: openUrl }]]);
     if (!res.ok && !res.skipped) console.warn('[creator-notify] delivery failed for debt', debt.id, res.error || '');
@@ -1149,7 +1151,9 @@ app.post('/api/debts/from-telegram', async (req, res) => {
           raw:          raw_input_text || '',
         }
       );
-      const webAppUrl = process.env.CLIENT_URL || process.env.WEB_APP_URL || 'https://helm-finance-web-production.up.railway.app';
+      // Public deep-link base. Prefer WEB_APP_URL; CLIENT_URL is the CORS origin
+    // and may point at a stale/non-public domain, so it is not used here.
+    const webAppUrl = process.env.WEB_APP_URL || 'https://helm-finance-web-production.up.railway.app';
       const openUrl = `${webAppUrl}/${type === 'receivable' ? 'receivables' : 'payables'}`;
       // Inline approval keyboard. callback_data `debt_*:<uuid>` ≤ 49 bytes (limit 64).
       // The bot owns these callbacks and calls /api/telegram/debts/:id/* with x-bot-secret.
