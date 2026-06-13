@@ -1,0 +1,31 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main, develop]
+  push:
+    branches: [develop]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install server deps
+        run: npm install --no-audit --no-fund
+
+      - name: Server syntax check
+        run: node --check server/index.js
+
+      - name: Install client deps
+        run: npm install --no-audit --no-fund
+        working-directory: client
+
+      - name: Build client
+        run: npm run build
+        working-directory: client
