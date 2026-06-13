@@ -1212,7 +1212,7 @@ app.post('/api/telegram/debts/attach-receipt', async (req, res) => {
 // and the file is attached. Bot-safe. Manager/employee → pending_approval.
 app.post('/api/telegram/debts/from-receipt', async (req, res) => {
   if (!requireBotSecret(req)) return res.status(401).json({ error: 'Invalid bot credentials' });
-  const { telegram_id, file_id, caption } = req.body || {};
+  const { telegram_id, file_id, caption, kind } = req.body || {};
   if (!telegram_id || !file_id) return res.status(400).json({ error: 'telegram_id and file_id required' });
   try {
     const m = await resolveTelegramMember(telegram_id);
@@ -1223,16 +1223,26 @@ app.post('/api/telegram/debts/from-receipt', async (req, res) => {
     if (!ocr || !ocr.amount)
       return res.status(422).json({ error: 'amount_not_recognized', message: 'Не удалось распознать сумму на счёте.' });
 
+    // Reimbursement: the submitter paid (often from personal funds) and the
+    // company owes THEM, so the counterparty is the submitter — never the OCR
+    // counterparty from the payment proof.
+    const isReimbursement = kind === 'expense_request';
     const amountNum = Number(ocr.amount);
     const approvalStatus = m.isPrivileged ? 'approved' : 'pending_approval';
-    const item = { file_id, mime: file?.mime || null, amount: amountNum, counterparty: ocr.counterparty || null, date: ocr.date || null, recognized: true };
+    const counterparty = isReimbursement
+      ? m.submitterUser.name
+      : (ocr.counterparty || m.submitterUser.name || 'Invoice');
+    const item = { file_id, mime: file?.mime || null, amount: amountNum, counterparty: isReimbursement ? null : (ocr.counterparty || null), date: ocr.date || null, recognized: true };
 
     const insertRow = {
       user_id: m.ownerId, business_id: m.businessId, type: 'payable',
-      counterparty: ocr.counterparty || m.submitterUser.name || 'Invoice',
+      counterparty,
       amount: amountNum, original_amount: amountNum, paid_amount: 0,
-      currency: ocr.currency || 'IDR', due_date: ocr.date || null,
-      description: (caption && caption.trim()) || 'Invoice via Telegram',
+      currency: ocr.currency || 'IDR', due_date: isReimbursement ? null : (ocr.date || null),
+      description: isReimbursement
+        ? ((caption && caption.trim()) || 'Reimbursement (paid from personal funds)')
+        : ((caption && caption.trim()) || 'Invoice via Telegram'),
+      training_type: isReimbursement ? 'expense_request' : null,
       status: 'open', source_channel: 'telegram',
       raw_input_text: (caption && caption.trim()) || null,
       created_by_user_id: m.submitterUser.id, created_by_telegram_id: Number(telegram_id),
@@ -1250,7 +1260,9 @@ app.post('/api/telegram/debts/from-receipt', async (req, res) => {
     const ccy = data.currency || 'IDR';
     const webAppUrl = process.env.WEB_APP_URL || 'https://helm-finance-web-production.up.railway.app';
     if (!m.isPrivileged) {
-      const text = `📤 <b>Счёт на оплату (из Telegram)</b>\n\nПоставщик: ${data.counterparty}\nСумма: <b>${amountNum.toLocaleString('en-US')} ${ccy}</b>\nСрок: ${data.due_date || '—'}\nСоздал: ${m.submitterUser.name} · ${m.role}\n📎 Распознано со счёта · ⏳ ожидает подтверждения`;
+      const text = isReimbursement
+        ? `🧾 <b>Компенсация расхода (из Telegram)</b>\n\nВернуть: ${data.counterparty}\nСумма: <b>${amountNum.toLocaleString('en-US')} ${ccy}</b>\nСоздал: ${m.submitterUser.name} · ${m.role}\n📎 Оплачено с личных средств · ⏳ ожидает подтверждения`
+        : `📤 <b>Счёт на оплату (из Telegram)</b>\n\nПоставщик: ${data.counterparty}\nСумма: <b>${amountNum.toLocaleString('en-US')} ${ccy}</b>\nСрок: ${data.due_date || '—'}\nСоздал: ${m.submitterUser.name} · ${m.role}\n📎 Распознано со счёта · ⏳ ожидает подтверждения`;
       notifyBusinessAdminsViaTelegram(m.ownerId, text, [
         [ { text: '📊 View impact', callback_data: `debt_impact:${data.id}` } ],
         [ { text: '✅ Approve', callback_data: `debt_approve:${data.id}` }, { text: '❌ Reject', callback_data: `debt_reject:${data.id}` } ],
@@ -1258,7 +1270,7 @@ app.post('/api/telegram/debts/from-receipt', async (req, res) => {
       ]).catch(() => {});
     }
 
-    res.json({ ok: true, action: 'created', debt_id: data.id, amount: amountNum, counterparty: data.counterparty, needs_approval: !m.isPrivileged, currency: ccy });
+    res.json({ ok: true, action: 'created', kind: isReimbursement ? 'expense_request' : 'payable', debt_id: data.id, amount: amountNum, counterparty: data.counterparty, needs_approval: !m.isPrivileged, currency: ccy });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
