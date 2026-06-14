@@ -12,7 +12,7 @@ const L = {
     debit: 'Debit column (optional)', credit: 'Credit column (optional)', dcHint: 'If the statement has separate Debit/Credit columns, map both — Amount is then ignored.',
     opening: 'Opening balance (optional)', closing: 'Closing balance (optional)', parse: 'Parse file', back: 'Back',
     rows: 'rows', duplicates: 'duplicates', toImport: 'to import', confirmImport: 'Confirm import', imported: 'Imported',
-    type: 'Type', income: 'Income', expense: 'Expense', dup: 'Duplicate', include: 'Include', reconciled: 'Reconciliation',
+    category: 'Category', type: 'Type', income: 'Income', expense: 'Expense', dup: 'Duplicate', include: 'Include', reconciled: 'Reconciliation',
     balanced: 'Balanced', unbalanced: 'Unbalanced', difference: 'Difference', noWallet: 'Select a target account first.',
     history: 'Recent imports', createTx: 'Will create transactions for included rows only.' },
   ru: { title: 'Импорт из банка', subtitle: 'Загрузи выписку CSV/XLSX — проверь, затем создадим транзакции',
@@ -21,7 +21,7 @@ const L = {
     debit: 'Колонка Debit (необязательно)', credit: 'Колонка Credit (необязательно)', dcHint: 'Если в выписке отдельные колонки Debit/Credit — укажи обе, тогда «Сумма» игнорируется.',
     opening: 'Входящий остаток (необязательно)', closing: 'Исходящий остаток (необязательно)', parse: 'Разобрать файл', back: 'Назад',
     rows: 'строк', duplicates: 'дубликатов', toImport: 'к импорту', confirmImport: 'Подтвердить импорт', imported: 'Импортировано',
-    type: 'Тип', income: 'Доход', expense: 'Расход', dup: 'Дубликат', include: 'Включить', reconciled: 'Сверка',
+    category: 'Категория', type: 'Тип', income: 'Доход', expense: 'Расход', dup: 'Дубликат', include: 'Включить', reconciled: 'Сверка',
     balanced: 'Сходится', unbalanced: 'Не сходится', difference: 'Разница', noWallet: 'Сначала выбери счёт назначения.',
     history: 'Последние импорты', createTx: 'Транзакции создаются только для включённых строк.' },
   id: { title: 'Impor bank', subtitle: 'Impor rekening koran CSV/XLSX — tinjau, lalu buat transaksi',
@@ -30,7 +30,7 @@ const L = {
     debit: 'Kolom Debit (opsional)', credit: 'Kolom Credit (opsional)', dcHint: 'Jika rekening punya kolom Debit/Credit terpisah, petakan keduanya — Jumlah diabaikan.',
     opening: 'Saldo awal (opsional)', closing: 'Saldo akhir (opsional)', parse: 'Urai file', back: 'Kembali',
     rows: 'baris', duplicates: 'duplikat', toImport: 'akan diimpor', confirmImport: 'Konfirmasi impor', imported: 'Terimpor',
-    type: 'Tipe', income: 'Pemasukan', expense: 'Pengeluaran', dup: 'Duplikat', include: 'Sertakan', reconciled: 'Rekonsiliasi',
+    category: 'Kategori', type: 'Tipe', income: 'Pemasukan', expense: 'Pengeluaran', dup: 'Duplikat', include: 'Sertakan', reconciled: 'Rekonsiliasi',
     balanced: 'Seimbang', unbalanced: 'Tidak seimbang', difference: 'Selisih', noWallet: 'Pilih akun tujuan dulu.',
     history: 'Impor terbaru', createTx: 'Transaksi hanya dibuat untuk baris yang disertakan.' },
 }
@@ -68,12 +68,14 @@ export default function BankImport() {
   const [recon, setRecon] = useState(null)
   const [busy, setBusy] = useState(false)
   const [history, setHistory] = useState([])
+  const [categories, setCategories] = useState([])
 
   const loadHistory = useCallback(() => {
     apiFetch('/bank-import/batches', token).then(d => setHistory(d.batches || [])).catch(() => {})
   }, [token])
   useEffect(() => {
     apiFetch('/wallets', token).then(d => setWallets(d.wallets || [])).catch(() => {})
+    apiFetch('/cashflow-categories', token).then(d => setCategories((d.categories || []).map(c => c.name))).catch(() => {})
     loadHistory()
   }, [token, loadHistory])
 
@@ -81,9 +83,11 @@ export default function BankImport() {
     const file = e.target.files?.[0]; if (!file) return
     setFileName(file.name)
     const buf = await file.arrayBuffer()
-    const wb = XLSX.read(buf, { type: 'array', cellDates: true })
+    // raw:false + no cellDates → cells come as their displayed text, so a
+    // DD/MM/YY date is NOT misread by XLSX as US MM/DD. Our toISO parses it.
+    const wb = XLSX.read(buf, { type: 'array', cellDates: false })
     const sheet = wb.Sheets[wb.SheetNames[0]]
-    const arr = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: true, defval: '' })
+    const arr = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false, defval: '' })
     const firstNonEmpty = arr.findIndex(r => r.some(c => String(c).trim() !== ''))
     const row1 = (arr[firstNonEmpty] || []).map(h => String(h).trim())
     const row2 = (arr[firstNonEmpty + 1] || []).map(h => String(h).trim())
@@ -173,17 +177,23 @@ export default function BankImport() {
       } })
       // default: include non-duplicate rows
       setBatch(d.batch)
-      setRows((d.rows || []).map(r => ({ ...r, _include: r.match_status !== 'duplicate' })))
+      setRows((d.rows || []).map(r => ({ ...r, _include: r.match_status !== 'duplicate', _category: r.suggested_category || '' })))
     } catch (e) { alert(e.message) } finally { setBusy(false) }
   }
 
   const confirm = async () => {
     setBusy(true)
     try {
-      // mark included rows confirmed, others stay
+      // mark included rows confirmed (+ persist edited type/category), others stay
       for (const r of rows) {
         const target = r._include && r.match_status !== 'duplicate' ? 'confirmed' : (r.match_status === 'duplicate' ? 'duplicate' : 'rejected')
-        if (target !== r.match_status) await apiFetch(`/bank-import/rows/${r.id}`, token, { method: 'PATCH', body: { match_status: target } })
+        const patch = {}
+        if (target !== r.match_status) patch.match_status = target
+        if (target === 'confirmed') {
+          if (r.suggested_type) patch.suggested_type = r.suggested_type
+          if (r._category) patch.suggested_category = r._category
+        }
+        if (Object.keys(patch).length) await apiFetch(`/bank-import/rows/${r.id}`, token, { method: 'PATCH', body: patch })
       }
       const res = await apiFetch(`/bank-import/batches/${batch.id}/confirm`, token, { method: 'POST' })
       setRecon(res.reconciliation || null)
@@ -251,7 +261,7 @@ export default function BankImport() {
               <thead><tr style={{ position: 'sticky', top: 0, background: 'var(--bg-3)' }}>
                 <th style={{ padding: 6 }}>✓</th><th style={{ padding: 6, textAlign: 'left' }}>{l.date}</th>
                 <th style={{ padding: 6, textAlign: 'left' }}>{l.desc}</th><th style={{ padding: 6, textAlign: 'right' }}>{l.amount}</th>
-                <th style={{ padding: 6 }}>{l.type}</th></tr></thead>
+                <th style={{ padding: 6 }}>{l.type}</th><th style={{ padding: 6, textAlign: 'left' }}>{l.category}</th></tr></thead>
               <tbody>
                 {rows.map((r, i) => (
                   <tr key={r.id} style={{ borderTop: '0.5px solid var(--border)', opacity: r.match_status === 'duplicate' ? 0.5 : 1 }}>
@@ -260,17 +270,23 @@ export default function BankImport() {
                         onChange={e => setRows(rows.map((x, j) => j === i ? { ...x, _include: e.target.checked } : x))} />
                     </td>
                     <td style={{ padding: 6 }}>{r.tx_date}</td>
-                    <td style={{ padding: 6, maxWidth: 280, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.description}{r.match_status === 'duplicate' && <span style={{ color: 'var(--amber-dark)', marginLeft: 6 }}>· {l.dup}</span>}</td>
+                    <td style={{ padding: 6, maxWidth: 240, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.description}{r.match_status === 'duplicate' && <span style={{ color: 'var(--amber-dark)', marginLeft: 6 }}>· {l.dup}</span>}</td>
                     <td style={{ padding: 6, textAlign: 'right', color: r.suggested_type === 'income' ? 'var(--green-dark)' : 'var(--red-dark)' }}>{r.suggested_type === 'income' ? '+' : '−'}{fmt(r.amount)}</td>
                     <td style={{ padding: 6, textAlign: 'center' }}>
                       <select value={r.suggested_type} onChange={e => setRows(rows.map((x, j) => j === i ? { ...x, suggested_type: e.target.value } : x))} style={{ fontSize: 11 }}>
                         <option value="income">{l.income}</option><option value="expense">{l.expense}</option>
                       </select>
                     </td>
+                    <td style={{ padding: 6 }}>
+                      <input list="bank-import-cats" value={r._category || ''} placeholder={l.category}
+                        onChange={e => setRows(rows.map((x, j) => j === i ? { ...x, _category: e.target.value } : x))}
+                        style={{ fontSize: 11, width: 130, padding: '3px 6px', border: '1px solid var(--border-2)', borderRadius: 6 }} />
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
+            <datalist id="bank-import-cats">{categories.map(c => <option key={c} value={c} />)}</datalist>
           </div>
           <button className="btn btn-primary btn-md" disabled={busy || includeCount === 0} onClick={confirm} style={{ marginTop: 12 }}>
             {busy ? '…' : `${l.confirmImport} · ${includeCount}`}
