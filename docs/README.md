@@ -6,3 +6,4 @@
 
 ## Modules
 - [AI Categorization & Bank Review Queue V1](modules/AI_CATEGORIZATION_AND_BANK_REVIEW_V1.md) — owner-controlled AI categorization + review queue. Production `8798068`, migration `022`, validated 2026-06-14.
+- [Tax Engine Foundation V1](modules/TAX_ENGINE_FOUNDATION_V1.md) — tax profile, versioned rules registry, official sources, applicability engine, compliance calendar. Migration `023`, Indonesia first.

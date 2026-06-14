@@ -1801,6 +1801,62 @@ const COMPLIANCE_REMINDER = {
   id: (lines, overdue) => `🧮 <b>Tenggat pajak</b>\n\n${lines}${overdue ? `\n\n⚠️ Terlambat: ${overdue}` : ''}\n\nHanya rekomendasi — konfirmasikan dengan akuntan.`,
 };
 
+// Tax compliance notification templates (RU/EN/ID). Telegram never shows a full
+// tax return — only short alerts with deep links. Buttons added if WEB_APP_URL set.
+const TAX_TG_TEMPLATES = {
+  tax_profile_incomplete: {
+    ru: () => '🧾 <b>Налоговый профиль не заполнен</b>\nЗаполните обязательные поля, чтобы построить календарь обязательств.',
+    en: () => '🧾 <b>Tax profile incomplete</b>\nComplete the required fields to build your compliance calendar.',
+    id: () => '🧾 <b>Profil pajak belum lengkap</b>\nLengkapi bidang wajib untuk membuat kalender kepatuhan.',
+  },
+  tax_obligation_due_soon: {
+    ru: (x) => `⏰ <b>Скоро срок</b>\n${x || 'Налоговое обязательство приближается к сроку.'}\nИнформация рекомендательная — подтвердите у бухгалтера.`,
+    en: (x) => `⏰ <b>Obligation due soon</b>\n${x || 'A tax obligation is approaching its deadline.'}\nAdvisory only — confirm with your accountant.`,
+    id: (x) => `⏰ <b>Segera jatuh tempo</b>\n${x || 'Kewajiban pajak mendekati tenggat.'}\nHanya rekomendasi — konfirmasikan dengan akuntan.`,
+  },
+  tax_obligation_overdue: {
+    ru: (x) => `⚠️ <b>Просрочено</b>\n${x || 'Есть просроченные налоговые обязательства.'}\nПодтвердите у лицензированного специалиста.`,
+    en: (x) => `⚠️ <b>Overdue</b>\n${x || 'You have overdue tax obligations.'}\nConfirm with a licensed professional.`,
+    id: (x) => `⚠️ <b>Terlambat</b>\n${x || 'Ada kewajiban pajak yang terlambat.'}\nKonfirmasikan dengan profesional berlisensi.`,
+  },
+  tax_rule_source_outdated: {
+    ru: () => '📚 <b>Источник правила требует проверки</b>\nНекоторые налоговые правила ожидают проверки официального источника.',
+    en: () => '📚 <b>Rule source needs verification</b>\nSome tax rules are awaiting official source verification.',
+    id: () => '📚 <b>Sumber aturan perlu verifikasi</b>\nBeberapa aturan pajak menunggu verifikasi sumber resmi.',
+  },
+  professional_review_required: {
+    ru: () => '👤 <b>Нужна проверка специалистом</b>\nОбязательство ожидает профессиональной проверки.',
+    en: () => '👤 <b>Professional review required</b>\nAn obligation is awaiting professional review.',
+    id: () => '👤 <b>Perlu tinjauan profesional</b>\nKewajiban menunggu tinjauan profesional.',
+  },
+  owner_tax_approval_required: {
+    ru: () => '✅ <b>Нужно подтверждение владельца</b>\nНалоговое обязательство ожидает вашего решения.',
+    en: () => '✅ <b>Owner approval required</b>\nA tax obligation is awaiting your decision.',
+    id: () => '✅ <b>Perlu persetujuan pemilik</b>\nKewajiban pajak menunggu keputusan Anda.',
+  },
+};
+function taxTgButtons(lang) {
+  const base = process.env.WEB_APP_URL;
+  if (!base) return [];
+  const t = { ru: ['Профиль', 'Календарь'], en: ['Tax profile', 'Calendar'], id: ['Profil', 'Kalender'] }[lang] || ['Tax profile', 'Calendar'];
+  return [[{ text: t[0], url: `${base}/accountant/tax-profile` }, { text: t[1], url: `${base}/accountant/calendar` }]];
+}
+
+// POST /api/accountant/telegram/test — owner/admin manual test of a template.
+app.post('/api/accountant/telegram/test', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canApproveFinancialRecord(biz.role)) return res.status(403).json({ error: 'Forbidden' });
+    const tpl = String(req.body?.template || '');
+    if (!TAX_TG_TEMPLATES[tpl]) return res.status(400).json({ error: `Unknown template. One of: ${Object.keys(TAX_TG_TEMPLATES).join(', ')}` });
+    const language = normalizeLanguage(await getUserLanguage(req.user.userId));
+    const fn = TAX_TG_TEMPLATES[tpl][language] || TAX_TG_TEMPLATES[tpl].en;
+    const r = await notifyBusinessAdminsViaTelegram(biz.ownerUserId, fn(req.body?.detail || ''), taxTgButtons(language));
+    res.json({ ok: true, sent: r.sent ?? 0, template: tpl });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // POST /api/accountant/calendar/remind — send a compliance reminder to admins
 // (Telegram reminder foundation; owner-triggered now, scheduler is future work).
 app.post('/api/accountant/calendar/remind', auth, async (req, res) => {
