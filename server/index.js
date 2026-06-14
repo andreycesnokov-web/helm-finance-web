@@ -97,6 +97,12 @@ function canApproveFinancialRecord(role)       { return ['owner', 'ceo', 'admin'
 function canManagePayroll(role)                { return ['owner', 'ceo', 'admin', 'cfo'].includes(role); }
 function canManageWallets(role)                { return ['owner', 'ceo', 'admin', 'cfo'].includes(role); }
 function canUseAiCfo(role)                     { return ['owner', 'ceo', 'admin', 'cfo', 'accountant'].includes(role); }
+// Category structure: who may create/edit/archive business categories.
+// Accountant may PROPOSE (create) but not restructure (edit/archive).
+function canManageCategories(role)            { return ['owner', 'ceo', 'admin', 'cfo'].includes(role); }
+function canProposeCategory(role)             { return ['owner', 'ceo', 'admin', 'cfo', 'accountant'].includes(role); }
+// Classification rules (business memory) — same as structural management.
+function canManageClassificationRules(role)   { return ['owner', 'ceo', 'admin', 'cfo'].includes(role); }
 
 /**
  * Resolve the active business for a request and validate membership.
@@ -1564,6 +1570,19 @@ function rowDedupHash(businessId, walletId, r) {
   return crypto.createHash('sha256').update(parts).digest('hex').slice(0, 32);
 }
 
+// System transaction types — cash logic. Kept separate from business categories.
+const VALID_SYSTEM_TX_TYPES = ['income', 'expense', 'transfer', 'payroll', 'owner_injection', 'owner_withdrawal', 'correction'];
+
+// Build a Map(categoryId → name) for the business's active categories.
+// The ledger stores category as TEXT, so we resolve ids → names on import.
+async function loadBusinessCategoryMap(biz) {
+  const { data } = await supabase.from('cashflow_categories')
+    .select('id, name').or(bizOrFilter(biz));
+  const map = new Map();
+  for (const c of (data || [])) map.set(c.id, c.name);
+  return map;
+}
+
 // POST /api/bank-import/batches — create a batch from client-parsed rows
 app.post('/api/bank-import/batches', auth, async (req, res) => {
   try {
@@ -1713,24 +1732,37 @@ app.post('/api/bank-import/batches/:id/confirm', auth, async (req, res) => {
     }
 
     const { data: rows } = await supabase.from('bank_import_rows').select('*').eq('batch_id', batch.id);
-    // Import rows the user confirmed (not duplicates, not rejected).
-    const toImport = (rows || []).filter(r => r.match_status === 'confirmed' && !r.linked_transaction_id);
+    // Import rows the user confirmed (not duplicates, not rejected). review_status
+    // 'confirmed' (new review queue) OR legacy match_status 'confirmed'.
+    const isConfirmed = (r) => (r.review_status === 'confirmed' || r.match_status === 'confirmed') && r.review_status !== 'excluded';
+    const toImport = (rows || []).filter(r => isConfirmed(r) && !r.linked_transaction_id);
+
+    // Resolve category ids → names (ledger is TEXT). Prefer the user's FINAL choice.
+    const catMap = await loadBusinessCategoryMap(biz);
 
     let imported = 0, signedSum = 0;
     for (const r of toImport) {
-      const isIncome = r.suggested_type === 'income';
+      // Final decision (review queue) overrides the suggestion; suggestion never auto-applies.
+      let txType = r.final_transaction_type || r.suggested_type || 'expense';
+      if (!VALID_SYSTEM_TX_TYPES.includes(txType)) txType = r.suggested_type || 'expense';
+      const categoryName = r.final_category_id ? (catMap.get(r.final_category_id) || null)
+                         : (r.suggested_category_id ? (catMap.get(r.suggested_category_id) || null)
+                         : (r.suggested_category || null));
+      const isIncome = txType === 'income';
       const { data: tx, error } = await supabase.from('transactions').insert({
         ...bizWriteFields(biz, req.user.userId),
-        type: r.suggested_type,
+        type: txType,
         amount_original: r.amount, amount_idr: r.amount, currency_original: batch.currency || 'IDR',
         description: r.description || 'Bank import', source: wallet?.name || null,
-        wallet_id: batch.wallet_id || null, scope: wallet?.scope || 'business',
-        category: r.suggested_category || null,
+        wallet_id: batch.wallet_id || null, scope: r.final_scope || wallet?.scope || 'business',
+        category: categoryName,
         counterparty_name: r.suggested_counterparty || null,
         transaction_date: r.tx_date || new Date().toISOString().slice(0, 10),
       }).select('id').single();
       if (error) continue;
-      await supabase.from('bank_import_rows').update({ linked_transaction_id: tx.id, match_status: 'confirmed' }).eq('id', r.id);
+      await supabase.from('bank_import_rows').update({
+        linked_transaction_id: tx.id, match_status: 'confirmed', review_status: 'imported',
+      }).eq('id', r.id);
       imported++; signedSum += isIncome ? r.amount : -r.amount;
     }
 
@@ -2868,6 +2900,9 @@ app.post('/api/cashflow-categories', auth, async (req, res) => {
     if (!name || !group_type) return res.status(400).json({ error: 'name and group_type required' });
     const biz = await requireBusiness(req, res);
     if (!biz) return;
+    // Manager/Employee may select categories but never create them.
+    if (!canProposeCategory(biz.role))
+      return res.status(403).json({ error: 'Your role cannot create categories' });
     const { data, error } = await supabase
       .from('cashflow_categories')
       .insert({ user_id: biz.ownerUserId, business_id: biz.business.id, name, group_type, activity_type: activity_type || null, sub_category: sub_category || null, description: description || null, is_system: false })
@@ -2883,7 +2918,10 @@ app.post('/api/cashflow-categories', auth, async (req, res) => {
 // PATCH /api/cashflow-categories/:id — update user's own custom category
 app.patch('/api/cashflow-categories/:id', auth, async (req, res) => {
   try {
-    const userId = req.user.userId;
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canManageCategories(biz.role))
+      return res.status(403).json({ error: 'Your role cannot edit category structure' });
     const { name, group_type, activity_type, sub_category, description, is_active } = req.body;
     const updates = { updated_at: new Date().toISOString() };
     if (name !== undefined) updates.name = name;
@@ -2896,7 +2934,8 @@ app.patch('/api/cashflow-categories/:id', auth, async (req, res) => {
       .from('cashflow_categories')
       .update(updates)
       .eq('id', req.params.id)
-      .eq('user_id', userId)   // can only edit own categories, not system ones
+      .or(bizOrFilter(biz))     // business-scoped; system categories have no business_id match
+      .eq('is_system', false)   // never edit system categories
       .select()
       .single();
     if (error) throw error;
@@ -2910,12 +2949,16 @@ app.patch('/api/cashflow-categories/:id', auth, async (req, res) => {
 // DELETE /api/cashflow-categories/:id — soft archive user's own category
 app.delete('/api/cashflow-categories/:id', auth, async (req, res) => {
   try {
-    const userId = req.user.userId;
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canManageCategories(biz.role))
+      return res.status(403).json({ error: 'Your role cannot archive categories' });
     const { data, error } = await supabase
       .from('cashflow_categories')
       .update({ is_active: false, updated_at: new Date().toISOString() })
       .eq('id', req.params.id)
-      .eq('user_id', userId)
+      .or(bizOrFilter(biz))
+      .eq('is_system', false)
       .select()
       .single();
     if (error) throw error;
