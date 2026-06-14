@@ -1910,8 +1910,84 @@ function classifyRowDeterministic(row, ctx) {
   return out;
 }
 
-// POST /api/bank-imports/:batchId/suggest — run deterministic cascade.
-// Does NOT call AI, does NOT touch the ledger.
+// AI Level 5 — batch-suggest categories for rows the cascade couldn't resolve.
+// Sends ONLY: business categories, known counterparties, and per-row
+// description/amount/direction/date/reference + a few safe historical examples.
+// Never sends balances, employee lists, secrets, or another business's data.
+// AI must pick category_id ONLY from the provided list; unknown → discarded.
+async function aiSuggestRows(biz, rows, cats, cps, examples, batchId, userId) {
+  const result = new Map();
+  if (!process.env.ANTHROPIC_API_KEY || !rows.length) return result;
+  const catIds = new Set(cats.map(c => c.id));
+  const cpIds = new Set(cps.map(c => c.id));
+  const CHUNK = 30;
+
+  for (let i = 0; i < rows.length; i += CHUNK) {
+    const chunk = rows.slice(i, i + CHUNK);
+    const payload = {
+      business_categories: cats.map(c => ({ id: c.id, name: c.name })),
+      known_counterparties: cps.map(c => ({ id: c.id, name: c.name })),
+      historical_examples: examples.slice(0, 15),
+      transactions: chunk.map(r => ({
+        row_id: r.id, description: r.description, amount: r.amount,
+        direction: r.direction, date: r.tx_date, bank_reference: r.bank_reference || null,
+      })),
+    };
+    const prompt = `You categorize bank statement rows for ONE business.
+
+Allowed system transaction_type values: ${VALID_SYSTEM_TX_TYPES.join(', ')}.
+
+STRICT RULES:
+- Choose category_id ONLY from business_categories below. If none fits, set category_id to null.
+- Choose counterparty_id ONLY from known_counterparties, else null.
+- NEVER invent a category. NEVER create one.
+- confidence is 0..1. Use <0.7 when unsure.
+- scope is "business" or "personal".
+
+Return ONLY a JSON array, no prose, no markdown:
+[{"row_id":"...","transaction_type":"expense","category_id":"id-or-null","counterparty_id":"id-or-null","scope":"business","confidence":0.0,"reason":"short"}]
+
+DATA:
+${JSON.stringify(payload)}`;
+
+    try {
+      const resp = await anthropic.messages.create({
+        model: 'claude-sonnet-4-5', max_tokens: 1800,
+        messages: [{ role: 'user', content: prompt }],
+      });
+      const raw = (resp.content?.[0]?.text || '').trim().replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+      const arr = JSON.parse(raw);
+      for (const s of (Array.isArray(arr) ? arr : [])) {
+        const row = chunk.find(r => String(r.id) === String(s.row_id));
+        if (!row) continue;
+        const type = VALID_SYSTEM_TX_TYPES.includes(s.transaction_type) ? s.transaction_type : (row.direction === 'in' ? 'income' : 'expense');
+        const categoryId = (s.category_id && catIds.has(s.category_id)) ? s.category_id : null; // unknown → discard
+        const cpId = (s.counterparty_id && cpIds.has(s.counterparty_id)) ? s.counterparty_id : null;
+        let conf = Number(s.confidence);
+        if (!(conf >= 0 && conf <= 1)) conf = 0;
+        if (!categoryId) conf = Math.min(conf, 0.69); // no valid category → force needs_review
+        result.set(String(row.id), {
+          suggested_transaction_type: type, suggested_category_id: categoryId,
+          suggested_counterparty_id: cpId, suggested_scope: s.scope === 'personal' ? 'personal' : 'business',
+          suggestion_source: 'ai', suggestion_confidence: conf,
+          suggestion_reason: typeof s.reason === 'string' ? s.reason.slice(0, 300) : null,
+        });
+      }
+      await supabase.from('ai_usage_events').insert({
+        business_id: biz.business.id, feature: 'bank_categorization_ai', batch_id: batchId,
+        rows_processed: chunk.length, model: 'claude-sonnet-4-5',
+        input_tokens: resp.usage?.input_tokens ?? null, output_tokens: resp.usage?.output_tokens ?? null,
+        created_by_user_id: userId,
+      });
+    } catch (e) {
+      // AI unavailable or bad JSON → leave these rows for manual review (no block).
+    }
+  }
+  return result;
+}
+
+// POST /api/bank-imports/:batchId/suggest — run deterministic cascade, then AI
+// for the remainder. Does NOT touch the ledger.
 app.post('/api/bank-imports/:batchId/suggest', auth, async (req, res) => {
   try {
     const biz = await requireBusiness(req, res);
@@ -2012,22 +2088,43 @@ app.post('/api/bank-imports/:batchId/suggest', auth, async (req, res) => {
       findExistingTx, findDebt, findPayroll, transferAmounts,
     };
 
-    // ── Classify each row + persist suggestion ────────────────────────────────
-    let high = 0, needs = 0, matched = 0, suggested = 0;
-    for (const r of rows) {
-      const s = classifyRowDeterministic(r, ctx);
-      const bucket = reviewBucket(s.suggestion_confidence, s.suggested_transaction_type, s.suggested_scope, !!s.suggested_match_type);
+    // ── Level 1-4: deterministic classification (in memory) ───────────────────
+    const detResults = rows.map(r => ({ row: r, s: classifyRowDeterministic(r, ctx) }));
+    // Only rows the cascade couldn't resolve go to AI (cost control).
+    const aiCandidates = detResults.filter(x => x.s.suggestion_source === 'none').map(x => x.row);
+
+    // Safe historical examples for AI (this business only): desc → confirmed category.
+    const { data: fb } = await supabase.from('classification_feedback')
+      .select('normalized_desc, final_category_id').eq('business_id', biz.business.id)
+      .not('final_category_id', 'is', null).order('created_at', { ascending: false }).limit(60);
+    const seenEx = new Set();
+    const examples = [];
+    for (const f of (fb || [])) {
+      const name = catNameById.get(f.final_category_id);
+      if (!name || !f.normalized_desc || seenEx.has(f.normalized_desc)) continue;
+      seenEx.add(f.normalized_desc);
+      examples.push({ description: f.normalized_desc, category: name });
+    }
+
+    // ── Level 5: AI for the remainder ─────────────────────────────────────────
+    const aiMap = await aiSuggestRows(biz, aiCandidates, cats || [], cps || [], examples, batch.id, req.user.userId);
+
+    // ── Merge + persist ───────────────────────────────────────────────────────
+    let high = 0, needs = 0, matched = 0, suggested = 0, aiUsed = 0;
+    for (const { row, s } of detResults) {
+      const sug = aiMap.has(String(row.id)) ? { ...s, ...aiMap.get(String(row.id)) } : s;
+      if (aiMap.has(String(row.id))) aiUsed++;
+      const bucket = reviewBucket(sug.suggestion_confidence, sug.suggested_transaction_type, sug.suggested_scope, !!sug.suggested_match_type);
       if (bucket === 'high_confidence') high++;
       else if (bucket === 'matched_existing') matched++;
       else if (bucket === 'suggested') suggested++;
       else needs++;
-      await supabase.from('bank_import_rows').update({ ...s, review_status: bucket }).eq('id', r.id);
+      await supabase.from('bank_import_rows').update({ ...sug, review_status: bucket }).eq('id', row.id);
     }
 
     res.json({
-      ok: true, processed: rows.length,
+      ok: true, processed: rows.length, ai_rows: aiUsed,
       summary: { high_confidence: high, suggested, matched_existing: matched, needs_review: needs },
-      ai_pending: needs, // rows AI (Phase 3) will attempt
     });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
