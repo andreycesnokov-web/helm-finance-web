@@ -9,6 +9,7 @@
 | **Database migration** | `023_tax_engine_foundation.sql` (additive + idempotent; applied manually in Supabase) — builds on `020` |
 | **Delivery** | 6 PRs via `feature/* → develop → main → Railway` |
 | **Governing specs** | `docs/specs/AI_ACCOUNTANT_MODULE_SPECIFICATION_V1.0.md`, `docs/specs/SYSTEM_ARCHITECTURE_V4.0.md` |
+| **Implementation report** | [docs/reports/TAX_ENGINE_FOUNDATION_V1_REPORT.md](../reports/TAX_ENGINE_FOUNDATION_V1_REPORT.md) |
 
 ---
 
