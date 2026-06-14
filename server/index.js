@@ -104,6 +104,41 @@ function canProposeCategory(role)             { return ['owner', 'ceo', 'admin',
 // Classification rules (business memory) — same as structural management.
 function canManageClassificationRules(role)   { return ['owner', 'ceo', 'admin', 'cfo'].includes(role); }
 
+// ── Tax Engine Foundation helpers (PR1 — additive, no behaviour change) ──────
+// tax_rules / official_sources are a PLATFORM-LEVEL registry, not business-owned.
+// Only a platform admin (or a future dedicated tax_rule_editor) may manage them.
+// A business Owner can never create or activate a global tax rule.
+function canEditTaxRules(userId)              { return isAdminUser(userId); }  // isAdminUser hoisted
+
+// Append-only audit writer. Best-effort: auditing must never block the action.
+// business_id is null for platform-level entities (tax_rule, official_source).
+// Never pass secrets/tokens or unnecessary PII in before/after.
+async function recordAudit({ businessId = null, actorUserId = null, actorRole = null, channel = 'web',
+                             entityType, entityId = null, action, before = null, after = null, requestId = null }) {
+  try {
+    await supabase.from('audit_events').insert({
+      business_id: businessId, actor_user_id: actorUserId, actor_role: actorRole, channel,
+      entity_type: entityType, entity_id: entityId != null ? String(entityId) : null,
+      action, before_json: before, after_json: after, request_id: requestId,
+    });
+  } catch { /* audit best-effort */ }
+}
+
+// A tax rule only DRIVES obligations / AI / Decision Engine when it is active AND
+// backed by a verified official source. Unverified or under_review rules never
+// generate events or feed AI. `source` may be the joined official_sources row.
+function effectiveRuleActive(rule, source = null) {
+  if (!rule || rule.status !== 'active') return false;
+  if (!rule.last_verified_at) return false;            // rule itself must be verified
+  if (!rule.official_source_id) return false;          // must cite a source
+  const src = source || rule.official_sources || null;
+  if (src) {
+    if (['outdated', 'unavailable', 'replaced', 'draft'].includes(src.status)) return false;
+    if (!src.last_verified_at) return false;            // source must be verified
+  }
+  return true;
+}
+
 /**
  * Resolve the active business for a request and validate membership.
  * Selection priority: x-business-id header → ?business_id → body.business_id
