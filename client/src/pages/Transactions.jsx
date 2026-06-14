@@ -81,8 +81,22 @@ function DetailRow({ label, value, valueStyle }) {
 }
 
 // ── Inline Detail Panel (non-payroll) ─────────────────────────────────────────
-function TxInlinePanel({ tx, refDirections = [], refActivityTypes = [], refWallets = [], t: tr }) {
+function TxInlinePanel({ tx, refDirections = [], refActivityTypes = [], refWallets = [], categories = [], onSaveCategory, t: tr }) {
+  const [catDraft, setCatDraft] = useState(tx?.category || '')
+  const [catSaving, setCatSaving] = useState(false)
+  const [catSaved, setCatSaved] = useState(false)
+  useEffect(() => { setCatDraft(tx?.category || ''); setCatSaved(false) }, [tx?.id, tx?.category])
+
   if (!tx) return null
+
+  const catDirty = (catDraft || '') !== (tx.category || '')
+  const saveCat = async () => {
+    if (!onSaveCategory || !catDirty) return
+    setCatSaving(true)
+    try { await onSaveCategory(tx.id, catDraft.trim() || null); setCatSaved(true) }
+    catch { /* keep draft so user can retry */ }
+    finally { setCatSaving(false) }
+  }
 
   const badge      = getTypeBadge(tx.type)
   const impact     = getCashImpact(tx.type)
@@ -129,9 +143,26 @@ function TxInlinePanel({ tx, refDirections = [], refActivityTypes = [], refWalle
 
       {/* Detail grid */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '10px 20px', marginBottom: 14 }}>
-        {tx.category && (
-          <div><div style={lbSt}>{tr('transactions.category')}</div><div style={vlSt}>{tx.category}</div></div>
-        )}
+        <div style={{ gridColumn: '1 / -1' }} onClick={e => e.stopPropagation()}>
+          <div style={lbSt}>{tr('transactions.category')}</div>
+          <div style={{ display: 'flex', gap: 6, marginTop: 3, alignItems: 'center', flexWrap: 'wrap' }}>
+            <input
+              list={`tx-cats-${tx.id}`}
+              value={catDraft}
+              placeholder={tr('transactions.uncategorized')}
+              onChange={e => { setCatDraft(e.target.value); setCatSaved(false) }}
+              onKeyDown={e => { if (e.key === 'Enter') saveCat() }}
+              style={{ fontSize: 13, padding: '5px 9px', border: '1px solid var(--border-2)', borderRadius: 8, minWidth: 180, background: 'var(--bg)' }}
+            />
+            <datalist id={`tx-cats-${tx.id}`}>{categories.map(c => <option key={c} value={c} />)}</datalist>
+            {catDirty && (
+              <button className="btn btn-primary btn-sm" disabled={catSaving} onClick={saveCat} style={{ fontSize: 12, padding: '5px 12px' }}>
+                {catSaving ? '…' : tr('common.save') || 'Save'}
+              </button>
+            )}
+            {catSaved && !catDirty && <span style={{ fontSize: 12, color: 'var(--green-dark)' }}>✓</span>}
+          </div>
+        </div>
         <div>
           <div style={lbSt}>{tr('transactions.scope')}</div>
           <div style={vlSt}>{tx.scope === 'business' ? '💼 Business' : '👤 Personal'}</div>
@@ -524,6 +555,13 @@ export default function Transactions() {
   const [refDirections,    setRefDirections]   = useState([])
   const [refActivityTypes, setRefActivityTypes] = useState([])
   const [refWallets,       setRefWallets]       = useState([])
+  const [categories,       setCategories]       = useState([])
+
+  // Save an edited category and patch local state in place
+  const saveCategory = async (txId, category) => {
+    const updated = await apiFetch(`/transactions/${txId}`, token, { method: 'PATCH', body: { category } })
+    setTxs(prev => prev.map(t => t.id === txId ? { ...t, category: updated.category } : t))
+  }
 
   // ── Load from API ─────────────────────────────────────────────────────────
   const load = () => {
@@ -547,6 +585,7 @@ export default function Transactions() {
     apiFetch('/business-directions', token).then(d => setRefDirections(d.directions || [])).catch(() => {})
     apiFetch('/activity-types', token).then(d => setRefActivityTypes(d.activityTypes || [])).catch(() => {})
     apiFetch('/wallets', token).then(d => setRefWallets(d.wallets || [])).catch(() => {})
+    apiFetch('/cashflow-categories', token).then(d => setCategories((d.categories || []).map(c => c.name))).catch(() => {})
   }, [token])
 
   // ── Client-side filters ───────────────────────────────────────────────────
@@ -754,7 +793,7 @@ export default function Transactions() {
                         <td colSpan="7" style={{ padding: 0, border: 'none' }}>
                           {isPayroll
                             ? <PayrollInlinePanel txId={t.id} detailsMap={payrollDetailsByTxId} loadingId={loadingPayrollTxId} t={tr} />
-                            : <TxInlinePanel tx={t} refDirections={refDirections} refActivityTypes={refActivityTypes} refWallets={refWallets} t={tr} />
+                            : <TxInlinePanel tx={t} refDirections={refDirections} refActivityTypes={refActivityTypes} refWallets={refWallets} categories={categories} onSaveCategory={saveCategory} t={tr} />
                           }
                         </td>
                       </tr>

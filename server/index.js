@@ -2594,6 +2594,34 @@ app.get('/api/transactions', auth, async (req, res) => {
   res.json(data);
 });
 
+// PATCH /api/transactions/:id — edit category (post-import categorization)
+app.patch('/api/transactions/:id', auth, async (req, res) => {
+  const biz = await requireBusiness(req, res);
+  if (!biz) return;
+  if (!canCreateConfirmedFinancialRecord(biz.role))
+    return res.status(403).json({ error: 'Your role does not allow editing transactions' });
+
+  const updates = {};
+  if ('category' in req.body) {
+    const c = req.body.category;
+    if (c !== null && typeof c !== 'string')
+      return res.status(400).json({ error: 'category must be a string or null' });
+    updates.category = c ? String(c).trim().slice(0, 120) || null : null;
+  }
+  if (Object.keys(updates).length === 0)
+    return res.status(400).json({ error: 'No editable fields provided' });
+
+  const { data, error } = await supabase.from('transactions')
+    .update(updates)
+    .eq('id', req.params.id)
+    .or(bizOrFilter(biz))
+    .select()
+    .single();
+  if (error) return res.status(500).json({ error: error.message });
+  if (!data) return res.status(404).json({ error: 'Transaction not found' });
+  res.json(data);
+});
+
 // --- Reminders API ---------------------------------------------------------
 
 app.post('/api/reminders', auth, async (req, res) => {
