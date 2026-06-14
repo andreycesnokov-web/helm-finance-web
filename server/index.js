@@ -1889,8 +1889,11 @@ function classifyRowDeterministic(row, ctx) {
       return out;
     }
   }
-  // 3d. Transfer — opposite row of same amount within this batch
-  if (ctx.transferAmounts.get(amt) > 1) {
+  // 3d. Transfer — a matching OPPOSITE-direction row of the same amount exists
+  // in this batch (one IN + one OUT). Same-direction duplicates (e.g. two equal
+  // admin fees) are NOT transfers.
+  const dirs = ctx.transferAmounts.get(amt);
+  if (dirs && dirs.has('in') && dirs.has('out')) {
     out.suggested_transaction_type = 'transfer';
     out.suggested_match_type = 'transfer';
     out.suggestion_source = 'match'; out.suggestion_confidence = 0.5;
@@ -2079,11 +2082,14 @@ app.post('/api/bank-imports/:batchId/suggest', auth, async (req, res) => {
       return Math.abs(new Date(p.payment_date) - new Date(date)) <= 2 * 86400000;
     }) || null;
 
-    // Transfer detection: count rows per absolute amount in this batch.
-    const transferAmounts = new Map();
+    // Transfer detection: track which directions each absolute amount appears
+    // with. A transfer needs the same amount with BOTH 'in' and 'out'.
+    const transferAmounts = new Map(); // amount → Set<direction>
     for (const r of rows) {
       const a = Math.abs(Number(r.amount) || 0);
-      transferAmounts.set(a, (transferAmounts.get(a) || 0) + 1);
+      const set = transferAmounts.get(a) || new Set();
+      set.add(r.direction);
+      transferAmounts.set(a, set);
     }
 
     const ctx = {
