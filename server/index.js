@@ -1411,18 +1411,124 @@ app.get('/api/accountant/profile', auth, async (req, res) => {
 });
 
 // PUT /api/accountant/profile — owner/admin/cfo edits the tax profile
-const TAX_PROFILE_FIELDS = ['country','jurisdiction','legal_entity_type','tax_residency','tax_regime','tax_identifier','financial_year_start','financial_year_end','vat_status','pkp_status','employee_status','payroll_tax_status','industry','business_activity_codes','accounting_method','reporting_currency','filing_frequency'];
+const TAX_PROFILE_FIELDS = ['country','jurisdiction','legal_entity_type','tax_residency','tax_regime','tax_identifier','npwp','nib','financial_year_start','financial_year_end','vat_status','pkp_status','employee_status','payroll_tax_status','withholding_tax_status','industry','business_activity_codes','accounting_method','reporting_currency','filing_frequency'];
+// Minimum fields needed before any obligation can be generated.
+const REQUIRED_PROFILE_FIELDS = ['country','jurisdiction','legal_entity_type','tax_regime','financial_year_start','financial_year_end','vat_status'];
+// Changing these re-opens verification and is always audited.
+const CRITICAL_PROFILE_FIELDS = ['country','legal_entity_type','tax_regime','tax_identifier','npwp','pkp_status','vat_status','financial_year_start','financial_year_end'];
+
+function profileCompleteness(p) {
+  if (!p) return { percent: 0, missing: [...REQUIRED_PROFILE_FIELDS] };
+  const missing = REQUIRED_PROFILE_FIELDS.filter(f => !p[f]);
+  return { percent: Math.round((REQUIRED_PROFILE_FIELDS.length - missing.length) / REQUIRED_PROFILE_FIELDS.length * 100), missing };
+}
+// tax_identifier (universal) vs npwp (Indonesia) — surface a mismatch, never pick.
+function profileWarnings(p) {
+  const w = [];
+  if (p?.tax_identifier && p?.npwp && p.tax_identifier !== p.npwp)
+    w.push({ field: 'tax_identifier_npwp_mismatch', message: 'tax_identifier and NPWP differ — please review which is correct.' });
+  return w;
+}
+
+// Deterministic applicability — never uses an LLM. Each verdict has a reason.
+function evaluateApplicableTaxRules({ taxProfile, activeRules, asOfDate = new Date() }) {
+  const applicable = [], excluded = [], warnings = [];
+  const missing = new Set();
+  const p = taxProfile || {};
+  const asOf = new Date(asOfDate);
+  for (const rule of (activeRules || [])) {
+    if (rule.effective_from && new Date(rule.effective_from) > asOf) { excluded.push({ rule_code: rule.rule_code, reason: `Not yet effective (from ${rule.effective_from}).` }); continue; }
+    if (rule.effective_to && new Date(rule.effective_to) < asOf) { excluded.push({ rule_code: rule.rule_code, reason: `No longer effective (until ${rule.effective_to}).` }); continue; }
+    const cond = rule.applies_when || rule.applicability_conditions_json || {};
+    let verdict = 'applicable', reason = '';
+    if (rule.legal_entity_type) {
+      if (!p.legal_entity_type) { verdict = 'unknown'; reason = 'legal_entity_type is missing'; missing.add('legal_entity_type'); }
+      else if (rule.legal_entity_type !== p.legal_entity_type) { verdict = 'excluded'; reason = `Requires entity type ${rule.legal_entity_type}; business is ${p.legal_entity_type}.`; }
+    }
+    if (verdict === 'applicable' && cond.vat_status) {
+      if (!p.vat_status) { verdict = 'unknown'; reason = 'vat_status is missing'; missing.add('vat_status'); }
+      else if (p.vat_status !== cond.vat_status) { verdict = 'excluded'; reason = `Requires vat_status ${cond.vat_status}; business is ${p.vat_status}.`; }
+    }
+    if (verdict === 'applicable' && cond.has_employees) {
+      if (!p.employee_status) { verdict = 'unknown'; reason = 'employee/payroll status is missing'; missing.add('employee_status'); }
+      else if (p.employee_status !== 'has_employees') { verdict = 'excluded'; reason = 'Business has no employees.'; }
+    }
+    if (verdict === 'applicable') applicable.push({ rule_code: rule.rule_code, rule_id: rule.id, version: rule.version, title: rule.title, obligation_type: rule.obligation_type, reason: reason || `Applies to ${p.legal_entity_type || 'this business'}.`, official_source: rule.official_sources || null });
+    else if (verdict === 'excluded') excluded.push({ rule_code: rule.rule_code, reason });
+    else warnings.push({ rule_code: rule.rule_code, reason: `Cannot determine — ${reason}.` });
+  }
+  return { applicable_rules: applicable, excluded_rules: excluded, missing_profile_fields: [...missing], warnings };
+}
+
 app.put('/api/accountant/profile', auth, async (req, res) => {
   try {
     const biz = await requireBusiness(req, res);
     if (!biz) return;
     if (!canApproveFinancialRecord(biz.role)) return res.status(403).json({ error: 'Only owner, CEO, admin or CFO can edit the tax profile' });
+    const { data: beforeRows } = await supabase.from('tax_profiles').select('*').eq('business_id', biz.business.id).limit(1);
+    const before = beforeRows?.[0] || null;
+
     const updates = { business_id: biz.business.id, updated_at: new Date().toISOString() };
     for (const f of TAX_PROFILE_FIELDS) if (req.body[f] !== undefined) updates[f] = req.body[f] || null;
+    if (!before) updates.created_by_user_id = req.user.userId;
+
+    // Recompute status from completeness. A critical change on a verified profile
+    // re-opens review (verification must be redone).
+    const merged = { ...(before || {}), ...updates };
+    const { missing } = profileCompleteness(merged);
+    const criticalChanged = CRITICAL_PROFILE_FIELDS.some(f => f in updates && (before?.[f] || null) !== (updates[f] || null));
+    if (missing.length) updates.profile_status = 'incomplete';
+    else if (before?.profile_status === 'verified' && criticalChanged) { updates.profile_status = 'needs_review'; updates.verified_at = null; updates.verified_by_user_id = null; }
+    else if (!before?.profile_status || before.profile_status === 'incomplete') updates.profile_status = 'active';
+
     const { data, error } = await supabase.from('tax_profiles')
       .upsert(updates, { onConflict: 'business_id' }).select().single();
     if (error) return res.status(500).json({ error: error.message });
+
+    if (!before || criticalChanged) {
+      const beforeCrit = {}, afterCrit = {};
+      for (const f of CRITICAL_PROFILE_FIELDS) { beforeCrit[f] = before?.[f] ?? null; afterCrit[f] = data[f] ?? null; }
+      await recordAudit({ businessId: biz.business.id, actorUserId: req.user.userId, actorRole: biz.role, entityType: 'tax_profile', entityId: data.id, action: before ? 'critical_fields_changed' : 'created', before: before ? beforeCrit : null, after: afterCrit });
+    }
+    res.json({ profile: data, completeness: profileCompleteness(data), warnings: profileWarnings(data) });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// POST /api/accountant/profile/verify — owner/admin/cfo confirms the profile.
+app.post('/api/accountant/profile/verify', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canApproveFinancialRecord(biz.role)) return res.status(403).json({ error: 'Forbidden' });
+    const { data: rows } = await supabase.from('tax_profiles').select('*').eq('business_id', biz.business.id).limit(1);
+    const p = rows?.[0];
+    if (!p) return res.status(404).json({ error: 'No tax profile' });
+    const { missing } = profileCompleteness(p);
+    if (missing.length) return res.status(422).json({ error: 'Profile incomplete', missing });
+    const now = new Date().toISOString();
+    const { data, error } = await supabase.from('tax_profiles')
+      .update({ profile_status: 'verified', verified_by_user_id: req.user.userId, verified_at: now, updated_at: now })
+      .eq('business_id', biz.business.id).select().single();
+    if (error) return res.status(500).json({ error: error.message });
+    await recordAudit({ businessId: biz.business.id, actorUserId: req.user.userId, actorRole: biz.role, entityType: 'tax_profile', entityId: data.id, action: 'verified' });
     res.json({ profile: data });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// GET /api/accountant/applicability — deterministic applicable-rule evaluation.
+app.get('/api/accountant/applicability', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canViewBusinessFinance(biz.role)) return res.status(403).json({ error: 'Forbidden' });
+    const { data: rows } = await supabase.from('tax_profiles').select('*').eq('business_id', biz.business.id).limit(1);
+    const profile = rows?.[0] || null;
+    const jur = profile?.jurisdiction || 'ID';
+    const { data: rules } = await supabase.from('tax_rules').select('*, official_sources(*)').eq('jurisdiction', jur).eq('status', 'active');
+    // Only rules with a verified source actually drive obligations.
+    const effective = (rules || []).filter(r => effectiveRuleActive(r, r.official_sources));
+    const result = evaluateApplicableTaxRules({ taxProfile: profile, activeRules: effective });
+    res.json({ ...result, completeness: profileCompleteness(profile), profile_warnings: profileWarnings(profile), active_unverified: (rules || []).length - effective.length });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
