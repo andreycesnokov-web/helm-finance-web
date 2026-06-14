@@ -6,6 +6,11 @@ import { apiFetch, fmt, fmtFull } from '../lib/api'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
+// The real date money moved (statement/entry date), not the record creation time.
+function txWhen(t) {
+  return t?.transaction_date || t?.created_at
+}
+
 function fmtDate(dateStr) {
   if (!dateStr) return '—'
   const d = new Date(dateStr)
@@ -224,7 +229,7 @@ function TransactionDetailsDrawer({ tx, onClose, refDirections = [], refActivity
               {badge.labelKey ? tr(badge.labelKey) : badge.label}
             </span>
             <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-3)', letterSpacing: '0.04em' }}>
-              {fmtDate(tx.created_at)}
+              {fmtDate(txWhen(tx))}
             </span>
           </div>
           <button className="tx-drawer-close" onClick={onClose} aria-label="Close">
@@ -718,7 +723,7 @@ export default function Transactions() {
                       className={`tx-row-clickable${isExpanded ? ' tx-row-expanded' : ''}`}
                       onClick={() => toggleExpanded(t)}
                     >
-                      <td className="tx-col-date">{fmtDate(t.created_at)}</td>
+                      <td className="tx-col-date">{fmtDate(txWhen(t))}</td>
                       <td className="tx-col-desc">
                         <div className="tx-desc-text">{t.description || '—'}</div>
                         {t.project && <div className="tx-desc-sub">{t.project}</div>}
@@ -787,7 +792,7 @@ export default function Transactions() {
                   <div className="tx-card-body">
                     <div className="tx-card-desc">{t.description || '—'}</div>
                     <div className="tx-card-meta">
-                      <span>{fmtDateShort(t.created_at)}</span>
+                      <span>{fmtDateShort(txWhen(t))}</span>
                       {t.category && <><span className="tx-meta-dot">·</span><span>{t.category}</span></>}
                       {t.source   && <><span className="tx-meta-dot">·</span><span>{t.source}</span></>}
                     </div>
