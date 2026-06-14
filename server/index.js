@@ -1625,8 +1625,11 @@ app.post('/api/bank-import/batches', auth, async (req, res) => {
     }
 
     // Already-imported dedup hashes (avoid re-importing the same statement).
+    // Only rows that became real transactions count — abandoned review batches
+    // (re-uploaded for another pass) must NOT mark a fresh upload as duplicate.
     const { data: priorRows } = await supabase.from('bank_import_rows')
-      .select('dedup_hash').eq('business_id', biz.business.id);
+      .select('dedup_hash').eq('business_id', biz.business.id)
+      .not('linked_transaction_id', 'is', null);
     const priorHashes = new Set((priorRows || []).map(r => r.dedup_hash));
 
     // Create batch
