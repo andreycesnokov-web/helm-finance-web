@@ -127,11 +127,17 @@ export default function BankImport() {
     return null
   }
 
+  // Summary / balance rows (Opening/Closing/Total) are not transactions — their
+  // date cell carries a label like "Opening balance per 01/05/26".
+  const SUMMARY_RE = /balance|saldo|total|grand|opening|closing/i
+
   const buildRows = () => {
     const idx = (name) => headers.indexOf(name)
     const useDC = map.debit || map.credit
     return rawRows.map((r, i) => {
       const rawObj = {}; headers.forEach((h, j) => { rawObj[h] = r[j] })
+      const dateCell = String(r[idx(map.date)] || '')
+      if (SUMMARY_RE.test(dateCell)) return null  // skip Opening/Closing/Total rows
       let amount = null, direction = null
       if (useDC) {
         const debit = num(r[idx(map.debit)]) || 0
@@ -153,7 +159,7 @@ export default function BankImport() {
         amount, direction,
         bank_reference: map.reference ? String(r[idx(map.reference)] || '').trim() || null : null,
       }
-    }).filter(r => r.amount !== null && r.amount > 0 && r.tx_date)  // junk/balance rows have no parseable date
+    }).filter(r => r && r.amount !== null && r.amount > 0 && r.tx_date)  // drop summary/balance rows and unparseable lines
   }
 
   const parseAndUpload = async () => {
