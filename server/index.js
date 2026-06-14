@@ -3,6 +3,7 @@ const cors = require('cors');
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const { createClient } = require('@supabase/supabase-js');
+const { calculateDueDate, ymd } = require('./lib/dueDate');
 require('dotenv').config();
 
 // --- Environment validation (fail fast, never log secret values) -----------
@@ -1606,7 +1607,30 @@ function eventStatus(dueDate, now) {
   return 'upcoming';
 }
 
-// GET /api/accountant/calendar — generate + persist + return upcoming events
+// Reporting periods a rule covers right now (start/end as YYYY-MM-DD).
+// Monthly: last 2 completed months + current. Annual: last completed FY
+// (from the profile's financial year; default Jan 1 – Dec 31).
+function periodsForRule(rule, profile, now) {
+  const out = [];
+  const y = now.getUTCFullYear(), m0 = now.getUTCMonth();
+  if (rule.filing_frequency === 'monthly') {
+    for (let back = 2; back >= 0; back--) {
+      const total = m0 - back;
+      const py = y + Math.floor(total / 12);
+      const pm0 = ((total % 12) + 12) % 12;
+      out.push({ period: `${py}-${String(pm0 + 1).padStart(2, '0')}`, period_start: ymd(py, pm0, 1), period_end: ymd(py, pm0, 31) });
+    }
+  } else if (rule.filing_frequency === 'annual') {
+    const [sm, sd] = (profile?.financial_year_start || '01-01').split('-').map(Number);
+    const [em, ed] = (profile?.financial_year_end || '12-31').split('-').map(Number);
+    const py = y - 1; // last completed calendar/financial year
+    out.push({ period: String(py), period_start: ymd(py, (sm || 1) - 1, sd || 1), period_end: ymd(py, (em || 12) - 1, ed || 31) });
+  }
+  return out;
+}
+
+// GET /api/accountant/calendar — deterministic generation from verified active
+// rules + applicability engine + structured due dates. Idempotent upsert.
 app.get('/api/accountant/calendar', auth, async (req, res) => {
   try {
     const biz = await requireBusiness(req, res);
@@ -1616,43 +1640,54 @@ app.get('/api/accountant/calendar', auth, async (req, res) => {
     const { data: profRows } = await supabase.from('tax_profiles').select('*').eq('business_id', biz.business.id).limit(1);
     const profile = profRows?.[0] || null;
     const jur = profile?.jurisdiction || 'ID';
-    const { data: rules } = await supabase.from('tax_rules')
+    const { data: allActive } = await supabase.from('tax_rules')
       .select('*, official_sources(*)').eq('jurisdiction', jur).eq('status', 'active');
 
-    // Does the business have payroll employees? (for PPh 21 applicability)
-    const { count: empCount } = await supabase.from('payroll_employees')
-      .select('id', { count: 'exact', head: true }).or(bizOrFilter(biz)).neq('status', 'archived');
-    const hasEmployees = (profile?.employee_status === 'has_employees') || (empCount || 0) > 0;
+    // Only rules with a verified source drive obligations; the rest are surfaced.
+    const effective = (allActive || []).filter(r => effectiveRuleActive(r, r.official_sources));
+    const { applicable_rules, missing_profile_fields } = evaluateApplicableTaxRules({ taxProfile: profile, activeRules: effective });
+    const applicableCodes = new Set(applicable_rules.map(r => r.rule_code));
 
     const now = new Date();
+    const warnings = [];
     const generated = [];
-    for (const rule of (rules || [])) {
-      if (!ruleApplies(rule, profile, hasEmployees)) continue;
-      for (const ev of ruleEvents(rule, profile, now)) {
+    for (const rule of effective) {
+      if (!applicableCodes.has(rule.rule_code)) continue;
+      for (const per of periodsForRule(rule, profile, now)) {
+        let due;
+        try { due = calculateDueDate(rule, per.period_start, per.period_end); }
+        catch { warnings.push(`${rule.rule_code}: no structured due_date_rule_json — skipped (never guessed).`); continue; }
         generated.push({
-          business_id: biz.business.id, rule_id: rule.id, rule_code: rule.rule_code,
+          business_id: biz.business.id, rule_id: rule.id, rule_code: rule.rule_code, rule_version: rule.version,
           obligation_type: rule.obligation_type, title: rule.title,
-          period: ev.period, due_date: ev.due_date, currency: profile?.reporting_currency || 'IDR',
-          status: eventStatus(ev.due_date, now),
+          period: per.period, period_start: per.period_start, period_end: per.period_end,
+          due_date: due, currency: profile?.reporting_currency || 'IDR',
+          status: eventStatus(due, now), amount_status: 'unknown',
+          source_verification_required: false,
+          source_snapshot_json: rule.official_sources ? { id: rule.official_sources.id, title: rule.official_sources.title, url: rule.official_sources.url, last_verified_at: rule.official_sources.last_verified_at } : null,
+          generated_at: new Date().toISOString(), generated_by: req.user.userId,
         });
       }
     }
 
-    // Persist (upsert) so tracking columns survive; ignore failures (read still works).
-    if (generated.length) {
+    // Idempotent upsert. Do NOT touch confirmed/paid events (skip recompute).
+    const { data: stored0 } = await supabase.from('compliance_events').select('*').eq('business_id', biz.business.id);
+    const locked = new Set((stored0 || []).filter(s => ['paid', 'filed'].includes(s.payment_status) || ['paid', 'filed'].includes(s.status)).map(s => `${s.rule_code}|${s.period}`));
+    const toUpsert = generated.filter(g => !locked.has(`${g.rule_code}|${g.period}`));
+    if (toUpsert.length) {
       await supabase.from('compliance_events')
-        .upsert(generated.map(g => ({ ...g, updated_at: new Date().toISOString() })), { onConflict: 'business_id,rule_code,period' })
+        .upsert(toUpsert.map(g => ({ ...g, updated_at: new Date().toISOString() })), { onConflict: 'business_id,rule_code,period' })
         .then(() => {}, () => {});
     }
-    // Merge stored tracking fields back in.
+
     const { data: stored } = await supabase.from('compliance_events').select('*').eq('business_id', biz.business.id);
     const byKey = Object.fromEntries((stored || []).map(s => [`${s.rule_code}|${s.period}`, s]));
     const events = generated.map(g => {
       const s = byKey[`${g.rule_code}|${g.period}`] || {};
-      const rule = (rules || []).find(r => r.rule_code === g.rule_code);
+      const rule = effective.find(r => r.rule_code === g.rule_code);
       return {
-        ...g, id: s.id,
-        status: eventStatus(g.due_date, now),
+        ...g, id: s.id, status: eventStatus(g.due_date, now),
+        amount_status: s.amount_status || 'unknown',
         professional_review_status: s.professional_review_status || 'not_started',
         owner_approval_status: s.owner_approval_status || 'not_required',
         payment_status: s.payment_status || 'unpaid',
@@ -1662,7 +1697,11 @@ app.get('/api/accountant/calendar', auth, async (req, res) => {
       };
     }).sort((a, b) => new Date(a.due_date) - new Date(b.due_date));
 
-    res.json({ jurisdiction: jur, profile_complete: !!(profile && profile.country && profile.legal_entity_type), events });
+    res.json({
+      jurisdiction: jur, profile_complete: !missing_profile_fields.length && !!(profile && profile.country && profile.legal_entity_type),
+      events, warnings, missing_profile_fields,
+      active_unverified: (allActive || []).length - effective.length,
+    });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
