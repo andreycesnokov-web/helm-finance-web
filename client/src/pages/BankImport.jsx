@@ -14,7 +14,16 @@ const L = {
     rows: 'rows', duplicates: 'duplicates', toImport: 'to import', confirmImport: 'Confirm import', imported: 'Imported',
     category: 'Category', type: 'Type', income: 'Income', expense: 'Expense', dup: 'Duplicate', include: 'Include', reconciled: 'Reconciliation',
     balanced: 'Balanced', unbalanced: 'Unbalanced', difference: 'Difference', noWallet: 'Select a target account first.',
-    history: 'Recent imports', createTx: 'Will create transactions for included rows only.' },
+    history: 'Recent imports', createTx: 'Will create transactions for included rows only.',
+    suggesting: 'Analyzing with rules + AI…', confidence: 'Confidence', match: 'Match', suggestion: 'AI suggestion',
+    aiDisclaimer: 'AI only recommends. The final choice remains with your business.',
+    noMatchingCategory: 'No matching business category found. Leave uncategorized or create a new category.',
+    fAll: 'All', fHigh: 'High confidence', fNeeds: 'Needs review', fMatched: 'Matched', fDup: 'Possible duplicates', fUncat: 'Uncategorized', fTransfer: 'Transfers',
+    confirmSelected: 'Confirm selected', confirmHigh: 'Confirm high-confidence', exclude: 'Exclude', markPersonal: 'Mark personal',
+    createNewCategory: '+ New category', uncategorized: 'Uncategorized', high: 'High', medium: 'Medium', low: 'Low',
+    matchedExisting: 'Matched existing', possibleTransfer: 'Possible transfer', linkedPayable: 'Possible payable', linkedReceivable: 'Possible receivable', possiblePayroll: 'Possible payroll',
+    runSuggest: 'Re-run suggestions', total: 'total', selected: 'selected',
+    createRuleAsk: 'Always categorize similar transactions this way?' },
   ru: { title: 'Импорт из банка', subtitle: 'Загрузи выписку CSV/XLSX — проверь, затем создадим транзакции',
     upload: 'Загрузить выписку (CSV / XLSX)', wallet: 'Счёт назначения', map: 'Сопоставь колонки', date: 'Дата', amount: 'Сумма',
     desc: 'Описание', direction: 'Направление (необязательно)', ref: 'Референс (необязательно)', preview: 'Превью и проверка',
@@ -23,7 +32,16 @@ const L = {
     rows: 'строк', duplicates: 'дубликатов', toImport: 'к импорту', confirmImport: 'Подтвердить импорт', imported: 'Импортировано',
     category: 'Категория', type: 'Тип', income: 'Доход', expense: 'Расход', dup: 'Дубликат', include: 'Включить', reconciled: 'Сверка',
     balanced: 'Сходится', unbalanced: 'Не сходится', difference: 'Разница', noWallet: 'Сначала выбери счёт назначения.',
-    history: 'Последние импорты', createTx: 'Транзакции создаются только для включённых строк.' },
+    history: 'Последние импорты', createTx: 'Транзакции создаются только для включённых строк.',
+    suggesting: 'Анализ правилами + AI…', confidence: 'Уверенность', match: 'Совпадение', suggestion: 'Подсказка AI',
+    aiDisclaimer: 'AI только рекомендует. Финальный выбор остаётся за вашим бизнесом.',
+    noMatchingCategory: 'Подходящей категории не найдено. Оставь без категории или создай новую.',
+    fAll: 'Все', fHigh: 'Высокая уверенность', fNeeds: 'Нужна проверка', fMatched: 'Совпадения', fDup: 'Возможные дубли', fUncat: 'Без категории', fTransfer: 'Переводы',
+    confirmSelected: 'Подтвердить выбранные', confirmHigh: 'Подтвердить высокую уверенность', exclude: 'Исключить', markPersonal: 'Личное',
+    createNewCategory: '+ Новая категория', uncategorized: 'Без категории', high: 'Высокая', medium: 'Средняя', low: 'Низкая',
+    matchedExisting: 'Уже в учёте', possibleTransfer: 'Возможно перевод', linkedPayable: 'Возможно оплата долга', linkedReceivable: 'Возможно поступление', possiblePayroll: 'Возможно зарплата',
+    runSuggest: 'Пересчитать подсказки', total: 'всего', selected: 'выбрано',
+    createRuleAsk: 'Всегда категоризировать похожие операции так же?' },
   id: { title: 'Impor bank', subtitle: 'Impor rekening koran CSV/XLSX — tinjau, lalu buat transaksi',
     upload: 'Unggah rekening (CSV / XLSX)', wallet: 'Akun tujuan', map: 'Petakan kolom', date: 'Tanggal', amount: 'Jumlah',
     desc: 'Deskripsi', direction: 'Arah (opsional)', ref: 'Referensi (opsional)', preview: 'Pratinjau & tinjau',
@@ -32,7 +50,16 @@ const L = {
     rows: 'baris', duplicates: 'duplikat', toImport: 'akan diimpor', confirmImport: 'Konfirmasi impor', imported: 'Terimpor',
     category: 'Kategori', type: 'Tipe', income: 'Pemasukan', expense: 'Pengeluaran', dup: 'Duplikat', include: 'Sertakan', reconciled: 'Rekonsiliasi',
     balanced: 'Seimbang', unbalanced: 'Tidak seimbang', difference: 'Selisih', noWallet: 'Pilih akun tujuan dulu.',
-    history: 'Impor terbaru', createTx: 'Transaksi hanya dibuat untuk baris yang disertakan.' },
+    history: 'Impor terbaru', createTx: 'Transaksi hanya dibuat untuk baris yang disertakan.',
+    suggesting: 'Menganalisis dengan aturan + AI…', confidence: 'Keyakinan', match: 'Kecocokan', suggestion: 'Saran AI',
+    aiDisclaimer: 'AI hanya memberikan rekomendasi. Pilihan akhir tetap berada pada bisnis Anda.',
+    noMatchingCategory: 'Tidak ada kategori bisnis yang cocok. Biarkan tanpa kategori atau buat baru.',
+    fAll: 'Semua', fHigh: 'Keyakinan tinggi', fNeeds: 'Perlu ditinjau', fMatched: 'Cocok', fDup: 'Kemungkinan duplikat', fUncat: 'Tanpa kategori', fTransfer: 'Transfer',
+    confirmSelected: 'Konfirmasi terpilih', confirmHigh: 'Konfirmasi keyakinan tinggi', exclude: 'Kecualikan', markPersonal: 'Pribadi',
+    createNewCategory: '+ Kategori baru', uncategorized: 'Tanpa kategori', high: 'Tinggi', medium: 'Sedang', low: 'Rendah',
+    matchedExisting: 'Sudah tercatat', possibleTransfer: 'Mungkin transfer', linkedPayable: 'Mungkin bayar utang', linkedReceivable: 'Mungkin penerimaan', possiblePayroll: 'Mungkin gaji',
+    runSuggest: 'Hitung ulang saran', total: 'total', selected: 'terpilih',
+    createRuleAsk: 'Selalu kategorikan transaksi serupa seperti ini?' },
 }
 
 const num = (v) => {
@@ -82,17 +109,23 @@ export default function BankImport() {
   const [rows, setRows] = useState([])
   const [recon, setRecon] = useState(null)
   const [busy, setBusy] = useState(false)
+  const [suggesting, setSuggesting] = useState(false)
   const [history, setHistory] = useState([])
-  const [categories, setCategories] = useState([])
+  const [cats, setCats] = useState([])              // [{id,name,group_type}]
+  const [cps, setCps] = useState([])                // [{id,name}]
+  const [summary, setSummary] = useState(null)
+  const [filter, setFilter] = useState('fAll')
+  const [canMakeCat, setCanMakeCat] = useState(false)
 
   const loadHistory = useCallback(() => {
     apiFetch('/bank-import/batches', token).then(d => setHistory(d.batches || [])).catch(() => {})
   }, [token])
   useEffect(() => {
     apiFetch('/wallets', token).then(d => setWallets(d.wallets || [])).catch(() => {})
-    apiFetch('/cashflow-categories', token).then(d => setCategories((d.categories || []).map(c => c.name))).catch(() => {})
+    apiFetch('/cashflow-categories', token).then(d => setCats(d.categories || [])).catch(() => {})
     loadHistory()
   }, [token, loadHistory])
+  const catName = useCallback((id) => cats.find(c => c.id === id)?.name || '', [cats])
 
   const onFile = async (e) => {
     const file = e.target.files?.[0]; if (!file) return
@@ -182,6 +215,23 @@ export default function BankImport() {
     }).filter(r => r && r.amount !== null && r.amount > 0 && r.tx_date)  // drop summary/balance rows and unparseable lines
   }
 
+  // Map a /review row into local editable state (final decision defaults to suggestion).
+  const toLocal = (r) => ({
+    ...r,
+    _include: r.match_status !== 'duplicate' && r.review_status !== 'excluded',
+    _type: r.final_transaction_type || r.suggested_transaction_type || r.suggested_type || (r.direction === 'in' ? 'income' : 'expense'),
+    _categoryId: r.final_category_id || r.suggested_category_id || '',
+    _counterpartyId: r.final_counterparty_id || r.suggested_counterparty_id || '',
+    _scope: r.final_scope || r.suggested_scope || 'business',
+  })
+
+  const loadReview = async (batchId) => {
+    const d = await apiFetch(`/bank-imports/${batchId}/review`, token)
+    setCats(d.categories || []); setCps(d.counterparties || [])
+    setSummary(d.summary || null); setCanMakeCat(!!d.canManageCategories)
+    setRows((d.rows || []).map(toLocal))
+  }
+
   const parseAndUpload = async () => {
     if (!walletId) { alert(l.noWallet); return }
     setBusy(true)
@@ -191,34 +241,95 @@ export default function BankImport() {
         wallet_id: walletId, file_name: fileName, file_type: fileName.split('.').pop(),
         currency: 'IDR', opening_balance: num(opening), closing_balance: num(closing), rows: built,
       } })
-      // default: include non-duplicate rows
       setBatch(d.batch)
-      setRows((d.rows || []).map(r => ({ ...r, _include: r.match_status !== 'duplicate', _category: r.suggested_category || '' })))
-    } catch (e) { alert(e.message) } finally { setBusy(false) }
+      setSuggesting(true)
+      // Run rules + AI cascade, then load the enriched review queue.
+      try { await apiFetch(`/bank-imports/${d.batch.id}/suggest`, token, { method: 'POST' }) } catch { /* AI optional */ }
+      await loadReview(d.batch.id)
+    } catch (e) { alert(e.message) } finally { setBusy(false); setSuggesting(false) }
   }
 
-  const confirm = async () => {
+  const reSuggest = async () => {
+    if (!batch) return
+    setSuggesting(true)
+    try { await apiFetch(`/bank-imports/${batch.id}/suggest`, token, { method: 'POST' }); await loadReview(batch.id) }
+    catch (e) { alert(e.message) } finally { setSuggesting(false) }
+  }
+
+  const confirm = async (onlyRows) => {
+    const target = (onlyRows || rows).filter(r => r._include && r.match_status !== 'duplicate' && r.review_status !== 'imported')
+    if (!target.length) return
     setBusy(true)
     try {
-      // mark included rows confirmed (+ persist edited type/category), others stay
-      for (const r of rows) {
-        const target = r._include && r.match_status !== 'duplicate' ? 'confirmed' : (r.match_status === 'duplicate' ? 'duplicate' : 'rejected')
-        const patch = {}
-        if (target !== r.match_status) patch.match_status = target
-        if (target === 'confirmed') {
-          if (r.suggested_type) patch.suggested_type = r.suggested_type
-          if (r._category) patch.suggested_category = r._category
-        }
-        if (Object.keys(patch).length) await apiFetch(`/bank-import/rows/${r.id}`, token, { method: 'PATCH', body: patch })
-      }
-      const res = await apiFetch(`/bank-import/batches/${batch.id}/confirm`, token, { method: 'POST' })
+      const payload = target.map(r => ({
+        row_id: r.id, transaction_type: r._type,
+        category_id: r._categoryId || null, counterparty_id: r._counterpartyId || null,
+        scope: r._scope, match_action: r.suggested_match_type && r._action === 'link' ? 'link' : 'create_transaction',
+      }))
+      const res = await apiFetch(`/bank-imports/${batch.id}/confirm`, token, { method: 'POST', body: { rows: payload } })
       setRecon(res.reconciliation || null)
       alert(`${l.imported}: ${res.imported}`)
-      setBatch(null); setRows([]); setHeaders([]); setRawRows([]); loadHistory()
+      await offerRulePromotion()
+      setBatch(null); setRows([]); setHeaders([]); setRawRows([]); setSummary(null); loadHistory()
     } catch (e) { alert(e.message) } finally { setBusy(false) }
   }
 
-  const includeCount = rows.filter(r => r._include && r.match_status !== 'duplicate').length
+  // After confirm, offer to turn repeated confirmations into a reusable rule.
+  const offerRulePromotion = async () => {
+    try {
+      const d = await apiFetch('/classification-rules', token)
+      if (!d.canManage || !(d.candidates || []).length) return
+      for (const c of d.candidates.slice(0, 5)) {
+        const msg = `${l.aiDisclaimer}\n\n"${c.match_value}" → ${c.category_name} (${c.count}×)\n${l.createRuleAsk}`
+        if (window.confirm(msg)) {
+          await apiFetch('/classification-rules', token, { method: 'POST', body: {
+            match_type: 'contains', match_value: c.match_value,
+            category_id: c.category_id, transaction_type: c.transaction_type, created_from: 'confirmed_correction',
+          } }).catch(() => {})
+        }
+      }
+    } catch { /* non-blocking */ }
+  }
+
+  const excludeRow = async (r) => {
+    try { await apiFetch(`/bank-imports/${batch.id}/rows/${r.id}/exclude`, token, { method: 'POST' }) } catch { /* */ }
+    setRows(rows.map(x => x.id === r.id ? { ...x, review_status: 'excluded', _include: false } : x))
+  }
+
+  const createCategory = async () => {
+    const name = window.prompt(l.createNewCategory)
+    if (!name || !name.trim()) return
+    const group_type = cats[0]?.group_type || 'operating'
+    try {
+      const d = await apiFetch('/cashflow-categories', token, { method: 'POST', body: { name: name.trim(), group_type } })
+      if (d.category) setCats([...cats, d.category])
+    } catch (e) { alert(e.message) }
+  }
+
+  // Confidence badge: High >=0.9, Medium >=0.7, Low otherwise.
+  const confBadge = (r) => {
+    const c = Number(r.suggestion_confidence) || 0
+    if (r.suggested_match_type) return { label: ({ existing_tx: l.matchedExisting, payable: l.linkedPayable, receivable: l.linkedReceivable, payroll: l.possiblePayroll, transfer: l.possibleTransfer }[r.suggested_match_type] || l.match), bg: '#EEF2FF', fg: '#3730A3' }
+    if (!r.suggestion_source || r.suggestion_source === 'none') return null
+    if (c >= 0.9) return { label: `${l.high} ${Math.round(c * 100)}%`, bg: '#E1F5EE', fg: '#085041' }
+    if (c >= 0.7) return { label: `${l.medium} ${Math.round(c * 100)}%`, bg: '#FEF3C7', fg: '#92400E' }
+    return { label: `${l.low} ${Math.round(c * 100)}%`, bg: '#FEE2E2', fg: '#991B1B' }
+  }
+
+  const matchFilter = (r) => {
+    if (filter === 'fAll') return true
+    if (filter === 'fHigh') return r.review_status === 'high_confidence'
+    if (filter === 'fNeeds') return r.review_status === 'needs_review'
+    if (filter === 'fMatched') return r.review_status === 'matched_existing'
+    if (filter === 'fDup') return r.match_status === 'duplicate'
+    if (filter === 'fUncat') return !r._categoryId
+    if (filter === 'fTransfer') return r._type === 'transfer' || r.suggested_match_type === 'transfer'
+    return true
+  }
+  const visibleRows = rows.filter(matchFilter)
+
+  const includeCount = rows.filter(r => r._include && r.match_status !== 'duplicate' && r.review_status !== 'imported').length
+  const highRows = rows.filter(r => r.review_status === 'high_confidence' && r._include)
   const dupCount = rows.filter(r => r.match_status === 'duplicate').length
 
   const sel = (val, onChange, opts) => (
@@ -267,44 +378,98 @@ export default function BankImport() {
 
       {batch && (
         <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, padding: 18, marginBottom: 16 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, flexWrap: 'wrap', gap: 8 }}>
-            <div style={{ fontWeight: 700 }}>{l.preview} · {rows.length} {l.rows} · {dupCount} {l.duplicates} · {includeCount} {l.toImport}</div>
-            <button className="btn btn-ghost btn-sm" onClick={() => { setBatch(null); setRows([]) }}>{l.back}</button>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, flexWrap: 'wrap', gap: 8 }}>
+            <div style={{ fontWeight: 700 }}>{l.preview} · {rows.length} {l.total} · {includeCount} {l.toImport}</div>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button className="btn btn-ghost btn-sm" disabled={suggesting} onClick={reSuggest}>{suggesting ? '…' : l.runSuggest}</button>
+              <button className="btn btn-ghost btn-sm" onClick={() => { setBatch(null); setRows([]); setSummary(null) }}>{l.back}</button>
+            </div>
           </div>
-          <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 8 }}>{l.createTx}</div>
-          <div style={{ maxHeight: 420, overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 10 }}>
+
+          {/* AI disclaimer — the final choice is always the user's */}
+          <div style={{ fontSize: 12, color: 'var(--text-2)', background: '#EEF2FF', border: '1px solid #C7D2FE', borderRadius: 8, padding: '7px 10px', marginBottom: 10 }}>
+            💡 {l.aiDisclaimer}
+          </div>
+
+          {suggesting && <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 8 }}>⏳ {l.suggesting}</div>}
+
+          {/* Summary chips */}
+          {summary && (
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10, fontSize: 11 }}>
+              {[['fAll', summary.total], ['fHigh', summary.high_confidence], ['fNeeds', summary.needs_review], ['fMatched', summary.matched_existing], ['fDup', summary.possible_duplicate], ['fUncat', summary.uncategorized], ['fTransfer', null]].map(([key, n]) => (
+                <button key={key} onClick={() => setFilter(key)}
+                  style={{ padding: '4px 10px', borderRadius: 20, border: '1px solid var(--border)', cursor: 'pointer',
+                    background: filter === key ? 'var(--accent,#4F46E5)' : 'var(--bg-3)', color: filter === key ? '#fff' : 'var(--text-2)', fontWeight: 600 }}>
+                  {l[key]}{n != null ? ` · ${n}` : ''}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Bulk actions */}
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
+            <button className="btn btn-primary btn-sm" disabled={busy || includeCount === 0} onClick={() => confirm()}>{busy ? '…' : `${l.confirmSelected} · ${includeCount}`}</button>
+            <button className="btn btn-ghost btn-sm" disabled={busy || highRows.length === 0} onClick={() => confirm(highRows)}>{l.confirmHigh} · {highRows.length}</button>
+            {canMakeCat && <button className="btn btn-ghost btn-sm" onClick={createCategory}>{l.createNewCategory}</button>}
+          </div>
+
+          <div style={{ maxHeight: 460, overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 10 }}>
             <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
-              <thead><tr style={{ position: 'sticky', top: 0, background: 'var(--bg-3)' }}>
+              <thead><tr style={{ position: 'sticky', top: 0, background: 'var(--bg-3)', zIndex: 1 }}>
                 <th style={{ padding: 6 }}>✓</th><th style={{ padding: 6, textAlign: 'left' }}>{l.date}</th>
                 <th style={{ padding: 6, textAlign: 'left' }}>{l.desc}</th><th style={{ padding: 6, textAlign: 'right' }}>{l.amount}</th>
-                <th style={{ padding: 6 }}>{l.type}</th><th style={{ padding: 6, textAlign: 'left' }}>{l.category}</th></tr></thead>
+                <th style={{ padding: 6 }}>{l.type}</th><th style={{ padding: 6, textAlign: 'left' }}>{l.category}</th>
+                <th style={{ padding: 6, textAlign: 'left' }}>{l.suggestion}</th><th style={{ padding: 6 }}></th></tr></thead>
               <tbody>
-                {rows.map((r, i) => (
-                  <tr key={r.id} style={{ borderTop: '0.5px solid var(--border)', opacity: r.match_status === 'duplicate' ? 0.5 : 1 }}>
-                    <td style={{ padding: 6, textAlign: 'center' }}>
-                      <input type="checkbox" disabled={r.match_status === 'duplicate'} checked={!!r._include && r.match_status !== 'duplicate'}
-                        onChange={e => setRows(rows.map((x, j) => j === i ? { ...x, _include: e.target.checked } : x))} />
-                    </td>
-                    <td style={{ padding: 6 }}>{r.tx_date}</td>
-                    <td style={{ padding: 6, maxWidth: 240, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.description}{r.match_status === 'duplicate' && <span style={{ color: 'var(--amber-dark)', marginLeft: 6 }}>· {l.dup}</span>}</td>
-                    <td style={{ padding: 6, textAlign: 'right', color: r.suggested_type === 'income' ? 'var(--green-dark)' : 'var(--red-dark)' }}>{r.suggested_type === 'income' ? '+' : '−'}{fmt(r.amount)}</td>
-                    <td style={{ padding: 6, textAlign: 'center' }}>
-                      <select value={r.suggested_type} onChange={e => setRows(rows.map((x, j) => j === i ? { ...x, suggested_type: e.target.value } : x))} style={{ fontSize: 11 }}>
-                        <option value="income">{l.income}</option><option value="expense">{l.expense}</option>
-                      </select>
-                    </td>
-                    <td style={{ padding: 6 }}>
-                      <input list="bank-import-cats" value={r._category || ''} placeholder={l.category}
-                        onChange={e => setRows(rows.map((x, j) => j === i ? { ...x, _category: e.target.value } : x))}
-                        style={{ fontSize: 11, width: 130, padding: '3px 6px', border: '1px solid var(--border-2)', borderRadius: 6 }} />
-                    </td>
-                  </tr>
-                ))}
+                {visibleRows.map((r) => {
+                  const isDup = r.match_status === 'duplicate'
+                  const isExcluded = r.review_status === 'excluded'
+                  const badge = confBadge(r)
+                  const setRow = (patch) => setRows(rows.map(x => x.id === r.id ? { ...x, ...patch } : x))
+                  return (
+                    <tr key={r.id} style={{ borderTop: '0.5px solid var(--border)', opacity: isDup || isExcluded ? 0.45 : 1 }}>
+                      <td style={{ padding: 6, textAlign: 'center' }}>
+                        <input type="checkbox" disabled={isDup || isExcluded} checked={!!r._include && !isDup && !isExcluded}
+                          onChange={e => setRow({ _include: e.target.checked })} />
+                      </td>
+                      <td style={{ padding: 6, whiteSpace: 'nowrap' }}>{r.tx_date}</td>
+                      <td style={{ padding: 6, maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={r.description}>
+                        {r.description}{isDup && <span style={{ color: 'var(--amber-dark)', marginLeft: 6 }}>· {l.dup}</span>}
+                      </td>
+                      <td style={{ padding: 6, textAlign: 'right', whiteSpace: 'nowrap', color: r._type === 'income' ? 'var(--green-dark)' : 'var(--red-dark)' }}>
+                        {r._type === 'income' ? '+' : '−'}{fmt(r.amount)}
+                      </td>
+                      <td style={{ padding: 6, textAlign: 'center' }}>
+                        <select value={r._type} onChange={e => setRow({ _type: e.target.value })} style={{ fontSize: 11 }}>
+                          <option value="income">{l.income}</option><option value="expense">{l.expense}</option>
+                          <option value="transfer">transfer</option><option value="payroll">payroll</option>
+                          <option value="owner_injection">owner in</option><option value="owner_withdrawal">owner out</option>
+                          <option value="correction">correction</option>
+                        </select>
+                      </td>
+                      <td style={{ padding: 6 }}>
+                        <select value={r._categoryId || ''} onChange={e => setRow({ _categoryId: e.target.value })}
+                          style={{ fontSize: 11, maxWidth: 150, padding: '3px 6px', border: '1px solid var(--border-2)', borderRadius: 6 }}>
+                          <option value="">{l.uncategorized}</option>
+                          {cats.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                        </select>
+                      </td>
+                      <td style={{ padding: 6 }}>
+                        {badge && <span style={{ background: badge.bg, color: badge.fg, borderRadius: 6, padding: '2px 7px', fontSize: 10, fontWeight: 700, whiteSpace: 'nowrap' }} title={r.suggestion_reason || ''}>{badge.label}</span>}
+                        {r.suggested_category_id && r._categoryId !== r.suggested_category_id && (
+                          <span style={{ marginLeft: 4, color: 'var(--text-3)', fontSize: 10 }}>({catName(r.suggested_category_id)})</span>
+                        )}
+                      </td>
+                      <td style={{ padding: 6, textAlign: 'center' }}>
+                        {!isExcluded && !isDup && <button className="btn btn-ghost btn-sm" style={{ fontSize: 10, padding: '2px 6px' }} onClick={() => excludeRow(r)}>✕</button>}
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
-            <datalist id="bank-import-cats">{categories.map(c => <option key={c} value={c} />)}</datalist>
           </div>
-          <button className="btn btn-primary btn-md" disabled={busy || includeCount === 0} onClick={confirm} style={{ marginTop: 12 }}>
+          <button className="btn btn-primary btn-md" disabled={busy || includeCount === 0} onClick={() => confirm()} style={{ marginTop: 12 }}>
             {busy ? '…' : `${l.confirmImport} · ${includeCount}`}
           </button>
         </div>
