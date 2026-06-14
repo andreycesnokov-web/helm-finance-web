@@ -1788,6 +1788,451 @@ app.post('/api/bank-import/batches/:id/confirm', auth, async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// ═════════════════════════════════════════════════════════════════════════════
+//  AI CATEGORIZATION — Phase 2: deterministic suggestion cascade (no AI, no
+//  ledger change). Levels 1–4 run before any AI call (Phase 3). Confidence and
+//  review_status are written to bank_import_rows for the review queue.
+// ═════════════════════════════════════════════════════════════════════════════
+
+// Confidence → review bucket. Special-risk types always force manual review.
+const SPECIAL_RISK_TYPES = ['transfer', 'owner_injection', 'owner_withdrawal', 'correction'];
+function reviewBucket(confidence, type, scope, hasMatch) {
+  if (hasMatch) return 'matched_existing';
+  if (SPECIAL_RISK_TYPES.includes(type) || scope === 'personal') return 'needs_review';
+  if (confidence >= 0.90) return 'high_confidence';
+  if (confidence >= 0.70) return 'suggested';
+  return 'needs_review';
+}
+
+// Safe system-type keyword hints (Level 4). Never bound to a user category.
+const KEYWORD_HINTS = [
+  { re: /\b(bank fee|admin fee|biaya adm|adm fee|service charge)\b/i, type: 'expense', conf: 0.6 },
+  { re: /\b(interest|bunga|interest credit)\b/i,                       type: 'income',  conf: 0.6 },
+  { re: /\b(transfer between own|own account|antar rekening)\b/i,      type: 'transfer', conf: 0.55 },
+];
+
+// Run the deterministic cascade for one row against preloaded business context.
+function classifyRowDeterministic(row, ctx) {
+  const desc = normalizeDesc(row.description);
+  const dir = row.direction; // 'in' | 'out'
+  const baseType = dir === 'in' ? 'income' : 'expense';
+  const out = {
+    suggested_transaction_type: baseType, suggested_category_id: null,
+    suggested_counterparty_id: null, suggested_scope: 'business',
+    suggested_match_type: null, suggested_match_id: null,
+    suggestion_source: 'none', suggestion_confidence: 0, suggestion_reason: null,
+  };
+
+  // ── Level 1: exact business rule ───────────────────────────────────────────
+  for (const rule of ctx.rules) {
+    const hit = rule.match_type === 'equals' ? desc === rule.normalized_value
+              : rule.match_type === 'starts_with' ? desc.startsWith(rule.normalized_value)
+              : desc.includes(rule.normalized_value);
+    if (rule.normalized_value && hit) {
+      out.suggested_transaction_type = rule.transaction_type || baseType;
+      out.suggested_category_id = rule.category_id || null;
+      out.suggested_counterparty_id = rule.counterparty_id || null;
+      out.suggested_scope = rule.scope || 'business';
+      out.suggestion_source = 'rule';
+      out.suggestion_confidence = 0.95;
+      out.suggestion_reason = `Matched rule "${rule.rule_name || rule.match_value}".`;
+      return out; // rule wins
+    }
+  }
+
+  // ── Level 2: existing counterparty + its previously confirmed category ──────
+  for (const cp of ctx.counterparties) {
+    if (cp.normalized && desc.includes(cp.normalized)) {
+      out.suggested_counterparty_id = cp.id;
+      const hist = ctx.cpCategoryHistory.get(cp.normalized);
+      if (hist && hist.count >= 2 && hist.categoryId) {
+        out.suggested_category_id = hist.categoryId;
+        out.suggestion_source = 'counterparty';
+        out.suggestion_confidence = 0.85;
+        out.suggestion_reason = `${cp.name} was previously categorized as ${ctx.catNameById.get(hist.categoryId) || 'this category'} ${hist.count}×.`;
+        return out;
+      }
+      break; // counterparty found but no strong history → continue to matches/keyword
+    }
+  }
+
+  // ── Level 3: existing financial match (no new transaction should be created) ─
+  const amt = Math.abs(Number(row.amount) || 0);
+  // 3a. Existing imported/manual transaction (duplicate of ledger)
+  const exTx = ctx.findExistingTx(row.tx_date, amt, baseType);
+  if (exTx) {
+    out.suggested_match_type = 'existing_tx'; out.suggested_match_id = String(exTx.id);
+    out.suggestion_source = 'match'; out.suggestion_confidence = 0.9;
+    out.suggestion_reason = 'Matches an existing ledger transaction (same date/amount).';
+    return out;
+  }
+  // 3b. Payable (outgoing) / Receivable (incoming)
+  const debt = ctx.findDebt(dir === 'out' ? 'payable' : 'receivable', amt);
+  if (debt) {
+    out.suggested_match_type = dir === 'out' ? 'payable' : 'receivable';
+    out.suggested_match_id = String(debt.id);
+    out.suggestion_source = 'match'; out.suggestion_confidence = 0.85;
+    out.suggestion_reason = `Possible ${out.suggested_match_type} payment to ${debt.counterparty || 'a counterparty'}.`;
+    return out;
+  }
+  // 3c. Payroll (outgoing salary)
+  if (dir === 'out') {
+    const pay = ctx.findPayroll(row.tx_date, amt);
+    if (pay) {
+      out.suggested_transaction_type = 'payroll';
+      out.suggested_match_type = 'payroll'; out.suggested_match_id = String(pay.id);
+      out.suggestion_source = 'match'; out.suggestion_confidence = 0.85;
+      out.suggestion_reason = `Possible payroll payment to ${pay.employee_name}.`;
+      return out;
+    }
+  }
+  // 3d. Transfer — opposite row of same amount within this batch
+  if (ctx.transferAmounts.get(amt) > 1) {
+    out.suggested_transaction_type = 'transfer';
+    out.suggested_match_type = 'transfer';
+    out.suggestion_source = 'match'; out.suggestion_confidence = 0.5;
+    out.suggestion_reason = 'Possible transfer — an opposite row of the same amount exists in this statement.';
+    return out;
+  }
+
+  // ── Level 4: safe keyword hint (system type only) ──────────────────────────
+  for (const k of KEYWORD_HINTS) {
+    if (k.re.test(row.description || '')) {
+      out.suggested_transaction_type = k.type;
+      out.suggestion_source = 'keyword';
+      out.suggestion_confidence = k.conf;
+      out.suggestion_reason = 'Matched a safe keyword hint (system type only, no category).';
+      return out;
+    }
+  }
+
+  // Nothing deterministic → leave for AI (Phase 3) / manual review.
+  return out;
+}
+
+// POST /api/bank-imports/:batchId/suggest — run deterministic cascade.
+// Does NOT call AI, does NOT touch the ledger.
+app.post('/api/bank-imports/:batchId/suggest', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canCreateConfirmedFinancialRecord(biz.role))
+      return res.status(403).json({ error: 'Your role cannot classify bank statements' });
+
+    const { data: batch } = await supabase.from('bank_import_batches')
+      .select('*').eq('id', req.params.batchId).eq('business_id', biz.business.id).single();
+    if (!batch) return res.status(404).json({ error: 'Batch not found' });
+
+    const { data: allRows } = await supabase.from('bank_import_rows')
+      .select('*').eq('batch_id', batch.id).order('row_index');
+    // Only rows still open for review (skip duplicates, imported, excluded).
+    const rows = (allRows || []).filter(r =>
+      !r.linked_transaction_id && r.match_status !== 'duplicate' && r.review_status !== 'excluded');
+
+    // ── Preload business context (one query each) ─────────────────────────────
+    const [{ data: cats }, { data: cps }, { data: rulesRaw }] = await Promise.all([
+      supabase.from('cashflow_categories').select('id, name').or(bizOrFilter(biz)).eq('is_active', true),
+      supabase.from('counterparties').select('id, name').or(bizOrFilter(biz)).eq('is_active', true),
+      supabase.from('classification_rules').select('*').eq('business_id', biz.business.id).eq('is_enabled', true).order('priority'),
+    ]);
+    const catNameById = new Map((cats || []).map(c => [c.id, c.name]));
+    const counterparties = (cps || []).map(c => ({ id: c.id, name: c.name, normalized: normalizeDesc(c.name) }))
+      .filter(c => c.normalized.length >= 3); // avoid matching very short names
+    const rules = (rulesRaw || []);
+
+    // Counterparty → most-frequent confirmed category, from prior ledger rows.
+    const { data: priorTx } = await supabase.from('transactions')
+      .select('counterparty_name, category').or(bizOrFilter(biz))
+      .not('counterparty_name', 'is', null).not('category', 'is', null).limit(2000);
+    const catIdByName = new Map((cats || []).map(c => [c.name, c.id]));
+    const cpHist = new Map(); // normalizedCpName → { categoryId, count }
+    const cpTally = new Map();
+    for (const t of (priorTx || [])) {
+      const key = normalizeDesc(t.counterparty_name);
+      if (!key) continue;
+      const m = cpTally.get(key) || new Map();
+      m.set(t.category, (m.get(t.category) || 0) + 1);
+      cpTally.set(key, m);
+    }
+    for (const [key, m] of cpTally) {
+      let best = null, bestN = 0;
+      for (const [cat, n] of m) if (n > bestN) { best = cat; bestN = n; }
+      if (best) cpHist.set(key, { categoryId: catIdByName.get(best) || null, count: bestN });
+    }
+
+    // Existing ledger transactions for the wallet (duplicate / match detection).
+    let existing = [];
+    if (batch.wallet_id) {
+      const { data: txs } = await supabase.from('transactions')
+        .select('id, type, amount_original, transaction_date, created_at')
+        .or(bizOrFilter(biz)).eq('wallet_id', batch.wallet_id);
+      existing = txs || [];
+    }
+    const exKey = (d, amt, type) => `${(d || '').slice(0, 10)}|${Math.abs(Number(amt) || 0).toFixed(2)}|${type}`;
+    const exIndex = new Map();
+    for (const t of existing) {
+      const d = t.transaction_date || (t.created_at ? t.created_at.slice(0, 10) : null);
+      exIndex.set(exKey(d, t.amount_original, t.type), t.id);
+    }
+    const findExistingTx = (date, amt, type) => {
+      const base = new Date(date);
+      for (const off of [0, -1, 1]) {
+        const d = isNaN(base) ? date : new Date(base.getTime() + off * 86400000).toISOString().slice(0, 10);
+        const id = exIndex.get(exKey(d, amt, type));
+        if (id) return { id };
+      }
+      return null;
+    };
+
+    // Open debts (payables / receivables) for matching.
+    const { data: debts } = await supabase.from('debts')
+      .select('id, type, counterparty, amount, original_amount, paid_amount, status')
+      .or(bizOrFilter(biz)).neq('status', 'paid');
+    const findDebt = (type, amt) => (debts || []).find(d => d.type === type &&
+      Math.abs(Number(d.original_amount ?? d.amount) - amt) < 1) || null;
+
+    // Payroll payments for matching (by amount + close date).
+    const { data: payrolls } = await supabase.from('payroll_payments')
+      .select('id, employee_name, amount, payment_date').eq('user_id', biz.ownerUserId);
+    const findPayroll = (date, amt) => (payrolls || []).find(p => {
+      if (Math.abs(Number(p.amount) - amt) >= 1) return false;
+      if (!p.payment_date || !date) return true;
+      return Math.abs(new Date(p.payment_date) - new Date(date)) <= 2 * 86400000;
+    }) || null;
+
+    // Transfer detection: count rows per absolute amount in this batch.
+    const transferAmounts = new Map();
+    for (const r of rows) {
+      const a = Math.abs(Number(r.amount) || 0);
+      transferAmounts.set(a, (transferAmounts.get(a) || 0) + 1);
+    }
+
+    const ctx = {
+      rules, counterparties, catNameById, cpCategoryHistory: cpHist,
+      findExistingTx, findDebt, findPayroll, transferAmounts,
+    };
+
+    // ── Classify each row + persist suggestion ────────────────────────────────
+    let high = 0, needs = 0, matched = 0, suggested = 0;
+    for (const r of rows) {
+      const s = classifyRowDeterministic(r, ctx);
+      const bucket = reviewBucket(s.suggestion_confidence, s.suggested_transaction_type, s.suggested_scope, !!s.suggested_match_type);
+      if (bucket === 'high_confidence') high++;
+      else if (bucket === 'matched_existing') matched++;
+      else if (bucket === 'suggested') suggested++;
+      else needs++;
+      await supabase.from('bank_import_rows').update({ ...s, review_status: bucket }).eq('id', r.id);
+    }
+
+    res.json({
+      ok: true, processed: rows.length,
+      summary: { high_confidence: high, suggested, matched_existing: matched, needs_review: needs },
+      ai_pending: needs, // rows AI (Phase 3) will attempt
+    });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// GET /api/bank-imports/:batchId/review — review queue: rows + suggestions +
+// business categories + counterparties + summary. Read-only.
+app.get('/api/bank-imports/:batchId/review', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canViewBusinessFinance(biz.role)) return res.status(403).json({ error: 'Forbidden' });
+
+    const { data: batch } = await supabase.from('bank_import_batches')
+      .select('*').eq('id', req.params.batchId).eq('business_id', biz.business.id).single();
+    if (!batch) return res.status(404).json({ error: 'Batch not found' });
+
+    const [{ data: rows }, { data: cats }, { data: cps }, { data: recon }] = await Promise.all([
+      supabase.from('bank_import_rows').select('*').eq('batch_id', batch.id).order('row_index'),
+      supabase.from('cashflow_categories').select('id, name, group_type').or(bizOrFilter(biz)).eq('is_active', true).order('name'),
+      supabase.from('counterparties').select('id, name, type').or(bizOrFilter(biz)).eq('is_active', true).order('name'),
+      supabase.from('bank_reconciliations').select('*').eq('batch_id', batch.id).limit(1),
+    ]);
+
+    const all = rows || [];
+    const count = (pred) => all.filter(pred).length;
+    const summary = {
+      total: all.length,
+      high_confidence: count(r => r.review_status === 'high_confidence'),
+      suggested: count(r => r.review_status === 'suggested'),
+      needs_review: count(r => r.review_status === 'needs_review'),
+      matched_existing: count(r => r.review_status === 'matched_existing'),
+      possible_duplicate: count(r => r.match_status === 'duplicate'),
+      uncategorized: count(r => !r.final_category_id && !r.suggested_category_id),
+      confirmed: count(r => r.review_status === 'confirmed'),
+      excluded: count(r => r.review_status === 'excluded'),
+    };
+
+    res.json({
+      batch, rows: all,
+      categories: cats || [], counterparties: cps || [],
+      reconciliation: recon?.[0] || null, summary,
+      canManageCategories: canManageCategories(biz.role),
+    });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// POST /api/bank-imports/:batchId/confirm — confirm rows with FINAL decisions,
+// then create transactions. The user's choice always overrides the suggestion.
+// Records classification_feedback (suggestion vs final) for audit + rule promotion.
+app.post('/api/bank-imports/:batchId/confirm', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canCreateConfirmedFinancialRecord(biz.role))
+      return res.status(403).json({ error: 'Your role cannot confirm bank imports' });
+
+    const { data: batch } = await supabase.from('bank_import_batches')
+      .select('*').eq('id', req.params.batchId).eq('business_id', biz.business.id).single();
+    if (!batch) return res.status(404).json({ error: 'Batch not found' });
+
+    const payloadRows = Array.isArray(req.body?.rows) ? req.body.rows : [];
+    if (!payloadRows.length) return res.status(400).json({ error: 'rows required' });
+
+    // Ownership validation sets (category / counterparty must belong to business).
+    const [{ data: cats }, { data: cps }] = await Promise.all([
+      supabase.from('cashflow_categories').select('id, name').or(bizOrFilter(biz)),
+      supabase.from('counterparties').select('id, name').or(bizOrFilter(biz)),
+    ]);
+    const catNameById = new Map((cats || []).map(c => [c.id, c.name]));
+    const cpNameById = new Map((cps || []).map(c => [c.id, c.name]));
+
+    let wallet = null;
+    if (batch.wallet_id) {
+      const { data: w } = await supabase.from('wallets').select('id, name, scope').eq('id', batch.wallet_id).limit(1);
+      wallet = w?.[0] || null;
+    }
+
+    const now = new Date().toISOString();
+    let imported = 0, linked = 0, signedSum = 0;
+
+    for (const p of payloadRows) {
+      const { data: row } = await supabase.from('bank_import_rows')
+        .select('*').eq('id', p.row_id).eq('batch_id', batch.id).single();
+      if (!row || row.linked_transaction_id) continue;
+
+      // Validate final decision
+      let type = p.transaction_type || row.suggested_transaction_type || row.suggested_type || (row.direction === 'in' ? 'income' : 'expense');
+      if (!VALID_SYSTEM_TX_TYPES.includes(type)) return res.status(400).json({ error: `Invalid transaction_type: ${type}` });
+      const categoryId = p.category_id || null;
+      if (categoryId && !catNameById.has(categoryId)) return res.status(400).json({ error: 'category_id does not belong to this business' });
+      const counterpartyId = p.counterparty_id || null;
+      if (counterpartyId && !cpNameById.has(counterpartyId)) return res.status(400).json({ error: 'counterparty_id does not belong to this business' });
+      const scope = p.scope || row.suggested_scope || wallet?.scope || 'business';
+
+      // Persist final decision + audit feedback (suggestion vs final)
+      await supabase.from('bank_import_rows').update({
+        final_transaction_type: type, final_category_id: categoryId,
+        final_counterparty_id: counterpartyId, final_scope: scope,
+        review_status: 'confirmed', reviewed_by_user_id: req.user.userId, reviewed_at: now,
+      }).eq('id', row.id);
+      await supabase.from('classification_feedback').insert({
+        business_id: biz.business.id, bank_import_row_id: row.id,
+        normalized_desc: normalizeDesc(row.description),
+        suggested_category_id: row.suggested_category_id || null, final_category_id: categoryId,
+        suggested_transaction_type: row.suggested_transaction_type || null, final_transaction_type: type,
+        confidence: row.suggestion_confidence || null,
+        accepted: (row.suggested_category_id || null) === categoryId && (row.suggested_transaction_type || null) === type,
+        source: 'bank_review', reviewed_by_user_id: req.user.userId,
+      });
+
+      // Link to an existing record (no new transaction, no double cash impact).
+      if (p.match_action === 'link' && row.suggested_match_id) {
+        await supabase.from('bank_import_rows').update({
+          review_status: 'matched_existing',
+          matched_transaction_id: row.suggested_match_type === 'existing_tx' ? Number(row.suggested_match_id) : row.matched_transaction_id,
+        }).eq('id', row.id);
+        linked++; continue;
+      }
+      if (p.match_action === 'exclude') {
+        await supabase.from('bank_import_rows').update({ review_status: 'excluded' }).eq('id', row.id);
+        continue;
+      }
+
+      // Create the transaction (default action)
+      const { data: tx, error } = await supabase.from('transactions').insert({
+        ...bizWriteFields(biz, req.user.userId),
+        type, amount_original: row.amount, amount_idr: row.amount,
+        currency_original: batch.currency || 'IDR',
+        description: row.description || 'Bank import', source: wallet?.name || null,
+        wallet_id: batch.wallet_id || null, scope,
+        category: categoryId ? catNameById.get(categoryId) : null,
+        counterparty_name: counterpartyId ? cpNameById.get(counterpartyId) : (row.suggested_counterparty || null),
+        transaction_date: row.tx_date || now.slice(0, 10),
+      }).select('id').single();
+      if (error) continue;
+      await supabase.from('bank_import_rows').update({ linked_transaction_id: tx.id, review_status: 'imported' }).eq('id', row.id);
+      imported++; signedSum += type === 'income' ? row.amount : -row.amount;
+    }
+
+    // Reconciliation snapshot
+    let reconciliation = null;
+    if (batch.opening_balance !== null && batch.closing_balance !== null) {
+      const computed = Number(batch.opening_balance) + signedSum;
+      const diff = Number(batch.closing_balance) - computed;
+      const { data: rec } = await supabase.from('bank_reconciliations').insert({
+        batch_id: batch.id, business_id: biz.business.id, wallet_id: batch.wallet_id || null,
+        opening_balance: batch.opening_balance, closing_balance: batch.closing_balance,
+        computed_closing: computed, difference: diff,
+        status: Math.abs(diff) < 1 ? 'balanced' : 'unbalanced',
+      }).select().single();
+      reconciliation = rec || null;
+    }
+
+    const { data: after } = await supabase.from('bank_import_rows').select('review_status').eq('batch_id', batch.id);
+    const remaining = (after || []).filter(r => ['needs_review', 'suggested', 'high_confidence'].includes(r.review_status)).length;
+    const status = remaining > 0 ? 'partially_imported' : 'imported';
+    await supabase.from('bank_import_batches').update({
+      imported_count: (batch.imported_count || 0) + imported, status, updated_at: now,
+    }).eq('id', batch.id);
+
+    res.json({ ok: true, imported, linked, status, reconciliation });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// POST /api/bank-imports/:batchId/rows/:rowId/exclude — drop a row from import.
+app.post('/api/bank-imports/:batchId/rows/:rowId/exclude', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canCreateConfirmedFinancialRecord(biz.role)) return res.status(403).json({ error: 'Forbidden' });
+    const { data, error } = await supabase.from('bank_import_rows')
+      .update({ review_status: 'excluded' })
+      .eq('id', req.params.rowId).eq('batch_id', req.params.batchId).eq('business_id', biz.business.id)
+      .select().single();
+    if (error) return res.status(500).json({ error: error.message });
+    if (!data) return res.status(404).json({ error: 'Row not found' });
+    res.json({ row: data });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// POST /api/bank-imports/:batchId/rows/:rowId/link — link to an existing record
+// instead of creating a transaction (avoids double cash impact).
+app.post('/api/bank-imports/:batchId/rows/:rowId/link', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canCreateConfirmedFinancialRecord(biz.role)) return res.status(403).json({ error: 'Forbidden' });
+    const { match_type, match_id } = req.body || {};
+    if (!match_id) return res.status(400).json({ error: 'match_id required' });
+    const updates = {
+      review_status: 'matched_existing',
+      suggested_match_type: match_type || 'existing_tx',
+      suggested_match_id: String(match_id),
+    };
+    if ((match_type || 'existing_tx') === 'existing_tx') updates.matched_transaction_id = Number(match_id);
+    const { data, error } = await supabase.from('bank_import_rows')
+      .update(updates)
+      .eq('id', req.params.rowId).eq('batch_id', req.params.batchId).eq('business_id', biz.business.id)
+      .select().single();
+    if (error) return res.status(500).json({ error: error.message });
+    if (!data) return res.status(404).json({ error: 'Row not found' });
+    res.json({ row: data });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // ── POST /api/debts/from-telegram ────────────────────────────────────────────
 // Called by the Telegram bot to create a draft receivable / payable.
 // Requires telegram_id → users.id mapping.
