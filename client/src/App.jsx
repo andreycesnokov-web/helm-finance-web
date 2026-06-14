@@ -53,6 +53,7 @@ import JoinInvite from './pages/JoinInvite'
 import Admin from './pages/Admin'
 import AdminUser from './pages/AdminUser'
 import TaxRulesAdmin from './pages/TaxRulesAdmin'
+import TaxProfile from './pages/TaxProfile'
 import WalletDetail from './pages/WalletDetail'
 import Onboarding, { shouldShowOnboarding, clearOnboardingFlags } from './pages/Onboarding'
 
@@ -519,6 +520,7 @@ export default function App() {
           <Route path="/approvals"    element={<Layout><Approvals /></Layout>} />
           <Route path="/team"         element={<Layout><Team /></Layout>} />
           <Route path="/accountant"   element={<Layout><Accountant /></Layout>} />
+          <Route path="/accountant/tax-profile" element={<Layout><TaxProfile /></Layout>} />
           <Route path="/bank-import"  element={<Layout><BankImport /></Layout>} />
           <Route path="/team-onboarding" element={<Layout><TeamOnboarding /></Layout>} />
           {/* Public invite page — no auth required to view, Telegram widget handles login */}
