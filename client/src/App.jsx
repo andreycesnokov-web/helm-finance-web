@@ -52,6 +52,7 @@ import TeamOnboarding, { MemberTutorial } from './pages/TeamOnboarding'
 import JoinInvite from './pages/JoinInvite'
 import Admin from './pages/Admin'
 import AdminUser from './pages/AdminUser'
+import TaxRulesAdmin from './pages/TaxRulesAdmin'
 import WalletDetail from './pages/WalletDetail'
 import Onboarding, { shouldShowOnboarding, clearOnboardingFlags } from './pages/Onboarding'
 
@@ -527,6 +528,7 @@ export default function App() {
           {/* Hidden admin routes — not in sidebar, protected by ADMIN_TELEGRAM_IDS on backend */}
           <Route path="/admin"           element={<Layout><Admin /></Layout>} />
           <Route path="/admin/users/:id" element={<Layout><AdminUser /></Layout>} />
+          <Route path="/admin/tax-rules" element={<Layout><TaxRulesAdmin /></Layout>} />
         </Routes>
       </AuthProvider>
     </BrowserRouter>

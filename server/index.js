@@ -1589,6 +1589,168 @@ app.post('/api/accountant/calendar/remind', auth, async (req, res) => {
 });
 
 // ═════════════════════════════════════════════════════════════════════════════
+// TAX RULES REGISTRY & OFFICIAL SOURCES — platform-level admin (PR2)
+// tax_rules / official_sources are a GLOBAL platform registry (no business_id).
+// Only a platform admin may manage them. Active rules are immutable and require
+// a verified official source. A change creates a NEW version (old stays).
+// ═════════════════════════════════════════════════════════════════════════════
+
+function requireTaxRuleEditor(req, res) {
+  if (!canEditTaxRules(req.user.userId)) { res.status(403).json({ error: 'Platform tax-rule editor access required' }); return false; }
+  return true;
+}
+const TAX_RULE_EDITABLE = ['jurisdiction','country','legal_entity_type','legal_entity_types','tax_regime','tax_regimes','obligation_type','title','description','calculation_method','parameters','filing_frequency','payment_frequency','due_date_rule','due_date_rule_json','applies_when','official_source_id','effective_from','effective_to'];
+const SOURCE_EDITABLE = ['jurisdiction','authority','title','url','source_type','document_number','publication_date','effective_from','effective_to','language','content_hash','notes','status'];
+
+// ── Official sources ─────────────────────────────────────────────────────────
+app.get('/api/admin/official-sources', auth, async (req, res) => {
+  if (!requireTaxRuleEditor(req, res)) return;
+  const { data, error } = await supabase.from('official_sources').select('*').order('jurisdiction').order('created_at', { ascending: false });
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ sources: data || [] });
+});
+
+app.post('/api/admin/official-sources', auth, async (req, res) => {
+  if (!requireTaxRuleEditor(req, res)) return;
+  const body = {}; for (const k of SOURCE_EDITABLE) if (req.body[k] !== undefined) body[k] = req.body[k];
+  if (!body.jurisdiction || !body.authority || !body.title || !body.url) return res.status(400).json({ error: 'jurisdiction, authority, title, url required' });
+  body.status = body.status || 'draft';
+  const { data, error } = await supabase.from('official_sources').insert(body).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  await recordAudit({ actorUserId: req.user.userId, actorRole: 'platform_admin', entityType: 'official_source', entityId: data.id, action: 'created', after: data });
+  res.json({ source: data });
+});
+
+app.patch('/api/admin/official-sources/:id', auth, async (req, res) => {
+  if (!requireTaxRuleEditor(req, res)) return;
+  const { data: before } = await supabase.from('official_sources').select('*').eq('id', req.params.id).single();
+  if (!before) return res.status(404).json({ error: 'Source not found' });
+  const updates = { updated_at: new Date().toISOString() };
+  for (const k of SOURCE_EDITABLE) if (req.body[k] !== undefined) updates[k] = req.body[k];
+  const { data, error } = await supabase.from('official_sources').update(updates).eq('id', req.params.id).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  await recordAudit({ actorUserId: req.user.userId, actorRole: 'platform_admin', entityType: 'official_source', entityId: data.id, action: 'updated', before, after: data });
+  res.json({ source: data });
+});
+
+// Verify a source: marks it verified + sets last_verified_at + verifier.
+app.post('/api/admin/official-sources/:id/verify', auth, async (req, res) => {
+  if (!requireTaxRuleEditor(req, res)) return;
+  const { data: before } = await supabase.from('official_sources').select('*').eq('id', req.params.id).single();
+  if (!before) return res.status(404).json({ error: 'Source not found' });
+  const { data, error } = await supabase.from('official_sources')
+    .update({ status: 'verified', last_verified_at: new Date().toISOString(), verified_by_user_id: req.user.userId, updated_at: new Date().toISOString() })
+    .eq('id', req.params.id).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  await recordAudit({ actorUserId: req.user.userId, actorRole: 'platform_admin', entityType: 'official_source', entityId: data.id, action: 'verified', before, after: data });
+  res.json({ source: data });
+});
+
+// ── Tax rules (versioned) ────────────────────────────────────────────────────
+app.get('/api/admin/tax-rules', auth, async (req, res) => {
+  if (!requireTaxRuleEditor(req, res)) return;
+  let q = supabase.from('tax_rules').select('*, official_sources(*)').order('rule_code').order('version', { ascending: false });
+  if (req.query.jurisdiction) q = q.eq('jurisdiction', req.query.jurisdiction);
+  if (req.query.status) q = q.eq('status', req.query.status);
+  const { data, error } = await q;
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ rules: data || [] });
+});
+
+app.post('/api/admin/tax-rules', auth, async (req, res) => {
+  if (!requireTaxRuleEditor(req, res)) return;
+  const body = { status: 'draft', version: 1, created_by_user_id: req.user.userId };
+  for (const k of TAX_RULE_EDITABLE) if (req.body[k] !== undefined) body[k] = req.body[k];
+  if (!body.rule_code || !body.jurisdiction || !body.country || !body.obligation_type || !body.title)
+    return res.status(400).json({ error: 'rule_code, jurisdiction, country, obligation_type, title required' });
+  // New rule_code starts at v1; if rule_code exists, require the new-version flow.
+  const { data: existing } = await supabase.from('tax_rules').select('id').eq('rule_code', body.rule_code).limit(1);
+  if (existing?.length) return res.status(409).json({ error: 'rule_code exists — use "new version" instead' });
+  const { data, error } = await supabase.from('tax_rules').insert(body).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  await recordAudit({ actorUserId: req.user.userId, actorRole: 'platform_admin', entityType: 'tax_rule', entityId: data.id, action: 'created', after: data });
+  res.json({ rule: data });
+});
+
+app.patch('/api/admin/tax-rules/:id', auth, async (req, res) => {
+  if (!requireTaxRuleEditor(req, res)) return;
+  const { data: before } = await supabase.from('tax_rules').select('*').eq('id', req.params.id).single();
+  if (!before) return res.status(404).json({ error: 'Rule not found' });
+  // Only draft / under_review rules are editable. Active rules are immutable.
+  if (!['draft', 'under_review', 'rejected'].includes(before.status))
+    return res.status(409).json({ error: `Cannot edit a ${before.status} rule — create a new version` });
+  const updates = { updated_at: new Date().toISOString() };
+  for (const k of TAX_RULE_EDITABLE) if (req.body[k] !== undefined) updates[k] = req.body[k];
+  const { data, error } = await supabase.from('tax_rules').update(updates).eq('id', req.params.id).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  await recordAudit({ actorUserId: req.user.userId, actorRole: 'platform_admin', entityType: 'tax_rule', entityId: data.id, action: 'updated', before, after: data });
+  res.json({ rule: data });
+});
+
+// Lifecycle: submit (→under_review), activate (→active, requires verified
+// source), deprecate (→deprecated), new-version (clone as draft).
+app.post('/api/admin/tax-rules/:id/submit', auth, async (req, res) => {
+  if (!requireTaxRuleEditor(req, res)) return;
+  const { data: before } = await supabase.from('tax_rules').select('*').eq('id', req.params.id).single();
+  if (!before) return res.status(404).json({ error: 'Rule not found' });
+  if (before.status !== 'draft') return res.status(409).json({ error: 'Only a draft can be submitted for review' });
+  const { data, error } = await supabase.from('tax_rules').update({ status: 'under_review', updated_at: new Date().toISOString() }).eq('id', req.params.id).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  await recordAudit({ actorUserId: req.user.userId, actorRole: 'platform_admin', entityType: 'tax_rule', entityId: data.id, action: 'submitted', before, after: data });
+  res.json({ rule: data });
+});
+
+app.post('/api/admin/tax-rules/:id/activate', auth, async (req, res) => {
+  if (!requireTaxRuleEditor(req, res)) return;
+  const { data: before } = await supabase.from('tax_rules').select('*, official_sources(*)').eq('id', req.params.id).single();
+  if (!before) return res.status(404).json({ error: 'Rule not found' });
+  if (before.status === 'active') return res.status(409).json({ error: 'Already active' });
+  // ENFORCE: active requires a verified official source.
+  const src = before.official_sources;
+  if (!before.official_source_id || !src) return res.status(422).json({ error: 'Cannot activate: rule has no official source' });
+  if (!src.last_verified_at || !['verified', 'active'].includes(src.status))
+    return res.status(422).json({ error: 'Cannot activate: official source is not verified' });
+  const now = new Date().toISOString();
+  const { data, error } = await supabase.from('tax_rules')
+    .update({ status: 'active', last_verified_at: now, reviewed_by_user_id: req.user.userId, reviewed_at: now, updated_at: now })
+    .eq('id', req.params.id).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  await recordAudit({ actorUserId: req.user.userId, actorRole: 'platform_admin', entityType: 'tax_rule', entityId: data.id, action: 'activated', before, after: data });
+  res.json({ rule: data });
+});
+
+app.post('/api/admin/tax-rules/:id/deprecate', auth, async (req, res) => {
+  if (!requireTaxRuleEditor(req, res)) return;
+  const { data: before } = await supabase.from('tax_rules').select('*').eq('id', req.params.id).single();
+  if (!before) return res.status(404).json({ error: 'Rule not found' });
+  const { data, error } = await supabase.from('tax_rules').update({ status: 'deprecated', updated_at: new Date().toISOString() }).eq('id', req.params.id).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  await recordAudit({ actorUserId: req.user.userId, actorRole: 'platform_admin', entityType: 'tax_rule', entityId: data.id, action: 'deprecated', before, after: data });
+  res.json({ rule: data });
+});
+
+// Create a new version: old row stays immutable, new draft has version+1 and
+// supersedes_rule_id → old. Activating the new version later supersedes the old.
+app.post('/api/admin/tax-rules/:id/new-version', auth, async (req, res) => {
+  if (!requireTaxRuleEditor(req, res)) return;
+  const { data: old } = await supabase.from('tax_rules').select('*').eq('id', req.params.id).single();
+  if (!old) return res.status(404).json({ error: 'Rule not found' });
+  // Highest existing version for this rule_code.
+  const { data: versions } = await supabase.from('tax_rules').select('version').eq('rule_code', old.rule_code).order('version', { ascending: false }).limit(1);
+  const nextVersion = (versions?.[0]?.version || old.version || 1) + 1;
+  const clone = {};
+  for (const k of TAX_RULE_EDITABLE) clone[k] = old[k];
+  for (const k of TAX_RULE_EDITABLE) if (req.body[k] !== undefined) clone[k] = req.body[k];
+  clone.rule_code = old.rule_code; clone.version = nextVersion; clone.status = 'draft';
+  clone.supersedes_rule_id = old.id; clone.created_by_user_id = req.user.userId;
+  clone.last_verified_at = null; clone.reviewed_by_user_id = null; clone.reviewed_at = null;
+  const { data, error } = await supabase.from('tax_rules').insert(clone).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  await recordAudit({ actorUserId: req.user.userId, actorRole: 'platform_admin', entityType: 'tax_rule', entityId: data.id, action: 'new_version', before: { from: old.id, version: old.version }, after: data });
+  res.json({ rule: data });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
 // BANK STATEMENT IMPORT & RECONCILIATION V1 (AI Accountant — Module F)
 // Client parses the file (CSV/XLSX) and posts normalized rows. The backend does
 // the deterministic work: dedup, matching against existing transactions, import
