@@ -37,7 +37,22 @@ const L = {
 
 const num = (v) => {
   if (v === null || v === undefined || v === '') return null
-  const s = String(v).replace(/[^\d.,-]/g, '').replace(/\.(?=\d{3}\b)/g, '').replace(',', '.')
+  if (typeof v === 'number') return isFinite(v) ? v : null
+  let s = String(v).replace(/[^\d.,-]/g, '')
+  if (!s) return null
+  // Disambiguate thousands vs decimal separator: the LAST separator is the decimal.
+  // "2,426,050.00" → 2426050  |  "1.000.000,00" → 1000000  |  "700,000" → 700000
+  const lastDot = s.lastIndexOf('.'), lastComma = s.lastIndexOf(',')
+  if (lastDot > -1 && lastComma > -1) {
+    if (lastDot > lastComma) s = s.replace(/,/g, '')            // dot is decimal
+    else s = s.replace(/\./g, '').replace(',', '.')             // comma is decimal
+  } else if (lastComma > -1) {
+    // only commas: decimal if a single comma with 1-2 trailing digits, else thousands
+    s = (s.indexOf(',') === lastComma && /,\d{1,2}$/.test(s)) ? s.replace(',', '.') : s.replace(/,/g, '')
+  } else if (lastDot > -1) {
+    // only dots: decimal if a single dot with 1-2 trailing digits, else thousands
+    s = (s.indexOf('.') === lastDot && /\.\d{1,2}$/.test(s)) ? s : s.replace(/\./g, '')
+  }
   const n = Number(s); return isFinite(n) ? n : null
 }
 const toISO = (v) => {
@@ -102,7 +117,8 @@ export default function BankImport() {
     let openBal = '', closeBal = ''
     arr.slice(bodyStart).forEach(r => {
       const first = String(r[0] || '').toLowerCase()
-      const val = r.map(c => num(c)).filter(n => n !== null && n !== 0).pop()
+      // Skip col 0 (the label) — "Opening balance per 01/05/26" would yield 010526.
+      const val = r.slice(1).map(c => num(c)).filter(n => n !== null && n !== 0).pop()
       if (/opening balance|saldo awal/.test(first) && val) openBal = String(val)
       if (/closing balance|saldo akhir/.test(first) && val) closeBal = String(val)
     })
