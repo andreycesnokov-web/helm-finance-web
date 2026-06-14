@@ -22,7 +22,8 @@ const L = {
     confirmSelected: 'Confirm selected', confirmHigh: 'Confirm high-confidence', exclude: 'Exclude', markPersonal: 'Mark personal',
     createNewCategory: '+ New category', uncategorized: 'Uncategorized', high: 'High', medium: 'Medium', low: 'Low',
     matchedExisting: 'Matched existing', possibleTransfer: 'Possible transfer', linkedPayable: 'Possible payable', linkedReceivable: 'Possible receivable', possiblePayroll: 'Possible payroll',
-    runSuggest: 'Re-run suggestions', total: 'total', selected: 'selected' },
+    runSuggest: 'Re-run suggestions', total: 'total', selected: 'selected',
+    createRuleAsk: 'Always categorize similar transactions this way?' },
   ru: { title: 'Импорт из банка', subtitle: 'Загрузи выписку CSV/XLSX — проверь, затем создадим транзакции',
     upload: 'Загрузить выписку (CSV / XLSX)', wallet: 'Счёт назначения', map: 'Сопоставь колонки', date: 'Дата', amount: 'Сумма',
     desc: 'Описание', direction: 'Направление (необязательно)', ref: 'Референс (необязательно)', preview: 'Превью и проверка',
@@ -39,7 +40,8 @@ const L = {
     confirmSelected: 'Подтвердить выбранные', confirmHigh: 'Подтвердить высокую уверенность', exclude: 'Исключить', markPersonal: 'Личное',
     createNewCategory: '+ Новая категория', uncategorized: 'Без категории', high: 'Высокая', medium: 'Средняя', low: 'Низкая',
     matchedExisting: 'Уже в учёте', possibleTransfer: 'Возможно перевод', linkedPayable: 'Возможно оплата долга', linkedReceivable: 'Возможно поступление', possiblePayroll: 'Возможно зарплата',
-    runSuggest: 'Пересчитать подсказки', total: 'всего', selected: 'выбрано' },
+    runSuggest: 'Пересчитать подсказки', total: 'всего', selected: 'выбрано',
+    createRuleAsk: 'Всегда категоризировать похожие операции так же?' },
   id: { title: 'Impor bank', subtitle: 'Impor rekening koran CSV/XLSX — tinjau, lalu buat transaksi',
     upload: 'Unggah rekening (CSV / XLSX)', wallet: 'Akun tujuan', map: 'Petakan kolom', date: 'Tanggal', amount: 'Jumlah',
     desc: 'Deskripsi', direction: 'Arah (opsional)', ref: 'Referensi (opsional)', preview: 'Pratinjau & tinjau',
@@ -56,7 +58,8 @@ const L = {
     confirmSelected: 'Konfirmasi terpilih', confirmHigh: 'Konfirmasi keyakinan tinggi', exclude: 'Kecualikan', markPersonal: 'Pribadi',
     createNewCategory: '+ Kategori baru', uncategorized: 'Tanpa kategori', high: 'Tinggi', medium: 'Sedang', low: 'Rendah',
     matchedExisting: 'Sudah tercatat', possibleTransfer: 'Mungkin transfer', linkedPayable: 'Mungkin bayar utang', linkedReceivable: 'Mungkin penerimaan', possiblePayroll: 'Mungkin gaji',
-    runSuggest: 'Hitung ulang saran', total: 'total', selected: 'terpilih' },
+    runSuggest: 'Hitung ulang saran', total: 'total', selected: 'terpilih',
+    createRuleAsk: 'Selalu kategorikan transaksi serupa seperti ini?' },
 }
 
 const num = (v) => {
@@ -266,8 +269,26 @@ export default function BankImport() {
       const res = await apiFetch(`/bank-imports/${batch.id}/confirm`, token, { method: 'POST', body: { rows: payload } })
       setRecon(res.reconciliation || null)
       alert(`${l.imported}: ${res.imported}`)
+      await offerRulePromotion()
       setBatch(null); setRows([]); setHeaders([]); setRawRows([]); setSummary(null); loadHistory()
     } catch (e) { alert(e.message) } finally { setBusy(false) }
+  }
+
+  // After confirm, offer to turn repeated confirmations into a reusable rule.
+  const offerRulePromotion = async () => {
+    try {
+      const d = await apiFetch('/classification-rules', token)
+      if (!d.canManage || !(d.candidates || []).length) return
+      for (const c of d.candidates.slice(0, 5)) {
+        const msg = `${l.aiDisclaimer}\n\n"${c.match_value}" → ${c.category_name} (${c.count}×)\n${l.createRuleAsk}`
+        if (window.confirm(msg)) {
+          await apiFetch('/classification-rules', token, { method: 'POST', body: {
+            match_type: 'contains', match_value: c.match_value,
+            category_id: c.category_id, transaction_type: c.transaction_type, created_from: 'confirmed_correction',
+          } }).catch(() => {})
+        }
+      }
+    } catch { /* non-blocking */ }
   }
 
   const excludeRow = async (r) => {

@@ -2330,6 +2330,125 @@ app.post('/api/bank-imports/:batchId/rows/:rowId/link', auth, async (req, res) =
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// ═════════════════════════════════════════════════════════════════════════════
+//  CLASSIFICATION RULES — business memory (Phase 5). Created only from confirmed
+//  user corrections, never automatically. Owner/Admin/CFO manage; everyone with
+//  finance view can read. Used by the cascade Level 1.
+// ═════════════════════════════════════════════════════════════════════════════
+
+// Detect promotable patterns: a normalized description confirmed to the SAME
+// category >= threshold times, with no existing enabled rule. Returns candidates.
+async function promotionCandidates(biz, threshold = 3) {
+  const { data: fb } = await supabase.from('classification_feedback')
+    .select('normalized_desc, final_category_id, final_transaction_type')
+    .eq('business_id', biz.business.id).not('final_category_id', 'is', null).limit(3000);
+  const tally = new Map(); // `${desc}|${catId}` → { desc, catId, type, count }
+  for (const f of (fb || [])) {
+    if (!f.normalized_desc) continue;
+    const key = `${f.normalized_desc}|${f.final_category_id}`;
+    const cur = tally.get(key) || { desc: f.normalized_desc, catId: f.final_category_id, type: f.final_transaction_type, count: 0 };
+    cur.count++; tally.set(key, cur);
+  }
+  const promotable = [...tally.values()].filter(c => c.count >= threshold);
+  if (!promotable.length) return [];
+  const { data: rules } = await supabase.from('classification_rules')
+    .select('normalized_value').eq('business_id', biz.business.id);
+  const existing = new Set((rules || []).map(r => r.normalized_value));
+  const { data: cats } = await supabase.from('cashflow_categories').select('id, name').or(bizOrFilter(biz));
+  const catName = new Map((cats || []).map(c => [c.id, c.name]));
+  return promotable
+    .filter(c => !existing.has(c.desc))
+    .map(c => ({ match_value: c.desc, normalized_value: c.desc, category_id: c.catId,
+                 category_name: catName.get(c.catId) || null, transaction_type: c.type, count: c.count }));
+}
+
+// GET /api/classification-rules — list (+ promotion candidates)
+app.get('/api/classification-rules', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canViewBusinessFinance(biz.role)) return res.status(403).json({ error: 'Forbidden' });
+    const { data } = await supabase.from('classification_rules')
+      .select('*').eq('business_id', biz.business.id).order('priority').order('created_at', { ascending: false });
+    let candidates = [];
+    if (canManageClassificationRules(biz.role)) { try { candidates = await promotionCandidates(biz); } catch { candidates = []; } }
+    res.json({ rules: data || [], candidates, canManage: canManageClassificationRules(biz.role) });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// POST /api/classification-rules — create (manual or accepted promotion)
+app.post('/api/classification-rules', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canManageClassificationRules(biz.role)) return res.status(403).json({ error: 'Your role cannot manage rules' });
+    const { rule_name, match_type, match_value, transaction_type, category_id, counterparty_id, scope, priority, created_from } = req.body || {};
+    if (!match_value || !String(match_value).trim()) return res.status(400).json({ error: 'match_value required' });
+    // Validate ownership of referenced category / counterparty
+    if (category_id) {
+      const { data: c } = await supabase.from('cashflow_categories').select('id').eq('id', category_id).or(bizOrFilter(biz)).limit(1);
+      if (!c?.length) return res.status(400).json({ error: 'category_id does not belong to this business' });
+    }
+    if (counterparty_id) {
+      const { data: cp } = await supabase.from('counterparties').select('id').eq('id', counterparty_id).or(bizOrFilter(biz)).limit(1);
+      if (!cp?.length) return res.status(400).json({ error: 'counterparty_id does not belong to this business' });
+    }
+    if (transaction_type && !VALID_SYSTEM_TX_TYPES.includes(transaction_type))
+      return res.status(400).json({ error: 'Invalid transaction_type' });
+    const { data, error } = await supabase.from('classification_rules').insert({
+      business_id: biz.business.id, rule_name: rule_name || null,
+      match_type: ['contains', 'equals', 'starts_with'].includes(match_type) ? match_type : 'contains',
+      match_value: String(match_value).trim(), normalized_value: normalizeDesc(match_value),
+      transaction_type: transaction_type || null, category_id: category_id || null,
+      counterparty_id: counterparty_id || null, scope: scope || null,
+      priority: Number.isFinite(+priority) ? +priority : 100,
+      created_by_user_id: req.user.userId, created_from: created_from || 'manual',
+    }).select().single();
+    if (error) return res.status(500).json({ error: error.message });
+    res.json({ rule: data });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// PATCH /api/classification-rules/:id — edit / enable / disable
+app.patch('/api/classification-rules/:id', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canManageClassificationRules(biz.role)) return res.status(403).json({ error: 'Your role cannot manage rules' });
+    const allowed = ['rule_name', 'match_type', 'match_value', 'transaction_type', 'category_id', 'counterparty_id', 'scope', 'priority', 'is_enabled'];
+    const updates = { updated_at: new Date().toISOString() };
+    for (const k of allowed) if (req.body[k] !== undefined) updates[k] = req.body[k];
+    if (updates.match_value !== undefined) updates.normalized_value = normalizeDesc(updates.match_value);
+    if (updates.transaction_type && !VALID_SYSTEM_TX_TYPES.includes(updates.transaction_type))
+      return res.status(400).json({ error: 'Invalid transaction_type' });
+    const { data, error } = await supabase.from('classification_rules')
+      .update(updates).eq('id', req.params.id).eq('business_id', biz.business.id).select().single();
+    if (error) return res.status(500).json({ error: error.message });
+    if (!data) return res.status(404).json({ error: 'Rule not found' });
+    res.json({ rule: data });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// DELETE /api/classification-rules/:id — soft-disable (preferred) or hard delete
+app.delete('/api/classification-rules/:id', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canManageClassificationRules(biz.role)) return res.status(403).json({ error: 'Your role cannot manage rules' });
+    if (req.query.hard === '1') {
+      const { error } = await supabase.from('classification_rules').delete().eq('id', req.params.id).eq('business_id', biz.business.id);
+      if (error) return res.status(500).json({ error: error.message });
+      return res.json({ ok: true, deleted: true });
+    }
+    const { data, error } = await supabase.from('classification_rules')
+      .update({ is_enabled: false, updated_at: new Date().toISOString() })
+      .eq('id', req.params.id).eq('business_id', biz.business.id).select().single();
+    if (error) return res.status(500).json({ error: error.message });
+    if (!data) return res.status(404).json({ error: 'Rule not found' });
+    res.json({ rule: data });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // ── POST /api/debts/from-telegram ────────────────────────────────────────────
 // Called by the Telegram bot to create a draft receivable / payable.
 // Requires telegram_id → users.id mapping.
@@ -3193,6 +3312,20 @@ app.patch('/api/transactions/:id', auth, async (req, res) => {
     .single();
   if (error) return res.status(500).json({ error: error.message });
   if (!data) return res.status(404).json({ error: 'Transaction not found' });
+
+  // Record post-import categorization as feedback (business memory). Does not
+  // change historical rows; feeds rule promotion the next time rules are viewed.
+  if ('category' in updates && updates.category) {
+    try {
+      const { data: cat } = await supabase.from('cashflow_categories')
+        .select('id').eq('name', updates.category).or(bizOrFilter(biz)).limit(1);
+      await supabase.from('classification_feedback').insert({
+        business_id: biz.business.id, normalized_desc: normalizeDesc(data.description),
+        final_category_id: cat?.[0]?.id || null, final_transaction_type: data.type,
+        source: 'post_import_edit', reviewed_by_user_id: req.user.userId,
+      });
+    } catch { /* feedback is best-effort */ }
+  }
   res.json(data);
 });
 
