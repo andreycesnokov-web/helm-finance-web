@@ -1533,6 +1533,95 @@ app.get('/api/accountant/applicability', auth, async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// Shared deterministic data the AI Accountant explains (never invents).
+async function buildAccountantData(biz) {
+  const { data: rows } = await supabase.from('tax_profiles').select('*').eq('business_id', biz.business.id).limit(1);
+  const profile = rows?.[0] || null;
+  const jur = profile?.jurisdiction || 'ID';
+  const { data: rules } = await supabase.from('tax_rules').select('*, official_sources(*)').eq('jurisdiction', jur).eq('status', 'active');
+  const effective = (rules || []).filter(r => effectiveRuleActive(r, r.official_sources));
+  const appl = evaluateApplicableTaxRules({ taxProfile: profile, activeRules: effective });
+  const today = new Date();
+  const { data: evRows } = await supabase.from('compliance_events')
+    .select('title, due_date, status, period, rule_code, rule_version, amount_status, source_verification_required')
+    .eq('business_id', biz.business.id).order('due_date', { ascending: true });
+  const events = (evRows || []).map(e => ({ ...e, days: Math.ceil((new Date(e.due_date) - today) / 86400000) }));
+  return {
+    profile, jurisdiction: jur,
+    completeness: profileCompleteness(profile),
+    profile_warnings: profileWarnings(profile),
+    applicable_rules: appl.applicable_rules, excluded_rules: appl.excluded_rules,
+    missing_profile_fields: appl.missing_profile_fields,
+    active_unverified: (rules || []).length - effective.length,
+    overdue: events.filter(e => e.days < 0 && !['paid', 'filed'].includes(e.status)),
+    upcoming: events.filter(e => e.days >= 0 && e.days <= 90),
+  };
+}
+
+// GET /api/accountant/summary — AI Accountant home (deterministic).
+app.get('/api/accountant/summary', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canViewBusinessFinance(biz.role)) return res.status(403).json({ error: 'Forbidden' });
+    const language = normalizeLanguage(req.query.language || await getUserLanguage(req.user.userId));
+    const data = await buildAccountantData(biz);
+    res.json({ ...data, entitled: await hasAccountantAddon(biz), disclaimer: AI_ACCOUNTANT_DISCLAIMER[language] || AI_ACCOUNTANT_DISCLAIMER.en });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// POST /api/accountant/ask — AI explains compliance using ONLY deterministic
+// data. It never invents a rate/deadline/requirement and always cites sources.
+app.post('/api/accountant/ask', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canViewBusinessFinance(biz.role)) return res.status(403).json({ error: 'Forbidden' });
+    const question = String(req.body?.question || '').slice(0, 500);
+    if (!question) return res.status(400).json({ error: 'question required' });
+    const language = normalizeLanguage(await getUserLanguage(req.user.userId));
+    const disclaimer = AI_ACCOUNTANT_DISCLAIMER[language] || AI_ACCOUNTANT_DISCLAIMER.en;
+    const data = await buildAccountantData(biz);
+
+    // Only safe deterministic facts go to the model.
+    const facts = {
+      jurisdiction: data.jurisdiction,
+      profile: data.profile ? { legal_entity_type: data.profile.legal_entity_type, tax_regime: data.profile.tax_regime, vat_status: data.profile.vat_status, employee_status: data.profile.employee_status, financial_year_start: data.profile.financial_year_start, financial_year_end: data.profile.financial_year_end } : null,
+      profile_completeness_percent: data.completeness.percent,
+      missing_profile_fields: data.missing_profile_fields,
+      applicable_rules: data.applicable_rules.map(r => ({ rule_code: r.rule_code, version: r.version, title: r.title, reason: r.reason, official_source: r.official_source ? { title: r.official_source.title, url: r.official_source.url, last_verified_at: r.official_source.last_verified_at } : null })),
+      upcoming_obligations: data.upcoming.map(e => ({ title: e.title, rule_code: e.rule_code, version: e.rule_version, period: e.period, due_date: e.due_date, status: e.status })),
+      overdue_obligations: data.overdue.map(e => ({ title: e.title, due_date: e.due_date })),
+      active_unverified_rules: data.active_unverified,
+    };
+    const prompt = `You are the Helm Finance AI Accountant for ONE business. Answer in ${language === 'ru' ? 'Russian' : language === 'id' ? 'Indonesian' : 'English'}.
+
+STRICT RULES:
+- Use ONLY the deterministic facts below. NEVER invent a tax rate, deadline, filing frequency, threshold or legal interpretation.
+- If the facts do not contain an active rule needed to answer, say the determination is not possible yet and what is missing (e.g. missing profile fields, unverified rules).
+- When you state an obligation, cite its rule_code, version and official source title.
+- You explain and summarise; you do not calculate tax amounts (the deterministic engine does that later).
+- Do not present this as official advice.
+
+FACTS:
+${JSON.stringify(facts)}
+
+QUESTION: ${question}`;
+
+    let answer;
+    try {
+      const resp = await anthropic.messages.create({ model: 'claude-sonnet-4-5', max_tokens: 700, messages: [{ role: 'user', content: prompt }] });
+      answer = (resp.content?.[0]?.text || '').trim();
+    } catch {
+      // Local fallback keeps the feature usable if the model is unavailable.
+      answer = data.applicable_rules.length
+        ? `Applicable obligations: ${data.applicable_rules.map(r => `${r.title} (${r.rule_code} v${r.version})`).join('; ')}. ${data.overdue.length ? `${data.overdue.length} overdue. ` : ''}Confirm with a licensed professional.`
+        : `No active verified tax rules apply yet${data.missing_profile_fields.length ? ` — missing profile fields: ${data.missing_profile_fields.join(', ')}` : ''}. Determination not possible.`;
+    }
+    res.json({ answer, disclaimer, used_rules: data.applicable_rules.map(r => ({ rule_code: r.rule_code, version: r.version })) });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // GET /api/accountant/rules — active rules for the profile's jurisdiction
 app.get('/api/accountant/rules', auth, async (req, res) => {
   try {
@@ -5666,16 +5755,34 @@ async function buildAiCfoContext(userId, language = 'en', biz = null) {
   let compliance = { upcoming: [], overdue_count: 0 };
   try {
     if (biz) {
-      const { data: evRows } = await supabase.from('compliance_events')
-        .select('title, due_date, obligation_type, status, period')
-        .eq('business_id', biz.business.id)
-        .order('due_date', { ascending: true });
       const today = new Date();
-      const evs = (evRows || []).map(e => ({ ...e, days: Math.ceil((new Date(e.due_date) - today) / 86400000) }));
+      const [{ data: evRows }, { data: profRows }] = await Promise.all([
+        supabase.from('compliance_events')
+          .select('title, due_date, obligation_type, status, period, amount_status, estimated_amount, confirmed_amount, currency, professional_review_status, owner_approval_status, payment_status, source_verification_required')
+          .eq('business_id', biz.business.id).order('due_date', { ascending: true }),
+        supabase.from('tax_profiles').select('*').eq('business_id', biz.business.id).limit(1),
+      ]);
+      const all = (evRows || []).map(e => ({ ...e, days: Math.ceil((new Date(e.due_date) - today) / 86400000) }));
+      // Real pressure = unpaid obligations backed by a verified source.
+      const open = all.filter(e => !['paid', 'filed'].includes(e.payment_status) && !e.source_verification_required);
+      const overdue = open.filter(e => e.days < 0);
+      const sum = (arr, f) => arr.reduce((s, e) => s + Number(e[f] || 0), 0);
+      const missing = profileCompleteness(profRows?.[0] || null).missing;
       compliance = {
-        overdue_count: evs.filter(e => e.days < 0).length,
-        next_90: evs.filter(e => e.days >= 0 && e.days <= 90),
-        upcoming: evs.filter(e => e.days >= -30 && e.days <= 90).slice(0, 8),
+        // Counts (deterministic; amounts NOT subtracted from cash — pressure only)
+        upcoming_7d:  open.filter(e => e.days >= 0 && e.days <= 7).length,
+        upcoming_30d: open.filter(e => e.days >= 0 && e.days <= 30).length,
+        upcoming_90d: open.filter(e => e.days >= 0 && e.days <= 90).length,
+        overdue_count: overdue.length,
+        overdue_amount: sum(overdue, 'confirmed_amount') || sum(overdue, 'estimated_amount'),
+        // estimated = potential; confirmed = professionally reviewed / owner confirmed
+        estimated_amount: sum(open.filter(e => e.amount_status === 'estimated'), 'estimated_amount'),
+        confirmed_amount: sum(open.filter(e => ['professionally_reviewed', 'owner_confirmed'].includes(e.amount_status)), 'confirmed_amount'),
+        professional_review_pending: open.filter(e => e.professional_review_status && !['approved', 'not_started'].includes(e.professional_review_status)).length,
+        owner_approval_pending: open.filter(e => e.owner_approval_status === 'required').length,
+        missing_profile_fields: missing,
+        upcoming: open.filter(e => e.days >= -30 && e.days <= 90).slice(0, 8),
+        next_90: open.filter(e => e.days >= 0 && e.days <= 90),
       };
       if (compliance.overdue_count > 0)
         partialCtx.risks.push({ type: 'overdue_filing', severity: 'high', title: `${compliance.overdue_count} overdue tax filing${compliance.overdue_count > 1 ? 's' : ''}`, description: 'Compliance deadlines passed — confirm with your accountant', amount: 0 });
@@ -5727,11 +5834,16 @@ async function buildBusinessFinancialSnapshot(biz, language = 'en', asOfDate = n
   const now = asOfDate ? new Date(asOfDate) : new Date();
   const bizOr = bizOrFilter(biz);
 
-  const [{ data: wallets }, { data: txs }, { data: rawDebts }, { data: employees }] = await Promise.all([
+  const [{ data: wallets }, { data: txs }, { data: rawDebts }, { data: employees }, { data: taxObs }] = await Promise.all([
     supabase.from('wallets').select('id,name,currency,type,scope').or(bizOr).eq('is_active', true),
     supabase.from('transactions').select('type,amount_original,created_at,wallet_id,source,scope').or(bizOr),
     supabase.from('debts').select('*').or(bizOr).or('is_training.is.null,is_training.eq.false'),
     supabase.from('payroll_employees').select('default_salary,pay_day,status').or(bizOr).neq('status', 'archived'),
+    // Tax obligations: only verified-source, reviewed/owner-confirmed, unpaid ones
+    // count as real cash pressure. Estimates / unverified are excluded.
+    supabase.from('compliance_events')
+      .select('title, due_date, confirmed_amount, estimated_amount, amount_status, payment_status, professional_review_status, owner_approval_status, source_verification_required')
+      .eq('business_id', biz.business.id),
   ]);
 
   const CASH_IN = ['income'], CASH_OUT = ['expense', 'payroll'];
@@ -5785,6 +5897,20 @@ async function buildBusinessFinancialSnapshot(biz, language = 'en', asOfDate = n
   const payList = confirmed.filter(d => d.type === 'payable');
   const recvList = confirmed.filter(d => d.type === 'receivable');
 
+  // Tax obligations as confirmed future cash pressure (reviewed / owner-approved
+  // only; never draft / unverified / estimate-only / AI-only).
+  const taxConfirmed = (taxObs || []).filter(o =>
+    !['paid', 'filed'].includes(o.payment_status) && !o.source_verification_required &&
+    (['professionally_reviewed', 'owner_confirmed'].includes(o.amount_status) || o.owner_approval_status === 'approved' || (o.professional_review_status === 'approved')));
+  const taxAmt = (o) => Number(o.confirmed_amount || o.estimated_amount || 0);
+  const taxWithin = (n) => taxConfirmed.filter(o => { const dd = daysUntilDate(o.due_date, now); return dd !== null && dd >= 0 && dd <= n; });
+  const taxObligations = {
+    due_7_days:  taxWithin(7).reduce((s, o) => s + taxAmt(o), 0),
+    due_30_days: taxWithin(30).reduce((s, o) => s + taxAmt(o), 0),
+    due_90_days: taxWithin(90).reduce((s, o) => s + taxAmt(o), 0),
+    next_item:   taxWithin(90).sort((a, b) => new Date(a.due_date) - new Date(b.due_date))[0] || null,
+  };
+
   // Payroll — best-effort estimate from employees' pay_day (no scheduled table).
   const dom = now.getDate();
   const daysToPayDay = (pd) => { if (!pd) return null; const d = pd - dom; return d >= 0 ? d : d + 30; };
@@ -5799,6 +5925,7 @@ async function buildBusinessFinancialSnapshot(biz, language = 'en', asOfDate = n
     payables: { ...debtBuckets(payList), pending_amount: pending.filter(d => d.type === 'payable').reduce((s, d) => s + Number(d.remaining_amount || d.amount || 0), 0) },
     receivables: { ...debtBuckets(recvList), pending_amount: pending.filter(d => d.type === 'receivable').reduce((s, d) => s + Number(d.remaining_amount || d.amount || 0), 0) },
     payroll: { due_7_days: payroll7, due_30_days: payroll30 },
+    tax_obligations: taxObligations,
     policy: DEFAULT_DECISION_POLICY,
     _confirmedPayables: payList,
   };
@@ -5881,6 +6008,14 @@ function assessDebtPayment(snap, debt, paymentAmount, walletId) {
     if (pctOfCash > snap.policy.large_payment_pct) { flag('caution', 'medium'); factors.push({ key: 'large_payment', severity: 'medium', label: `Payment is ${Math.round(pctOfCash)}% of cash`, value: pctOfCash }); }
     if (snap.payroll.due_7_days > 0 && cashAfter < snap.payroll.due_7_days + payables7) { flag('caution', 'high'); factors.push({ key: 'payroll_pressure', severity: 'high', label: 'Payroll + near-term payables may not be covered after payment', value: snap.payroll.due_7_days }); }
     if (cashAfter < protectedCash && recommendation === 'safe') { flag('caution', 'medium'); factors.push({ key: 'below_reserve', severity: 'medium', label: `Cash after payment below ${snap.policy.protected_cash_days}d reserve`, value: protectedCash }); }
+    // Reviewed / owner-approved tax obligations due soon are real cash pressure.
+    const taxDue30 = snap.tax_obligations?.due_30_days || 0;
+    if (taxDue30 > 0 && cashAfter < taxDue30 + payables7) {
+      flag('caution', 'high');
+      const ti = snap.tax_obligations.next_item;
+      const amt = Math.round(taxDue30).toLocaleString('en-US');
+      factors.push({ key: 'tax_obligation_pressure', severity: 'high', label: ti ? `Reviewed tax obligation ${amt} due ~${ti.due_date} may not be covered after payment` : `Reviewed tax obligations ${amt} due within 30d may not be covered`, value: taxDue30 });
+    }
   }
 
   return {
