@@ -34,13 +34,30 @@ CREATE TABLE IF NOT EXISTS audit_events (
 CREATE INDEX IF NOT EXISTS audit_events_business_idx ON audit_events(business_id, created_at);
 CREATE INDEX IF NOT EXISTS audit_events_entity_idx   ON audit_events(entity_type, entity_id);
 
+-- DB-level append-only guard: block UPDATE/DELETE at the database, not just by
+-- the absence of API endpoints. Applies to all roles (including the service
+-- role the backend uses — which only ever INSERTs). For genuine platform
+-- maintenance, run:  ALTER TABLE audit_events DISABLE TRIGGER audit_events_append_only;
+CREATE OR REPLACE FUNCTION audit_events_no_mutate() RETURNS trigger AS $$
+BEGIN
+  RAISE EXCEPTION 'audit_events is append-only (% blocked)', TG_OP;
+END;
+$$ LANGUAGE plpgsql;
+DROP TRIGGER IF EXISTS audit_events_append_only ON audit_events;
+CREATE TRIGGER audit_events_append_only
+  BEFORE UPDATE OR DELETE ON audit_events
+  FOR EACH ROW EXECUTE FUNCTION audit_events_no_mutate();
+
 -- ── 2. tax_profiles — add profile status, verification, NPWP/NIB, audit ───────
 -- (existing reused: country, jurisdiction, legal_entity_type, tax_residency,
 --  tax_regime, tax_identifier, financial_year_start/end, vat_status, pkp_status,
 --  employee_status, payroll_tax_status, industry, business_activity_codes,
 --  accounting_method, reporting_currency, filing_frequency, professional_partner_id)
+-- Semantics (no silent reconciliation): tax_identifier = universal identifier;
+-- npwp = Indonesia-specific. They are NOT auto-synced. If both are set and
+-- differ, the UI (PR3) must flag the profile for review rather than pick one.
 ALTER TABLE tax_profiles
-  ADD COLUMN IF NOT EXISTS npwp                  TEXT NULL,   -- Indonesia tax ID (alias of tax_identifier; kept explicit)
+  ADD COLUMN IF NOT EXISTS npwp                  TEXT NULL,   -- Indonesia-specific tax ID; see note above
   ADD COLUMN IF NOT EXISTS nib                   TEXT NULL,   -- business identification number
   ADD COLUMN IF NOT EXISTS withholding_tax_status TEXT NULL,
   ADD COLUMN IF NOT EXISTS profile_status        TEXT NOT NULL DEFAULT 'incomplete',
