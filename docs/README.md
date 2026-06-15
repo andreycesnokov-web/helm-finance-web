@@ -12,5 +12,8 @@
 - [Brand Guidelines V1](brand/BRAND_GUIDELINES_V1.md) — approved CFO AI brand system + usage rules. Status: pending professional vectorization and final color approval.
 - [Brand Migration V1 — Checklist](brand/BRAND_MIGRATION_V1_CHECKLIST.md) — surfaces to migrate once the asset package lands (blocked until then).
 
+## Tax packs
+- [Indonesia Tax Rule Pack V1](tax-packs/INDONESIA_TAX_RULE_PACK_V1.md) — status: Ready for professional verification. Pilot rule [ID_PPN_MONTHLY](tax-packs/indonesia/ID_PPN_MONTHLY_V1.md).
+
 ## Reports
 - [Tax Engine Foundation V1 — Production Implementation Report](reports/TAX_ENGINE_FOUNDATION_V1_REPORT.md) — implementation snapshot (migration `023`, verified 2026-06-15).
