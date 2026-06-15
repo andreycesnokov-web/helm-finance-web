@@ -4,6 +4,7 @@ const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const { createClient } = require('@supabase/supabase-js');
 const { calculateDueDate, ymd } = require('./lib/dueDate');
+const { computeActivationBlockers, isEffectiveApprovedReview, validReviewTransition } = require('./lib/taxGate');
 require('dotenv').config();
 
 // --- Environment validation (fail fast, never log secret values) -----------
@@ -1891,35 +1892,16 @@ function requireTaxRuleEditor(req, res) {
 }
 const TAX_RULE_EDITABLE = ['jurisdiction','country','legal_entity_type','legal_entity_types','tax_regime','tax_regimes','obligation_type','title','description','calculation_method','parameters','parameters_status','filing_frequency','payment_frequency','due_date_rule','due_date_rule_json','applies_when','official_source_id','effective_from','effective_to','interpretation_notes','exceptions','required_profile_fields'];
 const SOURCE_EDITABLE = ['jurisdiction','authority','title','url','source_type','document_number','publication_date','effective_from','effective_to','language','content_hash','notes','status','relevant_sections','quoted_section_reference','interpretation_notes','superseded_documents','known_amendments','accessed_at'];
-const DUE_DATE_TYPES = ['day_of_next_month','end_of_next_month','months_after_period_end'];
+// The deterministic gate + transitions live in a unit-tested module.
+// computeActivationBlockers, isEffectiveApprovedReview, validReviewTransition
+// are imported below (see require at the top of the file).
 
-// Deterministic activation gate (§15). Returns the list of blockers; empty =
-// the rule may be activated. The backend is the source of truth — the UI button
-// must not bypass this. `approvedReview` = a tax_rule_reviews row (approved).
-function computeActivationBlockers(rule, source, approvedReview, now = new Date()) {
-  const b = [];
-  if (!rule || rule.status === 'active') { if (rule?.status === 'active') b.push('already_active'); }
-  if (!rule?.official_source_id || !source) b.push('source_missing');
-  else {
-    if (!['verified', 'active'].includes(source.status) || !source.last_verified_at) b.push('source_not_verified');
-    if (['outdated', 'unavailable', 'replaced'].includes(source.status)) b.push('source_outdated');
-  }
-  if (!approvedReview) b.push('rule_not_professionally_reviewed');
-  else if (approvedReview.expires_at && new Date(approvedReview.expires_at) < now) b.push('review_expired');
-  if (!rule?.effective_from) b.push('effective_dates_missing');
-  if (!rule?.due_date_rule_json) b.push('due_date_missing');
-  else if (!DUE_DATE_TYPES.includes(rule.due_date_rule_json.type)) b.push('due_date_invalid');
-  if (rule?.applies_when == null) b.push('applicability_incomplete');
-  return [...new Set(b)];
-}
-
-// Latest approved, non-expired professional review for a rule version.
-async function loadApprovedReview(ruleId, version) {
+// The single EFFECTIVE approved review for a rule's CURRENT version (or null).
+async function loadEffectiveApprovedReview(rule) {
   const { data } = await supabase.from('tax_rule_reviews')
-    .select('*').eq('tax_rule_id', ruleId).eq('review_status', 'approved')
+    .select('*').eq('tax_rule_id', rule.id).eq('review_status', 'approved')
     .order('reviewed_at', { ascending: false }).limit(5);
-  const now = new Date();
-  return (data || []).find(r => (r.rule_version == null || r.rule_version === version) && (!r.expires_at || new Date(r.expires_at) >= now)) || null;
+  return (data || []).find(r => isEffectiveApprovedReview(r, rule)) || null;
 }
 
 // ── Professional review records (PR1: model + read; full workflow in PR3) ─────
@@ -1952,21 +1934,48 @@ app.patch('/api/admin/tax-rule-reviews/:reviewId', auth, async (req, res) => {
   if (!requireTaxRuleEditor(req, res)) return;
   const { data: before } = await supabase.from('tax_rule_reviews').select('*').eq('id', req.params.reviewId).single();
   if (!before) return res.status(404).json({ error: 'Review not found' });
-  const allowed = ['reviewer_user_id', 'reviewer_name', 'reviewer_role', 'license_number', 'license_type', 'issuing_authority', 'license_verification_status', 'review_status', 'review_scope', 'review_notes', 'changes_requested_json', 'expires_at'];
+  // License verification is a SEPARATE, audited action (verify-license) — it
+  // cannot be set here, so a reviewer cannot self-verify their own license.
+  const allowed = ['reviewer_user_id', 'reviewer_name', 'reviewer_role', 'license_number', 'license_type', 'issuing_authority', 'review_status', 'review_scope', 'review_notes', 'changes_requested_json', 'expires_at'];
   const updates = { updated_at: new Date().toISOString() };
   for (const k of allowed) if (req.body[k] !== undefined) updates[k] = req.body[k];
+
+  // Enforce valid status transitions.
+  if (updates.review_status && !validReviewTransition(before.review_status, updates.review_status))
+    return res.status(409).json({ error: `Invalid transition ${before.review_status} → ${updates.review_status}` });
+
   const finalStatus = updates.review_status || before.review_status;
-  const finalLicense = updates.license_verification_status || before.license_verification_status;
-  const finalName = updates.reviewer_name || before.reviewer_name;
-  const finalLicNo = updates.license_number || before.license_number;
   if (finalStatus === 'approved') {
-    if (finalLicense !== 'manually_verified' || !finalName || !finalLicNo)
-      return res.status(422).json({ error: 'Approval requires a named reviewer with a recorded license and license_verification_status=manually_verified' });
+    const name = updates.reviewer_name || before.reviewer_name;
+    const licNo = updates.license_number || before.license_number;
+    if (before.license_verification_status !== 'verified' || !name || !licNo)
+      return res.status(422).json({ error: 'Approval requires a named reviewer with a recorded license whose license_verification_status is verified (use /verify-license first)' });
     updates.reviewed_at = updates.reviewed_at || new Date().toISOString();
   }
   const { data, error } = await supabase.from('tax_rule_reviews').update(updates).eq('id', req.params.reviewId).select().single();
   if (error) return res.status(500).json({ error: error.message });
   await recordAudit({ actorUserId: req.user.userId, actorRole: 'platform_admin', entityType: 'tax_rule_review', entityId: data.id, action: `review_${finalStatus}`, before, after: data });
+  res.json({ review: data });
+});
+
+// POST /api/admin/tax-rule-reviews/:reviewId/verify-license — a separate
+// platform-admin action that records license verification (never self-service
+// by the reviewer). Audited. Method stored separately from the status value.
+app.post('/api/admin/tax-rule-reviews/:reviewId/verify-license', auth, async (req, res) => {
+  if (!requireTaxRuleEditor(req, res)) return;
+  const { data: before } = await supabase.from('tax_rule_reviews').select('*').eq('id', req.params.reviewId).single();
+  if (!before) return res.status(404).json({ error: 'Review not found' });
+  const status = req.body?.status === 'failed' ? 'failed' : 'verified';
+  if (status === 'verified' && (!before.license_number || !before.reviewer_name))
+    return res.status(422).json({ error: 'Cannot verify: reviewer_name and license_number must be recorded first' });
+  // The verifier must not be the reviewer themselves.
+  if (before.reviewer_user_id && String(before.reviewer_user_id) === String(req.user.userId))
+    return res.status(403).json({ error: 'A reviewer cannot verify their own license' });
+  const { data, error } = await supabase.from('tax_rule_reviews')
+    .update({ license_verification_status: status, verification_method: req.body?.method || 'manual', updated_at: new Date().toISOString() })
+    .eq('id', req.params.reviewId).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  await recordAudit({ actorUserId: req.user.userId, actorRole: 'platform_admin', entityType: 'tax_rule_review', entityId: data.id, action: `license_${status}`, before, after: data });
   res.json({ review: data });
 });
 
@@ -2033,8 +2042,14 @@ app.get('/api/admin/tax-rules', auth, async (req, res) => {
   const now = new Date();
   const enriched = rules.map(r => {
     const reviews = reviewsByRule[r.id] || [];
-    const approved = reviews.find(rv => rv.review_status === 'approved' && (rv.rule_version == null || rv.rule_version === r.version) && (!rv.expires_at || new Date(rv.expires_at) >= now)) || null;
-    return { ...r, latest_review: reviews[0] || null, activation_blockers: computeActivationBlockers(r, r.official_sources, approved, now) };
+    // effective_approved_review drives the gate; latest_review is for UI/history.
+    const effective = reviews.find(rv => isEffectiveApprovedReview(rv, r, now)) || null;
+    return {
+      ...r,
+      latest_review: reviews[0] || null,
+      effective_approved_review: effective,
+      activation_blockers: computeActivationBlockers(r, r.official_sources, effective, now),
+    };
   });
   res.json({ rules: enriched });
 });
@@ -2088,7 +2103,7 @@ app.post('/api/admin/tax-rules/:id/activate', auth, async (req, res) => {
   if (!before) return res.status(404).json({ error: 'Rule not found' });
   if (before.status === 'active') return res.status(409).json({ error: 'Already active' });
   // ENFORCE the full activation gate (§15). Backend is the source of truth.
-  const approvedReview = await loadApprovedReview(before.id, before.version);
+  const approvedReview = await loadEffectiveApprovedReview(before);
   const blockers = computeActivationBlockers(before, before.official_sources, approvedReview);
   if (blockers.length) return res.status(422).json({ error: 'Activation blocked', blockers });
   const now = new Date().toISOString();
