@@ -41,7 +41,15 @@ export default function TaxRulesAdmin() {
 
   const act = async (fn) => { setBusy(true); try { await fn(); load() } catch (e) { alert(e.message) } finally { setBusy(false) } }
   const ruleAction = (id, action) => act(() => apiFetch(`/admin/tax-rules/${id}/${action}`, token, { method: 'POST' }))
-  const verifySource = (id) => act(() => apiFetch(`/admin/official-sources/${id}/verify`, token, { method: 'POST' }))
+  const verifySource = (id) => {
+    const content_hash = prompt('Content hash (paste current document hash; leave blank to keep):') || undefined
+    const notes = prompt('Verification notes (optional):') || undefined
+    act(() => apiFetch(`/admin/official-sources/${id}/verify`, token, { method: 'POST', body: { content_hash, notes, accessed_at: new Date().toISOString() } }))
+  }
+  const sourceAction = (id, action, body) => act(() => apiFetch(`/admin/official-sources/${id}/${action}`, token, { method: 'POST', body }))
+  const markOutdated = (id) => { if (confirm('Mark outdated? Dependent active rules return to review.')) sourceAction(id, 'mark-outdated') }
+  const markReplaced = (id) => { const replaced_by = prompt('Replaced by (document number / URL, optional):') || undefined; if (confirm('Mark replaced? Dependent active rules return to review.')) sourceAction(id, 'mark-replaced', { replaced_by }) }
+  const addAmendment = (id) => { const note = prompt('Amendment note:'); if (note) sourceAction(id, 'amendment', { note, document_number: prompt('Amendment document number (optional):') || undefined }) }
 
   const newSource = () => {
     const authority = prompt('Authority (e.g. Direktorat Jenderal Pajak)'); if (!authority) return
@@ -124,7 +132,7 @@ export default function TaxRulesAdmin() {
           </div>
           <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
             <thead><tr style={{ background: 'var(--bg-3)', textAlign: 'left' }}>
-              <th style={{ padding: 8 }}>Authority / Title</th><th style={{ padding: 8 }}>Status</th><th style={{ padding: 8 }}>Verified</th><th style={{ padding: 8 }}>Actions</th>
+              <th style={{ padding: 8 }}>Authority / Title</th><th style={{ padding: 8 }}>Status</th><th style={{ padding: 8 }}>Verified</th><th style={{ padding: 8 }}>Hash / Amend</th><th style={{ padding: 8 }}>Actions</th>
             </tr></thead>
             <tbody>
               {sources.map(s => (
@@ -132,7 +140,13 @@ export default function TaxRulesAdmin() {
                   <td style={{ padding: 8 }}><b>{s.authority}</b><div style={{ color: 'var(--text-3)' }}><a href={s.url} target="_blank" rel="noreferrer">{s.title}</a></div></td>
                   <td style={{ padding: 8 }}><Badge s={s.status} /></td>
                   <td style={{ padding: 8 }}>{fmtDate(s.last_verified_at)}</td>
-                  <td style={{ padding: 8 }}>{!s.last_verified_at && <button disabled={busy} onClick={() => verifySource(s.id)} style={btn}>Verify</button>}</td>
+                  <td style={{ padding: 8, color: 'var(--text-3)' }}>{s.content_hash ? `#${String(s.content_hash).slice(0, 8)}` : '—'}{(s.known_amendments || []).length ? ` · ${s.known_amendments.length} amд` : ''}</td>
+                  <td style={{ padding: 8, whiteSpace: 'nowrap' }}>
+                    <button disabled={busy} onClick={() => verifySource(s.id)} style={btn}>{s.last_verified_at ? 'Re-verify' : 'Verify'}</button>
+                    {['verified', 'active', 'draft'].includes(s.status) && <button disabled={busy} onClick={() => markOutdated(s.id)} style={btn}>Outdated</button>}
+                    {s.status !== 'replaced' && <button disabled={busy} onClick={() => markReplaced(s.id)} style={btn}>Replaced</button>}
+                    <button disabled={busy} onClick={() => addAmendment(s.id)} style={btn}>+ Amendment</button>
+                  </td>
                 </tr>
               ))}
             </tbody>
