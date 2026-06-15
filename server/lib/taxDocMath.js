@@ -11,22 +11,26 @@ function reconcileInvoice(input) {
   const wBase = n(input.withholding_base);
   const wRate = n(input.withholding_rate);
   const wAmount = n(input.withholding_amount);
+  const bankFee = n(input.bank_fee);
 
   const grossComputed = subtotal + commercialVat;
   const withholdingComputed = Math.round(wBase * wRate);
   const expectedVendorNet = gross - wAmount;             // vendor receives gross minus withholding
-  const combinedCashOut = expectedVendorNet + wAmount;   // vendor net + tax payment
+  const settlement = expectedVendorNet + wAmount;        // closes the payable (bank fee NOT included)
+  const vendorBankDebit = expectedVendorNet + bankFee;   // what the bank actually debits for the vendor payment
 
   const mismatches = [];
   if (gross && Math.abs(grossComputed - gross) > 1) mismatches.push(`gross ${gross} != subtotal+VAT ${grossComputed}`);
   if (wBase && wRate && Math.abs(withholdingComputed - wAmount) > 1) mismatches.push(`withholding ${wAmount} != base*rate ${withholdingComputed}`);
-  if (Math.abs(combinedCashOut - gross) > 1) mismatches.push(`combined cash-out ${combinedCashOut} != gross ${gross}`);
+  if (Math.abs(settlement - gross) > 1) mismatches.push(`settlement ${settlement} != gross ${gross}`);
 
   return {
     subtotal, commercial_vat: commercialVat, gross,
     withholding_amount: wAmount,
     expected_vendor_net_amount: expectedVendorNet,
-    combined_cash_out: combinedCashOut,
+    settlement,                       // vendor_net + withholding = gross
+    bank_fee: bankFee,                // separate expense, NOT part of settlement
+    vendor_bank_debit: vendorBankDebit,
     balanced: mismatches.length === 0,
     mismatches,
   };

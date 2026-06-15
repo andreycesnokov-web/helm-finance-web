@@ -10,12 +10,16 @@ const ok = (name, cond) => { if (cond) { console.log(`OK  ${name}`); pass++; } e
 const r = reconcileInvoice({
   subtotal_amount: 6000000, commercial_tax_amount: 660000, gross_amount: 6660000,
   withholding_base: 6000000, withholding_rate: 0.10, withholding_amount: 600000,
+  bank_fee: 7500,
 });
 
 eq('gross = subtotal + VAT', r.gross, 6660000);
 eq('expected vendor net = gross - withholding', r.expected_vendor_net_amount, 6060000);
-eq('combined cash out = vendor net + tax', r.combined_cash_out, 6660000);
+eq('settlement = vendor net + tax = gross', r.settlement, 6660000);
+eq('bank fee separate', r.bank_fee, 7500);
+eq('vendor bank debit = net + fee', r.vendor_bank_debit, 6067500);
 ok('case is balanced (no double counting)', r.balanced === true);
+ok('bank fee excluded from settlement', r.settlement === r.gross && r.bank_fee > 0);
 ok('no mismatches', r.mismatches.length === 0);
 
 // Bases stay separate — faktur DPP (5.5M) is NOT the withholding base (6.0M).
