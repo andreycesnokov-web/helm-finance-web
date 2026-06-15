@@ -28,6 +28,24 @@ export default function TaxRulesAdmin() {
   const [error, setError] = useState(null)
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
+  const [reviewRule, setReviewRule] = useState(null) // { id, rule_code }
+  const [reviews, setReviews] = useState([])
+
+  const openReviews = async (rule) => {
+    setReviewRule(rule)
+    try { const d = await apiFetch(`/admin/tax-rules/${rule.id}/reviews`, token); setReviews(d.reviews || []) } catch { setReviews([]) }
+  }
+  const reloadReviews = async () => { if (!reviewRule) return; const d = await apiFetch(`/admin/tax-rules/${reviewRule.id}/reviews`, token); setReviews(d.reviews || []) }
+  const reviewBusy = async (fn) => { setBusy(true); try { await fn(); await reloadReviews(); load() } catch (e) { alert(e.message) } finally { setBusy(false) } }
+  const createReview = () => {
+    const reviewer_name = prompt('Reviewer name:'); if (!reviewer_name) return
+    const reviewer_role = prompt('Reviewer role (tax_consultant / public_accountant / KAP):') || 'tax_consultant'
+    const license_number = prompt('License number:') || undefined
+    const issuing_authority = prompt('Issuing authority (optional):') || undefined
+    reviewBusy(() => apiFetch(`/admin/tax-rules/${reviewRule.id}/reviews`, token, { method: 'POST', body: { reviewer_name, reviewer_role, license_number, issuing_authority } }))
+  }
+  const patchReview = (rid, body) => reviewBusy(() => apiFetch(`/admin/tax-rule-reviews/${rid}`, token, { method: 'PATCH', body }))
+  const verifyLicense = (rid) => { if (confirm('Confirm the license is officially verified? (You must not be the reviewer.)')) reviewBusy(() => apiFetch(`/admin/tax-rule-reviews/${rid}/verify-license`, token, { method: 'POST', body: { method: 'manual' } })) }
 
   const load = useCallback(() => {
     setLoading(true)
@@ -106,7 +124,7 @@ export default function TaxRulesAdmin() {
                     <td style={{ padding: 8 }}>{r.version}</td>
                     <td style={{ padding: 8 }}><Badge s={r.status} /></td>
                     <td style={{ padding: 8 }}>{src ? <span title={src.url}>{src.title?.slice(0, 20)}… {sourceOk ? '✓' : '⚠'}</span> : <span style={{ color: 'var(--red-dark)' }}>none</span>}</td>
-                    <td style={{ padding: 8 }}>{rev ? <Badge s={rev.review_status} /> : <span style={{ color: 'var(--text-4)' }}>none</span>}</td>
+                    <td style={{ padding: 8 }}><button onClick={() => openReviews(r)} style={{ ...btn, marginRight: 0 }}>{rev ? <Badge s={rev.review_status} /> : 'manage'}</button></td>
                     <td style={{ padding: 8, maxWidth: 220 }}>
                       {canActivate ? <span style={{ color: 'var(--green-dark)' }}>✓ none</span>
                         : blockers.map(b => <span key={b} style={{ display: 'inline-block', background: '#FEE2E2', color: '#991B1B', borderRadius: 5, padding: '1px 6px', margin: 1, fontSize: 10 }}>{b}</span>)}
@@ -155,8 +173,52 @@ export default function TaxRulesAdmin() {
       )}
 
       <div style={{ fontSize: 11, color: 'var(--text-4)', marginTop: 12 }}>
-        A rule can be activated only after its official source is verified. Active rules are immutable — edit by creating a new version.
+        A rule can be activated only after its official source is verified AND a licensed professional review is approved. Active rules are immutable — edit by creating a new version.
       </div>
+
+      {/* Professional review queue (per rule) */}
+      {reviewRule && (
+        <div onClick={() => setReviewRule(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 }}>
+          <div onClick={e => e.stopPropagation()} style={{ background: 'var(--surface)', borderRadius: 14, padding: 18, width: 560, maxHeight: '80vh', overflowY: 'auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+              <div style={{ fontWeight: 800 }}>Professional review · {reviewRule.rule_code}</div>
+              <button onClick={() => setReviewRule(null)} style={btn}>Close</button>
+            </div>
+            <button disabled={busy} onClick={createReview} style={{ ...btn, background: 'var(--accent,#4F46E5)', color: '#fff', border: 'none', marginBottom: 10 }}>+ New review request</button>
+            {reviews.length === 0 && <div style={{ fontSize: 13, color: 'var(--text-3)' }}>No reviews yet.</div>}
+            {reviews.map(rv => {
+              const licOk = rv.license_verification_status === 'verified'
+              return (
+                <div key={rv.id} style={{ border: '1px solid var(--border)', borderRadius: 10, padding: 10, marginBottom: 8, fontSize: 12 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span><b>{rv.reviewer_name || '—'}</b> · {rv.reviewer_role || '—'}</span>
+                    <Badge s={rv.review_status} />
+                  </div>
+                  <div style={{ color: 'var(--text-3)', marginTop: 3 }}>
+                    License: {rv.license_number || '—'} · <span style={{ color: licOk ? 'var(--green-dark)' : 'var(--amber-dark)' }}>{rv.license_verification_status}</span>
+                    {rv.reviewed_at && ` · reviewed ${fmtDate(rv.reviewed_at)}`}
+                  </div>
+                  <div style={{ display: 'flex', gap: 4, marginTop: 8, flexWrap: 'wrap' }}>
+                    {!licOk && <button disabled={busy} onClick={() => verifyLicense(rv.id)} style={btn}>Verify license</button>}
+                    {rv.review_status === 'pending' && <button disabled={busy} onClick={() => patchReview(rv.id, { review_status: 'in_review' })} style={btn}>Start review</button>}
+                    {rv.review_status === 'in_review' && <>
+                      <button disabled={busy} onClick={() => patchReview(rv.id, { review_status: 'changes_required', review_notes: prompt('Changes required (note):') || undefined })} style={btn}>Changes required</button>
+                      <button disabled={busy || !licOk} title={licOk ? '' : 'Verify the license first'} onClick={() => patchReview(rv.id, { review_status: 'approved', expires_at: prompt('Approval expiry (YYYY-MM-DD, optional):') || undefined })} style={btn}>Approve</button>
+                      <button disabled={busy} onClick={() => patchReview(rv.id, { review_status: 'rejected' })} style={btn}>Reject</button>
+                    </>}
+                    {rv.review_status === 'changes_required' && <button disabled={busy} onClick={() => patchReview(rv.id, { review_status: 'in_review' })} style={btn}>Resume review</button>}
+                    {rv.review_status === 'approved' && <button disabled={busy} onClick={() => patchReview(rv.id, { review_status: 'superseded' })} style={btn}>Supersede</button>}
+                  </div>
+                  {rv.review_notes && <div style={{ color: 'var(--text-3)', marginTop: 6, fontStyle: 'italic' }}>{rv.review_notes}</div>}
+                </div>
+              )
+            })}
+            <div style={{ fontSize: 11, color: 'var(--text-4)', marginTop: 8 }}>
+              Approval requires a verified license. A reviewer cannot verify their own license. Approval enables activation only if it matches the rule's current version and has not expired.
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
