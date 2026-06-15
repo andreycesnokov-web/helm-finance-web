@@ -2011,15 +2011,79 @@ app.patch('/api/admin/official-sources/:id', auth, async (req, res) => {
 });
 
 // Verify a source: marks it verified + sets last_verified_at + verifier.
+// When a source goes outdated/replaced OR its content changes, any rule that
+// cites it must NOT silently stay active — return such rules to under_review and
+// flag their compliance events for re-verification. Audited per rule.
+async function returnRulesToReviewForSource(sourceId, reason, actorUserId) {
+  const { data: rules } = await supabase.from('tax_rules')
+    .select('id, rule_code').eq('official_source_id', sourceId).eq('status', 'active');
+  for (const r of (rules || [])) {
+    await supabase.from('tax_rules').update({ status: 'under_review', updated_at: new Date().toISOString() }).eq('id', r.id);
+    await supabase.from('compliance_events').update({ source_verification_required: true, updated_at: new Date().toISOString() }).eq('rule_code', r.rule_code);
+    await recordAudit({ actorUserId, actorRole: 'platform_admin', entityType: 'tax_rule', entityId: r.id, action: 'returned_to_review', before: { status: 'active' }, after: { status: 'under_review', reason } });
+  }
+  return (rules || []).length;
+}
+
+// Verify (or re-verify) a source: records last_verified_at, verifier, optional
+// content_hash + notes + accessed_at. If the content hash CHANGED, dependent
+// active rules are returned to review (no silent active rule after a change).
 app.post('/api/admin/official-sources/:id/verify', auth, async (req, res) => {
   if (!requireTaxRuleEditor(req, res)) return;
   const { data: before } = await supabase.from('official_sources').select('*').eq('id', req.params.id).single();
   if (!before) return res.status(404).json({ error: 'Source not found' });
-  const { data, error } = await supabase.from('official_sources')
-    .update({ status: 'verified', last_verified_at: new Date().toISOString(), verified_by_user_id: req.user.userId, updated_at: new Date().toISOString() })
-    .eq('id', req.params.id).select().single();
+  const newHash = req.body?.content_hash != null ? String(req.body.content_hash) : before.content_hash;
+  const hashChanged = !!(before.content_hash && newHash && newHash !== before.content_hash);
+  const updates = {
+    status: 'verified', last_verified_at: new Date().toISOString(), verified_by_user_id: req.user.userId,
+    content_hash: newHash, updated_at: new Date().toISOString(),
+  };
+  if (req.body?.notes != null) updates.notes = req.body.notes;
+  if (req.body?.accessed_at != null) updates.accessed_at = req.body.accessed_at;
+  const { data, error } = await supabase.from('official_sources').update(updates).eq('id', req.params.id).select().single();
   if (error) return res.status(500).json({ error: error.message });
-  await recordAudit({ actorUserId: req.user.userId, actorRole: 'platform_admin', entityType: 'official_source', entityId: data.id, action: 'verified', before, after: data });
+  let returned = 0;
+  if (hashChanged) returned = await returnRulesToReviewForSource(req.params.id, 'source_content_changed', req.user.userId);
+  await recordAudit({ actorUserId: req.user.userId, actorRole: 'platform_admin', entityType: 'official_source', entityId: data.id, action: hashChanged ? 'reverified_content_changed' : 'verified', before, after: data });
+  res.json({ source: data, content_changed: hashChanged, rules_returned_to_review: returned });
+});
+
+// Mark a source outdated — dependent active rules return to review.
+app.post('/api/admin/official-sources/:id/mark-outdated', auth, async (req, res) => {
+  if (!requireTaxRuleEditor(req, res)) return;
+  const { data: before } = await supabase.from('official_sources').select('*').eq('id', req.params.id).single();
+  if (!before) return res.status(404).json({ error: 'Source not found' });
+  const { data } = await supabase.from('official_sources').update({ status: 'outdated', updated_at: new Date().toISOString() }).eq('id', req.params.id).select().single();
+  const returned = await returnRulesToReviewForSource(req.params.id, 'source_outdated', req.user.userId);
+  await recordAudit({ actorUserId: req.user.userId, actorRole: 'platform_admin', entityType: 'official_source', entityId: data.id, action: 'marked_outdated', before, after: data });
+  res.json({ source: data, rules_returned_to_review: returned });
+});
+
+// Mark a source replaced (optionally record the superseding document).
+app.post('/api/admin/official-sources/:id/mark-replaced', auth, async (req, res) => {
+  if (!requireTaxRuleEditor(req, res)) return;
+  const { data: before } = await supabase.from('official_sources').select('*').eq('id', req.params.id).single();
+  if (!before) return res.status(404).json({ error: 'Source not found' });
+  const superseded = Array.isArray(before.superseded_documents) ? before.superseded_documents : [];
+  if (req.body?.replaced_by) superseded.push({ replaced_by: req.body.replaced_by, at: new Date().toISOString() });
+  const { data } = await supabase.from('official_sources').update({ status: 'replaced', superseded_documents: superseded, updated_at: new Date().toISOString() }).eq('id', req.params.id).select().single();
+  const returned = await returnRulesToReviewForSource(req.params.id, 'source_replaced', req.user.userId);
+  await recordAudit({ actorUserId: req.user.userId, actorRole: 'platform_admin', entityType: 'official_source', entityId: data.id, action: 'marked_replaced', before, after: data });
+  res.json({ source: data, rules_returned_to_review: returned });
+});
+
+// Append a known amendment (audited; does not auto-return rules — the editor
+// decides whether the amendment is material and re-verifies / marks outdated).
+app.post('/api/admin/official-sources/:id/amendment', auth, async (req, res) => {
+  if (!requireTaxRuleEditor(req, res)) return;
+  const { data: before } = await supabase.from('official_sources').select('*').eq('id', req.params.id).single();
+  if (!before) return res.status(404).json({ error: 'Source not found' });
+  const note = String(req.body?.note || '').trim();
+  if (!note) return res.status(400).json({ error: 'note required' });
+  const amendments = Array.isArray(before.known_amendments) ? before.known_amendments : [];
+  amendments.push({ note, document_number: req.body?.document_number || null, at: new Date().toISOString(), by_user_id: req.user.userId });
+  const { data } = await supabase.from('official_sources').update({ known_amendments: amendments, updated_at: new Date().toISOString() }).eq('id', req.params.id).select().single();
+  await recordAudit({ actorUserId: req.user.userId, actorRole: 'platform_admin', entityType: 'official_source', entityId: data.id, action: 'amendment_added', before, after: data });
   res.json({ source: data });
 });
 
