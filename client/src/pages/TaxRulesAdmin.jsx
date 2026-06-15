@@ -83,22 +83,29 @@ export default function TaxRulesAdmin() {
           <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
             <thead><tr style={{ background: 'var(--bg-3)', textAlign: 'left' }}>
               <th style={{ padding: 8 }}>Rule</th><th style={{ padding: 8 }}>v</th><th style={{ padding: 8 }}>Status</th>
-              <th style={{ padding: 8 }}>Source</th><th style={{ padding: 8 }}>Verified</th><th style={{ padding: 8 }}>Actions</th>
+              <th style={{ padding: 8 }}>Source</th><th style={{ padding: 8 }}>Review</th><th style={{ padding: 8 }}>Activation blockers</th><th style={{ padding: 8 }}>Actions</th>
             </tr></thead>
             <tbody>
               {rules.map(r => {
                 const src = r.official_sources || srcById[r.official_source_id]
                 const sourceOk = src && src.last_verified_at && ['verified', 'active'].includes(src.status)
+                const blockers = r.activation_blockers || []
+                const canActivate = blockers.length === 0
+                const rev = r.latest_review
                 return (
                   <tr key={r.id} style={{ borderTop: '0.5px solid var(--border)' }}>
                     <td style={{ padding: 8 }}><b>{r.rule_code}</b><div style={{ color: 'var(--text-3)' }}>{r.title}</div></td>
                     <td style={{ padding: 8 }}>{r.version}</td>
                     <td style={{ padding: 8 }}><Badge s={r.status} /></td>
-                    <td style={{ padding: 8 }}>{src ? <span title={src.url}>{src.title?.slice(0, 24)}… {sourceOk ? '✓' : '⚠'}</span> : <span style={{ color: 'var(--red-dark)' }}>none</span>}</td>
-                    <td style={{ padding: 8 }}>{fmtDate(r.last_verified_at)}</td>
+                    <td style={{ padding: 8 }}>{src ? <span title={src.url}>{src.title?.slice(0, 20)}… {sourceOk ? '✓' : '⚠'}</span> : <span style={{ color: 'var(--red-dark)' }}>none</span>}</td>
+                    <td style={{ padding: 8 }}>{rev ? <Badge s={rev.review_status} /> : <span style={{ color: 'var(--text-4)' }}>none</span>}</td>
+                    <td style={{ padding: 8, maxWidth: 220 }}>
+                      {canActivate ? <span style={{ color: 'var(--green-dark)' }}>✓ none</span>
+                        : blockers.map(b => <span key={b} style={{ display: 'inline-block', background: '#FEE2E2', color: '#991B1B', borderRadius: 5, padding: '1px 6px', margin: 1, fontSize: 10 }}>{b}</span>)}
+                    </td>
                     <td style={{ padding: 8, whiteSpace: 'nowrap' }}>
                       {r.status === 'draft' && <button disabled={busy} onClick={() => ruleAction(r.id, 'submit')} style={btn}>Submit</button>}
-                      {['draft', 'under_review'].includes(r.status) && <button disabled={busy || !sourceOk} title={sourceOk ? '' : 'Verify the source first'} onClick={() => ruleAction(r.id, 'activate')} style={btn}>Activate</button>}
+                      {['draft', 'under_review'].includes(r.status) && <button disabled={busy || !canActivate} title={canActivate ? '' : `Blocked: ${blockers.join(', ')}`} onClick={() => ruleAction(r.id, 'activate')} style={btn}>Activate</button>}
                       {r.status === 'active' && <button disabled={busy} onClick={() => ruleAction(r.id, 'deprecate')} style={btn}>Deprecate</button>}
                       <button disabled={busy} onClick={() => ruleAction(r.id, 'new-version')} style={btn}>New version</button>
                     </td>
