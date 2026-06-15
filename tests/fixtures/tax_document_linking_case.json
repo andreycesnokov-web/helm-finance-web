@@ -1,0 +1,58 @@
+{
+  "_note": "REDACTED SYNTHETIC FIXTURE. No real NPWP/NIK, bank accounts, QR codes, billing codes, signatures or personal identifiers. Amounts mirror the real Helm Care / PT Bali Pawiwahan PPh 4(2) case for arithmetic testing only.",
+  "business": { "id": "biz-helmcare-test", "name": "Helm Care (test)", "npwp": "REDACTED" },
+  "vendor": { "counterparty_name": "PT Vendor Sintetis (test)", "type": "supplier", "npwp": "REDACTED", "bank_account": "REDACTED" },
+  "documents": [
+    {
+      "document_type": "vendor_invoice",
+      "document_number": "538/BPW/IV/2026",
+      "document_date": "2026-04-15",
+      "tax_period": "2026-04",
+      "currency": "IDR",
+      "subtotal_amount": 6000000,
+      "commercial_tax_amount": 660000,
+      "gross_amount": 6660000
+    },
+    {
+      "document_type": "tax_invoice",
+      "document_number": "FP-REDACTED-0001",
+      "document_date": "2026-04-15",
+      "tax_period": "2026-04",
+      "currency": "IDR",
+      "official_tax_base": 5500000,
+      "official_tax_amount": 660000,
+      "_note": "Faktur Pajak DPP differs from commercial base — stored separately, not assumed equal."
+    },
+    {
+      "document_type": "bukti_potong",
+      "document_number": "BP-REDACTED-0001",
+      "document_date": "2026-04-20",
+      "tax_period": "2026-04",
+      "currency": "IDR",
+      "official_tax_base": 6000000,
+      "official_tax_amount": 600000,
+      "tax_object_code": "REDACTED-4(2)"
+    },
+    { "document_type": "payment_proof", "status": "pending", "_note": "vendor net payment not yet confirmed by bank" },
+    { "document_type": "tax_billing", "status": "pending" },
+    { "document_type": "filing_confirmation", "status": "pending" }
+  ],
+  "withholding": {
+    "tax_type": "pph_4_2",
+    "tax_object_code": "REDACTED-4(2)",
+    "tax_base": 6000000,
+    "tax_rate": 0.10,
+    "withholding_amount": 600000,
+    "expected_vendor_net_amount": 6060000,
+    "status": "suggested"
+  },
+  "cash_impact_invariants": {
+    "expense": 6000000,
+    "input_vat": 660000,
+    "gross_payable": 6660000,
+    "withholding_payable": 600000,
+    "expected_vendor_payment": 6060000,
+    "combined_cash_out": 6660000,
+    "rule": "vendor_net (6,060,000) + tax_payment (600,000) = gross (6,660,000); PPN and PPh counted once."
+  }
+}
