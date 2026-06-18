@@ -1,0 +1,41 @@
+{
+  "_note": "REDACTED SYNTHETIC FIXTURES. No real NPWP/NIK/bank/billing codes/QR/signatures/PII/PDFs. Amounts mirror observed cases for arithmetic + workflow tests only. Observed accountant practice is NOT a verified tax rule.",
+  "fixture_B_company_bears_tax": {
+    "withholding_mode": "paid_gross_not_deducted",
+    "treatment_status": "needs_review",
+    "vendor_gross": 4400000, "vendor_paid": 4400000, "tax": 110000,
+    "expected": { "vendor_debt_settled_by": 4400000, "tax_is_additional_cash_cost": 110000, "total_company_cash_cost": 4510000,
+      "rule": "vendor payment closes full vendor debt; withholding does NOT settle vendor debt; tax is a separate obligation" }
+  },
+  "fixture_C_intercompany_funded_expense": {
+    "economic_owner": "Company B (test)", "cash_payer": "Company A (test)",
+    "funding_type": "vendor_payment", "funded_amount": 6660000, "currency": "IDR",
+    "expected": {
+      "A_cash_decreases": true, "A_intercompany_receivable_increases": 6660000, "A_operating_expense": 0,
+      "B_expense_recognised": 6660000, "B_due_to_A": 6660000, "no_duplicate_expense": true }
+  },
+  "fixture_D_intercompany_funded_tax": {
+    "economic_owner": "Company B (test)", "cash_payer": "Company A (test)",
+    "funding_type": "tax_payment", "funded_amount": 600000,
+    "expected": { "B_tax_obligation_closes": 600000, "A_receivable": 600000, "B_payable_to_A": 600000, "no_new_expense_on_repayment": true }
+  },
+  "fixture_E_aggregated_unifikasi_billing": {
+    "document_type": "tax_billing", "billing_total": 858662,
+    "allocations": [
+      { "tax_type": "pph_21_freelancer", "amount": 29375 },
+      { "tax_type": "pph_23", "amount": 379287 },
+      { "tax_type": "pph_4_2", "amount": 450000 }
+    ],
+    "expected": { "allocation_total_equals_billing_total": 858662, "one_billing_many_obligations": true }
+  },
+  "fixture_F_payroll_pph21": {
+    "context_type": "payroll", "tax_type": "pph_21", "billing_amount": 1948095, "has_vendor_invoice": false,
+    "expected": { "linked_to": "payroll_period", "not_vendor_invoice": true, "in_payroll_cash_forecast": true }
+  },
+  "fixture_G_pp55_periodic": {
+    "context_type": "periodic_revenue", "tax_period": "2026-02", "billing_amount": 244593,
+    "rule_status": "unverified_observed_practice",
+    "expected": { "no_invoice_required": true, "unverified_rule_blocks_automatic_calculation": true,
+      "separation": "observed accountant practice != verified active tax rule" }
+  }
+}

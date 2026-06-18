@@ -1,0 +1,51 @@
+{
+  "_note": "REDACTED SYNTHETIC FIXTURE. No real NPWP/NIK, bank accounts, billing codes, QR codes, signatures, phones, emails, personal data or original PDFs. Amounts mirror the confirmed Helm Care / PT Bali Pawiwahan PPh 4(2) case for arithmetic testing only.",
+  "business": { "id": "biz-helmcare-test", "name": "Helm Care (test)", "npwp": "REDACTED" },
+  "vendor": { "counterparty_name": "PT Vendor Sintetis (test)", "type": "supplier", "npwp": "REDACTED", "bank_account": "REDACTED" },
+  "document_files": [
+    { "id": "file-001", "sha256_hash": "REDACTED-SHA-001", "file_name": "scan_redacted.pdf", "mime_type": "application/pdf",
+      "_note": "ONE physical PDF holding TWO logical documents (invoice p1, faktur p2). Dedup is on document_files(business_id, sha256)." }
+  ],
+  "logical_documents_from_file_001": [
+    { "document_type": "vendor_invoice", "file_id": "file-001", "page_start": 1, "page_end": 1 },
+    { "document_type": "tax_invoice", "file_id": "file-001", "page_start": 2, "page_end": 2 }
+  ],
+  "settlement_breakdown": {
+    "debt_gross": 6660000,
+    "allocations": [
+      { "settlement_source_type": "transaction", "allocated_amount": 6060000, "_note": "vendor payment cash" },
+      { "settlement_source_type": "withholding_record", "allocated_amount": 600000, "_note": "withheld portion, NO cash" }
+    ],
+    "settlement_total": 6660000,
+    "withholding_tax_payment_later": { "transaction": 600000, "closes": "withholding liability only (via withholding_payment_allocations), NOT the vendor payable again" },
+    "bank_fee": { "amount": 7500, "treatment": "separate expense transaction, not allocated to the payable" }
+  },
+  "documents": [
+    { "document_type": "vendor_invoice", "document_number": "538/BPW/IV/2026", "document_date": "2026-04-15", "tax_period": "2026-04",
+      "currency": "IDR", "commercial_base_amount": 6000000, "commercial_tax_amount": 660000, "gross_amount": 6660000 },
+    { "document_type": "tax_invoice", "document_number": "FP-REDACTED-0001", "document_date": "2026-04-15", "tax_period": "2026-04",
+      "currency": "IDR", "official_tax_base": 5500000, "official_tax_amount": 660000,
+      "_note": "Faktur Pajak DPP (5.5M) differs from commercial base (6.0M) — stored separately, never assumed equal." },
+    { "document_type": "bukti_potong", "document_number": "BP-REDACTED-0001", "document_date": "2026-04-20", "tax_period": "2026-04",
+      "currency": "IDR", "official_tax_base": 6000000, "official_tax_amount": 600000, "tax_object_code": "REDACTED-4(2)" },
+    { "document_type": "payment_proof", "status": "pending", "_note": "vendor net payment not yet confirmed by bank" },
+    { "document_type": "tax_billing", "status": "pending" },
+    { "document_type": "filing_confirmation", "status": "pending" }
+  ],
+  "tax_treatment": {
+    "tax_type": "pph_4_2", "tax_nature": "final", "tax_object_code": "REDACTED-4(2)",
+    "commercial_base": 6000000, "vat_dpp": 5500000, "vat_amount": 660000,
+    "withholding_dpp": 6000000, "withholding_rate": 0.10, "withholding_amount": 600000,
+    "expected_vendor_net": 6060000, "treatment_status": "suggested"
+  },
+  "separated_tax_bases": { "commercial_amount": 6000000, "vat_dpp": 5500000, "withholding_dpp": 6000000,
+    "_note": "Three distinct bases — must NOT be auto-equated." },
+  "cash_model": {
+    "vendor_payment": 6060000,
+    "withholding_tax_payment": 600000,
+    "bank_fee": 7500,
+    "total_bank_debit_for_vendor_payment": 6067500,
+    "settlement_of_gross_payable": "vendor_payment (6,060,000) + withholding_tax (600,000) = 6,660,000",
+    "rule": "Three separate ledger transactions (vendor / withholding / bank fee). Bank fee is NOT allocated to the payable. PPN and PPh counted once."
+  }
+}
