@@ -83,6 +83,8 @@ DROP TRIGGER IF EXISTS trg_tax_deposit_alloc_guard ON tax_deposit_allocations;
 CREATE TRIGGER trg_tax_deposit_alloc_guard BEFORE INSERT OR UPDATE ON tax_deposit_allocations
   FOR EACH ROW EXECUTE FUNCTION fn_tax_deposit_alloc_guard();
 
+COMMIT;
+
 -- ── Verify ───────────────────────────────────────────────────────────────────
 SELECT table_name FROM information_schema.tables WHERE table_schema='public' AND table_name IN
   ('tax_deposit_accounts','tax_deposit_entries','tax_deposit_allocations')
