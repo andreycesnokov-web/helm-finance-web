@@ -139,6 +139,14 @@ export default function Admin() {
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)', padding: 0 }}>
 
+      {/* Platform admin tabs */}
+      <div style={{ display: 'flex', gap: 8, padding: '12px 32px 0', flexWrap: 'wrap' }}>
+        {[['/admin', 'Users', true], ['/admin/businesses', 'Businesses', false], ['/admin/access-audit', 'Audit Log', false]].map(([to, label, active]) => (
+          <a key={to} href={to} style={{ padding: '6px 14px', borderRadius: 20, textDecoration: 'none', fontWeight: 600, fontSize: 13,
+            background: active ? 'var(--accent,#4F46E5)' : 'var(--bg-3)', color: active ? '#fff' : 'var(--text-2)' }}>{label}</a>
+        ))}
+      </div>
+
       {/* ── Admin header ─── */}
       <div style={{
         background: 'linear-gradient(135deg, #0F172A 0%, #1e293b 100%)',
