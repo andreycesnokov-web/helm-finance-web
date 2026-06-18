@@ -31,8 +31,11 @@ CREATE TABLE businesses (
   subscription_status text
 );
 CREATE TABLE counterparties (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), business_id uuid);
-CREATE TABLE debts (id bigint PRIMARY KEY, business_id uuid, amount numeric, original_amount numeric, paid_amount numeric);
-CREATE TABLE transactions (id bigint PRIMARY KEY, business_id uuid, amount_original numeric);
+-- NOTE: prod debts.id / transactions.id are int4 (integer), not bigint. The
+-- 031-034 FK columns are BIGINT referencing these int4 PKs — valid in Postgres
+-- (cross-type int equality). Baseline uses integer to mirror production exactly.
+CREATE TABLE debts (id integer PRIMARY KEY, business_id uuid, amount numeric, original_amount numeric, paid_amount numeric);
+CREATE TABLE transactions (id integer PRIMARY KEY, business_id uuid, amount_original numeric);
 CREATE TABLE compliance_events (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), business_id uuid);
 CREATE TABLE payroll_payments (id uuid PRIMARY KEY DEFAULT gen_random_uuid());
 CREATE TABLE tax_rules (id uuid PRIMARY KEY DEFAULT gen_random_uuid());
