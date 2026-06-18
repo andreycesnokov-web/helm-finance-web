@@ -1,5 +1,5 @@
--- Migration 028 — Intercompany relationships, funding & settlement
--- Date: 2026-06-15. ADDITIVE + IDEMPOTENT. No DROP, NO seed, NO cash. Needs 026.
+-- Migration 033 — Intercompany relationships, funding & settlement
+-- Date: 2026-06-15. ADDITIVE + IDEMPOTENT. No DROP, NO seed, NO cash. Needs 031.
 -- intercompany_balances is a read-only VIEW recomputed from the allocation
 -- ledger — it is never inserted/updated directly.
 

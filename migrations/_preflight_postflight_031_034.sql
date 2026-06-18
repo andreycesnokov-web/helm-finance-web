@@ -1,13 +1,14 @@
--- Preflight / Postflight for migrations 026–029 (run manually in Supabase).
+-- Preflight / Postflight for migrations 031–034 (run manually in Supabase).
 -- NOT a migration. No DDL. Read-only checks.
+-- NOTE: renumbered from 026–029 — these apply AFTER migration 030 (business registry).
 
--- ════════════════ PREFLIGHT (run BEFORE applying 026) ════════════════════════
+-- ════════════════ PREFLIGHT (run BEFORE applying 031) ════════════════════════
 -- 1. FK target types must be: debts/transactions = bigint; rest = uuid.
 SELECT table_name, data_type FROM information_schema.columns
 WHERE column_name='id' AND table_name IN ('debts','transactions','counterparties','businesses','compliance_events','payroll_payments','tax_rules','official_sources')
 ORDER BY table_name;
 
--- 2. Dependencies present (must all exist before 026).
+-- 2. Dependencies present (must all exist before 031). Includes migration 030's businesses columns.
 SELECT t AS required_table,
   (SELECT count(*) FROM information_schema.tables WHERE table_schema='public' AND table_name=t) AS present
 FROM unnest(ARRAY['businesses','counterparties','debts','transactions','compliance_events','payroll_payments','tax_rules','official_sources']) t;
@@ -19,7 +20,7 @@ SELECT table_name FROM information_schema.tables WHERE table_schema='public' AND
   'business_relationships','intercompany_funding_records','intercompany_settlement_allocations',
   'tax_deposit_accounts','tax_deposit_entries','tax_deposit_allocations');
 
--- ════════════════ POSTFLIGHT (run AFTER applying 026–029) ════════════════════
+-- ════════════════ POSTFLIGHT (run AFTER applying 031–034) ════════════════════
 -- 4. Object counts.
 SELECT 'tables' AS kind, count(*) FROM information_schema.tables WHERE table_schema='public' AND table_name IN
  ('document_files','financial_documents','document_links','document_debt_links','document_transaction_links',

@@ -1,5 +1,5 @@
--- Migration 029 — Tax deposit accounts, entries & allocations
--- Date: 2026-06-15. ADDITIVE + IDEMPOTENT. No DROP, NO seed, NO cash. Needs 026.
+-- Migration 034 — Tax deposit accounts, entries & allocations
+-- Date: 2026-06-15. ADDITIVE + IDEMPOTENT. No DROP, NO seed, NO cash. Needs 031.
 -- All amounts positive; balance is derived strictly from entry_type:
 --   deposit_payment (+)  allocation (−)  refund (−)  adjustment (±, reason req.)
 -- A deposit is NOT a paid/filed tax until allocated to a specific obligation.

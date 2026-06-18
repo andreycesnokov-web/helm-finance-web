@@ -1,4 +1,4 @@
--- Migration 026 — Shared Financial Document Foundation V1 (hardened)
+-- Migration 031 — Shared Financial Document Foundation V1 (hardened)
 -- Date: 2026-06-15. ADDITIVE + IDEMPOTENT + TRANSACTIONAL. No DROP, NO seed, NO cash.
 -- Cash lives ONLY in `transactions`. Physical file (document_files, dedup) is
 -- separate from logical document (financial_documents, page range). DB-level

@@ -1,22 +1,35 @@
 // Real migration CI on an ephemeral PostgreSQL (PGlite / WASM Postgres).
-// Builds the minimal baseline that 026-029 reference, applies 026-029 twice
-// (idempotency), runs a partial-state recovery, then exercises the DB guards:
-// business isolation, over-allocation, legacy paid_amount. Prints real output.
+// Builds a baseline that reflects the POST-030 schema (business_code + type +
+// override columns + access_audit are applied via the REAL migration 030), then
+// applies 031-034 twice (idempotency), runs a partial-state recovery, then
+// exercises the DB guards: business isolation, over-allocation, legacy
+// paid_amount, intercompany, tax-deposit. Prints real output.
 // Run: node tests/migrations/ci.js
 const fs = require('fs');
 const path = require('path');
 const { PGlite } = require('@electric-sql/pglite');
 
 const MIG = (n) => fs.readFileSync(path.join(__dirname, '..', '..', 'migrations', n), 'utf8');
-const FILES = ['026_tax_document_linking.sql', '027_tax_settlement_modes.sql', '028_intercompany_funding.sql', '029_tax_deposit_allocation.sql'];
+// Renumbered from 026-029: these apply AFTER migration 030 (business registry).
+const FILES = ['031_tax_document_linking.sql', '032_tax_settlement_modes.sql', '033_intercompany_funding.sql', '034_tax_deposit_allocation.sql'];
 
 let pass = 0, fail = 0;
 const ok = (m) => { console.log('OK  ' + m); pass++; };
 const bad = (m) => { console.log('XX  ' + m); fail++; };
 
-// Minimal baseline (the existing CFO tables 026-029 reference; real types).
+// Baseline = the CFO tables 031-034 reference (real types) + the businesses
+// columns that exist by migration 030 time (name/plan/trial/subscription) so the
+// REAL migration 030 (applied below) runs verbatim, incl. its verify SELECT.
 const BASELINE = `
-CREATE TABLE businesses (id uuid PRIMARY KEY DEFAULT gen_random_uuid());
+CREATE TABLE users (id bigint PRIMARY KEY);
+CREATE TABLE businesses (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  name text,
+  plan text DEFAULT 'free',
+  trial_status text DEFAULT 'inactive',
+  trial_ends_at timestamptz,
+  subscription_status text
+);
 CREATE TABLE counterparties (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), business_id uuid);
 CREATE TABLE debts (id bigint PRIMARY KEY, business_id uuid, amount numeric, original_amount numeric, paid_amount numeric);
 CREATE TABLE transactions (id bigint PRIMARY KEY, business_id uuid, amount_original numeric);
@@ -31,13 +44,23 @@ async function applyAll(db) { for (const f of FILES) await db.exec(MIG(f)); }
 (async () => {
   const db = new PGlite();
   await db.exec(BASELINE);
-  console.log('\n=== baseline (001-025 stand-in) applied ===');
+  console.log('\n=== baseline (001-029 stand-in) applied ===');
 
-  // ── Clean apply ─────────────────────────────────────────────────────────
-  try { await applyAll(db); ok('clean apply 026-029'); } catch (e) { bad('clean apply: ' + e.message); }
+  // ── Apply REAL migration 030 (business registry) so 031-034 test the actual
+  //    post-030 schema: business_code, type, override cols, access_audit. ─────
+  try { await db.exec(MIG('030_business_registry.sql')); ok('migration 030 applied (real, post-prod schema)'); }
+  catch (e) { bad('030 apply: ' + e.message); }
+  const colCnt = async (col) => Number((await db.query(
+    `SELECT count(*) c FROM information_schema.columns WHERE table_name='businesses' AND column_name=$1`, [col])).rows[0].c);
+  ((await colCnt('business_code')) === 1 && (await colCnt('type')) === 1)
+    ? ok('compat #9: businesses.business_code + businesses.type present (from 030)')
+    : bad('compat #9: business_code/type missing after 030');
+
+  // ── Clean apply 031-034 on top of the post-030 schema ───────────────────
+  try { await applyAll(db); ok('clean apply 031-034'); } catch (e) { bad('clean apply: ' + e.message); }
 
   // ── Second apply (idempotency) ──────────────────────────────────────────
-  try { await applyAll(db); ok('second apply 026-029 (idempotent, no error)'); } catch (e) { bad('second apply: ' + e.message); }
+  try { await applyAll(db); ok('second apply 031-034 (idempotent, no error)'); } catch (e) { bad('second apply: ' + e.message); }
 
   // ── Object inventory ────────────────────────────────────────────────────
   const cnt = async (sql) => Number((await db.query(sql)).rows[0].c);
@@ -61,6 +84,15 @@ async function applyAll(db) { for (const f of FILES) await db.exec(MIG(f)); }
   const reIdx  = await cnt(`SELECT count(*) c FROM pg_indexes WHERE indexname='fin_docs_file_idx'`);
   (reTrig >= 1 && reIdx === 1) ? ok('partial-state objects restored') : bad('partial-state not restored');
 
+  // ── compat #10/#11/#12: 031-034 must NOT add triggers to pre-existing
+  //    financial tables (debts/transactions) or override 030's businesses
+  //    triggers — so old Pay Now / Mark Received and Pulse/wallet/AI-CFO read
+  //    paths are byte-for-byte unaffected until runtime actions arrive. ──────
+  const oldTblTrigs = await cnt(`SELECT count(*) c FROM information_schema.triggers WHERE event_object_table IN ('debts','transactions','wallets')`);
+  oldTblTrigs === 0 ? ok('compat #11/#12: no new triggers on debts/transactions/wallets') : bad(`unexpected triggers on old tables (${oldTblTrigs})`);
+  const bizTrigs = await cnt(`SELECT count(*) c FROM information_schema.triggers WHERE event_object_table='businesses'`);
+  bizTrigs === 2 ? ok('compat #10: businesses still has exactly 030 triggers (code default+immutable)') : bad(`businesses trigger count changed (${bizTrigs}, expected 2)`);
+
   // ── Seed two businesses (explicit UUIDs; committed) ─────────────────────
   const { randomUUID } = require('crypto');
   const A = randomUUID(), B = randomUUID(), fileA = randomUUID(), fileB = randomUUID(),
@@ -75,6 +107,11 @@ async function applyAll(db) { for (const f of FILES) await db.exec(MIG(f)); }
     INSERT INTO financial_documents(id,business_id,file_id,document_type) VALUES ('${docA}','${A}','${fileA}','vendor_invoice'),('${docB}','${B}','${fileB}','vendor_invoice');
     INSERT INTO compliance_events(id,business_id) VALUES ('${ce}','${A}');
   COMMIT;`);
+
+  // compat #9: businesses seeded above must have auto-received codes via 030's
+  // BEFORE INSERT trigger, even with the 031-034 tables now present.
+  const coded = await cnt(`SELECT count(*) c FROM businesses WHERE business_code LIKE 'HF-BIZ-%'`);
+  coded === 2 ? ok('compat #9: seeded businesses auto-got HF-BIZ codes (030 trigger fires post-031-034)') : bad(`expected 2 coded businesses, got ${coded}`);
 
   // Each test runs in its own transaction so a rejection rolls back ONLY itself.
   const expectReject = async (label, sql) => {

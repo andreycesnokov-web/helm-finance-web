@@ -1,5 +1,5 @@
--- Migration 027 — Tax settlement modes + treatment context + multi-tax billing
--- Date: 2026-06-15. ADDITIVE + IDEMPOTENT + TRANSACTIONAL. No DROP, NO seed, NO cash. Needs 026.
+-- Migration 032 — Tax settlement modes + treatment context + multi-tax billing
+-- Date: 2026-06-15. ADDITIVE + IDEMPOTENT + TRANSACTIONAL. No DROP, NO seed, NO cash. Needs 031.
 
 BEGIN;
 
