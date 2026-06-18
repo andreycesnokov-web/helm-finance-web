@@ -5641,6 +5641,98 @@ app.get('/api/admin/businesses/:businessId/access', auth, requireAdmin, async (r
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// ── PLATFORM ADMIN — access WRITE endpoints (PR2) ────────────────────────────
+const OVERRIDE_PLANS = ['starter', 'business', 'founder', 'enterprise'];
+
+// Load business or 404; also reject a malformed UUID with 400.
+async function loadBusinessOr4xx(req, res) {
+  const id = req.params.businessId;
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) { res.status(400).json({ error: 'Invalid business id' }); return null; }
+  const { data: b } = await supabase.from('businesses').select('*').eq('id', id).single();
+  if (!b) { res.status(404).json({ error: 'Business not found' }); return null; }
+  return b;
+}
+
+// Apply an UPDATE to a business, write an access_audit row, return new access.
+async function applyAccessChange(before, patch, action, reason, actorUserId) {
+  const prev = computeBusinessAccess(before);
+  const { data: after } = await supabase.from('businesses').update({ ...patch, updated_at: new Date().toISOString() }).eq('id', before.id).select().single();
+  const next = computeBusinessAccess(after);
+  await supabase.from('access_audit').insert({
+    business_id: before.id, business_code: before.business_code, action,
+    previous_plan: before.plan, previous_effective_plan: prev.effective_plan,
+    new_plan: after.plan, new_effective_plan: next.effective_plan,
+    access_source: next.effective_access_source, reason: reason || null,
+    changed_by_user_id: actorUserId, override_ends_at: after.override_ends_at || null,
+    metadata: { admin_override_plan: after.admin_override_plan || null },
+  });
+  return next;
+}
+
+// POST /trial — activate a 7-day full trial or extend by 7/14/30 days.
+app.post('/api/admin/businesses/:businessId/trial', auth, requireAdmin, async (req, res) => {
+  try {
+    const b = await loadBusinessOr4xx(req, res); if (!b) return;
+    const op = req.body?.action;
+    const now = new Date();
+    let patch, action;
+    if (op === 'activate') {
+      const end = new Date(now.getTime() + 7 * 86400000);
+      patch = { trial_started_at: now.toISOString(), trial_ends_at: end.toISOString(), trial_status: 'active', subscription_status: 'trialing' };
+      action = 'trial_activated';
+    } else if (op === 'extend') {
+      const days = Number(req.body?.days);
+      if (![7, 14, 30].includes(days)) return res.status(400).json({ error: 'days must be 7, 14 or 30' });
+      const base = b.trial_ends_at && new Date(b.trial_ends_at) > now ? new Date(b.trial_ends_at) : now;
+      patch = { trial_ends_at: new Date(base.getTime() + days * 86400000).toISOString(), trial_status: 'active' };
+      action = 'trial_extended';
+    } else return res.status(400).json({ error: 'action must be activate or extend' });
+    const access = await applyAccessChange(b, patch, action, req.body?.reason, req.user.userId);
+    res.json({ ok: true, access });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// PATCH /access — grant/change an admin override plan.
+app.patch('/api/admin/businesses/:businessId/access', auth, requireAdmin, async (req, res) => {
+  try {
+    const b = await loadBusinessOr4xx(req, res); if (!b) return;
+    const plan = req.body?.plan;
+    if (!OVERRIDE_PLANS.includes(plan)) return res.status(400).json({ error: `plan must be one of ${OVERRIDE_PLANS.join(', ')}` });
+    let overrideEnds = null;
+    if (req.body?.expires_at) { const d = new Date(req.body.expires_at); if (isNaN(d) || d <= new Date()) return res.status(400).json({ error: 'expires_at must be a future date' }); overrideEnds = d.toISOString(); }
+    if (!req.body?.reason || !String(req.body.reason).trim()) return res.status(400).json({ error: 'reason is required' });
+    const patch = {
+      admin_override_plan: plan, override_started_at: new Date().toISOString(), override_ends_at: overrideEnds,
+      override_reason: String(req.body.reason).trim(), override_created_by_user_id: req.user.userId, override_created_at: new Date().toISOString(),
+    };
+    const action = b.admin_override_plan ? 'override_changed' : 'override_created';
+    const access = await applyAccessChange(b, patch, action, req.body.reason, req.user.userId);
+    res.json({ ok: true, access });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// DELETE /override — remove the override (fallback to subscription→trial→free).
+app.delete('/api/admin/businesses/:businessId/override', auth, requireAdmin, async (req, res) => {
+  try {
+    const b = await loadBusinessOr4xx(req, res); if (!b) return;
+    if (!b.admin_override_plan) return res.status(400).json({ error: 'No active override' });
+    const patch = { admin_override_plan: null, override_started_at: null, override_ends_at: null, override_reason: null, override_created_by_user_id: null, override_created_at: null };
+    const access = await applyAccessChange(b, patch, 'override_removed', req.body?.reason, req.user.userId);
+    res.json({ ok: true, access });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// GET /access-audit — read-only access change history (optional ?business_id).
+app.get('/api/admin/access-audit', auth, requireAdmin, async (req, res) => {
+  try {
+    let q = supabase.from('access_audit').select('*').order('changed_at', { ascending: false }).limit(Math.min(Number(req.query.limit) || 100, 200));
+    if (req.query.business_id) q = q.eq('business_id', req.query.business_id);
+    const { data, error } = await q;
+    if (error) return res.status(500).json({ error: error.message });
+    res.json({ events: data || [] });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // POST /api/admin/wallets/:id/adjust-balance
 // Super-admin only. Creates a signed correction transaction to bring the wallet
 // balance to target_balance.  NEVER modifies wallet.balance directly.
