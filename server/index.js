@@ -5,6 +5,7 @@ const jwt = require('jsonwebtoken');
 const { createClient } = require('@supabase/supabase-js');
 const { calculateDueDate, ymd } = require('./lib/dueDate');
 const { computeActivationBlockers, isEffectiveApprovedReview, validReviewTransition } = require('./lib/taxGate');
+const { VALID_PLANS, computeBusinessAccess } = require('./lib/businessAccess');
 require('dotenv').config();
 
 // --- Environment validation (fail fast, never log secret values) -----------
@@ -4544,44 +4545,56 @@ async function ensureDefaultBusiness(userId, firstName) {
  *   subscription active    → business.plan
  *   expired / no sub       → free
  */
+// Per-business resolver — see server/lib/businessAccess.js (unit-tested).
+// Back-compat shape used by existing callers.
 function getAccessState(business) {
-  const now = new Date();
-  const trialEnd = business.trial_ends_at ? new Date(business.trial_ends_at) : null;
-  const isTrialActive =
-    business.trial_status === 'active' &&
-    trialEnd !== null &&
-    now < trialEnd;
+  const a = computeBusinessAccess(business);
+  return { isTrialActive: a.trial_status_effective === 'active', daysLeft: a.daysLeft, effectivePlan: a.effective_plan };
+}
 
-  const daysLeft = isTrialActive && trialEnd
-    ? Math.max(0, Math.ceil((trialEnd - now) / (1000 * 60 * 60 * 24)))
-    : 0;
+// Per-business access WITH membership check (the correct path; no arbitrary pick).
+async function getBusinessAccess(userId, businessId) {
+  const { data: m } = await supabase.from('business_members')
+    .select('role, status, businesses(*)').eq('user_id', userId).eq('business_id', businessId).eq('status', 'active').limit(1);
+  if (!m?.length) return null;
+  const business = m[0].businesses;
+  const access = computeBusinessAccess(business);
+  const { data: limits } = await supabase.from('plan_limits').select('*').eq('plan', access.effective_plan).single();
+  return { business, membership: { role: m[0].role, status: m[0].status }, access, limits: limits || {} };
+}
 
-  let effectivePlan;
-  if (isTrialActive) {
-    effectivePlan = 'founder'; // Full access during trial
-  } else if (business.subscription_status === 'active') {
-    effectivePlan = business.plan;
-  } else {
-    effectivePlan = 'free'; // Expired trial, no paid sub
-  }
-
-  return { isTrialActive, daysLeft, effectivePlan };
+// Platform-admin path: no membership requirement (admin sees any business).
+async function getBusinessAccessForPlatformAdmin(businessId) {
+  const { data: business } = await supabase.from('businesses').select('*').eq('id', businessId).single();
+  if (!business) return null;
+  const access = computeBusinessAccess(business);
+  const { data: limits } = await supabase.from('plan_limits').select('*').eq('plan', access.effective_plan).single();
+  return { business, access, limits: limits || {} };
 }
 
 /**
  * Load full access context for a userId.
  * Returns null if no business found (before ensureDefaultBusiness call).
  */
-async function getCurrentAccess(userId) {
+async function getCurrentAccess(userId, businessId = null) {
+  // If a specific business is known, resolve THAT one (no arbitrary pick).
+  if (businessId) {
+    const r = await getBusinessAccess(userId, businessId);
+    if (r) return { business: r.business, membership: r.membership, accessState: getAccessState(r.business), limits: r.limits };
+  }
+  // Legacy default: deterministic — prefer an owned business, then the oldest.
   const { data: memberships } = await supabase
     .from('business_members')
     .select('role, status, businesses(*)')
     .eq('user_id', userId)
-    .eq('status', 'active')
-    .limit(1);
+    .eq('status', 'active');
 
   if (!memberships || memberships.length === 0) return null;
 
+  const rolePri = { owner: 0, ceo: 1, admin: 2, cfo: 3, accountant: 4, manager: 5, employee: 6 };
+  memberships.sort((a, b) =>
+    (rolePri[a.role] ?? 9) - (rolePri[b.role] ?? 9) ||
+    new Date(a.businesses?.created_at || 0) - new Date(b.businesses?.created_at || 0));
   const m = memberships[0];
   const business = m.businesses;
   const accessState = getAccessState(business);
@@ -5510,6 +5523,122 @@ app.get('/api/admin/users/:id', auth, requireAdmin, async (req, res) => {
 // Used by frontend to conditionally show admin-only UI elements.
 app.get('/api/admin/status', auth, (req, res) => {
   res.json({ is_admin: isAdminUser(req.user.userId) });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// PLATFORM ADMIN — BUSINESS REGISTRY (read-only, PR1). Platform admin only.
+// ═════════════════════════════════════════════════════════════════════════════
+const monthStartISO = () => { const n = new Date(); return new Date(n.getFullYear(), n.getMonth(), 1).toISOString(); };
+
+// GET /api/admin/businesses — the real business registry.
+app.get('/api/admin/businesses', auth, requireAdmin, async (req, res) => {
+  try {
+    const { data: businesses } = await supabase.from('businesses').select('*').order('business_code', { ascending: true, nullsFirst: false }).order('created_at');
+    const all = businesses || [];
+    const ids = all.map(b => b.id);
+    // members + owner names
+    const { data: members } = ids.length ? await supabase.from('business_members').select('business_id, user_id, role, status').in('business_id', ids) : { data: [] };
+    const ownerIds = [...new Set(all.map(b => b.owner_user_id).filter(Boolean))];
+    const { data: owners } = ownerIds.length ? await supabase.from('users').select('id, first_name, username').in('id', ownerIds) : { data: [] };
+    const ownerById = Object.fromEntries((owners || []).map(u => [String(u.id), u]));
+    const mByBiz = {}; for (const m of (members || [])) (mByBiz[m.business_id] ||= []).push(m);
+    // usage counters (per business)
+    const { data: wallets } = ids.length ? await supabase.from('wallets').select('business_id').in('business_id', ids).eq('is_active', true) : { data: [] };
+    const wCount = {}; for (const w of (wallets || [])) wCount[w.business_id] = (wCount[w.business_id] || 0) + 1;
+    const { data: txs } = ids.length ? await supabase.from('transactions').select('business_id').in('business_id', ids).gte('created_at', monthStartISO()) : { data: [] };
+    const txCount = {}; for (const t of (txs || [])) txCount[t.business_id] = (txCount[t.business_id] || 0) + 1;
+
+    let rows = all.map(b => {
+      const a = computeBusinessAccess(b);
+      const mem = mByBiz[b.id] || [];
+      const owner = ownerById[String(b.owner_user_id)];
+      return {
+        business_id: b.id, business_code: b.business_code, name: b.name, type: b.type || 'business',
+        owner: owner ? { user_id: b.owner_user_id, name: owner.first_name || owner.username || null } : { user_id: b.owner_user_id, name: null },
+        member_count: mem.length, active_member_count: mem.filter(m => m.status === 'active').length,
+        stored_plan: a.stored_plan, effective_plan: a.effective_plan, effective_access_source: a.effective_access_source,
+        trial_status_effective: a.trial_status_effective, trial_ends_at: b.trial_ends_at,
+        subscription_status: b.subscription_status, admin_override_plan: b.admin_override_plan,
+        wallet_count: wCount[b.id] || 0, transactions_this_month: txCount[b.id] || 0,
+        created_at: b.created_at, last_activity: b.updated_at,
+      };
+    });
+    // filters
+    const q = (req.query.search || '').toLowerCase();
+    if (q) rows = rows.filter(r => (r.name || '').toLowerCase().includes(q) || (r.business_code || '').toLowerCase().includes(q));
+    if (req.query.plan) rows = rows.filter(r => r.effective_plan === req.query.plan);
+    if (req.query.type) rows = rows.filter(r => r.type === req.query.type);
+    if (req.query.trial) rows = rows.filter(r => r.trial_status_effective === req.query.trial);
+    const limit = Math.min(Number(req.query.limit) || 100, 200), offset = Number(req.query.offset) || 0;
+    res.json({ total: rows.length, limit, offset, businesses: rows.slice(offset, offset + limit) });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// GET /api/admin/businesses/:businessId — detail
+app.get('/api/admin/businesses/:businessId', auth, requireAdmin, async (req, res) => {
+  try {
+    const r = await getBusinessAccessForPlatformAdmin(req.params.businessId);
+    if (!r) return res.status(404).json({ error: 'Business not found' });
+    const b = r.business;
+    const { count: memberCount } = await supabase.from('business_members').select('id', { count: 'exact', head: true }).eq('business_id', b.id);
+    const { data: owner } = b.owner_user_id ? await supabase.from('users').select('id, first_name, username').eq('id', b.owner_user_id).single() : { data: null };
+    res.json({
+      identity: { business_id: b.id, business_code: b.business_code, name: b.name, type: b.type || 'business', status: b.status, country: b.country, language: b.base_currency ? undefined : null, currency: b.base_currency, timezone: b.timezone, created_at: b.created_at },
+      owner: owner ? { user_id: b.owner_user_id, name: owner.first_name || owner.username } : { user_id: b.owner_user_id, name: null },
+      members_summary: { total: memberCount || 0 },
+      access: r.access, last_activity: b.updated_at,
+    });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// GET /api/admin/businesses/:businessId/members
+app.get('/api/admin/businesses/:businessId/members', auth, requireAdmin, async (req, res) => {
+  try {
+    const { data: biz } = await supabase.from('businesses').select('id').eq('id', req.params.businessId).single();
+    if (!biz) return res.status(404).json({ error: 'Business not found' });
+    const { data: members } = await supabase.from('business_members').select('user_id, role, status, joined_at, onboarding_status, telegram_connected_at').eq('business_id', req.params.businessId);
+    const uids = [...new Set((members || []).map(m => m.user_id))];
+    const { data: users } = uids.length ? await supabase.from('users').select('id, first_name, username').in('id', uids) : { data: [] };
+    const uById = Object.fromEntries((users || []).map(u => [String(u.id), u]));
+    res.json({ members: (members || []).map(m => ({
+      user_id: m.user_id, name: uById[String(m.user_id)]?.first_name || uById[String(m.user_id)]?.username || null,
+      username: uById[String(m.user_id)]?.username || null, role: m.role, status: m.status,
+      joined_at: m.joined_at, onboarding_status: m.onboarding_status, telegram_connected: !!m.telegram_connected_at,
+    })) });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// GET /api/admin/businesses/:businessId/usage
+app.get('/api/admin/businesses/:businessId/usage', auth, requireAdmin, async (req, res) => {
+  try {
+    const id = req.params.businessId;
+    const { data: biz } = await supabase.from('businesses').select('id').eq('id', id).single();
+    if (!biz) return res.status(404).json({ error: 'Business not found' });
+    const since = monthStartISO();
+    const head = (t, extra) => supabase.from(t).select('id', { count: 'exact', head: true }).eq('business_id', id);
+    const [{ count: wallets }, { count: tx }, { count: debts }, { count: members }, { count: batches }, { count: docs }] = await Promise.all([
+      supabase.from('wallets').select('id', { count: 'exact', head: true }).eq('business_id', id).eq('is_active', true),
+      supabase.from('transactions').select('id', { count: 'exact', head: true }).eq('business_id', id).gte('created_at', since),
+      supabase.from('debts').select('id', { count: 'exact', head: true }).eq('business_id', id).gte('created_at', since),
+      supabase.from('business_members').select('id', { count: 'exact', head: true }).eq('business_id', id),
+      supabase.from('bank_import_batches').select('id', { count: 'exact', head: true }).eq('business_id', id),
+      supabase.from('financial_documents').select('id', { count: 'exact', head: true }).eq('business_id', id).then(r => r, () => ({ count: null })),
+    ]);
+    res.json({ usage: {
+      wallets: wallets ?? 0, transactions_this_month: tx ?? 0, invoices_this_month: debts ?? 0,
+      ai_chat_usage: null, voice_usage: null,   // no usage_event store yet (PR-future)
+      members: members ?? 0, bank_imports: batches ?? 0, documents: docs ?? null,
+    } });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// GET /api/admin/businesses/:businessId/access — full resolver response
+app.get('/api/admin/businesses/:businessId/access', auth, requireAdmin, async (req, res) => {
+  try {
+    const r = await getBusinessAccessForPlatformAdmin(req.params.businessId);
+    if (!r) return res.status(404).json({ error: 'Business not found' });
+    res.json({ ...r.access, limits: r.limits, features: r.limits });
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 // POST /api/admin/wallets/:id/adjust-balance
