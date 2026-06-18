@@ -3,6 +3,8 @@
 -- intercompany_balances is a read-only VIEW recomputed from the allocation
 -- ledger — it is never inserted/updated directly.
 
+BEGIN;
+
 CREATE TABLE IF NOT EXISTS business_relationships (
   id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   from_business_id  UUID NOT NULL REFERENCES businesses(id) ON DELETE RESTRICT,
@@ -15,7 +17,8 @@ CREATE TABLE IF NOT EXISTS business_relationships (
   created_by_user_id BIGINT NULL,
   created_at        TIMESTAMPTZ DEFAULT NOW(),
   updated_at        TIMESTAMPTZ DEFAULT NOW(),
-  CHECK (from_business_id <> to_business_id)
+  CHECK (from_business_id <> to_business_id),
+  CHECK (effective_to IS NULL OR effective_from IS NULL OR effective_to >= effective_from)
 );
 CREATE UNIQUE INDEX IF NOT EXISTS business_relationships_uniq
   ON business_relationships(from_business_id, to_business_id, relationship_type, effective_from);
@@ -118,6 +121,8 @@ FROM intercompany_funding_records f
 LEFT JOIN repaid r ON r.funding_record_id = f.id
 WHERE f.status IN ('confirmed','partially_repaid','repaid')
 GROUP BY f.relationship_id, f.cash_payer_business_id, f.economic_owner_business_id, f.currency;
+
+COMMIT;
 
 -- ── Verify ───────────────────────────────────────────────────────────────────
 SELECT table_name FROM information_schema.tables WHERE table_schema='public' AND table_name IN

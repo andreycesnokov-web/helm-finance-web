@@ -4,6 +4,8 @@
 --   deposit_payment (+)  allocation (−)  refund (−)  adjustment (±, reason req.)
 -- A deposit is NOT a paid/filed tax until allocated to a specific obligation.
 
+BEGIN;
+
 CREATE TABLE IF NOT EXISTS tax_deposit_accounts (
   id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   business_id UUID NOT NULL REFERENCES businesses(id) ON DELETE RESTRICT,
@@ -64,6 +66,9 @@ BEGIN
   SELECT business_id INTO acct_business FROM tax_deposit_accounts WHERE id = NEW.deposit_account_id FOR UPDATE;
   IF acct_business IS NULL THEN RAISE EXCEPTION 'deposit account % not found', NEW.deposit_account_id; END IF;
   IF acct_business <> NEW.business_id THEN RAISE EXCEPTION 'business isolation: deposit account other business'; END IF;
+  IF NEW.tax_treatment_id IS NOT NULL AND (SELECT business_id FROM tax_treatments WHERE id=NEW.tax_treatment_id) IS DISTINCT FROM NEW.business_id THEN RAISE EXCEPTION 'isolation: deposit target treatment other business'; END IF;
+  IF NEW.withholding_record_id IS NOT NULL AND (SELECT business_id FROM withholding_records WHERE id=NEW.withholding_record_id) IS DISTINCT FROM NEW.business_id THEN RAISE EXCEPTION 'isolation: deposit target withholding other business'; END IF;
+  IF NEW.compliance_event_id IS NOT NULL AND (SELECT business_id FROM compliance_events WHERE id=NEW.compliance_event_id) IS DISTINCT FROM NEW.business_id THEN RAISE EXCEPTION 'isolation: deposit target compliance other business'; END IF;
   bal := fn_deposit_balance(NEW.deposit_account_id);
   SELECT COALESCE(SUM(allocated_amount),0) INTO already
     FROM tax_deposit_allocations WHERE deposit_account_id = NEW.deposit_account_id AND id <> NEW.id;

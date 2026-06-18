@@ -1,5 +1,7 @@
 -- Migration 027 — Tax settlement modes + treatment context + multi-tax billing
--- Date: 2026-06-15. ADDITIVE + IDEMPOTENT. No DROP, NO seed, NO cash. Needs 026.
+-- Date: 2026-06-15. ADDITIVE + IDEMPOTENT + TRANSACTIONAL. No DROP, NO seed, NO cash. Needs 026.
+
+BEGIN;
 
 ALTER TABLE tax_treatments
   ADD COLUMN IF NOT EXISTS withholding_mode    TEXT NULL,
@@ -44,6 +46,9 @@ BEGIN
   SELECT COALESCE(gross_amount, official_tax_amount), business_id INTO nominal, doc_business
     FROM financial_documents WHERE id = NEW.billing_document_id FOR UPDATE;
   IF doc_business IS DISTINCT FROM NEW.business_id THEN RAISE EXCEPTION 'business isolation: billing doc other business'; END IF;
+  IF NEW.tax_treatment_id IS NOT NULL AND (SELECT business_id FROM tax_treatments WHERE id=NEW.tax_treatment_id) IS DISTINCT FROM NEW.business_id THEN RAISE EXCEPTION 'isolation: billing target treatment other business'; END IF;
+  IF NEW.withholding_record_id IS NOT NULL AND (SELECT business_id FROM withholding_records WHERE id=NEW.withholding_record_id) IS DISTINCT FROM NEW.business_id THEN RAISE EXCEPTION 'isolation: billing target withholding other business'; END IF;
+  IF NEW.compliance_event_id IS NOT NULL AND (SELECT business_id FROM compliance_events WHERE id=NEW.compliance_event_id) IS DISTINCT FROM NEW.business_id THEN RAISE EXCEPTION 'isolation: billing target compliance other business'; END IF;
   IF nominal IS NOT NULL THEN
     SELECT COALESCE(SUM(allocated_amount),0) INTO allocated
       FROM tax_billing_allocations WHERE billing_document_id = NEW.billing_document_id AND id <> NEW.id;
@@ -56,6 +61,8 @@ END $$ LANGUAGE plpgsql;
 DROP TRIGGER IF EXISTS trg_tax_billing_alloc_guard ON tax_billing_allocations;
 CREATE TRIGGER trg_tax_billing_alloc_guard BEFORE INSERT OR UPDATE ON tax_billing_allocations
   FOR EACH ROW EXECUTE FUNCTION fn_tax_billing_alloc_guard();
+
+COMMIT;
 
 -- ── Verify ───────────────────────────────────────────────────────────────────
 SELECT 'tax_treatments.withholding_mode' AS check,
