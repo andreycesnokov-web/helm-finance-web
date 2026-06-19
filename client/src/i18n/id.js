@@ -47,6 +47,7 @@ const id = {
     approvals: 'Persetujuan',
     team: 'Tim',
     accountant: 'AI Akuntan',
+    documents: 'Dokumen',
     bankImport: 'Impor bank',
     sectionOverview: 'Ringkasan',
     sectionFinance: 'Keuangan',

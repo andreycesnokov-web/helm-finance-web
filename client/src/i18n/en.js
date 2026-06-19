@@ -45,6 +45,7 @@ const en = {
     approvals: 'Approvals',
     team: 'Team',
     accountant: 'AI Accountant',
+    documents: 'Documents',
     bankImport: 'Bank import',
     sectionOverview: 'Overview',
     sectionFinance: 'Finance',
