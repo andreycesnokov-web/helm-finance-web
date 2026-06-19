@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { useTranslation } from '../hooks/useTranslation'
 import { apiFetch, fmt, fmtFull } from '../lib/api'
+import DocumentsPanel from '../components/DocumentsPanel'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -204,6 +205,9 @@ function TxInlinePanel({ tx, refDirections = [], refActivityTypes = [], refWalle
       <div style={{ fontSize: 11, color: 'var(--text-4)', fontFamily: 'monospace' }}>
         ID: {tx.id} · {fmtDateTime(tx.created_at)}
       </div>
+
+      {/* Linked documents (no cash impact) */}
+      <DocumentsPanel targetType="transaction" targetId={tx.id} />
     </div>
   )
 }

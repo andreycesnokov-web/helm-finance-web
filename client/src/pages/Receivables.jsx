@@ -6,6 +6,7 @@ import { apiFetch, fmt, daysUntil } from '../lib/api'
 import DebtPaymentModal from '../components/DebtPaymentModal'
 import DebtFormModal from '../components/DebtFormModal'
 import ReceiptList from '../components/ReceiptList'
+import DocumentsPanel from '../components/DocumentsPanel'
 
 function fmtDate(str) {
   if (!str) return '—'
@@ -46,6 +47,7 @@ function DebtRow({ debt, accounts, token, onRefresh }) {
   const [editModal,       setEditModal]       = useState(false)
   const [success,         setSuccess]         = useState(false)
   const [approvalLoading, setApprovalLoading] = useState(false)
+  const [docsOpen,        setDocsOpen]        = useState(false)
   const { t } = useTranslation()
 
   const badge     = getStatusBadge(debt)
@@ -197,6 +199,13 @@ function DebtRow({ debt, accounts, token, onRefresh }) {
             </div>
           ) : null}
         </div>
+      </div>
+
+      <div style={{ padding: '0 14px 10px' }}>
+        <button onClick={() => setDocsOpen(o => !o)} style={{ fontSize: 12, padding: '3px 8px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg-2)', cursor: 'pointer', color: 'var(--text-2)' }}>
+          📄 {t('nav.documents')} {docsOpen ? '▲' : '▼'}
+        </button>
+        {docsOpen && <DocumentsPanel targetType="debt" targetId={debt.id} />}
       </div>
 
       {modal && (

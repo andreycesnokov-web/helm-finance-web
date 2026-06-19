@@ -6,6 +6,7 @@ const { createClient } = require('@supabase/supabase-js');
 const { calculateDueDate, ymd } = require('./lib/dueDate');
 const { computeActivationBlockers, isEffectiveApprovedReview, validReviewTransition } = require('./lib/taxGate');
 const { VALID_PLANS, computeBusinessAccess } = require('./lib/businessAccess');
+const docV = require('./lib/documentValidation');
 require('dotenv').config();
 
 // --- Environment validation (fail fast, never log secret values) -----------
@@ -7638,6 +7639,349 @@ app.get('/api/payroll/by-transaction/:transactionId', auth, async (req, res) => 
 
 app.get('*', (req, res) => {
   res.sendFile('index.html', { root: 'client/dist' });
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// TAX DOCUMENTS RUNTIME V1 — secure document center & financial-record linking
+// Uses the migration-031 tables only. No cash impact: linking/archiving a
+// document never creates a transaction, moves a wallet, or touches a debt.
+// ════════════════════════════════════════════════════════════════════════════
+const DOC_BUCKET = process.env.DOCUMENTS_BUCKET || 'financial-documents';
+const SIGNED_URL_TTL = 600; // 10 minutes
+
+// Roles: upload = anyone who can create a request (NOT auditor); manage
+// (link/unlink/archive/edit) = confirmed-record roles; view-all = finance roles
+// + auditor. Manager/employee see only their own uploads.
+function canUploadDocument(role)   { return canCreateFinancialRequest(role) && role !== 'auditor'; }
+function canManageDocuments(role)  { return canCreateConfirmedFinancialRecord(role); }
+function canViewAllDocuments(role) { return canViewBusinessFinance(role); }
+
+// Business-specific entitlement (NOT the arbitrary .limit(1) path — see spec §16).
+async function hasDocumentsAccess(biz) {
+  try {
+    const r = await getBusinessAccess(biz.ownerUserId, biz.business.id);
+    const plan = r?.access?.effective_plan;
+    if (plan === 'founder' || plan === 'enterprise') return true;
+    if (r?.access?.trial_status_effective === 'active') return true;
+  } catch { /* fall through to addon */ }
+  try {
+    const { data } = await supabase.from('business_addons')
+      .select('addon').eq('business_id', biz.business.id)
+      .like('addon', 'ai_accountant%').eq('status', 'active').limit(1);
+    return !!data?.length;
+  } catch { return false; }
+}
+
+// Best-effort audit. If migration 035 (document_audit) is not applied yet, the
+// insert fails silently and the document operation still succeeds.
+async function logDocumentAudit(biz, { document_id, actor_user_id, action, target_type = null, target_id = null, channel = 'web', metadata = null }) {
+  try {
+    await supabase.from('document_audit').insert({
+      business_id: biz.business.id, document_id: document_id || null,
+      actor_user_id: actor_user_id ?? null, channel, action,
+      target_type, target_id: target_id != null ? String(target_id) : null, metadata,
+    });
+  } catch { /* audit table may not exist yet — never block the operation */ }
+}
+
+// Resolve a financial_documents row scoped to the active business (+ file meta).
+async function loadDocumentScoped(biz, documentId) {
+  const { data } = await supabase.from('financial_documents')
+    .select('*').eq('id', documentId).eq('business_id', biz.business.id).limit(1);
+  return data?.[0] || null;
+}
+
+// Attach resolved links (debt / transaction / compliance) to a set of documents.
+async function attachLinks(biz, docs) {
+  const ids = docs.map(d => d.id);
+  if (!ids.length) return docs;
+  const byDoc = new Map(ids.map(id => [id, []]));
+  for (const [type, def] of Object.entries(docV.LINK_TARGETS)) {
+    const { data } = await supabase.from(def.table)
+      .select(`id, document_id, ${def.column}`).eq('business_id', biz.business.id).in('document_id', ids);
+    for (const row of (data || [])) {
+      (byDoc.get(row.document_id) || []).push({ link_id: row.id, target_type: type, target_id: row[def.column] });
+    }
+  }
+  return docs.map(d => ({ ...d, links: byDoc.get(d.id) || [] }));
+}
+
+// GET /api/documents — business-scoped list with filters.
+app.get('/api/documents', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res); if (!biz) return;
+    if (!canViewBusinessFinance(biz.role)) return res.status(403).json({ error: 'Your role cannot view documents' });
+    if (!await hasDocumentsAccess(biz)) return res.status(403).json({ error: 'Document Center is not enabled on this plan', upgrade_required: true });
+
+    const { type, date_from, date_to, counterparty, uploaded_by, search,
+            linked_status, debt_id, transaction_id, compliance_id, status } = req.query;
+
+    // Link-target filters: resolve document ids from the link table first.
+    let restrictIds = null;
+    const target = debt_id ? ['debt', debt_id] : transaction_id ? ['transaction', transaction_id] : compliance_id ? ['compliance', compliance_id] : null;
+    if (target) {
+      const def = docV.LINK_TARGETS[target[0]];
+      const { data } = await supabase.from(def.table).select('document_id')
+        .eq('business_id', biz.business.id).eq(def.column, target[1]);
+      restrictIds = (data || []).map(r => r.document_id);
+      if (!restrictIds.length) return res.json({ documents: [] });
+    }
+
+    let q = supabase.from('financial_documents').select('*').eq('business_id', biz.business.id);
+    if (status === 'archived') q = q.not('archived_at', 'is', null);
+    else q = q.is('archived_at', null);
+    // Manager/employee see only their own uploads.
+    if (!canViewAllDocuments(biz.role)) q = q.eq('created_by_user_id', req.user.userId);
+    if (type) q = q.eq('document_type', type);
+    if (counterparty) q = q.eq('issuer_counterparty_id', counterparty);
+    if (uploaded_by) q = q.eq('created_by_user_id', uploaded_by);
+    if (date_from) q = q.gte('document_date', date_from);
+    if (date_to) q = q.lte('document_date', date_to);
+    if (search) q = q.ilike('document_number', `%${search}%`);
+    if (restrictIds) q = q.in('id', restrictIds);
+    q = q.order('created_at', { ascending: false }).limit(Math.min(Number(req.query.limit) || 100, 200));
+
+    let { data: docs, error } = await q;
+    if (error) return res.status(500).json({ error: error.message });
+    docs = docs || [];
+
+    // File metadata
+    const fileIds = [...new Set(docs.map(d => d.file_id).filter(Boolean))];
+    const fileMap = new Map();
+    if (fileIds.length) {
+      const { data: files } = await supabase.from('document_files')
+        .select('id, file_name, mime_type, file_size, upload_channel').in('id', fileIds);
+      for (const f of (files || [])) fileMap.set(f.id, f);
+    }
+    let out = docs.map(d => ({ ...d, file: fileMap.get(d.file_id) || null }));
+    out = await attachLinks(biz, out);
+    if (linked_status === 'linked') out = out.filter(d => d.links.length > 0);
+    if (linked_status === 'unlinked') out = out.filter(d => d.links.length === 0);
+    res.json({ documents: out });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// GET /api/documents/:id — detail.
+app.get('/api/documents/:id', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res); if (!biz) return;
+    if (!canViewBusinessFinance(biz.role)) return res.status(403).json({ error: 'Your role cannot view documents' });
+    if (!await hasDocumentsAccess(biz)) return res.status(403).json({ error: 'Document Center is not enabled', upgrade_required: true });
+    const doc = await loadDocumentScoped(biz, req.params.id);
+    if (!doc) return res.status(404).json({ error: 'Document not found' });
+    if (!canViewAllDocuments(biz.role) && doc.created_by_user_id !== req.user.userId)
+      return res.status(403).json({ error: 'You do not have access to this document' });
+    const { data: fileRows } = await supabase.from('document_files').select('*').eq('id', doc.file_id).limit(1);
+    const [withLinks] = await attachLinks(biz, [doc]);
+    res.json({ document: withLinks, file: fileRows?.[0] || null });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// POST /api/documents/upload-init — validate + issue a short-lived signed upload URL.
+app.post('/api/documents/upload-init', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res); if (!biz) return;
+    if (!canUploadDocument(biz.role)) return res.status(403).json({ error: 'Your role cannot upload documents' });
+    if (!await hasDocumentsAccess(biz)) return res.status(403).json({ error: 'Document Center is not enabled', upgrade_required: true });
+    const { file_name, mime_type, file_size, document_type } = req.body || {};
+    const v = docV.validateUpload({ file_name, mime_type, file_size, document_type });
+    if (!v.ok) return res.status(400).json({ error: v.error });
+
+    const documentId = crypto.randomUUID();
+    const storagePath = docV.buildStoragePath(biz.business.id, documentId, file_name);
+    const { data, error } = await supabase.storage.from(DOC_BUCKET).createSignedUploadUrl(storagePath);
+    if (error) return res.status(500).json({ error: 'storage_unavailable', detail: error.message });
+    // Absolute URL the client PUTs the raw file to (no supabase-js on the client).
+    const uploadUrl = `${process.env.SUPABASE_URL}/storage/v1/object/upload/sign/${DOC_BUCKET}/${storagePath}?token=${data.token}`;
+    res.json({ document_id: documentId, storage_path: storagePath, token: data.token, upload_url: uploadUrl, bucket: DOC_BUCKET });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// POST /api/documents/upload-complete — record metadata after the client upload.
+app.post('/api/documents/upload-complete', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res); if (!biz) return;
+    if (!canUploadDocument(biz.role)) return res.status(403).json({ error: 'Your role cannot upload documents' });
+    if (!await hasDocumentsAccess(biz)) return res.status(403).json({ error: 'Document Center is not enabled', upgrade_required: true });
+    const b = req.body || {};
+    const v = docV.validateUpload(b);
+    if (!v.ok) return res.status(400).json({ error: v.error });
+    if (!docV.isValidSha256(b.sha256)) return res.status(400).json({ error: 'invalid_hash' });
+    if (!b.document_id) return res.status(400).json({ error: 'document_id required' });
+    // The storage path must be the one we issued (business + doc scoped).
+    const expectedPath = docV.buildStoragePath(biz.business.id, b.document_id, b.file_name);
+    if (b.storage_path !== expectedPath) return res.status(400).json({ error: 'storage_path_mismatch' });
+
+    // Per-business dedup. Never reveal another business's documents.
+    const { data: dup } = await supabase.from('document_files')
+      .select('id').eq('business_id', biz.business.id).eq('sha256_hash', b.sha256).limit(1);
+    if (dup?.length) {
+      await supabase.storage.from(DOC_BUCKET).remove([expectedPath]).catch(() => {});
+      const { data: ex } = await supabase.from('financial_documents')
+        .select('id').eq('business_id', biz.business.id).eq('file_id', dup[0].id).limit(1);
+      return res.status(409).json({ error: 'duplicate', duplicate: true, existing_document_id: ex?.[0]?.id || null });
+    }
+
+    const fileId = crypto.randomUUID();
+    const { error: fErr } = await supabase.from('document_files').insert({
+      id: fileId, business_id: biz.business.id, storage_path: expectedPath,
+      file_name: docV.safeFilename(b.file_name), mime_type: b.mime_type, file_size: b.file_size,
+      sha256_hash: b.sha256, upload_channel: 'web', uploaded_by_user_id: req.user.userId,
+    });
+    if (fErr) return res.status(500).json({ error: 'file_insert_failed', detail: fErr.message });
+
+    const notes = (b.description || '').toString().slice(0, 2000) || null;
+    const { data: docRows, error: dErr } = await supabase.from('financial_documents').insert({
+      id: b.document_id, business_id: biz.business.id, file_id: fileId,
+      document_type: b.document_type || 'other',
+      document_number: b.title ? String(b.title).slice(0, 200) : (b.document_number || null),
+      document_date: b.document_date || null,
+      period_start: b.period_start || null, period_end: b.period_end || null,
+      issuer_counterparty_id: b.counterparty_id || null,
+      currency: b.currency || 'IDR',
+      gross_amount: (b.amount != null && isFinite(Number(b.amount))) ? Number(b.amount) : null,
+      extraction_status: 'manual', review_status: 'needs_review',
+      extracted_json: notes ? { notes } : null,
+      created_by_user_id: req.user.userId,
+    }).select('*');
+    if (dErr) {
+      await supabase.from('document_files').delete().eq('id', fileId).catch(() => {});
+      await supabase.storage.from(DOC_BUCKET).remove([expectedPath]).catch(() => {});
+      return res.status(500).json({ error: 'document_insert_failed', detail: dErr.message });
+    }
+    const doc = docRows[0];
+    await logDocumentAudit(biz, { document_id: doc.id, actor_user_id: req.user.userId, action: 'uploaded' });
+
+    // Optional link — best-effort; never lose the upload if linking fails.
+    let link_result = null;
+    if (b.link && b.link.target_type && b.link.target_id != null) {
+      const r = await linkDocument(biz, doc, b.link.target_type, b.link.target_id, req.user.userId);
+      link_result = r.ok ? { ok: true } : { ok: false, error: r.error };
+    }
+    res.json({ document: doc, link_result });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// POST /api/documents/:id/signed-url — short-lived view/download URL after access check.
+app.post('/api/documents/:id/signed-url', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res); if (!biz) return;
+    if (!canViewBusinessFinance(biz.role)) return res.status(403).json({ error: 'Your role cannot view documents' });
+    if (!await hasDocumentsAccess(biz)) return res.status(403).json({ error: 'Document Center is not enabled', upgrade_required: true });
+    const doc = await loadDocumentScoped(biz, req.params.id);
+    if (!doc) return res.status(404).json({ error: 'Document not found' });
+    if (!canViewAllDocuments(biz.role) && doc.created_by_user_id !== req.user.userId)
+      return res.status(403).json({ error: 'You do not have access to this document' });
+    const { data: fileRows } = await supabase.from('document_files').select('storage_path, file_name').eq('id', doc.file_id).limit(1);
+    if (!fileRows?.length) return res.status(404).json({ error: 'File not found' });
+    const mode = req.body?.mode === 'download' ? { download: fileRows[0].file_name } : {};
+    const { data, error } = await supabase.storage.from(DOC_BUCKET).createSignedUrl(fileRows[0].storage_path, SIGNED_URL_TTL, mode);
+    if (error) return res.status(500).json({ error: 'storage_unavailable', detail: error.message });
+    await logDocumentAudit(biz, { document_id: doc.id, actor_user_id: req.user.userId, action: 'signed_url_issued', metadata: { mode: req.body?.mode || 'view' } });
+    res.json({ url: data.signedUrl, expires_in: SIGNED_URL_TTL });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// PATCH /api/documents/:id — safe metadata only.
+app.patch('/api/documents/:id', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res); if (!biz) return;
+    if (!canManageDocuments(biz.role)) return res.status(403).json({ error: 'Your role cannot edit documents' });
+    if (!await hasDocumentsAccess(biz)) return res.status(403).json({ error: 'Document Center is not enabled', upgrade_required: true });
+    const doc = await loadDocumentScoped(biz, req.params.id);
+    if (!doc) return res.status(404).json({ error: 'Document not found' });
+    const b = req.body || {};
+    if (b.document_type != null && !docV.DOCUMENT_TYPES.includes(b.document_type))
+      return res.status(400).json({ error: 'invalid_document_type' });
+    const patch = { updated_at: new Date().toISOString() };
+    if (b.document_type != null) patch.document_type = b.document_type;
+    if (b.title != null) patch.document_number = String(b.title).slice(0, 200);
+    if (b.document_date !== undefined) patch.document_date = b.document_date || null;
+    if (b.period_start !== undefined) patch.period_start = b.period_start || null;
+    if (b.period_end !== undefined) patch.period_end = b.period_end || null;
+    if (b.currency != null) patch.currency = b.currency;
+    if (b.amount !== undefined) patch.gross_amount = (b.amount != null && isFinite(Number(b.amount))) ? Number(b.amount) : null;
+    if (b.counterparty_id !== undefined) patch.issuer_counterparty_id = b.counterparty_id || null;
+    if (b.description !== undefined) patch.extracted_json = b.description ? { ...(doc.extracted_json || {}), notes: String(b.description).slice(0, 2000) } : (doc.extracted_json || null);
+    const { data, error } = await supabase.from('financial_documents')
+      .update(patch).eq('id', doc.id).eq('business_id', biz.business.id).select('*');
+    if (error) return res.status(500).json({ error: error.message });
+    await logDocumentAudit(biz, { document_id: doc.id, actor_user_id: req.user.userId, action: 'metadata_changed' });
+    res.json({ document: data[0] });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// POST /api/documents/:id/archive — soft archive (no hard-delete of evidence).
+app.post('/api/documents/:id/archive', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res); if (!biz) return;
+    if (!canManageDocuments(biz.role)) return res.status(403).json({ error: 'Your role cannot archive documents' });
+    if (!await hasDocumentsAccess(biz)) return res.status(403).json({ error: 'Document Center is not enabled', upgrade_required: true });
+    const doc = await loadDocumentScoped(biz, req.params.id);
+    if (!doc) return res.status(404).json({ error: 'Document not found' });
+    const { data, error } = await supabase.from('financial_documents')
+      .update({ archived_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+      .eq('id', doc.id).eq('business_id', biz.business.id).select('id, archived_at');
+    if (error) return res.status(500).json({ error: error.message });
+    await logDocumentAudit(biz, { document_id: doc.id, actor_user_id: req.user.userId, action: 'archived' });
+    res.json({ ok: true, document: data[0] });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Shared link helper — enforces the 3-way business-isolation rule, then inserts.
+async function linkDocument(biz, doc, targetType, targetId, actorUserId) {
+  const def = docV.LINK_TARGETS[targetType];
+  if (!def) return { ok: false, error: 'invalid_target_type', status: 400 };
+  const { data: targetRows } = await supabase.from(def.ledger)
+    .select('id, business_id').eq('id', targetId).limit(1);
+  const targetBusinessId = targetRows?.[0]?.business_id;
+  if (!targetRows?.length) return { ok: false, error: 'target_not_found', status: 404 };
+  if (!docV.sameBusinessLink(biz.business.id, doc.business_id, targetBusinessId))
+    return { ok: false, error: 'cross_business_link_forbidden', status: 403 };
+  const row = { business_id: biz.business.id, document_id: doc.id, [def.column]: targetId, created_by_user_id: actorUserId };
+  const { data, error } = await supabase.from(def.table).insert(row).select('id');
+  if (error) {
+    if (/duplicate|unique/i.test(error.message)) return { ok: false, error: 'already_linked', status: 409 };
+    return { ok: false, error: error.message, status: 500 };
+  }
+  await logDocumentAudit(biz, { document_id: doc.id, actor_user_id: actorUserId, action: 'linked', target_type: targetType, target_id: targetId });
+  return { ok: true, link_id: data[0].id };
+}
+
+// POST /api/documents/:id/links — link to debt / transaction / compliance.
+app.post('/api/documents/:id/links', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res); if (!biz) return;
+    if (!canManageDocuments(biz.role)) return res.status(403).json({ error: 'Your role cannot link documents' });
+    if (!await hasDocumentsAccess(biz)) return res.status(403).json({ error: 'Document Center is not enabled', upgrade_required: true });
+    const doc = await loadDocumentScoped(biz, req.params.id);
+    if (!doc) return res.status(404).json({ error: 'Document not found' });
+    const { target_type, target_id } = req.body || {};
+    if (!target_type || target_id == null) return res.status(400).json({ error: 'target_type and target_id required' });
+    const r = await linkDocument(biz, doc, target_type, target_id, req.user.userId);
+    if (!r.ok) return res.status(r.status || 400).json({ error: r.error });
+    res.json({ ok: true, link_id: r.link_id });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// DELETE /api/documents/:id/links/:linkId — remove a link; records untouched.
+app.delete('/api/documents/:id/links/:linkId', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res); if (!biz) return;
+    if (!canManageDocuments(biz.role)) return res.status(403).json({ error: 'Your role cannot unlink documents' });
+    if (!await hasDocumentsAccess(biz)) return res.status(403).json({ error: 'Document Center is not enabled', upgrade_required: true });
+    const doc = await loadDocumentScoped(biz, req.params.id);
+    if (!doc) return res.status(404).json({ error: 'Document not found' });
+    let removed = null, targetType = null;
+    for (const [type, def] of Object.entries(docV.LINK_TARGETS)) {
+      const { data } = await supabase.from(def.table).delete()
+        .eq('id', req.params.linkId).eq('business_id', biz.business.id).eq('document_id', doc.id).select('id');
+      if (data?.length) { removed = data[0].id; targetType = type; break; }
+    }
+    if (!removed) return res.status(404).json({ error: 'Link not found' });
+    await logDocumentAudit(biz, { document_id: doc.id, actor_user_id: req.user.userId, action: 'unlinked', target_type: targetType });
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 const PORT = process.env.PORT || 3001;
