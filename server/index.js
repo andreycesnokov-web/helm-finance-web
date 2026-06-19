@@ -1376,9 +1376,17 @@ const AI_ACCOUNTANT_DISCLAIMER = {
 
 // Entitlement: an active AI Accountant add-on, OR full access during trial/founder.
 async function hasAccountantAddon(biz) {
+  // Entitlement is per the ACTIVE business (honors its admin override / plan /
+  // trial), not the owner's arbitrary default business. Mirrors hasDocumentsAccess
+  // — fixes AI Accountant staying locked when the active business has a founder
+  // override but the default business's trial expired.
   try {
-    const access = await getCurrentAccess(biz.ownerUserId);
-    if (access?.accessState?.effectivePlan === 'founder' || access?.accessState?.isTrialActive) return true;
+    const r = await getBusinessAccess(biz.ownerUserId, biz.business.id);
+    const plan = r?.access?.effective_plan;
+    if (plan === 'founder' || plan === 'enterprise') return true;
+    if (r?.access?.trial_status_effective === 'active') return true;
+  } catch { /* fall through to add-on check */ }
+  try {
     const { data } = await supabase.from('business_addons')
       .select('addon,status').eq('business_id', biz.business.id)
       .like('addon', 'ai_accountant%').eq('status', 'active').limit(1);
