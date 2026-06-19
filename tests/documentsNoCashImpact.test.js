@@ -31,5 +31,14 @@ ok('reads debts only via .select (ownership check)', !/from\('debts'\)\s*\.(inse
 ok('archive sets archived_at', /archived_at:\s*new Date/.test(block));
 ok('no hard delete of financial_documents via endpoint', !/from\('financial_documents'\)\s*\.delete\(\)/.test(block) || /document_insert_failed/.test(block));
 
+// Hardening: server-side hash verification (download + compute), storage gate,
+// and the stored hash is the VERIFIED one (never the client-claimed value).
+ok('downloads stored object for verification', /storage\.from\(DOC_BUCKET\)\.download\(/.test(block));
+ok('computes server-side sha256', /crypto\.createHash\('sha256'\)/.test(block));
+ok('stores verified hash, not client hash', /sha256_hash:\s*verifiedHash/.test(block) && !/sha256_hash:\s*b\.sha256/.test(block));
+ok('rejects client/server hash mismatch', /hash_mismatch/.test(block));
+ok('storage readiness gate on upload/signed-url', (block.match(/blockIfStorageNotReady\(res\)/g) || []).length >= 3);
+ok('health endpoint reports degraded config', /getDocumentsHealth/.test(block) && /audit_table_missing/.test(block));
+
 console.log(`\n${fail === 0 ? 'ALL PASS' : 'FAIL'} — ${pass} passed, ${fail} failed`);
 process.exit(fail === 0 ? 0 : 1);

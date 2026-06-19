@@ -7648,6 +7648,54 @@ app.get('*', (req, res) => {
 // ════════════════════════════════════════════════════════════════════════════
 const DOC_BUCKET = process.env.DOCUMENTS_BUCKET || 'financial-documents';
 const SIGNED_URL_TTL = 600; // 10 minutes
+const IS_PROD = process.env.NODE_ENV === 'production';
+
+// ── Storage & audit readiness (cached ~60s; never auto-creates the bucket) ────
+// Documents is disabled gracefully when storage is not ready; the rest of CFO
+// AI is unaffected. In production a missing audit table is a degraded config.
+let _docHealth = { at: 0, value: null };
+async function getDocumentsHealth() {
+  if (_docHealth.value && Date.now() - _docHealth.at < 60000) return _docHealth.value;
+  const env_present = !!(process.env.SUPABASE_URL && process.env.SUPABASE_SECRET_KEY);
+  let bucket_exists = false, bucket_private = false, bucket_error = null;
+  try {
+    const { data, error } = await supabase.storage.getBucket(DOC_BUCKET);
+    if (error) bucket_error = error.message;
+    else if (data) { bucket_exists = true; bucket_private = data.public === false; }
+  } catch (e) { bucket_error = e.message; }
+  let audit_table = false;
+  try {
+    const { error } = await supabase.from('document_audit').select('id', { head: true, count: 'exact' }).limit(1);
+    audit_table = !error;
+  } catch { audit_table = false; }
+
+  const storage_ready = env_present && bucket_exists && bucket_private;
+  // Production hard-requires the audit table (035). Dev/develop may run without it.
+  const audit_degraded = IS_PROD && !audit_table;
+  const value = {
+    env_present, bucket: DOC_BUCKET, bucket_exists, bucket_private, bucket_error,
+    audit_table, storage_ready,
+    degraded: !storage_ready || audit_degraded,
+    documents_enabled: storage_ready,
+    reasons: [
+      ...(env_present ? [] : ['env_missing']),
+      ...(bucket_exists ? [] : ['bucket_missing']),
+      ...(bucket_exists && !bucket_private ? ['bucket_public'] : []),
+      ...(audit_degraded ? ['audit_table_missing'] : []),
+    ],
+  };
+  _docHealth = { at: Date.now(), value };
+  return value;
+}
+// Gate for storage-dependent ops (upload, signed URL). Returns true if it sent a response.
+async function blockIfStorageNotReady(res) {
+  const h = await getDocumentsHealth();
+  if (!h.storage_ready) {
+    res.status(503).json({ error: 'documents_unavailable', reasons: h.reasons });
+    return true;
+  }
+  return false;
+}
 
 // Roles: upload = anyone who can create a request (NOT auditor); manage
 // (link/unlink/archive/edit) = confirmed-record roles; view-all = finance roles
@@ -7681,7 +7729,7 @@ async function logDocumentAudit(biz, { document_id, actor_user_id, action, targe
       actor_user_id: actor_user_id ?? null, channel, action,
       target_type, target_id: target_id != null ? String(target_id) : null, metadata,
     });
-  } catch { /* audit table may not exist yet — never block the operation */ }
+  } catch { _docHealth.at = 0; /* table may be absent — surface via health, never block the op */ }
 }
 
 // Resolve a financial_documents row scoped to the active business (+ file meta).
@@ -7705,6 +7753,17 @@ async function attachLinks(biz, docs) {
   }
   return docs.map(d => ({ ...d, links: byDoc.get(d.id) || [] }));
 }
+
+// GET /api/documents/health — storage + audit readiness (admin/status surface).
+// Reports degraded configuration; never auto-creates the bucket. In production
+// a missing audit table (035) is reported as degraded.
+app.get('/api/documents/health', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res); if (!biz) return;
+    const h = await getDocumentsHealth();
+    res.json({ ...h, environment: IS_PROD ? 'production' : (process.env.NODE_ENV || 'development') });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
 
 // GET /api/documents — business-scoped list with filters.
 app.get('/api/documents', auth, async (req, res) => {
@@ -7783,9 +7842,24 @@ app.post('/api/documents/upload-init', auth, async (req, res) => {
     const biz = await requireBusiness(req, res); if (!biz) return;
     if (!canUploadDocument(biz.role)) return res.status(403).json({ error: 'Your role cannot upload documents' });
     if (!await hasDocumentsAccess(biz)) return res.status(403).json({ error: 'Document Center is not enabled', upgrade_required: true });
-    const { file_name, mime_type, file_size, document_type } = req.body || {};
+    if (await blockIfStorageNotReady(res)) return;
+    const { file_name, mime_type, file_size, document_type, sha256 } = req.body || {};
     const v = docV.validateUpload({ file_name, mime_type, file_size, document_type });
     if (!v.ok) return res.status(400).json({ error: v.error });
+
+    // Stage 1 dedup: if the client's preliminary hash already matches a verified
+    // file in THIS business, skip the upload entirely. Never reveals other
+    // businesses (query is business-scoped). The hash is re-verified server-side
+    // in upload-complete, so a forged hash here only forgoes a shortcut.
+    if (docV.isValidSha256(sha256)) {
+      const { data: dup } = await supabase.from('document_files')
+        .select('id').eq('business_id', biz.business.id).eq('sha256_hash', sha256).limit(1);
+      if (dup?.length) {
+        const { data: ex } = await supabase.from('financial_documents')
+          .select('id').eq('business_id', biz.business.id).eq('file_id', dup[0].id).limit(1);
+        return res.status(409).json({ error: 'duplicate', duplicate: true, existing_document_id: ex?.[0]?.id || null });
+      }
+    }
 
     const documentId = crypto.randomUUID();
     const storagePath = docV.buildStoragePath(biz.business.id, documentId, file_name);
@@ -7803,32 +7877,53 @@ app.post('/api/documents/upload-complete', auth, async (req, res) => {
     const biz = await requireBusiness(req, res); if (!biz) return;
     if (!canUploadDocument(biz.role)) return res.status(403).json({ error: 'Your role cannot upload documents' });
     if (!await hasDocumentsAccess(biz)) return res.status(403).json({ error: 'Document Center is not enabled', upgrade_required: true });
+    if (await blockIfStorageNotReady(res)) return;
     const b = req.body || {};
     const v = docV.validateUpload(b);
     if (!v.ok) return res.status(400).json({ error: v.error });
-    if (!docV.isValidSha256(b.sha256)) return res.status(400).json({ error: 'invalid_hash' });
     if (!b.document_id) return res.status(400).json({ error: 'document_id required' });
     // The storage path must be the one we issued (business + doc scoped).
     const expectedPath = docV.buildStoragePath(biz.business.id, b.document_id, b.file_name);
     if (b.storage_path !== expectedPath) return res.status(400).json({ error: 'storage_path_mismatch' });
 
-    // Per-business dedup. Never reveal another business's documents.
-    const { data: dup } = await supabase.from('document_files')
-      .select('id').eq('business_id', biz.business.id).eq('sha256_hash', b.sha256).limit(1);
-    if (dup?.length) {
-      await supabase.storage.from(DOC_BUCKET).remove([expectedPath]).catch(() => {});
-      const { data: ex } = await supabase.from('financial_documents')
-        .select('id').eq('business_id', biz.business.id).eq('file_id', dup[0].id).limit(1);
-      return res.status(409).json({ error: 'duplicate', duplicate: true, existing_document_id: ex?.[0]?.id || null });
+    // ── Server-side verification: download the ACTUAL stored bytes and compute
+    //    the real SHA-256. The client hash is never trusted for storage. ───────
+    const { data: blob, error: dlErr } = await supabase.storage.from(DOC_BUCKET).download(expectedPath);
+    if (dlErr || !blob) return res.status(400).json({ error: 'upload_not_found' });
+    const buf = Buffer.from(await blob.arrayBuffer());
+    const removeOrphan = () => supabase.storage.from(DOC_BUCKET).remove([expectedPath]).catch(() => {});
+    if (buf.length === 0) { await removeOrphan(); return res.status(400).json({ error: 'empty_upload' }); }
+    if (buf.length > docV.MAX_FILE_BYTES) { await removeOrphan(); return res.status(413).json({ error: 'file_too_large' }); }
+    const verifiedHash = crypto.createHash('sha256').update(buf).digest('hex');
+    // If the client claimed a hash that doesn't match the real bytes → tamper.
+    if (docV.isValidSha256(b.sha256) && b.sha256.toLowerCase() !== verifiedHash) {
+      await removeOrphan();
+      return res.status(409).json({ error: 'hash_mismatch' });
     }
 
+    // ── Stage 2 dedup — transactional via UNIQUE(business_id, sha256_hash).
+    //    The DB index serialises concurrent uploads of the same file. ──────────
     const fileId = crypto.randomUUID();
     const { error: fErr } = await supabase.from('document_files').insert({
       id: fileId, business_id: biz.business.id, storage_path: expectedPath,
-      file_name: docV.safeFilename(b.file_name), mime_type: b.mime_type, file_size: b.file_size,
-      sha256_hash: b.sha256, upload_channel: 'web', uploaded_by_user_id: req.user.userId,
+      file_name: docV.safeFilename(b.file_name), mime_type: b.mime_type, file_size: buf.length,
+      sha256_hash: verifiedHash, upload_channel: 'web', uploaded_by_user_id: req.user.userId,
     });
-    if (fErr) return res.status(500).json({ error: 'file_insert_failed', detail: fErr.message });
+    if (fErr) {
+      await removeOrphan();
+      if (/duplicate|unique/i.test(fErr.message)) {
+        const { data: dupf } = await supabase.from('document_files')
+          .select('id').eq('business_id', biz.business.id).eq('sha256_hash', verifiedHash).limit(1);
+        let existing = null;
+        if (dupf?.length) {
+          const { data: ex } = await supabase.from('financial_documents')
+            .select('id').eq('business_id', biz.business.id).eq('file_id', dupf[0].id).limit(1);
+          existing = ex?.[0]?.id || null;
+        }
+        return res.status(409).json({ error: 'duplicate', duplicate: true, existing_document_id: existing });
+      }
+      return res.status(500).json({ error: 'file_insert_failed', detail: fErr.message });
+    }
 
     const notes = (b.description || '').toString().slice(0, 2000) || null;
     const { data: docRows, error: dErr } = await supabase.from('financial_documents').insert({
@@ -7868,6 +7963,7 @@ app.post('/api/documents/:id/signed-url', auth, async (req, res) => {
     const biz = await requireBusiness(req, res); if (!biz) return;
     if (!canViewBusinessFinance(biz.role)) return res.status(403).json({ error: 'Your role cannot view documents' });
     if (!await hasDocumentsAccess(biz)) return res.status(403).json({ error: 'Document Center is not enabled', upgrade_required: true });
+    if (await blockIfStorageNotReady(res)) return;
     const doc = await loadDocumentScoped(biz, req.params.id);
     if (!doc) return res.status(404).json({ error: 'Document not found' });
     if (!canViewAllDocuments(biz.role) && doc.created_by_user_id !== req.user.userId)

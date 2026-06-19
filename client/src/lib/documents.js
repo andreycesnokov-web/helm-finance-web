@@ -21,14 +21,16 @@ export async function uploadDocument(token, file, meta = {}, link = null) {
     file_name: file.name, mime_type: file.type || 'application/octet-stream',
     file_size: file.size, document_type: meta.document_type || null,
   }
-  const init = await apiFetch('/documents/upload-init', token, { method: 'POST', body: payload })
+  // Preliminary hash so the backend can short-circuit a same-business duplicate
+  // before we waste an upload. The backend re-verifies the hash server-side.
+  const sha256 = await sha256Hex(file)
+  const init = await apiFetch('/documents/upload-init', token, { method: 'POST', body: { ...payload, sha256 } })
   const putRes = await fetch(init.upload_url, {
     method: 'PUT',
     headers: { 'content-type': payload.mime_type, 'x-upsert': 'false' },
     body: file,
   })
   if (!putRes.ok) throw new Error('Upload to storage failed')
-  const sha256 = await sha256Hex(file)
   return apiFetch('/documents/upload-complete', token, {
     method: 'POST',
     body: {
