@@ -35,6 +35,7 @@ const samples = {
   pdf: { name: 'a.pdf', type: 'application/pdf', body: Buffer.from('%PDF-1.4 test\n%%EOF') },
   jpg: { name: 'a.jpg', type: 'image/jpeg', body: Buffer.from([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3]) },
   csv: { name: 'a.csv', type: 'text/csv', body: Buffer.from('a,b,c\n1,2,3\n') },
+  xlsx: { name: 'a.xlsx', type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', body: Buffer.from('PK test xlsx payload') },
 };
 
 (async () => {
@@ -52,7 +53,8 @@ const samples = {
     const { data: init, error: iErr } = await supabase.storage.from(BUCKET).createSignedUploadUrl(path);
     ok(`[${k}] signed upload init`, !iErr && !!init?.token);
     if (iErr) continue;
-    ok(`[${k}] app URL parity with SDK signedUrl`, `${URL}/storage/v1${init.signedUrl}`.split('?')[0] === rawPutUrl(path, init.token).split('?')[0]);
+    // The SDK returns an absolute signedUrl; the backend builds the same string.
+    ok(`[${k}] app URL parity with SDK signedUrl`, init.signedUrl.split('?')[0] === rawPutUrl(path, init.token).split('?')[0]);
 
     // 3. Real binary upload via the exact raw PUT the client uses.
     const put = await fetch(rawPutUrl(path, init.token), {
@@ -104,7 +106,7 @@ const samples = {
   const BIZ_A = process.env.DOC_TEST_BIZ_A, BIZ_B = process.env.DOC_TEST_BIZ_B;
   const DEBT_B = process.env.DOC_TEST_DEBT_B; // a debt id belonging to BIZ_B
   if (BIZ_A && BIZ_B) {
-    const sha = 'a'.repeat(64);
+    const sha = crypto.randomBytes(32).toString('hex'); // unique per run (idempotent re-runs)
     const fileA = crypto.randomUUID(), docA = crypto.randomUUID();
     const auditCount = async (id, action) => Number((await supabase.from('document_audit').select('*', { count: 'exact', head: true }).eq('document_id', id).eq('action', action)).count || 0);
 
@@ -144,10 +146,12 @@ const samples = {
     const { error: arch } = await supabase.rpc('rpc_document_archive', { p_document_id: docA, p_business_id: BIZ_A, p_actor: 1, p_channel: 'web' });
     ok('[db] archive wrote audit (RPC, no cash impact)', !arch && (await auditCount(docA, 'archived')) === 1);
 
-    // cleanup (audit is append-only and intentionally retained on staging)
-    await supabase.from('document_debt_links').delete().eq('document_id', docA).catch(() => {});
-    await supabase.from('financial_documents').delete().eq('id', docA).catch(() => {});
-    await supabase.from('document_files').delete().in('id', [fileA, fileB]).catch(() => {});
+    // cleanup (audit is append-only and intentionally retained)
+    try {
+      await supabase.from('document_debt_links').delete().eq('document_id', docA);
+      await supabase.from('financial_documents').delete().eq('id', docA);
+      await supabase.from('document_files').delete().in('id', [fileA, fileB]);
+    } catch { /* best-effort cleanup */ }
   } else {
     console.log('--  [db] scenarios 6,7,8,13,14,23,29,30 need DOC_TEST_BIZ_A & DOC_TEST_BIZ_B (seeded staging businesses) and migrations 035+036 applied. Scenario 31 is proven by tests/migrations/ci_036.js.');
   }
