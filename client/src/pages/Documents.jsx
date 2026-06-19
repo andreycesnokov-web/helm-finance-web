@@ -9,17 +9,17 @@ const L = {
     all: 'All', unlinked: 'Unlinked', linked: 'Linked', month: 'This month', archived: 'Archived',
     search: 'Search…', allTypes: 'All types', allStatus: 'Linked / unlinked', empty: 'No documents',
     type: 'Type', name: 'Title / file', date: 'Date', amount: 'Amount', links: 'Links', uploadedBy: 'Uploaded by', status: 'Status', actions: '',
-    view: 'View', download: 'Download', archive: 'Archive', file: 'File', title: 'Title', docDate: 'Document date', currency: 'Currency', desc: 'Description', linkTo: 'Link to', none: 'None', payable: 'Payable / Receivable (debt id)', transaction: 'Transaction id', save: 'Upload', cancel: 'Cancel', tooLarge: 'File is too large (max 20 MB)', dup: 'This file is already in your documents', linkFail: 'Uploaded, but linking failed — link it later', uploading: 'Uploading…', notEnabled: 'Document Center is not enabled on this plan' },
+    view: 'View', download: 'Download', archive: 'Archive', file: 'File', titleField: 'Title', docDate: 'Document date', currency: 'Currency', desc: 'Description', linkTo: 'Link to', none: 'None', payable: 'Payable / Receivable (debt id)', transaction: 'Transaction id', save: 'Upload', cancel: 'Cancel', tooLarge: 'File is too large (max 20 MB)', dup: 'This file is already in your documents', linkFail: 'Uploaded, but linking failed — link it later', uploading: 'Uploading…', notEnabled: 'Document Center is not enabled on this plan' },
   ru: { title: 'Документы', sub: 'Финансовые доказательства, счета, чеки и комплаенс-файлы.', upload: 'Загрузить документ',
     all: 'Все', unlinked: 'Непривязанные', linked: 'Привязанные', month: 'За месяц', archived: 'Архив',
     search: 'Поиск…', allTypes: 'Все типы', allStatus: 'Привязка', empty: 'Нет документов',
     type: 'Тип', name: 'Название / файл', date: 'Дата', amount: 'Сумма', links: 'Связи', uploadedBy: 'Загрузил', status: 'Статус', actions: '',
-    view: 'Просмотр', download: 'Скачать', archive: 'В архив', file: 'Файл', title: 'Название', docDate: 'Дата документа', currency: 'Валюта', desc: 'Описание', linkTo: 'Привязать к', none: 'Нет', payable: 'Payable / Receivable (debt id)', transaction: 'Transaction id', save: 'Загрузить', cancel: 'Отмена', tooLarge: 'Файл слишком большой (макс 20 МБ)', dup: 'Этот файл уже есть в документах', linkFail: 'Загружено, но привязать не удалось — привяжите позже', uploading: 'Загрузка…', notEnabled: 'Document Center недоступен на этом плане' },
+    view: 'Просмотр', download: 'Скачать', archive: 'В архив', file: 'Файл', titleField: 'Название', docDate: 'Дата документа', currency: 'Валюта', desc: 'Описание', linkTo: 'Привязать к', none: 'Нет', payable: 'Payable / Receivable (debt id)', transaction: 'Transaction id', save: 'Загрузить', cancel: 'Отмена', tooLarge: 'Файл слишком большой (макс 20 МБ)', dup: 'Этот файл уже есть в документах', linkFail: 'Загружено, но привязать не удалось — привяжите позже', uploading: 'Загрузка…', notEnabled: 'Document Center недоступен на этом плане' },
   id: { title: 'Dokumen', sub: 'Bukti keuangan, faktur, kuitansi, dan berkas kepatuhan.', upload: 'Unggah dokumen',
     all: 'Semua', unlinked: 'Belum tertaut', linked: 'Tertaut', month: 'Bulan ini', archived: 'Arsip',
     search: 'Cari…', allTypes: 'Semua tipe', allStatus: 'Tautan', empty: 'Tidak ada dokumen',
     type: 'Tipe', name: 'Judul / file', date: 'Tanggal', amount: 'Jumlah', links: 'Tautan', uploadedBy: 'Diunggah oleh', status: 'Status', actions: '',
-    view: 'Lihat', download: 'Unduh', archive: 'Arsip', file: 'File', title: 'Judul', docDate: 'Tanggal dokumen', currency: 'Mata uang', desc: 'Deskripsi', linkTo: 'Tautkan ke', none: 'Tidak ada', payable: 'Payable / Receivable (debt id)', transaction: 'Transaction id', save: 'Unggah', cancel: 'Batal', tooLarge: 'File terlalu besar (maks 20 MB)', dup: 'File ini sudah ada di dokumen Anda', linkFail: 'Terunggah, tapi gagal menautkan — tautkan nanti', uploading: 'Mengunggah…', notEnabled: 'Document Center tidak aktif di paket ini' },
+    view: 'Lihat', download: 'Unduh', archive: 'Arsip', file: 'File', titleField: 'Judul', docDate: 'Tanggal dokumen', currency: 'Mata uang', desc: 'Deskripsi', linkTo: 'Tautkan ke', none: 'Tidak ada', payable: 'Payable / Receivable (debt id)', transaction: 'Transaction id', save: 'Unggah', cancel: 'Batal', tooLarge: 'File terlalu besar (maks 20 MB)', dup: 'File ini sudah ada di dokumen Anda', linkFail: 'Terunggah, tapi gagal menautkan — tautkan nanti', uploading: 'Mengunggah…', notEnabled: 'Document Center tidak aktif di paket ini' },
 }
 const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'
 
@@ -131,7 +131,7 @@ function UploadModal({ token, l, onClose, onDone }) {
         <div style={{ fontSize: 17, fontWeight: 800, marginBottom: 12 }}>{l.upload}</div>
         <Field label={l.file}><input type="file" accept=".pdf,.jpg,.jpeg,.png,.csv,.xlsx" onChange={e => setFile(e.target.files?.[0] || null)} /></Field>
         <Field label={l.type}><select value={m.document_type} onChange={e => setM({ ...m, document_type: e.target.value })} style={inp}>{DOC_TYPES.map(t => <option key={t} value={t}>{t}</option>)}</select></Field>
-        <Field label={l.title}><input value={m.title} onChange={e => setM({ ...m, title: e.target.value })} style={inp} /></Field>
+        <Field label={l.titleField}><input value={m.title} onChange={e => setM({ ...m, title: e.target.value })} style={inp} /></Field>
         <Field label={l.docDate}><input type="date" value={m.document_date} onChange={e => setM({ ...m, document_date: e.target.value })} style={inp} /></Field>
         <div style={{ display: 'flex', gap: 8 }}>
           <Field label={l.amount}><input type="number" value={m.amount} onChange={e => setM({ ...m, amount: e.target.value })} style={inp} /></Field>

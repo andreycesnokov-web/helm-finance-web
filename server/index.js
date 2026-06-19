@@ -7638,10 +7638,6 @@ app.get('/api/payroll/by-transaction/:transactionId', auth, async (req, res) => 
 
 // ── END PAYROLL V1 ────────────────────────────────────────────────────────────
 
-app.get('*', (req, res) => {
-  res.sendFile('index.html', { root: 'client/dist' });
-});
-
 // ════════════════════════════════════════════════════════════════════════════
 // TAX DOCUMENTS RUNTIME V1 — secure document center & financial-record linking
 // Uses the migration-031 tables only. No cash impact: linking/archiving a
@@ -7797,7 +7793,7 @@ app.get('/api/documents/health', auth, async (req, res) => {
 app.get('/api/documents', auth, async (req, res) => {
   try {
     const biz = await requireBusiness(req, res); if (!biz) return;
-    if (!canViewBusinessFinance(biz.role)) return res.status(403).json({ error: 'Your role cannot view documents' });
+    if (!canViewBusinessFinance(biz.role) && !canUploadDocument(biz.role)) return res.status(403).json({ error: 'Your role cannot view documents' });
     if (!await hasDocumentsAccess(biz)) return res.status(403).json({ error: 'Document Center is not enabled on this plan', upgrade_required: true });
 
     const { type, date_from, date_to, counterparty, uploaded_by, search,
@@ -7858,7 +7854,7 @@ app.get('/api/documents', auth, async (req, res) => {
 app.get('/api/documents/:id', auth, async (req, res) => {
   try {
     const biz = await requireBusiness(req, res); if (!biz) return;
-    if (!canViewBusinessFinance(biz.role)) return res.status(403).json({ error: 'Your role cannot view documents' });
+    if (!canViewBusinessFinance(biz.role) && !canUploadDocument(biz.role)) return res.status(403).json({ error: 'Your role cannot view documents' });
     if (!await hasDocumentsAccess(biz)) return res.status(403).json({ error: 'Document Center is not enabled', upgrade_required: true });
     const doc = await loadDocumentScoped(biz, req.params.id);
     if (!doc) return res.status(404).json({ error: 'Document not found' });
@@ -7989,7 +7985,7 @@ app.post('/api/documents/upload-complete', auth, async (req, res) => {
 app.post('/api/documents/:id/signed-url', auth, async (req, res) => {
   try {
     const biz = await requireBusiness(req, res); if (!biz) return;
-    if (!canViewBusinessFinance(biz.role)) return res.status(403).json({ error: 'Your role cannot view documents' });
+    if (!canViewBusinessFinance(biz.role) && !canUploadDocument(biz.role)) return res.status(403).json({ error: 'Your role cannot view documents' });
     if (!await hasDocumentsAccess(biz)) return res.status(403).json({ error: 'Document Center is not enabled', upgrade_required: true });
     if (await blockIfStorageNotReady(res)) return;
     const doc = await loadDocumentScoped(biz, req.params.id);
@@ -8106,6 +8102,11 @@ app.delete('/api/documents/:id/links/:linkId', auth, async (req, res) => {
     }
     res.json({ ok: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// SPA catch-all — MUST be the last route so it never shadows API endpoints.
+app.get('*', (req, res) => {
+  res.sendFile('index.html', { root: 'client/dist' });
 });
 
 const PORT = process.env.PORT || 3001;
