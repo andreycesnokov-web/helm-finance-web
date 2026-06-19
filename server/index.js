@@ -7,6 +7,7 @@ const { calculateDueDate, ymd } = require('./lib/dueDate');
 const { computeActivationBlockers, isEffectiveApprovedReview, validReviewTransition } = require('./lib/taxGate');
 const { VALID_PLANS, computeBusinessAccess } = require('./lib/businessAccess');
 const docV = require('./lib/documentValidation');
+const docA = require('./lib/documentAccess');
 require('dotenv').config();
 
 // --- Environment validation (fail fast, never log secret values) -----------
@@ -7732,6 +7733,21 @@ async function logDocumentAudit(biz, { document_id, actor_user_id, action, targe
   } catch { _docHealth.at = 0; /* table may be absent — surface via health, never block the op */ }
 }
 
+// Debt ids the actor created — for restricted (manager/employee) visibility of
+// documents linked to their own submitted records.
+async function ownedDebtIds(biz, userId) {
+  const { data } = await supabase.from('debts').select('id')
+    .eq('business_id', biz.business.id).eq('created_by_user_id', userId);
+  return (data || []).map(d => d.id);
+}
+// Per-document access for restricted roles (own upload OR linked to own debt).
+async function userCanAccessDoc(biz, userId, role, docWithLinks) {
+  if (docA.canViewAllDocuments(role)) return true;
+  if (docWithLinks.created_by_user_id === userId) return true;
+  const owned = await ownedDebtIds(biz, userId);
+  return docA.canAccessDocument({ role, userId, doc: docWithLinks, ownedDebtIds: owned });
+}
+
 // Resolve a financial_documents row scoped to the active business (+ file meta).
 async function loadDocumentScoped(biz, documentId) {
   const { data } = await supabase.from('financial_documents')
@@ -7761,6 +7777,9 @@ app.get('/api/documents/health', auth, async (req, res) => {
   try {
     const biz = await requireBusiness(req, res); if (!biz) return;
     const h = await getDocumentsHealth();
+    // Ordinary users get only availability. Bucket/env/audit internals are
+    // visible to Platform Admin only.
+    if (!isAdminUser(req.user.userId)) return res.json({ available: h.documents_enabled, degraded: h.degraded });
     res.json({ ...h, environment: IS_PROD ? 'production' : (process.env.NODE_ENV || 'development') });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -7789,8 +7808,9 @@ app.get('/api/documents', auth, async (req, res) => {
     let q = supabase.from('financial_documents').select('*').eq('business_id', biz.business.id);
     if (status === 'archived') q = q.not('archived_at', 'is', null);
     else q = q.is('archived_at', null);
-    // Manager/employee see only their own uploads.
-    if (!canViewAllDocuments(biz.role)) q = q.eq('created_by_user_id', req.user.userId);
+    // Manager/employee are restricted — filtered in JS after links resolve
+    // (own uploads OR linked to a debt they created). No SQL created_by filter
+    // here so linked-to-own-debt docs are not excluded prematurely.
     if (type) q = q.eq('document_type', type);
     if (counterparty) q = q.eq('issuer_counterparty_id', counterparty);
     if (uploaded_by) q = q.eq('created_by_user_id', uploaded_by);
@@ -7814,6 +7834,11 @@ app.get('/api/documents', auth, async (req, res) => {
     }
     let out = docs.map(d => ({ ...d, file: fileMap.get(d.file_id) || null }));
     out = await attachLinks(biz, out);
+    // Restricted roles: keep only own uploads + docs linked to their own debts.
+    if (!canViewAllDocuments(biz.role)) {
+      const owned = await ownedDebtIds(biz, req.user.userId);
+      out = out.filter(d => docA.canAccessDocument({ role: biz.role, userId: req.user.userId, doc: d, ownedDebtIds: owned }));
+    }
     if (linked_status === 'linked') out = out.filter(d => d.links.length > 0);
     if (linked_status === 'unlinked') out = out.filter(d => d.links.length === 0);
     res.json({ documents: out });
@@ -7828,10 +7853,10 @@ app.get('/api/documents/:id', auth, async (req, res) => {
     if (!await hasDocumentsAccess(biz)) return res.status(403).json({ error: 'Document Center is not enabled', upgrade_required: true });
     const doc = await loadDocumentScoped(biz, req.params.id);
     if (!doc) return res.status(404).json({ error: 'Document not found' });
-    if (!canViewAllDocuments(biz.role) && doc.created_by_user_id !== req.user.userId)
+    const [withLinks] = await attachLinks(biz, [doc]);
+    if (!await userCanAccessDoc(biz, req.user.userId, biz.role, withLinks))
       return res.status(403).json({ error: 'You do not have access to this document' });
     const { data: fileRows } = await supabase.from('document_files').select('*').eq('id', doc.file_id).limit(1);
-    const [withLinks] = await attachLinks(biz, [doc]);
     res.json({ document: withLinks, file: fileRows?.[0] || null });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -7966,7 +7991,8 @@ app.post('/api/documents/:id/signed-url', auth, async (req, res) => {
     if (await blockIfStorageNotReady(res)) return;
     const doc = await loadDocumentScoped(biz, req.params.id);
     if (!doc) return res.status(404).json({ error: 'Document not found' });
-    if (!canViewAllDocuments(biz.role) && doc.created_by_user_id !== req.user.userId)
+    const [docWithLinks] = await attachLinks(biz, [doc]);
+    if (!await userCanAccessDoc(biz, req.user.userId, biz.role, docWithLinks))
       return res.status(403).json({ error: 'You do not have access to this document' });
     const { data: fileRows } = await supabase.from('document_files').select('storage_path, file_name').eq('id', doc.file_id).limit(1);
     if (!fileRows?.length) return res.status(404).json({ error: 'File not found' });

@@ -99,6 +99,41 @@ const samples = {
   const pA = docV.buildStoragePath('A', 'd1', 'f.pdf'), pB = docV.buildStoragePath('B', 'd1', 'f.pdf');
   ok('cross-business paths are isolated', pA !== pB && pA.includes('/A/') && pB.includes('/B/'));
 
+  // ── Optional DB-coupled scenarios (6,7,13,14,18,19,20). Requires staging DB
+  //    with migrations 031(+035) applied and two seeded business ids. ──────────
+  const BIZ_A = process.env.DOC_TEST_BIZ_A, BIZ_B = process.env.DOC_TEST_BIZ_B;
+  const DEBT_B = process.env.DOC_TEST_DEBT_B; // a debt id belonging to BIZ_B
+  if (BIZ_A && BIZ_B) {
+    const sha = 'a'.repeat(64);
+    const fileA = crypto.randomUUID(), docA = crypto.randomUUID();
+    // 6 + 7: document_files + financial_documents created.
+    const { error: f1 } = await supabase.from('document_files').insert({ id: fileA, business_id: BIZ_A, storage_path: `businesses/${BIZ_A}/documents/${docA}/x.pdf`, file_name: 'x.pdf', mime_type: 'application/pdf', file_size: 10, sha256_hash: sha, upload_channel: 'web' });
+    ok('[db] document_files created', !f1);
+    const { error: d1 } = await supabase.from('financial_documents').insert({ id: docA, business_id: BIZ_A, file_id: fileA, document_type: 'other' });
+    ok('[db] financial_documents created', !d1);
+    // 13: duplicate same business + same hash → unique violation.
+    const { error: dup } = await supabase.from('document_files').insert({ id: crypto.randomUUID(), business_id: BIZ_A, storage_path: 'p2', file_name: 'y.pdf', mime_type: 'application/pdf', file_size: 10, sha256_hash: sha, upload_channel: 'web' });
+    ok('[db] duplicate same-business rejected (unique index)', !!dup);
+    // 14: same hash in another business → allowed (no cross-business leak/coupling).
+    const fileB = crypto.randomUUID();
+    const { error: other } = await supabase.from('document_files').insert({ id: fileB, business_id: BIZ_B, storage_path: 'pB', file_name: 'z.pdf', mime_type: 'application/pdf', file_size: 10, sha256_hash: sha, upload_channel: 'web' });
+    ok('[db] same hash in other business is independent (no leak)', !other);
+    // 18/19: cross-business link rejected by the 031 isolation trigger.
+    if (DEBT_B) {
+      const { error: xb } = await supabase.from('document_debt_links').insert({ business_id: BIZ_A, document_id: docA, debt_id: Number(DEBT_B) });
+      ok('[db] cross-business link rejected (isolation trigger)', !!xb);
+    } else { console.log('--  [db] cross-business link: set DOC_TEST_DEBT_B (a debt in BIZ_B) to test'); }
+    // 20: archive (soft) succeeds — evidence stays, no ledger touched.
+    const { error: arch } = await supabase.from('financial_documents').update({ archived_at: new Date().toISOString() }).eq('id', docA).eq('business_id', BIZ_A);
+    ok('[db] archive (soft) without cash impact', !arch);
+    // cleanup db rows + objects
+    await supabase.from('document_debt_links').delete().eq('document_id', docA).catch(() => {});
+    await supabase.from('financial_documents').delete().eq('id', docA).catch(() => {});
+    await supabase.from('document_files').delete().in('id', [fileA, fileB]).catch(() => {});
+  } else {
+    console.log('--  [db] scenarios 6,7,13,14,18,19,20 need DOC_TEST_BIZ_A & DOC_TEST_BIZ_B (seeded staging businesses). Also proven independently by tests/migrations/ci.js on PGlite.');
+  }
+
   // Cleanup
   if (created.length) await supabase.storage.from(BUCKET).remove(created).catch(() => {});
 
