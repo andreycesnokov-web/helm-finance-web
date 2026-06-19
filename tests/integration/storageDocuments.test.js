@@ -106,32 +106,50 @@ const samples = {
   if (BIZ_A && BIZ_B) {
     const sha = 'a'.repeat(64);
     const fileA = crypto.randomUUID(), docA = crypto.randomUUID();
-    // 6 + 7: document_files + financial_documents created.
-    const { error: f1 } = await supabase.from('document_files').insert({ id: fileA, business_id: BIZ_A, storage_path: `businesses/${BIZ_A}/documents/${docA}/x.pdf`, file_name: 'x.pdf', mime_type: 'application/pdf', file_size: 10, sha256_hash: sha, upload_channel: 'web' });
-    ok('[db] document_files created', !f1);
-    const { error: d1 } = await supabase.from('financial_documents').insert({ id: docA, business_id: BIZ_A, file_id: fileA, document_type: 'other' });
-    ok('[db] financial_documents created', !d1);
+    const auditCount = async (id, action) => Number((await supabase.from('document_audit').select('*', { count: 'exact', head: true }).eq('document_id', id).eq('action', action)).count || 0);
+
+    // 6 + 7 + 8: finalize RPC creates document_files + financial_documents + audit atomically.
+    const { data: fin, error: finErr } = await supabase.rpc('rpc_document_finalize_upload', {
+      p_file: { id: fileA, business_id: BIZ_A, storage_path: `businesses/${BIZ_A}/documents/${docA}/x.pdf`, file_name: 'x.pdf', mime_type: 'application/pdf', file_size: 10, sha256_hash: sha, upload_channel: 'web' },
+      p_doc: { id: docA, business_id: BIZ_A, document_type: 'other', currency: 'IDR' }, p_actor: 1, p_channel: 'web',
+    });
+    ok('[db] finalize created financial_documents (RPC)', !finErr && fin && fin.id === docA);
+    ok('[db] finalize created document_files', !!(await supabase.from('document_files').select('id').eq('id', fileA)).data?.length);
+    ok('[db] finalize wrote uploaded audit atomically', (await auditCount(docA, 'uploaded')) === 1);
+
     // 13: duplicate same business + same hash → unique violation.
     const { error: dup } = await supabase.from('document_files').insert({ id: crypto.randomUUID(), business_id: BIZ_A, storage_path: 'p2', file_name: 'y.pdf', mime_type: 'application/pdf', file_size: 10, sha256_hash: sha, upload_channel: 'web' });
     ok('[db] duplicate same-business rejected (unique index)', !!dup);
-    // 14: same hash in another business → allowed (no cross-business leak/coupling).
+    // 14: same hash in another business → allowed (no cross-business leak).
     const fileB = crypto.randomUUID();
     const { error: other } = await supabase.from('document_files').insert({ id: fileB, business_id: BIZ_B, storage_path: 'pB', file_name: 'z.pdf', mime_type: 'application/pdf', file_size: 10, sha256_hash: sha, upload_channel: 'web' });
     ok('[db] same hash in other business is independent (no leak)', !other);
-    // 18/19: cross-business link rejected by the 031 isolation trigger.
+
+    // 23: cross-business link rejected inside rpc_document_link.
     if (DEBT_B) {
-      const { error: xb } = await supabase.from('document_debt_links').insert({ business_id: BIZ_A, document_id: docA, debt_id: Number(DEBT_B) });
-      ok('[db] cross-business link rejected (isolation trigger)', !!xb);
-    } else { console.log('--  [db] cross-business link: set DOC_TEST_DEBT_B (a debt in BIZ_B) to test'); }
-    // 20: archive (soft) succeeds — evidence stays, no ledger touched.
-    const { error: arch } = await supabase.from('financial_documents').update({ archived_at: new Date().toISOString() }).eq('id', docA).eq('business_id', BIZ_A);
-    ok('[db] archive (soft) without cash impact', !arch);
-    // cleanup db rows + objects
+      const { error: xb } = await supabase.rpc('rpc_document_link', { p_document_id: docA, p_business_id: BIZ_A, p_target_type: 'debt', p_target_id: String(DEBT_B), p_actor: 1, p_channel: 'web' });
+      ok('[db] cross-business link rejected (RPC + 031 trigger)', !!xb);
+    } else { console.log('--  [db] cross-business link: set DOC_TEST_DEBT_B (a debt in BIZ_B) to test scenario 23'); }
+
+    // 30: link + unlink each write audit (use a debt in A if provided).
+    if (process.env.DOC_TEST_DEBT_A) {
+      const { data: linkId, error: lErr } = await supabase.rpc('rpc_document_link', { p_document_id: docA, p_business_id: BIZ_A, p_target_type: 'debt', p_target_id: String(process.env.DOC_TEST_DEBT_A), p_actor: 1, p_channel: 'web' });
+      ok('[db] link wrote audit (RPC)', !lErr && (await auditCount(docA, 'linked')) === 1);
+      const { error: uErr } = await supabase.rpc('rpc_document_unlink', { p_link_id: linkId, p_document_id: docA, p_business_id: BIZ_A, p_actor: 1, p_channel: 'web' });
+      ok('[db] unlink wrote audit (RPC)', !uErr && (await auditCount(docA, 'unlinked')) === 1);
+    } else { console.log('--  [db] link/unlink audit: set DOC_TEST_DEBT_A (a debt in BIZ_A) to test scenario 30'); }
+
+    // 29: archive RPC writes audit atomically. 31 (forced audit failure rollback)
+    //     is proven in tests/migrations/ci_036.js (isolated PGlite).
+    const { error: arch } = await supabase.rpc('rpc_document_archive', { p_document_id: docA, p_business_id: BIZ_A, p_actor: 1, p_channel: 'web' });
+    ok('[db] archive wrote audit (RPC, no cash impact)', !arch && (await auditCount(docA, 'archived')) === 1);
+
+    // cleanup (audit is append-only and intentionally retained on staging)
     await supabase.from('document_debt_links').delete().eq('document_id', docA).catch(() => {});
     await supabase.from('financial_documents').delete().eq('id', docA).catch(() => {});
     await supabase.from('document_files').delete().in('id', [fileA, fileB]).catch(() => {});
   } else {
-    console.log('--  [db] scenarios 6,7,13,14,18,19,20 need DOC_TEST_BIZ_A & DOC_TEST_BIZ_B (seeded staging businesses). Also proven independently by tests/migrations/ci.js on PGlite.');
+    console.log('--  [db] scenarios 6,7,8,13,14,23,29,30 need DOC_TEST_BIZ_A & DOC_TEST_BIZ_B (seeded staging businesses) and migrations 035+036 applied. Scenario 31 is proven by tests/migrations/ci_036.js.');
   }
 
   // Cleanup

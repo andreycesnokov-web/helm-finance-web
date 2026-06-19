@@ -27,9 +27,8 @@ for (const re of FORBIDDEN) ok('no ledger mutation: ' + re.source.slice(0, 38), 
 // The block reads the ledger only to verify business ownership for links.
 ok('reads debts only via .select (ownership check)', !/from\('debts'\)\s*\.(insert|update|delete)/.test(block));
 
-// Archive is a soft-delete (sets archived_at), never a hard DELETE of evidence.
-ok('archive sets archived_at', /archived_at:\s*new Date/.test(block));
-ok('no hard delete of financial_documents via endpoint', !/from\('financial_documents'\)\s*\.delete\(\)/.test(block) || /document_insert_failed/.test(block));
+// Archive is a soft-delete via the RPC (sets archived_at), never a hard DELETE.
+ok('no hard delete of financial_documents via endpoint', !/from\('financial_documents'\)\s*\.delete\(\)/.test(block));
 
 // Hardening: server-side hash verification (download + compute), storage gate,
 // and the stored hash is the VERIFIED one (never the client-claimed value).
@@ -39,6 +38,16 @@ ok('stores verified hash, not client hash', /sha256_hash:\s*verifiedHash/.test(b
 ok('rejects client/server hash mismatch', /hash_mismatch/.test(block));
 ok('storage readiness gate on upload/signed-url', (block.match(/blockIfStorageNotReady\(res\)/g) || []).length >= 3);
 ok('health endpoint reports degraded config', /getDocumentsHealth/.test(block) && /audit_table_missing/.test(block));
+
+// Atomic audit: critical mutations go through 036 RPCs; best-effort audit is
+// used ONLY for signed-url (read-only event).
+ok('upload uses finalize RPC', /supabase\.rpc\('rpc_document_finalize_upload'/.test(block));
+ok('archive uses RPC', /supabase\.rpc\('rpc_document_archive'/.test(block));
+ok('metadata uses RPC', /supabase\.rpc\('rpc_document_update_metadata'/.test(block));
+ok('link uses RPC', /supabase\.rpc\('rpc_document_link'/.test(block));
+ok('unlink uses RPC', /supabase\.rpc\('rpc_document_unlink'/.test(block));
+ok('best-effort audit only for signed_url', (block.match(/await logDocumentAudit\(/g) || []).length === 1 && /signed_url_issued/.test(block));
+ok('health reports rpc_functions readiness', /rpc_functions/.test(block) && /rpc_functions_missing/.test(block));
 
 console.log(`\n${fail === 0 ? 'ALL PASS' : 'FAIL'} — ${pass} passed, ${fail} failed`);
 process.exit(fail === 0 ? 0 : 1);

@@ -7669,20 +7669,29 @@ async function getDocumentsHealth() {
     const { error } = await supabase.from('document_audit').select('id', { head: true, count: 'exact' }).limit(1);
     audit_table = !error;
   } catch { audit_table = false; }
+  // Critical mutations require the 036 RPCs. Probe one with bogus args: a
+  // "function does not exist" error means missing; any other error means present.
+  let rpc_functions = false;
+  try {
+    const { error } = await supabase.rpc('rpc_document_archive',
+      { p_document_id: '00000000-0000-0000-0000-000000000000', p_business_id: '00000000-0000-0000-0000-000000000000', p_actor: 0, p_channel: 'probe' });
+    rpc_functions = !(error && /does not exist|could not find|schema cache/i.test(error.message));
+  } catch { rpc_functions = false; }
 
   const storage_ready = env_present && bucket_exists && bucket_private;
-  // Production hard-requires the audit table (035). Dev/develop may run without it.
-  const audit_degraded = IS_PROD && !audit_table;
+  // Production hard-requires the audit table (035) and the RPCs (036).
+  const audit_degraded = IS_PROD && (!audit_table || !rpc_functions);
   const value = {
     env_present, bucket: DOC_BUCKET, bucket_exists, bucket_private, bucket_error,
-    audit_table, storage_ready,
+    audit_table, rpc_functions, storage_ready,
     degraded: !storage_ready || audit_degraded,
     documents_enabled: storage_ready,
     reasons: [
       ...(env_present ? [] : ['env_missing']),
       ...(bucket_exists ? [] : ['bucket_missing']),
       ...(bucket_exists && !bucket_private ? ['bucket_public'] : []),
-      ...(audit_degraded ? ['audit_table_missing'] : []),
+      ...(IS_PROD && !audit_table ? ['audit_table_missing'] : []),
+      ...(IS_PROD && !rpc_functions ? ['rpc_functions_missing'] : []),
     ],
   };
   _docHealth = { at: Date.now(), value };
@@ -7926,17 +7935,33 @@ app.post('/api/documents/upload-complete', auth, async (req, res) => {
       return res.status(409).json({ error: 'hash_mismatch' });
     }
 
-    // ── Stage 2 dedup — transactional via UNIQUE(business_id, sha256_hash).
-    //    The DB index serialises concurrent uploads of the same file. ──────────
+    // ── Stage 2 dedup + atomic create. rpc_document_finalize_upload inserts
+    //    document_files + financial_documents + the 'uploaded' audit row in ONE
+    //    transaction (migration 036). The UNIQUE(business_id, sha256_hash) index
+    //    serialises concurrent duplicates; on conflict the RPC aborts. ─────────
     const fileId = crypto.randomUUID();
-    const { error: fErr } = await supabase.from('document_files').insert({
+    const notes = (b.description || '').toString().slice(0, 2000) || null;
+    const pFile = {
       id: fileId, business_id: biz.business.id, storage_path: expectedPath,
       file_name: docV.safeFilename(b.file_name), mime_type: b.mime_type, file_size: buf.length,
-      sha256_hash: verifiedHash, upload_channel: 'web', uploaded_by_user_id: req.user.userId,
-    });
-    if (fErr) {
+      sha256_hash: verifiedHash, upload_channel: 'web',
+    };
+    const pDoc = {
+      id: b.document_id, business_id: biz.business.id,
+      document_type: b.document_type || 'other',
+      document_number: b.title ? String(b.title).slice(0, 200) : (b.document_number || null),
+      document_date: b.document_date || null,
+      period_start: b.period_start || null, period_end: b.period_end || null,
+      issuer_counterparty_id: b.counterparty_id || null,
+      currency: b.currency || 'IDR',
+      gross_amount: (b.amount != null && isFinite(Number(b.amount))) ? Number(b.amount) : null,
+      extracted_json: notes ? { notes } : null,
+    };
+    const { data: doc, error: rpcErr } = await supabase.rpc('rpc_document_finalize_upload',
+      { p_file: pFile, p_doc: pDoc, p_actor: req.user.userId, p_channel: 'web' });
+    if (rpcErr) {
       await removeOrphan();
-      if (/duplicate|unique/i.test(fErr.message)) {
+      if (/duplicate|unique/i.test(rpcErr.message)) {
         const { data: dupf } = await supabase.from('document_files')
           .select('id').eq('business_id', biz.business.id).eq('sha256_hash', verifiedHash).limit(1);
         let existing = null;
@@ -7947,30 +7972,8 @@ app.post('/api/documents/upload-complete', auth, async (req, res) => {
         }
         return res.status(409).json({ error: 'duplicate', duplicate: true, existing_document_id: existing });
       }
-      return res.status(500).json({ error: 'file_insert_failed', detail: fErr.message });
+      return res.status(500).json({ error: 'document_finalize_failed', detail: rpcErr.message });
     }
-
-    const notes = (b.description || '').toString().slice(0, 2000) || null;
-    const { data: docRows, error: dErr } = await supabase.from('financial_documents').insert({
-      id: b.document_id, business_id: biz.business.id, file_id: fileId,
-      document_type: b.document_type || 'other',
-      document_number: b.title ? String(b.title).slice(0, 200) : (b.document_number || null),
-      document_date: b.document_date || null,
-      period_start: b.period_start || null, period_end: b.period_end || null,
-      issuer_counterparty_id: b.counterparty_id || null,
-      currency: b.currency || 'IDR',
-      gross_amount: (b.amount != null && isFinite(Number(b.amount))) ? Number(b.amount) : null,
-      extraction_status: 'manual', review_status: 'needs_review',
-      extracted_json: notes ? { notes } : null,
-      created_by_user_id: req.user.userId,
-    }).select('*');
-    if (dErr) {
-      await supabase.from('document_files').delete().eq('id', fileId).catch(() => {});
-      await supabase.storage.from(DOC_BUCKET).remove([expectedPath]).catch(() => {});
-      return res.status(500).json({ error: 'document_insert_failed', detail: dErr.message });
-    }
-    const doc = docRows[0];
-    await logDocumentAudit(biz, { document_id: doc.id, actor_user_id: req.user.userId, action: 'uploaded' });
 
     // Optional link — best-effort; never lose the upload if linking fails.
     let link_result = null;
@@ -8015,21 +8018,24 @@ app.patch('/api/documents/:id', auth, async (req, res) => {
     const b = req.body || {};
     if (b.document_type != null && !docV.DOCUMENT_TYPES.includes(b.document_type))
       return res.status(400).json({ error: 'invalid_document_type' });
-    const patch = { updated_at: new Date().toISOString() };
+    // Build the safe patch (whitelist only); the RPC writes it + audit atomically.
+    const patch = {};
     if (b.document_type != null) patch.document_type = b.document_type;
     if (b.title != null) patch.document_number = String(b.title).slice(0, 200);
-    if (b.document_date !== undefined) patch.document_date = b.document_date || null;
-    if (b.period_start !== undefined) patch.period_start = b.period_start || null;
-    if (b.period_end !== undefined) patch.period_end = b.period_end || null;
+    if (b.document_date !== undefined && b.document_date) patch.document_date = b.document_date;
+    if (b.period_start !== undefined && b.period_start) patch.period_start = b.period_start;
+    if (b.period_end !== undefined && b.period_end) patch.period_end = b.period_end;
     if (b.currency != null) patch.currency = b.currency;
-    if (b.amount !== undefined) patch.gross_amount = (b.amount != null && isFinite(Number(b.amount))) ? Number(b.amount) : null;
-    if (b.counterparty_id !== undefined) patch.issuer_counterparty_id = b.counterparty_id || null;
-    if (b.description !== undefined) patch.extracted_json = b.description ? { ...(doc.extracted_json || {}), notes: String(b.description).slice(0, 2000) } : (doc.extracted_json || null);
-    const { data, error } = await supabase.from('financial_documents')
-      .update(patch).eq('id', doc.id).eq('business_id', biz.business.id).select('*');
-    if (error) return res.status(500).json({ error: error.message });
-    await logDocumentAudit(biz, { document_id: doc.id, actor_user_id: req.user.userId, action: 'metadata_changed' });
-    res.json({ document: data[0] });
+    if (b.amount !== undefined && b.amount != null && isFinite(Number(b.amount))) patch.gross_amount = Number(b.amount);
+    if (b.counterparty_id) patch.issuer_counterparty_id = b.counterparty_id;
+    if (b.description !== undefined) patch.extracted_json = { ...(doc.extracted_json || {}), notes: b.description ? String(b.description).slice(0, 2000) : null };
+    const { data, error } = await supabase.rpc('rpc_document_update_metadata',
+      { p_document_id: doc.id, p_business_id: biz.business.id, p_actor: req.user.userId, p_patch: patch, p_channel: 'web' });
+    if (error) {
+      if (/archived/i.test(error.message)) return res.status(409).json({ error: 'document_archived' });
+      return res.status(500).json({ error: error.message });
+    }
+    res.json({ document: data });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -8041,33 +8047,28 @@ app.post('/api/documents/:id/archive', auth, async (req, res) => {
     if (!await hasDocumentsAccess(biz)) return res.status(403).json({ error: 'Document Center is not enabled', upgrade_required: true });
     const doc = await loadDocumentScoped(biz, req.params.id);
     if (!doc) return res.status(404).json({ error: 'Document not found' });
-    const { data, error } = await supabase.from('financial_documents')
-      .update({ archived_at: new Date().toISOString(), updated_at: new Date().toISOString() })
-      .eq('id', doc.id).eq('business_id', biz.business.id).select('id, archived_at');
+    const { data, error } = await supabase.rpc('rpc_document_archive',
+      { p_document_id: doc.id, p_business_id: biz.business.id, p_actor: req.user.userId, p_channel: 'web' });
     if (error) return res.status(500).json({ error: error.message });
-    await logDocumentAudit(biz, { document_id: doc.id, actor_user_id: req.user.userId, action: 'archived' });
-    res.json({ ok: true, document: data[0] });
+    res.json({ ok: true, document: { id: data.id, archived_at: data.archived_at } });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// Shared link helper — enforces the 3-way business-isolation rule, then inserts.
+// Shared link helper — rpc_document_link validates same-business (document AND
+// target) and writes the link + audit atomically (migration 036).
 async function linkDocument(biz, doc, targetType, targetId, actorUserId) {
-  const def = docV.LINK_TARGETS[targetType];
-  if (!def) return { ok: false, error: 'invalid_target_type', status: 400 };
-  const { data: targetRows } = await supabase.from(def.ledger)
-    .select('id, business_id').eq('id', targetId).limit(1);
-  const targetBusinessId = targetRows?.[0]?.business_id;
-  if (!targetRows?.length) return { ok: false, error: 'target_not_found', status: 404 };
-  if (!docV.sameBusinessLink(biz.business.id, doc.business_id, targetBusinessId))
-    return { ok: false, error: 'cross_business_link_forbidden', status: 403 };
-  const row = { business_id: biz.business.id, document_id: doc.id, [def.column]: targetId, created_by_user_id: actorUserId };
-  const { data, error } = await supabase.from(def.table).insert(row).select('id');
+  if (!docV.LINK_TARGETS[targetType]) return { ok: false, error: 'invalid_target_type', status: 400 };
+  const { data, error } = await supabase.rpc('rpc_document_link', {
+    p_document_id: doc.id, p_business_id: biz.business.id,
+    p_target_type: targetType, p_target_id: String(targetId), p_actor: actorUserId, p_channel: 'web',
+  });
   if (error) {
+    if (/cross-business/i.test(error.message)) return { ok: false, error: 'cross_business_link_forbidden', status: 403 };
     if (/duplicate|unique/i.test(error.message)) return { ok: false, error: 'already_linked', status: 409 };
+    if (/invalid input syntax|not found/i.test(error.message)) return { ok: false, error: 'target_not_found', status: 404 };
     return { ok: false, error: error.message, status: 500 };
   }
-  await logDocumentAudit(biz, { document_id: doc.id, actor_user_id: actorUserId, action: 'linked', target_type: targetType, target_id: targetId });
-  return { ok: true, link_id: data[0].id };
+  return { ok: true, link_id: data };
 }
 
 // POST /api/documents/:id/links — link to debt / transaction / compliance.
@@ -8094,14 +8095,15 @@ app.delete('/api/documents/:id/links/:linkId', auth, async (req, res) => {
     if (!await hasDocumentsAccess(biz)) return res.status(403).json({ error: 'Document Center is not enabled', upgrade_required: true });
     const doc = await loadDocumentScoped(biz, req.params.id);
     if (!doc) return res.status(404).json({ error: 'Document not found' });
-    let removed = null, targetType = null;
-    for (const [type, def] of Object.entries(docV.LINK_TARGETS)) {
-      const { data } = await supabase.from(def.table).delete()
-        .eq('id', req.params.linkId).eq('business_id', biz.business.id).eq('document_id', doc.id).select('id');
-      if (data?.length) { removed = data[0].id; targetType = type; break; }
+    // rpc_document_unlink deletes the link + writes audit atomically.
+    const { error } = await supabase.rpc('rpc_document_unlink', {
+      p_link_id: req.params.linkId, p_document_id: doc.id, p_business_id: biz.business.id,
+      p_actor: req.user.userId, p_channel: 'web',
+    });
+    if (error) {
+      if (/not found/i.test(error.message)) return res.status(404).json({ error: 'Link not found' });
+      return res.status(500).json({ error: error.message });
     }
-    if (!removed) return res.status(404).json({ error: 'Link not found' });
-    await logDocumentAudit(biz, { document_id: doc.id, actor_user_id: req.user.userId, action: 'unlinked', target_type: targetType });
     res.json({ ok: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
