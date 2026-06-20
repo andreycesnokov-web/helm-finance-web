@@ -8,3 +8,8 @@ supabase/.local-base.sql
 supabase/.temp/
 supabase/.branches/
 *.local-snapshot.sql
+
+client/.env
+client/.env.local
+client/.env.*.local
+.env.local

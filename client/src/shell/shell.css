@@ -13,8 +13,13 @@
 
 .cfo-sidebar{background:var(--surface-card);border-right:1px solid var(--border-default);
   padding:20px 16px;display:flex;flex-direction:column;gap:16px;position:sticky;top:0;height:100vh;overflow-y:auto}
-.cfo-brand{padding:2px 6px}
-.cfo-brand img{height:34px;width:auto;display:block}
+/* Desktop wordmark: the official lockup PNG has ~45% empty transparent canvas on
+   the right (viewBox 0 0 900 220, artwork ends ~x480). We clip ONLY that transparent
+   padding with an overflow window — the asset itself is unmodified (no rescale of a
+   single axis, no recolor, no rebuild). Result: prominent, readable CFO AI / FINANCIAL
+   OS at ~48px tall (≈1.7× the previous rendered size), with clear space preserved. */
+.cfo-brand{height:48px;width:138px;overflow:hidden;margin:0 4px 6px}
+.cfo-brand img{height:48px;width:auto;max-width:none;display:block}
 .cfo-nav{display:flex;flex-direction:column;gap:2px;margin-top:2px}
 .cfo-navgroup-title{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--text-muted);font-weight:700;padding:14px 12px 6px}
 .cfo-navitem{display:flex;align-items:center;gap:11px;padding:9px 12px;border-radius:var(--radius-sm);
@@ -28,7 +33,7 @@
 
 .cfo-mobilehead{display:none;align-items:center;gap:10px;background:var(--surface-card);
   border-bottom:1px solid var(--border-default);padding:11px 16px;position:sticky;top:0;z-index:20}
-.cfo-mobilesym{height:30px;width:30px}
+.cfo-mobilesym{height:36px;width:36px}
 .cfo-burger{margin-left:auto;background:none;border:0;display:flex;flex-direction:column;gap:4px;cursor:pointer;padding:6px}
 .cfo-burger span{width:20px;height:2px;background:var(--text-primary);border-radius:2px}
 .cfo-main{min-width:0;padding:26px 30px 56px}

@@ -101,7 +101,7 @@ export default function WorkspaceShell({ workspaces, activeId, onSelectWorkspace
       {/* mobile drawer */}
       <div className={`cfo-drawer-scrim${drawer ? ' is-open' : ''}`} onClick={() => setDrawer(false)} />
       <div className={`cfo-drawer${drawer ? ' is-open' : ''}`}>
-        <div className="cfo-brand"><img src={LOGO_WORDMARK} alt="CFO AI" style={{ height: 30 }} /></div>
+        <div className="cfo-brand"><img src={LOGO_WORDMARK} alt="CFO AI" /></div>
         {SwitcherEl}
         <Nav groups={nav} activeKey={activeKey} onNavigate={go} />
         <div className="cfo-side-foot">{footer}</div>
