@@ -146,6 +146,27 @@ REVOKE ALL ON FUNCTION fn_is_workspace_type(uuid, text) FROM PUBLIC;
 DO $$ BEGIN IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN
   GRANT EXECUTE ON FUNCTION fn_is_workspace_type(uuid, text) TO service_role; END IF; END $$;
 
+-- ── Backend-first table access ──────────────────────────────────────────────
+-- New tables are service_role-only. RLS denies anon/authenticated DIRECT PostgREST
+-- access even if the environment's default privileges granted them (Supabase grants
+-- new public tables to anon/authenticated by default — that would bypass the Express
+-- privacy layer). service_role (the backend) bypasses RLS and is granted explicitly,
+-- so access never depends on ambient default privileges. Idempotent + role-guarded.
+DO $$
+DECLARE t text; r text;
+BEGIN
+  FOREACH t IN ARRAY ARRAY['user_workspace_preferences','personal_business_relationships','personal_business_relationship_roles']
+  LOOP
+    EXECUTE format('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY', t);
+    FOR r IN SELECT rolname FROM pg_roles WHERE rolname IN ('anon','authenticated') LOOP
+      EXECUTE format('REVOKE ALL ON public.%I FROM %I', t, r);
+    END LOOP;
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN
+      EXECUTE format('GRANT SELECT, INSERT, UPDATE, DELETE ON public.%I TO service_role', t);
+    END IF;
+  END LOOP;
+END $$;
+
 COMMIT;
 
 -- ── Verify ───────────────────────────────────────────────────────────────────

@@ -61,6 +61,13 @@ async function api(base, method, path, userId, body) {
     wal(W.pm1_idr, P_M1, 'IDR') + wal(W.pm1_usd, P_M1, 'USD') + wal(W.pm1_btc, P_M1, 'BTC', 'crypto', 8) +
     wal(W.pm2_idr, P_M2, 'IDR') + wal(W.pa1_usdt, P_A1, 'USDT', 'crypto', 6) +
     wal(W.ba_idr, BA, 'IDR') + wal(W.ba_idr2, BA, 'IDR') + wal(W.ba_usd, BA, 'USD') + wal(W.ba_btc, BA, 'BTC', 'crypto', 8) + wal(W.bb_idr, BB, 'IDR'));
+  // entitlements (explicit add-ons, not plan-derived): personal_finance_workspace on
+  // a business the user belongs to; personal_investor_funding on each funding source WS.
+  await db.exec(`INSERT INTO business_addons(business_id,addon,status) VALUES
+    ('${BA}','personal_finance_workspace','active'),
+    ('${P_M1}','personal_investor_funding','active'),
+    ('${P_M2}','personal_investor_funding','active'),
+    ('${P_A1}','personal_investor_funding','active');`);
   // active relationship P_M1 ↔ BA ; revoked relationship P_A1 ↔ BB
   const REL = (await db.query(`SELECT id FROM rpc_request_personal_business_connection('${P_M1}','${BA}',${U.multi},'web')`)).rows[0].id;
   await db.query(`SELECT rpc_confirm_personal_business_connection('${REL}',${U.baOwner},'web')`);

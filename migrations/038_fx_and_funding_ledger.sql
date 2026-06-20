@@ -191,6 +191,33 @@ SELECT
 FROM conf c LEFT JOIN rep r ON r.funding_transfer_id = c.id
 GROUP BY c.target_business_id, c.contributor_user_id, c.principal_asset;
 
+-- ── Backend-first table access (see 037 rationale) ──────────────────────────
+-- FX + funding ledger tables are service_role-only. RLS blocks anon/authenticated
+-- direct PostgREST access regardless of ambient default privileges; service_role
+-- bypasses RLS and is granted explicitly. funding_audit stays append-only via its
+-- own trigger even with UPDATE/DELETE granted. Idempotent + role-guarded.
+DO $$
+DECLARE t text; r text;
+BEGIN
+  FOREACH t IN ARRAY ARRAY['exchange_rate_quotes','fx_conversions','funding_transfers','funding_repayments','funding_audit']
+  LOOP
+    EXECUTE format('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY', t);
+    FOR r IN SELECT rolname FROM pg_roles WHERE rolname IN ('anon','authenticated') LOOP
+      EXECUTE format('REVOKE ALL ON public.%I FROM %I', t, r);
+    END LOOP;
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN
+      EXECUTE format('GRANT SELECT, INSERT, UPDATE, DELETE ON public.%I TO service_role', t);
+    END IF;
+  END LOOP;
+  -- reporting view: readable by the backend only
+  FOR r IN SELECT rolname FROM pg_roles WHERE rolname IN ('anon','authenticated') LOOP
+    EXECUTE format('REVOKE ALL ON public.personal_funding_balances FROM %I', r);
+  END LOOP;
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN
+    GRANT SELECT ON public.personal_funding_balances TO service_role;
+  END IF;
+END $$;
+
 COMMIT;
 
 -- ── Verify ───────────────────────────────────────────────────────────────────

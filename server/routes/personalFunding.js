@@ -21,6 +21,19 @@ module.exports = function personalFundingRouter({ supabase, auth, getBusinessAcc
     return str;
   };
   const rpc = (fn, args) => supabase.rpc(fn, args);
+
+  // CRITICAL: PostgREST serializes NUMERIC as JSON numbers; supabase-js then parses
+  // them as JS doubles, silently truncating values beyond ~17 significant digits
+  // (e.g. 0.123456789012345678 → 0.12345678901234568). We therefore read every
+  // money/rate column as ::text so 18-decimal precision survives DB→HTTP intact, and
+  // re-read rows after a mutating RPC (whose composite return is parsed lossily).
+  const Q_SEL = 'id,provider,base_asset,quote_asset,rate::text,inverse_rate::text,bid::text,ask::text,market_timestamp,retrieved_at,valid_until,status,source_type,manual_reason,created_at';
+  const FT_SEL = 'id,relationship_id,funding_type,status,repayable,source_workspace_id,source_wallet_id,target_business_id,target_wallet_id,source_asset,source_principal_amount::text,source_total_debit::text,target_asset,target_amount::text,fee_amount::text,fee_asset,network_fee_amount::text,booked_rate::text,reporting_currency,reporting_amount::text,contributor_user_id,fx_quote_id';
+  const FR_SEL = 'id,funding_transfer_id,repayment_amount_native::text,repayment_asset,principal_reduction_amount::text,principal_asset,booked_rate::text,reporting_amount::text,status';
+  const PFB_SEL = 'target_business_id,contributor_user_id,principal_asset,loans_principal::text,loans_repaid_principal::text,outstanding_principal_native::text,capital_contributed::text,loans_reporting_value::text';
+  const rereadOne = async (table, id, sel) => { const { data } = await supabase.from(table).select(sel).eq('id', id).limit(1); return data?.[0] || null; };
+  const rereadQuote = (id) => rereadOne('exchange_rate_quotes', id, Q_SEL);
+  const rereadFunding = (id) => rereadOne('funding_transfers', id, FT_SEL);
   const rpcErr = (res, error) => {
     const m = error.message || 'error';
     if (/not active|not pending|relationship|revoked|not repayable/i.test(m)) return res.status(409).json({ error: m });
@@ -29,22 +42,28 @@ module.exports = function personalFundingRouter({ supabase, auth, getBusinessAcc
     return res.status(500).json({ error: m });
   };
 
-  // Personal-workspace entitlement: any business the user belongs to grants founder/
-  // enterprise/trial access, OR an explicit personal_finance add-on. (V1 resolution.)
+  // Two EXPLICIT entitlement keys — never derived from a Business plan. A founder/
+  // enterprise Business subscription does NOT auto-unlock Personal features, and the
+  // Personal-workspace key does NOT auto-unlock the Funding Bridge.
+  //
+  // personal_finance_workspace — create/use Personal Workspaces. Per-user: the add-on
+  //   is attached to one of the user's workspaces (the billing entity). Resolved over
+  //   the user's explicit memberships (no .limit(1) arbitrary pick of a single row).
   async function hasPersonalWorkspaceEntitlement(userId) {
     const memberships = await WA.listAccessibleWorkspaces(supabase, userId);
-    for (const m of memberships) {
-      if (m.businesses.type !== 'business') continue;
-      try {
-        const r = await getBusinessAccess(userId, m.business_id);
-        const plan = r?.access?.effective_plan;
-        if (plan === 'founder' || plan === 'enterprise') return true;
-        if (r?.access?.trial_status_effective === 'active') return true;
-      } catch { /* continue */ }
-    }
+    const ids = memberships.map(m => m.business_id);
+    if (!ids.length) return false;
     const { data } = await supabase.from('business_addons')
-      .select('addon').like('addon', 'personal_finance%').eq('status', 'active')
-      .in('business_id', memberships.map(m => m.business_id)).limit(1);
+      .select('business_id').eq('addon', 'personal_finance_workspace').eq('status', 'active')
+      .in('business_id', ids);
+    return !!data?.length;
+  }
+  // personal_investor_funding — use the Funding Bridge. Resolved on the SPECIFIC
+  //   personal workspace doing the funding (explicit workspace id), never on a Business.
+  async function hasFundingEntitlement(personalWorkspaceId) {
+    const { data } = await supabase.from('business_addons')
+      .select('business_id').eq('business_id', personalWorkspaceId)
+      .eq('addon', 'personal_investor_funding').eq('status', 'active').limit(1);
     return !!data?.length;
   }
 
@@ -257,13 +276,14 @@ module.exports = function personalFundingRouter({ supabase, auth, getBusinessAcc
       };
       const { data, error } = await rpc('rpc_create_fx_quote_record', { p: payload, p_actor: userId, p_channel: channel });
       if (error) return rpcErr(res, error);
-      res.status(201).json(shapeQuote(Array.isArray(data) ? data[0] : data));
+      const row = Array.isArray(data) ? data[0] : data;
+      res.status(201).json(shapeQuote(await rereadQuote(row.id) || row));
     } catch (e) { res.status(e.status || 500).json({ error: e.message }); }
   });
 
   router.get('/fx/quotes/:id', auth, async (req, res) => {
     try {
-      const { data } = await supabase.from('exchange_rate_quotes').select('*').eq('id', req.params.id).limit(1);
+      const { data } = await supabase.from('exchange_rate_quotes').select(Q_SEL).eq('id', req.params.id).limit(1);
       if (!data?.length) return res.status(404).json({ error: 'quote not found' });
       res.json(shapeQuote(data[0]));
     } catch (e) { res.status(500).json({ error: e.message }); }
@@ -287,7 +307,8 @@ module.exports = function personalFundingRouter({ supabase, auth, getBusinessAcc
       };
       const { data, error } = await rpc('rpc_create_fx_quote_record', { p: payload, p_actor: userId, p_channel: channel });
       if (error) return rpcErr(res, error);
-      res.status(201).json(shapeQuote(Array.isArray(data) ? data[0] : data));
+      const row = Array.isArray(data) ? data[0] : data;
+      res.status(201).json(shapeQuote(await rereadQuote(row.id) || row));
     } catch (e) { res.status(500).json({ error: e.message }); }
   });
 
@@ -331,7 +352,7 @@ module.exports = function personalFundingRouter({ supabase, auth, getBusinessAcc
     let quote = null, rate = '1';
     if ((b.source_asset || src.wallet.asset_code) !== (b.target_asset || tgt.wallet.asset_code)) {
       if (!b.fx_quote_id) return { error: { status: 400, message: 'cross-currency transfer requires a quote' } };
-      const { data } = await supabase.from('exchange_rate_quotes').select('*').eq('id', b.fx_quote_id).limit(1);
+      const { data } = await supabase.from('exchange_rate_quotes').select(Q_SEL).eq('id', b.fx_quote_id).limit(1);
       quote = data?.[0];
       if (!quote) return { error: { status: 404, message: 'quote not found' } };
       if (quote.status === 'expired' || (quote.valid_until && new Date(quote.valid_until) < new Date())) return { error: { status: 400, message: 'refresh_quote_required' } };
@@ -390,11 +411,16 @@ module.exports = function personalFundingRouter({ supabase, auth, getBusinessAcc
       const userId = req.user.userId; const b = req.body || {};
       // caller must own the source personal workspace
       await WA.resolvePersonalWorkspaceOwner(supabase, userId, b.source_workspace_id);
+      // Funding Bridge requires the personal_investor_funding entitlement on THIS workspace.
+      if (!await hasFundingEntitlement(b.source_workspace_id)) {
+        return res.status(403).json({ error: 'Funding Bridge (personal_investor_funding) is not enabled for this workspace', upgrade_required: true });
+      }
       const payload = { ...b, contributor_user_id: b.contributor_user_id || userId,
         idempotency_key: b.idempotency_key || `fund-${userId}-${Date.now()}` };
       const { data, error } = await rpc('rpc_create_funding_transfer', { p: payload, p_actor: userId, p_channel: channel });
       if (error) return rpcErr(res, error);
-      res.status(201).json(shapePersonalFunding(Array.isArray(data) ? data[0] : data));
+      const row = Array.isArray(data) ? data[0] : data;
+      res.status(201).json(shapePersonalFunding(await rereadFunding(row.id) || row));
     } catch (e) { res.status(e.status || 500).json({ error: e.message }); }
   });
 
@@ -408,7 +434,7 @@ module.exports = function personalFundingRouter({ supabase, auth, getBusinessAcc
       if (!['owner', 'ceo', 'admin', 'cfo'].includes(role)) return res.status(403).json({ error: 'business approver role required' });
       const { data, error } = await rpc('rpc_confirm_funding_transfer', { p_funding: req.params.id, p_actor: userId, p_channel: channel });
       if (error) return rpcErr(res, error);
-      res.json(shapeBusinessFunding(Array.isArray(data) ? data[0] : data, await resolveUserDisplayName(ft.contributor_user_id), await rolesFor(ft.relationship_id)));
+      res.json(shapeBusinessFunding(await rereadFunding(req.params.id), await resolveUserDisplayName(ft.contributor_user_id), await rolesFor(ft.relationship_id)));
     } catch (e) { res.status(500).json({ error: e.message }); }
   });
 
@@ -422,7 +448,7 @@ module.exports = function personalFundingRouter({ supabase, auth, getBusinessAcc
       if (!ownsPersonal && !['owner', 'ceo', 'admin', 'cfo'].includes(bizRole)) return res.status(403).json({ error: 'not authorized' });
       const { data, error } = await rpc('rpc_cancel_funding_transfer', { p_funding: req.params.id, p_actor: userId, p_channel: channel });
       if (error) return rpcErr(res, error);
-      res.json(Array.isArray(data) ? data[0] : data);
+      res.json(shapePersonalFunding(await rereadFunding(req.params.id)));
     } catch (e) { res.status(500).json({ error: e.message }); }
   });
 
@@ -437,7 +463,8 @@ module.exports = function personalFundingRouter({ supabase, auth, getBusinessAcc
       const payload = { ...b, funding_transfer_id: req.params.id, idempotency_key: b.idempotency_key || `repay-${req.params.id}-${Date.now()}` };
       const { data, error } = await rpc('rpc_repay_funding_transfer', { p: payload, p_actor: userId, p_channel: channel });
       if (error) return rpcErr(res, error);
-      res.status(201).json(Array.isArray(data) ? data[0] : data);
+      const row = Array.isArray(data) ? data[0] : data;
+      res.status(201).json(await rereadOne('funding_repayments', row.id, FR_SEL) || row);
     } catch (e) { res.status(500).json({ error: e.message }); }
   });
 
@@ -447,7 +474,7 @@ module.exports = function personalFundingRouter({ supabase, auth, getBusinessAcc
       const memberships = await WA.listAccessibleWorkspaces(supabase, userId);
       const myPersonal = memberships.filter(m => m.businesses.type === 'personal').map(m => m.business_id);
       if (!myPersonal.length) return res.json({ funding: [] });
-      const { data } = await supabase.from('funding_transfers').select('*').in('source_workspace_id', myPersonal).order('created_at', { ascending: false });
+      const { data } = await supabase.from('funding_transfers').select(FT_SEL).in('source_workspace_id', myPersonal).order('created_at', { ascending: false });
       res.json({ funding: (data || []).map(shapePersonalFunding) });
     } catch (e) { res.status(500).json({ error: e.message }); }
   });
@@ -458,7 +485,7 @@ module.exports = function personalFundingRouter({ supabase, auth, getBusinessAcc
       const memberships = await WA.listAccessibleWorkspaces(supabase, userId);
       const myBusiness = memberships.filter(m => m.businesses.type !== 'personal').map(m => m.business_id);
       if (!myBusiness.length) return res.json({ funding: [] });
-      const { data } = await supabase.from('funding_transfers').select('*').in('target_business_id', myBusiness).order('created_at', { ascending: false });
+      const { data } = await supabase.from('funding_transfers').select(FT_SEL).in('target_business_id', myBusiness).order('created_at', { ascending: false });
       const out = [];
       for (const r of (data || [])) out.push(shapeBusinessFunding(r, await resolveUserDisplayName(r.contributor_user_id), await rolesFor(r.relationship_id)));
       res.json({ funding: out });
@@ -471,14 +498,15 @@ module.exports = function personalFundingRouter({ supabase, auth, getBusinessAcc
       const memberships = await WA.listAccessibleWorkspaces(supabase, userId);
       const myBusiness = memberships.filter(m => m.businesses.type !== 'personal').map(m => m.business_id);
       if (!myBusiness.length) return res.json({ balances: [] });
-      const { data } = await supabase.from('personal_funding_balances').select('*').in('target_business_id', myBusiness);
+      const { data } = await supabase.from('personal_funding_balances').select(PFB_SEL).in('target_business_id', myBusiness);
       // Financing values exposed SEPARATELY from revenue/operating expense.
       res.json({ balances: (data || []).map(r => ({
         target_business_id: r.target_business_id, contributor_user_id: r.contributor_user_id,
-        principal_asset: r.principal_asset, funding_type: r.funding_type,
+        principal_asset: r.principal_asset,
+        loans_principal: s(r.loans_principal), loans_repaid_principal: s(r.loans_repaid_principal),
         outstanding_principal_native: s(r.outstanding_principal_native),
-        reporting_amount: s(r.reporting_amount), economic_class: 'financing',
-        affects_revenue: false, affects_operating_expense: false,
+        capital_contributed: s(r.capital_contributed), loans_reporting_value: s(r.loans_reporting_value),
+        economic_class: 'financing', affects_revenue: false, affects_operating_expense: false,
       })) });
     } catch (e) { res.status(500).json({ error: e.message }); }
   });
@@ -504,15 +532,14 @@ module.exports = function personalFundingRouter({ supabase, auth, getBusinessAcc
 
   // ── helpers ──────────────────────────────────────────────────────────────
   async function loadFunding(id) {
-    const { data } = await supabase.from('funding_transfers').select('*').eq('id', id).limit(1);
-    return data?.[0] || null;
+    return rereadFunding(id);
   }
   async function rolesFor(relId) {
     const { data } = await supabase.from('personal_business_relationship_roles').select('role').eq('relationship_id', relId);
     return (data || []).map(r => r.role);
   }
   async function repaymentsFor(fundingId) {
-    const { data } = await supabase.from('funding_repayments').select('*').eq('funding_transfer_id', fundingId).eq('status', 'confirmed');
+    const { data } = await supabase.from('funding_repayments').select(FR_SEL).eq('funding_transfer_id', fundingId).eq('status', 'confirmed');
     return (data || []).map(r => ({ id: r.id, repayment_amount_native: s(r.repayment_amount_native), repayment_asset: r.repayment_asset,
       principal_reduction_amount: s(r.principal_reduction_amount), principal_asset: r.principal_asset, booked_rate: s(r.booked_rate) }));
   }

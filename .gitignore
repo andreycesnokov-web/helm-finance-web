@@ -3,3 +3,8 @@ node_modules/
 client/node_modules/
 client/dist/
 .claude/worktrees/
+supabase/.local-env
+supabase/.local-base.sql
+supabase/.temp/
+supabase/.branches/
+*.local-snapshot.sql
