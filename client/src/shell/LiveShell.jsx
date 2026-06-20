@@ -26,7 +26,7 @@ export default function LiveShell({ children }) {
 
   const onSelectWorkspace = async (w) => {
     await switchTo(w)
-    navigate(w.type === 'personal' ? '/personal' : '/')
+    navigate(w.type === 'personal' ? '/personal' : '/business/pulse')
   }
 
   return (

@@ -31,12 +31,12 @@ export const PERSONAL_NAV = [
 
 export const BUSINESS_NAV = [
   { title: 'Overview', items: [
-    { key: 'pulse', label: 'Pulse', to: '/', icon: <Icon.pulse /> },
+    { key: 'pulse', label: 'Pulse', to: '/business/pulse', icon: <Icon.pulse /> },
     { key: 'cfo', label: 'AI CFO', to: '/cfo', icon: <Icon.cfo /> },
   ] },
   { title: 'Finance', items: [
     { key: 'transactions', label: 'Transactions', to: '/transactions', icon: <Icon.list /> },
-    { key: 'accounts', label: 'Accounts', to: '/accounts', icon: <Icon.wallet /> },
+    { key: 'accounts', label: 'Accounts', to: '/business/accounts', icon: <Icon.wallet /> },
     { key: 'receivables', label: 'Receivables', to: '/receivables', icon: <Icon.down /> },
     { key: 'payables', label: 'Payables', to: '/payables', icon: <Icon.up /> },
     { key: 'funding', label: 'Funding & Investors', to: '/funding-investors', icon: <Icon.fund /> },
