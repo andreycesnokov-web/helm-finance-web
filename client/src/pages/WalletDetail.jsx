@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { useTranslation } from '../hooks/useTranslation'
 import { apiFetch, fmt } from '../lib/api'
+import { add, sub, cmp } from '../lib/money'
 
 function fmtDate(str) {
   if (!str) return '—'
@@ -51,10 +52,10 @@ export default function WalletDetail() {
       .finally(() => setLoading(false))
   }, [id, period, token])
 
-  // Summary stats
-  const income   = txs.filter(t => t.type === 'income').reduce((s, t) => s + Number(t.amount_idr || 0), 0)
-  const expenses = txs.filter(t => ['expense','payroll'].includes(t.type)).reduce((s, t) => s + Number(t.amount_idr || 0), 0)
-  const net      = income - expenses
+  // Summary stats — decimal-safe (string math, no binary float). Reporting currency (IDR).
+  const income   = txs.filter(t => t.type === 'income').reduce((s, t) => add(s, t.amount_idr || '0'), '0')
+  const expenses = txs.filter(t => ['expense','payroll'].includes(t.type)).reduce((s, t) => add(s, t.amount_idr || '0'), '0')
+  const net      = sub(income, expenses)
 
   return (
     <div className="hf-page">
@@ -87,7 +88,7 @@ export default function WalletDetail() {
           {[
             { label: t('transactions.income'),   value: '+' + fmt(income),   color: 'var(--green-dark)' },
             { label: t('aicfo.expenses'), value: '−' + fmt(expenses), color: 'var(--red-dark)' },
-            { label: t('radar.netFlow'),      value: (net >= 0 ? '+' : '−') + fmt(Math.abs(net)), color: net >= 0 ? 'var(--green-dark)' : 'var(--red-dark)' },
+            { label: t('radar.netFlow'),      value: (cmp(net, '0') >= 0 ? '+' : '−') + fmt(net.replace('-', '')), color: cmp(net, '0') >= 0 ? 'var(--green-dark)' : 'var(--red-dark)' },
           ].map(s => (
             <div key={s.label} className="summary-card" style={{ textAlign: 'center' }}>
               <div className="summary-card-label">{s.label}</div>
