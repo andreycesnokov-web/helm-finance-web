@@ -31,6 +31,11 @@ INSERT INTO transactions(business_id,type,amount_original,amount_idr,currency_or
   // precision widened + legacy value preserved
   ok('precision widened to scale 18', (await db.query(`SELECT numeric_scale s FROM information_schema.columns WHERE table_name='transactions' AND column_name='amount_original'`)).rows[0].s === 18);
   ok('legacy IDR value preserved exactly', Number((await db.query(`SELECT amount_original a FROM transactions WHERE currency_original='IDR'`)).rows[0].a) === 1500000.50);
+  // universal reporting columns + legacy backfill (amount_idr kept, no longer source of truth)
+  ok('booked_rate column added', (await cnt(db, `SELECT count(*) c FROM information_schema.columns WHERE table_name='transactions' AND column_name='booked_rate'`)) === 1);
+  ok('legacy reporting_currency backfilled to IDR', (await cnt(db, `SELECT count(*) c FROM transactions WHERE currency_original='IDR' AND reporting_currency='IDR'`)) >= 1);
+  ok('legacy amount_reporting = amount_idr', Number((await db.query(`SELECT amount_reporting a FROM transactions WHERE currency_original='IDR' LIMIT 1`)).rows[0].a) === 1500000.50);
+  ok('legacy IDR booked_rate = 1', Number((await db.query(`SELECT booked_rate r FROM transactions WHERE currency_original='IDR' AND asset_code='IDR' LIMIT 1`)).rows[0].r) === 1);
   // crypto precision now storable
   await db.exec(`INSERT INTO transactions(business_id,type,amount_original,currency_original,asset_code) VALUES ('11111111-1111-1111-1111-111111111111','income',0.00000001,'BTC','BTC')`);
   ok('crypto 0.00000001 BTC stored exactly', (await db.query(`SELECT amount_original::text a FROM transactions WHERE asset_code='BTC'`)).rows[0].a.startsWith('0.00000001'));

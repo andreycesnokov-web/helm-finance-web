@@ -37,6 +37,20 @@ CREATE TABLE IF NOT EXISTS exchange_rate_quotes (
 CREATE UNIQUE INDEX IF NOT EXISTS erq_idem_uidx ON exchange_rate_quotes(idempotency_key) WHERE idempotency_key IS NOT NULL;
 CREATE INDEX IF NOT EXISTS erq_pair_idx ON exchange_rate_quotes(base_asset, quote_asset, market_timestamp);
 
+-- booked-rate immutability: once a quote has been used (locked into a ledger leg),
+-- its rate/base/quote can never be rewritten. Valuation uses a NEW quote, never this one.
+CREATE OR REPLACE FUNCTION fn_quote_rate_immutable() RETURNS trigger
+LANGUAGE plpgsql SET search_path = pg_catalog, public AS $$
+BEGIN
+  IF OLD.status IN ('used','locked') AND
+     (NEW.rate IS DISTINCT FROM OLD.rate OR NEW.base_asset IS DISTINCT FROM OLD.base_asset OR NEW.quote_asset IS DISTINCT FROM OLD.quote_asset)
+  THEN RAISE EXCEPTION 'booked rate is immutable once the quote is locked/used'; END IF;
+  RETURN NEW;
+END $$;
+DROP TRIGGER IF EXISTS trg_quote_rate_immutable ON exchange_rate_quotes;
+CREATE TRIGGER trg_quote_rate_immutable BEFORE UPDATE ON exchange_rate_quotes
+  FOR EACH ROW EXECUTE FUNCTION fn_quote_rate_immutable();
+
 -- now that quotes exist, point transactions.fx_quote_id at them
 DO $$ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='transactions_fx_quote_fk') THEN

@@ -112,6 +112,28 @@ CREATE TABLE financial_documents (id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   ok('second-leg failure rolls back source leg', t2 && (await cnt(db, `SELECT count(*) c FROM transactions`)) === txPre);
   await db.exec(`DROP TRIGGER _lbt ON transactions; DROP FUNCTION _lb();`);
 
+  // ── SECURITY: ordinary wallet transfer CANNOT simulate Personal→Business funding ─
+  // rpc_create_wallet_transfer must never write to funding_transfers or relationships.
+  const src = (await db.query(`SELECT pg_get_functiondef(oid) d FROM pg_proc WHERE proname='rpc_create_wallet_transfer'`)).rows[0].d;
+  ok('wallet transfer RPC never touches funding_transfers', !/funding_transfers/i.test(src));
+  ok('wallet transfer RPC never touches personal_business_relationships', !/personal_business_relationships/i.test(src));
+  const fbBefore = await cnt(db, `SELECT count(*) c FROM funding_transfers`);
+  const fundClassBefore = await cnt(db, `SELECT count(*) c FROM transactions WHERE type IN ('funding_in','funding_out','capital_contribution_in','capital_contribution_out')`);
+  await db.query(`SELECT rpc_create_wallet_transfer($1::jsonb, ${U}, 'web')`, [JSON.stringify({ source_workspace_id: P, target_workspace_id: B, source_wallet_id: wPidr, target_wallet_id: wBidr, source_asset: 'IDR', target_asset: 'IDR', source_amount: 500, target_amount: 500, source_scope: 'personal', target_scope: 'business', actor_user_id: U })]);
+  ok('Personal→Business wallet transfer created NO funding record', (await cnt(db, `SELECT count(*) c FROM funding_transfers`)) === fbBefore);
+  ok('Personal→Business wallet transfer created NO liability/capital classification', (await cnt(db, `SELECT count(*) c FROM transactions WHERE type IN ('funding_in','funding_out','capital_contribution_in','capital_contribution_out')`)) === fundClassBefore);
+
+  // ── booked rate immutability: a used quote's rate cannot be changed ─────────
+  await reject(db, 'booked rate of a used quote is immutable', `UPDATE exchange_rate_quotes SET rate=99999 WHERE id='${qFund.id}'`);
+  // valuation/refresh of a newer quote does NOT mutate the booked rate on existing legs
+  const bookedBefore = (await db.query(`SELECT booked_rate r FROM funding_transfers WHERE id='${f1.id}'`)).rows[0].r;
+  await quote({ provider: 'demo', base_asset: 'USD', quote_asset: 'IDR', rate: 17000, source_type: 'market_api', valid_until: new Date(Date.now() + 3600000).toISOString() });
+  ok('new market quote does not rewrite booked rate on existing funding', Number((await db.query(`SELECT booked_rate r FROM funding_transfers WHERE id='${f1.id}'`)).rows[0].r) === Number(bookedBefore));
+
+  // ── non-IDR reporting workspace (USD-reported business) ────────────────────
+  await db.exec(`UPDATE businesses SET base_currency='USD' WHERE id='${BX}'`);
+  ok('workspace can report in a non-IDR currency', (await cnt(db, `SELECT count(*) c FROM businesses WHERE id='${BX}' AND base_currency='USD'`)) === 1);
+
   console.log(`\n${fail === 0 ? 'ALL PASS' : 'FAIL'} — ${pass} passed, ${fail} failed`);
   process.exit(fail === 0 ? 0 : 1);
 })().catch(e => { console.log('FATAL', e.message, e.stack); process.exit(1); });

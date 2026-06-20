@@ -8,6 +8,7 @@ const { computeActivationBlockers, isEffectiveApprovedReview, validReviewTransit
 const { VALID_PLANS, computeBusinessAccess } = require('./lib/businessAccess');
 const docV = require('./lib/documentValidation');
 const docA = require('./lib/documentAccess');
+const TX = require('./lib/transactionClass');
 require('dotenv').config();
 
 // --- Environment validation (fail fast, never log secret values) -----------
@@ -226,7 +227,7 @@ async function requireBusiness(req, res) {
 // @param totalBalance — computed total cash balance (all-time income − expenses + corrections)
 // @returns { burn_rate_daily, runway_days, burn_window_days }
 function computeBurnAndRunway(allTxs, totalBalance) {
-  const CASH_OUT = ['expense', 'payroll'];
+  const CASH_OUT = TX.CASH_OUT_LEGACY;
   const now      = new Date();
   const cutoff30 = new Date(now.getTime() - 30 * 86400000);
 
@@ -327,8 +328,8 @@ app.get('/api/pulse', auth, async (req, res) => {
     //   as cash-neutral to avoid phantom debits.
     //   TODO: when from_account / to_account schema fields are added,
     //         transfer should debit source account and credit destination.
-    const CASH_IN  = ['income'];
-    const CASH_OUT = ['expense', 'payroll'];
+    const CASH_IN  = TX.CASH_IN_LEGACY;
+    const CASH_OUT = TX.CASH_OUT_LEGACY;
     // 'transfer', 'correction', unknown types → NEUTRAL (no effect)
 
     const allIncome      = (allTxs || []).filter(t => CASH_IN.includes(t.type)).reduce((s, t) => s + Number(t.amount_original), 0);
@@ -2228,7 +2229,7 @@ app.post('/api/admin/tax-rules/:id/new-version', auth, async (req, res) => {
 // (each imported row creates a real transaction), and ending-balance reconcile.
 // ═════════════════════════════════════════════════════════════════════════════
 
-const CASH_IN_TYPES = ['income'];
+const CASH_IN_TYPES = TX.CASH_IN_LEGACY;
 
 function normalizeDesc(s) {
   return String(s || '').toLowerCase().replace(/\s+/g, ' ').replace(/[^a-z0-9а-яё ]/gi, '').trim();
@@ -4871,8 +4872,8 @@ function notificationText(type, language, params = {}) {
 // Phase 1: user-scoped. Balance computed from transactions (wallet_id match
 // OR legacy source-name match for backward compat with pre-wallet transactions).
 
-const WALLET_CASH_IN  = ['income'];
-const WALLET_CASH_OUT = ['expense', 'payroll'];
+const WALLET_CASH_IN  = TX.CASH_IN_LEGACY;
+const WALLET_CASH_OUT = TX.CASH_OUT_LEGACY;
 
 app.get('/api/wallets', auth, async (req, res) => {
   try {
@@ -6092,8 +6093,8 @@ async function buildAiCfoContext(userId, language = 'en', biz = null) {
   const businessWalletIds = new Set(businessWallets.map(w => w.id));
 
   // ── Cash (business wallets only for CFO Score / runway) ──────────────────
-  const CASH_IN  = ['income'];
-  const CASH_OUT = ['expense', 'payroll'];
+  const CASH_IN  = TX.CASH_IN_LEGACY;
+  const CASH_OUT = TX.CASH_OUT_LEGACY;
 
   // Helper to sum tx that belong to a given set of wallet IDs (or legacy source match or scope field)
   function txBelongsToWallets(t, walletSet, walletIdSet, scopeValue) {
@@ -6303,7 +6304,7 @@ async function buildBusinessFinancialSnapshot(biz, language = 'en', asOfDate = n
       .eq('business_id', biz.business.id),
   ]);
 
-  const CASH_IN = ['income'], CASH_OUT = ['expense', 'payroll'];
+  const CASH_IN = TX.CASH_IN_LEGACY, CASH_OUT = TX.CASH_OUT_LEGACY;
   const allWallets = wallets || [];
   const businessWallets = allWallets.filter(w => (w.scope || 'business') === 'business');
   const bizWalletIds = new Set(businessWallets.map(w => w.id));

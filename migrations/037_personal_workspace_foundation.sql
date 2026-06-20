@@ -64,9 +64,15 @@ ALTER TABLE transactions
   ADD COLUMN IF NOT EXISTS asset_code        TEXT NULL,             -- native asset of the leg
   ADD COLUMN IF NOT EXISTS amount_reporting  NUMERIC(38,18) NULL,   -- value in the workspace reporting currency
   ADD COLUMN IF NOT EXISTS reporting_currency TEXT NULL,
+  ADD COLUMN IF NOT EXISTS booked_rate       NUMERIC(38,18) NULL,   -- native→reporting rate locked at booking (immutable after use)
   ADD COLUMN IF NOT EXISTS fx_quote_id       UUID NULL;             -- FK added in 038 (after quotes exist)
 -- legacy rows: native asset = the original currency
 UPDATE transactions SET asset_code = currency_original WHERE asset_code IS NULL;
+-- legacy rows are IDR-reported: amount_reporting = amount_idr, reporting_currency = IDR, booked_rate = 1.
+-- amount_idr is KEPT for back-compat but is no longer the universal source of truth.
+UPDATE transactions SET reporting_currency = 'IDR' WHERE reporting_currency IS NULL;
+UPDATE transactions SET amount_reporting = amount_idr WHERE amount_reporting IS NULL AND amount_idr IS NOT NULL;
+UPDATE transactions SET booked_rate = 1 WHERE booked_rate IS NULL AND reporting_currency = 'IDR' AND asset_code = 'IDR';
 
 -- ── 3. user_workspace_preferences ───────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS user_workspace_preferences (
