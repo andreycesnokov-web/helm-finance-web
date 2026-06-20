@@ -61,6 +61,7 @@ import TaxProfile from './pages/TaxProfile'
 import ComplianceCalendar from './pages/ComplianceCalendar'
 import WalletDetail from './pages/WalletDetail'
 import Onboarding, { shouldShowOnboarding, clearOnboardingFlags } from './pages/Onboarding'
+import PersonalOverviewDemo from './pages/PersonalOverviewDemo'
 
 // ── Mobile bottom nav keys (labels resolved at render time via t()) ───────────
 const NAV_KEYS = [
@@ -532,6 +533,8 @@ export default function App() {
           <Route path="/accountant/calendar" element={<Layout><ComplianceCalendar /></Layout>} />
           <Route path="/bank-import"  element={<Layout><BankImport /></Layout>} />
           <Route path="/team-onboarding" element={<Layout><TeamOnboarding /></Layout>} />
+          {/* Brand/design demo — standalone, no auth, for design approval (?state=loading|empty|error) */}
+          <Route path="/demo/personal-overview" element={<PersonalOverviewDemo />} />
           {/* Public invite page — no auth required to view, Telegram widget handles login */}
           <Route path="/invite/:code" element={<JoinInvite />} />
           {/* Standalone onboarding — accessible directly to re-run setup */}
