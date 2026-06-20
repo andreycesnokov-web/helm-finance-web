@@ -9,6 +9,7 @@ const { VALID_PLANS, computeBusinessAccess } = require('./lib/businessAccess');
 const docV = require('./lib/documentValidation');
 const docA = require('./lib/documentAccess');
 const TX = require('./lib/transactionClass');
+const personalFundingRouter = require('./routes/personalFunding');
 require('dotenv').config();
 
 // --- Environment validation (fail fast, never log secret values) -----------
@@ -8112,6 +8113,10 @@ app.delete('/api/documents/:id/links/:linkId', auth, async (req, res) => {
     res.json({ ok: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
+
+// Personal Workspaces, Relationships, FX quotes, Wallet transfers & Funding Bridge.
+// Mounted under /api; shares auth, the service-role client and access helpers.
+app.use('/api', personalFundingRouter({ supabase, auth, getBusinessAccess, resolveUserDisplayName, TX }));
 
 // SPA catch-all — MUST be the last route so it never shadows API endpoints.
 app.get('*', (req, res) => {
