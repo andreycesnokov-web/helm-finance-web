@@ -10,6 +10,7 @@ import '@fontsource/archivo-black/latin.css'
 import '@fontsource/archivo-black/latin-ext.css'
 import '@fontsource-variable/jetbrains-mono/index.css'
 import './brand/tokens.css'
+import './shell/shell.css'
 import App from './App.jsx'
 import './index.css'
 
