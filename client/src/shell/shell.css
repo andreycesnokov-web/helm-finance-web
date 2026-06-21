@@ -202,6 +202,27 @@
   display:inline-flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text-secondary)}
 .cfo-iconbtn:hover{background:var(--surface-card-muted)}
 
+/* ── Global overflow guard — no horizontal page overflow on any premium page ─ */
+html, body, #root { max-width: 100%; overflow-x: hidden; }
+.cfo-shell, .cfo-main, .cfo-main-inner { max-width: 100%; min-width: 0; }
+.cfo-summary, .cfo-card, .cfo-money { min-width: 0; }
+.cfo-summary-value { overflow-wrap: anywhere; }
+
+/* ── Responsive table → stacked cards on mobile (DebtsView / Transactions) ─── */
+.cfo-mcards { display: none; }
+.cfo-dcard{background:var(--surface-card);border:1px solid var(--border-default);border-radius:var(--radius-md);padding:14px;box-shadow:var(--shadow-sm)}
+.cfo-dcard-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.cfo-dcard-name{font-weight:700;font-size:14px;min-width:0;overflow-wrap:anywhere}
+.cfo-dcard-amt{font-family:var(--font-mono);font-weight:800;font-size:16px;white-space:nowrap;flex-shrink:0}
+.cfo-dcard-amt.pos{color:var(--success)}.cfo-dcard-amt.neg{color:var(--danger)}
+.cfo-dcard-meta{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:9px;font-size:12px;color:var(--text-muted)}
+.cfo-dcard-meta .cfo-mono{white-space:nowrap}
+.cfo-dcard-foot{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:12px}
+
+/* form grid for the AI Accountant profile (stacks on mobile) */
+.cfo-form2{display:grid;grid-template-columns:1fr 1fr;gap:14px 18px}
+@media (max-width:640px){.cfo-form2{grid-template-columns:1fr}}
+
 /* ── Responsive ──────────────────────────────────────────────────────────── */
 @media (max-width:1024px){
   .cfo-shell{grid-template-columns:1fr}
@@ -212,15 +233,18 @@
   .cfo-grid-3{grid-template-columns:1fr 1fr}
   .cfo-grid-2{grid-template-columns:1fr}
   .cfo-table-wrap{overflow-x:auto}
+  .cfo-drawer{width:min(86vw,340px)}
 }
 @media (max-width:640px){
   .cfo-main{padding:14px 13px 44px}
-  .cfo-h1{font-size:25px}
-  .cfo-summary-value{font-size:31px}
+  .cfo-h1{font-size:24px}
+  .cfo-summary-value{font-size:30px}
   .cfo-grid-4{grid-template-columns:1fr 1fr}
   .cfo-pagehead-actions{width:100%}
   .cfo-pagehead-actions .cfo-btn-primary{flex:1}
   .cfo-summary-row{gap:18px}
-  /* tables collapse to stacked rows on mobile via ResponsiveTable cards */
+  /* tables hide; stacked cards show */
+  .cfo-rtable{display:none}
+  .cfo-mcards{display:flex;flex-direction:column;gap:10px}
 }
 @media (max-width:380px){.cfo-grid-4{grid-template-columns:1fr}}

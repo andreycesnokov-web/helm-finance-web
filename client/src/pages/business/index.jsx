@@ -10,9 +10,10 @@ import { formatAmount } from '../../lib/money'
 import { WorkspaceProvider, useWorkspace } from '../../shell/WorkspaceProvider'
 import LiveShell from '../../shell/LiveShell'
 import {
-  PageHeader, SummaryCard, MoneyCard, Card, Stat, DataList, StatusBadge,
-  EmptyState, ErrorState, LoadingSkeleton, Icon,
+  PageHeader, SummaryCard, MoneyCard, Card, Stat, DataList, StatusBadge, Btn,
+  EmptyState, ErrorState, LoadingSkeleton, ResponsiveTable, Icon,
 } from '../../shell/ui'
+import DebtPaymentModal from '../../components/DebtPaymentModal' // reused VERBATIM — Pay Now / Mark Received logic unchanged
 
 const SYMBOL = '/brand/symbol_navy_blue_dot_transparent.svg'
 const SYMBOL_WHITE = '/brand/symbol_white_transparent.svg'
@@ -126,3 +127,113 @@ function PulseSkeleton() {
     <div className="cfo-grid cfo-grid-4">{[0, 1, 2, 3].map(i => <div key={i} className="cfo-money"><LoadingSkeleton rows={3} /></div>)}</div>
   </>
 }
+
+const ccyOf = (t) => t.currency_original || 'IDR'
+
+// ── Business Transactions (premium presentation of /api/transactions — read-only,
+//    filters preserved; no CRUD/classification change) ─────────────────────────
+export function BusinessTransactions() {
+  const [period, setPeriod] = useState('month')
+  const [type, setType] = useState('all')
+  const q = type === 'all' ? `/transactions?period=${period}` : `/transactions?period=${period}&type=${type}`
+  const tx = useScoped(q, [period, type])
+  const head = <PageHeader eyebrow="Business Workspace" title="Transactions"
+    actions={<>
+      {['month', 'week', 'all'].map(p => <Btn key={p} variant={period === p ? 'secondary' : 'ghost'} sm onClick={() => setPeriod(p)}>{p === 'all' ? 'All time' : p === 'week' ? 'Week' : 'Month'}</Btn>)}
+    </>} />
+  const TYPES = ['all', 'income', 'expense', 'payroll', 'transfer']
+  const filters = (
+    <div className="cfo-tabs" role="tablist" style={{ marginBottom: 16 }}>
+      {TYPES.map(ty => <button key={ty} className={`cfo-tab${type === ty ? ' is-active' : ''}`} onClick={() => setType(ty)} style={{ textTransform: 'capitalize' }}>{ty}</button>)}
+    </div>
+  )
+  if (tx.loading) return <>{head}{filters}<Card><LoadingSkeleton rows={6} height={18} /></Card></>
+  if (tx.error) return <>{head}{filters}<ErrorState description={tx.error} onRetry={() => location.reload()} /></>
+  const rows = Array.isArray(tx.data) ? tx.data : []
+  if (!rows.length) return <>{head}{filters}<EmptyState symbol={SYMBOL} title="No transactions" description="Transactions in this period will appear here." /></>
+  return <>{head}{filters}
+    <Card>
+      <ResponsiveTable
+        columns={[
+          { key: 'date', label: 'Date', render: r => <span className="cfo-mono">{(r.transaction_date || r.created_at || '').slice(0, 10)}</span> },
+          { key: 'description', label: 'Description', render: r => r.description || r.type },
+          { key: 'type', label: 'Type', render: r => <StatusBadge tone="neutral">{r.type}</StatusBadge> },
+          { key: 'doc', label: 'Doc', render: r => (r.document_id || r.has_documents) ? <Icon.doc width="15" height="15" /> : '' },
+          { key: 'amount', label: 'Amount', num: true, render: r => <span className={r.type === 'income' ? 'cfo-pos' : ['expense', 'payroll'].includes(r.type) ? 'cfo-neg' : ''}>{formatAmount(String(r.amount_original ?? r.amount_idr ?? 0), ccyOf(r))} {ccyOf(r)}</span> },
+        ]}
+        rows={rows} rowKey={r => r.id} />
+    </Card>
+  </>
+}
+
+// ── Shared debts list (Payables / Receivables). Reuses /api/debts + DebtPaymentModal
+//    so Pay Now / Mark Received / partial logic is UNCHANGED. ────────────────────
+function DebtsView({ kind }) {
+  const { token } = useAuth()
+  const { active, scopeKey } = useWorkspace()
+  const isPayable = kind === 'payable'
+  const [data, setData] = useState({ loading: true, error: null, debts: null, wallets: [] })
+  const [payDebt, setPayDebt] = useState(null)
+  const reload = () => {
+    if (!token || !active) return
+    setData(d => ({ ...d, loading: true, error: null }))
+    Promise.all([apiFetch('/debts', token), apiFetch('/wallets', token).catch(() => ({ wallets: [] }))])
+      .then(([debts, w]) => setData({ loading: false, error: null, debts, wallets: w.wallets || [] }))
+      .catch(e => setData({ loading: false, error: e.message || 'Request failed', debts: null, wallets: [] }))
+  }
+  useEffect(() => { let on = true; if (token && active) { setData(d => ({ ...d, loading: true })); Promise.all([apiFetch('/debts', token), apiFetch('/wallets', token).catch(() => ({ wallets: [] }))]).then(([debts, w]) => on && setData({ loading: false, error: null, debts, wallets: w.wallets || [] })).catch(e => on && setData({ loading: false, error: e.message, debts: null, wallets: [] })) } return () => { on = false } }, [token, active?.id, scopeKey]) // eslint-disable-line
+
+  const title = isPayable ? 'Payables' : 'Receivables'
+  const head = <PageHeader eyebrow="Business Workspace" title={title} />
+  if (data.loading) return <>{head}<Card><LoadingSkeleton rows={5} height={18} /></Card></>
+  if (data.error) return <>{head}<ErrorState description={data.error} onRetry={reload} /></>
+  const debts = (data.debts || []).filter(d => d.type === kind && d.status !== 'cancelled')
+  if (!debts.length) return <>{head}<EmptyState symbol={SYMBOL} title={isPayable ? 'No payables' : 'No receivables'} description={isPayable ? 'Bills you owe will appear here.' : 'Money owed to you will appear here.'} /></>
+
+  const toneFor = (s) => s === 'paid' ? 'success' : s === 'overdue' ? 'danger' : s === 'partial' ? 'warning' : 'neutral'
+  const total = debts.reduce((s, d) => s + Number(d.remaining_amount ?? d.amount ?? 0), 0)
+  return <>{head}
+    <div style={{ marginBottom: 16 }}>
+      <Stat k={isPayable ? 'Total outstanding (you owe)' : 'Total outstanding (owed to you)'} v={idr(total)} />
+    </div>
+    {/* desktop table */}
+    <Card className="cfo-rtable">
+      <ResponsiveTable
+        columns={[
+          { key: 'cp', label: isPayable ? 'Payee' : 'Payer', render: d => d.counterparty || d.description || '—' },
+          { key: 'due', label: 'Due', render: d => <span className="cfo-mono">{(d.due_date || '').slice(0, 10) || '—'}</span> },
+          { key: 'status', label: 'Status', render: d => <StatusBadge tone={toneFor(d.status)}>{d.status}{d.days_overdue > 0 ? ` · ${d.days_overdue}d` : ''}</StatusBadge> },
+          { key: 'progress', label: 'Paid', render: d => <span className="cfo-mono">{idr(d.paid_amount || 0)} / {idr(d.original_amount || d.amount)}</span> },
+          { key: 'doc', label: 'Doc', render: d => (d.document_id || d.has_documents) ? <Icon.doc width="15" height="15" /> : '' },
+          { key: 'amount', label: 'Remaining', num: true, render: d => <span className={isPayable ? 'cfo-neg' : 'cfo-pos'}>{isPayable ? '−' : '+'}{idr(d.remaining_amount ?? d.amount)}</span> },
+          { key: 'act', label: '', render: d => d.status !== 'paid' ? <Btn sm variant="ghost" onClick={() => setPayDebt(d)}>{isPayable ? 'Pay Now' : (d.status === 'partial' ? 'More' : 'Mark received')}</Btn> : null },
+        ]}
+        rows={debts} rowKey={d => d.id} />
+    </Card>
+    {/* mobile cards */}
+    <div className="cfo-mcards">
+      {debts.map(d => (
+        <div className="cfo-dcard" key={d.id}>
+          <div className="cfo-dcard-top">
+            <div className="cfo-dcard-name">{d.counterparty || d.description || '—'}</div>
+            <div className={`cfo-dcard-amt ${isPayable ? 'neg' : 'pos'}`}>{isPayable ? '−' : '+'}{idr(d.remaining_amount ?? d.amount)}</div>
+          </div>
+          <div className="cfo-dcard-meta">
+            <StatusBadge tone={toneFor(d.status)}>{d.status}{d.days_overdue > 0 ? ` · ${d.days_overdue}d` : ''}</StatusBadge>
+            <span className="cfo-mono">Due {(d.due_date || '').slice(0, 10) || '—'}</span>
+            <span className="cfo-mono">Paid {idr(d.paid_amount || 0)} / {idr(d.original_amount || d.amount)}</span>
+            {(d.document_id || d.has_documents) && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><Icon.doc width="13" height="13" /> doc</span>}
+          </div>
+          {d.status !== 'paid' && <div className="cfo-dcard-foot"><Btn sm onClick={() => setPayDebt(d)}>{isPayable ? 'Pay Now' : (d.status === 'partial' ? 'More' : 'Mark received')}</Btn></div>}
+        </div>
+      ))}
+    </div>
+    {payDebt && (
+      <DebtPaymentModal debt={payDebt} accounts={data.wallets} token={token}
+        onClose={() => setPayDebt(null)} onSuccess={() => { setPayDebt(null); reload() }} />
+    )}
+  </>
+}
+
+export function BusinessPayables() { return <DebtsView kind="payable" /> }
+export function BusinessReceivables() { return <DebtsView kind="receivable" /> }

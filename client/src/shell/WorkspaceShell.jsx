@@ -36,13 +36,13 @@ export const BUSINESS_NAV = [
   { title: 'Overview', items: [
     { key: 'pulse', label: 'Pulse', to: '/business/pulse', icon: <Icon.pulse /> },
     { key: 'cfo', label: 'AI CFO', to: '/cfo', icon: <Icon.cfo /> },
-    { key: 'accountant', label: 'AI Accountant', to: '/accountant', icon: <Icon.acct /> },
+    { key: 'accountant', label: 'AI Accountant', to: '/business/accountant', icon: <Icon.acct /> },
   ] },
   { title: 'Finance', items: [
-    { key: 'transactions', label: 'Transactions', to: '/transactions', icon: <Icon.list /> },
+    { key: 'transactions', label: 'Transactions', to: '/business/transactions', icon: <Icon.list /> },
     { key: 'accounts', label: 'Accounts', to: '/business/accounts', icon: <Icon.wallet /> },
-    { key: 'receivables', label: 'Receivables', to: '/receivables', icon: <Icon.down /> },
-    { key: 'payables', label: 'Payables', to: '/payables', icon: <Icon.up /> },
+    { key: 'receivables', label: 'Receivables', to: '/business/receivables', icon: <Icon.down /> },
+    { key: 'payables', label: 'Payables', to: '/business/payables', icon: <Icon.up /> },
     { key: 'funding', label: 'Funding & Investors', to: '/funding-investors', icon: <Icon.fund /> },
     { key: 'bankimport', label: 'Bank Import', to: '/bank-import', icon: <Icon.bank /> },
   ] },

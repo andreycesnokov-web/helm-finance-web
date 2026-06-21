@@ -63,7 +63,8 @@ import WalletDetail from './pages/WalletDetail'
 import Onboarding, { shouldShowOnboarding, clearOnboardingFlags } from './pages/Onboarding'
 import PreviewApp from './pages/PreviewApp'
 import { PersonalLayout, PersonalShell, PersonalOverview, PersonalAccounts, PersonalTransactions, PersonalOnboarding } from './pages/personal'
-import { BusinessLayout, BusinessShell, BusinessPulse, BusinessAccounts } from './pages/business'
+import { BusinessLayout, BusinessShell, BusinessPulse, BusinessAccounts, BusinessTransactions, BusinessPayables, BusinessReceivables } from './pages/business'
+import { BusinessAccountant } from './pages/business/Accountant'
 
 // ── Mobile bottom nav keys (labels resolved at render time via t()) ───────────
 const NAV_KEYS = [
@@ -550,6 +551,10 @@ export default function App() {
           <Route element={<BusinessLayout />}>
             <Route path="/business/pulse" element={<BusinessShell><BusinessPulse /></BusinessShell>} />
             <Route path="/business/accounts" element={<BusinessShell><BusinessAccounts /></BusinessShell>} />
+            <Route path="/business/transactions" element={<BusinessShell><BusinessTransactions /></BusinessShell>} />
+            <Route path="/business/payables" element={<BusinessShell><BusinessPayables /></BusinessShell>} />
+            <Route path="/business/receivables" element={<BusinessShell><BusinessReceivables /></BusinessShell>} />
+            <Route path="/business/accountant" element={<BusinessShell><BusinessAccountant /></BusinessShell>} />
           </Route>
           {/* Public invite page — no auth required to view, Telegram widget handles login */}
           <Route path="/invite/:code" element={<JoinInvite />} />
