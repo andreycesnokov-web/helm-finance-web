@@ -151,18 +151,38 @@ export function BusinessTransactions() {
   if (tx.error) return <>{head}{filters}<ErrorState description={tx.error} onRetry={() => location.reload()} /></>
   const rows = Array.isArray(tx.data) ? tx.data : []
   if (!rows.length) return <>{head}{filters}<EmptyState symbol={SYMBOL} title="No transactions" description="Transactions in this period will appear here." /></>
+  const amtTone = (r) => r.type === 'income' ? 'cfo-pos' : ['expense', 'payroll'].includes(r.type) ? 'cfo-neg' : ''
+  const sign = (r) => r.type === 'income' ? '+' : ['expense', 'payroll'].includes(r.type) ? '−' : ''
   return <>{head}{filters}
-    <Card>
+    {/* desktop table */}
+    <Card className="cfo-rtable">
       <ResponsiveTable
         columns={[
           { key: 'date', label: 'Date', render: r => <span className="cfo-mono">{(r.transaction_date || r.created_at || '').slice(0, 10)}</span> },
           { key: 'description', label: 'Description', render: r => r.description || r.type },
           { key: 'type', label: 'Type', render: r => <StatusBadge tone="neutral">{r.type}</StatusBadge> },
           { key: 'doc', label: 'Doc', render: r => (r.document_id || r.has_documents) ? <Icon.doc width="15" height="15" /> : '' },
-          { key: 'amount', label: 'Amount', num: true, render: r => <span className={r.type === 'income' ? 'cfo-pos' : ['expense', 'payroll'].includes(r.type) ? 'cfo-neg' : ''}>{formatAmount(String(r.amount_original ?? r.amount_idr ?? 0), ccyOf(r))} {ccyOf(r)}</span> },
+          { key: 'amount', label: 'Amount', num: true, render: r => <span className={amtTone(r)}>{formatAmount(String(r.amount_original ?? r.amount_idr ?? 0), ccyOf(r))} {ccyOf(r)}</span> },
         ]}
         rows={rows} rowKey={r => r.id} />
     </Card>
+    {/* mobile cards */}
+    <div className="cfo-mcards">
+      {rows.map(r => (
+        <div className="cfo-dcard" key={r.id}>
+          <div className="cfo-dcard-top">
+            <div className="cfo-dcard-name">{r.description || r.type}</div>
+            <div className={`cfo-dcard-amt ${amtTone(r)}`}>{sign(r)}{formatAmount(String(r.amount_original ?? r.amount_idr ?? 0), ccyOf(r))} {ccyOf(r)}</div>
+          </div>
+          <div className="cfo-dcard-meta">
+            <StatusBadge tone="neutral">{r.type}</StatusBadge>
+            <span className="cfo-mono">{(r.transaction_date || r.created_at || '').slice(0, 10)}</span>
+            {(r.source || r.wallet_name) && <span>{r.source || r.wallet_name}</span>}
+            {(r.document_id || r.has_documents) && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><Icon.doc width="13" height="13" /> doc</span>}
+          </div>
+        </div>
+      ))}
+    </div>
   </>
 }
 
@@ -237,3 +257,49 @@ function DebtsView({ kind }) {
 
 export function BusinessPayables() { return <DebtsView kind="payable" /> }
 export function BusinessReceivables() { return <DebtsView kind="receivable" /> }
+
+// ── Business Invoices — premium PLACEHOLDER (no invoice backend/table yet).
+//    Shows real receivable/payable/overdue counts derived from /api/debts (NOT fake
+//    invoice records) + routes to Receivables/Payables. No debt-logic change. ──────
+export function BusinessInvoices() {
+  const w = useScoped('/debts')
+  const navigate = useNavigate()
+  const head = <PageHeader eyebrow="Business Workspace" title="Invoices"
+    actions={<StatusBadge tone="info">Coming next</StatusBadge>} />
+  const debts = Array.isArray(w.data) ? w.data : []
+  const recv = debts.filter(d => d.type === 'receivable' && d.status !== 'cancelled')
+  const pay = debts.filter(d => d.type === 'payable' && d.status !== 'cancelled')
+  const overdue = debts.filter(d => d.status === 'overdue')
+  const cards = [
+    { k: 'Receivable invoices', v: recv.length, sub: 'from Receivables', icon: <Icon.down /> },
+    { k: 'Payable invoices', v: pay.length, sub: 'from Payables', icon: <Icon.up /> },
+    { k: 'Overdue invoices', v: overdue.length, sub: 'past due date', icon: <Icon.warn /> },
+    { k: 'Draft invoices', v: 0, sub: 'not yet issued', icon: <Icon.doc /> },
+  ]
+  return <>{head}
+    <div style={{ marginBottom: 18, color: 'var(--text-secondary)', fontSize: 14 }}>
+      Invoices module is coming next. Receivables and Payables are already available below.
+    </div>
+    <div className="cfo-grid cfo-grid-4" style={{ marginBottom: 18 }}>
+      {cards.map(c => (
+        <Card key={c.k} title={c.k}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span className="cfo-state-ic" style={{ width: 36, height: 36, borderRadius: 10, background: 'var(--surface-card-muted)', color: 'var(--text-secondary)' }}>{c.icon}</span>
+            <div><div className="cfo-stat-v cfo-mono" style={{ fontSize: 22 }}>{w.loading ? '—' : c.v}</div>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{c.sub}</div></div>
+          </div>
+        </Card>
+      ))}
+    </div>
+    <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 18 }}>
+      <Btn onClick={() => navigate('/business/receivables')}>View Receivables</Btn>
+      <Btn variant="ghost" onClick={() => navigate('/business/payables')}>View Payables</Btn>
+    </div>
+    <Card title="Invoice views" action={<StatusBadge tone="neutral">Preview</StatusBadge>}>
+      <div className="cfo-tabs" style={{ marginBottom: 0, opacity: .55, pointerEvents: 'none' }}>
+        {['Cards', 'List', 'Kanban'].map((v, i) => <button key={v} className={`cfo-tab${i === 0 ? ' is-active' : ''}`} disabled>{v}</button>)}
+      </div>
+      <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 10 }}>Cards / List / Kanban views arrive with the Invoices module. No invoice records are created yet.</div>
+    </Card>
+  </>
+}

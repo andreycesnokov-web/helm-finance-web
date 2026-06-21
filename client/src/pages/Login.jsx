@@ -36,14 +36,9 @@ export default function Login() {
   return (
     <div style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px 24px' }}>
       <div style={{ marginBottom: 32, textAlign: 'center' }}>
-        <div style={{ fontSize: 40, marginBottom: 12 }}>
-          <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
-            <rect width="48" height="48" rx="14" fill="#1a1a1a"/>
-            <path d="M14 26l6 6 14-14" stroke="#1D9E75" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-        </div>
-        <div style={{ fontSize: 24, fontWeight: 600, color: 'var(--text)', marginBottom: 6 }}>Helm Finance</div>
-        <div style={{ fontSize: 14, color: 'var(--text-2)', lineHeight: 1.5 }}>Financial clarity for entrepreneurs</div>
+        <img src="/brand/logo_main_navy_transparent_2400.png" alt="CFO AI — Financial OS"
+          style={{ height: 56, width: 'auto', maxWidth: '78vw', objectFit: 'contain', marginBottom: 14 }} />
+        <div style={{ fontSize: 14, color: 'var(--text-2, #6B7E92)', lineHeight: 1.5 }}>Financial clarity for entrepreneurs</div>
       </div>
 
       <div ref={tgRef} style={{ marginBottom: 20 }} />

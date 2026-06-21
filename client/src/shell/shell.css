@@ -223,6 +223,14 @@ html, body, #root { max-width: 100%; overflow-x: hidden; }
 .cfo-form2{display:grid;grid-template-columns:1fr 1fr;gap:14px 18px}
 @media (max-width:640px){.cfo-form2{grid-template-columns:1fr}}
 
+/* preview banner — compact on mobile */
+@media (max-width:640px){
+  .cfo-preview-banner{padding:5px 10px;gap:8px;font-size:11px}
+  .cfo-preview-banner .cfo-pb-sub{display:none}
+  .cfo-preview-banner .cfo-pb-state{margin-left:auto}
+  .cfo-preview-banner .cfo-pb-state button{padding:3px 7px;font-size:11px}
+}
+
 /* ── Responsive ──────────────────────────────────────────────────────────── */
 @media (max-width:1024px){
   .cfo-shell{grid-template-columns:1fr}

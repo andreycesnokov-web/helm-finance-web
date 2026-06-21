@@ -207,13 +207,13 @@ function PreviewInner() {
 
   return (
     <div>
-      {/* preview banner */}
-      <div style={{ background: 'var(--brand-navy)', color: '#fff', padding: '7px 14px', display: 'flex', alignItems: 'center', gap: 12, fontSize: 12.5, fontFamily: 'var(--font-ui)', position: 'sticky', top: 0, zIndex: 100, flexWrap: 'wrap' }}>
+      {/* preview banner — compact on mobile (cfo-preview-banner) */}
+      <div className="cfo-preview-banner" style={{ background: 'var(--brand-navy)', color: '#fff', padding: '7px 14px', display: 'flex', alignItems: 'center', gap: 12, fontSize: 12.5, fontFamily: 'var(--font-ui)', position: 'sticky', top: 0, zIndex: 100, flexWrap: 'wrap' }}>
         <strong style={{ display: 'inline-flex', alignItems: 'center', gap: 7, letterSpacing: '.04em' }}>
           <span style={{ width: 8, height: 8, borderRadius: 99, background: 'var(--brand-electric-blue)' }} /> UI PREVIEW · SYNTHETIC DATA
         </strong>
-        <span style={{ opacity: .6 }}>No real data · write actions disabled</span>
-        <span style={{ marginLeft: 'auto', display: 'inline-flex', gap: 6, alignItems: 'center' }}>
+        <span className="cfo-pb-sub" style={{ opacity: .6 }}>No real data · write actions disabled</span>
+        <span className="cfo-pb-state" style={{ marginLeft: 'auto', display: 'inline-flex', gap: 6, alignItems: 'center' }}>
           <span style={{ opacity: .7 }}>State:</span>
           {['normal', 'loading', 'empty', 'error'].map(s => (
             <button key={s} onClick={() => setState(s)}

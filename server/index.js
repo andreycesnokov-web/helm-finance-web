@@ -5974,13 +5974,24 @@ app.patch('/api/business/current', auth, async (req, res) => {
     if (timezone !== undefined) updates.timezone      = timezone || null;
     if (country  !== undefined) updates.country       = country  || null;
 
-    const { data: business, error: bErr } = await supabase
-      .from('businesses').update(updates).eq('id', businessId).select().single();
-    if (bErr) throw bErr;
+    // Graceful degradation: if an optional column (e.g. country/timezone) is not in
+    // the live schema, drop it and retry rather than surfacing a raw PostgREST schema
+    // error. Required fields (name/base_currency) are never dropped.
+    let business, bErr, dropped = [];
+    for (let attempt = 0; attempt < 4; attempt++) {
+      ({ data: business, error: bErr } = await supabase
+        .from('businesses').update(updates).eq('id', businessId).select().single());
+      if (!bErr) break;
+      const m = /find the '([a-z_]+)' column/i.exec(bErr.message || '');
+      const col = m?.[1];
+      if (col && col in updates && !['name', 'base_currency'].includes(col)) { delete updates[col]; dropped.push(col); continue; }
+      break;
+    }
+    if (bErr) return res.status(400).json({ error: 'Could not save business settings. Please check the fields and try again.' });
 
-    res.json({ business });
+    res.json({ business, ...(dropped.length ? { unsupported_fields: dropped } : {}) });
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    res.status(500).json({ error: 'Could not save business settings.' });
   }
 });
 

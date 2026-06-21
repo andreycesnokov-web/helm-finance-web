@@ -41,6 +41,7 @@ export const BUSINESS_NAV = [
   { title: 'Finance', items: [
     { key: 'transactions', label: 'Transactions', to: '/business/transactions', icon: <Icon.list /> },
     { key: 'accounts', label: 'Accounts', to: '/business/accounts', icon: <Icon.wallet /> },
+    { key: 'invoices', label: 'Invoices', to: '/business/invoices', icon: <Icon.doc /> },
     { key: 'receivables', label: 'Receivables', to: '/business/receivables', icon: <Icon.down /> },
     { key: 'payables', label: 'Payables', to: '/business/payables', icon: <Icon.up /> },
     { key: 'funding', label: 'Funding & Investors', to: '/funding-investors', icon: <Icon.fund /> },
