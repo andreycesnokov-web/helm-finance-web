@@ -565,6 +565,17 @@ export default function App() {
             <Route path="/business/receivables" element={<BusinessShell><BusinessReceivables /></BusinessShell>} />
             <Route path="/business/accountant" element={<BusinessShell><BusinessAccountant /></BusinessShell>} />
             <Route path="/business/invoices" element={<BusinessShell><BusinessInvoices /></BusinessShell>} />
+            {/* Not-yet-migrated modules: existing components rendered INSIDE the premium
+                shell (real content + premium sidebar/header), so the user never sees the
+                legacy Layout. Legacy routes (/cfo,/payroll,…) remain by direct URL only. */}
+            <Route path="/business/ai-cfo" element={<BusinessShell><AICFO /></BusinessShell>} />
+            <Route path="/business/radar" element={<BusinessShell><Radar /></BusinessShell>} />
+            <Route path="/business/payroll" element={<BusinessShell><Payroll /></BusinessShell>} />
+            <Route path="/business/approvals" element={<BusinessShell><Approvals /></BusinessShell>} />
+            <Route path="/business/team" element={<BusinessShell><Team /></BusinessShell>} />
+            <Route path="/business/documents" element={<BusinessShell><Documents /></BusinessShell>} />
+            <Route path="/business/settings" element={<BusinessShell><Settings /></BusinessShell>} />
+            <Route path="/business/bank-import" element={<BusinessShell><BankImport /></BusinessShell>} />
           </Route>
           {/* Public invite page — no auth required to view, Telegram widget handles login */}
           <Route path="/invite/:code" element={<JoinInvite />} />

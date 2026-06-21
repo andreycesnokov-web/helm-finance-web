@@ -36,7 +36,8 @@ export const PERSONAL_NAV = [
 export const BUSINESS_NAV = [
   { title: 'Overview', items: [
     { key: 'pulse', label: 'Pulse', to: '/business/pulse', icon: <Icon.pulse /> },
-    { key: 'cfo', label: 'AI CFO', to: '/cfo', icon: <Icon.cfo /> },
+    { key: 'radar', label: 'Radar', to: '/business/radar', icon: <Icon.radar /> },
+    { key: 'cfo', label: 'AI CFO', to: '/business/ai-cfo', icon: <Icon.cfo /> },
     { key: 'accountant', label: 'AI Accountant', to: '/business/accountant', icon: <Icon.acct /> },
   ] },
   { title: 'Finance', items: [
@@ -48,14 +49,14 @@ export const BUSINESS_NAV = [
     // Funding & Investors depends on migrations 037–039; hidden when the gate is off
     // so production shows no dead link.
     ...(FUNDING_UI_ENABLED ? [{ key: 'funding', label: 'Funding & Investors', to: '/funding-investors', icon: <Icon.fund /> }] : []),
-    { key: 'bankimport', label: 'Bank Import', to: '/bank-import', icon: <Icon.bank /> },
+    { key: 'bankimport', label: 'Bank Import', to: '/business/bank-import', icon: <Icon.bank /> },
   ] },
   { title: 'Operations', items: [
-    { key: 'payroll', label: 'Payroll', to: '/payroll', icon: <Icon.team /> },
-    { key: 'approvals', label: 'Approvals', to: '/approvals', icon: <Icon.check /> },
-    { key: 'team', label: 'Team', to: '/team', icon: <Icon.users /> },
-    { key: 'documents', label: 'Documents', to: '/documents', icon: <Icon.doc /> },
-    { key: 'settings', label: 'Settings', to: '/settings', icon: <Icon.cog /> },
+    { key: 'payroll', label: 'Payroll', to: '/business/payroll', icon: <Icon.team /> },
+    { key: 'approvals', label: 'Approvals', to: '/business/approvals', icon: <Icon.check /> },
+    { key: 'team', label: 'Team', to: '/business/team', icon: <Icon.users /> },
+    { key: 'documents', label: 'Documents', to: '/business/documents', icon: <Icon.doc /> },
+    { key: 'settings', label: 'Settings', to: '/business/settings', icon: <Icon.cog /> },
   ] },
 ]
 
