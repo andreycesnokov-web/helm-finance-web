@@ -445,11 +445,9 @@ function PulseWrapper() {
     return <Onboarding onSkip={handleSkip} onComplete={handleComplete} />
   }
 
-  return (
-    <Layout rightPanel={<RightPanel data={pulseData} />}>
-      <Pulse onDataLoad={handleDataLoad} />
-    </Layout>
-  )
+  // Default authenticated landing is the premium Business shell, not the legacy
+  // dashboard. (Legacy routes remain reachable directly as a migration fallback.)
+  return <Navigate to="/business/pulse" replace />
 }
 
 // Standalone onboarding route — clears both flags, shows wizard, then redirects home
