@@ -10,6 +10,7 @@ import { Icon } from './ui'
 
 const LOGO_WORDMARK = '/brand/logo_main_navy_transparent_2400.png'
 const SYMBOL = '/brand/symbol_navy_blue_dot_transparent.svg'
+const FUNDING_UI_ENABLED = import.meta.env.VITE_PERSONAL_FUNDING_UI_ENABLED === 'true'
 
 // Nav configs — labels are i18n keys at call sites; here plain for V1.
 export const PERSONAL_NAV = [
@@ -44,7 +45,9 @@ export const BUSINESS_NAV = [
     { key: 'invoices', label: 'Invoices', to: '/business/invoices', icon: <Icon.doc /> },
     { key: 'receivables', label: 'Receivables', to: '/business/receivables', icon: <Icon.down /> },
     { key: 'payables', label: 'Payables', to: '/business/payables', icon: <Icon.up /> },
-    { key: 'funding', label: 'Funding & Investors', to: '/funding-investors', icon: <Icon.fund /> },
+    // Funding & Investors depends on migrations 037–039; hidden when the gate is off
+    // so production shows no dead link.
+    ...(FUNDING_UI_ENABLED ? [{ key: 'funding', label: 'Funding & Investors', to: '/funding-investors', icon: <Icon.fund /> }] : []),
     { key: 'bankimport', label: 'Bank Import', to: '/bank-import', icon: <Icon.bank /> },
   ] },
   { title: 'Operations', items: [
