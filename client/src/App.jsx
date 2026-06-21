@@ -61,6 +61,14 @@ import TaxProfile from './pages/TaxProfile'
 import ComplianceCalendar from './pages/ComplianceCalendar'
 import WalletDetail from './pages/WalletDetail'
 import Onboarding, { shouldShowOnboarding, clearOnboardingFlags } from './pages/Onboarding'
+import PreviewApp from './pages/PreviewApp'
+import { PersonalLayout, PersonalShell, PersonalOverview, PersonalAccounts, PersonalTransactions, PersonalOnboarding } from './pages/personal'
+import { BusinessLayout, BusinessShell, BusinessPulse, BusinessAccounts, BusinessTransactions, BusinessPayables, BusinessReceivables, BusinessInvoices } from './pages/business'
+import { BusinessAccountant } from './pages/business/Accountant'
+
+// Personal/Funding UI requires migrations 037–039. OFF by default so production stays
+// safe until they're applied. Enable in env: VITE_PERSONAL_FUNDING_UI_ENABLED=true.
+const PERSONAL_FUNDING_UI = import.meta.env.VITE_PERSONAL_FUNDING_UI_ENABLED === 'true'
 
 // ── Mobile bottom nav keys (labels resolved at render time via t()) ───────────
 const NAV_KEYS = [
@@ -532,6 +540,34 @@ export default function App() {
           <Route path="/accountant/calendar" element={<Layout><ComplianceCalendar /></Layout>} />
           <Route path="/bank-import"  element={<Layout><BankImport /></Layout>} />
           <Route path="/team-onboarding" element={<Layout><TeamOnboarding /></Layout>} />
+          {/* Premium UI preview — standalone, synthetic only, gated by VITE_PREMIUM_UI_PREVIEW.
+              404s in any build without the flag (e.g. production). */}
+          <Route path="/demo/personal-overview" element={<PreviewApp />} />
+          {/* Live Personal Workspace (Phase 2) — premium shell, real endpoints, no synthetic data. */}
+          {/* Personal/Funding UI depends on migrations 037–039. Gated so production
+              (without those migrations) hides the routes instead of hitting missing
+              tables. Enable with VITE_PERSONAL_FUNDING_UI_ENABLED=true. */}
+          {PERSONAL_FUNDING_UI ? (
+            <Route element={<PersonalLayout />}>
+              <Route path="/personal" element={<PersonalShell><PersonalOverview /></PersonalShell>} />
+              <Route path="/personal/accounts" element={<PersonalShell><PersonalAccounts /></PersonalShell>} />
+              <Route path="/personal/transactions" element={<PersonalShell><PersonalTransactions /></PersonalShell>} />
+              <Route path="/personal/onboarding" element={<PersonalOnboarding />} />
+            </Route>
+          ) : (
+            <Route path="/personal/*" element={<Navigate to="/" replace />} />
+          )}
+          {/* Business Workspace in premium shell (Phase 3, presentation-only). Legacy
+              /,/accounts routes remain untouched during the migration. */}
+          <Route element={<BusinessLayout />}>
+            <Route path="/business/pulse" element={<BusinessShell><BusinessPulse /></BusinessShell>} />
+            <Route path="/business/accounts" element={<BusinessShell><BusinessAccounts /></BusinessShell>} />
+            <Route path="/business/transactions" element={<BusinessShell><BusinessTransactions /></BusinessShell>} />
+            <Route path="/business/payables" element={<BusinessShell><BusinessPayables /></BusinessShell>} />
+            <Route path="/business/receivables" element={<BusinessShell><BusinessReceivables /></BusinessShell>} />
+            <Route path="/business/accountant" element={<BusinessShell><BusinessAccountant /></BusinessShell>} />
+            <Route path="/business/invoices" element={<BusinessShell><BusinessInvoices /></BusinessShell>} />
+          </Route>
           {/* Public invite page — no auth required to view, Telegram widget handles login */}
           <Route path="/invite/:code" element={<JoinInvite />} />
           {/* Standalone onboarding — accessible directly to re-run setup */}

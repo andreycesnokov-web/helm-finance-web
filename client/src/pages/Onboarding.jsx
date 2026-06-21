@@ -182,21 +182,12 @@ function StepBar({ current }) {
   )
 }
 
-// ── Logo mark ─────────────────────────────────────────────────────────────────
+// ── Logo mark (official CFO AI wordmark) ──────────────────────────────────────
 function LogoMark() {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 32 }}>
-      <div style={{ width: 38, height: 38, borderRadius: 11, background: 'linear-gradient(135deg, #1D4ED8, #2563EB)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-          <rect x="2"  y="14" width="4"  height="7" rx="1" fill="rgba(255,255,255,0.5)"/>
-          <rect x="8"  y="9"  width="4"  height="12" rx="1" fill="rgba(255,255,255,0.75)"/>
-          <rect x="14" y="5"  width="4"  height="16" rx="1" fill="#fff"/>
-        </svg>
-      </div>
-      <div>
-        <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--text)', letterSpacing: -0.3 }}>CFO AI</div>
-        <div style={{ fontSize: 10, color: 'var(--text-3)', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Financial OS</div>
-      </div>
+    <div style={{ marginBottom: 32 }}>
+      <img src="/brand/logo_main_navy_transparent_2400.png" alt="CFO AI — Financial OS"
+        style={{ height: 40, width: 'auto', maxWidth: '70vw', objectFit: 'contain', display: 'block' }} />
     </div>
   )
 }

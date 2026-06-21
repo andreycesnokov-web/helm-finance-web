@@ -8,6 +8,8 @@ const { computeActivationBlockers, isEffectiveApprovedReview, validReviewTransit
 const { VALID_PLANS, computeBusinessAccess } = require('./lib/businessAccess');
 const docV = require('./lib/documentValidation');
 const docA = require('./lib/documentAccess');
+const TX = require('./lib/transactionClass');
+const personalFundingRouter = require('./routes/personalFunding');
 require('dotenv').config();
 
 // --- Environment validation (fail fast, never log secret values) -----------
@@ -226,7 +228,7 @@ async function requireBusiness(req, res) {
 // @param totalBalance — computed total cash balance (all-time income − expenses + corrections)
 // @returns { burn_rate_daily, runway_days, burn_window_days }
 function computeBurnAndRunway(allTxs, totalBalance) {
-  const CASH_OUT = ['expense', 'payroll'];
+  const CASH_OUT = TX.CASH_OUT_LEGACY;
   const now      = new Date();
   const cutoff30 = new Date(now.getTime() - 30 * 86400000);
 
@@ -327,8 +329,8 @@ app.get('/api/pulse', auth, async (req, res) => {
     //   as cash-neutral to avoid phantom debits.
     //   TODO: when from_account / to_account schema fields are added,
     //         transfer should debit source account and credit destination.
-    const CASH_IN  = ['income'];
-    const CASH_OUT = ['expense', 'payroll'];
+    const CASH_IN  = TX.CASH_IN_LEGACY;
+    const CASH_OUT = TX.CASH_OUT_LEGACY;
     // 'transfer', 'correction', unknown types → NEUTRAL (no effect)
 
     const allIncome      = (allTxs || []).filter(t => CASH_IN.includes(t.type)).reduce((s, t) => s + Number(t.amount_original), 0);
@@ -2228,7 +2230,7 @@ app.post('/api/admin/tax-rules/:id/new-version', auth, async (req, res) => {
 // (each imported row creates a real transaction), and ending-balance reconcile.
 // ═════════════════════════════════════════════════════════════════════════════
 
-const CASH_IN_TYPES = ['income'];
+const CASH_IN_TYPES = TX.CASH_IN_LEGACY;
 
 function normalizeDesc(s) {
   return String(s || '').toLowerCase().replace(/\s+/g, ' ').replace(/[^a-z0-9а-яё ]/gi, '').trim();
@@ -4871,8 +4873,8 @@ function notificationText(type, language, params = {}) {
 // Phase 1: user-scoped. Balance computed from transactions (wallet_id match
 // OR legacy source-name match for backward compat with pre-wallet transactions).
 
-const WALLET_CASH_IN  = ['income'];
-const WALLET_CASH_OUT = ['expense', 'payroll'];
+const WALLET_CASH_IN  = TX.CASH_IN_LEGACY;
+const WALLET_CASH_OUT = TX.CASH_OUT_LEGACY;
 
 app.get('/api/wallets', auth, async (req, res) => {
   try {
@@ -5947,24 +5949,32 @@ app.patch('/api/business/current', auth, async (req, res) => {
       return res.status(400).json({ error: 'At least one field required: name, base_currency, timezone, country' });
     }
 
-    // Only owner or admin can update business settings
-    const { data: memberships } = await supabase
-      .from('business_members')
-      .select('business_id, role')
-      .eq('user_id', userId)
-      .eq('status', 'active')
-      .in('role', ['owner', 'admin'])
-      .limit(1);
-
+    // Workspace-aware + Business-only. This endpoint must NEVER mutate a Personal
+    // Workspace. Explicit-but-inaccessible/stale ids are rejected (no silent fallback).
+    const requested = req.headers['x-business-id'] || req.query?.business_id || null;
     let businessId;
-    if (!memberships || memberships.length === 0) {
-      // No business yet — bootstrap then update
-      const { data: userRow } = await supabase.from('users').select('first_name, username').eq('id', userId).single();
-      const firstName = userRow?.first_name || userRow?.username || 'My';
-      const { business: newBiz } = await ensureDefaultBusiness(userId, firstName);
-      businessId = newBiz.id;
+    if (requested) {
+      const { data } = await supabase.from('business_members')
+        .select('role, businesses(id, type)')
+        .eq('user_id', userId).eq('business_id', requested).eq('status', 'active').limit(1);
+      const m = data?.[0];
+      if (!m || !m.businesses) return res.status(403).json({ error: 'workspace_not_accessible' });
+      if (m.businesses.type === 'personal') return res.status(403).json({ error: 'business_workspace_required' });
+      if (!['owner', 'admin'].includes(m.role)) return res.status(403).json({ error: 'Only owner or admin can update business settings' });
+      businessId = m.businesses.id;
     } else {
-      businessId = memberships[0].business_id;
+      // No explicit id — pick the user's default BUSINESS (never a personal workspace).
+      const { data: memberships } = await supabase.from('business_members')
+        .select('business_id, role, businesses(type)')
+        .eq('user_id', userId).eq('status', 'active').in('role', ['owner', 'admin']);
+      const biz = (memberships || []).find(m => m.businesses?.type === 'business');
+      if (biz) businessId = biz.business_id;
+      else {
+        const { data: userRow } = await supabase.from('users').select('first_name, username').eq('id', userId).single();
+        const firstName = userRow?.first_name || userRow?.username || 'My';
+        const { business: newBiz } = await ensureDefaultBusiness(userId, firstName);
+        businessId = newBiz.id;
+      }
     }
     const updates = { updated_at: new Date().toISOString() };
     if (name?.trim())           updates.name          = name.trim();
@@ -5972,13 +5982,24 @@ app.patch('/api/business/current', auth, async (req, res) => {
     if (timezone !== undefined) updates.timezone      = timezone || null;
     if (country  !== undefined) updates.country       = country  || null;
 
-    const { data: business, error: bErr } = await supabase
-      .from('businesses').update(updates).eq('id', businessId).select().single();
-    if (bErr) throw bErr;
+    // Graceful degradation: if an optional column (e.g. country/timezone) is not in
+    // the live schema, drop it and retry rather than surfacing a raw PostgREST schema
+    // error. Required fields (name/base_currency) are never dropped.
+    let business, bErr, dropped = [];
+    for (let attempt = 0; attempt < 4; attempt++) {
+      ({ data: business, error: bErr } = await supabase
+        .from('businesses').update(updates).eq('id', businessId).select().single());
+      if (!bErr) break;
+      const m = /find the '([a-z_]+)' column/i.exec(bErr.message || '');
+      const col = m?.[1];
+      if (col && col in updates && !['name', 'base_currency'].includes(col)) { delete updates[col]; dropped.push(col); continue; }
+      break;
+    }
+    if (bErr) return res.status(400).json({ error: 'Could not save business settings. Please check the fields and try again.' });
 
-    res.json({ business });
+    res.json({ business, ...(dropped.length ? { unsupported_fields: dropped } : {}) });
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    res.status(500).json({ error: 'Could not save business settings.' });
   }
 });
 
@@ -6092,8 +6113,8 @@ async function buildAiCfoContext(userId, language = 'en', biz = null) {
   const businessWalletIds = new Set(businessWallets.map(w => w.id));
 
   // ── Cash (business wallets only for CFO Score / runway) ──────────────────
-  const CASH_IN  = ['income'];
-  const CASH_OUT = ['expense', 'payroll'];
+  const CASH_IN  = TX.CASH_IN_LEGACY;
+  const CASH_OUT = TX.CASH_OUT_LEGACY;
 
   // Helper to sum tx that belong to a given set of wallet IDs (or legacy source match or scope field)
   function txBelongsToWallets(t, walletSet, walletIdSet, scopeValue) {
@@ -6303,7 +6324,7 @@ async function buildBusinessFinancialSnapshot(biz, language = 'en', asOfDate = n
       .eq('business_id', biz.business.id),
   ]);
 
-  const CASH_IN = ['income'], CASH_OUT = ['expense', 'payroll'];
+  const CASH_IN = TX.CASH_IN_LEGACY, CASH_OUT = TX.CASH_OUT_LEGACY;
   const allWallets = wallets || [];
   const businessWallets = allWallets.filter(w => (w.scope || 'business') === 'business');
   const bizWalletIds = new Set(businessWallets.map(w => w.id));
@@ -8111,6 +8132,10 @@ app.delete('/api/documents/:id/links/:linkId', auth, async (req, res) => {
     res.json({ ok: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
+
+// Personal Workspaces, Relationships, FX quotes, Wallet transfers & Funding Bridge.
+// Mounted under /api; shares auth, the service-role client and access helpers.
+app.use('/api', personalFundingRouter({ supabase, auth, getBusinessAccess, resolveUserDisplayName, TX }));
 
 // SPA catch-all — MUST be the last route so it never shadows API endpoints.
 app.get('*', (req, res) => {

@@ -1,0 +1,258 @@
+/* ============================================================================
+   CFO AI — Shared Premium Component System (Phase 1)
+   One component system for BOTH Personal and Business workspaces. Brand tokens
+   only (src/brand/tokens.css). Personal vs Business differ in CONTENT/ACCESS,
+   never in component quality or identity. Class prefix: cfo-
+   ========================================================================== */
+
+/* ── App shell (sidebar + mobile header + content) ───────────────────────── */
+.cfo-shell{--side:288px;min-height:100vh;background:var(--surface-page);color:var(--text-primary);
+  font-family:var(--font-ui);font-size:15px;line-height:var(--line-normal);display:grid;grid-template-columns:var(--side) 1fr}
+.cfo-shell *{box-sizing:border-box}
+.cfo-mono{font-family:var(--font-mono);font-variant-numeric:tabular-nums}
+
+.cfo-sidebar{background:var(--surface-card);border-right:1px solid var(--border-default);
+  padding:20px 16px;display:flex;flex-direction:column;gap:16px;position:sticky;top:0;height:100vh;overflow-y:auto}
+/* Desktop wordmark: the official lockup PNG has ~45% empty transparent canvas on
+   the right (viewBox 0 0 900 220, artwork ends ~x480). We clip ONLY that transparent
+   padding with an overflow window — the asset itself is unmodified (no rescale of a
+   single axis, no recolor, no rebuild). Result: prominent, readable CFO AI / FINANCIAL
+   OS at ~48px tall (≈1.7× the previous rendered size), with clear space preserved. */
+.cfo-brand{height:48px;width:138px;overflow:hidden;margin:0 4px 6px}
+.cfo-brand img{height:48px;width:auto;max-width:none;display:block}
+.cfo-nav{display:flex;flex-direction:column;gap:2px;margin-top:2px}
+.cfo-navgroup-title{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--text-muted);font-weight:700;padding:14px 12px 6px}
+.cfo-navitem{display:flex;align-items:center;gap:11px;padding:9px 12px;border-radius:var(--radius-sm);
+  color:var(--text-secondary);text-decoration:none;font-weight:600;font-size:14px;border:0;background:none;cursor:pointer;width:100%;text-align:left}
+.cfo-navitem:hover{background:var(--surface-card-muted)}
+.cfo-navitem.is-active{background:var(--info-soft);color:var(--brand-navy)}
+.cfo-navitem svg{width:18px;height:18px;flex-shrink:0;opacity:.85}
+.cfo-navitem.is-active svg{color:var(--brand-electric-blue);opacity:1}
+.cfo-navitem:disabled{opacity:.45;cursor:default}
+.cfo-side-foot{margin-top:auto;display:flex;flex-direction:column;gap:8px;padding-top:8px}
+
+.cfo-mobilehead{display:none;align-items:center;gap:10px;background:var(--surface-card);
+  border-bottom:1px solid var(--border-default);padding:11px 16px;position:sticky;top:0;z-index:20}
+.cfo-mobilesym{height:36px;width:36px}
+.cfo-burger{margin-left:auto;background:none;border:0;display:flex;flex-direction:column;gap:4px;cursor:pointer;padding:6px}
+.cfo-burger span{width:20px;height:2px;background:var(--text-primary);border-radius:2px}
+.cfo-main{min-width:0;padding:26px 30px 56px}
+.cfo-main-inner{max-width:1180px;margin:0 auto}
+
+/* mobile drawer */
+.cfo-drawer-scrim{position:fixed;inset:0;background:var(--surface-overlay);z-index:40;opacity:0;pointer-events:none;transition:opacity .2s}
+.cfo-drawer-scrim.is-open{opacity:1;pointer-events:auto}
+.cfo-drawer{position:fixed;top:0;left:0;bottom:0;width:280px;background:var(--surface-card);z-index:41;
+  transform:translateX(-100%);transition:transform .22s ease;padding:18px 14px;display:flex;flex-direction:column;gap:14px;overflow-y:auto}
+.cfo-drawer.is-open{transform:translateX(0)}
+
+/* ── Workspace switcher ──────────────────────────────────────────────────── */
+.cfo-switch{display:flex;align-items:center;gap:10px;width:100%;padding:9px 10px;border:1px solid var(--border-default);
+  border-radius:var(--radius-md);background:var(--surface-card-muted);cursor:pointer;text-align:left;position:relative}
+.cfo-switch:hover{border-color:var(--border-strong)}
+.cfo-switch-ava{width:34px;height:34px;border-radius:9px;color:#fff;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:15px}
+.cfo-switch-ava.personal{background:var(--brand-navy)}
+.cfo-switch-ava.business{background:var(--brand-electric-blue)}
+.cfo-switch-text{display:flex;flex-direction:column;flex:1;min-width:0}
+.cfo-switch-name{font-weight:700;font-size:14px;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cfo-switch-type{display:flex;align-items:center;gap:4px;font-size:11.5px;color:var(--text-muted);font-family:var(--font-mono)}
+.cfo-switch-chev{color:var(--text-muted);flex-shrink:0}
+.cfo-switch-menu{position:absolute;top:calc(100% + 6px);left:0;right:0;background:var(--surface-card);
+  border:1px solid var(--border-default);border-radius:var(--radius-md);box-shadow:var(--shadow-lg);padding:8px;z-index:50;max-height:420px;overflow-y:auto}
+.cfo-switch-grouptitle{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--text-muted);font-weight:700;padding:10px 10px 5px}
+.cfo-switch-opt{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:var(--radius-sm);cursor:pointer;border:0;background:none;width:100%;text-align:left}
+.cfo-switch-opt:hover{background:var(--surface-card-muted)}
+.cfo-switch-opt.is-active{background:var(--info-soft)}
+.cfo-switch-opt .cfo-switch-ava{width:30px;height:30px;border-radius:8px;font-size:13px}
+
+/* ── Page header ─────────────────────────────────────────────────────────── */
+.cfo-pagehead{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;margin-bottom:22px}
+.cfo-eyebrow{font-size:12px;letter-spacing:.13em;text-transform:uppercase;color:var(--text-muted);font-weight:700}
+.cfo-h1{font-family:var(--font-display);font-size:30px;line-height:var(--line-tight);margin:4px 0 0;color:var(--brand-navy)}
+.cfo-pagehead-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+
+/* ── Badges ──────────────────────────────────────────────────────────────── */
+.cfo-badge{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;padding:6px 11px;border-radius:999px;white-space:nowrap}
+.cfo-badge svg{width:13px;height:13px}
+.cfo-badge-private{background:var(--info-soft);color:var(--brand-navy)}
+.cfo-badge-shared{background:var(--surface-card-muted);color:var(--text-secondary);border:1px solid var(--border-default)}
+.cfo-badge-success{background:var(--success-soft);color:var(--success)}
+.cfo-badge-warning{background:var(--warning-soft);color:var(--warning)}
+.cfo-badge-danger{background:var(--danger-soft);color:var(--danger)}
+.cfo-badge-info{background:var(--info-soft);color:var(--brand-navy)}
+.cfo-badge-neutral{background:var(--surface-card-muted);color:var(--text-muted)}
+
+/* ── Buttons ─────────────────────────────────────────────────────────────── */
+.cfo-btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;font-family:var(--font-ui);font-weight:700;
+  font-size:14px;border-radius:var(--radius-md);padding:10px 16px;cursor:pointer;border:1px solid transparent;line-height:1}
+.cfo-btn svg{width:16px;height:16px}
+.cfo-btn-primary{background:var(--brand-electric-blue);color:#fff;box-shadow:var(--shadow-sm)}
+.cfo-btn-primary:hover{background:#2486e6}
+.cfo-btn-secondary{background:var(--brand-navy);color:#fff}
+.cfo-btn-secondary:hover{background:#00284f}
+.cfo-btn-ghost{background:var(--surface-card);border-color:var(--border-default);color:var(--text-primary)}
+.cfo-btn-ghost:hover{background:var(--surface-card-muted)}
+.cfo-btn-danger{background:var(--danger);color:#fff}
+.cfo-btn:disabled{opacity:.5;cursor:default}
+.cfo-btn-sm{padding:7px 12px;font-size:13px}
+
+/* ── Cards ───────────────────────────────────────────────────────────────── */
+.cfo-card{background:var(--surface-card);border:1px solid var(--border-default);border-radius:var(--radius-lg);padding:20px;box-shadow:var(--shadow-sm)}
+.cfo-card-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}
+.cfo-card-title{font-size:14px;font-weight:800;color:var(--text-primary)}
+.cfo-grid{display:grid;gap:16px}
+.cfo-grid-2{grid-template-columns:1fr 1fr}
+.cfo-grid-3{grid-template-columns:repeat(3,1fr)}
+.cfo-grid-4{grid-template-columns:repeat(4,1fr)}
+
+/* Summary / hero card (navy) */
+.cfo-summary{position:relative;overflow:hidden;background:var(--brand-navy);color:#fff;border-radius:var(--radius-lg);padding:24px 26px;box-shadow:var(--shadow-md)}
+.cfo-summary-sym{position:absolute;right:-18px;top:-18px;width:180px;opacity:.10}
+.cfo-summary-label{font-size:13px;color:#AFC6DE;font-weight:600}
+.cfo-summary-value{font-family:var(--font-display);font-size:40px;line-height:1.1;margin-top:6px}
+.cfo-summary-meta{display:flex;align-items:center;gap:8px;margin-top:12px;color:#C5D6E7;font-size:13px;flex-wrap:wrap}
+.cfo-summary-meta .dot{color:var(--brand-electric-blue);display:inline-flex}
+.cfo-summary-row{display:flex;gap:32px;margin-top:18px;padding-top:16px;border-top:1px solid rgba(255,255,255,.14);flex-wrap:wrap}
+.cfo-summary-k{display:block;font-size:12px;color:#AFC6DE}
+.cfo-summary-v{display:block;font-weight:800;font-size:18px;margin-top:3px;font-family:var(--font-mono)}
+.cfo-summary-v.pos{color:#7FE3B6}.cfo-summary-v.neg{color:#FFB4A8}
+
+/* Money / asset card */
+.cfo-money{background:var(--surface-card);border:1px solid var(--border-default);border-radius:var(--radius-lg);padding:16px;box-shadow:var(--shadow-sm)}
+.cfo-money-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:13px}
+.cfo-money-asset{font-family:var(--font-mono);font-weight:700;font-size:13px;padding:4px 9px;border-radius:7px}
+.cfo-money-asset.fiat{background:var(--info-soft);color:var(--brand-navy)}
+.cfo-money-asset.crypto{background:#EDEAFB;color:#3B2F8A}
+.cfo-money-sub{font-size:11.5px;color:var(--text-muted)}
+.cfo-money-native{font-size:21px;font-weight:700;color:var(--text-primary);font-family:var(--font-mono);font-variant-numeric:tabular-nums}
+.cfo-money-unit{font-size:13px;color:var(--text-muted)}
+.cfo-money-rep{font-size:13px;color:var(--text-secondary);margin-top:4px}
+.cfo-money-ts{display:flex;align-items:center;gap:5px;font-size:11.5px;color:var(--text-muted);margin-top:10px}
+.cfo-money-ts.stale{color:var(--warning)}
+.cfo-money-ts svg{width:13px;height:13px}
+
+/* Stat */
+.cfo-stat{display:flex;flex-direction:column;gap:3px}
+.cfo-stat-k{font-size:12px;color:var(--text-muted)}
+.cfo-stat-v{font-size:17px;font-weight:700;color:var(--text-primary);font-family:var(--font-mono)}
+.cfo-stat-v.pos{color:var(--success)}.cfo-stat-v.neg{color:var(--danger)}
+
+/* ── Tabs ────────────────────────────────────────────────────────────────── */
+.cfo-tabs{display:flex;gap:4px;border-bottom:1px solid var(--border-default);margin-bottom:18px;overflow-x:auto}
+.cfo-tab{padding:10px 14px;border:0;background:none;font-family:var(--font-ui);font-weight:700;font-size:14px;
+  color:var(--text-muted);cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap}
+.cfo-tab.is-active{color:var(--brand-navy);border-bottom-color:var(--brand-electric-blue)}
+
+/* ── Table / list ────────────────────────────────────────────────────────── */
+.cfo-table{width:100%;border-collapse:collapse;font-size:14px}
+.cfo-table th{text-align:left;font-size:12px;color:var(--text-muted);font-weight:700;text-transform:uppercase;
+  letter-spacing:.04em;padding:10px 12px;border-bottom:1px solid var(--border-default)}
+.cfo-table td{padding:12px;border-bottom:1px solid var(--border-subtle);color:var(--text-primary)}
+.cfo-table tr:last-child td{border-bottom:0}
+.cfo-table tbody tr:hover{background:var(--surface-card-muted)}
+.cfo-table .num{text-align:right;font-family:var(--font-mono);font-variant-numeric:tabular-nums}
+
+.cfo-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.cfo-list-item{display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--border-subtle)}
+.cfo-list-item:last-child{border-bottom:0}
+.cfo-list-ic{width:30px;height:30px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-weight:800;flex-shrink:0}
+.cfo-list-ic.in{background:var(--success-soft);color:var(--success)}
+.cfo-list-ic.out{background:var(--danger-soft);color:var(--danger)}
+.cfo-list-ic.neutral{background:var(--surface-card-muted);color:var(--text-secondary)}
+.cfo-list-main{display:flex;flex-direction:column;flex:1;min-width:0}
+.cfo-list-label{font-size:14px;font-weight:600;color:var(--text-primary)}
+.cfo-list-sub{font-size:11.5px;color:var(--text-muted)}
+.cfo-list-amt{font-size:14px;font-weight:700;white-space:nowrap;font-family:var(--font-mono)}
+.cfo-pos{color:var(--success)}.cfo-neg{color:var(--danger)}
+.cfo-chip{font-size:11px;font-weight:700;padding:3px 8px;border-radius:999px;margin-left:8px}
+.cfo-chip-soft{background:var(--info-soft);color:var(--brand-navy);font-weight:600}
+
+/* ── States ──────────────────────────────────────────────────────────────── */
+.cfo-skel{background:linear-gradient(90deg,#EAEFF4 25%,#F4F7FA 37%,#EAEFF4 63%);background-size:400% 100%;
+  animation:cfosh 1.3s ease infinite;border-radius:8px}
+@keyframes cfosh{0%{background-position:100% 50%}100%{background-position:0 50%}}
+@media (prefers-reduced-motion:reduce){.cfo-skel{animation:none}}
+.cfo-state{background:var(--surface-card);border:1px solid var(--border-default);border-radius:var(--radius-lg);
+  padding:52px 28px;text-align:center;box-shadow:var(--shadow-sm)}
+.cfo-state-sym{width:60px;height:60px;opacity:.9;margin-bottom:8px}
+.cfo-state-ic{display:inline-flex;width:52px;height:52px;border-radius:14px;align-items:center;justify-content:center;margin-bottom:10px}
+.cfo-state-ic.danger{background:var(--danger-soft);color:var(--danger)}
+.cfo-state-ic.danger svg{width:24px;height:24px}
+.cfo-state-h{font-family:var(--font-display);font-size:22px;color:var(--brand-navy);margin:6px 0 6px}
+.cfo-state-p{color:var(--text-secondary);max-width:440px;margin:0 auto 22px;font-size:14px}
+.cfo-state-actions{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+
+/* ── Modal ───────────────────────────────────────────────────────────────── */
+.cfo-modal-scrim{position:fixed;inset:0;background:var(--surface-overlay);z-index:60;display:flex;align-items:center;justify-content:center;padding:20px}
+.cfo-modal{background:var(--surface-card);border-radius:var(--radius-lg);box-shadow:var(--shadow-lg);max-width:460px;width:100%;padding:24px}
+.cfo-modal-title{font-size:18px;font-weight:800;color:var(--brand-navy);margin:0 0 8px}
+.cfo-modal-body{color:var(--text-secondary);font-size:14px;margin-bottom:20px}
+.cfo-modal-actions{display:flex;gap:10px;justify-content:flex-end}
+
+/* ── Action menu ─────────────────────────────────────────────────────────── */
+.cfo-menu-wrap{position:relative;display:inline-block}
+.cfo-menu{position:absolute;right:0;top:calc(100% + 4px);background:var(--surface-card);border:1px solid var(--border-default);
+  border-radius:var(--radius-md);box-shadow:var(--shadow-lg);padding:6px;min-width:170px;z-index:55}
+.cfo-menu-item{display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:var(--radius-sm);cursor:pointer;
+  border:0;background:none;width:100%;text-align:left;font-size:14px;color:var(--text-primary);font-weight:500}
+.cfo-menu-item:hover{background:var(--surface-card-muted)}
+.cfo-menu-item.danger{color:var(--danger)}
+
+.cfo-iconbtn{width:34px;height:34px;border-radius:9px;border:1px solid var(--border-default);background:var(--surface-card);
+  display:inline-flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text-secondary)}
+.cfo-iconbtn:hover{background:var(--surface-card-muted)}
+
+/* ── Global overflow guard — no horizontal page overflow on any premium page ─ */
+html, body, #root { max-width: 100%; overflow-x: hidden; }
+.cfo-shell, .cfo-main, .cfo-main-inner { max-width: 100%; min-width: 0; }
+.cfo-summary, .cfo-card, .cfo-money { min-width: 0; }
+.cfo-summary-value { overflow-wrap: anywhere; }
+
+/* ── Responsive table → stacked cards on mobile (DebtsView / Transactions) ─── */
+.cfo-mcards { display: none; }
+.cfo-dcard{background:var(--surface-card);border:1px solid var(--border-default);border-radius:var(--radius-md);padding:14px;box-shadow:var(--shadow-sm)}
+.cfo-dcard-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.cfo-dcard-name{font-weight:700;font-size:14px;min-width:0;overflow-wrap:anywhere}
+.cfo-dcard-amt{font-family:var(--font-mono);font-weight:800;font-size:16px;white-space:nowrap;flex-shrink:0}
+.cfo-dcard-amt.pos{color:var(--success)}.cfo-dcard-amt.neg{color:var(--danger)}
+.cfo-dcard-meta{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:9px;font-size:12px;color:var(--text-muted)}
+.cfo-dcard-meta .cfo-mono{white-space:nowrap}
+.cfo-dcard-foot{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:12px}
+
+/* form grid for the AI Accountant profile (stacks on mobile) */
+.cfo-form2{display:grid;grid-template-columns:1fr 1fr;gap:14px 18px}
+@media (max-width:640px){.cfo-form2{grid-template-columns:1fr}}
+
+/* preview banner — compact on mobile */
+@media (max-width:640px){
+  .cfo-preview-banner{padding:5px 10px;gap:8px;font-size:11px}
+  .cfo-preview-banner .cfo-pb-sub{display:none}
+  .cfo-preview-banner .cfo-pb-state{margin-left:auto}
+  .cfo-preview-banner .cfo-pb-state button{padding:3px 7px;font-size:11px}
+}
+
+/* ── Responsive ──────────────────────────────────────────────────────────── */
+@media (max-width:1024px){
+  .cfo-shell{grid-template-columns:1fr}
+  .cfo-sidebar{display:none}
+  .cfo-mobilehead{display:flex}
+  .cfo-main{padding:18px 18px 48px}
+  .cfo-grid-4{grid-template-columns:repeat(2,1fr)}
+  .cfo-grid-3{grid-template-columns:1fr 1fr}
+  .cfo-grid-2{grid-template-columns:1fr}
+  .cfo-table-wrap{overflow-x:auto}
+  .cfo-drawer{width:min(86vw,340px)}
+}
+@media (max-width:640px){
+  .cfo-main{padding:14px 13px 44px}
+  .cfo-h1{font-size:24px}
+  .cfo-summary-value{font-size:30px}
+  .cfo-grid-4{grid-template-columns:1fr 1fr}
+  .cfo-pagehead-actions{width:100%}
+  .cfo-pagehead-actions .cfo-btn-primary{flex:1}
+  .cfo-summary-row{gap:18px}
+  /* tables hide; stacked cards show */
+  .cfo-rtable{display:none}
+  .cfo-mcards{display:flex;flex-direction:column;gap:10px}
+}
+@media (max-width:380px){.cfo-grid-4{grid-template-columns:1fr}}
