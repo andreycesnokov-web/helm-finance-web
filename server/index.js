@@ -5949,24 +5949,32 @@ app.patch('/api/business/current', auth, async (req, res) => {
       return res.status(400).json({ error: 'At least one field required: name, base_currency, timezone, country' });
     }
 
-    // Only owner or admin can update business settings
-    const { data: memberships } = await supabase
-      .from('business_members')
-      .select('business_id, role')
-      .eq('user_id', userId)
-      .eq('status', 'active')
-      .in('role', ['owner', 'admin'])
-      .limit(1);
-
+    // Workspace-aware + Business-only. This endpoint must NEVER mutate a Personal
+    // Workspace. Explicit-but-inaccessible/stale ids are rejected (no silent fallback).
+    const requested = req.headers['x-business-id'] || req.query?.business_id || null;
     let businessId;
-    if (!memberships || memberships.length === 0) {
-      // No business yet — bootstrap then update
-      const { data: userRow } = await supabase.from('users').select('first_name, username').eq('id', userId).single();
-      const firstName = userRow?.first_name || userRow?.username || 'My';
-      const { business: newBiz } = await ensureDefaultBusiness(userId, firstName);
-      businessId = newBiz.id;
+    if (requested) {
+      const { data } = await supabase.from('business_members')
+        .select('role, businesses(id, type)')
+        .eq('user_id', userId).eq('business_id', requested).eq('status', 'active').limit(1);
+      const m = data?.[0];
+      if (!m || !m.businesses) return res.status(403).json({ error: 'workspace_not_accessible' });
+      if (m.businesses.type === 'personal') return res.status(403).json({ error: 'business_workspace_required' });
+      if (!['owner', 'admin'].includes(m.role)) return res.status(403).json({ error: 'Only owner or admin can update business settings' });
+      businessId = m.businesses.id;
     } else {
-      businessId = memberships[0].business_id;
+      // No explicit id — pick the user's default BUSINESS (never a personal workspace).
+      const { data: memberships } = await supabase.from('business_members')
+        .select('business_id, role, businesses(type)')
+        .eq('user_id', userId).eq('status', 'active').in('role', ['owner', 'admin']);
+      const biz = (memberships || []).find(m => m.businesses?.type === 'business');
+      if (biz) businessId = biz.business_id;
+      else {
+        const { data: userRow } = await supabase.from('users').select('first_name, username').eq('id', userId).single();
+        const firstName = userRow?.first_name || userRow?.username || 'My';
+        const { business: newBiz } = await ensureDefaultBusiness(userId, firstName);
+        businessId = newBiz.id;
+      }
     }
     const updates = { updated_at: new Date().toISOString() };
     if (name?.trim())           updates.name          = name.trim();

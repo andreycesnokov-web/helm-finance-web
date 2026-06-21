@@ -24,9 +24,10 @@ const psql = (sql) => execFileSync(DOCKER, ['exec', '-i', DBC, 'psql', '-U', 'po
 let pass = 0, fail = 0;
 const ok = (m, c) => { if (c) { console.log('OK  ' + m); pass++; } else { console.log('XX  ' + m); fail++; } };
 const tok = (userId) => jwt.sign({ userId }, SECRET, { expiresIn: '1h' });
-async function api(method, path, userId, body) {
+async function api(method, path, userId, body, bizId) {
   const headers = { 'content-type': 'application/json' };
   if (userId) headers.authorization = 'Bearer ' + tok(userId);
+  if (bizId) headers['x-business-id'] = bizId;
   const res = await fetch(BASE + path, { method, headers, body: body ? JSON.stringify(body) : undefined });
   let json = null; try { json = await res.json(); } catch { /* */ }
   return { status: res.status, body: json };
@@ -220,6 +221,21 @@ const txCount = async () => Number((await sb.from('transactions').select('id', {
     psql(`DROP TRIGGER IF EXISTS _lbt ON transactions; DROP FUNCTION IF EXISTS _lb();`);
     ok('A1) target-leg failure rolls back source leg', confLeg.status >= 400 && (await txCount()) === tA);
     ok('A4) combined principal neutral by booked rate (10000*16300=163000000)', 10000 * 16300 === 163000000);
+
+    // ═══════════ BUSINESS-ONLY / WORKSPACE-AWARE PATCH /api/business/current ═══════════
+    const paNameBefore = (await sb.from('businesses').select('name').eq('id', PA1).single()).data.name;
+    const wp1 = await api('PATCH', '/api/business/current', U.a1, { name: 'X PERSONAL HIJACK' }, PA1);
+    ok('BP1) PATCH business/current with personal id rejected', wp1.status === 403 && wp1.body?.error === 'business_workspace_required');
+    const paNameAfter = (await sb.from('businesses').select('name').eq('id', PA1).single()).data.name;
+    ok('BP2) personal workspace name unchanged after rejected PATCH', paNameAfter === paNameBefore && paNameAfter !== 'X PERSONAL HIJACK');
+    const wp2 = await api('PATCH', '/api/business/current', U.a1, { name: 'Renamed Biz A' }, BA);
+    ok('BP3) PATCH business/current with valid business id works', wp2.status === 200 && (await sb.from('businesses').select('name').eq('id', BA).single()).data.name === 'Renamed Biz A');
+    const wp3 = await api('PATCH', '/api/business/current', U.a1, { name: 'No-header' });   // no x-business-id
+    ok('BP4) no-header fallback targets a BUSINESS only', wp3.status === 200 && (await sb.from('businesses').select('type').eq('id', BA).single()).data.type === 'business');
+    const wp4 = await api('PATCH', '/api/business/current', U.bbOwner, { name: 'Spoof' }, BA);  // bbOwner not a member of BA
+    ok('BP5) explicit inaccessible x-business-id → 403 workspace_not_accessible', wp4.status === 403 && wp4.body?.error === 'workspace_not_accessible');
+    const wp5 = await api('PATCH', '/api/business/current', U.a1, { name: 'Helm Care Indonesia', base_currency: 'IDR', country: 'Indonesia', timezone: 'Asia/Makassar' }, BA);
+    ok('BP6) country/timezone missing column → no raw schema error', wp5.status === 200 && !/find the '.*' column/i.test(JSON.stringify(wp5.body)));
 
     console.log(`\n${fail === 0 ? 'ALL PASS' : 'FAIL'} — ${pass} passed, ${fail} failed, 0 skipped`);
   } finally { /* leave synthetic data; cleaned at next run start */ }

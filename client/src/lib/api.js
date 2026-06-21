@@ -25,7 +25,14 @@ export async function apiFetch(path, token, options = {}) {
     body: options.body ? JSON.stringify(options.body) : undefined
   })
   const data = await res.json()
-  if (!res.ok) throw new Error(data.error || 'Request failed')
+  if (!res.ok) {
+    // Stale/inaccessible workspace: clear the active id so the next load re-picks a
+    // valid one (WorkspaceProvider refetches /api/workspaces). Only on explicit 403.
+    if (res.status === 403 && data?.error === 'workspace_not_accessible') {
+      try { setActiveBusinessId(null) } catch { /* */ }
+    }
+    const err = new Error(data.error || 'Request failed'); err.status = res.status; throw err
+  }
   return data
 }
 
