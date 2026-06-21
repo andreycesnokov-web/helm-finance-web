@@ -29,10 +29,14 @@ export const PERSONAL_NAV = [
   ] },
 ]
 
+// Labels are stable EN strings here (consistent across the shell); "AI Accountant"
+// matches the legacy label. Non-migrated items point at legacy routes so access is
+// never lost during the migration (Pulse/Accounts use the new premium routes).
 export const BUSINESS_NAV = [
   { title: 'Overview', items: [
     { key: 'pulse', label: 'Pulse', to: '/business/pulse', icon: <Icon.pulse /> },
     { key: 'cfo', label: 'AI CFO', to: '/cfo', icon: <Icon.cfo /> },
+    { key: 'accountant', label: 'AI Accountant', to: '/accountant', icon: <Icon.acct /> },
   ] },
   { title: 'Finance', items: [
     { key: 'transactions', label: 'Transactions', to: '/transactions', icon: <Icon.list /> },
@@ -40,12 +44,14 @@ export const BUSINESS_NAV = [
     { key: 'receivables', label: 'Receivables', to: '/receivables', icon: <Icon.down /> },
     { key: 'payables', label: 'Payables', to: '/payables', icon: <Icon.up /> },
     { key: 'funding', label: 'Funding & Investors', to: '/funding-investors', icon: <Icon.fund /> },
+    { key: 'bankimport', label: 'Bank Import', to: '/bank-import', icon: <Icon.bank /> },
   ] },
   { title: 'Operations', items: [
     { key: 'payroll', label: 'Payroll', to: '/payroll', icon: <Icon.team /> },
     { key: 'approvals', label: 'Approvals', to: '/approvals', icon: <Icon.check /> },
     { key: 'team', label: 'Team', to: '/team', icon: <Icon.users /> },
     { key: 'documents', label: 'Documents', to: '/documents', icon: <Icon.doc /> },
+    { key: 'settings', label: 'Settings', to: '/settings', icon: <Icon.cog /> },
   ] },
 ]
 
