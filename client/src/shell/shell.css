@@ -204,6 +204,9 @@
 
 /* ── Global overflow guard — no horizontal page overflow on any premium page ─ */
 html, body, #root { max-width: 100%; overflow-x: hidden; }
+/* #root is display:flex in the legacy app; the shell must fill it (was sizing to
+   content → ~840px with empty space on the right on every Business page). */
+.cfo-shell { width: 100%; flex: 1 1 100%; }
 .cfo-shell, .cfo-main, .cfo-main-inner { max-width: 100%; min-width: 0; }
 .cfo-summary, .cfo-card, .cfo-money { min-width: 0; }
 .cfo-summary-value { overflow-wrap: anywhere; }
@@ -230,6 +233,20 @@ html, body, #root { max-width: 100%; overflow-x: hidden; }
   .cfo-preview-banner .cfo-pb-state{margin-left:auto}
   .cfo-preview-banner .cfo-pb-state button{padding:3px 7px;font-size:11px}
 }
+
+/* ── Legacy-page harmonization inside the premium shell ─────────────────────
+   Wrapped legacy modules (AI CFO, Radar, Accounts, Payroll, Documents, Settings,
+   Team, Approvals, Bank Import) use .hf-page/.hf-card. Normalize them to the premium
+   width/header/card system WITHOUT touching their markup/logic. Scoped to .cfo-main
+   so the standalone legacy app is unaffected. */
+.cfo-main .hf-page, .cfo-main .cfo-page, .cfo-main .page { padding: 0 !important; max-width: 100% !important; margin: 0 !important; }
+.cfo-main .hf-page-header { margin-bottom: 22px; }
+.cfo-main .hf-page-title { font-family: var(--font-display); font-size: 30px; color: var(--brand-navy); letter-spacing: -0.4px; }
+.cfo-main .hf-page-subtitle { color: var(--text-muted); }
+.cfo-main .hf-card { border: 1px solid var(--border-default); border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); }
+.cfo-main .hf-card:hover { box-shadow: var(--shadow-md); }
+/* tame stray narrow inline columns so desktop content fills the shell width */
+.cfo-main .hf-page > [style*="max-width: 480"], .cfo-main .hf-page > [style*="max-width:480"] { max-width: 100% !important; }
 
 /* ── Responsive ──────────────────────────────────────────────────────────── */
 @media (max-width:1024px){
