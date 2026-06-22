@@ -559,7 +559,9 @@ export default function App() {
               /,/accounts routes remain untouched during the migration. */}
           <Route element={<BusinessLayout />}>
             <Route path="/business/pulse" element={<BusinessShell><BusinessPulse /></BusinessShell>} />
-            <Route path="/business/accounts" element={<BusinessShell><BusinessAccounts /></BusinessShell>} />
+            {/* Use the full legacy Accounts (add/edit/archive/balances) inside the premium
+                shell — restores functionality the minimal premium card view lacked. */}
+            <Route path="/business/accounts" element={<BusinessShell><Accounts /></BusinessShell>} />
             <Route path="/business/transactions" element={<BusinessShell><BusinessTransactions /></BusinessShell>} />
             <Route path="/business/payables" element={<BusinessShell><BusinessPayables /></BusinessShell>} />
             <Route path="/business/receivables" element={<BusinessShell><BusinessReceivables /></BusinessShell>} />
