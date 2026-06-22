@@ -48,7 +48,7 @@ export const BUSINESS_NAV = [
     { key: 'payables', label: 'Payables', to: '/business/payables', icon: <Icon.up /> },
     // Funding & Investors depends on migrations 037–039; hidden when the gate is off
     // so production shows no dead link.
-    ...(FUNDING_UI_ENABLED ? [{ key: 'funding', label: 'Funding & Investors', to: '/funding-investors', icon: <Icon.fund /> }] : []),
+    ...(FUNDING_UI_ENABLED ? [{ key: 'funding', label: 'Funding & Investors', to: '/business/funding-investors', icon: <Icon.fund /> }] : []),
     { key: 'bankimport', label: 'Bank Import', to: '/business/bank-import', icon: <Icon.bank /> },
   ] },
   { title: 'Operations', items: [

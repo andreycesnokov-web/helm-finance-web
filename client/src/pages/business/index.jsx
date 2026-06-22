@@ -303,3 +303,37 @@ export function BusinessInvoices() {
     </Card>
   </>
 }
+
+// ── Funding & Investors — premium placeholder (no backend calls; full module gated
+//    until Personal/Funding is enabled). Renders inside WorkspaceShell. ───────────
+export function BusinessFunding() {
+  const cards = [
+    { k: 'Owner funding', sub: 'founder advances & temporary funding', icon: <Icon.fund /> },
+    { k: 'Shareholder loans', sub: 'repayable investor loans', icon: <Icon.down /> },
+    { k: 'Capital contributions', sub: 'equity, not repayable', icon: <Icon.up /> },
+    { k: 'Repayments', sub: 'principal reductions & schedules', icon: <Icon.check /> },
+    { k: 'FX quotes', sub: 'booked rates & conversions', icon: <Icon.list /> },
+  ]
+  return <>
+    <PageHeader eyebrow="Business Workspace" title="Funding & Investors"
+      actions={<StatusBadge tone="info">Coming soon</StatusBadge>} />
+    <div style={{ marginBottom: 18, color: 'var(--text-secondary)', fontSize: 14, maxWidth: 640 }}>
+      Owner funding, shareholder loans, capital contributions and repayments will be managed here.
+      This module is gated until Personal / Funding is enabled.
+    </div>
+    <div className="cfo-grid cfo-grid-4" style={{ marginBottom: 18 }}>
+      {cards.map(c => (
+        <Card key={c.k} title={c.k}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span className="cfo-state-ic" style={{ width: 36, height: 36, borderRadius: 10, background: 'var(--surface-card-muted)', color: 'var(--text-secondary)' }}>{c.icon}</span>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{c.sub}</div>
+          </div>
+        </Card>
+      ))}
+    </div>
+    <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+      <Btn disabled>Coming soon</Btn>
+      <Btn variant="ghost" disabled>Learn more</Btn>
+    </div>
+  </>
+}
