@@ -63,7 +63,7 @@ import WalletDetail from './pages/WalletDetail'
 import Onboarding, { shouldShowOnboarding, clearOnboardingFlags } from './pages/Onboarding'
 import PreviewApp from './pages/PreviewApp'
 import { PersonalLayout, PersonalShell, PersonalOverview, PersonalAccounts, PersonalTransactions, PersonalOnboarding } from './pages/personal'
-import { BusinessLayout, BusinessShell, BusinessPulse, BusinessAccounts, BusinessTransactions, BusinessPayables, BusinessReceivables, BusinessInvoices } from './pages/business'
+import { BusinessLayout, BusinessShell, BusinessPulse, BusinessAccounts, BusinessTransactions, BusinessPayables, BusinessReceivables, BusinessInvoices, BusinessFunding } from './pages/business'
 import { BusinessAccountant } from './pages/business/Accountant'
 
 // Personal/Funding UI requires migrations 037–039. OFF by default so production stays
@@ -576,6 +576,9 @@ export default function App() {
             <Route path="/business/documents" element={<BusinessShell><Documents /></BusinessShell>} />
             <Route path="/business/settings" element={<BusinessShell><Settings /></BusinessShell>} />
             <Route path="/business/bank-import" element={<BusinessShell><BankImport /></BusinessShell>} />
+            {/* Funding & Investors: premium placeholder when flag on; safe redirect to
+                pulse when flag off (route never crashes / dead-links). */}
+            <Route path="/business/funding-investors" element={PERSONAL_FUNDING_UI ? <BusinessShell><BusinessFunding /></BusinessShell> : <Navigate to="/business/pulse" replace />} />
           </Route>
           {/* Public invite page — no auth required to view, Telegram widget handles login */}
           <Route path="/invite/:code" element={<JoinInvite />} />
