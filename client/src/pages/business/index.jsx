@@ -14,6 +14,7 @@ import {
   EmptyState, ErrorState, LoadingSkeleton, ResponsiveTable, Icon,
 } from '../../shell/ui'
 import DebtPaymentModal from '../../components/DebtPaymentModal' // reused VERBATIM — Pay Now / Mark Received logic unchanged
+import DebtFormModal from '../../components/DebtFormModal'       // create payable/receivable (business-scope locked)
 
 const SYMBOL = '/brand/symbol_navy_blue_dot_transparent.svg'
 const SYMBOL_WHITE = '/brand/symbol_white_transparent.svg'
@@ -194,6 +195,7 @@ function DebtsView({ kind }) {
   const isPayable = kind === 'payable'
   const [data, setData] = useState({ loading: true, error: null, debts: null, wallets: [] })
   const [payDebt, setPayDebt] = useState(null)
+  const [showCreate, setShowCreate] = useState(false)
   const reload = () => {
     if (!token || !active) return
     setData(d => ({ ...d, loading: true, error: null }))
@@ -204,11 +206,24 @@ function DebtsView({ kind }) {
   useEffect(() => { let on = true; if (token && active) { setData(d => ({ ...d, loading: true })); Promise.all([apiFetch('/debts', token), apiFetch('/wallets', token).catch(() => ({ wallets: [] }))]).then(([debts, w]) => on && setData({ loading: false, error: null, debts, wallets: w.wallets || [] })).catch(e => on && setData({ loading: false, error: e.message, debts: null, wallets: [] })) } return () => { on = false } }, [token, active?.id, scopeKey]) // eslint-disable-line
 
   const title = isPayable ? 'Payables' : 'Receivables'
-  const head = <PageHeader eyebrow="Business Workspace" title={title} />
+  const newLabel = isPayable ? '+ New payable' : '+ New receivable'
+  const newBtn = <Btn onClick={() => setShowCreate(true)}>{newLabel}</Btn>
+  // Create modal is business-scope LOCKED — every payable/receivable created here
+  // belongs to the active business (apiFetch carries x-business-id); refetch on success.
+  const createModal = showCreate && (
+    <DebtFormModal mode={kind} token={token} lockBusinessScope
+      onClose={() => setShowCreate(false)} onSuccess={() => { setShowCreate(false); reload() }} />
+  )
+  const head = <PageHeader eyebrow="Business Workspace" title={title} actions={newBtn} />
   if (data.loading) return <>{head}<Card><LoadingSkeleton rows={5} height={18} /></Card></>
   if (data.error) return <>{head}<ErrorState description={data.error} onRetry={reload} /></>
   const debts = (data.debts || []).filter(d => d.type === kind && d.status !== 'cancelled')
-  if (!debts.length) return <>{head}<EmptyState symbol={SYMBOL} title={isPayable ? 'No payables' : 'No receivables'} description={isPayable ? 'Bills you owe will appear here.' : 'Money owed to you will appear here.'} /></>
+  if (!debts.length) return <>{head}
+    <EmptyState symbol={SYMBOL} title={isPayable ? 'No payables' : 'No receivables'}
+      description={isPayable ? 'Bills you owe will appear here.' : 'Money owed to you will appear here.'} />
+    <div style={{ display: 'flex', justifyContent: 'center', marginTop: 16 }}>{newBtn}</div>
+    {createModal}
+  </>
 
   const toneFor = (s) => s === 'paid' ? 'success' : s === 'overdue' ? 'danger' : s === 'partial' ? 'warning' : 'neutral'
   const total = debts.reduce((s, d) => s + Number(d.remaining_amount ?? d.amount ?? 0), 0)
@@ -252,6 +267,7 @@ function DebtsView({ kind }) {
       <DebtPaymentModal debt={payDebt} accounts={data.wallets} token={token}
         onClose={() => setPayDebt(null)} onSuccess={() => { setPayDebt(null); reload() }} />
     )}
+    {createModal}
   </>
 }
 
