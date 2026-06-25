@@ -67,7 +67,7 @@ function defaultDueDate() {
   return d.toISOString().slice(0, 10)
 }
 
-export default function DebtFormModal({ mode, token, onClose, onSuccess, initialDebt = null }) {
+export default function DebtFormModal({ mode, token, onClose, onSuccess, initialDebt = null, lockBusinessScope = false }) {
   const isEdit = !!initialDebt
   const c = cfg(mode)
   const l = LABELS[getLang()] || LABELS.en
@@ -76,7 +76,7 @@ export default function DebtFormModal({ mode, token, onClose, onSuccess, initial
   const [description,  setDescription]  = useState(initialDebt?.description || '')
   const [amount,       setAmount]        = useState(initialDebt ? String(initialDebt.original_amount || initialDebt.amount || '') : '')
   const [dueDate,      setDueDate]       = useState(initialDebt?.due_date ? initialDebt.due_date.slice(0, 10) : defaultDueDate())
-  const [scope,        setScope]         = useState(initialDebt?.scope || 'business')
+  const [scope,        setScope]         = useState(lockBusinessScope ? 'business' : (initialDebt?.scope || 'business'))
   const [saving,       setSaving]        = useState(false)
   const [error,        setError]         = useState('')
 
@@ -136,22 +136,29 @@ export default function DebtFormModal({ mode, token, onClose, onSuccess, initial
           onKeyDown={onKey} placeholder={c.descPlaceholder}
           style={{ marginBottom: 12 }} />
 
-        <label className="modal-label">{l.scope}</label>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 18 }}>
-          {[
-            { value: 'business', label: l.business },
-            { value: 'personal', label: l.personal },
-          ].map(s => (
-            <button key={s.value} type="button" onClick={() => setScope(s.value)} style={{
-              padding: '10px 0', borderRadius: 10,
-              fontSize: 'var(--text-sm)', fontWeight: 500,
-              border: scope === s.value ? 'none' : '0.5px solid var(--border)',
-              background: scope === s.value ? 'var(--brand-light)' : 'none',
-              color: scope === s.value ? 'var(--brand-dark)' : 'var(--text-3)',
-              cursor: 'pointer', transition: 'all .12s', fontFamily: 'inherit',
-            }}>{s.label}</button>
-          ))}
-        </div>
+        {/* Scope selector — hidden in Business Workspace (lockBusinessScope): business
+            pages never create personal records; the record always belongs to the
+            active business. Personal scope returns only in the (gated) Personal UI. */}
+        {!lockBusinessScope && (
+          <>
+            <label className="modal-label">{l.scope}</label>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 18 }}>
+              {[
+                { value: 'business', label: l.business },
+                { value: 'personal', label: l.personal },
+              ].map(s => (
+                <button key={s.value} type="button" onClick={() => setScope(s.value)} style={{
+                  padding: '10px 0', borderRadius: 10,
+                  fontSize: 'var(--text-sm)', fontWeight: 500,
+                  border: scope === s.value ? 'none' : '0.5px solid var(--border)',
+                  background: scope === s.value ? 'var(--brand-light)' : 'none',
+                  color: scope === s.value ? 'var(--brand-dark)' : 'var(--text-3)',
+                  cursor: 'pointer', transition: 'all .12s', fontFamily: 'inherit',
+                }}>{s.label}</button>
+              ))}
+            </div>
+          </>
+        )}
 
         {error && (
           <div style={{ background: 'var(--red-light)', color: 'var(--red-dark)', borderRadius: 10, padding: '9px 13px', fontSize: 'var(--text-sm)', border: '1px solid rgba(240,68,56,.2)', marginBottom: 12 }}>

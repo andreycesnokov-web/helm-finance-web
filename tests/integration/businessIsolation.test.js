@@ -83,13 +83,22 @@ async function api(method, path, { biz, body } = {}) {
     const bTx = await api('GET', '/api/transactions?period=all', { biz: bizB });
     ok('B) B transactions empty (A had ' + aTxCount + ')', Array.isArray(bTx.body) && bTx.body.length === 0);
 
-    // debts is tolerant: SKIP if the table isn't present in this DB (old local schema).
-    const aDebts = await api('GET', '/api/debts', { biz: A.id });
-    const bDebts = await api('GET', '/api/debts', { biz: bizB });
-    if (aDebts.status === 200 && bDebts.status === 200) {
-      ok('B) B debts empty', (bDebts.body?.debts || bDebts.body || []).length === 0);
+    // Payables/Receivables (debts) isolation. Best-effort create in A; SKIP cleanly if
+    // the debts endpoint isn't available (old local schema). Created records belong to
+    // the active business (x-business-id) and must be invisible in B.
+    const payA = await api('POST', '/api/debts', { biz: A.id, body: { type: 'payable', counterparty: 'ISO-PAY-CP', amount: 5000, scope: 'business', description: 'ISO-PAY' } });
+    if (payA.status === 200 || payA.status === 201) {
+      await api('POST', '/api/debts', { biz: A.id, body: { type: 'receivable', counterparty: 'ISO-RECV-CP', amount: 7000, scope: 'business', description: 'ISO-RECV' } });
+      const aPay = await api('GET', '/api/debts?type=payable', { biz: A.id });
+      ok('A) A shows its payable', Array.isArray(aPay.body) && aPay.body.some(d => d.description === 'ISO-PAY'));
+      const aRecv = await api('GET', '/api/debts?type=receivable', { biz: A.id });
+      ok('A) A shows its receivable', Array.isArray(aRecv.body) && aRecv.body.some(d => d.description === 'ISO-RECV'));
+      const bPay = await api('GET', '/api/debts?type=payable', { biz: bizB });
+      ok('B) B payables empty (A had a payable)', Array.isArray(bPay.body) && bPay.body.length === 0);
+      const bRecv = await api('GET', '/api/debts?type=receivable', { biz: bizB });
+      ok('B) B receivables empty (A had a receivable)', Array.isArray(bRecv.body) && bRecv.body.length === 0);
     } else {
-      console.log(`--  B) debts check SKIPPED (debts endpoint status A=${aDebts.status} B=${bDebts.status}; align local schema to test)`);
+      console.log(`--  debts (payable/receivable) isolation SKIPPED (POST /api/debts status ${payA.status}; align local schema)`);
     }
 
     const bPulse = await api('GET', '/api/pulse', { biz: bizB });
@@ -107,7 +116,8 @@ async function api(method, path, { biz, body } = {}) {
     ok('SEC) invalid x-business-id → 403 workspace_not_accessible',
       bogus.status === 403 && bogus.body?.error === 'workspace_not_accessible');
   } finally {
-    // Cleanup: remove the seeded transaction + wallet and business B (+ membership).
+    // Cleanup: remove the seeded debts + transaction + wallet and business B (+ membership).
+    try { await supabase.from('debts').delete().in('description', ['ISO-PAY', 'ISO-RECV']); } catch { /* */ }
     try { await supabase.from('transactions').delete().eq('description', 'ISO-A-TX'); } catch { /* */ }
     try { if (walletId) await supabase.from('wallets').delete().eq('id', walletId); } catch { /* */ }
     try { if (bizB) { await supabase.from('business_members').delete().eq('business_id', bizB); await supabase.from('businesses').delete().eq('id', bizB); } } catch { /* */ }
