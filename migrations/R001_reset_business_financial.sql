@@ -60,7 +60,11 @@ BEGIN
 
   -- ── Atomic delete set (subtransaction: any error rolls the whole thing back) ─
   BEGIN
-    -- 1) Tax / withholding link rows that RESTRICT deletion of transactions & debts
+    -- 1) Allocation / link rows first. These RESTRICT-reference transactions, debts,
+    --    withholding_records and tax_treatments, so every allocation must go before the
+    --    records and the core rows it points at. Order within this block matters:
+    --    tax_deposit_allocations references withholding_records + tax_treatments, so it
+    --    must precede them (and precede tax_deposit_entries / accounts).
     IF to_regclass('public.withholding_payment_allocations') IS NOT NULL THEN
       DELETE FROM public.withholding_payment_allocations WHERE business_id = p_business;
       GET DIAGNOSTICS n = ROW_COUNT; r := r || jsonb_build_object('withholding_payment_allocations', n);
@@ -68,6 +72,20 @@ BEGIN
     IF to_regclass('public.debt_settlement_allocations') IS NOT NULL THEN
       DELETE FROM public.debt_settlement_allocations WHERE business_id = p_business;
       GET DIAGNOSTICS n = ROW_COUNT; r := r || jsonb_build_object('debt_payments', n);
+    END IF;
+    IF to_regclass('public.tax_deposit_allocations') IS NOT NULL THEN
+      DELETE FROM public.tax_deposit_allocations WHERE business_id = p_business;
+      GET DIAGNOSTICS n = ROW_COUNT; r := r || jsonb_build_object('tax_deposit_allocations', n);
+    END IF;
+    -- Intercompany settlement allocations have no business_id column — scope through the
+    -- funding record (either side of the transfer touching this business).
+    IF to_regclass('public.intercompany_settlement_allocations') IS NOT NULL
+       AND to_regclass('public.intercompany_funding_records') IS NOT NULL THEN
+      DELETE FROM public.intercompany_settlement_allocations a
+        USING public.intercompany_funding_records f
+       WHERE a.funding_record_id = f.id
+         AND (f.cash_payer_business_id = p_business OR f.economic_owner_business_id = p_business);
+      GET DIAGNOSTICS n = ROW_COUNT; r := r || jsonb_build_object('intercompany_settlement_allocations', n);
     END IF;
     IF to_regclass('public.document_transaction_links') IS NOT NULL THEN
       DELETE FROM public.document_transaction_links WHERE business_id = p_business;
@@ -77,6 +95,24 @@ BEGIN
       DELETE FROM public.document_debt_links WHERE business_id = p_business;
       GET DIAGNOSTICS n = ROW_COUNT; r := r || jsonb_build_object('document_debt_links', n);
     END IF;
+
+    -- 1b) Tax-deposit (034) + intercompany funding (033) parent rows. RESTRICT-reference
+    --     transactions / debts, so delete after their allocations and before the core rows.
+    IF to_regclass('public.tax_deposit_entries') IS NOT NULL THEN
+      DELETE FROM public.tax_deposit_entries WHERE business_id = p_business;
+      GET DIAGNOSTICS n = ROW_COUNT; r := r || jsonb_build_object('tax_deposit_entries', n);
+    END IF;
+    IF to_regclass('public.tax_deposit_accounts') IS NOT NULL THEN
+      DELETE FROM public.tax_deposit_accounts WHERE business_id = p_business;
+      GET DIAGNOSTICS n = ROW_COUNT; r := r || jsonb_build_object('tax_deposit_accounts', n);
+    END IF;
+    IF to_regclass('public.intercompany_funding_records') IS NOT NULL THEN
+      DELETE FROM public.intercompany_funding_records
+       WHERE cash_payer_business_id = p_business OR economic_owner_business_id = p_business;
+      GET DIAGNOSTICS n = ROW_COUNT; r := r || jsonb_build_object('intercompany_funding_records', n);
+    END IF;
+
+    -- 1c) Tax records (now unreferenced by the allocations above; still before debts).
     IF to_regclass('public.withholding_records') IS NOT NULL THEN
       DELETE FROM public.withholding_records WHERE business_id = p_business;
       GET DIAGNOSTICS n = ROW_COUNT; r := r || jsonb_build_object('withholding_records', n);
@@ -141,6 +177,19 @@ BEGIN
     IF to_regclass('public.reminders') IS NOT NULL THEN
       DELETE FROM public.reminders WHERE business_id = p_business;
       GET DIAGNOSTICS n = ROW_COUNT; r := r || jsonb_build_object('reminders', n);
+    END IF;
+    -- payroll_employees is PRESERVED (employee master, like team), but its
+    -- default_wallet_id RESTRICT-references wallets — null it for this business's
+    -- wallets first so wallet deletion can't fail. Scoped via wallet membership
+    -- (no dependency on payroll_employees.business_id), guarded for column presence.
+    IF to_regclass('public.payroll_employees') IS NOT NULL
+       AND EXISTS (SELECT 1 FROM information_schema.columns
+                    WHERE table_schema = 'public' AND table_name = 'payroll_employees'
+                      AND column_name = 'default_wallet_id') THEN
+      UPDATE public.payroll_employees
+         SET default_wallet_id = NULL
+       WHERE default_wallet_id IN (SELECT id FROM public.wallets WHERE business_id = p_business);
+      GET DIAGNOSTICS n = ROW_COUNT; r := r || jsonb_build_object('payroll_employee_wallet_refs_cleared', n);
     END IF;
     DELETE FROM public.wallets WHERE business_id = p_business;
     GET DIAGNOSTICS n = ROW_COUNT; r := r || jsonb_build_object('wallets', n);

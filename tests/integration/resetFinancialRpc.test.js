@@ -24,6 +24,7 @@ async function base({ itemsBusinessId = true, withItems = true } = {}) {
     CREATE TABLE debts (id bigint PRIMARY KEY, business_id uuid);
     CREATE TABLE reminders (id bigint PRIMARY KEY, business_id uuid);
     CREATE TABLE payroll_payments (id uuid PRIMARY KEY, business_id uuid, transaction_id bigint REFERENCES transactions(id), wallet_id uuid REFERENCES wallets(id));
+    CREATE TABLE payroll_employees (id uuid PRIMARY KEY, business_id uuid, default_wallet_id uuid REFERENCES wallets(id));
   `);
   if (withItems) {
     await db.exec(`CREATE TABLE payroll_payment_items (
@@ -41,6 +42,7 @@ async function base({ itemsBusinessId = true, withItems = true } = {}) {
     INSERT INTO debts VALUES (20,'${BIZ}');
     INSERT INTO reminders VALUES (30,'${BIZ}');
     INSERT INTO payroll_payments VALUES ('bbbbbbbb-0000-0000-0000-000000000001','${BIZ}',10,'aaaaaaaa-0000-0000-0000-000000000001');
+    INSERT INTO payroll_employees VALUES ('dddddddd-0000-0000-0000-000000000001','${BIZ}','aaaaaaaa-0000-0000-0000-000000000001');
   `);
   if (withItems) {
     const cols = itemsBusinessId ? `('cccccccc-0000-0000-0000-000000000001','${BIZ}','bbbbbbbb-0000-0000-0000-000000000001')`
@@ -129,6 +131,44 @@ test('missing optional payroll child table does not break reset', async () => {
   const r = await reset(db, BIZ, ADMIN);
   assert.equal(r.ok, true, JSON.stringify(r));
   assert.equal(await count(db, 'transactions'), 0);
+});
+
+test('payroll_employees.default_wallet_id is cleared so wallet delete cannot fail', async () => {
+  const db = await base(); // employee dddd... has default_wallet_id = the business wallet
+  const r = await reset(db, BIZ, ADMIN);
+  assert.equal(r.ok, true, JSON.stringify(r));
+  assert.equal(r.deleted.payroll_employee_wallet_refs_cleared, 1);
+  assert.equal(await count(db, 'wallets'), 0);
+  // employee row PRESERVED, ref nulled
+  assert.equal(await count(db, 'payroll_employees'), 1);
+  const e = (await db.query(`SELECT default_wallet_id FROM payroll_employees`)).rows[0];
+  assert.equal(e.default_wallet_id, null);
+});
+
+test('033/034 RESTRICT children (tax-deposit + intercompany) do not block reset', async () => {
+  const db = await base();
+  await db.exec(`
+    CREATE TABLE tax_deposit_accounts (id uuid PRIMARY KEY, business_id uuid);
+    CREATE TABLE tax_deposit_entries (id uuid PRIMARY KEY, business_id uuid, transaction_id bigint REFERENCES transactions(id) ON DELETE RESTRICT);
+    CREATE TABLE tax_deposit_allocations (id uuid PRIMARY KEY, business_id uuid, deposit_entry_id uuid REFERENCES tax_deposit_entries(id) ON DELETE RESTRICT);
+    CREATE TABLE intercompany_funding_records (id uuid PRIMARY KEY, cash_payer_business_id uuid, economic_owner_business_id uuid,
+      funded_transaction_id bigint REFERENCES transactions(id) ON DELETE RESTRICT, funded_debt_id bigint REFERENCES debts(id) ON DELETE RESTRICT);
+    CREATE TABLE intercompany_settlement_allocations (id uuid PRIMARY KEY, funding_record_id uuid REFERENCES intercompany_funding_records(id) ON DELETE RESTRICT,
+      repayment_transaction_id bigint REFERENCES transactions(id) ON DELETE RESTRICT);
+    INSERT INTO tax_deposit_accounts VALUES ('e0000000-0000-0000-0000-000000000001','${BIZ}');
+    INSERT INTO tax_deposit_entries VALUES ('e1000000-0000-0000-0000-000000000001','${BIZ}',10);
+    INSERT INTO tax_deposit_allocations VALUES ('e2000000-0000-0000-0000-000000000001','${BIZ}','e1000000-0000-0000-0000-000000000001');
+    INSERT INTO intercompany_funding_records VALUES ('f0000000-0000-0000-0000-000000000001','${BIZ}','${BIZ}',11,20);
+    INSERT INTO intercompany_settlement_allocations VALUES ('f1000000-0000-0000-0000-000000000001','f0000000-0000-0000-0000-000000000001',11);
+  `);
+  const r = await reset(db, BIZ, ADMIN);
+  assert.equal(r.ok, true, JSON.stringify(r));
+  assert.equal(await count(db, 'transactions'), 0);
+  assert.equal(await count(db, 'debts'), 0);
+  assert.equal(await count(db, 'tax_deposit_entries'), 0);
+  assert.equal(await count(db, 'tax_deposit_allocations'), 0);
+  assert.equal(await count(db, 'intercompany_funding_records'), 0);
+  assert.equal(await count(db, 'intercompany_settlement_allocations'), 0);
 });
 
 test('any failure rolls back ALL deletes (atomic)', async () => {
