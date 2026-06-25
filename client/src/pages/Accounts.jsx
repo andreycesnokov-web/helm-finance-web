@@ -672,29 +672,10 @@ export default function Accounts() {
               style={{ marginBottom: 14 }}
             />
 
-            {/* Scope selector */}
-            <label className="modal-label">{t('accounts.scopeLabel')}</label>
-            <div style={{ display: 'flex', gap: 8, marginBottom: 6 }}>
-              {['business', 'personal'].map(s => (
-                <button
-                  key={s}
-                  type="button"
-                  onClick={() => setForm(p => ({ ...p, scope: s }))}
-                  style={{
-                    flex: 1, padding: '9px 0', borderRadius: 10, fontSize: 'var(--text-sm)',
-                    border: '0.5px solid var(--border-2)', fontFamily: 'inherit', fontWeight: 700,
-                    background: form.scope === s ? (s === 'business' ? '#EEF2FF' : '#FDF2FF') : 'none',
-                    color:      form.scope === s ? (s === 'business' ? '#3730a3' : '#7E22CE') : 'var(--text-3)',
-                    cursor: 'pointer', transition: 'all .1s',
-                  }}
-                >
-                  {s === 'business' ? t('accounts.scopeBusiness') : t('accounts.scopePersonal')}
-                </button>
-              ))}
-            </div>
-            <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 14, lineHeight: 1.5 }}>
-              {t('accounts.scopeExplain')}
-            </div>
+            {/* Wallets created in the Business Workspace are always business-scoped.
+                The Business/Personal selector was removed — Personal Workspace is gated
+                off, so business pages must not create personal wallets. form.scope stays
+                'business' (see EMPTY_FORM). */}
 
             {/* Opening balance — only for new wallets */}
             {!editWallet && (

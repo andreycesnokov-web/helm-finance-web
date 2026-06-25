@@ -51,6 +51,12 @@ async function api(method, path, { biz, body } = {}) {
     await api('POST', '/api/transactions/batch', { biz: A.id, body: {
       transactions: [{ type: 'income', amount: 12345, scope: 'business', description: 'ISO-A-TX' }] } });
 
+    // Business Workspace must NOT create personal wallets while Personal Workspace is
+    // gated (validated before insert, so it holds regardless of local wallet schema).
+    const personalWallet = await api('POST', '/api/wallets', { biz: A.id, body: { name: 'ISO-personal', currency: 'IDR', scope: 'personal' } });
+    ok('A) personal-scope wallet rejected (gated)',
+      personalWallet.status === 400 && personalWallet.body?.error === 'personal_wallets_disabled');
+
     const aWallets = await api('GET', '/api/wallets', { biz: A.id });
     const aWalletCount = (aWallets.body?.wallets || []).length;
     ok('A) A has wallets (data present)', aWallets.status === 200 && aWalletCount > 0);
