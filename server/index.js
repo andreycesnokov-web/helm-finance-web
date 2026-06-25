@@ -7304,9 +7304,14 @@ async function resetFinancialHandler(req, res) {
     if (confirm !== 'RESET') return res.status(400).json({ ok: false, error: 'confirm_required', message: 'Send { "confirm": "RESET" } to confirm.' });
     const biz = await requireBusiness(req, res); if (!biz) return;
     if (!canApproveFinancialRecord(biz.role)) return res.status(403).json({ ok: false, error: 'forbidden', message: 'Only owner, CEO, admin or CFO can reset financial data.' });
-    const { data, error } = await supabase.rpc('rpc_reset_business_financial', { p_business: biz.business.id });
-    if (error) return res.status(200).json({ ok: false, error: 'reset_failed', message: 'Financial reset failed. No data was deleted.' });
-    return res.json({ ok: true, deleted: data || {} });
+    const { data, error } = await supabase.rpc('rpc_reset_business_financial', {
+      p_business: biz.business.id,
+      p_actor_user_id: req.user.userId,
+    });
+    // The RPC itself enforces auth + atomicity and always returns { ok, deleted, error }.
+    if (error || !data || data.ok !== true)
+      return res.status(200).json({ ok: false, error: (data && data.error) || 'reset_failed', deleted: {}, message: 'Financial reset failed. No data was deleted.' });
+    return res.json({ ok: true, deleted: data.deleted || {} });
   } catch (e) {
     return res.status(200).json({ ok: false, error: 'reset_failed', message: 'Financial reset failed. No data was deleted.' });
   }
