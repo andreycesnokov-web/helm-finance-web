@@ -238,7 +238,16 @@ export default function Settings() {
   const handleDeleteBusiness = async () => {
     let xbid = null; try { xbid = localStorage.getItem('activeBusinessId') } catch {}
     if (!xbid) { window.alert('No active business selected.'); return }
-    const confirm = window.prompt('This permanently deletes the current business. Type "DELETE BUSINESS" to confirm (only empty businesses can be deleted):')
+    // Conservative, test-business-oriented flow: only EMPTY businesses can be deleted.
+    // Businesses with financial data are blocked (archive flow will come later).
+    const confirm = window.prompt(
+      'Delete this business?\n\n' +
+      '• Only EMPTY test businesses can be deleted (no transactions, wallets/accounts, ' +
+      'debts/receivables/payables, reminders or payroll records).\n' +
+      '• A business that has financial data cannot be deleted yet — archiving real ' +
+      'companies will come later.\n\n' +
+      'Type "DELETE BUSINESS" (or the exact business name) to confirm:'
+    )
     if (confirm == null) return
     try {
       const res = await fetch(`/api/businesses/${xbid}`, {
@@ -248,7 +257,8 @@ export default function Settings() {
       })
       const data = await res.json().catch(() => ({}))
       if (res.ok && data.ok) {
-        // Switch to another business and reload so WorkspaceProvider re-picks.
+        // Switch to another business (or clear the stale id) and reload so
+        // WorkspaceProvider re-picks a valid workspace — never the deleted one.
         try {
           if (data.next_business_id) { localStorage.setItem('activeBusinessId', data.next_business_id); localStorage.setItem('activeWorkspaceId', data.next_business_id) }
           else { localStorage.removeItem('activeBusinessId'); localStorage.removeItem('activeWorkspaceId') }
@@ -256,7 +266,7 @@ export default function Settings() {
         window.location.assign('/')
         return
       }
-      const msg = data.error === 'business_not_empty' ? 'This business has financial data. Reset financial data first, then delete.'
+      const msg = data.error === 'business_not_empty' ? 'This business has financial data and cannot be deleted yet.'
         : data.error === 'last_business' ? 'You cannot delete your only business.'
         : data.error === 'forbidden' ? 'Only the business owner can delete it.'
         : data.error === 'business_workspace_required' ? 'Personal workspaces cannot be deleted here.'

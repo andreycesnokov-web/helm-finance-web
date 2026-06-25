@@ -7409,7 +7409,7 @@ app.delete('/api/businesses/:id', auth, async (req, res) => {
     const counts = await businessFinancialCounts(businessId);
     const total = Object.values(counts).reduce((a, b) => a + Number(b || 0), 0);
     if (total > 0)
-      return res.status(409).json({ error: 'business_not_empty', counts, message: 'This business has financial data. Reset financial data first, then delete.' });
+      return res.status(409).json({ error: 'business_not_empty', counts, message: 'This business has financial data and cannot be deleted yet.' });
 
     // ATOMIC hard delete: a SINGLE delete of the business row. business_members has
     // ON DELETE CASCADE, so memberships are removed in the same statement/transaction
@@ -7420,7 +7420,7 @@ app.delete('/api/businesses/:id', auth, async (req, res) => {
     // their FK to businesses is ON DELETE SET NULL when present, and absent in prod
     // (037 not applied) — either way no manual cleanup is needed here.
     const { error: delErr } = await supabase.from('businesses').delete().eq('id', businessId);
-    if (delErr) return res.status(409).json({ error: 'delete_blocked', message: 'Could not delete the business. Reset financial data first.' });
+    if (delErr) return res.status(409).json({ error: 'delete_blocked', message: 'This business has related records and cannot be deleted yet.' });
 
     const next = businessWorkspaces.find(x => x.business_id !== businessId);
     res.json({ ok: true, deleted_business_id: businessId, next_business_id: next?.business_id || null });
