@@ -204,8 +204,17 @@ END
 $$;
 
 -- Lock down execution: only the service role (used by the backend) may call it.
+-- Supabase auto-grants EXECUTE to anon/authenticated/service_role via ALTER DEFAULT
+-- PRIVILEGES, so revoking PUBLIC is not enough — revoke the PostgREST client roles by
+-- name. (The owner role `postgres` keeps EXECUTE; it is not a client-facing role.)
 REVOKE ALL ON FUNCTION rpc_reset_business_financial(uuid, bigint) FROM PUBLIC;
 DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN
+    REVOKE ALL ON FUNCTION rpc_reset_business_financial(uuid, bigint) FROM anon;
+  END IF;
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN
+    REVOKE ALL ON FUNCTION rpc_reset_business_financial(uuid, bigint) FROM authenticated;
+  END IF;
   IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'service_role') THEN
     GRANT EXECUTE ON FUNCTION rpc_reset_business_financial(uuid, bigint) TO service_role;
   END IF;
