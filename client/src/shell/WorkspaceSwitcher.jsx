@@ -58,6 +58,11 @@ export default function WorkspaceSwitcher({ workspaces, activeId, onSelect }) {
         <div className="cfo-switch-menu" role="listbox">
           <Group title="Personal" items={personal} />
           <Group title="Business" items={business} />
+          <button className="cfo-switch-opt" onClick={() => { setOpen(false); window.location.assign('/business/new') }}>
+            <span className="cfo-switch-ava business" aria-hidden>+</span>
+            <span className="cfo-switch-text"><span className="cfo-switch-name">Create new business</span>
+              <span className="cfo-switch-type">New owner workspace</span></span>
+          </button>
         </div>
       )}
     </div>

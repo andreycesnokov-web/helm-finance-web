@@ -7295,35 +7295,84 @@ ANSWER RULES:
 // Keeps: users row, business, business_members, access/plan.
 // Deletes: transactions, debts, wallets, reminders.
 // Requires confirmation token in body: { confirm: "RESET" }
-app.delete('/api/user/reset-data', auth, async (req, res) => {
+// Atomic, business-scoped, owner/admin-only financial reset. All-or-nothing via the
+// rpc_reset_business_financial(uuid) Postgres function (single transaction) — never
+// partial. Confirm token: { "confirm": "RESET" }.
+async function resetFinancialHandler(req, res) {
+  try {
+    const { confirm } = req.body || {};
+    if (confirm !== 'RESET') return res.status(400).json({ ok: false, error: 'confirm_required', message: 'Send { "confirm": "RESET" } to confirm.' });
+    const biz = await requireBusiness(req, res); if (!biz) return;
+    if (!canApproveFinancialRecord(biz.role)) return res.status(403).json({ ok: false, error: 'forbidden', message: 'Only owner, CEO, admin or CFO can reset financial data.' });
+    const { data, error } = await supabase.rpc('rpc_reset_business_financial', {
+      p_business: biz.business.id,
+      p_actor_user_id: req.user.userId,
+    });
+    // The RPC itself enforces auth + atomicity and always returns { ok, deleted, error }.
+    if (error || !data || data.ok !== true)
+      return res.status(200).json({ ok: false, error: (data && data.error) || 'reset_failed', deleted: {}, message: 'Financial reset failed. No data was deleted.' });
+    return res.json({ ok: true, deleted: data.deleted || {} });
+  } catch (e) {
+    return res.status(200).json({ ok: false, error: 'reset_failed', message: 'Financial reset failed. No data was deleted.' });
+  }
+}
+app.delete('/api/user/reset-data', auth, resetFinancialHandler);       // legacy path (frontend)
+app.post('/api/business/reset-financial', auth, resetFinancialHandler); // canonical path
+
+// GET /api/business/financial-counts — counts before/after reset (business-scoped).
+app.get('/api/business/financial-counts', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res); if (!biz) return;
+    const id = biz.business.id;
+    const cnt = async (tbl, col = 'business_id') => {
+      if (!tbl) return 0;
+      try { const { count } = await supabase.from(tbl).select('*', { count: 'exact', head: true }).eq(col, id); return count || 0; }
+      catch { return 0; }
+    };
+    const counts = {
+      transactions: await cnt('transactions'),
+      debts: await cnt('debts'),
+      wallets: await cnt('wallets'),
+      reminders: await cnt('reminders'),
+      payroll_payments: await cnt('payroll_payments'),
+    };
+    res.json({ ok: true, counts });
+  } catch (e) { res.status(200).json({ ok: false, counts: {} }); }
+});
+
+// POST /api/businesses — create an additional business (caller becomes owner).
+// Does not touch existing businesses. Graceful for optional columns (country/timezone/
+// business_type) that may be absent in the live schema — no raw schema error.
+app.post('/api/businesses', auth, async (req, res) => {
   try {
     const userId = req.user.userId;
-    const { confirm } = req.body || {};
+    const { name, base_currency, country, timezone, business_type } = req.body || {};
+    if (!name?.trim()) return res.status(400).json({ error: 'Business name is required.' });
+    if (base_currency && !BUSINESS_ALLOWED_CURRENCIES.includes(base_currency))
+      return res.status(400).json({ error: `Invalid currency. Allowed: ${BUSINESS_ALLOWED_CURRENCIES.join(', ')}` });
 
-    if (confirm !== 'RESET') {
-      return res.status(400).json({ error: 'Send { "confirm": "RESET" } to confirm data reset.' });
+    const row = { owner_user_id: userId, name: name.trim(), base_currency: base_currency || 'IDR', plan: 'free', type: 'business' };
+    if (country !== undefined) row.country = country || null;
+    if (timezone !== undefined) row.timezone = timezone || null;
+    if (business_type !== undefined) row.business_type = business_type || null;
+
+    let business, bErr, dropped = [];
+    for (let i = 0; i < 5; i++) {
+      ({ data: business, error: bErr } = await supabase.from('businesses').insert(row).select().single());
+      if (!bErr) break;
+      const m = /find the '([a-z_]+)' column/i.exec(bErr.message || '');
+      const col = m?.[1];
+      if (col && col in row && !['name', 'base_currency', 'owner_user_id', 'type', 'plan'].includes(col)) { delete row[col]; dropped.push(col); continue; }
+      break;
     }
+    if (bErr) return res.status(400).json({ error: 'Could not create the business. Please try again.' });
 
-    const errors = [];
+    const { error: mErr } = await supabase.from('business_members').insert({ business_id: business.id, user_id: userId, role: 'owner', status: 'active' });
+    if (mErr) return res.status(500).json({ error: 'Business created but membership failed. Please contact support.' });
 
-    // Delete in safe order (no FK issues — all scoped to user_id)
-    const tables = ['transactions', 'debts', 'reminders', 'wallets'];
-    for (const table of tables) {
-      const { error } = await supabase.from(table).delete().eq('user_id', userId);
-      if (error) errors.push(`${table}: ${error.message}`);
-    }
-
-    if (errors.length > 0) {
-      return res.status(500).json({ error: 'Partial reset — some tables failed', details: errors });
-    }
-
-    res.json({
-      success: true,
-      message: 'All financial data deleted. Account, business and plan settings are preserved.',
-      deleted: tables,
-    });
+    res.status(201).json({ business, ...(dropped.length ? { unsupported_fields: dropped } : {}) });
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    res.status(500).json({ error: 'Could not create the business.' });
   }
 });
 

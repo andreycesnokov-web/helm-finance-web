@@ -307,19 +307,22 @@ export function BusinessInvoices() {
 // ── Funding & Investors — premium placeholder (no backend calls; full module gated
 //    until Personal/Funding is enabled). Renders inside WorkspaceShell. ───────────
 export function BusinessFunding() {
+  // Premium LOCKED page — no Personal/Funding backend calls, no migrations required.
   const cards = [
     { k: 'Owner funding', sub: 'founder advances & temporary funding', icon: <Icon.fund /> },
     { k: 'Shareholder loans', sub: 'repayable investor loans', icon: <Icon.down /> },
     { k: 'Capital contributions', sub: 'equity, not repayable', icon: <Icon.up /> },
+    { k: 'Intercompany transfers', sub: 'between your businesses', icon: <Icon.link /> },
     { k: 'Repayments', sub: 'principal reductions & schedules', icon: <Icon.check /> },
     { k: 'FX quotes', sub: 'booked rates & conversions', icon: <Icon.list /> },
   ]
   return <>
     <PageHeader eyebrow="Business Workspace" title="Funding & Investors"
-      actions={<StatusBadge tone="info">Coming soon</StatusBadge>} />
-    <div style={{ marginBottom: 18, color: 'var(--text-secondary)', fontSize: 14, maxWidth: 640 }}>
-      Owner funding, shareholder loans, capital contributions and repayments will be managed here.
-      This module is gated until Personal / Funding is enabled.
+      actions={<StatusBadge tone="warning">Not enabled</StatusBadge>} />
+    <div style={{ marginBottom: 18, color: 'var(--text-secondary)', fontSize: 14, maxWidth: 680 }}>
+      Manage owner funding, shareholder loans, capital contributions and intercompany funding.
+      <br /><br />
+      This module is not enabled yet. Personal / Funding migrations are required before activation.
     </div>
     <div className="cfo-grid cfo-grid-4" style={{ marginBottom: 18 }}>
       {cards.map(c => (
@@ -331,9 +334,131 @@ export function BusinessFunding() {
         </Card>
       ))}
     </div>
-    <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-      <Btn disabled>Coming soon</Btn>
-      <Btn variant="ghost" disabled>Learn more</Btn>
+    <Btn disabled title="Requires Personal/Funding migrations">Enable after migration</Btn>
+  </>
+}
+
+// ── Create a new Business — additional company for the same owner. Does not touch the
+//    existing business. POST /api/businesses; caller becomes Owner; switches on success.
+const BIZ_CURRENCIES = ['IDR', 'USD', 'EUR', 'SGD', 'MYR', 'AUD', 'GBP', 'JPY', 'CNY']
+const BIZ_TYPES = [
+  { v: 'operating', label: 'Operating company' },
+  { v: 'holding', label: 'Holding company' },
+  { v: 'project', label: 'Project / SPV' },
+  { v: 'other', label: 'Other' },
+]
+export function BusinessNew() {
+  const { token } = useAuth()
+  const { applyActive, refresh } = useWorkspace()
+  const navigate = useNavigate()
+  const [f, setF] = useState({ name: '', base_currency: 'IDR', country: 'ID', timezone: 'Asia/Jakarta', business_type: 'operating' })
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
+  const set = (k) => (e) => setF(s => ({ ...s, [k]: e.target.value }))
+
+  const submit = async (e) => {
+    e?.preventDefault?.()
+    if (!f.name.trim()) { setErr('Business name is required.'); return }
+    setBusy(true); setErr('')
+    try {
+      const { business } = await apiFetch('/businesses', token, { method: 'POST', body: f })
+      applyActive({ id: business.id, name: business.name, type: 'business', role: 'owner' })
+      refresh()
+      navigate('/business/pulse')
+    } catch (e2) {
+      setErr(e2.message || 'Could not create the business.')
+    } finally { setBusy(false) }
+  }
+
+  const inp = { width: '100%', padding: '10px 12px', borderRadius: 10, border: '1px solid var(--border-subtle)', background: 'var(--surface-card)', color: 'var(--text-primary)', fontSize: 14 }
+  const lbl = { fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 6, display: 'block' }
+
+  return <>
+    <PageHeader eyebrow="Business Workspace" title="Create new business"
+      actions={<StatusBadge tone="info">Owner</StatusBadge>} />
+    <form onSubmit={submit} style={{ maxWidth: 560 }}>
+      <Card title="Company details">
+        <div style={{ display: 'grid', gap: 16 }}>
+          <div>
+            <label style={lbl}>Business name *</label>
+            <input style={inp} value={f.name} onChange={set('name')} placeholder="e.g. Helm Holdings" autoFocus />
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 6 }}>A business code is generated automatically.</div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div>
+              <label style={lbl}>Base currency</label>
+              <select style={inp} value={f.base_currency} onChange={set('base_currency')}>
+                {BIZ_CURRENCIES.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={lbl}>Business type</label>
+              <select style={inp} value={f.business_type} onChange={set('business_type')}>
+                {BIZ_TYPES.map(t => <option key={t.v} value={t.v}>{t.label}</option>)}
+              </select>
+            </div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div>
+              <label style={lbl}>Country</label>
+              <input style={inp} value={f.country} onChange={set('country')} placeholder="ID" />
+            </div>
+            <div>
+              <label style={lbl}>Timezone</label>
+              <input style={inp} value={f.timezone} onChange={set('timezone')} placeholder="Asia/Jakarta" />
+            </div>
+          </div>
+          {err && <div style={{ color: 'var(--danger, #c0392b)', fontSize: 13 }}>{err}</div>}
+          <div style={{ display: 'flex', gap: 10 }}>
+            <Btn type="submit" disabled={busy}>{busy ? 'Creating…' : 'Create business'}</Btn>
+            <Btn variant="ghost" type="button" onClick={() => navigate(-1)}>Cancel</Btn>
+          </div>
+        </div>
+      </Card>
+    </form>
+  </>
+}
+
+// ── Holding / Intercompany Transfers — premium placeholder + implementation plan.
+//    Intercompany transfers create MIRRORED records in two businesses and are NOT
+//    automatically revenue/expense. Ledger logic is intentionally not shipped until
+//    the schema is ready (see plan below). No backend calls here.
+export function BusinessIntercompany() {
+  const types = [
+    { k: 'Intercompany loan', sub: 'A: receivable + cash-out · B: liability + cash-in' },
+    { k: 'Capital contribution', sub: 'A: investment + cash-out · B: equity + cash-in' },
+    { k: 'Owner funding', sub: 'founder advance routed between entities' },
+    { k: 'Expense reimbursement', sub: 'one entity settles another’s cost' },
+    { k: 'Management fee / recharge', sub: 'service recharge between entities' },
+    { k: 'Other', sub: 'manually classified' },
+  ]
+  return <>
+    <PageHeader eyebrow="Holding Workspace" title="Intercompany Transfers"
+      actions={<StatusBadge tone="warning">Foundation</StatusBadge>} />
+    <div style={{ marginBottom: 18, color: 'var(--text-secondary)', fontSize: 14, maxWidth: 720 }}>
+      Move money between your own businesses with correct double-sided accounting. An
+      intercompany transfer is <strong>not</strong> automatically revenue or expense — each
+      type books a mirrored pair of records in both entities. Ledger posting is enabled once
+      the intercompany schema is applied.
     </div>
+    <div className="cfo-grid cfo-grid-3" style={{ marginBottom: 18 }}>
+      {types.map(t => (
+        <Card key={t.k} title={t.k}>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{t.sub}</div>
+        </Card>
+      ))}
+    </div>
+    <Card title="Implementation plan">
+      <div style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+        <strong>DB:</strong> intercompany_transfers (id, type, from_business_id, to_business_id,
+        amount, currency, fx_rate, booked_at, status, memo) + two mirrored ledger rows linked by
+        transfer_id (additive migration; no change to existing tables).<br />
+        <strong>API:</strong> POST /api/intercompany/transfers (owner/admin in BOTH entities),
+        atomic RPC writing both sides in one transaction; GET list per business.<br />
+        <strong>Accounting:</strong> loan → A receivable/cash-out, B liability/cash-in; capital →
+        A investment/cash-out, B equity/cash-in; repayment reduces principal (not opex); never
+        post a transfer as revenue.
+      </div>
+    </Card>
   </>
 }
