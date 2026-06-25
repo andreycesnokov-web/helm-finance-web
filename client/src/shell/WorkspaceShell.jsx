@@ -46,12 +46,13 @@ export const BUSINESS_NAV = [
     { key: 'invoices', label: 'Invoices', to: '/business/invoices', icon: <Icon.doc /> },
     { key: 'receivables', label: 'Receivables', to: '/business/receivables', icon: <Icon.down /> },
     { key: 'payables', label: 'Payables', to: '/business/payables', icon: <Icon.up /> },
-    // Funding & Investors depends on migrations 037–039; hidden when the gate is off
-    // so production shows no dead link.
-    ...(FUNDING_UI_ENABLED ? [{ key: 'funding', label: 'Funding & Investors', to: '/business/funding-investors', icon: <Icon.fund /> }] : []),
+    // Always visible — renders a premium locked page when the gate is off (no dead link,
+    // no Personal/Funding backend calls, no migrations required).
+    { key: 'funding', label: 'Funding & Investors', to: '/business/funding-investors', icon: <Icon.fund /> },
     { key: 'bankimport', label: 'Bank Import', to: '/business/bank-import', icon: <Icon.bank /> },
   ] },
   { title: 'Operations', items: [
+    { key: 'intercompany', label: 'Intercompany', to: '/business/intercompany', icon: <Icon.link /> },
     { key: 'payroll', label: 'Payroll', to: '/business/payroll', icon: <Icon.team /> },
     { key: 'approvals', label: 'Approvals', to: '/business/approvals', icon: <Icon.check /> },
     { key: 'team', label: 'Team', to: '/business/team', icon: <Icon.users /> },

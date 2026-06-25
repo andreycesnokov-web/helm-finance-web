@@ -218,16 +218,18 @@ export default function Settings() {
   const handleResetData = async () => {
     setResetLoading(true); setResetError('')
     try {
+      let xbid = null; try { xbid = localStorage.getItem('activeBusinessId') } catch {}
       const res = await fetch('/api/user/reset-data', {
         method: 'DELETE',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, ...(xbid ? { 'x-business-id': xbid } : {}) },
         body: JSON.stringify({ confirm: 'RESET' }),
       })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Reset failed')
-      setResetStep(2)
+      // Atomic endpoint: { ok:true } or { ok:false }. Never "partial".
+      if (data && data.ok) setResetStep(2)
+      else setResetError('Reset failed. No data was deleted.')
     } catch (e) {
-      setResetError(e.message)
+      setResetError('Reset failed. No data was deleted.')
     } finally {
       setResetLoading(false)
     }
