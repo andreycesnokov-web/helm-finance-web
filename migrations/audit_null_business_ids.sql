@@ -9,6 +9,10 @@
 -- (they belong to no business). Report the counts before promotion and decide:
 --   • backfill them to the owning business (additive UPDATE), or
 --   • explicitly approve a temporary compatibility path.
+-- PROMOTION GATE: every [GATE] row below must be 0. For transactions, only
+-- business-scope (and unknown-scope) NULLs gate promotion; personal-scope NULLs are
+-- legacy personal data with no business UI today and are reported separately.
+--
 -- NOTE on categories/counterparties: any rows there with BOTH business_id IS NULL
 -- AND user_id IS NULL are shared "system" rows. The OLD union also excluded those
 -- (it required user_id = owner), so strict scoping does NOT change their visibility.
@@ -17,7 +21,15 @@
 --
 -- Does NOT modify any data. Safe to run on production.
 -- ════════════════════════════════════════════════════════════════════════════
-SELECT 'transactions'        AS table, count(*) AS null_business_id_rows FROM public.transactions        WHERE business_id IS NULL
+-- transactions are split by scope: the PROMOTION GATE is business-scope NULLs only
+-- (those would leak under strict business scoping). Personal-scope NULLs are legacy
+-- personal data with no business UI today — reported separately, NOT a blocker.
+  SELECT 'transactions (scope=business) [GATE]' AS table,
+         count(*) AS null_business_id_rows FROM public.transactions WHERE business_id IS NULL AND scope = 'business'
+UNION ALL SELECT 'transactions (scope=personal) [report only]',
+         count(*) FROM public.transactions WHERE business_id IS NULL AND scope = 'personal'
+UNION ALL SELECT 'transactions (scope NULL/other) [GATE]',
+         count(*) FROM public.transactions WHERE business_id IS NULL AND (scope IS NULL OR scope NOT IN ('business','personal'))
 UNION ALL SELECT 'wallets',            count(*) FROM public.wallets            WHERE business_id IS NULL
 UNION ALL SELECT 'debts',              count(*) FROM public.debts              WHERE business_id IS NULL
 UNION ALL SELECT 'reminders',          (SELECT count(*) FROM public.reminders          WHERE business_id IS NULL)
