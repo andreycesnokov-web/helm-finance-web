@@ -3315,11 +3315,10 @@ function generateInviteCode() {
 app.get('/api/team', auth, async (req, res) => {
   const userId = req.user.userId;
   try {
-    // Get business_id for this user
-    const { data: memberships } = await supabase.from('business_members')
-      .select('business_id, role').eq('user_id', userId).eq('status', 'active').limit(1);
-    if (!memberships?.length) return res.status(403).json({ error: 'Not a member of any business' });
-    const { business_id, role: myRole } = memberships[0];
+    // Active business from x-business-id (NOT the first membership) — Team must be
+    // scoped to the selected workspace, never the user's default business.
+    const biz = await requireBusiness(req, res); if (!biz) return;
+    const business_id = biz.business.id, myRole = biz.role;
 
     if (!['owner', 'ceo', 'admin', 'cfo'].includes(myRole))
       return res.status(403).json({ error: 'Only owner, admin or CFO can view team' });
@@ -3369,10 +3368,8 @@ app.post('/api/team/invite', auth, async (req, res) => {
     return res.status(400).json({ error: `role must be one of: ${VALID_ROLES.join(', ')}` });
 
   try {
-    const { data: memberships } = await supabase.from('business_members')
-      .select('business_id, role').eq('user_id', userId).eq('status', 'active').limit(1);
-    if (!memberships?.length) return res.status(403).json({ error: 'Not a member of any business' });
-    const { business_id, role: myRole } = memberships[0];
+    const biz = await requireBusiness(req, res); if (!biz) return;
+    const business_id = biz.business.id, myRole = biz.role;
 
     if (!['owner', 'ceo', 'admin'].includes(myRole))
       return res.status(403).json({ error: 'Only owner, CEO or admin can create invites' });
@@ -3411,16 +3408,18 @@ app.post('/api/team/invite', auth, async (req, res) => {
 app.delete('/api/team/invites/:code', auth, async (req, res) => {
   const userId = req.user.userId;
   try {
-    const { data: memberships } = await supabase.from('business_members')
-      .select('business_id, role').eq('user_id', userId).eq('status', 'active').limit(1);
-    if (!memberships?.length) return res.status(403).json({ error: 'Not a member' });
-    if (!['owner', 'admin'].includes(memberships[0].role))
+    const biz = await requireBusiness(req, res); if (!biz) return;
+    if (!['owner', 'admin'].includes(biz.role))
       return res.status(403).json({ error: 'Only owner/admin can revoke invites' });
 
-    await supabase.from('business_invites')
+    // Scope strictly to the active business — an invite from another business is not
+    // revocable here (returns 404 rather than silently affecting nothing).
+    const { data: revoked } = await supabase.from('business_invites')
       .update({ status: 'revoked' })
       .eq('code', req.params.code)
-      .eq('business_id', memberships[0].business_id);
+      .eq('business_id', biz.business.id)
+      .select('id');
+    if (!revoked?.length) return res.status(404).json({ error: 'Invite not found in this business' });
 
     res.json({ ok: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
@@ -3432,23 +3431,24 @@ app.patch('/api/team/members/:memberId', auth, async (req, res) => {
   const userId = req.user.userId;
   const { role, status } = req.body;
   try {
-    const { data: myMem } = await supabase.from('business_members')
-      .select('business_id, role').eq('user_id', userId).eq('status', 'active').limit(1);
-    if (!myMem?.length) return res.status(403).json({ error: 'Not a member' });
-    if (!['owner', 'admin'].includes(myMem[0].role))
+    const biz = await requireBusiness(req, res); if (!biz) return;
+    if (!['owner', 'admin'].includes(biz.role))
       return res.status(403).json({ error: 'Only owner/admin can change roles' });
 
     const update = {};
     if (role)   update.role   = role;
     if (status) update.status = status;
 
+    // The target member MUST belong to the active business — never mutate a member of
+    // another workspace via its id.
     const { data, error } = await supabase.from('business_members')
       .update(update)
       .eq('id', req.params.memberId)
-      .eq('business_id', myMem[0].business_id)
-      .select().single();
+      .eq('business_id', biz.business.id)
+      .select();
     if (error) throw error;
-    res.json(data);
+    if (!data?.length) return res.status(404).json({ error: 'Member not found in this business' });
+    res.json(data[0]);
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -3457,24 +3457,25 @@ app.patch('/api/team/members/:memberId', auth, async (req, res) => {
 app.delete('/api/team/members/:memberId', auth, async (req, res) => {
   const userId = req.user.userId;
   try {
-    const { data: myMem } = await supabase.from('business_members')
-      .select('business_id, role').eq('user_id', userId).eq('status', 'active').limit(1);
-    if (!myMem?.length) return res.status(403).json({ error: 'Not a member' });
-    if (!['owner', 'admin'].includes(myMem[0].role))
+    const biz = await requireBusiness(req, res); if (!biz) return;
+    if (!['owner', 'admin'].includes(biz.role))
       return res.status(403).json({ error: 'Only owner/admin can remove members' });
 
-    // Prevent removing yourself
-    const { data: target } = await supabase.from('business_members')
-      .select('user_id, role').eq('id', req.params.memberId).single();
-    if (target?.user_id === userId)
+    // Target must belong to the ACTIVE business — never remove a member of another
+    // workspace via its id.
+    const { data: targetRows } = await supabase.from('business_members')
+      .select('user_id, role').eq('id', req.params.memberId).eq('business_id', biz.business.id).limit(1);
+    const target = targetRows?.[0];
+    if (!target) return res.status(404).json({ error: 'Member not found in this business' });
+    if (target.user_id === userId)
       return res.status(400).json({ error: 'Cannot remove yourself' });
-    if (target?.role === 'owner')
+    if (target.role === 'owner')
       return res.status(403).json({ error: 'Cannot remove business owner' });
 
     await supabase.from('business_members')
       .update({ status: 'removed' })
       .eq('id', req.params.memberId)
-      .eq('business_id', myMem[0].business_id);
+      .eq('business_id', biz.business.id);
 
     res.json({ ok: true });
   } catch (e) { res.status(500).json({ error: e.message }); }

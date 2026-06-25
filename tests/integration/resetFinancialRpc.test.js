@@ -81,6 +81,16 @@ test('admin and cfo with active membership are allowed', async () => {
   }
 });
 
+test('reset PRESERVES business_members (team is not deleted)', async () => {
+  const db = await base();
+  const before = Number((await db.query(`SELECT count(*)::int c FROM business_members WHERE business_id='${BIZ}'`)).rows[0].c);
+  const r = await reset(db, BIZ, ADMIN);
+  assert.equal(r.ok, true, JSON.stringify(r));
+  const after = Number((await db.query(`SELECT count(*)::int c FROM business_members WHERE business_id='${BIZ}'`)).rows[0].c);
+  assert.equal(after, before); // team membership untouched by financial reset
+  assert.ok(before >= 3);
+});
+
 test('owner WITH active membership is allowed', async () => {
   const db = await base();
   await db.exec(`INSERT INTO business_members VALUES ('${BIZ}',${OWNER},'owner','active');`);
