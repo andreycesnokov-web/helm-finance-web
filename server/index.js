@@ -33,6 +33,7 @@ app.use(cors({ origin: process.env.CLIENT_URL || 'http://localhost:5173' }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.static('client/dist'));
 
+const { resolveActiveBusiness: _resolveActiveBusiness } = require('./lib/businessResolver');
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SECRET_KEY);
 const JWT_SECRET = process.env.JWT_SECRET;
 const BOT_TOKEN = process.env.BOT_TOKEN;
@@ -153,32 +154,10 @@ function effectiveRuleActive(rule, source = null) {
  * Returns { business, role, ownerUserId }.
  * Throws { status, message } on access violation.
  */
-async function resolveActiveBusiness(req) {
-  const userId = req.user.userId;
-  const requested =
-    req.headers['x-business-id'] ||
-    req.query?.business_id ||
-    req.body?.business_id ||
-    null;
-
-  if (requested) {
-    const { data } = await supabase.from('business_members')
-      .select('role, status, business_id, businesses(*)')
-      .eq('user_id', userId).eq('business_id', requested).eq('status', 'active')
-      .limit(1);
-    if (data?.length) {
-      const m = data[0];
-      return { business: m.businesses, role: m.role, ownerUserId: m.businesses.owner_user_id };
-    }
-    // An EXPLICIT business id the user cannot access → reject. Never silently fall
-    // back to the default workspace: that masked the active-workspace selection and
-    // leaked the default business's data into a freshly-selected one. The frontend
-    // (apiFetch) clears the stale id on this 403 and re-picks a valid workspace.
-    const err = new Error('workspace_not_accessible'); err.status = 403; throw err;
-  }
-
-  const { business, membership } = await ensureDefaultBusiness(userId);
-  return { business, role: membership.role, ownerUserId: business.owner_user_id };
+function resolveActiveBusiness(req) {
+  // Delegates to the extracted, unit-tested helper (see server/lib/businessResolver.js
+  // and tests/integration/businessResolver.test.js). Behavior unchanged.
+  return _resolveActiveBusiness(supabase, ensureDefaultBusiness, req);
 }
 
 /**
