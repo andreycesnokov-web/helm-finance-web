@@ -33,6 +33,7 @@ app.use(cors({ origin: process.env.CLIENT_URL || 'http://localhost:5173' }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.static('client/dist'));
 
+const { resolveActiveBusiness: _resolveActiveBusiness, getPrimaryBusinessId } = require('./lib/businessResolver');
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SECRET_KEY);
 const JWT_SECRET = process.env.JWT_SECRET;
 const BOT_TOKEN = process.env.BOT_TOKEN;
@@ -153,30 +154,10 @@ function effectiveRuleActive(rule, source = null) {
  * Returns { business, role, ownerUserId }.
  * Throws { status, message } on access violation.
  */
-async function resolveActiveBusiness(req) {
-  const userId = req.user.userId;
-  const requested =
-    req.headers['x-business-id'] ||
-    req.query?.business_id ||
-    req.body?.business_id ||
-    null;
-
-  if (requested) {
-    const { data } = await supabase.from('business_members')
-      .select('role, status, business_id, businesses(*)')
-      .eq('user_id', userId).eq('business_id', requested).eq('status', 'active')
-      .limit(1);
-    if (data?.length) {
-      const m = data[0];
-      return { business: m.businesses, role: m.role, ownerUserId: m.businesses.owner_user_id };
-    }
-    // Requested business the user is NOT a member of → fall back to their
-    // default business (never leak another workspace; also handles a stale
-    // localStorage id after switching accounts on the same browser).
-  }
-
-  const { business, membership } = await ensureDefaultBusiness(userId);
-  return { business, role: membership.role, ownerUserId: business.owner_user_id };
+function resolveActiveBusiness(req) {
+  // Delegates to the extracted, unit-tested helper (see server/lib/businessResolver.js
+  // and tests/integration/businessResolver.test.js). Behavior unchanged.
+  return _resolveActiveBusiness(supabase, ensureDefaultBusiness, req);
 }
 
 /**
@@ -186,7 +167,14 @@ async function resolveActiveBusiness(req) {
  * user's first business existed.
  */
 function bizOrFilter(biz) {
-  return `business_id.eq.${biz.business.id},and(business_id.is.null,user_id.eq.${biz.ownerUserId})`;
+  // STRICT business scoping — every scoped financial read/write is filtered by
+  // business_id only. The legacy `business_id IS NULL` union was removed: migration
+  // 017 backfilled all NULL rows into the user's default business, so the union only
+  // risked leaking one business's (or orphaned) rows into another business the same
+  // user owns. Run migrations/audit_null_business_ids.sql before promotion to confirm
+  // zero NULL rows remain. (Kept as an `.or(...)` single-term string so every existing
+  // `.or(bizOrFilter(biz))` call site is unchanged.)
+  return `business_id.eq.${biz.business.id}`;
 }
 
 /**
@@ -4506,17 +4494,20 @@ app.delete('/api/activity-types/:id', auth, async (req, res) => {
  * Idempotent: safe to call on every request that needs access context.
  */
 async function ensureDefaultBusiness(userId, firstName) {
-  // Look for existing active membership
+  // Look for an existing active membership. Deterministic: the EARLIEST-created
+  // business-type workspace (never a personal workspace), so the "default" business
+  // is stable across requests rather than whatever Postgres returns first.
   const { data: memberships } = await supabase
     .from('business_members')
     .select('role, status, business_id, businesses(*)')
     .eq('user_id', userId)
-    .eq('status', 'active')
-    .limit(1);
+    .eq('status', 'active');
 
-  if (memberships && memberships.length > 0) {
-    const m = memberships[0];
-    return { business: m.businesses, membership: { role: m.role, status: m.status } };
+  const ownedBusiness = (memberships || [])
+    .filter(m => m.businesses && m.businesses.type !== 'personal')
+    .sort((a, b) => new Date(a.businesses.created_at || 0) - new Date(b.businesses.created_at || 0))[0];
+  if (ownedBusiness) {
+    return { business: ownedBusiness.businesses, membership: { role: ownedBusiness.role, status: ownedBusiness.status } };
   }
 
   // No business — bootstrap default with 7-day trial
@@ -6019,8 +6010,22 @@ app.get('/api/access/status', auth, async (req, res) => {
       .single();
     const firstName = user?.first_name || user?.username || 'My';
 
-    // Ensure business exists (creates on first call)
-    const { business, membership } = await ensureDefaultBusiness(userId, firstName);
+    // Honor the active workspace: if a valid x-business-id is supplied, report plan/
+    // trial for THAT business; reject an explicit-but-inaccessible id (no silent
+    // fallback). With no id, bootstrap/return the user's default business.
+    let business, membership;
+    const requestedBiz = req.headers['x-business-id'] || req.query?.business_id || null;
+    if (requestedBiz) {
+      const { data } = await supabase.from('business_members')
+        .select('role, status, businesses(*)')
+        .eq('user_id', userId).eq('business_id', requestedBiz).eq('status', 'active').limit(1);
+      const m = data?.[0];
+      if (!m || !m.businesses) return res.status(403).json({ error: 'workspace_not_accessible' });
+      business = m.businesses;
+      membership = { role: m.role, status: m.status };
+    } else {
+      ({ business, membership } = await ensureDefaultBusiness(userId, firstName));
+    }
 
     // Compute access state
     const accessState = getAccessState(business);
@@ -7319,25 +7324,109 @@ async function resetFinancialHandler(req, res) {
 app.delete('/api/user/reset-data', auth, resetFinancialHandler);       // legacy path (frontend)
 app.post('/api/business/reset-financial', auth, resetFinancialHandler); // canonical path
 
+// GET /api/business/active — auth-gated isolation diagnostic. Echoes the requested
+// x-business-id and the business the backend actually RESOLVED for this caller, so a
+// "shows another business's data" report can be pinned to client vs server in one call.
+app.get('/api/business/active', auth, async (req, res) => {
+  try {
+    const requested = req.headers['x-business-id'] || req.query?.business_id || null;
+    const biz = await requireBusiness(req, res); if (!biz) return;
+    const primaryId = await getPrimaryBusinessId(supabase, req.user.userId);
+    res.json({
+      requested_business_id: requested,
+      resolved: {
+        id:            biz.business.id,
+        business_code: biz.business.business_code || null,
+        name:          biz.business.name,
+        type:          biz.business.type || 'business',
+      },
+      role: biz.role,
+      is_primary_business: !!primaryId && primaryId === biz.business.id,
+      // True only when the client sent an id AND the server resolved that exact id.
+      matched: !!requested && String(requested) === String(biz.business.id),
+    });
+  } catch (e) {
+    res.status(e.status || 500).json({ error: e.message || 'failed' });
+  }
+});
+
+// Business-scoped financial row counts (shared by financial-counts + delete-guard).
+async function businessFinancialCounts(id) {
+  const cnt = async (tbl, col = 'business_id') => {
+    try { const { count } = await supabase.from(tbl).select('*', { count: 'exact', head: true }).eq(col, id); return count || 0; }
+    catch { return 0; }
+  };
+  return {
+    transactions: await cnt('transactions'),
+    debts: await cnt('debts'),
+    wallets: await cnt('wallets'),
+    reminders: await cnt('reminders'),
+    payroll_payments: await cnt('payroll_payments'),
+    bank_import_batches: await cnt('bank_import_batches'),
+  };
+}
+
 // GET /api/business/financial-counts — counts before/after reset (business-scoped).
 app.get('/api/business/financial-counts', auth, async (req, res) => {
   try {
     const biz = await requireBusiness(req, res); if (!biz) return;
-    const id = biz.business.id;
-    const cnt = async (tbl, col = 'business_id') => {
-      if (!tbl) return 0;
-      try { const { count } = await supabase.from(tbl).select('*', { count: 'exact', head: true }).eq(col, id); return count || 0; }
-      catch { return 0; }
-    };
-    const counts = {
-      transactions: await cnt('transactions'),
-      debts: await cnt('debts'),
-      wallets: await cnt('wallets'),
-      reminders: await cnt('reminders'),
-      payroll_payments: await cnt('payroll_payments'),
-    };
-    res.json({ ok: true, counts });
+    res.json({ ok: true, counts: await businessFinancialCounts(biz.business.id) });
   } catch (e) { res.status(200).json({ ok: false, counts: {} }); }
+});
+
+// DELETE /api/businesses/:id — owner-only, business-only, never the last business.
+// Empty business → hard delete (memberships cascade; workspace prefs FK is SET NULL).
+// Business with financial data → blocked (reset first). Returns the next business to
+// switch to so the client never lands on a deleted workspace.
+app.delete('/api/businesses/:id', auth, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const businessId = req.params.id;
+    const { confirm } = req.body || {};
+
+    const { data } = await supabase.from('business_members')
+      .select('role, status, businesses(*)')
+      .eq('user_id', userId).eq('business_id', businessId).eq('status', 'active').limit(1);
+    const m = data?.[0];
+    if (!m || !m.businesses) return res.status(403).json({ error: 'workspace_not_accessible' });
+    const business = m.businesses;
+    if (business.type === 'personal') return res.status(403).json({ error: 'business_workspace_required', message: 'Personal workspaces cannot be deleted here.' });
+    if (m.role !== 'owner') return res.status(403).json({ error: 'forbidden', message: 'Only the business owner can delete it.' });
+
+    // Typed confirmation: the business name OR the literal "DELETE BUSINESS".
+    if (confirm !== 'DELETE BUSINESS' && confirm !== business.name)
+      return res.status(400).json({ error: 'confirm_required', message: 'Type the business name or "DELETE BUSINESS" to confirm.' });
+
+    // Never delete the user's only business workspace.
+    const { data: owned } = await supabase.from('business_members')
+      .select('business_id, businesses(type)')
+      .eq('user_id', userId).eq('status', 'active');
+    const businessWorkspaces = (owned || []).filter(x => x.businesses && x.businesses.type !== 'personal');
+    if (businessWorkspaces.length <= 1)
+      return res.status(409).json({ error: 'last_business', message: 'You cannot delete your only business.' });
+
+    // Block when the business still holds financial data — reset it first.
+    const counts = await businessFinancialCounts(businessId);
+    const total = Object.values(counts).reduce((a, b) => a + Number(b || 0), 0);
+    if (total > 0)
+      return res.status(409).json({ error: 'business_not_empty', counts, message: 'This business has financial data and cannot be deleted yet.' });
+
+    // ATOMIC hard delete: a SINGLE delete of the business row. business_members has
+    // ON DELETE CASCADE, so memberships are removed in the same statement/transaction
+    // — no risk of a partial delete (orphaned members with no business). If any RESTRICT
+    // FK still references this business (it shouldn't: counts are proven zero above),
+    // the delete fails wholesale and we return a clean error — nothing is partially
+    // removed. We do NOT touch migration-037 tables (e.g. user_workspace_preferences);
+    // their FK to businesses is ON DELETE SET NULL when present, and absent in prod
+    // (037 not applied) — either way no manual cleanup is needed here.
+    const { error: delErr } = await supabase.from('businesses').delete().eq('id', businessId);
+    if (delErr) return res.status(409).json({ error: 'delete_blocked', message: 'This business has related records and cannot be deleted yet.' });
+
+    const next = businessWorkspaces.find(x => x.business_id !== businessId);
+    res.json({ ok: true, deleted_business_id: businessId, next_business_id: next?.business_id || null });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 // POST /api/businesses — create an additional business (caller becomes owner).
