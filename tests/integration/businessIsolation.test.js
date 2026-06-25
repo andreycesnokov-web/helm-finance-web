@@ -49,10 +49,23 @@ async function api(method, path, { biz, body } = {}) {
     const aWallets = await api('GET', '/api/wallets', { biz: A.id });
     ok('A) A shows its wallet', (aWallets.body?.wallets || []).some(x => x.name === 'ISO-A-Wallet'));
 
+    // Seed a transaction in A (isolation marker for /api/transactions).
+    const txCreate = await api('POST', '/api/transactions/batch', { biz: A.id, body: {
+      transactions: [{ type: 'income', amount: 12345, scope: 'business', description: 'ISO-A-TX' }] } });
+    ok('A) transaction created in A', txCreate.status === 200 || txCreate.status === 201);
+
+    const aTx = await api('GET', '/api/transactions?period=all', { biz: A.id });
+    ok('A) A shows its transaction', Array.isArray(aTx.body) && aTx.body.some(t => t.description === 'ISO-A-TX'));
+
     // Create business B for the same user → becomes owner.
     const created = await api('POST', '/api/businesses', { body: { name: 'ISO-B ' + Date.now(), base_currency: 'IDR' } });
     bizB = created.body?.business?.id || null;
     ok('B) business B created, user is owner', created.status === 201 && !!bizB);
+
+    // Debug endpoint must confirm the backend resolves B (not a fallback to default).
+    const dbg = await api('GET', '/api/business/active', { biz: bizB });
+    ok('B) /api/business/active resolves B (matched, not primary)',
+      dbg.status === 200 && dbg.body?.resolved?.id === bizB && dbg.body?.matched === true && dbg.body?.is_primary_business === false);
 
     // B must start EMPTY and never show A's data.
     const bWallets = await api('GET', '/api/wallets', { biz: bizB });
@@ -61,6 +74,9 @@ async function api(method, path, { biz, body } = {}) {
     const bDebts = await api('GET', '/api/debts', { biz: bizB });
     ok('B) B debts empty', bDebts.status === 200 && ((bDebts.body?.debts || bDebts.body || []).length === 0));
 
+    const bTx = await api('GET', '/api/transactions?period=all', { biz: bizB });
+    ok('B) B transactions empty', Array.isArray(bTx.body) && bTx.body.length === 0);
+
     const bPulse = await api('GET', '/api/pulse', { biz: bizB });
     const cash = bPulse.body?.total_balance ?? bPulse.body?.cash ?? bPulse.body?.summary?.total_balance ?? 0;
     ok('B) B pulse cash is zero', bPulse.status === 200 && Number(cash) === 0);
@@ -68,13 +84,16 @@ async function api(method, path, { biz, body } = {}) {
     // Switching back to A still returns A's data.
     const aAgain = await api('GET', '/api/wallets', { biz: A.id });
     ok('A) switching back to A returns A wallet', (aAgain.body?.wallets || []).some(x => x.name === 'ISO-A-Wallet'));
+    const aTxAgain = await api('GET', '/api/transactions?period=all', { biz: A.id });
+    ok('A) switching back to A returns A transaction', Array.isArray(aTxAgain.body) && aTxAgain.body.some(t => t.description === 'ISO-A-TX'));
 
     // Explicit invalid x-business-id → 403 (no silent fallback to default).
     const bogus = await api('GET', '/api/wallets', { biz: '00000000-0000-0000-0000-000000000000' });
     ok('SEC) invalid x-business-id → 403 workspace_not_accessible',
       bogus.status === 403 && bogus.body?.error === 'workspace_not_accessible');
   } finally {
-    // Cleanup: remove the seeded wallet and business B (+ its membership).
+    // Cleanup: remove the seeded transaction + wallet and business B (+ membership).
+    try { await supabase.from('transactions').delete().eq('description', 'ISO-A-TX'); } catch { /* */ }
     try { if (walletId) await supabase.from('wallets').delete().eq('id', walletId); } catch { /* */ }
     try { if (bizB) { await supabase.from('business_members').delete().eq('business_id', bizB); await supabase.from('businesses').delete().eq('id', bizB); } } catch { /* */ }
   }

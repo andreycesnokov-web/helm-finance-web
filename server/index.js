@@ -167,7 +167,14 @@ function resolveActiveBusiness(req) {
  * user's first business existed.
  */
 function bizOrFilter(biz) {
-  return `business_id.eq.${biz.business.id},and(business_id.is.null,user_id.eq.${biz.ownerUserId})`;
+  // Only the user's PRIMARY (earliest-created) business absorbs legacy rows that still
+  // have business_id NULL (migration 017 backfilled those into the default business).
+  // Every additional business is scoped STRICTLY by business_id, so a newly-created
+  // business never inherits another business's (or orphaned legacy) financial rows.
+  if (biz.isPrimaryBusiness) {
+    return `business_id.eq.${biz.business.id},and(business_id.is.null,user_id.eq.${biz.ownerUserId})`;
+  }
+  return `business_id.eq.${biz.business.id}`;
 }
 
 /**
@@ -4487,17 +4494,20 @@ app.delete('/api/activity-types/:id', auth, async (req, res) => {
  * Idempotent: safe to call on every request that needs access context.
  */
 async function ensureDefaultBusiness(userId, firstName) {
-  // Look for existing active membership
+  // Look for an existing active membership. Deterministic: the EARLIEST-created
+  // business-type workspace (never a personal workspace), so the "default" business
+  // is stable across requests rather than whatever Postgres returns first.
   const { data: memberships } = await supabase
     .from('business_members')
     .select('role, status, business_id, businesses(*)')
     .eq('user_id', userId)
-    .eq('status', 'active')
-    .limit(1);
+    .eq('status', 'active');
 
-  if (memberships && memberships.length > 0) {
-    const m = memberships[0];
-    return { business: m.businesses, membership: { role: m.role, status: m.status } };
+  const ownedBusiness = (memberships || [])
+    .filter(m => m.businesses && m.businesses.type !== 'personal')
+    .sort((a, b) => new Date(a.businesses.created_at || 0) - new Date(b.businesses.created_at || 0))[0];
+  if (ownedBusiness) {
+    return { business: ownedBusiness.businesses, membership: { role: ownedBusiness.role, status: ownedBusiness.status } };
   }
 
   // No business — bootstrap default with 7-day trial
@@ -7314,25 +7324,102 @@ async function resetFinancialHandler(req, res) {
 app.delete('/api/user/reset-data', auth, resetFinancialHandler);       // legacy path (frontend)
 app.post('/api/business/reset-financial', auth, resetFinancialHandler); // canonical path
 
+// GET /api/business/active — auth-gated isolation diagnostic. Echoes the requested
+// x-business-id and the business the backend actually RESOLVED for this caller, so a
+// "shows another business's data" report can be pinned to client vs server in one call.
+app.get('/api/business/active', auth, async (req, res) => {
+  try {
+    const requested = req.headers['x-business-id'] || req.query?.business_id || null;
+    const biz = await requireBusiness(req, res); if (!biz) return;
+    res.json({
+      requested_business_id: requested,
+      resolved: {
+        id:            biz.business.id,
+        business_code: biz.business.business_code || null,
+        name:          biz.business.name,
+        type:          biz.business.type || 'business',
+      },
+      role: biz.role,
+      is_primary_business: !!biz.isPrimaryBusiness,
+      // True only when the client sent an id AND the server resolved that exact id.
+      matched: !!requested && String(requested) === String(biz.business.id),
+    });
+  } catch (e) {
+    res.status(e.status || 500).json({ error: e.message || 'failed' });
+  }
+});
+
+// Business-scoped financial row counts (shared by financial-counts + delete-guard).
+async function businessFinancialCounts(id) {
+  const cnt = async (tbl, col = 'business_id') => {
+    try { const { count } = await supabase.from(tbl).select('*', { count: 'exact', head: true }).eq(col, id); return count || 0; }
+    catch { return 0; }
+  };
+  return {
+    transactions: await cnt('transactions'),
+    debts: await cnt('debts'),
+    wallets: await cnt('wallets'),
+    reminders: await cnt('reminders'),
+    payroll_payments: await cnt('payroll_payments'),
+    bank_import_batches: await cnt('bank_import_batches'),
+  };
+}
+
 // GET /api/business/financial-counts — counts before/after reset (business-scoped).
 app.get('/api/business/financial-counts', auth, async (req, res) => {
   try {
     const biz = await requireBusiness(req, res); if (!biz) return;
-    const id = biz.business.id;
-    const cnt = async (tbl, col = 'business_id') => {
-      if (!tbl) return 0;
-      try { const { count } = await supabase.from(tbl).select('*', { count: 'exact', head: true }).eq(col, id); return count || 0; }
-      catch { return 0; }
-    };
-    const counts = {
-      transactions: await cnt('transactions'),
-      debts: await cnt('debts'),
-      wallets: await cnt('wallets'),
-      reminders: await cnt('reminders'),
-      payroll_payments: await cnt('payroll_payments'),
-    };
-    res.json({ ok: true, counts });
+    res.json({ ok: true, counts: await businessFinancialCounts(biz.business.id) });
   } catch (e) { res.status(200).json({ ok: false, counts: {} }); }
+});
+
+// DELETE /api/businesses/:id — owner-only, business-only, never the last business.
+// Empty business → hard delete (memberships cascade; workspace prefs FK is SET NULL).
+// Business with financial data → blocked (reset first). Returns the next business to
+// switch to so the client never lands on a deleted workspace.
+app.delete('/api/businesses/:id', auth, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const businessId = req.params.id;
+    const { confirm } = req.body || {};
+
+    const { data } = await supabase.from('business_members')
+      .select('role, status, businesses(*)')
+      .eq('user_id', userId).eq('business_id', businessId).eq('status', 'active').limit(1);
+    const m = data?.[0];
+    if (!m || !m.businesses) return res.status(403).json({ error: 'workspace_not_accessible' });
+    const business = m.businesses;
+    if (business.type === 'personal') return res.status(403).json({ error: 'business_workspace_required', message: 'Personal workspaces cannot be deleted here.' });
+    if (m.role !== 'owner') return res.status(403).json({ error: 'forbidden', message: 'Only the business owner can delete it.' });
+
+    // Typed confirmation: the business name OR the literal "DELETE BUSINESS".
+    if (confirm !== 'DELETE BUSINESS' && confirm !== business.name)
+      return res.status(400).json({ error: 'confirm_required', message: 'Type the business name or "DELETE BUSINESS" to confirm.' });
+
+    // Never delete the user's only business workspace.
+    const { data: owned } = await supabase.from('business_members')
+      .select('business_id, businesses(type)')
+      .eq('user_id', userId).eq('status', 'active');
+    const businessWorkspaces = (owned || []).filter(x => x.businesses && x.businesses.type !== 'personal');
+    if (businessWorkspaces.length <= 1)
+      return res.status(409).json({ error: 'last_business', message: 'You cannot delete your only business.' });
+
+    // Block when the business still holds financial data — reset it first.
+    const counts = await businessFinancialCounts(businessId);
+    const total = Object.values(counts).reduce((a, b) => a + Number(b || 0), 0);
+    if (total > 0)
+      return res.status(409).json({ error: 'business_not_empty', counts, message: 'This business has financial data. Reset financial data first, then delete.' });
+
+    // Hard delete: memberships then the business row (members also cascade on the FK).
+    await supabase.from('business_members').delete().eq('business_id', businessId);
+    const { error: delErr } = await supabase.from('businesses').delete().eq('id', businessId);
+    if (delErr) return res.status(409).json({ error: 'delete_blocked', message: 'Could not delete the business. Reset financial data first.' });
+
+    const next = businessWorkspaces.find(x => x.business_id !== businessId);
+    res.json({ ok: true, deleted_business_id: businessId, next_business_id: next?.business_id || null });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 // POST /api/businesses — create an additional business (caller becomes owner).

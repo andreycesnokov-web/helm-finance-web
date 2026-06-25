@@ -235,6 +235,37 @@ export default function Settings() {
     }
   }
 
+  const handleDeleteBusiness = async () => {
+    let xbid = null; try { xbid = localStorage.getItem('activeBusinessId') } catch {}
+    if (!xbid) { window.alert('No active business selected.'); return }
+    const confirm = window.prompt('This permanently deletes the current business. Type "DELETE BUSINESS" to confirm (only empty businesses can be deleted):')
+    if (confirm == null) return
+    try {
+      const res = await fetch(`/api/businesses/${xbid}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, 'x-business-id': xbid },
+        body: JSON.stringify({ confirm }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (res.ok && data.ok) {
+        // Switch to another business and reload so WorkspaceProvider re-picks.
+        try {
+          if (data.next_business_id) { localStorage.setItem('activeBusinessId', data.next_business_id); localStorage.setItem('activeWorkspaceId', data.next_business_id) }
+          else { localStorage.removeItem('activeBusinessId'); localStorage.removeItem('activeWorkspaceId') }
+        } catch {}
+        window.location.assign('/')
+        return
+      }
+      const msg = data.error === 'business_not_empty' ? 'This business has financial data. Reset financial data first, then delete.'
+        : data.error === 'last_business' ? 'You cannot delete your only business.'
+        : data.error === 'forbidden' ? 'Only the business owner can delete it.'
+        : data.error === 'business_workspace_required' ? 'Personal workspaces cannot be deleted here.'
+        : data.error === 'confirm_required' ? 'Confirmation text did not match. Nothing was deleted.'
+        : (data.message || 'Could not delete the business.')
+      window.alert(msg)
+    } catch { window.alert('Could not delete the business.') }
+  }
+
   const closeReset = () => { setShowReset(false); setResetStep(1); setResetError('') }
   const resetAndReload = () => { closeReset(); navigate('/') }
   const handleNotif = () => { const n = !notifications; setNotifications(n); localStorage.setItem('hf_notif', String(n)) }
@@ -605,6 +636,15 @@ export default function Settings() {
           onClick={() => { setShowReset(true); setResetStep(1); setResetError('') }}
           style={{ width: '100%', padding: 13, borderRadius: 12, background: 'none', color: 'var(--amber-dark)', border: '0.5px solid var(--amber-dark)', fontSize: 14, fontWeight: 500, cursor: 'pointer' }}>
           🗑 Reset all financial data
+        </button>
+      </div>
+
+      {/* Delete this business (owner only; backend enforces all guards) */}
+      <div style={{ margin: '0 16px 8px' }}>
+        <button
+          onClick={handleDeleteBusiness}
+          style={{ width: '100%', padding: 13, borderRadius: 12, background: 'none', color: 'var(--red)', border: '0.5px solid var(--red)', fontSize: 14, fontWeight: 500, cursor: 'pointer' }}>
+          ⚠ Delete this business
         </button>
       </div>
 
