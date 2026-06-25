@@ -9,6 +9,30 @@ Hard constraints (in force):
 - Production DB currently has only **R001** added (reset RPC) + the one approved
   business_id backfill for transaction id 45.
 
+## Wallet & cross-workspace architecture (authoritative model)
+Personal wallets must NEVER be created inside a Business Workspace.
+
+- **Business Workspace** — business wallets/accounts, business categories, business
+  transactions, business cash/runway/CFO score ONLY.
+- **Personal Workspace** (this enablement) — personal wallets/accounts, personal
+  categories, personal transactions, personal cashflow ONLY. Personal wallets are
+  created here, never in a business.
+- **Cross-workspace link** — a personal account can be linked to one OR many
+  businesses as a funding source. Money moving from a personal wallet into a business
+  is an explicit **cross-workspace funding transaction**, NOT a personal wallet living
+  inside the business. Flows: owner funding, owner loan to business, equity/investment
+  contribution, reimbursement business→personal. One personal wallet may fund
+  Business A, B, C simultaneously.
+- **Categories stay separate**: personal categories ≠ business categories.
+
+Already enforced (shipped 2026-06, main 5ae673d): the Business Workspace Add-wallet
+modal has no Business/Personal selector, and `POST /api/wallets` rejects
+`scope='personal'` (`personal_wallets_disabled`) unless `PERSONAL_WORKSPACE_ENABLED=true`.
+When Personal Workspace ships, personal wallet creation lives only in the personal UI;
+business pages surface linked personal funding only through the funding/intercompany/
+owner-contribution flow (see Funding & Investors + Intercompany foundation), never as
+normal business wallets.
+
 ## Enablement order (when approved)
 1. Read-only preflight (verify schema, no NULL leaks, gate audit clean).
 2. Backup / restore point.
