@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from './useAuth'
-import { apiFetch, setActiveBusinessId } from '../lib/api'
+import { apiFetch } from '../lib/api'
 import { t } from '../i18n/index'
 
 /**
@@ -33,8 +33,9 @@ export function useAccess() {
     try {
       const data = await apiFetch('/access/status', token)
       setAccess(data)
-      // Persist active business so every apiFetch carries x-business-id
-      if (data?.business?.id) setActiveBusinessId(data.business.id)
+      // NOTE: do NOT stamp activeBusinessId here. WorkspaceProvider is the single
+      // source of truth for the active workspace; overwriting it from /access/status
+      // made a freshly-selected business show the default business's data.
       setError(null)
     } catch (e) {
       setError(e.message)

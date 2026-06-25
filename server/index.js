@@ -170,9 +170,11 @@ async function resolveActiveBusiness(req) {
       const m = data[0];
       return { business: m.businesses, role: m.role, ownerUserId: m.businesses.owner_user_id };
     }
-    // Requested business the user is NOT a member of → fall back to their
-    // default business (never leak another workspace; also handles a stale
-    // localStorage id after switching accounts on the same browser).
+    // An EXPLICIT business id the user cannot access → reject. Never silently fall
+    // back to the default workspace: that masked the active-workspace selection and
+    // leaked the default business's data into a freshly-selected one. The frontend
+    // (apiFetch) clears the stale id on this 403 and re-picks a valid workspace.
+    const err = new Error('workspace_not_accessible'); err.status = 403; throw err;
   }
 
   const { business, membership } = await ensureDefaultBusiness(userId);
@@ -6019,8 +6021,22 @@ app.get('/api/access/status', auth, async (req, res) => {
       .single();
     const firstName = user?.first_name || user?.username || 'My';
 
-    // Ensure business exists (creates on first call)
-    const { business, membership } = await ensureDefaultBusiness(userId, firstName);
+    // Honor the active workspace: if a valid x-business-id is supplied, report plan/
+    // trial for THAT business; reject an explicit-but-inaccessible id (no silent
+    // fallback). With no id, bootstrap/return the user's default business.
+    let business, membership;
+    const requestedBiz = req.headers['x-business-id'] || req.query?.business_id || null;
+    if (requestedBiz) {
+      const { data } = await supabase.from('business_members')
+        .select('role, status, businesses(*)')
+        .eq('user_id', userId).eq('business_id', requestedBiz).eq('status', 'active').limit(1);
+      const m = data?.[0];
+      if (!m || !m.businesses) return res.status(403).json({ error: 'workspace_not_accessible' });
+      business = m.businesses;
+      membership = { role: m.role, status: m.status };
+    } else {
+      ({ business, membership } = await ensureDefaultBusiness(userId, firstName));
+    }
 
     // Compute access state
     const accessState = getAccessState(business);

@@ -347,11 +347,42 @@ const BIZ_TYPES = [
   { v: 'project', label: 'Project / SPV' },
   { v: 'other', label: 'Other' },
 ]
+// Common zones surfaced first; the rest come from the browser's full IANA list so
+// the field is a real select (searchable via the native datalist), not free text.
+const COMMON_TZ = [
+  'Asia/Jakarta', 'Asia/Makassar', 'Asia/Jayapura', 'Asia/Singapore', 'Asia/Bangkok',
+  'Asia/Kuala_Lumpur', 'Asia/Manila', 'Asia/Ho_Chi_Minh', 'Asia/Hong_Kong', 'Asia/Tokyo',
+  'Asia/Shanghai', 'Asia/Dubai', 'Asia/Kolkata', 'Europe/Moscow', 'Europe/London',
+  'Europe/Berlin', 'America/New_York', 'America/Los_Angeles', 'UTC',
+]
+function allTimezones() {
+  try { const all = Intl.supportedValuesOf?.('timeZone'); if (all?.length) return all } catch { /* old browser */ }
+  return COMMON_TZ
+}
+// Best-effort country from the browser locale (e.g. "en-ID" → "ID"); user can edit.
+function detectCountry() {
+  try {
+    const loc = (navigator.languages?.[0] || navigator.language || '')
+    const m = /[-_]([A-Za-z]{2})$/.exec(loc)
+    return m ? m[1].toUpperCase() : ''
+  } catch { return '' }
+}
+function detectTimezone() {
+  try { return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC' } catch { return 'UTC' }
+}
 export function BusinessNew() {
   const { token } = useAuth()
   const { applyActive, refresh } = useWorkspace()
   const navigate = useNavigate()
-  const [f, setF] = useState({ name: '', base_currency: 'IDR', country: 'ID', timezone: 'Asia/Jakarta', business_type: 'operating' })
+  const detectedTz = detectTimezone()
+  // Ordered options: detected zone, then common zones, then the rest — de-duplicated.
+  const tzOptions = [...new Set([detectedTz, ...COMMON_TZ, ...allTimezones()])]
+  const [f, setF] = useState({
+    name: '', base_currency: 'IDR',
+    country: detectCountry() || 'ID',
+    timezone: detectedTz,
+    business_type: 'operating',
+  })
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
   const set = (k) => (e) => setF(s => ({ ...s, [k]: e.target.value }))
@@ -405,7 +436,12 @@ export function BusinessNew() {
             </div>
             <div>
               <label style={lbl}>Timezone</label>
-              <input style={inp} value={f.timezone} onChange={set('timezone')} placeholder="Asia/Jakarta" />
+              <input style={inp} value={f.timezone} onChange={set('timezone')} list="biz-tz-list"
+                placeholder="Asia/Jakarta" autoComplete="off" />
+              <datalist id="biz-tz-list">
+                {tzOptions.map(tz => <option key={tz} value={tz} />)}
+              </datalist>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 6 }}>Auto-detected: {detectedTz} · type to search</div>
             </div>
           </div>
           {err && <div style={{ color: 'var(--danger, #c0392b)', fontSize: 13 }}>{err}</div>}
