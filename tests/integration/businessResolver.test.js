@@ -47,16 +47,10 @@ test('honors x-business-id → returns the SELECTED business (B), not the defaul
   assert.equal(r.role, 'owner');
 });
 
-test('B (non-primary) is NOT primary → scoped strictly; A IS primary', async () => {
-  const { supabase, ensureDefaultBusiness } = await setup();
-  const rB = await resolveActiveBusiness(supabase, ensureDefaultBusiness, req({ 'x-business-id': B }));
-  assert.equal(rB.isPrimaryBusiness, false);
-  const rA = await resolveActiveBusiness(supabase, ensureDefaultBusiness, req({ 'x-business-id': A }));
-  assert.equal(rA.isPrimaryBusiness, true);
-});
-
-test('primary = EARLIEST-created business (deterministic)', async () => {
+test('primary = EARLIEST-created business (deterministic; used by the diagnostic only)', async () => {
   const { supabase } = await setup();
+  // Scoping is now strict business_id everywhere; primary is reported by
+  // /api/business/active for diagnostics, not used to widen any query.
   assert.equal(await getPrimaryBusinessId(supabase, USER), A);
 });
 

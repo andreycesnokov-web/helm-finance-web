@@ -35,7 +35,6 @@ async function resolveActiveBusiness(supabase, ensureDefaultBusiness, req) {
     req.body?.business_id ||
     null;
 
-  let resolved;
   if (requested) {
     const { data } = await supabase.from('business_members')
       .select('role, status, business_id, businesses(*)')
@@ -44,15 +43,11 @@ async function resolveActiveBusiness(supabase, ensureDefaultBusiness, req) {
     if (!data?.length) throw forbidden('workspace_not_accessible');
     const m = data[0];
     if (m.businesses?.type === 'personal') throw forbidden('business_workspace_required');
-    resolved = { business: m.businesses, role: m.role, ownerUserId: m.businesses.owner_user_id };
-  } else {
-    const { business, membership } = await ensureDefaultBusiness(userId);
-    resolved = { business, role: membership.role, ownerUserId: business.owner_user_id };
+    return { business: m.businesses, role: m.role, ownerUserId: m.businesses.owner_user_id };
   }
-
-  const primaryId = await getPrimaryBusinessId(supabase, userId);
-  resolved.isPrimaryBusiness = !!primaryId && primaryId === resolved.business.id;
-  return resolved;
+  // No explicit id → the user's deterministic default business workspace.
+  const { business, membership } = await ensureDefaultBusiness(userId);
+  return { business, role: membership.role, ownerUserId: business.owner_user_id };
 }
 
 module.exports = { resolveActiveBusiness, getPrimaryBusinessId };

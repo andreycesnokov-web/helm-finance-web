@@ -33,7 +33,7 @@ app.use(cors({ origin: process.env.CLIENT_URL || 'http://localhost:5173' }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.static('client/dist'));
 
-const { resolveActiveBusiness: _resolveActiveBusiness } = require('./lib/businessResolver');
+const { resolveActiveBusiness: _resolveActiveBusiness, getPrimaryBusinessId } = require('./lib/businessResolver');
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SECRET_KEY);
 const JWT_SECRET = process.env.JWT_SECRET;
 const BOT_TOKEN = process.env.BOT_TOKEN;
@@ -167,13 +167,13 @@ function resolveActiveBusiness(req) {
  * user's first business existed.
  */
 function bizOrFilter(biz) {
-  // Only the user's PRIMARY (earliest-created) business absorbs legacy rows that still
-  // have business_id NULL (migration 017 backfilled those into the default business).
-  // Every additional business is scoped STRICTLY by business_id, so a newly-created
-  // business never inherits another business's (or orphaned legacy) financial rows.
-  if (biz.isPrimaryBusiness) {
-    return `business_id.eq.${biz.business.id},and(business_id.is.null,user_id.eq.${biz.ownerUserId})`;
-  }
+  // STRICT business scoping — every scoped financial read/write is filtered by
+  // business_id only. The legacy `business_id IS NULL` union was removed: migration
+  // 017 backfilled all NULL rows into the user's default business, so the union only
+  // risked leaking one business's (or orphaned) rows into another business the same
+  // user owns. Run migrations/audit_null_business_ids.sql before promotion to confirm
+  // zero NULL rows remain. (Kept as an `.or(...)` single-term string so every existing
+  // `.or(bizOrFilter(biz))` call site is unchanged.)
   return `business_id.eq.${biz.business.id}`;
 }
 
@@ -7331,6 +7331,7 @@ app.get('/api/business/active', auth, async (req, res) => {
   try {
     const requested = req.headers['x-business-id'] || req.query?.business_id || null;
     const biz = await requireBusiness(req, res); if (!biz) return;
+    const primaryId = await getPrimaryBusinessId(supabase, req.user.userId);
     res.json({
       requested_business_id: requested,
       resolved: {
@@ -7340,7 +7341,7 @@ app.get('/api/business/active', auth, async (req, res) => {
         type:          biz.business.type || 'business',
       },
       role: biz.role,
-      is_primary_business: !!biz.isPrimaryBusiness,
+      is_primary_business: !!primaryId && primaryId === biz.business.id,
       // True only when the client sent an id AND the server resolved that exact id.
       matched: !!requested && String(requested) === String(biz.business.id),
     });
@@ -7410,8 +7411,14 @@ app.delete('/api/businesses/:id', auth, async (req, res) => {
     if (total > 0)
       return res.status(409).json({ error: 'business_not_empty', counts, message: 'This business has financial data. Reset financial data first, then delete.' });
 
-    // Hard delete: memberships then the business row (members also cascade on the FK).
-    await supabase.from('business_members').delete().eq('business_id', businessId);
+    // ATOMIC hard delete: a SINGLE delete of the business row. business_members has
+    // ON DELETE CASCADE, so memberships are removed in the same statement/transaction
+    // — no risk of a partial delete (orphaned members with no business). If any RESTRICT
+    // FK still references this business (it shouldn't: counts are proven zero above),
+    // the delete fails wholesale and we return a clean error — nothing is partially
+    // removed. We do NOT touch migration-037 tables (e.g. user_workspace_preferences);
+    // their FK to businesses is ON DELETE SET NULL when present, and absent in prod
+    // (037 not applied) — either way no manual cleanup is needed here.
     const { error: delErr } = await supabase.from('businesses').delete().eq('id', businessId);
     if (delErr) return res.status(409).json({ error: 'delete_blocked', message: 'Could not delete the business. Reset financial data first.' });
 
