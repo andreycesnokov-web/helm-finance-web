@@ -33,6 +33,69 @@ business pages surface linked personal funding only through the funding/intercom
 owner-contribution flow (see Funding & Investors + Intercompany foundation), never as
 normal business wallets.
 
+## Discovery findings (2026-06-26, code audit — no code changed)
+
+### What already exists in code
+- **Backend** `server/routes/personalFunding.js` (mounted at `/api`), fully built:
+  `GET /workspaces`, `POST /personal-workspaces`, `GET /personal-workspaces/:id`,
+  `PATCH /workspace-preferences`, `personal-business-connections` (request/confirm/
+  reject/revoke/list), `fx/quotes` (+refresh), `wallet-transfers/preview|confirm`,
+  `funding` (create/confirm/cancel/repay/incoming/outgoing/summary/:id). Helpers in
+  `server/lib/workspaceAccess.js` + `server/lib/fxProvider.js`.
+- **Frontend** `pages/personal/*` (Layout/Shell/Overview/Accounts/Transactions/
+  Onboarding); `/personal/*` routes + WorkspaceSwitcher personal section + PERSONAL_NAV
+  all gated by `VITE_PERSONAL_FUNDING_UI_ENABLED` (routes tree-shaken / redirect when off).
+- **Workspace model**: a personal workspace **is** a `businesses` row with
+  `type='personal'` (CHECK from migration 030) + exactly one owner `business_members`
+  row. Entitlement is the per-user add-on `personal_finance_workspace` in
+  `business_addons` (table from migration 020); Funding Bridge needs the separate
+  `personal_investor_funding` add-on. Neither is derived from a Business plan.
+
+### What is blocked because 037–039 are not applied
+Missing tables: `user_workspace_preferences`, `personal_business_relationships`,
+`personal_business_relationship_roles` (037); `exchange_rate_quotes`, `fx_conversions`,
+`funding_transfers`, `funding_repayments`, `funding_audit` (038). Missing RPCs (039):
+`rpc_request/confirm/reject/revoke_personal_business_connection`,
+`rpc_create_fx_quote_record`, `rpc_create_funding_transfer`,
+`rpc_confirm/repay/cancel_funding_transfer`, `rpc_create_wallet_transfer`. Missing
+triggers: `trg_uwp_type_guard`, `trg_pbr_type_guard`, `trg_personal_owner_only`
+(on `business_members`), `trg_wallet_asset_immutable` (on `wallets`),
+`trg_quote_rate_immutable`, `funding_audit_append_only`; plus wallet asset columns
+(`asset_code`) the transfer/funding layer reads.
+
+### What would break if we enabled it NOW (flag on, migrations NOT applied)
+- `GET /workspaces` keeps working — its `user_workspace_preferences` read only
+  destructures `data` (error ignored), so a missing table degrades to `pref = {}`
+  (is_primary/is_default/is_last_active all false). This is why prod works today.
+- `PATCH /workspace-preferences` → 400 (upsert into a non-existent table).
+- `fx/quotes`, `wallet-transfers/*`, `funding/*`, `personal-business-connections/*`
+  → 500/4xx (missing tables + RPCs).
+- `POST /personal-workspaces` does NOT depend on 037–039 — it inserts a
+  `businesses(type='personal')` row + owner membership. With the entitlement add-on it
+  would succeed, BUT without the 037 owner-only trigger there is no DB-level privacy
+  enforcement, and preferences can't be persisted. Without the add-on → 403.
+
+### IMPORTANT conflict to resolve before personal wallets work
+`POST /api/wallets` goes through `requireBusiness → resolveActiveBusiness`, which now
+**rejects** `type='personal'` (`business_workspace_required`). So personal wallets
+**cannot** be created via the business wallet route as-is. When Personal ships, personal
+wallet creation needs EITHER a dedicated personal-wallet endpoint OR a scope-aware
+resolver that allows personal workspaces on personal routes only. Also `PERSONAL_WORKSPACE_ENABLED`
+must be `true` (our new gate) for any `scope='personal'` wallet creation. These two
+guards must be lifted together, on the personal path only — never on business routes.
+
+### Exact requirements to enable later
+1. Apply migrations **037 → 038 → 039** in order (preflight/postflight in
+   `migrations/_preflight_postflight_037_039.sql`). 040 is independent (AI Accountant),
+   not required for Personal.
+2. Env flags: `VITE_PERSONAL_FUNDING_UI_ENABLED=true` (frontend UI) **and**
+   `PERSONAL_WORKSPACE_ENABLED=true` (backend personal-wallet gate).
+3. Per-user entitlements in `business_addons`: `personal_finance_workspace`
+   (create/use personal workspace) and, for the Funding Bridge, `personal_investor_funding`.
+4. Add the personal-wallet creation path (dedicated endpoint or scope-aware resolver).
+5. Migrate legacy personal transactions 46/47 (see task above) once a personal
+   workspace exists for user 7826585034.
+
 ## Enablement order (when approved)
 1. Read-only preflight (verify schema, no NULL leaks, gate audit clean).
 2. Backup / restore point.
