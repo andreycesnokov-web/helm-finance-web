@@ -34,6 +34,9 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.static('client/dist'));
 
 const { resolveActiveBusiness: _resolveActiveBusiness, getPrimaryBusinessId } = require('./lib/businessResolver');
+// Personal Workspace is gated (migrations 037–039 not applied). Until it is explicitly
+// enabled, business pages/API must not create personal-scoped wallets/records.
+const PERSONAL_WORKSPACE_ENABLED = process.env.PERSONAL_WORKSPACE_ENABLED === 'true';
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SECRET_KEY);
 const JWT_SECRET = process.env.JWT_SECRET;
 const BOT_TOKEN = process.env.BOT_TOKEN;
@@ -4919,6 +4922,12 @@ app.post('/api/wallets', auth, async (req, res) => {
   if (scope && !['business', 'personal'].includes(scope)) {
     return res.status(400).json({ error: "scope must be 'business' or 'personal'" });
   }
+  // Business Workspace creates business-scoped wallets only. Reject personal scope
+  // while Personal Workspace is gated — never silently create a personal wallet here.
+  if (scope === 'personal' && !PERSONAL_WORKSPACE_ENABLED) {
+    return res.status(400).json({ error: 'personal_wallets_disabled', message: 'Personal wallets are not available yet.' });
+  }
+  const walletScope = (scope === 'personal' && PERSONAL_WORKSPACE_ENABLED) ? 'personal' : 'business';
   try {
     const biz = await requireBusiness(req, res);
     if (!biz) return;
@@ -4958,7 +4967,7 @@ app.post('/api/wallets', auth, async (req, res) => {
         entity_name: entity_name || null,
         color:       color       || null,
         sort_order:  sort_order  || 0,
-        scope:       scope       || 'business',
+        scope:       walletScope,
       })
       .select()
       .single();
@@ -4976,7 +4985,7 @@ app.post('/api/wallets', auth, async (req, res) => {
         description:      `Opening balance · ${name}`,
         source:           name,
         wallet_id:        wallet.id,
-        scope:            scope || 'business',
+        scope:            walletScope,
       });
     }
 
