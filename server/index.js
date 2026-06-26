@@ -108,8 +108,8 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const normalizeEmail = (e) => String(e || '').trim().toLowerCase();
 const hashEmailCode = (code) => crypto.createHash('sha256').update(`${JWT_SECRET}:${code}`).digest('hex');
 const sixDigitCode = () => String(crypto.randomInt(0, 1000000)).padStart(6, '0');
+const magicToken = () => crypto.randomBytes(32).toString('hex');   // 256-bit URL-safe token
 const OTP_TTL_MS = 10 * 60 * 1000;       // 10 minutes
-const OTP_MAX_ATTEMPTS = 5;
 
 // Tiny in-memory rate limiter (best-effort; resets on restart). Keyed by email+ip.
 const _rl = new Map();
@@ -158,33 +158,31 @@ async function resolveOrCreateEmailUser(email) {
   return { id: newId, display_name: localPart };
 }
 
-// Create + persist an OTP for an email/purpose; returns the plaintext code (caller emails it).
-async function issueEmailCode(email, purpose) {
-  const code = sixDigitCode();
+// Persist a secret (6-digit code OR magic token) for an email/purpose; stores only the
+// HASH and returns the plaintext secret (caller emails it). Reuses email_login_codes —
+// magic links and OTP codes share the table (purpose-scoped, hashed, single-use, expiring).
+async function issueEmailSecret(email, purpose, secret) {
   await supabase.from('email_login_codes').insert({
-    email, code_hash: hashEmailCode(code), purpose,
+    email, code_hash: hashEmailCode(secret), purpose,
     expires_at: new Date(Date.now() + OTP_TTL_MS).toISOString(),
   });
-  // TODO(provider): send via SES/Resend. For now log server-side (dev) — never returned
-  // unless EMAIL_AUTH_DEV_RETURN_CODE is on.
-  console.log(`[email-otp] ${purpose} code for ${email}: ${code}`);
-  return code;
+  console.log(`[email-auth] ${purpose} secret for ${email} (len ${secret.length})`);
+  return secret;
 }
+async function issueEmailCode(email, purpose) { return issueEmailSecret(email, purpose, sixDigitCode()); }
 
-// Validate the latest matching OTP WITHOUT consuming it and WITHOUT touching users.
-// Returns the code record on success, or null. On a hash mismatch, increments attempts.
-async function checkEmailCode(email, purpose, code) {
-  const { data: rows } = await supabase.from('email_login_codes')
-    .select('*').eq('email', email).eq('purpose', purpose).is('consumed_at', null)
+// Look up an UNCONSUMED, UNEXPIRED code/token by its HASH (validate-first; touches no
+// users). Matching by code_hash supports both the 6-digit code (with email) and the
+// magic token (by token alone — the token itself is the secret). Returns rec or null.
+async function findUnconsumedCode({ email = null, purpose, codeHash }) {
+  let q = supabase.from('email_login_codes').select('*')
+    .eq('purpose', purpose).eq('code_hash', codeHash).is('consumed_at', null)
     .order('created_at', { ascending: false }).limit(1);
-  const rec = rows?.[0];
+  if (email) q = q.eq('email', email);
+  const { data } = await q;
+  const rec = data?.[0];
   if (!rec) return null;
   if (new Date(rec.expires_at) < new Date()) return null;
-  if (rec.attempts >= OTP_MAX_ATTEMPTS) return null;
-  if (rec.code_hash !== hashEmailCode(code)) {
-    await supabase.from('email_login_codes').update({ attempts: rec.attempts + 1 }).eq('id', rec.id);
-    return null;
-  }
   return rec;
 }
 
@@ -203,7 +201,10 @@ const emailJwt = (user, email) => jwt.sign({
   auth_channel: 'email',
 }, JWT_SECRET, { expiresIn: '30d' });
 
-// POST /api/auth/email/start — request an OTP. Always returns { ok:true } (anti-enumeration).
+// POST /api/auth/email/start — MAGIC-LINK FIRST. Issues a magic-link token AND a 6-digit
+// fallback code (both hashed, single-use, expiring). Always returns { ok:true }
+// (anti-enumeration). In DEV only (EMAIL_AUTH_DEV_RETURN_CODE) returns the magic link +
+// code for local testing — NEVER in production.
 app.post('/api/auth/email/start', emailAuthGate, async (req, res) => {
   try {
     const email = normalizeEmail(req.body?.email);
@@ -211,22 +212,37 @@ app.post('/api/auth/email/start', emailAuthGate, async (req, res) => {
     const ip = req.headers['x-forwarded-for'] || req.socket?.remoteAddress || 'ip';
     if (rateLimited(`start:${email}`, 5, 60 * 60 * 1000) || rateLimited(`start-ip:${ip}`, 30, 60 * 60 * 1000))
       return res.status(429).json({ error: 'rate_limited' });
-    const code = await issueEmailCode(email, 'login');
-    res.json({ ok: true, ...(EMAIL_AUTH_DEV_RETURN_CODE ? { dev_code: code } : {}) });
+    const token = await issueEmailSecret(email, 'login', magicToken());   // magic link
+    const code = await issueEmailCode(email, 'login');                    // fallback OTP
+    const magic_link_path = `/login/email/callback?token=${token}`;       // frontend builds full URL
+    // TODO(provider): email the magic link (primary) + the code (fallback).
+    res.json({ ok: true, ...(EMAIL_AUTH_DEV_RETURN_CODE ? { dev_code: code, magic_link: magic_link_path } : {}) });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// POST /api/auth/email/verify — verify OTP → resolve/create user → JWT.
+// POST /api/auth/email/verify — accepts EITHER { token } (magic link, primary) OR
+// { email, code } (6-digit fallback). Validates first (no user on a bad token/code),
+// then resolves/creates the user and atomically consumes the secret.
 app.post('/api/auth/email/verify', emailAuthGate, async (req, res) => {
   try {
-    const email = normalizeEmail(req.body?.email);
+    const token = typeof req.body?.token === 'string' ? req.body.token.trim() : '';
+    let email = normalizeEmail(req.body?.email);
     const code = String(req.body?.code || '');
-    if (!EMAIL_RE.test(email) || !/^\d{6}$/.test(code)) return res.status(400).json({ error: 'invalid_input' });
-    if (rateLimited(`verify:${email}`, 10, 10 * 60 * 1000)) return res.status(429).json({ error: 'rate_limited' });
-    // 1) validate the OTP FIRST — a wrong/expired code creates NO user, touches nothing.
-    const rec = await checkEmailCode(email, 'login', code);
-    if (!rec) return res.status(401).json({ error: 'invalid_or_expired_code' });
-    // 2) only now resolve/create the user, then 3) atomically consume the code.
+
+    let rec = null;
+    if (token) {
+      // magic link: the token IS the secret — look it up by hash (email comes from the record).
+      if (!/^[a-f0-9]{64}$/.test(token)) return res.status(400).json({ error: 'invalid_input' });
+      rec = await findUnconsumedCode({ purpose: 'login', codeHash: hashEmailCode(token) });
+      if (!rec) return res.status(401).json({ error: 'invalid_or_expired_token' });
+      email = rec.email;
+    } else {
+      // 6-digit fallback.
+      if (!EMAIL_RE.test(email) || !/^\d{6}$/.test(code)) return res.status(400).json({ error: 'invalid_input' });
+      if (rateLimited(`verify:${email}`, 10, 10 * 60 * 1000)) return res.status(429).json({ error: 'rate_limited' });
+      rec = await findUnconsumedCode({ email, purpose: 'login', codeHash: hashEmailCode(code) });
+      if (!rec) return res.status(401).json({ error: 'invalid_or_expired_code' });
+    }
     const user = await resolveOrCreateEmailUser(email);
     if (!await markCodeConsumed(rec.id, user.id)) return res.status(401).json({ error: 'invalid_or_expired_code' });
     res.json({ token: emailJwt(user, email), user: { id: user.id, display_name: user.display_name } });
@@ -246,7 +262,8 @@ app.post('/api/auth/email/accept-invite', emailAuthGate, async (req, res) => {
     const invite = inv?.[0];
     if (!invite || invite.status !== 'active') return res.status(404).json({ error: 'invite_not_found' });
     // validate OTP FIRST (no user created on a wrong code), then resolve/create + consume.
-    const rec = await checkEmailCode(email, 'invite_accept', code);
+    if (!/^\d{6}$/.test(code)) return res.status(400).json({ error: 'invalid_input' });
+    const rec = await findUnconsumedCode({ email, purpose: 'invite_accept', codeHash: hashEmailCode(code) });
     if (!rec) return res.status(401).json({ error: 'invalid_or_expired_code' });
     const user = await resolveOrCreateEmailUser(email);
     if (!await markCodeConsumed(rec.id, user.id)) return res.status(401).json({ error: 'invalid_or_expired_code' });
