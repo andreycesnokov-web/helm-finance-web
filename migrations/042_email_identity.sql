@@ -86,18 +86,34 @@ CREATE INDEX IF NOT EXISTS email_login_codes_expires_idx
 
 -- ── 5. Lock down: only the service role (backend) may touch these. ──────────
 -- email identities, profiles, and login codes must never be readable by client roles.
--- next_app_user_id(): revoke from PUBLIC first, then conditional role grants.
+-- Order: REVOKE from PUBLIC first, then conditional per-role revokes, then explicit
+-- service_role grants (so the backend retains the access it needs).
+
+-- 5a) functions: revoke from PUBLIC first.
 REVOKE ALL ON FUNCTION public.next_app_user_id() FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.fn_set_updated_at() FROM PUBLIC;
+
 DO $$ BEGIN
+  -- 5b) client roles: no access to identity/profile/code tables or these functions.
   IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN
     REVOKE ALL ON TABLE public.user_email_identities, public.email_login_codes, public.user_profiles FROM anon;
     REVOKE ALL ON FUNCTION public.next_app_user_id() FROM anon;
+    REVOKE ALL ON FUNCTION public.fn_set_updated_at() FROM anon;
   END IF;
   IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN
     REVOKE ALL ON TABLE public.user_email_identities, public.email_login_codes, public.user_profiles FROM authenticated;
     REVOKE ALL ON FUNCTION public.next_app_user_id() FROM authenticated;
+    REVOKE ALL ON FUNCTION public.fn_set_updated_at() FROM authenticated;
   END IF;
+
+  -- 5c) service_role (backend): explicit table CRUD + sequence usage + function execute.
   IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'service_role') THEN
+    GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE
+      public.user_email_identities, public.user_profiles, public.email_login_codes
+      TO service_role;
+    GRANT USAGE, SELECT ON SEQUENCE public.app_user_id_seq TO service_role;
     GRANT EXECUTE ON FUNCTION public.next_app_user_id() TO service_role;
+    -- fn_set_updated_at runs inside triggers (no client call needed); execute granted for completeness.
+    GRANT EXECUTE ON FUNCTION public.fn_set_updated_at() TO service_role;
   END IF;
 END $$;
