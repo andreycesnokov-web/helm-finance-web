@@ -44,6 +44,13 @@ const EMAIL_AUTH_ENABLED = process.env.EMAIL_AUTH_ENABLED === 'true';
 // DEV-ONLY: when true, the OTP code is returned in the API response for local testing.
 // NEVER enable in production. Off by default.
 const EMAIL_AUTH_DEV_RETURN_CODE = process.env.EMAIL_AUTH_DEV_RETURN_CODE === 'true';
+// Email provider (magic-link delivery). Only 'resend' is wired. Missing/other → no send
+// (dev relies on EMAIL_AUTH_DEV_RETURN_CODE to surface the link locally).
+const { sendMagicLinkEmail } = require('./lib/emailSender');
+const EMAIL_PROVIDER = process.env.EMAIL_PROVIDER || '';
+const RESEND_API_KEY = process.env.RESEND_API_KEY || '';
+const EMAIL_FROM = process.env.EMAIL_FROM || '';
+const APP_BASE_URL = process.env.APP_BASE_URL || '';
 // Telegram per-user active-business routing (multi-business). OFF by default. When OFF,
 // existing Telegram behavior is unchanged and nothing queries telegram_user_state
 // (migration 043) — so production is safe before 043 is applied. When ON, the
@@ -218,9 +225,16 @@ app.post('/api/auth/email/start', emailAuthGate, async (req, res) => {
     if (rateLimited(`start:${email}`, 5, 60 * 60 * 1000) || rateLimited(`start-ip:${ip}`, 30, 60 * 60 * 1000))
       return res.status(429).json({ error: 'rate_limited' });
     const token = await issueEmailSecret(email, 'login', magicToken());   // magic link
-    const code = await issueEmailCode(email, 'login');                    // fallback OTP
-    const magic_link_path = `/login/email/callback?token=${token}`;       // frontend builds full URL
-    // TODO(provider): email the magic link (primary) + the code (fallback).
+    const code = await issueEmailCode(email, 'login');                    // fallback OTP (dev/manual only)
+    const magic_link_path = `/login/email/callback?token=${token}`;
+    const magicLinkUrl = `${APP_BASE_URL}${magic_link_path}`;
+    // Send ONLY the magic link (the 6-digit code is fallback/dev-only, never emailed).
+    // NON-FATAL: a send failure must NOT change the response (anti-enumeration) and must
+    // not reveal whether the email exists. Errors are logged server-side without secrets.
+    try { await sendMagicLinkEmail({ provider: EMAIL_PROVIDER, apiKey: RESEND_API_KEY, from: EMAIL_FROM, toEmail: email, magicLinkUrl }); }
+    catch (e) { console.warn('[email-send] unexpected error:', e.message); }
+    // Dev convenience only: surface the link/code in the response (NEVER in production).
+    if (EMAIL_AUTH_DEV_RETURN_CODE) console.log(`[email-auth][dev] magic link for ${email}: ${magicLinkUrl}`);
     res.json({ ok: true, ...(EMAIL_AUTH_DEV_RETURN_CODE ? { dev_code: code, magic_link: magic_link_path } : {}) });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -8581,4 +8595,12 @@ app.get('*', (req, res) => {
 });
 
 const PORT = process.env.PORT || 3001;
+// Loud startup warning: email auth is ON but no provider is configured (and not in dev
+// return-code mode) → magic links will NOT be delivered. Fail visibly, not silently.
+if (EMAIL_AUTH_ENABLED && EMAIL_PROVIDER !== 'resend' && !EMAIL_AUTH_DEV_RETURN_CODE) {
+  console.warn('[email-auth] WARNING: EMAIL_AUTH_ENABLED=true but no email provider is configured ' +
+    '(set EMAIL_PROVIDER=resend + RESEND_API_KEY + EMAIL_FROM + APP_BASE_URL). Magic links will NOT be ' +
+    'delivered — do not enable the production UI until this is fixed.');
+}
+
 app.listen(PORT, () => console.log(`Helm Finance Web running on port ${PORT}`));
