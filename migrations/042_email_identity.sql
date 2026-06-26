@@ -14,7 +14,7 @@
 -- ════════════════════════════════════════════════════════════════════════════
 
 -- ── shared: updated_at trigger fn (used by user_email_identities + user_profiles) ──
-CREATE OR REPLACE FUNCTION fn_set_updated_at()
+CREATE OR REPLACE FUNCTION fn_email_identity_set_updated_at()
 RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN NEW.updated_at := now(); RETURN NEW; END $$;
 
@@ -46,7 +46,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS user_email_identities_email_lower_uidx
   ON user_email_identities (lower(email));
 DROP TRIGGER IF EXISTS trg_uei_updated_at ON user_email_identities;
 CREATE TRIGGER trg_uei_updated_at
-  BEFORE UPDATE ON user_email_identities FOR EACH ROW EXECUTE FUNCTION fn_set_updated_at();
+  BEFORE UPDATE ON user_email_identities FOR EACH ROW EXECUTE FUNCTION fn_email_identity_set_updated_at();
 
 -- ── 3. user_profiles — Personal Account SHELL (identity/profile only) ───────
 -- NOT a financial workspace: no wallets/transactions, no businesses.type='personal'.
@@ -63,7 +63,7 @@ CREATE TABLE IF NOT EXISTS user_profiles (
 );
 DROP TRIGGER IF EXISTS trg_user_profiles_updated_at ON user_profiles;
 CREATE TRIGGER trg_user_profiles_updated_at
-  BEFORE UPDATE ON user_profiles FOR EACH ROW EXECUTE FUNCTION fn_set_updated_at();
+  BEFORE UPDATE ON user_profiles FOR EACH ROW EXECUTE FUNCTION fn_email_identity_set_updated_at();
 
 -- ── 4. email_login_codes (OTP + magic-link tokens; HASH only) ───────────────
 CREATE TABLE IF NOT EXISTS email_login_codes (
@@ -89,21 +89,24 @@ CREATE INDEX IF NOT EXISTS email_login_codes_expires_idx
 -- Order: REVOKE from PUBLIC first, then conditional per-role revokes, then explicit
 -- service_role grants (so the backend retains the access it needs).
 
--- 5a) functions: revoke from PUBLIC first.
+-- 5a) functions + sequence: revoke from PUBLIC first.
 REVOKE ALL ON FUNCTION public.next_app_user_id() FROM PUBLIC;
-REVOKE ALL ON FUNCTION public.fn_set_updated_at() FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.fn_email_identity_set_updated_at() FROM PUBLIC;
+REVOKE ALL ON SEQUENCE public.app_user_id_seq FROM PUBLIC;
 
 DO $$ BEGIN
-  -- 5b) client roles: no access to identity/profile/code tables or these functions.
+  -- 5b) client roles: no access to identity/profile/code tables, these functions, or the sequence.
   IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN
     REVOKE ALL ON TABLE public.user_email_identities, public.email_login_codes, public.user_profiles FROM anon;
     REVOKE ALL ON FUNCTION public.next_app_user_id() FROM anon;
-    REVOKE ALL ON FUNCTION public.fn_set_updated_at() FROM anon;
+    REVOKE ALL ON FUNCTION public.fn_email_identity_set_updated_at() FROM anon;
+    REVOKE ALL ON SEQUENCE public.app_user_id_seq FROM anon;
   END IF;
   IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN
     REVOKE ALL ON TABLE public.user_email_identities, public.email_login_codes, public.user_profiles FROM authenticated;
     REVOKE ALL ON FUNCTION public.next_app_user_id() FROM authenticated;
-    REVOKE ALL ON FUNCTION public.fn_set_updated_at() FROM authenticated;
+    REVOKE ALL ON FUNCTION public.fn_email_identity_set_updated_at() FROM authenticated;
+    REVOKE ALL ON SEQUENCE public.app_user_id_seq FROM authenticated;
   END IF;
 
   -- 5c) service_role (backend): explicit table CRUD + sequence usage + function execute.
@@ -113,7 +116,7 @@ DO $$ BEGIN
       TO service_role;
     GRANT USAGE, SELECT ON SEQUENCE public.app_user_id_seq TO service_role;
     GRANT EXECUTE ON FUNCTION public.next_app_user_id() TO service_role;
-    -- fn_set_updated_at runs inside triggers (no client call needed); execute granted for completeness.
-    GRANT EXECUTE ON FUNCTION public.fn_set_updated_at() TO service_role;
+    -- fn_email_identity_set_updated_at runs inside triggers (no client call needed); execute granted for completeness.
+    GRANT EXECUTE ON FUNCTION public.fn_email_identity_set_updated_at() TO service_role;
   END IF;
 END $$;
