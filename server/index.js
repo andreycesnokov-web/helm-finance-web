@@ -37,6 +37,13 @@ const { resolveActiveBusiness: _resolveActiveBusiness, getPrimaryBusinessId } = 
 // Personal Workspace is gated (migrations 037–039 not applied). Until it is explicitly
 // enabled, business pages/API must not create personal-scoped wallets/records.
 const PERSONAL_WORKSPACE_ENABLED = process.env.PERSONAL_WORKSPACE_ENABLED === 'true';
+// Email-primary identity (Phase 1) is OFF by default. Endpoints 404 when disabled.
+// Requires migration 042 (user_email_identities / user_profiles / email_login_codes /
+// app_user_id_seq). Telegram auth is unaffected by this flag.
+const EMAIL_AUTH_ENABLED = process.env.EMAIL_AUTH_ENABLED === 'true';
+// DEV-ONLY: when true, the OTP code is returned in the API response for local testing.
+// NEVER enable in production. Off by default.
+const EMAIL_AUTH_DEV_RETURN_CODE = process.env.EMAIL_AUTH_DEV_RETURN_CODE === 'true';
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SECRET_KEY);
 const JWT_SECRET = process.env.JWT_SECRET;
 const BOT_TOKEN = process.env.BOT_TOKEN;
@@ -90,6 +97,184 @@ function auth(req, res, next) {
     res.status(401).json({ error: 'Invalid token' });
   }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// EMAIL IDENTITY (Phase 1) — OTP login, Personal Account shell, email team invites.
+// All endpoints are gated by EMAIL_AUTH_ENABLED (404 when off). Telegram auth above is
+// untouched. Requires migration 042. New email-first users get a NEGATIVE BIGINT id
+// (next_app_user_id) — disjoint from positive Telegram ids.
+// ─────────────────────────────────────────────────────────────────────────────
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const normalizeEmail = (e) => String(e || '').trim().toLowerCase();
+const hashEmailCode = (code) => crypto.createHash('sha256').update(`${JWT_SECRET}:${code}`).digest('hex');
+const sixDigitCode = () => String(crypto.randomInt(0, 1000000)).padStart(6, '0');
+const OTP_TTL_MS = 10 * 60 * 1000;       // 10 minutes
+const OTP_MAX_ATTEMPTS = 5;
+
+// Tiny in-memory rate limiter (best-effort; resets on restart). Keyed by email+ip.
+const _rl = new Map();
+function rateLimited(key, max, windowMs) {
+  const now = Date.now();
+  const e = _rl.get(key);
+  if (!e || now > e.reset) { _rl.set(key, { n: 1, reset: now + windowMs }); return false; }
+  e.n += 1; return e.n > max;
+}
+
+// Feature gate middleware — 404 when email auth is disabled (no surface area).
+function emailAuthGate(req, res, next) {
+  if (!EMAIL_AUTH_ENABLED) return res.status(404).json({ error: 'not_found' });
+  next();
+}
+
+// Resolve the internal user for an email, or create a new email-first user with a
+// NEGATIVE id + an identity + a Personal Account profile shell. Returns { id, display_name }.
+// Schema-safe: the base `users` table varies across environments, so we insert only the
+// id and gracefully drop any optional column the live schema lacks (e.g. first_name).
+// The display name lives in user_profiles.display_name, never assumed on users.
+async function resolveOrCreateEmailUser(email) {
+  const { data: idRows } = await supabase.from('user_email_identities')
+    .select('user_id').eq('email', email).limit(1);
+  if (idRows?.length) {
+    const uid = idRows[0].user_id;
+    const { data: prof } = await supabase.from('user_profiles').select('display_name').eq('user_id', uid).limit(1);
+    return { id: uid, display_name: prof?.[0]?.display_name || null };
+  }
+  const { data: idResp, error: idErr } = await supabase.rpc('next_app_user_id');
+  if (idErr) throw idErr;
+  const newId = Array.isArray(idResp) ? idResp[0] : idResp;
+  const localPart = email.split('@')[0];
+  // graceful insert: keep id; drop optional columns the schema doesn't have.
+  let row = { id: newId, username: '', first_name: localPart }, uErr;
+  for (let i = 0; i < 4; i++) {
+    ({ error: uErr } = await supabase.from('users').insert(row));
+    if (!uErr) break;
+    const col = /find the '([a-z_]+)' column/i.exec(uErr.message || '')?.[1];
+    if (col && col in row && col !== 'id') { delete row[col]; continue; }
+    break;
+  }
+  if (uErr) throw uErr;
+  await supabase.from('user_email_identities').insert({ user_id: newId, email, email_verified_at: new Date().toISOString() });
+  await supabase.from('user_profiles').insert({ user_id: newId, display_name: localPart });
+  return { id: newId, display_name: localPart };
+}
+
+// Create + persist an OTP for an email/purpose; returns the plaintext code (caller emails it).
+async function issueEmailCode(email, purpose) {
+  const code = sixDigitCode();
+  await supabase.from('email_login_codes').insert({
+    email, code_hash: hashEmailCode(code), purpose,
+    expires_at: new Date(Date.now() + OTP_TTL_MS).toISOString(),
+  });
+  // TODO(provider): send via SES/Resend. For now log server-side (dev) — never returned
+  // unless EMAIL_AUTH_DEV_RETURN_CODE is on.
+  console.log(`[email-otp] ${purpose} code for ${email}: ${code}`);
+  return code;
+}
+
+// Validate the latest matching OTP WITHOUT consuming it and WITHOUT touching users.
+// Returns the code record on success, or null. On a hash mismatch, increments attempts.
+async function checkEmailCode(email, purpose, code) {
+  const { data: rows } = await supabase.from('email_login_codes')
+    .select('*').eq('email', email).eq('purpose', purpose).is('consumed_at', null)
+    .order('created_at', { ascending: false }).limit(1);
+  const rec = rows?.[0];
+  if (!rec) return null;
+  if (new Date(rec.expires_at) < new Date()) return null;
+  if (rec.attempts >= OTP_MAX_ATTEMPTS) return null;
+  if (rec.code_hash !== hashEmailCode(code)) {
+    await supabase.from('email_login_codes').update({ attempts: rec.attempts + 1 }).eq('id', rec.id);
+    return null;
+  }
+  return rec;
+}
+
+// Atomically mark a validated code consumed (single-use, race-safe via the
+// `consumed_at IS NULL` guard). Returns true only if THIS call consumed it.
+async function markCodeConsumed(recId, userId) {
+  const { data } = await supabase.from('email_login_codes')
+    .update({ consumed_at: new Date().toISOString(), consumed_by_user_id: userId || null })
+    .eq('id', recId).is('consumed_at', null).select('id');
+  return !!data?.length;
+}
+
+const emailJwt = (user, email) => jwt.sign({
+  userId: user.id,
+  firstName: user.display_name || (email ? email.split('@')[0] : 'User'),
+  auth_channel: 'email',
+}, JWT_SECRET, { expiresIn: '30d' });
+
+// POST /api/auth/email/start — request an OTP. Always returns { ok:true } (anti-enumeration).
+app.post('/api/auth/email/start', emailAuthGate, async (req, res) => {
+  try {
+    const email = normalizeEmail(req.body?.email);
+    if (!EMAIL_RE.test(email)) return res.status(400).json({ error: 'invalid_email' });
+    const ip = req.headers['x-forwarded-for'] || req.socket?.remoteAddress || 'ip';
+    if (rateLimited(`start:${email}`, 5, 60 * 60 * 1000) || rateLimited(`start-ip:${ip}`, 30, 60 * 60 * 1000))
+      return res.status(429).json({ error: 'rate_limited' });
+    const code = await issueEmailCode(email, 'login');
+    res.json({ ok: true, ...(EMAIL_AUTH_DEV_RETURN_CODE ? { dev_code: code } : {}) });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// POST /api/auth/email/verify — verify OTP → resolve/create user → JWT.
+app.post('/api/auth/email/verify', emailAuthGate, async (req, res) => {
+  try {
+    const email = normalizeEmail(req.body?.email);
+    const code = String(req.body?.code || '');
+    if (!EMAIL_RE.test(email) || !/^\d{6}$/.test(code)) return res.status(400).json({ error: 'invalid_input' });
+    if (rateLimited(`verify:${email}`, 10, 10 * 60 * 1000)) return res.status(429).json({ error: 'rate_limited' });
+    // 1) validate the OTP FIRST — a wrong/expired code creates NO user, touches nothing.
+    const rec = await checkEmailCode(email, 'login', code);
+    if (!rec) return res.status(401).json({ error: 'invalid_or_expired_code' });
+    // 2) only now resolve/create the user, then 3) atomically consume the code.
+    const user = await resolveOrCreateEmailUser(email);
+    if (!await markCodeConsumed(rec.id, user.id)) return res.status(401).json({ error: 'invalid_or_expired_code' });
+    res.json({ token: emailJwt(user, email), user: { id: user.id, display_name: user.display_name } });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// POST /api/auth/email/accept-invite — invited email user joins a business (no Telegram).
+// Body: { email, code }. The code (purpose='invite_accept') carries the business_invites code.
+app.post('/api/auth/email/accept-invite', emailAuthGate, async (req, res) => {
+  try {
+    const email = normalizeEmail(req.body?.email);
+    const code = String(req.body?.code || '');
+    const inviteCode = String(req.body?.invite_code || '');
+    if (!EMAIL_RE.test(email) || !/^\d{6}$/.test(code) || !inviteCode) return res.status(400).json({ error: 'invalid_input' });
+    const { data: inv } = await supabase.from('business_invites')
+      .select('id, business_id, role, status').eq('code', inviteCode).limit(1);
+    const invite = inv?.[0];
+    if (!invite || invite.status !== 'active') return res.status(404).json({ error: 'invite_not_found' });
+    // validate OTP FIRST (no user created on a wrong code), then resolve/create + consume.
+    const rec = await checkEmailCode(email, 'invite_accept', code);
+    if (!rec) return res.status(401).json({ error: 'invalid_or_expired_code' });
+    const user = await resolveOrCreateEmailUser(email);
+    if (!await markCodeConsumed(rec.id, user.id)) return res.status(401).json({ error: 'invalid_or_expired_code' });
+    // attach membership (idempotent on business_id+user_id)
+    await supabase.from('business_members')
+      .upsert({ business_id: invite.business_id, user_id: user.id, role: invite.role, status: 'active' },
+              { onConflict: 'business_id,user_id' });
+    res.json({ token: emailJwt(user, email), user: { id: user.id, display_name: user.display_name }, business_id: invite.business_id, role: invite.role });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Personal Account shell — read/update the signed-in user's profile (identity only).
+app.get('/api/me/profile', emailAuthGate, auth, async (req, res) => {
+  try {
+    const { data } = await supabase.from('user_profiles').select('*').eq('user_id', req.user.userId).limit(1);
+    res.json({ profile: data?.[0] || null });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+app.patch('/api/me/profile', emailAuthGate, auth, async (req, res) => {
+  try {
+    const allowed = ['display_name', 'locale', 'timezone', 'avatar_url'];
+    const patch = {}; for (const k of allowed) if (k in (req.body || {})) patch[k] = req.body[k];
+    if (!Object.keys(patch).length) return res.status(400).json({ error: 'nothing_to_update' });
+    const { data } = await supabase.from('user_profiles')
+      .upsert({ user_id: req.user.userId, ...patch }, { onConflict: 'user_id' }).select().single();
+    res.json({ profile: data });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
 
 // ─────────────────────────────────────────────────────────────────────────────
 // BUSINESS-SCOPED ACCESS MODEL
@@ -3399,7 +3584,18 @@ app.post('/api/team/invite', auth, async (req, res) => {
     }).select().single();
     if (error) throw error;
 
-    res.json({ invite, invite_url: `/invite/${code}` });
+    // Optional email invite (Phase 1, gated): issue an accept-OTP for the email so the
+    // invitee can join WITHOUT Telegram. The invite code links the membership target.
+    let email_invited = null;
+    if (EMAIL_AUTH_ENABLED && req.body?.email) {
+      const email = normalizeEmail(req.body.email);
+      if (EMAIL_RE.test(email)) {
+        const otp = await issueEmailCode(email, 'invite_accept');
+        email_invited = { email, ...(EMAIL_AUTH_DEV_RETURN_CODE ? { dev_code: otp } : {}) };
+      }
+    }
+
+    res.json({ invite, invite_url: `/invite/${code}`, ...(email_invited ? { email_invited } : {}) });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 

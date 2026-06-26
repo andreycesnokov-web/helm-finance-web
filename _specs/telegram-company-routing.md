@@ -128,6 +128,50 @@ NEVER persisted with a null/guessed `business_id`.
 - **Bot app (separate)**: `/company` command UX (list + pick), prompt-on-ambiguous,
   and call the endpoints above before creating any financial record.
 
+## LIVE BUG FIX — implementation plan (Priority 1)
+**Observed:** the live bot detects multiple businesses but asks the user to **type the
+company name**. Required: show **inline buttons** of the available businesses and **save
+the active Telegram business per user**, then route.
+
+### Repo split
+- **Backend (this repo):** persistence + validated endpoints (below). Needs ONE additive
+  migration (`telegram_user_state`) — apply only after approval, under the gated process.
+- **Bot app (separate repo):** replace the free-text "type company name" prompt with an
+  inline keyboard and call the endpoints.
+
+### Backend work (this repo)
+1. Migration `telegram_user_state(user_id BIGINT PK REFERENCES users(id) ON DELETE
+   CASCADE, active_business_id UUID NULL REFERENCES businesses(id) ON DELETE SET NULL,
+   updated_at TIMESTAMPTZ DEFAULT now())`. Additive; no existing row touched.
+2. `GET /api/telegram/active-business?telegram_id=` (bot-secret) → resolve per §2 rules
+   (validate stored selection still active + business-type; invalid → clear + re-resolve):
+   `{status:'none'|'auto'|'active'|'choose', business?, options?:[{id,name,business_code,role}]}`.
+3. `POST /api/telegram/active-business { telegram_id, business_id }` (bot-secret) →
+   require active membership in a `type='business'` workspace; upsert `telegram_user_state`;
+   return `{ok:true, business}`; reject `not_a_member`/`business_workspace_required`/404.
+4. Telegram WRITE paths resolve the active business and stamp `business_id`; ambiguous →
+   `409 company_selection_required` + options (never a null/guessed business_id).
+
+### Bot work (separate repo)
+- On ambiguous create OR `/company`: render an **InlineKeyboardMarkup**, one button per
+  option → `text: "<name> · <business_code>"`, `callback_data: "setbiz:<business_id>"`
+  (mark the active one ✅). NO free-text company name entry.
+- On callback `setbiz:<id>` → `POST /api/telegram/active-business` → reply
+  `✅ Active company: <name> (<business_code>). New entries will be saved here.` then
+  retry the pending action.
+- Each created record echoes `Saved to <name> (<business_code>).`
+
+### Dependency / gating
+The inline-button UX is bot-side, but persistence + membership validation + record
+`business_id` stamping require the backend endpoints, which require the
+`telegram_user_state` migration. So: approve the migration → I implement endpoints here →
+bot adds the inline keyboard. No migration/flag/code until approved.
+
+### Tests (per §6 + this fix)
+Inline-selection round-trip (choose → POST → active), 1-business auto, ambiguous write
+blocked, per-user isolation, invalid/inactive cleared, non-null business_id, non-member
+rejected.
+
 ## Out of scope
 Personal workspaces (gated, 037+). Telegram routing is business-only; never route a
 Telegram record into a personal workspace.
