@@ -169,6 +169,23 @@ BEGIN
       GET DIAGNOSTICS n = ROW_COUNT; r := r || jsonb_build_object('payroll_payments', n);
     END IF;
 
+    -- 3b) Invoices (migration 041) — children first, then parents, then counters.
+    --     Guarded: no-op until 041 is applied. Reset clears the per-business invoice
+    --     numbering counter too (next invoice restarts at 00001 after a full reset).
+    --     invoices.linked_debt_id is ON DELETE SET NULL, so order vs debts is irrelevant.
+    IF to_regclass('public.invoice_line_items') IS NOT NULL THEN
+      DELETE FROM public.invoice_line_items WHERE business_id = p_business;
+      GET DIAGNOSTICS n = ROW_COUNT; r := r || jsonb_build_object('invoice_line_items', n);
+    END IF;
+    IF to_regclass('public.invoices') IS NOT NULL THEN
+      DELETE FROM public.invoices WHERE business_id = p_business;
+      GET DIAGNOSTICS n = ROW_COUNT; r := r || jsonb_build_object('invoices', n);
+    END IF;
+    IF to_regclass('public.invoice_counters') IS NOT NULL THEN
+      DELETE FROM public.invoice_counters WHERE business_id = p_business;
+      GET DIAGNOSTICS n = ROW_COUNT; r := r || jsonb_build_object('invoice_counters', n);
+    END IF;
+
     -- 4) Core financial rows
     DELETE FROM public.transactions WHERE business_id = p_business;
     GET DIAGNOSTICS n = ROW_COUNT; r := r || jsonb_build_object('transactions', n);
