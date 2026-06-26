@@ -89,7 +89,12 @@ CREATE INDEX IF NOT EXISTS email_login_codes_expires_idx
 -- Order: REVOKE from PUBLIC first, then conditional per-role revokes, then explicit
 -- service_role grants (so the backend retains the access it needs).
 
--- 5a) functions + sequence: revoke from PUBLIC first.
+-- 5a) tables + functions + sequence: revoke from PUBLIC first.
+REVOKE ALL ON TABLE
+  public.user_email_identities,
+  public.user_profiles,
+  public.email_login_codes
+  FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.next_app_user_id() FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.fn_email_identity_set_updated_at() FROM PUBLIC;
 REVOKE ALL ON SEQUENCE public.app_user_id_seq FROM PUBLIC;
