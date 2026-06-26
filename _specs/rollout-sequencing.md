@@ -28,6 +28,48 @@ production auth working for existing Telegram users until explicitly cut over (P
 - **MUST NOT touch:** 037–039, 040, Personal/Funding flag, `PERSONAL_WORKSPACE_ENABLED`,
   `users.id` semantics.
 
+## STATUS (2026-06-26)
+- **Phase 1 backend: SHIPPED to main, FLAG OFF.** Migration 042 (user_email_identities,
+  user_profiles, email_login_codes, app_user_id_seq + next_app_user_id) is APPLIED
+  LOCAL ONLY — **NOT in production**. Endpoints (`/api/auth/email/start|verify|accept-invite`,
+  `/api/me/profile`, email mode on `/api/team/invite`) are live in prod code but gated by
+  `EMAIL_AUTH_ENABLED` (unset → 404). Telegram auth untouched. Verified: PGlite migration
+  6/6, local HTTP flow 9/9.
+- **Still missing for Phase 2:** `user_telegram_links` table (NOT in 042 — needs a new
+  additive migration, e.g. 043) + connect/unlink endpoints + the bot resolver cutover.
+- **Product model (authoritative):** Personal Account = the human (a `users` row +
+  `user_email_identities` + `user_profiles` shell). Business Workspace = a company
+  (`businesses` type='business'). One Personal Account owns/joins many businesses via
+  `business_members`. **Telegram is NOT an account — it's a linked channel** to a Personal
+  Account; bot actions resolve `telegram_id → user_telegram_links.user_id → memberships →
+  selected active business` (inline buttons when multiple; never free-text).
+
+## A) Personal Account shell UI (safe to build now, flag-gated)
+- Email **login/register** screen (request OTP → enter code) + **Personal profile** page
+  (display_name/locale/timezone/avatar via `/api/me/profile`). NO wallets, NO
+  transactions, NO personal finance. Gated by a frontend flag `VITE_EMAIL_AUTH_ENABLED`
+  (default off; route tree-shaken/redirect when off) talking to the already-shipped
+  backend (which is itself gated by `EMAIL_AUTH_ENABLED`). Local/dev only until both
+  flags + prod 042 are deliberately enabled.
+
+## B) Telegram linking — Phase 2 (plan; needs migration 043 + endpoints)
+- Migration **043** (additive): `user_telegram_links(telegram_id BIGINT PK, user_id
+  BIGINT REFERENCES users(id) ON DELETE CASCADE, status, linked_at, UNIQUE(user_id))` +
+  `telegram_link_codes` (one-time connect codes). Backfill existing Telegram users
+  (`telegram_id = users.id`) so they keep working.
+- Endpoints: web "Connect Telegram" (issue one-time code) · `POST /api/telegram/link`
+  (bot-secret; anti-hijack: reject a telegram_id already linked elsewhere) · unlink.
+- Resolver cutover (flagged): bot + `/api/auth/telegram` resolve the app user via
+  `user_telegram_links` instead of assuming `users.id == telegram_id`. Legacy positive-id
+  users resolve to themselves via the backfilled link.
+
+## C) Business membership model (already supported)
+- A Personal Account creates a business (`POST /api/businesses`, owner membership) and can
+  own/join MANY via `business_members`. Employees are invited to a business first
+  (`/api/team/invite`, incl. the new email mode) then accept. The Telegram link belongs to
+  the USER, not the business — one linked Telegram channel can act across all the user's
+  businesses (with per-user active-business selection, Phase 3).
+
 ## Phase 1 — email identity foundation (additive; no cutover)
 - **Goal:** email accounts exist alongside Telegram; existing Telegram users untouched.
 - **Migrations:** additive only — `user_email_identities`, `user_telegram_links`

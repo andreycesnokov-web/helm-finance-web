@@ -62,6 +62,8 @@ import ComplianceCalendar from './pages/ComplianceCalendar'
 import WalletDetail from './pages/WalletDetail'
 import Onboarding, { shouldShowOnboarding, clearOnboardingFlags } from './pages/Onboarding'
 import PreviewApp from './pages/PreviewApp'
+import EmailLogin from './pages/EmailLogin'
+import PersonalProfile from './pages/PersonalProfile'
 import { PersonalLayout, PersonalShell, PersonalOverview, PersonalAccounts, PersonalTransactions, PersonalOnboarding } from './pages/personal'
 import { BusinessLayout, BusinessShell, BusinessPulse, BusinessAccounts, BusinessTransactions, BusinessPayables, BusinessReceivables, BusinessInvoices, BusinessFunding, BusinessNew, BusinessIntercompany } from './pages/business'
 import { BusinessAccountant } from './pages/business/Accountant'
@@ -69,6 +71,10 @@ import { BusinessAccountant } from './pages/business/Accountant'
 // Personal/Funding UI requires migrations 037–039. OFF by default so production stays
 // safe until they're applied. Enable in env: VITE_PERSONAL_FUNDING_UI_ENABLED=true.
 const PERSONAL_FUNDING_UI = import.meta.env.VITE_PERSONAL_FUNDING_UI_ENABLED === 'true'
+// Email-primary identity UI (Phase 1). Default OFF → /login/email + /account routes are
+// not registered (Telegram login unchanged). Backend is independently gated by
+// EMAIL_AUTH_ENABLED. No personal finance here.
+const EMAIL_AUTH_UI = import.meta.env.VITE_EMAIL_AUTH_ENABLED === 'true'
 
 // ── Mobile bottom nav keys (labels resolved at render time via t()) ───────────
 const NAV_KEYS = [
@@ -517,6 +523,10 @@ export default function App() {
         <SwipeBackIndicator />
         <Routes>
           <Route path="/login" element={<Login />} />
+          {/* Email-primary identity UI — only when VITE_EMAIL_AUTH_ENABLED=true.
+              Telegram login (/login) stays the default and is unchanged. */}
+          {EMAIL_AUTH_UI && <Route path="/login/email" element={<EmailLogin />} />}
+          {EMAIL_AUTH_UI && <Route path="/account" element={<PersonalProfile />} />}
           <Route path="/" element={<PulseWrapper />} />
           <Route path="/add"          element={<Layout><Add /></Layout>} />
           <Route path="/radar"        element={<Layout><Radar /></Layout>} />
