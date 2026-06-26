@@ -44,6 +44,11 @@ const EMAIL_AUTH_ENABLED = process.env.EMAIL_AUTH_ENABLED === 'true';
 // DEV-ONLY: when true, the OTP code is returned in the API response for local testing.
 // NEVER enable in production. Off by default.
 const EMAIL_AUTH_DEV_RETURN_CODE = process.env.EMAIL_AUTH_DEV_RETURN_CODE === 'true';
+// Telegram per-user active-business routing (multi-business). OFF by default. When OFF,
+// existing Telegram behavior is unchanged and nothing queries telegram_user_state
+// (migration 043) — so production is safe before 043 is applied. When ON, the
+// active-business endpoints + resolver are live and from-receipt routes via the selection.
+const TELEGRAM_ACTIVE_BUSINESS_ENABLED = process.env.TELEGRAM_ACTIVE_BUSINESS_ENABLED === 'true';
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SECRET_KEY);
 const JWT_SECRET = process.env.JWT_SECRET;
 const BOT_TOKEN = process.env.BOT_TOKEN;
@@ -1349,6 +1354,63 @@ async function resolveTelegramMember(telegram_id) {
   };
 }
 
+// ── Telegram active-business routing (gated by TELEGRAM_ACTIVE_BUSINESS_ENABLED) ──
+// Resolve the Telegram user's active business via telegram_user_state. user_id ==
+// telegram_id today (swap to user_telegram_links.user_id at Phase 2). Returns one of:
+//   { status:'none' } | { status:'auto'|'active', business } | { status:'choose', options }
+// Invalid/deleted/revoked/personal saved selection is cleared, then re-resolved.
+async function resolveTelegramActiveBusiness(telegram_id) {
+  const userId = Number(telegram_id);
+  const { data: mem } = await supabase.from('business_members')
+    .select('role, business_id, businesses(id, name, business_code, type, owner_user_id)')
+    .eq('user_id', userId).eq('status', 'active');
+  const owned = (mem || []).filter(m => m.businesses && m.businesses.type !== 'personal');
+  const opt = (m) => ({ id: m.business_id, name: m.businesses.name, business_code: m.businesses.business_code || null, role: m.role, owner_user_id: m.businesses.owner_user_id || userId });
+  if (!owned.length) return { status: 'none' };
+
+  const { data: st } = await supabase.from('telegram_user_state').select('active_business_id').eq('user_id', userId).limit(1);
+  const savedId = st?.[0]?.active_business_id || null;
+  const savedValid = savedId ? owned.find(m => m.business_id === savedId) : null;
+  if (savedValid) return { status: 'active', business: opt(savedValid) };
+  if (savedId && !savedValid) {
+    await supabase.from('telegram_user_state').update({ active_business_id: null }).eq('user_id', userId); // clear stale
+  }
+  if (owned.length === 1) {
+    await supabase.from('telegram_user_state').upsert({ user_id: userId, active_business_id: owned[0].business_id }, { onConflict: 'user_id' });
+    return { status: 'auto', business: opt(owned[0]) };
+  }
+  return { status: 'choose', options: owned.map(opt) };
+}
+
+// GET /api/telegram/active-business — bot-secret. 404 when the flag is off (no surface).
+app.get('/api/telegram/active-business', async (req, res) => {
+  if (!TELEGRAM_ACTIVE_BUSINESS_ENABLED) return res.status(404).json({ error: 'not_found' });
+  if (!requireBotSecret(req)) return res.status(401).json({ error: 'Invalid bot credentials' });
+  const telegram_id = req.query?.telegram_id || req.body?.telegram_id;
+  if (!telegram_id) return res.status(400).json({ error: 'telegram_id required' });
+  try { res.json(await resolveTelegramActiveBusiness(telegram_id)); }
+  catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// POST /api/telegram/active-business — set the active business. bot-secret. 404 when off.
+app.post('/api/telegram/active-business', async (req, res) => {
+  if (!TELEGRAM_ACTIVE_BUSINESS_ENABLED) return res.status(404).json({ error: 'not_found' });
+  if (!requireBotSecret(req)) return res.status(401).json({ error: 'Invalid bot credentials' });
+  const { telegram_id, business_id } = req.body || {};
+  if (!telegram_id || !business_id) return res.status(400).json({ error: 'telegram_id and business_id required' });
+  try {
+    const userId = Number(telegram_id);
+    const { data } = await supabase.from('business_members')
+      .select('role, businesses(id, name, business_code, type)')
+      .eq('user_id', userId).eq('business_id', business_id).eq('status', 'active').limit(1);
+    const m = data?.[0];
+    if (!m || !m.businesses) return res.status(403).json({ error: 'not_a_member' });
+    if (m.businesses.type === 'personal') return res.status(400).json({ error: 'business_workspace_required' });
+    await supabase.from('telegram_user_state').upsert({ user_id: userId, active_business_id: business_id }, { onConflict: 'user_id' });
+    res.json({ ok: true, business: { id: m.businesses.id, name: m.businesses.name, business_code: m.businesses.business_code || null, role: m.role } });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // Download a Telegram file as a base64 buffer + mime via the Bot API.
 async function fetchTelegramFile(fileId) {
   const botToken = process.env.TELEGRAM_BOT_TOKEN || process.env.BOT_TOKEN;
@@ -1456,8 +1518,23 @@ app.post('/api/telegram/debts/from-receipt', async (req, res) => {
   const { telegram_id, file_id, caption, kind } = req.body || {};
   if (!telegram_id || !file_id) return res.status(400).json({ error: 'telegram_id and file_id required' });
   try {
-    const m = await resolveTelegramMember(telegram_id);
-    if (m.error) return res.status(m.error === 'multiple_businesses' ? 409 : 403).json({ error: m.error });
+    let m;
+    if (TELEGRAM_ACTIVE_BUSINESS_ENABLED) {
+      // Active-business routing: ambiguous 2+ → 409 company_selection_required + options;
+      // never write a NULL business_id. Build the same member context the rest expects.
+      const r = await resolveTelegramActiveBusiness(telegram_id);
+      if (r.status === 'choose') return res.status(409).json({ error: 'company_selection_required', options: r.options });
+      if (r.status === 'none') return res.status(403).json({ error: 'not_member' });
+      const { data: urows } = await supabase.from('users').select('id, username, first_name').eq('id', telegram_id).limit(1);
+      const su = urows?.[0];
+      if (!su) return res.status(403).json({ error: 'not_linked' });
+      su.name = su.first_name || su.username || String(su.id);
+      const role = r.business.role;
+      m = { submitterUser: su, role, businessId: r.business.id, ownerId: r.business.owner_user_id || su.id, isPrivileged: ['owner', 'ceo', 'admin', 'cfo'].includes(role) };
+    } else {
+      m = await resolveTelegramMember(telegram_id);
+      if (m.error) return res.status(m.error === 'multiple_businesses' ? 409 : 403).json({ error: m.error });
+    }
 
     const file = await fetchTelegramFile(file_id).catch(() => null);
     const ocr = await recognizeReceipt(file).catch(() => null);
