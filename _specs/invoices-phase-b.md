@@ -154,6 +154,18 @@ phase doesn't need another migration. No PDF rendering in Phase B v1.
   business (children first: line_items → invoices → counters) so reset stays complete and
   atomic. Document this as part of the invoices migration PR.
 
+## PENDING SQL revision (before any apply) — same-business guards for FKs
+HELD. Next revision of `041_invoices.sql` must ensure an invoice cannot link to a
+**debt or document of another business**:
+- `linked_debt_id` → today a plain FK to `debts(id)`; add a same-business guard
+  (composite FK `(linked_debt_id, business_id)` → `debts(id, business_id)` requires a
+  `UNIQUE(id, business_id)` on debts — verify debts allows it; else a BEFORE INSERT/UPDATE
+  trigger asserting `debts.business_id = NEW.business_id`).
+- `document_id` → same: guard that `financial_documents.business_id = invoices.business_id`
+  (composite FK or trigger).
+Decide composite-FK vs trigger per table (debts is a base table; adding a UNIQUE there is
+a heavier change — a trigger may be cleaner). Resolve this before 041 is applied.
+
 ## Open decisions for you
 - Number format (`INV-YYYY-#####` vs `INV-<biz_code>-#####` vs custom).
 - Paid-status approach: read-through (A, recommended) vs synced (B).
