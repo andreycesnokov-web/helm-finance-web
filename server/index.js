@@ -127,25 +127,35 @@ function emailAuthGate(req, res, next) {
 }
 
 // Resolve the internal user for an email, or create a new email-first user with a
-// NEGATIVE id + an identity + a Personal Account profile shell. Returns the users row.
+// NEGATIVE id + an identity + a Personal Account profile shell. Returns { id, display_name }.
+// Schema-safe: the base `users` table varies across environments, so we insert only the
+// id and gracefully drop any optional column the live schema lacks (e.g. first_name).
+// The display name lives in user_profiles.display_name, never assumed on users.
 async function resolveOrCreateEmailUser(email) {
   const { data: idRows } = await supabase.from('user_email_identities')
     .select('user_id').eq('email', email).limit(1);
   if (idRows?.length) {
-    const { data: u } = await supabase.from('users').select('*').eq('id', idRows[0].user_id).limit(1);
-    if (u?.length) return u[0];
+    const uid = idRows[0].user_id;
+    const { data: prof } = await supabase.from('user_profiles').select('display_name').eq('user_id', uid).limit(1);
+    return { id: uid, display_name: prof?.[0]?.display_name || null };
   }
-  // allocate a negative id (disjoint from Telegram positive ids)
   const { data: idResp, error: idErr } = await supabase.rpc('next_app_user_id');
   if (idErr) throw idErr;
   const newId = Array.isArray(idResp) ? idResp[0] : idResp;
-  const firstName = email.split('@')[0];
-  const { data: created, error: uErr } = await supabase.from('users')
-    .insert({ id: newId, first_name: firstName, username: '' }).select().single();
+  const localPart = email.split('@')[0];
+  // graceful insert: keep id; drop optional columns the schema doesn't have.
+  let row = { id: newId, username: '', first_name: localPart }, uErr;
+  for (let i = 0; i < 4; i++) {
+    ({ error: uErr } = await supabase.from('users').insert(row));
+    if (!uErr) break;
+    const col = /find the '([a-z_]+)' column/i.exec(uErr.message || '')?.[1];
+    if (col && col in row && col !== 'id') { delete row[col]; continue; }
+    break;
+  }
   if (uErr) throw uErr;
   await supabase.from('user_email_identities').insert({ user_id: newId, email, email_verified_at: new Date().toISOString() });
-  await supabase.from('user_profiles').insert({ user_id: newId, display_name: firstName });
-  return created;
+  await supabase.from('user_profiles').insert({ user_id: newId, display_name: localPart });
+  return { id: newId, display_name: localPart };
 }
 
 // Create + persist an OTP for an email/purpose; returns the plaintext code (caller emails it).
@@ -161,25 +171,37 @@ async function issueEmailCode(email, purpose) {
   return code;
 }
 
-// Validate the latest matching OTP; on success mark consumed. Returns true/false.
-async function consumeEmailCode(email, purpose, code, userId) {
+// Validate the latest matching OTP WITHOUT consuming it and WITHOUT touching users.
+// Returns the code record on success, or null. On a hash mismatch, increments attempts.
+async function checkEmailCode(email, purpose, code) {
   const { data: rows } = await supabase.from('email_login_codes')
     .select('*').eq('email', email).eq('purpose', purpose).is('consumed_at', null)
     .order('created_at', { ascending: false }).limit(1);
   const rec = rows?.[0];
-  if (!rec) return false;
-  if (new Date(rec.expires_at) < new Date()) return false;
-  if (rec.attempts >= OTP_MAX_ATTEMPTS) return false;
+  if (!rec) return null;
+  if (new Date(rec.expires_at) < new Date()) return null;
+  if (rec.attempts >= OTP_MAX_ATTEMPTS) return null;
   if (rec.code_hash !== hashEmailCode(code)) {
     await supabase.from('email_login_codes').update({ attempts: rec.attempts + 1 }).eq('id', rec.id);
-    return false;
+    return null;
   }
-  await supabase.from('email_login_codes')
-    .update({ consumed_at: new Date().toISOString(), consumed_by_user_id: userId || null }).eq('id', rec.id);
-  return true;
+  return rec;
 }
 
-const emailJwt = (user) => jwt.sign({ userId: user.id, firstName: user.first_name, auth_channel: 'email' }, JWT_SECRET, { expiresIn: '30d' });
+// Atomically mark a validated code consumed (single-use, race-safe via the
+// `consumed_at IS NULL` guard). Returns true only if THIS call consumed it.
+async function markCodeConsumed(recId, userId) {
+  const { data } = await supabase.from('email_login_codes')
+    .update({ consumed_at: new Date().toISOString(), consumed_by_user_id: userId || null })
+    .eq('id', recId).is('consumed_at', null).select('id');
+  return !!data?.length;
+}
+
+const emailJwt = (user, email) => jwt.sign({
+  userId: user.id,
+  firstName: user.display_name || (email ? email.split('@')[0] : 'User'),
+  auth_channel: 'email',
+}, JWT_SECRET, { expiresIn: '30d' });
 
 // POST /api/auth/email/start — request an OTP. Always returns { ok:true } (anti-enumeration).
 app.post('/api/auth/email/start', emailAuthGate, async (req, res) => {
@@ -201,11 +223,13 @@ app.post('/api/auth/email/verify', emailAuthGate, async (req, res) => {
     const code = String(req.body?.code || '');
     if (!EMAIL_RE.test(email) || !/^\d{6}$/.test(code)) return res.status(400).json({ error: 'invalid_input' });
     if (rateLimited(`verify:${email}`, 10, 10 * 60 * 1000)) return res.status(429).json({ error: 'rate_limited' });
-    // resolve/create the user first so consumed_by_user_id can be recorded
+    // 1) validate the OTP FIRST — a wrong/expired code creates NO user, touches nothing.
+    const rec = await checkEmailCode(email, 'login', code);
+    if (!rec) return res.status(401).json({ error: 'invalid_or_expired_code' });
+    // 2) only now resolve/create the user, then 3) atomically consume the code.
     const user = await resolveOrCreateEmailUser(email);
-    const ok = await consumeEmailCode(email, 'login', code, user.id);
-    if (!ok) return res.status(401).json({ error: 'invalid_or_expired_code' });
-    res.json({ token: emailJwt(user), user });
+    if (!await markCodeConsumed(rec.id, user.id)) return res.status(401).json({ error: 'invalid_or_expired_code' });
+    res.json({ token: emailJwt(user, email), user: { id: user.id, display_name: user.display_name } });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -221,14 +245,16 @@ app.post('/api/auth/email/accept-invite', emailAuthGate, async (req, res) => {
       .select('id, business_id, role, status').eq('code', inviteCode).limit(1);
     const invite = inv?.[0];
     if (!invite || invite.status !== 'active') return res.status(404).json({ error: 'invite_not_found' });
+    // validate OTP FIRST (no user created on a wrong code), then resolve/create + consume.
+    const rec = await checkEmailCode(email, 'invite_accept', code);
+    if (!rec) return res.status(401).json({ error: 'invalid_or_expired_code' });
     const user = await resolveOrCreateEmailUser(email);
-    const ok = await consumeEmailCode(email, 'invite_accept', code, user.id);
-    if (!ok) return res.status(401).json({ error: 'invalid_or_expired_code' });
+    if (!await markCodeConsumed(rec.id, user.id)) return res.status(401).json({ error: 'invalid_or_expired_code' });
     // attach membership (idempotent on business_id+user_id)
     await supabase.from('business_members')
       .upsert({ business_id: invite.business_id, user_id: user.id, role: invite.role, status: 'active' },
               { onConflict: 'business_id,user_id' });
-    res.json({ token: emailJwt(user), user, business_id: invite.business_id, role: invite.role });
+    res.json({ token: emailJwt(user, email), user: { id: user.id, display_name: user.display_name }, business_id: invite.business_id, role: invite.role });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 

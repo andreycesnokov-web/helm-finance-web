@@ -33,9 +33,11 @@ async function api(method, path, { token, body } = {}) {
     ok('start returns ok + dev_code', start.status === 200 && start.body?.ok === true && /^\d{6}$/.test(start.body?.dev_code || ''));
     const code = start.body.dev_code;
 
-    // wrong code rejected
+    // wrong code rejected AND creates no user (validate-first)
     const bad = await api('POST', '/api/auth/email/verify', { body: { email, code: '000000' } });
     ok('wrong code → 401', bad.status === 401);
+    const { data: noIdent } = await supabase.from('user_email_identities').select('user_id').eq('email', email);
+    ok('wrong code creates NO user_email_identities row', (noIdent || []).length === 0);
 
     // verify → JWT + NEGATIVE user id
     const verify = await api('POST', '/api/auth/email/verify', { body: { email, code } });
