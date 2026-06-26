@@ -37,6 +37,16 @@ export function AuthProvider({ children }) {
     return data.user
   }
 
+  // Store a JWT obtained by any auth method (email OTP, etc.) the same way Telegram does.
+  const loginWithToken = (jwt, userFromApi = null) => {
+    localStorage.setItem('hf_token', jwt)
+    setToken(jwt)
+    let u = userFromApi
+    if (!u) { try { const p = JSON.parse(atob(jwt.split('.')[1])); u = { id: p.userId, firstName: p.firstName } } catch { u = null } }
+    setUser(u)
+    return u
+  }
+
   const logout = () => {
     localStorage.removeItem('hf_token')
     setToken(null)
@@ -44,7 +54,7 @@ export function AuthProvider({ children }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, token, loading, loginWithTelegram, logout }}>
+    <AuthContext.Provider value={{ user, token, loading, loginWithTelegram, loginWithToken, logout }}>
       {children}
     </AuthContext.Provider>
   )
