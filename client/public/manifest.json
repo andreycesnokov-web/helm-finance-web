@@ -1,11 +1,11 @@
 {
-  "name": "Helm Finance",
-  "short_name": "Helm Finance",
-  "description": "Financial clarity for entrepreneurs",
+  "name": "CFO AI",
+  "short_name": "CFO AI",
+  "description": "Financial OS for entrepreneurs",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
-  "theme_color": "#1a1a1a",
+  "theme_color": "#003366",
   "orientation": "portrait",
   "icons": [
     {
@@ -17,6 +17,12 @@
     {
       "src": "/icon-512.png",
       "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-1024.png",
+      "sizes": "1024x1024",
       "type": "image/png",
       "purpose": "any maskable"
     }
