@@ -4,7 +4,7 @@
 // businesses.type='personal'. Uses GET/PATCH /api/me/profile + GET /api/workspaces.
 // "Join" reuses the existing /invite/:code page (auto-accepts for a logged-in user).
 // Behind VITE_EMAIL_AUTH_ENABLED.
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { setActiveBusinessId } from '../lib/api'
@@ -37,6 +37,9 @@ export default function PersonalProfile() {
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState('')
   const [error, setError] = useState('')
+  const [avatarBusy, setAvatarBusy] = useState(false)
+  const [avatarError, setAvatarError] = useState('')
+  const fileRef = useRef(null)
 
   useEffect(() => {
     if (!token) { navigate('/login/email'); return }
@@ -66,6 +69,36 @@ export default function PersonalProfile() {
     } catch { setError('Network error.') } finally { setSaving(false) }
   }
 
+  // Avatar: upload immediately on file select (cleaner than a separate save step).
+  // Owner-only is enforced server-side; the path is namespaced by the user's id.
+  const onPickAvatar = async (e) => {
+    const file = e.target.files?.[0]
+    if (fileRef.current) fileRef.current.value = '' // allow re-picking the same file
+    if (!file) return
+    if (!file.type.startsWith('image/')) { setAvatarError('Please choose an image file.'); return }
+    if (file.size > 5 * 1024 * 1024) { setAvatarError('Image must be 5 MB or smaller.'); return }
+    setAvatarBusy(true); setAvatarError(''); setMsg('')
+    try {
+      const fd = new FormData()
+      fd.append('avatar', file)
+      const res = await fetch('/api/me/avatar', { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: fd })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) { setAvatarError(data.message || 'Could not upload the image.'); return }
+      setForm(f => ({ ...f, avatar_url: data.avatar_url }))
+    } catch { setAvatarError('Network error during upload.') } finally { setAvatarBusy(false) }
+  }
+
+  const removeAvatar = async () => {
+    setAvatarBusy(true); setAvatarError(''); setMsg('')
+    try {
+      const res = await fetch('/api/me/profile', {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ avatar_url: '' }),
+      })
+      if (!res.ok) { setAvatarError('Could not remove the photo.'); return }
+      setForm(f => ({ ...f, avatar_url: '' }))
+    } catch { setAvatarError('Network error.') } finally { setAvatarBusy(false) }
+  }
+
   // Join: parse the pasted link/code and hand off to the existing /invite/:code page,
   // which auto-accepts the invite for an already-signed-in user.
   const joinByInvite = (e) => {
@@ -82,6 +115,7 @@ export default function PersonalProfile() {
   }
 
   const greeting = form.display_name || (user?.firstName) || 'there'
+  const initials = (form.display_name || user?.firstName || '?').trim().split(/\s+/).map(w => w[0]).slice(0, 2).join('').toUpperCase() || '?'
   const card = { border: '1px solid var(--border-2,#e3e8ee)', borderRadius: 14, padding: 18, background: 'var(--bg,#fff)' }
   const inp = { width: '100%', padding: '10px 12px', borderRadius: 10, border: '1px solid var(--border-2,#ccc)', background: 'var(--bg,#fff)', color: 'var(--text,#111)', fontSize: 14, fontFamily: 'inherit', boxSizing: 'border-box' }
   const lbl = { fontSize: 12, fontWeight: 600, color: 'var(--text-2,#555)', margin: '12px 0 6px', display: 'block' }
@@ -171,6 +205,25 @@ export default function PersonalProfile() {
         </button>
         {showProfile && (
           <form onSubmit={save} style={{ marginTop: 8 }}>
+            {/* Avatar: preview + upload (no manual URL). */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginTop: 6 }}>
+              {form.avatar_url ? (
+                <img src={form.avatar_url} alt="Your avatar"
+                  style={{ width: 64, height: 64, borderRadius: '50%', objectFit: 'cover', border: '1px solid var(--border-2,#e3e8ee)', background: 'var(--bg-2,#f7f9fb)' }} />
+              ) : (
+                <div aria-label="No avatar" style={{ width: 64, height: 64, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--brand,#3399FF)', color: '#fff', fontSize: 22, fontWeight: 700 }}>{initials}</div>
+              )}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <input ref={fileRef} type="file" accept="image/*" onChange={onPickAvatar} style={{ display: 'none' }} />
+                <button type="button" disabled={avatarBusy} style={{ ...ghost, padding: '8px 14px' }} onClick={() => fileRef.current?.click()}>
+                  {avatarBusy ? 'Uploading…' : 'Upload photo'}
+                </button>
+                {form.avatar_url && !avatarBusy && (
+                  <button type="button" style={{ background: 'none', border: 'none', color: 'var(--red,#d33)', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left', padding: 0 }} onClick={removeAvatar}>Remove photo</button>
+                )}
+              </div>
+            </div>
+            {avatarError && <div style={{ marginTop: 8, color: 'var(--red-dark,#b3261e)', fontSize: 13 }}>{avatarError}</div>}
             <label style={lbl}>DISPLAY NAME</label>
             <input style={inp} value={form.display_name} onChange={set('display_name')} placeholder="Your name" />
             <label style={lbl}>LANGUAGE</label>
@@ -180,8 +233,6 @@ export default function PersonalProfile() {
             <label style={lbl}>TIMEZONE</label>
             <input style={inp} value={form.timezone} onChange={set('timezone')} list="profile-tz" placeholder="Asia/Jakarta" autoComplete="off" />
             <datalist id="profile-tz">{COMMON_TZ.map(tz => <option key={tz} value={tz} />)}</datalist>
-            <label style={lbl}>AVATAR URL</label>
-            <input style={inp} value={form.avatar_url} onChange={set('avatar_url')} placeholder="https://…" />
             <button type="submit" disabled={saving} style={{ ...primary, width: '100%', marginTop: 16 }}>{saving ? 'Saving…' : 'Save profile'}</button>
             {msg && <div style={{ marginTop: 10, color: 'var(--green-dark,#1a7f37)', fontSize: 13 }}>{msg}</div>}
             {error && <div style={{ marginTop: 10, color: 'var(--red-dark,#b3261e)', fontSize: 13 }}>{error}</div>}
