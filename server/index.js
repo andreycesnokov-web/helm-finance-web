@@ -10,6 +10,7 @@ const docV = require('./lib/documentValidation');
 const docA = require('./lib/documentAccess');
 const TX = require('./lib/transactionClass');
 const personalFundingRouter = require('./routes/personalFunding');
+const multer = require('multer');
 require('dotenv').config();
 
 // --- Environment validation (fail fast, never log secret values) -----------
@@ -310,6 +311,71 @@ app.patch('/api/me/profile', emailAuthGate, auth, async (req, res) => {
       .upsert({ user_id: req.user.userId, ...patch }, { onConflict: 'user_id' }).select().single();
     res.json({ profile: data });
   } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── Avatar upload (public `avatars` bucket) ───────────────────────────────────
+// POST /api/me/avatar — multipart image upload. Owner-only by construction: the
+// storage path is namespaced by req.user.userId, so a user can only ever write/
+// overwrite their OWN avatar. Image-only, 5 MB max. Stores to avatars/{userId}/
+// {uuid}.{ext} and persists the PUBLIC url into user_profiles.avatar_url.
+const AVATAR_BUCKET = process.env.AVATARS_BUCKET || 'avatars';
+const AVATAR_MAX_BYTES = 5 * 1024 * 1024; // 5 MB
+const AVATAR_MIME_EXT = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/gif': 'gif' };
+const avatarUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: AVATAR_MAX_BYTES, files: 1 },
+  fileFilter: (req, file, cb) => {
+    // Accept only known raster image types we can serve back.
+    if (AVATAR_MIME_EXT[file.mimetype]) return cb(null, true);
+    cb(Object.assign(new Error('not_an_image'), { code: 'NOT_AN_IMAGE' }));
+  },
+});
+
+// Lazily ensure the public bucket exists (idempotent; service_role only).
+let _avatarBucketReady = false;
+async function ensureAvatarBucket() {
+  if (_avatarBucketReady) return;
+  const { data } = await supabase.storage.getBucket(AVATAR_BUCKET);
+  if (!data) {
+    await supabase.storage.createBucket(AVATAR_BUCKET, {
+      public: true, fileSizeLimit: AVATAR_MAX_BYTES,
+      allowedMimeTypes: Object.keys(AVATAR_MIME_EXT),
+    }).catch(() => { /* race: another request created it */ });
+  }
+  _avatarBucketReady = true;
+}
+
+app.post('/api/me/avatar', emailAuthGate, auth, (req, res) => {
+  avatarUpload.single('avatar')(req, res, async (err) => {
+    try {
+      if (err) {
+        if (err.code === 'LIMIT_FILE_SIZE') return res.status(413).json({ error: 'file_too_large', message: 'Image must be 5 MB or smaller.' });
+        if (err.code === 'NOT_AN_IMAGE')   return res.status(400).json({ error: 'not_an_image', message: 'Please choose an image file.' });
+        return res.status(400).json({ error: 'upload_failed', message: 'Could not read the uploaded file.' });
+      }
+      const file = req.file;
+      if (!file) return res.status(400).json({ error: 'no_file', message: 'No image was provided.' });
+      const ext = AVATAR_MIME_EXT[file.mimetype];
+      if (!ext) return res.status(400).json({ error: 'not_an_image', message: 'Please choose an image file.' });
+
+      await ensureAvatarBucket();
+      const userId = req.user.userId;
+      const path = `${userId}/${crypto.randomUUID()}.${ext}`;
+      const { error: upErr } = await supabase.storage.from(AVATAR_BUCKET)
+        .upload(path, file.buffer, { contentType: file.mimetype, upsert: false });
+      if (upErr) return res.status(502).json({ error: 'storage_error', message: 'Could not store the image. Please try again.' });
+
+      const { data: pub } = supabase.storage.from(AVATAR_BUCKET).getPublicUrl(path);
+      const avatar_url = pub?.publicUrl;
+      const { error: dbErr } = await supabase.from('user_profiles')
+        .upsert({ user_id: userId, avatar_url }, { onConflict: 'user_id' });
+      if (dbErr) return res.status(500).json({ error: 'save_failed', message: 'Image uploaded but could not be saved to your profile.' });
+
+      res.json({ ok: true, avatar_url });
+    } catch (e) {
+      res.status(500).json({ error: 'upload_failed', message: 'Could not upload the image.' });
+    }
+  });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
