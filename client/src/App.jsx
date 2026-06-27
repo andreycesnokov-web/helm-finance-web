@@ -425,8 +425,19 @@ function Layout({ children, rightPanel }) {
 function PulseWrapper() {
   const [pulseData, setPulseData]       = useState(null)
   const [showOnboarding, setOnboarding] = useState(false)
-  const { access } = useAccess()
+  const { access, loading } = useAccess()
   const memberRole = access?.membership?.role
+
+  // Wait for access to resolve before deciding where to land — otherwise a no-business
+  // email user would briefly bounce to /business/pulse (→ 409) before we know.
+  if (loading) return null
+
+  // Email-first Personal Account with no business yet → land on /account onboarding,
+  // never the Business shell. Only when the email-auth UI is enabled; Telegram/legacy
+  // (business !== null, or flag off) keep the existing /business/pulse behavior.
+  if (EMAIL_AUTH_UI && access && access.business === null) {
+    return <Navigate to="/account" replace />
+  }
 
   // Manager / employee: Web App is a learning & setup surface, not a finance
   // dashboard (the backend returns 403 on /pulse for these roles anyway).

@@ -4818,6 +4818,14 @@ async function ensureDefaultBusiness(userId, firstName) {
     return { business: ownedBusiness.businesses, membership: { role: ownedBusiness.role, status: ownedBusiness.status } };
   }
 
+  // Email-first Personal Account users (negative app_user_id_seq ids) must NOT get an
+  // auto-created business. They explicitly click "Create business" from /account. Return
+  // a clean "no business" state instead of bootstrapping. Telegram/legacy users have
+  // POSITIVE ids and keep the historical auto-bootstrap behavior below.
+  if (userId < 0) {
+    return { business: null, membership: null };
+  }
+
   // No business — bootstrap default with 7-day trial
   const now = new Date();
   const trialEnd = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
@@ -6278,6 +6286,9 @@ app.patch('/api/business/current', auth, async (req, res) => {
         const { data: userRow } = await supabase.from('users').select('first_name, username').eq('id', userId).single();
         const firstName = userRow?.first_name || userRow?.username || 'My';
         const { business: newBiz } = await ensureDefaultBusiness(userId, firstName);
+        // Email-first user with no business yet — nothing to update. They must create a
+        // business first (no silent auto-create here).
+        if (!newBiz) return res.status(409).json({ error: 'no_business', message: 'Create a business first.' });
         businessId = newBiz.id;
       }
     }
@@ -6339,6 +6350,25 @@ app.get('/api/access/status', auth, async (req, res) => {
       membership = { role: m.role, status: m.status };
     } else {
       ({ business, membership } = await ensureDefaultBusiness(userId, firstName));
+    }
+
+    // Email-first Personal Account users with no business yet: clean "no business" state.
+    // No auto-created workspace, no plan/trial — the client shows onboarding ("Create
+    // your first business workspace") rather than crashing on a null business.
+    if (!business) {
+      return res.json({
+        business: null,
+        membership: null,
+        plan: null,
+        limits: {},
+        usage: {
+          wallets_count:           0,
+          transactions_this_month: 0,
+          invoices_this_month:     0,
+          ai_questions_this_month: 0,
+          voice_inputs_this_month: 0,
+        },
+      });
     }
 
     // Compute access state
