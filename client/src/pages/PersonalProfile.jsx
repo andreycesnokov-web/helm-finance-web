@@ -1,7 +1,9 @@
-// Personal Account home (Phase 1). The human account's starting point: create or join a
-// business, or go to an existing workspace. Identity/profile is secondary (collapsible).
-// NO personal wallets/transactions/finance and NO businesses.type='personal'. Uses
-// GET/PATCH /api/me/profile + GET /api/workspaces. Behind VITE_EMAIL_AUTH_ENABLED.
+// Personal Account home (Phase 1). The human account's starting point: create a
+// business, join one by invite link, or open a connected business. Identity/profile is
+// secondary (collapsible). NO personal wallets/transactions/finance and NO
+// businesses.type='personal'. Uses GET/PATCH /api/me/profile + GET /api/workspaces.
+// "Join" reuses the existing /invite/:code page (auto-accepts for a logged-in user).
+// Behind VITE_EMAIL_AUTH_ENABLED.
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
@@ -10,6 +12,18 @@ import { setActiveBusinessId } from '../lib/api'
 const COMMON_TZ = ['Asia/Jakarta', 'Asia/Makassar', 'Asia/Singapore', 'Asia/Bangkok', 'Europe/Moscow', 'UTC']
 const LOCALES = ['en', 'ru', 'id']
 
+// Pull an invite code out of whatever the user pastes: a full invite URL
+// (…/invite/ABC123), a bare code, or a code with surrounding whitespace.
+function parseInviteCode(raw) {
+  const s = (raw || '').trim()
+  if (!s) return ''
+  const m = s.match(/\/invite\/([A-Za-z0-9_-]+)/)
+  if (m) return m[1].toUpperCase()
+  // Otherwise take the last path-ish segment and strip query/hash + stray chars.
+  const last = s.split(/[/?#]/).filter(Boolean).pop() || s
+  return last.replace(/[^A-Za-z0-9_-]/g, '').toUpperCase()
+}
+
 export default function PersonalProfile() {
   const { token, user, logout } = useAuth()
   const navigate = useNavigate()
@@ -17,6 +31,9 @@ export default function PersonalProfile() {
   const [businesses, setBusinesses] = useState([])
   const [loading, setLoading] = useState(true)
   const [showProfile, setShowProfile] = useState(false)
+  const [showJoin, setShowJoin] = useState(false)
+  const [inviteInput, setInviteInput] = useState('')
+  const [joinError, setJoinError] = useState('')
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState('')
   const [error, setError] = useState('')
@@ -49,6 +66,16 @@ export default function PersonalProfile() {
     } catch { setError('Network error.') } finally { setSaving(false) }
   }
 
+  // Join: parse the pasted link/code and hand off to the existing /invite/:code page,
+  // which auto-accepts the invite for an already-signed-in user.
+  const joinByInvite = (e) => {
+    e?.preventDefault?.()
+    const code = parseInviteCode(inviteInput)
+    if (!code) { setJoinError('Paste the full invite link or its code.'); return }
+    setJoinError('')
+    navigate(`/invite/${code}`)
+  }
+
   const openBusiness = (b) => {
     try { setActiveBusinessId(b.id); localStorage.setItem('activeWorkspaceId', b.id) } catch { /* */ }
     navigate('/business/pulse')
@@ -63,6 +90,32 @@ export default function PersonalProfile() {
 
   if (loading) return <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-3,#777)' }}>Loading…</div>
 
+  // Reusable "Join business with invite link" block (toggle → input + helper text).
+  const joinBlock = (
+    <div style={{ marginTop: 12 }}>
+      {!showJoin ? (
+        <button style={{ ...ghost, width: '100%' }} onClick={() => { setShowJoin(true); setJoinError('') }}>
+          Join business with invite link
+        </button>
+      ) : (
+        <form onSubmit={joinByInvite} style={{ textAlign: 'left' }}>
+          <label style={lbl}>INVITE LINK OR CODE</label>
+          <input style={inp} value={inviteInput} autoFocus
+            onChange={(e) => { setInviteInput(e.target.value); setJoinError('') }}
+            placeholder="https://…/invite/ABC123  or  ABC123" />
+          <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+            <button type="submit" style={{ ...primary, flex: 1 }}>Continue</button>
+            <button type="button" style={ghost} onClick={() => { setShowJoin(false); setInviteInput(''); setJoinError('') }}>Cancel</button>
+          </div>
+          {joinError && <div style={{ marginTop: 8, color: 'var(--red-dark,#b3261e)', fontSize: 13 }}>{joinError}</div>}
+          <div style={{ fontSize: 12, color: 'var(--text-4,#999)', marginTop: 10 }}>
+            Don't have a code? Open the invite link from your email.
+          </div>
+        </form>
+      )}
+    </div>
+  )
+
   return (
     <div style={{ maxWidth: 560, margin: '0 auto', padding: '28px 18px' }}>
       {/* Header */}
@@ -71,8 +124,8 @@ export default function PersonalProfile() {
         <button onClick={() => { logout(); navigate('/login') }}
           style={{ background: 'none', border: 'none', color: 'var(--red,#d33)', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>Sign out</button>
       </div>
-      <p style={{ fontSize: 14, color: 'var(--text-2,#6B7E92)', marginTop: 0, marginBottom: 22 }}>
-        Hi, {greeting}. This is your human account — create or open a business below.
+      <p style={{ fontSize: 14, color: 'var(--text-2,#6B7E92)', marginTop: 0, marginBottom: 22, lineHeight: 1.5 }}>
+        Your personal login for CFO AI. Create a business or join one from an invitation.
       </p>
 
       {/* Onboarding / workspaces */}
@@ -80,32 +133,32 @@ export default function PersonalProfile() {
         <div style={{ ...card, textAlign: 'center' }}>
           <div style={{ fontSize: 17, fontWeight: 700, marginBottom: 6 }}>Create your first business workspace</div>
           <div style={{ fontSize: 14, color: 'var(--text-3,#777)', marginBottom: 18, lineHeight: 1.5 }}>
-            Invite your team and start tracking business finances.
+            Hi, {greeting}. Start a business to invite your team and track finances — or join a business you've been invited to.
           </div>
-          <button style={{ ...primary, width: '100%', maxWidth: 280 }} onClick={() => navigate('/business/new')}>+ Create business</button>
-          <div style={{ fontSize: 12, color: 'var(--text-4,#999)', marginTop: 14 }}>
-            Joining a team? Open the invite link from your email.
-          </div>
+          <button style={{ ...primary, width: '100%', maxWidth: 320 }} onClick={() => navigate('/business/new')}>+ Create new business</button>
+          <div style={{ maxWidth: 320, margin: '0 auto' }}>{joinBlock}</div>
         </div>
       ) : (
         <div style={card}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
             <div style={{ fontSize: 15, fontWeight: 700 }}>Your businesses</div>
-            <button style={ghost} onClick={() => navigate('/business/new')}>+ Create</button>
+            <button style={ghost} onClick={() => navigate('/business/new')}>+ Create another</button>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {businesses.map(b => (
-              <button key={b.id} onClick={() => openBusiness(b)}
-                style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '12px 14px', borderRadius: 10, border: '1px solid var(--border-2,#e3e8ee)', background: 'var(--bg-2,#f7f9fb)', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}>
-                <span>
+              <div key={b.id}
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '12px 14px', borderRadius: 10, border: '1px solid var(--border-2,#e3e8ee)', background: 'var(--bg-2,#f7f9fb)' }}>
+                <span style={{ minWidth: 0 }}>
                   <span style={{ fontWeight: 600, color: 'var(--text,#111)', fontSize: 14 }}>{b.name}</span>
-                  <span style={{ color: 'var(--text-3,#888)', fontSize: 12, marginLeft: 8 }}>{b.business_code || ''}{b.role ? ` · ${b.role}` : ''}</span>
+                  <span style={{ display: 'block', color: 'var(--text-3,#888)', fontSize: 12, marginTop: 2 }}>
+                    {b.business_code ? `Code ${b.business_code}` : ''}{b.business_code && b.role ? ' · ' : ''}{b.role || ''}
+                  </span>
                 </span>
-                <span style={{ color: 'var(--brand,#3399FF)', fontSize: 13, fontWeight: 600 }}>Open →</span>
-              </button>
+                <button style={{ ...primary, padding: '8px 16px' }} onClick={() => openBusiness(b)}>Open</button>
+              </div>
             ))}
           </div>
-          <button style={{ ...primary, width: '100%', marginTop: 14 }} onClick={() => openBusiness(businesses[0])}>Go to workspace</button>
+          {joinBlock}
         </div>
       )}
 
