@@ -64,6 +64,7 @@ import Onboarding, { shouldShowOnboarding, clearOnboardingFlags } from './pages/
 import PreviewApp from './pages/PreviewApp'
 import EmailLogin from './pages/EmailLogin'
 import EmailCallback from './pages/EmailCallback'
+import TelegramLogin from './pages/TelegramLogin'
 import PersonalProfile from './pages/PersonalProfile'
 import { PersonalLayout, PersonalShell, PersonalOverview, PersonalAccounts, PersonalTransactions, PersonalOnboarding } from './pages/personal'
 import { BusinessLayout, BusinessShell, BusinessPulse, BusinessAccounts, BusinessTransactions, BusinessPayables, BusinessReceivables, BusinessInvoices, BusinessFunding, BusinessNew, BusinessIntercompany } from './pages/business'
@@ -529,6 +530,11 @@ export default function App() {
           {EMAIL_AUTH_UI && <Route path="/login/email" element={<EmailLogin />} />}
           {EMAIL_AUTH_UI && <Route path="/login/email/callback" element={<EmailCallback />} />}
           {EMAIL_AUTH_UI && <Route path="/account" element={<PersonalProfile />} />}
+          {/* Legacy Telegram login: a real page when email auth is on; when off, /login
+              already shows the widget, so just send /login/telegram back to /login. */}
+          {EMAIL_AUTH_UI
+            ? <Route path="/login/telegram" element={<TelegramLogin />} />
+            : <Route path="/login/telegram" element={<Navigate to="/login" replace />} />}
           <Route path="/" element={<PulseWrapper />} />
           <Route path="/add"          element={<Layout><Add /></Layout>} />
           <Route path="/radar"        element={<Layout><Radar /></Layout>} />
