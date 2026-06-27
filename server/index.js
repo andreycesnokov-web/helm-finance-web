@@ -38,6 +38,12 @@ const { resolveActiveBusiness: _resolveActiveBusiness, getPrimaryBusinessId } = 
 // Personal Workspace is gated (migrations 037–039 not applied). Until it is explicitly
 // enabled, business pages/API must not create personal-scoped wallets/records.
 const PERSONAL_WORKSPACE_ENABLED = process.env.PERSONAL_WORKSPACE_ENABLED === 'true';
+// Personal Account v1 (dark by default). A SEPARATE flag from the legacy
+// PERSONAL_WORKSPACE_ENABLED (which controls the old within-business wallet scope).
+// When off, every /api/personal/* route returns 404 and nothing is provisioned.
+// Requires migration 044 (personal owner-only guard + one-personal-per-owner index).
+const PERSONAL_ACCOUNT_V1_ENABLED = process.env.PERSONAL_ACCOUNT_V1_ENABLED === 'true';
+const PW = require('./lib/personalWorkspace');
 // Email-primary identity (Phase 1) is OFF by default. Endpoints 404 when disabled.
 // Requires migration 042 (user_email_identities / user_profiles / email_login_codes /
 // app_user_id_seq). Telegram auth is unaffected by this flag.
@@ -376,6 +382,262 @@ app.post('/api/me/avatar', emailAuthGate, auth, (req, res) => {
       res.status(500).json({ error: 'upload_failed', message: 'Could not upload the image.' });
     }
   });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PERSONAL ACCOUNT v1 (dark behind PERSONAL_ACCOUNT_V1_ENABLED)
+// ─────────────────────────────────────────────────────────────────────────────
+// A personal workspace is a businesses row type='personal' owned by the caller.
+// Personal finance reuses wallets/transactions/cashflow_categories, ALWAYS scoped
+// by business_id = personal_workspace_id AND scope='personal' (never bare user_id).
+// Flag OFF → every route 404s and nothing is provisioned.
+
+// 404 when the feature is off (explicit JSON, not the SPA catch-all).
+function personalGate(req, res, next) {
+  if (!PERSONAL_ACCOUNT_V1_ENABLED) return res.status(404).json({ error: 'not_found' });
+  next();
+}
+
+// Resolve (and optionally first-action provision) the caller's personal workspace.
+// Returns the workspace row, or null after sending an error response.
+async function loadPersonalWs(req, res, createIfMissing) {
+  try {
+    await PW.rejectBusinessWorkspaceId(supabase, req.headers['x-business-id'] || req.query?.business_id || null);
+    return await PW.resolvePersonalWorkspace(supabase, req.user.userId, { createIfMissing });
+  } catch (e) {
+    res.status(e.status || 500).json({ error: e.message || 'failed' });
+    return null;
+  }
+}
+
+// All personal transactions for the workspace (strict scope). Used by summary + balances.
+async function personalTxRows(wsId, extra = (q) => q) {
+  const { data } = await extra(supabase.from('transactions')
+    .select('id, type, amount_original, currency_original, wallet_id, category, description, transaction_date, source, created_at')
+    .eq('business_id', wsId).eq('scope', 'personal'));
+  return data || [];
+}
+
+// GET /api/personal/summary — first-action provisions. Balance, MTD income/expense,
+// net saved, recent tx, and a deterministic CFO-Lite insight (no business data).
+app.get('/api/personal/summary', personalGate, auth, async (req, res) => {
+  const ws = await loadPersonalWs(req, res, true); if (!ws) return;
+  try {
+    const [{ data: wallets }, txAll] = await Promise.all([
+      supabase.from('wallets').select('id, name, type, currency, color, is_active, sort_order')
+        .eq('business_id', ws.id).eq('scope', 'personal').eq('is_active', true),
+      personalTxRows(ws.id),
+    ]);
+    const bal = PW.walletBalances(txAll);
+    const totalBalance = (wallets || []).reduce((s, w) => s + (bal.get(w.id) || 0), 0);
+
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const inMonth = (d, base) => { const t = new Date(d); return t.getFullYear() === base.getFullYear() && t.getMonth() === base.getMonth(); };
+    const realTx = txAll.filter(t => !PW.isTransferLeg(t)); // transfers don't change net worth
+    const mtd = realTx.filter(t => inMonth(t.transaction_date || t.created_at, now));
+    const income_mtd = mtd.filter(t => t.type === 'income').reduce((s, t) => s + Number(t.amount_original || 0), 0);
+    const expense_mtd = mtd.filter(t => t.type === 'expense').reduce((s, t) => s + Number(t.amount_original || 0), 0);
+
+    // Top expense categories MTD.
+    const catMap = new Map();
+    mtd.filter(t => t.type === 'expense').forEach(t => { const k = t.category || 'Uncategorized'; catMap.set(k, (catMap.get(k) || 0) + Number(t.amount_original || 0)); });
+    const top_categories = [...catMap.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3).map(([name, amount]) => ({ name, amount }));
+
+    // Same-day-of-month spend last month → "spending faster?" + delta %.
+    const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const dayCap = now.getDate();
+    const lastMonthToDate = realTx.filter(t => t.type === 'expense' && inMonth(t.transaction_date || t.created_at, lastMonth) && new Date(t.transaction_date || t.created_at).getDate() <= dayCap)
+      .reduce((s, t) => s + Number(t.amount_original || 0), 0);
+    const vs_last_month_pct = lastMonthToDate > 0 ? Math.round(((expense_mtd - lastMonthToDate) / lastMonthToDate) * 100) : null;
+
+    const recent = txAll.slice().sort((a, b) => new Date(b.transaction_date || b.created_at) - new Date(a.transaction_date || a.created_at)).slice(0, 7);
+
+    res.json({
+      workspace: { id: ws.id, base_currency: ws.base_currency },
+      totals: { balance: totalBalance, income_mtd, expense_mtd, net_saved: income_mtd - expense_mtd },
+      recent,
+      insight: { top_categories, vs_last_month_pct, safe_to_spend: income_mtd - expense_mtd, spending_faster: expense_mtd > lastMonthToDate },
+    });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// GET /api/personal/wallets — list with derived native balances.
+app.get('/api/personal/wallets', personalGate, auth, async (req, res) => {
+  const ws = await loadPersonalWs(req, res, false); if (!ws) return;
+  try {
+    const { data: wallets } = await supabase.from('wallets')
+      .select('id, name, type, currency, color, is_active, sort_order')
+      .eq('business_id', ws.id).eq('scope', 'personal').order('sort_order');
+    const bal = PW.walletBalances(await personalTxRows(ws.id));
+    res.json({ wallets: (wallets || []).map(w => ({ ...w, balance: bal.get(w.id) || 0 })) });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// POST /api/personal/wallets — first-action provisions the workspace.
+app.post('/api/personal/wallets', personalGate, auth, async (req, res) => {
+  const ws = await loadPersonalWs(req, res, true); if (!ws) return;
+  try {
+    const { name, type, currency, color } = req.body || {};
+    if (!name?.trim()) return res.status(400).json({ error: 'name_required' });
+    if (!PW.WALLET_TYPES.includes(type)) return res.status(400).json({ error: 'invalid_type', message: `type must be one of ${PW.WALLET_TYPES.join(', ')}` });
+    const { data, error } = await supabase.from('wallets').insert({
+      user_id: req.user.userId, business_id: ws.id, scope: 'personal',
+      name: name.trim(), type, currency: (currency || ws.base_currency || 'IDR').toUpperCase(),
+      color: color || null, is_active: true, created_by_user_id: req.user.userId,
+    }).select().single();
+    if (error) return res.status(500).json({ error: 'wallet_create_failed' });
+    res.status(201).json({ wallet: { ...data, balance: 0 } });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// PATCH /api/personal/wallets/:id — owner-scoped (must belong to this personal ws).
+app.patch('/api/personal/wallets/:id', personalGate, auth, async (req, res) => {
+  const ws = await loadPersonalWs(req, res, false); if (!ws) return;
+  try {
+    const { data: own } = await supabase.from('wallets').select('id')
+      .eq('id', req.params.id).eq('business_id', ws.id).eq('scope', 'personal').limit(1);
+    if (!own?.length) return res.status(404).json({ error: 'wallet_not_found' });
+    const patch = { updated_at: new Date().toISOString() };
+    for (const k of ['name', 'color', 'sort_order', 'is_active']) if (k in (req.body || {})) patch[k] = req.body[k];
+    const { data, error } = await supabase.from('wallets').update(patch).eq('id', req.params.id).select().single();
+    if (error) return res.status(400).json({ error: 'wallet_update_failed' });
+    res.json({ wallet: data });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// DELETE /api/personal/wallets/:id — blocked if it has transactions.
+app.delete('/api/personal/wallets/:id', personalGate, auth, async (req, res) => {
+  const ws = await loadPersonalWs(req, res, false); if (!ws) return;
+  try {
+    const { data: own } = await supabase.from('wallets').select('id')
+      .eq('id', req.params.id).eq('business_id', ws.id).eq('scope', 'personal').limit(1);
+    if (!own?.length) return res.status(404).json({ error: 'wallet_not_found' });
+    const { count } = await supabase.from('transactions').select('id', { count: 'exact', head: true })
+      .eq('business_id', ws.id).eq('scope', 'personal').eq('wallet_id', req.params.id);
+    if (count) return res.status(409).json({ error: 'wallet_not_empty', message: 'Move or delete its transactions first.' });
+    const { error } = await supabase.from('wallets').delete().eq('id', req.params.id);
+    if (error) return res.status(400).json({ error: 'wallet_delete_failed' });
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// GET /api/personal/transactions — paged, strict scope.
+app.get('/api/personal/transactions', personalGate, auth, async (req, res) => {
+  const ws = await loadPersonalWs(req, res, false); if (!ws) return;
+  try {
+    const limit = Math.min(Number(req.query.limit) || 50, 200);
+    const offset = Number(req.query.offset) || 0;
+    let q = supabase.from('transactions')
+      .select('id, type, amount_original, currency_original, wallet_id, category, description, transaction_date, source, created_at', { count: 'exact' })
+      .eq('business_id', ws.id).eq('scope', 'personal');
+    if (req.query.wallet_id) q = q.eq('wallet_id', req.query.wallet_id);
+    if (req.query.category) q = q.eq('category', req.query.category);
+    const { data, count } = await q.order('transaction_date', { ascending: false }).order('created_at', { ascending: false }).range(offset, offset + limit - 1);
+    res.json({ transactions: (data || []).map(t => ({ ...t, is_transfer: PW.isTransferLeg(t) })), total: count || 0 });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// POST /api/personal/transactions — income | expense | transfer (transfer = 2 legs).
+app.post('/api/personal/transactions', personalGate, auth, async (req, res) => {
+  const ws = await loadPersonalWs(req, res, false); if (!ws) return;
+  try {
+    const b = req.body || {};
+    if (!PW.TX_KINDS.includes(b.kind)) return res.status(400).json({ error: 'invalid_kind', message: `kind must be one of ${PW.TX_KINDS.join(', ')}` });
+    const amount = Number(b.amount);
+    if (!(amount > 0)) return res.status(400).json({ error: 'invalid_amount' });
+    const date = b.date || new Date().toISOString().slice(0, 10);
+
+    // Confirm a wallet belongs to THIS personal workspace.
+    const ownWallet = async (id) => {
+      if (!id) return null;
+      const { data } = await supabase.from('wallets').select('id, currency').eq('id', id).eq('business_id', ws.id).eq('scope', 'personal').limit(1);
+      return data?.[0] || null;
+    };
+
+    if (b.kind === 'transfer') {
+      if (!b.wallet_id || !b.to_wallet_id || b.wallet_id === b.to_wallet_id) return res.status(400).json({ error: 'invalid_transfer' });
+      const from = await ownWallet(b.wallet_id), to = await ownWallet(b.to_wallet_id);
+      if (!from || !to) return res.status(404).json({ error: 'wallet_not_found' });
+      const group = `xfer:${crypto.randomUUID()}`;
+      const base = { business_id: ws.id, user_id: req.user.userId, created_by_user_id: req.user.userId, scope: 'personal', category: 'Transfer', description: b.note || 'Transfer', transaction_date: date, source: group };
+      const { data, error } = await supabase.from('transactions').insert([
+        { ...base, type: 'expense', wallet_id: from.id, amount_original: amount, amount_idr: amount, currency_original: from.currency },
+        { ...base, type: 'income', wallet_id: to.id, amount_original: amount, amount_idr: amount, currency_original: to.currency },
+      ]).select();
+      if (error) return res.status(500).json({ error: 'transfer_failed' });
+      return res.status(201).json({ transactions: data });
+    }
+
+    const w = await ownWallet(b.wallet_id);
+    if (!w) return res.status(404).json({ error: 'wallet_not_found' });
+    const { data, error } = await supabase.from('transactions').insert({
+      business_id: ws.id, user_id: req.user.userId, created_by_user_id: req.user.userId, scope: 'personal',
+      type: b.kind, amount_original: amount, amount_idr: amount, currency_original: w.currency,
+      wallet_id: w.id, category: b.category || null, description: b.note || null, transaction_date: date,
+    }).select().single();
+    if (error) return res.status(500).json({ error: 'transaction_failed' });
+    res.status(201).json({ transaction: data });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// PATCH /api/personal/transactions/:id — single legs only (transfer legs are immutable here).
+app.patch('/api/personal/transactions/:id', personalGate, auth, async (req, res) => {
+  const ws = await loadPersonalWs(req, res, false); if (!ws) return;
+  try {
+    const { data: rows } = await supabase.from('transactions').select('id, source')
+      .eq('id', req.params.id).eq('business_id', ws.id).eq('scope', 'personal').limit(1);
+    const row = rows?.[0];
+    if (!row) return res.status(404).json({ error: 'transaction_not_found' });
+    if (PW.isTransferLeg(row)) return res.status(400).json({ error: 'transfer_edit_unsupported', message: 'Delete and re-create the transfer instead.' });
+    const patch = {};
+    if ('amount' in req.body) { const a = Number(req.body.amount); if (!(a > 0)) return res.status(400).json({ error: 'invalid_amount' }); patch.amount_original = a; patch.amount_idr = a; }
+    if ('category' in req.body) patch.category = req.body.category || null;
+    if ('note' in req.body) patch.description = req.body.note || null;
+    if ('date' in req.body) patch.transaction_date = req.body.date;
+    if (req.body.wallet_id) {
+      const { data: w } = await supabase.from('wallets').select('id, currency').eq('id', req.body.wallet_id).eq('business_id', ws.id).eq('scope', 'personal').limit(1);
+      if (!w?.length) return res.status(404).json({ error: 'wallet_not_found' });
+      patch.wallet_id = req.body.wallet_id; patch.currency_original = w[0].currency;
+    }
+    if (!Object.keys(patch).length) return res.status(400).json({ error: 'nothing_to_update' });
+    const { data, error } = await supabase.from('transactions').update(patch).eq('id', req.params.id).select().single();
+    if (error) return res.status(400).json({ error: 'transaction_update_failed' });
+    res.json({ transaction: data });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// DELETE /api/personal/transactions/:id — a transfer leg deletes BOTH legs.
+app.delete('/api/personal/transactions/:id', personalGate, auth, async (req, res) => {
+  const ws = await loadPersonalWs(req, res, false); if (!ws) return;
+  try {
+    const { data: rows } = await supabase.from('transactions').select('id, source')
+      .eq('id', req.params.id).eq('business_id', ws.id).eq('scope', 'personal').limit(1);
+    const row = rows?.[0];
+    if (!row) return res.status(404).json({ error: 'transaction_not_found' });
+    if (PW.isTransferLeg(row)) {
+      await supabase.from('transactions').delete().eq('business_id', ws.id).eq('scope', 'personal').eq('source', row.source);
+    } else {
+      await supabase.from('transactions').delete().eq('id', req.params.id).eq('business_id', ws.id).eq('scope', 'personal');
+    }
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// GET /api/personal/categories — seeded personal categories, grouped.
+app.get('/api/personal/categories', personalGate, auth, async (req, res) => {
+  const ws = await loadPersonalWs(req, res, false); if (!ws) return;
+  try {
+    const { data } = await supabase.from('cashflow_categories')
+      .select('id, name, group_type, activity_type, sort_order')
+      .eq('business_id', ws.id).order('sort_order');
+    const all = data || [];
+    res.json({
+      income: all.filter(c => c.group_type === 'inflow'),
+      expense: all.filter(c => c.group_type === 'outflow' && c.activity_type !== 'financing'),
+      business_related: all.filter(c => c.activity_type === 'financing'),
+    });
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
