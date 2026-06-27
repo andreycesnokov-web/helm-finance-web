@@ -14,6 +14,7 @@
 // newly-created business starts genuinely empty.
 
 function forbidden(message) { const e = new Error(message); e.status = 403; return e; }
+function noBusiness(message) { const e = new Error(message); e.status = 409; return e; }
 
 // The user's primary business = earliest-created active-membership business of
 // type 'business' (deterministic; never a personal workspace).
@@ -47,6 +48,10 @@ async function resolveActiveBusiness(supabase, ensureDefaultBusiness, req) {
   }
   // No explicit id → the user's deterministic default business workspace.
   const { business, membership } = await ensureDefaultBusiness(userId);
+  // Email-first users with no business get a clean "no business" state (no auto-create).
+  // Business routes must not crash — surface a 409 the client can interpret as
+  // "create your first business" rather than a 500.
+  if (!business) throw noBusiness('no_business');
   return { business, role: membership.role, ownerUserId: business.owner_user_id };
 }
 
