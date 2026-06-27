@@ -60,6 +60,17 @@ test('no x-business-id → falls back to the default business (A)', async () => 
   assert.equal(r.business.id, A);
 });
 
+test('email-first user with no business → default path returns 409 no_business (no auto-create)', async () => {
+  const { supabase } = await setup();
+  // Mirror the real ensureDefaultBusiness contract for an email-first (negative-id)
+  // user who owns no business: it returns a null business instead of bootstrapping one.
+  const ensureNoBusiness = async () => ({ business: null, membership: null });
+  await assert.rejects(
+    () => resolveActiveBusiness(supabase, ensureNoBusiness, req({})),
+    (e) => { assert.equal(e.message, 'no_business'); assert.equal(e.status, 409); return true; }
+  );
+});
+
 test('explicit INACCESSIBLE id → 403 workspace_not_accessible (no silent fallback)', async () => {
   const { supabase, ensureDefaultBusiness } = await setup();
   await assert.rejects(
