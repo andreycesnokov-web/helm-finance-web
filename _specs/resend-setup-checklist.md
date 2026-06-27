@@ -5,7 +5,7 @@ migrations, no Railway env vars, no flags. You prepare Resend + DNS + an API key
 report back. Enabling email auth happens later via the 042 runbook.
 
 Provider decision: Resend (see [email-provider-decision.md](email-provider-decision.md)).
-Sending domain: **auth.helmfinance.com** (a subdomain — isolates login email from any
+Sending domain: **auth.cfo-ai.site** (a subdomain — isolates login email from any
 future marketing mail).
 
 ---
@@ -15,22 +15,22 @@ future marketing mail).
 - Turn on 2FA on the Resend account.
 
 ## 2) Add the sending domain
-- Resend dashboard → **Domains → Add Domain** → enter **`auth.helmfinance.com`**.
+- Resend dashboard → **Domains → Add Domain** → enter **`auth.cfo-ai.site`**.
 - Resend will then show a set of DNS records to add (next step). Keep that page open.
 
 ## 3) DNS records to add (use the EXACT values Resend shows — don't copy from here)
 Resend generates these for your domain; add them at your DNS provider:
 - **DKIM** — usually 1–3 `CNAME` (or `TXT`) records (e.g. `resend._domainkey…`). Required.
 - **SPF / sending TXT** — a `TXT` (and/or an MX for the mail subdomain) that Resend lists.
-  Add it if Resend provides one for `auth.helmfinance.com`. Required if shown.
-- **DMARC (recommended, optional)** — a `TXT` at `_dmarc.auth.helmfinance.com`, start
-  gentle: `v=DMARC1; p=none; rua=mailto:dmarc@helmfinance.com`. Tighten to `p=quarantine`
+  Add it if Resend provides one for `auth.cfo-ai.site`. Required if shown.
+- **DMARC (recommended, optional)** — a `TXT` at `_dmarc.auth.cfo-ai.site`, start
+  gentle: `v=DMARC1; p=none; rua=mailto:dmarc@cfo-ai.site`. Tighten to `p=quarantine`
   later once mail flows cleanly.
 > Always use the literal values from the Resend dashboard. Record names/types only (never
 > paste secrets). TTL: default/automatic is fine.
 
 ## 4) Where to add DNS records (by provider)
-Find where `helmfinance.com` is managed and open its DNS editor:
+Find where `cfo-ai.site` is managed and open its DNS editor:
 - **Cloudflare:** Dashboard → your domain → **DNS → Records → Add record**. For DKIM
   `CNAME`s set **Proxy status = DNS only (grey cloud)**, not proxied.
 - **Namecheap:** Domain List → Manage → **Advanced DNS → Add New Record**.
@@ -42,7 +42,7 @@ relative name, enter e.g. `resend._domainkey.auth` (provider-dependent) — copy
 Resend shows.
 
 ## 5) Verify the domain in Resend
-- After adding the records, in Resend → **Domains → auth.helmfinance.com → Verify**.
+- After adding the records, in Resend → **Domains → auth.cfo-ai.site → Verify**.
 - DNS can take minutes to a few hours to propagate. Re-check until status = **Verified**.
 - Do not send real login email until the domain is Verified.
 
@@ -58,8 +58,8 @@ These will be added in the 042 runbook later, not now:
 ```
 EMAIL_PROVIDER=resend
 RESEND_API_KEY=<your sending-only key>     # from step 6 — keep in your password manager
-EMAIL_FROM=CFO AI <login@auth.helmfinance.com>
-APP_BASE_URL=https://helm-finance-web-production.up.railway.app
+EMAIL_FROM=CFO AI <login@auth.cfo-ai.site>
+APP_BASE_URL=https://app.cfo-ai.site
 ```
 
 ## 8) ⚠️ Production safety
@@ -68,7 +68,7 @@ APP_BASE_URL=https://helm-finance-web-production.up.railway.app
 - Only the four vars in step 7 are needed in prod. The dev var is not one of them.
 
 ## 9) Readiness criteria (all must be true before enabling later)
-- [ ] Domain `auth.helmfinance.com` shows **Verified** in Resend.
+- [ ] Domain `auth.cfo-ai.site` shows **Verified** in Resend.
 - [ ] A **test email from the Resend dashboard** (Domains/Emails → send test) arrives in a
       real inbox (check spam too).
 - [ ] Sending-only **API key created** and stored in your password manager.
@@ -83,11 +83,11 @@ APP_BASE_URL=https://helm-finance-web-production.up.railway.app
   may need the SPF/DMARC records or domain-reputation time.
 - You can't create a **sending-only** key → a full key works but flag it so we rotate to a
   scoped key later.
-- You're unsure which DNS provider hosts `helmfinance.com` → stop and find that first
+- You're unsure which DNS provider hosts `cfo-ai.site` → stop and find that first
   (check the domain registrar / `whois`).
 
 ## What to report back (no secrets)
-- Resend domain status for `auth.helmfinance.com`: **Verified / Not verified**.
+- Resend domain status for `auth.cfo-ai.site`: **Verified / Not verified**.
 - Which **DNS provider** hosts the domain (Cloudflare / Namecheap / GoDaddy / Route 53 / …).
 - Did the **Resend test email arrive?** yes/no (and inbox vs spam).
 - API key **created?** yes/no (do NOT share the key).

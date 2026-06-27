@@ -101,7 +101,7 @@ Telegram behavior instantly; no DB change needed.
 Use a real Telegram user id you control (`<TID>`) and the bot secret
 (`TELEGRAM_WEBHOOK_SECRET` or `BOT_TOKEN`). PowerShell:
 ```powershell
-$B   = "https://helm-finance-web-production.up.railway.app"
+$B   = "https://app.cfo-ai.site"
 $SEC = "<bot-secret>"
 $H   = @{ "x-bot-secret" = $SEC; "Content-Type" = "application/json" }
 

@@ -124,6 +124,13 @@ return `{"ok":true}` (NOT 404, NOT a dev_code). Confirm the response contains **
 Postmark/etc.) must be wired to actually send the magic link (primary) + the 6-digit code
 (fallback). Until then, prod users cannot receive a link and MUST NOT see the UI.
 
+Provider env vars (Railway, set alongside Step 4 — see the Resend checklist):
+```
+EMAIL_PROVIDER=resend
+RESEND_API_KEY=<sending-only key>
+EMAIL_FROM=CFO AI <login@auth.cfo-ai.site>
+APP_BASE_URL=https://app.cfo-ai.site          # magic links → https://app.cfo-ai.site/login/email/callback?token=…
+```
 Once email sending is verified end-to-end (a real inbox receives the link):
 - Frontend build/host env: `VITE_EMAIL_AUTH_ENABLED = true` → rebuild/redeploy the client.
 - **Rollback = `VITE_EMAIL_AUTH_ENABLED=false` → rebuild** (routes tree-shaken out again).

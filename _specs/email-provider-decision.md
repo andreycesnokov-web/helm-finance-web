@@ -29,19 +29,21 @@ deliverability must be maximal and paid-from-day-one is acceptable. Avoid SES fo
 ## Required env vars (Resend)
 ```
 RESEND_API_KEY=re_xxxxxxxxxxxxxxxxxxxxx              # sending-only API key
-EMAIL_FROM=CFO AI <login@auth.helmfinance.com>       # verified sender on a verified (sub)domain
+EMAIL_FROM=CFO AI <login@auth.cfo-ai.site>       # verified sender on a verified (sub)domain
 EMAIL_PROVIDER=resend                                # provider selector (future-proof)
-APP_BASE_URL=https://helm-finance-web-production.up.railway.app   # builds the absolute magic-link URL
+APP_BASE_URL=https://app.cfo-ai.site   # builds the absolute magic-link URL
 ```
 - DNS on the sending domain: SPF `TXT`, DKIM (`CNAME`/`TXT`), optional DMARC — per the
-  Resend dashboard. Use a **subdomain** (e.g. `auth.helmfinance.com`) to isolate auth-mail
+  Resend dashboard. Use a **subdomain** (e.g. `auth.cfo-ai.site`) to isolate auth-mail
   reputation from any future marketing mail.
 - `EMAIL_AUTH_DEV_RETURN_CODE` must remain **unset** in production (dev-only).
 
 ## Future implementation note (NOT now)
 When approved, wire `issueEmailSecret` to send via `EMAIL_PROVIDER`:
 - Resend: `POST https://api.resend.com/emails` with `Authorization: Bearer $RESEND_API_KEY`,
-  body `{ from: EMAIL_FROM, to, subject, html }`; magic link = `${APP_BASE_URL}/login/email/callback?token=…`.
+  body `{ from: EMAIL_FROM, to, subject, html }`; magic link =
+  `${APP_BASE_URL}/login/email/callback?token=…` → resolves to
+  `https://app.cfo-ai.site/login/email/callback?token=…`.
 - Keep send failures non-fatal to the start endpoint's anti-enumeration contract (still
   return `{ ok:true }`); log/alert on provider errors. Verify in staging/local first.
 
