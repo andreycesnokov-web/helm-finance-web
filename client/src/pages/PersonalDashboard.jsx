@@ -144,10 +144,35 @@ export default function PersonalWorkspace() {
   return (
     <WorkspaceShell workspaces={shellWorkspaces} activeId="personal" onSelectWorkspace={onSelectWorkspace}
       nav={PERSONAL_NAV} activeKey={section} onNavigate={(it) => setSection(it.key)}>
-      {body}
+      <div className="personal-app">
+        {body}
+        <PersonalMobileNav active={section} onNav={setSection} onAdd={() => setModal(hasWallet ? { tx: 'expense' } : 'wallet')} />
+      </div>
       {modal === 'wallet' && <AccountModal pf={pf} baseCur={baseCur} onClose={closeModal} onSaved={reload} />}
       {modal?.tx && <TxModal pf={pf} wallets={wallets} cats={cats} initialKind={modal.tx} onClose={closeModal} onSaved={reload} />}
     </WorkspaceShell>
+  )
+}
+
+function PersonalMobileNav({ active, onNav, onAdd }) {
+  const items = [
+    ['overview', 'Home', <Icon.pulse />],
+    ['wallets', 'Wallets', <Icon.wallet />],
+    ['add', 'Add', <Icon.plus />],
+    ['cfo', 'AI CFO', <Icon.cfo />],
+    ['profile', 'Profile', <Icon.users />],
+  ]
+  return (
+    <>
+      <nav className="personal-bottom-nav" aria-label="Personal mobile navigation">
+        {items.map(([key, label, icon]) => (
+          <button key={key} type="button" className={active === key ? 'is-active' : ''} onClick={() => key === 'add' ? onAdd() : onNav(key)}>
+            <span>{icon}</span><b>{label}</b>
+          </button>
+        ))}
+      </nav>
+      <button type="button" className="personal-fab" aria-label="Add personal transaction" onClick={onAdd}><Icon.plus /></button>
+    </>
   )
 }
 
