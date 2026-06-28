@@ -16,6 +16,7 @@ import { Icon, PageHeader, Card, SummaryCard, Stat, DataList, EmptyState, Btn, P
 
 const SYMBOL = '/brand/symbol_navy_blue_dot_transparent.svg'
 const WALLET_TYPES = [['cash', 'Cash'], ['bank', 'Bank account'], ['card', 'Card'], ['wise_paypal', 'Wise / Revolut / PayPal'], ['ewallet', 'E-wallet'], ['other', 'Other']]
+const CURRENCIES = ['IDR', 'USD', 'EUR', 'SGD', 'MYR', 'THB', 'CNY', 'RUB', 'GBP', 'AUD', 'JPY']
 const COMMON_TZ = ['Asia/Jakarta', 'Asia/Makassar', 'Asia/Singapore', 'Asia/Bangkok', 'Europe/Moscow', 'UTC']
 const LOCALES = ['en', 'ru', 'id']
 
@@ -443,7 +444,7 @@ function AccountModal({ pf, baseCur, onClose, onSaved }) {
   return <ModalFrame title="Add account" onClose={onClose}><form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
     <Field label="Account name"><input className="cfo-input" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="e.g. Cash, BCA, Wise" autoFocus /></Field>
     <Field label="Type"><select className="cfo-input" value={form.type} onChange={e => setForm({ ...form, type: e.target.value })}>{WALLET_TYPES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></Field>
-    <Field label="Currency"><input className="cfo-input" value={form.currency} onChange={e => setForm({ ...form, currency: e.target.value.toUpperCase() })} maxLength={5} /></Field>
+    <Field label="Currency"><select className="cfo-input" value={form.currency} onChange={e => setForm({ ...form, currency: e.target.value })}>{CURRENCIES.map(c => <option key={c} value={c}>{c}</option>)}</select></Field>
     {err && <div style={{ color: 'var(--danger)', fontSize: 13 }}>{err}</div>}
     <div className="cfo-modal-actions"><Btn variant="ghost" type="button" onClick={onClose}>Cancel</Btn><Btn type="submit" disabled={busy}>{busy ? 'Saving…' : 'Add account'}</Btn></div>
   </form></ModalFrame>
