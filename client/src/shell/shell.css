@@ -288,7 +288,7 @@ html, body, #root { max-width: 100%; overflow-x: hidden; }
 @media (max-width:640px){
   .personal-overview{width:100%;max-width:100%;overflow:hidden}
   .personal-overview .cfo-card,
-  .personal-overview .cfo-summary{width:calc(100vw - 60px);max-width:calc(100vw - 60px);min-width:0}
+  .personal-overview .cfo-summary{width:calc(100vw - 60px);max-width:calc(100vw - 60px);min-width:0;margin-left:10px}
   .personal-overview .cfo-pagehead{margin-bottom:8px}
   .personal-overview .cfo-pagehead-actions{display:none}
   .personal-overview .cfo-eyebrow{font-size:13px;letter-spacing:.16em;color:#6B7A90}
