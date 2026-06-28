@@ -8,10 +8,11 @@ import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { setActiveBusinessId } from '../lib/api'
-import PersonalDashboard from './PersonalDashboard'
+import PersonalWorkspace from './PersonalDashboard'
 
-// Personal Account v1 dashboard (personal finance) is gated separately from email
-// auth. When ON, /account leads with personal finance and demotes the business block.
+// Personal Account v1 (personal finance) is gated separately from email auth. When ON,
+// /account becomes the full Personal Workspace shell (mirrors the Business shell). When
+// OFF, /account keeps the legacy centered business-launcher page below — unchanged.
 const PERSONAL_V1 = import.meta.env.VITE_PERSONAL_ACCOUNT_V1_ENABLED === 'true'
 
 const COMMON_TZ = ['Asia/Jakarta', 'Asia/Makassar', 'Asia/Singapore', 'Asia/Bangkok', 'Europe/Moscow', 'UTC']
@@ -127,6 +128,9 @@ export default function PersonalProfile() {
   const primary = { padding: '12px 16px', borderRadius: 10, border: 'none', background: 'var(--brand,#3399FF)', color: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }
   const ghost = { padding: '10px 14px', borderRadius: 10, border: '1px solid var(--border-2,#ccc)', background: 'none', color: 'var(--text,#111)', fontSize: 14, cursor: 'pointer', fontFamily: 'inherit' }
 
+  // Flag ON → full Personal Workspace shell (mirrors Business). Flag OFF → legacy page below.
+  if (PERSONAL_V1) return <PersonalWorkspace />
+
   if (loading) return <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-3,#777)' }}>Loading…</div>
 
   // Reusable "Join business with invite link" block (toggle → input + helper text).
@@ -164,16 +168,8 @@ export default function PersonalProfile() {
           style={{ background: 'none', border: 'none', color: 'var(--red,#d33)', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>Sign out</button>
       </div>
       <p style={{ fontSize: 14, color: 'var(--text-2,#6B7E92)', marginTop: 0, marginBottom: 22, lineHeight: 1.5 }}>
-        {PERSONAL_V1
-          ? 'Your personal financial workspace. Business workspaces are optional — create or join one below.'
-          : 'Your personal login for CFO AI. Create a business or join one from an invitation.'}
+        Your personal login for CFO AI. Create a business or join one from an invitation.
       </p>
-
-      {/* Personal finance (Phase 2) leads when enabled */}
-      {PERSONAL_V1 && <PersonalDashboard token={token} />}
-
-      {/* Business workspaces — demoted to a secondary block when personal finance is on */}
-      {PERSONAL_V1 && <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-2,#6B7E92)', margin: '4px 0 8px' }}>Business workspaces</div>}
 
       {/* Onboarding / workspaces */}
       {businesses.length === 0 ? (
