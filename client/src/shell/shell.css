@@ -265,14 +265,16 @@ html, body, #root { max-width: 100%; overflow-x: hidden; }
   .cfo-h1{font-size:24px}
   .cfo-summary-value{font-size:30px}
   .cfo-grid-4{grid-template-columns:1fr 1fr}
-  .cfo-pagehead-actions{width:100%}
-  .cfo-pagehead-actions .cfo-btn-primary{flex:1}
+  .cfo-pagehead-actions{width:100%;display:grid;grid-template-columns:1fr}
+  .cfo-pagehead-actions .cfo-btn{min-width:0;padding-left:10px;padding-right:10px;white-space:nowrap}
   .cfo-summary-row{gap:18px}
   /* tables hide; stacked cards show */
   .cfo-rtable{display:none}
   .cfo-mcards{display:flex;flex-direction:column;gap:10px}
 }
-@media (max-width:380px){.cfo-grid-4{grid-template-columns:1fr}}
+@media (max-width:380px){
+  .cfo-grid-4{grid-template-columns:1fr}
+}
 
 /* ── Additive utilities (Personal Account v1; safe for Business — unused there) ── */
 .cfo-input{width:100%;padding:10px 12px;border:1px solid var(--border-default);border-radius:10px;background:var(--surface-card);color:var(--text-primary);font-size:14px;font-family:inherit;box-sizing:border-box}
