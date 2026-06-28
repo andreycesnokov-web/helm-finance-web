@@ -273,3 +273,8 @@ html, body, #root { max-width: 100%; overflow-x: hidden; }
   .cfo-mcards{display:flex;flex-direction:column;gap:10px}
 }
 @media (max-width:380px){.cfo-grid-4{grid-template-columns:1fr}}
+
+/* ── Additive utilities (Personal Account v1; safe for Business — unused there) ── */
+.cfo-input{width:100%;padding:10px 12px;border:1px solid var(--border-default);border-radius:10px;background:var(--surface-card);color:var(--text-primary);font-size:14px;font-family:inherit;box-sizing:border-box}
+.cfo-input:focus{outline:none;border-color:var(--brand-electric-blue)}
+.cfo-mt{margin-top:16px}
