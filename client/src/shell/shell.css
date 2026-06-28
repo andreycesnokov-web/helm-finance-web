@@ -280,3 +280,44 @@ html, body, #root { max-width: 100%; overflow-x: hidden; }
 .cfo-input{width:100%;padding:10px 12px;border:1px solid var(--border-default);border-radius:10px;background:var(--surface-card);color:var(--text-primary);font-size:14px;font-family:inherit;box-sizing:border-box}
 .cfo-input:focus{outline:none;border-color:var(--brand-electric-blue)}
 .cfo-mt{margin-top:16px}
+
+/* Personal Account v1 mobile polish: mirror the Business mobile first screen. */
+.personal-overview-subtitle{margin:-8px 0 18px;color:var(--text-muted);font-size:14px}
+.personal-mobile-meta{display:none}
+
+@media (max-width:640px){
+  .personal-overview{width:100%;max-width:100%;overflow:hidden}
+  .personal-overview .cfo-card,
+  .personal-overview .cfo-summary{width:calc(100% - 26px);max-width:calc(100% - 26px);min-width:0}
+  .personal-overview .cfo-pagehead{margin-bottom:8px}
+  .personal-overview .cfo-pagehead-actions{display:none}
+  .personal-overview .cfo-eyebrow{font-size:13px;letter-spacing:.16em;color:#6B7A90}
+  .personal-overview .cfo-h1{font-size:34px;line-height:.98;letter-spacing:-.02em;margin-top:10px}
+  .personal-overview-subtitle{font-size:15px;line-height:1.45;margin:12px 0 14px;color:var(--text-secondary)}
+  .personal-mobile-meta{display:flex;flex-wrap:wrap;gap:10px;margin:0 0 18px}
+  .personal-mobile-meta span{display:inline-flex;align-items:center;gap:7px;padding:8px 12px;border-radius:999px;background:var(--surface-card);border:1px solid var(--border-default);box-shadow:var(--shadow-sm);font-size:13px;font-weight:700;color:var(--text-secondary)}
+  .personal-mobile-meta span:last-child{background:var(--info-soft);border-color:transparent;color:var(--brand-navy);font-family:var(--font-mono)}
+  .personal-overview .cfo-summary{border-radius:24px;padding:28px 26px;margin-top:4px;box-shadow:0 18px 36px rgba(0,32,63,.18)}
+  .personal-overview .cfo-summary-sym{width:230px;right:-70px;top:8px;opacity:.12}
+  .personal-overview .cfo-summary-label{font-size:15px;color:#B8C8D8}
+  .personal-overview .cfo-summary-value{font-size:38px;line-height:1.08;margin-top:12px;letter-spacing:.01em;overflow-wrap:anywhere}
+  .personal-overview .cfo-summary-meta{font-size:14px;margin-top:16px;line-height:1.45}
+  .personal-overview .cfo-summary-row{display:grid;grid-template-columns:1fr;gap:17px;margin-top:22px;padding-top:20px}
+  .personal-overview .cfo-summary-k{font-size:15px;color:#AFC2D4;text-transform:none}
+  .personal-overview .cfo-summary-v{font-size:24px;line-height:1.1;margin-top:8px;overflow-wrap:anywhere}
+  .personal-overview .cfo-card{border-radius:22px;padding:20px 18px}
+  .personal-overview .cfo-card-title{font-size:19px}
+  .personal-overview .cfo-grid.cfo-grid-2{gap:14px}
+  .personal-overview .cfo-list-item{align-items:flex-start;padding:14px 0}
+  .personal-overview .cfo-list-amt{font-size:15px;white-space:normal;text-align:right}
+  .personal-overview .cfo-state{padding:34px 16px;border-radius:22px}
+  .personal-overview .cfo-state-h{font-size:20px}
+  .personal-overview .cfo-state-p{font-size:14px}
+}
+
+@media (max-width:380px){
+  .personal-overview .cfo-h1{font-size:30px}
+  .personal-overview .cfo-summary{padding:24px 21px}
+  .personal-overview .cfo-summary-value{font-size:32px}
+  .personal-overview .cfo-summary-v{font-size:20px}
+}

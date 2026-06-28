@@ -132,7 +132,7 @@ export default function PersonalWorkspace() {
   if (loading) body = <Card><div className="cfo-skel" style={{ height: 140 }} /></Card>
   else if (disabled) body = <EmptyState symbol={SYMBOL} title="Personal finance isn’t enabled yet" description="This workspace lights up once Personal Account v1 is enabled." />
   else if (error) body = <EmptyState symbol={SYMBOL} title="Couldn’t load personal finance" description={error} actions={<Btn onClick={load}>Try again</Btn>} />
-  else if (section === 'overview') body = <Overview {...{ baseCur, hasWallet, wallets, t, insight, savingsRate, summary, txItems, recommendation, setModal, setSection, businesses, navigate, onSelectWorkspace }} />
+  else if (section === 'overview') body = <Overview {...{ baseCur, hasWallet, wallets, t, insight, savingsRate, summary, txItems, recommendation, setModal, setSection, businesses, navigate, onSelectWorkspace, user }} />
   else if (section === 'wallets') body = <WalletsPage {...{ wallets, hasWallet, baseCur, setModal }} />
   else if (section === 'transactions') body = <TransactionsPage {...{ txs, txItems, hasWallet, setModal }} />
   else if (section === 'categories') body = <CategoriesPage />
@@ -151,13 +151,18 @@ export default function PersonalWorkspace() {
 }
 
 // ── Overview ─────────────────────────────────────────────────────────────────
-function Overview({ baseCur, hasWallet, wallets, t, insight, savingsRate, summary, txItems, recommendation, setModal, setSection, businesses, navigate, onSelectWorkspace }) {
+function Overview({ baseCur, hasWallet, wallets, t, insight, savingsRate, summary, txItems, recommendation, setModal, setSection, businesses, navigate, onSelectWorkspace, user }) {
+  const accountRef = user?.email || (user?.id != null ? `id ${user.id}` : 'Personal')
   return (
-    <>
+    <div className="personal-overview">
       <PageHeader eyebrow="Personal Workspace" title="Personal Account"
         actions={<><Btn variant="ghost" icon={<Icon.wallet width="16" height="16" />} onClick={() => setModal('wallet')}>Add account</Btn>
           <Btn icon={<Icon.plus width="16" height="16" />} onClick={() => setModal({ tx: 'expense' })} disabled={!hasWallet}>Add transaction</Btn></>} />
-      <p style={{ margin: '-8px 0 18px', color: 'var(--text-muted)', fontSize: 14 }}>Personal cashflow and owner finances</p>
+      <p className="personal-overview-subtitle">Personal cashflow and owner finances</p>
+      <div className="personal-mobile-meta">
+        <span><Icon.lock width="15" height="15" /> Private personal workspace</span>
+        <span>{accountRef}</span>
+      </div>
 
       {/* A. Personal Balance */}
       <SummaryCard symbol={SYMBOL} label="Total Personal Balance" value={money(t.balance, baseCur)}
@@ -215,7 +220,7 @@ function Overview({ baseCur, hasWallet, wallets, t, insight, savingsRate, summar
 
       {/* G. Business Connections (secondary) */}
       <BusinessLinks businesses={businesses} navigate={navigate} onSelect={onSelectWorkspace} compact />
-    </>
+    </div>
   )
 }
 // ── Wallets page ─────────────────────────────────────────────────────────────
