@@ -1,7 +1,7 @@
 // Personal Account v1 — FINAL Personal Workspace UI (per _specs/personal-account-final-
 // structure.md). Same product shell as Business (WorkspaceShell + cfo-* primitives).
 // Personal is primary; Business is secondary. Single /account route, in-shell sections:
-//   PERSONAL: Overview · Wallets · Transactions · Categories · AI CFO Lite · Business Links · Profile
+//   PERSONAL: Overview · Wallets · Transactions · AI CFO · Workspaces · Profile
 //
 // Gated by VITE_PERSONAL_ACCOUNT_V1_ENABLED (caller renders this only when on). RAW fetch
 // with Authorization only (never apiFetch → no x-business-id; backend rejects business ids
@@ -39,10 +39,18 @@ const PERSONAL_NAV = [
     { key: 'overview', label: 'Overview', icon: <Icon.pulse /> },
     { key: 'wallets', label: 'Wallets', icon: <Icon.wallet /> },
     { key: 'transactions', label: 'Transactions', icon: <Icon.list /> },
-    { key: 'categories', label: 'Categories', icon: <Icon.doc /> },
-    { key: 'cfo', label: 'AI CFO Lite', icon: <Icon.cfo /> },
-    { key: 'businesses', label: 'Business Links', icon: <Icon.link /> },
+    { key: 'cfo', label: 'AI CFO', icon: <Icon.cfo /> },
+    { key: 'businesses', label: 'Workspaces', icon: <Icon.link /> },
     { key: 'profile', label: 'Profile', icon: <Icon.cog /> },
+  ] },
+]
+const PERSONAL_SECONDARY_NAV = [
+  { title: 'Menu', items: [
+    { key: 'businesses', label: 'Workspaces', icon: <Icon.link /> },
+    { key: 'billing', label: 'Billing', icon: <Icon.fund /> },
+    { key: 'profile', label: 'Settings', icon: <Icon.cog /> },
+    { key: 'help', label: 'Help', icon: <Icon.doc /> },
+    { key: 'logout', label: 'Logout', icon: <Icon.warn /> },
   ] },
 ]
 
@@ -53,6 +61,17 @@ function money(n, cur = 'IDR') {
 }
 const labelFor = (t) => (WALLET_TYPES.find(x => x[0] === t) || [, t])[1]
 const isXfer = (tx) => typeof tx.source === 'string' && tx.source.startsWith('xfer:')
+const groupAmounts = (rows, valueKey = 'balance', currencyKey = 'currency') => rows.reduce((acc, row) => {
+  const cur = row?.[currencyKey] || 'IDR'
+  acc[cur] = (acc[cur] || 0) + Number(row?.[valueKey] || 0)
+  return acc
+}, {})
+const parseInviteCode = (raw) => {
+  const s = String(raw || '').trim()
+  if (!s) return ''
+  const m = s.match(/\/invite\/([^/?#]+)/i)
+  return decodeURIComponent((m?.[1] || s).replace(/^#/, '')).trim()
+}
 
 export default function PersonalWorkspace() {
   const { token, user, logout } = useAuth()
@@ -109,7 +128,7 @@ export default function PersonalWorkspace() {
 
   const subline = user?.email || (user?.id != null ? `id ${user.id}` : '')
   const shellWorkspaces = {
-    personal: [{ id: 'personal', name: 'Personal Account', type: 'personal', role: 'owner', business_code: subline }],
+    personal: [{ id: 'personal', name: 'Personal Finance', type: 'personal', role: 'owner', business_code: subline }],
     business: businesses,
   }
   const onSelectWorkspace = (w) => { if (w?.type !== 'personal') { try { setActiveBusinessId(w.id); localStorage.setItem('activeWorkspaceId', w.id) } catch { /* */ } navigate('/business/pulse') } }
@@ -140,10 +159,12 @@ export default function PersonalWorkspace() {
   else if (section === 'cfo') body = <CfoPage {...{ baseCur, t, insight, enoughData, recommendation }} />
   else if (section === 'businesses') body = <BusinessLinks {...{ businesses, navigate, onSelect: onSelectWorkspace }} />
   else if (section === 'profile') body = <ProfileSection token={token} user={user} logout={logout} navigate={navigate} />
+  else if (section === 'billing') body = <BillingPage />
+  else if (section === 'help') body = <HelpPage />
 
   return (
     <WorkspaceShell workspaces={shellWorkspaces} activeId="personal" onSelectWorkspace={onSelectWorkspace}
-      nav={PERSONAL_NAV} activeKey={section} onNavigate={(it) => setSection(it.key)}>
+      nav={PERSONAL_NAV} mobileNav={PERSONAL_SECONDARY_NAV} activeKey={section} onNavigate={(it) => it.key === 'logout' ? (logout(), navigate('/login')) : setSection(it.key)}>
       <div className="personal-app">
         {body}
         <PersonalMobileNav active={section} onNav={setSection} onAdd={() => setModal(hasWallet ? { tx: 'expense' } : 'wallet')} />
@@ -179,25 +200,36 @@ function PersonalMobileNav({ active, onNav, onAdd }) {
 // ── Overview ─────────────────────────────────────────────────────────────────
 function Overview({ baseCur, hasWallet, wallets, t, insight, savingsRate, summary, txItems, recommendation, setModal, setSection, businesses, navigate, onSelectWorkspace, user }) {
   const accountRef = user?.email || (user?.id != null ? `id ${user.id}` : 'Personal')
+  const walletTotals = groupAmounts(wallets)
+  const walletCurrencies = Object.keys(walletTotals)
+  const hasMixedWallets = walletCurrencies.length > 1
+  const primaryBalance = hasMixedWallets ? 'Multiple currencies' : money(t.balance, baseCur)
+  const txCurrencyTotals = groupAmounts(summary?.recent || [], 'amount_original', 'currency_original')
+  const needsOnboarding = !hasWallet && businesses.length === 0
   return (
     <div className="personal-overview">
-      <PageHeader eyebrow="Personal Workspace" title="Personal Account"
+      <PageHeader eyebrow="Personal Workspace" title="My Finances"
         actions={<><Btn variant="ghost" icon={<Icon.wallet width="16" height="16" />} onClick={() => setModal('wallet')}>Add account</Btn>
           <Btn icon={<Icon.plus width="16" height="16" />} onClick={() => setModal({ tx: 'expense' })} disabled={!hasWallet}>Add transaction</Btn></>} />
-      <p className="personal-overview-subtitle">Personal cashflow and owner finances</p>
+      <p className="personal-overview-subtitle">Your personal money, wallets and transactions. Business wallets stay separate.</p>
       <div className="personal-mobile-meta">
-        <span><Icon.lock width="15" height="15" /> Private personal workspace</span>
+        <span><Icon.lock width="15" height="15" /> Personal workspace</span>
         <span>{accountRef}</span>
       </div>
 
+      {needsOnboarding && <OnboardingChoices onPersonal={() => setModal('wallet')} onBusiness={() => navigate('/business/new')} onInvite={(code) => navigate(`/invite/${code}`)} />}
+
       {/* A. Personal Balance */}
-      <SummaryCard symbol={SYMBOL} label="Total Personal Balance" value={money(t.balance, baseCur)}
+      <SummaryCard symbol={SYMBOL} label="Personal balance" value={primaryBalance}
         meta={<><Icon.dot className="dot" width="12" height="12" /> Safe to spend this month: <b style={{ fontWeight: 700 }}>{money(insight.safe_to_spend, baseCur)}</b></>}
         metrics={[
-          { k: 'Monthly Income', v: money(t.income_mtd, baseCur), tone: 'pos' },
-          { k: 'Monthly Expenses', v: money(t.expense_mtd, baseCur), tone: 'neg' },
-          { k: 'Net Saved', v: money(t.net_saved, baseCur) },
+          { k: 'Income', v: money(t.income_mtd, baseCur), tone: 'pos' },
+          { k: 'Expenses', v: money(t.expense_mtd, baseCur), tone: 'neg' },
+          { k: 'Saved', v: money(t.net_saved, baseCur) },
         ]} />
+      {hasMixedWallets && <Card className="cfo-mt personal-currency-note" title="Balances by currency">
+        <DataList items={walletCurrencies.map(cur => ({ id: cur, label: cur, sub: 'Kept separate until conversion is available', amount: money(walletTotals[cur], cur) }))} />
+      </Card>}
 
       {/* B. Monthly Snapshot + D. Quick Add */}
       <div className="cfo-grid cfo-grid-2 cfo-mt">
@@ -227,7 +259,7 @@ function Overview({ baseCur, hasWallet, wallets, t, insight, savingsRate, summar
       <Card title="Accounts" className="cfo-mt" action={<Btn variant="ghost" sm onClick={() => setModal('wallet')}>+ Add account</Btn>}>
         {hasWallet
           ? <DataList items={wallets.map(w => ({ id: w.id, label: w.name, sub: labelFor(w.type), amount: money(w.balance, w.currency) }))} />
-          : <EmptyState title="Create your first personal account" description="Cash, bank, card, Wise/PayPal, e-wallet — track each balance." actions={<Btn onClick={() => setModal('wallet')}>+ Add account</Btn>} />}
+          : <EmptyState title="Create your first personal wallet" description="Cash, bank, card, Wise/PayPal, e-wallet — personal only, never shown as a business wallet." actions={<Btn onClick={() => setModal('wallet')}>+ Add account</Btn>} />}
       </Card>
 
       {/* E. Recent Transactions */}
@@ -236,12 +268,14 @@ function Overview({ baseCur, hasWallet, wallets, t, insight, savingsRate, summar
           ? <DataList items={txItems(summary.recent)} />
           : <EmptyState title="Your personal transactions will appear here" description="Add income, expenses, or transfers between your accounts." actions={<Btn onClick={() => setModal({ tx: 'expense' })} disabled={!hasWallet}>+ Add transaction</Btn>} />}
       </Card>
+      {Object.keys(txCurrencyTotals).length > 1 && <div className="personal-small-note">Multi-currency transactions are displayed in their original currency. We do not combine IDR and USD until conversion is available.</div>}
 
       {/* F. CFO AI Lite */}
-      <Card title="AI CFO · Lite" className="cfo-mt">
+      <Card title="AI CFO" className="cfo-mt" action={<span className="cfo-chip cfo-chip-soft">Free plan</span>}>
         <p style={{ margin: 0, fontSize: 14, color: 'var(--text-secondary)', lineHeight: 1.55 }}>
           {recommendation}{insight.vs_last_month_pct != null && ` (${insight.vs_last_month_pct > 0 ? '+' : ''}${insight.vs_last_month_pct}% vs last month)`}
         </p>
+        <UpgradeGates compact />
       </Card>
 
       {/* G. Business Connections (secondary) */}
@@ -249,11 +283,50 @@ function Overview({ baseCur, hasWallet, wallets, t, insight, savingsRate, summar
     </div>
   )
 }
+
+function OnboardingChoices({ onPersonal, onBusiness, onInvite }) {
+  const [invite, setInvite] = useState('')
+  const submitInvite = () => {
+    const code = parseInviteCode(invite)
+    if (code) onInvite(code)
+  }
+  return (
+    <Card title="What do you want to do first?" className="personal-onboarding">
+      <div className="personal-choice-grid">
+        <button type="button" onClick={onPersonal}><b>Manage personal finances</b><span>Add your first wallet and track personal spending.</span></button>
+        <button type="button" onClick={onBusiness}><b>Create business workspace</b><span>Start a separate team workspace for company money.</span></button>
+        <div className="personal-invite-choice">
+          <b>Join business by invite</b>
+          <span>Paste an invite link or code from your email.</span>
+          <div><input className="cfo-input" value={invite} onChange={e => setInvite(e.target.value)} placeholder="Invite link or code" /><Btn type="button" onClick={submitInvite} disabled={!invite.trim()}>Join</Btn></div>
+        </div>
+      </div>
+    </Card>
+  )
+}
+
+function UpgradeGates({ compact }) {
+  const plans = [
+    ['Free', 'Limited AI insights · Telegram locked'],
+    ['CFO AI Lite · $9', 'Telegram access · limited AI usage'],
+    ['Personal Pro · $39', 'Full personal features · fair usage'],
+  ]
+  return (
+    <div className={compact ? 'personal-plan-row compact' : 'personal-plan-row'}>
+      {plans.map(([name, desc]) => <div key={name} className="personal-plan-pill"><b>{name}</b><span>{desc}</span></div>)}
+    </div>
+  )
+}
 // ── Wallets page ─────────────────────────────────────────────────────────────
 function WalletsPage({ wallets, hasWallet, baseCur, setModal }) {
+  const totals = groupAmounts(wallets)
+  const currencies = Object.keys(totals)
   return (
     <>
       <PageHeader eyebrow="Personal" title="Wallets" actions={<Btn icon={<Icon.plus width="16" height="16" />} onClick={() => setModal('wallet')}>Add account</Btn>} />
+      {currencies.length > 1 && <Card title="Liquidity by currency" className="cfo-mt">
+        <DataList items={currencies.map(cur => ({ id: cur, label: cur, sub: 'Not combined without conversion', amount: money(totals[cur], cur) }))} />
+      </Card>}
       <Card>
         {hasWallet
           ? <DataList items={wallets.map(w => ({ id: w.id, label: w.name, sub: labelFor(w.type) + ' · ' + w.currency, amount: money(w.balance, w.currency) }))} />
@@ -295,8 +368,7 @@ function CategoriesPage() {
     <>
       <PageHeader eyebrow="Personal" title="Categories" />
       <p style={{ margin: '-8px 0 16px', color: 'var(--text-muted)', fontSize: 14 }}>
-        Human categories used when you add a transaction. Business-related personal categories
-        tag your personal records only — they do not create business records.
+        Choose the category that best explains your personal transaction. Business-related categories stay personal until you explicitly connect them to a business later.
       </p>
       <div className="cfo-grid cfo-grid-2">
         {CATEGORY_GROUPS.map(g => (
@@ -309,17 +381,19 @@ function CategoriesPage() {
   )
 }
 
-// ── AI CFO Lite page ─────────────────────────────────────────────────────────
+// ── AI CFO page ──────────────────────────────────────────────────────────────
 function CfoPage({ baseCur, t, insight, enoughData, recommendation }) {
   if (!enoughData) return (
     <>
-      <PageHeader eyebrow="Personal" title="AI CFO · Lite" />
+      <PageHeader eyebrow="Personal" title="AI CFO" />
+      <Card title="Plan level"><UpgradeGates /></Card>
       <EmptyState symbol={SYMBOL} title="Not enough data yet" description="Add 5–10 transactions and your personal insights — spending trend, safe-to-spend, and top categories — will appear here." />
     </>
   )
   return (
     <>
-      <PageHeader eyebrow="Personal" title="AI CFO · Lite" />
+      <PageHeader eyebrow="Personal" title="AI CFO" />
+      <Card title="Plan level"><UpgradeGates /></Card>
       <Card title="This month">
         <div className="cfo-grid cfo-grid-3">
           <Stat k="Income" v={money(t.income_mtd, baseCur)} tone="pos" />
@@ -340,35 +414,57 @@ function CfoPage({ baseCur, t, insight, enoughData, recommendation }) {
   )
 }
 
-// ── Business Links (secondary) ───────────────────────────────────────────────
+// ── Workspaces (secondary) ───────────────────────────────────────────────────
 function BusinessLinks({ businesses, navigate, onSelect, compact }) {
+  const [invite, setInvite] = useState('')
+  const join = () => {
+    const code = parseInviteCode(invite)
+    if (code) navigate(`/invite/${code}`)
+  }
   return (
     <>
-      {!compact && <PageHeader eyebrow="Personal" title="Business Links" />}
-      <Card title="Business workspaces" className={compact ? 'cfo-mt' : ''}
+      {!compact && <PageHeader eyebrow="Personal" title="Workspaces" />}
+      <Card title="Workspaces" className={compact ? 'cfo-mt' : ''}
         action={<Btn variant="ghost" sm onClick={() => navigate('/business/new')}>+ Create business</Btn>}>
         {businesses.length === 0 ? (
           <EmptyState title="No business workspaces yet"
-            description="Business workspaces are optional. Create one to invite a team, or open an invite link from your email to join one."
-            actions={<><Btn onClick={() => navigate('/business/new')}>Create business</Btn>
-              <Btn variant="ghost" onClick={() => navigate('/business/new')}>Join by invite</Btn></>} />
+            description="Business workspaces are optional and separate from your personal wallets. Create one for company money, or open an invite link from your email."
+            actions={<Btn onClick={() => navigate('/business/new')}>Create business</Btn>} />
         ) : (
           <DataList items={businesses.map(b => ({ id: b.id, label: b.name, sub: `${b.business_code ? b.business_code + ' · ' : ''}${b.role || ''}`, amount: 'Open →' }))} />
         )}
+        <div className="personal-inline-invite">
+          <input className="cfo-input" value={invite} onChange={e => setInvite(e.target.value)} placeholder="Invite link or code" />
+          <Btn variant="ghost" type="button" onClick={join} disabled={!invite.trim()}>Join</Btn>
+        </div>
         {!compact && businesses.length > 0 && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}>
             {businesses.map(b => <Btn key={b.id} variant="ghost" onClick={() => onSelect(b)}>{`Open ${b.name}`}</Btn>)}
           </div>
         )}
       </Card>
-      {!compact && (
-        <Card title="Funding & bridge" className="cfo-mt">
-          <p style={{ margin: 0, fontSize: 14, color: 'var(--text-muted)', lineHeight: 1.55 }}>
-            Fund a business, owner loan, equity contribution and reimbursement — <b>coming later</b>.
-            These will move personal money into a business only through an explicit bridge.
-          </p>
-        </Card>
-      )}
+    </>
+  )
+}
+
+function BillingPage() {
+  return (
+    <>
+      <PageHeader eyebrow="Personal" title="Billing" />
+      <Card title="Personal plans"><UpgradeGates /></Card>
+    </>
+  )
+}
+
+function HelpPage() {
+  return (
+    <>
+      <PageHeader eyebrow="Personal" title="Help" />
+      <Card title="Personal vs Business">
+        <p style={{ margin: 0, color: 'var(--text-secondary)', lineHeight: 1.55 }}>
+          Personal wallets are yours. Business wallets belong to a workspace and team. They stay separate unless you use an explicit funding or reimbursement flow.
+        </p>
+      </Card>
     </>
   )
 }
@@ -436,7 +532,6 @@ function ProfileSection({ token, user, logout, navigate }) {
             {err && <span style={{ color: 'var(--danger)', fontSize: 13 }}>{err}</span>}
           </div>
         </form>
-        {user?.id != null && <div style={{ marginTop: 14, fontSize: 11, color: 'var(--text-muted)' }}>Account type: Personal · {user?.email || `id ${user.id}`}</div>}
       </Card>
     </>
   )
