@@ -8,6 +8,11 @@ import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { setActiveBusinessId } from '../lib/api'
+import PersonalDashboard from './PersonalDashboard'
+
+// Personal Account v1 dashboard (personal finance) is gated separately from email
+// auth. When ON, /account leads with personal finance and demotes the business block.
+const PERSONAL_V1 = import.meta.env.VITE_PERSONAL_ACCOUNT_V1_ENABLED === 'true'
 
 const COMMON_TZ = ['Asia/Jakarta', 'Asia/Makassar', 'Asia/Singapore', 'Asia/Bangkok', 'Europe/Moscow', 'UTC']
 const LOCALES = ['en', 'ru', 'id']
@@ -159,8 +164,16 @@ export default function PersonalProfile() {
           style={{ background: 'none', border: 'none', color: 'var(--red,#d33)', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>Sign out</button>
       </div>
       <p style={{ fontSize: 14, color: 'var(--text-2,#6B7E92)', marginTop: 0, marginBottom: 22, lineHeight: 1.5 }}>
-        Your personal login for CFO AI. Create a business or join one from an invitation.
+        {PERSONAL_V1
+          ? 'Your personal financial workspace. Business workspaces are optional — create or join one below.'
+          : 'Your personal login for CFO AI. Create a business or join one from an invitation.'}
       </p>
+
+      {/* Personal finance (Phase 2) leads when enabled */}
+      {PERSONAL_V1 && <PersonalDashboard token={token} />}
+
+      {/* Business workspaces — demoted to a secondary block when personal finance is on */}
+      {PERSONAL_V1 && <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-2,#6B7E92)', margin: '4px 0 8px' }}>Business workspaces</div>}
 
       {/* Onboarding / workspaces */}
       {businesses.length === 0 ? (
