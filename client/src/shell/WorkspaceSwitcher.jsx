@@ -32,7 +32,7 @@ export default function WorkspaceSwitcher({ workspaces, activeId, onSelect }) {
           <span className="cfo-switch-text">
             <span className="cfo-switch-name">{w.name}</span>
             <span className="cfo-switch-type">
-              {w.type === 'personal' ? <><Icon.lock width="11" height="11" /> Personal</> : <>Business · {w.role || 'member'}</>}
+              {w.type === 'personal' ? <><Icon.lock width="11" height="11" /> Personal</> : <>Company · {w.role || 'member'}</>}
               {w.business_code ? ` · ${w.business_code}` : ''}
             </span>
           </span>
@@ -48,7 +48,7 @@ export default function WorkspaceSwitcher({ workspaces, activeId, onSelect }) {
         <span className="cfo-switch-text">
           <span className="cfo-switch-name">{active.name}</span>
           <span className="cfo-switch-type">
-            {isPersonal ? <><Icon.lock width="11" height="11" /> Personal</> : <>Business · {active.role || 'member'}</>}
+            {isPersonal ? <><Icon.lock width="11" height="11" /> Personal</> : <>Company · {active.role || 'member'}</>}
             {active.business_code ? ` · ${active.business_code}` : ''}
           </span>
         </span>
@@ -57,11 +57,11 @@ export default function WorkspaceSwitcher({ workspaces, activeId, onSelect }) {
       {open && (
         <div className="cfo-switch-menu" role="listbox">
           <Group title="Personal" items={personal} />
-          <Group title="Business" items={business} />
+          <Group title="Company Workspaces" items={business} />
           <button className="cfo-switch-opt" onClick={() => { setOpen(false); window.location.assign('/business/new') }}>
             <span className="cfo-switch-ava business" aria-hidden>+</span>
-            <span className="cfo-switch-text"><span className="cfo-switch-name">Create new business</span>
-              <span className="cfo-switch-type">New owner workspace</span></span>
+            <span className="cfo-switch-text"><span className="cfo-switch-name">Create company workspace</span>
+              <span className="cfo-switch-type">Separate company money and team</span></span>
           </button>
         </div>
       )}

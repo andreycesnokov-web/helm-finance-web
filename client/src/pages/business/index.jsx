@@ -55,6 +55,7 @@ export function BusinessShell({ children }) {
 // ── Business Pulse (premium presentation of /api/pulse — data unchanged) ──────
 export function BusinessPulse() {
   const { active } = useWorkspace()
+  const navigate = useNavigate()
   const p = useScoped('/pulse')
   const head = (
     <PageHeader eyebrow="Business Workspace" title={active?.name || 'Business'}
@@ -67,6 +68,12 @@ export function BusinessPulse() {
   if (p.loading) return <>{head}<PulseSkeleton /></>
   if (p.error) return <>{head}<ErrorState title="We couldn’t load Pulse" description={p.error} onRetry={() => location.reload()} /></>
   const d = p.data || {}
+  const emptyBusiness = Number(d.totalBalance || 0) === 0
+    && Number(d.income || 0) === 0
+    && Number(d.expenses || 0) === 0
+    && Number(d.receivables || 0) === 0
+    && Number(d.payables || 0) === 0
+    && !(d.recentTxs || []).length
   const recent = (d.recentTxs || []).slice(0, 6).map(t => ({
     id: t.id, label: t.description || t.type, sub: `${(t.currency_original || 'IDR')} · ${(t.transaction_date || t.created_at || '').slice(0, 10)}`,
     dir: t.type === 'income' ? 'in' : ['expense', 'payroll'].includes(t.type) ? 'out' : 'neutral',
@@ -90,6 +97,7 @@ export function BusinessPulse() {
         <Card title="Burn rate"><div className="cfo-stat-v cfo-mono" style={{ fontSize: 20 }}>{idr(d.burnRate)}</div><div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>per day · {d.burnWindowDays || 30}d window</div></Card>
         <Card title="Runway"><div className="cfo-stat-v cfo-mono" style={{ fontSize: 20 }}>{d.runway === 999 ? '—' : `${d.runway} days`}</div><div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>at current burn</div></Card>
       </div>
+      {emptyBusiness && <BusinessStarterActions navigate={navigate} />}
       <div className="cfo-grid cfo-grid-2">
         <Card title="AI CFO summary" action={<StatusBadge tone="info"><Icon.cfo width="13" height="13" /> Live</StatusBadge>}>
           <div style={{ display: 'flex', gap: 12 }}>
@@ -102,6 +110,26 @@ export function BusinessPulse() {
         </Card>
       </div>
     </>
+  )
+}
+
+function BusinessStarterActions({ navigate }) {
+  const actions = [
+    ['Add business wallet', '/business/accounts'],
+    ['Add transaction', '/business/transactions'],
+    ['Invite team', '/business/team'],
+    ['Upload document', '/business/documents'],
+    ['Ask AI CFO', '/business/ai-cfo'],
+  ]
+  return (
+    <Card title="Start your company workspace" className="cfo-mt">
+      <p style={{ margin: '0 0 14px', color: 'var(--text-secondary)', fontSize: 14, lineHeight: 1.5 }}>
+        This company workspace is separate from your personal wallets. Add business data here when you are ready.
+      </p>
+      <div className="cfo-grid cfo-grid-3" style={{ gap: 10 }}>
+        {actions.map(([label, path]) => <Btn key={path} variant="ghost" onClick={() => navigate(path)}>{label}</Btn>)}
+      </div>
+    </Card>
   )
 }
 

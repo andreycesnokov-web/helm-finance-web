@@ -299,6 +299,11 @@ html, body, #root { max-width: 100%; overflow-x: hidden; }
 .personal-plan-pill b{display:block;font-size:13px;color:var(--brand-navy);margin-bottom:4px}
 .personal-plan-pill span{font-size:11.5px;color:var(--text-muted);line-height:1.35}
 .personal-small-note{font-size:12px;color:var(--text-muted);margin:10px 2px 0;line-height:1.4}
+.personal-business-form{display:flex;flex-direction:column;gap:12px}
+.personal-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.personal-separation-copy{border:1px solid var(--border-default);background:var(--surface-card-muted);border-radius:12px;padding:12px;color:var(--text-secondary);font-size:13px;line-height:1.45}
+.personal-upgrade-prompt{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px;background:var(--warning-soft,#fff7e6)}
+.personal-upgrade-prompt p{margin:4px 0 0;color:var(--text-secondary);font-size:13px;line-height:1.4}
 
 @media (max-width:640px){
   .personal-app{padding-bottom:86px}
@@ -340,6 +345,8 @@ html, body, #root { max-width: 100%; overflow-x: hidden; }
   .personal-overview .cfo-btn{border-radius:10px;min-height:42px}
   .personal-overview .cfo-btn-primary{background:#0057FF}
   .personal-choice-grid{grid-template-columns:1fr}
+  .personal-form-grid{grid-template-columns:1fr}
+  .personal-upgrade-prompt{align-items:flex-start;flex-direction:column}
   .personal-invite-choice > div,.personal-inline-invite{grid-template-columns:1fr}
   .personal-plan-row{grid-template-columns:1fr}
   .personal-plan-row.compact{display:none}
