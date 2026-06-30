@@ -11,6 +11,7 @@ const Ctx = createContext(null)
 export const useWorkspace = () => useContext(Ctx)
 
 const LS_ACTIVE = 'activeWorkspaceId'
+const LS_LAST = 'last_active_workspace_id'
 
 function pickActive(ws, storedId) {
   const all = [...(ws.personal || []), ...(ws.business || [])]
@@ -32,7 +33,14 @@ export function WorkspaceProvider({ children }) {
 
   const applyActive = useCallback((w) => {
     setActive(w)
-    if (w) { setActiveBusinessId(w.id); try { localStorage.setItem(LS_ACTIVE, w.id) } catch {} }
+    if (w) {
+      if (w.type === 'personal') setActiveBusinessId(null)
+      else setActiveBusinessId(w.id)
+      try {
+        localStorage.setItem(LS_ACTIVE, w.id)
+        localStorage.setItem(LS_LAST, w.id)
+      } catch {}
+    }
   }, [])
 
   const load = useCallback(async () => {
@@ -42,7 +50,7 @@ export function WorkspaceProvider({ children }) {
       const data = await apiFetch('/workspaces', token)
       const ws = { personal: data.personal || [], business: data.business || [] }
       setWorkspaces(ws)
-      let stored = null; try { stored = localStorage.getItem(LS_ACTIVE) } catch {}
+      let stored = null; try { stored = localStorage.getItem(LS_LAST) || localStorage.getItem(LS_ACTIVE) } catch {}
       applyActive(pickActive(ws, stored))
     } catch (e) { setError(e.message || 'Failed to load workspaces') }
     finally { setLoading(false) }

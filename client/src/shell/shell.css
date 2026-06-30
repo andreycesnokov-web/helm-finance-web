@@ -294,6 +294,7 @@ html, body, #root { max-width: 100%; overflow-x: hidden; }
 .personal-invite-choice{grid-column:1 / -1}
 .personal-invite-choice > div,.personal-inline-invite{display:grid;grid-template-columns:1fr auto;gap:8px;margin-top:10px}
 .personal-plan-row{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.personal-wallet-actions{display:flex;gap:6px;margin-left:auto;flex-wrap:wrap;justify-content:flex-end}
 .personal-plan-row.compact{margin-top:14px}
 .personal-plan-pill{border:1px solid var(--border-default);border-radius:12px;padding:12px;background:var(--surface-card-muted)}
 .personal-plan-pill b{display:block;font-size:13px;color:var(--brand-navy);margin-bottom:4px}

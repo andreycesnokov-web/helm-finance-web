@@ -468,7 +468,7 @@ app.get('/api/personal/wallets', personalGate, auth, async (req, res) => {
   try {
     const { data: wallets } = await supabase.from('wallets')
       .select('id, name, type, currency, color, is_active, sort_order')
-      .eq('business_id', ws.id).eq('scope', 'personal').order('sort_order');
+      .eq('business_id', ws.id).eq('scope', 'personal').eq('is_active', true).order('sort_order');
     const bal = PW.walletBalances(await personalTxRows(ws.id));
     res.json({ wallets: (wallets || []).map(w => ({ ...w, balance: bal.get(w.id) || 0 })) });
   } catch (e) { res.status(500).json({ error: e.message }); }

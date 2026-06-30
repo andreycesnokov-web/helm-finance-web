@@ -119,6 +119,13 @@ export default function PersonalWorkspace() {
     } catch { setError('Could not load personal finance.') } finally { setLoading(false) }
   }
   useEffect(() => { if (token) load() }, [token]) // eslint-disable-line
+  useEffect(() => {
+    try {
+      setActiveBusinessId(null)
+      localStorage.setItem('activeWorkspaceId', 'personal')
+      localStorage.setItem('last_active_workspace_id', 'personal')
+    } catch { /* noop */ }
+  }, [])
 
   const baseCur = summary?.workspace?.base_currency || 'IDR'
   const hasWallet = wallets.length > 0
@@ -139,6 +146,7 @@ export default function PersonalWorkspace() {
     try {
       setActiveBusinessId(w.id)
       localStorage.setItem('activeWorkspaceId', w.id)
+      localStorage.setItem('last_active_workspace_id', w.id)
     } catch { /* noop */ }
     navigate('/business/pulse')
   }
@@ -181,6 +189,8 @@ export default function PersonalWorkspace() {
         <PersonalMobileNav active={section} onNav={setSection} onAdd={() => setModal(hasWallet ? { tx: 'expense' } : 'wallet')} />
       </div>
       {modal === 'wallet' && <AccountModal pf={pf} baseCur={baseCur} onClose={closeModal} onSaved={reload} />}
+      {modal?.editWallet && <AccountModal pf={pf} baseCur={baseCur} wallet={modal.editWallet} onClose={closeModal} onSaved={reload} />}
+      {modal?.adjustWallet && <AdjustBalanceModal pf={pf} wallet={modal.adjustWallet} onClose={closeModal} onSaved={reload} />}
       {modal?.tx && <TxModal pf={pf} wallets={wallets} cats={cats} initialKind={modal.tx} onClose={closeModal} onSaved={reload} />}
       {modal === 'business' && <BusinessCreateModal token={token} onClose={closeModal} onUpgrade={setUpgrade} onCreated={openBusiness} />}
     </WorkspaceShell>
@@ -353,10 +363,26 @@ function WalletsPage({ wallets, hasWallet, baseCur, setModal }) {
         <DataList items={currencies.map(cur => ({ id: cur, label: cur, sub: 'Not combined without conversion', amount: money(totals[cur], cur) }))} />
       </Card>}
       <Card>
-        {hasWallet
-          ? <DataList items={wallets.map(w => ({ id: w.id, label: w.name, sub: labelFor(w.type) + ' · ' + w.currency, amount: money(w.balance, w.currency) }))} />
-          : <EmptyState symbol={SYMBOL} title="Create your first personal account" description="Cash, bank, card, Wise/Revolut/PayPal, e-wallet. Crypto comes later." actions={<Btn onClick={() => setModal('wallet')}>+ Add account</Btn>} />}
+        {hasWallet ? (
+          <ul className="cfo-list">
+            {wallets.map(w => (
+              <li key={w.id} className="cfo-list-item">
+                <span className="cfo-list-ic neutral"><Icon.wallet width="16" height="16" /></span>
+                <span className="cfo-list-main">
+                  <span className="cfo-list-label">{w.name}</span>
+                  <span className="cfo-list-sub">{labelFor(w.type)} · {w.currency} · personal only</span>
+                </span>
+                <span className="cfo-list-amt">{money(w.balance, w.currency)}</span>
+                <div className="personal-wallet-actions">
+                  <Btn sm variant="ghost" type="button" onClick={() => setModal({ adjustWallet: w })}>Adjust</Btn>
+                  <Btn sm variant="ghost" type="button" onClick={() => setModal({ editWallet: w })}>Edit</Btn>
+                </div>
+              </li>
+            ))}
+          </ul>
+        ) : <EmptyState symbol={SYMBOL} title="Create your first personal account" description="Cash, bank, card, Wise/Revolut/PayPal, e-wallet. Crypto comes later." actions={<Btn onClick={() => setModal('wallet')}>+ Add account</Btn>} />}
       </Card>
+      <div className="personal-small-note">Personal accounts never appear as company accounts. Company accounts stay inside company workspaces.</div>
     </>
   )
 }
@@ -643,22 +669,77 @@ function ModalFrame({ title, onClose, children }) {
     </div>
   )
 }
-function AccountModal({ pf, baseCur, onClose, onSaved }) {
-  const [form, setForm] = useState({ name: '', type: 'cash', currency: baseCur })
+function AccountModal({ pf, baseCur, wallet, onClose, onSaved }) {
+  const editing = !!wallet
+  const [form, setForm] = useState({ name: wallet?.name || '', type: wallet?.type || 'cash', currency: wallet?.currency || baseCur })
   const [busy, setBusy] = useState(false); const [err, setErr] = useState('')
   const submit = async (e) => {
     e.preventDefault(); setBusy(true); setErr('')
     try {
-      const r = await pf('/wallets', { method: 'POST', body: { name: form.name, type: form.type, currency: form.currency } })
-      const d = await r.json().catch(() => ({})); if (!r.ok) { setErr(d.message || d.error || 'Could not add account.'); return } onSaved()
+      const path = editing ? `/wallets/${wallet.id}` : '/wallets'
+      const method = editing ? 'PATCH' : 'POST'
+      const body = editing ? { name: form.name } : { name: form.name, type: form.type, currency: form.currency }
+      const r = await pf(path, { method, body })
+      const d = await r.json().catch(() => ({})); if (!r.ok) { setErr(d.message || d.error || 'Could not save account.'); return } onSaved()
     } catch { setErr('Network error.') } finally { setBusy(false) }
   }
-  return <ModalFrame title="Add account" onClose={onClose}><form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+  const archive = async () => {
+    setBusy(true); setErr('')
+    try {
+      const r = await pf(`/wallets/${wallet.id}`, { method: 'PATCH', body: { is_active: false } })
+      const d = await r.json().catch(() => ({})); if (!r.ok) { setErr(d.message || d.error || 'Could not archive account.'); return } onSaved()
+    } catch { setErr('Network error.') } finally { setBusy(false) }
+  }
+  const remove = async () => {
+    setBusy(true); setErr('')
+    try {
+      const r = await pf(`/wallets/${wallet.id}`, { method: 'DELETE' })
+      const d = await r.json().catch(() => ({})); if (!r.ok) { setErr(d.message || d.error || 'Delete is available only for empty accounts. Archive this account instead.'); return } onSaved()
+    } catch { setErr('Network error.') } finally { setBusy(false) }
+  }
+  return <ModalFrame title={editing ? 'Edit account' : 'Add account'} onClose={onClose}><form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
     <Field label="Account name"><input className="cfo-input" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="e.g. Cash, BCA, Wise" autoFocus /></Field>
-    <Field label="Type"><select className="cfo-input" value={form.type} onChange={e => setForm({ ...form, type: e.target.value })}>{WALLET_TYPES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></Field>
-    <Field label="Currency"><select className="cfo-input" value={form.currency} onChange={e => setForm({ ...form, currency: e.target.value })}>{CURRENCIES.map(c => <option key={c} value={c}>{c}</option>)}</select></Field>
+    <Field label="Type"><select className="cfo-input" value={form.type} onChange={e => setForm({ ...form, type: e.target.value })} disabled={editing}>{WALLET_TYPES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></Field>
+    <Field label="Currency"><select className="cfo-input" value={form.currency} onChange={e => setForm({ ...form, currency: e.target.value })} disabled={editing}>{CURRENCIES.map(c => <option key={c} value={c}>{c}</option>)}</select></Field>
+    {editing && <div className="personal-small-note">Currency and type are locked after creation so old transactions stay correct.</div>}
     {err && <div style={{ color: 'var(--danger)', fontSize: 13 }}>{err}</div>}
-    <div className="cfo-modal-actions"><Btn variant="ghost" type="button" onClick={onClose}>Cancel</Btn><Btn type="submit" disabled={busy}>{busy ? 'Saving…' : 'Add account'}</Btn></div>
+    <div className="cfo-modal-actions">
+      {editing && <Btn variant="ghost" type="button" onClick={archive} disabled={busy}>Archive</Btn>}
+      {editing && <Btn variant="ghost" type="button" onClick={remove} disabled={busy}>Delete empty</Btn>}
+      <Btn variant="ghost" type="button" onClick={onClose}>Cancel</Btn>
+      <Btn type="submit" disabled={busy}>{busy ? 'Saving…' : (editing ? 'Save account' : 'Add account')}</Btn>
+    </div>
+  </form></ModalFrame>
+}
+function AdjustBalanceModal({ pf, wallet, onClose, onSaved }) {
+  const [target, setTarget] = useState(String(wallet?.balance ?? 0))
+  const [date, setDate] = useState(new Date().toISOString().slice(0, 10))
+  const [busy, setBusy] = useState(false); const [err, setErr] = useState('')
+  const submit = async (e) => {
+    e.preventDefault(); setBusy(true); setErr('')
+    const next = Number(target)
+    const current = Number(wallet?.balance || 0)
+    const delta = next - current
+    if (!Number.isFinite(next)) { setErr('Enter a valid balance.'); setBusy(false); return }
+    if (delta === 0) { onClose(); return }
+    try {
+      const r = await pf('/transactions', { method: 'POST', body: {
+        kind: delta > 0 ? 'income' : 'expense',
+        amount: Math.abs(delta),
+        wallet_id: wallet.id,
+        category: 'Balance Correction',
+        date,
+        note: `Balance correction to ${money(next, wallet.currency)}`,
+      } })
+      const d = await r.json().catch(() => ({})); if (!r.ok) { setErr(d.message || d.error || 'Could not adjust balance.'); return } onSaved()
+    } catch { setErr('Network error.') } finally { setBusy(false) }
+  }
+  return <ModalFrame title="Adjust balance" onClose={onClose}><form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+    <div className="personal-small-note">This creates a personal Balance Correction transaction in {wallet.name}. It never touches company wallets.</div>
+    <Field label={`New balance (${wallet.currency})`}><input className="cfo-input" type="number" step="any" value={target} onChange={e => setTarget(e.target.value)} autoFocus /></Field>
+    <Field label="Date"><input className="cfo-input" type="date" value={date} onChange={e => setDate(e.target.value)} /></Field>
+    {err && <div style={{ color: 'var(--danger)', fontSize: 13 }}>{err}</div>}
+    <div className="cfo-modal-actions"><Btn variant="ghost" type="button" onClick={onClose}>Cancel</Btn><Btn type="submit" disabled={busy}>{busy ? 'Saving…' : 'Save adjustment'}</Btn></div>
   </form></ModalFrame>
 }
 function TxModal({ pf, wallets, cats, initialKind = 'expense', onClose, onSaved }) {
