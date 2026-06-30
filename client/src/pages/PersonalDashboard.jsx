@@ -416,7 +416,7 @@ function WalletsPage({ pf, reload, wallets, hasWallet, baseCur, setModal }) {
       </Card>}
       <Card>
         {hasWallet ? (
-          <ul className="cfo-list">
+          <ul className="cfo-list personal-wallet-list">
             {wallets.map(w => (
               <li key={w.id} className="cfo-list-item">
                 <span className="cfo-list-ic neutral">{walletIcon(w)}</span>
