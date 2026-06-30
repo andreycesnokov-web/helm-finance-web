@@ -301,6 +301,39 @@ html, body, #root { max-width: 100%; overflow-x: hidden; }
 .personal-plan-pill b{display:block;font-size:13px;color:var(--brand-navy);margin-bottom:4px}
 .personal-plan-pill span{font-size:11.5px;color:var(--text-muted);line-height:1.35}
 .personal-small-note{font-size:12px;color:var(--text-muted);margin:10px 2px 0;line-height:1.4}
+.personal-ai-card{background:#EBF4FF;border-color:#CFE6FF}
+.personal-ai-card .cfo-card-title{color:var(--brand-navy)}
+.personal-currency-note .cfo-list-amt,
+.personal-tx-day-head span:last-child,
+.personal-monthly-badge,
+.personal-version{font-family:var(--font-mono);font-variant-numeric:tabular-nums}
+.personal-recurring-note{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center}
+.personal-recurring-note b{display:block;color:var(--brand-navy);font-size:14px}
+.personal-recurring-note p{margin:3px 0 0;color:var(--text-muted);font-size:12px;line-height:1.4}
+.personal-monthly-badge{background:var(--brand-pale-grey);color:var(--brand-navy);font-size:11px;font-weight:700;padding:4px 8px;border-radius:999px}
+.personal-tx-groups{display:flex;flex-direction:column;gap:18px}
+.personal-tx-day-head{display:flex;justify-content:space-between;gap:12px;margin-bottom:6px;color:var(--text-muted);font-size:12px;text-transform:uppercase;letter-spacing:.04em;font-weight:700}
+.personal-tx-day-head span:last-child{text-transform:none;letter-spacing:0;color:var(--brand-navy)}
+.personal-cfo-runway{margin-top:18px;padding:16px;border:1px solid var(--border-default);border-radius:14px;background:var(--surface-card-muted);display:grid;gap:4px}
+.personal-cfo-runway span{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-muted);font-weight:700}
+.personal-cfo-runway b{font-family:var(--font-mono);font-size:48px;line-height:1;color:var(--brand-navy)}
+.personal-cfo-runway small{font-size:12px;color:var(--text-secondary)}
+.personal-prompt-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.personal-prompt-row button{border:1px solid var(--border-default);background:var(--surface-card);color:var(--brand-navy);border-radius:999px;padding:8px 11px;font-family:var(--font-ui);font-size:12px;font-weight:700}
+.personal-category-bars{display:flex;flex-direction:column;gap:12px}
+.personal-category-bar{display:grid;grid-template-columns:auto 1fr;gap:10px;align-items:center}
+.personal-category-bar div div{display:flex;justify-content:space-between;gap:10px;font-size:13px;color:var(--text-primary)}
+.personal-category-bar div div span{font-family:var(--font-mono);font-weight:700}
+.personal-category-bar em{display:block;height:5px;background:var(--border-subtle);border-radius:999px;margin-top:6px;overflow:hidden}
+.personal-category-bar i{display:block;height:100%;background:var(--brand-electric-blue);border-radius:999px}
+.personal-profile-head{display:flex;align-items:center;gap:16px;margin-bottom:16px;flex-wrap:wrap}
+.personal-profile-copy{display:flex;flex-direction:column;gap:3px;min-width:180px;flex:1}
+.personal-profile-copy b{font-size:18px;color:var(--brand-navy)}
+.personal-profile-copy span{font-size:13px;color:var(--text-muted)}
+.personal-profile-copy em{width:max-content;background:var(--info-soft);color:var(--brand-navy);font-style:normal;font-weight:700;font-size:12px;border-radius:999px;padding:4px 9px}
+.personal-profile-actions{display:flex;flex-direction:column;gap:8px;align-items:flex-start}
+.personal-profile-metrics{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:10px 0 16px}
+.personal-version{text-align:center;color:var(--text-muted);font-size:11px;margin:18px 0}
 .personal-business-form{display:flex;flex-direction:column;gap:12px}
 .personal-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .personal-separation-copy{border:1px solid var(--border-default);background:var(--surface-card-muted);border-radius:12px;padding:12px;color:var(--text-secondary);font-size:13px;line-height:1.45}

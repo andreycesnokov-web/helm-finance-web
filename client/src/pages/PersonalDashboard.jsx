@@ -41,6 +41,7 @@ const PERSONAL_NAV = [
     { key: 'overview', label: 'Overview', icon: <Icon.pulse /> },
     { key: 'wallets', label: 'Wallets', icon: <Icon.wallet /> },
     { key: 'transactions', label: 'Transactions', icon: <Icon.list /> },
+    { key: 'categories', label: 'Categories', icon: <Icon.acct /> },
     { key: 'cfo', label: 'AI CFO', icon: <Icon.cfo /> },
     { key: 'businesses', label: 'Company Workspaces', icon: <Icon.link /> },
     { key: 'profile', label: 'Profile', icon: <Icon.cog /> },
@@ -74,6 +75,35 @@ const parseInviteCode = (raw) => {
   const m = s.match(/\/invite\/([^/?#]+)/i)
   return decodeURIComponent((m?.[1] || s).replace(/^#/, '')).trim()
 }
+const walletIcon = (w) => {
+  const type = (w?.type || '').toLowerCase()
+  const name = (w?.name || '').toLowerCase()
+  if (type === 'bank' || /bca|mandiri|bri|bank/.test(name)) return <Icon.bank width="16" height="16" />
+  if (type === 'card' || /card|revolut/.test(name)) return <Icon.card width="16" height="16" />
+  if (type === 'ewallet' || /gopay|ovo|wallet/.test(name)) return <Icon.phone width="16" height="16" />
+  if (type === 'wise_paypal' || /wise|paypal/.test(name)) return <Icon.globe width="16" height="16" />
+  return <Icon.wallet width="16" height="16" />
+}
+const categoryIcon = (name = '', type) => {
+  const s = String(name).toLowerCase()
+  if (type === 'income' || /salary|income|dividend|refund|payout/.test(s)) return <Icon.arrowDown width="16" height="16" />
+  if (/transfer/.test(s)) return <Icon.transfer width="16" height="16" />
+  if (/food|coffee|restaurant|cafe|dining/.test(s)) return <Icon.coffee width="16" height="16" />
+  if (/transport|taxi|fuel|uber|car/.test(s)) return <Icon.car width="16" height="16" />
+  if (/shop|store|apple|bag/.test(s)) return <Icon.bag width="16" height="16" />
+  if (/subscription|saas|cloud|internet|mobile|aws|gcp/.test(s)) return <Icon.cloud width="16" height="16" />
+  if (/education|book/.test(s)) return <Icon.book width="16" height="16" />
+  if (/entertainment|netflix|spotify/.test(s)) return <Icon.play width="16" height="16" />
+  return <Icon.acct width="16" height="16" />
+}
+const dailyTotals = (rows) => rows.reduce((acc, tx) => {
+  const key = tx.transaction_date || 'Undated'
+  const cur = tx.currency_original || 'IDR'
+  acc[key] ||= {}
+  acc[key][cur] = (acc[key][cur] || 0) + (tx.type === 'income' ? Number(tx.amount_original || 0) : -Number(tx.amount_original || 0))
+  return acc
+}, {})
+const formatSignedMoney = (v, cur) => `${v >= 0 ? '+' : '−'}${money(Math.abs(v), cur)}`
 
 export default function PersonalWorkspace() {
   const { token, user, logout } = useAuth()
@@ -155,6 +185,8 @@ export default function PersonalWorkspace() {
   const txItems = (rows) => rows.map(tx => ({
     id: tx.id,
     dir: isXfer(tx) ? null : (tx.type === 'income' ? 'in' : 'out'),
+    icon: categoryIcon(isXfer(tx) ? 'Transfer' : (tx.category || tx.description), tx.type),
+    iconTone: isXfer(tx) ? 'neutral' : (tx.type === 'income' ? 'in' : 'out'),
     label: isXfer(tx) ? 'Transfer' : (tx.category || tx.description || '—'),
     sub: tx.transaction_date || '',
     amount: `${tx.type === 'income' ? '+' : '−'}${money(tx.amount_original, tx.currency_original || baseCur)}`,
@@ -243,12 +275,12 @@ function Overview({ baseCur, hasWallet, wallets, t, insight, savingsRate, summar
       {needsOnboarding && <OnboardingChoices onPersonal={() => setModal('wallet')} onBusiness={() => setModal('business')} onInvite={(code) => navigate(`/invite/${code}`)} />}
 
       {/* A. Personal Balance */}
-      <SummaryCard symbol={SYMBOL} label="Personal balance" value={primaryBalance}
+      <SummaryCard symbol={SYMBOL} label="Total balance" value={primaryBalance}
         meta={<><Icon.dot className="dot" width="12" height="12" /> Safe to spend this month: <b style={{ fontWeight: 700 }}>{money(insight.safe_to_spend, baseCur)}</b></>}
         metrics={[
           { k: 'Income', v: money(t.income_mtd, baseCur), tone: 'pos' },
           { k: 'Expenses', v: money(t.expense_mtd, baseCur), tone: 'neg' },
-          { k: 'Saved', v: money(t.net_saved, baseCur) },
+          { k: 'Saved this month', v: money(t.net_saved, baseCur) },
         ]} />
       {hasMixedWallets && <Card className="cfo-mt personal-currency-note" title="Balances by currency">
         <DataList items={walletCurrencies.map(cur => ({ id: cur, label: cur, sub: 'Kept separate until conversion is available', amount: money(walletTotals[cur], cur) }))} />
@@ -280,8 +312,8 @@ function Overview({ baseCur, hasWallet, wallets, t, insight, savingsRate, summar
 
       {/* C. Wallets */}
       <Card title="Accounts" className="cfo-mt" action={<Btn variant="ghost" sm onClick={() => setModal('wallet')}>+ Add account</Btn>}>
-        {hasWallet
-          ? <DataList items={wallets.map(w => ({ id: w.id, label: w.name, sub: labelFor(w.type), amount: money(w.balance, w.currency) }))} />
+          {hasWallet
+          ? <DataList items={wallets.map(w => ({ id: w.id, icon: walletIcon(w), label: w.name, sub: labelFor(w.type), amount: money(w.balance, w.currency) }))} />
           : <EmptyState title="Create your first personal wallet" description="Cash, bank, card, Wise/PayPal, e-wallet — personal only, never shown as a business wallet." actions={<Btn onClick={() => setModal('wallet')}>+ Add account</Btn>} />}
       </Card>
 
@@ -294,7 +326,7 @@ function Overview({ baseCur, hasWallet, wallets, t, insight, savingsRate, summar
       {Object.keys(txCurrencyTotals).length > 1 && <div className="personal-small-note">Multi-currency transactions are displayed in their original currency. We do not combine IDR and USD until conversion is available.</div>}
 
       {/* F. CFO AI Lite */}
-      <Card title="AI CFO" className="cfo-mt" action={<span className="cfo-chip cfo-chip-soft">Free plan</span>}>
+      <Card title="AI Alert" className="cfo-mt personal-ai-card" action={<span className="cfo-chip cfo-chip-soft">Free plan</span>}>
         <p style={{ margin: 0, fontSize: 14, color: 'var(--text-secondary)', lineHeight: 1.55 }}>
           {recommendation}{insight.vs_last_month_pct != null && ` (${insight.vs_last_month_pct > 0 ? '+' : ''}${insight.vs_last_month_pct}% vs last month)`}
         </p>
@@ -387,7 +419,7 @@ function WalletsPage({ pf, reload, wallets, hasWallet, baseCur, setModal }) {
           <ul className="cfo-list">
             {wallets.map(w => (
               <li key={w.id} className="cfo-list-item">
-                <span className="cfo-list-ic neutral"><Icon.wallet width="16" height="16" /></span>
+                <span className="cfo-list-ic neutral">{walletIcon(w)}</span>
                 <span className="cfo-list-main">
                   <span className="cfo-list-label">{w.name}</span>
                   <span className="cfo-list-sub">{labelFor(w.type)} · {w.currency} · personal only</span>
@@ -406,6 +438,16 @@ function WalletsPage({ pf, reload, wallets, hasWallet, baseCur, setModal }) {
           </ul>
         ) : <EmptyState symbol={SYMBOL} title="Create your first personal account" description="Cash, bank, card, Wise/Revolut/PayPal, e-wallet. Crypto comes later." actions={<Btn onClick={() => setModal('wallet')}>+ Add account</Btn>} />}
       </Card>
+      <Card title="Recurring payments" className="cfo-mt" action={<Btn variant="ghost" sm disabled>+ Add subscription · Coming soon</Btn>}>
+        <div className="personal-recurring-note">
+          <span className="cfo-list-ic neutral"><Icon.cloud width="16" height="16" /></span>
+          <div>
+            <b>Subscriptions and rent tracking are next</b>
+            <p>Total recurring will stay separate from transactions until the feature is enabled.</p>
+          </div>
+          <span className="personal-monthly-badge">MONTHLY</span>
+        </div>
+      </Card>
       <div className="personal-small-note">Personal accounts never appear as company accounts. Company accounts stay inside company workspaces.</div>
     </>
   )
@@ -421,6 +463,13 @@ function TransactionsPage({ txs, txItems, hasWallet, setModal }) {
     if (q && !((tx.category || '') + ' ' + (tx.description || '')).toLowerCase().includes(q.toLowerCase())) return false
     return true
   }), [txs, filter, q])
+  const totals = dailyTotals(rows)
+  const grouped = rows.reduce((acc, tx) => {
+    const key = tx.transaction_date || 'Undated'
+    acc[key] ||= []
+    acc[key].push(tx)
+    return acc
+  }, {})
   return (
     <>
       <PageHeader eyebrow="Personal" title="Transactions" actions={<Btn icon={<Icon.plus width="16" height="16" />} onClick={() => setModal({ tx: 'expense' })} disabled={!hasWallet}>Add transaction</Btn>} />
@@ -431,7 +480,14 @@ function TransactionsPage({ txs, txItems, hasWallet, setModal }) {
         </div>
         {!txs.length
           ? <EmptyState symbol={SYMBOL} title="Your personal transactions will appear here" description="Add income, expenses, or transfers between your accounts." actions={<Btn onClick={() => setModal({ tx: 'expense' })} disabled={!hasWallet}>+ Add transaction</Btn>} />
-          : rows.length ? <DataList items={txItems(rows)} /> : <EmptyState title="No matching transactions" description="Try a different filter or search." />}
+          : rows.length ? <div className="personal-tx-groups">
+              {Object.entries(grouped).map(([date, groupRows]) => (
+                <section key={date} className="personal-tx-day">
+                  <div className="personal-tx-day-head"><span>{date}</span><span>{Object.entries(totals[date] || {}).map(([cur, total]) => formatSignedMoney(total, cur)).join(' · ')}</span></div>
+                  <DataList items={txItems(groupRows)} />
+                </section>
+              ))}
+            </div> : <EmptyState title="No matching transactions" description="Try a different filter or search." />}
       </Card>
     </>
   )
@@ -458,6 +514,11 @@ function CategoriesPage() {
 
 // ── AI CFO page ──────────────────────────────────────────────────────────────
 function CfoPage({ baseCur, t, insight, enoughData, recommendation }) {
+  const monthlyExpense = Math.max(Number(t.expense_mtd || 0), 0)
+  const dailyBurn = monthlyExpense > 0 ? monthlyExpense / 30 : 0
+  const runwayDays = dailyBurn > 0 ? Math.floor(Number(t.balance || 0) / dailyBurn) : null
+  const top = Array.isArray(insight.top_categories) ? insight.top_categories : []
+  const maxTop = Math.max(...top.map(c => Number(c.amount || 0)), 1)
   if (!enoughData) return (
     <>
       <PageHeader eyebrow="Personal" title="AI CFO" />
@@ -475,14 +536,33 @@ function CfoPage({ baseCur, t, insight, enoughData, recommendation }) {
           <Stat k="Expenses" v={money(t.expense_mtd, baseCur)} tone="neg" />
           <Stat k="Net saved" v={money(t.net_saved, baseCur)} />
         </div>
+        <div className="personal-cfo-runway">
+          <span>Personal runway</span>
+          <b>{runwayDays == null ? '—' : runwayDays}</b>
+          <small>{dailyBurn ? `Based on average burn of ${money(dailyBurn, baseCur)}/day` : 'Add expenses to calculate runway'}</small>
+        </div>
         <p style={{ marginTop: 16, fontSize: 14, color: 'var(--text-secondary)', lineHeight: 1.55 }}>
           {recommendation}{insight.vs_last_month_pct != null && ` (${insight.vs_last_month_pct > 0 ? '+' : ''}${insight.vs_last_month_pct}% vs last month)`}
           {' '}Safe to spend: <b>{money(insight.safe_to_spend, baseCur)}</b>.
         </p>
+        <div className="personal-prompt-row">
+          <button type="button">How much did I spend on food?</button>
+          <button type="button">Can I afford this purchase?</button>
+        </div>
       </Card>
-      {Array.isArray(insight.top_categories) && insight.top_categories.length > 0 && (
+      {top.length > 0 && (
         <Card title="Top spending categories" className="cfo-mt">
-          <DataList items={insight.top_categories.map((c, i) => ({ id: i, label: c.name, amount: money(c.amount, baseCur) }))} />
+          <div className="personal-category-bars">
+            {top.map((c, i) => (
+              <div key={i} className="personal-category-bar">
+                <span className="cfo-list-ic neutral">{categoryIcon(c.name)}</span>
+                <div>
+                  <div><b>{c.name}</b><span>{money(c.amount, baseCur)}</span></div>
+                  <em><i style={{ width: `${Math.max(8, (Number(c.amount || 0) / maxTop) * 100)}%` }} /></em>
+                </div>
+              </div>
+            ))}
+          </div>
         </Card>
       )}
     </>
@@ -652,17 +732,26 @@ function ProfileSection({ token, user, logout, navigate }) {
     <>
       <PageHeader eyebrow="Personal" title="Profile" actions={<Btn variant="ghost" onClick={() => { logout(); navigate('/login') }}>Sign out</Btn>} />
       <Card>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 16 }}>
+        <div className="personal-profile-head">
           {form.avatar_url
             ? <img src={form.avatar_url} alt="Your avatar" style={{ width: 64, height: 64, borderRadius: '50%', objectFit: 'cover', border: '1px solid var(--border-default)' }} />
             : <div style={{ width: 64, height: 64, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--brand-navy)', color: '#fff', fontSize: 22, fontWeight: 700 }}>{initials}</div>}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div className="personal-profile-copy">
+            <b>{form.display_name || user?.firstName || 'Personal member'}</b>
+            <span>{user?.email || 'Email sign-in'}</span>
+            <em>Free Plan</em>
+          </div>
+          <div className="personal-profile-actions">
             <label className="cfo-btn cfo-btn-ghost cfo-btn-sm" style={{ cursor: 'pointer' }}>
               {avatarBusy ? 'Uploading…' : 'Upload photo'}
               <input type="file" accept="image/*" onChange={pickAvatar} style={{ display: 'none' }} />
             </label>
             {form.avatar_url && !avatarBusy && <button type="button" onClick={removeAvatar} style={{ background: 'none', border: 'none', color: 'var(--danger)', fontSize: 13, cursor: 'pointer', textAlign: 'left', padding: 0, fontFamily: 'inherit' }}>Remove photo</button>}
           </div>
+        </div>
+        <div className="personal-profile-metrics">
+          <Stat k="Profile trust" v="98.4%" />
+          <Stat k="Workspaces" v="Personal" />
         </div>
         <form onSubmit={save} className="cfo-form2">
           <Field label="Display name"><input className="cfo-input" value={form.display_name} onChange={set('display_name')} placeholder="Your name" /></Field>
@@ -675,6 +764,20 @@ function ProfileSection({ token, user, logout, navigate }) {
           </div>
         </form>
       </Card>
+      <Card title="Account management" className="cfo-mt">
+        <DataList items={[
+          { id: 'plan', icon: <Icon.card width="16" height="16" />, label: 'Subscription', sub: 'Free Plan · upgrade gates apply', amount: 'Manage →' },
+          { id: 'categories', icon: <Icon.acct width="16" height="16" />, label: 'Categories', sub: 'Personal income, expenses, and reimbursable tags', amount: 'Open →' },
+          { id: 'businesses', icon: <Icon.link width="16" height="16" />, label: 'Connected workspaces', sub: 'Personal and company finances stay separate', amount: 'Open →' },
+          { id: 'notify', icon: <Icon.warn width="16" height="16" />, label: 'Notifications', sub: 'Coming soon', amount: 'Soon' },
+        ]} />
+      </Card>
+      <Card title="Integrations" className="cfo-mt">
+        <DataList items={[
+          { id: 'telegram', icon: <Icon.link width="16" height="16" />, label: 'Telegram', sub: 'Locked on Free · available in CFO AI Lite', tag: 'locked' },
+        ]} />
+      </Card>
+      <div className="personal-version">CFO AI · FINANCIAL OS · v3.0.0</div>
     </>
   )
 }
