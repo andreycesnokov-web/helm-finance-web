@@ -12,7 +12,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { setActiveBusinessId } from '../lib/api'
 import WorkspaceShell from '../shell/WorkspaceShell'
-import { Icon, PageHeader, Card, SummaryCard, Stat, DataList, EmptyState, Btn, PageTabs } from '../shell/ui'
+import { Icon, PageHeader, Card, SummaryCard, Stat, DataList, EmptyState, Btn, PageTabs, ActionMenu } from '../shell/ui'
 
 const SYMBOL = '/brand/symbol_navy_blue_dot_transparent.svg'
 const WALLET_TYPES = [['cash', 'Cash'], ['bank', 'Bank account'], ['card', 'Card'], ['wise_paypal', 'Wise / Revolut / PayPal'], ['ewallet', 'E-wallet'], ['other', 'Other']]
@@ -172,7 +172,7 @@ export default function PersonalWorkspace() {
   else if (disabled) body = <EmptyState symbol={SYMBOL} title="Personal finance isn’t enabled yet" description="This workspace lights up once Personal Account v1 is enabled." />
   else if (error) body = <EmptyState symbol={SYMBOL} title="Couldn’t load personal finance" description={error} actions={<Btn onClick={load}>Try again</Btn>} />
   else if (section === 'overview') body = <Overview {...{ baseCur, hasWallet, wallets, t, insight, savingsRate, summary, txItems, recommendation, setModal, setSection, businesses, navigate, onSelectWorkspace, user, upgrade, setUpgrade }} />
-  else if (section === 'wallets') body = <WalletsPage {...{ wallets, hasWallet, baseCur, setModal }} />
+  else if (section === 'wallets') body = <WalletsPage {...{ pf, reload, wallets, hasWallet, baseCur, setModal }} />
   else if (section === 'transactions') body = <TransactionsPage {...{ txs, txItems, hasWallet, setModal }} />
   else if (section === 'categories') body = <CategoriesPage />
   else if (section === 'cfo') body = <CfoPage {...{ baseCur, t, insight, enoughData, recommendation }} />
@@ -353,9 +353,29 @@ function UpgradeGates({ compact }) {
   )
 }
 // ── Wallets page ─────────────────────────────────────────────────────────────
-function WalletsPage({ wallets, hasWallet, baseCur, setModal }) {
+function WalletsPage({ pf, reload, wallets, hasWallet, baseCur, setModal }) {
   const totals = groupAmounts(wallets)
   const currencies = Object.keys(totals)
+  const archiveWallet = async (w) => {
+    if (!window.confirm(`Archive "${w.name}"? The account will be hidden. Transactions stay intact.`)) return
+    const r = await pf(`/wallets/${w.id}`, { method: 'PATCH', body: { is_active: false } })
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}))
+      alert(d.message || d.error || 'Could not archive account.')
+      return
+    }
+    reload()
+  }
+  const deleteWallet = async (w) => {
+    if (!window.confirm(`Delete "${w.name}"? This only works for empty accounts.`)) return
+    const r = await pf(`/wallets/${w.id}`, { method: 'DELETE' })
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}))
+      alert(d.message || d.error || 'Delete is available only for empty accounts. Archive this account instead.')
+      return
+    }
+    reload()
+  }
   return (
     <>
       <PageHeader eyebrow="Personal" title="Wallets" actions={<Btn icon={<Icon.plus width="16" height="16" />} onClick={() => setModal('wallet')}>Add account</Btn>} />
@@ -372,10 +392,14 @@ function WalletsPage({ wallets, hasWallet, baseCur, setModal }) {
                   <span className="cfo-list-label">{w.name}</span>
                   <span className="cfo-list-sub">{labelFor(w.type)} · {w.currency} · personal only</span>
                 </span>
-                <span className="cfo-list-amt">{money(w.balance, w.currency)}</span>
-                <div className="personal-wallet-actions">
-                  <Btn sm variant="ghost" type="button" onClick={() => setModal({ adjustWallet: w })}>Adjust</Btn>
-                  <Btn sm variant="ghost" type="button" onClick={() => setModal({ editWallet: w })}>Edit</Btn>
+                <div className="personal-wallet-right">
+                  <span className="cfo-list-amt">{money(w.balance, w.currency)}</span>
+                  <ActionMenu items={[
+                    { label: 'Adjust balance', onClick: () => setModal({ adjustWallet: w }) },
+                    { label: 'Edit account', onClick: () => setModal({ editWallet: w }) },
+                    { label: 'Archive account', danger: true, onClick: () => archiveWallet(w) },
+                    { label: 'Delete empty account', danger: true, onClick: () => deleteWallet(w) },
+                  ]} />
                 </div>
               </li>
             ))}
@@ -683,20 +707,6 @@ function AccountModal({ pf, baseCur, wallet, onClose, onSaved }) {
       const d = await r.json().catch(() => ({})); if (!r.ok) { setErr(d.message || d.error || 'Could not save account.'); return } onSaved()
     } catch { setErr('Network error.') } finally { setBusy(false) }
   }
-  const archive = async () => {
-    setBusy(true); setErr('')
-    try {
-      const r = await pf(`/wallets/${wallet.id}`, { method: 'PATCH', body: { is_active: false } })
-      const d = await r.json().catch(() => ({})); if (!r.ok) { setErr(d.message || d.error || 'Could not archive account.'); return } onSaved()
-    } catch { setErr('Network error.') } finally { setBusy(false) }
-  }
-  const remove = async () => {
-    setBusy(true); setErr('')
-    try {
-      const r = await pf(`/wallets/${wallet.id}`, { method: 'DELETE' })
-      const d = await r.json().catch(() => ({})); if (!r.ok) { setErr(d.message || d.error || 'Delete is available only for empty accounts. Archive this account instead.'); return } onSaved()
-    } catch { setErr('Network error.') } finally { setBusy(false) }
-  }
   return <ModalFrame title={editing ? 'Edit account' : 'Add account'} onClose={onClose}><form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
     <Field label="Account name"><input className="cfo-input" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="e.g. Cash, BCA, Wise" autoFocus /></Field>
     <Field label="Type"><select className="cfo-input" value={form.type} onChange={e => setForm({ ...form, type: e.target.value })} disabled={editing}>{WALLET_TYPES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></Field>
@@ -704,8 +714,6 @@ function AccountModal({ pf, baseCur, wallet, onClose, onSaved }) {
     {editing && <div className="personal-small-note">Currency and type are locked after creation so old transactions stay correct.</div>}
     {err && <div style={{ color: 'var(--danger)', fontSize: 13 }}>{err}</div>}
     <div className="cfo-modal-actions">
-      {editing && <Btn variant="ghost" type="button" onClick={archive} disabled={busy}>Archive</Btn>}
-      {editing && <Btn variant="ghost" type="button" onClick={remove} disabled={busy}>Delete empty</Btn>}
       <Btn variant="ghost" type="button" onClick={onClose}>Cancel</Btn>
       <Btn type="submit" disabled={busy}>{busy ? 'Saving…' : (editing ? 'Save account' : 'Add account')}</Btn>
     </div>
