@@ -26,7 +26,15 @@ export default function LiveShell({ children }) {
 
   const onSelectWorkspace = async (w) => {
     await switchTo(w)
-    navigate(w.type === 'personal' ? '/personal' : '/business/pulse')
+    if (w.type === 'personal') {
+      try {
+        localStorage.setItem('activeWorkspaceId', 'personal')
+        localStorage.setItem('last_active_workspace_id', 'personal')
+      } catch { /* noop */ }
+      navigate('/account')
+      return
+    }
+    navigate('/business/pulse')
   }
 
   return (

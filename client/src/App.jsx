@@ -435,6 +435,11 @@ function PulseWrapper() {
   // Email-first Personal Account with no business yet → land on /account onboarding,
   // never the Business shell. Only when the email-auth UI is enabled; Telegram/legacy
   // (business !== null, or flag off) keep the existing /business/pulse behavior.
+  let lastWorkspace = null
+  try { lastWorkspace = localStorage.getItem('last_active_workspace_id') || localStorage.getItem('activeWorkspaceId') } catch {}
+  if (EMAIL_AUTH_UI && lastWorkspace === 'personal') {
+    return <Navigate to="/account" replace />
+  }
   if (EMAIL_AUTH_UI && access && access.business === null) {
     return <Navigate to="/account" replace />
   }
