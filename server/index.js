@@ -364,8 +364,22 @@ app.post('/api/me/avatar', emailAuthGate, auth, (req, res) => {
       const ext = AVATAR_MIME_EXT[file.mimetype];
       if (!ext) return res.status(400).json({ error: 'not_an_image', message: 'Please choose an image file.' });
 
-      await ensureAvatarBucket();
       const userId = req.user.userId;
+      // Storage-abuse guard: authenticated users can't loop 5MB uploads (10/hour).
+      if (rateLimited(`avatar:${userId}`, 10, 60 * 60 * 1000))
+        return res.status(429).json({ error: 'rate_limited', message: 'Too many uploads — try again later.' });
+
+      await ensureAvatarBucket();
+      // Remember the previous avatar path so we can delete the orphan after replacing.
+      const { data: prevRows } = await supabase.from('user_profiles')
+        .select('avatar_url').eq('user_id', userId).limit(1);
+      const prevUrl = prevRows?.[0]?.avatar_url || '';
+      const prevPath = (() => {
+        const m = prevUrl.match(new RegExp(`/${AVATAR_BUCKET}/(.+)$`));
+        // Only ever delete inside the caller's own folder — never trust a foreign path.
+        return m && m[1].startsWith(`${userId}/`) ? m[1] : null;
+      })();
+
       const path = `${userId}/${crypto.randomUUID()}.${ext}`;
       const { error: upErr } = await supabase.storage.from(AVATAR_BUCKET)
         .upload(path, file.buffer, { contentType: file.mimetype, upsert: false });
@@ -376,6 +390,9 @@ app.post('/api/me/avatar', emailAuthGate, auth, (req, res) => {
       const { error: dbErr } = await supabase.from('user_profiles')
         .upsert({ user_id: userId, avatar_url }, { onConflict: 'user_id' });
       if (dbErr) return res.status(500).json({ error: 'save_failed', message: 'Image uploaded but could not be saved to your profile.' });
+
+      // Best-effort cleanup of the replaced file (profile already points at the new one).
+      if (prevPath && prevPath !== path) supabase.storage.from(AVATAR_BUCKET).remove([prevPath]).catch(() => {});
 
       res.json({ ok: true, avatar_url });
     } catch (e) {
@@ -429,17 +446,32 @@ app.get('/api/personal/summary', personalGate, auth, async (req, res) => {
       personalTxRows(ws.id),
     ]);
     const bal = PW.walletBalances(txAll);
-    const totalBalance = (wallets || []).reduce((s, w) => s + (bal.get(w.id) || 0), 0);
 
+    // ── Currency correctness: NEVER sum across currencies. Totals/insights are computed
+    // in the workspace base currency only; other currencies are reported natively as
+    // separate lines (same rule as the business MoneyCard: no cross-asset sums).
+    const baseCur = (ws.base_currency || 'IDR').toUpperCase();
+    const walletCur = new Map((wallets || []).map(w => [w.id, (w.currency || baseCur).toUpperCase()]));
+    const totalBalance = (wallets || [])
+      .filter(w => (w.currency || baseCur).toUpperCase() === baseCur)
+      .reduce((s, w) => s + (bal.get(w.id) || 0), 0);
+    const otherMap = new Map();
+    for (const w of (wallets || [])) {
+      const cur = (w.currency || baseCur).toUpperCase();
+      if (cur === baseCur) continue;
+      otherMap.set(cur, (otherMap.get(cur) || 0) + (bal.get(w.id) || 0));
+    }
+    const other_currencies = [...otherMap.entries()].map(([currency, balance]) => ({ currency, balance }));
+
+    const inBase = (t) => ((t.currency_original || walletCur.get(t.wallet_id) || baseCur).toUpperCase() === baseCur);
     const now = new Date();
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
     const inMonth = (d, base) => { const t = new Date(d); return t.getFullYear() === base.getFullYear() && t.getMonth() === base.getMonth(); };
-    const realTx = txAll.filter(t => !PW.isTransferLeg(t)); // transfers don't change net worth
+    const realTx = txAll.filter(t => !PW.isTransferLeg(t) && inBase(t)); // base-currency, non-transfer
     const mtd = realTx.filter(t => inMonth(t.transaction_date || t.created_at, now));
     const income_mtd = mtd.filter(t => t.type === 'income').reduce((s, t) => s + Number(t.amount_original || 0), 0);
     const expense_mtd = mtd.filter(t => t.type === 'expense').reduce((s, t) => s + Number(t.amount_original || 0), 0);
 
-    // Top expense categories MTD.
+    // Top expense categories MTD (base currency only).
     const catMap = new Map();
     mtd.filter(t => t.type === 'expense').forEach(t => { const k = t.category || 'Uncategorized'; catMap.set(k, (catMap.get(k) || 0) + Number(t.amount_original || 0)); });
     const top_categories = [...catMap.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3).map(([name, amount]) => ({ name, amount }));
@@ -454,8 +486,8 @@ app.get('/api/personal/summary', personalGate, auth, async (req, res) => {
     const recent = txAll.slice().sort((a, b) => new Date(b.transaction_date || b.created_at) - new Date(a.transaction_date || a.created_at)).slice(0, 7);
 
     res.json({
-      workspace: { id: ws.id, base_currency: ws.base_currency },
-      totals: { balance: totalBalance, income_mtd, expense_mtd, net_saved: income_mtd - expense_mtd },
+      workspace: { id: ws.id, base_currency: baseCur },
+      totals: { balance: totalBalance, income_mtd, expense_mtd, net_saved: income_mtd - expense_mtd, other_currencies },
       recent,
       insight: { top_categories, vs_last_month_pct, safe_to_spend: income_mtd - expense_mtd, spending_faster: expense_mtd > lastMonthToDate },
     });
@@ -555,15 +587,25 @@ app.post('/api/personal/transactions', personalGate, auth, async (req, res) => {
       return data?.[0] || null;
     };
 
+    // NOTE on amount_idr: for personal rows it mirrors amount_original (native value) —
+    // there is no FX engine yet. Business queries never read scope='personal' rows, and
+    // every personal read uses amount_original + currency_original, so no mixed math.
+    const idrOf = (cur, amt) => amt;
+
     if (b.kind === 'transfer') {
       if (!b.wallet_id || !b.to_wallet_id || b.wallet_id === b.to_wallet_id) return res.status(400).json({ error: 'invalid_transfer' });
       const from = await ownWallet(b.wallet_id), to = await ownWallet(b.to_wallet_id);
       if (!from || !to) return res.status(404).json({ error: 'wallet_not_found' });
+      // V1: transfers only between SAME-currency wallets — no silent 1:1 FX (a 500k IDR
+      // leg must never appear as "$500k"). Cross-currency needs a real rate (later).
+      if ((from.currency || '').toUpperCase() !== (to.currency || '').toUpperCase()) {
+        return res.status(400).json({ error: 'cross_currency_transfer_unsupported', message: `Transfers need matching currencies (${from.currency} → ${to.currency}). Multi-currency transfers are coming later.` });
+      }
       const group = `xfer:${crypto.randomUUID()}`;
       const base = { business_id: ws.id, user_id: req.user.userId, created_by_user_id: req.user.userId, scope: 'personal', category: 'Transfer', description: b.note || 'Transfer', transaction_date: date, source: group };
       const { data, error } = await supabase.from('transactions').insert([
-        { ...base, type: 'expense', wallet_id: from.id, amount_original: amount, amount_idr: amount, currency_original: from.currency },
-        { ...base, type: 'income', wallet_id: to.id, amount_original: amount, amount_idr: amount, currency_original: to.currency },
+        { ...base, type: 'expense', wallet_id: from.id, amount_original: amount, amount_idr: idrOf(from.currency, amount), currency_original: from.currency },
+        { ...base, type: 'income', wallet_id: to.id, amount_original: amount, amount_idr: idrOf(to.currency, amount), currency_original: to.currency },
       ]).select();
       if (error) return res.status(500).json({ error: 'transfer_failed' });
       return res.status(201).json({ transactions: data });
@@ -573,7 +615,7 @@ app.post('/api/personal/transactions', personalGate, auth, async (req, res) => {
     if (!w) return res.status(404).json({ error: 'wallet_not_found' });
     const { data, error } = await supabase.from('transactions').insert({
       business_id: ws.id, user_id: req.user.userId, created_by_user_id: req.user.userId, scope: 'personal',
-      type: b.kind, amount_original: amount, amount_idr: amount, currency_original: w.currency,
+      type: b.kind, amount_original: amount, amount_idr: idrOf(w.currency, amount), currency_original: w.currency,
       wallet_id: w.id, category: b.category || null, description: b.note || null, transaction_date: date,
     }).select().single();
     if (error) return res.status(500).json({ error: 'transaction_failed' });

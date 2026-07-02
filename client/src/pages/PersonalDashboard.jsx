@@ -257,7 +257,9 @@ function Overview({ baseCur, hasWallet, wallets, t, insight, savingsRate, summar
   const walletTotals = groupAmounts(wallets)
   const walletCurrencies = Object.keys(walletTotals)
   const hasMixedWallets = walletCurrencies.length > 1
-  const primaryBalance = hasMixedWallets ? 'Multiple currencies' : money(t.balance, baseCur)
+  // Backend totals are base-currency only (never summed across currencies), so the
+  // headline number is always honest; the by-currency card lists the other currencies.
+  const primaryBalance = money(t.balance, baseCur)
   const txCurrencyTotals = groupAmounts(summary?.recent || [], 'amount_original', 'currency_original')
   const needsOnboarding = !hasWallet && businesses.length === 0
   return (
@@ -275,7 +277,7 @@ function Overview({ baseCur, hasWallet, wallets, t, insight, savingsRate, summar
       {needsOnboarding && <OnboardingChoices onPersonal={() => setModal('wallet')} onBusiness={() => setModal('business')} onInvite={(code) => navigate(`/invite/${code}`)} />}
 
       {/* A. Personal Balance */}
-      <SummaryCard symbol={SYMBOL} label="Total balance" value={primaryBalance}
+      <SummaryCard symbol={SYMBOL} label={hasMixedWallets ? `Total balance · ${baseCur}` : 'Total balance'} value={primaryBalance}
         meta={<><Icon.dot className="dot" width="12" height="12" /> Safe to spend this month: <b style={{ fontWeight: 700 }}>{money(insight.safe_to_spend, baseCur)}</b></>}
         metrics={[
           { k: 'Income', v: money(t.income_mtd, baseCur), tone: 'pos' },
@@ -858,7 +860,10 @@ function TxModal({ pf, wallets, cats, initialKind = 'expense', onClose, onSaved 
   const [form, setForm] = useState({ amount: '', wallet_id: wallets[0]?.id || '', to_wallet_id: '', category: '', date: new Date().toISOString().slice(0, 10), note: '' })
   const [busy, setBusy] = useState(false); const [err, setErr] = useState('')
   const catList = kind === 'income' ? cats.income : [...cats.expense, ...(cats.business_related || [])]
-  const canTransfer = wallets.length >= 2
+  // Transfers are same-currency only in v1 (no silent 1:1 FX) — mirror the backend rule.
+  const fromWallet = wallets.find(w => w.id === form.wallet_id)
+  const sameCurrencyTargets = wallets.filter(w => w.id !== form.wallet_id && (w.currency || '').toUpperCase() === (fromWallet?.currency || '').toUpperCase())
+  const canTransfer = wallets.length >= 2 && (kind !== 'transfer' || sameCurrencyTargets.length > 0)
   const submit = async (e) => {
     e.preventDefault(); setBusy(true); setErr('')
     try {
@@ -871,11 +876,12 @@ function TxModal({ pf, wallets, cats, initialKind = 'expense', onClose, onSaved 
   const seg = (v, l) => <button type="button" onClick={() => setKind(v)} className={`cfo-tab${kind === v ? ' is-active' : ''}`} style={{ flex: 1 }}>{l}</button>
   return <ModalFrame title="Add transaction" onClose={onClose}><form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
     <div className="cfo-tabs" role="tablist">{seg('expense', 'Expense')}{seg('income', 'Income')}{seg('transfer', 'Transfer')}</div>
-    {kind === 'transfer' && !canTransfer && <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>Add a second account to transfer between accounts.</div>}
+    {kind === 'transfer' && wallets.length < 2 && <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>Add a second account to transfer between accounts.</div>}
+    {kind === 'transfer' && wallets.length >= 2 && sameCurrencyTargets.length === 0 && <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>Transfers work between accounts of the same currency ({fromWallet?.currency}). Multi-currency transfers are coming later.</div>}
     <Field label="Amount"><input className="cfo-input" type="number" min="0" step="any" value={form.amount} onChange={e => setForm({ ...form, amount: e.target.value })} placeholder="0" autoFocus /></Field>
     <Field label={kind === 'transfer' ? 'From account' : 'Account'}><select className="cfo-input" value={form.wallet_id} onChange={e => setForm({ ...form, wallet_id: e.target.value })}>{wallets.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}</select></Field>
     {kind === 'transfer'
-      ? <Field label="To account"><select className="cfo-input" value={form.to_wallet_id} onChange={e => setForm({ ...form, to_wallet_id: e.target.value })}><option value="">—</option>{wallets.filter(w => w.id !== form.wallet_id).map(w => <option key={w.id} value={w.id}>{w.name}</option>)}</select></Field>
+      ? <Field label="To account"><select className="cfo-input" value={form.to_wallet_id} onChange={e => setForm({ ...form, to_wallet_id: e.target.value })}><option value="">—</option>{sameCurrencyTargets.map(w => <option key={w.id} value={w.id}>{w.name} · {w.currency}</option>)}</select></Field>
       : <Field label="Category"><select className="cfo-input" value={form.category} onChange={e => setForm({ ...form, category: e.target.value })}><option value="">—</option>{catList.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}</select></Field>}
     <Field label="Date"><input className="cfo-input" type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} /></Field>
     <Field label="Note"><input className="cfo-input" value={form.note} onChange={e => setForm({ ...form, note: e.target.value })} placeholder="Optional" /></Field>
