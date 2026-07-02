@@ -464,9 +464,12 @@ app.get('/api/personal/summary', personalGate, auth, async (req, res) => {
     const other_currencies = [...otherMap.entries()].map(([currency, balance]) => ({ currency, balance }));
 
     const inBase = (t) => ((t.currency_original || walletCur.get(t.wallet_id) || baseCur).toUpperCase() === baseCur);
+    // Balance corrections adjust wallet balances but are NOT income/spending — keep them
+    // out of monthly stats (otherwise a correction inflates income / savings rate).
+    const isCorrection = (t) => (t.category === 'Balance Correction');
     const now = new Date();
     const inMonth = (d, base) => { const t = new Date(d); return t.getFullYear() === base.getFullYear() && t.getMonth() === base.getMonth(); };
-    const realTx = txAll.filter(t => !PW.isTransferLeg(t) && inBase(t)); // base-currency, non-transfer
+    const realTx = txAll.filter(t => !PW.isTransferLeg(t) && !isCorrection(t) && inBase(t)); // base-currency cash flow only
     const mtd = realTx.filter(t => inMonth(t.transaction_date || t.created_at, now));
     const income_mtd = mtd.filter(t => t.type === 'income').reduce((s, t) => s + Number(t.amount_original || 0), 0);
     const expense_mtd = mtd.filter(t => t.type === 'expense').reduce((s, t) => s + Number(t.amount_original || 0), 0);
@@ -489,7 +492,8 @@ app.get('/api/personal/summary', personalGate, auth, async (req, res) => {
       workspace: { id: ws.id, base_currency: baseCur },
       totals: { balance: totalBalance, income_mtd, expense_mtd, net_saved: income_mtd - expense_mtd, other_currencies },
       recent,
-      insight: { top_categories, vs_last_month_pct, safe_to_spend: income_mtd - expense_mtd, spending_faster: expense_mtd > lastMonthToDate },
+      // Safe-to-spend can never exceed what's actually in the base-currency wallets.
+      insight: { top_categories, vs_last_month_pct, safe_to_spend: Math.max(0, Math.min(totalBalance, income_mtd - expense_mtd)), spending_faster: expense_mtd > lastMonthToDate },
     });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });

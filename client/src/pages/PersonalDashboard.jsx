@@ -182,16 +182,23 @@ export default function PersonalWorkspace() {
   }
   const onSelectWorkspace = (w) => { if (w?.type !== 'personal') openBusiness(w) }
 
-  const txItems = (rows) => rows.map(tx => ({
-    id: tx.id,
-    dir: isXfer(tx) ? null : (tx.type === 'income' ? 'in' : 'out'),
-    icon: categoryIcon(isXfer(tx) ? 'Transfer' : (tx.category || tx.description), tx.type),
-    iconTone: isXfer(tx) ? 'neutral' : (tx.type === 'income' ? 'in' : 'out'),
-    label: isXfer(tx) ? 'Transfer' : (tx.category || tx.description || '—'),
-    sub: tx.transaction_date || '',
-    amount: `${tx.type === 'income' ? '+' : '−'}${money(tx.amount_original, tx.currency_original || baseCur)}`,
-    amountTone: tx.type === 'income' ? 'pos' : '',
-  }))
+  // Corrections and transfers are bookkeeping, not cash flow — render them neutral
+  // (no green/red arrows) so the list reads as "what I actually earned/spent".
+  const isCorrection = (tx) => tx.category === 'Balance Correction'
+  const txItems = (rows) => rows.map(tx => {
+    const neutral = isXfer(tx) || isCorrection(tx)
+    return {
+      id: tx.id,
+      dir: neutral ? null : (tx.type === 'income' ? 'in' : 'out'),
+      icon: categoryIcon(isXfer(tx) ? 'Transfer' : (tx.category || tx.description), tx.type),
+      iconTone: neutral ? 'neutral' : (tx.type === 'income' ? 'in' : 'out'),
+      label: isXfer(tx) ? 'Transfer' : (isCorrection(tx) ? 'Balance correction' : (tx.category || tx.description || '—')),
+      tag: isCorrection(tx) ? 'adjustment' : undefined,
+      sub: tx.transaction_date || '',
+      amount: `${tx.type === 'income' ? '+' : '−'}${money(tx.amount_original, tx.currency_original || baseCur)}`,
+      amountTone: neutral ? '' : (tx.type === 'income' ? 'pos' : ''),
+    }
+  })
 
   const recommendation = !enoughData
     ? 'Not enough data yet — add 5–10 transactions to unlock personal insights.'
@@ -283,20 +290,19 @@ function Overview({ baseCur, hasWallet, wallets, t, insight, savingsRate, summar
           { k: 'Income', v: money(t.income_mtd, baseCur), tone: 'pos' },
           { k: 'Expenses', v: money(t.expense_mtd, baseCur), tone: 'neg' },
           { k: 'Saved this month', v: money(t.net_saved, baseCur) },
+          { k: 'Savings rate', v: savingsRate != null ? `${savingsRate}%` : '—' },
         ]} />
       {hasMixedWallets && <Card className="cfo-mt personal-currency-note" title="Balances by currency">
-        <DataList items={walletCurrencies.map(cur => ({ id: cur, label: cur, sub: 'Kept separate until conversion is available', amount: money(walletTotals[cur], cur) }))} />
+        <DataList items={walletCurrencies.map(cur => ({ id: cur, label: cur, amount: money(walletTotals[cur], cur) }))} />
+        <div style={{ marginTop: 8, fontSize: 12, color: 'var(--text-muted)' }}>Currencies are kept separate — no automatic conversion yet.</div>
       </Card>}
 
-      {/* B. Monthly Snapshot + D. Quick Add */}
+      {/* B. AI insight + D. Quick Add (monthly numbers live in the hero — no duplicate card) */}
       <div className="cfo-grid cfo-grid-2 cfo-mt">
-        <Card title="Monthly snapshot">
-          <div className="cfo-grid cfo-grid-2" style={{ gap: 14 }}>
-            <Stat k="Income" v={money(t.income_mtd, baseCur)} tone="pos" />
-            <Stat k="Expenses" v={money(t.expense_mtd, baseCur)} tone="neg" />
-            <Stat k="Net saved" v={money(t.net_saved, baseCur)} />
-            <Stat k="Savings rate" v={savingsRate != null ? `${savingsRate}%` : '—'} />
-          </div>
+        <Card title="AI Alert" className="personal-ai-card" action={<span className="cfo-chip cfo-chip-soft">Free plan</span>}>
+          <p style={{ margin: 0, fontSize: 14, color: 'var(--text-secondary)', lineHeight: 1.55 }}>
+            {recommendation}{insight.vs_last_month_pct != null && ` (${insight.vs_last_month_pct > 0 ? '+' : ''}${insight.vs_last_month_pct}% vs last month)`}
+          </p>
           {Array.isArray(insight.top_categories) && insight.top_categories.length > 0 && (
             <div style={{ marginTop: 12, fontSize: 13, color: 'var(--text-muted)' }}>Top: {insight.top_categories.map(c => `${c.name} (${money(c.amount, baseCur)})`).join(' · ')}</div>
           )}
@@ -326,14 +332,6 @@ function Overview({ baseCur, hasWallet, wallets, t, insight, savingsRate, summar
           : <EmptyState title="Your personal transactions will appear here" description="Add income, expenses, or transfers between your accounts." actions={<Btn onClick={() => setModal({ tx: 'expense' })} disabled={!hasWallet}>+ Add transaction</Btn>} />}
       </Card>
       {Object.keys(txCurrencyTotals).length > 1 && <div className="personal-small-note">Multi-currency transactions are displayed in their original currency. We do not combine IDR and USD until conversion is available.</div>}
-
-      {/* F. CFO AI Lite */}
-      <Card title="AI Alert" className="cfo-mt personal-ai-card" action={<span className="cfo-chip cfo-chip-soft">Free plan</span>}>
-        <p style={{ margin: 0, fontSize: 14, color: 'var(--text-secondary)', lineHeight: 1.55 }}>
-          {recommendation}{insight.vs_last_month_pct != null && ` (${insight.vs_last_month_pct > 0 ? '+' : ''}${insight.vs_last_month_pct}% vs last month)`}
-        </p>
-        <UpgradeGates compact />
-      </Card>
 
       {/* G. Business Connections (secondary) */}
       <BusinessLinks businesses={businesses} navigate={navigate} onSelect={onSelectWorkspace} setModal={setModal} upgrade={upgrade} setUpgrade={setUpgrade} compact />
@@ -465,7 +463,9 @@ function TransactionsPage({ txs, txItems, hasWallet, setModal }) {
     if (q && !((tx.category || '') + ' ' + (tx.description || '')).toLowerCase().includes(q.toLowerCase())) return false
     return true
   }), [txs, filter, q])
-  const totals = dailyTotals(rows)
+  // Day-group sums = real cash flow only (no transfer legs, no balance corrections) —
+  // otherwise a correction shows nonsense like "+$99,019" in the day header.
+  const totals = dailyTotals(rows.filter(tx => !isXfer(tx) && tx.category !== 'Balance Correction'))
   const grouped = rows.reduce((acc, tx) => {
     const key = tx.transaction_date || 'Undated'
     acc[key] ||= []
