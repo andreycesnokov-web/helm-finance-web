@@ -15,10 +15,15 @@ import {
 } from '../../shell/ui'
 import DebtPaymentModal from '../../components/DebtPaymentModal' // reused VERBATIM — Pay Now / Mark Received logic unchanged
 import DebtFormModal from '../../components/DebtFormModal'       // create payable/receivable (business-scope locked)
+import { upcomingDeadlines } from './AccountantPremium'          // static statutory schedule (premium P1)
 
 const SYMBOL = '/brand/symbol_navy_blue_dot_transparent.svg'
 const SYMBOL_WHITE = '/brand/symbol_white_transparent.svg'
 const idr = (v) => 'Rp ' + formatAmount(String(v ?? 0), 'IDR')
+
+// Premium P1 additions (Radar strip, Decision Engine, Compliance snapshot, Accounts
+// hero/share%). Flag OFF ⇒ pages render byte-identically to today.
+const BUSINESS_PREMIUM = import.meta.env.VITE_BUSINESS_PREMIUM_UI === 'true'
 
 function useScoped(path, deps = []) {
   const { token } = useAuth()
@@ -91,6 +96,7 @@ export function BusinessPulse() {
             { k: 'Net position', v: idr(d.netPosition), tone: Number(d.netPosition) >= 0 ? 'pos' : 'neg' },
           ]} />
       </div>
+      {BUSINESS_PREMIUM && <RadarStrip d={d} navigate={navigate} />}
       <div className="cfo-grid cfo-grid-4" style={{ marginBottom: 26 }}>
         <Card title="Receivables"><div className="cfo-stat-v cfo-mono" style={{ fontSize: 20 }}>{idr(d.receivables)}</div>{!!d.pendingReceivables && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>+{idr(d.pendingReceivables)} pending</div>}</Card>
         <Card title="Payables"><div className="cfo-stat-v cfo-mono" style={{ fontSize: 20 }}>{idr(d.payables)}</div>{!!d.pendingPayables && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>+{idr(d.pendingPayables)} pending</div>}</Card>
@@ -98,8 +104,17 @@ export function BusinessPulse() {
         <Card title="Runway"><div className="cfo-stat-v cfo-mono" style={{ fontSize: 20 }}>{d.runway === 999 ? '—' : `${d.runway} days`}</div><div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>at current burn</div></Card>
       </div>
       {emptyBusiness && <BusinessStarterActions navigate={navigate} />}
+      {BUSINESS_PREMIUM && (
+        <div className="cfo-grid cfo-grid-2" style={{ marginBottom: 26 }}>
+          <DecisionEngineCard d={d} />
+          <ComplianceSnapshotCard navigate={navigate} />
+        </div>
+      )}
       <div className="cfo-grid cfo-grid-2">
-        <Card title="AI CFO summary" action={<StatusBadge tone="info"><Icon.cfo width="13" height="13" /> Live</StatusBadge>}>
+        <Card title="AI CFO summary" action={<span style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <StatusBadge tone="info"><Icon.cfo width="13" height="13" /> Live</StatusBadge>
+          {BUSINESS_PREMIUM && <Btn sm variant="ghost" onClick={() => navigate('/business/ai-cfo')}>Ask AI CFO</Btn>}
+        </span>}>
           <div style={{ display: 'flex', gap: 12 }}>
             <span className="cfo-state-ic" style={{ background: 'var(--info-soft)', color: 'var(--brand-navy)', width: 40, height: 40, borderRadius: 11, flexShrink: 0 }}><Icon.cfo width="20" height="20" /></span>
             <div style={{ fontSize: 14, color: 'var(--text-secondary)', lineHeight: 1.5 }}>{d.aiText || 'No urgent actions detected.'}</div>
@@ -110,6 +125,75 @@ export function BusinessPulse() {
         </Card>
       </div>
     </>
+  )
+}
+
+// ── Premium P1: Radar strip — REAL signals only (pulse data + statutory calendar) ──
+function RadarStrip({ d, navigate }) {
+  const chips = []
+  const pendingAmt = Number(d.pendingPayables || 0) + Number(d.pendingReceivables || 0)
+  if (pendingAmt > 0) chips.push({ tone: 'warning', icon: <Icon.warn width="13" height="13" />, text: `Pending approvals · ${idr(pendingAmt)}`, go: '/business/approvals' })
+  if (d.runway !== 999 && d.runway != null) {
+    const r = Number(d.runway)
+    chips.push(r < 30
+      ? { tone: 'danger', icon: <Icon.warn width="13" height="13" />, text: `Low runway · ${r} days` }
+      : r < 60
+        ? { tone: 'warning', icon: <Icon.warn width="13" height="13" />, text: `Runway · ${r} days` }
+        : { tone: 'success', icon: <Icon.check width="13" height="13" />, text: `Runway healthy · ${r} days` })
+  }
+  const next = upcomingDeadlines(1)[0]
+  if (next) chips.push({ tone: 'info', icon: <Icon.doc width="13" height="13" />, text: `Next tax: ${next.title} · ${next.date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}`, go: '/business/accountant' })
+  if (!chips.length) return null
+  return (
+    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 18, alignItems: 'center' }}>
+      <span style={{ fontSize: 11, letterSpacing: '.06em', textTransform: 'uppercase', fontWeight: 700, color: 'var(--text-muted)' }}>Radar</span>
+      {chips.map((c, i) => (
+        <span key={i} onClick={c.go ? () => navigate(c.go) : undefined} style={c.go ? { cursor: 'pointer' } : undefined}>
+          <StatusBadge tone={c.tone}>{c.icon} {c.text}</StatusBadge>
+        </span>
+      ))}
+    </div>
+  )
+}
+
+// ── Premium P1: Decision Engine — honest CLIENT-SIDE projection from live pulse
+//    numbers (cash, burn). No AI, no backend: newRunway = (cash − X) / burn. ─────
+function DecisionEngineCard({ d }) {
+  const [amount, setAmount] = useState('')
+  const cash = Number(d.totalBalance || 0)
+  const burn = Number(d.burnRate || 0)
+  const x = Number(amount)
+  const valid = Number.isFinite(x) && x > 0
+  const current = burn > 0 ? Math.floor(cash / burn) : null
+  const projected = valid && burn > 0 ? Math.max(0, Math.floor((cash - x) / burn)) : null
+  return (
+    <Card title="Decision engine" action={<StatusBadge tone="info">Projection</StatusBadge>}>
+      <div style={{ fontSize: 13.5, color: 'var(--text-secondary)', marginBottom: 10 }}>What happens to runway if I pay this today?</div>
+      <input className="cfo-input" type="number" min="0" step="any" placeholder="Amount (IDR)" value={amount} onChange={e => setAmount(e.target.value)} />
+      {valid && (burn > 0 ? (
+        <div style={{ marginTop: 12, display: 'flex', gap: 22 }}>
+          <Stat k="Runway now" v={current === null ? '—' : `${current} days`} />
+          <Stat k="After payment" v={`${projected} days`} tone={projected < 30 ? 'neg' : undefined} />
+          <Stat k="Change" v={`−${current - projected} days`} tone="neg" />
+        </div>
+      ) : (
+        <div style={{ marginTop: 12, fontSize: 13, color: 'var(--text-muted)' }}>No burn detected yet — runway is not limited by spending.</div>
+      ))}
+      <div style={{ marginTop: 10, fontSize: 11.5, color: 'var(--text-muted)' }}>Deterministic projection from your live cash & burn — not financial advice.</div>
+    </Card>
+  )
+}
+
+// ── Premium P1: Compliance snapshot — statutory deadlines + link to the module ──
+function ComplianceSnapshotCard({ navigate }) {
+  const next = upcomingDeadlines(2)
+  return (
+    <Card title="Tax & compliance" action={<Btn sm variant="ghost" onClick={() => navigate('/business/accountant')}>Open AI Accountant</Btn>}>
+      {next.length === 0
+        ? <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>No statutory deadlines in the next weeks.</div>
+        : <DataList items={next.map(x => ({ id: x.key + x.date.toISOString(), label: x.title, sub: x.sub, amount: x.date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }), amountTone: '' }))} />}
+      <div style={{ marginTop: 8, fontSize: 11.5, color: 'var(--text-muted)' }}>Statutory schedule — amounts arrive with the tax engine.</div>
+    </Card>
   )
 }
 
@@ -141,6 +225,47 @@ export function BusinessAccounts() {
   if (w.error) return <>{head}<ErrorState description={w.error} onRetry={() => location.reload()} /></>
   const wallets = w.data?.wallets || []
   if (!wallets.length) return <>{head}<EmptyState symbol={SYMBOL} title="No accounts yet" description="Business accounts and balances will appear here." /></>
+
+  // Premium P1: navy hero total + per-wallet share bars. Same MoneyCard rule as ever:
+  // NEVER sum across currencies — the hero totals IDR wallets only; other currencies
+  // stay native in their own cards.
+  if (BUSINESS_PREMIUM) {
+    const idrWallets = wallets.filter(x => (x.currency || 'IDR').toUpperCase() === 'IDR')
+    const otherWallets = wallets.filter(x => (x.currency || 'IDR').toUpperCase() !== 'IDR')
+    const total = idrWallets.reduce((s, x) => s + Number(x.balance || 0), 0)
+    return <>{head}
+      <div style={{ marginBottom: 22 }}>
+        <SummaryCard symbol={SYMBOL_WHITE} label={otherWallets.length ? 'Total balance · IDR wallets' : 'Total balance · all wallets'}
+          value={idr(total)}
+          meta={<>{idrWallets.length} active wallet{idrWallets.length === 1 ? '' : 's'}{otherWallets.length ? ` · ${otherWallets.length} in other currencies (kept separate)` : ''}</>} />
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: otherWallets.length ? 22 : 0 }}>
+        {idrWallets.map(x => {
+          const share = total > 0 ? Math.round((Number(x.balance || 0) / total) * 100) : 0
+          return (
+            <Card key={x.id}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+                <span style={{ fontWeight: 700, fontSize: 14 }}>{x.name}</span>
+                <span className="cfo-mono" style={{ fontWeight: 800, fontSize: 14 }}>{idr(x.balance)} <span style={{ color: 'var(--text-muted)', fontWeight: 600, fontSize: 11.5 }}>· {share}%</span></span>
+              </div>
+              <div style={{ height: 6, borderRadius: 4, background: 'var(--surface-page)', marginTop: 9 }}>
+                <div style={{ height: 6, width: `${share}%`, borderRadius: 4, background: 'var(--brand-electric-blue)' }} />
+              </div>
+              <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginTop: 6 }}>{x.asset_type === 'crypto' ? 'Crypto' : 'Fiat'} · {(x.currency || 'IDR').toUpperCase()}</div>
+            </Card>
+          )
+        })}
+      </div>
+      {otherWallets.length > 0 && (
+        <div className="cfo-grid cfo-grid-4">
+          {otherWallets.map(x => (
+            <MoneyCard key={x.id} asset={x.asset_code || x.currency || 'IDR'} kind={x.asset_type === 'crypto' ? 'Crypto' : 'Fiat'} sub={x.name} native={formatAmount(String(x.balance ?? 0), x.currency || 'IDR') + ' ' + (x.currency || 'IDR')} />
+          ))}
+        </div>
+      )}
+    </>
+  }
+
   return <>{head}
     <div className="cfo-grid cfo-grid-4">
       {wallets.map(x => (
