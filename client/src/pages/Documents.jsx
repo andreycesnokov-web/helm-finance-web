@@ -23,6 +23,50 @@ const L = {
 }
 const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'
 
+// Premium P2: type "folders" + an honest metadata insight strip. Presentation only —
+// derived from the already-loaded documents list. Flag OFF ⇒ page unchanged.
+const BUSINESS_PREMIUM = import.meta.env.VITE_BUSINESS_PREMIUM_UI === 'true'
+
+function DocFolders({ docs, active, onPick }) {
+  const byType = docs.reduce((m, d) => { const t = d.document_type || 'other'; m[t] = (m[t] || 0) + 1; return m }, {})
+  const types = Object.entries(byType).sort((a, b) => b[1] - a[1])
+  if (!types.length) return null
+  return (
+    <div style={{ display: 'flex', gap: 8, margin: '0 0 12px', flexWrap: 'wrap' }}>
+      {types.map(([t, n]) => (
+        <button key={t} onClick={() => onPick(active === t ? '' : t)}
+          style={{
+            fontSize: 12, fontWeight: 700, padding: '6px 12px', borderRadius: 9, cursor: 'pointer',
+            border: '1px solid ' + (active === t ? 'transparent' : 'var(--border, #DDE5EC)'),
+            background: active === t ? 'var(--brand-navy, #003366)' : 'var(--surface, #fff)',
+            color: active === t ? '#fff' : 'var(--text-2, #3D556E)',
+          }}>
+          {t} <span style={{ opacity: .65 }}>· {n}</span>
+        </button>
+      ))}
+    </div>
+  )
+}
+
+function DocInsightStrip({ docs }) {
+  const activeDocs = docs.filter(d => !d.archived_at)
+  const unlinked = activeDocs.filter(d => (d.links || []).length === 0).length
+  const noAmount = activeDocs.filter(d => d.gross_amount == null).length
+  if (!unlinked && !noAmount) return null
+  return (
+    <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start', background: 'var(--surface, #fff)', border: '1px solid var(--border, #DDE5EC)', borderLeft: '3px solid var(--brand-electric-blue, #3399FF)', borderRadius: '0 12px 12px 0', padding: '10px 14px', margin: '0 0 12px', fontSize: 13, color: 'var(--text-2, #3D556E)' }}>
+      <span aria-hidden>🤖</span>
+      <span>
+        <b style={{ color: 'var(--brand-electric-blue-ink, #1565C0)' }}>Document health:</b>{' '}
+        {unlinked > 0 && <>{unlinked} document{unlinked === 1 ? '' : 's'} not linked to any transaction or payable</>}
+        {unlinked > 0 && noAmount > 0 && ' · '}
+        {noAmount > 0 && <>{noAmount} missing an amount</>}
+        {' — '}complete them for audit readiness. Derived from your document metadata only.
+      </span>
+    </div>
+  )
+}
+
 export default function Documents() {
   const { token } = useAuth()
   const l = L[['ru', 'id'].includes(getLang()) ? getLang() : 'en']
@@ -68,6 +112,9 @@ export default function Documents() {
           </div>
         ))}
       </div>
+
+      {BUSINESS_PREMIUM && <DocFolders docs={docs} active={f.type} onPick={(t) => setF({ ...f, type: t })} />}
+      {BUSINESS_PREMIUM && <DocInsightStrip docs={docs} />}
 
       <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
         <input value={f.search} onChange={e => setF({ ...f, search: e.target.value })} placeholder={l.search} style={{ flex: 1, minWidth: 160, padding: '7px 10px', border: '1px solid var(--border-2)', borderRadius: 8, fontSize: 13 }} />
