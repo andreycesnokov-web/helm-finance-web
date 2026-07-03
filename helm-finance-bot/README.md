@@ -27,15 +27,28 @@ Requires Node 18+ (uses global `fetch`).
 
 1. **Connect** — user opens `https://t.me/<bot>?start=cfo_<memberId32>_<hmac10>`
    from the web tutorial → bot calls `POST /api/telegram/connect`.
-2. **Training** — messages starting with `TEST:` / `ТЕСТ:` are classified
+2. **Company selection** — `/company` or any ambiguous write calls
+   `GET /api/telegram/active-business?telegram_id=...` and shows inline company
+   buttons when the user belongs to more than one business. The selected company
+   is saved through `POST /api/telegram/active-business`, then the pending action
+   is retried.
+3. **Clarification** — if the parser is uncertain, the bot asks with inline
+   buttons: Expense / Income / Payable / Receivable.
+4. **Training** — messages starting with `TEST:` / `ТЕСТ:` are classified
    (payable / receivable / expense_request) and sent to
    `POST /api/team/onboarding/training-submission` (`is_training=true`, no cash impact).
-3. **Real** — non-TEST financial messages call `POST /api/debts/from-telegram`
+5. **Real** — non-TEST financial messages call `POST /api/debts/from-telegram`
    → pending-approval record (owner/admin approves in the web app).
+6. **Role-aware help/menu** — employees get expense-recording guidance only.
+   Reports/balances are blocked for employees and remain web-only for managers
+   until dedicated backend report endpoints exist.
 
 ## Limitations (V1)
 
-- No inline Approve/Reject callback buttons (next task).
+- Live multi-business selection requires backend migration 043 and
+  `TELEGRAM_ACTIVE_BUSINESS_ENABLED=true`. If that backend flag is off, the bot
+  fails closed with a clear message instead of guessing a company.
+- No inline Approve/Reject callback buttons from this bot process yet.
 - No voice / photo / invoice OCR.
-- Single-business members only; multi-business `409` is not yet disambiguated.
+- No Telegram report/balance payloads yet; managers are directed to the web app.
 - Heuristic NLP parser (keywords + simple amount/date), not a full model.
