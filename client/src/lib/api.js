@@ -12,6 +12,17 @@ export function setActiveBusinessId(id) {
   } catch { /* private mode */ }
 }
 
+// One-shot post-login destination (e.g. /invite/CODE set by JoinInvite before sending
+// the user to email sign-in). Same-app paths only — never an external URL.
+export function consumePostLoginRedirect() {
+  try {
+    const r = localStorage.getItem('post_login_redirect')
+    localStorage.removeItem('post_login_redirect')
+    if (r && r.startsWith('/') && !r.startsWith('//')) return r
+  } catch { /* private mode */ }
+  return null
+}
+
 export async function apiFetch(path, token, options = {}) {
   const businessId = getActiveBusinessId()
   const res = await fetch(BASE + path, {

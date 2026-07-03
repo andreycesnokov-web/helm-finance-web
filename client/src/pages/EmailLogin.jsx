@@ -5,6 +5,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
+import { consumePostLoginRedirect } from '../lib/api'
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
@@ -53,7 +54,7 @@ export default function EmailLogin() {
         return
       }
       loginWithToken(data.token, data.user ? { id: data.user.id, firstName: data.user.display_name } : null)
-      navigate('/account')
+      navigate(consumePostLoginRedirect() || '/account')
     } catch { setError('Network error. Please try again.') }
     finally { setBusy(false) }
   }
