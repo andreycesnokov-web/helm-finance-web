@@ -1548,6 +1548,8 @@ app.post('/api/telegram/debts/:id/approve', async (req, res) => {
     if (r.error === 'not_found') return res.status(404).json({ error: 'not_found', message: 'Request not found.' });
     if (r.error)                 return res.status(403).json({ error: 'forbidden', message: 'You do not have access to this request.' });
     const { debt, userId, role } = r;
+    const gate = await telegramPaidGate(debt.business_id);
+    if (gate) return res.status(402).json(gate);
 
     if (!canApproveFinancialRecord(role))
       return res.status(403).json({ error: 'forbidden', message: 'Your role cannot approve requests.' });
@@ -1581,6 +1583,8 @@ app.post('/api/telegram/debts/:id/reject', async (req, res) => {
     if (r.error === 'not_found') return res.status(404).json({ error: 'not_found', message: 'Request not found.' });
     if (r.error)                 return res.status(403).json({ error: 'forbidden', message: 'You do not have access to this request.' });
     const { debt, userId, role } = r;
+    const gate = await telegramPaidGate(debt.business_id);
+    if (gate) return res.status(402).json(gate);
 
     if (!canApproveFinancialRecord(role))
       return res.status(403).json({ error: 'forbidden', message: 'Your role cannot reject requests.' });
@@ -1615,6 +1619,8 @@ app.post('/api/telegram/debts/:id/request-info', async (req, res) => {
     if (r.error === 'not_found') return res.status(404).json({ error: 'not_found', message: 'Request not found.' });
     if (r.error)                 return res.status(403).json({ error: 'forbidden', message: 'You do not have access to this request.' });
     const { debt, userId, role } = r;
+    const gate = await telegramPaidGate(debt.business_id);
+    if (gate) return res.status(402).json(gate);
 
     if (!canApproveFinancialRecord(role))
       return res.status(403).json({ error: 'forbidden', message: 'Your role cannot request info.' });
@@ -1708,6 +1714,8 @@ app.post('/api/telegram/debts/:id/decision', async (req, res) => {
       business = ob?.[0];
     }
     if (!business) return res.status(404).json({ error: 'business_not_found' });
+    const gate = await telegramPaidGate(business.id);
+    if (gate) return res.status(402).json(gate);
     const biz = { business, role: r.role, ownerUserId: business.owner_user_id };
     const language = normalizeLanguage(await getUserLanguage(telegram_id).catch(() => 'en'));
     const debt = await loadBusinessDebt(biz, req.params.id);
@@ -1776,7 +1784,14 @@ app.get('/api/telegram/active-business', async (req, res) => {
   if (!requireBotSecret(req)) return res.status(401).json({ error: 'Invalid bot credentials' });
   const telegram_id = req.query?.telegram_id || req.body?.telegram_id;
   if (!telegram_id) return res.status(400).json({ error: 'telegram_id required' });
-  try { res.json(await resolveTelegramActiveBusiness(telegram_id)); }
+  try {
+    const r = await resolveTelegramActiveBusiness(telegram_id);
+    if (r.business) {
+      const gate = await telegramPaidGate(r.business.id);
+      if (gate) return res.status(402).json(gate);
+    }
+    res.json(r);
+  }
   catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -1794,6 +1809,8 @@ app.post('/api/telegram/active-business', async (req, res) => {
     const m = data?.[0];
     if (!m || !m.businesses) return res.status(403).json({ error: 'not_a_member' });
     if (m.businesses.type === 'personal') return res.status(400).json({ error: 'business_workspace_required' });
+    const gate = await telegramPaidGate(business_id);
+    if (gate) return res.status(402).json(gate);
     await supabase.from('telegram_user_state').upsert({ user_id: userId, active_business_id: business_id }, { onConflict: 'user_id' });
     res.json({ ok: true, business: { id: m.businesses.id, name: m.businesses.name, business_code: m.businesses.business_code || null, role: m.role } });
   } catch (e) { res.status(500).json({ error: e.message }); }
@@ -1853,6 +1870,8 @@ app.post('/api/telegram/debts/attach-receipt', async (req, res) => {
       .limit(1);
     const debt = candidates?.[0];
     if (!debt) return res.status(404).json({ error: 'no_open_request', message: 'No open request to attach a receipt to.' });
+    const gate = await telegramPaidGate(debt.business_id);
+    if (gate) return res.status(402).json(gate);
 
     const existing = Array.isArray(debt.attachments) ? debt.attachments : [];
     if (existing.length >= MAX_RECEIPTS)
@@ -1923,6 +1942,8 @@ app.post('/api/telegram/debts/from-receipt', async (req, res) => {
       m = await resolveTelegramMember(telegram_id);
       if (m.error) return res.status(m.error === 'multiple_businesses' ? 409 : 403).json({ error: m.error });
     }
+    const gate = await telegramPaidGate(m.businessId);
+    if (gate) return res.status(402).json(gate);
 
     const file = await fetchTelegramFile(file_id).catch(() => null);
     const ocr = await recognizeReceipt(file).catch(() => null);
@@ -4268,6 +4289,25 @@ function requireBotSecret(req) {
   return req.headers['x-bot-secret'] && req.headers['x-bot-secret'] === botSecret;
 }
 
+// ── Telegram = paid add-on (V4.1) ────────────────────────────────────────────
+// When TELEGRAM_PAID_GATE_ENABLED=true, bot-facing endpoints refuse businesses whose
+// EFFECTIVE plan is 'free' (active trials pass — trial grants full product access).
+// Returns a 402 payload the bot can relay, or null when allowed. Default OFF so the
+// rollout is dark; enabling is an explicit Railway env step (owner action).
+const TELEGRAM_PAID_GATE_ENABLED = process.env.TELEGRAM_PAID_GATE_ENABLED === 'true';
+async function telegramPaidGate(businessId) {
+  if (!TELEGRAM_PAID_GATE_ENABLED || !businessId) return null;
+  const { data } = await supabase.from('businesses').select('*').eq('id', businessId).limit(1);
+  const business = data?.[0];
+  if (!business) return null; // let the route's own not-found handling answer
+  if (computeBusinessAccess(business).effectivePlan !== 'free') return null;
+  return {
+    error: 'telegram_paid_plan_required',
+    message: 'The Telegram assistant is a paid add-on. Upgrade your plan in CFO AI (app.cfo-ai.site → Settings) to keep using it.',
+    upgrade_url: 'https://app.cfo-ai.site/business/settings',
+  };
+}
+
 // ── GET /api/telegram/config — PUBLIC (no auth) ──────────────────────────────
 // Returns only non-secret bot config. Never exposes any token/secret.
 app.get('/api/telegram/config', (req, res) => {
@@ -4495,6 +4535,9 @@ app.post('/api/telegram/connect', async (req, res) => {
     // their own Telegram account. Never bind a foreign telegram_id.
     if (String(member.user_id) !== String(telegram_id))
       return res.status(403).json({ error: 'telegram_id does not match this member' });
+
+    const gate = await telegramPaidGate(member.business_id);
+    if (gate) return res.status(402).json(gate);
 
     await supabase.from('business_members').update({
       telegram_connected_at:    new Date().toISOString(),
