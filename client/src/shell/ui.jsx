@@ -197,6 +197,7 @@ export const DataList = ({ items }) => (
           {it.sub && <span className="cfo-list-sub">{it.sub}</span>}
         </span>
         {it.amount && <span className={`cfo-list-amt ${it.amountTone || ''}`}>{it.amount}</span>}
+        {it.action}
       </li>
     ))}
   </ul>

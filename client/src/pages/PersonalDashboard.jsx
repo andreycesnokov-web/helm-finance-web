@@ -212,7 +212,7 @@ export default function PersonalWorkspace() {
   else if (error) body = <EmptyState symbol={SYMBOL} title="Couldn’t load personal finance" description={error} actions={<Btn onClick={load}>Try again</Btn>} />
   else if (section === 'overview') body = <Overview {...{ baseCur, hasWallet, wallets, t, insight, savingsRate, summary, txItems, recommendation, setModal, setSection, businesses, navigate, onSelectWorkspace, user, upgrade, setUpgrade }} />
   else if (section === 'wallets') body = <WalletsPage {...{ pf, reload, wallets, hasWallet, baseCur, setModal }} />
-  else if (section === 'transactions') body = <TransactionsPage {...{ txs, txItems, hasWallet, setModal }} />
+  else if (section === 'transactions') body = <TransactionsPage {...{ txs, txItems, hasWallet, setModal, pf, onChanged: load }} />
   else if (section === 'categories') body = <CategoriesPage />
   else if (section === 'cfo') body = <CfoPage {...{ baseCur, t, insight, enoughData, recommendation }} />
   else if (section === 'businesses') body = <BusinessLinks {...{ businesses, navigate, onSelect: onSelectWorkspace, setModal, upgrade, setUpgrade }} />
@@ -289,7 +289,7 @@ function Overview({ baseCur, hasWallet, wallets, t, insight, savingsRate, summar
         metrics={[
           { k: 'Income', v: money(t.income_mtd, baseCur), tone: 'pos' },
           { k: 'Expenses', v: money(t.expense_mtd, baseCur), tone: 'neg' },
-          { k: 'Saved this month', v: money(t.net_saved, baseCur) },
+          { k: 'Saved this month', v: money(t.net_saved, baseCur), tone: Number(t.net_saved) < 0 ? 'neg' : undefined },
           { k: 'Savings rate', v: savingsRate != null ? `${savingsRate}%` : '—' },
         ]} />
       {hasMixedWallets && <Card className="cfo-mt personal-currency-note" title="Balances by currency">
@@ -454,9 +454,30 @@ function WalletsPage({ pf, reload, wallets, hasWallet, baseCur, setModal }) {
 }
 
 // ── Transactions page (filters + search) ─────────────────────────────────────
-function TransactionsPage({ txs, txItems, hasWallet, setModal }) {
+function TransactionsPage({ txs, txItems, hasWallet, setModal, pf, onChanged }) {
   const [filter, setFilter] = useState('all')
   const [q, setQ] = useState('')
+  const [busyId, setBusyId] = useState(null)
+  // Delete a personal transaction (transfer legs are removed as a pair server-side).
+  // Lets users clean up test data like stray balance corrections.
+  const del = async (tx) => {
+    const what = isXfer(tx) ? 'this transfer (both legs)' : `"${tx.category || tx.description || 'this transaction'}"`
+    if (!window.confirm(`Delete ${what}? This cannot be undone.`)) return
+    setBusyId(tx.id)
+    try {
+      const r = await pf(`/transactions/${tx.id}`, { method: 'DELETE' })
+      if (r.ok) onChanged?.()
+    } finally { setBusyId(null) }
+  }
+  const withDelete = (groupRows) => {
+    const byId = new Map(groupRows.map(tx => [tx.id, tx]))
+    return txItems(groupRows).map(it => ({
+      ...it,
+      action: <button type="button" aria-label="Delete transaction" disabled={busyId === it.id}
+        onClick={() => del(byId.get(it.id))}
+        style={{ marginLeft: 10, border: 'none', background: 'none', color: 'var(--text-muted)', fontSize: 16, cursor: 'pointer', lineHeight: 1, padding: '2px 4px' }}>×</button>,
+    }))
+  }
   const rows = useMemo(() => txs.filter(tx => {
     const kind = isXfer(tx) ? 'transfer' : tx.type
     if (filter !== 'all' && kind !== filter) return false
@@ -486,7 +507,7 @@ function TransactionsPage({ txs, txItems, hasWallet, setModal }) {
               {Object.entries(grouped).map(([date, groupRows]) => (
                 <section key={date} className="personal-tx-day">
                   <div className="personal-tx-day-head"><span>{date}</span><span>{Object.entries(totals[date] || {}).map(([cur, total]) => formatSignedMoney(total, cur)).join(' · ')}</span></div>
-                  <DataList items={txItems(groupRows)} />
+                  <DataList items={withDelete(groupRows)} />
                 </section>
               ))}
             </div> : <EmptyState title="No matching transactions" description="Try a different filter or search." />}
