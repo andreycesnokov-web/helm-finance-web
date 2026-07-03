@@ -313,6 +313,28 @@ app.patch('/api/me/profile', emailAuthGate, auth, async (req, res) => {
     const allowed = ['display_name', 'locale', 'timezone', 'avatar_url'];
     const patch = {}; for (const k of allowed) if (k in (req.body || {})) patch[k] = req.body[k];
     if (!Object.keys(patch).length) return res.status(400).json({ error: 'nothing_to_update' });
+
+    // Field validation (B4). Lengths bounded; locale allow-listed; avatar_url may only
+    // be cleared ('') or point at OUR public avatars bucket — arbitrary external URLs
+    // are rejected so a profile can never carry a foreign/tracking image address.
+    if ('display_name' in patch) {
+      patch.display_name = String(patch.display_name ?? '').trim().slice(0, 80);
+    }
+    if ('locale' in patch && patch.locale !== '' && !['en', 'ru', 'id'].includes(patch.locale)) {
+      return res.status(400).json({ error: 'invalid_locale' });
+    }
+    if ('timezone' in patch) {
+      patch.timezone = String(patch.timezone ?? '').trim().slice(0, 64);
+      if (patch.timezone && !/^[A-Za-z0-9_+\-/]+$/.test(patch.timezone)) {
+        return res.status(400).json({ error: 'invalid_timezone' });
+      }
+    }
+    if ('avatar_url' in patch && patch.avatar_url !== '' && patch.avatar_url != null) {
+      const ok = typeof patch.avatar_url === 'string'
+        && patch.avatar_url.length <= 500
+        && patch.avatar_url.includes(`/storage/v1/object/public/${AVATAR_BUCKET}/`);
+      if (!ok) return res.status(400).json({ error: 'invalid_avatar_url', message: 'Use the photo upload — external image URLs are not accepted.' });
+    }
     const { data } = await supabase.from('user_profiles')
       .upsert({ user_id: req.user.userId, ...patch }, { onConflict: 'user_id' }).select().single();
     res.json({ profile: data });
@@ -4184,6 +4206,11 @@ app.delete('/api/team/members/:memberId', auth, async (req, res) => {
 // Returns invite info so the join page can show company name + role.
 app.get('/api/invite/:code', async (req, res) => {
   try {
+    // C5: public endpoint — throttle per IP so invite codes can't be enumerated.
+    const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.ip || 'unknown';
+    if (rateLimited(`invite-lookup:${ip}`, 60, 60 * 60 * 1000))
+      return res.status(429).json({ error: 'rate_limited', message: 'Too many requests — try again later.' });
+
     const { data: invite, error } = await supabase.from('business_invites')
       .select('id, code, role, label, max_uses, uses_count, expires_at, status, business_id')
       .eq('code', req.params.code.toUpperCase()).single();
