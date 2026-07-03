@@ -68,7 +68,9 @@ import TelegramLogin from './pages/TelegramLogin'
 import PersonalProfile from './pages/PersonalProfile'
 import { PersonalLayout, PersonalShell, PersonalOverview, PersonalAccounts, PersonalTransactions, PersonalOnboarding } from './pages/personal'
 import { BusinessLayout, BusinessShell, BusinessPulse, BusinessAccounts, BusinessTransactions, BusinessPayables, BusinessReceivables, BusinessInvoices, BusinessFunding, BusinessNew, BusinessIntercompany } from './pages/business'
-import { BusinessAccountant } from './pages/business/Accountant'
+// Premium hub renders the Workbench/Calendar/Tax Draft module when
+// VITE_AI_ACCOUNTANT_PREMIUM=true; flag off → the existing profile page unchanged.
+import { BusinessAccountantHub } from './pages/business/AccountantPremium'
 
 // Personal/Funding UI requires migrations 037–039. OFF by default so production stays
 // safe until they're applied. Enable in env: VITE_PERSONAL_FUNDING_UI_ENABLED=true.
@@ -599,7 +601,7 @@ export default function App() {
             <Route path="/business/transactions" element={<BusinessShell><BusinessTransactions /></BusinessShell>} />
             <Route path="/business/payables" element={<BusinessShell><BusinessPayables /></BusinessShell>} />
             <Route path="/business/receivables" element={<BusinessShell><BusinessReceivables /></BusinessShell>} />
-            <Route path="/business/accountant" element={<BusinessShell><BusinessAccountant /></BusinessShell>} />
+            <Route path="/business/accountant" element={<BusinessShell><BusinessAccountantHub /></BusinessShell>} />
             <Route path="/business/invoices" element={<BusinessShell><BusinessInvoices /></BusinessShell>} />
             {/* Not-yet-migrated modules: existing components rendered INSIDE the premium
                 shell (real content + premium sidebar/header), so the user never sees the
