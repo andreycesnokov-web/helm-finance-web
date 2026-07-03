@@ -7,6 +7,9 @@ const ROLE_LABELS = {
   owner: 'Owner', admin: 'Admin', cfo: 'CFO', manager: 'Manager', employee: 'Employee',
 }
 
+// Email is the primary sign-in when enabled; Telegram widget stays legacy-only.
+const EMAIL_AUTH_UI = import.meta.env.VITE_EMAIL_AUTH_ENABLED === 'true'
+
 export default function JoinInvite() {
   const { code }                     = useParams()
   const { user, token, loginWithTelegram } = useAuth()
@@ -163,8 +166,30 @@ export default function JoinInvite() {
             </div>
           )}
 
-          {/* Not logged in — show Telegram widget */}
-          {!joined && !user && (
+          {/* Not logged in. Email is the PRIMARY sign-in (free identity entry); the
+              Telegram widget stays only as legacy access for EXISTING Telegram users. */}
+          {!joined && !user && EMAIL_AUTH_UI && (
+            <div>
+              <div style={{ fontSize: 14, color: 'var(--text-3)', marginBottom: 16 }}>
+                Sign in to join the team
+              </div>
+              <button onClick={() => {
+                try { localStorage.setItem('post_login_redirect', `/invite/${code.toUpperCase()}`) } catch { /* */ }
+                navigate('/login/email')
+              }}
+                style={{ width: '100%', padding: '14px', borderRadius: 12, background: 'var(--brand, #3399FF)', color: '#fff', fontSize: 15, fontWeight: 700, border: 'none', cursor: 'pointer' }}>
+                Sign in with email to join
+              </button>
+              <div style={{ fontSize: 12, color: 'var(--text-4)', marginTop: 10 }}>
+                You'll automatically join <b>{invite.business_name}</b> after signing in
+              </div>
+              <div style={{ marginTop: 18, fontSize: 12, color: 'var(--text-4)' }}>Existing Telegram user?</div>
+              <div ref={tgRef} style={{ display: 'flex', justifyContent: 'center', marginTop: 6 }} />
+            </div>
+          )}
+
+          {/* Flag OFF → old behavior: Telegram widget only */}
+          {!joined && !user && !EMAIL_AUTH_UI && (
             <div>
               <div style={{ fontSize: 14, color: 'var(--text-3)', marginBottom: 16 }}>
                 Sign in with Telegram to join the team

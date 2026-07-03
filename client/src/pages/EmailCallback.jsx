@@ -4,6 +4,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
+import { consumePostLoginRedirect } from '../lib/api'
 
 export default function EmailCallback() {
   const { loginWithToken } = useAuth()
@@ -26,7 +27,7 @@ export default function EmailCallback() {
           return
         }
         loginWithToken(data.token, data.user ? { id: data.user.id, firstName: data.user.display_name } : null)
-        navigate('/account')
+        navigate(consumePostLoginRedirect() || '/account')
       } catch { if (!cancelled) setError('Network error. Please try again.') }
     })()
     return () => { cancelled = true }
