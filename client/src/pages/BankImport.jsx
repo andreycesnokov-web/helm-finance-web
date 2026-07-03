@@ -62,6 +62,53 @@ const L = {
     createRuleAsk: 'Selalu kategorikan transaksi serupa seperti ini?' },
 }
 
+// Premium P2 (business-premium-redesign spec): stepper + AI summary strip over the
+// EXISTING import flow — presentation only, driven by real local state. Flag OFF ⇒
+// this page renders exactly as before.
+const BUSINESS_PREMIUM = import.meta.env.VITE_BUSINESS_PREMIUM_UI === 'true'
+
+function ImportStepper({ headers, batch, suggesting, rows }) {
+  // Map the real flow state onto steps: Upload → Map columns → AI suggest → Review.
+  const step = batch ? (suggesting ? 2 : 3) : (headers.length ? 1 : 0)
+  const steps = ['Upload', 'Map columns', 'AI suggest', 'Review & confirm']
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', margin: '0 0 14px', fontSize: 12, fontWeight: 700 }}>
+      {steps.map((s, i) => (
+        <span key={s} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+          <span style={{
+            width: 20, height: 20, borderRadius: '50%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 10.5,
+            background: i < step ? 'var(--success, #0F7A52)' : i === step ? 'var(--brand-electric-blue, #3399FF)' : 'var(--bg-3, #EDF1F5)',
+            color: i <= step ? '#fff' : 'var(--text-3, #6B7E92)',
+          }}>{i < step ? '✓' : i + 1}</span>
+          <span style={{ color: i === step ? 'var(--text, #003366)' : 'var(--text-3, #6B7E92)' }}>{s}{i === 2 && suggesting ? '…' : ''}</span>
+          {i < steps.length - 1 && <span style={{ color: 'var(--border, #DDE5EC)' }}>—</span>}
+        </span>
+      ))}
+      {batch && rows.length > 0 && <span style={{ marginLeft: 'auto', fontWeight: 600, color: 'var(--text-3, #6B7E92)' }}>Batch · {rows.length} rows parsed</span>}
+    </div>
+  )
+}
+
+function ImportAiStrip({ summary, dupCount }) {
+  const total = Number(summary.total || 0)
+  const uncat = Number(summary.uncategorized || 0)
+  const high = Number(summary.high_confidence || 0)
+  const auto = total > 0 ? Math.round(((total - uncat) / total) * 100) : 0
+  return (
+    <div style={{ background: 'var(--brand-navy, #003366)', color: '#fff', borderRadius: 12, padding: '12px 16px', margin: '0 0 14px' }}>
+      <div style={{ fontSize: 11, color: '#AFC6DE', fontWeight: 600, letterSpacing: '.05em', textTransform: 'uppercase' }}>AI summary</div>
+      <div style={{ fontSize: 15, fontWeight: 800, margin: '3px 0' }}>
+        {auto}% auto-categorized · {high} high-confidence row{high === 1 ? '' : 's'}
+      </div>
+      <div style={{ fontSize: 12, color: '#C5D6E7' }}>
+        {dupCount > 0 ? `${dupCount} possible duplicate${dupCount === 1 ? '' : 's'} flagged · ` : ''}
+        {uncat > 0 ? `${uncat} row${uncat === 1 ? '' : 's'} still uncategorized — review below. ` : 'Every row has a category suggestion. '}
+        You approve; nothing is imported automatically.
+      </div>
+    </div>
+  )
+}
+
 const num = (v) => {
   if (v === null || v === undefined || v === '') return null
   if (typeof v === 'number') return isFinite(v) ? v : null
@@ -342,6 +389,9 @@ export default function BankImport() {
     <div style={{ maxWidth: 920, margin: '0 auto' }}>
       <h1 style={{ fontSize: 22, fontWeight: 800, margin: 0 }}>🏦 {l.title}</h1>
       <div style={{ fontSize: 13, color: 'var(--text-3)', marginBottom: 16 }}>{l.subtitle}</div>
+
+      {BUSINESS_PREMIUM && <ImportStepper headers={headers} batch={batch} suggesting={suggesting} rows={rows} />}
+      {BUSINESS_PREMIUM && batch && summary && <ImportAiStrip summary={summary} dupCount={dupCount} />}
 
       {!batch && (
         <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, padding: 18, marginBottom: 16 }}>
