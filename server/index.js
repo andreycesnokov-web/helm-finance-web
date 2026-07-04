@@ -49,8 +49,10 @@ const PW = require('./lib/personalWorkspace');
 // app_user_id_seq). Telegram auth is unaffected by this flag.
 const EMAIL_AUTH_ENABLED = process.env.EMAIL_AUTH_ENABLED === 'true';
 // DEV-ONLY: when true, the OTP code is returned in the API response for local testing.
-// NEVER enable in production. Off by default.
-const EMAIL_AUTH_DEV_RETURN_CODE = process.env.EMAIL_AUTH_DEV_RETURN_CODE === 'true';
+// NEVER enable in production. Off by default. HARD-DISABLED whenever NODE_ENV==='production'
+// regardless of the env var, so prod can never echo login codes/magic links in responses.
+const EMAIL_AUTH_DEV_RETURN_CODE = process.env.EMAIL_AUTH_DEV_RETURN_CODE === 'true'
+  && process.env.NODE_ENV !== 'production';
 // Email provider (magic-link delivery). Only 'resend' is wired. Missing/other → no send
 // (dev relies on EMAIL_AUTH_DEV_RETURN_CODE to surface the link locally).
 const { sendMagicLinkEmail } = require('./lib/emailSender');
@@ -185,7 +187,7 @@ async function issueEmailSecret(email, purpose, secret) {
     email, code_hash: hashEmailCode(secret), purpose,
     expires_at: new Date(Date.now() + OTP_TTL_MS).toISOString(),
   });
-  console.log(`[email-auth] ${purpose} secret for ${email} (len ${secret.length})`);
+  console.log(`[email-auth] ${purpose} secret issued for ${email}`);
   return secret;
 }
 async function issueEmailCode(email, purpose) { return issueEmailSecret(email, purpose, sixDigitCode()); }
@@ -4425,7 +4427,7 @@ async function telegramPaidGate(businessId) {
   const { data } = await supabase.from('businesses').select('*').eq('id', businessId).limit(1);
   const business = data?.[0];
   if (!business) return null; // let the route's own not-found handling answer
-  if (computeBusinessAccess(business).effectivePlan !== 'free') return null;
+  if (computeBusinessAccess(business).effective_plan !== 'free') return null;
   return {
     error: 'telegram_paid_plan_required',
     message: 'The Telegram assistant is a paid add-on. Upgrade your plan in CFO AI (app.cfo-ai.site → Settings) to keep using it.',
@@ -9160,6 +9162,18 @@ app.delete('/api/documents/:id/links/:linkId', auth, async (req, res) => {
 // Personal Workspaces, Relationships, FX quotes, Wallet transfers & Funding Bridge.
 // Mounted under /api; shares auth, the service-role client and access helpers.
 app.use('/api', personalFundingRouter({ supabase, auth, getBusinessAccess, resolveUserDisplayName, TX }));
+
+// Liveness probe — JSON, never the SPA shell. No DB call (pure process liveness).
+app.get('/api/health', (req, res) => {
+  res.json({ ok: true, service: 'helm-finance-web', ts: new Date().toISOString() });
+});
+
+// Unknown /api/* → JSON 404, NOT the SPA HTML shell. Registered after every real
+// /api route (incl. personalFundingRouter above) so it only catches misses. Keeps API
+// clients from receiving 200 + index.html for a mistyped/removed endpoint.
+app.use('/api', (req, res) => {
+  res.status(404).json({ error: 'not_found', path: req.originalUrl });
+});
 
 // SPA catch-all — MUST be the last route so it never shadows API endpoints.
 app.get('*', (req, res) => {
