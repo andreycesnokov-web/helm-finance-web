@@ -1,0 +1,68 @@
+# Handoff - CFO AI / Helm Finance
+
+Last updated: 2026-07-04.
+
+## Current State
+
+- Web app is live at `https://app.cfo-ai.site`.
+- Email auth is live and is the primary identity entry.
+- Telegram login remains as legacy access.
+- Personal Account v1 exists but finance features are gated.
+- Business Workspace is active and is the main monetization path.
+- Telegram active-business routing has been applied and improved.
+- Bot work happens in separate repo `C:\Users\HUAWEI\Desktop\Fin Bot`.
+
+## Current Local Branch
+
+- Branch: `feature/business-premium-p3b`.
+- Local commit ahead of `origin/main`: `7bb6a3ce feat(business): P3b - deterministic tax obligations (no estimates)`.
+- Treat P3b as not fully production-confirmed unless owner confirms promote/deploy.
+
+## Last Known Important Production Facts
+
+- App shell returns HTTP 200 on `app.cfo-ai.site`.
+- `/api/documents/health` returns API-style 401 when unauthenticated.
+- `/api/health` returned SPA HTML shell during this audit. FIXED on branch
+  `feature/stabilization-pass` (now JSON; unknown `/api/*` → JSON 404). Not yet promoted —
+  production still serves the old behavior until deploy.
+
+## Stabilization Pass Batch (pending review)
+
+- Branch: `feature/stabilization-pass` (off `main` at `6c96666f`).
+- Backend-only safe fixes: JSON `/api/health` + JSON `/api/*` 404; Telegram paid-gate
+  `.effectivePlan`→`.effective_plan`; `EMAIL_AUTH_DEV_RETURN_CODE` prod hard-disable;
+  magic-link HTML escaping; removed secret-length from logs; default-OFF bridge kill-switch
+  `PERSONAL_FUNDING_BRIDGE_ENABLED`.
+- No migrations, no env changes, no Telegram linking/cutover, no payments, no bridge
+  implementation, no backend auth changes.
+- Verified: `node --check` (3 files) OK; 29 integration tests pass; builds Personal OFF/ON
+  exit 0; local smoke of health/404/SPA/documents-health OK; secret scan clean.
+- Awaiting Codex review before promote (Claude writes, Codex reviews, owner go/no-go).
+
+## Next Recommended Work
+
+1. Personal -> Business Activation MVP.
+2. Entitlements/pricing foundation.
+3. Personal AI CFO insights after 5-10 transactions.
+4. Business Pro value dashboard.
+5. Telegram paid integration design.
+
+## Multi-Agent Rule
+
+Use one writer, one reviewer, one auditor:
+
+- Claude writes small approved batches.
+- Codex reviews and verifies before merge/promote.
+- MiMo audits independently after fixes.
+
+No parallel code edits from multiple agents.
+
+## Do Not Touch
+
+- Reset/R001.
+- Migrations 037-039/040/041/043.
+- Payments.
+- Personal-to-Business bridge.
+- Telegram linking/cutover.
+- Railway env.
+- Backend auth.
