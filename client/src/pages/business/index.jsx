@@ -510,12 +510,20 @@ export function BusinessFunding() {
 // ── Create a new Business — additional company for the same owner. Does not touch the
 //    existing business. POST /api/businesses; caller becomes Owner; switches on success.
 const BIZ_CURRENCIES = ['IDR', 'USD', 'EUR', 'SGD', 'MYR', 'AUD', 'GBP', 'JPY', 'CNY']
+// Legal entity forms (Indonesia-first) — matches the flag-ON Personal Dashboard chooser.
 const BIZ_TYPES = [
-  { v: 'operating', label: 'Operating company' },
-  { v: 'holding', label: 'Holding company' },
-  { v: 'project', label: 'Project / SPV' },
+  { v: 'pt', label: 'PT' },
+  { v: 'pt_pma', label: 'PT PMA' },
+  { v: 'cv', label: 'CV' },
+  { v: 'sole_owner', label: 'Sole owner' },
   { v: 'other', label: 'Other' },
 ]
+// Countries offered in the creation form (default Indonesia). Free-form otherwise.
+const BIZ_COUNTRIES = ['Indonesia', 'Singapore', 'Thailand', 'Malaysia', 'Other']
+// The creator is always the workspace owner; this captures their stated function so
+// onboarding/roles can use it later. It does NOT change the owner membership created
+// server-side (POST /api/businesses always makes the creator the owner).
+const BIZ_ROLES = ['Owner', 'Director', 'Finance', 'Accountant', 'Staff']
 // Common zones surfaced first; the rest come from the browser's full IANA list so
 // the field is a real select (searchable via the native datalist), not free text.
 const COMMON_TZ = [
@@ -548,9 +556,10 @@ export function BusinessNew() {
   const tzOptions = [...new Set([detectedTz, ...COMMON_TZ, ...allTimezones()])]
   const [f, setF] = useState({
     name: '', base_currency: 'IDR',
-    country: detectCountry() || 'ID',
+    country: 'Indonesia',
     timezone: detectedTz,
-    business_type: 'operating',
+    business_type: 'pt',
+    user_role: 'Owner',   // captured for onboarding; server always makes creator the owner
   })
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
@@ -579,6 +588,10 @@ export function BusinessNew() {
     <form onSubmit={submit} style={{ maxWidth: 560 }}>
       <Card title="Company details">
         <div style={{ display: 'grid', gap: 16 }}>
+          <div style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.5, padding: '10px 12px', borderRadius: 10, background: 'var(--info-soft, #eef4fb)' }}>
+            Your personal wallets and business wallets are separate. Money only moves between
+            them through an explicit owner loan, capital contribution, reimbursement, or dividend flow.
+          </div>
           <div>
             <label style={lbl}>Business name *</label>
             <input style={inp} value={f.name} onChange={set('name')} placeholder="e.g. Helm Holdings" autoFocus />
@@ -601,7 +614,9 @@ export function BusinessNew() {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <div>
               <label style={lbl}>Country</label>
-              <input style={inp} value={f.country} onChange={set('country')} placeholder="ID" />
+              <select style={inp} value={f.country} onChange={set('country')}>
+                {BIZ_COUNTRIES.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
             </div>
             <div>
               <label style={lbl}>Timezone</label>
@@ -612,6 +627,13 @@ export function BusinessNew() {
               </datalist>
               <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 6 }}>Auto-detected: {detectedTz} · type to search</div>
             </div>
+          </div>
+          <div>
+            <label style={lbl}>Your role</label>
+            <select style={inp} value={f.user_role} onChange={set('user_role')}>
+              {BIZ_ROLES.map(r => <option key={r} value={r}>{r}</option>)}
+            </select>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 6 }}>As the creator you are the workspace owner. You can invite others and assign roles after setup.</div>
           </div>
           {err && <div style={{ color: 'var(--danger, #c0392b)', fontSize: 13 }}>{err}</div>}
           <div style={{ display: 'flex', gap: 10 }}>
