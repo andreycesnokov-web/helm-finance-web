@@ -12,6 +12,19 @@ const WA = require('../lib/workspaceAccess');
 module.exports = function personalFundingRouter({ supabase, auth, getBusinessAccess, resolveUserDisplayName, TX }) {
   const router = express.Router();
   const channel = 'web';
+
+  // Personal→Business BRIDGE kill-switch. The bridge (personal↔business relationships +
+  // funding transfers/repayments) is NOT approved for production and stays FULLY OFF unless
+  // explicitly enabled via env. Default OFF preserves prod behavior: no bridge entitlements
+  // exist in prod, so these routes already 403 for everyone — this just makes the gate
+  // unconditional (defense-in-depth) so no future addon row can silently open the bridge.
+  // Personal-workspace primitives (/workspaces, /fx, /wallet-transfers) are NOT gated here;
+  // wallet-transfers already rejects personal↔business movement on its own.
+  const BRIDGE_ENABLED = process.env.PERSONAL_FUNDING_BRIDGE_ENABLED === 'true';
+  const bridgeGate = (req, res, next) => BRIDGE_ENABLED
+    ? next()
+    : res.status(403).json({ error: 'bridge_disabled', message: 'Personal→Business bridge is not enabled' });
+  router.use(['/personal-business-connections', '/funding'], bridgeGate);
   // money/rate values are returned as canonical decimal STRINGS (trailing zeros
   // trimmed) so precision is preserved without float coercion.
   const s = (v) => {
