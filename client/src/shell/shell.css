@@ -409,3 +409,4 @@ html, body, #root { max-width: 100%; overflow-x: hidden; }
   .personal-overview .cfo-summary-row{gap:6px}
   .personal-overview .cfo-summary-v{font-size:12px}
 }
+.cfo-mb{margin-bottom:16px}
