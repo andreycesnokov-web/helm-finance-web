@@ -1789,13 +1789,13 @@ async function resolveTelegramActiveBusiness(telegram_id) {
   const { data: st } = await supabase.from('telegram_user_state').select('active_business_id').eq('user_id', userId).limit(1);
   const savedId = st?.[0]?.active_business_id || null;
   const savedValid = savedId ? owned.find(m => m.business_id === savedId) : null;
-  if (savedValid) return { status: 'active', business: opt(savedValid) };
+  if (savedValid) return { status: 'active', business: opt(savedValid), options: owned.map(opt) };
   if (savedId && !savedValid) {
     await supabase.from('telegram_user_state').update({ active_business_id: null }).eq('user_id', userId); // clear stale
   }
   if (owned.length === 1) {
     await supabase.from('telegram_user_state').upsert({ user_id: userId, active_business_id: owned[0].business_id }, { onConflict: 'user_id' });
-    return { status: 'auto', business: opt(owned[0]) };
+    return { status: 'auto', business: opt(owned[0]), options: owned.map(opt) };
   }
   return { status: 'choose', options: owned.map(opt) };
 }
@@ -2232,6 +2232,41 @@ app.post('/api/accountant/profile/verify', auth, async (req, res) => {
 });
 
 // GET /api/accountant/applicability — deterministic applicable-rule evaluation.
+// ── GET /api/audit/events — business-scoped audit trail (P3, premium module) ──
+// Read-only view over audit_events (023). Strictly scoped to the ACTIVE business;
+// restricted to oversight roles. before/after JSON payloads are intentionally NOT
+// returned (they may carry record snapshots) — only the who/what/when envelope.
+app.get('/api/audit/events', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!['owner', 'ceo', 'admin', 'cfo', 'auditor'].includes(biz.role))
+      return res.status(403).json({ error: 'forbidden', message: 'Your role cannot view the audit trail.' });
+
+    const limit = Math.min(Number(req.query.limit) || 50, 200);
+    const offset = Number(req.query.offset) || 0;
+    let q = supabase.from('audit_events')
+      .select('id, created_at, actor_user_id, actor_role, channel, entity_type, entity_id, action, request_id', { count: 'exact' })
+      .eq('business_id', biz.business.id);
+    if (req.query.entity_type) q = q.eq('entity_type', String(req.query.entity_type));
+    if (req.query.action) q = q.eq('action', String(req.query.action));
+    const { data, count, error } = await q.order('created_at', { ascending: false }).range(offset, offset + limit - 1);
+    if (error) return res.status(500).json({ error: 'audit_query_failed' });
+
+    // Resolve actor display names (best-effort, no PII beyond first name/username).
+    const ids = [...new Set((data || []).map(e => e.actor_user_id).filter(x => x != null))];
+    let names = {};
+    if (ids.length) {
+      const { data: users } = await supabase.from('users').select('id, first_name, username').in('id', ids);
+      names = Object.fromEntries((users || []).map(u => [u.id, u.first_name || u.username || String(u.id)]));
+    }
+    res.json({
+      events: (data || []).map(e => ({ ...e, actor_name: e.actor_user_id != null ? (names[e.actor_user_id] || String(e.actor_user_id)) : 'System' })),
+      total: count || 0,
+    });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 app.get('/api/accountant/applicability', auth, async (req, res) => {
   try {
     const biz = await requireBusiness(req, res);
