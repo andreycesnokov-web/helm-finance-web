@@ -116,7 +116,15 @@ export default function PersonalProfile() {
   }
 
   const openBusiness = (b) => {
-    try { setActiveBusinessId(b.id); localStorage.setItem('activeWorkspaceId', b.id) } catch { /* */ }
+    // Sync ALL THREE workspace keys so PulseWrapper/WorkspaceProvider resolve to this
+    // business — otherwise a stale last_active_workspace_id='personal' bounces the user
+    // back to /account. (activeBusinessId = API scope; activeWorkspaceId + last_active =
+    // WorkspaceProvider selection.)
+    try {
+      setActiveBusinessId(b.id)
+      localStorage.setItem('activeWorkspaceId', b.id)
+      localStorage.setItem('last_active_workspace_id', b.id)
+    } catch { /* */ }
     navigate('/business/pulse')
   }
 
