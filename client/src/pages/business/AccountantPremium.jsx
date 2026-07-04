@@ -18,6 +18,17 @@ import { BusinessAccountant } from './Accountant'
 const PREMIUM = import.meta.env.VITE_AI_ACCOUNTANT_PREMIUM === 'true'
 const SYMBOL = '/brand/symbol_navy_blue_dot_transparent.svg'
 
+const idr = (v) => 'Rp ' + Number(v || 0).toLocaleString('en-US')
+// Deterministic obligation → display. calculated shows the real amount; the other two
+// states show honest text and are visually distinct (never look like a number).
+function obligationDisplay(o) {
+  if (!o) return { amount: '—', note: '', tone: 'muted' }
+  if (o.status === 'calculated') return { amount: idr(o.amount), note: o.source_label, tone: 'calc' }
+  if (o.status === 'insufficient_data') return { amount: 'insufficient data', note: o.source_label, tone: 'muted' }
+  return { amount: 'not enabled', note: o.source_label, tone: 'muted' } // unavailable
+}
+const findOb = (obligations, type) => (obligations?.obligations || []).find(o => o.obligation_type === type)
+
 // ── Static Indonesian compliance schedule (deterministic; engine wiring later) ──
 // Generic monthly deadlines under Indonesian tax law. Amount/source wiring arrives
 // with the tax-engine endpoints; dates themselves are fixed statutory rules.
@@ -44,7 +55,7 @@ function PremiumAccountant() {
   const { active, scopeKey } = useWorkspace()
   const navigate = useNavigate()
   const [tab, setTab] = useState('workbench')
-  const [state, setState] = useState({ loading: true, applicability: null, profile: null, pulse: null })
+  const [state, setState] = useState({ loading: true, applicability: null, profile: null, pulse: null, obligations: null })
 
   useEffect(() => {
     if (!token || !active) return
@@ -53,7 +64,8 @@ function PremiumAccountant() {
       apiFetch('/accountant/applicability', token).catch(() => null),
       apiFetch('/accountant/profile', token).catch(() => null),
       apiFetch('/pulse', token).catch(() => null),
-    ]).then(([applicability, profile, pulse]) => on && setState({ loading: false, applicability, profile: profile?.profile || null, pulse }))
+      apiFetch('/accountant/obligations', token).catch(() => null),
+    ]).then(([applicability, profile, pulse, obligations]) => on && setState({ loading: false, applicability, profile: profile?.profile || null, pulse, obligations }))
     return () => { on = false }
   }, [token, active?.id, scopeKey])
 
@@ -75,8 +87,8 @@ function PremiumAccountant() {
         <PageTabs tabs={tabs} active={tab} onChange={setTab} />
       </div>
       {tab === 'workbench' && <Workbench state={state} setTab={setTab} navigate={navigate} />}
-      {tab === 'calendar' && <CalendarTab />}
-      {tab === 'taxdraft' && <TaxDraftTab />}
+      {tab === 'calendar' && <CalendarTab obligations={state.obligations} />}
+      {tab === 'taxdraft' && <TaxDraftTab obligations={state.obligations} />}
       {tab === 'audit' && <AuditTab />}
       {tab === 'profile' && <BusinessAccountant />}
     </>
@@ -104,6 +116,9 @@ function Workbench({ state, setTab, navigate }) {
   ]
 
   const nextDeadlines = upcomingDeadlines(3)
+  const obs = state.obligations?.obligations || []
+  const reserve = Number(state.obligations?.reserve?.amount || 0)
+  const reserveLines = (state.obligations?.reserve?.lines || []).length
 
   const actions = []
   if (missing.length) actions.push({ id: 'profile', label: 'Complete your tax profile', sub: `${missing.length} field${missing.length > 1 ? 's' : ''} missing — obligations depend on it`, cta: 'Complete', go: () => setTab('profile') })
@@ -123,8 +138,12 @@ function Workbench({ state, setTab, navigate }) {
       <div className="cfo-grid cfo-grid-2" style={{ marginBottom: 18 }}>
         <div className="cfo-summary" style={{ padding: '20px 22px' }}>
           <div className="cfo-summary-label">Tax reserve · IDR</div>
-          <div className="cfo-summary-value" style={{ fontSize: 30 }}>—</div>
-          <div className="cfo-summary-meta">Calculated by the deterministic tax engine — <b>not connected yet</b>. No estimates are shown until real numbers exist.</div>
+          <div className="cfo-summary-value" style={{ fontSize: 30 }}>{reserve > 0 ? idr(reserve) : '—'}</div>
+          <div className="cfo-summary-meta">
+            {reserve > 0
+              ? <>Sum of obligations with a real deterministic amount ({reserveLines} line{reserveLines === 1 ? '' : 's'}). Insufficient-data rows and PPN are excluded.</>
+              : <>No obligation has a deterministic amount yet — nothing is estimated. Record tax withholding in Payroll and it appears here.</>}
+          </div>
         </div>
         <Card title="Profile completeness" action={<StatusBadge tone={completeness >= 80 ? 'success' : 'warning'}>{completeness}%</StatusBadge>}>
           <div style={{ height: 8, borderRadius: 5, background: 'var(--surface-page)', margin: '6px 0 10px' }}>
@@ -136,7 +155,25 @@ function Workbench({ state, setTab, navigate }) {
         </Card>
       </div>
 
-      <div className="cfo-grid cfo-grid-2">
+      <Card title="Tax obligations" className="cfo-mt" action={<StatusBadge tone="neutral">{state.obligations?.period || ''}</StatusBadge>}>
+        {obs.length === 0
+          ? <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>No obligations resolved yet.</div>
+          : <DataList items={obs.map(o => {
+              const dsp = obligationDisplay(o)
+              return {
+                id: o.obligation_type,
+                label: o.title,
+                sub: dsp.note,
+                amount: dsp.amount,
+                amountTone: dsp.tone === 'calc' ? 'cfo-neg' : '',
+              }
+            })} />}
+        <div style={{ marginTop: 8, fontSize: 12, color: 'var(--text-muted)' }}>
+          Amounts are read only from data you recorded — the engine calculates, it never estimates. PPN needs invoicing (not enabled).
+        </div>
+      </Card>
+
+      <div className="cfo-grid cfo-grid-2 cfo-mt">
         <Card title="Pending actions">
           {actions.length === 0
             ? <div style={{ fontSize: 14, color: 'var(--text-muted)' }}>Nothing pending — nice.</div>
@@ -188,7 +225,9 @@ export function upcomingDeadlines(n = 3) {
 }
 
 // ── Compliance Calendar (real month grid, per owner decision) ─────────────────
-function CalendarTab() {
+// Deadline key → obligation type, so each row can show its deterministic amount/state.
+const DEADLINE_OB = { pph2126: 'pph_21_26', pph21file: 'pph_21_26', pph23: 'pph_23', ppn: 'ppn' }
+function CalendarTab({ obligations }) {
   const now = new Date()
   const [ym, setYm] = useState({ y: now.getFullYear(), m: now.getMonth() })
   const deadlines = idComplianceDeadlines(ym.y, ym.m)
@@ -233,12 +272,19 @@ function CalendarTab() {
         </div>
       </Card>
       <Card title="Deadlines this month">
-        <DataList items={deadlines.map(x => ({
-          id: x.key, label: x.title, sub: x.sub,
-          amount: x.date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }), amountTone: '',
-        }))} />
+        <DataList items={deadlines.map(x => {
+          const ob = DEADLINE_OB[x.key] ? findOb(obligations, DEADLINE_OB[x.key]) : null
+          const dsp = ob ? obligationDisplay(ob) : null
+          return {
+            id: x.key,
+            label: x.title,
+            sub: dsp ? `${x.date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })} · ${dsp.amount}` : `${x.date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })} · ${x.sub}`,
+            amount: dsp && dsp.tone === 'calc' ? dsp.amount : x.date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }),
+            amountTone: '',
+          }
+        })} />
         <div style={{ marginTop: 10, fontSize: 12, color: 'var(--text-muted)' }}>
-          Fixed Indonesian statutory schedule. Per-deadline amounts and your filing status arrive with the tax engine — nothing here is an estimate.
+          Fixed Indonesian statutory schedule. Amounts shown are computed only from data you recorded; “insufficient data” / “not enabled” means no estimate is made.
         </div>
         <Btn disabled title="Available once the tax engine is connected" style={{ marginTop: 12 }}>Prepare filing pack (soon)</Btn>
       </Card>
@@ -252,13 +298,22 @@ function Legend({ color, label }) {
   </span>
 }
 
-// ── Tax Draft (layout preview — engine not connected; NO fake numbers) ────────
-function TaxDraftTab() {
+// ── Tax Draft (layout preview — CIT engine not connected; only recorded numbers) ─
+function TaxDraftTab({ obligations }) {
   const row = (label, mono = '—') => ({ id: label, label, amount: mono, amountTone: '' })
+  const pph21 = findOb(obligations, 'pph_21_26')
+  const hasWithholding = pph21 && pph21.status === 'calculated'
   return (
     <>
+      {hasWithholding && (
+        <Card title="Payroll withholding (PPH 21/26)" className="cfo-mb" style={{ borderLeft: '3px solid var(--success)' }} action={<StatusBadge tone="success">Calculated</StatusBadge>}>
+          <DataList items={[{ id: 'w', label: 'Withholding to remit', sub: pph21.source_label, amount: idr(pph21.amount), amountTone: '' }]} />
+          <div style={{ marginTop: 6, fontSize: 12, color: 'var(--text-muted)' }}>Period {pph21.period} · due {new Date(pph21.due_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}. Read from recorded payroll withholding lines — not an estimate.</div>
+        </Card>
+      )}
       <div className="cfo-grid cfo-grid-2">
         <Card title="Deterministic calculation" action={<StatusBadge tone="neutral">Base currency: IDR</StatusBadge>}>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8 }}>Corporate Income Tax (CIT) draft — the CIT engine is not connected yet. No estimated numbers are shown.</div>
           <DataList items={[
             row('Gross revenue'), row('Non-object income'), row('Operating expenses'),
             row('Deductible splits'), row('Non-deductible splits'),

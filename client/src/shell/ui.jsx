@@ -55,8 +55,8 @@ export const PageHeader = ({ eyebrow, title, actions }) => (
   </div>
 )
 
-export const Card = ({ title, action, children, className = '' }) => (
-  <section className={`cfo-card ${className}`}>
+export const Card = ({ title, action, children, className = '', style }) => (
+  <section className={`cfo-card ${className}`} style={style}>
     {(title || action) && <div className="cfo-card-head"><span className="cfo-card-title">{title}</span>{action}</div>}
     {children}
   </section>

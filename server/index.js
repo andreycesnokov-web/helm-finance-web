@@ -2267,6 +2267,69 @@ app.get('/api/audit/events', auth, async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// ── GET /api/accountant/obligations — deterministic tax obligations (P3b) ─────
+// READ-ONLY. Numbers come ONLY from data the user actually recorded — never from an
+// invented rate. Engine reads; AI explains. No migrations, no 041.
+//   PPH 21/26 : sum of payroll deduction lines EXPLICITLY labelled as tax withholding
+//               (label/item_type matches pph|pajak|tax|withhold) for the last completed
+//               payroll month. No tax lines → insufficient_data (we never derive a
+//               progressive amount from gross — that is the un-built engine).
+//   PPH 23    : insufficient_data — no withholding rate / deterministic service
+//               classification exists in the product yet. Never a guessed %.
+//   PPN       : unavailable — needs invoice data (041 not applied / invoicing off).
+//   reserve   : sum of CALCULATED obligations only.
+app.get('/api/accountant/obligations', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!['owner', 'ceo', 'admin', 'cfo', 'accountant', 'auditor'].includes(biz.role))
+      return res.status(403).json({ error: 'forbidden' });
+
+    const now = new Date();
+    // Obligations file for the LAST completed month (paid in the current month).
+    const period = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const periodStr = `${period.getFullYear()}-${String(period.getMonth() + 1).padStart(2, '0')}`;
+    const due10 = new Date(now.getFullYear(), now.getMonth(), 10).toISOString().slice(0, 10);
+    const dueEndNext = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().slice(0, 10);
+
+    // ── PPH 21/26 — recorded withholding lines only ──────────────────────────
+    const { data: pays } = await supabase.from('payroll_payments')
+      .select('id, currency, period_month, payment_date, status').or(bizOrFilter(biz));
+    const inPeriod = (pays || []).filter(p =>
+      (p.status === 'paid' || !p.status) &&
+      (p.period_month === periodStr || String(p.payment_date || '').slice(0, 7) === periodStr));
+    let pph21 = { amount: null, source_count: inPeriod.length, status: 'insufficient_data',
+      source_label: inPeriod.length ? `from Payroll · ${inPeriod.length} payment${inPeriod.length === 1 ? '' : 's'} (no tax lines recorded)` : 'from Payroll · no payments in period' };
+    if (inPeriod.length) {
+      const ids = inPeriod.map(p => p.id);
+      const { data: items } = await supabase.from('payroll_payment_items')
+        .select('amount, direction, item_type, label, payroll_payment_id').in('payroll_payment_id', ids);
+      const taxLines = (items || []).filter(i => i.direction === 'deduction'
+        && /pph|pajak|\btax\b|withhold/i.test(`${i.label || ''} ${i.item_type || ''}`));
+      const amount = taxLines.reduce((s, i) => s + Number(i.amount || 0), 0);
+      if (taxLines.length && amount > 0) {
+        pph21 = { amount, source_count: inPeriod.length, status: 'calculated',
+          source_label: `from Payroll · ${inPeriod.length} payment${inPeriod.length === 1 ? '' : 's'} · ${taxLines.length} withholding line${taxLines.length === 1 ? '' : 's'}` };
+      }
+    }
+
+    const obligations = [
+      { obligation_type: 'pph_21_26', title: 'PPH 21/26', currency: 'IDR', period: periodStr, due_date: due10, ...pph21 },
+      { obligation_type: 'pph_23', title: 'PPH 23', amount: null, currency: 'IDR', period: periodStr, due_date: due10,
+        source_count: 0, status: 'insufficient_data', source_label: 'No withholding rate / service classification defined' },
+      { obligation_type: 'ppn', title: 'PPN', amount: null, currency: 'IDR', period: periodStr, due_date: dueEndNext,
+        source_count: 0, status: 'unavailable', source_label: 'PPN requires invoice data — invoicing not enabled' },
+    ];
+    const calc = obligations.filter(o => o.status === 'calculated');
+    res.json({
+      period: periodStr,
+      obligations,
+      reserve: { currency: 'IDR', amount: calc.reduce((s, o) => s + Number(o.amount || 0), 0),
+        lines: calc.map(o => ({ obligation_type: o.obligation_type, title: o.title, amount: o.amount, source_label: o.source_label })) },
+    });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 app.get('/api/accountant/applicability', auth, async (req, res) => {
   try {
     const biz = await requireBusiness(req, res);
