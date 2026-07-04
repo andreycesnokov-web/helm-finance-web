@@ -1789,13 +1789,13 @@ async function resolveTelegramActiveBusiness(telegram_id) {
   const { data: st } = await supabase.from('telegram_user_state').select('active_business_id').eq('user_id', userId).limit(1);
   const savedId = st?.[0]?.active_business_id || null;
   const savedValid = savedId ? owned.find(m => m.business_id === savedId) : null;
-  if (savedValid) return { status: 'active', business: opt(savedValid) };
+  if (savedValid) return { status: 'active', business: opt(savedValid), options: owned.map(opt) };
   if (savedId && !savedValid) {
     await supabase.from('telegram_user_state').update({ active_business_id: null }).eq('user_id', userId); // clear stale
   }
   if (owned.length === 1) {
     await supabase.from('telegram_user_state').upsert({ user_id: userId, active_business_id: owned[0].business_id }, { onConflict: 'user_id' });
-    return { status: 'auto', business: opt(owned[0]) };
+    return { status: 'auto', business: opt(owned[0]), options: owned.map(opt) };
   }
   return { status: 'choose', options: owned.map(opt) };
 }
