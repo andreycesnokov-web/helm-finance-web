@@ -146,7 +146,7 @@ function RadarStrip({ d, navigate }) {
   if (!chips.length) return null
   return (
     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 18, alignItems: 'center' }}>
-      <span style={{ fontSize: 11, letterSpacing: '.06em', textTransform: 'uppercase', fontWeight: 700, color: 'var(--text-muted)' }}>Radar</span>
+      <span style={{ fontSize: 11, letterSpacing: '.06em', textTransform: 'uppercase', fontWeight: 700, color: 'var(--text-muted)' }}>Alerts</span>
       {chips.map((c, i) => (
         <span key={i} onClick={c.go ? () => navigate(c.go) : undefined} style={c.go ? { cursor: 'pointer' } : undefined}>
           <StatusBadge tone={c.tone}>{c.icon} {c.text}</StatusBadge>
