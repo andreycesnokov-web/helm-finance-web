@@ -12,10 +12,11 @@ import { useNavigate } from 'react-router-dom'
 import { apiFetch } from '../../lib/api'
 import { useAuth } from '../../hooks/useAuth'
 import { useWorkspace } from '../../shell/WorkspaceProvider'
-import { PageHeader, Card, Btn, StatusBadge, Stat, DataList, LoadingSkeleton, Icon, PageTabs } from '../../shell/ui'
+import { PageHeader, Card, Btn, StatusBadge, Stat, DataList, LoadingSkeleton, Icon, PageTabs, EmptyState } from '../../shell/ui'
 import { BusinessAccountant } from './Accountant'
 
 const PREMIUM = import.meta.env.VITE_AI_ACCOUNTANT_PREMIUM === 'true'
+const SYMBOL = '/brand/symbol_navy_blue_dot_transparent.svg'
 
 // ── Static Indonesian compliance schedule (deterministic; engine wiring later) ──
 // Generic monthly deadlines under Indonesian tax law. Amount/source wiring arrives
@@ -64,6 +65,7 @@ function PremiumAccountant() {
     { key: 'workbench', label: 'Workbench' },
     { key: 'calendar', label: 'Compliance Calendar' },
     { key: 'taxdraft', label: 'Tax Draft' },
+    { key: 'audit', label: 'Audit' },
     { key: 'profile', label: 'Tax Profile' },
   ]
   return (
@@ -75,6 +77,7 @@ function PremiumAccountant() {
       {tab === 'workbench' && <Workbench state={state} setTab={setTab} navigate={navigate} />}
       {tab === 'calendar' && <CalendarTab />}
       {tab === 'taxdraft' && <TaxDraftTab />}
+      {tab === 'audit' && <AuditTab />}
       {tab === 'profile' && <BusinessAccountant />}
     </>
   )
@@ -291,6 +294,60 @@ function TaxDraftTab() {
             <Btn variant="ghost" disabled title="Available once the tax engine is connected">Export PDF (soon)</Btn>
             <Btn disabled title="Available once the tax engine is connected">Request professional review (soon)</Btn>
           </span>
+        </div>
+      </Card>
+    </>
+  )
+}
+
+// ── Audit trail (P3 — REAL data from GET /api/audit/events, 023 audit_events) ─
+function AuditTab() {
+  const { token } = useAuth()
+  const { active, scopeKey } = useWorkspace()
+  const [state, setState] = useState({ loading: true, events: [], total: 0, error: null })
+  const [entityType, setEntityType] = useState('')
+
+  useEffect(() => {
+    if (!token || !active) return
+    let on = true; setState(s => ({ ...s, loading: true, error: null }))
+    apiFetch(`/audit/events?limit=50${entityType ? `&entity_type=${encodeURIComponent(entityType)}` : ''}`, token)
+      .then(d => on && setState({ loading: false, events: d.events || [], total: d.total || 0, error: null }))
+      .catch(e => on && setState({ loading: false, events: [], total: 0, error: e.message }))
+    return () => { on = false }
+  }, [token, active?.id, scopeKey, entityType])
+
+  if (state.loading) return <Card><LoadingSkeleton rows={6} height={16} /></Card>
+  if (state.error) {
+    const forbidden = /role|forbidden/i.test(state.error)
+    return <Card><div style={{ fontSize: 14, color: 'var(--text-secondary)' }}>{forbidden ? 'Your role cannot view the audit trail (owner / admin / CFO / auditor only).' : state.error}</div></Card>
+  }
+  const types = [...new Set(state.events.map(e => e.entity_type))]
+  const actors = new Set(state.events.map(e => e.actor_name))
+  const fmtTs = (t) => new Date(t).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
+  return (
+    <>
+      <div className="cfo-grid cfo-grid-3" style={{ marginBottom: 16 }}>
+        <Card title="Total entries"><div className="cfo-stat-v cfo-mono" style={{ fontSize: 22 }}>{state.total.toLocaleString('en-US')}</div><div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>business-scoped, append-only</div></Card>
+        <Card title="Actors in view"><div className="cfo-stat-v cfo-mono" style={{ fontSize: 22 }}>{actors.size}</div><div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>people + system processes</div></Card>
+        <Card title="Latest event"><div className="cfo-stat-v cfo-mono" style={{ fontSize: 16 }}>{state.events[0] ? fmtTs(state.events[0].created_at) : '—'}</div><div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>most recent activity</div></Card>
+      </div>
+      <Card title="Audit trail" action={
+        <select className="cfo-input" style={{ maxWidth: 200 }} value={entityType} onChange={e => setEntityType(e.target.value)}>
+          <option value="">All entity types</option>
+          {types.map(t => <option key={t} value={t}>{t}</option>)}
+        </select>
+      }>
+        {state.events.length === 0
+          ? <EmptyState symbol={SYMBOL} title="No audit events yet" description="Actions across your workspace (profile changes, rule updates, approvals) will appear here as an append-only trail." />
+          : <DataList items={state.events.map(e => ({
+              id: e.id,
+              label: `${e.entity_type} · ${e.action}`,
+              tag: e.channel || undefined,
+              sub: `${e.actor_name}${e.actor_role ? ` (${e.actor_role})` : ''}${e.entity_id ? ` · ${String(e.entity_id).slice(0, 12)}` : ''}`,
+              amount: fmtTs(e.created_at), amountTone: '',
+            }))} />}
+        <div style={{ marginTop: 10, fontSize: 12, color: 'var(--text-muted)' }}>
+          Read-only envelope (who / what / when / channel). Record snapshots are never exposed here.
         </div>
       </Card>
     </>
