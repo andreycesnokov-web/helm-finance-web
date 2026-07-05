@@ -35,6 +35,7 @@ export default function PersonalProfile() {
   const navigate = useNavigate()
   const [form, setForm] = useState({ display_name: '', locale: '', timezone: '', avatar_url: '' })
   const [businesses, setBusinesses] = useState([])
+  const [loginMethods, setLoginMethods] = useState(null)
   const [loading, setLoading] = useState(true)
   const [showProfile, setShowProfile] = useState(false)
   const [showJoin, setShowJoin] = useState(false)
@@ -53,10 +54,12 @@ export default function PersonalProfile() {
     Promise.all([
       fetch('/api/me/profile', h).then(r => r.json()).catch(() => ({})),
       fetch('/api/workspaces', h).then(r => r.json()).catch(() => ({})),
-    ]).then(([prof, ws]) => {
+      fetch('/api/me/login-methods', h).then(r => r.json()).catch(() => null),
+    ]).then(([prof, ws, lm]) => {
       const p = prof.profile || {}
       setForm({ display_name: p.display_name || '', locale: p.locale || '', timezone: p.timezone || '', avatar_url: p.avatar_url || '' })
       setBusinesses(Array.isArray(ws.business) ? ws.business : [])
+      setLoginMethods(lm && !lm.error ? lm : null)
     }).catch(() => setError('Could not load your account.')).finally(() => setLoading(false))
   }, [token]) // eslint-disable-line
 
@@ -241,6 +244,35 @@ export default function PersonalProfile() {
           {separationCopy}
         </div>
       )}
+
+      {/* Login & Security (read-only status; email/link changes are verification/admin-managed) */}
+      <div style={{ ...card, marginTop: 16 }}>
+        <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 12 }}>Login &amp; Security</div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+            <span style={{ fontSize: 13, color: 'var(--text-2,#555)' }}>Email</span>
+            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text,#111)', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {loginMethods?.email || <span style={{ color: 'var(--text-3,#999)', fontWeight: 400 }}>Not linked</span>}
+              {loginMethods?.email && loginMethods?.email_verified && <span style={{ marginLeft: 6, fontSize: 11, color: 'var(--green-dark,#1a7f37)' }}>✓ verified</span>}
+            </span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+            <span style={{ fontSize: 13, color: 'var(--text-2,#555)' }}>Telegram</span>
+            <span style={{ fontSize: 13, fontWeight: 600, color: loginMethods?.telegram_linked ? 'var(--green-dark,#1a7f37)' : 'var(--text-3,#999)' }}>
+              {loginMethods?.telegram_linked ? 'Linked' : 'Not linked'}
+            </span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+            <span style={{ fontSize: 13, color: 'var(--text-2,#555)' }}>Display name</span>
+            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text,#111)' }}>{form.display_name || loginMethods?.display_name || greeting}</span>
+          </div>
+        </div>
+        <div style={{ marginTop: 12, fontSize: 12, color: 'var(--text-3,#888)', lineHeight: 1.5 }}>
+          Email and Telegram are login methods for the same account when linked. To change or
+          link an email, contact support — email changes are verification-based and, for
+          existing Telegram accounts, linked by an administrator.
+        </div>
+      </div>
 
       {/* Profile settings (secondary, collapsible) */}
       <div style={{ ...card, marginTop: 16 }}>

@@ -39,6 +39,23 @@ Last updated: 2026-07-04.
   exit 0; local smoke of health/404/SPA/documents-health OK; secret scan clean.
 - Awaiting Codex review before promote (Claude writes, Codex reviews, owner go/no-go).
 
+## Account & Identity Management MVP Batch (2026-07-05, pending review)
+
+- Branch: `feature/account-identity-mvp` (off `main`).
+- Adds: `/account` "Login & Security" (read-only), admin Users console enrichment (email
+  identities, memberships, email search), and admin action `POST /api/admin/users/:id/link-email`
+  (safe email→existing-user linking; linked/already_linked/conflict; audited). New read
+  endpoint `GET /api/me/login-methods` (no internal id).
+- Core rule: email + Telegram are login methods of ONE account. Linking is additive (inserts
+  `user_email_identities` for the existing user id); email login then resolves to that account.
+- NOT implemented (documented): account disable/suspend (needs additive `users.status`
+  migration + auth check), hard delete / anonymize / merge (future design).
+- No migrations, no env, no Telegram/payments/bridge/backend-auth-architecture changes.
+- Verified: `node --check` OK; builds Personal OFF/ON exit 0; 26 boundary/auth tests pass;
+  local guard smoke (link-email 401/403/400, /me/login-methods 401, Telegram+email login
+  routes still present). Link DB branches verified by review (no live DB in CI).
+- Awaiting Codex review before promote.
+
 ## Next Recommended Work
 
 1. Personal -> Business Activation MVP.

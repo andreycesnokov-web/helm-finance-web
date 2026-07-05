@@ -97,6 +97,33 @@ Impact:
 - If source data is missing, show `insufficient_data` or `unavailable`.
 - Do not invent tax values.
 
+## D8 - Email + Telegram Are Login Identities of ONE Account (Admin-Linked)
+
+Decision:
+
+- A single user account (`users.id`) may carry a Telegram identity, an email identity, a
+  profile, a personal workspace, and business memberships — they are login methods, not
+  separate people.
+- Linking an email to an existing Telegram user is an ADMIN action for this MVP
+  (`POST /api/admin/users/:id/link-email`). No self-serve email↔Telegram linking yet.
+- Linking is additive: it inserts a `user_email_identities` row for the existing user id;
+  after that, email login resolves to the same account and keeps all business access.
+- An admin link is treated as admin-verified (`email_verified_at` set).
+- If the email already belongs to a DIFFERENT user, the action returns a CONFLICT and never
+  auto-merges. Destructive account merge is future work.
+
+Reason:
+
+- PT Helm Care Indonesia (and other early accounts) were created via Telegram identity;
+  owners need email login without losing their workspace.
+
+Impact:
+
+- Admin UI may show internal ids; normal-user UI must not (`/api/me/login-methods` never
+  returns the id).
+- Every link attempt (linked / already_linked / conflict) is written to `audit_events`.
+- Account disable/suspend and hard delete are NOT implemented (see PROJECT_STATE / RISKS).
+
 ## D7 - Canonical Docs Are Local `_specs/`
 
 Decision:
