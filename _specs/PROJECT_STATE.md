@@ -70,6 +70,31 @@ DARK / BEHIND FLAG:
 - Personal finance dashboard and `/api/personal/*` behind personal v1 flags.
 - Premium Business UI enhancements behind premium frontend flags.
 
+## Account & Identity Management MVP (2026-07-05, branch `feature/account-identity-mvp`)
+
+Status: implemented on branch, pending review/deploy. Frontend + additive read/action
+endpoints only. No migrations, no env changes, no auth-architecture change.
+
+LIVE (on branch):
+
+- `/account` "Login & Security" section (read-only): shows primary email + verified state,
+  Telegram linked status, display name, and copy: "Email and Telegram are login methods for
+  the same account when linked." No raw email editing; no internal id shown.
+- Admin Users console extended: search by name/username/email/user id; user detail shows
+  internal id, email identities, Telegram identity, business memberships, account status.
+- Admin action **Link email to existing user** (`POST /api/admin/users/:id/link-email`):
+  validates email; links to the existing user (admin-verified) when the email is free;
+  returns `already_linked` when it's the same user; returns a non-destructive `conflict`
+  (with the other user's id + summary) when the email belongs to a different user. Audited.
+- Result: an email can be linked to a Telegram-origin account (e.g. PT Helm Care's owner);
+  subsequent email login resolves to that same account with the same business access.
+
+NOT IMPLEMENTED (documented; needs owner go):
+
+- Account disable/suspend — no `users.status`/`disabled_at` column exists. Requires an
+  additive migration plus an auth-middleware check that rejects disabled users. Not faked.
+- Hard delete / anonymize / account merge — future design only (see RISKS_AND_TESTS).
+
 ## Login and Identity
 
 LIVE:
