@@ -375,6 +375,29 @@ async function ensureAvatarBucket() {
   _avatarBucketReady = true;
 }
 
+// GET /api/me/login-methods — read-only "Login & Security" summary for the CURRENT user.
+// Shows which login methods are attached to this one account. NEVER exposes the internal
+// user id (normal-user UI must not show ids like -2); admins use /api/admin/users for ids.
+app.get('/api/me/login-methods', emailAuthGate, auth, async (req, res) => {
+  try {
+    const uid = req.user.userId;
+    const [{ data: emails }, { data: prof }] = await Promise.all([
+      supabase.from('user_email_identities').select('email, email_verified_at').eq('user_id', uid).order('email_verified_at', { ascending: true }),
+      supabase.from('user_profiles').select('display_name, avatar_url').eq('user_id', uid).limit(1),
+    ]);
+    const primary = (emails || [])[0] || null;
+    res.json({
+      email: primary?.email || null,
+      email_verified: !!primary?.email_verified_at,
+      telegram_linked: Number(uid) > 0,   // positive ids are Telegram-origin accounts
+      display_name: prof?.[0]?.display_name || null,
+      avatar_url: prof?.[0]?.avatar_url || null,
+    });
+  } catch (e) {
+    res.status(500).json({ error: 'failed' });
+  }
+});
+
 app.post('/api/me/avatar', emailAuthGate, auth, (req, res) => {
   avatarUpload.single('avatar')(req, res, async (err) => {
     try {
@@ -6210,14 +6233,23 @@ app.get('/api/admin/users', auth, requireAdmin, async (req, res) => {
       { data: transactions, error: tErr },
       { data: debts,        error: dErr },
       { data: reminders,    error: rErr },
+      { data: identities },
     ] = await Promise.all([
       supabase.from('users').select('*').order('id', { ascending: true }),
       supabase.from('transactions').select('user_id, created_at'),
       supabase.from('debts').select('user_id, created_at'),
       supabase.from('reminders').select('user_id, created_at'),
+      supabase.from('user_email_identities').select('user_id, email'),
     ]);
 
     if (uErr) throw uErr;
+
+    // email identities per user (lets admins search by email as well as name/id)
+    const emailMap = {};
+    (identities || []).forEach(i => {
+      const uid = String(i.user_id);
+      (emailMap[uid] = emailMap[uid] || []).push(i.email);
+    });
 
     // Build per-user aggregates in JS
     const txMap  = {};
@@ -6268,7 +6300,8 @@ app.get('/api/admin/users', auth, requireAdmin, async (req, res) => {
         language:             u.language   || null,
         timezone:             u.timezone   || null,
         created_at:           u.created_at || null,
-        is_telegram_connected: true, // always — auth is Telegram-only
+        is_telegram_connected: Number(u.id) > 0, // positive ids = Telegram-origin
+        emails:               emailMap[uid] || [],
         transaction_count:    txD.count,
         debt_count:           dbD.count,
         reminder_count:       rmD.count,
@@ -6360,6 +6393,11 @@ app.get('/api/admin/users/:id', auth, requireAdmin, async (req, res) => {
       .sort((a, b) => (b.date || '') > (a.date || '') ? 1 : -1)
       .slice(0, 10);
 
+    // Identity + membership enrichment (email login identities, business memberships).
+    // is_telegram_connected is derived from the id sign: positive ids are Telegram-origin,
+    // negative ids (next_app_user_id) are email-first accounts with no Telegram identity.
+    const identity = await adminUserSummary(targetId);
+
     res.json({
       user: {
         id:                   user.id,
@@ -6370,8 +6408,11 @@ app.get('/api/admin/users/:id', auth, requireAdmin, async (req, res) => {
         language:             user.language   || null,
         timezone:             user.timezone   || null,
         created_at:           user.created_at || null,
-        is_telegram_connected: true,
+        is_telegram_connected: Number(user.id) > 0,
+        account_status:       'active', // no disable column yet — see identity MVP docs
       },
+      email_identities: identity.emails,
+      businesses:        identity.businesses,
       summary: {
         transaction_count: txs.length,
         debt_count:        dbs.length,
@@ -6385,6 +6426,70 @@ app.get('/api/admin/users/:id', auth, requireAdmin, async (req, res) => {
     });
   } catch (e) {
     res.status(500).json({ error: e.message });
+  }
+});
+
+// Basic identity + membership summary for one user (admin-facing). Used by the detail
+// endpoint and by the link-email CONFLICT response so an admin can see who owns an email.
+// No secrets/tokens; business names + roles only.
+async function adminUserSummary(userId) {
+  const [{ data: prof }, { data: emails }, { data: mems }] = await Promise.all([
+    supabase.from('user_profiles').select('display_name, avatar_url').eq('user_id', userId).limit(1),
+    supabase.from('user_email_identities').select('email, email_verified_at').eq('user_id', userId),
+    supabase.from('business_members').select('business_id, role, status, businesses(name, type, business_code)').eq('user_id', userId),
+  ]);
+  return {
+    user_id: String(userId),
+    display_name: prof?.[0]?.display_name || null,
+    avatar_url: prof?.[0]?.avatar_url || null,
+    is_telegram: Number(userId) > 0,
+    emails: (emails || []).map(e => ({ email: e.email, verified: !!e.email_verified_at })),
+    businesses: (mems || []).map(m => ({ id: m.business_id, name: m.businesses?.name || null, type: m.businesses?.type || null, business_code: m.businesses?.business_code || null, role: m.role, status: m.status })),
+  };
+}
+
+// POST /api/admin/users/:id/link-email — SAFE admin identity linking. Adds an email login
+// identity to an EXISTING user (e.g. a Telegram-origin account like PT Helm Care's owner)
+// so the same person can also sign in by email and keep all business access. Admin-only,
+// never public, never merges two distinct users, never logs secrets. Every attempt (link /
+// already-linked / conflict) is written to audit_events.
+app.post('/api/admin/users/:id/link-email', auth, requireAdmin, async (req, res) => {
+  try {
+    const targetId = String(req.params.id);
+    const email = normalizeEmail(req.body?.email);
+    if (!EMAIL_RE.test(email)) return res.status(400).json({ error: 'invalid_email' });
+
+    // Target user must exist.
+    const { data: tRows } = await supabase.from('users').select('id').eq('id', targetId).limit(1);
+    if (!tRows?.length) return res.status(404).json({ error: 'user_not_found' });
+
+    // Is this email already an identity somewhere?
+    const { data: idRows } = await supabase.from('user_email_identities')
+      .select('user_id').eq('email', email).limit(1);
+    if (idRows?.length) {
+      const owner = String(idRows[0].user_id);
+      if (owner === targetId) {
+        await recordAudit({ actorUserId: req.user.userId, actorRole: 'platform_admin', entityType: 'user_identity', entityId: targetId, action: 'email_already_linked', after: { email } });
+        return res.json({ status: 'already_linked', user_id: targetId, email });
+      }
+      // Email belongs to a DIFFERENT user — do NOT auto-merge. Return a conflict with both
+      // sides so an admin can decide; destructive merge is future work.
+      const existing = await adminUserSummary(owner);
+      await recordAudit({ actorUserId: req.user.userId, actorRole: 'platform_admin', entityType: 'user_identity', entityId: targetId, action: 'email_link_conflict', after: { email, existing_user_id: owner } });
+      return res.status(409).json({ status: 'conflict', email, target_user_id: targetId, existing_user_id: owner, existing_user: existing });
+    }
+
+    // No existing identity → link it. An explicit admin action is treated as admin-verified.
+    const { error: insErr } = await supabase.from('user_email_identities')
+      .insert({ user_id: targetId, email, email_verified_at: new Date().toISOString() });
+    if (insErr) return res.status(500).json({ error: 'link_failed' });
+    // Ensure a profile shell exists so /account resolves (non-fatal).
+    const { data: prof } = await supabase.from('user_profiles').select('user_id').eq('user_id', targetId).limit(1);
+    if (!prof?.length) { try { await supabase.from('user_profiles').insert({ user_id: targetId, display_name: email.split('@')[0] }); } catch { /* non-fatal */ } }
+    await recordAudit({ actorUserId: req.user.userId, actorRole: 'platform_admin', entityType: 'user_identity', entityId: targetId, action: 'email_linked', after: { email, admin_verified: true } });
+    res.status(201).json({ status: 'linked', user_id: targetId, email, verified: true });
+  } catch (e) {
+    res.status(500).json({ error: 'link_failed' });
   }
 });
 
