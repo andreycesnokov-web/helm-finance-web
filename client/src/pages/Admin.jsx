@@ -124,6 +124,7 @@ export default function Admin() {
         (u.first_name || '').toLowerCase().includes(q) ||
         (u.last_name  || '').toLowerCase().includes(q) ||
         (u.username   || '').toLowerCase().includes(q) ||
+        (u.emails || []).some(e => (e || '').toLowerCase().includes(q)) ||
         String(u.id).includes(q)
       )
     })
@@ -190,7 +191,7 @@ export default function Admin() {
             <input
               value={search}
               onChange={e => setSearch(e.target.value)}
-              placeholder="Search name, username, Telegram ID…"
+              placeholder="Search name, username, email, Telegram ID…"
               style={{
                 width: '100%', padding: '10px 14px 10px 36px', borderRadius: 10,
                 border: '1px solid var(--border-2)', fontSize: 13, background: 'var(--bg-2)',

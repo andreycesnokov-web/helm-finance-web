@@ -76,6 +76,36 @@ Database:
 - `email_login_codes`
 - `app_user_id_seq`
 
+## Identity & Account Model (Account & Identity MVP, 2026-07-05)
+
+One `users` row = one account (one person). Login methods attach to it:
+
+- Telegram identity: the `users` row itself, positive `id`, created by `POST /api/auth/telegram`.
+- Email identity: a `user_email_identities` row (`user_id`, `email`, `email_verified_at`).
+  Email-first accounts get a NEGATIVE `users.id` from `next_app_user_id`.
+- Sign in is unified by `resolveOrCreateEmailUser`: an email that already has an identity
+  resolves to that existing `user_id` (Telegram or email origin) — same profile, personal
+  workspace, and business memberships.
+
+Derivation used by the admin/account surfaces:
+
+- `is_telegram_connected` / `telegram_linked` = `users.id > 0` (positive = Telegram-origin).
+- A Telegram account with a linked email keeps its positive id and gains an email identity.
+
+Account surfaces:
+
+- `GET /api/me/login-methods` (self, no internal id) — email, email_verified, telegram_linked,
+  display_name, avatar_url. Backs the `/account` "Login & Security" section.
+- `GET /api/admin/users` — list incl. `emails[]` per user (search by name/username/email/id).
+- `GET /api/admin/users/:id` — detail incl. `email_identities`, `businesses` (memberships),
+  `is_telegram_connected`, `account_status` ('active' placeholder — no disable column yet).
+- `POST /api/admin/users/:id/link-email` (admin-only) — safe email→user linking; returns
+  `linked` | `already_linked` | `conflict` (never merges). Writes `audit_events`.
+
+NOT IMPLEMENTED (documented, needs owner go): account disable/suspend (no `users.status`
+column — would be an additive migration + an auth-middleware check), and hard delete /
+anonymize / account merge.
+
 ## User Profile Model
 
 LIVE:

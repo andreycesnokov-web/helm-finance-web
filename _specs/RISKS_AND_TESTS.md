@@ -177,6 +177,36 @@ Reduced risks (backend runtime flags — no Railway change required to stay safe
 - API hygiene: `/api/health` is JSON; unknown `/api/*` returns JSON 404, not the SPA shell.
 - Email body: magic-link URL HTML-escaped; secret length removed from logs.
 
+## Account & Identity MVP (2026-07-05)
+
+Audit: identity-link actions ARE audited — `recordAudit()` → `audit_events` writes
+`email_linked` / `email_already_linked` / `email_link_conflict` with actor (admin) id,
+target user id, and the email. No secrets/tokens logged. (No audit-table gap here.)
+
+Rules enforced:
+
+- `POST /api/admin/users/:id/link-email` is admin-only (`requireAdmin`), never public.
+- Email format validated; email that belongs to another user → CONFLICT, never auto-merge.
+- Admin link sets `email_verified_at` (admin-verified). Normal-user UI shows no internal id.
+
+Required tests (this batch):
+
+- Email login still works; legacy Telegram login still works (routes present, not 404).
+- Admin search by email/name/id works; link to existing Telegram user works; duplicate-email
+  conflict handled safely; business access unchanged after linking.
+
+Gaps / NOT IMPLEMENTED (needs follow-up):
+
+- **Account disable/suspend**: no `users.status`/`disabled_at` column. Required follow-up =
+  additive migration + `auth` middleware check that 401s disabled users + admin toggle
+  endpoint (audited). Do NOT fake disable without the column.
+- **Hard delete / anonymize / merge**: future design only. Deleting a sole business owner
+  must be blocked unless ownership is transferred or the business archived. Business audit
+  trail and financial records must be retained even when a login is disabled.
+- **Link endpoint DB branches** (linked/already/conflict) were verified by code review +
+  local guard/validation smoke (401/403/400); not run against a live Supabase in CI
+  (no creds). Run against local/staging DB before relying on them in production.
+
 ## Minimum Checks by Change Type
 
 Personal UI:
