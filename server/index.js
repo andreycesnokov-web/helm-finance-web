@@ -6455,7 +6455,11 @@ async function adminUserSummary(userId) {
 // already-linked / conflict) is written to audit_events.
 app.post('/api/admin/users/:id/link-email', auth, requireAdmin, async (req, res) => {
   try {
-    const targetId = String(req.params.id);
+    // Coerce the path id to a numeric user id. Number() (not parseInt) so partial-numeric
+    // strings like "12abc" become NaN and are rejected. Both positive (Telegram-origin) and
+    // negative (email-origin, next_app_user_id) ids are valid; NaN/floats/unsafe → 400.
+    const targetId = Number(req.params.id);
+    if (!Number.isSafeInteger(targetId)) return res.status(400).json({ error: 'invalid_user_id' });
     const email = normalizeEmail(req.body?.email);
     if (!EMAIL_RE.test(email)) return res.status(400).json({ error: 'invalid_email' });
 
@@ -6467,7 +6471,7 @@ app.post('/api/admin/users/:id/link-email', auth, requireAdmin, async (req, res)
     const { data: idRows } = await supabase.from('user_email_identities')
       .select('user_id').eq('email', email).limit(1);
     if (idRows?.length) {
-      const owner = String(idRows[0].user_id);
+      const owner = Number(idRows[0].user_id);
       if (owner === targetId) {
         await recordAudit({ actorUserId: req.user.userId, actorRole: 'platform_admin', entityType: 'user_identity', entityId: targetId, action: 'email_already_linked', after: { email } });
         return res.json({ status: 'already_linked', user_id: targetId, email });
