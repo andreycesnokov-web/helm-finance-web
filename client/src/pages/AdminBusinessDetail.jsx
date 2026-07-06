@@ -24,12 +24,14 @@ export default function AdminBusinessDetail() {
   const { token } = useAuth()
   const lang = ['ru', 'id'].includes(getLang()) ? getLang() : 'en'; const l = L[lang]
   const [d, setD] = useState(null); const [members, setMembers] = useState([]); const [usage, setUsage] = useState(null); const [audit, setAudit] = useState([])
+  const [pf, setPf] = useState(null)
   const [busy, setBusy] = useState(false); const [error, setError] = useState(null)
 
   const load = useCallback(() => {
     apiFetch(`/admin/businesses/${businessId}`, token).then(setD).catch(setError)
     apiFetch(`/admin/businesses/${businessId}/members`, token).then(r => setMembers(r.members || [])).catch(() => {})
     apiFetch(`/admin/businesses/${businessId}/usage`, token).then(r => setUsage(r.usage)).catch(() => {})
+    apiFetch(`/admin/businesses/${businessId}/cleanup-preflight`, token).then(setPf).catch(() => {})
     apiFetch(`/admin/access-audit?business_id=${businessId}`, token).then(r => setAudit(r.events || [])).catch(() => {})
   }, [token, businessId])
   useEffect(() => { if (token) load() }, [token, load])
@@ -39,6 +41,15 @@ export default function AdminBusinessDetail() {
   const activateTrial = () => act(() => apiFetch(`/admin/businesses/${businessId}/trial`, token, { method: 'POST', body: { action: 'activate' } }))
   const extendTrial = (days) => act(() => apiFetch(`/admin/businesses/${businessId}/trial`, token, { method: 'POST', body: { action: 'extend', days } }))
   const removeOverride = () => { if (confirm(l.remove + '?')) act(() => apiFetch(`/admin/businesses/${businessId}/override`, token, { method: 'DELETE' })) }
+  // Archive = soft hide (status='archived'); reversible, deletes NO data. Requires typing
+  // the exact business name so a real workspace (e.g. Helm Care) is never archived by accident.
+  const archive = () => {
+    const name = pf?.business?.name || id.name || ''
+    const typed = prompt(`Archive this workspace? It will be hidden from the switcher but NO data is deleted.\n\nType the exact name to confirm:\n"${name}"`)
+    if (typed == null) return
+    act(() => apiFetch(`/admin/businesses/${businessId}/archive`, token, { method: 'POST', body: { confirm: true, confirm_name: typed } }))
+  }
+  const unarchive = () => { if (confirm('Unarchive this workspace (make it active again)?')) act(() => apiFetch(`/admin/businesses/${businessId}/unarchive`, token, { method: 'POST', body: {} })) }
 
   if (error) return <div style={{ padding: 40, textAlign: 'center' }}><div style={{ fontSize: 48 }}>{/Forbidden|access/.test(error.message) ? '🔒' : '⚠️'}</div><div>{error.message}</div></div>
   if (!d) return <div style={{ padding: 40, color: 'var(--text-3)' }}>Loading…</div>
@@ -94,6 +105,26 @@ export default function AdminBusinessDetail() {
       <Card title={l.auditL}>
         {audit.length === 0 && <div style={{ fontSize: 12, color: 'var(--text-3)' }}>—</div>}
         {audit.map(e => <Row key={e.id} k={`${fmt(e.changed_at)} · ${e.action}`}>{e.previous_effective_plan} → <b>{e.new_effective_plan}</b>{e.reason ? ` · ${e.reason}` : ''}</Row>)}
+      </Card>
+
+      {/* Cleanup — archive (soft, reversible). Never a hard delete. */}
+      <Card title="Cleanup">
+        <Row k="Status">
+          {pf?.business?.status === 'archived'
+            ? <span style={{ color: 'var(--red-dark,#b3261e)', fontWeight: 700 }}>Archived (hidden from switcher)</span>
+            : <span style={{ color: 'var(--green-dark,#1a7f37)', fontWeight: 700 }}>Active</span>}
+        </Row>
+        {pf?.counts && Object.entries(pf.counts).map(([k, v]) => <Row key={k} k={k}>{v == null ? '—' : v}</Row>)}
+        {pf && <Row k="Empty (no financial/doc data)">{pf.is_empty ? 'yes' : 'no'}</Row>}
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 10 }}>
+          {pf?.business?.status === 'archived'
+            ? <button disabled={busy} onClick={unarchive} style={btn}>Unarchive</button>
+            : <button disabled={busy} onClick={archive} style={{ ...btn, color: 'var(--red-dark,#b3261e)', borderColor: 'var(--red-dark,#b3261e)' }}>Archive workspace…</button>}
+        </div>
+        <div style={{ fontSize: 11, color: 'var(--text-4)', marginTop: 8, lineHeight: 1.5 }}>
+          Archive is a reversible soft-hide — no wallets, transactions, documents, or audit history are deleted.
+          You must type the exact business name to confirm. Hard delete is not available here.
+        </div>
       </Card>
     </div>
   )
