@@ -628,6 +628,9 @@ export default function App() {
           <Route path="/onboarding" element={<OnboardingRoute />} />
           {/* Hidden admin routes — not in sidebar, protected by ADMIN_TELEGRAM_IDS on backend */}
           <Route path="/admin"           element={<Layout><Admin /></Layout>} />
+          {/* Users console is also reachable at /admin/users (same list as /admin) so the
+              natural URL renders instead of an unmatched-route blank page. */}
+          <Route path="/admin/users"     element={<Layout><Admin /></Layout>} />
           <Route path="/admin/users/:id" element={<Layout><AdminUser /></Layout>} />
           <Route path="/admin/businesses" element={<Layout><AdminBusinesses /></Layout>} />
           <Route path="/admin/businesses/:businessId" element={<Layout><AdminBusinessDetail /></Layout>} />
