@@ -207,6 +207,34 @@ Gaps / NOT IMPLEMENTED (needs follow-up):
   local guard/validation smoke (401/403/400); not run against a live Supabase in CI
   (no creds). Run against local/staging DB before relying on them in production.
 
+## Admin Cleanup / Archive MVP (2026-07-06)
+
+Production cleanup rules:
+
+- Archive (soft, reversible) is the DEFAULT. Hard delete is blocked (DECISIONS D9).
+- Archive requires admin auth + `confirm:true` + exact `confirm_name`. Real workspaces
+  (Helm Care Indonesia / Helm Care Pay) cannot be archived without typing their exact name.
+- Archiving mutates ONLY `businesses.status`; never touches wallets/transactions/documents/
+  audit. Archived workspaces are hidden from the switcher, still visible in admin.
+- Every archive/unarchive is written to `audit_events` (actor admin id, business id, action).
+
+Duplicate user cleanup:
+
+- Marking the duplicate email user `-1` as disabled is NOT supported — no `users.status`
+  column. Required follow-up = additive migration (`users.status`/`disabled_at`) + auth
+  check. Do NOT delete the user row, audit history, or historical references.
+
+Tested (this batch):
+
+- Admin-only gating on preflight/archive/unarchive (401 unauth, 403 non-admin), bad UUID
+  → 400 (live smoke). Build OFF/ON, funding E2E (uses `listAccessibleWorkspaces`) pass.
+
+Gaps / NOT RUN:
+
+- Archive DB write + switcher-hide + confirm/name-mismatch branches verified by code review;
+  not run against a live Supabase (no creds) — run on staging before production cleanup.
+- No production data archived by this task (implementation only).
+
 ## Minimum Checks by Change Type
 
 Personal UI:

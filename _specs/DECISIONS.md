@@ -124,6 +124,31 @@ Impact:
 - Every link attempt (linked / already_linked / conflict) is written to `audit_events`.
 - Account disable/suspend and hard delete are NOT implemented (see PROJECT_STATE / RISKS).
 
+## D9 - Cleanup Is Archive-First; Hard Delete Is Blocked by Default
+
+Decision:
+
+- Removing a test/duplicate business or workspace uses a reversible SOFT archive
+  (`businesses.status='archived'`), never a destructive delete.
+- Archived workspaces disappear from the switcher / `/api/workspaces`
+  (`listAccessibleWorkspaces` filters `status!='archived'`) but stay visible in admin.
+- Archive is admin-only and requires typing the EXACT business name (`confirm_name`) plus
+  `confirm:true`, so a real workspace (Helm Care Indonesia / Helm Care Pay) can never be
+  archived by accident. Every archive/unarchive is audited to `audit_events`.
+- Hard delete is NOT implemented. It is allowed only in a future task when ALL hold: owner
+  explicitly approves; preflight shows zero financial/document footprint; dependencies are
+  handled; audit exists; a backup/export is confirmed.
+
+Reason:
+
+- Production data safety: never lose real financial/business/audit data during cleanup.
+
+Impact:
+
+- No wallets/transactions/documents/audit are moved or deleted by cleanup.
+- Duplicate-user disable needs a `users.status` column (not present) — documented as a
+  required future migration; not faked. See [[D8]].
+
 ## D7 - Canonical Docs Are Local `_specs/`
 
 Decision:
