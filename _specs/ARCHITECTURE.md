@@ -106,6 +106,24 @@ NOT IMPLEMENTED (documented, needs owner go): account disable/suspend (no `users
 column — would be an additive migration + an auth-middleware check), and hard delete /
 anonymize / account merge.
 
+## Admin Cleanup / Archive Model (2026-07-06)
+
+Businesses and personal workspaces are `businesses` rows with a `status` column
+(`'active'` default). Cleanup uses SOFT archive — no row/data deletion:
+
+- `businesses.status = 'archived'` hides a workspace from `listAccessibleWorkspaces`
+  (server/lib/workspaceAccess.js), so it leaves the switcher and `/api/workspaces` while
+  all wallets/transactions/documents/audit stay intact. Admin queries `businesses` directly
+  and still see archived rows (`GET /api/admin/businesses` now returns `status`).
+- `GET /api/admin/businesses/:id/cleanup-preflight` — all-time counts (members, wallets,
+  transactions, invoices, payables, receivables, documents, audit_events) + `is_empty`.
+- `POST /api/admin/businesses/:id/archive` — admin-only; requires `confirm:true` AND
+  `confirm_name` === exact business name (accident guard for real workspaces); audited.
+- `POST /api/admin/businesses/:id/unarchive` — reverse to `status='active'`; audited.
+- Hard delete: NOT implemented (blocked by default — see DECISIONS D9).
+- Duplicate-user disable: NOT implemented — needs a `users.status` migration (see identity
+  MVP notes); archive covers duplicate *workspaces*, not the duplicate user row.
+
 ## User Profile Model
 
 LIVE:

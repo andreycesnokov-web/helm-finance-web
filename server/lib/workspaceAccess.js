@@ -5,13 +5,16 @@
 // Pure-ish: every function takes the service-role `supabase` client explicitly.
 // No arbitrary `.limit(1)` membership picks for financial reads.
 
-// All active memberships for a user, with the joined business row.
+// All active memberships for a user, with the joined business row. Excludes ARCHIVED
+// workspaces (businesses.status='archived') so admin-archived test/duplicate workspaces
+// disappear from the switcher and /api/workspaces without any data being deleted. Admin
+// endpoints query `businesses` directly and still see archived rows.
 async function listAccessibleWorkspaces(supabase, userId) {
   const { data, error } = await supabase.from('business_members')
     .select('role, status, business_id, businesses(*)')
     .eq('user_id', userId).eq('status', 'active');
   if (error) throw error;
-  return (data || []).filter(m => m.businesses);
+  return (data || []).filter(m => m.businesses && m.businesses.status !== 'archived');
 }
 
 // Resolve ANY workspace (personal or business) the caller is an active member of.

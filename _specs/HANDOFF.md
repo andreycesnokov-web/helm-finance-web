@@ -56,6 +56,26 @@ Last updated: 2026-07-04.
   routes still present). Link DB branches verified by review (no live DB in CI).
 - Awaiting Codex review before promote.
 
+## Admin Test Data Cleanup / Archive MVP Batch (2026-07-06, pending review)
+
+- Branch: `feature/admin-archive-mvp` (off `main`).
+- Adds: soft archive of businesses/workspaces via existing `businesses.status='archived'`
+  — `GET …/cleanup-preflight`, `POST …/archive` (confirm + exact-name guard),
+  `POST …/unarchive`; `listAccessibleWorkspaces` hides archived from the switcher; admin
+  business list returns `status`; Admin Business Detail Cleanup card (preflight + archive).
+- Archive is reversible and deletes nothing; audited to `audit_events`. Hard delete NOT
+  implemented (blocked by default). Duplicate-user disable NOT implemented (needs
+  `users.status` migration).
+- No migrations, no env, no Telegram/payments/bridge/backend-auth changes. No production data
+  archived by this task (implementation only).
+- Verified: `node --check` OK; builds OFF/ON exit 0; 20 boundary/funding tests pass; live
+  guard smoke (preflight/archive/unarchive 401/403, bad-uuid 400). Archive DB write +
+  confirm/name guards verified by review (no live DB in CI).
+- Owner cleanup target (owner-run later): archive `My Business` + duplicate personal
+  workspace (both owner `-1`); keep 1057134807/@Andrei_Cn + Helm Care Indonesia/Pay +
+  Andrei's personal workspace.
+- Awaiting Codex review before promote.
+
 ## Next Recommended Work
 
 1. Personal -> Business Activation MVP.

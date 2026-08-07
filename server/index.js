@@ -6532,6 +6532,7 @@ app.get('/api/admin/businesses', auth, requireAdmin, async (req, res) => {
       const owner = ownerById[String(b.owner_user_id)];
       return {
         business_id: b.id, business_code: b.business_code, name: b.name, type: b.type || 'business',
+        status: b.status || 'active',
         owner: owner ? { user_id: b.owner_user_id, name: owner.first_name || owner.username || null } : { user_id: b.owner_user_id, name: null },
         member_count: mem.length, active_member_count: mem.filter(m => m.status === 'active').length,
         stored_plan: a.stored_plan, effective_plan: a.effective_plan, effective_access_source: a.effective_access_source,
@@ -6608,6 +6609,71 @@ app.get('/api/admin/businesses/:businessId/usage', auth, requireAdmin, async (re
       members: members ?? 0, bank_imports: batches ?? 0, documents: docs ?? null,
     } });
   } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// GET /api/admin/businesses/:businessId/cleanup-preflight — ALL-TIME dependency counts
+// for a safe archive/delete decision. Read-only; mutates nothing. Proves whether a
+// business/workspace is empty (safe to hard-delete later) or carries real data (archive only).
+app.get('/api/admin/businesses/:businessId/cleanup-preflight', auth, requireAdmin, async (req, res) => {
+  try {
+    const b = await loadBusinessOr4xx(req, res);
+    if (!b) return;
+    const id = b.id;
+    const cnt = (t, col = 'id') => supabase.from(t).select(col, { count: 'exact', head: true }).eq('business_id', id).then(r => r.count ?? 0, () => null);
+    const [members, wallets, transactions, documents, audit, debtRows] = await Promise.all([
+      cnt('business_members'), cnt('wallets'), cnt('transactions'),
+      cnt('financial_documents'), cnt('audit_events'),
+      supabase.from('debts').select('type').eq('business_id', id).then(r => r.data || [], () => []),
+    ]);
+    const payables = debtRows.filter(d => d.type === 'payable').length;
+    const receivables = debtRows.filter(d => d.type === 'receivable').length;
+    const totals = { members, wallets, transactions, invoices: debtRows.length, payables, receivables, documents, audit_events: audit };
+    // "Empty" = no financial/document footprint (members alone don't count as data).
+    const hasFinancialData = [wallets, transactions, debtRows.length, documents].some(n => Number(n) > 0);
+    res.json({
+      business: { business_id: id, name: b.name, type: b.type || 'business', owner_user_id: b.owner_user_id, status: b.status || 'active' },
+      counts: totals,
+      is_empty: !hasFinancialData,
+      recommendation: hasFinancialData ? 'archive_only' : 'archive_or_delete_with_owner_approval',
+    });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// POST /api/admin/businesses/:businessId/archive — SOFT archive (status='archived').
+// Requires confirm:true AND confirm_name matching the exact business name, so a real
+// workspace (e.g. Helm Care) can never be archived accidentally. Reversible; deletes NO
+// data. Archived workspaces vanish from the switcher (listAccessibleWorkspaces) but stay
+// visible in admin. Audited to audit_events. NEVER hard-deletes.
+app.post('/api/admin/businesses/:businessId/archive', auth, requireAdmin, async (req, res) => {
+  try {
+    const b = await loadBusinessOr4xx(req, res);
+    if (!b) return;
+    const { confirm, confirm_name } = req.body || {};
+    if (confirm !== true) return res.status(400).json({ error: 'confirmation_required', message: 'Set confirm:true to archive.' });
+    if ((confirm_name || '').trim() !== (b.name || '').trim())
+      return res.status(400).json({ error: 'name_mismatch', message: 'confirm_name must exactly match the business name.' });
+    if (b.status === 'archived') return res.json({ status: 'archived', business_id: b.id, name: b.name, already: true });
+
+    const { data: after, error } = await supabase.from('businesses')
+      .update({ status: 'archived', updated_at: new Date().toISOString() }).eq('id', b.id).select().single();
+    if (error) return res.status(500).json({ error: 'archive_failed' });
+    await recordAudit({ actorUserId: req.user.userId, actorRole: 'platform_admin', entityType: 'business', entityId: b.id, action: 'business_archived', before: { status: b.status || 'active' }, after: { status: 'archived', name: b.name } });
+    res.json({ status: 'archived', business_id: after.id, name: after.name });
+  } catch (e) { res.status(500).json({ error: 'archive_failed' }); }
+});
+
+// POST /api/admin/businesses/:businessId/unarchive — reverse an archive (status='active').
+app.post('/api/admin/businesses/:businessId/unarchive', auth, requireAdmin, async (req, res) => {
+  try {
+    const b = await loadBusinessOr4xx(req, res);
+    if (!b) return;
+    if (b.status !== 'archived') return res.json({ status: b.status || 'active', business_id: b.id, name: b.name, already: true });
+    const { data: after, error } = await supabase.from('businesses')
+      .update({ status: 'active', updated_at: new Date().toISOString() }).eq('id', b.id).select().single();
+    if (error) return res.status(500).json({ error: 'unarchive_failed' });
+    await recordAudit({ actorUserId: req.user.userId, actorRole: 'platform_admin', entityType: 'business', entityId: b.id, action: 'business_unarchived', before: { status: 'archived' }, after: { status: 'active', name: b.name } });
+    res.json({ status: 'active', business_id: after.id, name: after.name });
+  } catch (e) { res.status(500).json({ error: 'unarchive_failed' }); }
 });
 
 // GET /api/admin/businesses/:businessId/access — full resolver response
