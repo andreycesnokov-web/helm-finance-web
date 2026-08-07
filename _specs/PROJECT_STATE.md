@@ -95,6 +95,29 @@ NOT IMPLEMENTED (documented; needs owner go):
   additive migration plus an auth-middleware check that rejects disabled users. Not faked.
 - Hard delete / anonymize / account merge — future design only (see RISKS_AND_TESTS).
 
+## Admin Test Data Cleanup / Archive MVP (2026-07-06, branch `feature/admin-archive-mvp`)
+
+Status: implemented on branch, pending review/deploy. Additive endpoints + admin UI only;
+no migrations (reuses existing `businesses.status`), no env, no data mutated during build.
+
+- Soft archive of businesses/workspaces via `businesses.status='archived'` — reversible,
+  deletes nothing. Archived workspaces leave the switcher (`listAccessibleWorkspaces` filter)
+  but remain visible in admin. New: `GET …/cleanup-preflight`, `POST …/archive`,
+  `POST …/unarchive`; admin business list now returns `status`.
+- Archive requires `confirm:true` + exact `confirm_name` (guards Helm Care Indonesia /
+  Helm Care Pay from accidental archive). Audited to `audit_events`.
+- Admin Business Detail UI: Cleanup card with preflight counts + Archive/Unarchive (typed-name
+  confirmation). No destructive delete shown.
+
+NOT IMPLEMENTED (documented; needs owner go):
+
+- Hard delete of businesses/users (blocked by default — see DECISIONS D9).
+- Duplicate-user (`-1`) disable — needs a `users.status`/`disabled_at` additive migration.
+
+Intended production cleanup (owner-run, NOT executed by this task): archive test business
+`My Business` (owner `-1`) and the duplicate personal workspace (owner `-1`); keep user
+`1057134807`/@Andrei_Cn, Helm Care Indonesia, Helm Care Pay, and Andrei's personal workspace.
+
 ## Login and Identity
 
 LIVE:
