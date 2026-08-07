@@ -235,6 +235,23 @@ Gaps / NOT RUN:
   not run against a live Supabase (no creds) — run on staging before production cleanup.
 - No production data archived by this task (implementation only).
 
+Remaining risk — archived workspaces still reachable by direct access:
+
+- Archive hides a workspace from the SWITCHER / `/api/workspaces` only
+  (`listAccessibleWorkspaces`). Other resolution paths (direct `/business/*` routes, stale
+  `activeWorkspaceId` / `last_active_workspace_id` in localStorage, `/api/access/status`
+  auto-resolve) do NOT check `businesses.status`, so an archived workspace may still be
+  reachable until a future "resolver status-check" task adds that guard. Deliberately out of
+  scope here. Not a data-loss risk (archive deletes nothing), and it does not affect the
+  intended cleanup targets (owned by duplicate user `-1`).
+
+Archive UI safety gate (2026-07-06):
+
+- The Archive action is DISABLED unless `GET …/cleanup-preflight` loaded successfully.
+  Loading / failed / incomplete-payload states all disable it, show a visible error, and
+  display: "Cleanup preflight must load successfully before archive is allowed." The
+  `archive()` handler also returns early when preflight is not `ok` (defense in depth).
+
 ## Minimum Checks by Change Type
 
 Personal UI:
