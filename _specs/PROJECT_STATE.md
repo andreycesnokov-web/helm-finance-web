@@ -118,6 +118,25 @@ Intended production cleanup (owner-run, NOT executed by this task): archive test
 `My Business` (owner `-1`) and the duplicate personal workspace (owner `-1`); keep user
 `1057134807`/@Andrei_Cn, Helm Care Indonesia, Helm Care Pay, and Andrei's personal workspace.
 
+## Email Auth Hardening Hotfix (2026-08-11, branch `hotfix/email-auth-persistence`)
+
+Status: implemented on branch, pending review/deploy. Auth-path only; no migrations, no env.
+
+Context: during the Supabase connectivity outage, magic-link emails were still sent even
+though the token insert into `email_login_codes` had failed silently, so every link failed
+later as "invalid or expired" while logs falsely showed "secret issued".
+
+Fix: the email is only sent after the token is persisted.
+
+- `issueEmailSecret()` checks the insert error and throws typed `secret_not_persisted`.
+- `POST /api/auth/email/start` returns **503 `auth_temporarily_unavailable`** with a
+  user-safe message and sends NO email; the generic catch no longer leaks internal errors.
+- `/login/email` displays the message and stays on step 1 (never claims a link was sent).
+- Invite creation degrades gracefully (`email_invite_failed: true`) instead of 500.
+
+Unchanged when the DB is healthy: link requested → token stored → email sent → newest link
+signs in; old/used/expired links still fail normally. Telegram auth untouched.
+
 ## Login and Identity
 
 LIVE:
