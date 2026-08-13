@@ -137,6 +137,28 @@ Fix: the email is only sent after the token is persisted.
 Unchanged when the DB is healthy: link requested → token stored → email sent → newest link
 signs in; old/used/expired links still fail normally. Telegram auth untouched.
 
+## Platform Admin Dashboard Foundation (2026-08-11, branch `feature/admin-dashboard`)
+
+Status: implemented on branch, pending review/deploy. Additive read-only endpoint + admin
+page. No migrations, no env, no auth/Telegram/payments/bridge/archive changes.
+
+- `GET /api/admin/dashboard` (admin-only) + `/admin/dashboard` page, linked from the admin
+  tab bar. Built inside the existing app — no separate backend app.
+- Metrics: users (total, email/Telegram origin, linked, without email/Telegram, new 7/30d),
+  businesses (total, active, archived, personal vs company, without owner, new 7/30d),
+  identity risks (Telegram-only owners, email-first owners, users without login identity),
+  activity last 7 days (audit events, transactions, documents, new users/businesses),
+  system health (db_reachable, timestamp, commit, feature-flag booleans).
+- Unavailable metrics return `null` + a `warnings` entry — never a guessed number.
+  Known null: `businesses.inactive_no_recent_activity` (needs per-business aggregation) and
+  `identity_risks.duplicate_email_conflicts` (detected at link time, not measured).
+- Collection is bounded by a 6s deadline: on expiry the response still returns 200 with
+  `system.degraded:true`, `db_reachable:false` and nulls (measured 6.0s during a DB outage,
+  0.06s healthy). Risk metrics return null if their bounded selects hit the 5000-row cap.
+  Warnings are sanitized — no raw DB/network internals reach the client.
+- Billing is a placeholder only (`billing_enabled:false`, `paid_businesses:null`,
+  `mrr:null`) — billing/entitlements remain NOT implemented.
+
 ## Login and Identity
 
 LIVE:
