@@ -76,6 +76,24 @@ Last updated: 2026-07-04.
   Andrei's personal workspace.
 - Awaiting Codex review before promote.
 
+## Email Auth Hardening Hotfix Batch (2026-08-11, pending review)
+
+- Branch: `hotfix/email-auth-persistence` (off `main`).
+- Root cause it fixes: `issueEmailSecret()` ignored the `email_login_codes` insert error, so
+  during the Supabase outage links were emailed for tokens that were never stored → every
+  callback said "invalid or expired" while logs said "secret issued".
+- Change: persist first, then send. Typed `secret_not_persisted` error → `POST
+  /api/auth/email/start` returns 503 `auth_temporarily_unavailable` (user-safe message, no
+  email sent); `/login/email` shows it and stays on step 1; invite path degrades to
+  `email_invite_failed: true`; generic catch no longer leaks internal error text.
+- No migrations, no env, no Telegram/payments/bridge/archive changes.
+- Verified: `node --check` OK; simulated insert failure → 503 + 0 "secret issued" + 0 email
+  sends + 0 secret leakage; success path (fake PostgREST) → 200, 2 inserts, correct logs;
+  invalid token 400 / bad code 401 unchanged; builds Personal OFF/ON exit 0; 26 tests pass.
+- NOT tested: success path against a real Supabase (would write to production) — owner
+  should confirm with one fresh magic-link login after deploy.
+- Awaiting Codex review before promote.
+
 ## Next Recommended Work
 
 1. Personal -> Business Activation MVP.
