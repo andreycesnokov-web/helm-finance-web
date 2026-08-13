@@ -252,6 +252,41 @@ Archive UI safety gate (2026-07-06):
   display: "Cleanup preflight must load successfully before archive is allowed." The
   `archive()` handler also returns early when preflight is not `ok` (defense in depth).
 
+## Email Auth Hardening (2026-08-11, after the Supabase outage)
+
+Rule: **an email magic link may only be sent AFTER the token is persisted.**
+
+- `issueEmailSecret()` now checks the `email_login_codes` insert error and throws a typed
+  `secret_not_persisted` error instead of silently continuing.
+- `POST /api/auth/email/start` aborts before sending any email and returns **503**
+  `auth_temporarily_unavailable` with "Login is temporarily unavailable. Please try again in
+  a few minutes." The generic catch no longer echoes internal error text to the client.
+- `/login/email` shows that message and stays on step 1 — it never claims a link was sent.
+- Invite creation tolerates the failure: the invite row still returns, with
+  `email_invite_failed: true`, instead of 500-ing the whole request.
+
+Outage failure mode (what went wrong):
+
+- While Supabase was unreachable the insert failed silently, the server still logged
+  "secret issued", the email was still sent, and every callback reported
+  "invalid or expired" because the token row never existed.
+- **Links issued during the outage are permanently invalid — expected, not a bug.** Always
+  request a fresh link after an outage.
+
+Logging safety:
+
+- Never log the token, the magic link, or any secret. On failure we log only:
+  purpose, normalized email, and the technical DB error message (e.g. "TypeError: fetch
+  failed"). Verified: 0 token/link occurrences in logs on both success and failure paths.
+
+Tested (this batch):
+
+- Simulated insert failure (unreachable Supabase host): 503 + safe message, **0** "secret
+  issued" logs, **0** email-send attempts, **0** secret leakage.
+- Success path (local fake PostgREST): 200 `{ok:true}`, 2 rows inserted, "secret issued"
+  logged, no secret leakage. Invalid email still 400.
+- Invalid token → 400; bad 6-digit code → 401 `invalid_or_expired_code` (unchanged).
+
 ## Minimum Checks by Change Type
 
 Personal UI:
