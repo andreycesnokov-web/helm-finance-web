@@ -6546,6 +6546,164 @@ app.get('/api/admin/status', auth, (req, res) => {
 // ═════════════════════════════════════════════════════════════════════════════
 const monthStartISO = () => { const n = new Date(); return new Date(n.getFullYear(), n.getMonth(), 1).toISOString(); };
 
+// ── PLATFORM ADMIN DASHBOARD (read-only foundation) ──────────────────────────
+// GET /api/admin/dashboard — owner/admin overview of the whole customer base.
+// STRICTLY READ-ONLY: counts and derived risk signals only, never financial amounts,
+// never secrets/tokens/keys. Any metric that cannot be computed safely returns null and
+// adds a human-readable entry to `warnings` — we never invent a number.
+app.get('/api/admin/dashboard', auth, requireAdmin, async (req, res) => {
+  const warnings = [];
+  const daysAgoISO = (d) => new Date(Date.now() - d * 24 * 60 * 60 * 1000).toISOString();
+  // Bounded COUNT query (head:true → no rows transferred). Missing table/column ⇒ null.
+  const countRows = async (label, table, col = 'id', apply = null) => {
+    try {
+      let q = supabase.from(table).select(col, { count: 'exact', head: true });
+      if (apply) q = apply(q);
+      const { count, error } = await q;
+      if (error) { warnings.push(`${label}: unavailable (${error.message})`); return null; }
+      return count ?? 0;
+    } catch (e) { warnings.push(`${label}: unavailable (${e.message})`); return null; }
+  };
+  const sub = (a, b) => (a == null || b == null ? null : a - b);
+
+  try {
+    // All counts run in PARALLEL. Sequential awaits would multiply per-query retry backoff
+    // during a DB outage (~7s each), leaving an admin request hanging for minutes.
+    // Identity origin is encoded in the id sign: positive = Telegram, negative = email-first.
+    const [
+      total_users, with_email, telegram_origin, email_origin, email_on_telegram,
+      new_users_7d, new_users_30d,
+      biz_total, biz_archived, biz_personal, biz_company, biz_no_owner, new_biz_7d, new_biz_30d,
+    ] = await Promise.all([
+      countRows('users.total', 'users'),
+      countRows('users.with_email', 'user_email_identities', 'user_id'),
+      countRows('users.telegram_origin', 'users', 'id', q => q.gt('id', 0)),
+      countRows('users.email_origin', 'users', 'id', q => q.lt('id', 0)),
+      countRows('users.email_linked_to_telegram', 'user_email_identities', 'user_id', q => q.gt('user_id', 0)),
+      countRows('users.new_7d', 'users', 'id', q => q.gte('created_at', daysAgoISO(7))),
+      countRows('users.new_30d', 'users', 'id', q => q.gte('created_at', daysAgoISO(30))),
+      countRows('businesses.total', 'businesses'),
+      countRows('businesses.archived', 'businesses', 'id', q => q.eq('status', 'archived')),
+      countRows('businesses.personal', 'businesses', 'id', q => q.eq('type', 'personal')),
+      countRows('businesses.company', 'businesses', 'id', q => q.neq('type', 'personal')),
+      countRows('businesses.without_owner', 'businesses', 'id', q => q.is('owner_user_id', null)),
+      countRows('businesses.new_7d', 'businesses', 'id', q => q.gte('created_at', daysAgoISO(7))),
+      countRows('businesses.new_30d', 'businesses', 'id', q => q.gte('created_at', daysAgoISO(30))),
+    ]);
+
+    // ── Identity risk signals ────────────────────────────────────────────────
+    // Owner ids + email-identity ids are small sets at this scale; both are capped so the
+    // dashboard can never trigger an unbounded scan.
+    const CAP = 5000;
+    let telegram_only_owners = null, email_only_owners = null, users_without_identity = null;
+    try {
+      const [{ data: owners, error: oErr }, { data: idents, error: iErr }] = await Promise.all([
+        supabase.from('businesses').select('owner_user_id').not('owner_user_id', 'is', null).limit(CAP),
+        supabase.from('user_email_identities').select('user_id').limit(CAP),
+      ]);
+      if (oErr || iErr) {
+        warnings.push('identity_risks: unavailable (owner/identity lookup failed)');
+      } else {
+        if ((owners || []).length >= CAP || (idents || []).length >= CAP)
+          warnings.push(`identity_risks: truncated at ${CAP} rows — treat as approximate`);
+        const emailSet = new Set((idents || []).map(r => String(r.user_id)));
+        const ownerIds = [...new Set((owners || []).map(r => String(r.owner_user_id)))];
+        // Telegram-origin owner (id > 0) with no email identity → cannot use email login.
+        telegram_only_owners = ownerIds.filter(id => Number(id) > 0 && !emailSet.has(id)).length;
+        // Email-first owner (id < 0) that owns a workspace.
+        email_only_owners = ownerIds.filter(id => Number(id) < 0).length;
+      }
+    } catch (e) { warnings.push(`identity_risks: unavailable (${e.message})`); }
+
+    // Email-first users with NO email identity row would be unreachable by any login.
+    const negative_users_with_email = email_on_telegram == null ? null
+      : (with_email == null ? null : with_email - email_on_telegram);
+    users_without_identity = sub(email_origin, negative_users_with_email);
+    if (users_without_identity != null && users_without_identity < 0) {
+      users_without_identity = null;
+      warnings.push('identity_risks.users_without_login_identity: inconsistent counts — not reported');
+    }
+
+    // ── Activity (last 7 days) — also parallel ───────────────────────────────
+    const [act_audit, act_tx, act_docs] = await Promise.all([
+      countRows('activity.audit_events_7d', 'audit_events', 'id', q => q.gte('created_at', daysAgoISO(7))),
+      countRows('activity.transactions_7d', 'transactions', 'id', q => q.gte('created_at', daysAgoISO(7))),
+      countRows('activity.documents_7d', 'financial_documents', 'id', q => q.gte('created_at', daysAgoISO(7))),
+    ]);
+
+    // Deliberately not computed: needs a per-business scan of transactions/documents,
+    // which is the kind of unbounded query this endpoint must avoid.
+    warnings.push('businesses.inactive_no_recent_activity: not computed (requires per-business aggregation)');
+
+    // db_reachable: at least one count succeeded (a total outage nulls everything).
+    const db_reachable = [total_users, biz_total, act_audit].some(v => v != null);
+
+    res.json({
+      generated_at: new Date().toISOString(),
+      users: {
+        total: total_users,
+        with_email_identity: with_email,
+        telegram_origin, email_origin,
+        with_email_and_telegram: email_on_telegram,
+        without_email: sub(total_users, with_email),
+        without_telegram: email_origin,
+        new_last_7_days: new_users_7d,
+        new_last_30_days: new_users_30d,
+      },
+      businesses: {
+        total: biz_total,
+        active: sub(biz_total, biz_archived),
+        archived: biz_archived,
+        personal_workspaces: biz_personal,
+        company_workspaces: biz_company,
+        without_owner: biz_no_owner,
+        new_last_7_days: new_biz_7d,
+        new_last_30_days: new_biz_30d,
+        inactive_no_recent_activity: null,   // needs per-business aggregation — see warnings
+      },
+      identity_risks: {
+        telegram_only_owners,
+        email_only_owners,
+        email_identities_on_email_first_users: negative_users_with_email,
+        users_without_login_identity: users_without_identity,
+        // DB enforces one identity per user (PK) + unique lower(email), so duplicates
+        // cannot exist; conflicts surface at link time via /link-email.
+        duplicate_email_conflicts: 0,
+      },
+      activity_last_7_days: {
+        audit_events: act_audit,
+        transactions: act_tx,
+        documents: act_docs,
+        new_users: new_users_7d,
+        new_businesses: new_biz_7d,
+      },
+      system: {
+        db_reachable,
+        timestamp: new Date().toISOString(),
+        commit: (process.env.RAILWAY_GIT_COMMIT_SHA || '').slice(0, 7) || null,
+        // Booleans only — never the values of secrets/keys.
+        feature_flags: {
+          email_auth: EMAIL_AUTH_ENABLED,
+          personal_account_v1: process.env.PERSONAL_ACCOUNT_V1_ENABLED === 'true',
+          telegram_active_business: TELEGRAM_ACTIVE_BUSINESS_ENABLED,
+          telegram_paid_gate: TELEGRAM_PAID_GATE_ENABLED,
+          personal_funding_bridge: process.env.PERSONAL_FUNDING_BRIDGE_ENABLED === 'true',
+        },
+      },
+      billing: {
+        billing_enabled: false,
+        paid_businesses: null,
+        mrr: null,
+        note: 'Billing/entitlements not implemented yet',
+      },
+      warnings,
+    });
+  } catch (e) {
+    console.error(`[admin-dashboard] failed: ${e.message}`);
+    res.status(500).json({ error: 'dashboard_unavailable' });
+  }
+});
+
 // GET /api/admin/businesses — the real business registry.
 app.get('/api/admin/businesses', auth, requireAdmin, async (req, res) => {
   try {
