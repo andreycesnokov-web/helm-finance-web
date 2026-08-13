@@ -94,6 +94,19 @@ Last updated: 2026-07-04.
   should confirm with one fresh magic-link login after deploy.
 - Awaiting Codex review before promote.
 
+## Platform Admin Dashboard Foundation Batch (2026-08-11, pending review)
+
+- Branch: `feature/admin-dashboard` (off `main` = `be6d2f71`).
+- Adds read-only `GET /api/admin/dashboard` (auth + requireAdmin) and the `/admin/dashboard`
+  page, linked from the admin tab bar. Built inside the existing app — NOT a separate backend.
+- Counts only; unavailable metrics return null + warnings; billing is an explicit placeholder.
+- Verified: `node --check` OK; 401/403/200 guards; healthy-DB 200 in ~0.05s; DB-unreachable
+  200 with nulls + warnings in ~21s; read-only proof (17 HEAD + 2 GET, 0 writes); no secrets
+  in response; builds Personal OFF/ON exit 0; 26 tests pass; client/dist clean.
+- No migrations, no env, no auth/Telegram/payments/bridge/archive changes. Nothing deployed.
+- Future (not now): admin.cfo-ai.site + analytics warehouse.
+- Awaiting Codex review before promote.
+
 ## Next Recommended Work
 
 1. Personal -> Business Activation MVP.

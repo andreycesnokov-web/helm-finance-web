@@ -124,6 +124,28 @@ Businesses and personal workspaces are `businesses` rows with a `status` column
 - Duplicate-user disable: NOT implemented — needs a `users.status` migration (see identity
   MVP notes); archive covers duplicate *workspaces*, not the duplicate user row.
 
+## Platform Admin Dashboard (foundation, 2026-08-11)
+
+Built INSIDE the existing app/admin area — there is deliberately **no separate backend app**.
+
+- `GET /api/admin/dashboard` (`auth` + `requireAdmin`) — read-only platform summary.
+  Returns `users`, `businesses`, `identity_risks`, `activity_last_7_days`, `system`,
+  `billing`, `warnings`. Counts only: no financial amounts, no secrets/tokens/keys.
+- Frontend `/admin/dashboard` (`client/src/pages/AdminDashboard.jsx`), linked from the
+  admin tab bar in `Admin.jsx` and the shared `AdminTabs` in `AdminBusinesses.jsx`.
+- Safety model: every metric goes through a bounded `count`-only query (`head:true`).
+  A missing table/column or a DB failure yields `null` + a human-readable `warnings` entry —
+  numbers are never invented. All counts run in parallel so a DB outage cannot hang the
+  request for minutes. Verified read-only (HEAD/GET only; zero write verbs).
+- Identity risk signals are derived from the id-sign convention (positive = Telegram-origin,
+  negative = email-first) plus `user_email_identities`, capped at 5000 rows with a
+  truncation warning.
+- `billing` is an explicit placeholder: `billing_enabled:false`, `paid_businesses:null`,
+  `mrr:null` — billing/entitlements are NOT implemented.
+
+Future direction (NOT now): a dedicated `admin.cfo-ai.site` console and an analytics
+warehouse. Until then the dashboard stays inside this app.
+
 ## User Profile Model
 
 LIVE:

@@ -287,6 +287,34 @@ Tested (this batch):
   logged, no secret leakage. Invalid email still 400.
 - Invalid token → 400; bad 6-digit code → 401 `invalid_or_expired_code` (unchanged).
 
+## Platform Admin Dashboard (2026-08-11)
+
+Rules:
+
+- Admin-only (`auth` + `requireAdmin`); never public. Counts only — no financial amounts,
+  no secrets/tokens/keys, no raw magic links.
+- Read-only by construction: `head:true` count queries + two bounded selects. Verified with
+  a method-capturing fake DB: **17 HEAD + 2 GET, 0 write verbs**.
+- Never invent a number: a missing table/column or DB error ⇒ `null` + `warnings` entry.
+- Bounded queries only. Identity-risk selects are capped at 5000 rows and warn when
+  truncated. All counts run in parallel (a DB outage must not hang the request for minutes).
+
+Tested (this batch):
+
+- unauth → **401**; non-admin → **403**; admin → **200** with the expected top-level shape.
+- Healthy DB: 200 in ~0.05s. DB unreachable: still **200** with all-null metrics,
+  `db_reachable:false` and 19 warnings, in ~21s (was ~105s before parallelizing).
+- No secrets in the response (grep for key/token/secret patterns → 0).
+- Builds Personal OFF/ON exit 0; 26 integration tests pass.
+
+Known gaps / not computed:
+
+- `businesses.inactive_no_recent_activity` — requires per-business aggregation; returns null.
+- `duplicate_email_conflicts` is reported as 0 by construction (unique lower(email) index +
+  one identity row per user); real conflicts surface at link time via `/link-email`.
+- During a full DB outage the endpoint still takes ~21s (supabase-js retry backoff). Admin-only,
+  acceptable for now; could be cut further with a per-query timeout.
+
 ## Minimum Checks by Change Type
 
 Personal UI:
