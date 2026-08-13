@@ -150,7 +150,12 @@ page. No migrations, no env, no auth/Telegram/payments/bridge/archive changes.
   activity last 7 days (audit events, transactions, documents, new users/businesses),
   system health (db_reachable, timestamp, commit, feature-flag booleans).
 - Unavailable metrics return `null` + a `warnings` entry — never a guessed number.
-  Known null: `businesses.inactive_no_recent_activity` (needs per-business aggregation).
+  Known null: `businesses.inactive_no_recent_activity` (needs per-business aggregation) and
+  `identity_risks.duplicate_email_conflicts` (detected at link time, not measured).
+- Collection is bounded by a 6s deadline: on expiry the response still returns 200 with
+  `system.degraded:true`, `db_reachable:false` and nulls (measured 6.0s during a DB outage,
+  0.06s healthy). Risk metrics return null if their bounded selects hit the 5000-row cap.
+  Warnings are sanitized — no raw DB/network internals reach the client.
 - Billing is a placeholder only (`billing_enabled:false`, `paid_businesses:null`,
   `mrr:null`) — billing/entitlements remain NOT implemented.
 

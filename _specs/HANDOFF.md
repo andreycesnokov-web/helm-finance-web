@@ -105,7 +105,13 @@ Last updated: 2026-07-04.
   in response; builds Personal OFF/ON exit 0; 26 tests pass; client/dist clean.
 - No migrations, no env, no auth/Telegram/payments/bridge/archive changes. Nothing deployed.
 - Future (not now): admin.cfo-ai.site + analytics warehouse.
-- Awaiting Codex review before promote.
+- **Review-blocker fixes applied (2026-08-11)**: 6s collection deadline (degraded 200 instead
+  of a ~21s hang); `duplicate_email_conflicts` null instead of hardcoded 0; capped selects
+  null out dependent risk metrics; `email_only_owners` requires an actual email identity, not
+  just a negative id; warnings sanitized (no raw DB internals in the response).
+  Verified: 6.0s degraded / 0.06s healthy, 401/403 guards, cap→null, email_only_owners=1 (not
+  2) on controlled data, builds OFF/ON, 26 tests, dist clean, no secrets.
+- Awaiting Codex re-review before promote. Nothing deployed.
 
 ## Next Recommended Work
 
