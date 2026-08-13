@@ -182,11 +182,21 @@ async function resolveOrCreateEmailUser(email) {
 // Persist a secret (6-digit code OR magic token) for an email/purpose; stores only the
 // HASH and returns the plaintext secret (caller emails it). Reuses email_login_codes —
 // magic links and OTP codes share the table (purpose-scoped, hashed, single-use, expiring).
+// FAILS LOUDLY: if the row cannot be persisted (e.g. Supabase unreachable), we throw a
+// typed error so the caller aborts BEFORE emailing a link whose token was never stored —
+// that combination produced "invalid or expired" for every link during the outage.
+// Logs the technical reason only (no token, no magic link, no secret ever logged).
 async function issueEmailSecret(email, purpose, secret) {
-  await supabase.from('email_login_codes').insert({
+  const { error } = await supabase.from('email_login_codes').insert({
     email, code_hash: hashEmailCode(secret), purpose,
     expires_at: new Date(Date.now() + OTP_TTL_MS).toISOString(),
   });
+  if (error) {
+    console.error(`[email-auth] ${purpose} secret NOT stored for ${email} — insert failed: ${error.message}`);
+    const err = new Error('secret_not_persisted');
+    err.code = 'secret_not_persisted';
+    throw err;
+  }
   console.log(`[email-auth] ${purpose} secret issued for ${email}`);
   return secret;
 }
@@ -233,8 +243,22 @@ app.post('/api/auth/email/start', emailAuthGate, async (req, res) => {
     const ip = req.headers['x-forwarded-for'] || req.socket?.remoteAddress || 'ip';
     if (rateLimited(`start:${email}`, 5, 60 * 60 * 1000) || rateLimited(`start-ip:${ip}`, 30, 60 * 60 * 1000))
       return res.status(429).json({ error: 'rate_limited' });
-    const token = await issueEmailSecret(email, 'login', magicToken());   // magic link
-    const code = await issueEmailCode(email, 'login');                    // fallback OTP (dev/manual only)
+    // Persist FIRST. If the token cannot be stored we must NOT send an email — a link whose
+    // token was never saved always fails later as "invalid or expired". Returns a safe 503;
+    // the failure is store-wide (not per-email) so this leaks no account existence.
+    let token, code;
+    try {
+      token = await issueEmailSecret(email, 'login', magicToken());   // magic link
+      code = await issueEmailCode(email, 'login');                    // fallback OTP (dev/manual only)
+    } catch (e) {
+      if (e?.code === 'secret_not_persisted') {
+        return res.status(503).json({
+          error: 'auth_temporarily_unavailable',
+          message: 'Login is temporarily unavailable. Please try again in a few minutes.',
+        });
+      }
+      throw e;
+    }
     const magic_link_path = `/login/email/callback?token=${token}`;
     const magicLinkUrl = `${APP_BASE_URL}${magic_link_path}`;
     // Send ONLY the magic link (the 6-digit code is fallback/dev-only, never emailed).
@@ -245,7 +269,14 @@ app.post('/api/auth/email/start', emailAuthGate, async (req, res) => {
     // Dev convenience only: surface the link/code in the response (NEVER in production).
     if (EMAIL_AUTH_DEV_RETURN_CODE) console.log(`[email-auth][dev] magic link for ${email}: ${magicLinkUrl}`);
     res.json({ ok: true, ...(EMAIL_AUTH_DEV_RETURN_CODE ? { dev_code: code, magic_link: magic_link_path } : {}) });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) {
+    // Technical detail stays in the server log; the client gets a safe, generic message.
+    console.error(`[email-auth] start failed: ${e.message}`);
+    res.status(503).json({
+      error: 'auth_temporarily_unavailable',
+      message: 'Login is temporarily unavailable. Please try again in a few minutes.',
+    });
+  }
 });
 
 // POST /api/auth/email/verify — accepts EITHER { token } (magic link, primary) OR
@@ -4234,16 +4265,23 @@ app.post('/api/team/invite', auth, async (req, res) => {
 
     // Optional email invite (Phase 1, gated): issue an accept-OTP for the email so the
     // invitee can join WITHOUT Telegram. The invite code links the membership target.
-    let email_invited = null;
+    let email_invited = null, email_invite_failed = false;
     if (EMAIL_AUTH_ENABLED && req.body?.email) {
       const email = normalizeEmail(req.body.email);
       if (EMAIL_RE.test(email)) {
-        const otp = await issueEmailCode(email, 'invite_accept');
-        email_invited = { email, ...(EMAIL_AUTH_DEV_RETURN_CODE ? { dev_code: otp } : {}) };
+        // The invite row already exists; if the accept-OTP cannot be stored, report that
+        // honestly instead of failing the whole request (the invite link still works).
+        try {
+          const otp = await issueEmailCode(email, 'invite_accept');
+          email_invited = { email, ...(EMAIL_AUTH_DEV_RETURN_CODE ? { dev_code: otp } : {}) };
+        } catch (e) {
+          if (e?.code !== 'secret_not_persisted') throw e;
+          email_invite_failed = true;
+        }
       }
     }
 
-    res.json({ invite, invite_url: `/invite/${code}`, ...(email_invited ? { email_invited } : {}) });
+    res.json({ invite, invite_url: `/invite/${code}`, ...(email_invited ? { email_invited } : {}), ...(email_invite_failed ? { email_invite_failed: true } : {}) });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
