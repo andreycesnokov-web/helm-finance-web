@@ -174,6 +174,9 @@ export default function AdminDashboard() {
         <Section title="System health">
           <Panel>
             <Row k="DB reachable">{s.db_reachable === true ? 'yes' : s.db_reachable === false ? 'no' : val(null)}</Row>
+            <Row k="Collection status">{s.degraded
+              ? <span style={{ color: '#92400e' }}>degraded — timed out, metrics partial</span>
+              : <span style={{ color: 'var(--green-dark,#1a7f37)' }}>complete</span>}</Row>
             <Row k="Generated at">{d.generated_at || '—'}</Row>
             <Row k="Commit">{s.commit || val(null)}</Row>
             <Row k="Flag · email auth">{String(!!flags.email_auth)}</Row>

@@ -6554,16 +6554,44 @@ const monthStartISO = () => { const n = new Date(); return new Date(n.getFullYea
 app.get('/api/admin/dashboard', auth, requireAdmin, async (req, res) => {
   const warnings = [];
   const daysAgoISO = (d) => new Date(Date.now() - d * 24 * 60 * 60 * 1000).toISOString();
-  // Bounded COUNT query (head:true → no rows transferred). Missing table/column ⇒ null.
-  const countRows = async (label, table, col = 'id', apply = null) => {
-    try {
-      let q = supabase.from(table).select(col, { count: 'exact', head: true });
-      if (apply) q = apply(q);
-      const { count, error } = await q;
-      if (error) { warnings.push(`${label}: unavailable (${error.message})`); return null; }
-      return count ?? 0;
-    } catch (e) { warnings.push(`${label}: unavailable (${e.message})`); return null; }
+
+  // ── Overall collection deadline ──────────────────────────────────────────
+  // A DB outage makes every query burn supabase-js retry backoff, so without a deadline the
+  // admin UI hangs for ~20s+. Every query races this shared deadline and is aborted when it
+  // fires; whatever has not resolved becomes null with a single safe warning.
+  const DEADLINE_MS = 6000;
+  const ctl = new AbortController();
+  let timedOut = false;
+  const deadline = new Promise(resolve => {
+    const t = setTimeout(() => {
+      timedOut = true;
+      try { ctl.abort(); } catch { /* ignore */ }
+      resolve('__deadline__');
+    }, DEADLINE_MS);
+    t.unref?.();   // never hold the event loop open on its own
+  });
+  // Warnings are SANITIZED: metric name only, never raw DB/network/schema internals.
+  // Technical detail goes to the server log.
+  const failed = (label, e) => {
+    console.error(`[admin-dashboard] ${label} failed: ${e?.message || e}`);
+    warnings.push(`${label}: unavailable (database error)`);
   };
+  const raceDeadline = async (label, run) => {
+    const r = await Promise.race([run().catch(e => ({ __err: e })), deadline]);
+    if (r === '__deadline__') return null;                 // timeout → single global warning
+    if (r && r.__err) { failed(label, r.__err); return null; }
+    return r;
+  };
+
+  // Bounded COUNT query (head:true → no rows transferred). Missing table/column ⇒ null.
+  const countRows = (label, table, col = 'id', apply = null) => raceDeadline(label, async () => {
+    let q = supabase.from(table).select(col, { count: 'exact', head: true });
+    if (apply) q = apply(q);
+    if (typeof q.abortSignal === 'function') q = q.abortSignal(ctl.signal);
+    const { count, error } = await q;
+    if (error) throw new Error(error.message);
+    return count ?? 0;
+  });
   const sub = (a, b) => (a == null || b == null ? null : a - b);
 
   try {
@@ -6596,24 +6624,29 @@ app.get('/api/admin/dashboard', auth, requireAdmin, async (req, res) => {
     // dashboard can never trigger an unbounded scan.
     const CAP = 5000;
     let telegram_only_owners = null, email_only_owners = null, users_without_identity = null;
-    try {
-      const [{ data: owners, error: oErr }, { data: idents, error: iErr }] = await Promise.all([
+    const risk = await raceDeadline('identity_risks', async () => {
+      const [oRes, iRes] = await Promise.all([
         supabase.from('businesses').select('owner_user_id').not('owner_user_id', 'is', null).limit(CAP),
         supabase.from('user_email_identities').select('user_id').limit(CAP),
       ]);
-      if (oErr || iErr) {
-        warnings.push('identity_risks: unavailable (owner/identity lookup failed)');
+      if (oRes.error || iRes.error) throw new Error(oRes.error?.message || iRes.error?.message);
+      return { owners: oRes.data || [], idents: iRes.data || [] };
+    });
+    if (risk) {
+      // Hitting the safety cap means the sets are INCOMPLETE. A partial count would look
+      // exact and mislead, so dependent metrics stay null rather than being reported.
+      if (risk.owners.length >= CAP || risk.idents.length >= CAP) {
+        warnings.push('identity_risks: unavailable because source rows reached the safety cap');
       } else {
-        if ((owners || []).length >= CAP || (idents || []).length >= CAP)
-          warnings.push(`identity_risks: truncated at ${CAP} rows — treat as approximate`);
-        const emailSet = new Set((idents || []).map(r => String(r.user_id)));
-        const ownerIds = [...new Set((owners || []).map(r => String(r.owner_user_id)))];
+        const emailSet = new Set(risk.idents.map(r => String(r.user_id)));
+        const ownerIds = [...new Set(risk.owners.map(r => String(r.owner_user_id)))];
         // Telegram-origin owner (id > 0) with no email identity → cannot use email login.
         telegram_only_owners = ownerIds.filter(id => Number(id) > 0 && !emailSet.has(id)).length;
-        // Email-first owner (id < 0) that owns a workspace.
-        email_only_owners = ownerIds.filter(id => Number(id) < 0).length;
+        // Email-first owner: negative id AND an actual email identity — a negative id alone
+        // does not prove the account has an email login.
+        email_only_owners = ownerIds.filter(id => Number(id) < 0 && emailSet.has(id)).length;
       }
-    } catch (e) { warnings.push(`identity_risks: unavailable (${e.message})`); }
+    }
 
     // Email-first users with NO email identity row would be unreachable by any login.
     const negative_users_with_email = email_on_telegram == null ? null
@@ -6634,9 +6667,12 @@ app.get('/api/admin/dashboard', auth, requireAdmin, async (req, res) => {
     // Deliberately not computed: needs a per-business scan of transactions/documents,
     // which is the kind of unbounded query this endpoint must avoid.
     warnings.push('businesses.inactive_no_recent_activity: not computed (requires per-business aggregation)');
+    warnings.push('identity_risks.duplicate_email_conflicts: unavailable; conflicts are currently detected at link time');
+    if (timedOut) warnings.push('Dashboard metrics timed out. Some metrics are unavailable.');
 
     // db_reachable: at least one count succeeded (a total outage nulls everything).
-    const db_reachable = [total_users, biz_total, act_audit].some(v => v != null);
+    // A timeout means we could not confirm reachability → report degraded, never "true".
+    const db_reachable = timedOut ? false : [total_users, biz_total, act_audit].some(v => v != null);
 
     res.json({
       generated_at: new Date().toISOString(),
@@ -6666,9 +6702,9 @@ app.get('/api/admin/dashboard', auth, requireAdmin, async (req, res) => {
         email_only_owners,
         email_identities_on_email_first_users: negative_users_with_email,
         users_without_login_identity: users_without_identity,
-        // DB enforces one identity per user (PK) + unique lower(email), so duplicates
-        // cannot exist; conflicts surface at link time via /link-email.
-        duplicate_email_conflicts: 0,
+        // NOT measured — reporting 0 would look like a real measurement. Conflicts are
+        // detected at link time by POST /api/admin/users/:id/link-email.
+        duplicate_email_conflicts: null,
       },
       activity_last_7_days: {
         audit_events: act_audit,
@@ -6679,6 +6715,7 @@ app.get('/api/admin/dashboard', auth, requireAdmin, async (req, res) => {
       },
       system: {
         db_reachable,
+        degraded: timedOut,          // true ⇒ collection hit the deadline; metrics are partial
         timestamp: new Date().toISOString(),
         commit: (process.env.RAILWAY_GIT_COMMIT_SHA || '').slice(0, 7) || null,
         // Booleans only — never the values of secrets/keys.
