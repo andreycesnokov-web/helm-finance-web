@@ -6562,14 +6562,18 @@ app.get('/api/admin/dashboard', auth, requireAdmin, async (req, res) => {
   const DEADLINE_MS = 6000;
   const ctl = new AbortController();
   let timedOut = false;
+  let deadlineTimer = null;
   const deadline = new Promise(resolve => {
-    const t = setTimeout(() => {
+    deadlineTimer = setTimeout(() => {
       timedOut = true;
       try { ctl.abort(); } catch { /* ignore */ }
       resolve('__deadline__');
     }, DEADLINE_MS);
-    t.unref?.();   // never hold the event loop open on its own
+    deadlineTimer.unref?.();   // never hold the event loop open on its own
   });
+  // Every Supabase query MUST go through this so it carries the shared abort signal —
+  // otherwise it keeps running in the background after a degraded response.
+  const signed = (q) => (typeof q.abortSignal === 'function' ? q.abortSignal(ctl.signal) : q);
   // Warnings are SANITIZED: metric name only, never raw DB/network/schema internals.
   // Technical detail goes to the server log.
   const failed = (label, e) => {
@@ -6577,6 +6581,8 @@ app.get('/api/admin/dashboard', auth, requireAdmin, async (req, res) => {
     warnings.push(`${label}: unavailable (database error)`);
   };
   const raceDeadline = async (label, run) => {
+    // Never START new work once the deadline has passed — the response is already degraded.
+    if (timedOut) return null;
     const r = await Promise.race([run().catch(e => ({ __err: e })), deadline]);
     if (r === '__deadline__') return null;                 // timeout → single global warning
     if (r && r.__err) { failed(label, r.__err); return null; }
@@ -6587,7 +6593,7 @@ app.get('/api/admin/dashboard', auth, requireAdmin, async (req, res) => {
   const countRows = (label, table, col = 'id', apply = null) => raceDeadline(label, async () => {
     let q = supabase.from(table).select(col, { count: 'exact', head: true });
     if (apply) q = apply(q);
-    if (typeof q.abortSignal === 'function') q = q.abortSignal(ctl.signal);
+    q = signed(q);
     const { count, error } = await q;
     if (error) throw new Error(error.message);
     return count ?? 0;
@@ -6626,8 +6632,8 @@ app.get('/api/admin/dashboard', auth, requireAdmin, async (req, res) => {
     let telegram_only_owners = null, email_only_owners = null, users_without_identity = null;
     const risk = await raceDeadline('identity_risks', async () => {
       const [oRes, iRes] = await Promise.all([
-        supabase.from('businesses').select('owner_user_id').not('owner_user_id', 'is', null).limit(CAP),
-        supabase.from('user_email_identities').select('user_id').limit(CAP),
+        signed(supabase.from('businesses').select('owner_user_id').not('owner_user_id', 'is', null).limit(CAP)),
+        signed(supabase.from('user_email_identities').select('user_id').limit(CAP)),
       ]);
       if (oRes.error || iRes.error) throw new Error(oRes.error?.message || iRes.error?.message);
       return { owners: oRes.data || [], idents: iRes.data || [] };
@@ -6669,6 +6675,8 @@ app.get('/api/admin/dashboard', auth, requireAdmin, async (req, res) => {
     warnings.push('businesses.inactive_no_recent_activity: not computed (requires per-business aggregation)');
     warnings.push('identity_risks.duplicate_email_conflicts: unavailable; conflicts are currently detected at link time');
     if (timedOut) warnings.push('Dashboard metrics timed out. Some metrics are unavailable.');
+    // Collection finished (or gave up) — stop the deadline timer so nothing lingers.
+    if (deadlineTimer) { clearTimeout(deadlineTimer); deadlineTimer = null; }
 
     // db_reachable: at least one count succeeded (a total outage nulls everything).
     // A timeout means we could not confirm reachability → report degraded, never "true".
@@ -6736,6 +6744,7 @@ app.get('/api/admin/dashboard', auth, requireAdmin, async (req, res) => {
       warnings,
     });
   } catch (e) {
+    if (deadlineTimer) { clearTimeout(deadlineTimer); deadlineTimer = null; }
     console.error(`[admin-dashboard] failed: ${e.message}`);
     res.status(500).json({ error: 'dashboard_unavailable' });
   }
