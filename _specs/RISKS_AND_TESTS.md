@@ -314,6 +314,12 @@ Review-blocker fixes (2026-08-11):
   `system.db_reachable:false`, unresolved metrics null, and the warning
   "Dashboard metrics timed out. Some metrics are unavailable." Measured: **6.0s** during a
   full DB outage (was ~21s), **0.06s** when healthy.
+- **No background queries after a degraded response:** EVERY Supabase call — including the
+  two bounded `identity_risks` selects — goes through a `signed()` helper that attaches the
+  shared abort signal, `raceDeadline()` refuses to start new work once `timedOut` is true,
+  and the deadline timer is cleared on both the success and error paths.
+  Proven with a hanging-DB harness: 14 requests before the deadline, **0 after**, 14 aborted;
+  and with counts-OK/selects-hanging: both bounded GETs issued then **ABORTED**, 0 later.
 - **No fake zeros:** `duplicate_email_conflicts` is now **null** (was a hardcoded 0) plus the
   warning "unavailable; conflicts are currently detected at link time".
 - **Cap semantics:** if either bounded identity/owner select reaches the 5000-row cap, the

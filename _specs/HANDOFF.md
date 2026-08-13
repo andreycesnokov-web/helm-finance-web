@@ -111,7 +111,11 @@ Last updated: 2026-07-04.
   just a negative id; warnings sanitized (no raw DB internals in the response).
   Verified: 6.0s degraded / 0.06s healthy, 401/403 guards, cap→null, email_only_owners=1 (not
   2) on controlled data, builds OFF/ON, 26 tests, dist clean, no secrets.
-- Awaiting Codex re-review before promote. Nothing deployed.
+- **Final timeout-abort fix (2026-08-11)**: the two bounded `identity_risks` selects now
+  carry the shared abort signal, no new query starts once the deadline passed, and the
+  deadline timer is cleared on success and error. Proven: 0 requests after the degraded
+  response; both bounded GETs aborted. Healthy path 0.05s, degraded 6.03s, guards 401/403.
+- Awaiting Codex final review before promote. Nothing deployed.
 
 ## Next Recommended Work
 
