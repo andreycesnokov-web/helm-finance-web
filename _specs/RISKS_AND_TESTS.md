@@ -336,6 +336,36 @@ Known gaps / not computed:
 - `duplicate_email_conflicts` — not computed; detected at link time via `/link-email`.
 - Metrics are null (never 0) whenever they cannot be measured; the UI renders them as "n/a".
 
+## Build Determinism (2026-08-13)
+
+Root cause of the Railway build failure (`Cannot find module @rollup/rollup-linux-x64-gnu`):
+
+- `client/node_modules` was COMMITTED to git (2310 files) — `.gitignore` listed it, but
+  tracked files ignore `.gitignore`. The committed tree carried only the **Windows** Rollup
+  binaries (`rollup-win32-x64-gnu`, `rollup-win32-x64-msvc`) plus `vite` 5.4.21.
+- Nothing installed `client/` dependencies on Railway (no workspaces, no `postinstall`), so
+  the Linux builder used the checked-in Windows tree: vite resolved, the Linux native binary
+  did not exist. Builds only passed while a Nixpacks cache held a real Linux install.
+- The lockfile was NOT at fault — it already lists all 26 platform binaries.
+
+Rules now in force:
+
+- **Never commit `client/node_modules` or `client/dist`.** Both are untracked; the build
+  regenerates `dist` on every deploy and every dist asset has a tracked source in
+  `client/public/` (31 files) or `client/index.html`.
+- The root `build` script runs `cd client && npm ci && npm run build`, so the builder always
+  installs client deps from `client/package-lock.json` and gets **its own platform's**
+  binaries.
+- Build/runtime Node is pinned to **22 LTS** via `.nvmrc` (Nixpacks prefers `.nvmrc` over
+  `engines`), with `engines.node ">=20.11.0"` as the documented floor. Railway had drifted to
+  Node 24.18.1 (Current, not LTS).
+- Do NOT add `@rollup/rollup-linux-x64-gnu` as a normal dependency — it hard-codes one
+  platform and hides the real problem.
+
+Verified: fresh-clone simulation (no `client/node_modules`, no `client/dist`) → root
+`npm run build` installs and builds successfully, producing `index.html`, `sw.js` and 16
+assets. Root and client `npm ci --dry-run` both in sync; no lockfile modified.
+
 ## Minimum Checks by Change Type
 
 Personal UI:

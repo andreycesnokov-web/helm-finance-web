@@ -159,6 +159,22 @@ page. No migrations, no env, no auth/Telegram/payments/bridge/archive changes.
 - Billing is a placeholder only (`billing_enabled:false`, `paid_businesses:null`,
   `mrr:null`) — billing/entitlements remain NOT implemented.
 
+## Build & Deployment Hygiene (2026-08-13, branch `hotfix/railway-build-rollup`)
+
+Status: implemented on branch, pending review/deploy. Build-infra only — no product code.
+
+- Railway build failed with `Cannot find module @rollup/rollup-linux-x64-gnu` because
+  `client/node_modules` was committed to git carrying only Windows Rollup binaries, and
+  nothing installed client deps on the Linux builder.
+- `client/node_modules` and `client/dist` are now UNTRACKED (both were already in
+  `.gitignore`; tracked files had been overriding it). Dependencies and build output are
+  never shipped through git.
+- Root `build` = `cd client && npm ci && npm run build` → deterministic, platform-correct
+  install from `client/package-lock.json` on every build.
+- Node pinned to **22 LTS** via `.nvmrc`; `engines.node >=20.11.0` documents the floor.
+  Railway had been building on Node 24.18.1 (Current, not LTS).
+- No lockfile changed, no dependency added, no env/Railway dashboard change.
+
 ## Login and Identity
 
 LIVE:
