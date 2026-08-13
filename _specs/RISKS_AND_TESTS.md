@@ -287,6 +287,55 @@ Tested (this batch):
   logged, no secret leakage. Invalid email still 400.
 - Invalid token → 400; bad 6-digit code → 401 `invalid_or_expired_code` (unchanged).
 
+## Platform Admin Dashboard (2026-08-11)
+
+Rules:
+
+- Admin-only (`auth` + `requireAdmin`); never public. Counts only — no financial amounts,
+  no secrets/tokens/keys, no raw magic links.
+- Read-only by construction: `head:true` count queries + two bounded selects. Verified with
+  a method-capturing fake DB: **17 HEAD + 2 GET, 0 write verbs**.
+- Never invent a number: a missing table/column or DB error ⇒ `null` + `warnings` entry.
+- Bounded queries only. Identity-risk selects are capped at 5000 rows and warn when
+  truncated. All counts run in parallel (a DB outage must not hang the request for minutes).
+
+Tested (this batch):
+
+- unauth → **401**; non-admin → **403**; admin → **200** with the expected top-level shape.
+- Healthy DB: 200 in ~0.05s. DB unreachable: still **200** with all-null metrics,
+  `db_reachable:false` and 19 warnings, in ~21s (was ~105s before parallelizing).
+- No secrets in the response (grep for key/token/secret patterns → 0).
+- Builds Personal OFF/ON exit 0; 26 integration tests pass.
+
+Review-blocker fixes (2026-08-11):
+
+- **Timeout:** metric collection races a shared 6s deadline (AbortController aborts in-flight
+  queries). On expiry the endpoint returns 200 immediately with `system.degraded:true`,
+  `system.db_reachable:false`, unresolved metrics null, and the warning
+  "Dashboard metrics timed out. Some metrics are unavailable." Measured: **6.0s** during a
+  full DB outage (was ~21s), **0.06s** when healthy.
+- **No background queries after a degraded response:** EVERY Supabase call — including the
+  two bounded `identity_risks` selects — goes through a `signed()` helper that attaches the
+  shared abort signal, `raceDeadline()` refuses to start new work once `timedOut` is true,
+  and the deadline timer is cleared on both the success and error paths.
+  Proven with a hanging-DB harness: 14 requests before the deadline, **0 after**, 14 aborted;
+  and with counts-OK/selects-hanging: both bounded GETs issued then **ABORTED**, 0 later.
+- **No fake zeros:** `duplicate_email_conflicts` is now **null** (was a hardcoded 0) plus the
+  warning "unavailable; conflicts are currently detected at link time".
+- **Cap semantics:** if either bounded identity/owner select reaches the 5000-row cap, the
+  dependent risk metrics return **null** with "identity_risks: unavailable because source
+  rows reached the safety cap" — partial counts are never presented as exact.
+- **`email_only_owners` correctness:** counts owners that are negative-id **AND** present in
+  the email-identity set; a negative id alone no longer implies an email login.
+- **Sanitized warnings:** responses contain metric names and safe phrasing only — no raw
+  Supabase/network/schema text. Technical detail goes to the server log instead.
+
+Known gaps / not computed:
+
+- `businesses.inactive_no_recent_activity` — requires per-business aggregation; returns null.
+- `duplicate_email_conflicts` — not computed; detected at link time via `/link-email`.
+- Metrics are null (never 0) whenever they cannot be measured; the UI renders them as "n/a".
+
 ## Minimum Checks by Change Type
 
 Personal UI:

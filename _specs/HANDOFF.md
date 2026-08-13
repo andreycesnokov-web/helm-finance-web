@@ -94,6 +94,29 @@ Last updated: 2026-07-04.
   should confirm with one fresh magic-link login after deploy.
 - Awaiting Codex review before promote.
 
+## Platform Admin Dashboard Foundation Batch (2026-08-11, pending review)
+
+- Branch: `feature/admin-dashboard` (off `main` = `be6d2f71`).
+- Adds read-only `GET /api/admin/dashboard` (auth + requireAdmin) and the `/admin/dashboard`
+  page, linked from the admin tab bar. Built inside the existing app — NOT a separate backend.
+- Counts only; unavailable metrics return null + warnings; billing is an explicit placeholder.
+- Verified: `node --check` OK; 401/403/200 guards; healthy-DB 200 in ~0.05s; DB-unreachable
+  200 with nulls + warnings in ~21s; read-only proof (17 HEAD + 2 GET, 0 writes); no secrets
+  in response; builds Personal OFF/ON exit 0; 26 tests pass; client/dist clean.
+- No migrations, no env, no auth/Telegram/payments/bridge/archive changes. Nothing deployed.
+- Future (not now): admin.cfo-ai.site + analytics warehouse.
+- **Review-blocker fixes applied (2026-08-11)**: 6s collection deadline (degraded 200 instead
+  of a ~21s hang); `duplicate_email_conflicts` null instead of hardcoded 0; capped selects
+  null out dependent risk metrics; `email_only_owners` requires an actual email identity, not
+  just a negative id; warnings sanitized (no raw DB internals in the response).
+  Verified: 6.0s degraded / 0.06s healthy, 401/403 guards, cap→null, email_only_owners=1 (not
+  2) on controlled data, builds OFF/ON, 26 tests, dist clean, no secrets.
+- **Final timeout-abort fix (2026-08-11)**: the two bounded `identity_risks` selects now
+  carry the shared abort signal, no new query starts once the deadline passed, and the
+  deadline timer is cleared on success and error. Proven: 0 requests after the degraded
+  response; both bounded GETs aborted. Healthy path 0.05s, degraded 6.03s, guards 401/403.
+- Awaiting Codex final review before promote. Nothing deployed.
+
 ## Next Recommended Work
 
 1. Personal -> Business Activation MVP.

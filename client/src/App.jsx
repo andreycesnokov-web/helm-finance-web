@@ -53,6 +53,7 @@ import TeamOnboarding, { MemberTutorial } from './pages/TeamOnboarding'
 import JoinInvite from './pages/JoinInvite'
 import Admin from './pages/Admin'
 import AdminUser from './pages/AdminUser'
+import AdminDashboard from './pages/AdminDashboard'
 import AdminBusinesses from './pages/AdminBusinesses'
 import AdminBusinessDetail from './pages/AdminBusinessDetail'
 import AdminAccessAudit from './pages/AdminAccessAudit'
@@ -628,6 +629,8 @@ export default function App() {
           <Route path="/onboarding" element={<OnboardingRoute />} />
           {/* Hidden admin routes — not in sidebar, protected by ADMIN_TELEGRAM_IDS on backend */}
           <Route path="/admin"           element={<Layout><Admin /></Layout>} />
+          {/* Platform Admin Dashboard (read-only owner console) */}
+          <Route path="/admin/dashboard" element={<Layout><AdminDashboard /></Layout>} />
           {/* Users console is also reachable at /admin/users (same list as /admin) so the
               natural URL renders instead of an unmatched-route blank page. */}
           <Route path="/admin/users"     element={<Layout><Admin /></Layout>} />

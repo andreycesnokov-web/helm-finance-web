@@ -21,6 +21,15 @@ This file lists the next practical work, not every idea.
 5. Telegram Paid Integration Design
    - Design only first: roles, paid gate, notifications, employee expense capture, CEO/CFO approvals, identity linking.
 
+## Platform Admin Console
+
+- Foundation shipped on branch `feature/admin-dashboard`: `/admin/dashboard` +
+  `GET /api/admin/dashboard` (read-only counts, identity risks, activity, system health).
+- Deliberately built INSIDE the existing app. **No separate backend app for now.**
+- Next increments (not in the foundation): per-business activity/inactivity metrics,
+  drilldown from risk rows, entitlements/billing once that layer exists.
+- Later direction (not now): dedicated `admin.cfo-ai.site` console + analytics warehouse.
+
 ## Current Strategic Direction
 
 Email account -> Personal Account -> Personal Finance -> optional Business Workspace -> optional Telegram paid integration.

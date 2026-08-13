@@ -142,7 +142,7 @@ export default function Admin() {
 
       {/* Platform admin tabs */}
       <div style={{ display: 'flex', gap: 8, padding: '12px 32px 0', flexWrap: 'wrap' }}>
-        {[['/admin', 'Users', true], ['/admin/businesses', 'Businesses', false], ['/admin/access-audit', 'Audit Log', false]].map(([to, label, active]) => (
+        {[['/admin/dashboard', 'Dashboard', false], ['/admin', 'Users', true], ['/admin/businesses', 'Businesses', false], ['/admin/access-audit', 'Audit Log', false]].map(([to, label, active]) => (
           <a key={to} href={to} style={{ padding: '6px 14px', borderRadius: 20, textDecoration: 'none', fontWeight: 600, fontSize: 13,
             background: active ? 'var(--accent,#4F46E5)' : 'var(--bg-3)', color: active ? '#fff' : 'var(--text-2)' }}>{label}</a>
         ))}
