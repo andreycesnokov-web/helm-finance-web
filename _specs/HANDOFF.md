@@ -117,6 +117,21 @@ Last updated: 2026-07-04.
   response; both bounded GETs aborted. Healthy path 0.05s, degraded 6.03s, guards 401/403.
 - Awaiting Codex final review before promote. Nothing deployed.
 
+## Railway Build Hotfix Batch (2026-08-13, pending review)
+
+- Branch: `hotfix/railway-build-rollup` (off `main`).
+- Fixes the failed Railway build (`Cannot find module @rollup/rollup-linux-x64-gnu`).
+- Root cause: committed `client/node_modules` (Windows binaries only) + no client install
+  step on the Linux builder. Lockfile was fine — it lists all 26 platform binaries.
+- Changes: untrack `client/node_modules` (2310 files) and `client/dist` (7 files); root
+  `build` now runs `npm ci` in client; `.nvmrc` = 22 LTS; `engines.node >=20.11.0`.
+- No lockfile edits, no new dependency, no product code, no env changes.
+- Verified: fresh-clone simulation (no node_modules, no dist) builds successfully;
+  `npm ci --dry-run` in sync at root and client; `node --check` OK; builds Personal
+  OFF/ON exit 0; integration tests pass; secret scan clean.
+- NOTE: first Railway build after this will be slower (real `npm ci`, no cached tree).
+- Awaiting Codex review before promote. Nothing deployed.
+
 ## Next Recommended Work
 
 1. Personal -> Business Activation MVP.

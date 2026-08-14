@@ -5,8 +5,11 @@
     "dev": "concurrently \"npm run server\" \"npm run client\"",
     "server": "node server/index.js",
     "client": "cd client && npm run dev",
-    "build": "cd client && npm run build",
+    "build": "cd client && npm ci && npm run build",
     "start": "node server/index.js"
+  },
+  "engines": {
+    "node": ">=20.11.0"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.20.0",
