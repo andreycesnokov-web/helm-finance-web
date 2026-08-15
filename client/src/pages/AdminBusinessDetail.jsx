@@ -4,6 +4,7 @@ import { useAuth } from '../hooks/useAuth'
 import { apiFetch } from '../lib/api'
 import { getLang } from '../i18n/index'
 import { Badge } from './AdminBusinesses'
+import { preflightState } from '../lib/preflight'
 
 const L = {
   en: { back: 'Businesses', overview: 'Overview', access: 'Plans & Access', members: 'Members', usage: 'Usage', auditL: 'Audit Log', manage: 'Manage access',
@@ -38,11 +39,12 @@ export default function AdminBusinessDetail() {
     setPfState('loading'); setPfError('')
     apiFetch(`/admin/businesses/${businessId}/cleanup-preflight`, token)
       .then(r => {
-        // Treat a malformed/incomplete payload as NOT loaded — never guess.
-        if (!r || !r.business || !r.counts) { setPf(null); setPfState('error'); setPfError('Preflight returned incomplete data.'); return }
-        setPf(r)
-        // FAIL CLOSED: if the backend could not read critical counts, archive stays blocked.
-        setPfState(r.preflight_complete === false ? 'incomplete' : 'ok')
+        // FAIL CLOSED via preflightState(): archive is offered ONLY when the backend
+        // explicitly reports preflight_complete === true. A missing/undefined/null field,
+        // a malformed payload or a partial read all resolve to 'error'/'incomplete'.
+        const st = preflightState(r)
+        if (st === 'error') { setPf(null); setPfState('error'); setPfError('Preflight returned incomplete data.'); return }
+        setPf(r); setPfState(st)
       })
       .catch(e => { setPf(null); setPfState('error'); setPfError(e?.message || 'Preflight request failed.') })
     apiFetch(`/admin/access-audit?business_id=${businessId}`, token).then(r => setAudit(r.events || [])).catch(() => {})

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { apiFetch } from '../lib/api'
+import { triState } from '../lib/preflight'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -397,8 +398,8 @@ export default function AdminUser() {
             {!cpf && !cpfErr && <div style={{ padding: '14px 16px', fontSize: 13, color: 'var(--text-3)' }}>Loading cleanup preflight…</div>}
             {cpf && <>
               <ProfileRow label="Identity" value={`${cpf.user.identity_type}${cpf.user.email_masked ? ` · ${cpf.user.email_masked}` : ''}`} />
-              <ProfileRow label="Email identity" value={cpf.user.has_email_identity ? 'linked' : 'not linked'} />
-              <ProfileRow label="Telegram identity" value={cpf.user.has_telegram_identity ? 'linked' : 'not linked'} />
+              <ProfileRow label="Email identity" value={triState(cpf.user.has_email_identity)} />
+              <ProfileRow label="Telegram identity" value={triState(cpf.user.has_telegram_identity)} />
               <ProfileRow label="Owned workspaces" value={na(cpf.ownership.owned_workspaces_count)} />
               <ProfileRow label="— personal / company" value={`${na(cpf.ownership.personal_workspaces_count)} / ${na(cpf.ownership.company_workspaces_count)}`} />
               <ProfileRow label="— archived" value={na(cpf.ownership.archived_workspaces_count)} />
@@ -407,7 +408,11 @@ export default function AdminUser() {
               <ProfileRow label="Documents" value={na(cpf.data_counts.documents_count)} />
               <ProfileRow label="Wallets (owned workspaces)" value={na(cpf.data_counts.wallets_count)} />
               <ProfileRow label="Audit events" value={na(cpf.data_counts.audit_events_count)} />
-              <ProfileRow label="Safe to archive/reset" value={cpf.safe_to_archive_or_reset ? 'yes — no financial data or documents' : 'no — data present or counts unknown'} />
+              <ProfileRow label="Safe to archive/reset" value={cpf.safe_to_archive_or_reset === true
+                ? 'yes — no financial data or documents'
+                : cpf.identity_complete === false || cpf.ownership_truncated
+                  ? 'no — some data could not be read'
+                  : 'no — data present or counts unknown'} />
 
               {cpf.owned_workspaces?.length > 0 && (
                 <div style={{ padding: '11px 16px', borderTop: '0.5px solid var(--border)' }}>

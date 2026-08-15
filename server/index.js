@@ -7115,10 +7115,20 @@ async function recordCleanupAudit({ actorUserId, action, targetType, targetId, t
 async function rollbackAfterAuditFailure(res, businessId, previousStatus, label) {
   let rolledBack = false;
   try {
-    const { error } = await supabase.from('businesses')
-      .update({ status: previousStatus, updated_at: new Date().toISOString() }).eq('id', businessId);
-    rolledBack = !error;
-    if (error) console.error(`[admin-cleanup] rollback of ${label} on ${businessId} FAILED: ${error.message}`);
+    // An update can return no error yet affect ZERO rows. Only a returned row whose status
+    // equals the expected previous status proves the undo actually happened.
+    const { data, error } = await supabase.from('businesses')
+      .update({ status: previousStatus, updated_at: new Date().toISOString() })
+      .eq('id', businessId).select('id,status').single();
+    if (error) {
+      console.error(`[admin-cleanup] rollback of ${label} on ${businessId} FAILED: ${error.message}`);
+    } else if (!data) {
+      console.error(`[admin-cleanup] rollback of ${label} on ${businessId} UNCONFIRMED: no row returned`);
+    } else if (data.status !== previousStatus) {
+      console.error(`[admin-cleanup] rollback of ${label} on ${businessId} UNCONFIRMED: status is '${data.status}', expected '${previousStatus}'`);
+    } else {
+      rolledBack = true;
+    }
   } catch (e) {
     console.error(`[admin-cleanup] rollback of ${label} on ${businessId} FAILED: ${e.message}`);
   }

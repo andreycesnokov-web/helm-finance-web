@@ -59,15 +59,27 @@ function startFakeDb() {
 
         // ---- audit writes ----
         if (table === 'audit_events' && req.method === 'POST') {
-          if (mode === 'audit_fail' || mode === 'audit_fail_rollback_fail') return dbError('audit table unavailable');
+          // Every audit_fail* scenario starts by failing the audit write, which is what
+          // triggers the rollback path we then script below.
+          if (mode.startsWith('audit_fail')) return dbError('audit table unavailable');
           return json([]);
         }
 
         // ---- business status updates (archive / rollback) ----
         if (table === 'businesses' && req.method === 'PATCH') {
           patchCount++;
-          // Fail ONLY the rollback (2nd patch) so we can test the uncertain-state path.
-          if (mode === 'audit_fail_rollback_fail' && patchCount >= 2) return dbError('update failed');
+          const isRollback = patchCount >= 2;   // 1st patch = the archive itself
+          if (isRollback) {
+            // Fail ONLY the rollback so we can test the uncertain-state paths.
+            if (mode === 'audit_fail_rollback_fail') return dbError('update failed');
+            // No error, but ZERO rows affected — .single() surfaces this as an error.
+            if (mode === 'audit_fail_rollback_norow') return json(single ? null : [], 406);
+            // No error and a row, but the status was NOT restored.
+            if (mode === 'audit_fail_rollback_wrongstatus') {
+              const stuck = { ...BUSINESS, status: 'archived' };
+              return json(single ? stuck : [stuck]);
+            }
+          }
           return json(single ? BUSINESS : [BUSINESS]);
         }
 
@@ -268,4 +280,62 @@ test('audit fails + rollback fails ⇒ says uncertain, never claims rollback', a
   assert.match(body.message, /Manual review required/i);
   assert.ok(!/rolled back\.?$/i.test(body.message), 'must not claim a successful rollback');
   assert.ok(!NO_INTERNALS.test(JSON.stringify(body)));
+});
+
+// A rollback update can return "no error" yet change nothing. Success must be CONFIRMED by
+// a returned row whose status equals the expected previous status — never assumed.
+test('audit fails + rollback affects NO rows ⇒ uncertain, not "rolled back"', async () => {
+  mode = 'audit_fail_rollback_norow';
+  const { status, body } = await archive(VALID_ARCHIVE);
+  assert.strictEqual(status, 500);
+  assert.strictEqual(body.error, 'audit_failed_rollback_failed', 'zero affected rows must not count as a rollback');
+  assert.strictEqual(body.state, 'uncertain');
+  assert.match(body.message, /could not be confirmed/i);
+  assert.ok(!NO_INTERNALS.test(JSON.stringify(body)));
+});
+
+test('audit fails + rollback returns row with WRONG status ⇒ uncertain', async () => {
+  mode = 'audit_fail_rollback_wrongstatus';
+  const { status, body } = await archive(VALID_ARCHIVE);
+  assert.strictEqual(status, 500);
+  assert.strictEqual(body.error, 'audit_failed_rollback_failed', 'an unrestored status must not count as a rollback');
+  assert.strictEqual(body.state, 'uncertain');
+  assert.ok(!/No change was kept/i.test(body.message), 'must not claim no change was kept');
+});
+
+test('audit fails + rollback CONFIRMED restored ⇒ may report rolled back', async () => {
+  mode = 'audit_fail';   // rollback returns the row with status restored to 'active'
+  const { status, body } = await archive(VALID_ARCHIVE);
+  assert.strictEqual(status, 500);
+  assert.strictEqual(body.error, 'audit_failed_rolled_back');
+  assert.match(body.message, /No change was kept/i);
+});
+
+// ── frontend gating logic (plain module, unit-tested directly) ───────────────
+test('frontend gate: archive is offered ONLY for preflight_complete === true', async () => {
+  const { preflightState, isPreflightComplete } = await import('../../client/src/lib/preflight.js');
+  const full = { business: {}, counts: {} };
+  // Explicitly complete → the only case that may enable archive.
+  assert.strictEqual(preflightState({ ...full, preflight_complete: true }), 'ok');
+  assert.strictEqual(isPreflightComplete({ ...full, preflight_complete: true }), true);
+  // Everything else must fail closed.
+  for (const v of [false, undefined, null, 'true', 1, 0]) {
+    assert.strictEqual(preflightState({ ...full, preflight_complete: v }), 'incomplete',
+      `preflight_complete=${JSON.stringify(v)} must be treated as incomplete`);
+    assert.strictEqual(isPreflightComplete({ ...full, preflight_complete: v }), false);
+  }
+  // Missing field entirely (e.g. older backend) ⇒ incomplete, never ok.
+  assert.strictEqual(preflightState(full), 'incomplete');
+  // Malformed / absent payloads ⇒ error.
+  for (const bad of [null, undefined, {}, { business: {} }, { counts: {} }]) {
+    assert.strictEqual(preflightState(bad), 'error');
+  }
+});
+
+test('frontend: tri-state identity — null renders as unknown, not "not linked"', async () => {
+  const { triState } = await import('../../client/src/lib/preflight.js');
+  assert.strictEqual(triState(true), 'linked');
+  assert.strictEqual(triState(false), 'not linked');
+  assert.strictEqual(triState(null), 'n/a');
+  assert.strictEqual(triState(undefined), 'n/a');
 });
