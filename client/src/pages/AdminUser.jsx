@@ -146,6 +146,10 @@ function StatCard({ label, value, sub, accent }) {
 }
 
 // ── Profile row ───────────────────────────────────────────────────────────────
+// null/undefined must read as unavailable, never as 0.
+const na = (v) => (v === null || v === undefined ? 'n/a' : String(v))
+const dbtn = { fontSize: 12, padding: '5px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text-4)', opacity: 0.55, cursor: 'not-allowed', fontFamily: 'inherit' }
+
 function ProfileRow({ label, value }) {
   return (
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', padding: '11px 16px', borderBottom: '0.5px solid var(--border)', gap: 16 }}>
@@ -171,10 +175,17 @@ export default function AdminUser() {
   const [linkBusy, setLinkBusy]   = useState(false)
   const [linkResult, setLinkResult] = useState(null) // { kind: 'linked'|'already'|'conflict'|'error', ... }
 
+  // Cleanup & Reset preflight (read-only assessment; never mutates)
+  const [cpf, setCpf] = useState(null)
+  const [cpfErr, setCpfErr] = useState('')
+
   const load = () => {
     apiFetch(`/admin/users/${id}`, token)
       .then(d => { setData(d); setLoading(false) })
       .catch(e => { setError(e); setLoading(false) })
+    apiFetch(`/admin/users/${id}/cleanup-preflight`, token)
+      .then(r => { setCpf(r); setCpfErr('') })
+      .catch(e => { setCpf(null); setCpfErr(e.message || 'Preflight failed.') })
   }
   useEffect(() => {
     if (!token || !id) return
@@ -375,6 +386,72 @@ export default function AdminUser() {
                     <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 20, background: 'var(--bg)', color: 'var(--text-2)' }}>{b.role}{b.status && b.status !== 'active' ? ` · ${b.status}` : ''}</span>
                   </div>
                 ))}
+          </div>
+        </div>
+
+        {/* ── Cleanup & Reset (read-only assessment; no destructive action available) ─── */}
+        <div style={{ marginBottom: 24 }}>
+          <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>Cleanup &amp; Reset</div>
+          <div style={{ background: 'var(--bg-2)', borderRadius: 14, border: '1px solid var(--border)', overflow: 'hidden' }}>
+            {cpfErr && <div style={{ padding: '12px 16px', fontSize: 13, color: '#b3261e', background: '#FDECEA' }}>Cleanup preflight unavailable: {cpfErr}</div>}
+            {!cpf && !cpfErr && <div style={{ padding: '14px 16px', fontSize: 13, color: 'var(--text-3)' }}>Loading cleanup preflight…</div>}
+            {cpf && <>
+              <ProfileRow label="Identity" value={`${cpf.user.identity_type}${cpf.user.email_masked ? ` · ${cpf.user.email_masked}` : ''}`} />
+              <ProfileRow label="Email identity" value={cpf.user.has_email_identity ? 'linked' : 'not linked'} />
+              <ProfileRow label="Telegram identity" value={cpf.user.has_telegram_identity ? 'linked' : 'not linked'} />
+              <ProfileRow label="Owned workspaces" value={na(cpf.ownership.owned_workspaces_count)} />
+              <ProfileRow label="— personal / company" value={`${na(cpf.ownership.personal_workspaces_count)} / ${na(cpf.ownership.company_workspaces_count)}`} />
+              <ProfileRow label="— archived" value={na(cpf.ownership.archived_workspaces_count)} />
+              <ProfileRow label="Memberships" value={na(cpf.ownership.memberships_count)} />
+              <ProfileRow label="Transactions" value={na(cpf.data_counts.transactions_count)} />
+              <ProfileRow label="Documents" value={na(cpf.data_counts.documents_count)} />
+              <ProfileRow label="Wallets (owned workspaces)" value={na(cpf.data_counts.wallets_count)} />
+              <ProfileRow label="Audit events" value={na(cpf.data_counts.audit_events_count)} />
+              <ProfileRow label="Safe to archive/reset" value={cpf.safe_to_archive_or_reset ? 'yes — no financial data or documents' : 'no — data present or counts unknown'} />
+
+              {cpf.owned_workspaces?.length > 0 && (
+                <div style={{ padding: '11px 16px', borderTop: '0.5px solid var(--border)' }}>
+                  <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 6 }}>Owned workspaces (open to archive/restore):</div>
+                  {cpf.owned_workspaces.map(w => (
+                    <div key={w.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 10, padding: '4px 0' }}>
+                      <a href={`/admin/businesses/${w.id}`} style={{ fontSize: 13, color: 'var(--accent,#4F46E5)', textDecoration: 'none' }}>{w.name || '(unnamed)'}</a>
+                      <span style={{ fontSize: 11, color: 'var(--text-3)' }}>{w.type}{w.status === 'archived' ? ' · archived' : ''}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {cpf.risk_flags?.length > 0 && (
+                <div style={{ padding: '11px 16px', borderTop: '0.5px solid var(--border)', display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                  {cpf.risk_flags.map(f => (
+                    <span key={f} style={{ fontSize: 11, fontWeight: 700, padding: '3px 9px', borderRadius: 20, background: '#FEF3C7', color: '#92400e' }}>{f}</span>
+                  ))}
+                </div>
+              )}
+              {cpf.recommended_actions?.length > 0 && (
+                <div style={{ padding: '11px 16px', borderTop: '0.5px solid var(--border)', fontSize: 12, color: 'var(--text-2)' }}>
+                  Recommended: {cpf.recommended_actions.join(' · ')}
+                </div>
+              )}
+              {cpf.warnings?.length > 0 && (
+                <div style={{ padding: '11px 16px', borderTop: '0.5px solid var(--border)' }}>
+                  {cpf.warnings.map((w, i) => <div key={i} style={{ fontSize: 12, color: '#92400e' }}>{w}</div>)}
+                </div>
+              )}
+
+              {/* Blocked actions — shown so the operator knows why, wired to nothing. */}
+              <div style={{ padding: '12px 16px', borderTop: '0.5px solid var(--border)', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <button disabled title="Reset is not enabled yet. Use archive/restore for now." style={dbtn}>Reset test data (disabled)</button>
+                <button disabled title="Requires user status migration and session handling." style={dbtn}>Suspend user (not available yet)</button>
+                <button disabled title="Hard delete is not available in production." style={dbtn}>Hard delete (unavailable)</button>
+              </div>
+              <div style={{ padding: '0 16px 14px', fontSize: 11.5, color: 'var(--text-4)', lineHeight: 1.6 }}>
+                Reset is not enabled yet. Use archive/restore for now — it would later cover: {(cpf.reset_scope_preview || []).join(', ')}.<br />
+                User account archive/suspend is <b>Not available yet</b> — requires user status migration and session handling (Phase 2).<br />
+                Hard delete is not available in production. Use archive/restore or reset-test-data workflows.<br />
+                Cleanup itself happens on the workspace page: open a workspace above to archive or restore it (reason + typed name required, always audited).
+              </div>
+            </>}
           </div>
         </div>
 

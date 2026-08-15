@@ -6535,6 +6535,138 @@ app.post('/api/admin/users/:id/link-email', auth, requireAdmin, async (req, res)
   }
 });
 
+// GET /api/admin/users/:id/cleanup-preflight — READ-ONLY cleanup assessment for one user.
+// Powers the admin "Cleanup & Reset" panel: what this account owns, how much data hangs off
+// it, and which cleanup actions are safe. Mutates NOTHING. Counts only — never financial
+// amounts, never secrets; the email is masked. Any metric that cannot be computed safely is
+// returned as null with a sanitized warning (raw DB errors stay in the server log).
+app.get('/api/admin/users/:id/cleanup-preflight', auth, requireAdmin, async (req, res) => {
+  const warnings = [];
+  const softFail = (label, e) => {
+    console.error(`[admin-cleanup] ${label} failed: ${e?.message || e}`);
+    warnings.push(`${label}: unavailable (database error)`);
+    return null;
+  };
+  // Bounded COUNT (head:true → no rows transferred).
+  const countRows = async (label, table, col, apply = null) => {
+    try {
+      let q = supabase.from(table).select(col, { count: 'exact', head: true });
+      if (apply) q = apply(q);
+      const { count, error } = await q;
+      if (error) return softFail(label, new Error(error.message));
+      return count ?? 0;
+    } catch (e) { return softFail(label, e); }
+  };
+  try {
+    const targetId = Number(req.params.id);
+    if (!Number.isSafeInteger(targetId)) return res.status(400).json({ error: 'invalid_user_id' });
+
+    const { data: uRows } = await supabase.from('users').select('*').eq('id', targetId).limit(1);
+    const user = uRows?.[0];
+    if (!user) return res.status(404).json({ error: 'user_not_found' });
+
+    // Identity + memberships (reuses the shared admin summary helper).
+    const summary = await adminUserSummary(targetId);
+    const emails = summary.emails || [];
+    const hasEmail = emails.length > 0;
+    const hasTelegram = Number(targetId) > 0;   // positive ids are Telegram-origin
+    // Mask the address — admins need to recognise it, not read it in full.
+    const maskEmail = (e) => {
+      if (!e) return null;
+      const [l, d] = String(e).split('@');
+      if (!d) return null;
+      return `${l.slice(0, 2)}${'*'.repeat(Math.max(1, l.length - 2))}@${d}`;
+    };
+
+    // Workspaces this user OWNS (bounded) — distinct from memberships.
+    const OWN_CAP = 200;
+    let owned = [], ownedTruncated = false;
+    try {
+      const { data, error } = await supabase.from('businesses')
+        .select('id, name, type, status').eq('owner_user_id', targetId).limit(OWN_CAP);
+      if (error) throw new Error(error.message);
+      owned = data || [];
+      ownedTruncated = owned.length >= OWN_CAP;
+      if (ownedTruncated) warnings.push(`ownership: truncated at ${OWN_CAP} workspaces — treat counts as approximate`);
+    } catch (e) { softFail('ownership', e); owned = null; }
+
+    const ownedIds = (owned || []).map(b => b.id);
+    const ownership = owned === null ? {
+      owned_workspaces_count: null, personal_workspaces_count: null,
+      company_workspaces_count: null, archived_workspaces_count: null,
+      memberships_count: (summary.businesses || []).length,
+    } : {
+      owned_workspaces_count: owned.length,
+      personal_workspaces_count: owned.filter(b => b.type === 'personal').length,
+      company_workspaces_count: owned.filter(b => b.type !== 'personal').length,
+      archived_workspaces_count: owned.filter(b => b.status === 'archived').length,
+      memberships_count: (summary.businesses || []).length,
+    };
+
+    // Data footprint. Wallets are workspace-scoped, so they are counted across the
+    // workspaces this user owns; transactions/documents/audit are counted on the user.
+    const [transactions_count, documents_count, audit_events_count] = await Promise.all([
+      countRows('data_counts.transactions', 'transactions', 'id', q => q.eq('user_id', targetId)),
+      countRows('data_counts.documents', 'financial_documents', 'id', q => q.eq('created_by_user_id', targetId)),
+      countRows('data_counts.audit_events', 'audit_events', 'id', q => q.eq('actor_user_id', targetId)),
+    ]);
+    let wallets_count = 0;
+    if (owned === null) { wallets_count = null; warnings.push('data_counts.wallets: unavailable (owner workspaces unknown)'); }
+    else if (ownedIds.length) wallets_count = await countRows('data_counts.wallets', 'wallets', 'id', q => q.in('business_id', ownedIds));
+
+    const data_counts = { transactions_count, documents_count, wallets_count, audit_events_count };
+    const hasFinancialData = [transactions_count, wallets_count].some(n => Number(n) > 0);
+    const hasDocuments = Number(documents_count) > 0;
+
+    // Risk flags — only raised from values we actually computed.
+    const risk_flags = [];
+    if (hasTelegram && !hasEmail) risk_flags.push('telegram_only_owner');
+    if (!hasTelegram && hasEmail && (ownership.company_workspaces_count || 0) > 0) risk_flags.push('email_only_duplicate');
+    if ((ownership.company_workspaces_count || 0) > 0) risk_flags.push('owns_company_workspace');
+    if (hasFinancialData) risk_flags.push('has_financial_data');
+    if (hasDocuments) risk_flags.push('has_documents');
+    if ((ownership.personal_workspaces_count || 0) > 0) risk_flags.push('is_personal_workspace_owner');
+
+    const recommended_actions = ['do_not_delete_user'];
+    if ((ownership.company_workspaces_count || 0) > 0 || (ownership.personal_workspaces_count || 0) > 0)
+      recommended_actions.push('archive_test_workspace');
+    if (hasTelegram && !hasEmail) recommended_actions.push('review_email_identity_transfer');
+
+    // "Safe" = nothing of value hangs off this account. Unknown counts ⇒ not safe.
+    const anyUnknown = Object.values(data_counts).some(v => v === null) || owned === null;
+    const safe_to_archive_or_reset = !anyUnknown && !hasFinancialData && !hasDocuments;
+    if (anyUnknown) warnings.push('safety: some counts are unavailable — treated as NOT safe to reset');
+
+    res.json({
+      ok: true,
+      user: {
+        id: String(user.id),
+        name: [user.first_name, user.last_name].filter(Boolean).join(' ') || user.username || null,
+        username: user.username || null,
+        email_masked: maskEmail(emails[0]?.email),
+        has_email_identity: hasEmail,
+        has_telegram_identity: hasTelegram,
+        identity_type: hasEmail && hasTelegram ? 'email+telegram' : hasEmail ? 'email' : 'telegram',
+      },
+      ownership,
+      owned_workspaces: (owned || []).map(b => ({ id: b.id, name: b.name, type: b.type || 'business', status: b.status || 'active' })),
+      data_counts,
+      risk_flags,
+      recommended_actions,
+      safe_to_archive_or_reset,
+      // Phase 1: reset is preflight-only. These are the tables a future reset would touch.
+      reset_scope_preview: ['transactions', 'documents', 'wallets', 'reminders', 'debts', 'business metadata', 'personal finance data'],
+      reset_enabled: false,
+      hard_delete_enabled: false,
+      user_suspend_enabled: false,
+      warnings,
+    });
+  } catch (e) {
+    console.error(`[admin-cleanup] user preflight failed: ${e.message}`);
+    res.status(500).json({ error: 'cleanup_preflight_unavailable' });
+  }
+});
+
 // GET /api/admin/status  — any authenticated user can call; returns is_admin boolean
 // Used by frontend to conditionally show admin-only UI elements.
 app.get('/api/admin/status', auth, (req, res) => {
@@ -6886,11 +7018,35 @@ app.get('/api/admin/businesses/:businessId/cleanup-preflight', auth, requireAdmi
 // workspace (e.g. Helm Care) can never be archived accidentally. Reversible; deletes NO
 // data. Archived workspaces vanish from the switcher (listAccessibleWorkspaces) but stay
 // visible in admin. Audited to audit_events. NEVER hard-deletes.
+// A cleanup action must never happen without a trace: this writes the audit row and REPORTS
+// failure instead of swallowing it (unlike best-effort recordAudit). Returns true on success.
+async function recordCleanupAudit({ actorUserId, action, targetType, targetId, targetName, reason, before, after }) {
+  try {
+    const { error } = await supabase.from('audit_events').insert({
+      business_id: targetType === 'business' ? targetId : null,
+      actor_user_id: actorUserId, actor_role: 'platform_admin', channel: 'web',
+      entity_type: targetType, entity_id: targetId != null ? String(targetId) : null,
+      action,
+      before_json: { ...(before || {}), target_name: targetName || null },
+      after_json: { ...(after || {}), target_name: targetName || null, reason: reason || null },
+    });
+    if (error) { console.error(`[admin-cleanup] audit write failed for ${action}: ${error.message}`); return false; }
+    return true;
+  } catch (e) { console.error(`[admin-cleanup] audit write failed for ${action}: ${e.message}`); return false; }
+}
+// Cleanup actions require a human-readable reason (stored in the audit trail).
+const cleanupReason = (v) => {
+  const r = String(v ?? '').trim();
+  return r.length >= 3 && r.length <= 500 ? r : null;
+};
+
 app.post('/api/admin/businesses/:businessId/archive', auth, requireAdmin, async (req, res) => {
   try {
     const b = await loadBusinessOr4xx(req, res);
     if (!b) return;
     const { confirm, confirm_name } = req.body || {};
+    const reason = cleanupReason(req.body?.reason);
+    if (!reason) return res.status(400).json({ error: 'reason_required', message: 'Provide a reason (3–500 characters) — it is stored in the audit trail.' });
     if (confirm !== true) return res.status(400).json({ error: 'confirmation_required', message: 'Set confirm:true to archive.' });
     if ((confirm_name || '').trim() !== (b.name || '').trim())
       return res.status(400).json({ error: 'name_mismatch', message: 'confirm_name must exactly match the business name.' });
@@ -6899,8 +7055,19 @@ app.post('/api/admin/businesses/:businessId/archive', auth, requireAdmin, async 
     const { data: after, error } = await supabase.from('businesses')
       .update({ status: 'archived', updated_at: new Date().toISOString() }).eq('id', b.id).select().single();
     if (error) return res.status(500).json({ error: 'archive_failed' });
-    await recordAudit({ actorUserId: req.user.userId, actorRole: 'platform_admin', entityType: 'business', entityId: b.id, action: 'business_archived', before: { status: b.status || 'active' }, after: { status: 'archived', name: b.name } });
-    res.json({ status: 'archived', business_id: after.id, name: after.name });
+
+    // No audit ⇒ no cleanup action. Archive is reversible, so roll the status back rather
+    // than leave a state change with no trace.
+    const audited = await recordCleanupAudit({
+      actorUserId: req.user.userId, action: 'business_archived', targetType: 'business',
+      targetId: b.id, targetName: b.name, reason,
+      before: { status: b.status || 'active' }, after: { status: 'archived' },
+    });
+    if (!audited) {
+      await supabase.from('businesses').update({ status: b.status || 'active', updated_at: new Date().toISOString() }).eq('id', b.id);
+      return res.status(500).json({ error: 'audit_failed', message: 'Archive was rolled back because the audit event could not be written.' });
+    }
+    res.json({ status: 'archived', business_id: after.id, name: after.name, reason });
   } catch (e) { res.status(500).json({ error: 'archive_failed' }); }
 });
 
@@ -6909,12 +7076,22 @@ app.post('/api/admin/businesses/:businessId/unarchive', auth, requireAdmin, asyn
   try {
     const b = await loadBusinessOr4xx(req, res);
     if (!b) return;
+    const reason = cleanupReason(req.body?.reason);
+    if (!reason) return res.status(400).json({ error: 'reason_required', message: 'Provide a reason (3–500 characters) — it is stored in the audit trail.' });
     if (b.status !== 'archived') return res.json({ status: b.status || 'active', business_id: b.id, name: b.name, already: true });
     const { data: after, error } = await supabase.from('businesses')
       .update({ status: 'active', updated_at: new Date().toISOString() }).eq('id', b.id).select().single();
     if (error) return res.status(500).json({ error: 'unarchive_failed' });
-    await recordAudit({ actorUserId: req.user.userId, actorRole: 'platform_admin', entityType: 'business', entityId: b.id, action: 'business_unarchived', before: { status: 'archived' }, after: { status: 'active', name: b.name } });
-    res.json({ status: 'active', business_id: after.id, name: after.name });
+    const audited = await recordCleanupAudit({
+      actorUserId: req.user.userId, action: 'business_unarchived', targetType: 'business',
+      targetId: b.id, targetName: b.name, reason,
+      before: { status: 'archived' }, after: { status: 'active' },
+    });
+    if (!audited) {
+      await supabase.from('businesses').update({ status: 'archived', updated_at: new Date().toISOString() }).eq('id', b.id);
+      return res.status(500).json({ error: 'audit_failed', message: 'Restore was rolled back because the audit event could not be written.' });
+    }
+    res.json({ status: 'active', business_id: after.id, name: after.name, reason });
   } catch (e) { res.status(500).json({ error: 'unarchive_failed' }); }
 });
 

@@ -27,6 +27,8 @@ export default function AdminBusinessDetail() {
   // Cleanup preflight is a SAFETY GATE: archive stays disabled unless it loaded OK, so a
   // failed/pending preflight can never leave a live Archive button behind.
   const [pf, setPf] = useState(null); const [pfState, setPfState] = useState('loading'); const [pfError, setPfError] = useState('')
+  // Cleanup & Reset panel inputs
+  const [reason, setReason] = useState(''); const [typedName, setTypedName] = useState(''); const [cleanupMsg, setCleanupMsg] = useState(null)
   const [busy, setBusy] = useState(false); const [error, setError] = useState(null)
 
   const load = useCallback(() => {
@@ -50,17 +52,25 @@ export default function AdminBusinessDetail() {
   const activateTrial = () => act(() => apiFetch(`/admin/businesses/${businessId}/trial`, token, { method: 'POST', body: { action: 'activate' } }))
   const extendTrial = (days) => act(() => apiFetch(`/admin/businesses/${businessId}/trial`, token, { method: 'POST', body: { action: 'extend', days } }))
   const removeOverride = () => { if (confirm(l.remove + '?')) act(() => apiFetch(`/admin/businesses/${businessId}/override`, token, { method: 'DELETE' })) }
-  // Archive = soft hide (status='archived'); reversible, deletes NO data. Requires typing
-  // the exact business name so a real workspace (e.g. Helm Care) is never archived by accident.
+  // Archive = soft hide (status='archived'); reversible, deletes NO data. Both actions need a
+  // reason (stored in the audit trail); archive additionally needs the exact workspace name
+  // typed, so a real workspace (e.g. Helm Care) can never be archived by accident.
+  const runCleanup = async (path, body) => {
+    setCleanupMsg(null); setBusy(true)
+    try {
+      await apiFetch(`/admin/businesses/${businessId}/${path}`, token, { method: 'POST', body })
+      setCleanupMsg({ ok: true, text: path === 'archive' ? 'Workspace archived. It is hidden from the workspace switcher; no data was deleted.' : 'Workspace restored to active.' })
+      setReason(''); setTypedName(''); load()
+    } catch (e) {
+      setCleanupMsg({ ok: false, text: e.message || 'Action failed.' })
+    } finally { setBusy(false) }
+  }
   const archive = () => {
     // Hard gate: never archive from unverified state (defense in depth behind the disabled button).
     if (pfState !== 'ok' || !pf?.business) return
-    const name = pf.business.name || ''
-    const typed = prompt(`Archive this workspace? It will be hidden from the switcher but NO data is deleted.\n\nType the exact name to confirm:\n"${name}"`)
-    if (typed == null) return
-    act(() => apiFetch(`/admin/businesses/${businessId}/archive`, token, { method: 'POST', body: { confirm: true, confirm_name: typed } }))
+    runCleanup('archive', { confirm: true, confirm_name: typedName.trim(), reason: reason.trim() })
   }
-  const unarchive = () => { if (confirm('Unarchive this workspace (make it active again)?')) act(() => apiFetch(`/admin/businesses/${businessId}/unarchive`, token, { method: 'POST', body: {} })) }
+  const unarchive = () => runCleanup('unarchive', { reason: reason.trim() })
 
   if (error) return <div style={{ padding: 40, textAlign: 'center' }}><div style={{ fontSize: 48 }}>{/Forbidden|access/.test(error.message) ? '🔒' : '⚠️'}</div><div>{error.message}</div></div>
   if (!d) return <div style={{ padding: 40, color: 'var(--text-3)' }}>Loading…</div>
@@ -142,15 +152,44 @@ export default function AdminBusinessDetail() {
           <Row k="Empty (no financial/doc data)">{pf.is_empty ? 'yes' : 'no'}</Row>
         </>}
 
+        {/* Reason is mandatory for BOTH archive and restore — it is stored in the audit trail. */}
+        {pfState === 'ok' && <div style={{ marginTop: 12, display: 'grid', gap: 8 }}>
+          <label style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--text-3)' }}>
+            Reason (required, stored in audit)
+            <input value={reason} onChange={e => { setReason(e.target.value); setCleanupMsg(null) }}
+              placeholder="e.g. duplicate test workspace from onboarding QA" style={inp} />
+          </label>
+          {pf.business.status !== 'archived' && (
+            <label style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--text-3)' }}>
+              Type the exact workspace name to confirm: <code style={{ color: 'var(--text)' }}>{pf.business.name}</code>
+              <input value={typedName} onChange={e => { setTypedName(e.target.value); setCleanupMsg(null) }}
+                placeholder={pf.business.name} style={inp} />
+            </label>
+          )}
+        </div>}
+
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 10 }}>
           {pfState === 'ok' && pf.business.status === 'archived'
-            ? <button disabled={busy} onClick={unarchive} style={btn}>Unarchive</button>
-            : <button disabled={busy || pfState !== 'ok'} onClick={archive}
-                title={pfState !== 'ok' ? 'Cleanup preflight must load successfully before archive is allowed.' : undefined}
-                style={{ ...btn, color: 'var(--red-dark,#b3261e)', borderColor: 'var(--red-dark,#b3261e)', opacity: pfState === 'ok' ? 1 : 0.5, cursor: pfState === 'ok' ? 'pointer' : 'not-allowed' }}>
-                Archive workspace…
+            ? <button disabled={busy || reason.trim().length < 3} onClick={unarchive}
+                title={reason.trim().length < 3 ? 'A reason is required.' : undefined}
+                style={{ ...btn, opacity: reason.trim().length < 3 ? 0.5 : 1 }}>Restore workspace</button>
+            : <button disabled={busy || pfState !== 'ok' || reason.trim().length < 3 || !typedName.trim()} onClick={archive}
+                title={pfState !== 'ok' ? 'Cleanup preflight must load successfully before archive is allowed.' : 'Reason and exact name are required.'}
+                style={{ ...btn, color: 'var(--red-dark,#b3261e)', borderColor: 'var(--red-dark,#b3261e)',
+                  opacity: (pfState === 'ok' && reason.trim().length >= 3 && typedName.trim()) ? 1 : 0.5 }}>
+                Archive workspace
               </button>}
+          {/* Blocked actions — visible so the operator knows WHY, but they call nothing. */}
+          <button disabled title="Reset is not enabled yet. Use archive/restore for now." style={{ ...btn, opacity: 0.45, cursor: 'not-allowed' }}>Reset test data (disabled)</button>
+          <button disabled title="Hard delete is not available in production." style={{ ...btn, opacity: 0.45, cursor: 'not-allowed' }}>Hard delete (unavailable)</button>
         </div>
+
+        {cleanupMsg && (
+          <div style={{ marginTop: 10, fontSize: 12.5, borderRadius: 8, padding: '9px 12px',
+            color: cleanupMsg.ok ? '#085041' : 'var(--red-dark,#b3261e)', background: cleanupMsg.ok ? '#E1F5EE' : 'var(--red-soft,#FDECEA)' }}>
+            {cleanupMsg.text}
+          </div>
+        )}
 
         {pfState !== 'ok' && (
           <div style={{ fontSize: 11.5, color: 'var(--red-dark,#b3261e)', marginTop: 8, fontWeight: 600 }}>
@@ -159,7 +198,10 @@ export default function AdminBusinessDetail() {
         )}
         <div style={{ fontSize: 11, color: 'var(--text-4)', marginTop: 8, lineHeight: 1.5 }}>
           Archive is a reversible soft-hide — no wallets, transactions, documents, or audit history are deleted.
-          You must type the exact business name to confirm. Hard delete is not available here.
+          Archived workspaces disappear from the user's workspace switcher but stay visible here.
+          Every archive/restore writes an audit event with your reason; if the audit cannot be written the action is rolled back.
+          <br />Reset is not enabled yet. Use archive/restore for now.
+          <br />Hard delete is not available in production. Use archive/restore or reset-test-data workflows.
         </div>
       </Card>
     </div>
@@ -170,3 +212,4 @@ function Card({ title, children }) {
     <div style={{ fontSize: 12, fontWeight: 800, textTransform: 'uppercase', color: 'var(--text-3)', marginBottom: 4 }}>{title}</div>{children}</div>
 }
 const btn = { fontSize: 12, padding: '5px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-2)', cursor: 'pointer', color: 'var(--text-2)' }
+const inp = { display: 'block', width: '100%', marginTop: 4, padding: '7px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)', fontSize: 13, fontFamily: 'inherit', fontWeight: 400, boxSizing: 'border-box' }
