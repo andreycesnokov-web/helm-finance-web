@@ -165,6 +165,14 @@ Internal support tooling for cleaning up test/duplicate accounts. Archive-first,
   `recordAudit`). If the audit write fails, the status change is rolled back and the endpoint
   returns `audit_failed` — a cleanup action never happens without a trace.
 
+Safety semantics (2026-08-15 hardening): both preflights FAIL CLOSED — query errors and
+truncation yield `null` + sanitized warning and force `safe_to_archive_or_reset:false` /
+`preflight_complete:false`; `is_empty` is `null` when unknown. Debt rows are `debts_count`
+(`invoices` is `null`, no invoices table). On audit-write failure the status change is rolled
+back and the response distinguishes `audit_failed_rolled_back` from
+`audit_failed_rollback_failed` (`state:'uncertain'`, manual review) — the rollback result is
+always checked. Future improvement: atomic DB/RPC so no compensating update is needed.
+
 NOT implemented in Phase 1 (documented, no code): reset of child data, hard delete, and user
 suspend/archive (there is no `users.status`/`disabled_at` column — that needs an approved
 additive migration plus session handling).

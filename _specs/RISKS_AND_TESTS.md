@@ -391,6 +391,34 @@ Tested (this batch):
 - Builds Personal OFF/ON exit 0; 26 integration tests pass; no secrets; `client/node_modules`
   and `client/dist` untracked and clean.
 
+Fail-closed rules (safety fixes, 2026-08-15):
+
+- **Never infer safety from missing data.** Any query error, any truncated/capped list, any
+  unknown critical count ⇒ metric `null` + sanitized warning + `safe_to_archive_or_reset:false`
+  (user) / `preflight_complete:false`, `is_empty:null` (business).
+- `adminUserSummary()` reports query failures (`_errors`/`_partial`) so a failed lookup can
+  never read as "no email" or "no memberships". `has_email_identity` becomes `null` and
+  `identity_type` becomes `unknown`.
+- Business preflight checks `{ error }` on EVERY count/select — a DB error never becomes `0`
+  or `[]`. Its unexpected-failure path returns `business_cleanup_preflight_unavailable`
+  (no relation/column/schema/network detail).
+- **debts ≠ invoices.** Debt rows are reported as `debts_count` (+payables/receivables);
+  `invoices` is `null` with a warning because there is no invoices table.
+- Risk flag `email_only_duplicate` was renamed **`email_origin_owner`** — nothing in the
+  preflight proves a duplicate exists.
+- Audit failure ⇒ rollback, and the **rollback result is checked**:
+  `audit_failed_rolled_back` (undo confirmed) vs `audit_failed_rollback_failed` +
+  `state:'uncertain'` + "Manual review required." Never claims an unverified rollback.
+  Future improvement: make the status change + audit a single atomic DB/RPC operation.
+- Frontend fails closed: `preflight_complete:false` ⇒ Archive disabled with
+  "Cleanup preflight incomplete. Archive disabled until metrics are available."; null counts
+  render as `n/a`, never `0`.
+
+Regression coverage: `tests/integration/adminCleanup.test.js` (13 tests) runs the real server
+against a scriptable fake PostgREST and covers all of the above — guards (401/403/400/200),
+count-error, identity-error, truncation, business count errors, debts-not-invoices,
+sanitization, archive/restore guards, audit-ok, audit-fail+rollback-ok, audit-fail+rollback-fail.
+
 Phase 2 requirements (NOT built):
 
 - **User suspend/archive** needs an additive `users.status`/`disabled_at` migration plus an

@@ -143,7 +143,13 @@ Last updated: 2026-07-04.
 - Verified: `node --check` OK; guards 401/403/400/200; preflight read-only (0 write verbs);
   archive guard matrix; audit-failure rollback proven; builds OFF/ON exit 0; 26 tests pass;
   node_modules/dist untracked; secret scan clean. Nothing deployed.
-- Awaiting Codex review before promote.
+- **Safety fixes after NO-GO (2026-08-15)**: fail-closed preflights (errors/truncation ⇒ null +
+  warning + unsafe), business counts never collapse errors to 0, sanitized preflight failure
+  code, truthful rollback reporting (`audit_failed_rolled_back` vs
+  `audit_failed_rollback_failed` + uncertain), `email_origin_owner` rename, debts≠invoices,
+  frontend blocks Archive on incomplete preflight. NEW regression suite
+  `tests/integration/adminCleanup.test.js` — 13 tests, all passing (39 total across suites).
+- Awaiting Codex re-review before promote.
 
 ## Next Recommended Work
 

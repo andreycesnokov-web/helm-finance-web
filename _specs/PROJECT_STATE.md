@@ -189,6 +189,16 @@ Status: implemented on branch, pending review/deploy. Admin-only; no migrations,
 - Blocked by design in Phase 1 (visible, disabled, explained): reset test data, hard delete,
   user suspend/archive.
 
+Safety blockers from review fixed (2026-08-15): preflights fail closed on errors/truncation,
+business counts no longer collapse DB errors into zeros, rollback result is verified and
+reported truthfully, warnings sanitized, `email_origin_owner` renamed, debts no longer
+labelled invoices, frontend disables Archive on incomplete preflight. Covered by 13 new
+regression tests in `tests/integration/adminCleanup.test.js`.
+
+Residual risk still open: archived workspaces remain reachable via direct routes / stale
+localStorage until a resolver status-check task. Real production cleanup stays blocked until a
+disposable-workspace archive→audit→restore smoke passes.
+
 Phase 2 backlog: user suspend/restore (needs `users.status` migration + session revoke),
 table-by-table reset of test data, Email Identity Transfer, workspace ownership transfer,
 support notes.
