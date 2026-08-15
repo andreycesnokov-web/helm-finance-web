@@ -366,6 +366,40 @@ Verified: fresh-clone simulation (no `client/node_modules`, no `client/dist`) �
 `npm run build` installs and builds successfully, producing `index.html`, `sw.js` and 16
 assets. Root and client `npm ci --dry-run` both in sync; no lockfile modified.
 
+## Admin Cleanup & Reset Console (Phase 1, 2026-08-15)
+
+Rules:
+
+- Archive-first. **No hard delete anywhere**; no reset of child data in Phase 1.
+- Every cleanup mutation needs a **reason** (3–500 chars); archive also needs `confirm:true`
+  plus the exact workspace name typed. Both are admin-only.
+- Every cleanup mutation writes an audit event containing action, actor admin id, target
+  type/id/name, reason and before/after. **If the audit write fails the action is rolled back**
+  (`audit_failed`) — no state change without a trace.
+- Preflights are strictly read-only and never invent numbers (null + sanitized warning).
+- Personal and Business workspaces stay separate; archived workspaces remain hidden from the
+  user switcher (`listAccessibleWorkspaces`) and visible in admin.
+
+Tested (this batch):
+
+- User preflight: unauth **401**, non-admin **403**, bad id **400**, admin **200** with the
+  documented shape; **read-only proven** (5 GET + 4 HEAD, **0 write verbs**).
+- Archive rejects: missing reason, <3-char reason, wrong `confirm_name`, missing `confirm`,
+  non-admin (403). Restore rejects missing reason.
+- Audit healthy → archive 200 with 1 audit insert and 1 status PATCH.
+- Audit broken → **500 `audit_failed` and 2 PATCHes** (archive then rollback to active).
+- Builds Personal OFF/ON exit 0; 26 integration tests pass; no secrets; `client/node_modules`
+  and `client/dist` untracked and clean.
+
+Phase 2 requirements (NOT built):
+
+- **User suspend/archive** needs an additive `users.status`/`disabled_at` migration plus an
+  auth-middleware check and session revoke. Do not fake it.
+- **Reset test data** must be specified table-by-table (transactions, documents, wallets,
+  reminders, debts, business metadata, personal finance data) with per-table safety rules;
+  resetting child rows is more dangerous than archiving a workspace.
+- Email Identity Transfer and workspace ownership transfer stay out of scope until designed.
+
 ## Minimum Checks by Change Type
 
 Personal UI:

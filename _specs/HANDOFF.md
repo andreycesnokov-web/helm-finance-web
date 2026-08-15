@@ -132,6 +132,19 @@ Last updated: 2026-07-04.
 - NOTE: first Railway build after this will be slower (real `npm ci`, no cached tree).
 - Awaiting Codex review before promote. Nothing deployed.
 
+## Admin Cleanup & Reset Console Phase 1 Batch (2026-08-15, pending review)
+
+- Branch: `feature/admin-cleanup-console` (off `main` = 11f710f4).
+- Adds read-only `GET /api/admin/users/:id/cleanup-preflight` + Cleanup & Reset panel on
+  `/admin/users/:id`; upgrades `/admin/businesses/:id` cleanup to reason + typed-name inputs.
+- Archive/restore now REQUIRE a reason and roll back if the audit event cannot be written.
+- No hard delete, no reset, no user suspend (no `users.status` column — Phase 2, needs an
+  approved migration). No migrations, no env, no auth/Telegram/payments/bridge changes.
+- Verified: `node --check` OK; guards 401/403/400/200; preflight read-only (0 write verbs);
+  archive guard matrix; audit-failure rollback proven; builds OFF/ON exit 0; 26 tests pass;
+  node_modules/dist untracked; secret scan clean. Nothing deployed.
+- Awaiting Codex review before promote.
+
 ## Next Recommended Work
 
 1. Personal -> Business Activation MVP.
