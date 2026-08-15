@@ -149,7 +149,13 @@ Last updated: 2026-07-04.
   `audit_failed_rollback_failed` + uncertain), `email_origin_owner` rename, debts≠invoices,
   frontend blocks Archive on incomplete preflight. NEW regression suite
   `tests/integration/adminCleanup.test.js` — 13 tests, all passing (39 total across suites).
-- Awaiting Codex re-review before promote.
+- **Final fail-closed fixes (2026-08-15)**: rollback confirmed via returned row+status
+  (zero-row/wrong-status ⇒ uncertain, never "rolled back"); frontend gate requires explicit
+  `preflight_complete === true` (new `client/src/lib/preflight.js`, unit-tested); tri-state
+  identity so `null` shows n/a instead of "not linked". Regression suite now 18 tests;
+  44 tests pass across all suites. Real production archive still blocked until a
+  disposable-workspace smoke passes.
+- Awaiting Codex final review before promote.
 
 ## Next Recommended Work
 

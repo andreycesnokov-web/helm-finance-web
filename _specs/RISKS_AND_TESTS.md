@@ -414,6 +414,23 @@ Fail-closed rules (safety fixes, 2026-08-15):
   "Cleanup preflight incomplete. Archive disabled until metrics are available."; null counts
   render as `n/a`, never `0`.
 
+Final fail-closed rules (2026-08-15, second review pass):
+
+- **Rollback counts as successful only when CONFIRMED.** The compensating update runs as
+  `.update({status}).eq('id',…).select('id,status').single()` and is accepted only if a row
+  comes back AND its status equals the expected previous status. "No error" is not enough —
+  an update can succeed while affecting zero rows. No row, wrong status, or an error ⇒
+  `audit_failed_rollback_failed` + `state:'uncertain'` + "Manual review required."
+  "No change was kept" is never claimed unless the undo was confirmed.
+- **Frontend archive requires `preflight_complete === true` explicitly.** `false`, `null`,
+  `undefined`, a missing field, a wrong type, or a malformed payload all resolve to
+  incomplete/error via `client/src/lib/preflight.js` — the UI can no longer fail open against
+  an older or partially-broken backend.
+- Tri-state identity display: `true` → linked, `false` → not linked, `null` → n/a. A failed
+  identity read never renders as a confident "not linked".
+- Real production archive stays BLOCKED until a disposable-workspace archive→audit→restore
+  smoke passes against a live database.
+
 Regression coverage: `tests/integration/adminCleanup.test.js` (13 tests) runs the real server
 against a scriptable fake PostgREST and covers all of the above — guards (401/403/400/200),
 count-error, identity-error, truncation, business count errors, debts-not-invoices,

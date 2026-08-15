@@ -195,6 +195,10 @@ reported truthfully, warnings sanitized, `email_origin_owner` renamed, debts no 
 labelled invoices, frontend disables Archive on incomplete preflight. Covered by 13 new
 regression tests in `tests/integration/adminCleanup.test.js`.
 
+Second review pass fixed (2026-08-15): rollback success is now confirmed by the returned
+row/status (a zero-row update no longer reports "rolled back"), and the frontend enables
+archive only on an explicit `preflight_complete === true`. Regression suite grew to 18 tests.
+
 Residual risk still open: archived workspaces remain reachable via direct routes / stale
 localStorage until a resolver status-check task. Real production cleanup stays blocked until a
 disposable-workspace archive→audit→restore smoke passes.
