@@ -40,7 +40,9 @@ export default function AdminBusinessDetail() {
       .then(r => {
         // Treat a malformed/incomplete payload as NOT loaded — never guess.
         if (!r || !r.business || !r.counts) { setPf(null); setPfState('error'); setPfError('Preflight returned incomplete data.'); return }
-        setPf(r); setPfState('ok')
+        setPf(r)
+        // FAIL CLOSED: if the backend could not read critical counts, archive stays blocked.
+        setPfState(r.preflight_complete === false ? 'incomplete' : 'ok')
       })
       .catch(e => { setPf(null); setPfState('error'); setPfError(e?.message || 'Preflight request failed.') })
     apiFetch(`/admin/access-audit?business_id=${businessId}`, token).then(r => setAudit(r.events || [])).catch(() => {})
@@ -142,15 +144,28 @@ export default function AdminBusinessDetail() {
           </div>
         )}
 
-        {pfState === 'ok' && <>
+        {(pfState === 'ok' || pfState === 'incomplete') && <>
           <Row k="Status">
             {pf.business.status === 'archived'
               ? <span style={{ color: 'var(--red-dark,#b3261e)', fontWeight: 700 }}>Archived (hidden from switcher)</span>
               : <span style={{ color: 'var(--green-dark,#1a7f37)', fontWeight: 700 }}>Active</span>}
           </Row>
-          {Object.entries(pf.counts).map(([k, v]) => <Row key={k} k={k}>{v == null ? '—' : v}</Row>)}
-          <Row k="Empty (no financial/doc data)">{pf.is_empty ? 'yes' : 'no'}</Row>
+          {/* null means "could not read" — render as n/a, never as 0. */}
+          {Object.entries(pf.counts).map(([k, v]) => <Row key={k} k={k}>{v == null ? <span style={naStyle}>n/a</span> : v}</Row>)}
+          <Row k="Empty (no financial/doc data)">{pf.is_empty == null ? <span style={naStyle}>n/a</span> : pf.is_empty ? 'yes' : 'no'}</Row>
+          {(pf.warnings || []).length > 0 && (
+            <div style={{ marginTop: 10 }}>
+              {pf.warnings.map((w, i) => <div key={i} style={{ fontSize: 12, color: '#92400e', background: '#FEF3C7', borderRadius: 8, padding: '7px 10px', marginTop: 4 }}>{w}</div>)}
+            </div>
+          )}
         </>}
+
+        {pfState === 'incomplete' && (
+          <div style={{ marginTop: 10, fontSize: 12.5, color: 'var(--red-dark,#b3261e)', background: 'var(--red-soft,#FDECEA)', border: '1px solid var(--red-dark,#b3261e)', borderRadius: 8, padding: '10px 12px', lineHeight: 1.5 }}>
+            <strong>Cleanup preflight incomplete.</strong> Archive disabled until metrics are available.
+            <button disabled={busy} onClick={load} style={{ ...btn, marginTop: 8 }}>Retry preflight</button>
+          </div>
+        )}
 
         {/* Reason is mandatory for BOTH archive and restore — it is stored in the audit trail. */}
         {pfState === 'ok' && <div style={{ marginTop: 12, display: 'grid', gap: 8 }}>
@@ -193,7 +208,9 @@ export default function AdminBusinessDetail() {
 
         {pfState !== 'ok' && (
           <div style={{ fontSize: 11.5, color: 'var(--red-dark,#b3261e)', marginTop: 8, fontWeight: 600 }}>
-            Cleanup preflight must load successfully before archive is allowed.
+            {pfState === 'incomplete'
+              ? 'Cleanup preflight incomplete. Archive disabled until metrics are available.'
+              : 'Cleanup preflight must load successfully before archive is allowed.'}
           </div>
         )}
         <div style={{ fontSize: 11, color: 'var(--text-4)', marginTop: 8, lineHeight: 1.5 }}>
@@ -212,4 +229,5 @@ function Card({ title, children }) {
     <div style={{ fontSize: 12, fontWeight: 800, textTransform: 'uppercase', color: 'var(--text-3)', marginBottom: 4 }}>{title}</div>{children}</div>
 }
 const btn = { fontSize: 12, padding: '5px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-2)', cursor: 'pointer', color: 'var(--text-2)' }
+const naStyle = { fontSize: 11.5, fontWeight: 700, padding: '1px 8px', borderRadius: 999, background: 'var(--bg)', color: 'var(--text-4)', border: '1px solid var(--border)' }
 const inp = { display: 'block', width: '100%', marginTop: 4, padding: '7px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)', fontSize: 13, fontFamily: 'inherit', fontWeight: 400, boxSizing: 'border-box' }
