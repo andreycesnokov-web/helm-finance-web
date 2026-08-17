@@ -175,6 +175,38 @@ Status: implemented on branch, pending review/deploy. Build-infra only — no pr
   Railway had been building on Node 24.18.1 (Current, not LTS).
 - No lockfile changed, no dependency added, no env/Railway dashboard change.
 
+## Admin Cleanup & Reset Console — Phase 1 (2026-08-15, branch `feature/admin-cleanup-console`)
+
+Status: implemented on branch, pending review/deploy. Admin-only; no migrations, no env.
+
+- User detail (`/admin/users/:id`) gains a **Cleanup & Reset** panel backed by the new
+  read-only `GET /api/admin/users/:id/cleanup-preflight`: identity, ownership, data counts,
+  risk flags, recommended actions, links to owned workspaces, and disabled placeholders.
+- Workspace cleanup reuses the existing archive/unarchive endpoints; both now require a
+  **reason**, archive also keeps the typed exact-name confirmation. `/admin/businesses/:id`
+  now has proper reason + typed-name inputs (previously browser `prompt()`).
+- Audit is enforced: on audit-write failure the archive/restore is ROLLED BACK.
+- Blocked by design in Phase 1 (visible, disabled, explained): reset test data, hard delete,
+  user suspend/archive.
+
+Safety blockers from review fixed (2026-08-15): preflights fail closed on errors/truncation,
+business counts no longer collapse DB errors into zeros, rollback result is verified and
+reported truthfully, warnings sanitized, `email_origin_owner` renamed, debts no longer
+labelled invoices, frontend disables Archive on incomplete preflight. Covered by 13 new
+regression tests in `tests/integration/adminCleanup.test.js`.
+
+Second review pass fixed (2026-08-15): rollback success is now confirmed by the returned
+row/status (a zero-row update no longer reports "rolled back"), and the frontend enables
+archive only on an explicit `preflight_complete === true`. Regression suite grew to 18 tests.
+
+Residual risk still open: archived workspaces remain reachable via direct routes / stale
+localStorage until a resolver status-check task. Real production cleanup stays blocked until a
+disposable-workspace archive→audit→restore smoke passes.
+
+Phase 2 backlog: user suspend/restore (needs `users.status` migration + session revoke),
+table-by-table reset of test data, Email Identity Transfer, workspace ownership transfer,
+support notes.
+
 ## Login and Identity
 
 LIVE:
