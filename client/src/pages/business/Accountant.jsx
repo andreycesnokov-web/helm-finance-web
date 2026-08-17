@@ -83,22 +83,16 @@ export function BusinessAccountant() {
     } catch (e) { setError(e.message) } finally { setSaving(false) }
   }, [form, docs, token, active, obligations])
 
+  // Shared props for <Field>. Field itself lives at MODULE scope (see bottom of file) so
+  // its component identity is stable across renders — that is what keeps input focus.
+  const fp = { form, set, vstatus }
+
   const head = (
     <PageHeader eyebrow="Business Workspace · AI Accountant" title="Company Tax & Compliance Profile"
       actions={<><StatusBadge tone="info">Preliminary assessment</StatusBadge><Btn onClick={save} disabled={saving}>{saving ? 'Saving…' : 'Save profile'}</Btn></>} />
   )
   if (loading) return <>{head}<Card><LoadingSkeleton rows={6} height={18} /></Card></>
   if (error && !form) return <>{head}<ErrorState description={error} onRetry={() => location.reload()} /></>
-
-  const Field = ({ label, k, type = 'text', options, placeholder }) => (
-    <div style={{ minWidth: 0 }}>
-      <label style={LBL}>{label} {!PERSISTED.has(k) && <span style={{ color: 'var(--text-muted)', fontWeight: 500, fontSize: 11 }}>· draft</span>}</label>
-      {options
-        ? <select style={INP} value={form[k] || ''} onChange={e => set(k, e.target.value)}><option value="">—</option>{options.map(o => <option key={o.value ?? o} value={o.value ?? o}>{o.label ?? o}</option>)}</select>
-        : <input style={INP} type={type} value={form[k] || ''} placeholder={placeholder} onChange={e => set(k, e.target.value)} />}
-      <div style={{ marginTop: 6 }}><StatusBadge tone={VSTATES[vstatus(k)].tone}>{VSTATES[vstatus(k)].label}</StatusBadge></div>
-    </div>
-  )
 
   return (
     <>{head}
@@ -123,44 +117,44 @@ export function BusinessAccountant() {
       <div className="cfo-grid cfo-grid-2" style={{ marginTop: readiness ? 18 : 0 }}>
         <Card title="1 · Basic Tax Profile">
           <div className="cfo-form2">
-            <Field label="Country" k="country" options={['Indonesia', 'Singapore', 'Other']} />
-            <Field label="Jurisdiction" k="jurisdiction" placeholder="e.g. ID" />
-            <Field label="Legal entity type" k="legal_entity_type" options={LEGAL_ENTITY} />
-            <Field label="Foreign-owned company" k="foreign_owned" options={[{ value: 'yes', label: 'Yes' }, { value: 'no', label: 'No' }, { value: 'unknown', label: 'Unknown' }]} />
-            <Field label="Company legal name" k="company_legal_name" />
-            <Field label="Brand / trading name" k="brand_name" />
+            <Field {...fp} label="Country" k="country" options={['Indonesia', 'Singapore', 'Other']} />
+            <Field {...fp} label="Jurisdiction" k="jurisdiction" placeholder="e.g. ID" />
+            <Field {...fp} label="Legal entity type" k="legal_entity_type" options={LEGAL_ENTITY} />
+            <Field {...fp} label="Foreign-owned company" k="foreign_owned" options={[{ value: 'yes', label: 'Yes' }, { value: 'no', label: 'No' }, { value: 'unknown', label: 'Unknown' }]} />
+            <Field {...fp} label="Company legal name" k="company_legal_name" />
+            <Field {...fp} label="Brand / trading name" k="brand_name" />
           </div>
         </Card>
 
         <Card title="2 · Tax Identity">
           <div className="cfo-form2">
-            <Field label="NPWP" k="npwp" placeholder="00.000.000.0-000.000" />
-            <Field label="KPP (registered tax office)" k="kpp" />
-            <Field label="PKP status" k="pkp_status" options={[{ value: 'pkp_registered', label: 'PKP registered' }, { value: 'non_pkp', label: 'Non-PKP' }, { value: 'unknown', label: 'Unknown' }]} />
-            <Field label="PKP effective date" k="pkp_effective_date" type="date" />
-            <Field label="Financial year start" k="financial_year_start" type="date" />
-            <Field label="Financial year end" k="financial_year_end" type="date" />
+            <Field {...fp} label="NPWP" k="npwp" placeholder="00.000.000.0-000.000" />
+            <Field {...fp} label="KPP (registered tax office)" k="kpp" />
+            <Field {...fp} label="PKP status" k="pkp_status" options={[{ value: 'pkp_registered', label: 'PKP registered' }, { value: 'non_pkp', label: 'Non-PKP' }, { value: 'unknown', label: 'Unknown' }]} />
+            <Field {...fp} label="PKP effective date" k="pkp_effective_date" type="date" />
+            <Field {...fp} label="Financial year start" k="financial_year_start" type="date" />
+            <Field {...fp} label="Financial year end" k="financial_year_end" type="date" />
           </div>
         </Card>
 
         <Card title="3 · Business Activity">
           <div className="cfo-form2">
-            <Field label="NIB number" k="nib" />
-            <Field label="NIB issue date" k="nib_issue_date" type="date" />
-            <Field label="Primary KBLI" k="primary_kbli" placeholder="e.g. 62090" />
-            <Field label="Additional KBLI" k="additional_kbli" placeholder="comma-separated" />
-            <Field label="Actual business activities" k="actual_business_activities" />
+            <Field {...fp} label="NIB number" k="nib" />
+            <Field {...fp} label="NIB issue date" k="nib_issue_date" type="date" />
+            <Field {...fp} label="Primary KBLI" k="primary_kbli" placeholder="e.g. 62090" />
+            <Field {...fp} label="Additional KBLI" k="additional_kbli" placeholder="comma-separated" />
+            <Field {...fp} label="Actual business activities" k="actual_business_activities" />
           </div>
         </Card>
 
         <Card title="4 · Employees">
           <div className="cfo-form2">
-            <Field label="Has employees" k="employee_status" options={[{ value: 'has_employees', label: 'Yes' }, { value: 'no_employees', label: 'No' }]} />
-            <Field label="Employee count" k="employee_count" type="number" />
-            <Field label="Local employees" k="local_employee_count" type="number" />
-            <Field label="Foreign employees" k="foreign_employee_count" type="number" />
-            <Field label="Payroll frequency" k="payroll_frequency" options={['Monthly', 'Bi-weekly', 'Weekly']} />
-            <Field label="BPJS registered" k="bpjs_registered" options={[{ value: 'true', label: 'Yes' }, { value: 'false', label: 'No' }]} />
+            <Field {...fp} label="Has employees" k="employee_status" options={[{ value: 'has_employees', label: 'Yes' }, { value: 'no_employees', label: 'No' }]} />
+            <Field {...fp} label="Employee count" k="employee_count" type="number" />
+            <Field {...fp} label="Local employees" k="local_employee_count" type="number" />
+            <Field {...fp} label="Foreign employees" k="foreign_employee_count" type="number" />
+            <Field {...fp} label="Payroll frequency" k="payroll_frequency" options={['Monthly', 'Bi-weekly', 'Weekly']} />
+            <Field {...fp} label="BPJS registered" k="bpjs_registered" options={[{ value: 'true', label: 'Yes' }, { value: 'false', label: 'No' }]} />
           </div>
         </Card>
 
@@ -197,5 +191,28 @@ export function BusinessAccountant() {
     </>
   )
 }
+// Tax-profile input. MUST stay at module scope.
+//
+// This used to be declared inside BusinessAccountant. Because a component declared during
+// render gets a NEW function identity on every render, React treated each keystroke as a
+// different component type, unmounted the subtree and mounted a fresh <input> — so the field
+// lost focus after a single character. Keeping the declaration here makes the element type
+// stable, so React updates the existing input in place and focus/caret survive typing.
+//
+// Values stay STRINGS end to end: identifiers such as NPWP/NIB keep leading zeros, dots and
+// dashes, and are never coerced to numbers. No masking is applied while typing.
+function Field({ label, k, type = 'text', options, placeholder, form, set, vstatus }) {
+  return (
+    <div style={{ minWidth: 0 }}>
+      <label style={LBL}>{label} {!PERSISTED.has(k) && <span style={{ color: 'var(--text-muted)', fontWeight: 500, fontSize: 11 }}>· draft</span>}</label>
+      {options
+        ? <select style={INP} value={form[k] ?? ''} onChange={e => set(k, e.target.value)}><option value="">—</option>{options.map(o => <option key={o.value ?? o} value={o.value ?? o}>{o.label ?? o}</option>)}</select>
+        : <input style={INP} type={type} value={form[k] ?? ''} placeholder={placeholder} onChange={e => set(k, e.target.value)} />}
+      {/* Status chip may change while typing; it is a sibling, so it never remounts the input. */}
+      <div style={{ marginTop: 6 }}><StatusBadge tone={VSTATES[vstatus(k)].tone}>{VSTATES[vstatus(k)].label}</StatusBadge></div>
+    </div>
+  )
+}
+
 const LBL = { display: 'block', fontSize: 12.5, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }
 const INP = { width: '100%', maxWidth: '100%', padding: '10px 11px', border: '1px solid var(--border-default)', borderRadius: 'var(--radius-md)', fontFamily: 'var(--font-ui)', fontSize: 14, background: 'var(--surface-card)', color: 'var(--text-primary)', boxSizing: 'border-box' }
