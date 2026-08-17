@@ -366,6 +366,85 @@ Verified: fresh-clone simulation (no `client/node_modules`, no `client/dist`) �
 `npm run build` installs and builds successfully, producing `index.html`, `sw.js` and 16
 assets. Root and client `npm ci --dry-run` both in sync; no lockfile modified.
 
+## Admin Cleanup & Reset Console (Phase 1, 2026-08-15)
+
+Rules:
+
+- Archive-first. **No hard delete anywhere**; no reset of child data in Phase 1.
+- Every cleanup mutation needs a **reason** (3–500 chars); archive also needs `confirm:true`
+  plus the exact workspace name typed. Both are admin-only.
+- Every cleanup mutation writes an audit event containing action, actor admin id, target
+  type/id/name, reason and before/after. **If the audit write fails the action is rolled back**
+  (`audit_failed`) — no state change without a trace.
+- Preflights are strictly read-only and never invent numbers (null + sanitized warning).
+- Personal and Business workspaces stay separate; archived workspaces remain hidden from the
+  user switcher (`listAccessibleWorkspaces`) and visible in admin.
+
+Tested (this batch):
+
+- User preflight: unauth **401**, non-admin **403**, bad id **400**, admin **200** with the
+  documented shape; **read-only proven** (5 GET + 4 HEAD, **0 write verbs**).
+- Archive rejects: missing reason, <3-char reason, wrong `confirm_name`, missing `confirm`,
+  non-admin (403). Restore rejects missing reason.
+- Audit healthy → archive 200 with 1 audit insert and 1 status PATCH.
+- Audit broken → **500 `audit_failed` and 2 PATCHes** (archive then rollback to active).
+- Builds Personal OFF/ON exit 0; 26 integration tests pass; no secrets; `client/node_modules`
+  and `client/dist` untracked and clean.
+
+Fail-closed rules (safety fixes, 2026-08-15):
+
+- **Never infer safety from missing data.** Any query error, any truncated/capped list, any
+  unknown critical count ⇒ metric `null` + sanitized warning + `safe_to_archive_or_reset:false`
+  (user) / `preflight_complete:false`, `is_empty:null` (business).
+- `adminUserSummary()` reports query failures (`_errors`/`_partial`) so a failed lookup can
+  never read as "no email" or "no memberships". `has_email_identity` becomes `null` and
+  `identity_type` becomes `unknown`.
+- Business preflight checks `{ error }` on EVERY count/select — a DB error never becomes `0`
+  or `[]`. Its unexpected-failure path returns `business_cleanup_preflight_unavailable`
+  (no relation/column/schema/network detail).
+- **debts ≠ invoices.** Debt rows are reported as `debts_count` (+payables/receivables);
+  `invoices` is `null` with a warning because there is no invoices table.
+- Risk flag `email_only_duplicate` was renamed **`email_origin_owner`** — nothing in the
+  preflight proves a duplicate exists.
+- Audit failure ⇒ rollback, and the **rollback result is checked**:
+  `audit_failed_rolled_back` (undo confirmed) vs `audit_failed_rollback_failed` +
+  `state:'uncertain'` + "Manual review required." Never claims an unverified rollback.
+  Future improvement: make the status change + audit a single atomic DB/RPC operation.
+- Frontend fails closed: `preflight_complete:false` ⇒ Archive disabled with
+  "Cleanup preflight incomplete. Archive disabled until metrics are available."; null counts
+  render as `n/a`, never `0`.
+
+Final fail-closed rules (2026-08-15, second review pass):
+
+- **Rollback counts as successful only when CONFIRMED.** The compensating update runs as
+  `.update({status}).eq('id',…).select('id,status').single()` and is accepted only if a row
+  comes back AND its status equals the expected previous status. "No error" is not enough —
+  an update can succeed while affecting zero rows. No row, wrong status, or an error ⇒
+  `audit_failed_rollback_failed` + `state:'uncertain'` + "Manual review required."
+  "No change was kept" is never claimed unless the undo was confirmed.
+- **Frontend archive requires `preflight_complete === true` explicitly.** `false`, `null`,
+  `undefined`, a missing field, a wrong type, or a malformed payload all resolve to
+  incomplete/error via `client/src/lib/preflight.js` — the UI can no longer fail open against
+  an older or partially-broken backend.
+- Tri-state identity display: `true` → linked, `false` → not linked, `null` → n/a. A failed
+  identity read never renders as a confident "not linked".
+- Real production archive stays BLOCKED until a disposable-workspace archive→audit→restore
+  smoke passes against a live database.
+
+Regression coverage: `tests/integration/adminCleanup.test.js` (13 tests) runs the real server
+against a scriptable fake PostgREST and covers all of the above — guards (401/403/400/200),
+count-error, identity-error, truncation, business count errors, debts-not-invoices,
+sanitization, archive/restore guards, audit-ok, audit-fail+rollback-ok, audit-fail+rollback-fail.
+
+Phase 2 requirements (NOT built):
+
+- **User suspend/archive** needs an additive `users.status`/`disabled_at` migration plus an
+  auth-middleware check and session revoke. Do not fake it.
+- **Reset test data** must be specified table-by-table (transactions, documents, wallets,
+  reminders, debts, business metadata, personal finance data) with per-table safety rules;
+  resetting child rows is more dangerous than archiving a workspace.
+- Email Identity Transfer and workspace ownership transfer stay out of scope until designed.
+
 ## Minimum Checks by Change Type
 
 Personal UI:

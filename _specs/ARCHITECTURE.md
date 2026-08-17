@@ -146,6 +146,37 @@ Built INSIDE the existing app/admin area — there is deliberately **no separate
 Future direction (NOT now): a dedicated `admin.cfo-ai.site` console and an analytics
 warehouse. Until then the dashboard stays inside this app.
 
+## Admin Cleanup & Reset Console (Phase 1, 2026-08-15)
+
+Internal support tooling for cleaning up test/duplicate accounts. Archive-first, never delete.
+
+- `GET /api/admin/users/:id/cleanup-preflight` (auth + requireAdmin) — READ-ONLY assessment
+  of one account: identity (email masked), ownership counts (owned/personal/company/archived
+  workspaces + memberships), data footprint (transactions, documents, wallets across owned
+  workspaces, audit events), `risk_flags`, `recommended_actions`, `safe_to_archive_or_reset`,
+  `reset_scope_preview`, and the `reset_enabled` / `hard_delete_enabled` /
+  `user_suspend_enabled` capability flags (all false in Phase 1). Bounded count queries only;
+  unavailable metrics return null + a sanitized warning. Verified read-only (GET/HEAD only).
+- Workspace cleanup REUSES the existing endpoints — no duplicates were created:
+  `GET /api/admin/businesses/:id/cleanup-preflight`, `POST …/archive`, `POST …/unarchive`.
+  Both mutations now additionally require a **reason** (3–500 chars) stored in the audit trail;
+  archive still requires `confirm:true` + exact `confirm_name`.
+- `recordCleanupAudit()` writes the audit row and REPORTS failure (unlike best-effort
+  `recordAudit`). If the audit write fails, the status change is rolled back and the endpoint
+  returns `audit_failed` — a cleanup action never happens without a trace.
+
+Safety semantics (2026-08-15 hardening): both preflights FAIL CLOSED — query errors and
+truncation yield `null` + sanitized warning and force `safe_to_archive_or_reset:false` /
+`preflight_complete:false`; `is_empty` is `null` when unknown. Debt rows are `debts_count`
+(`invoices` is `null`, no invoices table). On audit-write failure the status change is rolled
+back and the response distinguishes `audit_failed_rolled_back` from
+`audit_failed_rollback_failed` (`state:'uncertain'`, manual review) — the rollback result is
+always checked. Future improvement: atomic DB/RPC so no compensating update is needed.
+
+NOT implemented in Phase 1 (documented, no code): reset of child data, hard delete, and user
+suspend/archive (there is no `users.status`/`disabled_at` column — that needs an approved
+additive migration plus session handling).
+
 ## User Profile Model
 
 LIVE:
