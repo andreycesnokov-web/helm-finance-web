@@ -172,6 +172,21 @@ Last updated: 2026-07-04.
   pre-fix file, passes on the fix). Builds OFF/ON exit 0; 46 tests pass.
 - Awaiting Codex review before promote. Nothing deployed.
 
+## AI Accountant Document Intake Phase 1 Batch (2026-08-17, pending review)
+
+- Branch: `feature/ai-accountant-doc-intake` (off `main` = 0ed2cd25).
+- One upload window + classification + preliminary required-document checklist + manual
+  correction, on the AI Accountant Tax Profile page. Upload reuses the existing Document
+  Center flow; **no migration** (intake metadata lives in `extracted_json.ai_intake`).
+- 4 new endpoints, all business-scoped and auth-gated; GETs never write.
+- Verified: 66 tests pass (19 new); builds Personal OFF/ON exit 0; all endpoints 401 unauth;
+  browser check of the checklist, intake inbox, upload-modal detection and manual correction;
+  no migrations/env/new provider; secret scan clean; node_modules and dist untracked.
+- Phase 2 backlog: OCR, AI classification from document text, official KB-backed
+  requirements, accountant review workflow, expiry tracking, Telegram upload routing, and
+  consolidating the legacy manual checkbox card.
+- Awaiting Codex review before promote. Nothing deployed.
+
 ## Next Recommended Work
 
 1. Personal -> Business Activation MVP.

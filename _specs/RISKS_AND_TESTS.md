@@ -467,6 +467,44 @@ Verified by driving the real form in a browser: typing 15+ characters into NPWP,
 Company legal name and Employee count never loses focus and never detaches the DOM node;
 select and date fields still work; save PUTs NPWP as a string with its leading zero intact.
 
+## AI Accountant Document Intake (Phase 1, 2026-08-17)
+
+Honesty rules (enforced in code and tests):
+
+- Classification uses ONLY file name + MIME. `auto_classified` requires a STRONG match;
+  medium/low/unknown become `needs_review`.
+- A requirement is `uploaded` only for a `manually_confirmed` document or an
+  `auto_classified` one with HIGH confidence. A low-confidence file shows `needs_review` —
+  **an uncertain guess can never mark compliance satisfied.**
+- The checklist is labelled "AI Accountant preliminary checklist" and carries a disclaimer
+  that it does not verify official validity and to confirm with a licensed professional.
+- Unknown profile values are reported as `optional` or warned about, never as `required`.
+- Manual correction always overrides classification and is recorded with actor + timestamp.
+
+Isolation:
+
+- Every endpoint goes through `requireBusiness`, so it resolves the ACTIVE business only and
+  rejects personal workspaces via the business resolver. Document reads/writes are
+  `.eq('business_id', ...)`; `loadDocumentScoped` means a document from another workspace is
+  simply "not found". The frontend re-fetches on `scopeKey`, so switching workspace cannot
+  leave one company's documents on screen. Archived workspaces never appear in the switcher,
+  so they cannot be an upload target.
+
+Tested: 19 logic tests in `tests/integration/documentIntake.test.js` — strong/weak/unknown
+classification including underscore-separated names, MIME-only as low confidence, every
+taxonomy entry maps to a CHECK-valid `document_type`, checklist behaviour per
+PKP/employees/entity type, low-confidence stays needs_review, manual correction flips to
+uploaded, and `extracted_json` siblings are preserved. Live: all four endpoints return 401
+unauthenticated. Browser: checklist and intake inbox render, the upload modal classifies NPWP
+(high) versus an unknown scan (needs review), and manual correction fires the correct PATCH.
+
+Gaps / NOT RUN:
+
+- End-to-end upload against real Supabase Storage was not run (no creds; it would write to
+  production). The upload path itself is the pre-existing, already-live Document Center flow.
+- Phase 2: OCR/text extraction, AI classification from content, KB-backed official
+  requirements, accountant review workflow, document expiry tracking, Telegram upload routing.
+
 ## Minimum Checks by Change Type
 
 Personal UI:

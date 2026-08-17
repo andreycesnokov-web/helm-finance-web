@@ -177,6 +177,33 @@ NOT implemented in Phase 1 (documented, no code): reset of child data, hard dele
 suspend/archive (there is no `users.status`/`disabled_at` column — that needs an approved
 additive migration plus session handling).
 
+## AI Accountant Document Intake (Phase 1, 2026-08-17)
+
+One upload window; CFO AI classifies and files. **No migration** — see the storage note below.
+
+- Uploading REUSES `/api/documents/upload-init` + `/api/documents/upload-complete` (same
+  storage bucket, server-side SHA verification, dedup, role and plan gates, audit). No new
+  upload path was created.
+- New endpoints (all `auth` + `requireBusiness` + documents role/plan gates):
+  - `GET /api/ai-accountant/document-intake` — intake inbox for the ACTIVE business.
+  - `POST /api/ai-accountant/documents/classify` — STATELESS preview for the upload window.
+  - `PATCH /api/ai-accountant/documents/:id/classification` — manual correction.
+  - `GET /api/ai-accountant/required-documents` — preliminary checklist.
+- Logic lives in `server/lib/documentIntake.js` (pure, unit-tested): taxonomy, `classify()`,
+  `requirementsFor(profile)`, `buildChecklist()`, `readIntake()`, `intakePatch()`.
+- **Storage note (why no migration):** migration 031 constrains
+  `financial_documents.document_type` to a fixed CHECK list with no NPWP/NIB/Akta values.
+  Rather than alter that constraint, the intake taxonomy is stored in the existing free-form
+  `extracted_json.ai_intake` (`doc_type`, `confidence`, `classification_status`,
+  `confirmed_by_user_id`, `confirmed_at`), while `document_type` keeps a CHECK-valid value via
+  `INTAKE_TYPES[].maps_to`. Writes go through the same audited `rpc_document_update_metadata`.
+- Classification is deterministic: file name + MIME only. No OCR, no AI provider, no new env
+  var. GET endpoints never write — auto-classification is derived on read; only a manual
+  confirmation is persisted.
+- Frontend: `client/src/components/DocumentIntakeModal.jsx` (multi-file drag & drop, reuses
+  `uploadDocument()`) plus the "Compliance documents · preliminary" and "Document intake"
+  sections on the AI Accountant Tax Profile page.
+
 ## User Profile Model
 
 LIVE:

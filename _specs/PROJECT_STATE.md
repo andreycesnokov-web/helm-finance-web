@@ -220,6 +220,28 @@ migration or env change; no production data touched.
 - Save behaviour unchanged and pre-existing: only `PERSISTED` fields are PUT to the backend;
   fields labelled "· draft" are stored per business in localStorage.
 
+## AI Accountant Document Intake Phase 1 (2026-08-17, branch `feature/ai-accountant-doc-intake`)
+
+Status: implemented on branch, pending review/deploy. **No migrations, no env, no new provider.**
+
+- Single "Upload documents" window on the AI Accountant Tax Profile page: multi-file drag &
+  drop, shows the active business and warns that files land in that workspace only.
+- Deterministic classification (file name + MIME) into a 16-type product taxonomy: NPWP, NIB,
+  Akta, SK Kemenkumham, OSS licence, PKP certificate, KPP registration, bank statement,
+  invoice, receipt, payroll, BPJS, tax report, tax payment proof, contract, unknown.
+- Confidence model: `high` (strong name match) becomes `auto_classified`;
+  `medium`/`low`/`unknown` become `needs_review`. An uncertain match NEVER satisfies a
+  requirement.
+- Preliminary checklist driven by the SAVED profile (entity type, PKP status, employees) with
+  statuses `uploaded | needs_review | missing | not_required | optional`.
+- Manual correction always available (dropdown + Confirm) becoming `manually_confirmed`.
+- Intake metadata stored in the existing `extracted_json.ai_intake` — no schema change.
+- NOT implemented: OCR/text extraction, AI classification from content, official validation,
+  accountant review workflow, document expiry, Telegram upload routing (all Phase 2).
+- Known overlap: the legacy manual checkbox card "6 · Required Documents" on the same page is
+  left untouched because it feeds the existing readiness summary. Consolidating it into the
+  real checklist is a Phase 2 cleanup.
+
 ## Login and Identity
 
 LIVE:
