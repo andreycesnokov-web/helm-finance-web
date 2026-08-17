@@ -157,6 +157,21 @@ Last updated: 2026-07-04.
   disposable-workspace smoke passes.
 - Awaiting Codex final review before promote.
 
+## Tax Profile Input Focus Fix Batch (2026-08-17, pending review)
+
+- Branch: `fix/tax-profile-input-focus` (off `main` = 8b164ae4).
+- Fixes the production bug where AI Accountant → Tax Profile inputs accepted one character
+  then lost focus. Root cause: `Field` declared inside `BusinessAccountant` ⇒ new component
+  type per render ⇒ React remounted the `<input>`. Hoisted to module scope.
+- Frontend only: `client/src/pages/business/Accountant.jsx` + new guard test. No backend, no
+  migrations, no env, no production data mutations.
+- Verified in a browser before AND after: pre-fix lost focus after character 1 (value "0");
+  post-fix 15+ characters typed continuously into NPWP/NIB/KPP/legal name with focus and DOM
+  node intact; select + date fields work; status chip updates without remounting.
+- New regression guard `tests/integration/formComponentStability.test.js` (fails on the
+  pre-fix file, passes on the fix). Builds OFF/ON exit 0; 46 tests pass.
+- Awaiting Codex review before promote. Nothing deployed.
+
 ## Next Recommended Work
 
 1. Personal -> Business Activation MVP.

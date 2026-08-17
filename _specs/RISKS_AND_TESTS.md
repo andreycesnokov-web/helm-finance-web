@@ -445,6 +445,28 @@ Phase 2 requirements (NOT built):
   resetting child rows is more dangerous than archiving a workspace.
 - Email Identity Transfer and workspace ownership transfer stay out of scope until designed.
 
+## React Input Focus (form stability, 2026-08-17)
+
+Bug class: a component declared INSIDE another component gets a new function identity every
+render, so React unmounts and remounts its subtree. Any `<input>` in it loses focus and the
+caret — the user can type exactly one character before having to click back in.
+
+- This shipped in the AI Accountant Tax Profile form (`Field` was declared inside
+  `BusinessAccountant`). Fixed by hoisting `Field` to module scope and passing
+  `form` / `set` / `vstatus` via props.
+- **Rule: never declare a component that renders form controls inside another component.**
+  Guarded by `tests/integration/formComponentStability.test.js`, which scans every
+  form-bearing `.jsx` file and fails on the pattern (verified: it fails on the pre-fix file
+  and passes on the fixed one).
+- Identifier fields (NPWP, NIB, KPP, KBLI) are STRINGS end to end: leading zeros, dots and
+  dashes are preserved and never coerced to numbers. No masking is applied while typing.
+- Status chips (Missing / User declared) are siblings of the input, so they may update
+  without remounting the field.
+
+Verified by driving the real form in a browser: typing 15+ characters into NPWP, NIB, KPP,
+Company legal name and Employee count never loses focus and never detaches the DOM node;
+select and date fields still work; save PUTs NPWP as a string with its leading zero intact.
+
 ## Minimum Checks by Change Type
 
 Personal UI:
