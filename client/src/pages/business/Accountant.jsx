@@ -3,12 +3,13 @@
 // New fields (not yet in schema — see migration 040 PROPOSAL) are LOCAL DRAFT until 040
 // is applied. Obligations come from /api/accountant/applicability (deterministic, no LLM).
 // No tax-calculation/logic change; no OCR/extraction/filing. Mobile-safe.
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { apiFetch } from '../../lib/api'
 import { useAuth } from '../../hooks/useAuth'
 import { useWorkspace } from '../../shell/WorkspaceProvider'
 import { PageHeader, Card, Btn, StatusBadge, Stat, ErrorState, LoadingSkeleton, Icon } from '../../shell/ui'
 import DocumentIntakeModal from '../../components/DocumentIntakeModal'
+import { createRequestGuard } from '../../lib/requestGuard'
 
 // Which UI fields persist to the backend today vs. live as local draft (await 040).
 const PERSISTED = new Set(['country', 'jurisdiction', 'legal_entity_type', 'npwp', 'pkp_status', 'vat_status', 'financial_year_start', 'financial_year_end', 'nib', 'employee_status'])
@@ -39,7 +40,10 @@ export function BusinessAccountant() {
   // Document intake (Phase 1): real checklist + classified inbox for the ACTIVE business.
   const [checklist, setChecklist] = useState(null)
   const [intake, setIntake] = useState(null)
+  const [intakeLoading, setIntakeLoading] = useState(true)
   const [intakeErr, setIntakeErr] = useState('')
+  // Ignores responses from a workspace the user has already switched away from.
+  const intakeGuard = useRef(createRequestGuard())
   const [showUpload, setShowUpload] = useState(false)
   const [confirming, setConfirming] = useState(null)
 
@@ -62,13 +66,30 @@ export function BusinessAccountant() {
   // Re-fetched per active workspace (scopeKey bumps on switch), so documents from another
   // business can never linger on screen.
   const loadIntake = useCallback(() => {
-    if (!token || !active) return
-    setIntakeErr('')
-    apiFetch('/ai-accountant/required-documents', token).then(setChecklist)
-      .catch(e => { setChecklist(null); setIntakeErr(e.message || 'Checklist unavailable') })
-    apiFetch('/ai-accountant/document-intake', token).then(setIntake).catch(() => setIntake(null))
+    // Clear FIRST: never leave the previous workspace's documents on screen while the new
+    // workspace loads.
+    setChecklist(null); setIntake(null); setIntakeErr('')
+    if (!token || !active) { setIntakeLoading(false); return }
+    setIntakeLoading(true)
+    const req = intakeGuard.current.start()
+    const opts = { signal: req.signal }
+    Promise.allSettled([
+      apiFetch('/ai-accountant/required-documents', token, opts),
+      apiFetch('/ai-accountant/document-intake', token, opts),
+    ]).then(([cl, ik]) => {
+      if (req.isStale()) return                       // a newer workspace load already won
+      if (cl.status === 'fulfilled') setChecklist(cl.value)
+      else setIntakeErr(cl.reason?.message || 'Checklist unavailable')
+      if (ik.status === 'fulfilled') setIntake(ik.value)
+      setIntakeLoading(false)
+    })
   }, [token, active?.id])
-  useEffect(() => { loadIntake() }, [loadIntake, scopeKey])
+
+  useEffect(() => {
+    loadIntake()
+    // Abort in-flight work when the workspace changes or the page unmounts.
+    return () => intakeGuard.current.abort()
+  }, [loadIntake, scopeKey])
 
   const confirmType = async (docId, docType) => {
     setConfirming(docId)
@@ -221,9 +242,10 @@ export function BusinessAccountant() {
           </span>}>
 
           {intakeErr && <div style={{ fontSize: 13, color: 'var(--danger)', marginBottom: 10 }}>{intakeErr}</div>}
-          {!checklist && !intakeErr && <LoadingSkeleton rows={4} height={16} />}
+          {intakeLoading && <LoadingSkeleton rows={4} height={16} />}
+          {!intakeLoading && !checklist && !intakeErr && <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>Checklist unavailable.</div>}
 
-          {checklist && <>
+          {!intakeLoading && checklist && <>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
               <StatusBadge tone="success">{checklist.counts.uploaded} uploaded</StatusBadge>
               <StatusBadge tone="warning">{checklist.counts.needs_review} need review</StatusBadge>
@@ -258,7 +280,7 @@ export function BusinessAccountant() {
       </div>
 
       {/* Intake inbox — confirm or correct what was detected. */}
-      {intake?.documents?.length > 0 && (
+      {!intakeLoading && intake?.documents?.length > 0 && (
         <div style={{ marginTop: 14 }}>
           <Card title={`Document intake · ${intake.documents.length}`} action={<StatusBadge tone="neutral">{intake.business?.name || 'This workspace'}</StatusBadge>}>
             <div style={{ border: '1px solid var(--border-default)', borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>

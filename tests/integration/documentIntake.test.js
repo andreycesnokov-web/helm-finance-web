@@ -81,23 +81,24 @@ test('every intake type maps to a CHECK-valid document_type', () => {
 
 // ── checklist ───────────────────────────────────────────────────────────────
 test('checklist: NPWP is missing with no documents, uploaded once confirmed', () => {
-  const empty = di.buildChecklist({}, []);
+  const ID = { country: 'Indonesia' };
+  const empty = di.buildChecklist(ID, []);
   const npwpMissing = empty.items.find(i => i.type === 'npwp');
   assert.strictEqual(npwpMissing.requirement, 'required');
   assert.strictEqual(npwpMissing.status, 'missing');
 
-  const withDoc = di.buildChecklist({}, [docOf('NPWP.pdf', { doc_type: 'npwp', confidence: 'high', classification_status: 'manually_confirmed' })]);
+  const withDoc = di.buildChecklist(ID, [docOf('NPWP.pdf', { doc_type: 'npwp', confidence: 'high', classification_status: 'manually_confirmed' })]);
   assert.strictEqual(withDoc.items.find(i => i.type === 'npwp').status, 'uploaded');
 });
 
 test('checklist: high-confidence auto-classified document counts as uploaded', () => {
-  const c = di.buildChecklist({}, [docOf('NIB_123.pdf', { doc_type: 'nib', confidence: 'high', classification_status: 'auto_classified' })]);
+  const c = di.buildChecklist({ country: 'Indonesia' }, [docOf('NIB_123.pdf', { doc_type: 'nib', confidence: 'high', classification_status: 'auto_classified' })]);
   assert.strictEqual(c.items.find(i => i.type === 'nib').status, 'uploaded');
 });
 
 test('checklist: a LOW/medium confidence document stays needs_review, never uploaded', () => {
   for (const conf of ['low', 'medium', 'unknown']) {
-    const c = di.buildChecklist({}, [docOf('scan.pdf', { doc_type: 'npwp', confidence: conf, classification_status: 'needs_review' })]);
+    const c = di.buildChecklist({ country: 'Indonesia' }, [docOf('scan.pdf', { doc_type: 'npwp', confidence: conf, classification_status: 'needs_review' })]);
     const npwp = c.items.find(i => i.type === 'npwp');
     assert.strictEqual(npwp.status, 'needs_review', `${conf} confidence must not satisfy a requirement`);
     assert.notStrictEqual(npwp.status, 'uploaded');
@@ -105,37 +106,48 @@ test('checklist: a LOW/medium confidence document stays needs_review, never uplo
 });
 
 test('checklist: PKP certificate follows the saved PKP status', () => {
-  const req = di.buildChecklist({ pkp_status: 'pkp_registered' }, []).items.find(i => i.type === 'pkp_certificate');
+  const req = di.buildChecklist({ country: 'Indonesia', pkp_status: 'pkp_registered' }, []).items.find(i => i.type === 'pkp_certificate');
   assert.strictEqual(req.requirement, 'required');
   assert.strictEqual(req.status, 'missing');
 
-  const notReq = di.buildChecklist({ pkp_status: 'non_pkp' }, []).items.find(i => i.type === 'pkp_certificate');
+  const notReq = di.buildChecklist({ country: 'Indonesia', pkp_status: 'non_pkp' }, []).items.find(i => i.type === 'pkp_certificate');
   assert.strictEqual(notReq.requirement, 'not_required');
   assert.strictEqual(notReq.status, 'not_required');
 
-  const unknown = di.buildChecklist({}, []).items.find(i => i.type === 'pkp_certificate');
+  const unknown = di.buildChecklist({ country: 'Indonesia' }, []).items.find(i => i.type === 'pkp_certificate');
   assert.strictEqual(unknown.requirement, 'optional', 'unknown PKP status must not be reported as required');
 });
 
+test('unset employee status is optional, never reported as "no employees"', () => {
+  const c = di.buildChecklist({ country: 'Indonesia' }, []);
+  for (const t of ['payroll_document', 'bpjs_document']) {
+    const item = c.items.find(i => i.type === t);
+    assert.strictEqual(item.requirement, 'optional', `${t} must not be decided without employee status`);
+    assert.doesNotMatch(item.reason, /states there are no employees/i,
+      'must not claim the profile says something it never said');
+    assert.match(item.reason, /Set employee status/i);
+  }
+});
+
 test('checklist: payroll/BPJS required only when the profile says there are employees', () => {
-  const withEmp = di.buildChecklist({ employee_status: 'has_employees' }, []);
+  const withEmp = di.buildChecklist({ country: 'Indonesia', employee_status: 'has_employees' }, []);
   for (const t of ['payroll_document', 'bpjs_document']) {
     const item = withEmp.items.find(i => i.type === t);
     assert.strictEqual(item.requirement, 'conditional_required');
     assert.strictEqual(item.status, 'missing');
   }
-  const noEmp = di.buildChecklist({ employee_status: 'none' }, []);
+  const noEmp = di.buildChecklist({ country: 'Indonesia', employee_status: 'none' }, []);
   for (const t of ['payroll_document', 'bpjs_document']) {
     assert.strictEqual(noEmp.items.find(i => i.type === t).status, 'not_required');
   }
 });
 
 test('checklist: deed/Kemenkumham required for incorporated entities only', () => {
-  const pt = di.buildChecklist({ legal_entity_type: 'PT PMA' }, []);
+  const pt = di.buildChecklist({ country: 'Indonesia', legal_entity_type: 'PT PMA' }, []);
   assert.strictEqual(pt.items.find(i => i.type === 'akta').requirement, 'required');
   assert.strictEqual(pt.items.find(i => i.type === 'sk_kemenkumham').requirement, 'required');
 
-  const indiv = di.buildChecklist({ legal_entity_type: 'Individual / Freelancer' }, []);
+  const indiv = di.buildChecklist({ country: 'Indonesia', legal_entity_type: 'Individual / Freelancer' }, []);
   assert.strictEqual(indiv.items.find(i => i.type === 'akta').requirement, 'optional');
 });
 
@@ -147,7 +159,7 @@ test('checklist is labelled preliminary and carries a disclaimer', () => {
 });
 
 test('checklist counts add up to the number of items', () => {
-  const c = di.buildChecklist({ employee_status: 'has_employees', pkp_status: 'pkp_registered' }, []);
+  const c = di.buildChecklist({ country: 'Indonesia', employee_status: 'has_employees', pkp_status: 'pkp_registered' }, []);
   const total = Object.values(c.counts).reduce((a, b) => a + b, 0);
   assert.strictEqual(total, c.items.length);
 });
@@ -185,11 +197,72 @@ test('intakePatch records manual confirmation and preserves sibling keys', () =>
 });
 
 test('manual correction flips a needs_review document to uploaded in the checklist', () => {
-  const before = di.buildChecklist({}, [docOf('scan.pdf', { doc_type: 'npwp', confidence: 'low', classification_status: 'needs_review' })]);
+  const before = di.buildChecklist({ country: 'Indonesia' }, [docOf('scan.pdf', { doc_type: 'npwp', confidence: 'low', classification_status: 'needs_review' })]);
   assert.strictEqual(before.items.find(i => i.type === 'npwp').status, 'needs_review');
 
   const patch = di.intakePatch(null, { doc_type: 'npwp', actorUserId: 1 });
   const corrected = di.readIntake({ extracted_json: patch }, { file_name: 'scan.pdf' });
-  const after = di.buildChecklist({}, [{ id: 'd1', file_name: 'scan.pdf', intake: corrected }]);
+  const after = di.buildChecklist({ country: 'Indonesia' }, [{ id: 'd1', file_name: 'scan.pdf', intake: corrected }]);
   assert.strictEqual(after.items.find(i => i.type === 'npwp').status, 'uploaded');
+});
+
+// ── jurisdiction awareness (P0 fix) ─────────────────────────────────────────
+test('Indonesia profile requires NPWP and NIB', () => {
+  const c = di.buildChecklist({ country: 'Indonesia' }, []);
+  for (const t of ['npwp', 'nib']) {
+    assert.strictEqual(c.items.find(i => i.type === t).requirement, 'required');
+  }
+  assert.strictEqual(c.jurisdiction, 'id');
+});
+
+test('non-Indonesia profile does NOT require Indonesian documents', () => {
+  for (const country of ['Singapore', 'Other', 'Malaysia']) {
+    const c = di.buildChecklist({ country }, []);
+    assert.strictEqual(c.jurisdiction, 'other', country);
+    for (const t of ['npwp', 'nib', 'bpjs_document', 'kpp_registration']) {
+      const item = c.items.find(i => i.type === t);
+      assert.strictEqual(item.requirement, 'not_required', `${t} must not be required in ${country}`);
+      assert.strictEqual(item.status, 'not_required');
+      assert.match(item.reason, /Indonesian requirement|only covers Indonesia/i);
+    }
+    assert.ok(c.warnings.some(w => /only covers Indonesia/i.test(w)), 'must warn that coverage is Indonesia-only');
+  }
+});
+
+test('unknown jurisdiction is optional + warned, never "required"', () => {
+  const c = di.buildChecklist({}, []);
+  assert.strictEqual(c.jurisdiction, 'unknown');
+  for (const t of ['npwp', 'nib']) {
+    const item = c.items.find(i => i.type === t);
+    assert.strictEqual(item.requirement, 'optional', `${t} must not be claimed required without a country`);
+    assert.match(item.reason, /Set country\/jurisdiction/i);
+  }
+  assert.ok(c.warnings.some(w => /Country\/jurisdiction is not set/i.test(w)));
+});
+
+test('jurisdictionOf recognises Indonesia via country or jurisdiction field', () => {
+  assert.strictEqual(di.jurisdictionOf({ country: 'Indonesia' }), 'id');
+  assert.strictEqual(di.jurisdictionOf({ jurisdiction: 'ID' }), 'id');
+  assert.strictEqual(di.jurisdictionOf({ country: 'Singapore' }), 'other');
+  assert.strictEqual(di.jurisdictionOf({}), 'unknown');
+});
+
+// ── truncation (P0 fix) ─────────────────────────────────────────────────────
+test('truncated document set never yields a confident "missing"', () => {
+  const full = di.buildChecklist({ country: 'Indonesia' }, [], { truncated: false });
+  assert.strictEqual(full.items.find(i => i.type === 'npwp').status, 'missing');
+
+  const cut = di.buildChecklist({ country: 'Indonesia' }, [], { truncated: true });
+  const npwp = cut.items.find(i => i.type === 'npwp');
+  assert.strictEqual(npwp.status, 'needs_review', 'a partial set cannot prove a document is absent');
+  assert.notStrictEqual(npwp.status, 'missing');
+  assert.strictEqual(cut.truncated, true);
+  assert.ok(cut.warnings.some(w => /outside this set|most recent documents/i.test(w)));
+});
+
+test('truncation does not downgrade an already-satisfied requirement', () => {
+  const c = di.buildChecklist({ country: 'Indonesia' },
+    [docOf('NPWP.pdf', { doc_type: 'npwp', confidence: 'high', classification_status: 'manually_confirmed' })],
+    { truncated: true });
+  assert.strictEqual(c.items.find(i => i.type === 'npwp').status, 'uploaded');
 });

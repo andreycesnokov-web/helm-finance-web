@@ -9564,13 +9564,30 @@ app.get('/api/documents/health', auth, async (req, res) => {
 // ═══════════════════════════════════════════════════════════════════════════
 const docIntake = require('./lib/documentIntake');
 
-// Shared loader: active-business documents + their file metadata + intake classification.
-async function loadIntakeDocuments(biz) {
+const INTAKE_DOC_CAP = 500;
+
+// Shared loader: active-business documents + file metadata + intake classification.
+//
+// Applies the SAME role-level visibility rule as GET /api/documents — business scoping alone
+// is not enough. A manager/employee must not see file names, ids, classification or checklist
+// matches for documents they cannot access (own uploads, or docs linked to their own debts).
+// Returns { documents, truncated } so callers can avoid confident conclusions on a partial set.
+async function loadIntakeDocuments(biz, userId) {
   const { data: docs, error } = await supabase.from('financial_documents')
     .select('*').eq('business_id', biz.business.id).is('archived_at', null)
-    .order('created_at', { ascending: false }).limit(500);
+    .order('created_at', { ascending: false }).limit(INTAKE_DOC_CAP + 1);   // +1 detects the cap
   if (error) throw new Error(error.message);
-  const rows = docs || [];
+  let rows = docs || [];
+  const truncated = rows.length > INTAKE_DOC_CAP;
+  if (truncated) rows = rows.slice(0, INTAKE_DOC_CAP);
+
+  // Links are required by the restricted-role rule (doc linked to a debt the user created).
+  rows = await attachLinks(biz, rows);
+  if (!canViewAllDocuments(biz.role)) {
+    const owned = await ownedDebtIds(biz, userId);
+    rows = rows.filter(d => docA.canAccessDocument({ role: biz.role, userId, doc: d, ownedDebtIds: owned }));
+  }
+
   const fileIds = [...new Set(rows.map(d => d.file_id).filter(Boolean))];
   let filesById = {};
   if (fileIds.length) {
@@ -9579,7 +9596,7 @@ async function loadIntakeDocuments(biz) {
       .eq('business_id', biz.business.id).in('id', fileIds);
     filesById = Object.fromEntries((files || []).map(f => [f.id, f]));
   }
-  return rows.map(d => {
+  const documents = rows.map(d => {
     const file = filesById[d.file_id] || {};
     const intake = docIntake.readIntake(d, file);
     return {
@@ -9595,6 +9612,7 @@ async function loadIntakeDocuments(biz) {
       raw: d,                                          // internal only; stripped before responses
     };
   });
+  return { documents, truncated };
 }
 const publicIntakeDoc = ({ raw, ...rest }) => rest;   // never leak the raw row
 
@@ -9605,12 +9623,17 @@ app.get('/api/ai-accountant/document-intake', auth, async (req, res) => {
     if (!canViewBusinessFinance(biz.role) && !canUploadDocument(biz.role))
       return res.status(403).json({ error: 'Your role cannot view documents' });
     if (!await hasDocumentsAccess(biz)) return res.status(403).json({ error: 'Document Center is not enabled', upgrade_required: true });
-    const docs = (await loadIntakeDocuments(biz)).map(publicIntakeDoc);
+    // Visibility-filtered inside the loader — restricted roles never receive metadata for
+    // documents they cannot access.
+    const { documents, truncated } = await loadIntakeDocuments(biz, req.user.userId);
+    const docs = documents.map(publicIntakeDoc);
     res.json({
       business: { id: biz.business.id, name: biz.business.name },
       types: docIntake.INTAKE_TYPES.map(({ type, label, area }) => ({ type, label, area })),
       documents: docs,
       needs_review_count: docs.filter(d => d.intake.classification_status === 'needs_review').length,
+      truncated,
+      warnings: truncated ? [`Showing the ${INTAKE_DOC_CAP} most recent documents — older documents are not included.`] : [],
       note: 'Preliminary classification from file name and type only — confirm each document.',
     });
   } catch (e) {
@@ -9692,8 +9715,11 @@ app.get('/api/ai-accountant/required-documents', auth, async (req, res) => {
     const profile = profRows?.[0] || {};
     if (!pErr && !profRows?.length) warnings.push('No tax profile saved yet — the checklist assumes defaults until you complete it.');
 
-    const docs = await loadIntakeDocuments(biz);
-    const checklist = docIntake.buildChecklist(profile, docs);
+    // Same visibility filtering as the intake list: a restricted role must not learn about
+    // documents through the checklist either. `truncated` stops a partial set producing a
+    // confident "missing".
+    const { documents, truncated } = await loadIntakeDocuments(biz, req.user.userId);
+    const checklist = docIntake.buildChecklist(profile, documents, { truncated });
     res.json({
       business: { id: biz.business.id, name: biz.business.name },
       profile_used: {
@@ -9703,7 +9729,8 @@ app.get('/api/ai-accountant/required-documents', auth, async (req, res) => {
         country: profile.country ?? null,
       },
       ...checklist,
-      warnings,
+      truncated,
+      warnings: [...warnings, ...checklist.warnings],
     });
   } catch (e) {
     console.error(`[doc-intake] required-documents failed: ${e.message}`);

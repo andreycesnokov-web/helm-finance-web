@@ -98,6 +98,16 @@ function classify({ file_name = '', mime_type = '' } = {}) {
 // ── Required documents (PRELIMINARY, profile-driven) ────────────────────────
 // requirement: 'required' | 'conditional_required' | 'optional' | 'not_required'
 // Every entry carries a plain-language reason so nothing looks like an oracle.
+// Is this profile in the Indonesian regime? Indonesia is the only jurisdiction this Phase 1
+// rule pack covers — Indonesian requirements must never be presented as universal.
+// Returns 'id' | 'other' | 'unknown'.
+function jurisdictionOf(profile = {}) {
+  const raw = `${profile.country || ''} ${profile.jurisdiction || ''}`.trim().toLowerCase();
+  if (!raw) return 'unknown';
+  if (/indonesia|^id$|\bid\b|idn/.test(raw)) return 'id';
+  return 'other';
+}
+
 function requirementsFor(profile = {}) {
   const p = profile || {};
   const entity = String(p.legal_entity_type || '').toLowerCase();
@@ -106,37 +116,53 @@ function requirementsFor(profile = {}) {
   const hasEmployees = String(p.employee_status || '') === 'has_employees';
   const foreign = String(p.foreign_owned || '') === 'yes';
   const known = (v) => v !== undefined && v !== null && v !== '';
+  const jur = jurisdictionOf(p);
+  const idOnly = jur === 'id';
+  const jurUnknown = jur === 'unknown';
+  const where = p.country || p.jurisdiction || 'this jurisdiction';
 
   const out = [];
   const add = (type, requirement, reason) => out.push({ type, label: labelFor(type), area: areaFor(type), requirement, reason });
+  // Indonesia-specific document: required only under the Indonesian regime, explicitly
+  // not_required elsewhere, and merely optional (with a warning) while the country is unknown.
+  const addIndonesian = (type, requirement, reason) => {
+    if (idOnly) return add(type, requirement, reason);
+    if (jurUnknown) return add(type, 'optional', 'Set country/jurisdiction in the tax profile to know whether this applies.');
+    return add(type, 'not_required', `Indonesian requirement — the profile country is ${where}. This checklist only covers Indonesia.`);
+  };
 
-  add('npwp', 'required', 'Every registered taxpayer has an NPWP.');
-  add('nib', 'required', 'Business identification number for Indonesian entities.');
+  addIndonesian('npwp', 'required', 'Every registered Indonesian taxpayer has an NPWP.');
+  addIndonesian('nib', 'required', 'Business identification number for Indonesian entities.');
 
-  if (isCompany) add('akta', 'required', `Deed of establishment is expected for ${p.legal_entity_type}.`);
+  if (isCompany) addIndonesian('akta', 'required', `Deed of establishment is expected for ${p.legal_entity_type}.`);
   else if (!known(p.legal_entity_type)) add('akta', 'optional', 'Set legal entity type to know whether a deed applies.');
   else add('akta', 'optional', 'Not typically required for this entity type.');
 
-  if (isCompany) add('sk_kemenkumham', 'required', 'Ministry approval accompanies the deed for incorporated entities.');
-  else add('sk_kemenkumham', 'optional', 'Applies to incorporated entities.');
+  if (isCompany) addIndonesian('sk_kemenkumham', 'required', 'Ministry approval accompanies the deed for incorporated entities.');
+  else addIndonesian('sk_kemenkumham', 'optional', 'Applies to incorporated Indonesian entities.');
 
   add('oss_license', 'optional', 'Recommended when your activity requires a licence.');
 
-  if (pkp === 'pkp_registered') add('pkp_certificate', 'required', 'Profile states the company is PKP-registered.');
+  if (pkp === 'pkp_registered') addIndonesian('pkp_certificate', 'required', 'Profile states the company is PKP-registered.');
   else if (pkp === 'non_pkp') add('pkp_certificate', 'not_required', 'Profile states the company is not PKP.');
-  else add('pkp_certificate', 'optional', 'Set PKP status to know whether this is required.');
+  else addIndonesian('pkp_certificate', 'optional', 'Set PKP status to know whether this is required.');
 
-  add('kpp_registration', 'optional', 'Useful for confirming the registered tax office.');
+  addIndonesian('kpp_registration', 'optional', 'Useful for confirming the registered Indonesian tax office.');
 
+  // Employee-driven documents. An UNSET employee status must not be reported as "no
+  // employees" — that would state something the user never entered.
   if (hasEmployees) {
     add('payroll_document', 'conditional_required', 'Profile states the company has employees.');
-    add('bpjs_document', 'conditional_required', 'BPJS applies once you have employees.');
-  } else {
+    addIndonesian('bpjs_document', 'conditional_required', 'BPJS applies once an Indonesian employer has employees.');
+  } else if (known(p.employee_status)) {
     add('payroll_document', 'not_required', 'Profile states there are no employees.');
-    add('bpjs_document', 'not_required', 'Profile states there are no employees.');
+    addIndonesian('bpjs_document', 'not_required', 'Profile states there are no employees.');
+  } else {
+    add('payroll_document', 'optional', 'Set employee status to know whether payroll documents apply.');
+    addIndonesian('bpjs_document', 'optional', 'Set employee status to know whether BPJS documents apply.');
   }
 
-  if (foreign) add('oss_license', 'conditional_required', 'Foreign-owned companies usually hold additional licences.');
+  if (foreign && idOnly) add('oss_license', 'conditional_required', 'Foreign-owned Indonesian companies usually hold additional licences.');
 
   add('tax_report', 'optional', 'Keep filed returns for your records.');
   add('tax_payment_proof', 'optional', 'Keep payment proofs for your records.');
@@ -158,8 +184,13 @@ function requirementsFor(profile = {}) {
 // 'uploaded' is granted ONLY by a manually confirmed document, or an auto-classified one
 // with HIGH confidence. A medium/low-confidence match shows needs_review — an uncertain
 // guess must never mark a requirement satisfied.
-function buildChecklist(profile = {}, docs = []) {
+function buildChecklist(profile = {}, docs = [], { truncated = false } = {}) {
   const reqs = requirementsFor(profile);
+  const jur = jurisdictionOf(profile);
+  const warnings = [];
+  if (jur === 'unknown') warnings.push('Country/jurisdiction is not set — Indonesia-specific documents are shown as optional until you set it.');
+  else if (jur === 'other') warnings.push(`This checklist only covers Indonesia. The profile country is ${profile.country || profile.jurisdiction} — Indonesian documents are marked not required.`);
+  if (truncated) warnings.push('Only the most recent documents were checked, so a required document may exist outside this set — affected items show "needs review" instead of "missing".');
   const byType = new Map();
   for (const d of docs || []) {
     const t = d?.intake?.doc_type;
@@ -179,6 +210,9 @@ function buildChecklist(profile = {}, docs = []) {
     else if (weak.length) status = 'needs_review';
     else if (r.requirement === 'not_required') status = 'not_required';
     else if (r.requirement === 'optional') status = 'optional';
+    // A truncated document set cannot prove absence: an older matching document may simply
+    // not have been fetched. Report needs_review rather than a confident "missing".
+    else if (truncated) status = 'needs_review';
     else status = 'missing';
 
     counts[status] += 1;
@@ -195,8 +229,11 @@ function buildChecklist(profile = {}, docs = []) {
   return {
     label: 'AI Accountant preliminary checklist',
     disclaimer: 'Preliminary only. This checklist reflects the profile you entered and file names — it does not verify that a document is officially valid or that your filing obligations are complete. Confirm with a licensed professional.',
+    jurisdiction: jur,
+    truncated,
     counts,
     items,
+    warnings,
   };
 }
 
@@ -238,6 +275,7 @@ function intakePatch(existingExtracted, { doc_type, actorUserId }) {
 }
 
 module.exports = {
+  jurisdictionOf,
   INTAKE_TYPES, isIntakeType, labelFor, areaFor, mapsTo,
   classify, requirementsFor, buildChecklist, readIntake, intakePatch,
 };
