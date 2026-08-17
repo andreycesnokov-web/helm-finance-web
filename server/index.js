@@ -9543,6 +9543,174 @@ app.get('/api/documents/health', auth, async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// ═══════════════════════════════════════════════════════════════════════════
+// AI ACCOUNTANT — DOCUMENT INTAKE (Phase 1)
+//
+// One upload window, then CFO AI organises. Uploading itself REUSES the existing
+// /api/documents/upload-init + upload-complete flow (same storage, dedup, role checks and
+// audit) — nothing new was added there. These endpoints only add classification, a
+// preliminary required-document checklist, and manual correction.
+//
+// Safety:
+//   * Every endpoint is business-scoped through requireBusiness + the documents role/plan
+//     gates, so a document can never be read or written across workspaces, and Personal
+//     workspaces are rejected by the business resolver.
+//   * Classification is deterministic (file name + MIME only). No OCR, no AI provider, no
+//     new env var, NO migration: intake metadata lives in the existing free-form
+//     financial_documents.extracted_json.ai_intake.
+//   * GETs never write. Auto-classification is DERIVED on read; only a manual confirmation
+//     is persisted.
+//   * Nothing here asserts that a document is officially valid.
+// ═══════════════════════════════════════════════════════════════════════════
+const docIntake = require('./lib/documentIntake');
+
+// Shared loader: active-business documents + their file metadata + intake classification.
+async function loadIntakeDocuments(biz) {
+  const { data: docs, error } = await supabase.from('financial_documents')
+    .select('*').eq('business_id', biz.business.id).is('archived_at', null)
+    .order('created_at', { ascending: false }).limit(500);
+  if (error) throw new Error(error.message);
+  const rows = docs || [];
+  const fileIds = [...new Set(rows.map(d => d.file_id).filter(Boolean))];
+  let filesById = {};
+  if (fileIds.length) {
+    const { data: files } = await supabase.from('document_files')
+      .select('id, file_name, mime_type, file_size, created_at')
+      .eq('business_id', biz.business.id).in('id', fileIds);
+    filesById = Object.fromEntries((files || []).map(f => [f.id, f]));
+  }
+  return rows.map(d => {
+    const file = filesById[d.file_id] || {};
+    const intake = docIntake.readIntake(d, file);
+    return {
+      id: d.id,
+      file_name: file.file_name || null,
+      mime_type: file.mime_type || null,
+      file_size: file.file_size ?? null,
+      uploaded_at: d.created_at,
+      stored_document_type: d.document_type,          // the CHECK-valid column value
+      review_status: d.review_status,
+      intake,                                          // { doc_type, label, area, confidence, classification_status }
+      routed_to: intake.area,
+      raw: d,                                          // internal only; stripped before responses
+    };
+  });
+}
+const publicIntakeDoc = ({ raw, ...rest }) => rest;   // never leak the raw row
+
+// GET /api/ai-accountant/document-intake — intake inbox for the ACTIVE business.
+app.get('/api/ai-accountant/document-intake', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res); if (!biz) return;
+    if (!canViewBusinessFinance(biz.role) && !canUploadDocument(biz.role))
+      return res.status(403).json({ error: 'Your role cannot view documents' });
+    if (!await hasDocumentsAccess(biz)) return res.status(403).json({ error: 'Document Center is not enabled', upgrade_required: true });
+    const docs = (await loadIntakeDocuments(biz)).map(publicIntakeDoc);
+    res.json({
+      business: { id: biz.business.id, name: biz.business.name },
+      types: docIntake.INTAKE_TYPES.map(({ type, label, area }) => ({ type, label, area })),
+      documents: docs,
+      needs_review_count: docs.filter(d => d.intake.classification_status === 'needs_review').length,
+      note: 'Preliminary classification from file name and type only — confirm each document.',
+    });
+  } catch (e) {
+    console.error(`[doc-intake] list failed: ${e.message}`);
+    res.status(500).json({ error: 'document_intake_unavailable' });
+  }
+});
+
+// POST /api/ai-accountant/documents/classify — STATELESS preview for the upload window.
+// Writes nothing; lets the UI show a detected type before/while uploading.
+app.post('/api/ai-accountant/documents/classify', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res); if (!biz) return;
+    if (!canUploadDocument(biz.role)) return res.status(403).json({ error: 'Your role cannot upload documents' });
+    const files = Array.isArray(req.body?.files) ? req.body.files.slice(0, 50) : null;
+    if (!files) return res.status(400).json({ error: 'files_required' });
+    res.json({
+      results: files.map(f => {
+        const c = docIntake.classify({ file_name: f?.file_name, mime_type: f?.mime_type });
+        return { file_name: f?.file_name ?? null, ...c, label: docIntake.labelFor(c.doc_type), area: docIntake.areaFor(c.doc_type) };
+      }),
+    });
+  } catch (e) {
+    console.error(`[doc-intake] classify failed: ${e.message}`);
+    res.status(500).json({ error: 'classify_unavailable' });
+  }
+});
+
+// PATCH /api/ai-accountant/documents/:id/classification — manual correction.
+// Sets classification_status='manually_confirmed' and keeps the stored document_type on a
+// CHECK-valid value. Persisted through the SAME audited RPC the Document Center uses.
+app.patch('/api/ai-accountant/documents/:id/classification', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res); if (!biz) return;
+    if (!canManageDocuments(biz.role)) return res.status(403).json({ error: 'Your role cannot edit documents' });
+    if (!await hasDocumentsAccess(biz)) return res.status(403).json({ error: 'Document Center is not enabled', upgrade_required: true });
+
+    const docType = req.body?.doc_type;
+    if (!docIntake.isIntakeType(docType)) return res.status(400).json({ error: 'invalid_doc_type' });
+
+    // Business-scoped load — a document from another workspace simply is not found.
+    const doc = await loadDocumentScoped(biz, req.params.id);
+    if (!doc) return res.status(404).json({ error: 'document_not_found' });
+
+    const patch = {
+      document_type: docIntake.mapsTo(docType),
+      extracted_json: docIntake.intakePatch(doc.extracted_json, { doc_type: docType, actorUserId: req.user.userId }),
+    };
+    const { error } = await supabase.rpc('rpc_document_update_metadata',
+      { p_document_id: doc.id, p_business_id: biz.business.id, p_actor: req.user.userId, p_patch: patch, p_channel: 'web' });
+    if (error) {
+      if (/archived/i.test(error.message)) return res.status(409).json({ error: 'document_archived' });
+      console.error(`[doc-intake] classification update failed: ${error.message}`);
+      return res.status(500).json({ error: 'classification_update_failed' });
+    }
+    res.json({
+      ok: true, id: doc.id, doc_type: docType, label: docIntake.labelFor(docType),
+      area: docIntake.areaFor(docType), classification_status: 'manually_confirmed',
+    });
+  } catch (e) {
+    console.error(`[doc-intake] classification failed: ${e.message}`);
+    res.status(500).json({ error: 'classification_update_failed' });
+  }
+});
+
+// GET /api/ai-accountant/required-documents — PRELIMINARY checklist for the active business.
+app.get('/api/ai-accountant/required-documents', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res); if (!biz) return;
+    if (!canViewBusinessFinance(biz.role) && !canUploadDocument(biz.role))
+      return res.status(403).json({ error: 'Your role cannot view documents' });
+    if (!await hasDocumentsAccess(biz)) return res.status(403).json({ error: 'Document Center is not enabled', upgrade_required: true });
+
+    // Profile drives which documents apply. A missing profile is reported, never guessed.
+    const { data: profRows, error: pErr } = await supabase.from('tax_profiles')
+      .select('*').eq('business_id', biz.business.id).limit(1);
+    const warnings = [];
+    if (pErr) { console.error(`[doc-intake] profile read failed: ${pErr.message}`); warnings.push('tax profile: unavailable (database error)'); }
+    const profile = profRows?.[0] || {};
+    if (!pErr && !profRows?.length) warnings.push('No tax profile saved yet — the checklist assumes defaults until you complete it.');
+
+    const docs = await loadIntakeDocuments(biz);
+    const checklist = docIntake.buildChecklist(profile, docs);
+    res.json({
+      business: { id: biz.business.id, name: biz.business.name },
+      profile_used: {
+        legal_entity_type: profile.legal_entity_type ?? null,
+        pkp_status: profile.pkp_status ?? null,
+        employee_status: profile.employee_status ?? null,
+        country: profile.country ?? null,
+      },
+      ...checklist,
+      warnings,
+    });
+  } catch (e) {
+    console.error(`[doc-intake] required-documents failed: ${e.message}`);
+    res.status(500).json({ error: 'required_documents_unavailable' });
+  }
+});
+
 // GET /api/documents — business-scoped list with filters.
 app.get('/api/documents', auth, async (req, res) => {
   try {

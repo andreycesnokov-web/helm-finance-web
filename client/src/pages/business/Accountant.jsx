@@ -8,6 +8,7 @@ import { apiFetch } from '../../lib/api'
 import { useAuth } from '../../hooks/useAuth'
 import { useWorkspace } from '../../shell/WorkspaceProvider'
 import { PageHeader, Card, Btn, StatusBadge, Stat, ErrorState, LoadingSkeleton, Icon } from '../../shell/ui'
+import DocumentIntakeModal from '../../components/DocumentIntakeModal'
 
 // Which UI fields persist to the backend today vs. live as local draft (await 040).
 const PERSISTED = new Set(['country', 'jurisdiction', 'legal_entity_type', 'npwp', 'pkp_status', 'vat_status', 'financial_year_start', 'financial_year_end', 'nib', 'employee_status'])
@@ -35,6 +36,12 @@ export function BusinessAccountant() {
   const [docs, setDocs] = useState({})          // documents checklist (local placeholder)
   const [saving, setSaving] = useState(false)
   const [readiness, setReadiness] = useState(null)
+  // Document intake (Phase 1): real checklist + classified inbox for the ACTIVE business.
+  const [checklist, setChecklist] = useState(null)
+  const [intake, setIntake] = useState(null)
+  const [intakeErr, setIntakeErr] = useState('')
+  const [showUpload, setShowUpload] = useState(false)
+  const [confirming, setConfirming] = useState(null)
 
   useEffect(() => {
     if (!token || !active) return
@@ -51,6 +58,25 @@ export function BusinessAccountant() {
     }).catch(e => { if (on) { setError(e.message); setLoading(false) } })
     return () => { on = false }
   }, [token, active?.id, scopeKey])
+
+  // Re-fetched per active workspace (scopeKey bumps on switch), so documents from another
+  // business can never linger on screen.
+  const loadIntake = useCallback(() => {
+    if (!token || !active) return
+    setIntakeErr('')
+    apiFetch('/ai-accountant/required-documents', token).then(setChecklist)
+      .catch(e => { setChecklist(null); setIntakeErr(e.message || 'Checklist unavailable') })
+    apiFetch('/ai-accountant/document-intake', token).then(setIntake).catch(() => setIntake(null))
+  }, [token, active?.id])
+  useEffect(() => { loadIntake() }, [loadIntake, scopeKey])
+
+  const confirmType = async (docId, docType) => {
+    setConfirming(docId)
+    try {
+      await apiFetch(`/ai-accountant/documents/${docId}/classification`, token, { method: 'PATCH', body: { doc_type: docType } })
+      loadIntake()
+    } catch (e) { alert(e.message || 'Could not update the document type') } finally { setConfirming(null) }
+  }
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
   const vstatus = (k) => (form.field_verification?.[k]) || (form[k] !== undefined && form[k] !== '' && form[k] !== null ? 'user_declared' : 'missing')
@@ -182,9 +208,105 @@ export function BusinessAccountant() {
         </Card>
       </div>
 
+      {/* ── Document intake (Phase 1) ─────────────────────────────────────────
+          One upload window; CFO AI classifies and files. The checklist is PRELIMINARY and
+          driven by the saved profile — an uncertain match shows "needs review" and never
+          counts as satisfied. */}
+      <div style={{ marginTop: 18 }}>
+        <Card
+          title="Compliance documents · preliminary"
+          action={<span style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            {intake?.needs_review_count > 0 && <StatusBadge tone="warning">{intake.needs_review_count} need review</StatusBadge>}
+            <Btn sm onClick={() => setShowUpload(true)}>Upload documents</Btn>
+          </span>}>
+
+          {intakeErr && <div style={{ fontSize: 13, color: 'var(--danger)', marginBottom: 10 }}>{intakeErr}</div>}
+          {!checklist && !intakeErr && <LoadingSkeleton rows={4} height={16} />}
+
+          {checklist && <>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
+              <StatusBadge tone="success">{checklist.counts.uploaded} uploaded</StatusBadge>
+              <StatusBadge tone="warning">{checklist.counts.needs_review} need review</StatusBadge>
+              <StatusBadge tone="danger">{checklist.counts.missing} missing</StatusBadge>
+              <StatusBadge tone="neutral">{checklist.counts.optional} optional</StatusBadge>
+              <StatusBadge tone="neutral">{checklist.counts.not_required} not required</StatusBadge>
+            </div>
+
+            <div style={{ border: '1px solid var(--border-default)', borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>
+              {checklist.items.map((it, i) => (
+                <div key={it.type} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderTop: i ? '0.5px solid var(--border-subtle)' : 'none' }}>
+                  <Icon.doc width="15" height="15" />
+                  <span style={{ flex: 1, minWidth: 0 }}>
+                    <span style={{ fontSize: 13.5, fontWeight: 600 }}>{it.label}</span>
+                    <span style={{ display: 'block', fontSize: 11.5, color: 'var(--text-muted)' }}>{it.reason}</span>
+                  </span>
+                  <StatusBadge tone={
+                    it.status === 'uploaded' ? 'success'
+                      : it.status === 'needs_review' ? 'warning'
+                        : it.status === 'missing' ? 'danger' : 'neutral'
+                  }>{it.status.replace('_', ' ')}</StatusBadge>
+                </div>
+              ))}
+            </div>
+
+            {(checklist.warnings || []).map((w, i) => (
+              <div key={i} style={{ marginTop: 8, fontSize: 12, color: 'var(--warning)' }}>⚠ {w}</div>
+            ))}
+            <div style={{ marginTop: 10, fontSize: 11.5, color: 'var(--text-muted)', lineHeight: 1.55 }}>{checklist.disclaimer}</div>
+          </>}
+        </Card>
+      </div>
+
+      {/* Intake inbox — confirm or correct what was detected. */}
+      {intake?.documents?.length > 0 && (
+        <div style={{ marginTop: 14 }}>
+          <Card title={`Document intake · ${intake.documents.length}`} action={<StatusBadge tone="neutral">{intake.business?.name || 'This workspace'}</StatusBadge>}>
+            <div style={{ border: '1px solid var(--border-default)', borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>
+              {intake.documents.map((d, i) => (
+                <div key={d.id} style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', padding: '10px 12px', borderTop: i ? '0.5px solid var(--border-subtle)' : 'none' }}>
+                  <span style={{ flex: 1, minWidth: 180 }}>
+                    <span style={{ fontSize: 13.5, fontWeight: 600, display: 'block', overflow: 'hidden', textOverflow: 'ellipsis' }}>{d.file_name || '(unnamed file)'}</span>
+                    <span style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>
+                      {d.intake.confidence} confidence · routed to {d.routed_to.replace('_', ' ')}
+                    </span>
+                  </span>
+                  <StatusBadge tone={
+                    d.intake.classification_status === 'manually_confirmed' ? 'success'
+                      : d.intake.classification_status === 'auto_classified' ? 'info' : 'warning'
+                  }>{d.intake.classification_status.replace(/_/g, ' ')}</StatusBadge>
+                  {/* Manual correction always available — AI classification is never the last word. */}
+                  <select
+                    className="cfo-input" style={{ maxWidth: 210 }}
+                    value={d.intake.doc_type}
+                    disabled={confirming === d.id}
+                    onChange={e => confirmType(d.id, e.target.value)}>
+                    {(intake.types || []).map(t => <option key={t.type} value={t.type}>{t.label}</option>)}
+                  </select>
+                  <Btn sm variant="ghost" disabled={confirming === d.id || d.intake.classification_status === 'manually_confirmed'}
+                    onClick={() => confirmType(d.id, d.intake.doc_type)}>
+                    {confirming === d.id ? '…' : 'Confirm'}
+                  </Btn>
+                </div>
+              ))}
+            </div>
+            <div style={{ marginTop: 10, fontSize: 11.5, color: 'var(--text-muted)', lineHeight: 1.55 }}>
+              {intake.note} Confirming a type files the document into its compliance area and updates the checklist.
+              Documents are archived from the Document Center — nothing is deleted here.
+            </div>
+          </Card>
+        </div>
+      )}
+
       <div style={{ marginTop: 18, display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
         <Btn onClick={save} disabled={saving}>{saving ? 'Saving…' : 'Save profile'}</Btn>
       </div>
+      {showUpload && (
+        <DocumentIntakeModal
+          business={intake?.business || active}
+          onClose={() => setShowUpload(false)}
+          onUploaded={loadIntake}
+        />
+      )}
       <div style={{ marginTop: 12, fontSize: 12, color: 'var(--text-muted)' }}>
         Verification states: {Object.values(VSTATES).map(v => v.label).join(' · ')}. Persisted fields sync to your account; “draft” fields are saved locally until the additive profile migration is applied. This is a preliminary assessment, not final legal/tax advice.
       </div>
