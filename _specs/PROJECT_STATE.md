@@ -207,6 +207,19 @@ Phase 2 backlog: user suspend/restore (needs `users.status` migration + session 
 table-by-table reset of test data, Email Identity Transfer, workspace ownership transfer,
 support notes.
 
+## AI Accountant Tax Profile input focus fix (2026-08-17, branch `fix/tax-profile-input-focus`)
+
+Status: implemented on branch, pending review/deploy. Frontend only — no backend, schema,
+migration or env change; no production data touched.
+
+- Symptom: Tax Profile fields (NPWP, NIB, Company legal name, …) accepted only one character
+  before losing focus. Root cause: `Field` was declared inside `BusinessAccountant`, so every
+  keystroke created a new component type and React remounted the `<input>`.
+- Fix: `Field` hoisted to module scope; `form` / `set` / `vstatus` passed as props.
+- NPWP/NIB/KPP/KBLI remain string identifiers (leading zeros, dots and dashes preserved).
+- Save behaviour unchanged and pre-existing: only `PERSISTED` fields are PUT to the backend;
+  fields labelled "· draft" are stored per business in localStorage.
+
 ## Login and Identity
 
 LIVE:
