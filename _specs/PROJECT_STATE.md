@@ -236,6 +236,12 @@ Status: implemented on branch, pending review/deploy. **No migrations, no env, n
   statuses `uploaded | needs_review | missing | not_required | optional`.
 - Manual correction always available (dropdown + Confirm) becoming `manually_confirmed`.
 - Intake metadata stored in the existing `extracted_json.ai_intake` — no schema change.
+- **P0 security fixes (2026-08-17)**: role-level document visibility now applied to both new
+  GETs (a manager no longer sees other users' file names/ids via intake or checklist); stale
+  workspace responses are aborted and ignored via a request guard with state cleared first;
+  requirements are jurisdiction-aware (Indonesian docs not required outside Indonesia,
+  optional+warned when country unknown); truncated document sets report `needs_review` instead
+  of a confident `missing`; unset employee status no longer claims "no employees".
 - NOT implemented: OCR/text extraction, AI classification from content, official validation,
   accountant review workflow, document expiry, Telegram upload routing (all Phase 2).
 - Known overlap: the legacy manual checkbox card "6 · Required Documents" on the same page is

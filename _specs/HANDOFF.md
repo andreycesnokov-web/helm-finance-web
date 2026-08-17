@@ -130,7 +130,14 @@ Last updated: 2026-07-04.
   `npm ci --dry-run` in sync at root and client; `node --check` OK; builds Personal
   OFF/ON exit 0; integration tests pass; secret scan clean.
 - NOTE: first Railway build after this will be slower (real `npm ci`, no cached tree).
-- Awaiting Codex review before promote. Nothing deployed.
+- **P0 security fixes applied (2026-08-17)**: existing Document Center visibility rule reused
+  on both intake GETs; request-guard against stale workspace responses (new
+  `client/src/lib/requestGuard.js`); jurisdiction-aware requirements; truncation blocks a
+  confident "missing"; unset employee status no longer overclaims. NEW
+  `tests/integration/documentIntakeSecurity.test.js` (16 endpoint/security tests) — 89 tests
+  pass overall. Real-storage E2E still needs a disposable-business smoke, and a MiMo/security
+  audit is required before deploy.
+- Awaiting Codex re-review before promote. Nothing deployed.
 
 ## Admin Cleanup & Reset Console Phase 1 Batch (2026-08-15, pending review)
 

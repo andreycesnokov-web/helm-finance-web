@@ -197,6 +197,18 @@ One upload window; CFO AI classifies and files. **No migration** — see the sto
   `extracted_json.ai_intake` (`doc_type`, `confidence`, `classification_status`,
   `confirmed_by_user_id`, `confirmed_at`), while `document_type` keeps a CHECK-valid value via
   `INTAKE_TYPES[].maps_to`. Writes go through the same audited `rpc_document_update_metadata`.
+- **Permission model (P0 fix):** the intake and checklist GETs reuse the Document Center rule
+  exactly — `canViewAllDocuments(role)` else
+  `docA.canAccessDocument({ role, userId, doc, ownedDebtIds })`, applied after `attachLinks`.
+  A restricted role never receives metadata for documents it cannot access. Manual correction
+  stays manage-role only and business-scoped (`loadDocumentScoped` ⇒ cross-business is 404).
+- Requirements are **jurisdiction-aware** via `jurisdictionOf(profile)` (`id|other|unknown`):
+  Indonesian documents are required only under the Indonesian regime, `not_required`
+  elsewhere, `optional` + warned when the country is unknown.
+- The loader fetches `INTAKE_DOC_CAP + 1` to detect truncation and returns `truncated`;
+  a truncated set downgrades `missing` to `needs_review`.
+- Frontend loads are protected by `client/src/lib/requestGuard.js` (generation + AbortController)
+  so a response from a previously active workspace can never be rendered.
 - Classification is deterministic: file name + MIME only. No OCR, no AI provider, no new env
   var. GET endpoints never write — auto-classification is derived on read; only a manual
   confirmation is persisted.
