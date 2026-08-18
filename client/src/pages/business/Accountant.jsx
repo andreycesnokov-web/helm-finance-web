@@ -3,13 +3,14 @@
 // New fields (not yet in schema — see migration 040 PROPOSAL) are LOCAL DRAFT until 040
 // is applied. Obligations come from /api/accountant/applicability (deterministic, no LLM).
 // No tax-calculation/logic change; no OCR/extraction/filing. Mobile-safe.
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { apiFetch } from '../../lib/api'
 import { useAuth } from '../../hooks/useAuth'
 import { useWorkspace } from '../../shell/WorkspaceProvider'
 import { PageHeader, Card, Btn, StatusBadge, Stat, ErrorState, LoadingSkeleton, Icon } from '../../shell/ui'
 import DocumentIntakeModal from '../../components/DocumentIntakeModal'
 import { createRequestGuard } from '../../lib/requestGuard'
+import { buildReadiness } from '../../lib/accountantReadiness'
 
 // Which UI fields persist to the backend today vs. live as local draft (await 040).
 const PERSISTED = new Set(['country', 'jurisdiction', 'legal_entity_type', 'npwp', 'pkp_status', 'vat_status', 'financial_year_start', 'financial_year_end', 'nib', 'employee_status'])
@@ -25,7 +26,6 @@ const VSTATES = {
   accountant_verified: { label: 'Accountant verified', tone: 'success' },
   conflict: { label: 'Conflict', tone: 'danger' },
 }
-const REQUIRED_DOCS = ['NPWP', 'NIB', 'PKP certificate', 'Akta', 'SK Kemenkumham', 'OSS / licenses', 'KBLI support documents', 'BPJS registration (if employees)']
 
 export function BusinessAccountant() {
   const { token } = useAuth()
@@ -34,9 +34,9 @@ export function BusinessAccountant() {
   const [error, setError] = useState(null)
   const [form, setForm] = useState({})
   const [obligations, setObligations] = useState({ applicable_rules: [], missing_profile_fields: [] })
-  const [docs, setDocs] = useState({})          // documents checklist (local placeholder)
   const [saving, setSaving] = useState(false)
-  const [readiness, setReadiness] = useState(null)
+  const [savedMissingFields, setSavedMissingFields] = useState([])
+  const [profileSaved, setProfileSaved] = useState(false)
   // Document intake (Phase 1): real checklist + classified inbox for the ACTIVE business.
   const [checklist, setChecklist] = useState(null)
   const [intake, setIntake] = useState(null)
@@ -114,21 +114,21 @@ export function BusinessAccountant() {
       // refresh obligations + build readiness summary
       const ap = await apiFetch('/accountant/applicability', token).catch(() => obligations)
       setObligations(ap)
-      const missingFields = (res?.completeness?.missing || ap.missing_profile_fields || [])
-      const missingDocs = REQUIRED_DOCS.filter(d => !docs[d])
-      const riskFlags = []
-      if (form.foreign_owned === 'yes' && form.pkp_status !== 'pkp_registered') riskFlags.push('Foreign-owned (PT PMA) without confirmed PKP status')
-      if (form.employee_status === 'has_employees' && !form.bpjs_registered) riskFlags.push('Has employees but BPJS not registered')
-      setReadiness({
-        obligations: (ap.applicable_rules || []).length,
-        missingDocs: missingDocs.length,
-        verificationGaps: missingFields.length,
-        riskFlags,
-        next: missingDocs.includes('NIB') || missingDocs.includes('PKP certificate')
-          ? 'Upload NIB and PKP certificate.' : (missingFields[0] ? `Complete ${missingFields[0].replace(/_/g, ' ')}.` : 'Request accountant verification.'),
-      })
+      setSavedMissingFields(res?.completeness?.missing || ap.missing_profile_fields || [])
+      setProfileSaved(true)
+      // The profile drives which documents are required — reload the checklist so the
+      // readiness card and the Compliance Documents card stay on the same answer.
+      loadIntake()
     } catch (e) { setError(e.message) } finally { setSaving(false) }
-  }, [form, docs, token, active, obligations])
+  }, [form, token, active, obligations, loadIntake])
+
+  // Readiness is DERIVED from the checklist payload, not from a second local list, so the
+  // card can never contradict Compliance Documents.
+  const readiness = useMemo(() => buildReadiness(checklist, {
+    form,
+    missingFields: savedMissingFields.length ? savedMissingFields : (obligations.missing_profile_fields || []),
+    obligations: (obligations.applicable_rules || []).length,
+  }), [checklist, form, savedMissingFields, obligations])
 
   // Shared props for <Field>. Field itself lives at MODULE scope (see bottom of file) so
   // its component identity is stable across renders — that is what keeps input focus.
@@ -143,14 +143,16 @@ export function BusinessAccountant() {
 
   return (
     <>{head}
-      {readiness && (
+      {!intakeLoading && (
         <Card title="AI Accountant readiness" action={<StatusBadge tone="warning">Needs accountant review</StatusBadge>} className="cfo-accountant-readiness" >
-          <div style={{ fontSize: 14, color: 'var(--text-secondary)', marginBottom: 14 }}>Profile saved. Preliminary assessment (not final tax advice):</div>
+          <div style={{ fontSize: 14, color: 'var(--text-secondary)', marginBottom: 14 }}>
+            {profileSaved ? 'Profile saved. ' : ''}Preliminary assessment (not final tax advice). Document counts come from the Compliance Documents checklist below:
+          </div>
           <div className="cfo-grid cfo-grid-4" style={{ marginBottom: 14 }}>
             <Stat k="Likely obligations" v={readiness.obligations} />
-            <Stat k="Missing documents" v={readiness.missingDocs} tone={readiness.missingDocs ? 'neg' : 'pos'} />
+            <Stat k="Missing documents" v={readiness.available ? readiness.missingDocs : '—'} tone={readiness.missingDocs ? 'neg' : 'pos'} />
+            <Stat k="Need confirmation" v={readiness.available ? readiness.needsConfirmation : '—'} tone={readiness.needsConfirmation ? 'neg' : 'pos'} />
             <Stat k="Verification gaps" v={readiness.verificationGaps} tone={readiness.verificationGaps ? 'neg' : 'pos'} />
-            <Stat k="Risk flags" v={readiness.riskFlags.length} tone={readiness.riskFlags.length ? 'neg' : 'pos'} />
           </div>
           {readiness.riskFlags.map((r, i) => <div key={i} style={{ fontSize: 13, color: 'var(--danger)', marginBottom: 4 }}>⚠ {r}</div>)}
           <div style={{ marginTop: 8, padding: 12, background: 'var(--info-soft)', borderRadius: 'var(--radius-md)', fontSize: 14 }}>
@@ -161,7 +163,7 @@ export function BusinessAccountant() {
 
       {error && <div style={{ color: 'var(--danger)', fontSize: 13, margin: '10px 0' }}>{error}</div>}
 
-      <div className="cfo-grid cfo-grid-2" style={{ marginTop: readiness ? 18 : 0 }}>
+      <div className="cfo-grid cfo-grid-2" style={{ marginTop: 18 }}>
         <Card title="1 · Basic Tax Profile">
           <div className="cfo-form2">
             <Field {...fp} label="Country" k="country" options={['Indonesia', 'Singapore', 'Other']} />
@@ -215,18 +217,6 @@ export function BusinessAccountant() {
           </div>
         </Card>
 
-        <Card title="6 · Required Documents" action={<StatusBadge tone="neutral">Document Center</StatusBadge>}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {REQUIRED_DOCS.map(d => (
-              <label key={d} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 14, cursor: 'pointer' }}>
-                <input type="checkbox" checked={!!docs[d]} onChange={e => setDocs(s => ({ ...s, [d]: e.target.checked }))} />
-                <Icon.doc width="15" height="15" /> {d}
-                <span style={{ marginLeft: 'auto' }}><StatusBadge tone={docs[d] ? 'success' : 'danger'}>{docs[d] ? 'Linked' : 'Missing'}</StatusBadge></span>
-              </label>
-            ))}
-            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>Linking uses the existing Document Center. OCR / extraction / filing are not part of V1.</div>
-          </div>
-        </Card>
       </div>
 
       {/* ── Document intake (Phase 1) ─────────────────────────────────────────

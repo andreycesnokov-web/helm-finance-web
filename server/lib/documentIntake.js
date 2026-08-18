@@ -46,7 +46,10 @@ const mapsTo = (t) => TYPE_BY_KEY[t]?.maps_to || 'other';
 const STRONG = [
   ['npwp',              [/\bnpwp\b/]],
   ['nib',               [/\bnib\b/, /nomor[\s_-]*induk[\s_-]*berusaha/]],
-  ['sk_kemenkumham',    [/kemenkumham/, /\bsk[\s_-]*kemenkum/, /ahu[\s_-]*ah/]],
+  // The ministry approval letter is often filed under its full title rather than "SK".
+  ['sk_kemenkumham',    [/kemenkumham/, /\bsk[\s_-]*kemenkum/, /ahu[\s_-]*ah/,
+                         /keputusan[\s_-]*menteri[\s_-]*hukum/, /pengesahan[\s_-]*pendirian/,
+                         /pengesahan[\s_-]*badan[\s_-]*hukum/]],
   ['akta',              [/\bakta\b/, /\bakte\b/, /notaris/, /deed[\s_-]*of[\s_-]*establishment/]],
   ['pkp_certificate',   [/\bpkp\b/, /pengukuhan[\s_-]*pkp/, /sppkp/]],
   ['oss_license',       [/\boss\b/, /izin[\s_-]*usaha/, /business[\s_-]*licen[cs]e/]],
