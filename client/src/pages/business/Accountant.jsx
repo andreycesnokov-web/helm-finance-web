@@ -295,7 +295,7 @@ export function BusinessAccountant() {
                     <span style={{ fontSize: 13.5, fontWeight: 600, display: 'block', overflow: 'hidden', textOverflow: 'ellipsis' }}>{d.file_name || '(unnamed file)'}</span>
                     <span style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>
                       {d.intake.confidence} confidence · routed to {d.routed_to.replace('_', ' ')}
-                      {d.intake.extraction?.text_available === false && ' · text could not be read'}
+                      {intake.content_classification_enabled && d.intake.extraction?.text_available === false && ' · text could not be read'}
                     </span>
                     {/* Why we think so — marker labels only, never document text. */}
                     {d.intake.explanation && (
@@ -325,7 +325,7 @@ export function BusinessAccountant() {
                     onClick={() => confirmType(d.id, d.intake.doc_type)}>
                     {confirming === d.id ? '…' : 'Confirm'}
                   </Btn>
-                  {d.intake.classification_status !== 'manually_confirmed' && (
+                  {intake.content_classification_enabled && d.intake.classification_status !== 'manually_confirmed' && (
                     <Btn sm variant="ghost" disabled={confirming === d.id} onClick={() => reclassify(d.id)}>
                       {confirming === d.id ? 'Reading…' : 'Re-read'}
                     </Btn>

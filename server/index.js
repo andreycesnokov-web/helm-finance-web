@@ -9572,11 +9572,19 @@ const INTAKE_DOC_CAP = 500;
 // PDF embedded text only: no OCR provider, no AI provider, no new env var. A scanned page
 // yields no text and simply degrades to the Phase 1 file-name verdict.
 // Returns the object stored at extracted_json.ai_intake.
+// Kill switch — DEFAULT OFF. Content extraction stays dark until a disposable Supabase +
+// browser smoke passes in production. Absent env var = OFF, so no Railway change is needed
+// to ship this safely; only an explicit "true"/"1" turns it on.
+const CONTENT_CLASSIFICATION_ENABLED =
+  /^(true|1|yes|on)$/i.test(String(process.env.DOCUMENT_CONTENT_CLASSIFICATION_ENABLED || ''));
+
 function classifyUploadedBytes(buf, { file_name, mime_type, company_name }) {
   const isPdf = /pdf/i.test(mime_type || '') || /\.pdf$/i.test(file_name || '');
-  const ex = isPdf && Buffer.isBuffer(buf)
+  const startedAt = Date.now();
+  const ex = (CONTENT_CLASSIFICATION_ENABLED && isPdf && Buffer.isBuffer(buf))
     ? extractPdfText(buf)
-    : { text: '', text_available: false, method: 'filename_only', reason: 'not_a_pdf' };
+    : { text: '', text_available: false, method: 'filename_only',
+        reason: CONTENT_CLASSIFICATION_ENABLED ? 'not_a_pdf' : 'content_classification_disabled' };
   const result = docContent.classifyDocument({
     file_name, mime_type, company_name,
     text: ex.text, text_available: ex.text_available, method: ex.method, extraction_reason: ex.reason,
@@ -9590,7 +9598,10 @@ function classifyUploadedBytes(buf, { file_name, mime_type, company_name }) {
     extraction: result.extraction,
     explanation: docContent.explain(result),
     classified_at: new Date().toISOString(),
-    classifier_version: 2,
+    // Bounded operational metadata — no internals, no document content.
+    extraction_ms: Date.now() - startedAt,
+    content_classification_enabled: CONTENT_CLASSIFICATION_ENABLED,
+    classifier_version: CONTENT_CLASSIFICATION_ENABLED ? 2 : 1,
   };
 }
 
@@ -9645,8 +9656,40 @@ async function loadIntakeDocuments(biz, userId) {
 }
 const publicIntakeDoc = ({ raw, ...rest }) => rest;   // never leak the raw row
 
-// Marker LABELS only. The stored sample (extraction.text_sample_safe) and any extracted text
-// stay server-side — the API never returns document content.
+// Marker LABELS only — our own vocabulary, never an excerpt of the document. Phase 2 stores
+// no document text at all, and this whitelist keeps any future field from leaking by default.
+// ── public serialisers for the GENERIC document endpoints ───────────────────
+// `financial_documents.extracted_json` is free-form and now also holds Phase 2 classification
+// metadata, so returning the column wholesale would leak extraction internals through
+// /api/documents. Both of these are WHITELISTS: a field that is not named here is not
+// returned, so future additions to extracted_json are private by default.
+const publicExtractedJson = (ej) => {
+  if (!ej || typeof ej !== 'object') return null;
+  const ai = ej.ai_intake;
+  return {
+    notes: typeof ej.notes === 'string' ? ej.notes : null,
+    ai_intake: ai ? {
+      doc_type: ai.doc_type ?? null,
+      confidence: ai.confidence ?? null,
+      classification_status: ai.classification_status ?? null,
+      matched_on: ai.matched_on ?? null,
+      explanation: ai.explanation ?? null,
+      confirmed_at: ai.confirmed_at ?? null,
+      signals: publicSignals(ai.signals),
+      extraction: ai.extraction
+        ? { text_available: !!ai.extraction.text_available, method: ai.extraction.method ?? null }
+        : null,
+    } : null,
+  };
+};
+const publicDocRow = (d) => (d ? { ...d, extracted_json: publicExtractedJson(d.extracted_json) } : d);
+// Storage paths are internal: a signed URL is issued through its own audited endpoint.
+const publicFileRow = (f) => {
+  if (!f) return null;
+  const { storage_path, ...rest } = f;
+  return rest;
+};
+
 const publicSignals = (s) => (s ? {
   filename_matches: s.filename_matches || [],
   text_matches: s.text_matches || [],
@@ -9674,7 +9717,11 @@ app.get('/api/ai-accountant/document-intake', auth, async (req, res) => {
       needs_review_count: docs.filter(d => d.intake.classification_status === 'needs_review').length,
       truncated,
       warnings: truncated ? [`Showing the ${INTAKE_DOC_CAP} most recent documents — older documents are not included.`] : [],
-      note: 'Preliminary classification from file name and type only — confirm each document.',
+      // Lets the UI tell the truth about what the classifier actually did.
+      content_classification_enabled: CONTENT_CLASSIFICATION_ENABLED,
+      note: CONTENT_CLASSIFICATION_ENABLED
+        ? 'Preliminary classification from the document text and file name — confirm each document.'
+        : 'Preliminary classification from file name and type only — confirm each document.',
     });
   } catch (e) {
     console.error(`[doc-intake] list failed: ${e.message}`);
@@ -9748,6 +9795,11 @@ app.post('/api/ai-accountant/documents/:id/reclassify', auth, async (req, res) =
     const biz = await requireBusiness(req, res); if (!biz) return;
     if (!canManageDocuments(biz.role)) return res.status(403).json({ error: 'Your role cannot edit documents' });
     if (!await hasDocumentsAccess(biz)) return res.status(403).json({ error: 'Document Center is not enabled', upgrade_required: true });
+    // Flag OFF: re-reading a document would do nothing but a pointless storage download.
+    // Say so plainly instead of pretending to have re-read it.
+    if (!CONTENT_CLASSIFICATION_ENABLED)
+      return res.status(503).json({ error: 'content_classification_disabled',
+        message: 'Reading document content is not enabled yet. Choose the document type manually.' });
     if (await blockIfStorageNotReady(res)) return;
 
     const doc = await loadDocumentScoped(biz, req.params.id);
@@ -9881,7 +9933,7 @@ app.get('/api/documents', auth, async (req, res) => {
         .select('id, file_name, mime_type, file_size, upload_channel').in('id', fileIds);
       for (const f of (files || [])) fileMap.set(f.id, f);
     }
-    let out = docs.map(d => ({ ...d, file: fileMap.get(d.file_id) || null }));
+    let out = docs.map(d => ({ ...publicDocRow(d), file: publicFileRow(fileMap.get(d.file_id)) || null }));
     out = await attachLinks(biz, out);
     // Restricted roles: keep only own uploads + docs linked to their own debts.
     if (!canViewAllDocuments(biz.role)) {
@@ -9906,7 +9958,7 @@ app.get('/api/documents/:id', auth, async (req, res) => {
     if (!await userCanAccessDoc(biz, req.user.userId, biz.role, withLinks))
       return res.status(403).json({ error: 'You do not have access to this document' });
     const { data: fileRows } = await supabase.from('document_files').select('*').eq('id', doc.file_id).limit(1);
-    res.json({ document: withLinks, file: fileRows?.[0] || null });
+    res.json({ document: publicDocRow(withLinks), file: publicFileRow(fileRows?.[0]) });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -10033,7 +10085,7 @@ app.post('/api/documents/upload-complete', auth, async (req, res) => {
       const r = await linkDocument(biz, doc, b.link.target_type, b.link.target_id, req.user.userId);
       link_result = r.ok ? { ok: true } : { ok: false, error: r.error };
     }
-    res.json({ document: doc, link_result });
+    res.json({ document: publicDocRow(doc), link_result });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -10087,7 +10139,7 @@ app.patch('/api/documents/:id', auth, async (req, res) => {
       if (/archived/i.test(error.message)) return res.status(409).json({ error: 'document_archived' });
       return res.status(500).json({ error: error.message });
     }
-    res.json({ document: data });
+    res.json({ document: publicDocRow(data) });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 

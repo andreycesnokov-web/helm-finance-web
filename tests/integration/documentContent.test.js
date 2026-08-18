@@ -141,11 +141,51 @@ test('a readable document whose text says nothing downgrades a filename-only ver
 });
 
 // ── privacy ──────────────────────────────────────────────────────────────────
-test('the stored sample is short and masks long digit runs', () => {
-  const secret = 'RAHASIA nomor 9876543210123 ' + 'x'.repeat(500);
-  const r = pdf('scan.pdf', 'NPWP ' + secret);
-  assert.ok(r.extraction.text_sample_safe.length <= 160);
-  assert.ok(!r.extraction.text_sample_safe.includes('9876543210123'), 'long digit runs must be masked');
+test('NO excerpt of the document is stored anywhere in the result', () => {
+  const secret = 'RAHASIA nomor 9876543210123 jalan merdeka 5 andrey@example.com';
+  const r = pdf('scan.pdf', 'NPWP NOMOR POKOK WAJIB PAJAK ' + secret);
+  const s = JSON.stringify(r);
+  assert.ok(!('text_sample_safe' in r.extraction), 'text_sample_safe must not exist');
+  for (const leak of ['RAHASIA', '9876543210123', 'jalan merdeka', 'andrey@example.com'])
+    assert.ok(!s.includes(leak), `leaked ${leak}`);
+  // Only the bounded metadata survives.
+  assert.deepStrictEqual(Object.keys(r.extraction).sort(), ['method', 'reason', 'text_available']);
+});
+
+// ── SK vs Akta: issuer identity is not a decision title ──────────────────────
+test('an akta that merely cites Kemenkumham and AHU is NOT auto-classified as SK', () => {
+  const r = pdf('doc.pdf', 'AKTA PENDIRIAN PERSEROAN TERBATAS di hadapan NOTARIS, ' +
+    'menyebut KEMENTERIAN HUKUM dan nomor AHU-0012345 sebagai referensi');
+  assert.notStrictEqual(r.confidence, 'high');
+  assert.strictEqual(r.classification_status, 'needs_review');
+  assert.strictEqual(r.doc_type, 'akta', 'a deed citing the ministry is still a deed');
+});
+
+test('issuer + AHU alone cannot reach high confidence for SK', () => {
+  const r = pdf('doc.pdf', 'dokumen menyebut KEMENTERIAN HUKUM KEMENKUMHAM MENTERI HUKUM dan AHU-0012345');
+  assert.strictEqual(r.doc_type, 'sk_kemenkumham');
+  assert.strictEqual(r.confidence, 'medium', 'no decision/approval title present');
+  assert.strictEqual(r.classification_status, 'needs_review');
+  assert.strictEqual(r.matched_on, 'content_without_title_marker');
+});
+
+test('equivalent issuer wordings count once, not three times', () => {
+  const r = pdf('doc.pdf', 'KEMENTERIAN HUKUM KEMENKUMHAM MENTERI HUKUM direktur jenderal administrasi hukum');
+  const issuer = r.signals.strong_matches.filter(m => /Kemenkumham/i.test(m));
+  assert.strictEqual(issuer.length, 1, 'grouped issuer markers must not double-count');
+});
+
+test('a clear SK decision title still reaches high even alongside deed wording', () => {
+  const r = pdf('doc.pdf', 'KEPUTUSAN MENTERI HUKUM PENGESAHAN PENDIRIAN BADAN HUKUM ' +
+    'berdasarkan AKTA PENDIRIAN yang dibuat NOTARIS');
+  assert.strictEqual(r.doc_type, 'sk_kemenkumham');
+  assert.strictEqual(r.confidence, 'high');
+});
+
+test('PERSEROAN TERBATAS alone decides nothing', () => {
+  const r = pdf('doc.pdf', 'dokumen ini hanya menyebut PERSEROAN TERBATAS dan republik indonesia');
+  assert.notStrictEqual(r.confidence, 'high');
+  assert.strictEqual(r.classification_status, 'needs_review');
 });
 
 test('signals carry marker labels, never raw document text', () => {

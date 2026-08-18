@@ -18,19 +18,29 @@ const { classify: classifyFilename } = require('./documentIntake');
 // WEAK = supporting vocabulary that alone means little (e.g. "PERSEROAN TERBATAS" appears on
 // both an akta and an SK, so it can never be strong for either).
 const CONTENT_RULES = {
+  // An SK is a MINISTERIAL DECISION. An akta (a notarial deed) routinely names the same
+  // ministry and quotes the AHU number, so issuer identity alone can never make it an SK:
+  // `decision` markers are the ones that identify the document, and `issuer`/`identifier`
+  // markers only corroborate. Equivalent issuer wordings are grouped so they cannot
+  // double-count as two independent pieces of evidence.
   sk_kemenkumham: {
-    strong: [
+    decision: [
       [/keputusan\s+menteri\s+hukum/, 'KEPUTUSAN MENTERI HUKUM'],
       [/pengesahan\s+pendirian\s+badan\s+hukum/, 'PENGESAHAN PENDIRIAN BADAN HUKUM'],
       [/pengesahan\s+badan\s+hukum/, 'PENGESAHAN BADAN HUKUM'],
-      [/kementerian\s+hukum/, 'KEMENTERIAN HUKUM'],
-      [/\bahu\s*-\s*\d/, 'AHU- reference number'],
-      [/kemenkumham/, 'KEMENKUMHAM'],
+      [/surat\s+keputusan\s+menteri/, 'SURAT KEPUTUSAN MENTERI'],
+      [/menetapkan\s*:?\s*pengesahan/, 'MENETAPKAN: PENGESAHAN'],
     ],
+    // Grouped: any one of these proves "the ministry is involved", once.
+    groups: [
+      [[/kementerian\s+hukum/, /kemenkumham/, /menteri\s+hukum/, /direktur\s+jenderal\s+administrasi\s+hukum/],
+       'Ministry of Law (Kemenkumham) issuer'],
+      [[/\bahu\s*-\s*\d/, /ahu[\s_.-]*ah\.?\d/], 'AHU reference number'],
+    ],
+    strong: [],
     weak: [
       [/perseroan\s+terbatas/, 'PERSEROAN TERBATAS'],
       [/republik\s+indonesia/, 'REPUBLIK INDONESIA'],
-      [/direktur\s+jenderal\s+administrasi\s+hukum/, 'Direktorat Jenderal AHU'],
     ],
   },
   akta: {
@@ -145,17 +155,37 @@ const STRONG_MIN_FOR_HIGH = 2;   // one marker is never enough to auto-classify
 const norm = (t) => String(t || '').toLowerCase().replace(/\s+/g, ' ');
 
 // Score every type against the text. Returns ranked candidates.
+//
+// `strong` markers each count once. `groups` collapse equivalent wordings (several ways of
+// naming the same issuer) into a SINGLE piece of evidence. `decision` markers are strong AND
+// mark the candidate as title-identified — a type that declares `decision` markers cannot
+// reach high confidence without one, which is what stops an akta quoting the ministry and the
+// AHU number from being auto-classified as an SK.
 function scoreContent(text) {
   const t = norm(text);
   if (!t) return [];
   const out = [];
   for (const [type, rules] of Object.entries(CONTENT_RULES)) {
-    const strong = rules.strong.filter(([re]) => re.test(t)).map(([, label]) => label);
-    const weak = rules.weak.filter(([re]) => re.test(t)).map(([, label]) => label);
+    const decision = (rules.decision || []).filter(([re]) => re.test(t)).map(([, label]) => label);
+    const plain = (rules.strong || []).filter(([re]) => re.test(t)).map(([, label]) => label);
+    const grouped = (rules.groups || [])
+      .filter(([res]) => res.some(re => re.test(t)))
+      .map(([, label]) => label);
+    const strong = [...decision, ...plain, ...grouped];
+    const weak = (rules.weak || []).filter(([re]) => re.test(t)).map(([, label]) => label);
     if (!strong.length && !weak.length) continue;
-    out.push({ type, strong, weak, score: strong.length * 10 + weak.length });
+    out.push({
+      type, strong, weak,
+      decision,
+      // A type that defines decision markers REQUIRES one to be title-identified.
+      requires_decision: !!(rules.decision || []).length,
+      score: strong.length * 10 + weak.length,
+    });
   }
-  return out.sort((a, b) => b.score - a.score);
+  // Rank by evidence, but on a tie prefer the candidate whose own title identifies it: a deed
+  // that merely cites the ministry should rank as a deed, not as a ministerial decision.
+  const titled = (c) => (!c.requires_decision || c.decision.length >= 1 ? 1 : 0);
+  return out.sort((a, b) => (b.score - a.score) || (titled(b) - titled(a)));
 }
 
 // Look for the company name in the text — a supporting signal, never decisive.
@@ -166,11 +196,10 @@ function companyNameMatch(text, companyName) {
   return norm(text).includes(needle) ? name : null;
 }
 
-// A short, sanitised sample for the "why" line. Never the whole document, never numbers that
-// could be an identifier: digit runs of 4+ are masked.
-function safeSample(text, max = 160) {
-  return norm(text).slice(0, max).replace(/\d{4,}/g, '####').trim();
-}
+// NOTE: Phase 2 deliberately stores NO excerpt of the document text. An earlier revision kept
+// a masked 160-char sample; review found that masking cannot be trusted (names, addresses,
+// emails and identifiers survive it) and that any stored excerpt can leak through a generic
+// document endpoint. Only marker LABELS — our own vocabulary — are ever stored or returned.
 
 /**
  * Layered classification: filename/MIME (Phase 1) + document content (Phase 2).
@@ -193,7 +222,6 @@ function classifyDocument({ file_name, mime_type, text = '', text_available = fa
     text_available: !!text_available,
     method: text_available ? method : 'filename_only',
     reason: text_available ? null : extraction_reason,
-    text_sample_safe: text_available ? safeSample(text) : null,
   };
 
   // ── no usable text → Phase 1 result, unchanged ────────────────────────────
@@ -228,9 +256,15 @@ function classifyDocument({ file_name, mime_type, text = '', text_available = fa
   // A close second candidate means the markers do not point at one type.
   const ambiguous = !!runnerUp && runnerUp.score >= best.score;
 
+  // A type whose identity comes from a decision/approval title needs that title to auto-
+  // classify. Issuer + identifier alone (which an akta also carries) is at most medium.
+  const titleIdentified = !best.requires_decision || best.decision.length >= 1;
+
   let confidence, matched_on;
   if (ambiguous) {
     confidence = 'low'; matched_on = 'content_ambiguous';
+  } else if (!titleIdentified) {
+    confidence = 'medium'; matched_on = 'content_without_title_marker';
   } else if (best.strong.length >= STRONG_MIN_FOR_HIGH || (best.strong.length >= 1 && agrees)) {
     // Two independent strong markers, or one strong marker corroborated by the file name.
     confidence = 'high'; matched_on = agrees ? 'content_and_file_name' : 'content';
@@ -277,4 +311,4 @@ function explain(result) {
   return 'No clear signal found — please choose the document type.';
 }
 
-module.exports = { classifyDocument, scoreContent, explain, safeSample, CONTENT_RULES, STRONG_MIN_FOR_HIGH };
+module.exports = { classifyDocument, scoreContent, explain, CONTENT_RULES, STRONG_MIN_FOR_HIGH };

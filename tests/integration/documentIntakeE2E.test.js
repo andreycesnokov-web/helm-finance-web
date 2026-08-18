@@ -184,6 +184,8 @@ function startApp() {
         SUPABASE_URL: `http://127.0.0.1:${DB_PORT}`, SUPABASE_SECRET_KEY: 'x',
         BOT_TOKEN: 'x:x', JWT_SECRET: SECRET, PORT: String(APP_PORT), NODE_ENV: 'production',
         DOCUMENTS_BUCKET: BUCKET,
+        // This suite exercises Phase 2, so it turns the default-OFF flag ON explicitly.
+        DOCUMENT_CONTENT_CLASSIFICATION_ENABLED: 'true',
       },
       stdio: ['ignore', 'ignore', 'ignore'],
     });
@@ -493,4 +495,26 @@ test('H7. a restricted role still sees none of the content-classified documents'
   assert.strictEqual(manager.status, 200);
   assert.strictEqual(manager.body.documents.length, 0);
   assert.ok(!JSON.stringify(manager.body).includes(contentDocId));
+});
+
+test('H8. the generic /api/documents endpoints do not leak extraction internals', async () => {
+  const list = await call('GET', '/api/documents', { userId: OWNER, businessId: BIZ_A });
+  assert.strictEqual(list.status, 200, JSON.stringify(list.body));
+  const s = JSON.stringify(list.body);
+  assert.ok(!s.includes(SECRET_PHRASE), 'document text must not appear in /api/documents');
+  assert.ok(!s.includes('text_sample_safe'));
+  assert.ok(!s.includes('storage_path'), 'storage paths are internal');
+  // extracted_json is whitelisted, not passed through wholesale.
+  const doc = list.body.documents.find(d => d.id === contentDocId);
+  assert.ok(doc, 'the document is listed');
+  if (doc.extracted_json) {
+    assert.deepStrictEqual(Object.keys(doc.extracted_json).sort(), ['ai_intake', 'notes']);
+    assert.ok(!('classified_at' in (doc.extracted_json.ai_intake || {})), 'internals stay private');
+    assert.ok(!('extraction_ms' in (doc.extracted_json.ai_intake || {})));
+  }
+
+  const detail = await call('GET', `/api/documents/${contentDocId}`, { userId: OWNER, businessId: BIZ_A });
+  assert.strictEqual(detail.status, 200);
+  const d = JSON.stringify(detail.body);
+  assert.ok(!d.includes(SECRET_PHRASE) && !d.includes('text_sample_safe') && !d.includes('storage_path'));
 });
