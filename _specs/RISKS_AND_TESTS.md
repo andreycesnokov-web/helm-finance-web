@@ -572,44 +572,72 @@ Docs-only:
 
 ## Document Intelligence Phase 2 — content-based classification (2026-08-18)
 
-**What changed.** Classification was file name + MIME only (Phase 1). It now also reads the
-text a PDF already carries and matches Indonesian document markers.
+**Status: FEATURE-FLAGGED, DEFAULT OFF.** `DOCUMENT_CONTENT_CLASSIFICATION_ENABLED` is unset in
+production, so deployed behaviour is Phase 1 (file name + MIME) exactly. No Railway/env change
+is needed to ship it dark. Turning it on requires a **disposable Supabase + browser smoke**
+first (a real text PDF, a scanned PDF, and a large PDF into a throwaway business).
+
+**What it does when ON.** Reads the text a PDF already carries and matches Indonesian document
+markers, combined with the file-name signal. **Not OCR** — a scanned page has no text layer and
+degrades to the file-name verdict.
 
 **Confidence model — no certainty is ever claimed.**
 | Level | Meaning | Status |
 |---|---|---|
-| high | 2+ strong markers, or 1 strong marker the file name agrees with | `auto_classified` |
-| medium | 1 strong marker alone, or a file-name verdict the readable text did not corroborate, or a file-name/content conflict | `needs_review` |
+| high | 2+ strong markers, or 1 strong marker the file name agrees with — and, for types identified by a decision title, that title must be present | `auto_classified` |
+| medium | 1 strong marker alone; issuer/identifier without the decision title; readable text that did not corroborate the file name; a file-name/content conflict | `needs_review` |
 | low | weak wording only, or two candidates tied | `needs_review` |
 | unknown | no usable text and no file-name signal | `needs_review` |
 
-No percentage is produced. Nothing asserts a document is officially valid — a marker match
-says "this looks like an SK Kemenkumham letter". Manual confirmation always remains available
-and always wins; `reclassify` refuses to overwrite a manually confirmed type (409).
+No percentage is produced; nothing asserts a document is officially valid. Manual confirmation
+always exists and always wins (`reclassify` returns 409 on a manually confirmed document).
 
-**Privacy.** Extracted text stays server-side. The API returns marker LABELS, a
-one-sentence explanation built from those labels, and `extraction.{text_available, method}`.
-The stored `text_sample_safe` (160 chars, digit runs of 4+ masked) is never returned and never
-logged. Asserted by test with a phrase planted in the document and checked absent from
-responses.
+**SK vs Akta ambiguity (hardened after review).** An akta routinely names the ministry and
+quotes the AHU number, so issuer identity alone can no longer make a document an SK:
+- equivalent issuer wordings (KEMENTERIAN HUKUM / KEMENKUMHAM / MENTERI HUKUM / Dirjen AHU) are
+  **grouped** and count as ONE piece of evidence, not three; AHU reference forms likewise;
+- SK requires a **decision/approval title** (KEPUTUSAN MENTERI HUKUM, PENGESAHAN PENDIRIAN
+  BADAN HUKUM, PENGESAHAN BADAN HUKUM, SURAT KEPUTUSAN MENTERI) to reach high confidence —
+  issuer + AHU alone is capped at medium/needs_review;
+- on a tie, a candidate identified by its own title outranks one that is merely cited, so a
+  deed quoting the ministry ranks as a deed;
+- PERSEROAN TERBATAS stays weak for both and can never decide alone.
 
-**Known limits (owner decisions needed, NOT implemented):**
-- **OCR for scanned images / photos.** A WhatsApp photo or a scanned page has no text layer,
-  so it still lands in needs_review. Options: (a) accept it, (b) add a local OCR dependency
-  (e.g. tesseract — build weight, quality uncertain on Indonesian government forms),
-  (c) use the EXISTING Anthropic SDK + `ANTHROPIC_API_KEY` (already in the repo and used for
-  Telegram receipt recognition) to read the document — no new provider or env var, but it
-  sends document content to an external API and costs per document. **Not enabled in this
-  task; needs explicit approval.**
-- The PDF text extractor is hand-rolled (no PDF dependency was approved). It handles
-  Flate-compressed and plain content streams and rejects illegible output, but PDFs with
-  custom font encodings will decode to garbage and are correctly reported as "text not
-  legible" rather than misclassified.
-- Marker rules are Indonesian-specific; other jurisdictions rely on file names.
+**Decompression bounds (zip-bomb defence).** The extractor inflates attacker-supplied streams,
+so: per-stream output cap 4 MB (enforced via zlib `maxOutputLength`, so the buffer is never
+allocated), cumulative cap 24 MB, expansion-ratio cap 200x, and a 2 s wall-clock guard over the
+whole parse. Breaching any of them aborts the WHOLE extraction with
+`reason: 'decompression_limit_exceeded'` and `text_available: false`; classification falls back
+to the file name and **the upload still succeeds**. A malformed stream is skipped, not fatal.
 
-**Tests:** `tests/integration/documentContent.test.js` (21) — every required Indonesian rule,
-the confidence ladder, the filename/content conflict, no-text degradation, sample masking, PDF
-extraction incl. empty/non-PDF/scanned-image fail-closed. `documentIntakeE2E.test.js` H1–H7 —
-generic-name PDF classified from content end to end through real upload, no document text in
-any response, checklist satisfaction, reclassify auth/scope/role/manual-confirmation guards.
+**No document text is stored or returned.** The earlier `text_sample_safe` excerpt was
+**removed entirely** — masking cannot be trusted (names, addresses, emails survive it) and any
+stored excerpt can leak through a generic endpoint. Only marker LABELS (our own vocabulary), a
+one-sentence explanation built from them, and `extraction.{text_available, method}` survive.
 
+**Generic document endpoints are whitelisted.** `/api/documents` and `/api/documents/:id`
+previously returned `extracted_json` wholesale and the full `document_files` row.
+`publicExtractedJson()` and `publicFileRow()` now whitelist fields — `storage_path`,
+`classified_at`, `extraction_ms` and anything added to `extracted_json` later are private by
+default.
+
+**Tests:** `documentContent.test.js` (26) — Indonesian rules, confidence ladder,
+filename/content conflict, SK-vs-akta ambiguity, grouped issuer markers, no stored excerpt.
+`documentContentSafety.test.js` (8) — single-stream bomb, cumulative cap, ratio cap, oversized
+uncompressed stream, malformed stream, normal PDF still extracts, fail-closed degradation to
+Phase 1, no text on any failure path. `documentContentFlag.test.js` (6) — default OFF,
+upload-complete does not read content, Phase 1 classification preserved, reclassify 503 with
+zero writes, auth/personal guards, manual confirmation still works.
+`documentIntakeE2E.test.js` H1-H8 (23) — content classification end to end with the flag ON, a
+planted secret phrase absent from every response, checklist satisfaction, reclassify
+auth/scope/role/manual-confirmation guards, generic document endpoints sanitised.
+
+**Remaining risks:**
+- Extraction still runs synchronously inside `upload-complete`. It is bounded (~2 s worst case
+  and it never fails the upload) but is not isolated in a worker — worker isolation was judged
+  too large for a security pass. The flag stays OFF until the real-storage smoke.
+- The extractor is hand-rolled (no PDF dependency approved). PDFs with custom font encodings
+  decode to garbage and are reported as unreadable rather than misclassified.
+- OCR for scanned images is NOT implemented; options (accept / local OCR / the existing
+  Anthropic SDK) still need an owner decision.
+- Marker rules are Indonesia-specific; other jurisdictions rely on file names.

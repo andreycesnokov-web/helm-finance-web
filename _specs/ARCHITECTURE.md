@@ -209,6 +209,9 @@ One upload window; CFO AI classifies and files. **No migration** — see the sto
   a truncated set downgrades `missing` to `needs_review`.
 - Frontend loads are protected by `client/src/lib/requestGuard.js` (generation + AbortController)
   so a response from a previously active workspace can never be rendered.
+- Phase 2 sits behind the default-OFF backend flag `DOCUMENT_CONTENT_CLASSIFICATION_ENABLED`;
+  unset means the pipeline is Phase 1 only. Generic document responses pass through the
+  `publicExtractedJson()` / `publicFileRow()` whitelists.
 - **Phase 2 (content-based classification, 2026-08-18)** — `server/lib/pdfText.js` extracts
   text a PDF already carries (dependency-free zlib inflate of content streams; bounded work;
   garbage/illegible output rejected). `server/lib/documentContent.js` scores that text against

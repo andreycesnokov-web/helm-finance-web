@@ -242,6 +242,10 @@ Status: implemented on branch, pending review/deploy. **No migrations, no env, n
   requirements are jurisdiction-aware (Indonesian docs not required outside Indonesia,
   optional+warned when country unknown); truncated document sets report `needs_review` instead
   of a confident `missing`; unset employee status no longer claims "no employees".
+- Phase 2 is **feature-flagged default OFF** (`DOCUMENT_CONTENT_CLASSIFICATION_ENABLED`);
+  production behaviour stays Phase 1 until a disposable Supabase + browser smoke passes.
+  Hardened after review: decompression caps, no stored text excerpt, whitelisted document APIs,
+  and SK now requires a decision title so an akta citing Kemenkumham/AHU is not read as an SK.
 - **Document Intelligence Phase 2 (2026-08-18, on branch)**: classification now reads PDF
   embedded text, so a document named `scan.pdf` containing "KEPUTUSAN MENTERI HUKUM" and
   "PENGESAHAN PENDIRIAN BADAN HUKUM" is identified as SK Kemenkumham. Confidence model is
