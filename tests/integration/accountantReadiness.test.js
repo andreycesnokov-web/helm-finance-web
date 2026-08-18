@@ -148,3 +148,113 @@ test('profile gaps are surfaced only once the documents are handled', () => {
   assert.match(r.next, /complete financial year start in the profile/i);
   assert.strictEqual(r.verificationGaps, 1);
 });
+
+// ── Workbench pending actions (same payload as the Compliance Documents checklist) ──
+// Regression: the Workbench rendered a hardcoded "NPWP, NIB, PKP certificate" line, so it kept
+// asking for documents the checklist already showed as uploaded.
+let buildDocumentActions;
+test.before(async () => { ({ buildDocumentActions } = await import(MOD)); });
+
+const labelsOf = (r) => r.actions.map(a => a.label).join(' | ');
+
+test('uploaded NPWP and NIB produce no upload action', () => {
+  const items = [
+    item('npwp', 'NPWP', 'required', 'uploaded'),
+    item('nib', 'NIB', 'required', 'uploaded'),
+    item('akta', 'Akta / Deed', 'required', 'uploaded'),
+    item('sk_kemenkumham', 'SK Kemenkumham approval', 'required', 'uploaded'),
+  ];
+  const r = buildDocumentActions(checklist(items), { form: { npwp: '01.234', nib: '9123' } });
+  assert.strictEqual(r.available, true);
+  assert.strictEqual(r.actions.length, 0, labelsOf(r));
+  assert.ok(!/Upload NPWP|Upload NIB/i.test(labelsOf(r)));
+});
+
+test('the hardcoded NPWP/NIB/PKP wording can never be produced', () => {
+  const items = [item('npwp', 'NPWP', 'required', 'uploaded'), item('nib', 'NIB', 'required', 'uploaded')];
+  const r = buildDocumentActions(checklist(items), { form: { npwp: '1', nib: '2' } });
+  assert.ok(!JSON.stringify(r).includes('NPWP, NIB, PKP certificate'));
+});
+
+test('NIB uploaded but the NIB number is empty → an "enter number" action, not an upload', () => {
+  const items = [item('nib', 'NIB', 'required', 'uploaded')];
+  const r = buildDocumentActions(checklist(items), { form: { nib: '' } });
+  assert.strictEqual(r.actions.length, 1);
+  assert.strictEqual(r.actions[0].type, 'number');
+  assert.match(r.actions[0].label, /Enter your NIB number/i);
+});
+
+test('a missing PKP certificate produces an upload action', () => {
+  const items = [
+    item('npwp', 'NPWP', 'required', 'uploaded'),
+    item('pkp_certificate', 'PKP certificate', 'required', 'missing'),
+  ];
+  const r = buildDocumentActions(checklist(items), { form: { npwp: '1' } });
+  assert.strictEqual(r.actions.length, 1);
+  assert.strictEqual(r.actions[0].type, 'upload');
+  assert.match(r.actions[0].label, /Upload PKP certificate/i);
+});
+
+test('declared employees with no payroll/BPJS produce upload actions', () => {
+  const items = [
+    item('payroll_document', 'Payroll document', 'conditional_required', 'missing'),
+    item('bpjs_document', 'BPJS document', 'conditional_required', 'missing'),
+  ];
+  const r = buildDocumentActions(checklist(items), { form: { employee_status: 'has_employees' } });
+  assert.strictEqual(r.actions.length, 2);
+  assert.ok(r.actions.every(a => a.type === 'upload'));
+  assert.match(labelsOf(r), /Payroll document/);
+  assert.match(labelsOf(r), /BPJS document/);
+});
+
+test('a needs_review document produces a confirm action, not an upload', () => {
+  const items = [item('akta', 'Akta / Deed', 'required', 'needs_review')];
+  const r = buildDocumentActions(checklist(items), { form: {} });
+  assert.strictEqual(r.actions.length, 1);
+  assert.strictEqual(r.actions[0].type, 'confirm');
+  assert.match(r.actions[0].label, /Confirm document type/i);
+  assert.ok(!/Upload/i.test(labelsOf(r)));
+});
+
+test('optional and not_required documents never produce an action', () => {
+  const items = [
+    item('oss_license', 'OSS / business licence', 'optional', 'optional'),
+    item('npwp', 'NPWP', 'not_required', 'not_required'),
+    item('nib', 'NIB', 'not_required', 'uploaded'),          // uploaded, number blank, not required
+    item('kpp_registration', 'KPP registration', 'optional', 'missing'),
+  ];
+  const r = buildDocumentActions(checklist(items, { jurisdiction: 'other' }), { form: { nib: '' } });
+  assert.strictEqual(r.actions.length, 0, labelsOf(r));
+});
+
+test('no checklist → no invented document actions', () => {
+  const r = buildDocumentActions(null, { form: {} });
+  assert.strictEqual(r.available, false);
+  assert.strictEqual(r.actions.length, 0);
+  assert.strictEqual(r.reason, 'unavailable');
+});
+
+test('a truncated checklist produces no confident upload actions', () => {
+  const items = [item('npwp', 'NPWP', 'required', 'needs_review')];
+  const r = buildDocumentActions(checklist(items, { truncated: true }), { form: {} });
+  assert.strictEqual(r.available, false);
+  assert.strictEqual(r.actions.length, 0);
+  assert.strictEqual(r.reason, 'truncated');
+});
+
+test('the Workbench actions agree with the readiness summary on the same payload', () => {
+  const items = [
+    item('npwp', 'NPWP', 'required', 'uploaded'),
+    item('nib', 'NIB', 'required', 'uploaded'),
+    item('pkp_certificate', 'PKP certificate', 'required', 'missing'),
+  ];
+  const form = { npwp: '01.234', nib: '' };
+  const actions = buildDocumentActions(checklist(items), { form });
+  const readiness = buildReadiness(checklist(items), { form });
+  assert.strictEqual(actions.actions.filter(a => a.type === 'upload').length, readiness.missingDocs);
+  assert.match(readiness.next, /Upload PKP certificate/i);
+  assert.match(labelsOf(actions), /Upload PKP certificate/i);
+  // Both surfaces ask for the NIB number, neither asks to upload NIB again.
+  assert.match(labelsOf(actions), /Enter your NIB number/i);
+  assert.match(readiness.next, /enter your NIB number/i);
+});

@@ -7,13 +7,15 @@
 // payables/receivables presence). Everything the tax engine doesn't provide yet is
 // explicitly labelled "preview / engine not connected" — never fake numbers.
 // No backend, no migrations. Frontend + existing endpoints only.
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { apiFetch } from '../../lib/api'
 import { useAuth } from '../../hooks/useAuth'
 import { useWorkspace } from '../../shell/WorkspaceProvider'
 import { PageHeader, Card, Btn, StatusBadge, Stat, DataList, LoadingSkeleton, Icon, PageTabs, EmptyState } from '../../shell/ui'
 import { BusinessAccountant } from './Accountant'
+import { buildDocumentActions } from '../../lib/accountantReadiness'
+import { createRequestGuard } from '../../lib/requestGuard'
 
 const PREMIUM = import.meta.env.VITE_AI_ACCOUNTANT_PREMIUM === 'true'
 const SYMBOL = '/brand/symbol_navy_blue_dot_transparent.svg'
@@ -55,18 +57,29 @@ function PremiumAccountant() {
   const { active, scopeKey } = useWorkspace()
   const navigate = useNavigate()
   const [tab, setTab] = useState('workbench')
-  const [state, setState] = useState({ loading: true, applicability: null, profile: null, pulse: null, obligations: null })
+  const EMPTY = { loading: true, applicability: null, profile: null, pulse: null, obligations: null, checklist: null }
+  const [state, setState] = useState(EMPTY)
+  // Ignores a response from a workspace the user has already switched away from.
+  const guard = useRef(createRequestGuard())
 
   useEffect(() => {
+    // Clear FIRST so business A's pending actions can never render under business B.
+    setState(EMPTY)
     if (!token || !active) return
-    let on = true
+    const req = guard.current.start()
+    const opts = { signal: req.signal }
     Promise.all([
-      apiFetch('/accountant/applicability', token).catch(() => null),
-      apiFetch('/accountant/profile', token).catch(() => null),
-      apiFetch('/pulse', token).catch(() => null),
-      apiFetch('/accountant/obligations', token).catch(() => null),
-    ]).then(([applicability, profile, pulse, obligations]) => on && setState({ loading: false, applicability, profile: profile?.profile || null, pulse, obligations }))
-    return () => { on = false }
+      apiFetch('/accountant/applicability', token, opts).catch(() => null),
+      apiFetch('/accountant/profile', token, opts).catch(() => null),
+      apiFetch('/pulse', token, opts).catch(() => null),
+      apiFetch('/accountant/obligations', token, opts).catch(() => null),
+      // Same source of truth as the Compliance Documents checklist.
+      apiFetch('/ai-accountant/required-documents', token, opts).catch(() => null),
+    ]).then(([applicability, profile, pulse, obligations, checklist]) => {
+      if (req.isStale()) return
+      setState({ loading: false, applicability, profile: profile?.profile || null, pulse, obligations, checklist })
+    })
+    return () => guard.current.abort()
   }, [token, active?.id, scopeKey])
 
   const head = (
@@ -120,9 +133,31 @@ function Workbench({ state, setTab, navigate }) {
   const reserve = Number(state.obligations?.reserve?.amount || 0)
   const reserveLines = (state.obligations?.reserve?.lines || []).length
 
+  // Document actions come from the SAME payload the Compliance Documents checklist renders —
+  // never from a hardcoded list, which is how the Workbench used to ask for an already
+  // uploaded NPWP/NIB. Everything routes to Tax Profile, where the checklist and the upload
+  // window live, rather than to the generic Document Center.
+  const docActions = buildDocumentActions(state.checklist, { form: state.profile || {} })
+  const goDocs = () => setTab('profile')
+
   const actions = []
   if (missing.length) actions.push({ id: 'profile', label: 'Complete your tax profile', sub: `${missing.length} field${missing.length > 1 ? 's' : ''} missing — obligations depend on it`, cta: 'Complete', go: () => setTab('profile') })
-  actions.push({ id: 'docs', label: 'Link compliance documents', sub: 'NPWP, NIB, PKP certificate — via Document Center', cta: 'Open', go: () => navigate('/business/documents') })
+  for (const a of docActions.actions) {
+    actions.push({ id: a.id, label: a.label, sub: a.sub,
+      cta: a.type === 'upload' ? 'Upload' : a.type === 'confirm' ? 'Confirm' : 'Enter', go: goDocs })
+  }
+  if (docActions.available && !docActions.actions.length) {
+    actions.push({ id: 'docs-ok', label: 'Required documents are in place',
+      sub: 'Preliminary — the checklist reflects your profile and the documents you uploaded, not an official validation',
+      cta: 'Review', go: goDocs })
+  }
+  if (!docActions.available) {
+    actions.push({ id: 'docs-unknown', label: 'Complete compliance documents',
+      sub: docActions.reason === 'truncated'
+        ? 'Too many documents to check at once — open the checklist to review them'
+        : 'Open the Compliance Documents checklist to see what is still needed',
+      cta: 'Open', go: goDocs })
+  }
 
   return (
     <>
