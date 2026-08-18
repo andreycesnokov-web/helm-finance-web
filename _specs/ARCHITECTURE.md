@@ -209,6 +209,22 @@ One upload window; CFO AI classifies and files. **No migration** — see the sto
   a truncated set downgrades `missing` to `needs_review`.
 - Frontend loads are protected by `client/src/lib/requestGuard.js` (generation + AbortController)
   so a response from a previously active workspace can never be rendered.
+- Phase 2 sits behind the default-OFF backend flag `DOCUMENT_CONTENT_CLASSIFICATION_ENABLED`;
+  unset means the pipeline is Phase 1 only. Generic document responses pass through the
+  `publicExtractedJson()` / `publicFileRow()` whitelists.
+- **Phase 2 (content-based classification, 2026-08-18)** — `server/lib/pdfText.js` extracts
+  text a PDF already carries (dependency-free zlib inflate of content streams; bounded work;
+  garbage/illegible output rejected). `server/lib/documentContent.js` scores that text against
+  Indonesian document markers and combines it with the Phase 1 file-name signal.
+  It is NOT OCR: a scanned page has no embedded text and degrades to the file-name verdict.
+  No OCR provider, no AI provider, no new env var, no migration — the result is stored in the
+  existing free-form `extracted_json.ai_intake` (`signals`, `extraction`, `explanation`,
+  `classifier_version: 2`).
+  Classification runs inside `upload-complete` on the bytes already verified there (no second
+  storage read) and can be re-run per document via
+  `POST /api/ai-accountant/documents/:id/reclassify` (manage role, business-scoped, refuses to
+  overwrite a manually confirmed type). Responses carry marker LABELS only — the extracted
+  text and the stored sample never leave the server.
 - Classification is deterministic: file name + MIME only. No OCR, no AI provider, no new env
   var. GET endpoints never write — auto-classification is derived on read; only a manual
   confirmation is persisted.

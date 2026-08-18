@@ -137,6 +137,14 @@ Last updated: 2026-07-04.
   `tests/integration/documentIntakeSecurity.test.js` (16 endpoint/security tests) — 89 tests
   pass overall. Real-storage E2E still needs a disposable-business smoke, and a MiMo/security
   audit is required before deploy.
+- Phase 2 ships **dark**: `DOCUMENT_CONTENT_CLASSIFICATION_ENABLED` defaults to OFF, so no env
+  change is needed to deploy and nothing changes until it is switched on after the smoke.
+- **Document Intelligence Phase 2 (2026-08-18, branch `feature/doc-content-classification`)**:
+  content-based classification from PDF embedded text. New `server/lib/pdfText.js` and
+  `server/lib/documentContent.js`; classification runs in `upload-complete`; new
+  `POST /api/ai-accountant/documents/:id/reclassify`. No migration, no env, no OCR/AI provider.
+  180 tests pass. OCR for scanned images and LLM classification are DESIGNED BUT NOT ENABLED —
+  both need an explicit owner decision.
 - Awaiting Codex re-review before promote. Nothing deployed.
 
 ## Admin Cleanup & Reset Console Phase 1 Batch (2026-08-15, pending review)
