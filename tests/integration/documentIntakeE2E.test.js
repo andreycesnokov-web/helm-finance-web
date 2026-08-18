@@ -518,3 +518,89 @@ test('H8. the generic /api/documents endpoints do not leak extraction internals'
   const d = JSON.stringify(detail.body);
   assert.ok(!d.includes(SECRET_PHRASE) && !d.includes('text_sample_safe') && !d.includes('storage_path'));
 });
+
+// ══ I. Document file metadata is an explicit whitelist ══════════════════════
+// The fake PostgREST ignores `select=`, so it hands back FULL rows — which means these
+// assertions prove the serialiser strips the fields, not the query.
+const FORBIDDEN_FILE_FIELDS = ['storage_path', 'sha256_hash', 'sha256', 'checksum', 'hash',
+  'business_id', 'created_by_user_id', 'uploaded_by', 'user_id', 'owner_user_id', 'bucket'];
+const ALLOWED_FILE_FIELDS = ['file_name', 'mime_type', 'file_size', 'created_at', 'upload_channel'];
+
+const assertNoFileSecrets = (payload, where) => {
+  const s = JSON.stringify(payload);
+  for (const f of ['storage_path', 'sha256_hash', 'checksum', 'bucket'])
+    assert.ok(!s.includes(f), `${where} leaked field name ${f}`);
+  // The real values, not just the key names.
+  for (const f of db.document_files) {
+    assert.ok(!s.includes(f.storage_path), `${where} leaked a storage path`);
+    assert.ok(!s.includes(f.sha256_hash), `${where} leaked a SHA-256 fingerprint`);
+  }
+};
+
+test('I1. /api/documents list returns ONLY whitelisted file fields', async () => {
+  const r = await call('GET', '/api/documents', { userId: OWNER, businessId: BIZ_A });
+  assert.strictEqual(r.status, 200, JSON.stringify(r.body));
+  assert.ok(r.body.documents.length > 0);
+  for (const d of r.body.documents) {
+    if (!d.file) continue;
+    for (const k of Object.keys(d.file))
+      assert.ok(ALLOWED_FILE_FIELDS.includes(k), `unexpected file field "${k}" in the list`);
+    for (const k of FORBIDDEN_FILE_FIELDS)
+      assert.ok(!(k in d.file), `file.${k} must not be returned`);
+  }
+  assertNoFileSecrets(r.body, '/api/documents');
+});
+
+test('I2. /api/documents/:id detail returns ONLY whitelisted file fields', async () => {
+  const list = await call('GET', '/api/documents', { userId: OWNER, businessId: BIZ_A });
+  const id = list.body.documents[0].id;
+  const r = await call('GET', `/api/documents/${id}`, { userId: OWNER, businessId: BIZ_A });
+  assert.strictEqual(r.status, 200);
+  assert.ok(r.body.file, 'the file object is still returned');
+  for (const k of Object.keys(r.body.file))
+    assert.ok(ALLOWED_FILE_FIELDS.includes(k), `unexpected file field "${k}" in the detail`);
+  for (const k of FORBIDDEN_FILE_FIELDS) assert.ok(!(k in r.body.file));
+  assertNoFileSecrets(r.body, '/api/documents/:id');
+});
+
+test('I3. the whitelist survives a widened DB row (future columns stay private)', async () => {
+  // Simulate a migration adding a column: the serialiser must not pass it through.
+  db.document_files.forEach(f => { f.virus_scan_token = 'INTERNAL-SCAN-TOKEN-XYZ'; });
+  try {
+    const list = await call('GET', '/api/documents', { userId: OWNER, businessId: BIZ_A });
+    const detail = await call('GET', `/api/documents/${list.body.documents[0].id}`, { userId: OWNER, businessId: BIZ_A });
+    for (const payload of [list.body, detail.body])
+      assert.ok(!JSON.stringify(payload).includes('INTERNAL-SCAN-TOKEN-XYZ'),
+        'an unknown future column must not be returned by default');
+  } finally {
+    db.document_files.forEach(f => { delete f.virus_scan_token; });
+  }
+});
+
+test('I4. upload-complete and metadata update leak no file internals', async () => {
+  const up = await uploadFile({ businessId: BIZ_A, userId: OWNER,
+    file_name: 'whitelist-check.pdf', content: 'whitelist check bytes' });
+  assert.strictEqual(up.status, 200);
+  assertNoFileSecrets(up.body, 'upload-complete');
+
+  const patch = await call('PATCH', `/api/documents/${up.body.document.id}`,
+    { userId: OWNER, businessId: BIZ_A, body: { document_number: 'REF-1' } });
+  if (patch.status === 200) assertNoFileSecrets(patch.body, 'document metadata update');
+
+  const re = await call('POST', `/api/ai-accountant/documents/${up.body.document.id}/reclassify`,
+    { userId: OWNER, businessId: BIZ_A });
+  assertNoFileSecrets(re.body, 'reclassify');
+});
+
+test('I5. the frontend still gets what it renders', async () => {
+  const r = await call('GET', '/api/documents', { userId: OWNER, businessId: BIZ_A });
+  const withFile = r.body.documents.find(d => d.file);
+  assert.ok(withFile.file.file_name, 'file name is required by the documents table');
+  assert.ok(withFile.file.mime_type);
+  assert.ok(typeof withFile.file.file_size === 'number');
+  // The intake list keeps its own safe projection.
+  const intake = await call('GET', INTAKE, { userId: OWNER, businessId: BIZ_A });
+  const doc = intake.body.documents[0];
+  assert.ok(doc.file_name && doc.mime_type);
+  assertNoFileSecrets(intake.body, 'intake list');
+});

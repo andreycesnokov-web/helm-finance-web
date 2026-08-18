@@ -9683,11 +9683,17 @@ const publicExtractedJson = (ej) => {
   };
 };
 const publicDocRow = (d) => (d ? { ...d, extracted_json: publicExtractedJson(d.extracted_json) } : d);
-// Storage paths are internal: a signed URL is issued through its own audited endpoint.
+// Explicit WHITELIST of the file fields the UI actually renders. A blacklist (drop
+// storage_path, keep the rest) would keep leaking as columns are added, and would still expose
+// the SHA-256 fingerprint, the internal file id, business_id and the uploader's user id.
+// Everything not named here — including every future column — stays server-side.
+// Downloads go through the audited signed-URL endpoint, never through a path in a payload.
+const PUBLIC_FILE_FIELDS = ['file_name', 'mime_type', 'file_size', 'created_at', 'upload_channel'];
 const publicFileRow = (f) => {
-  if (!f) return null;
-  const { storage_path, ...rest } = f;
-  return rest;
+  if (!f || typeof f !== 'object') return null;
+  const out = {};
+  for (const k of PUBLIC_FILE_FIELDS) if (f[k] !== undefined) out[k] = f[k];
+  return out;
 };
 
 const publicSignals = (s) => (s ? {
@@ -9957,7 +9963,11 @@ app.get('/api/documents/:id', auth, async (req, res) => {
     const [withLinks] = await attachLinks(biz, [doc]);
     if (!await userCanAccessDoc(biz, req.user.userId, biz.role, withLinks))
       return res.status(403).json({ error: 'You do not have access to this document' });
-    const { data: fileRows } = await supabase.from('document_files').select('*').eq('id', doc.file_id).limit(1);
+    // Select only what the whitelist can return — defence in depth, so a widened
+    // serialiser could still not reach storage_path, the checksum or the uploader id.
+    const { data: fileRows } = await supabase.from('document_files')
+      .select('file_name, mime_type, file_size, created_at, upload_channel')
+      .eq('id', doc.file_id).limit(1);
     res.json({ document: publicDocRow(withLinks), file: publicFileRow(fileRows?.[0]) });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });

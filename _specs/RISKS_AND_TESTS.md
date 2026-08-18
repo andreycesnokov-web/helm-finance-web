@@ -617,9 +617,12 @@ one-sentence explanation built from them, and `extraction.{text_available, metho
 
 **Generic document endpoints are whitelisted.** `/api/documents` and `/api/documents/:id`
 previously returned `extracted_json` wholesale and the full `document_files` row.
-`publicExtractedJson()` and `publicFileRow()` now whitelist fields — `storage_path`,
-`classified_at`, `extraction_ms` and anything added to `extracted_json` later are private by
-default.
+`publicExtractedJson()` and `publicFileRow()` are both EXPLICIT whitelists (not blacklists):
+`PUBLIC_FILE_FIELDS = [file_name, mime_type, file_size, created_at, upload_channel]` is all a
+file object can ever contain, so the SHA-256 fingerprint, the internal file id, `business_id`,
+the uploader's user id, the bucket, `storage_path` and every future column stay server-side by
+default. The detail query was narrowed to match, as defence in depth. Proven by a test that
+adds an unknown column to the row and asserts it is not returned.
 
 **Tests:** `documentContent.test.js` (26) — Indonesian rules, confidence ladder,
 filename/content conflict, SK-vs-akta ambiguity, grouped issuer markers, no stored excerpt.
