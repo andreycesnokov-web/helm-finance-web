@@ -569,3 +569,47 @@ Docs-only:
 - `git diff --stat`.
 - Ensure no app source changed.
 
+
+## Document Intelligence Phase 2 — content-based classification (2026-08-18)
+
+**What changed.** Classification was file name + MIME only (Phase 1). It now also reads the
+text a PDF already carries and matches Indonesian document markers.
+
+**Confidence model — no certainty is ever claimed.**
+| Level | Meaning | Status |
+|---|---|---|
+| high | 2+ strong markers, or 1 strong marker the file name agrees with | `auto_classified` |
+| medium | 1 strong marker alone, or a file-name verdict the readable text did not corroborate, or a file-name/content conflict | `needs_review` |
+| low | weak wording only, or two candidates tied | `needs_review` |
+| unknown | no usable text and no file-name signal | `needs_review` |
+
+No percentage is produced. Nothing asserts a document is officially valid — a marker match
+says "this looks like an SK Kemenkumham letter". Manual confirmation always remains available
+and always wins; `reclassify` refuses to overwrite a manually confirmed type (409).
+
+**Privacy.** Extracted text stays server-side. The API returns marker LABELS, a
+one-sentence explanation built from those labels, and `extraction.{text_available, method}`.
+The stored `text_sample_safe` (160 chars, digit runs of 4+ masked) is never returned and never
+logged. Asserted by test with a phrase planted in the document and checked absent from
+responses.
+
+**Known limits (owner decisions needed, NOT implemented):**
+- **OCR for scanned images / photos.** A WhatsApp photo or a scanned page has no text layer,
+  so it still lands in needs_review. Options: (a) accept it, (b) add a local OCR dependency
+  (e.g. tesseract — build weight, quality uncertain on Indonesian government forms),
+  (c) use the EXISTING Anthropic SDK + `ANTHROPIC_API_KEY` (already in the repo and used for
+  Telegram receipt recognition) to read the document — no new provider or env var, but it
+  sends document content to an external API and costs per document. **Not enabled in this
+  task; needs explicit approval.**
+- The PDF text extractor is hand-rolled (no PDF dependency was approved). It handles
+  Flate-compressed and plain content streams and rejects illegible output, but PDFs with
+  custom font encodings will decode to garbage and are correctly reported as "text not
+  legible" rather than misclassified.
+- Marker rules are Indonesian-specific; other jurisdictions rely on file names.
+
+**Tests:** `tests/integration/documentContent.test.js` (21) — every required Indonesian rule,
+the confidence ladder, the filename/content conflict, no-text degradation, sample masking, PDF
+extraction incl. empty/non-PDF/scanned-image fail-closed. `documentIntakeE2E.test.js` H1–H7 —
+generic-name PDF classified from content end to end through real upload, no document text in
+any response, checklist satisfaction, reclassify auth/scope/role/manual-confirmation guards.
+

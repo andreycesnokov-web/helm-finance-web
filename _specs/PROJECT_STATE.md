@@ -242,6 +242,14 @@ Status: implemented on branch, pending review/deploy. **No migrations, no env, n
   requirements are jurisdiction-aware (Indonesian docs not required outside Indonesia,
   optional+warned when country unknown); truncated document sets report `needs_review` instead
   of a confident `missing`; unset employee status no longer claims "no employees".
+- **Document Intelligence Phase 2 (2026-08-18, on branch)**: classification now reads PDF
+  embedded text, so a document named `scan.pdf` containing "KEPUTUSAN MENTERI HUKUM" and
+  "PENGESAHAN PENDIRIAN BADAN HUKUM" is identified as SK Kemenkumham. Confidence model is
+  high / medium / low / unknown — never a percentage, never "officially valid"; only `high`
+  auto-classifies, everything else stays `needs_review`, and manual confirmation is always
+  available. A file name that conflicts with the content is downgraded to needs_review.
+  Scanned images still have no text layer: OCR is NOT implemented (see RISKS_AND_TESTS for
+  the options that need an owner decision).
 - NOT implemented: OCR/text extraction, AI classification from content, official validation,
   accountant review workflow, document expiry, Telegram upload routing (all Phase 2).
 - Known overlap: the legacy manual checkbox card "6 · Required Documents" on the same page is
