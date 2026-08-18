@@ -130,7 +130,14 @@ Last updated: 2026-07-04.
   `npm ci --dry-run` in sync at root and client; `node --check` OK; builds Personal
   OFF/ON exit 0; integration tests pass; secret scan clean.
 - NOTE: first Railway build after this will be slower (real `npm ci`, no cached tree).
-- Awaiting Codex review before promote. Nothing deployed.
+- **P0 security fixes applied (2026-08-17)**: existing Document Center visibility rule reused
+  on both intake GETs; request-guard against stale workspace responses (new
+  `client/src/lib/requestGuard.js`); jurisdiction-aware requirements; truncation blocks a
+  confident "missing"; unset employee status no longer overclaims. NEW
+  `tests/integration/documentIntakeSecurity.test.js` (16 endpoint/security tests) — 89 tests
+  pass overall. Real-storage E2E still needs a disposable-business smoke, and a MiMo/security
+  audit is required before deploy.
+- Awaiting Codex re-review before promote. Nothing deployed.
 
 ## Admin Cleanup & Reset Console Phase 1 Batch (2026-08-15, pending review)
 
@@ -170,6 +177,21 @@ Last updated: 2026-07-04.
   node intact; select + date fields work; status chip updates without remounting.
 - New regression guard `tests/integration/formComponentStability.test.js` (fails on the
   pre-fix file, passes on the fix). Builds OFF/ON exit 0; 46 tests pass.
+- Awaiting Codex review before promote. Nothing deployed.
+
+## AI Accountant Document Intake Phase 1 Batch (2026-08-17, pending review)
+
+- Branch: `feature/ai-accountant-doc-intake` (off `main` = 0ed2cd25).
+- One upload window + classification + preliminary required-document checklist + manual
+  correction, on the AI Accountant Tax Profile page. Upload reuses the existing Document
+  Center flow; **no migration** (intake metadata lives in `extracted_json.ai_intake`).
+- 4 new endpoints, all business-scoped and auth-gated; GETs never write.
+- Verified: 66 tests pass (19 new); builds Personal OFF/ON exit 0; all endpoints 401 unauth;
+  browser check of the checklist, intake inbox, upload-modal detection and manual correction;
+  no migrations/env/new provider; secret scan clean; node_modules and dist untracked.
+- Phase 2 backlog: OCR, AI classification from document text, official KB-backed
+  requirements, accountant review workflow, expiry tracking, Telegram upload routing, and
+  consolidating the legacy manual checkbox card.
 - Awaiting Codex review before promote. Nothing deployed.
 
 ## Next Recommended Work

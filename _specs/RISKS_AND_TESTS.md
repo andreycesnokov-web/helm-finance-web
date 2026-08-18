@@ -467,6 +467,79 @@ Verified by driving the real form in a browser: typing 15+ characters into NPWP,
 Company legal name and Employee count never loses focus and never detaches the DOM node;
 select and date fields still work; save PUTs NPWP as a string with its leading zero intact.
 
+## AI Accountant Document Intake (Phase 1, 2026-08-17)
+
+Honesty rules (enforced in code and tests):
+
+- Classification uses ONLY file name + MIME. `auto_classified` requires a STRONG match;
+  medium/low/unknown become `needs_review`.
+- A requirement is `uploaded` only for a `manually_confirmed` document or an
+  `auto_classified` one with HIGH confidence. A low-confidence file shows `needs_review` —
+  **an uncertain guess can never mark compliance satisfied.**
+- The checklist is labelled "AI Accountant preliminary checklist" and carries a disclaimer
+  that it does not verify official validity and to confirm with a licensed professional.
+- Unknown profile values are reported as `optional` or warned about, never as `required`.
+- Manual correction always overrides classification and is recorded with actor + timestamp.
+
+Isolation:
+
+- Every endpoint goes through `requireBusiness`, so it resolves the ACTIVE business only and
+  rejects personal workspaces via the business resolver. Document reads/writes are
+  `.eq('business_id', ...)`; `loadDocumentScoped` means a document from another workspace is
+  simply "not found". The frontend re-fetches on `scopeKey`, so switching workspace cannot
+  leave one company's documents on screen. Archived workspaces never appear in the switcher,
+  so they cannot be an upload target.
+
+Tested: 19 logic tests in `tests/integration/documentIntake.test.js` — strong/weak/unknown
+classification including underscore-separated names, MIME-only as low confidence, every
+taxonomy entry maps to a CHECK-valid `document_type`, checklist behaviour per
+PKP/employees/entity type, low-confidence stays needs_review, manual correction flips to
+uploaded, and `extracted_json` siblings are preserved. Live: all four endpoints return 401
+unauthenticated. Browser: checklist and intake inbox render, the upload modal classifies NPWP
+(high) versus an unknown scan (needs review), and manual correction fires the correct PATCH.
+
+P0 security fixes (2026-08-17, after review NO-GO):
+
+- **Role-level document visibility now applies to the new GETs.** Business scoping alone was
+  not enough: `loadIntakeDocuments()` attaches links and then applies the SAME rule as
+  `GET /api/documents` — `canViewAllDocuments(role)` else
+  `docA.canAccessDocument({ role, userId, doc, ownedDebtIds })`. A restricted role
+  (manager/employee) receives no file name, id, classification or checklist match for a
+  document it cannot access, in **both** the intake list and the checklist. One permissions
+  model, reused — no second model was invented.
+- **Stale workspace responses cannot render.** `client/src/lib/requestGuard.js` bumps a
+  generation and aborts the previous request on every load; a response is applied only when
+  its generation is current. State is cleared FIRST and a loading skeleton shows while the new
+  workspace loads, so Business A's late response can never paint under Business B's name.
+- **Jurisdiction-aware requirements.** `jurisdictionOf(profile)` returns `id | other |
+  unknown`. Indonesian documents (NPWP, NIB, Akta, SK, PKP, KPP, BPJS) are `required` only
+  under the Indonesian regime, `not_required` elsewhere with the reason "Indonesian
+  requirement — the profile country is X", and merely `optional` + warned while the country is
+  unknown. Indonesian rules are never presented as universal.
+- **Truncation cannot fake absence.** The loader fetches cap+1 to detect truncation and
+  returns `truncated:true`; a truncated set turns what would be `missing` into `needs_review`
+  with a warning, because a partial set cannot prove a document does not exist.
+- Also fixed while testing: an unset `employee_status` previously produced "Profile states
+  there are no employees" — an overclaim about data the user never entered. It is now
+  `optional` with "Set employee status …".
+
+Endpoint/security tests: `tests/integration/documentIntakeSecurity.test.js` (16 tests) drives
+the real server against a scriptable fake PostgREST — owner sees all documents, manager sees
+only its own (asserting the other file name and id are absent from the payload), checklist does
+not leak either, cross-business documents never appear and cannot be patched (404, no write),
+personal workspace rejected on all endpoints, invalid doc_type rejected before any write,
+no raw internals/storage paths, raw DB row stripped, truncation flagged and blocking confident
+"missing", classify preview writes nothing, plus 4 request-guard tests including an
+out-of-order completion that must not overwrite newer data.
+
+Gaps / NOT RUN:
+
+- End-to-end upload against real Supabase Storage was not run (no creds; it would write to
+  production). The upload path itself is the pre-existing, already-live Document Center flow.
+  A **disposable-business smoke plus a MiMo/security audit are still required before deploy.**
+- Phase 2: OCR/text extraction, AI classification from content, KB-backed official
+  requirements, accountant review workflow, document expiry tracking, Telegram upload routing.
+
 ## Minimum Checks by Change Type
 
 Personal UI:
