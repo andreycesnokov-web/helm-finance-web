@@ -19,6 +19,30 @@ const CHECK_VALID = [
   'payment_proof', 'filing_confirmation', 'bank_document', 'other',
 ];
 
+// Regression: the ministry approval letter is usually filed under its full Indonesian title,
+// which contains neither "SK" nor "Kemenkumham".
+test('SK Kemenkumham full-title aliases classify as sk_kemenkumham', () => {
+  for (const name of ['KEPUTUSAN MENTERI HUKUM.pdf', 'PENGESAHAN PENDIRIAN.pdf',
+                      'PENGESAHAN BADAN HUKUM.pdf', 'SK_Kemenkumham_2024.pdf',
+                      'KEPUTUSAN MENTERI HUKUM REPUBLIK INDONESIA - PENGESAHAN PENDIRIAN BADAN HUKUM PT X.pdf']) {
+    const r = di.classify({ file_name: name, mime_type: 'application/pdf' });
+    assert.strictEqual(r.doc_type, 'sk_kemenkumham', name);
+    assert.strictEqual(r.confidence, 'high', name);
+    assert.strictEqual(r.classification_status, 'auto_classified', name);
+  }
+});
+
+test('the SK aliases do not disturb the NPWP / NIB / akta control cases', () => {
+  for (const [name, expected] of [
+    ['NPWP_test_company.pdf', 'npwp'],
+    ['NIB_1234567890.pdf', 'nib'],
+    ['Akta Pendirian notaris.pdf', 'akta'],
+    ['SPPKP-pkp-certificate.pdf', 'pkp_certificate'],
+  ]) {
+    assert.strictEqual(di.classify({ file_name: name, mime_type: 'application/pdf' }).doc_type, expected, name);
+  }
+});
+
 const docOf = (file_name, intake) => ({ id: file_name, file_name, intake: { label: '', area: '', ...intake } });
 
 // ── classification ──────────────────────────────────────────────────────────
