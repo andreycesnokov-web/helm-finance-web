@@ -255,6 +255,13 @@ function readIntake(doc = {}, file = {}) {
       classification_status: stored.classification_status || 'needs_review',
       matched_on: stored.matched_on || 'stored',
       confirmed_at: stored.confirmed_at || null,
+      // Phase 2: why we think so. Marker LABELS and a masked sample only — never the
+      // document text, and only what was already stored.
+      signals: stored.signals || null,
+      extraction: stored.extraction
+        ? { text_available: !!stored.extraction.text_available, method: stored.extraction.method || null }
+        : null,
+      explanation: stored.explanation || null,
       persisted: true,
     };
   }

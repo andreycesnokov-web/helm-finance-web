@@ -9563,8 +9563,36 @@ app.get('/api/documents/health', auth, async (req, res) => {
 //   * Nothing here asserts that a document is officially valid.
 // ═══════════════════════════════════════════════════════════════════════════
 const docIntake = require('./lib/documentIntake');
+const docContent = require('./lib/documentContent');
+const { extractPdfText } = require('./lib/pdfText');
 
 const INTAKE_DOC_CAP = 500;
+
+// Phase 2 — classify from the document's own content when it carries readable text.
+// PDF embedded text only: no OCR provider, no AI provider, no new env var. A scanned page
+// yields no text and simply degrades to the Phase 1 file-name verdict.
+// Returns the object stored at extracted_json.ai_intake.
+function classifyUploadedBytes(buf, { file_name, mime_type, company_name }) {
+  const isPdf = /pdf/i.test(mime_type || '') || /\.pdf$/i.test(file_name || '');
+  const ex = isPdf && Buffer.isBuffer(buf)
+    ? extractPdfText(buf)
+    : { text: '', text_available: false, method: 'filename_only', reason: 'not_a_pdf' };
+  const result = docContent.classifyDocument({
+    file_name, mime_type, company_name,
+    text: ex.text, text_available: ex.text_available, method: ex.method, extraction_reason: ex.reason,
+  });
+  return {
+    doc_type: result.doc_type,
+    confidence: result.confidence,
+    classification_status: result.classification_status,
+    matched_on: result.matched_on,
+    signals: result.signals,
+    extraction: result.extraction,
+    explanation: docContent.explain(result),
+    classified_at: new Date().toISOString(),
+    classifier_version: 2,
+  };
+}
 
 // Shared loader: active-business documents + file metadata + intake classification.
 //
@@ -9598,7 +9626,8 @@ async function loadIntakeDocuments(biz, userId) {
   }
   const documents = rows.map(d => {
     const file = filesById[d.file_id] || {};
-    const intake = docIntake.readIntake(d, file);
+    const raw_intake = docIntake.readIntake(d, file);
+    const intake = { ...raw_intake, signals: publicSignals(raw_intake.signals) };
     return {
       id: d.id,
       file_name: file.file_name || null,
@@ -9615,6 +9644,17 @@ async function loadIntakeDocuments(biz, userId) {
   return { documents, truncated };
 }
 const publicIntakeDoc = ({ raw, ...rest }) => rest;   // never leak the raw row
+
+// Marker LABELS only. The stored sample (extraction.text_sample_safe) and any extracted text
+// stay server-side — the API never returns document content.
+const publicSignals = (s) => (s ? {
+  filename_matches: s.filename_matches || [],
+  text_matches: s.text_matches || [],
+  strong_matches: s.strong_matches || [],
+  company_name_match: s.company_name_match || null,
+  conflict: s.conflict || null,
+  mime_type: s.mime_type || null,
+} : null);
 
 // GET /api/ai-accountant/document-intake — intake inbox for the ACTIVE business.
 app.get('/api/ai-accountant/document-intake', auth, async (req, res) => {
@@ -9696,6 +9736,61 @@ app.patch('/api/ai-accountant/documents/:id/classification', auth, async (req, r
   } catch (e) {
     console.error(`[doc-intake] classification failed: ${e.message}`);
     res.status(500).json({ error: 'classification_update_failed' });
+  }
+});
+
+// POST /api/ai-accountant/documents/:id/reclassify — re-read an EXISTING document's content.
+// For documents uploaded before Phase 2, or after a failed extraction. Same guards as the
+// manual correction: auth + requireBusiness (personal rejected) + manage role + business-scoped
+// load, so a document from another workspace is simply not found. Never returns document text.
+app.post('/api/ai-accountant/documents/:id/reclassify', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res); if (!biz) return;
+    if (!canManageDocuments(biz.role)) return res.status(403).json({ error: 'Your role cannot edit documents' });
+    if (!await hasDocumentsAccess(biz)) return res.status(403).json({ error: 'Document Center is not enabled', upgrade_required: true });
+    if (await blockIfStorageNotReady(res)) return;
+
+    const doc = await loadDocumentScoped(biz, req.params.id);
+    if (!doc) return res.status(404).json({ error: 'document_not_found' });
+    // A manually confirmed type is the user's decision — never overwrite it automatically.
+    if (doc.extracted_json?.ai_intake?.classification_status === 'manually_confirmed')
+      return res.status(409).json({ error: 'manually_confirmed', message: 'This document type was confirmed manually. Change it from the document list instead.' });
+
+    const { data: fileRows } = await supabase.from('document_files')
+      .select('id, storage_path, file_name, mime_type')
+      .eq('id', doc.file_id).eq('business_id', biz.business.id).limit(1);
+    const file = fileRows?.[0];
+    if (!file) return res.status(404).json({ error: 'file_not_found' });
+
+    const { data: blob, error: dlErr } = await supabase.storage.from(DOC_BUCKET).download(file.storage_path);
+    if (dlErr || !blob) return res.status(503).json({ error: 'document_unavailable' });
+    const buf = Buffer.from(await blob.arrayBuffer());
+
+    const intake = classifyUploadedBytes(buf, {
+      file_name: file.file_name, mime_type: file.mime_type, company_name: biz.business?.name,
+    });
+    const patch = {
+      document_type: docIntake.mapsTo(intake.doc_type),
+      extracted_json: { ...(doc.extracted_json || {}), ai_intake: intake },
+    };
+    const { error } = await supabase.rpc('rpc_document_update_metadata',
+      { p_document_id: doc.id, p_business_id: biz.business.id, p_actor: req.user.userId, p_patch: patch, p_channel: 'web' });
+    if (error) {
+      if (/archived/i.test(error.message)) return res.status(409).json({ error: 'document_archived' });
+      console.error(`[doc-intake] reclassify update failed: ${error.message}`);
+      return res.status(500).json({ error: 'reclassify_failed' });
+    }
+    // Response mirrors the intake list shape — marker labels only, never document text.
+    res.json({
+      ok: true, id: doc.id, doc_type: intake.doc_type, label: docIntake.labelFor(intake.doc_type),
+      area: docIntake.areaFor(intake.doc_type), confidence: intake.confidence,
+      classification_status: intake.classification_status, explanation: intake.explanation,
+      signals: publicSignals(intake.signals),
+      extraction: { text_available: !!intake.extraction?.text_available, method: intake.extraction?.method || null },
+    });
+  } catch (e) {
+    console.error(`[doc-intake] reclassify failed: ${e.message}`);
+    res.status(500).json({ error: 'reclassify_failed' });
   }
 });
 
@@ -9902,6 +9997,18 @@ app.post('/api/documents/upload-complete', auth, async (req, res) => {
       gross_amount: (b.amount != null && isFinite(Number(b.amount))) ? Number(b.amount) : null,
       extracted_json: notes ? { notes } : null,
     };
+    // ── Phase 2: content-based classification, best effort ──────────────────
+    // The verified bytes are already in memory, so no second storage read is needed.
+    // Never blocks or fails the upload: on any problem this falls back to the Phase 1
+    // file-name verdict, which is what shipped before.
+    try {
+      const intake = classifyUploadedBytes(buf, {
+        file_name: pFile.file_name, mime_type: pFile.mime_type, company_name: biz.business?.name,
+      });
+      pDoc.extracted_json = { ...(pDoc.extracted_json || {}), ai_intake: intake };
+    } catch (e) {
+      console.warn(`[doc-intake] content classification skipped: ${e.message}`);
+    }
     const { data: doc, error: rpcErr } = await supabase.rpc('rpc_document_finalize_upload',
       { p_file: pFile, p_doc: pDoc, p_actor: req.user.userId, p_channel: 'web' });
     if (rpcErr) {

@@ -15,6 +15,7 @@ const test = require('node:test');
 const assert = require('node:assert');
 const http = require('node:http');
 const crypto = require('node:crypto');
+const zlib = require('node:zlib');
 const { spawn } = require('node:child_process');
 const path = require('node:path');
 const jwt = require('jsonwebtoken');
@@ -402,4 +403,94 @@ test('G1. the personal workspace is rejected on every intake endpoint', async ()
     assert.ok(r.status >= 400 && r.status < 500, `${m} ${u} → ${r.status}`);
     assert.ok(!JSON.stringify(r.body).includes('NPWP_test_company.pdf'));
   }
+});
+
+// ══ H. Phase 2 — content-based classification (end to end) ══════════════════
+// A real (minimal) PDF carrying embedded text, uploaded under a GENERIC file name.
+function makePdf(text) {
+  const content = Buffer.from(`BT /F1 12 Tf 72 720 Td (${text}) Tj ET`);
+  const z = zlib.deflateSync(content);
+  return Buffer.concat([
+    Buffer.from(`%PDF-1.4\n1 0 obj\n<< /Length ${z.length} /Filter /FlateDecode >>\nstream\n`),
+    z, Buffer.from('\nendstream\nendobj\n%%EOF\n')]);
+}
+const SECRET_PHRASE = 'RAHASIA-INTERNAL-XYZ-9988';
+const SK_TEXT = 'KEPUTUSAN MENTERI HUKUM REPUBLIK INDONESIA PENGESAHAN PENDIRIAN BADAN HUKUM ' + SECRET_PHRASE;
+let contentDocId = null;
+
+test('H1. a generically named PDF is classified from its CONTENT during upload', async () => {
+  const r = await uploadFile({ businessId: BIZ_A, userId: OWNER,
+    file_name: 'scan.pdf', content: makePdf(SK_TEXT) });
+  assert.strictEqual(r.status, 200, JSON.stringify(r.body));
+  contentDocId = r.body.document.id;
+
+  const list = await call('GET', INTAKE, { userId: OWNER, businessId: BIZ_A });
+  const doc = list.body.documents.find(d => d.id === contentDocId);
+  assert.strictEqual(doc.intake.doc_type, 'sk_kemenkumham', 'content, not the file name');
+  assert.strictEqual(doc.intake.confidence, 'high');
+  assert.strictEqual(doc.intake.classification_status, 'auto_classified');
+  assert.strictEqual(doc.intake.extraction.text_available, true);
+  assert.strictEqual(doc.intake.extraction.method, 'pdf_text');
+  assert.match(doc.intake.explanation, /KEPUTUSAN MENTERI HUKUM/);
+});
+
+test('H2. the API never returns the document text or a stored sample', async () => {
+  const list = await call('GET', INTAKE, { userId: OWNER, businessId: BIZ_A });
+  const s = JSON.stringify(list.body);
+  assert.ok(!s.includes(SECRET_PHRASE), 'document text must not leave the server');
+  assert.ok(!s.includes('text_sample_safe'), 'the stored sample must not be returned');
+  // The marker labels themselves are fine — they are our vocabulary, not the document.
+  const doc = list.body.documents.find(d => d.id === contentDocId);
+  assert.ok(doc.intake.signals.strong_matches.length > 0);
+});
+
+test('H3. a content classification satisfies the right checklist item only', async () => {
+  const r = await call('GET', REQUIRED, { userId: OWNER, businessId: BIZ_A });
+  const sk = r.body.items.find(i => i.type === 'sk_kemenkumham');
+  assert.strictEqual(sk.status, 'uploaded', 'the SK content match satisfies the SK item');
+  // Nothing was uploaded for PKP, and the SK document must not satisfy it.
+  assert.notStrictEqual(r.body.items.find(i => i.type === 'pkp_certificate').status, 'uploaded');
+});
+
+test('H4. reclassify re-reads an existing document, business-scoped', async () => {
+  const r = await call('POST', `/api/ai-accountant/documents/${contentDocId}/reclassify`,
+    { userId: OWNER, businessId: BIZ_A });
+  assert.strictEqual(r.status, 200, JSON.stringify(r.body));
+  assert.strictEqual(r.body.doc_type, 'sk_kemenkumham');
+  assert.strictEqual(r.body.confidence, 'high');
+  const s = JSON.stringify(r.body);
+  assert.ok(!s.includes(SECRET_PHRASE) && !s.includes('text_sample_safe'));
+  assert.ok(!/storage_path|relation|column/i.test(s));
+});
+
+test('H5. reclassify is rejected across businesses, for personal, and unauthenticated', async () => {
+  const before = db.document_audit.length;
+  const cross = await call('POST', `/api/ai-accountant/documents/${contentDocId}/reclassify`,
+    { userId: OWNER, businessId: BIZ_B });
+  assert.strictEqual(cross.status, 404);
+  const personal = await call('POST', `/api/ai-accountant/documents/${contentDocId}/reclassify`,
+    { userId: OWNER, businessId: PERSONAL });
+  assert.ok(personal.status >= 400 && personal.status < 500, `personal → ${personal.status}`);
+  const anon = await call('POST', `/api/ai-accountant/documents/${contentDocId}/reclassify`, {});
+  assert.strictEqual(anon.status, 401);
+  assert.strictEqual(db.document_audit.length, before, 'no writes from rejected attempts');
+});
+
+test('H6. reclassify refuses to overwrite a manually confirmed type', async () => {
+  const up = await uploadFile({ businessId: BIZ_A, userId: OWNER, file_name: 'manual.pdf', content: makePdf(SK_TEXT + ' UNIQUE-FOR-DEDUP-H6') });
+  await call('PATCH', `/api/ai-accountant/documents/${up.body.document.id}/classification`,
+    { userId: OWNER, businessId: BIZ_A, body: { doc_type: 'contract' } });
+  const r = await call('POST', `/api/ai-accountant/documents/${up.body.document.id}/reclassify`,
+    { userId: OWNER, businessId: BIZ_A });
+  assert.strictEqual(r.status, 409);
+  assert.strictEqual(r.body.error, 'manually_confirmed');
+  const stored = db.financial_documents.find(d => d.id === up.body.document.id);
+  assert.strictEqual(stored.extracted_json.ai_intake.doc_type, 'contract', 'the manual choice stands');
+});
+
+test('H7. a restricted role still sees none of the content-classified documents', async () => {
+  const manager = await call('GET', INTAKE, { userId: MANAGER, businessId: BIZ_A });
+  assert.strictEqual(manager.status, 200);
+  assert.strictEqual(manager.body.documents.length, 0);
+  assert.ok(!JSON.stringify(manager.body).includes(contentDocId));
 });

@@ -57,6 +57,8 @@ export default function DocumentIntakeModal({ business, onClose, onUploaded }) {
         // document_type is deliberately left to the backend default/mapping; the AI Accountant
         // taxonomy is stored separately and confirmed by the user in the intake list.
         await uploadDocument(token, it.file, { title: it.file.name })
+        // The server reads the document's content during upload-complete, so by the time
+        // this resolves the real classification already exists — the list below refreshes.
         setItems(prev => prev.map((x, idx) => idx === i ? { ...x, status: 'uploaded' } : x))
       } catch (e) {
         const dup = /duplicate/i.test(e.message || '')
@@ -114,7 +116,7 @@ export default function DocumentIntakeModal({ business, onClose, onUploaded }) {
                   <span style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 600 }}>{it.file.name}</span>
                   <span style={{ fontSize: 11.5, color: 'var(--text-muted,#888)' }}>
                     {it.detected
-                      ? <>Detected: <b>{it.detected.label}</b> · {it.detected.confidence} confidence{it.detected.classification_status === 'needs_review' ? ' · needs review' : ''}</>
+                      ? <>Preliminary from file name: <b>{it.detected.label}</b> · {it.detected.confidence} confidence. The document text is read after upload.</>
                       : 'Detecting…'}
                     {it.error ? ` · ${it.error}` : ''}
                   </span>
@@ -125,7 +127,7 @@ export default function DocumentIntakeModal({ business, onClose, onUploaded }) {
                       : it.status === 'duplicate' ? 'warning'
                         : it.detected ? CONF_TONE[it.detected.confidence] || 'neutral' : 'neutral'
                 }>
-                  {it.status === 'queued' ? 'Ready' : it.status === 'uploading' ? 'Uploading…' : it.status.replace('_', ' ')}
+                  {it.status === 'queued' ? 'Ready' : it.status === 'uploading' ? 'Reading document…' : it.status.replace('_', ' ')}
                 </StatusBadge>
               </div>
             ))}
