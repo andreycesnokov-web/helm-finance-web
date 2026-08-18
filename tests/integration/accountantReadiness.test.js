@@ -40,6 +40,30 @@ test('NIB document uploaded but the NIB number is empty → "enter your NIB numb
   assert.ok(!/Upload[^,.]*\bNIB\b/i.test(r.next), `must not ask to upload NIB again: ${r.next}`);
 });
 
+// A number is only worth asking for when this jurisdiction actually requires the document.
+test('an optional NIB with an empty number does NOT ask for the number', () => {
+  const items = [item('nib', 'NIB', 'optional', 'uploaded')];
+  const r = buildReadiness(checklist(items, { jurisdiction: 'unknown' }), { form: { nib: '' } });
+  assert.ok(!/NIB number/i.test(r.next), r.next);
+  assert.strictEqual(r.next, 'Request accountant verification.');
+});
+
+test('a not_required NIB/NPWP outside Indonesia does NOT ask for the number', () => {
+  const items = [
+    item('nib', 'NIB', 'not_required', 'uploaded'),
+    item('npwp', 'NPWP', 'not_required', 'uploaded'),
+  ];
+  const r = buildReadiness(checklist(items, { jurisdiction: 'other' }), { form: { nib: '', npwp: '' } });
+  assert.ok(!/NIB number|NPWP number/i.test(r.next), r.next);
+  assert.strictEqual(r.missingDocs, 0);
+});
+
+test('a conditional_required document with an empty number still asks for the number', () => {
+  const items = [item('nib', 'NIB', 'conditional_required', 'uploaded')];
+  const r = buildReadiness(checklist(items), { form: { nib: '' } });
+  assert.match(r.next, /enter your NIB number/i);
+});
+
 test('the readiness card and the checklist agree on which documents are missing', () => {
   const items = [...ID_BASE, item('pkp_certificate', 'PKP certificate', 'required', 'missing')];
   const r = buildReadiness(checklist(items), { form: { nib: '1', npwp: '2' } });

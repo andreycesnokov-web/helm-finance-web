@@ -62,7 +62,10 @@ export function buildReadiness(checklist, { form = {}, missingFields = [], oblig
   const uploaded = checklist.items.filter(i => i.status === 'uploaded');
 
   // An uploaded document whose number is still blank in the profile: ask for the NUMBER.
+  // Only for documents this jurisdiction actually requires — an optional or not_required
+  // NPWP/NIB (e.g. a Singapore profile) must never produce "Enter your NIB number".
   const numbersToEnter = uploaded
+    .filter(i => REQUIRED_LEVELS.has(i.requirement))
     .filter(i => NUMBER_FIELD[i.type])
     .filter(i => {
       const v = form[NUMBER_FIELD[i.type]];

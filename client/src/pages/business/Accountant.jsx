@@ -48,6 +48,11 @@ export function BusinessAccountant() {
   const [confirming, setConfirming] = useState(null)
 
   useEffect(() => {
+    // Saved-profile state belongs to ONE workspace: clear it before anything else so
+    // business A's "Profile saved" banner and missing-field list can never be shown
+    // under business B.
+    setProfileSaved(false); setSavedMissingFields([])
+    setObligations({ applicable_rules: [], missing_profile_fields: [] })
     if (!token || !active) return
     let on = true; setLoading(true); setError(null)
     Promise.all([
