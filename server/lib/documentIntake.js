@@ -115,6 +115,21 @@ function requirementsFor(profile = {}) {
   const p = profile || {};
   const entity = String(p.legal_entity_type || '').toLowerCase();
   const isCompany = /pt|cv|yayasan|firma/.test(entity);
+  // The ministry approval document is ENTITY-SPECIFIC. A PT receives an SK Kemenkumham
+  // (Pengesahan Pendirian Badan Hukum Perseroan Terbatas); a CV is registered in AHU rather
+  // than approved as a badan hukum, and a Yayasan follows its own foundation route. Asking a
+  // CV for a PT decision letter is simply wrong, so the label and reason vary by entity while
+  // the stored doc_type stays `sk_kemenkumham` (no new taxonomy, no migration).
+  const isPT = /\bpt\b/.test(entity);
+  const isCV = /\bcv\b/.test(entity);
+  const legalEntityDoc = isPT
+    ? { label: 'SK Kemenkumham approval',
+        reason: `Ministry decision approving the ${p.legal_entity_type} as a legal entity, issued with the deed.` }
+    : isCV
+      ? { label: 'AHU CV registration proof',
+          reason: 'Surat Keterangan Terdaftar — confirms the CV is registered in AHU. A CV does not receive a PT approval decision.' }
+      : { label: 'AHU legal entity approval / registration',
+          reason: `The AHU approval or registration document for a ${p.legal_entity_type || 'this entity type'}. Confirm the exact document with your notary.` };
   const pkp = String(p.pkp_status || '').toLowerCase();
   const hasEmployees = String(p.employee_status || '') === 'has_employees';
   const foreign = String(p.foreign_owned || '') === 'yes';
@@ -125,13 +140,14 @@ function requirementsFor(profile = {}) {
   const where = p.country || p.jurisdiction || 'this jurisdiction';
 
   const out = [];
-  const add = (type, requirement, reason) => out.push({ type, label: labelFor(type), area: areaFor(type), requirement, reason });
+  // `label` may be overridden for entity-specific wording; the doc_type never changes.
+  const add = (type, requirement, reason, label) => out.push({ type, label: label || labelFor(type), area: areaFor(type), requirement, reason });
   // Indonesia-specific document: required only under the Indonesian regime, explicitly
   // not_required elsewhere, and merely optional (with a warning) while the country is unknown.
-  const addIndonesian = (type, requirement, reason) => {
-    if (idOnly) return add(type, requirement, reason);
-    if (jurUnknown) return add(type, 'optional', 'Set country/jurisdiction in the tax profile to know whether this applies.');
-    return add(type, 'not_required', `Indonesian requirement — the profile country is ${where}. This checklist only covers Indonesia.`);
+  const addIndonesian = (type, requirement, reason, label) => {
+    if (idOnly) return add(type, requirement, reason, label);
+    if (jurUnknown) return add(type, 'optional', 'Set country/jurisdiction in the tax profile to know whether this applies.', label);
+    return add(type, 'not_required', `Indonesian requirement — the profile country is ${where}. This checklist only covers Indonesia.`, label);
   };
 
   addIndonesian('npwp', 'required', 'Every registered Indonesian taxpayer has an NPWP.');
@@ -141,8 +157,8 @@ function requirementsFor(profile = {}) {
   else if (!known(p.legal_entity_type)) add('akta', 'optional', 'Set legal entity type to know whether a deed applies.');
   else add('akta', 'optional', 'Not typically required for this entity type.');
 
-  if (isCompany) addIndonesian('sk_kemenkumham', 'required', 'Ministry approval accompanies the deed for incorporated entities.');
-  else addIndonesian('sk_kemenkumham', 'optional', 'Applies to incorporated Indonesian entities.');
+  if (isCompany) addIndonesian('sk_kemenkumham', 'required', legalEntityDoc.reason, legalEntityDoc.label);
+  else addIndonesian('sk_kemenkumham', 'optional', 'Applies to registered Indonesian legal entities.', legalEntityDoc.label);
 
   add('oss_license', 'optional', 'Recommended when your activity requires a licence.');
 

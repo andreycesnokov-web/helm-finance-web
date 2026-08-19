@@ -42,13 +42,14 @@ test('every required document type has complete knowledge metadata', () => {
   const REQUIRED_TYPES = ['npwp', 'nib', 'akta', 'sk_kemenkumham', 'pkp_certificate',
     'kpp_registration', 'oss_license', 'payroll_document', 'bpjs_document', 'bank_statement',
     'tax_report', 'tax_payment_proof', 'contract', 'invoice', 'receipt'];
-  const FIELDS = ['display_label', 'official_indonesian_name', 'aliases',
-    'plain_language_description', 'why_needed', 'when_required', 'where_to_get',
+  const FIELDS = ['doc_type', 'issuing_body', 'display_label', 'official_indonesian_name',
+    'aliases', 'plain_language_description', 'why_needed', 'when_required', 'where_to_get',
     'confirms_profile_fields', 'group'];
   for (const t of REQUIRED_TYPES) {
     const k = KB.knowledgeFor(t);
     assert.ok(k, `missing knowledge for ${t}`);
     for (const f of FIELDS) assert.ok(k[f] !== undefined && k[f] !== '', `${t}.${f} is empty`);
+    assert.strictEqual(k.doc_type, t, `${t}.doc_type must match its key`);
     assert.ok(KB.GROUP_ORDER.includes(k.group), `${t} has an unknown group ${k.group}`);
   }
 });
@@ -148,7 +149,8 @@ test('no checklist → no grouping and no invented pack', () => {
   const g = KB.groupChecklist(null);
   assert.strictEqual(g.available, false);
   assert.strictEqual(g.groups.length, 0);
-  assert.strictEqual(g.pack.total, 0);
+  assert.strictEqual(g.pack.total, null, 'unknown, not zero');
+  assert.strictEqual(g.pack.countable, false);
   assert.strictEqual(g.pack.complete, false);
 });
 
@@ -189,6 +191,106 @@ test('an uploaded core document never produces an action', () => {
 test('no action copy claims validity or compliance', () => {
   const r = buildDocumentActions(checklist(OWNER_STATE), { form: {} });
   const s = JSON.stringify(r.actions);
+  for (const bad of [/fully compliant/i, /legally valid/i, /\bcertified\b/i, /guarantee/i, /100%/])
+    assert.ok(!bad.test(s), `forbidden wording ${bad}`);
+});
+
+
+// ── Codex fix 1: a truncated checklist must not assert absence ──────────────
+const TRUNCATED = (items) => checklist(items, { truncated: true });
+
+test('a truncated checklist produces NO exact minimum-company-pack count', () => {
+  const g = KB.groupChecklist(TRUNCATED(OWNER_STATE));
+  assert.strictEqual(g.truncated, true);
+  assert.strictEqual(g.pack.countable, false);
+  assert.strictEqual(g.pack.total, null, 'no "N of M" may be derived');
+  assert.strictEqual(g.pack.satisfied, null);
+  assert.strictEqual(g.pack.complete, false);
+});
+
+test('a truncated checklist produces NO "still needed" list', () => {
+  const g = KB.groupChecklist(TRUNCATED(OWNER_STATE));
+  assert.deepStrictEqual(g.pack.outstanding, [], 'listing outstanding documents asserts absence');
+  assert.deepStrictEqual(g.payroll.outstanding, []);
+  assert.strictEqual(g.payroll.countable, false);
+  // The specific claim the owner would otherwise have seen must be underivable.
+  assert.ok(!JSON.stringify(g.pack.outstanding).includes('pkp_certificate'));
+});
+
+test('a truncated checklist still shows what we DID see, and never counts "missing"', () => {
+  const g = KB.groupChecklist(TRUNCATED(OWNER_STATE));
+  const identity = g.groups.find(x => x.key === 'identity');
+  assert.strictEqual(identity.items.length, 4, 'known rows stay visible');
+  assert.strictEqual(identity.counts.satisfied, 4, 'uploaded is an observation, not an inference');
+  const tax = g.groups.find(x => x.key === 'tax_registration');
+  assert.strictEqual(tax.counts.missing, null, '"missing" asserts absence and must be suppressed');
+});
+
+test('a truncated checklist produces no specific upload actions in the Workbench', () => {
+  const r = buildDocumentActions(TRUNCATED(OWNER_STATE), { form: { npwp: '1', nib: '2' } });
+  assert.strictEqual(r.available, false);
+  assert.strictEqual(r.actions.length, 0, 'no confident action may be derived');
+  assert.strictEqual(r.reason, 'truncated');
+});
+
+test('the truncated notice is neutral and claims nothing', () => {
+  assert.match(KB.TRUNCATED_NOTICE, /incomplete|review/i);
+  // "incomplete" is fine; a standalone "complete" would be a claim.
+  for (const bad of [/still needed/i, /missing/i, /\bcomplete\b/i])
+    assert.ok(!bad.test(KB.TRUNCATED_NOTICE), `truncated notice must not assert: ${bad}`);
+});
+
+// ── Codex fix 2: the legal-entity document is entity-specific ───────────────
+const PT = { legal_entity_type: 'PT PMA' };
+const PT_LOCAL = { legal_entity_type: 'PT Local' };
+const CV = { legal_entity_type: 'CV' };
+const YAYASAN = { legal_entity_type: 'Yayasan' };
+
+test('PT and PT PMA get the PT-specific SK Kemenkumham wording', () => {
+  for (const profile of [PT, PT_LOCAL]) {
+    const k = KB.knowledgeFor('sk_kemenkumham', profile);
+    assert.strictEqual(k.display_label, 'SK Kemenkumham approval');
+    assert.match(k.official_indonesian_name, /Keputusan Menteri Hukum/);
+    assert.match(k.official_indonesian_name, /Perseroan Terbatas/);
+    assert.match(k.where_to_get, /notary|AHU/i);
+  }
+});
+
+test('a CV never sees PT-specific SK wording', () => {
+  const k = KB.knowledgeFor('sk_kemenkumham', CV);
+  assert.ok(!/Perseroan Terbatas/i.test(k.official_indonesian_name), 'PT wording leaked to a CV');
+  assert.ok(!/\bSK Kemenkumham\b/.test(k.display_label));
+  assert.match(k.display_label, /CV registration/i);
+  assert.match(k.official_indonesian_name, /Surat Keterangan Terdaftar/);
+  assert.match(k.official_indonesian_name, /Persekutuan Komanditer/);
+  assert.match(k.why_needed, /registered rather than approved|not a PT approval/i);
+});
+
+test('a Yayasan never sees Perseroan Terbatas wording and stays neutral', () => {
+  const k = KB.knowledgeFor('sk_kemenkumham', YAYASAN);
+  assert.ok(!/Perseroan Terbatas/i.test(JSON.stringify(k)), 'PT wording leaked to a Yayasan');
+  assert.match(k.display_label, /AHU legal entity/i);
+  // Where the exact title is not certain we say so rather than guessing.
+  assert.match(k.when_required, /confirm the exact document/i);
+});
+
+test('entityFormOf classifies the entity forms the backend distinguishes', () => {
+  assert.strictEqual(KB.entityFormOf(PT), 'pt');
+  assert.strictEqual(KB.entityFormOf(PT_LOCAL), 'pt');
+  assert.strictEqual(KB.entityFormOf(CV), 'cv');
+  assert.strictEqual(KB.entityFormOf(YAYASAN), 'other');
+  assert.strictEqual(KB.entityFormOf({}), 'other');
+});
+
+test('grouping applies the entity-specific knowledge to the row', () => {
+  const g = KB.groupChecklist(checklist(OWNER_STATE), CV);
+  const row = g.groups.find(x => x.key === 'identity').items.find(i => i.type === 'sk_kemenkumham');
+  assert.ok(!/Perseroan Terbatas/i.test(row.knowledge.official_indonesian_name));
+  assert.match(row.knowledge.official_indonesian_name, /Persekutuan Komanditer/);
+});
+
+test('entity variants claim no legal certainty', () => {
+  const s = JSON.stringify(KB.LEGAL_ENTITY_DOC_VARIANTS);
   for (const bad of [/fully compliant/i, /legally valid/i, /\bcertified\b/i, /guarantee/i, /100%/])
     assert.ok(!bad.test(s), `forbidden wording ${bad}`);
 });

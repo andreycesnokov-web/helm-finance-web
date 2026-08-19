@@ -13,6 +13,9 @@
 //     (/api/ai-accountant/required-documents), never from this file.
 //   * Indonesia-focused, matching the checklist's own jurisdiction handling.
 
+export const TRUNCATED_NOTICE =
+  'Checklist incomplete — too many documents to verify automatically. Review the full document list.';
+
 export const DISCLAIMER =
   'Preliminary guidance only. This explains what each document is and where it is normally ' +
   'issued — it does not verify that your document is officially valid and it is not legal or ' +
@@ -35,6 +38,8 @@ const GROUP_LABEL = Object.fromEntries(GROUPS.map(g => [g.key, g.label]));
 // ── the knowledge base ──────────────────────────────────────────────────────
 export const DOCUMENT_KNOWLEDGE = {
   npwp: {
+    doc_type: 'npwp',
+    issuing_body: 'Direktorat Jenderal Pajak (DJP)',
     display_label: 'NPWP',
     official_indonesian_name: 'Nomor Pokok Wajib Pajak (NPWP)',
     aliases: ['NPWP badan', 'Kartu NPWP', 'tax ID'],
@@ -46,6 +51,8 @@ export const DOCUMENT_KNOWLEDGE = {
     group: 'identity',
   },
   nib: {
+    doc_type: 'nib',
+    issuing_body: 'Lembaga OSS (Online Single Submission)',
     display_label: 'NIB',
     official_indonesian_name: 'Nomor Induk Berusaha (NIB)',
     aliases: ['business registration number', 'OSS NIB'],
@@ -57,6 +64,8 @@ export const DOCUMENT_KNOWLEDGE = {
     group: 'identity',
   },
   akta: {
+    doc_type: 'akta',
+    issuing_body: 'Notaris (notary)',
     display_label: 'Akta / Deed',
     official_indonesian_name: 'Akta Pendirian (dan Akta Perubahan, if any)',
     aliases: ['deed of establishment', 'akta notaris', 'articles of association'],
@@ -68,6 +77,8 @@ export const DOCUMENT_KNOWLEDGE = {
     group: 'identity',
   },
   sk_kemenkumham: {
+    doc_type: 'sk_kemenkumham',
+    issuing_body: 'Kementerian Hukum — Direktorat Jenderal AHU',
     display_label: 'SK Kemenkumham approval',
     official_indonesian_name: 'Keputusan Menteri Hukum tentang Pengesahan Pendirian Badan Hukum Perseroan Terbatas',
     aliases: ['SK Kemenkumham', 'SK pengesahan', 'AHU decision letter'],
@@ -79,6 +90,8 @@ export const DOCUMENT_KNOWLEDGE = {
     group: 'identity',
   },
   pkp_certificate: {
+    doc_type: 'pkp_certificate',
+    issuing_body: 'Direktorat Jenderal Pajak (DJP) / KPP',
     display_label: 'PKP certificate',
     official_indonesian_name: 'Surat Pengukuhan Pengusaha Kena Pajak (SPPKP)',
     aliases: ['SPPKP', 'PKP certificate', 'VAT registration'],
@@ -90,6 +103,8 @@ export const DOCUMENT_KNOWLEDGE = {
     group: 'tax_registration',
   },
   kpp_registration: {
+    doc_type: 'kpp_registration',
+    issuing_body: 'Kantor Pelayanan Pajak (KPP)',
     display_label: 'KPP registration',
     official_indonesian_name: 'Surat Keterangan Terdaftar (SKT) — Kantor Pelayanan Pajak',
     aliases: ['SKT', 'KPP registration letter'],
@@ -101,6 +116,8 @@ export const DOCUMENT_KNOWLEDGE = {
     group: 'tax_registration',
   },
   oss_license: {
+    doc_type: 'oss_license',
+    issuing_body: 'Lembaga OSS',
     display_label: 'OSS / business licence',
     official_indonesian_name: 'Izin Usaha / Sertifikat Standar (via OSS)',
     aliases: ['izin usaha', 'business licence', 'sertifikat standar'],
@@ -112,6 +129,8 @@ export const DOCUMENT_KNOWLEDGE = {
     group: 'tax_registration',
   },
   payroll_document: {
+    doc_type: 'payroll_document',
+    issuing_body: 'The company itself (payroll system / HR)',
     display_label: 'Payroll document',
     official_indonesian_name: 'Slip gaji / Daftar gaji',
     aliases: ['payslip', 'payroll register', 'daftar gaji'],
@@ -123,6 +142,8 @@ export const DOCUMENT_KNOWLEDGE = {
     group: 'payroll',
   },
   bpjs_document: {
+    doc_type: 'bpjs_document',
+    issuing_body: 'BPJS Ketenagakerjaan / BPJS Kesehatan',
     display_label: 'BPJS document',
     official_indonesian_name: 'BPJS Ketenagakerjaan / BPJS Kesehatan — employer registration or payment proof',
     aliases: ['BPJS', 'Jamsostek', 'social security registration'],
@@ -134,6 +155,8 @@ export const DOCUMENT_KNOWLEDGE = {
     group: 'payroll',
   },
   bank_statement: {
+    doc_type: 'bank_statement',
+    issuing_body: 'The company’s bank',
     display_label: 'Bank statement',
     official_indonesian_name: 'Rekening koran / Mutasi rekening',
     aliases: ['bank statement', 'e-statement', 'mutasi'],
@@ -145,6 +168,8 @@ export const DOCUMENT_KNOWLEDGE = {
     group: 'operational',
   },
   tax_report: {
+    doc_type: 'tax_report',
+    issuing_body: 'Direktorat Jenderal Pajak (DJP) — filed by the taxpayer',
     display_label: 'Tax report',
     official_indonesian_name: 'Surat Pemberitahuan (SPT) — Tahunan / Masa',
     aliases: ['SPT', 'tax return', 'bukti lapor'],
@@ -156,6 +181,8 @@ export const DOCUMENT_KNOWLEDGE = {
     group: 'operational',
   },
   tax_payment_proof: {
+    doc_type: 'tax_payment_proof',
+    issuing_body: 'Direktorat Jenderal Pajak (DJP) via the receiving bank',
     display_label: 'Tax payment proof',
     official_indonesian_name: 'Bukti Penerimaan Negara (BPN) / NTPN — Surat Setoran Pajak',
     aliases: ['NTPN', 'SSP', 'billing code receipt'],
@@ -167,6 +194,8 @@ export const DOCUMENT_KNOWLEDGE = {
     group: 'operational',
   },
   contract: {
+    doc_type: 'contract',
+    issuing_body: 'The contracting parties',
     display_label: 'Contract',
     official_indonesian_name: 'Perjanjian / Kontrak',
     aliases: ['agreement', 'MoU', 'SPK'],
@@ -178,6 +207,8 @@ export const DOCUMENT_KNOWLEDGE = {
     group: 'operational',
   },
   invoice: {
+    doc_type: 'invoice',
+    issuing_body: 'The issuing party (e-Faktur for faktur pajak)',
     display_label: 'Invoice',
     official_indonesian_name: 'Faktur / Faktur Pajak / Tagihan',
     aliases: ['invoice', 'tagihan', 'faktur pajak'],
@@ -189,6 +220,8 @@ export const DOCUMENT_KNOWLEDGE = {
     group: 'operational',
   },
   receipt: {
+    doc_type: 'receipt',
+    issuing_body: 'The merchant or counterparty',
     display_label: 'Receipt',
     official_indonesian_name: 'Kwitansi / Nota / Struk',
     aliases: ['receipt', 'kwitansi', 'struk'],
@@ -201,7 +234,58 @@ export const DOCUMENT_KNOWLEDGE = {
   },
 };
 
-export const knowledgeFor = (docType) => DOCUMENT_KNOWLEDGE[docType] || null;
+// ── entity-specific legal-entity document ───────────────────────────────────
+// `sk_kemenkumham` is ONE stored doc_type, but the document it names differs by entity: a PT
+// receives a ministerial approval decision, a CV is registered in AHU rather than approved as
+// a badan hukum, and other forms follow their own route. Showing PT wording ("Perseroan
+// Terbatas") to a CV or Yayasan would be wrong, so the presentation varies while the taxonomy
+// does not. Where the exact official title is not certain for an entity form, the wording is
+// deliberately NEUTRAL rather than guessed — see the disclaimer.
+export const LEGAL_ENTITY_DOC_VARIANTS = {
+  pt: {
+    display_label: 'SK Kemenkumham approval',
+    official_indonesian_name: 'Keputusan Menteri Hukum tentang Pengesahan Pendirian Badan Hukum Perseroan Terbatas',
+    aliases: ['SK Kemenkumham', 'SK pengesahan', 'AHU decision letter'],
+    plain_language_description: 'The ministry decision letter approving the PT as a legal entity.',
+    why_needed: 'It confirms the PT was approved as a legal entity — the deed alone does not.',
+    when_required: 'Issued with the deed for a PT / PT PMA.',
+  },
+  cv: {
+    display_label: 'AHU CV registration proof',
+    official_indonesian_name: 'Surat Keterangan Terdaftar Persekutuan Komanditer (CV)',
+    aliases: ['SKT CV', 'AHU CV registration', 'pendaftaran CV'],
+    plain_language_description: 'Proof that the CV is registered in the AHU system.',
+    why_needed: 'A CV is registered rather than approved as a badan hukum, so this is the registration evidence — not a PT approval decision.',
+    when_required: 'For a CV registered in Indonesia.',
+  },
+  other: {
+    display_label: 'AHU legal entity approval / registration',
+    official_indonesian_name: 'AHU legal entity approval or registration document',
+    aliases: ['AHU approval', 'AHU registration'],
+    plain_language_description: 'The AHU approval or registration document for this entity form.',
+    why_needed: 'It evidences that the entity is recognised by the ministry. The exact document depends on the entity form.',
+    when_required: 'For registered Indonesian legal entities other than a PT or CV — confirm the exact document with your notary.',
+  },
+};
+
+// 'pt' | 'cv' | 'other'. Mirrors the backend rule in server/lib/documentIntake.js.
+export function entityFormOf(profile = {}) {
+  const e = String(profile?.legal_entity_type || '').toLowerCase();
+  if (/\bpt\b/.test(e)) return 'pt';
+  if (/\bcv\b/.test(e)) return 'cv';
+  return 'other';
+}
+
+/**
+ * Knowledge for a document type. Pass the profile so the legal-entity document is described
+ * in terms of the entity the user actually has.
+ */
+export const knowledgeFor = (docType, profile) => {
+  const base = DOCUMENT_KNOWLEDGE[docType] || null;
+  if (!base) return null;
+  if (docType !== 'sk_kemenkumham' || profile === undefined) return base;
+  return { ...base, ...LEGAL_ENTITY_DOC_VARIANTS[entityFormOf(profile)] };
+};
 export const groupOf = (docType) => DOCUMENT_KNOWLEDGE[docType]?.group || 'operational';
 
 // ── priority ────────────────────────────────────────────────────────────────
@@ -245,14 +329,20 @@ export const isUrgent = (item) => URGENT_PRIORITIES.has(priorityOf(item));
  * @returns {{available, groups:Array, pack:{items,total,satisfied,outstanding,complete},
  *            payroll:{items,total,satisfied,outstanding,applies}, disclaimer}}
  */
-export function groupChecklist(checklist) {
-  const base = { available: false, groups: [], disclaimer: checklist?.disclaimer || DISCLAIMER,
-    pack: { items: [], total: 0, satisfied: 0, outstanding: [], complete: false },
-    payroll: { items: [], total: 0, satisfied: 0, outstanding: [], applies: false } };
+export function groupChecklist(checklist, profile) {
+  const base = { available: false, truncated: false, disclaimer: checklist?.disclaimer || DISCLAIMER,
+    groups: [],
+    pack: { items: [], total: null, satisfied: null, outstanding: [], complete: false, countable: false },
+    payroll: { items: [], total: null, satisfied: null, outstanding: [], applies: false, countable: false } };
   if (!checklist || !Array.isArray(checklist.items)) return base;
 
+  // A truncated document set cannot prove a document is ABSENT — a matching document may sit
+  // outside the fetched page. Uploaded statuses that we DID see stay visible, but no count and
+  // no "still needed" list is produced, because both would assert absence.
+  const countable = !checklist.truncated;
+
   const decorate = (i) => {
-    const k = knowledgeFor(i.type);
+    const k = knowledgeFor(i.type, profile);
     const priority = priorityOf(i);
     return {
       ...i,
@@ -274,7 +364,8 @@ export function groupChecklist(checklist) {
       counts: {
         total: rows.length,
         satisfied: rows.filter(i => i.satisfied).length,
-        missing: rows.filter(i => i.status === 'missing' && isUrgent(i)).length,
+        // "missing" asserts absence, so it is only counted on a complete set.
+        missing: countable ? rows.filter(i => i.status === 'missing' && isUrgent(i)).length : null,
         needs_review: rows.filter(i => i.status === 'needs_review').length,
       },
     };
@@ -290,17 +381,19 @@ export function groupChecklist(checklist) {
     groups,
     pack: {
       items: packItems,
-      total: packItems.length,
-      satisfied: packItems.filter(i => i.satisfied).length,
-      outstanding: outstanding(packItems),
-      complete: packItems.length > 0 && packItems.every(i => i.satisfied),
+      countable,
+      total: countable ? packItems.length : null,
+      satisfied: countable ? packItems.filter(i => i.satisfied).length : null,
+      outstanding: countable ? outstanding(packItems) : [],
+      complete: countable && packItems.length > 0 && packItems.every(i => i.satisfied),
     },
     payroll: {
       items: payrollItems,
-      total: payrollItems.length,
-      satisfied: payrollItems.filter(i => i.satisfied).length,
-      outstanding: outstanding(payrollItems),
+      countable,
       applies: payrollItems.length > 0,
+      total: countable ? payrollItems.length : null,
+      satisfied: countable ? payrollItems.filter(i => i.satisfied).length : null,
+      outstanding: countable ? outstanding(payrollItems) : [],
     },
     disclaimer: checklist.disclaimer || DISCLAIMER,
   };

@@ -209,6 +209,9 @@ One upload window; CFO AI classifies and files. **No migration** — see the sto
   a truncated set downgrades `missing` to `needs_review`.
 - Frontend loads are protected by `client/src/lib/requestGuard.js` (generation + AbortController)
   so a response from a previously active workspace can never be rendered.
+- `requirementsFor()` varies the legal-entity document's LABEL and REASON by entity form
+  (PT / CV / other) while keeping one stored `doc_type` — presentation differs, taxonomy
+  does not, so no migration is needed.
 - `client/src/lib/documentKnowledge.js` holds the static Indonesian document knowledge base
   plus the grouping/priority derivation the checklist and the Workbench share. It reads the
   backend `requirement` and never overrides it.

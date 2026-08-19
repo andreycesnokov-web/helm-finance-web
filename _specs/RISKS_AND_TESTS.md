@@ -607,11 +607,43 @@ BPJS.
 advice"). Tests assert the knowledge base and every generated action are free of "fully
 compliant", "legally valid", "certified", "guarantee" and "100%".
 
-**Tests:** `documentKnowledge.test.js` (17) — metadata completeness for all 15 types, the
+**Review fixes (2026-08-19, after Conditional GO).**
+
+1. *Truncated checklists no longer assert absence.* `groupChecklist()` now returns
+   `pack.countable=false` with `total`/`satisfied` as **null** and empty `outstanding` when
+   `checklist.truncated` is true, and group-level `missing` counts are null. The UI shows
+   "Checklist incomplete" plus a neutral notice instead of "N of M in place" / "Still needed:
+   …", and a `missing` row renders as "not verified". Uploaded statuses we did observe stay
+   visible — an upload is an observation, absence would be an inference. The Workbench already
+   produced only a neutral action on a truncated set; that is now pinned by test.
+
+2. *The legal-entity document is entity-specific.* A PT receives a ministerial approval
+   decision; a CV is REGISTERED in AHU rather than approved as a badan hukum. The backend
+   previously required the PT-specific "SK Kemenkumham approval" for every
+   `/pt|cv|yayasan|firma/` entity. `requirementsFor()` now varies the label and reason by
+   entity while keeping the stored `doc_type` as `sk_kemenkumham` — **no new taxonomy and no
+   migration**:
+   - PT / PT PMA → "SK Kemenkumham approval" (Keputusan Menteri Hukum … Perseroan Terbatas)
+   - CV → "AHU CV registration proof" (Surat Keterangan Terdaftar Persekutuan Komanditer)
+   - Yayasan / Firma / other → "AHU legal entity approval / registration" — deliberately
+     NEUTRAL wording, because the exact official title per entity form is not confirmed in
+     code; the row tells the user to confirm the document with their notary.
+   The frontend mirrors this through `LEGAL_ENTITY_DOC_VARIANTS` + `entityFormOf(profile)`,
+   and `knowledgeFor(docType, profile)` returns the entity-appropriate record.
+
+3. *Metadata contract.* Every knowledge record now carries an explicit `doc_type` (asserted to
+   match its key) and an explicit `issuing_body`, separate from the free-text `where_to_get`.
+
+**Tests:** `documentKnowledge.test.js` (28) — metadata completeness for all 15 types, the
 Indonesian official names and issuing bodies, forbidden wording, four-group ordering, payroll
 labelled as payroll, priority derived from the backend requirement, the owner's 4-of-5 pack,
 payroll separated, optional documents excluded from the pack, no-employees case, all-uploaded
-case, null checklist, and Workbench action ordering/copy matching the grouping.
+case, null checklist, and Workbench action ordering/copy matching the grouping. Plus the
+review fixes: truncated set yields no pack count, no still-needed list and no specific
+Workbench action while keeping observed uploads visible; PT/PT PMA get PT wording; a CV
+never sees "Perseroan Terbatas" and uses Surat Keterangan Terdaftar wording; a Yayasan
+stays neutral and is told to confirm with a notary; every record has doc_type +
+issuing_body.
 
 **Remaining risks:** the content is Indonesia-specific and hand-written — it should be reviewed
 by a licensed Indonesian practitioner before it is treated as guidance rather than orientation;

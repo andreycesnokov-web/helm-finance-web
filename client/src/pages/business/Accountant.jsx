@@ -11,7 +11,7 @@ import { PageHeader, Card, Btn, StatusBadge, Stat, ErrorState, LoadingSkeleton, 
 import DocumentIntakeModal from '../../components/DocumentIntakeModal'
 import { createRequestGuard } from '../../lib/requestGuard'
 import { buildReadiness } from '../../lib/accountantReadiness'
-import { groupChecklist } from '../../lib/documentKnowledge'
+import { groupChecklist, TRUNCATED_NOTICE } from '../../lib/documentKnowledge'
 
 // Which UI fields persist to the backend today vs. live as local draft (await 040).
 const PERSISTED = new Set(['country', 'jurisdiction', 'legal_entity_type', 'npwp', 'pkp_status', 'vat_status', 'financial_year_start', 'financial_year_end', 'nib', 'employee_status'])
@@ -142,7 +142,9 @@ export function BusinessAccountant() {
   // Readiness is DERIVED from the checklist payload, not from a second local list, so the
   // card can never contradict Compliance Documents.
   // Grouped, knowledge-annotated view of the SAME checklist payload.
-  const grouped = useMemo(() => groupChecklist(checklist), [checklist])
+  // `form` is passed so the legal-entity document is described for the entity the user
+  // actually has (a CV must not be shown PT wording).
+  const grouped = useMemo(() => groupChecklist(checklist, form), [checklist, form])
 
   const readiness = useMemo(() => buildReadiness(checklist, {
     form,
@@ -268,22 +270,34 @@ export function BusinessAccountant() {
             <div style={{ padding: '10px 12px', marginBottom: 12, border: '1px solid var(--border-default)', borderRadius: 'var(--radius-md)', background: 'var(--info-soft)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                 <strong style={{ fontSize: 13.5 }}>Minimum company pack</strong>
-                <StatusBadge tone={grouped.pack.complete ? 'success' : 'warning'}>
-                  {grouped.pack.satisfied} of {grouped.pack.total} in place
-                </StatusBadge>
+                {grouped.pack.countable
+                  ? <StatusBadge tone={grouped.pack.complete ? 'success' : 'warning'}>
+                      {grouped.pack.satisfied} of {grouped.pack.total} in place
+                    </StatusBadge>
+                  : <StatusBadge tone="neutral">Checklist incomplete</StatusBadge>}
               </div>
-              <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 4 }}>
-                {grouped.pack.complete
-                  ? 'Every document this profile needs for company identity and tax registration is uploaded.'
-                  : <>Still needed: {grouped.pack.outstanding.map(i => i.label).join(', ')}.</>}
-              </div>
-              {grouped.payroll.applies && (
-                <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 6 }}>
-                  <strong>Payroll compliance</strong> (separate from the company pack):{' '}
-                  {grouped.payroll.outstanding.length
-                    ? <>still needed &mdash; {grouped.payroll.outstanding.map(i => i.label).join(', ')}.</>
-                    : 'in place.'}
+              {/* A truncated document set cannot prove absence, so neither an exact count nor a
+                  "still needed" list may be shown — only a neutral prompt to review. */}
+              {!grouped.pack.countable ? (
+                <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 4 }}>
+                  {TRUNCATED_NOTICE}
                 </div>
+              ) : (
+                <>
+                  <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 4 }}>
+                    {grouped.pack.complete
+                      ? 'Every document this profile needs for company identity and tax registration is uploaded.'
+                      : <>Still needed: {grouped.pack.outstanding.map(i => i.label).join(', ')}.</>}
+                  </div>
+                  {grouped.payroll.applies && (
+                    <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 6 }}>
+                      <strong>Payroll compliance</strong> (separate from the company pack):{' '}
+                      {grouped.payroll.outstanding.length
+                        ? <>still needed &mdash; {grouped.payroll.outstanding.map(i => i.label).join(', ')}.</>
+                        : 'in place.'}
+                    </div>
+                  )}
+                </>
               )}
             </div>
 
@@ -316,8 +330,9 @@ export function BusinessAccountant() {
                         <StatusBadge tone={
                           it.status === 'uploaded' ? 'success'
                             : it.status === 'needs_review' ? 'warning'
-                              : it.status === 'missing' ? 'danger' : 'neutral'
-                        }>{it.status.replace('_', ' ')}</StatusBadge>
+                              : it.status === 'missing' && grouped.pack.countable ? 'danger' : 'neutral'
+                        }>{it.status === 'missing' && !grouped.pack.countable
+                          ? 'not verified' : it.status.replace('_', ' ')}</StatusBadge>
                         {it.knowledge && (
                           <Btn sm variant="ghost" onClick={() => setOpenWhy(openWhy === it.type ? null : it.type)}>
                             {openWhy === it.type ? 'Hide' : 'Why needed?'}
