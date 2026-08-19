@@ -464,16 +464,63 @@ test('unknown/unset PKP with vat_status missing → NOT suppressed', () => {
     assert.strictEqual(prepareNeeded({ pkp_status }, ['vat_status']), true, `pkp_status=${pkp_status}`);
 });
 
-test('the Workbench source no longer reads the raw backend missing list for display', () => {
+// EVERY page that displays profile completeness must filter through the same helper — a page
+// that counts or lists the raw backend field is a second, contradicting source of truth.
+const PAGE_DIR = path.join(__dirname, '..', '..', 'client', 'src', 'pages');
+const PAGES_THAT_SHOW_MISSING_FIELDS = [
+  ['Workbench (premium)', WORKBENCH_SRC],
+  ['legacy Accountant page', path.join(PAGE_DIR, 'Accountant.jsx')],
+  ['TaxProfile page', path.join(PAGE_DIR, 'TaxProfile.jsx')],
+];
+
+for (const [name, file] of PAGES_THAT_SHOW_MISSING_FIELDS) {
+  test(`${name} never renders the raw backend missing list`, () => {
+    const src = fs.readFileSync(file, 'utf8');
+    const rawReads = src.split('\n').filter(l => l.includes('missing_profile_fields'));
+    assert.ok(rawReads.length, `${name}: expected this page to reference the field at all`);
+    for (const line of rawReads) {
+      // Allowed: the filter call itself, and a default/empty-state literal.
+      const ok = line.includes('applicableMissingFields') || line.includes('missing_profile_fields: []');
+      assert.ok(ok, `${name}: raw missing_profile_fields used for display: ${line.trim()}`);
+    }
+    assert.ok(src.includes('applicableMissingFields('), `${name}: the filter must be used`);
+  });
+}
+
+test('"What to prepare" specifically does not read the raw list', () => {
   const src = fs.readFileSync(WORKBENCH_SRC, 'utf8');
-  // One derivation only: the filtered `missing`. Any other read of the raw field would be a
-  // second, contradicting source of truth.
-  const rawReads = src.split('\n').filter(l => l.includes('missing_profile_fields'));
-  for (const line of rawReads) {
-    const ok = line.includes('applicableMissingFields') || /missing_profile_fields: \[\]/.test(line);
-    assert.ok(ok, `raw missing_profile_fields used for display: ${line.trim()}`);
-  }
-  assert.ok(src.includes('applicableMissingFields('), 'the filter must be used');
   assert.ok(!/What to prepare[\s\S]{0,200}state\.applicability\?\.missing_profile_fields/.test(src),
     '"What to prepare" must not read the raw list');
+});
+
+// ── the four PKP cases, as the legacy pages now compute them ────────────────
+// Both legacy pages render `applicableMissingFields(profile, backendMissing)` directly — a
+// count on the Accountant page, a joined list on TaxProfile — so that call IS their logic.
+const legacyMissing = (form, backendMissing) => applicableMissingFields(form, backendMissing);
+
+test('legacy pages: Non-PKP + only vat_status → nothing counted or listed', () => {
+  const shown = legacyMissing({ pkp_status: 'non_pkp' }, ['vat_status']);
+  assert.strictEqual(shown.length, 0, 'the count tile must read 0');
+  assert.strictEqual(shown.join(', '), '', 'the TaxProfile list must render nothing');
+});
+
+test('legacy pages: Non-PKP + an unrelated field → only that field remains', () => {
+  const shown = legacyMissing({ pkp_status: 'non_pkp' }, ['vat_status', 'financial_year_start']);
+  assert.deepStrictEqual(shown, ['financial_year_start']);
+  assert.strictEqual(shown.length, 1);
+});
+
+test('legacy pages: PKP registered + vat_status → still missing', () => {
+  assert.deepStrictEqual(legacyMissing({ pkp_status: 'pkp_registered' }, ['vat_status']), ['vat_status']);
+});
+
+test('legacy pages: unknown or unset PKP + vat_status → still missing', () => {
+  for (const pkp_status of ['unknown', '', undefined, null])
+    assert.deepStrictEqual(legacyMissing({ pkp_status }, ['vat_status']), ['vat_status'], `pkp_status=${pkp_status}`);
+});
+
+test('legacy pages: a missing profile object never throws or over-suppresses', () => {
+  assert.deepStrictEqual(legacyMissing({}, ['vat_status']), ['vat_status']);
+  assert.deepStrictEqual(legacyMissing(null, ['vat_status']), ['vat_status']);
+  assert.deepStrictEqual(legacyMissing(undefined, ['vat_status']), ['vat_status']);
 });

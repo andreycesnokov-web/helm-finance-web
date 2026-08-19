@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '../hooks/useAuth'
 import { apiFetch } from '../lib/api'
+import { applicableMissingFields } from '../lib/accountantReadiness'
 import { getLang } from '../i18n/index'
 
 const L = {
@@ -128,8 +129,10 @@ export default function TaxProfile() {
               ✅ <b>{r.title}</b> <span style={{ color: 'var(--text-3)' }}>({r.rule_code})</span><div style={{ fontSize: 12, color: 'var(--text-3)' }}>{r.reason}</div>
             </div>
           ))}
-          {(appl.missing_profile_fields || []).length > 0 && (
-            <div style={{ fontSize: 12, color: 'var(--amber-dark)', marginTop: 8 }}>{l.missing}: {appl.missing_profile_fields.join(', ')}</div>
+          {/* Only fields that APPLY to this profile: a Non-PKP company is not missing
+              vat_status, and listing it here would contradict the AI Accountant pages. */}
+          {applicableMissingFields(p, appl.missing_profile_fields || []).length > 0 && (
+            <div style={{ fontSize: 12, color: 'var(--amber-dark)', marginTop: 8 }}>{l.missing}: {applicableMissingFields(p, appl.missing_profile_fields || []).join(', ')}</div>
           )}
           {(appl.excluded_rules || []).length > 0 && (
             <details style={{ marginTop: 8, fontSize: 12, color: 'var(--text-3)' }}>
