@@ -32,13 +32,40 @@ const humanList = (items) => {
   return `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`;
 };
 
-// 'pkp_registered' | 'non_pkp' | 'unknown'. An unset value and the explicit "Unknown" option
-// are the same thing: we do not know. Anything else the user actually stated is respected.
-export function pkpStatusOf(form = {}) {
-  const v = String(form?.pkp_status || '').trim().toLowerCase();
-  if (v === 'pkp_registered') return 'pkp_registered';
-  if (v === 'non_pkp') return 'non_pkp';
+// MIRRORS server/lib/pkpStatus.js — keep the two in step.
+//
+// The legacy Tax Profile page stored plain `pkp` for a registered company while the premium
+// page stores `pkp_registered`, so a stored value has to be interpreted, not compared.
+// Anything unrecognised is `unknown`, never `non_pkp`: guessing "not registered" would
+// silently drop a real requirement.
+const PKP_REGISTERED_VALUES = new Set(['pkp_registered', 'pkp', 'registered', 'is_pkp', 'yes', 'true']);
+const PKP_NOT_REGISTERED_VALUES = new Set(['non_pkp', 'non-pkp', 'nonpkp', 'not_pkp', 'not_registered', 'no', 'false']);
+
+/** @returns {'pkp_registered'|'non_pkp'|'unknown'} */
+export function normalizePkpStatus(value) {
+  const v = String(value ?? '').trim().toLowerCase().replace(/\s+/g, '_');
+  if (!v) return 'unknown';
+  if (PKP_REGISTERED_VALUES.has(v)) return 'pkp_registered';
+  if (PKP_NOT_REGISTERED_VALUES.has(v)) return 'non_pkp';
   return 'unknown';
+}
+
+// The value a NEW save should write. Legacy values are normalised on read, never rewritten
+// behind the user's back.
+export const CANONICAL_PKP_VALUES = ['pkp_registered', 'non_pkp'];
+
+/**
+ * The option a <select> should show for a stored value. A profile holding the legacy `pkp`
+ * displays as "PKP registered" instead of falling back to a blank option.
+ */
+export function pkpSelectValue(stored) {
+  const n = normalizePkpStatus(stored);
+  return n === 'unknown' ? '' : n;
+}
+
+// 'pkp_registered' | 'non_pkp' | 'unknown' for a profile form.
+export function pkpStatusOf(form = {}) {
+  return normalizePkpStatus(form?.pkp_status);
 }
 
 // Profile fields that stop applying once the company states it is NOT PKP.

@@ -13,6 +13,8 @@
 // migration), the intake taxonomy lives in the existing free-form extracted_json.ai_intake,
 // and document_type keeps a CHECK-valid value. See INTAKE_TYPES[].maps_to.
 
+const { normalizePkpStatus } = require('./pkpStatus');
+
 // ── Taxonomy ────────────────────────────────────────────────────────────────
 // area  = where a confirmed document routes to
 // maps_to = the CHECK-valid financial_documents.document_type to keep on the row
@@ -130,7 +132,8 @@ function requirementsFor(profile = {}) {
           reason: 'Surat Keterangan Terdaftar — confirms the CV is registered in AHU. A CV does not receive a PT approval decision.' }
       : { label: 'AHU legal entity approval / registration',
           reason: `The AHU approval or registration document for a ${p.legal_entity_type || 'this entity type'}. Confirm the exact document with your notary.` };
-  const pkp = String(p.pkp_status || '').toLowerCase();
+  // Normalised: the legacy Tax Profile page stores `pkp` for a registered company.
+  const pkp = normalizePkpStatus(p.pkp_status);
   const hasEmployees = String(p.employee_status || '') === 'has_employees';
   const foreign = String(p.foreign_owned || '') === 'yes';
   const known = (v) => v !== undefined && v !== null && v !== '';

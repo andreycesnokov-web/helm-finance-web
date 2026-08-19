@@ -2185,14 +2185,20 @@ app.get('/api/accountant/profile', auth, async (req, res) => {
 // PUT /api/accountant/profile — owner/admin/cfo edits the tax profile
 const TAX_PROFILE_FIELDS = ['country','jurisdiction','legal_entity_type','tax_residency','tax_regime','tax_identifier','npwp','nib','financial_year_start','financial_year_end','vat_status','pkp_status','employee_status','payroll_tax_status','withholding_tax_status','industry','business_activity_codes','accounting_method','reporting_currency','filing_frequency'];
 // Minimum fields needed before any obligation can be generated.
+const { applicableProfileFields } = require('./lib/pkpStatus');
 const REQUIRED_PROFILE_FIELDS = ['country','jurisdiction','legal_entity_type','tax_regime','financial_year_start','financial_year_end','vat_status'];
 // Changing these re-opens verification and is always audited.
 const CRITICAL_PROFILE_FIELDS = ['country','legal_entity_type','tax_regime','tax_identifier','npwp','pkp_status','vat_status','financial_year_start','financial_year_end'];
 
+// Completeness is measured against the fields that APPLY to this profile. A company that
+// states it is NOT PKP is not missing `vat_status` — the question does not apply to it — so
+// demanding it would hold completeness below 100% and block the verify gate forever. Any
+// status other than a clear "non_pkp" keeps the full field list (unknown is not "no").
 function profileCompleteness(p) {
-  if (!p) return { percent: 0, missing: [...REQUIRED_PROFILE_FIELDS] };
-  const missing = REQUIRED_PROFILE_FIELDS.filter(f => !p[f]);
-  return { percent: Math.round((REQUIRED_PROFILE_FIELDS.length - missing.length) / REQUIRED_PROFILE_FIELDS.length * 100), missing };
+  const required = applicableProfileFields(REQUIRED_PROFILE_FIELDS, p?.pkp_status);
+  if (!p) return { percent: 0, missing: [...required] };
+  const missing = required.filter(f => !p[f]);
+  return { percent: Math.round((required.length - missing.length) / required.length * 100), missing };
 }
 // tax_identifier (universal) vs npwp (Indonesia) — surface a mismatch, never pick.
 function profileWarnings(p) {
