@@ -2,7 +2,7 @@
 //
 // This is a SOFT archive: it sets archived_at through the existing audited
 // POST /api/documents/:id/archive. The file is not deleted from storage, and the row stays
-// visible in the Document Center and the audit history. Nothing here can hard-delete.
+// visible in the Document Center and the audit history. Nothing here deletes a file.
 //
 // The friction scales with what is at stake:
 //   * a document that merely needs review → one explicit "Archive document" click;
@@ -33,7 +33,7 @@ export default function ArchiveDocumentModal({ doc, businessName, onCancel, onCo
 
         <div style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
           This removes the document from the AI Accountant checklist and intake.
-          The file is kept for audit and history unless it is deleted from the Document Center.
+          The file is kept for audit and history in the Document Center.
         </div>
 
         <div style={{ margin: '12px 0', padding: '10px 12px', border: '1px solid var(--border-subtle)',

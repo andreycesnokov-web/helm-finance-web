@@ -12,6 +12,7 @@ import DocumentIntakeModal from '../../components/DocumentIntakeModal'
 import ArchiveDocumentModal from '../../components/ArchiveDocumentModal'
 import { getSignedUrl } from '../../lib/documents'
 import { previewActionLabel, previewModeFor, formatFileSize, formatUploadedAt, fileKindLabel } from '../../lib/documentPreview'
+import { openDocumentSafely, POPUP_BLOCKED_MESSAGE, OPEN_FAILED_MESSAGE } from '../../lib/openDocument'
 import { createRequestGuard } from '../../lib/requestGuard'
 import { buildReadiness, isFieldNotRequired } from '../../lib/accountantReadiness'
 import { groupChecklist, TRUNCATED_NOTICE } from '../../lib/documentKnowledge'
@@ -55,6 +56,8 @@ export function BusinessAccountant({ onProfileSaved, onDocumentsChanged } = {}) 
   const [archiving, setArchiving] = useState(null)   // the document awaiting confirmation
   const [archiveBusy, setArchiveBusy] = useState(false)
   const [opening, setOpening] = useState(null)
+  const [openFallback, setOpenFallback] = useState({})   // docId -> signed URL to click
+  const [openError, setOpenError] = useState({})         // docId -> message
 
   useEffect(() => {
     // Saved-profile state belongs to ONE workspace: clear it before anything else so
@@ -124,15 +127,18 @@ export function BusinessAccountant({ onProfileSaved, onDocumentsChanged } = {}) 
     } catch (e) { alert(e.message || 'Could not re-read the document') } finally { setConfirming(null) }
   }
 
-  // Open the file itself. A short-lived signed URL from the existing audited endpoint — the
-  // storage path never reaches the client. `noopener` so the new tab cannot touch this one.
+  // Open the file itself, popup-safe: the tab is claimed synchronously inside this click and
+  // navigated once the short-lived signed URL arrives. A blocked popup or a failed request
+  // becomes visible inline instead of doing nothing. The storage path never reaches the
+  // client through any list payload; the signed URL itself IS the access grant.
   const openDocument = async (d) => {
     setOpening(d.id)
-    try {
-      const mode = previewModeFor(d)
-      const url = await getSignedUrl(token, d.id, mode)
-      window.open(url, '_blank', 'noopener,noreferrer')
-    } catch (e) { alert(e.message || 'Could not open the document') } finally { setOpening(null) }
+    setOpenError(e => ({ ...e, [d.id]: null }))
+    setOpenFallback(f => ({ ...f, [d.id]: null }))
+    const r = await openDocumentSafely({ fetchUrl: () => getSignedUrl(token, d.id, previewModeFor(d)) })
+    if (r.status === 'blocked') setOpenFallback(f => ({ ...f, [d.id]: r.url }))
+    if (r.status === 'error') setOpenError(e => ({ ...e, [d.id]: OPEN_FAILED_MESSAGE }))
+    setOpening(null)
   }
 
   // Soft archive through the existing audited endpoint: sets archived_at, deletes nothing.
@@ -145,7 +151,13 @@ export function BusinessAccountant({ onProfileSaved, onDocumentsChanged } = {}) 
       setArchiving(null)
       loadIntake()
       if (typeof onDocumentsChanged === 'function') onDocumentsChanged()
-    } catch (e) { alert(e.message || 'Could not archive the document') } finally { setArchiveBusy(false) }
+    } catch (e) {
+      // The backend is the source of truth for the role gate; make its refusal readable.
+      const msg = /role cannot|permission|403/i.test(e.message || '')
+        ? 'You do not have permission to archive this document.'
+        : (e.message || 'Could not archive the document')
+      alert(msg)
+    } finally { setArchiveBusy(false) }
   }
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
@@ -426,6 +438,22 @@ export function BusinessAccountant({ onProfileSaved, onDocumentsChanged } = {}) 
                       {[fileKindLabel(d), formatFileSize(d.file_size), formatUploadedAt(d.uploaded_at)]
                         .filter(Boolean).join(' · ') || 'No file details available'}
                     </span>
+                    {/* A blocked popup is never a silent no-op: the user gets a real link, and
+                        clicking it is a fresh gesture the browser accepts. */}
+                    {openFallback[d.id] && (
+                      <span style={{ display: 'block', fontSize: 11.5, marginTop: 2, color: 'var(--warning)' }}>
+                        {POPUP_BLOCKED_MESSAGE}{' '}
+                        <a href={openFallback[d.id]} target="_blank" rel="noopener noreferrer"
+                          style={{ color: 'var(--brand-electric-blue)', textDecoration: 'underline' }}>
+                          {previewModeFor(d) === 'view' ? 'Open document' : 'Download document'}
+                        </a>
+                      </span>
+                    )}
+                    {openError[d.id] && (
+                      <span style={{ display: 'block', fontSize: 11.5, marginTop: 2, color: 'var(--danger)' }}>
+                        {openError[d.id]}
+                      </span>
+                    )}
                     <span style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>
                       {d.intake.confidence} confidence · routed to {d.routed_to.replace('_', ' ')}
                       {intake.content_classification_enabled && d.intake.extraction?.text_available === false && ' · text could not be read'}
