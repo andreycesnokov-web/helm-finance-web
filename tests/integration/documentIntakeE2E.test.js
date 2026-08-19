@@ -106,6 +106,13 @@ function startFakeBackend() {
               return json({ url: `/object/upload/sign/${BUCKET}/${p}?token=disposable-token` });
             if (req.method === 'PUT') { storage.set(p, buf); return json({ Key: `${BUCKET}/${p}` }); }
           }
+          // createSignedUrl (view/download) — distinct from the upload sign endpoint above.
+          const readSignPrefix = `/storage/v1/object/sign/${BUCKET}/`;
+          if (pathname.startsWith(readSignPrefix) && req.method === 'POST') {
+            const p = decodeURIComponent(pathname.slice(readSignPrefix.length));
+            if (!storage.has(p)) return json({ error: 'not_found' }, 404);
+            return json({ signedURL: `/object/sign/${BUCKET}/${p}?token=read-token` });
+          }
           const objPrefix = `/storage/v1/object/`;
           if (pathname.startsWith(objPrefix)) {
             let p = decodeURIComponent(pathname.slice(objPrefix.length));
@@ -125,7 +132,14 @@ function startFakeBackend() {
 
         if (table.startsWith('rpc/')) {
           const fn = table.slice(4);
-          if (fn === 'rpc_document_archive') return json({ message: 'probe' }, 200);
+          if (fn === 'rpc_document_archive') {
+            const doc = db.financial_documents.find(d => d.id === body?.p_document_id
+              && d.business_id === body?.p_business_id);
+            if (!doc) return json({ message: 'probe' }, 200);   // the storage-health probe
+            doc.archived_at = new Date().toISOString();
+            db.document_audit.push({ id: crypto.randomUUID(), document_id: doc.id, action: 'archived' });
+            return json({ id: doc.id, archived_at: doc.archived_at });
+          }
           if (fn === 'rpc_document_finalize_upload') {
             db.document_files.push({ ...body.p_file, created_at: new Date().toISOString() });
             const doc = { ...body.p_doc, file_id: body.p_file.id, created_by_user_id: body.p_actor,
@@ -603,4 +617,147 @@ test('I5. the frontend still gets what it renders', async () => {
   const doc = intake.body.documents[0];
   assert.ok(doc.file_name && doc.mime_type);
   assertNoFileSecrets(intake.body, 'intake list');
+});
+
+// ══ J. Preview + archive from the intake list ═══════════════════════════════
+// The user is asked to confirm a type for a row called `6.PDF`; they must be able to open the
+// file, and to remove a wrong upload. Archive is SOFT — the row keeps its file and audit trail.
+let archiveDocId = null;
+
+test('J1. a signed URL can be issued for an intake document, without leaking the path', async () => {
+  const up = await uploadFile({ businessId: BIZ_A, userId: OWNER,
+    file_name: '6.PDF', content: 'preview me' });
+  assert.strictEqual(up.status, 200);
+  archiveDocId = up.body.document.id;
+
+  const r = await call('POST', `/api/documents/${archiveDocId}/signed-url`,
+    { userId: OWNER, businessId: BIZ_A, body: { mode: 'view' } });
+  assert.strictEqual(r.status, 200, JSON.stringify(r.body));
+  assert.ok(r.body.url, 'a URL is returned');
+  const stored = db.document_files.find(f => f.file_name === '6.PDF');
+  // NOTE: a signed URL necessarily contains the object path — that IS the grant. What must not
+  // appear is the checksum, and the path must never appear in LIST payloads (see J9).
+  assert.ok(r.body.url.includes('token='), 'the URL must be token-scoped, not a bare path');
+  assert.ok(!JSON.stringify(r.body).includes(stored.sha256_hash), 'the checksum must not leak');
+  assert.ok(typeof r.body.expires_in === 'number', 'the grant must be short-lived');
+});
+
+test('J2. the signed URL requires auth and the right workspace', async () => {
+  const anon = await call('POST', `/api/documents/${archiveDocId}/signed-url`, { body: { mode: 'view' } });
+  assert.strictEqual(anon.status, 401);
+  const crossBiz = await call('POST', `/api/documents/${archiveDocId}/signed-url`,
+    { userId: OWNER, businessId: BIZ_B, body: { mode: 'view' } });
+  assert.strictEqual(crossBiz.status, 404, 'business B must not reach a business A document');
+  const personal = await call('POST', `/api/documents/${archiveDocId}/signed-url`,
+    { userId: OWNER, businessId: PERSONAL, body: { mode: 'view' } });
+  assert.ok(personal.status >= 400 && personal.status < 500);
+});
+
+test('J3. archive removes the document from the active intake list', async () => {
+  const before = await call('GET', INTAKE, { userId: OWNER, businessId: BIZ_A });
+  assert.ok(before.body.documents.some(d => d.id === archiveDocId), 'present before archiving');
+
+  const r = await call('POST', `/api/documents/${archiveDocId}/archive`, { userId: OWNER, businessId: BIZ_A });
+  assert.strictEqual(r.status, 200, JSON.stringify(r.body));
+  assert.ok(db.financial_documents.find(d => d.id === archiveDocId).archived_at, 'archived_at is set');
+
+  const after = await call('GET', INTAKE, { userId: OWNER, businessId: BIZ_A });
+  assert.ok(!after.body.documents.some(d => d.id === archiveDocId), 'gone from the intake list');
+  assert.ok(!JSON.stringify(after.body).includes('6.PDF'));
+});
+
+test('J4. archive is SOFT — the file and its audit trail survive', async () => {
+  const doc = db.financial_documents.find(d => d.id === archiveDocId);
+  assert.ok(doc, 'the document row still exists');
+  const file = db.document_files.find(f => f.id === doc.file_id);
+  assert.ok(file, 'the file row still exists');
+  assert.ok(storage.has(file.storage_path), 'the stored bytes are NOT deleted');
+  assert.ok(db.document_audit.some(a => a.document_id === archiveDocId && a.action === 'archived'));
+});
+
+test('J5. an archived document no longer satisfies the checklist', async () => {
+  // Upload an NPWP, confirm it (checklist satisfied), then archive it.
+  const up = await uploadFile({ businessId: BIZ_A, userId: OWNER,
+    file_name: 'NPWP_archive_case.pdf', content: 'npwp bytes for archive case' });
+  const id = up.body.document.id;
+  await call('PATCH', `/api/ai-accountant/documents/${id}/classification`,
+    { userId: OWNER, businessId: BIZ_A, body: { doc_type: 'npwp' } });
+
+  const satisfied = await call('GET', REQUIRED, { userId: OWNER, businessId: BIZ_A });
+  assert.strictEqual(satisfied.body.items.find(i => i.type === 'npwp').status, 'uploaded');
+
+  assert.ok(satisfied.body.items.find(i => i.type === 'npwp').documents.some(d => d.id === id),
+    'this document is one of the NPWP matches');
+
+  const arch = await call('POST', `/api/documents/${id}/archive`, { userId: OWNER, businessId: BIZ_A });
+  assert.strictEqual(arch.status, 200);
+
+  const after = await call('GET', REQUIRED, { userId: OWNER, businessId: BIZ_A });
+  const npwp = after.body.items.find(i => i.type === 'npwp');
+  assert.ok(!npwp.documents.some(d => d.id === id), 'the archived document stops counting');
+  assert.ok(!JSON.stringify(after.body).includes('NPWP_archive_case.pdf'));
+
+  // Earlier tests left another NPWP in this workspace. Archive every remaining match to prove
+  // the item's STATUS flips back once nothing satisfies it.
+  for (const m of npwp.documents)
+    assert.strictEqual((await call('POST', `/api/documents/${m.id}/archive`,
+      { userId: OWNER, businessId: BIZ_A })).status, 200);
+  const empty = await call('GET', REQUIRED, { userId: OWNER, businessId: BIZ_A });
+  const npwpNow = empty.body.items.find(i => i.type === 'npwp');
+  assert.notStrictEqual(npwpNow.status, 'uploaded', 'with every match archived the item is unsatisfied');
+  assert.ok(['missing', 'needs_review'].includes(npwpNow.status), `got ${npwpNow.status}`);
+});
+
+test('J6. archive requires auth, the right workspace and a manage role', async () => {
+  const up = await uploadFile({ businessId: BIZ_A, userId: OWNER,
+    file_name: 'guarded.pdf', content: 'guarded bytes' });
+  const id = up.body.document.id;
+
+  const anon = await call('POST', `/api/documents/${id}/archive`, {});
+  assert.strictEqual(anon.status, 401);
+
+  const before = db.document_audit.length;
+  const crossBiz = await call('POST', `/api/documents/${id}/archive`, { userId: OWNER, businessId: BIZ_B });
+  assert.strictEqual(crossBiz.status, 404, 'business A document cannot be archived from business B');
+  assert.strictEqual(db.document_audit.length, before, 'nothing written on a cross-business attempt');
+  assert.ok(!db.financial_documents.find(d => d.id === id).archived_at, 'still not archived');
+
+  const personal = await call('POST', `/api/documents/${id}/archive`, { userId: OWNER, businessId: PERSONAL });
+  assert.ok(personal.status >= 400 && personal.status < 500, 'personal workspace rejected');
+});
+
+test('J7. confirming an archived document is impossible', async () => {
+  const r = await call('PATCH', `/api/ai-accountant/documents/${archiveDocId}/classification`,
+    { userId: OWNER, businessId: BIZ_A, body: { doc_type: 'npwp' } });
+  assert.strictEqual(r.status, 404, 'an archived document is not found for classification');
+});
+
+test('J8. a manually confirmed type can be changed by confirming a different one', async () => {
+  const up = await uploadFile({ businessId: BIZ_A, userId: OWNER,
+    file_name: 'retype.pdf', content: 'retype bytes' });
+  const id = up.body.document.id;
+  const first = await call('PATCH', `/api/ai-accountant/documents/${id}/classification`,
+    { userId: OWNER, businessId: BIZ_A, body: { doc_type: 'akta' } });
+  assert.strictEqual(first.status, 200);
+  const second = await call('PATCH', `/api/ai-accountant/documents/${id}/classification`,
+    { userId: OWNER, businessId: BIZ_A, body: { doc_type: 'nib' } });
+  assert.strictEqual(second.status, 200, 'a wrong confirmation must be correctable');
+  assert.strictEqual(second.body.doc_type, 'nib');
+  const stored = db.financial_documents.find(d => d.id === id);
+  assert.strictEqual(stored.extracted_json.ai_intake.doc_type, 'nib', 'only ONE type is stored');
+
+  // …and the same file cannot satisfy two checklist items at once.
+  const cl = await call('GET', REQUIRED, { userId: OWNER, businessId: BIZ_A });
+  const matched = cl.body.items.filter(i => (i.documents || []).some(d => d.id === id));
+  assert.strictEqual(matched.length, 1, 'one file satisfies at most one checklist item');
+  assert.strictEqual(matched[0].type, 'nib');
+});
+
+test('J9. the intake list carries the metadata the row renders', async () => {
+  const r = await call('GET', INTAKE, { userId: OWNER, businessId: BIZ_A });
+  const d = r.body.documents[0];
+  for (const k of ['id', 'file_name', 'mime_type', 'file_size', 'uploaded_at', 'intake'])
+    assert.ok(k in d, `the row needs ${k}`);
+  assert.ok(!JSON.stringify(r.body).includes('storage_path'));
+  assert.ok(!JSON.stringify(r.body).includes('sha256'));
 });

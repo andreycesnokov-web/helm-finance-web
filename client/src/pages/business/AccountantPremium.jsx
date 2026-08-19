@@ -106,7 +106,9 @@ function PremiumAccountant() {
       {tab === 'calendar' && <CalendarTab obligations={state.obligations} />}
       {tab === 'taxdraft' && <TaxDraftTab obligations={state.obligations} />}
       {tab === 'audit' && <AuditTab />}
-      {tab === 'profile' && <BusinessAccountant onProfileSaved={() => setProfileVersion(v => v + 1)} />}
+      {tab === 'profile' && <BusinessAccountant
+        onProfileSaved={() => setProfileVersion(v => v + 1)}
+        onDocumentsChanged={() => setProfileVersion(v => v + 1)} />}
     </>
   )
 }

@@ -9,6 +9,9 @@ import { useAuth } from '../../hooks/useAuth'
 import { useWorkspace } from '../../shell/WorkspaceProvider'
 import { PageHeader, Card, Btn, StatusBadge, Stat, ErrorState, LoadingSkeleton, Icon } from '../../shell/ui'
 import DocumentIntakeModal from '../../components/DocumentIntakeModal'
+import ArchiveDocumentModal from '../../components/ArchiveDocumentModal'
+import { getSignedUrl } from '../../lib/documents'
+import { previewActionLabel, previewModeFor, formatFileSize, formatUploadedAt, fileKindLabel } from '../../lib/documentPreview'
 import { createRequestGuard } from '../../lib/requestGuard'
 import { buildReadiness, isFieldNotRequired } from '../../lib/accountantReadiness'
 import { groupChecklist, TRUNCATED_NOTICE } from '../../lib/documentKnowledge'
@@ -29,7 +32,7 @@ const VSTATES = {
   not_required: { label: 'Not required', tone: 'neutral' },
 }
 
-export function BusinessAccountant({ onProfileSaved } = {}) {
+export function BusinessAccountant({ onProfileSaved, onDocumentsChanged } = {}) {
   const { token } = useAuth()
   const { active, scopeKey } = useWorkspace()
   const [loading, setLoading] = useState(true)
@@ -49,6 +52,9 @@ export function BusinessAccountant({ onProfileSaved } = {}) {
   const [showUpload, setShowUpload] = useState(false)
   const [openWhy, setOpenWhy] = useState(null)   // doc_type whose knowledge panel is expanded
   const [confirming, setConfirming] = useState(null)
+  const [archiving, setArchiving] = useState(null)   // the document awaiting confirmation
+  const [archiveBusy, setArchiveBusy] = useState(false)
+  const [opening, setOpening] = useState(null)
 
   useEffect(() => {
     // Saved-profile state belongs to ONE workspace: clear it before anything else so
@@ -104,6 +110,7 @@ export function BusinessAccountant({ onProfileSaved } = {}) {
     try {
       await apiFetch(`/ai-accountant/documents/${docId}/classification`, token, { method: 'PATCH', body: { doc_type: docType } })
       loadIntake()
+      if (typeof onDocumentsChanged === 'function') onDocumentsChanged()
     } catch (e) { alert(e.message || 'Could not update the document type') } finally { setConfirming(null) }
   }
 
@@ -115,6 +122,30 @@ export function BusinessAccountant({ onProfileSaved } = {}) {
       await apiFetch(`/ai-accountant/documents/${docId}/reclassify`, token, { method: 'POST' })
       loadIntake()
     } catch (e) { alert(e.message || 'Could not re-read the document') } finally { setConfirming(null) }
+  }
+
+  // Open the file itself. A short-lived signed URL from the existing audited endpoint — the
+  // storage path never reaches the client. `noopener` so the new tab cannot touch this one.
+  const openDocument = async (d) => {
+    setOpening(d.id)
+    try {
+      const mode = previewModeFor(d)
+      const url = await getSignedUrl(token, d.id, mode)
+      window.open(url, '_blank', 'noopener,noreferrer')
+    } catch (e) { alert(e.message || 'Could not open the document') } finally { setOpening(null) }
+  }
+
+  // Soft archive through the existing audited endpoint: sets archived_at, deletes nothing.
+  // The intake list and the checklist both exclude archived documents, so one reload is enough
+  // to drop it from the inbox, the checklist counts and the readiness card together.
+  const archiveDocument = async (d) => {
+    setArchiveBusy(true)
+    try {
+      await apiFetch(`/documents/${d.id}/archive`, token, { method: 'POST' })
+      setArchiving(null)
+      loadIntake()
+      if (typeof onDocumentsChanged === 'function') onDocumentsChanged()
+    } catch (e) { alert(e.message || 'Could not archive the document') } finally { setArchiveBusy(false) }
   }
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
@@ -390,6 +421,11 @@ export function BusinessAccountant({ onProfileSaved } = {}) {
                 <div key={d.id} style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', padding: '10px 12px', borderTop: i ? '0.5px solid var(--border-subtle)' : 'none' }}>
                   <span style={{ flex: 1, minWidth: 180 }}>
                     <span style={{ fontSize: 13.5, fontWeight: 600, display: 'block', overflow: 'hidden', textOverflow: 'ellipsis' }}>{d.file_name || '(unnamed file)'}</span>
+                    {/* Enough context to answer "what is this file?" without opening it. */}
+                    <span style={{ display: 'block', fontSize: 11.5, color: 'var(--text-muted)' }}>
+                      {[fileKindLabel(d), formatFileSize(d.file_size), formatUploadedAt(d.uploaded_at)]
+                        .filter(Boolean).join(' · ') || 'No file details available'}
+                    </span>
                     <span style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>
                       {d.intake.confidence} confidence · routed to {d.routed_to.replace('_', ' ')}
                       {intake.content_classification_enabled && d.intake.extraction?.text_available === false && ' · text could not be read'}
@@ -418,6 +454,10 @@ export function BusinessAccountant({ onProfileSaved } = {}) {
                     onChange={e => confirmType(d.id, e.target.value)}>
                     {(intake.types || []).map(t => <option key={t.type} value={t.type}>{t.label}</option>)}
                   </select>
+                  {/* See the document before being asked to classify it. */}
+                  <Btn sm variant="ghost" disabled={opening === d.id} onClick={() => openDocument(d)}>
+                    {opening === d.id ? 'Opening…' : previewActionLabel(d)}
+                  </Btn>
                   <Btn sm variant="ghost" disabled={confirming === d.id || d.intake.classification_status === 'manually_confirmed'}
                     onClick={() => confirmType(d.id, d.intake.doc_type)}>
                     {confirming === d.id ? '…' : 'Confirm'}
@@ -427,12 +467,15 @@ export function BusinessAccountant({ onProfileSaved } = {}) {
                       {confirming === d.id ? 'Reading…' : 'Re-read'}
                     </Btn>
                   )}
+                  {/* Soft archive — never a hard delete. Confirmation happens in the modal. */}
+                  <Btn sm variant="ghost" disabled={archiveBusy} onClick={() => setArchiving(d)}>Archive</Btn>
                 </div>
               ))}
             </div>
             <div style={{ marginTop: 10, fontSize: 11.5, color: 'var(--text-muted)', lineHeight: 1.55 }}>
               {intake.note} Confirming a type files the document into its compliance area and updates the checklist.
-              Documents are archived from the Document Center — nothing is deleted here.
+              Archiving removes a document from this checklist and keeps the file for audit and
+              history. To change a confirmed type, pick a different type and confirm again.
             </div>
           </Card>
         </div>
@@ -441,6 +484,16 @@ export function BusinessAccountant({ onProfileSaved } = {}) {
       <div style={{ marginTop: 18, display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
         <Btn onClick={save} disabled={saving}>{saving ? 'Saving…' : 'Save profile'}</Btn>
       </div>
+      {archiving && (
+        <ArchiveDocumentModal
+          doc={archiving}
+          businessName={intake?.business?.name || active?.name}
+          busy={archiveBusy}
+          onCancel={() => (archiveBusy ? null : setArchiving(null))}
+          onConfirm={archiveDocument}
+        />
+      )}
+
       {showUpload && (
         <DocumentIntakeModal
           business={intake?.business || active}
