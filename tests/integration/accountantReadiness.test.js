@@ -426,3 +426,54 @@ test('applicableMissingFields is defensive about odd input', () => {
   assert.deepStrictEqual(applicableMissingFields({}, null), []);
   assert.deepStrictEqual(applicableMissingFields({ pkp_status: 'non_pkp' }, ['npwp']), ['npwp']);
 });
+
+// ── Workbench "What to prepare" must use the FILTERED missing list ──────────
+// Regression: the card read state.applicability.missing_profile_fields directly, so a Non-PKP
+// company whose only backend gap was vat_status still saw "Finish your tax profile…" while the
+// field badge said Not required and verification gaps were 0.
+const fs = require('node:fs');
+const WORKBENCH_SRC = path.join(__dirname, '..', '..', 'client', 'src', 'pages', 'business', 'AccountantPremium.jsx');
+
+// The card is inline JSX, so its INPUT is what a unit test can pin.
+const prepareNeeded = (form, backendMissing) =>
+  applicableMissingFields(form, backendMissing).length > 0;
+
+test('Non-PKP with only vat_status missing → no "Finish your tax profile"', () => {
+  const form = { pkp_status: 'non_pkp' };
+  assert.strictEqual(prepareNeeded(form, ['vat_status']), false);
+  // …and the other two surfaces agree, which is the point.
+  const r = buildReadiness(checklist(PKP_NOT_REQUIRED), { form, missingFields: ['vat_status'] });
+  assert.strictEqual(r.verificationGaps, 0);
+  assert.strictEqual(buildDocumentActions(checklist(PKP_NOT_REQUIRED), { form }).actions.length, 0);
+});
+
+test('Non-PKP with an unrelated missing field → profile guidance is still shown', () => {
+  const form = { pkp_status: 'non_pkp' };
+  assert.strictEqual(prepareNeeded(form, ['vat_status', 'financial_year_start']), true);
+  const r = buildReadiness(checklist(PKP_NOT_REQUIRED),
+    { form, missingFields: ['vat_status', 'financial_year_start'] });
+  assert.strictEqual(r.verificationGaps, 1);
+});
+
+test('PKP registered with vat_status missing → profile guidance is still shown', () => {
+  assert.strictEqual(prepareNeeded({ pkp_status: 'pkp_registered' }, ['vat_status']), true);
+});
+
+test('unknown/unset PKP with vat_status missing → NOT suppressed', () => {
+  for (const pkp_status of ['unknown', '', undefined])
+    assert.strictEqual(prepareNeeded({ pkp_status }, ['vat_status']), true, `pkp_status=${pkp_status}`);
+});
+
+test('the Workbench source no longer reads the raw backend missing list for display', () => {
+  const src = fs.readFileSync(WORKBENCH_SRC, 'utf8');
+  // One derivation only: the filtered `missing`. Any other read of the raw field would be a
+  // second, contradicting source of truth.
+  const rawReads = src.split('\n').filter(l => l.includes('missing_profile_fields'));
+  for (const line of rawReads) {
+    const ok = line.includes('applicableMissingFields') || /missing_profile_fields: \[\]/.test(line);
+    assert.ok(ok, `raw missing_profile_fields used for display: ${line.trim()}`);
+  }
+  assert.ok(src.includes('applicableMissingFields('), 'the filter must be used');
+  assert.ok(!/What to prepare[\s\S]{0,200}state\.applicability\?\.missing_profile_fields/.test(src),
+    '"What to prepare" must not read the raw list');
+});

@@ -73,7 +73,15 @@ export const SEVERITY = { RISK: 'risk', ADVISORY: 'advisory' };
  *   @param {string[]} opts.missingFields   profile fields the backend reports as missing
  *   @param {number} opts.obligations       count of applicable rules
  * @returns {{available:boolean, missingDocs:number|null, needsConfirmation:number|null,
- *            verificationGaps:number, riskFlags:string[], next:string, source:string}}
+ *            verificationGaps:number,
+ *            riskFlags:Array<{severity:'risk'|'advisory', message:string}>,
+ *            riskCount:number, suppressedFields:string[],
+ *            next:string, source:'checklist'|'truncated'|'unavailable'}}
+ *
+ * `verificationGaps` counts only fields that APPLY to this profile; `suppressedFields` lists
+ * the ones dropped because the stated PKP status makes them irrelevant. Consumers that render
+ * a profile-completion prompt must use [applicableMissingFields], never the raw backend list,
+ * or they will contradict the field badges.
  */
 export function buildReadiness(checklist, { form = {}, missingFields = [], obligations = 0 } = {}) {
   const riskFlags = [];

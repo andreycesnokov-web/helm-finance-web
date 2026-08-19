@@ -237,7 +237,9 @@ function Workbench({ state, setTab, navigate }) {
         <div className="cfo-grid cfo-grid-3">
           <PlainCard k="What to do" v={nextDeadlines[0] ? `${nextDeadlines[0].title} by ${nextDeadlines[0].date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}.` : 'No statutory deadlines left this month.'} />
           <PlainCard k="Why" v="These are fixed Indonesian statutory deadlines. Exact amounts will come from the deterministic tax engine with legal source references." />
-          <PlainCard k="What to prepare" v={(state.applicability?.missing_profile_fields || []).length ? 'Finish your tax profile so obligations can be computed.' : 'Keep invoices and payroll records confirmed and up to date.'} />
+          {/* `missing` is the FILTERED list — a field that does not apply (vat_status on a
+              Non-PKP company) must not read as an unfinished profile here either. */}
+          <PlainCard k="What to prepare" v={missing.length ? 'Finish your tax profile so obligations can be computed.' : 'Keep invoices and payroll records confirmed and up to date.'} />
         </div>
         <div style={{ display: 'flex', gap: 10, marginTop: 14 }}>
           <Btn disabled title="Available once the tax engine is connected">Prepare filing pack (soon)</Btn>
