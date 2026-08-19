@@ -570,6 +570,54 @@ Docs-only:
 - Ensure no app source changed.
 
 
+## Document Knowledge Base + checklist grouping (2026-08-19)
+
+**Why.** The checklist was a flat list, so an owner could not tell a company-foundation
+document from a payroll formality, and had no way to answer "what is this called officially
+and where do I get it?".
+
+**What it is.** `client/src/lib/documentKnowledge.js` — a static, local, frontend-only config.
+No backend, no migration, no network call, no AI. It holds, per document type:
+`display_label`, `official_indonesian_name`, `aliases`, `plain_language_description`,
+`why_needed`, `when_required`, `where_to_get`, `confirms_profile_fields`, `group`.
+15 types: NPWP, NIB, Akta, SK Kemenkumham, PKP certificate, KPP registration, OSS licence,
+payroll document, BPJS document, bank statement, tax report, tax payment proof, contract,
+invoice, receipt.
+
+**Critical boundary.** The knowledge base is DESCRIPTIVE only. Whether a document is REQUIRED
+still comes exclusively from the backend checklist (`/api/ai-accountant/required-documents`).
+`priorityOf()` reads the backend `requirement` and only decides how it READS; it can never
+promote an `optional` document to required. A test pins this.
+
+**Groups** (render order): Core company identity, Tax registration, Payroll compliance,
+Operational & supporting.
+
+**Priority vocabulary:** `core_required` ("Required — company identity"),
+`conditional_required` ("Required — tax registration"), `payroll_required` ("Required for
+payroll compliance"), `recommended`, `optional`, `not_required`, `needs_review`. Payroll
+documents can never carry an identity label — asserted by test.
+
+**Minimum company pack** = identity + tax-registration items the backend marks
+required/conditional_required. Payroll is deliberately excluded and reported separately, so
+missing BPJS never inflates the "company pack" count. On the owner's live profile this reads
+4 of 5 in place with PKP certificate outstanding, plus a separate payroll line for payroll +
+BPJS.
+
+**Honesty.** The disclaimer stays ("preliminary", "does not verify", "not legal or tax
+advice"). Tests assert the knowledge base and every generated action are free of "fully
+compliant", "legally valid", "certified", "guarantee" and "100%".
+
+**Tests:** `documentKnowledge.test.js` (17) — metadata completeness for all 15 types, the
+Indonesian official names and issuing bodies, forbidden wording, four-group ordering, payroll
+labelled as payroll, priority derived from the backend requirement, the owner's 4-of-5 pack,
+payroll separated, optional documents excluded from the pack, no-employees case, all-uploaded
+case, null checklist, and Workbench action ordering/copy matching the grouping.
+
+**Remaining risks:** the content is Indonesia-specific and hand-written — it should be reviewed
+by a licensed Indonesian practitioner before it is treated as guidance rather than orientation;
+issuing bodies and portal names change over time and there is no update mechanism; the grouping
+is frontend-only, so any other consumer of the checklist endpoint sees the flat list.
+
 ## Document Intelligence Phase 2 — content-based classification (2026-08-18)
 
 **Status: FEATURE-FLAGGED, DEFAULT OFF.** `DOCUMENT_CONTENT_CLASSIFICATION_ENABLED` is unset in

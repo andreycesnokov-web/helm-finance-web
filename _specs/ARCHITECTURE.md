@@ -209,6 +209,9 @@ One upload window; CFO AI classifies and files. **No migration** — see the sto
   a truncated set downgrades `missing` to `needs_review`.
 - Frontend loads are protected by `client/src/lib/requestGuard.js` (generation + AbortController)
   so a response from a previously active workspace can never be rendered.
+- `client/src/lib/documentKnowledge.js` holds the static Indonesian document knowledge base
+  plus the grouping/priority derivation the checklist and the Workbench share. It reads the
+  backend `requirement` and never overrides it.
 - Phase 2 sits behind the default-OFF backend flag `DOCUMENT_CONTENT_CLASSIFICATION_ENABLED`;
   unset means the pipeline is Phase 1 only. Generic document responses pass through the
   `publicExtractedJson()` / `publicFileRow()` whitelists.

@@ -137,6 +137,9 @@ Last updated: 2026-07-04.
   `tests/integration/documentIntakeSecurity.test.js` (16 endpoint/security tests) — 89 tests
   pass overall. Real-storage E2E still needs a disposable-business smoke, and a MiMo/security
   audit is required before deploy.
+- Document Knowledge Base + checklist grouping is on branch
+  `feature/document-knowledge-base`, not deployed. Frontend-only: no backend, no migration,
+  no env. Knowledge is descriptive; the backend checklist still decides what is required.
 - Phase 2 ships **dark**: `DOCUMENT_CONTENT_CLASSIFICATION_ENABLED` defaults to OFF, so no env
   change is needed to deploy and nothing changes until it is switched on after the smoke.
 - **Document Intelligence Phase 2 (2026-08-18, branch `feature/doc-content-classification`)**:
