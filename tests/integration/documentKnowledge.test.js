@@ -294,3 +294,47 @@ test('entity variants claim no legal certainty', () => {
   for (const bad of [/fully compliant/i, /legally valid/i, /\bcertified\b/i, /guarantee/i, /100%/])
     assert.ok(!bad.test(s), `forbidden wording ${bad}`);
 });
+
+// ── Codex final finding: a truncated set must not show "0 missing" ──────────
+const COUNTS = { uploaded: 4, needs_review: 1, missing: 0, optional: 3, not_required: 1 };
+
+test('a truncated checklist never renders a confident "0 missing" badge', () => {
+  const badges = KB.summaryBadges({ counts: COUNTS, truncated: true });
+  const labels = badges.map(b => b.label);
+  assert.ok(!labels.some(l => /\d+\s+missing$/.test(l)), `exact missing count leaked: ${labels}`);
+  assert.ok(!labels.includes('0 missing'), 'the misleading badge must be gone');
+  const missing = badges.find(b => b.key === 'missing');
+  assert.strictEqual(missing.count, null, 'missing is unknown, not zero');
+  assert.strictEqual(missing.label, 'missing unknown');
+  assert.strictEqual(missing.tone, 'neutral', 'unknown must not look like a danger count');
+});
+
+test('a complete checklist still shows the real missing count', () => {
+  const badges = KB.summaryBadges({ counts: { ...COUNTS, missing: 2 }, truncated: false });
+  const missing = badges.find(b => b.key === 'missing');
+  assert.strictEqual(missing.count, 2);
+  assert.strictEqual(missing.label, '2 missing');
+  assert.strictEqual(missing.tone, 'danger');
+});
+
+test('observed counts survive truncation; only the inference is suppressed', () => {
+  const badges = KB.summaryBadges({ counts: COUNTS, truncated: true });
+  const by = Object.fromEntries(badges.map(b => [b.key, b]));
+  assert.strictEqual(by.uploaded.label, '4 uploaded', 'an upload is an observation');
+  assert.strictEqual(by.needs_review.label, '1 need review');
+  assert.strictEqual(by.optional.label, '3 optional');
+  assert.strictEqual(by.not_required.label, '1 not required');
+});
+
+test('the grouped result exposes the same summary the UI renders', () => {
+  const g = KB.groupChecklist(checklist(OWNER_STATE, { truncated: true, counts: COUNTS }));
+  assert.ok(Array.isArray(g.summary));
+  assert.strictEqual(g.summary.find(b => b.key === 'missing').label, 'missing unknown');
+  // …and the pack block stays neutral alongside it.
+  assert.strictEqual(g.pack.countable, false);
+  assert.strictEqual(g.pack.total, null);
+});
+
+test('a missing checklist yields an empty summary rather than zeros', () => {
+  assert.deepStrictEqual(KB.groupChecklist(null).summary, []);
+});

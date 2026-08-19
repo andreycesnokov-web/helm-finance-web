@@ -259,11 +259,12 @@ export function BusinessAccountant() {
 
           {!intakeLoading && checklist && <>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
-              <StatusBadge tone="success">{checklist.counts.uploaded} uploaded</StatusBadge>
-              <StatusBadge tone="warning">{checklist.counts.needs_review} need review</StatusBadge>
-              <StatusBadge tone="danger">{checklist.counts.missing} missing</StatusBadge>
-              <StatusBadge tone="neutral">{checklist.counts.optional} optional</StatusBadge>
-              <StatusBadge tone="neutral">{checklist.counts.not_required} not required</StatusBadge>
+              {/* Counts of rows we were given are observations and survive truncation;
+                  "missing" is an inference, so on a truncated set it reads "missing unknown"
+                  rather than a confident "0 missing". */}
+              {grouped.summary.map(b => (
+                <StatusBadge key={b.key} tone={b.tone}>{b.label}</StatusBadge>
+              ))}
             </div>
 
             {/* Minimum company pack: the short list worth doing first. */}

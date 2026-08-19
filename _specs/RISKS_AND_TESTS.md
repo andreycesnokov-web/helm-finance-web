@@ -631,7 +631,15 @@ compliant", "legally valid", "certified", "guarantee" and "100%".
    The frontend mirrors this through `LEGAL_ENTITY_DOC_VARIANTS` + `entityFormOf(profile)`,
    and `knowledgeFor(docType, profile)` returns the entity-appropriate record.
 
-3. *Metadata contract.* Every knowledge record now carries an explicit `doc_type` (asserted to
+3. *The summary badge no longer shows "0 missing" on a truncated set.* The header badges are
+   now derived by `summaryBadges()`: `uploaded`, `needs_review`, `optional` and `not_required`
+   are OBSERVATIONS of rows we were handed and survive truncation, while `missing` is an
+   INFERENCE about documents that may not have been fetched — on a truncated set it becomes
+   `count: null`, renders as **"missing unknown"** in a neutral tone, and is never a number.
+   Backend regression tests for the entity-specific `requirementsFor()` logic live in
+   `tests/integration/documentRequirements.test.js` (10).
+
+4. *Metadata contract.* Every knowledge record now carries an explicit `doc_type` (asserted to
    match its key) and an explicit `issuing_body`, separate from the free-text `where_to_get`.
 
 **Tests:** `documentKnowledge.test.js` (28) — metadata completeness for all 15 types, the

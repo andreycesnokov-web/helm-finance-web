@@ -323,6 +323,31 @@ export const isMinimumPack = (item) => PACK_PRIORITIES.has(priorityOf(item));
 export const isUrgent = (item) => URGENT_PRIORITIES.has(priorityOf(item));
 
 /**
+ * Summary badges for the checklist header.
+ *
+ * `uploaded`, `needs_review`, `optional` and `not_required` are OBSERVATIONS of rows we were
+ * given, so they survive truncation. `missing` is an INFERENCE about documents we may simply
+ * not have fetched — on a truncated set it becomes `null` and renders as "missing unknown",
+ * never as a confident "0 missing".
+ *
+ * @returns {Array<{key,count:number|null,label,tone}>}
+ */
+export function summaryBadges(checklist) {
+  const counts = checklist?.counts || {};
+  const truncated = !!checklist?.truncated;
+  const badge = (key, label, tone) => ({ key, count: counts[key] ?? 0, label: `${counts[key] ?? 0} ${label}`, tone });
+  return [
+    badge('uploaded', 'uploaded', 'success'),
+    badge('needs_review', 'need review', 'warning'),
+    truncated
+      ? { key: 'missing', count: null, label: 'missing unknown', tone: 'neutral' }
+      : badge('missing', 'missing', 'danger'),
+    badge('optional', 'optional', 'neutral'),
+    badge('not_required', 'not required', 'neutral'),
+  ];
+}
+
+/**
  * Group a checklist payload for display.
  *
  * @param {object|null} checklist the /required-documents payload
@@ -331,7 +356,7 @@ export const isUrgent = (item) => URGENT_PRIORITIES.has(priorityOf(item));
  */
 export function groupChecklist(checklist, profile) {
   const base = { available: false, truncated: false, disclaimer: checklist?.disclaimer || DISCLAIMER,
-    groups: [],
+    summary: [], groups: [],
     pack: { items: [], total: null, satisfied: null, outstanding: [], complete: false, countable: false },
     payroll: { items: [], total: null, satisfied: null, outstanding: [], applies: false, countable: false } };
   if (!checklist || !Array.isArray(checklist.items)) return base;
@@ -378,6 +403,7 @@ export function groupChecklist(checklist, profile) {
   return {
     available: true,
     truncated: !!checklist.truncated,
+    summary: summaryBadges(checklist),
     groups,
     pack: {
       items: packItems,
