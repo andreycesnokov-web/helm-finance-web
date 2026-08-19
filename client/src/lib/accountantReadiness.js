@@ -19,6 +19,13 @@ const NUMBER_FIELD = { npwp: 'npwp', nib: 'nib' };
 
 const REQUIRED_LEVELS = new Set(['required', 'conditional_required']);
 
+// Group/priority come from the knowledge base so the Workbench and the checklist describe a
+// document the same way — payroll formalities must never read like foundation documents.
+import { groupOf, priorityOf, PRIORITY_LABEL } from './documentKnowledge.js';
+
+// Urgent first, and within that: identity, then tax registration, then payroll.
+const PRIORITY_RANK = { core_required: 0, conditional_required: 1, payroll_required: 2 };
+
 const humanList = (items) => {
   if (items.length <= 1) return items[0] || '';
   if (items.length === 2) return `${items[0]} and ${items[1]}`;
@@ -113,23 +120,37 @@ export function buildDocumentActions(checklist, { form = {} } = {}) {
   const required = checklist.items.filter(i => REQUIRED_LEVELS.has(i.requirement));
   const actions = [];
 
+  const meta = (i) => {
+    const priority = priorityOf(i);
+    return { doc_type: i.type, group: groupOf(i.type), priority,
+      priority_label: PRIORITY_LABEL[priority], rank: PRIORITY_RANK[priority] ?? 9 };
+  };
+
   for (const i of required.filter(i => i.status === 'missing')) {
-    actions.push({ id: `upload:${i.type}`, type: 'upload', doc_type: i.type,
-      label: `Upload ${i.label}`, sub: i.reason || 'Required for this profile' });
+    const m = meta(i);
+    actions.push({ id: `upload:${i.type}`, type: 'upload', ...m,
+      label: `Upload ${i.label}`,
+      // The priority label says WHY it is asked for, so a BPJS row cannot read like an akta.
+      sub: `${m.priority_label} — ${i.reason || 'required for this profile'}` });
   }
   for (const i of required.filter(i => i.status === 'needs_review')) {
-    actions.push({ id: `confirm:${i.type}`, type: 'confirm', doc_type: i.type,
+    const m = meta(i);
+    actions.push({ id: `confirm:${i.type}`, type: 'confirm', ...m,
       label: `Confirm document type — ${i.label}`,
-      sub: 'A document may match, but it has not been confirmed yet' });
+      sub: `${m.priority_label} — a document may match, but it has not been confirmed yet` });
   }
   for (const i of required.filter(i => i.status === 'uploaded' && NUMBER_FIELD[i.type])) {
     const v = form[NUMBER_FIELD[i.type]];
     if (v === undefined || v === null || String(v).trim() === '') {
-      actions.push({ id: `number:${i.type}`, type: 'number', doc_type: i.type,
+      const m = meta(i);
+      actions.push({ id: `number:${i.type}`, type: 'number', ...m,
         label: `Enter your ${i.label} number`,
         sub: `The ${i.label} document is uploaded, but the number is missing from the profile` });
     }
   }
+  // Identity, then tax registration, then payroll. Optional/recommended documents produce no
+  // action at all, so they can never look urgent.
+  actions.sort((a, b) => a.rank - b.rank);
   return { available: true, actions, reason: null };
 }
 

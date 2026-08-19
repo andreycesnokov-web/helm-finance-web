@@ -242,6 +242,16 @@ Status: implemented on branch, pending review/deploy. **No migrations, no env, n
   requirements are jurisdiction-aware (Indonesian docs not required outside Indonesia,
   optional+warned when country unknown); truncated document sets report `needs_review` instead
   of a confident `missing`; unset employee status no longer claims "no employees".
+- Review fixes applied: a truncated checklist shows no exact pack count or "still needed"
+  list (absence cannot be proven from a partial set), and the AHU/legal-entity document is
+  entity-specific — PT gets SK Kemenkumham wording, CV gets AHU registration wording,
+  Yayasan/other get neutral wording. No new doc_type, no migration.
+- **Document Knowledge Base + checklist grouping (2026-08-19, on branch)**: the Compliance
+  Documents checklist is grouped into Core company identity / Tax registration / Payroll
+  compliance / Operational, each row carries the official Indonesian name and an inline
+  "Why needed? / Where to get it?" panel, and a "Minimum company pack" short list separates
+  company documents from payroll formalities. Frontend-only static config
+  (`client/src/lib/documentKnowledge.js`); requirement still comes from the backend checklist.
 - Phase 2 is **feature-flagged default OFF** (`DOCUMENT_CONTENT_CLASSIFICATION_ENABLED`);
   production behaviour stays Phase 1 until a disposable Supabase + browser smoke passes.
   Hardened after review: decompression caps, no stored text excerpt, whitelisted document APIs,

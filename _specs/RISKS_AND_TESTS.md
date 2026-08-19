@@ -570,6 +570,94 @@ Docs-only:
 - Ensure no app source changed.
 
 
+## Document Knowledge Base + checklist grouping (2026-08-19)
+
+**Why.** The checklist was a flat list, so an owner could not tell a company-foundation
+document from a payroll formality, and had no way to answer "what is this called officially
+and where do I get it?".
+
+**What it is.** `client/src/lib/documentKnowledge.js` — a static, local, frontend-only config.
+No backend, no migration, no network call, no AI. It holds, per document type:
+`display_label`, `official_indonesian_name`, `aliases`, `plain_language_description`,
+`why_needed`, `when_required`, `where_to_get`, `confirms_profile_fields`, `group`.
+15 types: NPWP, NIB, Akta, SK Kemenkumham, PKP certificate, KPP registration, OSS licence,
+payroll document, BPJS document, bank statement, tax report, tax payment proof, contract,
+invoice, receipt.
+
+**Critical boundary.** The knowledge base is DESCRIPTIVE only. Whether a document is REQUIRED
+still comes exclusively from the backend checklist (`/api/ai-accountant/required-documents`).
+`priorityOf()` reads the backend `requirement` and only decides how it READS; it can never
+promote an `optional` document to required. A test pins this.
+
+**Groups** (render order): Core company identity, Tax registration, Payroll compliance,
+Operational & supporting.
+
+**Priority vocabulary:** `core_required` ("Required — company identity"),
+`conditional_required` ("Required — tax registration"), `payroll_required` ("Required for
+payroll compliance"), `recommended`, `optional`, `not_required`, `needs_review`. Payroll
+documents can never carry an identity label — asserted by test.
+
+**Minimum company pack** = identity + tax-registration items the backend marks
+required/conditional_required. Payroll is deliberately excluded and reported separately, so
+missing BPJS never inflates the "company pack" count. On the owner's live profile this reads
+4 of 5 in place with PKP certificate outstanding, plus a separate payroll line for payroll +
+BPJS.
+
+**Honesty.** The disclaimer stays ("preliminary", "does not verify", "not legal or tax
+advice"). Tests assert the knowledge base and every generated action are free of "fully
+compliant", "legally valid", "certified", "guarantee" and "100%".
+
+**Review fixes (2026-08-19, after Conditional GO).**
+
+1. *Truncated checklists no longer assert absence.* `groupChecklist()` now returns
+   `pack.countable=false` with `total`/`satisfied` as **null** and empty `outstanding` when
+   `checklist.truncated` is true, and group-level `missing` counts are null. The UI shows
+   "Checklist incomplete" plus a neutral notice instead of "N of M in place" / "Still needed:
+   …", and a `missing` row renders as "not verified". Uploaded statuses we did observe stay
+   visible — an upload is an observation, absence would be an inference. The Workbench already
+   produced only a neutral action on a truncated set; that is now pinned by test.
+
+2. *The legal-entity document is entity-specific.* A PT receives a ministerial approval
+   decision; a CV is REGISTERED in AHU rather than approved as a badan hukum. The backend
+   previously required the PT-specific "SK Kemenkumham approval" for every
+   `/pt|cv|yayasan|firma/` entity. `requirementsFor()` now varies the label and reason by
+   entity while keeping the stored `doc_type` as `sk_kemenkumham` — **no new taxonomy and no
+   migration**:
+   - PT / PT PMA → "SK Kemenkumham approval" (Keputusan Menteri Hukum … Perseroan Terbatas)
+   - CV → "AHU CV registration proof" (Surat Keterangan Terdaftar Persekutuan Komanditer)
+   - Yayasan / Firma / other → "AHU legal entity approval / registration" — deliberately
+     NEUTRAL wording, because the exact official title per entity form is not confirmed in
+     code; the row tells the user to confirm the document with their notary.
+   The frontend mirrors this through `LEGAL_ENTITY_DOC_VARIANTS` + `entityFormOf(profile)`,
+   and `knowledgeFor(docType, profile)` returns the entity-appropriate record.
+
+3. *The summary badge no longer shows "0 missing" on a truncated set.* The header badges are
+   now derived by `summaryBadges()`: `uploaded`, `needs_review`, `optional` and `not_required`
+   are OBSERVATIONS of rows we were handed and survive truncation, while `missing` is an
+   INFERENCE about documents that may not have been fetched — on a truncated set it becomes
+   `count: null`, renders as **"missing unknown"** in a neutral tone, and is never a number.
+   Backend regression tests for the entity-specific `requirementsFor()` logic live in
+   `tests/integration/documentRequirements.test.js` (10).
+
+4. *Metadata contract.* Every knowledge record now carries an explicit `doc_type` (asserted to
+   match its key) and an explicit `issuing_body`, separate from the free-text `where_to_get`.
+
+**Tests:** `documentKnowledge.test.js` (28) — metadata completeness for all 15 types, the
+Indonesian official names and issuing bodies, forbidden wording, four-group ordering, payroll
+labelled as payroll, priority derived from the backend requirement, the owner's 4-of-5 pack,
+payroll separated, optional documents excluded from the pack, no-employees case, all-uploaded
+case, null checklist, and Workbench action ordering/copy matching the grouping. Plus the
+review fixes: truncated set yields no pack count, no still-needed list and no specific
+Workbench action while keeping observed uploads visible; PT/PT PMA get PT wording; a CV
+never sees "Perseroan Terbatas" and uses Surat Keterangan Terdaftar wording; a Yayasan
+stays neutral and is told to confirm with a notary; every record has doc_type +
+issuing_body.
+
+**Remaining risks:** the content is Indonesia-specific and hand-written — it should be reviewed
+by a licensed Indonesian practitioner before it is treated as guidance rather than orientation;
+issuing bodies and portal names change over time and there is no update mechanism; the grouping
+is frontend-only, so any other consumer of the checklist endpoint sees the flat list.
+
 ## Document Intelligence Phase 2 — content-based classification (2026-08-18)
 
 **Status: FEATURE-FLAGGED, DEFAULT OFF.** `DOCUMENT_CONTENT_CLASSIFICATION_ENABLED` is unset in

@@ -142,8 +142,10 @@ function Workbench({ state, setTab, navigate }) {
 
   const actions = []
   if (missing.length) actions.push({ id: 'profile', label: 'Complete your tax profile', sub: `${missing.length} field${missing.length > 1 ? 's' : ''} missing — obligations depend on it`, cta: 'Complete', go: () => setTab('profile') })
+  // Already ordered identity -> tax registration -> payroll by the helper, and each action
+  // carries the priority label, so a BPJS row never reads like a foundation document.
   for (const a of docActions.actions) {
-    actions.push({ id: a.id, label: a.label, sub: a.sub,
+    actions.push({ id: a.id, label: a.label, sub: a.sub, group: a.group, priority: a.priority,
       cta: a.type === 'upload' ? 'Upload' : a.type === 'confirm' ? 'Confirm' : 'Enter', go: goDocs })
   }
   if (docActions.available && !docActions.actions.length) {
