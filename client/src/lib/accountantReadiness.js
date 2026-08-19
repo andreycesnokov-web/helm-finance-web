@@ -50,6 +50,23 @@ export function isFieldNotRequired(form, field) {
 }
 
 /**
+ * Drop profile fields that do not apply from a backend `missing` list.
+ *
+ * The persisted profile schema still carries `vat_status`, so the backend keeps reporting it
+ * as missing for a Non-PKP company. If the field badge says "Not required" while readiness
+ * counts it as a verification gap, the two surfaces contradict each other — the exact class of
+ * bug this module exists to prevent. Frontend filtering only: no migration.
+ */
+export function applicableMissingFields(form, missingFields = []) {
+  return (missingFields || []).filter(f => !isFieldNotRequired(form, f));
+}
+
+// Severity for a readiness message. `risk` is a real gap; `advisory` is information about a
+// choice the user has already made and should confirm with a professional — it must not be
+// rendered as an error.
+export const SEVERITY = { RISK: 'risk', ADVISORY: 'advisory' };
+
+/**
  * @param {object|null} checklist  the /required-documents payload (null while loading/failed)
  * @param {object} opts
  *   @param {object} opts.form              current profile form values
@@ -62,15 +79,27 @@ export function buildReadiness(checklist, { form = {}, missingFields = [], oblig
   const riskFlags = [];
   // "Non-PKP" is a STATED status, not a missing one. Only an unset/unknown PKP status is a
   // gap; telling a user who just answered the question that it is unconfirmed is simply wrong.
+  // And a stated Non-PKP is an ADVISORY — worth confirming with an accountant, not an error.
   const pkp = pkpStatusOf(form);
   if (form.foreign_owned === 'yes' && pkp === 'unknown')
-    riskFlags.push('Foreign-owned (PT PMA) without a confirmed PKP status — set PKP status in the profile');
+    riskFlags.push({ severity: SEVERITY.RISK,
+      message: 'Foreign-owned (PT PMA) without a confirmed PKP status — set PKP status in the profile' });
   else if (form.foreign_owned === 'yes' && pkp === 'non_pkp')
-    riskFlags.push('Company is marked Non-PKP. Confirm with an accountant if VAT/PPN registration is required.');
+    riskFlags.push({ severity: SEVERITY.ADVISORY,
+      message: 'Company is marked Non-PKP. Confirm with an accountant if VAT/PPN registration is required.' });
   if (form.employee_status === 'has_employees' && !form.bpjs_registered)
-    riskFlags.push('Has employees but BPJS not registered');
+    riskFlags.push({ severity: SEVERITY.RISK, message: 'Has employees but BPJS not registered' });
 
-  const base = { obligations, verificationGaps: missingFields.length, riskFlags };
+  // A field that does not apply is not a gap. Keep this in step with the field badges.
+  const applicableMissing = applicableMissingFields(form, missingFields);
+  const base = {
+    obligations,
+    verificationGaps: applicableMissing.length,
+    riskFlags,
+    // Only genuine risks colour the summary; advisories are informational.
+    riskCount: riskFlags.filter(f => f.severity === SEVERITY.RISK).length,
+    suppressedFields: (missingFields || []).filter(f => isFieldNotRequired(form, f)),
+  };
 
   // No checklist → say so. Never fall back to a second, contradicting source.
   if (!checklist || !Array.isArray(checklist.items)) {
@@ -106,8 +135,8 @@ export function buildReadiness(checklist, { form = {}, missingFields = [], oblig
   if (missing.length) parts.push(`Upload ${humanList(missing.map(i => i.label))}`);
   if (unconfirmed.length) parts.push(`confirm the document type for ${humanList(unconfirmed.map(i => i.label))}`);
   if (numbersToEnter.length) parts.push(`enter your ${humanList(numbersToEnter)} number`);
-  if (!parts.length && missingFields.length)
-    parts.push(`complete ${missingFields[0].replace(/_/g, ' ')} in the profile`);
+  if (!parts.length && applicableMissing.length)
+    parts.push(`complete ${applicableMissing[0].replace(/_/g, ' ')} in the profile`);
 
   const next = parts.length
     ? parts.join(', and ').replace(/^(.)/, c => c.toUpperCase()) + '.'

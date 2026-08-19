@@ -184,7 +184,14 @@ export function BusinessAccountant({ onProfileSaved } = {}) {
             <Stat k="Need confirmation" v={readiness.available ? readiness.needsConfirmation : '—'} tone={readiness.needsConfirmation ? 'neg' : 'pos'} />
             <Stat k="Verification gaps" v={readiness.verificationGaps} tone={readiness.verificationGaps ? 'neg' : 'pos'} />
           </div>
-          {readiness.riskFlags.map((r, i) => <div key={i} style={{ fontSize: 13, color: 'var(--danger)', marginBottom: 4 }}>⚠ {r}</div>)}
+          {/* A risk is a real gap (red); an advisory describes a choice the user already made
+              and should confirm — it must not look like an error. */}
+          {readiness.riskFlags.map((r, i) => (
+            <div key={i} style={{ fontSize: 13, marginBottom: 4,
+              color: r.severity === 'advisory' ? 'var(--text-secondary)' : 'var(--danger)' }}>
+              {r.severity === 'advisory' ? 'ℹ' : '⚠'} {r.message}
+            </div>
+          ))}
           <div style={{ marginTop: 8, padding: 12, background: 'var(--info-soft)', borderRadius: 'var(--radius-md)', fontSize: 14 }}>
             <strong>Suggested next action:</strong> {readiness.next}
           </div>

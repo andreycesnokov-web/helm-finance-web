@@ -306,7 +306,7 @@ test('PKP registered or unknown → the PKP effective date still applies', () =>
 test('a foreign-owned Non-PKP company gets an advisory, not an "unconfirmed" warning', () => {
   const r = buildReadiness(checklist(PKP_NOT_REQUIRED),
     { form: { foreign_owned: 'yes', pkp_status: 'non_pkp', legal_entity_type: 'PT PMA' } });
-  const flags = r.riskFlags.join(' | ');
+  const flags = r.riskFlags.map(f => f.message).join(' | ');
   assert.ok(!/without confirmed PKP status/i.test(flags), `stale warning: ${flags}`);
   assert.match(flags, /marked Non-PKP/i);
   assert.match(flags, /Confirm with an accountant if VAT\/PPN registration is required/i);
@@ -315,13 +315,14 @@ test('a foreign-owned Non-PKP company gets an advisory, not an "unconfirmed" war
 test('a foreign-owned company with an UNSET PKP status is still flagged', () => {
   for (const pkp_status of ['unknown', '', undefined]) {
     const r = buildReadiness(checklist(PKP_OPTIONAL), { form: { foreign_owned: 'yes', pkp_status } });
-    assert.match(r.riskFlags.join(' | '), /without a confirmed PKP status/i, `pkp_status=${pkp_status}`);
+    assert.match(r.riskFlags.map(f => f.message).join(' | '), /without a confirmed PKP status/i, `pkp_status=${pkp_status}`);
   }
 });
 
 test('a foreign-owned PKP-registered company raises no PKP flag at all', () => {
   const r = buildReadiness(checklist(PKP_REQUIRED), { form: { foreign_owned: 'yes', pkp_status: 'pkp_registered' } });
-  assert.ok(!/PKP/i.test(r.riskFlags.join(' | ')), r.riskFlags.join(' | '));
+  const msgs = r.riskFlags.map(f => f.message).join(' | ');
+  assert.ok(!/PKP/i.test(msgs), msgs);
 });
 
 test('unknown PKP produces no confident certificate requirement of our own', () => {
@@ -339,4 +340,89 @@ test('pkpStatusOf normalises the stated status', () => {
   assert.strictEqual(pkpStatusOf({ pkp_status: 'NON_PKP' }), 'non_pkp');
   assert.strictEqual(pkpStatusOf({ pkp_status: 'unknown' }), 'unknown');
   assert.strictEqual(pkpStatusOf({}), 'unknown');
+});
+
+// ── severity: an advisory is not an error ───────────────────────────────────
+let SEVERITY, applicableMissingFields;
+test.before(async () => { ({ SEVERITY, applicableMissingFields } = await import(MOD)); });
+
+const flagFor = (form) => buildReadiness(checklist(PKP_NOT_REQUIRED), { form });
+
+test('the foreign-owned Non-PKP message is an ADVISORY, not a risk', () => {
+  const r = flagFor({ foreign_owned: 'yes', pkp_status: 'non_pkp' });
+  assert.strictEqual(r.riskFlags.length, 1);
+  assert.strictEqual(r.riskFlags[0].severity, SEVERITY.ADVISORY);
+  assert.strictEqual(r.riskFlags[0].severity, 'advisory');
+  assert.match(r.riskFlags[0].message, /marked Non-PKP/i);
+  assert.strictEqual(r.riskCount, 0, 'an advisory must not count as a risk');
+});
+
+test('the advisory copy does not claim Non-PKP is legally correct', () => {
+  const msg = flagFor({ foreign_owned: 'yes', pkp_status: 'non_pkp' }).riskFlags[0].message;
+  for (const bad of [/correct/i, /legally/i, /compliant/i, /\bvalid\b/i, /no action needed/i])
+    assert.ok(!bad.test(msg), `advisory overclaims: ${msg}`);
+  assert.match(msg, /Confirm with an accountant/i);
+});
+
+test('an unset or unknown PKP status is still a RISK, not an advisory', () => {
+  for (const pkp_status of ['unknown', '', undefined]) {
+    const r = buildReadiness(checklist(PKP_OPTIONAL), { form: { foreign_owned: 'yes', pkp_status } });
+    assert.strictEqual(r.riskFlags[0].severity, SEVERITY.RISK, `pkp_status=${pkp_status}`);
+    assert.strictEqual(r.riskCount, 1, `pkp_status=${pkp_status}`);
+  }
+});
+
+test('the BPJS gap remains a risk', () => {
+  const r = buildReadiness(checklist(PKP_NOT_REQUIRED),
+    { form: { pkp_status: 'non_pkp', employee_status: 'has_employees' } });
+  const bpjs = r.riskFlags.find(f => /BPJS/.test(f.message));
+  assert.strictEqual(bpjs.severity, SEVERITY.RISK);
+});
+
+// ── vat_status consistency: the badge and readiness must agree ──────────────
+test('Non-PKP: a backend "vat_status" gap is suppressed, not counted', () => {
+  const form = { pkp_status: 'non_pkp' };
+  const r = buildReadiness(checklist(PKP_NOT_REQUIRED), { form, missingFields: ['vat_status'] });
+  assert.strictEqual(r.verificationGaps, 0, 'a not-required field is not a gap');
+  assert.deepStrictEqual(r.suppressedFields, ['vat_status']);
+  assert.ok(!/vat status/i.test(r.next), `readiness still asks for it: ${r.next}`);
+  assert.strictEqual(r.next, 'Request accountant verification.');
+});
+
+test('Non-PKP: the field badge and readiness agree on vat_status', () => {
+  const form = { pkp_status: 'non_pkp' };
+  // What the badge says…
+  assert.strictEqual(isFieldNotRequired(form, 'vat_status'), true);
+  // …and what readiness counts must be the same answer.
+  assert.strictEqual(applicableMissingFields(form, ['vat_status']).length, 0);
+});
+
+test('Non-PKP: unrelated missing fields are still reported', () => {
+  const form = { pkp_status: 'non_pkp' };
+  const r = buildReadiness(checklist(PKP_NOT_REQUIRED),
+    { form, missingFields: ['vat_status', 'financial_year_start'] });
+  assert.strictEqual(r.verificationGaps, 1, 'only the PKP-only field is suppressed');
+  assert.match(r.next, /complete financial year start in the profile/i);
+});
+
+test('PKP registered: vat_status is still a real gap', () => {
+  const r = buildReadiness(checklist(PKP_REQUIRED),
+    { form: { pkp_status: 'pkp_registered' }, missingFields: ['vat_status'] });
+  assert.strictEqual(r.verificationGaps, 1);
+  assert.deepStrictEqual(r.suppressedFields, []);
+});
+
+test('unknown/unset PKP: vat_status is NOT suppressed', () => {
+  for (const pkp_status of ['unknown', '', undefined]) {
+    const form = { pkp_status };
+    assert.strictEqual(isFieldNotRequired(form, 'vat_status'), false, `pkp_status=${pkp_status}`);
+    const r = buildReadiness(checklist(PKP_OPTIONAL), { form, missingFields: ['vat_status'] });
+    assert.strictEqual(r.verificationGaps, 1, `pkp_status=${pkp_status}`);
+  }
+});
+
+test('applicableMissingFields is defensive about odd input', () => {
+  assert.deepStrictEqual(applicableMissingFields({}, undefined), []);
+  assert.deepStrictEqual(applicableMissingFields({}, null), []);
+  assert.deepStrictEqual(applicableMissingFields({ pkp_status: 'non_pkp' }, ['npwp']), ['npwp']);
 });

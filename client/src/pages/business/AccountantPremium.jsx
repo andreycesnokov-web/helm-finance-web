@@ -14,7 +14,7 @@ import { useAuth } from '../../hooks/useAuth'
 import { useWorkspace } from '../../shell/WorkspaceProvider'
 import { PageHeader, Card, Btn, StatusBadge, Stat, DataList, LoadingSkeleton, Icon, PageTabs, EmptyState } from '../../shell/ui'
 import { BusinessAccountant } from './Accountant'
-import { buildDocumentActions } from '../../lib/accountantReadiness'
+import { buildDocumentActions, applicableMissingFields } from '../../lib/accountantReadiness'
 import { createRequestGuard } from '../../lib/requestGuard'
 
 const PREMIUM = import.meta.env.VITE_AI_ACCOUNTANT_PREMIUM === 'true'
@@ -115,7 +115,9 @@ function PremiumAccountant() {
 function Workbench({ state, setTab, navigate }) {
   if (state.loading) return <Card><LoadingSkeleton rows={5} height={18} /></Card>
   const ap = state.applicability || { applicable_rules: [], missing_profile_fields: [] }
-  const missing = ap.missing_profile_fields || []
+  // Fields that do not apply to this profile (vat_status on a Non-PKP company) are not gaps.
+  // The Tax Profile badges say "Not required"; the Workbench must not contradict them.
+  const missing = applicableMissingFields(state.profile || {}, ap.missing_profile_fields || [])
   const rules = ap.applicable_rules || []
   const d = state.pulse || {}
 
