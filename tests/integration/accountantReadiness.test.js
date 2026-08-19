@@ -258,3 +258,85 @@ test('the Workbench actions agree with the readiness summary on the same payload
   assert.match(labelsOf(actions), /Enter your NIB number/i);
   assert.match(readiness.next, /enter your NIB number/i);
 });
+
+// ── PKP status: "Non-PKP" is an ANSWER, not a gap ───────────────────────────
+// Regression: after setting PKP status to Non-PKP the UI still said "Upload PKP certificate",
+// showed PKP effective date as Missing, and warned "without confirmed PKP status".
+let pkpStatusOf, isFieldNotRequired;
+test.before(async () => { ({ pkpStatusOf, isFieldNotRequired } = await import(MOD)); });
+
+const PKP_REQUIRED = [item('pkp_certificate', 'PKP certificate', 'required', 'missing')];
+const PKP_NOT_REQUIRED = [item('pkp_certificate', 'PKP certificate', 'not_required', 'not_required')];
+const PKP_OPTIONAL = [item('pkp_certificate', 'PKP certificate', 'optional', 'missing')];
+
+test('PKP registered → the PKP certificate is asked for', () => {
+  const form = { pkp_status: 'pkp_registered' };
+  const r = buildReadiness(checklist(PKP_REQUIRED), { form });
+  assert.strictEqual(r.missingDocs, 1);
+  assert.match(r.next, /Upload PKP certificate/i);
+  const a = buildDocumentActions(checklist(PKP_REQUIRED), { form });
+  assert.deepStrictEqual(a.actions.map(x => x.doc_type), ['pkp_certificate']);
+});
+
+test('Non-PKP → no "Upload PKP certificate" anywhere', () => {
+  const form = { pkp_status: 'non_pkp' };
+  const r = buildReadiness(checklist(PKP_NOT_REQUIRED), { form });
+  assert.strictEqual(r.missingDocs, 0, 'a not_required document is not missing');
+  assert.ok(!/PKP certificate/i.test(r.next), `readiness still asks for it: ${r.next}`);
+  const a = buildDocumentActions(checklist(PKP_NOT_REQUIRED), { form });
+  assert.strictEqual(a.actions.length, 0, 'the Workbench must show no PKP action');
+});
+
+test('Non-PKP → PKP-only profile fields are not required, not "missing"', () => {
+  const form = { pkp_status: 'non_pkp' };
+  assert.strictEqual(isFieldNotRequired(form, 'pkp_effective_date'), true);
+  assert.strictEqual(isFieldNotRequired(form, 'vat_status'), true);
+  // Fields unrelated to PKP are unaffected.
+  assert.strictEqual(isFieldNotRequired(form, 'npwp'), false);
+  assert.strictEqual(isFieldNotRequired(form, 'financial_year_start'), false);
+});
+
+test('PKP registered or unknown → the PKP effective date still applies', () => {
+  for (const pkp_status of ['pkp_registered', 'unknown', '', undefined]) {
+    assert.strictEqual(isFieldNotRequired({ pkp_status }, 'pkp_effective_date'), false,
+      `pkp_status=${pkp_status}`);
+  }
+});
+
+test('a foreign-owned Non-PKP company gets an advisory, not an "unconfirmed" warning', () => {
+  const r = buildReadiness(checklist(PKP_NOT_REQUIRED),
+    { form: { foreign_owned: 'yes', pkp_status: 'non_pkp', legal_entity_type: 'PT PMA' } });
+  const flags = r.riskFlags.join(' | ');
+  assert.ok(!/without confirmed PKP status/i.test(flags), `stale warning: ${flags}`);
+  assert.match(flags, /marked Non-PKP/i);
+  assert.match(flags, /Confirm with an accountant if VAT\/PPN registration is required/i);
+});
+
+test('a foreign-owned company with an UNSET PKP status is still flagged', () => {
+  for (const pkp_status of ['unknown', '', undefined]) {
+    const r = buildReadiness(checklist(PKP_OPTIONAL), { form: { foreign_owned: 'yes', pkp_status } });
+    assert.match(r.riskFlags.join(' | '), /without a confirmed PKP status/i, `pkp_status=${pkp_status}`);
+  }
+});
+
+test('a foreign-owned PKP-registered company raises no PKP flag at all', () => {
+  const r = buildReadiness(checklist(PKP_REQUIRED), { form: { foreign_owned: 'yes', pkp_status: 'pkp_registered' } });
+  assert.ok(!/PKP/i.test(r.riskFlags.join(' | ')), r.riskFlags.join(' | '));
+});
+
+test('unknown PKP produces no confident certificate requirement of our own', () => {
+  // The backend marks it optional; the UI must not promote that to a demand.
+  const form = { pkp_status: 'unknown' };
+  const r = buildReadiness(checklist(PKP_OPTIONAL), { form });
+  assert.strictEqual(r.missingDocs, 0);
+  assert.ok(!/Upload PKP certificate/i.test(r.next));
+  assert.strictEqual(buildDocumentActions(checklist(PKP_OPTIONAL), { form }).actions.length, 0);
+});
+
+test('pkpStatusOf normalises the stated status', () => {
+  assert.strictEqual(pkpStatusOf({ pkp_status: 'pkp_registered' }), 'pkp_registered');
+  assert.strictEqual(pkpStatusOf({ pkp_status: 'non_pkp' }), 'non_pkp');
+  assert.strictEqual(pkpStatusOf({ pkp_status: 'NON_PKP' }), 'non_pkp');
+  assert.strictEqual(pkpStatusOf({ pkp_status: 'unknown' }), 'unknown');
+  assert.strictEqual(pkpStatusOf({}), 'unknown');
+});

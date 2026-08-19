@@ -32,6 +32,23 @@ const humanList = (items) => {
   return `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`;
 };
 
+// 'pkp_registered' | 'non_pkp' | 'unknown'. An unset value and the explicit "Unknown" option
+// are the same thing: we do not know. Anything else the user actually stated is respected.
+export function pkpStatusOf(form = {}) {
+  const v = String(form?.pkp_status || '').trim().toLowerCase();
+  if (v === 'pkp_registered') return 'pkp_registered';
+  if (v === 'non_pkp') return 'non_pkp';
+  return 'unknown';
+}
+
+// Profile fields that stop applying once the company states it is NOT PKP.
+const PKP_ONLY_FIELDS = new Set(['pkp_effective_date', 'vat_status']);
+
+/** Is this profile field irrelevant given the stated PKP status? */
+export function isFieldNotRequired(form, field) {
+  return pkpStatusOf(form) === 'non_pkp' && PKP_ONLY_FIELDS.has(field);
+}
+
 /**
  * @param {object|null} checklist  the /required-documents payload (null while loading/failed)
  * @param {object} opts
@@ -43,8 +60,13 @@ const humanList = (items) => {
  */
 export function buildReadiness(checklist, { form = {}, missingFields = [], obligations = 0 } = {}) {
   const riskFlags = [];
-  if (form.foreign_owned === 'yes' && form.pkp_status !== 'pkp_registered')
-    riskFlags.push('Foreign-owned (PT PMA) without confirmed PKP status');
+  // "Non-PKP" is a STATED status, not a missing one. Only an unset/unknown PKP status is a
+  // gap; telling a user who just answered the question that it is unconfirmed is simply wrong.
+  const pkp = pkpStatusOf(form);
+  if (form.foreign_owned === 'yes' && pkp === 'unknown')
+    riskFlags.push('Foreign-owned (PT PMA) without a confirmed PKP status — set PKP status in the profile');
+  else if (form.foreign_owned === 'yes' && pkp === 'non_pkp')
+    riskFlags.push('Company is marked Non-PKP. Confirm with an accountant if VAT/PPN registration is required.');
   if (form.employee_status === 'has_employees' && !form.bpjs_registered)
     riskFlags.push('Has employees but BPJS not registered');
 

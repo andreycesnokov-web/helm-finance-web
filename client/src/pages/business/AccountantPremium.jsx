@@ -57,6 +57,9 @@ function PremiumAccountant() {
   const { active, scopeKey } = useWorkspace()
   const navigate = useNavigate()
   const [tab, setTab] = useState('workbench')
+  // Bumped when the Tax Profile tab saves, so the Workbench reloads its checklist:
+  // changing PKP status changes which documents are required.
+  const [profileVersion, setProfileVersion] = useState(0)
   const EMPTY = { loading: true, applicability: null, profile: null, pulse: null, obligations: null, checklist: null }
   const [state, setState] = useState(EMPTY)
   // Ignores a response from a workspace the user has already switched away from.
@@ -80,7 +83,7 @@ function PremiumAccountant() {
       setState({ loading: false, applicability, profile: profile?.profile || null, pulse, obligations, checklist })
     })
     return () => guard.current.abort()
-  }, [token, active?.id, scopeKey])
+  }, [token, active?.id, scopeKey, profileVersion])
 
   const head = (
     <PageHeader eyebrow="AI Accountant · Indonesia" title="Tax & Compliance Workbench"
@@ -103,7 +106,7 @@ function PremiumAccountant() {
       {tab === 'calendar' && <CalendarTab obligations={state.obligations} />}
       {tab === 'taxdraft' && <TaxDraftTab obligations={state.obligations} />}
       {tab === 'audit' && <AuditTab />}
-      {tab === 'profile' && <BusinessAccountant />}
+      {tab === 'profile' && <BusinessAccountant onProfileSaved={() => setProfileVersion(v => v + 1)} />}
     </>
   )
 }

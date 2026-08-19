@@ -106,3 +106,37 @@ test('no requirement reason claims legal validity or compliance', () => {
       assert.ok(!bad.test(s), `${entity}: forbidden wording ${bad}`);
   }
 });
+
+// ── PKP status drives the PKP certificate requirement (backend source of truth) ──
+const pkpRow = (pkp_status) =>
+  di.requirementsFor({ country: 'Indonesia', legal_entity_type: 'PT PMA', pkp_status })
+    .find(i => i.type === 'pkp_certificate');
+
+test('PKP registered → the PKP certificate is required', () => {
+  const r = pkpRow('pkp_registered');
+  assert.strictEqual(r.requirement, 'required');
+  assert.match(r.reason, /PKP-registered/i);
+});
+
+test('Non-PKP → the PKP certificate is NOT required', () => {
+  const r = pkpRow('non_pkp');
+  assert.strictEqual(r.requirement, 'not_required');
+  assert.match(r.reason, /not PKP/i);
+});
+
+test('unknown or unset PKP → optional, never a confident requirement', () => {
+  for (const v of ['unknown', '', undefined, null]) {
+    const r = pkpRow(v);
+    assert.strictEqual(r.requirement, 'optional', `pkp_status=${v}`);
+    assert.match(r.reason, /Set PKP status/i, `pkp_status=${v}`);
+  }
+});
+
+test('the Non-PKP verdict survives into the rendered checklist', () => {
+  const cl = di.buildChecklist({ country: 'Indonesia', legal_entity_type: 'PT PMA', pkp_status: 'non_pkp' }, []);
+  const row = cl.items.find(i => i.type === 'pkp_certificate');
+  assert.strictEqual(row.requirement, 'not_required');
+  assert.strictEqual(row.status, 'not_required', 'a not_required document is never "missing"');
+  assert.strictEqual(cl.counts.missing, cl.items.filter(i => i.status === 'missing').length);
+  assert.ok(!cl.items.some(i => i.type === 'pkp_certificate' && i.status === 'missing'));
+});

@@ -10,7 +10,7 @@ import { useWorkspace } from '../../shell/WorkspaceProvider'
 import { PageHeader, Card, Btn, StatusBadge, Stat, ErrorState, LoadingSkeleton, Icon } from '../../shell/ui'
 import DocumentIntakeModal from '../../components/DocumentIntakeModal'
 import { createRequestGuard } from '../../lib/requestGuard'
-import { buildReadiness } from '../../lib/accountantReadiness'
+import { buildReadiness, isFieldNotRequired } from '../../lib/accountantReadiness'
 import { groupChecklist, TRUNCATED_NOTICE } from '../../lib/documentKnowledge'
 
 // Which UI fields persist to the backend today vs. live as local draft (await 040).
@@ -26,9 +26,10 @@ const VSTATES = {
   extracted: { label: 'Extracted from document', tone: 'info' },
   accountant_verified: { label: 'Accountant verified', tone: 'success' },
   conflict: { label: 'Conflict', tone: 'danger' },
+  not_required: { label: 'Not required', tone: 'neutral' },
 }
 
-export function BusinessAccountant() {
+export function BusinessAccountant({ onProfileSaved } = {}) {
   const { token } = useAuth()
   const { active, scopeKey } = useWorkspace()
   const [loading, setLoading] = useState(true)
@@ -117,7 +118,11 @@ export function BusinessAccountant() {
   }
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
-  const vstatus = (k) => (form.field_verification?.[k]) || (form[k] !== undefined && form[k] !== '' && form[k] !== null ? 'user_declared' : 'missing')
+  // A field that does not apply (PKP effective date on a Non-PKP company) must not be
+  // reported as Missing — nothing is missing, it simply does not apply.
+  const vstatus = (k) => isFieldNotRequired(form, k)
+    ? 'not_required'
+    : (form.field_verification?.[k]) || (form[k] !== undefined && form[k] !== '' && form[k] !== null ? 'user_declared' : 'missing')
 
   const save = useCallback(async () => {
     setSaving(true); setError(null)
@@ -133,11 +138,14 @@ export function BusinessAccountant() {
       setObligations(ap)
       setSavedMissingFields(res?.completeness?.missing || ap.missing_profile_fields || [])
       setProfileSaved(true)
+      // The Workbench holds its own copy of the checklist; the profile decides what the
+      // checklist requires, so it has to be told the profile changed.
+      if (typeof onProfileSaved === 'function') onProfileSaved()
       // The profile drives which documents are required — reload the checklist so the
       // readiness card and the Compliance Documents card stay on the same answer.
       loadIntake()
     } catch (e) { setError(e.message) } finally { setSaving(false) }
-  }, [form, token, active, obligations, loadIntake])
+  }, [form, token, active, obligations, loadIntake, onProfileSaved])
 
   // Readiness is DERIVED from the checklist payload, not from a second local list, so the
   // card can never contradict Compliance Documents.
