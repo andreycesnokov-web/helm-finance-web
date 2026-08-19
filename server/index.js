@@ -9776,6 +9776,10 @@ app.patch('/api/ai-accountant/documents/:id/classification', auth, async (req, r
     // Business-scoped load — a document from another workspace simply is not found.
     const doc = await loadDocumentScoped(biz, req.params.id);
     if (!doc) return res.status(404).json({ error: 'document_not_found' });
+    // An archived document has been removed from the intake and the checklist, so confirming
+    // it would write a classification nothing can see. A stale list or a second tab is the
+    // realistic way to reach this — treat it as gone.
+    if (doc.archived_at) return res.status(404).json({ error: 'document_not_found' });
 
     const patch = {
       document_type: docIntake.mapsTo(docType),
@@ -9816,6 +9820,7 @@ app.post('/api/ai-accountant/documents/:id/reclassify', auth, async (req, res) =
 
     const doc = await loadDocumentScoped(biz, req.params.id);
     if (!doc) return res.status(404).json({ error: 'document_not_found' });
+    if (doc.archived_at) return res.status(404).json({ error: 'document_not_found' });
     // A manually confirmed type is the user's decision — never overwrite it automatically.
     if (doc.extracted_json?.ai_intake?.classification_status === 'manually_confirmed')
       return res.status(409).json({ error: 'manually_confirmed', message: 'This document type was confirmed manually. Change it from the document list instead.' });
