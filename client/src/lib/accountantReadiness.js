@@ -88,4 +88,49 @@ export function buildReadiness(checklist, { form = {}, missingFields = [], oblig
     needsConfirmation: unconfirmed.length, source: 'checklist', next };
 }
 
+/**
+ * Pending document ACTIONS for the AI Accountant Workbench.
+ *
+ * Same payload, same rules as [buildReadiness] and the Compliance Documents checklist — the
+ * Workbench previously rendered a hardcoded "NPWP, NIB, PKP certificate" line that kept asking
+ * for documents the checklist already showed as uploaded.
+ *
+ * Only these produce an action:
+ *   - a required/conditional_required document with status `missing`  → upload it
+ *   - a required/conditional_required document with status `needs_review` → confirm its type
+ *   - a required/conditional_required document that is uploaded but whose profile number is
+ *     blank → enter the number
+ * `uploaded` (with its number filled), `optional` and `not_required` never produce an action.
+ *
+ * @returns {{available:boolean, actions:Array<{id,type,doc_type,label,sub}>, reason:string|null}}
+ */
+export function buildDocumentActions(checklist, { form = {} } = {}) {
+  if (!checklist || !Array.isArray(checklist.items))
+    return { available: false, actions: [], reason: 'unavailable' };
+  // A partial document set cannot prove a document is absent — do not invent upload actions.
+  if (checklist.truncated) return { available: false, actions: [], reason: 'truncated' };
+
+  const required = checklist.items.filter(i => REQUIRED_LEVELS.has(i.requirement));
+  const actions = [];
+
+  for (const i of required.filter(i => i.status === 'missing')) {
+    actions.push({ id: `upload:${i.type}`, type: 'upload', doc_type: i.type,
+      label: `Upload ${i.label}`, sub: i.reason || 'Required for this profile' });
+  }
+  for (const i of required.filter(i => i.status === 'needs_review')) {
+    actions.push({ id: `confirm:${i.type}`, type: 'confirm', doc_type: i.type,
+      label: `Confirm document type — ${i.label}`,
+      sub: 'A document may match, but it has not been confirmed yet' });
+  }
+  for (const i of required.filter(i => i.status === 'uploaded' && NUMBER_FIELD[i.type])) {
+    const v = form[NUMBER_FIELD[i.type]];
+    if (v === undefined || v === null || String(v).trim() === '') {
+      actions.push({ id: `number:${i.type}`, type: 'number', doc_type: i.type,
+        label: `Enter your ${i.label} number`,
+        sub: `The ${i.label} document is uploaded, but the number is missing from the profile` });
+    }
+  }
+  return { available: true, actions, reason: null };
+}
+
 export default buildReadiness;
