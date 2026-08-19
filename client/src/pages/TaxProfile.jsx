@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '../hooks/useAuth'
 import { apiFetch } from '../lib/api'
+import { applicableMissingFields, pkpSelectValue } from '../lib/accountantReadiness'
 import { getLang } from '../i18n/index'
 
 const L = {
@@ -34,7 +35,9 @@ const OPTS = {
   legal_entity_type: ['', 'PT', 'PT PMA', 'CV', 'Perorangan', 'Yayasan', 'Firma'],
   tax_regime: ['', 'normal', 'pp23_final', 'pph_final_umkm'],
   vat_status: ['', 'pkp', 'non_pkp', 'not_registered'],
-  pkp_status: ['', 'pkp', 'non_pkp'],
+  // Canonical value for NEW saves. A profile already storing the legacy `pkp` still
+  // displays as registered (see pkpSelectValue) and the backend normalises it.
+  pkp_status: ['', 'pkp_registered', 'non_pkp'],
   employee_status: ['', 'has_employees', 'none'],
   accounting_method: ['', 'accrual', 'cash'],
   filing_frequency: ['', 'monthly', 'quarterly', 'annual'],
@@ -69,9 +72,12 @@ export default function TaxProfile() {
     catch (e) { alert(e.message) } finally { setBusy(false) }
   }
 
+  // A stored legacy `pkp` has no matching option, which would render as blank and silently
+  // downgrade a registered company on the next save. Normalise it to the canonical option.
+  const selectValue = (k) => (k === 'pkp_status' ? pkpSelectValue(p[k]) : (p[k] || ''))
   const field = (k, label) => OPTS[k]
     ? <label style={fl}><span style={ls}>{label}</span>
-        <select value={p[k] || ''} onChange={e => set(k, e.target.value)} style={inp}>{OPTS[k].map(o => <option key={o} value={o}>{o || '—'}</option>)}</select></label>
+        <select value={selectValue(k)} onChange={e => set(k, e.target.value)} style={inp}>{OPTS[k].map(o => <option key={o} value={o}>{o || '—'}</option>)}</select></label>
     : <label style={fl}><span style={ls}>{label}</span>
         <input value={p[k] || ''} onChange={e => set(k, e.target.value)} style={inp} /></label>
 
@@ -128,8 +134,10 @@ export default function TaxProfile() {
               ✅ <b>{r.title}</b> <span style={{ color: 'var(--text-3)' }}>({r.rule_code})</span><div style={{ fontSize: 12, color: 'var(--text-3)' }}>{r.reason}</div>
             </div>
           ))}
-          {(appl.missing_profile_fields || []).length > 0 && (
-            <div style={{ fontSize: 12, color: 'var(--amber-dark)', marginTop: 8 }}>{l.missing}: {appl.missing_profile_fields.join(', ')}</div>
+          {/* Only fields that APPLY to this profile: a Non-PKP company is not missing
+              vat_status, and listing it here would contradict the AI Accountant pages. */}
+          {applicableMissingFields(p, appl.missing_profile_fields || []).length > 0 && (
+            <div style={{ fontSize: 12, color: 'var(--amber-dark)', marginTop: 8 }}>{l.missing}: {applicableMissingFields(p, appl.missing_profile_fields || []).join(', ')}</div>
           )}
           {(appl.excluded_rules || []).length > 0 && (
             <details style={{ marginTop: 8, fontSize: 12, color: 'var(--text-3)' }}>

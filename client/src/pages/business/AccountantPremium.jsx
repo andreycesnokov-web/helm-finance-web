@@ -14,7 +14,7 @@ import { useAuth } from '../../hooks/useAuth'
 import { useWorkspace } from '../../shell/WorkspaceProvider'
 import { PageHeader, Card, Btn, StatusBadge, Stat, DataList, LoadingSkeleton, Icon, PageTabs, EmptyState } from '../../shell/ui'
 import { BusinessAccountant } from './Accountant'
-import { buildDocumentActions } from '../../lib/accountantReadiness'
+import { buildDocumentActions, applicableMissingFields } from '../../lib/accountantReadiness'
 import { createRequestGuard } from '../../lib/requestGuard'
 
 const PREMIUM = import.meta.env.VITE_AI_ACCOUNTANT_PREMIUM === 'true'
@@ -57,6 +57,9 @@ function PremiumAccountant() {
   const { active, scopeKey } = useWorkspace()
   const navigate = useNavigate()
   const [tab, setTab] = useState('workbench')
+  // Bumped when the Tax Profile tab saves, so the Workbench reloads its checklist:
+  // changing PKP status changes which documents are required.
+  const [profileVersion, setProfileVersion] = useState(0)
   const EMPTY = { loading: true, applicability: null, profile: null, pulse: null, obligations: null, checklist: null }
   const [state, setState] = useState(EMPTY)
   // Ignores a response from a workspace the user has already switched away from.
@@ -80,7 +83,7 @@ function PremiumAccountant() {
       setState({ loading: false, applicability, profile: profile?.profile || null, pulse, obligations, checklist })
     })
     return () => guard.current.abort()
-  }, [token, active?.id, scopeKey])
+  }, [token, active?.id, scopeKey, profileVersion])
 
   const head = (
     <PageHeader eyebrow="AI Accountant · Indonesia" title="Tax & Compliance Workbench"
@@ -103,7 +106,7 @@ function PremiumAccountant() {
       {tab === 'calendar' && <CalendarTab obligations={state.obligations} />}
       {tab === 'taxdraft' && <TaxDraftTab obligations={state.obligations} />}
       {tab === 'audit' && <AuditTab />}
-      {tab === 'profile' && <BusinessAccountant />}
+      {tab === 'profile' && <BusinessAccountant onProfileSaved={() => setProfileVersion(v => v + 1)} />}
     </>
   )
 }
@@ -112,7 +115,9 @@ function PremiumAccountant() {
 function Workbench({ state, setTab, navigate }) {
   if (state.loading) return <Card><LoadingSkeleton rows={5} height={18} /></Card>
   const ap = state.applicability || { applicable_rules: [], missing_profile_fields: [] }
-  const missing = ap.missing_profile_fields || []
+  // Fields that do not apply to this profile (vat_status on a Non-PKP company) are not gaps.
+  // The Tax Profile badges say "Not required"; the Workbench must not contradict them.
+  const missing = applicableMissingFields(state.profile || {}, ap.missing_profile_fields || [])
   const rules = ap.applicable_rules || []
   const d = state.pulse || {}
 
@@ -232,7 +237,9 @@ function Workbench({ state, setTab, navigate }) {
         <div className="cfo-grid cfo-grid-3">
           <PlainCard k="What to do" v={nextDeadlines[0] ? `${nextDeadlines[0].title} by ${nextDeadlines[0].date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}.` : 'No statutory deadlines left this month.'} />
           <PlainCard k="Why" v="These are fixed Indonesian statutory deadlines. Exact amounts will come from the deterministic tax engine with legal source references." />
-          <PlainCard k="What to prepare" v={(state.applicability?.missing_profile_fields || []).length ? 'Finish your tax profile so obligations can be computed.' : 'Keep invoices and payroll records confirmed and up to date.'} />
+          {/* `missing` is the FILTERED list — a field that does not apply (vat_status on a
+              Non-PKP company) must not read as an unfinished profile here either. */}
+          <PlainCard k="What to prepare" v={missing.length ? 'Finish your tax profile so obligations can be computed.' : 'Keep invoices and payroll records confirmed and up to date.'} />
         </div>
         <div style={{ display: 'flex', gap: 10, marginTop: 14 }}>
           <Btn disabled title="Available once the tax engine is connected">Prepare filing pack (soon)</Btn>

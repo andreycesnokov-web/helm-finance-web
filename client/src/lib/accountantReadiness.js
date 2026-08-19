@@ -32,6 +32,67 @@ const humanList = (items) => {
   return `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`;
 };
 
+// MIRRORS server/lib/pkpStatus.js — keep the two in step.
+//
+// The legacy Tax Profile page stored plain `pkp` for a registered company while the premium
+// page stores `pkp_registered`, so a stored value has to be interpreted, not compared.
+// Anything unrecognised is `unknown`, never `non_pkp`: guessing "not registered" would
+// silently drop a real requirement.
+const PKP_REGISTERED_VALUES = new Set(['pkp_registered', 'pkp', 'registered', 'is_pkp', 'yes', 'true']);
+const PKP_NOT_REGISTERED_VALUES = new Set(['non_pkp', 'non-pkp', 'nonpkp', 'not_pkp', 'not_registered', 'no', 'false']);
+
+/** @returns {'pkp_registered'|'non_pkp'|'unknown'} */
+export function normalizePkpStatus(value) {
+  const v = String(value ?? '').trim().toLowerCase().replace(/\s+/g, '_');
+  if (!v) return 'unknown';
+  if (PKP_REGISTERED_VALUES.has(v)) return 'pkp_registered';
+  if (PKP_NOT_REGISTERED_VALUES.has(v)) return 'non_pkp';
+  return 'unknown';
+}
+
+// The value a NEW save should write. Legacy values are normalised on read, never rewritten
+// behind the user's back.
+export const CANONICAL_PKP_VALUES = ['pkp_registered', 'non_pkp'];
+
+/**
+ * The option a <select> should show for a stored value. A profile holding the legacy `pkp`
+ * displays as "PKP registered" instead of falling back to a blank option.
+ */
+export function pkpSelectValue(stored) {
+  const n = normalizePkpStatus(stored);
+  return n === 'unknown' ? '' : n;
+}
+
+// 'pkp_registered' | 'non_pkp' | 'unknown' for a profile form.
+export function pkpStatusOf(form = {}) {
+  return normalizePkpStatus(form?.pkp_status);
+}
+
+// Profile fields that stop applying once the company states it is NOT PKP.
+const PKP_ONLY_FIELDS = new Set(['pkp_effective_date', 'vat_status']);
+
+/** Is this profile field irrelevant given the stated PKP status? */
+export function isFieldNotRequired(form, field) {
+  return pkpStatusOf(form) === 'non_pkp' && PKP_ONLY_FIELDS.has(field);
+}
+
+/**
+ * Drop profile fields that do not apply from a backend `missing` list.
+ *
+ * The persisted profile schema still carries `vat_status`, so the backend keeps reporting it
+ * as missing for a Non-PKP company. If the field badge says "Not required" while readiness
+ * counts it as a verification gap, the two surfaces contradict each other — the exact class of
+ * bug this module exists to prevent. Frontend filtering only: no migration.
+ */
+export function applicableMissingFields(form, missingFields = []) {
+  return (missingFields || []).filter(f => !isFieldNotRequired(form, f));
+}
+
+// Severity for a readiness message. `risk` is a real gap; `advisory` is information about a
+// choice the user has already made and should confirm with a professional — it must not be
+// rendered as an error.
+export const SEVERITY = { RISK: 'risk', ADVISORY: 'advisory' };
+
 /**
  * @param {object|null} checklist  the /required-documents payload (null while loading/failed)
  * @param {object} opts
@@ -39,16 +100,41 @@ const humanList = (items) => {
  *   @param {string[]} opts.missingFields   profile fields the backend reports as missing
  *   @param {number} opts.obligations       count of applicable rules
  * @returns {{available:boolean, missingDocs:number|null, needsConfirmation:number|null,
- *            verificationGaps:number, riskFlags:string[], next:string, source:string}}
+ *            verificationGaps:number,
+ *            riskFlags:Array<{severity:'risk'|'advisory', message:string}>,
+ *            riskCount:number, suppressedFields:string[],
+ *            next:string, source:'checklist'|'truncated'|'unavailable'}}
+ *
+ * `verificationGaps` counts only fields that APPLY to this profile; `suppressedFields` lists
+ * the ones dropped because the stated PKP status makes them irrelevant. Consumers that render
+ * a profile-completion prompt must use [applicableMissingFields], never the raw backend list,
+ * or they will contradict the field badges.
  */
 export function buildReadiness(checklist, { form = {}, missingFields = [], obligations = 0 } = {}) {
   const riskFlags = [];
-  if (form.foreign_owned === 'yes' && form.pkp_status !== 'pkp_registered')
-    riskFlags.push('Foreign-owned (PT PMA) without confirmed PKP status');
+  // "Non-PKP" is a STATED status, not a missing one. Only an unset/unknown PKP status is a
+  // gap; telling a user who just answered the question that it is unconfirmed is simply wrong.
+  // And a stated Non-PKP is an ADVISORY — worth confirming with an accountant, not an error.
+  const pkp = pkpStatusOf(form);
+  if (form.foreign_owned === 'yes' && pkp === 'unknown')
+    riskFlags.push({ severity: SEVERITY.RISK,
+      message: 'Foreign-owned (PT PMA) without a confirmed PKP status — set PKP status in the profile' });
+  else if (form.foreign_owned === 'yes' && pkp === 'non_pkp')
+    riskFlags.push({ severity: SEVERITY.ADVISORY,
+      message: 'Company is marked Non-PKP. Confirm with an accountant if VAT/PPN registration is required.' });
   if (form.employee_status === 'has_employees' && !form.bpjs_registered)
-    riskFlags.push('Has employees but BPJS not registered');
+    riskFlags.push({ severity: SEVERITY.RISK, message: 'Has employees but BPJS not registered' });
 
-  const base = { obligations, verificationGaps: missingFields.length, riskFlags };
+  // A field that does not apply is not a gap. Keep this in step with the field badges.
+  const applicableMissing = applicableMissingFields(form, missingFields);
+  const base = {
+    obligations,
+    verificationGaps: applicableMissing.length,
+    riskFlags,
+    // Only genuine risks colour the summary; advisories are informational.
+    riskCount: riskFlags.filter(f => f.severity === SEVERITY.RISK).length,
+    suppressedFields: (missingFields || []).filter(f => isFieldNotRequired(form, f)),
+  };
 
   // No checklist → say so. Never fall back to a second, contradicting source.
   if (!checklist || !Array.isArray(checklist.items)) {
@@ -84,8 +170,8 @@ export function buildReadiness(checklist, { form = {}, missingFields = [], oblig
   if (missing.length) parts.push(`Upload ${humanList(missing.map(i => i.label))}`);
   if (unconfirmed.length) parts.push(`confirm the document type for ${humanList(unconfirmed.map(i => i.label))}`);
   if (numbersToEnter.length) parts.push(`enter your ${humanList(numbersToEnter)} number`);
-  if (!parts.length && missingFields.length)
-    parts.push(`complete ${missingFields[0].replace(/_/g, ' ')} in the profile`);
+  if (!parts.length && applicableMissing.length)
+    parts.push(`complete ${applicableMissing[0].replace(/_/g, ' ')} in the profile`);
 
   const next = parts.length
     ? parts.join(', and ').replace(/^(.)/, c => c.toUpperCase()) + '.'
