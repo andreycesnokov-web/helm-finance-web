@@ -11,6 +11,7 @@ import { PageHeader, Card, Btn, StatusBadge, Stat, ErrorState, LoadingSkeleton, 
 import DocumentIntakeModal from '../../components/DocumentIntakeModal'
 import { createRequestGuard } from '../../lib/requestGuard'
 import { buildReadiness } from '../../lib/accountantReadiness'
+import { groupChecklist } from '../../lib/documentKnowledge'
 
 // Which UI fields persist to the backend today vs. live as local draft (await 040).
 const PERSISTED = new Set(['country', 'jurisdiction', 'legal_entity_type', 'npwp', 'pkp_status', 'vat_status', 'financial_year_start', 'financial_year_end', 'nib', 'employee_status'])
@@ -45,6 +46,7 @@ export function BusinessAccountant() {
   // Ignores responses from a workspace the user has already switched away from.
   const intakeGuard = useRef(createRequestGuard())
   const [showUpload, setShowUpload] = useState(false)
+  const [openWhy, setOpenWhy] = useState(null)   // doc_type whose knowledge panel is expanded
   const [confirming, setConfirming] = useState(null)
 
   useEffect(() => {
@@ -139,6 +141,9 @@ export function BusinessAccountant() {
 
   // Readiness is DERIVED from the checklist payload, not from a second local list, so the
   // card can never contradict Compliance Documents.
+  // Grouped, knowledge-annotated view of the SAME checklist payload.
+  const grouped = useMemo(() => groupChecklist(checklist), [checklist])
+
   const readiness = useMemo(() => buildReadiness(checklist, {
     form,
     missingFields: savedMissingFields.length ? savedMissingFields : (obligations.missing_profile_fields || []),
@@ -259,22 +264,83 @@ export function BusinessAccountant() {
               <StatusBadge tone="neutral">{checklist.counts.not_required} not required</StatusBadge>
             </div>
 
-            <div style={{ border: '1px solid var(--border-default)', borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>
-              {checklist.items.map((it, i) => (
-                <div key={it.type} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderTop: i ? '0.5px solid var(--border-subtle)' : 'none' }}>
-                  <Icon.doc width="15" height="15" />
-                  <span style={{ flex: 1, minWidth: 0 }}>
-                    <span style={{ fontSize: 13.5, fontWeight: 600 }}>{it.label}</span>
-                    <span style={{ display: 'block', fontSize: 11.5, color: 'var(--text-muted)' }}>{it.reason}</span>
-                  </span>
-                  <StatusBadge tone={
-                    it.status === 'uploaded' ? 'success'
-                      : it.status === 'needs_review' ? 'warning'
-                        : it.status === 'missing' ? 'danger' : 'neutral'
-                  }>{it.status.replace('_', ' ')}</StatusBadge>
+            {/* Minimum company pack: the short list worth doing first. */}
+            <div style={{ padding: '10px 12px', marginBottom: 12, border: '1px solid var(--border-default)', borderRadius: 'var(--radius-md)', background: 'var(--info-soft)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <strong style={{ fontSize: 13.5 }}>Minimum company pack</strong>
+                <StatusBadge tone={grouped.pack.complete ? 'success' : 'warning'}>
+                  {grouped.pack.satisfied} of {grouped.pack.total} in place
+                </StatusBadge>
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 4 }}>
+                {grouped.pack.complete
+                  ? 'Every document this profile needs for company identity and tax registration is uploaded.'
+                  : <>Still needed: {grouped.pack.outstanding.map(i => i.label).join(', ')}.</>}
+              </div>
+              {grouped.payroll.applies && (
+                <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 6 }}>
+                  <strong>Payroll compliance</strong> (separate from the company pack):{' '}
+                  {grouped.payroll.outstanding.length
+                    ? <>still needed &mdash; {grouped.payroll.outstanding.map(i => i.label).join(', ')}.</>
+                    : 'in place.'}
                 </div>
-              ))}
+              )}
             </div>
+
+            {/* Grouped checklist with an inline knowledge panel per row. */}
+            {grouped.groups.map(g => (
+              <div key={g.key} style={{ marginBottom: 14 }}>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 6, flexWrap: 'wrap' }}>
+                  <strong style={{ fontSize: 13 }}>{g.label}</strong>
+                  <span style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>{g.blurb}</span>
+                </div>
+                <div style={{ border: '1px solid var(--border-default)', borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>
+                  {g.items.map((it, i) => (
+                    <div key={it.type} style={{ borderTop: i ? '0.5px solid var(--border-subtle)' : 'none' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', flexWrap: 'wrap' }}>
+                        <Icon.doc width="15" height="15" />
+                        <span style={{ flex: 1, minWidth: 160 }}>
+                          <span style={{ fontSize: 13.5, fontWeight: 600 }}>{it.label}</span>
+                          {it.knowledge && (
+                            <span style={{ display: 'block', fontSize: 11.5, color: 'var(--text-muted)' }}>
+                              {it.knowledge.official_indonesian_name}
+                            </span>
+                          )}
+                          <span style={{ display: 'block', fontSize: 11.5, color: 'var(--text-muted)' }}>{it.reason}</span>
+                        </span>
+                        <StatusBadge tone={
+                          it.priority === 'not_required' ? 'neutral'
+                            : it.priority === 'payroll_required' ? 'info'
+                              : it.priority === 'core_required' || it.priority === 'conditional_required' ? 'warning' : 'neutral'
+                        }>{it.priority_label}</StatusBadge>
+                        <StatusBadge tone={
+                          it.status === 'uploaded' ? 'success'
+                            : it.status === 'needs_review' ? 'warning'
+                              : it.status === 'missing' ? 'danger' : 'neutral'
+                        }>{it.status.replace('_', ' ')}</StatusBadge>
+                        {it.knowledge && (
+                          <Btn sm variant="ghost" onClick={() => setOpenWhy(openWhy === it.type ? null : it.type)}>
+                            {openWhy === it.type ? 'Hide' : 'Why needed?'}
+                          </Btn>
+                        )}
+                      </div>
+                      {openWhy === it.type && it.knowledge && (
+                        <div style={{ padding: '2px 12px 12px 37px', fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+                          <div><strong>Official name:</strong> {it.knowledge.official_indonesian_name}</div>
+                          <div><strong>What it is:</strong> {it.knowledge.plain_language_description}</div>
+                          <div><strong>Why needed:</strong> {it.knowledge.why_needed}</div>
+                          <div><strong>When required:</strong> {it.knowledge.when_required}</div>
+                          <div><strong>Where to get it:</strong> {it.knowledge.where_to_get}</div>
+                          {!!(it.knowledge.aliases || []).length && (
+                            <div style={{ color: 'var(--text-muted)' }}>Also called: {it.knowledge.aliases.join(', ')}</div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
 
             {(checklist.warnings || []).map((w, i) => (
               <div key={i} style={{ marginTop: 8, fontSize: 12, color: 'var(--warning)' }}>⚠ {w}</div>
