@@ -9,6 +9,9 @@ const { VALID_PLANS, computeBusinessAccess } = require('./lib/businessAccess');
 const docV = require('./lib/documentValidation');
 const docA = require('./lib/documentAccess');
 const TX = require('./lib/transactionClass');
+// Telegram-created payables are IDR-only until multi-currency payables exist end to end.
+// See server/lib/telegramCurrency.js for why refusing beats recording a wrong row.
+const { isSupportedTelegramCurrency, currencyNotSupported, normalizeCurrency } = require('./lib/telegramCurrency');
 const personalFundingRouter = require('./routes/personalFunding');
 const multer = require('multer');
 require('dotenv').config();
@@ -2028,6 +2031,13 @@ app.post('/api/telegram/debts/from-receipt', async (req, res) => {
     if (!ocr || !ocr.amount)
       return res.status(422).json({ error: 'amount_not_recognized', message: 'Не удалось распознать сумму на счёте.' });
 
+    // The SECOND Telegram door. An invoice photo carries its own currency, so a USD invoice
+    // reaches the same broken downstream as a USD text message. Gated identically, after
+    // membership and before any write. Patching only the text path would leave this open.
+    if (!isSupportedTelegramCurrency(ocr.currency)) {
+      return res.status(422).json(currencyNotSupported(ocr.currency));
+    }
+
     // Reimbursement: the submitter paid (often from personal funds) and the
     // company owes THEM, so the counterparty is the submitter — never the OCR
     // counterparty from the payment proof.
@@ -2043,7 +2053,7 @@ app.post('/api/telegram/debts/from-receipt', async (req, res) => {
       user_id: m.ownerId, business_id: m.businessId, type: 'payable',
       counterparty,
       amount: amountNum, original_amount: amountNum, paid_amount: 0,
-      currency: ocr.currency || 'IDR', due_date: isReimbursement ? null : (ocr.date || null),
+      currency: normalizeCurrency(ocr.currency), due_date: isReimbursement ? null : (ocr.date || null),
       description: isReimbursement
         ? ((caption && caption.trim()) || 'Reimbursement (paid from personal funds)')
         : ((caption && caption.trim()) || 'Invoice via Telegram'),
@@ -4091,6 +4101,15 @@ app.post('/api/debts/from-telegram', async (req, res) => {
       });
     }
 
+    // ── Currency gate ───────────────────────────────────────────────────────
+    // Placed AFTER the bot secret and after membership resolution, so it can never be used
+    // as an unauthenticated oracle, and BEFORE anything else happens — no approval decision,
+    // no debt row, no transaction, no notification. Everything above is read-only, so a
+    // refused request leaves the database exactly as it found it.
+    if (!isSupportedTelegramCurrency(currency)) {
+      return res.status(422).json(currencyNotSupported(currency));
+    }
+
     // Owner/admin/CFO → approved immediately; others → pending_approval
     const isPrivileged = ['owner', 'ceo', 'admin', 'cfo'].includes(memberRole);
     const approvalStatus = isPrivileged ? 'approved' : 'pending_approval';
@@ -4108,7 +4127,9 @@ app.post('/api/debts/from-telegram', async (req, res) => {
       amount:                amountNum,
       original_amount:       amountNum,
       paid_amount:           0,
-      currency:              currency || 'IDR',
+      // Canonical form: the gate above has already guaranteed this is IDR, so this only
+      // stops a lowercase 'idr' from being stored as a second spelling.
+      currency:              normalizeCurrency(currency),
       due_date:              due_date || null,
       description:           description || null,
       status,
