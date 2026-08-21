@@ -1908,6 +1908,21 @@ app.post('/api/telegram/active-business', async (req, res) => {
     // selected either, including by a client replaying an id from before it was archived.
     const r = await setTelegramActiveWorkspace({ supabase, telegram_id, business_id, routeName: 'set-active-business' });
     if (!r.ok) return sendTelegramActorError(res, r);
+    // The helper can succeed at everything EXCEPT storing the choice: with the identity
+    // resolver on and the 045 state store off, a linked email-origin user resolves to a
+    // negative id, and a negative id must never be written to telegram_user_state. There is
+    // nowhere to put the selection, so it does not persist.
+    //
+    // Answering ok:true there would be the worst possible outcome — the user is told they
+    // switched company, and their next message asks them to choose again. 503, not 403: this
+    // is a temporary limitation of how the platform is configured right now, not a statement
+    // about what this user is allowed to do.
+    if (r.persisted === false) {
+      return res.status(503).json({
+        error: 'workspace_state_not_persisted',
+        message: 'Workspace selection could not be saved. Please try again later.',
+      });
+    }
     const gate = await telegramPaidGate(business_id);
     if (gate) return res.status(402).json(gate);
     res.json({ ok: true, business: r.business });

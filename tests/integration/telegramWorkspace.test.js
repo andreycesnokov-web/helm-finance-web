@@ -652,6 +652,109 @@ test('from-receipt: an archived saved workspace does not become the posting targ
 });
 
 // ════════════════════════════════════════════════════════════════════════════
+// persisted:false — the selection that was never saved (Codex CONDITIONAL GO)
+//
+// The helper reported honestly and the route threw the report away. With the identity
+// resolver on and the 045 state store off, a linked email-origin user resolves to a negative
+// id; a negative id must never be written to telegram_user_state, so there is nowhere to put
+// the selection. The route answered { ok: true } anyway.
+//
+// The user experience of that bug: "switched to Beta Co" — then the very next message asks
+// which company to use. Nothing is corrupted, but the product lies to the user and then
+// contradicts itself, which is worse than an honest failure.
+// ════════════════════════════════════════════════════════════════════════════
+
+test('POST: a selection that cannot be stored is 503, NEVER ok:true', async () => {
+  reset(EMAIL_USER, [biz(BIZ_A, 'acme'), biz(BIZ_B, 'beta')]);
+  scenario.rows.user_channel_links = [linkRow(EMAIL_USER)];
+  await IDENTITY_ONLY(async () => {
+    const r = await setWs(TG_USER, BIZ_B);
+    assert.strictEqual(r.status, 503, `expected 503, got ${r.status}`);
+    assert.strictEqual(r.body?.error, 'workspace_state_not_persisted');
+    assert.notStrictEqual(r.body?.ok, true, 'the route claimed a save that did not happen');
+    // 503, not 403: this is a limitation of how the platform is configured right now, not a
+    // statement about what this user may do. Mapping it to 403 — or worse, to not_linked —
+    // would tell a correctly linked user their account is not connected.
+    assert.notStrictEqual(r.status, 403);
+    assert.ok(!['not_linked', 'not_a_member', 'forbidden'].includes(r.body?.error),
+      'a storage limitation was reported as an authorization failure');
+  });
+});
+
+test('POST: nothing at all is written for a negative id with the state store off', async () => {
+  reset(EMAIL_USER, [biz(BIZ_A, 'acme'), biz(BIZ_B, 'beta')]);
+  scenario.rows.user_channel_links = [linkRow(EMAIL_USER)];
+  await IDENTITY_ONLY(async () => await setWs(TG_USER, BIZ_B));
+  assert.deepStrictEqual(wrote('telegram_user_state'), [],
+    'a negative user id reached 043 — the one thing 043 can never hold');
+  assert.deepStrictEqual(wrote('user_channel_state'), [],
+    'the 045 store is off; it must not be written');
+});
+
+test('POST: with BOTH flags on, the same selection succeeds and lands in 045', async () => {
+  // The other half of the story: the 503 above is a configuration state to pass THROUGH, not
+  // a dead end. Turn the state store on and the identical request works.
+  reset(EMAIL_USER, [biz(BIZ_A, 'acme'), biz(BIZ_B, 'beta')]);
+  scenario.rows.user_channel_links = [linkRow(EMAIL_USER)];
+  await FULL(async () => {
+    const r = await setWs(TG_USER, BIZ_B);
+    assert.strictEqual(r.status, 200);
+    assert.strictEqual(r.body.ok, true);
+    assert.strictEqual(r.body.business.id, BIZ_B);
+  });
+  const w = wrote('user_channel_state');
+  assert.strictEqual(w.length, 1, 'the selection was not stored in 045');
+  assert.strictEqual(w[0].values.active_business_id, BIZ_B);
+  assert.strictEqual(w[0].values.user_id, EMAIL_USER);
+  assert.deepStrictEqual(wrote('telegram_user_state'), [],
+    'a negative id must never mirror to 043, even with the state store on');
+});
+
+test('POST: a legacy positive user with the resolver on still saves to 043 and returns ok:true', async () => {
+  // The fix must not turn a working path into a 503. A positive id has somewhere to go.
+  reset(TG_USER, [biz(BIZ_A, 'acme'), biz(BIZ_B, 'beta')]);
+  await IDENTITY_ONLY(async () => {
+    const r = await setWs(TG_USER, BIZ_B);
+    assert.strictEqual(r.status, 200);
+    assert.strictEqual(r.body.ok, true);
+    assert.strictEqual(r.body.business.id, BIZ_B);
+  });
+  const w = wrote('telegram_user_state');
+  assert.strictEqual(w.length, 1);
+  assert.strictEqual(w[0].values.active_business_id, BIZ_B);
+});
+
+test('POST: with both flags off, selection is untouched by any of this', async () => {
+  reset(TG_USER, [biz(BIZ_A, 'acme'), biz(BIZ_B, 'beta')]);
+  await LEGACY(async () => {
+    const r = await setWs(TG_USER, BIZ_B);
+    assert.strictEqual(r.status, 200);
+    assert.strictEqual(r.body.ok, true);
+  });
+  assert.strictEqual(wrote('telegram_user_state').length, 1);
+  assert.deepStrictEqual(wrote('user_channel_state'), []);
+});
+
+test('POST: ok:true is returned only when something was actually stored', async () => {
+  // The invariant behind all of the above, stated once: across every flag combination, a 200
+  // with ok:true implies at least one state write. This is the assertion that would have
+  // failed on the reviewed commit.
+  const combos = [[LEGACY, TG_USER], [IDENTITY_ONLY, TG_USER], [FULL, TG_USER],
+                  [IDENTITY_ONLY, EMAIL_USER], [FULL, EMAIL_USER]];
+  for (const [flags, actingUser] of combos) {
+    reset(actingUser, [biz(BIZ_A, 'acme'), biz(BIZ_B, 'beta')]);
+    if (actingUser === EMAIL_USER) scenario.rows.user_channel_links = [linkRow(EMAIL_USER)];
+    await flags(async () => {
+      const r = await setWs(TG_USER, BIZ_B);
+      if (r.status === 200 && r.body?.ok === true) {
+        const stored = wrote('user_channel_state').length + wrote('telegram_user_state').length;
+        assert.ok(stored > 0, 'ok:true was returned with no state write behind it');
+      }
+    });
+  }
+});
+
+// ════════════════════════════════════════════════════════════════════════════
 // SOURCE GUARDS
 // ════════════════════════════════════════════════════════════════════════════
 
