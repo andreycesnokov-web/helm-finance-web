@@ -23,6 +23,10 @@ const REQUIRED_ENV = [
   'SUPABASE_SECRET_KEY',
   'BOT_TOKEN',
   'JWT_SECRET',
+  // PR0.5: the only credential that authenticates the Telegram bot. Previously optional,
+  // because requireBotSecret() fell back to BOT_TOKEN when it was unset — which meant a
+  // missing value produced working-but-wrong authentication instead of an error.
+  'TELEGRAM_WEBHOOK_SECRET',
 ];
 
 const missing = REQUIRED_ENV.filter(k => !process.env[k]);
@@ -4008,10 +4012,12 @@ app.post('/api/debts/from-telegram', async (req, res) => {
     // ── Bot authentication ───────────────────────────────────────────────────
     // This endpoint has no user JWT (called by the bot, not a browser).
     // The bot must prove its identity with a shared secret header:
-    //   x-bot-secret: <TELEGRAM_WEBHOOK_SECRET or BOT_TOKEN>
+    //   x-bot-secret: <TELEGRAM_WEBHOOK_SECRET>
     // Without this check, anyone who knows a telegram_id could inject records.
-    const botSecret = process.env.TELEGRAM_WEBHOOK_SECRET || process.env.BOT_TOKEN;
-    if (!req.headers['x-bot-secret'] || req.headers['x-bot-secret'] !== botSecret) {
+    //
+    // PR0.5: this used to inline its own copy of the chain, so there were two definitions of
+    // bot authentication to keep in sync. It now calls the single shared one.
+    if (!requireBotSecret(req)) {
       return res.status(401).json({ error: 'Invalid bot credentials' });
     }
 
@@ -4499,9 +4505,25 @@ function parseStartPayload(payload) {
   return memberId;
 }
 
+/**
+ * The ONE place a Telegram bot request is authenticated.
+ *
+ * PR0.5: `TELEGRAM_WEBHOOK_SECRET` only. The `|| BOT_TOKEN` fallback is gone — it made
+ * backend authentication depend on the Telegram bot token, so revoking or regenerating that
+ * token in BotFather silently broke the API, and it reused a credential that is far more
+ * exposed (BotFather, every Telegram API URL, webhook config) as an API secret.
+ *
+ * The explicit `!botSecret` check matters: without it, an unset secret and a missing header
+ * both compare as undefined and the guard would authenticate everyone. Fail closed.
+ *
+ * `TELEGRAM_WEBHOOK_SECRET` is in REQUIRED_ENV, so a missing value stops the server at boot
+ * rather than at the first bot request.
+ */
 function requireBotSecret(req) {
-  const botSecret = process.env.TELEGRAM_WEBHOOK_SECRET || process.env.BOT_TOKEN;
-  return req.headers['x-bot-secret'] && req.headers['x-bot-secret'] === botSecret;
+  const botSecret = process.env.TELEGRAM_WEBHOOK_SECRET;
+  if (!botSecret) return false;
+  const provided = req.headers['x-bot-secret'];
+  return Boolean(provided) && provided === botSecret;
 }
 
 // ── Telegram = paid add-on (V4.1) ────────────────────────────────────────────

@@ -196,7 +196,9 @@ function startApp() {
       env: {
         ...process.env,
         SUPABASE_URL: `http://127.0.0.1:${DB_PORT}`, SUPABASE_SECRET_KEY: 'x',
-        BOT_TOKEN: 'x:x', JWT_SECRET: SECRET, PORT: String(APP_PORT), NODE_ENV: 'production',
+        BOT_TOKEN: 'x:x',
+        // PR0.5: required at boot — the server refuses to start without it.
+        TELEGRAM_WEBHOOK_SECRET: 'test-bot-secret', JWT_SECRET: SECRET, PORT: String(APP_PORT), NODE_ENV: 'production',
         DOCUMENTS_BUCKET: BUCKET,
         // This suite exercises Phase 2, so it turns the default-OFF flag ON explicitly.
         DOCUMENT_CONTENT_CLASSIFICATION_ENABLED: 'true',

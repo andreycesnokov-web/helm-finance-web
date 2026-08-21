@@ -124,7 +124,9 @@ function startApp() {
       env: {
         ...process.env,
         SUPABASE_URL: `http://127.0.0.1:${DB_PORT}`, SUPABASE_SECRET_KEY: 'x',
-        BOT_TOKEN: 'x:x', JWT_SECRET: SECRET, ADMIN_TELEGRAM_IDS: String(ADMIN_ID),
+        BOT_TOKEN: 'x:x',
+        // PR0.5: required at boot — the server refuses to start without it.
+        TELEGRAM_WEBHOOK_SECRET: 'test-bot-secret', JWT_SECRET: SECRET, ADMIN_TELEGRAM_IDS: String(ADMIN_ID),
         EMAIL_AUTH_ENABLED: 'true', PORT: String(APP_PORT), NODE_ENV: 'production',
       },
       stdio: ['ignore', 'ignore', 'ignore'],
