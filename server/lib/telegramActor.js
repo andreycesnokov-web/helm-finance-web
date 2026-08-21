@@ -123,11 +123,40 @@ const actorErrorResponse = (actor) => ({
   message: actor.safeMessage || 'Identity could not be resolved.',
 });
 
+/**
+ * Send an actor failure as its OWN status, and nothing else.
+ *
+ * Why this exists: this module computed 400/403/503 carefully, and then four debt routes threw
+ * that away with `if (r.error) return res.status(403).json({ error: 'forbidden' })`. A lookup
+ * failure (503, "try again") arrived at the bot as a flat "you do not have access" — the exact
+ * collapse the status mapping was written to prevent, and the one that turns a transient
+ * Supabase blip into a user who believes their account was disconnected.
+ *
+ * The fallback is 503, never 403: if a status is somehow missing, "we could not tell" is the
+ * honest answer. Saying "forbidden" asserts a fact about the user that we do not have.
+ *
+ * The body is error + message only — no reason, no telegram id, no handle, no metadata.
+ */
+function sendTelegramActorError(res, actor) {
+  return res.status(actor.httpStatus || 503).json(actorErrorResponse(actor));
+}
+
+/**
+ * Did this `{ error }` result come from identity resolution, or from business logic?
+ *
+ * Routes receive both through the same channel. Only actor failures carry a prepared status,
+ * and they are tagged explicitly rather than sniffed, so a future business error that happens
+ * to include an httpStatus cannot start impersonating an identity failure.
+ */
+const isActorError = (r) => Boolean(r && r.actorError);
+
 module.exports = {
   FLAG,
   isResolverEnabled,
   resolveTelegramActorForRoute,
   actorErrorResponse,
+  sendTelegramActorError,
+  isActorError,
   getCounters,
   resetCounters,
 };

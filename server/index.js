@@ -15,7 +15,7 @@ const { isSupportedTelegramCurrency, currencyNotSupported, normalizeCurrency } =
 // PR2.5: route-level Telegram actor resolution, gated by
 // TELEGRAM_CHANNEL_IDENTITY_RESOLVER_ENABLED (default OFF). With the flag off this
 // returns Number(telegram_id) — exactly what the inline code below used to do.
-const { resolveTelegramActorForRoute, actorErrorResponse } = require('./lib/telegramActor');
+const { resolveTelegramActorForRoute, sendTelegramActorError, isActorError } = require('./lib/telegramActor');
 const personalFundingRouter = require('./routes/personalFunding');
 const multer = require('multer');
 require('dotenv').config();
@@ -1620,7 +1620,7 @@ async function resolveBotApprover(telegram_id, debtId) {
 
   // PR2.5: membership is checked for the RESOLVED user, not for the raw Telegram id.
   const actor = await resolveTelegramActorForRoute({ supabase, telegram_id, routeName: 'telegram-debt-action' });
-  if (!actor.ok) return { error: actor.code, httpStatus: actor.httpStatus, safeMessage: actor.safeMessage };
+  if (!actor.ok) return { actorError: true, error: actor.code, code: actor.code, httpStatus: actor.httpStatus, safeMessage: actor.safeMessage };
 
   const { data: mem } = await supabase.from('business_members')
     .select('role').eq('user_id', actor.userId).eq('business_id', businessId)
@@ -1639,6 +1639,9 @@ app.post('/api/telegram/debts/:id/approve', async (req, res) => {
   try {
     const r = await resolveBotApprover(telegram_id, req.params.id);
     if (r.error === 'not_found') return res.status(404).json({ error: 'not_found', message: 'Request not found.' });
+    // An identity failure keeps its own status: 400 invalid, 403 not_linked/link_revoked,
+    // 503 lookup failed. Only a genuine membership refusal is 'forbidden'.
+    if (isActorError(r))         return sendTelegramActorError(res, r);
     if (r.error)                 return res.status(403).json({ error: 'forbidden', message: 'You do not have access to this request.' });
     const { debt, userId, role } = r;
     const gate = await telegramPaidGate(debt.business_id);
@@ -1674,6 +1677,9 @@ app.post('/api/telegram/debts/:id/reject', async (req, res) => {
   try {
     const r = await resolveBotApprover(telegram_id, req.params.id);
     if (r.error === 'not_found') return res.status(404).json({ error: 'not_found', message: 'Request not found.' });
+    // An identity failure keeps its own status: 400 invalid, 403 not_linked/link_revoked,
+    // 503 lookup failed. Only a genuine membership refusal is 'forbidden'.
+    if (isActorError(r))         return sendTelegramActorError(res, r);
     if (r.error)                 return res.status(403).json({ error: 'forbidden', message: 'You do not have access to this request.' });
     const { debt, userId, role } = r;
     const gate = await telegramPaidGate(debt.business_id);
@@ -1710,6 +1716,9 @@ app.post('/api/telegram/debts/:id/request-info', async (req, res) => {
   try {
     const r = await resolveBotApprover(telegram_id, req.params.id);
     if (r.error === 'not_found') return res.status(404).json({ error: 'not_found', message: 'Request not found.' });
+    // An identity failure keeps its own status: 400 invalid, 403 not_linked/link_revoked,
+    // 503 lookup failed. Only a genuine membership refusal is 'forbidden'.
+    if (isActorError(r))         return sendTelegramActorError(res, r);
     if (r.error)                 return res.status(403).json({ error: 'forbidden', message: 'You do not have access to this request.' });
     const { debt, userId, role } = r;
     const gate = await telegramPaidGate(debt.business_id);
@@ -1797,6 +1806,7 @@ app.post('/api/telegram/debts/:id/decision', async (req, res) => {
   try {
     const r = await resolveBotApprover(telegram_id, req.params.id);
     if (r.error === 'not_found') return res.status(404).json({ error: 'not_found' });
+    if (isActorError(r))         return sendTelegramActorError(res, r);
     if (r.error)                 return res.status(403).json({ error: 'forbidden' });
     if (!canViewBusinessFinance(r.role)) return res.status(403).json({ error: 'forbidden' });
 
@@ -1826,7 +1836,7 @@ async function resolveTelegramMember(telegram_id, routeName = 'telegram') {
   // PR2.5: the acting user is resolved BEFORE the users lookup, so a linked account reaches
   // its own row rather than the row whose id happens to equal the Telegram id.
   const actor = await resolveTelegramActorForRoute({ supabase, telegram_id, routeName });
-  if (!actor.ok) return { error: actor.code, httpStatus: actor.httpStatus, safeMessage: actor.safeMessage };
+  if (!actor.ok) return { actorError: true, error: actor.code, code: actor.code, httpStatus: actor.httpStatus, safeMessage: actor.safeMessage };
 
   const { data: rows } = await supabase.from('users').select('id, username, first_name').eq('id', actor.userId).limit(1);
   const submitterUser = rows?.[0];
@@ -1962,7 +1972,7 @@ app.post('/api/telegram/debts/attach-receipt', async (req, res) => {
     // assumption — created_by_telegram_id holds the EXTERNAL account, created_by_user_id the
     // platform user. With the flag off both resolve to the same value, as before.
     const actor = await resolveTelegramActorForRoute({ supabase, telegram_id, routeName: 'attach-receipt' });
-    if (!actor.ok) return res.status(actor.httpStatus || 403).json(actorErrorResponse(actor));
+    if (!actor.ok) return sendTelegramActorError(res, actor);
 
     const { data: candidates } = await supabase.from('debts')
       .select('*')
@@ -2044,6 +2054,7 @@ app.post('/api/telegram/debts/from-receipt', async (req, res) => {
       m = { submitterUser: su, role, businessId: r.business.id, ownerId: r.business.owner_user_id || su.id, isPrivileged: ['owner', 'ceo', 'admin', 'cfo'].includes(role) };
     } else {
       m = await resolveTelegramMember(telegram_id);
+      if (isActorError(m)) return sendTelegramActorError(res, m);
       if (m.error) return res.status(m.error === 'multiple_businesses' ? 409 : 403).json({ error: m.error });
     }
     const gate = await telegramPaidGate(m.businessId);
@@ -4070,7 +4081,7 @@ app.post('/api/debts/from-telegram', async (req, res) => {
     // PR2.5: resolve the acting user first. With the flag off this is Number(telegram_id),
     // identical to the previous inline behaviour.
     const actor = await resolveTelegramActorForRoute({ supabase, telegram_id, routeName: 'from-telegram' });
-    if (!actor.ok) return res.status(actor.httpStatus || 403).json(actorErrorResponse(actor));
+    if (!actor.ok) return sendTelegramActorError(res, actor);
 
     const { data: submitterRows, error: subErr } = await supabase.from('users')
       .select('id, username, first_name').eq('id', actor.userId).limit(1);
@@ -4833,7 +4844,7 @@ app.post('/api/team/onboarding/training-submission', async (req, res) => {
     if (!actingUserId && requireBotSecret(req) && telegram_id) {
       // PR2.5: resolved rather than assumed. Flag off ⇒ Number(telegram_id), as before.
       const actor = await resolveTelegramActorForRoute({ supabase, telegram_id, routeName: 'training-submission' });
-      if (!actor.ok) return res.status(actor.httpStatus || 403).json(actorErrorResponse(actor));
+      if (!actor.ok) return sendTelegramActorError(res, actor);
       actingUserId = actor.userId;
     }
     if (!actingUserId) return res.status(401).json({ error: 'Unauthorized' });
