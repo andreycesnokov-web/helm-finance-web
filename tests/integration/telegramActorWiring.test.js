@@ -311,21 +311,17 @@ test('the flag is read at CALL time, not captured at import', () => {
   assert.ok(!/^const\s+\w*ENABLED\s*=/m.test(LIB), 'the flag must not be captured at import');
 });
 
-test('PR2.5 does not touch telegram_user_state (043) — that is PR3', () => {
-  assert.ok(!/telegram_user_state/.test(LIB));
-  const stateLines = SERVER.split('\n')
-    .filter((l) => /telegram_user_state/.test(l) && !l.trim().startsWith('//'));
-  assert.strictEqual(stateLines.length, 4, 'the 043 access sites must be unchanged in number');
-  for (const l of stateLines)
-    assert.ok(!/actor\.|resolveTelegramActorForRoute/.test(l), `043 site was wired: ${l.trim()}`);
-});
-
-test('resolveTelegramActiveBusiness is NOT wired — it owns 043 and belongs to PR3', () => {
-  const fn = SERVER.slice(SERVER.indexOf('async function resolveTelegramActiveBusiness'),
-                          SERVER.indexOf('// GET /api/telegram/active-business'));
-  assert.ok(fn.length > 0, 'resolveTelegramActiveBusiness not found');
-  assert.ok(!/resolveTelegramActorForRoute/.test(fn), 'active-business wiring must wait for PR3');
-  assert.match(fn, /const userId = Number\(telegram_id\);/, 'its legacy derivation is unchanged');
+test('the identity resolver knows nothing about workspace state', () => {
+  // Was "PR2.5 does not touch telegram_user_state — that is PR3". PR3 has now happened, so the
+  // 043 statements have moved out of server/index.js into lib/telegramWorkspace.js. What must
+  // still hold is the separation the original guard was really protecting: identity resolution
+  // answers "who is this" and must never read or write "where are they posting".
+  assert.ok(!/telegram_user_state|user_channel_state/.test(LIB),
+    'telegramActor.js must not touch workspace state');
+  const direct = SERVER.split('\n')
+    .filter((l) => /telegram_user_state|user_channel_state/.test(l) && !l.trim().startsWith('//'));
+  assert.deepStrictEqual(direct, [],
+    'workspace state must be reached only through lib/telegramWorkspace.js');
 });
 
 test('the routes PR2.5 must not change are untouched', () => {
@@ -458,23 +454,24 @@ test('attach-receipt keeps the external id and the platform id apart', () => {
   assert.match(body, /created_by_user_id\.eq\.\$\{actor\.userId\}/);
 });
 
-test('the four telegram_user_state statements are byte-for-byte unchanged', () => {
-  // Survivor: appending a comment to a 043 statement passed a guard that only counted the
-  // lines and checked they mention no actor. PR2.5 does not touch active-business state at
-  // all, so the requirement is literal. Matched on the RAW source, not the stripped one — a
-  // trailing comment is itself a change.
-  const EXPECTED = [
-    "const { data: st } = await supabase.from('telegram_user_state').select('active_business_id').eq('user_id', userId).limit(1);",
-    "await supabase.from('telegram_user_state').update({ active_business_id: null }).eq('user_id', userId); // clear stale",
-    "await supabase.from('telegram_user_state').upsert({ user_id: userId, active_business_id: owned[0].business_id }, { onConflict: 'user_id' });",
-    "await supabase.from('telegram_user_state').upsert({ user_id: userId, active_business_id: business_id }, { onConflict: 'user_id' });",
-  ];
-  const actual = SERVER.split(/\r?\n/)
-    .filter((l) => l.includes('telegram_user_state') && !/^\s*\/\//.test(l))
+test('the 043 statements survived the move to lib/telegramWorkspace.js intact', () => {
+  // Was a byte-for-byte pin on server/index.js. PR3 moved these statements into the workspace
+  // module, so the pin moved with them rather than being dropped: production has a live 043
+  // row, and the legacy read/write shape is what keeps that user's selection working across
+  // the cutover. What changed on purpose is the WRITE guard (`userId > 0`) and the clear,
+  // which now names the table it is clearing.
+  const WS = fs.readFileSync(path.join(__dirname, '../../server/lib/telegramWorkspace.js'), 'utf8');
+  const stmts = WS.split(String.fromCharCode(10))
+    .filter((l) => /supabase\.from\('telegram_user_state'\)/.test(l))
     .map((l) => l.trim());
-  assert.deepStrictEqual(actual, EXPECTED, 'a telegram_user_state statement changed — that is PR3, not PR2.5');
-  // And the function around them still derives its id the old way, deliberately.
-  assert.match(region('async function resolveTelegramActiveBusiness', 4), /const userId = Number\(telegram_id\);/);
+  assert.strictEqual(stmts.length, 3, 'expected one read, one mirror write and one legacy write');
+  assert.match(WS, /\.select\('active_business_id'\)\.eq\('user_id', userId\)\.limit\(1\)/);
+  assert.match(WS, /\.upsert\(\{ user_id: userId, active_business_id: businessId \}, \{ onConflict: 'user_id' \}\)/);
+  // A negative id must never reach 043 — guarded, not merely intended.
+  for (const m of WS.matchAll(/from\('telegram_user_state'\)[\s\S]{0,200}?upsert/g)) {
+    const before = WS.slice(Math.max(0, m.index - 400), m.index);
+    assert.match(before, /userId > 0/, 'a 043 write is not guarded by userId > 0');
+  }
 });
 
 test('the notification path is NOT wired to the reverse resolver — that is PR2.6', () => {

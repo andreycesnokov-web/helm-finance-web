@@ -16,6 +16,11 @@ const { isSupportedTelegramCurrency, currencyNotSupported, normalizeCurrency } =
 // TELEGRAM_CHANNEL_IDENTITY_RESOLVER_ENABLED (default OFF). With the flag off this
 // returns Number(telegram_id) — exactly what the inline code below used to do.
 const { resolveTelegramActorForRoute, sendTelegramActorError, isActorError } = require('./lib/telegramActor');
+// PR3: the active WORKSPACE, gated by TELEGRAM_ACTIVE_WORKSPACE_STATE_ENABLED (default OFF,
+// and ignored unless the identity resolver flag is also on). With both off this resolves the
+// same workspace from the same table as before — the change is that a failed lookup is now
+// reported as a failure instead of as "you have no workspaces".
+const { resolveTelegramActiveWorkspace, setTelegramActiveWorkspace } = require('./lib/telegramWorkspace');
 const personalFundingRouter = require('./routes/personalFunding');
 const multer = require('multer');
 require('dotenv').config();
@@ -1859,32 +1864,13 @@ async function resolveTelegramMember(telegram_id, routeName = 'telegram') {
 }
 
 // ── Telegram active-business routing (gated by TELEGRAM_ACTIVE_BUSINESS_ENABLED) ──
-// Resolve the Telegram user's active business via telegram_user_state. user_id ==
-// telegram_id today (swap to user_telegram_links.user_id at Phase 2). Returns one of:
-//   { status:'none' } | { status:'auto'|'active', business } | { status:'choose', options }
-// Invalid/deleted/revoked/personal saved selection is cleared, then re-resolved.
-async function resolveTelegramActiveBusiness(telegram_id) {
-  const userId = Number(telegram_id);
-  const { data: mem } = await supabase.from('business_members')
-    .select('role, business_id, businesses(id, name, business_code, type, owner_user_id)')
-    .eq('user_id', userId).eq('status', 'active');
-  const owned = (mem || []).filter(m => m.businesses && m.businesses.type !== 'personal');
-  const opt = (m) => ({ id: m.business_id, name: m.businesses.name, business_code: m.businesses.business_code || null, role: m.role, owner_user_id: m.businesses.owner_user_id || userId });
-  if (!owned.length) return { status: 'none' };
-
-  const { data: st } = await supabase.from('telegram_user_state').select('active_business_id').eq('user_id', userId).limit(1);
-  const savedId = st?.[0]?.active_business_id || null;
-  const savedValid = savedId ? owned.find(m => m.business_id === savedId) : null;
-  if (savedValid) return { status: 'active', business: opt(savedValid), options: owned.map(opt) };
-  if (savedId && !savedValid) {
-    await supabase.from('telegram_user_state').update({ active_business_id: null }).eq('user_id', userId); // clear stale
-  }
-  if (owned.length === 1) {
-    await supabase.from('telegram_user_state').upsert({ user_id: userId, active_business_id: owned[0].business_id }, { onConflict: 'user_id' });
-    return { status: 'auto', business: opt(owned[0]), options: owned.map(opt) };
-  }
-  return { status: 'choose', options: owned.map(opt) };
-}
+// The resolution itself lives in lib/telegramWorkspace.js (PR3). What used to be inline here
+// swallowed every Supabase error, so a failed membership query returned { status:'none' } and
+// the bot told a linked user to connect an account they had already connected.
+//
+// The wire shape the bot consumes — { status:'none' | 'auto' | 'active' | 'choose', business,
+// options } — is unchanged. Only failures look different, and they are new: previously there
+// were none, because failures were disguised as answers.
 
 // GET /api/telegram/active-business — bot-secret. 404 when the flag is off (no surface).
 app.get('/api/telegram/active-business', async (req, res) => {
@@ -1893,12 +1879,19 @@ app.get('/api/telegram/active-business', async (req, res) => {
   const telegram_id = req.query?.telegram_id || req.body?.telegram_id;
   if (!telegram_id) return res.status(400).json({ error: 'telegram_id required' });
   try {
-    const r = await resolveTelegramActiveBusiness(telegram_id);
+    const r = await resolveTelegramActiveWorkspace({ supabase, telegram_id, routeName: 'active-business' });
+    // 400 invalid / 403 not_linked / 403 link_revoked / 503 lookup failed — each keeps its own
+    // status. The bot's verifyLinkage() treats anything it does not positively recognise as
+    // "unverified" and refuses to process, so a 503 here fails closed on its side too.
+    if (!r.ok) return sendTelegramActorError(res, r);
     if (r.business) {
       const gate = await telegramPaidGate(r.business.id);
       if (gate) return res.status(402).json(gate);
     }
-    res.json(r);
+    // Exactly the legacy body: internal fields (userId, ok) are not part of the contract.
+    res.json(r.status === 'none'
+      ? { status: 'none' }
+      : { status: r.status, business: r.business, options: r.options });
   }
   catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -1910,17 +1903,14 @@ app.post('/api/telegram/active-business', async (req, res) => {
   const { telegram_id, business_id } = req.body || {};
   if (!telegram_id || !business_id) return res.status(400).json({ error: 'telegram_id and business_id required' });
   try {
-    const userId = Number(telegram_id);
-    const { data } = await supabase.from('business_members')
-      .select('role, businesses(id, name, business_code, type)')
-      .eq('user_id', userId).eq('business_id', business_id).eq('status', 'active').limit(1);
-    const m = data?.[0];
-    if (!m || !m.businesses) return res.status(403).json({ error: 'not_a_member' });
-    if (m.businesses.type === 'personal') return res.status(400).json({ error: 'business_workspace_required' });
+    // Membership, personal and ARCHIVED checks happen inside the helper, against the same
+    // filtered list the selector offers — so a workspace that cannot be shown cannot be
+    // selected either, including by a client replaying an id from before it was archived.
+    const r = await setTelegramActiveWorkspace({ supabase, telegram_id, business_id, routeName: 'set-active-business' });
+    if (!r.ok) return sendTelegramActorError(res, r);
     const gate = await telegramPaidGate(business_id);
     if (gate) return res.status(402).json(gate);
-    await supabase.from('telegram_user_state').upsert({ user_id: userId, active_business_id: business_id }, { onConflict: 'user_id' });
-    res.json({ ok: true, business: { id: m.businesses.id, name: m.businesses.name, business_code: m.businesses.business_code || null, role: m.role } });
+    res.json({ ok: true, business: r.business });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -2043,10 +2033,17 @@ app.post('/api/telegram/debts/from-receipt', async (req, res) => {
     if (TELEGRAM_ACTIVE_BUSINESS_ENABLED) {
       // Active-business routing: ambiguous 2+ → 409 company_selection_required + options;
       // never write a NULL business_id. Build the same member context the rest expects.
-      const r = await resolveTelegramActiveBusiness(telegram_id);
+      const r = await resolveTelegramActiveWorkspace({ supabase, telegram_id, routeName: 'from-receipt' });
+      if (!r.ok) return sendTelegramActorError(res, r);
       if (r.status === 'choose') return res.status(409).json({ error: 'company_selection_required', options: r.options });
       if (r.status === 'none') return res.status(403).json({ error: 'not_member' });
-      const { data: urows } = await supabase.from('users').select('id, username, first_name').eq('id', telegram_id).limit(1);
+      // PR3: the submitter row is fetched for the RESOLVED user. This line used to read
+      // .eq('id', telegram_id), so a linked email-origin account — whose user id is negative
+      // and never equals a Telegram id — could resolve a workspace and then be told
+      // 'not_linked' by the very next query.
+      const { data: urows, error: uErr } = await supabase.from('users')
+        .select('id, username, first_name').eq('id', r.userId).limit(1);
+      if (uErr) return res.status(503).json({ error: 'temporary_workspace_lookup_failed', message: 'Please try again.' });
       const su = urows?.[0];
       if (!su) return res.status(403).json({ error: 'not_linked' });
       su.name = su.first_name || su.username || String(su.id);
