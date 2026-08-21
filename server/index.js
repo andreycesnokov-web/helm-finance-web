@@ -12,6 +12,10 @@ const TX = require('./lib/transactionClass');
 // Telegram-created payables are IDR-only until multi-currency payables exist end to end.
 // See server/lib/telegramCurrency.js for why refusing beats recording a wrong row.
 const { isSupportedTelegramCurrency, currencyNotSupported, normalizeCurrency } = require('./lib/telegramCurrency');
+// PR2.5: route-level Telegram actor resolution, gated by
+// TELEGRAM_CHANNEL_IDENTITY_RESOLVER_ENABLED (default OFF). With the flag off this
+// returns Number(telegram_id) — exactly what the inline code below used to do.
+const { resolveTelegramActorForRoute, actorErrorResponse } = require('./lib/telegramActor');
 const personalFundingRouter = require('./routes/personalFunding');
 const multer = require('multer');
 require('dotenv').config();
@@ -1614,13 +1618,17 @@ async function resolveBotApprover(telegram_id, debtId) {
   }
   if (!businessId) return { error: 'forbidden' };
 
+  // PR2.5: membership is checked for the RESOLVED user, not for the raw Telegram id.
+  const actor = await resolveTelegramActorForRoute({ supabase, telegram_id, routeName: 'telegram-debt-action' });
+  if (!actor.ok) return { error: actor.code, httpStatus: actor.httpStatus, safeMessage: actor.safeMessage };
+
   const { data: mem } = await supabase.from('business_members')
-    .select('role').eq('user_id', telegram_id).eq('business_id', businessId)
+    .select('role').eq('user_id', actor.userId).eq('business_id', businessId)
     .eq('status', 'active').limit(1);
   const role = mem?.[0]?.role;
   if (!role) return { error: 'forbidden' };
 
-  return { debt, userId: Number(telegram_id), role };
+  return { debt, userId: actor.userId, role };
 }
 
 // POST /api/telegram/debts/:id/approve
@@ -1814,8 +1822,13 @@ const MAX_RECEIPTS = 5;
 
 // Resolve a Telegram submitter → { submitterUser, role, businessId, ownerId,
 // isPrivileged } using the same rules as from-telegram (single business).
-async function resolveTelegramMember(telegram_id) {
-  const { data: rows } = await supabase.from('users').select('id, username, first_name').eq('id', telegram_id).limit(1);
+async function resolveTelegramMember(telegram_id, routeName = 'telegram') {
+  // PR2.5: the acting user is resolved BEFORE the users lookup, so a linked account reaches
+  // its own row rather than the row whose id happens to equal the Telegram id.
+  const actor = await resolveTelegramActorForRoute({ supabase, telegram_id, routeName });
+  if (!actor.ok) return { error: actor.code, httpStatus: actor.httpStatus, safeMessage: actor.safeMessage };
+
+  const { data: rows } = await supabase.from('users').select('id, username, first_name').eq('id', actor.userId).limit(1);
   const submitterUser = rows?.[0];
   if (!submitterUser) return { error: 'not_linked' };
   submitterUser.name = submitterUser.first_name || submitterUser.username || String(submitterUser.id);
@@ -1945,9 +1958,15 @@ app.post('/api/telegram/debts/attach-receipt', async (req, res) => {
   const { telegram_id, file_id } = req.body || {};
   if (!telegram_id || !file_id) return res.status(400).json({ error: 'telegram_id and file_id required' });
   try {
+    // PR2.5: the two columns mean different things once identity is a row rather than an
+    // assumption — created_by_telegram_id holds the EXTERNAL account, created_by_user_id the
+    // platform user. With the flag off both resolve to the same value, as before.
+    const actor = await resolveTelegramActorForRoute({ supabase, telegram_id, routeName: 'attach-receipt' });
+    if (!actor.ok) return res.status(actor.httpStatus || 403).json(actorErrorResponse(actor));
+
     const { data: candidates } = await supabase.from('debts')
       .select('*')
-      .or(`created_by_telegram_id.eq.${telegram_id},created_by_user_id.eq.${telegram_id}`)
+      .or(`created_by_telegram_id.eq.${actor.externalUserId},created_by_user_id.eq.${actor.userId}`)
       .not('approval_status', 'in', '("rejected")')
       .not('status', 'in', '("paid","cancelled")')
       .order('info_requested_at', { ascending: false, nullsLast: true })
@@ -4048,8 +4067,13 @@ app.post('/api/debts/from-telegram', async (req, res) => {
     // back to the telegram_id column for any rows that have it populated.
     // users.id IS the Telegram id in this app — match on id directly.
     // Table columns: id, username, first_name, role (no name/last_name/telegram_id).
+    // PR2.5: resolve the acting user first. With the flag off this is Number(telegram_id),
+    // identical to the previous inline behaviour.
+    const actor = await resolveTelegramActorForRoute({ supabase, telegram_id, routeName: 'from-telegram' });
+    if (!actor.ok) return res.status(actor.httpStatus || 403).json(actorErrorResponse(actor));
+
     const { data: submitterRows, error: subErr } = await supabase.from('users')
-      .select('id, username, first_name').eq('id', telegram_id).limit(1);
+      .select('id, username, first_name').eq('id', actor.userId).limit(1);
     const submitterUser = submitterRows?.[0];
     if (submitterUser) {
       submitterUser.name = submitterUser.first_name || submitterUser.username || String(submitterUser.id);
@@ -4807,7 +4831,10 @@ app.post('/api/team/onboarding/training-submission', async (req, res) => {
       try { actingUserId = jwt.verify(token, JWT_SECRET).userId; } catch { /* fall through */ }
     }
     if (!actingUserId && requireBotSecret(req) && telegram_id) {
-      actingUserId = Number(telegram_id); // users.id == telegram id
+      // PR2.5: resolved rather than assumed. Flag off ⇒ Number(telegram_id), as before.
+      const actor = await resolveTelegramActorForRoute({ supabase, telegram_id, routeName: 'training-submission' });
+      if (!actor.ok) return res.status(actor.httpStatus || 403).json(actorErrorResponse(actor));
+      actingUserId = actor.userId;
     }
     if (!actingUserId) return res.status(401).json({ error: 'Unauthorized' });
 
