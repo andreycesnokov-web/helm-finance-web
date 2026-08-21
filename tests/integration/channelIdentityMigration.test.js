@@ -311,11 +311,20 @@ test('043 telegram_user_state is untouched by this migration', async () => {
     '045 must not touch the live 043 table');
 });
 
-test('no production route file changed for PR1', async () => {
-  // Schema only: the resolver is PR2, the connect flow is PR4.
-  const server = fs.readFileSync(path.join(__dirname, '../../server/index.js'), 'utf8');
+test('the 045 tables are never touched directly by server/index.js', async () => {
+  // Was "no production route file changed for PR1". PR2.5, PR3 and PR2.6 have since wired
+  // identity, workspace and notifications — all through libraries in server/lib. The property
+  // that survives, and should outlive every one of those PRs, is that the route file itself
+  // never reaches these tables: they are reached through a resolver that owns their meaning.
+  //
+  // Comment-stripped, because prose explaining what PR4 will replace is not a table access,
+  // and a substring search cannot tell the two apart.
+  const code = fs.readFileSync(path.join(__dirname, '../../server/index.js'), 'utf8')
+    .split(String.fromCharCode(10))
+    .map((l) => (/^\s*(\/\/|\*|\/\*)/.test(l) ? '' : l.replace(/(^|[^:])\/\/.*$/, '$1')))
+    .join(String.fromCharCode(10));
   for (const t of ['user_channel_links', 'channel_link_tokens', 'user_channel_state'])
-    assert.ok(!server.includes(t), `server/index.js already references ${t} — PR1 is schema only`);
+    assert.ok(!code.includes(t), `server/index.js reaches ${t} directly — it must go through server/lib`);
 });
 
 // ── access control ──────────────────────────────────────────────────────────

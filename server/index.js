@@ -21,6 +21,9 @@ const { resolveTelegramActorForRoute, sendTelegramActorError, isActorError } = r
 // same workspace from the same table as before — the change is that a failed lookup is now
 // reported as a failure instead of as "you have no workspaces".
 const { resolveTelegramActiveWorkspace, setTelegramActiveWorkspace } = require('./lib/telegramWorkspace');
+// PR2.6: outbound Telegram recipients. A platform user id is NOT a chat id — migration 042
+// gave email-origin accounts negative ids, and Telegram reads a negative chat_id as a GROUP.
+const { resolveTelegramNotificationRecipients, resolveSingleTelegramRecipient, isSendableChatId } = require('./lib/telegramNotifications');
 const personalFundingRouter = require('./routes/personalFunding');
 const multer = require('multer');
 require('dotenv').config();
@@ -1353,6 +1356,10 @@ function normalizeChannel(ch) {
 // Send a Telegram message to all admin+ members of the business that owns
 // `ownerUserId`'s data. No-op if TELEGRAM_BOT_TOKEN is not configured
 // (the bot lives in a separate repo / may not be deployed yet).
+//
+// PR2.6: recipients are RESOLVED, not assumed. A legacy positive user id may stand in for its
+// own chat id, but only through the resolver; a negative platform id never becomes a chat id.
+// Unreachable members are dropped and reported in the return value rather than guessed at.
 // `buttons` — array of [{ text, url }] rows for an inline keyboard.
 // TODO: when the bot supports callback actions, switch url-buttons for
 //       callback_data buttons (Approve / Reject / Ask details) that call
@@ -1371,11 +1378,18 @@ async function notifyBusinessAdminsViaTelegram(ownerUserId, text, buttons = []) 
         .eq('status', 'active').in('role', ['owner', 'ceo', 'admin', 'cfo']);
       if (admins?.length) adminUserIds = admins.map(a => a.user_id);
     }
-    // users.id IS the Telegram chat id (no separate telegram_id column).
-    const chatIds = [...new Set(adminUserIds)];
+    // Resolution decides who is reachable, and de-dupes on the resolved chat id — two
+    // platform users can map to one Telegram account during the migration.
+    const { chatIds, dropped } = await resolveTelegramNotificationRecipients({
+      supabase, userIds: adminUserIds, reason: 'business-admins',
+    });
+    if (!chatIds.length) return { sent: 0, dropped };
 
     let sent = 0;
     for (const chatId of chatIds) {
+      // Belt and braces: resolution already guarantees this, and the guarantee is re-checked
+      // at the wire because the cost of being wrong here is disclosure, not a retry.
+      if (!isSendableChatId(chatId)) continue;
       try {
         const resp = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
           method: 'POST',
@@ -1393,7 +1407,7 @@ async function notifyBusinessAdminsViaTelegram(ownerUserId, text, buttons = []) 
         if (resp.ok) sent++;
       } catch (_) { /* one failed chat must not break the rest */ }
     }
-    return { sent };
+    return { sent, dropped };
   } catch (e) {
     console.warn('[telegram-notify] failed:', e.message);
     return { sent: 0, error: e.message };
@@ -1405,6 +1419,13 @@ async function notifyBusinessAdminsViaTelegram(ownerUserId, text, buttons = []) 
 async function sendTelegramDM(chatId, text, buttons = []) {
   const botToken = process.env.TELEGRAM_BOT_TOKEN || process.env.BOT_TOKEN;
   if (!botToken || !chatId) return { ok: false, skipped: true };
+  // Unconditional, outside every flag: a negative or malformed chat_id is never correct.
+  // Telegram reads a negative chat id as a GROUP, so the failure this prevents is not a
+  // dropped message — it is a company's financials arriving in an unrelated chat.
+  if (!isSendableChatId(chatId)) {
+    console.warn('[telegram-dm] refused an unsendable chat id');
+    return { ok: false, skipped: true, refused: 'unsendable_chat_id' };
+  }
   try {
     const resp = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -1451,18 +1472,43 @@ const CREATOR_TEMPLATES = {
 
 // Notify the ORIGINAL CREATOR of a debt about a state change. Never throws —
 // the financial action must succeed even if Telegram delivery fails.
-// Creator resolution: created_by_telegram_id → created_by_user_id (= telegram id).
+//
+// PR2.6 changed three things here:
+//
+//   * created_by_telegram_id is the EXTERNAL account and is used directly, but only after it
+//     is validated as a real Telegram id. The old fallback to created_by_user_id treated a
+//     platform id as a chat id, which is safe only while the two are the same number.
+//   * self-suppression compared a CHAT id with a PLATFORM user id. For a linked user those
+//     differ, so an approver would start getting "your request was approved" about their own
+//     action. It now compares platform id to platform id.
+//   * the language lookup was keyed by chat id. A linked email-origin user's row lives under
+//     their negative platform id, so their language silently fell back to English.
 async function notifyRequestCreatorViaTelegram({ debt, event, actorUserId, actorRole, reason, note }) {
   try {
-    const chatId = debt.created_by_telegram_id || debt.created_by_user_id || null;
+    const creatorUserId = debt.created_by_user_id ?? null;
+
+    // Don't notify the actor about their own action (e.g. owner self-approve). Platform id to
+    // platform id — the only comparison that stays true once identities are linked.
+    if (creatorUserId !== null && actorUserId !== null && actorUserId !== undefined
+        && String(creatorUserId) === String(actorUserId)) return;
+
+    let chatId = null;
+    if (isSendableChatId(debt.created_by_telegram_id)) {
+      chatId = String(debt.created_by_telegram_id);
+    } else if (creatorUserId !== null) {
+      const r = await resolveSingleTelegramRecipient({
+        supabase, userId: creatorUserId, reason: 'creator-notify',
+      });
+      chatId = r.chatId;
+      if (!chatId) { console.warn('[creator-notify] unreachable creator for debt', debt.id, r.dropped || ''); return; }
+    }
     if (!chatId) { console.warn('[creator-notify] no telegram identity for debt', debt.id); return; }
-    // Don't notify the actor about their own action (e.g. owner self-approve).
-    if (String(chatId) === String(actorUserId)) return;
 
     const tplKey = { approved: 'request_approved_creator', rejected: 'request_rejected_creator', request_info: 'request_info_creator' }[event];
     if (!tplKey) return;
 
-    const lang = await getUserLanguage(chatId).catch(() => 'en');
+    // Language belongs to the PLATFORM user, not to the chat.
+    const lang = await getUserLanguage(creatorUserId ?? chatId).catch(() => 'en');
     let approver = actorUserId ? await resolveUserDisplayName(actorUserId) : '—';
     if (actorRole) approver += ` · ${actorRole}`;
     const tpl = CREATOR_TEMPLATES[tplKey];
@@ -4085,10 +4131,11 @@ app.post('/api/debts/from-telegram', async (req, res) => {
     if (!amount || isNaN(Number(amount)))
       return res.status(400).json({ error: 'amount required' });
 
-    // Resolve submitting user. In this app users.id IS the Telegram id
-    // (the telegram_id column may be NULL), so match on id first, then fall
-    // back to the telegram_id column for any rows that have it populated.
-    // users.id IS the Telegram id in this app — match on id directly.
+    // Resolve the submitting user. A LEGACY positive account has users.id equal to its
+    // Telegram id, which is why matching on id works today — but that equality is a historical
+    // artefact, not a rule: email-origin accounts (042) have negative ids that are not Telegram
+    // ids at all. PR2.5 resolves the acting user before this lookup so the id used here is the
+    // platform user, whichever way it was created.
     // Table columns: id, username, first_name, role (no name/last_name/telegram_id).
     // PR2.5: resolve the acting user first. With the flag off this is Number(telegram_id),
     // identical to the previous inline behaviour.
@@ -4626,6 +4673,20 @@ app.post('/api/team/onboarding/test-ceo-notification', auth, async (req, res) =>
     if (!memRows?.[0]?.telegram_connected_at)
       return res.status(400).json({ error: 'not_connected', message: 'Connect your Telegram first.' });
 
+    // PR2.6: telegram_connected_at records that onboarding ticked a box; it does not prove a
+    // reachable Telegram identity exists. For this route the resolver is the authority —
+    // answering ok:true after sending nowhere is exactly what a "test your notifications"
+    // button must never do. (The column's own semantics are untouched; it still gates above.)
+    const rec = await resolveSingleTelegramRecipient({ supabase, userId, reason: 'ceo-test' });
+    if (!rec.chatId) {
+      if (rec.dropped === 'identity_lookup_failed' || rec.dropped === 'resolver_exception') {
+        return res.status(503).json({ error: 'temporary_notification_lookup_failed',
+          message: 'Cannot verify your Telegram connection right now. Please try again.' });
+      }
+      return res.status(400).json({ error: 'telegram_not_linked',
+        message: 'No Telegram account is linked to this user. Connect Telegram first.' });
+    }
+
     const lang = normalizeLanguage(await getUserLanguage(userId));
     const text = {
       ru: '✅ CFO AI test alert\n\nTelegram уведомления подключены.\nТеперь вы сможете получать approvals, cash alerts и daily pulse здесь.',
@@ -4633,10 +4694,9 @@ app.post('/api/team/onboarding/test-ceo-notification', auth, async (req, res) =>
       en: '✅ CFO AI test alert\n\nTelegram notifications are connected.\nYou will receive approvals, cash alerts and daily pulse here.',
     }[lang] || '✅ CFO AI test alert\n\nTelegram notifications are connected.';
 
-    // users.id IS the telegram chat id in this app
     const resp = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ chat_id: userId, text }),
+      body: JSON.stringify({ chat_id: rec.chatId, text }),
     });
     if (!resp.ok) return res.status(502).json({ error: 'send_failed' });
     res.json({ ok: true });
@@ -4681,7 +4741,12 @@ app.get('/api/team/onboarding', auth, async (req, res) => {
           name:                       m.display_name || u.first_name || u.username || String(m.user_id),
           role:                       m.role,
           status:                     m.status,
-          telegram_id:                m.user_id, // users.id IS the telegram id in this app
+          // NOTE (PR2.6): for a legacy account this happens to be the Telegram id; for an
+          // email-origin member it is a negative platform id and NOT a Telegram id. It is
+          // reported to the team-onboarding UI only — it must never be used as a chat id, and
+          // outbound sends resolve recipients through lib/telegramNotifications.js instead.
+          // Correcting this field belongs to PR4, with the UI that consumes it.
+          telegram_id:                m.user_id,
           telegram_connected_at:      m.telegram_connected_at,
           onboarding_status:          m.onboarding_status || 'not_started',
           onboarding_step:            m.onboarding_step,
@@ -4815,8 +4880,10 @@ app.post('/api/telegram/connect', async (req, res) => {
     if (business_id && member.business_id !== business_id)
       return res.status(403).json({ error: 'Member does not belong to this business' });
 
-    // In this app users.id IS the telegram id — a member may only connect
-    // their own Telegram account. Never bind a foreign telegram_id.
+    // A member may only connect their OWN Telegram account — never bind a foreign
+    // telegram_id. The equality check below works because a legacy account's users.id is its
+    // Telegram id; PR4 replaces this with an explicit user_channel_links row, at which point
+    // the comparison stops being an id coincidence and becomes a real lookup.
     if (String(member.user_id) !== String(telegram_id))
       return res.status(403).json({ error: 'telegram_id does not match this member' });
 

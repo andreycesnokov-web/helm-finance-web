@@ -789,8 +789,13 @@ test('the non-IDR block, notifications and auth routes are untouched by PR3', ()
   const server = SRC('server/index.js');
   assert.strictEqual((server.match(/isSupportedTelegramCurrency\(/g) || []).length, 2,
     'both Telegram currency doors must still be gated');
-  assert.ok(server.includes('const chatIds = [...new Set(adminUserIds)];'),
-    'the notification path belongs to PR2.6');
+  // PR2.6 replaced the raw fan-out with resolved recipients. The invariant that matters to
+  // PR3 is unchanged: the notification path is either fully unwired or fully resolved, never
+  // half-wired — and workspace resolution has nothing to do with either.
+  assert.ok(!/const chatIds = \[\.\.\.new Set\(adminUserIds\)\]/.test(server),
+    'chat ids must not be taken straight from membership rows');
+  assert.match(server, /resolveTelegramNotificationRecipients/,
+    'the notification fan-out must resolve its recipients');
   assert.ok(!/resolveChannelExternalId|resolveTelegramExternalId/.test(server),
-    'the reverse resolver must not be wired');
+    'the reverse resolver is reached through lib/telegramNotifications.js, not directly');
 });

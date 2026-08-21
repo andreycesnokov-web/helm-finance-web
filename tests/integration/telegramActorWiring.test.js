@@ -474,15 +474,15 @@ test('the 043 statements survived the move to lib/telegramWorkspace.js intact', 
   }
 });
 
-test('the notification path is NOT wired to the reverse resolver — that is PR2.6', () => {
-  // Survivor: the mutation used (.map(String) on chatIds) was a functional no-op, so nothing
-  // could catch it and nothing needed to. The property worth pinning is that no reverse
-  // resolution happens here yet: notifications still send to user ids, the known bug PR2.6
-  // fixes, and a half-wired version would be worse than either end state.
+test('the notification path resolves its recipients (PR2.6 landed)', () => {
+  // PR2.5 pinned this line as "the known bug PR2.6 fixes", and PR2.6 has now fixed it: chat
+  // ids are resolved rather than assumed. What PR2.5 actually cared about — that identity
+  // resolution and notification routing never end up half-wired into each other — still holds,
+  // and is now expressed as "the reverse resolver is reached only through its own helper".
   assert.ok(!/resolveChannelExternalId|resolveTelegramExternalId/.test(SERVER_CODE),
-    'the reverse resolver must not appear anywhere in this PR');
-  const line = SERVER_LINES.find((l) => l.includes('const chatIds ='));
-  assert.ok(line, 'the notification chatIds derivation disappeared');
-  assert.strictEqual(line.trim(), 'const chatIds = [...new Set(adminUserIds)];',
-    'the notification path changed — PR2.5 documents this bug, it does not fix it');
+    'server/index.js must reach the reverse resolver through lib/telegramNotifications.js');
+  assert.ok(!SERVER_LINES.some((l) => l.includes('const chatIds = [...new Set(adminUserIds)]')),
+    'chat ids are being taken straight from membership rows again');
+  assert.match(SERVER_CODE, /resolveTelegramNotificationRecipients\(\{/,
+    'the notification fan-out must resolve its recipients');
 });
