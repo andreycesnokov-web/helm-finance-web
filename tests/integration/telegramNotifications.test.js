@@ -447,6 +447,159 @@ test('ceo-test: telegram_connected_at alone no longer proves reachability', asyn
 });
 
 // ════════════════════════════════════════════════════════════════════════════
+// PR2.7 — revocation beats the historical address
+//
+// created_by_telegram_id is written once when the request is submitted and never updated. It
+// is a cache with no invalidation, so checking it BEFORE the link table (as PR2.6 did) meant:
+//
+//   * a revoked link was never noticed — the user asked us to stop, and we kept sending
+//   * a user who relinked to a different Telegram account kept receiving at the OLD one
+//
+// The rule now: the resolver decides, and the historical column is consulted only when the
+// resolver's answer was "I have no link information" — never "withdrawn" and never "I could
+// not find out".
+// ════════════════════════════════════════════════════════════════════════════
+
+const HISTORICAL = '444000111';   // the address recorded when the request was submitted
+
+test('revoked: a valid historical id does NOT override a withdrawn link', async () => {
+  // The regression this PR exists for. Before PR2.7 this sent to HISTORICAL.
+  seedApproval({ created_by_telegram_id: Number(HISTORICAL) });
+  scenario.rows.user_channel_links = [link(EMAIL_USER, EXTERNAL, '2026-01-01T00:00:00Z')];
+  await ON(async () => {
+    await approve();
+    assert.deepStrictEqual(sends, [], 'a revoked link still received a notification');
+    assert.ok(!chatIdsSent().includes(HISTORICAL), 'the stale address was used anyway');
+  });
+});
+
+test('revoked: nothing is sent when there is no historical id either', async () => {
+  seedApproval();
+  scenario.rows.user_channel_links = [link(EMAIL_USER, EXTERNAL, '2026-01-01T00:00:00Z')];
+  await ON(async () => {
+    await approve();
+    assert.deepStrictEqual(sends, []);
+  });
+});
+
+test('relink: an active link wins over a DIFFERENT historical id', async () => {
+  // The quieter half of the same defect: the user still has Telegram, but a different account.
+  // The column would have kept messaging the account they moved away from.
+  seedApproval({ created_by_telegram_id: Number(HISTORICAL) });
+  scenario.rows.user_channel_links = [link(EMAIL_USER, EXTERNAL)];
+  await ON(async () => {
+    await approve();
+    assert.deepStrictEqual(chatIdsSent(), [EXTERNAL], 'the current link must win');
+    assert.ok(!chatIdsSent().includes(HISTORICAL));
+  });
+});
+
+test('unlinked: the historical id is still allowed — no link info is not a withdrawal', async () => {
+  seedApproval({ created_by_telegram_id: Number(HISTORICAL) });
+  await ON(async () => {
+    await approve();
+    assert.deepStrictEqual(chatIdsSent(), [HISTORICAL]);
+  });
+});
+
+test('resolver error: the historical id must NOT be used as a fallback', async () => {
+  // Fail closed. "We could not read the link table" is not evidence that the old address is
+  // still good — and if the reason it failed is the same reason a revocation is invisible,
+  // falling back would defeat the revocation exactly when it matters.
+  seedApproval({ created_by_telegram_id: Number(HISTORICAL) });
+  scenario.failTables.add('user_channel_links');
+  await ON(async () => {
+    await approve();
+    assert.deepStrictEqual(sends, [], 'a lookup failure fell back to the stale address');
+  });
+});
+
+test('legacy positive creator: unchanged', async () => {
+  seedApproval({ created_by_user_id: TG_OTHER, created_by_telegram_id: TG_OTHER });
+  await ON(async () => {
+    await approve();
+    assert.deepStrictEqual(chatIdsSent(), [String(TG_OTHER)]);
+  });
+});
+
+test('no platform id on the row: a valid historical id still delivers', async () => {
+  // Nothing to resolve, so the recorded address is the only one that exists.
+  seedApproval({ created_by_user_id: null, created_by_telegram_id: Number(HISTORICAL) });
+  await ON(async () => {
+    await approve();
+    assert.deepStrictEqual(chatIdsSent(), [HISTORICAL]);
+  });
+});
+
+test('no platform id and an INVALID historical id: nothing is sent', async () => {
+  for (const bad of [-100200300, '-5', 0, '007', 'abc', null]) {
+    seedApproval({ created_by_user_id: null, created_by_telegram_id: bad });
+    await ON(async () => {
+      await approve();
+      assert.deepStrictEqual(sends, [], `an invalid historical id was used: ${JSON.stringify(bad)}`);
+    });
+  }
+});
+
+test('the fallback allowlist is positive — an unknown reason suppresses', () => {
+  // Guarding the DESIGN, not just the behaviour: expressed as a denylist, any drop reason added
+  // later would silently become sendable. This is the assertion that keeps that from happening.
+  const src = SRC('server/index.js');
+  const m = /FALLBACK_TO_HISTORICAL_TELEGRAM_ID_REASONS = new Set\(\[([\s\S]*?)\]\)/.exec(src);
+  assert.ok(m, 'the allowlist must be a literal Set');
+  const listed = [...m[1].matchAll(/'([a-z_]+)'/g)].map((x) => x[1]).sort();
+  assert.deepStrictEqual(listed, ['negative_user_id_unresolvable', 'not_linked'],
+    'only "no link information" reasons may fall back to the historical address');
+  for (const forbidden of ['link_revoked', 'identity_lookup_failed', 'resolver_exception', 'invalid_user_id']) {
+    assert.ok(!listed.includes(forbidden), `${forbidden} must never permit a fallback`);
+  }
+});
+
+test('the resolver is consulted BEFORE the historical column', () => {
+  const src = SRC('server/index.js');
+  const fn = src.slice(src.indexOf('async function notifyRequestCreatorViaTelegram'),
+                       src.indexOf('// ── PATCH /api/debts/:id/approve'));
+  assert.ok(fn.length > 0, 'the creator notification disappeared');
+  const resolveAt = fn.indexOf('resolveSingleTelegramRecipient');
+  const historicalAt = fn.indexOf('chatId = String(debt.created_by_telegram_id)');
+  assert.ok(resolveAt > -1 && historicalAt > -1);
+  assert.ok(resolveAt < historicalAt,
+    'the historical column is being checked before the resolver again');
+  // and it is never used unvalidated
+  assert.ok(!/chatId = String\(debt\.created_by_telegram_id\)/.test(
+    fn.replace(/isSendableChatId\(debt\.created_by_telegram_id\)[\s\S]*?\{[\s\S]*?\}/g, '')),
+    'the historical column is used without isSendableChatId somewhere');
+});
+
+test('a suppressed creator notification does not fail the approval', async () => {
+  seedApproval({ created_by_telegram_id: Number(HISTORICAL) });
+  scenario.rows.user_channel_links = [link(EMAIL_USER, EXTERNAL, '2026-01-01T00:00:00Z')];
+  await ON(async () => {
+    const r = await approve();
+    assert.ok(r.status < 500, `the approval failed with ${r.status}`);
+    assert.deepStrictEqual(sends, []);
+  });
+});
+
+test('OFF: creator recipients are identical to pre-PR2.7 behaviour', async () => {
+  // With the notify flag off nothing reads the link table, so revocation is not knowable and
+  // the historical address is reached through the "no link information" branch. Production
+  // today — flags off, no links — must be byte-identical.
+  seedApproval({ created_by_user_id: TG_OTHER, created_by_telegram_id: Number(HISTORICAL) });
+  await OFF(async () => {
+    await approve();
+    assert.deepStrictEqual(chatIdsSent(), [String(TG_OTHER)], 'a legacy creator resolves to their own id');
+  });
+  // A negative creator with a recorded address: no link table is consulted, so the drop reason
+  // is "unresolvable", which permits the historical address — the same message that arrives today.
+  seedApproval({ created_by_telegram_id: Number(HISTORICAL) });
+  await OFF(async () => {
+    await approve();
+    assert.deepStrictEqual(chatIdsSent(), [HISTORICAL]);
+  });
+});
+
+// ════════════════════════════════════════════════════════════════════════════
 // THE SWEEP — the assertion that would have caught the original bug
 // ════════════════════════════════════════════════════════════════════════════
 
@@ -484,12 +637,55 @@ test('across EVERY combination, no negative or malformed chat_id ever goes on th
       }
     }
   }
+  // ── the creator path, including revocation and stale historical addresses ──────────────
+  // PR2.7 added a second way for an address to reach the wire: the historical
+  // created_by_telegram_id column. It is validated, but it is also attacker-adjacent in the
+  // sense that nothing keeps it fresh, so it belongs in the sweep rather than only in the
+  // targeted tests above.
+  const historicalIds = [null, 444000111, -444000111, 0, '007', 'abc'];
+  const creatorLinks = [
+    [],
+    [link(EMAIL_USER, EXTERNAL)],
+    [link(EMAIL_USER, EXTERNAL, '2026-01-01T00:00:00Z')],
+  ];
+  for (const flag of [undefined, 'true']) {
+    for (const creator of [EMAIL_USER, TG_OTHER, null]) {
+      for (const hist of historicalIds) {
+        for (const links of creatorLinks) {
+          seedApproval({ created_by_user_id: creator, created_by_telegram_id: hist });
+          scenario.rows.user_channel_links = links;
+          await withNotify(flag, async () => { await approve(); });
+          combos++;
+          totalSends += sends.length;
+          for (const id of chatIdsSent()) {
+            assert.ok(N.isSendableChatId(id),
+              `an unsendable chat_id reached the wire from the creator path: ${JSON.stringify(id)}`);
+            assert.ok(!String(id).startsWith('-'), `a negative chat_id reached the wire: ${id}`);
+          }
+          // A withdrawn link suppresses the creator's notification — but only when the
+          // revocation is BOTH about this creator and knowable. Two conditions, both real:
+          //
+          //   * the link must belong to the creator. A revoked link for someone else says
+          //     nothing about this person, and suppressing on it would silence bystanders.
+          //   * the notify flag must be on. With it off, no link table is read anywhere, so
+          //     revocation cannot be observed — the documented limit of the policy, not a bug.
+          const revokedForCreator = flag === 'true'
+            && links.some((l) => l.user_id === creator && l.revoked_at);
+          if (revokedForCreator) {
+            assert.deepStrictEqual(sends, [],
+              `a revoked creator was messaged (historical=${JSON.stringify(hist)})`);
+          }
+        }
+      }
+    }
+  }
+
   // Proof the sweep was not vacuous. Every assertion above is of the form "nothing bad went
   // out", which is trivially satisfied by a harness that sends nothing — and that is precisely
   // the state this file was in while the routes were erroring. If these counts ever collapse,
   // the sweep is asserting about an empty set and must be treated as failing, not passing.
-  assert.ok(combos >= 60, `the sweep covered only ${combos} combinations`);
-  assert.ok(totalSends >= 20, `the sweep observed only ${totalSends} sends — it proved nothing`);
+  assert.ok(combos >= 160, `the sweep covered only ${combos} combinations`);
+  assert.ok(totalSends >= 40, `the sweep observed only ${totalSends} sends — it proved nothing`);
 });
 
 // ════════════════════════════════════════════════════════════════════════════

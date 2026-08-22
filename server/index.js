@@ -1470,14 +1470,27 @@ const CREATOR_TEMPLATES = {
   },
 };
 
+// When a resolver drop still permits the historical created_by_telegram_id to be used.
+//
+// A POSITIVE allowlist, not a denylist, and that is the whole design. These two reasons mean
+// "we have no link information for this person" — there is nothing to honour, so a validated
+// address recorded when they submitted the request is still the best evidence available.
+// Every other reason means something stronger: withdrawn, unreadable, or malformed. A new
+// reason added later therefore defaults to SUPPRESSION, which is the safe direction for a rule
+// whose failure mode is sending financial data to an address someone asked us to stop using.
+const FALLBACK_TO_HISTORICAL_TELEGRAM_ID_REASONS = new Set([
+  'not_linked',                      // resolver on, nothing on file for this user
+  'negative_user_id_unresolvable',   // resolver off, negative id — no link table was consulted
+]);
+
 // Notify the ORIGINAL CREATOR of a debt about a state change. Never throws —
 // the financial action must succeed even if Telegram delivery fails.
 //
 // PR2.6 changed three things here:
 //
-//   * created_by_telegram_id is the EXTERNAL account and is used directly, but only after it
-//     is validated as a real Telegram id. The old fallback to created_by_user_id treated a
-//     platform id as a chat id, which is safe only while the two are the same number.
+//   * created_by_telegram_id is the EXTERNAL account, validated before use. The old fallback
+//     to created_by_user_id treated a platform id as a chat id, which is safe only while the
+//     two are the same number.
 //   * self-suppression compared a CHAT id with a PLATFORM user id. For a linked user those
 //     differ, so an approver would start getting "your request was approved" about their own
 //     action. It now compares platform id to platform id.
@@ -1492,15 +1505,36 @@ async function notifyRequestCreatorViaTelegram({ debt, event, actorUserId, actor
     if (creatorUserId !== null && actorUserId !== null && actorUserId !== undefined
         && String(creatorUserId) === String(actorUserId)) return;
 
+    // PR2.7: the RESOLVER decides, and created_by_telegram_id is a last resort.
+    //
+    // It used to be the other way round, which meant a validated historical id short-circuited
+    // the link table completely — so a revoked link was never noticed, and a user who relinked
+    // to a different Telegram account kept receiving notifications at the old one. The column
+    // is written once at submission and never updated: it is a cache with no invalidation, and
+    // it is not even reliably an external id (the training-submission writer stores a platform
+    // id when no telegram_id is present). Trusting it first meant trusting the weaker source.
     let chatId = null;
-    if (isSendableChatId(debt.created_by_telegram_id)) {
-      chatId = String(debt.created_by_telegram_id);
-    } else if (creatorUserId !== null) {
+    if (creatorUserId !== null) {
       const r = await resolveSingleTelegramRecipient({
         supabase, userId: creatorUserId, reason: 'creator-notify',
       });
-      chatId = r.chatId;
-      if (!chatId) { console.warn('[creator-notify] unreachable creator for debt', debt.id, r.dropped || ''); return; }
+      if (r.chatId) {
+        chatId = r.chatId;
+      } else if (FALLBACK_TO_HISTORICAL_TELEGRAM_ID_REASONS.has(r.dropped)
+                 && isSendableChatId(debt.created_by_telegram_id)) {
+        // No link information — not a withdrawal, not a failure. The address they wrote from
+        // is still the best evidence we have.
+        chatId = String(debt.created_by_telegram_id);
+      } else {
+        // Revoked, unreadable or malformed: suppress. Falling back here would let a stale
+        // cache quietly overrule a decision the user made.
+        console.warn('[creator-notify] suppressed for debt', debt.id, 'reason=', r.dropped || 'unknown');
+        return;
+      }
+    } else if (isSendableChatId(debt.created_by_telegram_id)) {
+      // No platform identity on the row at all — there is nothing to resolve, so the validated
+      // historical id is the only address that exists.
+      chatId = String(debt.created_by_telegram_id);
     }
     if (!chatId) { console.warn('[creator-notify] no telegram identity for debt', debt.id); return; }
 
