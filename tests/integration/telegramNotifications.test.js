@@ -581,17 +581,44 @@ test('a suppressed creator notification does not fail the approval', async () =>
   });
 });
 
-test('OFF: creator recipients are identical to pre-PR2.7 behaviour', async () => {
-  // With the notify flag off nothing reads the link table, so revocation is not knowable and
-  // the historical address is reached through the "no link information" branch. Production
-  // today — flags off, no links — must be byte-identical.
+test('OFF: a normal legacy row (platform id == historical id) is unchanged', async () => {
+  // The compatibility case that actually covers production. Telegram-origin rows are written
+  // with created_by_user_id and created_by_telegram_id holding the SAME number, so precedence
+  // between them is unobservable and PR2.7 changes nothing here.
+  seedApproval({ created_by_user_id: TG_OTHER, created_by_telegram_id: TG_OTHER });
+  await OFF(async () => {
+    await approve();
+    assert.deepStrictEqual(chatIdsSent(), [String(TG_OTHER)]);
+  });
+});
+
+test('OFF: a MISMATCHED row now follows platform identity — an intentional change', async () => {
+  // NOT a compatibility test. This is the one case where PR2.7 changes flag-OFF behaviour, and
+  // it is deliberate: pre-PR2.7 this sent to the historical address, because the column was
+  // checked first. It now sends to the platform identity.
+  //
+  // The reasoning: created_by_telegram_id is written once at submission and never updated, and
+  // the training-submission writer can even store a platform id in it. When the two disagree,
+  // one of them is a stale cache and the other is the account the row actually belongs to.
+  // Preferring the cache is how a revoked or relinked user kept receiving mail at an address
+  // they had moved away from.
+  //
+  // Naming this "identical behaviour" — as an earlier revision of this file did — would have
+  // walked a real behaviour change past review under a compatibility label.
   seedApproval({ created_by_user_id: TG_OTHER, created_by_telegram_id: Number(HISTORICAL) });
   await OFF(async () => {
     await approve();
-    assert.deepStrictEqual(chatIdsSent(), [String(TG_OTHER)], 'a legacy creator resolves to their own id');
+    assert.deepStrictEqual(chatIdsSent(), [String(TG_OTHER)],
+      'platform identity must win over the historical cache');
+    assert.ok(!chatIdsSent().includes(HISTORICAL),
+      'the stale historical address must not be used when a platform id exists');
   });
-  // A negative creator with a recorded address: no link table is consulted, so the drop reason
-  // is "unresolvable", which permits the historical address — the same message that arrives today.
+});
+
+test('OFF: a negative creator with a recorded address still reaches it — unchanged', async () => {
+  // Genuinely identical to pre-PR2.7. No link table is read with the flag off, so the drop
+  // reason is 'negative_user_id_unresolvable', which is on the fallback allowlist, and the
+  // recorded address is used exactly as it was before.
   seedApproval({ created_by_telegram_id: Number(HISTORICAL) });
   await OFF(async () => {
     await approve();
