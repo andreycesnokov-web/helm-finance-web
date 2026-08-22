@@ -24,6 +24,9 @@ const { resolveTelegramActiveWorkspace, setTelegramActiveWorkspace } = require('
 // PR2.6: outbound Telegram recipients. A platform user id is NOT a chat id — migration 042
 // gave email-origin accounts negative ids, and Telegram reads a negative chat_id as a GROUP.
 const { resolveTelegramNotificationRecipients, resolveSingleTelegramRecipient, isSendableChatId } = require('./lib/telegramNotifications');
+// PR4a: connecting and disconnecting a Telegram account. Identity only — a link grants no
+// access of any kind, and membership stays entirely in business_members.
+const telegramLink = require('./lib/telegramLink');
 const personalFundingRouter = require('./routes/personalFunding');
 const multer = require('multer');
 require('dotenv').config();
@@ -4672,6 +4675,89 @@ async function telegramPaidGate(businessId) {
     upgrade_url: 'https://app.cfo-ai.site/business/settings',
   };
 }
+
+// ═════════════════════════════════════════════════════════════════════════════
+// PR4a — Telegram account linking
+//
+// Four endpoints with a deliberate auth asymmetry that is the security boundary here:
+//
+//   * the three /api/account/integrations/telegram/* routes are JWT ONLY. If a bot secret
+//     could reach them, anyone holding it could mint a connection link for any user.
+//   * /api/telegram/link-token/consume is BOT SECRET ONLY. If a JWT could reach it, a user
+//     could consume someone else's token from a browser.
+//
+// Neither route family falls back to the other. `auth` rejects a bot secret because it only
+// reads Authorization; the consume route never inspects Authorization at all.
+//
+// Nothing here writes users, business_members, telegram_user_state or user_channel_state.
+// ═════════════════════════════════════════════════════════════════════════════
+
+const telegramBotUsername = () =>
+  (process.env.TELEGRAM_BOT_USERNAME || process.env.VITE_BOT_USERNAME || '').replace(/^@/, '') || null;
+
+// GET /api/account/integrations/telegram — the signed-in user's connection state.
+app.get('/api/account/integrations/telegram', auth, async (req, res) => {
+  try {
+    const r = await telegramLink.getTelegramLinkStatus({ supabase, userId: req.user.userId });
+    if (!r.ok) return res.status(r.httpStatus).json({ error: r.code, message: r.message });
+    res.json(r.body);
+  } catch (e) { res.status(500).json({ error: 'status_failed' }); }
+});
+
+// POST /api/account/integrations/telegram/link-token — mint a one-time deep link.
+app.post('/api/account/integrations/telegram/link-token', auth, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    // Reuses the existing in-memory limiter. Best-effort and per-instance, but it bounds how
+    // fast one account can mint tokens, which is the abuse that matters here.
+    if (rateLimited(`tglink:${userId}`, 5, 15 * 60 * 1000)) {
+      return res.status(429).json({ error: 'rate_limited', message: 'Too many attempts. Please wait a few minutes.' });
+    }
+    const r = await telegramLink.createTelegramLinkToken({
+      supabase, userId, botUsername: telegramBotUsername(),
+    });
+    if (!r.ok) return res.status(r.httpStatus).json({ error: r.code, message: r.message });
+    // The audit records THAT a token was created, never the token or its hash.
+    recordAudit({ actorUserId: userId, entityType: 'telegram_link', action: 'link_token_created' });
+    res.json(r.body);
+  } catch (e) { res.status(500).json({ error: 'link_token_failed' }); }
+});
+
+// POST /api/account/integrations/telegram/unlink — withdraw the active link.
+app.post('/api/account/integrations/telegram/unlink', auth, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const r = await telegramLink.revokeTelegramLink({ supabase, userId });
+    if (!r.ok) return res.status(r.httpStatus).json({ error: r.code, message: r.message });
+    recordAudit({ actorUserId: userId, entityType: 'telegram_link', action: 'telegram_link_revoked' });
+    res.json(r.body);
+  } catch (e) { res.status(500).json({ error: 'unlink_failed' }); }
+});
+
+// POST /api/telegram/link-token/consume — the bot redeems a token for a link.
+app.post('/api/telegram/link-token/consume', async (req, res) => {
+  // Authentication first, before the token is even hashed: an unauthenticated caller must not
+  // be able to use this endpoint as an oracle for which tokens exist.
+  if (!requireBotSecret(req)) return res.status(401).json({ error: 'Invalid bot credentials' });
+  try {
+    const { token, telegram_id, username, first_name } = req.body || {};
+    const r = await telegramLink.consumeTelegramLinkToken({
+      supabase, token, telegramId: telegram_id, username, first_name,
+    });
+    if (!r.ok) {
+      // Conflicts are worth an audit trail — they are how a stolen or mistaken link attempt
+      // would look. The token never appears in it.
+      if (r.httpStatus === 409) {
+        recordAudit({ channel: 'telegram', entityType: 'telegram_link',
+          action: 'telegram_link_conflict', after: { code: r.code } });
+      }
+      return res.status(r.httpStatus).json({ error: r.code, message: r.message });
+    }
+    recordAudit({ actorUserId: r.linkedUserId ?? null, channel: 'telegram',
+      entityType: 'telegram_link', action: 'telegram_link_consumed' });
+    res.json(r.body);
+  } catch (e) { res.status(500).json({ error: 'link_failed' }); }
+});
 
 // ── GET /api/telegram/config — PUBLIC (no auth) ──────────────────────────────
 // Returns only non-secret bot config. Never exposes any token/secret.
