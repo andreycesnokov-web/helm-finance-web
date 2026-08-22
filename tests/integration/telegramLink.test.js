@@ -763,17 +763,36 @@ test('a short external id is masked completely, not decorated', async () => {
 });
 
 test('no external id — short or long — appears in full in a status response', async () => {
+  // FLAKY BEFORE: this asserted the id string was absent from the WHOLE serialised body, which
+  // also carries `linked_at` — a Postgres timestamp whose digits can coincidentally contain a
+  // short id like '1234'. That produced a rare, unreproducible failure that had nothing to do
+  // with the behaviour under test.
+  //
+  // Now each identity-bearing FIELD is inspected on its own. Timestamps are excluded because
+  // they cannot leak an id: their digits are not derived from one. This is both deterministic
+  // and a sharper statement of the actual guarantee.
+  const ID_FIELDS = ['external_user_id_masked', 'handle', 'status'];
   for (const ext of ['1234', '99999', '555000222']) {
     await freshDb();
-    // Seed the link directly: a 4-digit id is not one the normalizer would accept from a bot,
-    // but the status endpoint must not depend on that for its safety.
+    // Seeded directly: a 4-digit id is not one the normalizer would accept from a bot, but the
+    // status endpoint must not depend on that for its safety.
     await db.query(`INSERT INTO user_channel_links (channel, external_user_id, user_id, linked_via)
                     VALUES ('telegram', '${ext}', ${EMAIL_USER}, 'link_token')`);
     const s = await status();
-    const text = JSON.stringify(s.body);
-    assert.ok(!text.includes(ext), `the full external id ${ext} leaked: ${text}`);
-    assert.ok(!text.includes(String(EMAIL_USER)), 'the platform user id leaked');
+
+    for (const field of ID_FIELDS) {
+      const value = s.body[field] == null ? '' : String(s.body[field]);
+      assert.ok(!value.includes(ext), `the full external id ${ext} leaked via ${field}: ${value}`);
+      assert.ok(!value.includes(String(EMAIL_USER)), `the platform user id leaked via ${field}`);
+      assert.ok(!value.includes(String(Math.abs(EMAIL_USER))), `the platform user id leaked via ${field}`);
+    }
     assert.ok(s.body.external_user_id_masked.startsWith('…'));
+
+    // And the body carries no field beyond the documented contract, so a future addition
+    // cannot smuggle an id past the field list above.
+    assert.deepStrictEqual(Object.keys(s.body).sort(),
+      ['external_user_id_masked', 'handle', 'legacy_conflict', 'linked_at', 'revoked_at', 'status'],
+      'the status contract changed — re-check what the new field can leak');
   }
 });
 
@@ -815,8 +834,11 @@ test('an UNKNOWN insert failure is 503, never a fabricated conflict', async () =
   assert.deepStrictEqual(await links(), [], 'nothing was linked');
 });
 
-test('a failed DIAGNOSTIC read after an insert failure is also 503', async () => {
-  // If we cannot confirm a conflict, we do not claim one.
+test('a failed PRE-CHECK read is 503 before the insert is ever attempted', async () => {
+  // Renamed and re-scoped. This client fails EVERY select on user_channel_links, so the first
+  // pre-check errors and the insert is never reached — which is a real path worth covering, but
+  // it is NOT the post-insert diagnostic path this test used to claim. Codex caught that; the
+  // post-insert path is now proven separately, further down.
   await freshDb();
   const r = await mint();
   const broken = failing('user_channel_links', 'select');
@@ -825,6 +847,8 @@ test('a failed DIAGNOSTIC read after an insert failure is also 503', async () =>
   });
   assert.strictEqual(c.ok, false);
   assert.strictEqual(c.httpStatus, 503);
+  assert.strictEqual(c.code, 'temporary_link_failed', 'this is the PRE-CHECK code, not the post-insert one');
+  assert.deepStrictEqual(await links(), []);
 });
 
 test('a REAL external conflict still returns 409, with the existing link untouched', async () => {
@@ -901,6 +925,150 @@ test('replay after a plain revoke does not resurrect the link', async () => {
   assert.strictEqual(c.code, 'token_already_used');
   assert.strictEqual((await links()).filter((x) => x.revoked_at === null).length, 0,
     'no active link may exist after revoke + replay');
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// PR4a.1 — POST-INSERT diagnostic reads, proven to be reached
+//
+// Codex found that the earlier "failed diagnostic read" test did not prove what it claimed.
+// It failed EVERY select on user_channel_links, so the very first PRE-CHECK
+// (activeLinkForExternal, before the insert) errored and returned 503 — the insert was never
+// attempted and the post-insert branch was never entered. The test asserted only the status
+// code, and 503 is what both paths produce, so it passed for the wrong reason.
+//
+// Two things make these replacements conclusive:
+//
+//   1. The failure is injected only AFTER an insert has been attempted, so the pre-checks run
+//      normally and the post-insert branch is genuinely reached.
+//   2. The assertion is on the CODE, not the status. The pre-check path returns
+//      'temporary_link_failed'; the post-insert path returns 'temporary_link_failure'. Those
+//      two strings are the discriminator — asserting 503 alone cannot tell them apart.
+// ════════════════════════════════════════════════════════════════════════════
+
+const PRE_CHECK_CODE = 'temporary_link_failed';    // returned BEFORE the insert
+const POST_INSERT_CODE = 'temporary_link_failure'; // returned only from the post-insert branch
+
+/**
+ * A client whose INSERT into user_channel_links always fails, and whose post-insert diagnostic
+ * reads can be made to fail individually.
+ *
+ * Selects before the insert behave normally, which is the whole point: without that, the
+ * pre-checks short-circuit and the code under test is never executed.
+ */
+function afterInsertFailing({ failExternalRead = false, failUserRead = false } = {}) {
+  const base = supabase;
+  let insertAttempted = false;
+  let postInsertSelects = 0;
+  return {
+    from(t) {
+      const q = base.from(t);
+      if (t !== 'user_channel_links') return q;
+      const originalInsert = q.insert.bind(q);
+      q.insert = (...args) => { q.__isInsert = true; return originalInsert(...args); };
+      const originalThen = q.then.bind(q);
+      q.then = (res, rej) => {
+        if (q.__isInsert) {
+          insertAttempted = true;
+          return Promise.resolve({ data: null, error: { message: 'simulated insert failure' } }).then(res, rej);
+        }
+        if (insertAttempted) {
+          postInsertSelects += 1;
+          const shouldFail = (postInsertSelects === 1 && failExternalRead)
+                          || (postInsertSelects === 2 && failUserRead);
+          if (shouldFail) {
+            return Promise.resolve({ data: null, error: { message: 'simulated post-insert read failure' } }).then(res, rej);
+          }
+        }
+        return originalThen(res, rej);
+      };
+      return q;
+    },
+    // exposed so a test can assert the insert really was attempted
+    get _insertAttempted() { return insertAttempted; },
+    get _postInsertSelects() { return postInsertSelects; },
+  };
+}
+
+test('post-insert: a failed EXTERNAL diagnostic read is 503, and the insert really was reached', async () => {
+  await freshDb();
+  const r = await mint();
+  const broken = afterInsertFailing({ failExternalRead: true });
+  const c = await L.consumeTelegramLinkToken({ supabase: broken, token: r.body.token, telegramId: TG });
+
+  // Proof the pre-checks were passed and the insert was attempted — without this the test
+  // could pass from the pre-check path, which is exactly the flaw being fixed.
+  assert.strictEqual(broken._insertAttempted, true, 'the insert was never attempted');
+  assert.strictEqual(broken._postInsertSelects, 1, 'the post-insert external read did not run');
+
+  assert.strictEqual(c.ok, false);
+  assert.strictEqual(c.httpStatus, 503);
+  assert.strictEqual(c.code, POST_INSERT_CODE, 'this must come from the POST-INSERT branch');
+  assert.notStrictEqual(c.code, PRE_CHECK_CODE, 'the pre-check path short-circuited instead');
+  assert.deepStrictEqual(await links(), [], 'nothing may be linked');
+  // The token is burned either way — a conflict here means starting again, by design.
+  assert.ok((await tokens())[0].used_at, 'the token should have been claimed before the insert');
+});
+
+test('post-insert: a failed USER diagnostic read is 503, after the external read succeeded', async () => {
+  // The second read. The first one succeeds and finds no conflict, so only the user read can
+  // account for the failure — a narrower path than the previous test, and one that a
+  // fail-everything client could never isolate.
+  await freshDb();
+  const r = await mint();
+  const broken = afterInsertFailing({ failUserRead: true });
+  const c = await L.consumeTelegramLinkToken({ supabase: broken, token: r.body.token, telegramId: TG });
+
+  assert.strictEqual(broken._insertAttempted, true, 'the insert was never attempted');
+  assert.strictEqual(broken._postInsertSelects, 2, 'both post-insert reads should have run');
+
+  assert.strictEqual(c.ok, false);
+  assert.strictEqual(c.httpStatus, 503);
+  assert.strictEqual(c.code, POST_INSERT_CODE);
+  assert.deepStrictEqual(await links(), []);
+});
+
+test('post-insert: both reads succeed but confirm no conflict — still 503, never a fake 409', async () => {
+  // The terminal fallback, and the reason the whole classification exists. The insert failed,
+  // both diagnostics are healthy, and neither finds a conflict — so the cause is unknown.
+  // Answering 409 here would tell the user their Telegram belongs to somebody else on no
+  // evidence whatsoever.
+  await freshDb();
+  const r = await mint();
+  const broken = afterInsertFailing();   // insert fails; both reads work normally
+  const c = await L.consumeTelegramLinkToken({ supabase: broken, token: r.body.token, telegramId: TG });
+
+  assert.strictEqual(broken._insertAttempted, true);
+  assert.strictEqual(broken._postInsertSelects, 2, 'both diagnostic reads must have run');
+
+  assert.strictEqual(c.ok, false);
+  assert.strictEqual(c.httpStatus, 503);
+  assert.strictEqual(c.code, POST_INSERT_CODE);
+  assert.notStrictEqual(c.code, 'external_already_linked');
+  assert.notStrictEqual(c.code, 'user_already_linked');
+  assert.deepStrictEqual(await links(), []);
+});
+
+test('both post-insert diagnostic reads check their error (source pin)', () => {
+  // The EXTERNAL read error check is behaviourally provable and mutation-caught. The USER read
+  // error check is NOT: with that read failing, mineNow is null, no conflict is confirmed, and
+  // control reaches the terminal 503 anyway — the same status and the same code. So removing it
+  // changes nothing observable, and no test can fail on it.
+  //
+  // It is kept because it says what it means and exits at the point the fault is known, and it
+  // is pinned here because mutation testing showed a test could never notice its removal.
+  const lib = SRC('server/lib/telegramLink.js');
+  const at = lib.indexOf('if (insErr) {');
+  const branch = lib.slice(at, at + 2000);
+  assert.ok(branch.includes('if (racedErr) return fail(503'), 'the external read error check is gone');
+  assert.ok(branch.includes('if (mineErr) return fail(503'), 'the user read error check is gone');
+});
+test('the pre-check and post-insert failure codes are distinct, or neither test proves anything', () => {
+  // If these two ever become the same string, all three tests above silently stop
+  // distinguishing the paths they were written to separate.
+  const lib = SRC('server/lib/telegramLink.js');
+  assert.notStrictEqual(PRE_CHECK_CODE, POST_INSERT_CODE);
+  assert.ok(lib.includes(`fail(503, '${PRE_CHECK_CODE}'`), 'the pre-check code changed');
+  assert.ok(lib.includes(`fail(503, '${POST_INSERT_CODE}'`), 'the post-insert code changed');
 });
 
 // ════════════════════════════════════════════════════════════════════════════
