@@ -36,16 +36,42 @@ const { normalizeChannelExternalUserId } = require('./channelIdentity');
 
 const CHANNEL = 'telegram';
 const TOKEN_TTL_MS = 15 * 60 * 1000;
-// 256 bits. The deep link is pasted into a chat app and may sit in history, so the token's only
-// defence is being unguessable and short-lived.
+// 256 bits, encoded base64url rather than hex.
+//
+// This is a hard constraint, not a preference: Telegram's /start deep-link parameter accepts at
+// most 64 characters, and it only accepts [A-Za-z0-9_-]. Hex spent 64 of those 64 characters on
+// the token alone, so `link_` + 64 = 69 and the link would have been rejected by Telegram —
+// the whole connect flow, dead on arrival. base64url carries the same 256 bits in 43 characters,
+// leaving `link_` + 43 = 48 and room to spare.
 const TOKEN_BYTES = 32;
-const TOKEN_RE = /^[0-9a-f]{64}$/;
+const TOKEN_ENCODING = 'base64url';
+// 43 chars is 32 bytes in base64url with no padding. The alphabet is exactly what Telegram
+// permits, so a valid token is always a valid start parameter.
+const TOKEN_RE = /^[A-Za-z0-9_-]{43}$/;
+// Telegram's documented limit for the /start payload.
+const TELEGRAM_START_PARAM_MAX = 64;
+const TOKEN_PREFIX = 'link_';
 
-const newToken = () => crypto.randomBytes(TOKEN_BYTES).toString('hex');
+const newToken = () => crypto.randomBytes(TOKEN_BYTES).toString(TOKEN_ENCODING);
 /** Only the hash is ever stored. The raw token exists in exactly one HTTP response, once. */
 const hashToken = (t) => crypto.createHash('sha256').update(String(t)).digest('hex');
 
 const fail = (httpStatus, code, message) => ({ ok: false, httpStatus, code, message });
+
+/**
+ * The bot deep link, with the payload length enforced where it is built.
+ *
+ * Asserting here rather than only in a test means a future change to the token encoding cannot
+ * quietly produce a link Telegram will refuse: the failure surfaces at mint time, in the only
+ * place that constructs the payload.
+ */
+function buildDeepLink(botUsername, token) {
+  const payload = TOKEN_PREFIX + token;
+  if (payload.length > TELEGRAM_START_PARAM_MAX) {
+    throw new Error(`telegram start payload is ${payload.length} chars, over the ${TELEGRAM_START_PARAM_MAX} limit`);
+  }
+  return `https://t.me/${botUsername}?start=${payload}`;
+}
 
 /**
  * Show enough of an external id to be recognisable, never enough to be reused.
@@ -53,11 +79,20 @@ const fail = (httpStatus, code, message) => ({ ok: false, httpStatus, code, mess
  * A Telegram id is not a secret in the way a token is, but it identifies a person across every
  * chat they are in, and this endpoint is reachable by anyone with a session. The last four
  * digits are enough for "yes, that is my account".
+ *
+ * The threshold matters. An earlier version returned '…' + the WHOLE id for anything four
+ * characters or shorter, which is not a mask at all — it revealed a short id completely while
+ * looking redacted. Revealing four of five characters is barely better, so the tail is only
+ * shown when there is a meaningful amount left hidden; anything shorter is masked entirely.
+ * Real Telegram ids are 9-10 digits, so the ellipsis-only branch is a safety floor rather than
+ * a case users will meet.
  */
+const MASK_MIN_LENGTH = 8;
 function maskExternalId(external) {
   const s = String(external || '');
   if (!s) return null;
-  return s.length <= 4 ? '…' + s : '…' + s.slice(-4);
+  if (s.length < MASK_MIN_LENGTH) return '…';
+  return '…' + s.slice(-4);
 }
 
 /** A display handle we are willing to store and echo back. */
@@ -149,7 +184,7 @@ async function createTelegramLinkToken({ supabase, userId, botUsername } = {}) {
     ok: true,
     // The ONLY time the raw token exists outside the caller's browser. Never logged, never
     // stored, not recoverable — a lost token is replaced by minting another.
-    body: { token, deep_link: `https://t.me/${botUsername}?start=link_${token}`, expires_at: expiresAt },
+    body: { token, deep_link: buildDeepLink(botUsername, token), expires_at: expiresAt },
   };
 }
 
@@ -213,8 +248,16 @@ async function consumeTelegramLinkToken({ supabase, token, telegramId, username,
       // A retry by the SAME Telegram account is a retry, not an attack: a dropped response or a
       // double tap. Confirm the link that already exists rather than reporting a failure for
       // something that plainly worked.
+      // Idempotent ONLY when this exact token, this exact Telegram account, and the link it
+      // actually created are all still the same thing.
+      //
+      // Both conditions are load-bearing. Without the first, a user who revoked and relinked to
+      // a DIFFERENT Telegram account could replay the old token from the new account and be told
+      // it succeeded — confirming a connection the token never made. Without the second, a
+      // replay would be confirmed after the link it created had been revoked.
       if (String(row.used_by_external_id) === external) {
-        const { row: mine } = await activeLinkForExternal(supabase, external);
+        const { row: mine, error: mineErr } = await activeLinkForExternal(supabase, external);
+        if (mineErr) return fail(503, 'temporary_link_failure', 'Please try again.');
         if (mine && String(mine.user_id) === String(row.user_id)) {
           return { ok: true, body: { ok: true, display_handle: safeHandle({ username, first_name }), idempotent: true } };
         }
@@ -258,13 +301,34 @@ async function consumeTelegramLinkToken({ supabase, token, telegramId, username,
     revoked_at: null,
   });
   if (insErr) {
-    // The partial unique indexes are the real authority; the checks above only choose a better
-    // message. Losing this race means someone linked in the milliseconds between.
-    const { row: raced } = await activeLinkForExternal(supabase, external);
+    // An insert can fail for two very different reasons, and they must not be conflated.
+    //
+    // A UNIQUE violation means somebody linked in the milliseconds between our checks and this
+    // write — a real conflict, and a 409. Anything else (a dropped connection, a permissions
+    // problem, a column that no longer exists) is OUR failure, and reporting it as "that
+    // Telegram account belongs to someone else" would be a confident lie: the user would go
+    // looking for an account that does not exist while the real fault went unnoticed.
+    //
+    // So the conflict is CONFIRMED by re-reading, and if it cannot be confirmed the answer is
+    // 503. Both diagnostic reads must succeed to draw a conclusion from them.
+    const { row: raced, error: racedErr } = await activeLinkForExternal(supabase, external);
+    if (racedErr) return fail(503, 'temporary_link_failure', 'Could not complete the connection. Please try again.');
+    const { row: mineNow, error: mineErr } = await activeLinkForUser(supabase, linkUserId);
+    if (mineErr) return fail(503, 'temporary_link_failure', 'Could not complete the connection. Please try again.');
+
     if (raced && String(raced.user_id) === String(linkUserId)) {
+      // The link we were trying to create already exists, for this user and this account.
       return { ok: true, body: { ok: true, display_handle: safeHandle({ username, first_name }), idempotent: true } };
     }
-    return fail(409, 'external_already_linked', 'That Telegram account is already connected to a different CFO AI account.');
+    if (raced) {
+      return fail(409, 'external_already_linked', 'That Telegram account is already connected to a different CFO AI account.');
+    }
+    if (mineNow && String(mineNow.external_user_id) !== external) {
+      return fail(409, 'user_already_linked', 'This account is already connected to a different Telegram account.');
+    }
+    // Neither conflict is present, so the insert failed for a reason we do not understand.
+    // Say so, rather than inventing a conflict that the data does not support.
+    return fail(503, 'temporary_link_failure', 'Could not complete the connection. Please try again.');
   }
 
   // Surfaced, never acted on: no merge, no identity transfer, no membership change.
@@ -309,6 +373,10 @@ async function revokeTelegramLink({ supabase, userId } = {}) {
 module.exports = {
   CHANNEL,
   TOKEN_TTL_MS,
+  TOKEN_RE,
+  TELEGRAM_START_PARAM_MAX,
+  TOKEN_PREFIX,
+  buildDeepLink,
   hashToken,
   maskExternalId,
   safeHandle,

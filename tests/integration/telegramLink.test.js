@@ -113,6 +113,11 @@ const rows = async (sql) => (await db.query(sql)).rows;
 const links = () => rows('SELECT * FROM user_channel_links ORDER BY id');
 const tokens = () => rows('SELECT * FROM channel_link_tokens');
 
+// A syntactically valid token that was never minted. Tests about "unknown" or "pre-existing"
+// tokens need a WELL-FORMED value, or they measure format validation instead of the case they
+// were written for.
+const fakeToken = (seed = 'z') => (seed.repeat(43)).slice(0, 43);
+
 const mint = (userId = EMAIL_USER, botUsername = BOT) =>
   L.createTelegramLinkToken({ supabase, userId, botUsername });
 const consume = (token, telegramId = TG, extra = {}) =>
@@ -145,7 +150,7 @@ test('mint: only the HASH is stored, never the token', async () => {
   await freshDb();
   const r = await mint();
   assert.strictEqual(r.ok, true);
-  assert.match(r.body.token, /^[0-9a-f]{64}$/, 'a 256-bit hex token');
+  assert.match(r.body.token, L.TOKEN_RE, 'a 256-bit base64url token');
   const t = await tokens();
   assert.strictEqual(t.length, 1);
   assert.strictEqual(t[0].token_hash, L.hashToken(r.body.token));
@@ -260,7 +265,7 @@ test('consume: a malformed telegram id is refused', async () => {
 
 test('consume: an unknown token is 404', async () => {
   await freshDb();
-  const c = await consume(crypto.randomBytes(32).toString('hex'));
+  const c = await consume(crypto.randomBytes(32).toString('base64url'));
   assert.strictEqual(c.httpStatus, 404);
   assert.strictEqual(c.code, 'token_not_found');
 });
@@ -333,8 +338,8 @@ test('consume: a user already linked to another Telegram account is refused', as
   // Mint refuses once linked, so this is the belt-and-braces path: a token minted BEFORE the
   // link existed, redeemed after.
   await db.query(`INSERT INTO channel_link_tokens (token_hash, user_id, intended_channel, expires_at)
-                  VALUES ('${L.hashToken('b'.repeat(64))}', ${EMAIL_USER}, 'telegram', now() + interval '10 minutes')`);
-  const c = await consume('b'.repeat(64), TG2);
+                  VALUES ('${L.hashToken(fakeToken('b'))}', ${EMAIL_USER}, 'telegram', now() + interval '10 minutes')`);
+  const c = await consume(fakeToken('b'), TG2);
   assert.strictEqual(c.ok, false);
   assert.strictEqual(c.code, 'user_already_linked');
   assert.strictEqual((await links()).length, 1);
@@ -607,7 +612,8 @@ test('HTTP: the full connect journey', async () => {
 
   const minted = await api('POST', `${ACCOUNT}/link-token`, { token: t });
   assert.strictEqual(minted.status, 200);
-  assert.match(minted.body.deep_link, new RegExp(`^https://t\\.me/${BOT}\\?start=link_[0-9a-f]{64}$`));
+  assert.match(minted.body.deep_link, new RegExp(`^https://t\\.me/${BOT}\\?start=link_[A-Za-z0-9_-]{43}$`));
+  assert.ok(minted.body.deep_link.split('start=')[1].length <= 64, 'the payload must fit Telegram');
 
   const consumed = await api('POST', '/api/telegram/link-token/consume',
     { secret: SECRET, body: { token: minted.body.token, telegram_id: TG, username: 'emi' } });
@@ -630,7 +636,8 @@ test('HTTP: consume failure codes reach the wire intact', async () => {
   await freshDb();
   const cases = [
     [{ token: 'nope', telegram_id: TG }, 400, 'invalid_token'],
-    [{ token: 'a'.repeat(64), telegram_id: TG }, 404, 'token_not_found'],
+    [{ token: 'a'.repeat(64), telegram_id: TG }, 400, 'invalid_token'],   // the old hex shape
+    [{ token: fakeToken('a'), telegram_id: TG }, 404, 'token_not_found'],
   ];
   for (const [body, status_, code] of cases) {
     const r = await api('POST', '/api/telegram/link-token/consume', { secret: SECRET, body });
@@ -673,6 +680,227 @@ test('HTTP: the audit trail records the events and never the token', async () =>
   const text = JSON.stringify(events);
   assert.ok(!text.includes(minted.body.token), 'the raw token reached the audit trail');
   assert.ok(!text.includes(L.hashToken(minted.body.token)), 'the token hash reached the audit trail');
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// CODEX NO-GO FIXES
+// ════════════════════════════════════════════════════════════════════════════
+
+// ── 1. the deep-link payload must fit Telegram's /start limit ───────────────
+
+test('the /start payload fits Telegram 64-character limit, with room to spare', async () => {
+  // The bug that made this a NO-GO: a 64-char hex token produced `link_` + 64 = 69 characters,
+  // over Telegram's documented limit for the start parameter. Telegram would have refused every
+  // deep link — the connect flow dead on arrival, and nothing in the previous test suite looked
+  // at the length.
+  await freshDb();
+  const r = await mint();
+  const payload = r.body.deep_link.split('start=')[1];
+  assert.ok(payload.length <= 64, `payload is ${payload.length} chars, over the limit`);
+  assert.strictEqual(payload, `link_${r.body.token}`);
+  assert.strictEqual(payload.length, 48);
+});
+
+test('the token is base64url — 256 bits in 43 characters', async () => {
+  await freshDb();
+  const seen = new Set();
+  for (let i = 0; i < 25; i++) {
+    const r = await mint();
+    const t = r.body.token;
+    assert.strictEqual(t.length, 43, 'a 32-byte base64url token is 43 characters');
+    assert.match(t, /^[A-Za-z0-9_-]{43}$/, 'only characters Telegram accepts in a start param');
+    assert.ok(!t.includes('+') && !t.includes('/') && !t.includes('='),
+      'standard base64 characters would be mangled in a URL');
+    seen.add(t);
+    await db.query('DELETE FROM channel_link_tokens');
+  }
+  assert.strictEqual(seen.size, 25, 'tokens must not repeat');
+});
+
+test('the deep-link builder refuses an over-long payload at the source', () => {
+  // Enforced where the link is built, not only in a test: a future change to the encoding
+  // cannot quietly produce a link Telegram will reject.
+  assert.throws(() => L.buildDeepLink(BOT, 'x'.repeat(70)), /over the 64/);
+  assert.doesNotThrow(() => L.buildDeepLink(BOT, 'x'.repeat(43)));
+});
+
+test('hash-only storage still holds for base64url tokens', async () => {
+  await freshDb();
+  const r = await mint();
+  const t = (await tokens())[0];
+  assert.strictEqual(t.token_hash, L.hashToken(r.body.token));
+  assert.ok(!JSON.stringify(t).includes(r.body.token), 'the raw token was persisted');
+  assert.strictEqual(t.token_hash.length, 64, 'the SHA-256 hash is still hex');
+});
+
+test('the old hex format and other malformed tokens are rejected', async () => {
+  await freshDb();
+  const rejected = [
+    'a'.repeat(64),                 // the previous hex format
+    'a'.repeat(42), 'a'.repeat(44), // wrong length
+    'a'.repeat(43) + '=',           // padded base64
+    'a'.repeat(42) + '+',           // standard base64 alphabet
+    'a'.repeat(42) + '/',
+    'a'.repeat(42) + ' ',
+  ];
+  for (const bad of rejected) {
+    const c = await consume(bad);
+    assert.strictEqual(c.ok, false);
+    assert.strictEqual(c.code, 'invalid_token', `accepted ${JSON.stringify(bad.slice(0, 12))}…`);
+  }
+});
+
+// ── 2. a short external id must never come back whole ───────────────────────
+
+test('a short external id is masked completely, not decorated', async () => {
+  // The previous mask returned '…' + the WHOLE id for anything four characters or shorter:
+  // redacted-looking, and not redacted at all.
+  for (const [input, expected] of [['1', '…'], ['12', '…'], ['123', '…'], ['1234', '…'],
+                                   ['12345', '…'], ['1234567', '…'],
+                                   ['12345678', '…5678'], ['555000222', '…0222']]) {
+    assert.strictEqual(L.maskExternalId(input), expected, `mask of ${input}`);
+  }
+});
+
+test('no external id — short or long — appears in full in a status response', async () => {
+  for (const ext of ['1234', '99999', '555000222']) {
+    await freshDb();
+    // Seed the link directly: a 4-digit id is not one the normalizer would accept from a bot,
+    // but the status endpoint must not depend on that for its safety.
+    await db.query(`INSERT INTO user_channel_links (channel, external_user_id, user_id, linked_via)
+                    VALUES ('telegram', '${ext}', ${EMAIL_USER}, 'link_token')`);
+    const s = await status();
+    const text = JSON.stringify(s.body);
+    assert.ok(!text.includes(ext), `the full external id ${ext} leaked: ${text}`);
+    assert.ok(!text.includes(String(EMAIL_USER)), 'the platform user id leaked');
+    assert.ok(s.body.external_user_id_masked.startsWith('…'));
+  }
+});
+
+// ── 3. an insert failure must be diagnosed, not assumed to be a conflict ────
+
+// Wrap the client so one specific operation fails, leaving everything else real. This is how a
+// transient database fault is reproduced without pretending the whole client is broken.
+function failing(table, op, message = 'simulated failure') {
+  const base = supabase;
+  return {
+    from(t) {
+      const q = base.from(t);
+      if (t !== table) return q;
+      const originalOp = q[op].bind(q);
+      q[op] = (...args) => { originalOp(...args); q.__fail = true; return q; };
+      const originalThen = q.then.bind(q);
+      q.then = (res, rej) => (q.__fail
+        ? Promise.resolve({ data: null, error: { message } }).then(res, rej)
+        : originalThen(res, rej));
+      return q;
+    },
+  };
+}
+
+test('an UNKNOWN insert failure is 503, never a fabricated conflict', async () => {
+  // The heart of this fix. Reporting "that Telegram account belongs to someone else" when the
+  // truth is "our insert failed for a reason we do not understand" sends the user hunting for
+  // an account that does not exist, and hides the real fault.
+  await freshDb();
+  const r = await mint();
+  const broken = failing('user_channel_links', 'insert');
+  const c = await L.consumeTelegramLinkToken({
+    supabase: broken, token: r.body.token, telegramId: TG,
+  });
+  assert.strictEqual(c.ok, false);
+  assert.strictEqual(c.httpStatus, 503, `expected 503, got ${c.httpStatus} (${c.code})`);
+  assert.strictEqual(c.code, 'temporary_link_failure');
+  assert.notStrictEqual(c.code, 'external_already_linked');
+  assert.deepStrictEqual(await links(), [], 'nothing was linked');
+});
+
+test('a failed DIAGNOSTIC read after an insert failure is also 503', async () => {
+  // If we cannot confirm a conflict, we do not claim one.
+  await freshDb();
+  const r = await mint();
+  const broken = failing('user_channel_links', 'select');
+  const c = await L.consumeTelegramLinkToken({
+    supabase: broken, token: r.body.token, telegramId: TG,
+  });
+  assert.strictEqual(c.ok, false);
+  assert.strictEqual(c.httpStatus, 503);
+});
+
+test('a REAL external conflict still returns 409, with the existing link untouched', async () => {
+  await freshDb();
+  const a = await mint(EMAIL_USER);
+  await consume(a.body.token, TG);
+  const before = (await links())[0];
+
+  const b = await mint(EMAIL_USER2);
+  const c = await consume(b.body.token, TG);
+  assert.strictEqual(c.httpStatus, 409);
+  assert.strictEqual(c.code, 'external_already_linked');
+  const after = await links();
+  assert.strictEqual(after.length, 1);
+  assert.deepStrictEqual(after[0], before, 'the existing link was modified');
+});
+
+test('a REAL user conflict still returns 409 user_already_linked', async () => {
+  await freshDb();
+  const a = await mint();
+  await consume(a.body.token, TG);
+  await db.query(`INSERT INTO channel_link_tokens (token_hash, user_id, intended_channel, expires_at)
+                  VALUES ('${L.hashToken('u'.repeat(43))}', ${EMAIL_USER}, 'telegram', now() + interval '10 minutes')`);
+  const c = await consume('u'.repeat(43), TG2);
+  assert.strictEqual(c.httpStatus, 409);
+  assert.strictEqual(c.code, 'user_already_linked');
+  assert.strictEqual((await links()).length, 1);
+});
+
+// ── 4. a replay must not attach itself to a LATER link ──────────────────────
+
+test('replay after revoke+relink: the old token cannot confirm the new link', async () => {
+  // The scenario Codex identified, and the one my earlier probe missed — which is why I called
+  // that mutation "equivalent" when it is not.
+  //
+  //   token A → user U links Telegram T1
+  //   U revokes
+  //   token B → user U links Telegram T2
+  //   replay token A, presented from T2
+  //
+  // Token A never had anything to do with T2. Confirming it would tell the user an old link
+  // succeeded on an account it never touched.
+  await freshDb();
+  const a = await mint();
+  await consume(a.body.token, TG);
+  await revoke();
+  const b = await mint();
+  await consume(b.body.token, TG2);
+
+  const replayFromNew = await consume(a.body.token, TG2);
+  assert.strictEqual(replayFromNew.ok, false, 'an old token confirmed a link it never created');
+  assert.strictEqual(replayFromNew.code, 'token_already_used');
+
+  const replayFromOld = await consume(a.body.token, TG);
+  assert.strictEqual(replayFromOld.ok, false, 'a revoked link was resurrected by a replay');
+  assert.strictEqual(replayFromOld.code, 'token_already_used');
+
+  const l = await links();
+  assert.strictEqual(l.length, 2, 'exactly the revoked T1 row and the active T2 row');
+  const active = l.filter((x) => x.revoked_at === null);
+  assert.strictEqual(active.length, 1, 'never two active links');
+  assert.strictEqual(active[0].external_user_id, TG2, 'the active link must still be T2');
+  const old = l.find((x) => x.external_user_id === TG);
+  assert.ok(old.revoked_at, 'the old T1 row must stay revoked');
+});
+
+test('replay after a plain revoke does not resurrect the link', async () => {
+  await freshDb();
+  const a = await mint();
+  await consume(a.body.token, TG);
+  await revoke();
+  const c = await consume(a.body.token, TG);
+  assert.strictEqual(c.ok, false);
+  assert.strictEqual(c.code, 'token_already_used');
+  assert.strictEqual((await links()).filter((x) => x.revoked_at === null).length, 0,
+    'no active link may exist after revoke + replay');
 });
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -736,7 +964,7 @@ test('the insert-failure branch maps a lost race to a conflict, not a success', 
   const lib = SRC('server/lib/telegramLink.js');
   const at = lib.indexOf('if (insErr) {');
   assert.ok(at > -1, 'the insert-error branch is gone');
-  const branch = lib.slice(at, at + 700);
+  const branch = lib.slice(at, at + 2000);
   assert.ok(branch.includes('activeLinkForExternal(supabase, external)'),
     'the branch no longer re-reads to find out who won the race');
   assert.ok(branch.includes("fail(409, 'external_already_linked'"),
