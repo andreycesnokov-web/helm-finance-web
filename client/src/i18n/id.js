@@ -520,6 +520,10 @@ const id = {
     remindersAndAlerts: 'Pengingat dan peringatan kewajiban',
     telegramBot: 'Bot Telegram',
     // ── PR4b2: Telegram account linking ──
+    tgStatusUnavailable: "Status koneksi tidak tersedia",
+    tgDescUnavailable: "Kami tidak dapat memeriksa apakah Telegram terhubung. Tidak ada yang berubah — silakan coba lagi.",
+    tgRetry: "Coba lagi",
+    errCopyFailed: "Tidak dapat menyalin tautan. Buka Telegram secara langsung.",
     telegramConnect: "Akun Telegram",
     tgStatusConnected: "Terhubung",
     tgStatusNotConnected: "Belum terhubung",

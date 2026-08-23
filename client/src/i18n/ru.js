@@ -501,6 +501,10 @@ const ru = {
     remindersAndAlerts: 'Напоминания и предупреждения',
     telegramBot: 'Telegram Бот',
     // ── PR4b2: Telegram account linking ──
+    tgStatusUnavailable: "Статус подключения недоступен",
+    tgDescUnavailable: "Не удалось проверить, подключён ли Telegram. Ничего не изменилось — попробуйте ещё раз.",
+    tgRetry: "Повторить",
+    errCopyFailed: "Не удалось скопировать ссылку. Откройте Telegram напрямую.",
     telegramConnect: "Аккаунт Telegram",
     tgStatusConnected: "Подключён",
     tgStatusNotConnected: "Не подключён",

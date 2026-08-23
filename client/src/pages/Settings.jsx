@@ -8,6 +8,12 @@ import {
   DEFAULT_BOT_USERNAME, connectionState, isSafeDeepLink, errorKey, minutesUntil, isExpired,
 } from '../lib/telegramConnect'
 
+// ── PR4b2 dark gate ──
+// Default OFF. Vite substitutes import.meta.env at build time, so when the variable is unset this
+// comparison folds to `false` and the bundler drops the card, its handlers and their API paths
+// out of the bundle: with the flag off the feature is ABSENT, not merely hidden behind a style.
+const TELEGRAM_LINKING_UI = import.meta.env.VITE_TELEGRAM_LINKING_UI_ENABLED === 'true'
+
 const LANGUAGES = [
   { code: 'en', label: 'English', flag: '🇬🇧' },
   { code: 'ru', label: 'Русский', flag: '🇷🇺' },
@@ -135,7 +141,7 @@ export default function Settings() {
 
   // Status only. No token is minted here — a link is created solely when the user asks for one,
   // so simply opening Settings never burns one.
-  const tgState = connectionState(tgStatus)
+  const tgState = TELEGRAM_LINKING_UI ? connectionState(tgStatus) : 'off'
 
   const loadTelegram = () => {
     setTgBusy('status')
@@ -172,7 +178,7 @@ export default function Settings() {
   }
 
   const loadRefData = () => {
-    loadTelegram()
+    if (TELEGRAM_LINKING_UI) loadTelegram()
     apiFetch('/telegram/config', token)
       .then(c => { if (c?.bot_username) setBotUsername(c.bot_username) })
       .catch(() => { /* keep the default; the link must never dead-end */ })
@@ -410,6 +416,7 @@ export default function Settings() {
         </div>
       </div>
 
+      {TELEGRAM_LINKING_UI && (<>
       {/* ── PR4b2: Telegram account linking ─────────────────────────────────
           Identity only. This connects a Telegram account to THIS CFO AI account; it grants no
           access and selects no workspace — membership stays in business_members. */}
@@ -417,6 +424,23 @@ export default function Settings() {
       <div style={{ margin: '0 16px 16px', background: 'var(--bg-2)', borderRadius: 12, padding: '14px 16px' }}>
         {tgState === 'loading' ? (
           <div style={{ fontSize: 13, color: 'var(--text-3)' }}>…</div>
+        ) : tgState === 'error' ? (
+          /* Fail closed. A failed status lookup means we do not KNOW whether this account is
+             linked, so the card offers nothing that presumes an answer — no Connect, no
+             Disconnect, only Retry. "Not connected" here would assert a fact we do not have. */
+          <>
+            <div style={{ fontSize: 14, color: 'var(--text)', marginBottom: 8 }}>{t('settings.tgStatusUnavailable')}</div>
+            <div style={{ fontSize: 12, color: 'var(--text-3)', lineHeight: 1.6, marginBottom: 12 }}>{t('settings.tgDescUnavailable')}</div>
+            {tgError && (
+              <div style={{ fontSize: 12, color: 'var(--red-dark)', background: 'var(--red-light)', borderRadius: 8, padding: '8px 12px', marginBottom: 12 }}>
+                {t('settings.' + tgError.replace('telegram.', ''))}
+              </div>
+            )}
+            <button onClick={loadTelegram} disabled={tgBusy !== ''}
+              style={{ width: '100%', padding: '11px', borderRadius: 10, border: '1px solid var(--border-2)', background: 'transparent', color: 'var(--text)', fontSize: 14, cursor: 'pointer' }}>
+              {t('settings.tgRetry')}
+            </button>
+          </>
         ) : (
           <>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 8 }}>
@@ -462,7 +486,15 @@ export default function Settings() {
                   {t('settings.tgOpenTelegram')}
                 </a>
                 <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
-                  <button onClick={() => { navigator.clipboard?.writeText(tgLink.deep_link); setTgCopied(true) }}
+                  <button onClick={async () => {
+                    // "Copied" has to mean copied. writeText rejects on permission or an insecure
+                    // context and is missing outright in some browsers; saying it worked would
+                    // leave the user pasting nothing and blaming the link.
+                    setTgError('')
+                    if (!navigator.clipboard?.writeText) { setTgCopied(false); setTgError('telegram.errCopyFailed'); return }
+                    try { await navigator.clipboard.writeText(tgLink.deep_link); setTgCopied(true) }
+                    catch { setTgCopied(false); setTgError('telegram.errCopyFailed') }
+                  }}
                     style={{ flex: 1, padding: '9px', borderRadius: 10, border: '1px solid var(--border-2)', background: 'transparent', color: 'var(--text)', fontSize: 13, cursor: 'pointer' }}>
                     {tgCopied ? t('settings.tgCopied') : t('settings.tgCopyLink')}
                   </button>
@@ -491,6 +523,7 @@ export default function Settings() {
           </>
         )}
       </div>
+      </>)}
 
       <div style={{ margin: '0 16px 8px', fontSize: 11, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: 0.5 }}>{t('settings.telegramBot')}</div>
       <div style={{ margin: '0 16px 16px', background: 'var(--bg-2)', borderRadius: 12 }}>
@@ -850,8 +883,8 @@ export default function Settings() {
         </div>
       )}
 
-      {/* ── Reset all data modal ── */}
-      {showTgUnlink && (
+      {/* ── Disconnect Telegram confirmation ── */}
+      {TELEGRAM_LINKING_UI && showTgUnlink && (
         <div onClick={() => setShowTgUnlink(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 200, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
           <div onClick={e => e.stopPropagation()} style={{ background: 'var(--bg)', borderRadius: '16px 16px 0 0', padding: '20px 16px 36px', width: '100%', maxWidth: 480 }}>
             <div style={{ width: 36, height: 3, background: 'var(--border-2)', borderRadius: 2, margin: '0 auto 20px' }} />
@@ -871,6 +904,7 @@ export default function Settings() {
         </div>
       )}
 
+      {/* ── Reset all data modal ── */}
       {showReset && (
         <div onClick={resetStep === 1 ? closeReset : undefined} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 200, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
           <div onClick={e => e.stopPropagation()} style={{ background: 'var(--bg)', borderRadius: '16px 16px 0 0', padding: '20px 16px 36px', width: '100%', maxWidth: 480 }}>

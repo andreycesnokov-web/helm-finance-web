@@ -518,6 +518,10 @@ const en = {
     remindersAndAlerts: 'Reminders and debt alerts',
     telegramBot: 'Telegram Bot',
     // ── PR4b2: Telegram account linking ──
+    tgStatusUnavailable: "Connection status unavailable",
+    tgDescUnavailable: "We could not check whether Telegram is connected. Nothing has changed — please try again.",
+    tgRetry: "Retry",
+    errCopyFailed: "Could not copy the link. Open Telegram directly instead.",
     telegramConnect: "Telegram Account",
     tgStatusConnected: "Connected",
     tgStatusNotConnected: "Not connected",
