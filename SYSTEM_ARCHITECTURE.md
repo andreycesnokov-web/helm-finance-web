@@ -544,7 +544,7 @@ if the env var is not set. This is a security vulnerability.
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `VITE_BOT_USERNAME` | ✅ | Telegram bot username for Login Widget (e.g. HCfinance_Bot) |
+| `VITE_BOT_USERNAME` | ✅ | Telegram bot username for Login Widget (e.g. CFOAIFinance_Bot) |
 | `VITE_API_URL` | optional | API base URL (currently unused — hardcoded to `/api`) |
 
 ---

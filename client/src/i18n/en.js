@@ -517,7 +517,7 @@ const en = {
     pushNotifications: 'Push notifications',
     remindersAndAlerts: 'Reminders and debt alerts',
     telegramBot: 'Telegram Bot',
-    openBot: 'Open @HCfinance_Bot',
+    openBot: 'Open @{bot}',
     addViaChat: 'Add transactions via chat',
     signOut: 'Sign out',
     signOutConfirm: 'Sign out?',

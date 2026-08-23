@@ -70,7 +70,7 @@ export default function JoinInvite() {
     tgRef.current.innerHTML = ''
     const script = document.createElement('script')
     script.src = 'https://telegram.org/js/telegram-widget.js?22'
-    script.setAttribute('data-telegram-login', import.meta.env.VITE_BOT_USERNAME || 'YourBot')
+    script.setAttribute('data-telegram-login', import.meta.env.VITE_BOT_USERNAME || 'CFOAIFinance_Bot')
     script.setAttribute('data-size', 'large')
     script.setAttribute('data-radius', '10')
     script.setAttribute('data-onauth', 'onTelegramAuth(user)')

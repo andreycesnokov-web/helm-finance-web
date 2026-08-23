@@ -5,6 +5,11 @@ import { useAccess } from '../hooks/useAccess'
 import { useTranslation } from '../hooks/useTranslation'
 import { apiFetch } from '../lib/api'
 
+// If /api/telegram/config cannot be reached, fall back to the canonical bot rather than to a
+// stale name or a placeholder: a wrong link is worse than a slightly stale one, and this is the
+// bot the product actually runs on.
+const DEFAULT_BOT_USERNAME = 'CFOAIFinance_Bot'
+
 const LANGUAGES = [
   { code: 'en', label: 'English', flag: '🇬🇧' },
   { code: 'ru', label: 'Русский', flag: '🇷🇺' },
@@ -52,6 +57,10 @@ const BIZ_TIMEZONES = [
 
 export default function Settings() {
   const { token, logout } = useAuth()
+  // The canonical bot name comes from the backend (TELEGRAM_BOT_USERNAME), the same source
+  // TeamOnboarding uses. It used to be hardcoded here and in three translation files, which is
+  // how this page ended up still advertising a bot the product had moved off.
+  const [botUsername, setBotUsername] = useState(DEFAULT_BOT_USERNAME)
   const { access, planLabel, isTrialActive, effectivePlan, refreshAccess } = useAccess()
   const navigate = useNavigate()
   const fileRef = useRef()
@@ -116,6 +125,9 @@ export default function Settings() {
   }
 
   const loadRefData = () => {
+    apiFetch('/telegram/config', token)
+      .then(c => { if (c?.bot_username) setBotUsername(c.bot_username) })
+      .catch(() => { /* keep the default; the link must never dead-end */ })
     apiFetch('/cashflow-categories', token).then(d => setCategories(d.categories || [])).catch(() => {})
     apiFetch('/business-directions', token).then(d => setDirections(d.directions || [])).catch(() => {})
     apiFetch('/activity-types', token).then(d => setActivityTypes(d.activityTypes || [])).catch(() => {})
@@ -352,13 +364,13 @@ export default function Settings() {
 
       <div style={{ margin: '0 16px 8px', fontSize: 11, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: 0.5 }}>{t('settings.telegramBot')}</div>
       <div style={{ margin: '0 16px 16px', background: 'var(--bg-2)', borderRadius: 12 }}>
-        <a href="https://t.me/HCfinance_Bot" target="_blank" rel="noreferrer" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 16px', textDecoration: 'none' }}>
+        <a href={`https://t.me/${botUsername}`} target="_blank" rel="noreferrer" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 16px', textDecoration: 'none' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <div style={{ width: 32, height: 32, borderRadius: 8, background: '#229ED9', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="white"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.562 8.248l-2.008 9.457c-.145.658-.537.818-1.084.508l-3-2.21-1.447 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.12l-6.871 4.326-2.962-.924c-.643-.204-.657-.643.136-.953l11.57-4.461c.537-.194 1.006.131.871.764z"/></svg>
             </div>
             <div>
-              <div style={{ fontSize: 14, color: 'var(--text)', marginBottom: 1 }}>{t('settings.openBot')}</div>
+              <div style={{ fontSize: 14, color: 'var(--text)', marginBottom: 1 }}>{t('settings.openBot').replace('{bot}', botUsername)}</div>
               <div style={{ fontSize: 11, color: 'var(--text-3)' }}>{t('settings.addViaChat')}</div>
             </div>
           </div>

@@ -500,7 +500,7 @@ const ru = {
     pushNotifications: 'Push уведомления',
     remindersAndAlerts: 'Напоминания и предупреждения',
     telegramBot: 'Telegram Бот',
-    openBot: 'Открыть @HCfinance_Bot',
+    openBot: 'Открыть @{bot}',
     addViaChat: 'Добавляйте транзакции в чате',
     signOut: 'Выйти',
     signOutConfirm: 'Выйти?',

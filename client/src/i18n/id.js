@@ -519,7 +519,7 @@ const id = {
     pushNotifications: 'Push notifikasi',
     remindersAndAlerts: 'Pengingat dan peringatan kewajiban',
     telegramBot: 'Bot Telegram',
-    openBot: 'Buka @HCfinance_Bot',
+    openBot: 'Buka @{bot}',
     addViaChat: 'Tambah transaksi via chat',
     signOut: 'Keluar',
     signOutConfirm: 'Keluar?',
