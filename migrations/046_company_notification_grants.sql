@@ -107,6 +107,16 @@ BEGIN
     RAISE EXCEPTION 'invalid_arguments';
   END IF;
 
+  -- Lock the member row FIRST, so a concurrent demotion/deactivation serialises with this grant
+  -- instead of racing it. Whichever transaction takes the lock first runs to completion; the other
+  -- waits and then re-reads the membership below. This is what makes "concurrent grant vs
+  -- demotion" unable to leave an enabled grant:
+  --   * grant-first  → grant commits, then the demotion's trigger disables it;
+  --   * demote-first → this re-read sees a non-CEO/CFO role and raises member_not_grantable.
+  PERFORM 1 FROM business_members
+    WHERE business_id = p_business_id AND user_id = p_user_id
+    FOR UPDATE;
+
   -- Live eligibility: active CEO/CFO of this business, or nothing is written.
   IF NOT EXISTS (
     SELECT 1 FROM business_members
@@ -148,60 +158,91 @@ BEGIN
   RETURN jsonb_build_object('changed', changed);
 END $fn$;
 
--- Disable ALL enabled grants for a member — called when a member loses CEO/CFO eligibility
--- (demotion, deactivation, removal). Deliberately does NOT re-check the current role, because the
--- whole point is that the role has just left ceo/cfo. Writes one auto-revoke audit row per
--- disabled category, atomically. Re-promotion therefore starts from all-off: the owner must grant
--- again, so an admin who can flip roles cannot resurrect a stale grant.
-CREATE OR REPLACE FUNCTION disable_member_notification_grants(
-  p_business_id UUID,
-  p_user_id     BIGINT,
-  p_actor       BIGINT,
-  p_actor_role  TEXT
-) RETURNS JSONB
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public, pg_temp
-AS $fn$
-DECLARE
-  r RECORD;
-  changed INT := 0;
-BEGIN
-  IF p_business_id IS NULL OR p_user_id IS NULL THEN
-    RAISE EXCEPTION 'invalid_arguments';
-  END IF;
-  FOR r IN
-    SELECT category FROM business_member_notification_grants
-    WHERE business_id = p_business_id AND user_id = p_user_id AND enabled = true
-  LOOP
-    UPDATE business_member_notification_grants
-      SET enabled = false, updated_at = now()
-      WHERE business_id = p_business_id AND user_id = p_user_id AND category = r.category;
-    INSERT INTO audit_events
-      (business_id, actor_user_id, actor_role, channel, entity_type, entity_id, action, before_json, after_json)
-    VALUES (p_business_id, p_actor, p_actor_role, 'web', 'notification_grant', p_user_id::text,
-            'auto_revoked',
-            jsonb_build_object('category', r.category, 'enabled', true),
-            jsonb_build_object('category', r.category, 'enabled', false));
-    changed := changed + 1;
-  END LOOP;
-  RETURN jsonb_build_object('changed', changed);
-END $fn$;
+-- (An earlier revision had a standalone disable_member_notification_grants() the API called on
+-- PATCH/DELETE. It is removed: the trigger below supersedes it — one mechanism, at the database
+-- level, covering every route and race rather than the two the API happened to call.)
 
 -- Execute only as service_role; never PUBLIC.
 REVOKE ALL ON FUNCTION apply_notification_grants(UUID, BIGINT, BIGINT, TEXT, JSONB) FROM PUBLIC;
-REVOKE ALL ON FUNCTION disable_member_notification_grants(UUID, BIGINT, BIGINT, TEXT) FROM PUBLIC;
 DO $$ BEGIN
   IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN
     REVOKE ALL ON FUNCTION apply_notification_grants(UUID, BIGINT, BIGINT, TEXT, JSONB) FROM anon;
-    REVOKE ALL ON FUNCTION disable_member_notification_grants(UUID, BIGINT, BIGINT, TEXT) FROM anon;
   END IF;
   IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN
     REVOKE ALL ON FUNCTION apply_notification_grants(UUID, BIGINT, BIGINT, TEXT, JSONB) FROM authenticated;
-    REVOKE ALL ON FUNCTION disable_member_notification_grants(UUID, BIGINT, BIGINT, TEXT) FROM authenticated;
   END IF;
   IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'service_role') THEN
     GRANT EXECUTE ON FUNCTION apply_notification_grants(UUID, BIGINT, BIGINT, TEXT, JSONB) TO service_role;
-    GRANT EXECUTE ON FUNCTION disable_member_notification_grants(UUID, BIGINT, BIGINT, TEXT) TO service_role;
+  END IF;
+END $$;
+
+-- ── DB-level stale-grant safety (P1: every route and every race) ─────────────
+-- A grant must never survive a membership transition. The earlier fix disabled grants in the API
+-- on PATCH/DELETE, but that (a) missed every other route that writes business_members — invite
+-- reactivation, admin tooling, direct SQL — (b) was two separate statements and therefore
+-- raceable against a concurrent grant, and (c) was gated by the app feature flag, so safety
+-- vanished while the flag was off. This trigger closes all three: it is DB-level (covers every
+-- writer including direct updates), runs in the SAME transaction as the membership change (atomic,
+-- no window), and is independent of the app flag (once 046 is applied, safety is always on).
+--
+-- The rule is symmetric and deliberately blunt: ANY real membership transition — into OR out of
+-- CEO/CFO, a brand-new membership, a reactivation — resets THIS member's grants in THIS business
+-- to OFF. Only a subsequent explicit owner action (apply_notification_grants, which is NOT a
+-- business_members write) can turn them back on. So a stale grant cannot ride a promotion,
+-- reactivation, or re-invite back to life, and a demotion cannot leave one enabled.
+--
+-- A same-role, same-status update (an unrelated field edit) is NOT a transition and leaves grants
+-- untouched, so a legitimate current grant is not wiped by incidental writes.
+CREATE OR REPLACE FUNCTION fn_bmng_reset_grants_on_membership_change()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $t$
+DECLARE r RECORD;
+BEGIN
+  IF TG_OP = 'UPDATE'
+     AND NEW.role   IS NOT DISTINCT FROM OLD.role
+     AND NEW.status IS NOT DISTINCT FROM OLD.status THEN
+    RETURN NEW;   -- not a transition; grants are left exactly as they are
+  END IF;
+
+  FOR r IN
+    SELECT category FROM business_member_notification_grants
+    WHERE business_id = NEW.business_id AND user_id = NEW.user_id AND enabled = true
+  LOOP
+    UPDATE business_member_notification_grants
+      SET enabled = false, updated_at = now()
+      WHERE business_id = NEW.business_id AND user_id = NEW.user_id AND category = r.category;
+    -- System-attributed: the actor of a membership change is not trusted here, and an auto-revoke
+    -- is the database enforcing an invariant, not a person acting. NULL actor + 'system' channel
+    -- records that honestly rather than blaming whoever happened to trigger it.
+    INSERT INTO audit_events
+      (business_id, actor_user_id, actor_role, channel, entity_type, entity_id, action, before_json, after_json)
+    VALUES (NEW.business_id, NULL, 'system', 'system', 'notification_grant', NEW.user_id::text,
+            'auto_revoked',
+            jsonb_build_object('category', r.category, 'enabled', true),
+            jsonb_build_object('category', r.category, 'enabled', false, 'reason', 'membership_change'));
+  END LOOP;
+  RETURN NEW;
+END $t$;
+
+-- AFTER INSERT OR UPDATE OF role, status: fires on a new membership and whenever an update targets
+-- the role or status column. The internal distinct-check makes a same-value write a no-op.
+DROP TRIGGER IF EXISTS trg_bmng_reset_on_membership ON business_members;
+CREATE TRIGGER trg_bmng_reset_on_membership
+  AFTER INSERT OR UPDATE OF role, status ON business_members
+  FOR EACH ROW EXECUTE FUNCTION fn_bmng_reset_grants_on_membership_change();
+
+REVOKE ALL ON FUNCTION fn_bmng_reset_grants_on_membership_change() FROM PUBLIC;
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN
+    REVOKE ALL ON FUNCTION fn_bmng_reset_grants_on_membership_change() FROM anon;
+  END IF;
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN
+    REVOKE ALL ON FUNCTION fn_bmng_reset_grants_on_membership_change() FROM authenticated;
+  END IF;
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'service_role') THEN
+    GRANT EXECUTE ON FUNCTION fn_bmng_reset_grants_on_membership_change() TO service_role;
   END IF;
 END $$;

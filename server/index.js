@@ -4416,24 +4416,6 @@ app.get('/api/team', auth, async (req, res) => {
 });
 
 // ── POST /api/team/invite ─────────────────────────────────────────────────────
-// When a member loses CEO/CFO eligibility — demotion, deactivation, or removal — disable ALL of
-// their enabled grants atomically, so a later re-promotion cannot silently resurrect a permission
-// only the owner should issue. This is what stops an admin (who may change roles) from indirectly
-// reactivating a stale grant: on the way out the grants are turned off, and coming back starts
-// from all-off. Gated by the flag: with grants off the table may not exist, and no grant could
-// have been created, so there is nothing to disable.
-async function disableStaleGrantsForMember({ businessId, userId, actorUserId, actorRole }) {
-  if (!isGrantsEnabled()) return { ok: true, skipped: 'flag_off' };
-  const { data, error } = await supabase.rpc('disable_member_notification_grants', {
-    p_business_id: businessId, p_user_id: userId, p_actor: actorUserId, p_actor_role: actorRole,
-  });
-  if (error || !data || typeof data.changed !== 'number') {
-    console.warn(`[grants] disable failed business=${businessId} user=${userId}: ${error?.message || 'unconfirmed'}`);
-    return { ok: false };
-  }
-  return { ok: true, changed: data.changed };
-}
-
 // ── Company Admin: notification grants (migration 046) ───────────────────────
 // Owner-only, business-scoped. An owner grants specific financial categories to a CEO/CFO of
 // the SAME business. Both endpoints are gated by COMPANY_NOTIFICATION_GRANTS_ENABLED: when the
@@ -4643,25 +4625,11 @@ app.patch('/api/team/members/:memberId', auth, async (req, res) => {
     if (role)   update.role   = role;
     if (status) update.status = status;
 
-    // Read the target first (scoped to this business) so we can tell whether the change removes
-    // CEO/CFO eligibility, and disable any stale grants BEFORE the role/status change commits.
-    const { data: targetRows } = await supabase.from('business_members')
-      .select('user_id, role, status').eq('id', req.params.memberId).eq('business_id', biz.business.id).limit(1);
-    const target = targetRows?.[0];
-    if (!target) return res.status(404).json({ error: 'Member not found in this business' });
-
-    const newRole = role || target.role;
-    const newStatus = status || target.status;
-    const stillEligible = newStatus === 'active' && ['ceo', 'cfo'].includes(newRole);
-    if (!stillEligible) {
-      // Losing (or never having) grant eligibility → clear grants first, fail closed if we cannot.
-      const d = await disableStaleGrantsForMember({
-        businessId: biz.business.id, userId: target.user_id, actorUserId: userId, actorRole: biz.role });
-      if (!d.ok) return res.status(500).json({ error: 'grant_cleanup_failed', message: 'Could not update the member. Please try again.' });
-    }
-
-    // The target member MUST belong to the active business — never mutate a member of
-    // another workspace via its id.
+    // The target member MUST belong to the active business — never mutate a member of another
+    // workspace via its id. Stale-grant cleanup is NOT done here: it is enforced in the database
+    // by a trigger on business_members (migration 046), so it happens in the SAME transaction as
+    // this update — atomic, race-free, and covering every route that changes a role or status,
+    // not just this one. If the trigger's audit write fails, this update rolls back and throws.
     const { data, error } = await supabase.from('business_members')
       .update(update)
       .eq('id', req.params.memberId)
@@ -4693,12 +4661,9 @@ app.delete('/api/team/members/:memberId', auth, async (req, res) => {
     if (target.role === 'owner')
       return res.status(403).json({ error: 'Cannot remove business owner' });
 
-    // Removal ends eligibility — disable any grants first so a re-invite starts from all-off and
-    // cannot inherit the removed member's old access. Fail closed if the cleanup cannot confirm.
-    const d = await disableStaleGrantsForMember({
-      businessId: biz.business.id, userId: target.user_id, actorUserId: userId, actorRole: biz.role });
-    if (!d.ok) return res.status(500).json({ error: 'grant_cleanup_failed', message: 'Could not remove the member. Please try again.' });
-
+    // Removal ends eligibility. Grant cleanup is enforced by the database trigger on
+    // business_members (migration 046) in the same transaction as this status change — so a
+    // re-invite later starts from all-off, with no separate cleanup step to race or forget.
     await supabase.from('business_members')
       .update({ status: 'removed' })
       .eq('id', req.params.memberId)

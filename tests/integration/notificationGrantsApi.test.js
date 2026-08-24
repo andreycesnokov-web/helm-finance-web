@@ -38,8 +38,6 @@ function seed() {
   dbState.grants = [];
   dbState.audit = [];
   dbFlags.rpcMode = 'ok';
-  dbFlags.disableFail = false;
-  dbFlags.rpcCalls = [];
 }
 
 // ── fake Supabase (embed-aware for businesses(*)) ─────────────────────────────
@@ -101,7 +99,7 @@ function fakeFrom(table) {
 //   'ok'          — behave like the function (default)
 //   'error'       — the transaction failed (e.g. audit insert error) → { error }
 //   'unconfirmed' — a null/zero-row result the API must NOT treat as success → { data: null }
-const dbFlags = { rpcMode: 'ok', disableFail: false, rpcCalls: [] };
+const dbFlags = { rpcMode: 'ok' };
 function rpcApply(args) {
   const { p_business_id, p_user_id, p_granted_by, p_actor_role, p_changes } = args;
   const m = dbState.business_members.find(x => x.business_id === p_business_id && x.user_id === p_user_id
@@ -120,31 +118,16 @@ function rpcApply(args) {
   }
   return { data: { changed }, error: null };
 }
-function rpcDisable(args) {
-  const { p_business_id, p_user_id } = args;
-  let changed = 0;
-  for (const g of dbState.grants) {
-    if (g.business_id === p_business_id && g.user_id === p_user_id && g.enabled === true) {
-      g.enabled = false;
-      dbState.audit.push({ entity_type: 'notification_grant', action: 'auto_revoked', business_id: p_business_id });
-      changed++;
-    }
-  }
-  return { data: { changed }, error: null };
-}
 const supabase = {
   from: fakeFrom,
   rpc: async (name, args) => {
-    dbFlags.rpcCalls.push(name);
     if (name === 'apply_notification_grants') {
       if (dbFlags.rpcMode === 'error') return { data: null, error: { message: 'audit down' } };
       if (dbFlags.rpcMode === 'unconfirmed') return { data: null, error: null };
       return rpcApply(args);
     }
-    if (name === 'disable_member_notification_grants') {
-      if (dbFlags.disableFail) return { data: null, error: { message: 'disable down' } };
-      return rpcDisable(args);
-    }
+    // disable_member_notification_grants was removed — the membership trigger (migration 046) now
+    // handles cleanup in-DB, so the API makes no such RPC call. A stray name returns a no-op.
     return { data: null, error: null };
   },
   storage: { from: () => ({}) }, auth: {},
@@ -313,105 +296,43 @@ test('idempotent repeat writes no duplicate audit event', async () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// P1 Blocker 1 — losing eligibility disables grants; re-promotion does not restore
+// Membership transitions — the API just issues plain updates now
+//
+// Stale-grant cleanup on demotion/deactivation/removal/re-invite is enforced by a DATABASE
+// TRIGGER on business_members (migration 046), in the same transaction as the membership change.
+// That is proven against real Postgres (PGlite) in companyGrantsMigration.test.js — including both
+// concurrency orderings and both rollback directions — because a trigger cannot be exercised by
+// this hand-written fake. Here we only confirm the API contract: these routes still succeed and
+// stay owner/admin-gated. The grant EFFECT is a DB concern, tested where the trigger actually runs.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const PATCH = (mid) => `/api/team/members/${mid}`;
-const grantEnabled = (uid, cat) => dbState.grants.some(g => g.user_id === uid && g.category === cat && g.enabled === true);
 
-test('demote CFO to manager disables their grants; re-promote does NOT restore', async () => {
+test('PATCH role change succeeds (grant cleanup is the DB trigger, not the API)', async () => {
   seed();
-  await api('PUT', TG('m-cfo-a'), { token: tok(OWNER_A), business: BIZ_A, body: { grants: { company_financial: true } } });
-  assert.ok(grantEnabled(CFO_A, 'company_financial'));
-
-  assert.strictEqual((await api('PATCH', PATCH('m-cfo-a'), { token: tok(OWNER_A), business: BIZ_A, body: { role: 'manager' } })).status, 200);
-  assert.ok(!grantEnabled(CFO_A, 'company_financial'), 'demotion did not disable the grant');
-
-  assert.strictEqual((await api('PATCH', PATCH('m-cfo-a'), { token: tok(OWNER_A), business: BIZ_A, body: { role: 'cfo' } })).status, 200);
-  assert.ok(!grantEnabled(CFO_A, 'company_financial'), 're-promotion silently restored the stale grant');
+  const r = await api('PATCH', PATCH('m-cfo-a'), { token: tok(OWNER_A), business: BIZ_A, body: { role: 'manager' } });
+  assert.strictEqual(r.status, 200);
 });
 
-test('deactivate CFO (status inactive) disables their grants', async () => {
+test('DELETE (soft remove) succeeds', async () => {
   seed();
-  await api('PUT', TG('m-cfo-a'), { token: tok(OWNER_A), business: BIZ_A, body: { grants: { company_financial: true } } });
-  await api('PATCH', PATCH('m-cfo-a'), { token: tok(OWNER_A), business: BIZ_A, body: { status: 'inactive' } });
-  assert.ok(!grantEnabled(CFO_A, 'company_financial'));
+  const r = await api('DELETE', PATCH('m-cfo-a'), { token: tok(OWNER_A), business: BIZ_A });
+  assert.ok(r.status < 500, `remove failed: ${r.status}`);
 });
 
-test('removing a member disables their grants; a re-add starts from all-off', async () => {
+test('a non-owner/admin cannot change roles (403)', async () => {
   seed();
-  await api('PUT', TG('m-cfo-a'), { token: tok(OWNER_A), business: BIZ_A, body: { grants: { company_financial: true } } });
-  const del = await api('DELETE', PATCH('m-cfo-a'), { token: tok(OWNER_A), business: BIZ_A });
-  assert.ok(del.status < 500, `remove failed: ${del.status}`);
-  assert.ok(!grantEnabled(CFO_A, 'company_financial'), 'removal did not disable the grant');
+  assert.strictEqual((await api('PATCH', PATCH('m-mgr-a'), { token: tok(CFO_A), business: BIZ_A, body: { role: 'employee' } })).status, 403);
 });
 
-test('an ADMIN cannot reactivate a stale grant by flipping roles', async () => {
-  seed();
-  await api('PUT', TG('m-cfo-a'), { token: tok(OWNER_A), business: BIZ_A, body: { grants: { company_financial: true } } });
-  await api('PATCH', PATCH('m-cfo-a'), { token: tok(ADMIN_A), business: BIZ_A, body: { role: 'manager' } });
-  await api('PATCH', PATCH('m-cfo-a'), { token: tok(ADMIN_A), business: BIZ_A, body: { role: 'cfo' } });
-  assert.ok(!grantEnabled(CFO_A, 'company_financial'), 'an admin reactivated a stale grant');
-  assert.strictEqual((await api('PUT', TG('m-cfo-a'), { token: tok(ADMIN_A), business: BIZ_A, body: { grants: { company_financial: true } } })).status, 403);
-});
-
-test('an unrelated member change does not disable another members grants', async () => {
-  seed();
-  await api('PUT', TG('m-cfo-a'), { token: tok(OWNER_A), business: BIZ_A, body: { grants: { company_financial: true } } });
-  await api('PATCH', PATCH('m-mgr-a'), { token: tok(OWNER_A), business: BIZ_A, body: { role: 'employee' } });
-  assert.ok(grantEnabled(CFO_A, 'company_financial'), 'an unrelated change revoked the CFO grant');
-});
-
-test('a Business A member change cannot affect Business B grants', async () => {
-  seed();
-  await api('PUT', TG('m-cfo-a'), { token: tok(OWNER_A), business: BIZ_A, body: { grants: { company_financial: true } } });
-  await api('PUT', TG('m-cfo-b'), { token: tok(OWNER_B), business: BIZ_B, body: { grants: { company_financial: true } } });
-  await api('PATCH', PATCH('m-cfo-a'), { token: tok(OWNER_A), business: BIZ_A, body: { role: 'manager' } });
-  assert.ok(!grantEnabled(CFO_A, 'company_financial'), 'business A grant was not disabled');
-  assert.ok(grantEnabled(CFO_B, 'company_financial'), 'business A change reached business B');
-});
-
-test('an active CFO with a grant is unaffected by a same-role update', async () => {
-  seed();
-  await api('PUT', TG('m-cfo-a'), { token: tok(OWNER_A), business: BIZ_A, body: { grants: { company_financial: true } } });
-  await api('PATCH', PATCH('m-cfo-a'), { token: tok(OWNER_A), business: BIZ_A, body: { role: 'cfo' } });
-  assert.ok(grantEnabled(CFO_A, 'company_financial'), 'a same-role update disabled an active CFO grant');
-});
-
-test('flag OFF: neither endpoint queries the grants table or RPC', async () => {
+test('flag OFF: the grant endpoints are 404 and a role change still works (no grant-table access)', async () => {
   seed();
   const prev = process.env[GRANTS_FLAG];
   process.env[GRANTS_FLAG] = 'false';
   try {
     assert.strictEqual((await api('GET', GET, { token: tok(OWNER_A), business: BIZ_A })).status, 404);
     assert.strictEqual((await api('PUT', TG('m-cfo-a'), { token: tok(OWNER_A), business: BIZ_A, body: { grants: { company_financial: true } } })).status, 404);
-    // A role change while the flag is off must not attempt the disable RPC (table may not exist).
-    const patch = await api('PATCH', PATCH('m-cfo-a'), { token: tok(OWNER_A), business: BIZ_A, body: { role: 'manager' } });
-    assert.strictEqual(patch.status, 200, 'a role change failed while grants were off');
-    assert.strictEqual(dbState.grants.length, 0, 'a grant table write happened while the flag was off');
-  } finally { process.env[GRANTS_FLAG] = prev; }
-});
-
-test('PATCH fails closed if the grant cleanup cannot confirm (role does NOT change)', async () => {
-  seed();
-  await api('PUT', TG('m-cfo-a'), { token: tok(OWNER_A), business: BIZ_A, body: { grants: { company_financial: true } } });
-  dbFlags.disableFail = true;   // the disable RPC cannot confirm
-  const r = await api('PATCH', PATCH('m-cfo-a'), { token: tok(OWNER_A), business: BIZ_A, body: { role: 'manager' } });
-  assert.strictEqual(r.status, 500, 'a failed grant cleanup still let the role change through');
-  assert.strictEqual(r.body.error, 'grant_cleanup_failed');
-  // The role must NOT have changed — the demotion was aborted because grants could not be cleared.
-  assert.strictEqual(dbState.business_members.find(m => m.id === 'm-cfo-a').role, 'cfo', 'the role changed despite the cleanup failing');
-});
-
-test('flag OFF: a role change never calls the disable RPC', async () => {
-  seed();
-  const prev = process.env[GRANTS_FLAG];
-  process.env[GRANTS_FLAG] = 'false';
-  try {
-    dbFlags.rpcCalls = [];
-    const r = await api('PATCH', PATCH('m-cfo-a'), { token: tok(OWNER_A), business: BIZ_A, body: { role: 'manager' } });
-    assert.strictEqual(r.status, 200);
-    assert.ok(!dbFlags.rpcCalls.includes('disable_member_notification_grants'),
-      'the disable RPC was called while the feature flag was off');
+    assert.strictEqual((await api('PATCH', PATCH('m-cfo-a'), { token: tok(OWNER_A), business: BIZ_A, body: { role: 'manager' } })).status, 200);
+    assert.strictEqual(dbState.grants.length, 0, 'a grant write happened while the flag was off');
   } finally { process.env[GRANTS_FLAG] = prev; }
 });

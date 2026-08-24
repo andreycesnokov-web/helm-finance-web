@@ -26,7 +26,8 @@ async function freshDb() {
     CREATE TABLE users (id BIGINT PRIMARY KEY);
     CREATE TABLE businesses (id uuid PRIMARY KEY, type text DEFAULT 'business');
     CREATE TABLE business_members (
-      id BIGSERIAL PRIMARY KEY, business_id uuid, user_id BIGINT, role text, status text DEFAULT 'active');
+      id BIGSERIAL PRIMARY KEY, business_id uuid, user_id BIGINT, role text, status text DEFAULT 'active',
+      display_name text);
     CREATE TABLE audit_events (
       id BIGSERIAL PRIMARY KEY, business_id uuid, actor_user_id BIGINT, actor_role text,
       channel text, entity_type text, entity_id text, action text,
@@ -179,37 +180,169 @@ test('apply: if the audit insert fails, the grant change ROLLS BACK', async () =
     'the grant survived even though its audit event failed — not atomic');
 });
 
-// ── Stale-grant disable (disable_member_notification_grants) ─────────────────
-test('disable: turns off all enabled grants and audits each as auto_revoked', async () => {
+// ── Membership trigger — the DB-level stale-grant safety ─────────────────────
+// The trigger fires in the same transaction as any business_members role/status change, so these
+// tests exercise the exact enforcement production gets, across every writer. Helpers below drive
+// the membership table directly (as any route or a direct UPDATE would).
+const setRole   = (db, role, { user = CFO, biz = BIZ_A } = {}) =>
+  db.exec(`UPDATE business_members SET role='${role}' WHERE business_id='${biz}' AND user_id=${user}`);
+const setStatus = (db, status, { user = CFO, biz = BIZ_A } = {}) =>
+  db.exec(`UPDATE business_members SET status='${status}' WHERE business_id='${biz}' AND user_id=${user}`);
+
+test('trigger: demotion CFO→manager disables grants and writes an auto_revoked audit row', async () => {
   const db = await freshDb();
   await apply(db, { company_financial: true, tax_compliance: true });
-  const { rows } = await db.query(`SELECT disable_member_notification_grants('${BIZ_A}', ${CFO}, ${OWNER}, 'admin') AS r`);
-  assert.strictEqual(rows[0].r.changed, 2);
+  await setRole(db, 'manager');
   assert.strictEqual(await grantEnabled(db, CFO, 'company_financial'), false);
   assert.strictEqual(await grantEnabled(db, CFO, 'tax_compliance'), false);
-  const { rows: a } = await db.query(`SELECT count(*)::int AS n FROM audit_events WHERE action='auto_revoked'`);
-  assert.strictEqual(a[0].n, 2);
+  const { rows } = await db.query(`SELECT count(*)::int AS n, count(actor_user_id)::int AS actors
+    FROM audit_events WHERE action='auto_revoked'`);
+  assert.strictEqual(rows[0].n, 2, 'auto_revoke audit rows were not written');
+  assert.strictEqual(rows[0].actors, 0, 'the auto-revoke trusted a client actor instead of the system');
 });
 
-test('disable: re-promotion does not restore — grants stay OFF until re-granted', async () => {
+test('trigger: promoting a manager who has a stale enabled grant leaves it OFF', async () => {
+  const db = await freshDb();
+  // A stale enabled grant exists for a MANAGER (e.g. seeded, or from before 046). Promotion to CFO
+  // must NOT make it effective — the transition resets it.
+  await db.exec(`UPDATE business_members SET role='manager' WHERE user_id=${CFO}`);
+  await db.exec(grant(BIZ_A, CFO, 'company_financial', true));   // stale enabled grant on a manager
+  await setRole(db, 'cfo');   // promote into eligibility
+  assert.strictEqual(await grantEnabled(db, CFO, 'company_financial'), false, 'a stale grant rode a promotion back to life');
+});
+
+test('trigger: activating an inactive member as CEO leaves a stale grant OFF', async () => {
+  const db = await freshDb();
+  await setStatus(db, 'inactive');
+  await db.exec(grant(BIZ_A, CFO, 'company_financial', true));   // stale enabled grant while inactive
+  await db.exec(`UPDATE business_members SET status='active', role='ceo' WHERE user_id=${CFO}`);
+  assert.strictEqual(await grantEnabled(db, CFO, 'company_financial'), false);
+});
+
+test('trigger: a re-invited (re-inserted) member starts with all grants OFF', async () => {
   const db = await freshDb();
   await apply(db, { company_financial: true });
-  await db.query(`SELECT disable_member_notification_grants('${BIZ_A}', ${CFO}, ${OWNER}, 'admin')`);
-  // Simulate a re-promotion: role is CFO again. The old row must remain disabled.
-  assert.strictEqual(await grantEnabled(db, CFO, 'company_financial'), false, 're-promotion silently restored a grant');
+  // Remove the membership row entirely (grants persist — they only cascade on user/business delete)
+  // then re-insert as CFO, the shape of a fresh invite accept that does not reuse the old row.
+  await db.exec(`DELETE FROM business_members WHERE user_id=${CFO}`);
+  assert.strictEqual(await grantEnabled(db, CFO, 'company_financial'), true, 'precondition: the grant survives a membership delete');
+  await db.exec(`INSERT INTO business_members (business_id, user_id, role, status) VALUES ('${BIZ_A}', ${CFO}, 'cfo', 'active')`);
+  assert.strictEqual(await grantEnabled(db, CFO, 'company_financial'), false, 'a re-inserted member inherited an old grant');
 });
 
-test('disable is business-scoped: business B grants are untouched', async () => {
+test('trigger: reactivating a removed member (UPDATE) leaves stale grants OFF', async () => {
+  const db = await freshDb();
+  await apply(db, { company_financial: true });
+  await setStatus(db, 'removed');           // removal disables via the trigger
+  // Force a stale ENABLED row back on directly (as a rogue write or pre-046 state might), then
+  // reactivate: the reactivation transition must disable it again.
+  await db.exec(`UPDATE business_member_notification_grants SET enabled=true WHERE user_id=${CFO}`);
+  await db.exec(`UPDATE business_members SET status='active', role='cfo' WHERE user_id=${CFO}`);  // re-invite
+  assert.strictEqual(await grantEnabled(db, CFO, 'company_financial'), false);
+});
+
+test('trigger: a same-role, same-status update does NOT disable a live grant', async () => {
+  const db = await freshDb();
+  await apply(db, { company_financial: true });
+  await db.exec(`UPDATE business_members SET display_name='X', role='cfo', status='active' WHERE user_id=${CFO}`);
+  assert.strictEqual(await grantEnabled(db, CFO, 'company_financial'), true, 'an unrelated edit wiped a live grant');
+});
+
+test('trigger: changing member A does not touch member B grants', async () => {
+  const db = await freshDb();
+  await db.exec(`INSERT INTO business_members (business_id, user_id, role, status) VALUES ('${BIZ_A}', 7700002, 'cfo', 'active')`);
+  await apply(db, { company_financial: true }, { user: CFO });
+  await apply(db, { company_financial: true }, { user: 7700002 });
+  await setRole(db, 'manager', { user: CFO });   // demote A only
+  assert.strictEqual(await grantEnabled(db, CFO, 'company_financial'), false);
+  assert.strictEqual(await grantEnabled(db, 7700002, 'company_financial'), true, "member A's demotion revoked member B's grant");
+});
+
+test('trigger: a Business A transition cannot affect Business B grants', async () => {
   const db = await freshDb();
   await db.exec(`INSERT INTO business_members (business_id, user_id, role, status) VALUES ('${BIZ_B}', ${CFO}, 'cfo', 'active')`);
   await apply(db, { company_financial: true }, { biz: BIZ_A });
   await apply(db, { company_financial: true }, { biz: BIZ_B });
-  await db.query(`SELECT disable_member_notification_grants('${BIZ_A}', ${CFO}, ${OWNER}, 'admin')`);
+  await setRole(db, 'manager', { biz: BIZ_A });
   assert.strictEqual(await grantEnabled(db, CFO, 'company_financial', BIZ_A), false);
-  assert.strictEqual(await grantEnabled(db, CFO, 'company_financial', BIZ_B), true, "business A's disable leaked into B");
+  assert.strictEqual(await grantEnabled(db, CFO, 'company_financial', BIZ_B), true, "business A's transition reached business B");
+  // The disable scan itself must be business-scoped: exactly ONE auto-revoke, for business A's one
+  // grant — not two, which is what an unscoped scan (touching business B's identical category)
+  // would produce. Both businesses hold the same category for the same user, so this pins scope.
+  const { rows } = await db.query(`SELECT count(*)::int AS n FROM audit_events
+    WHERE action='auto_revoked' AND business_id='${BIZ_A}'`);
+  assert.strictEqual(rows[0].n, 1, 'the disable scan was not scoped to the transitioning business');
 });
 
-test('the extended migration re-applies cleanly (functions included)', async () => {
+// ── Concurrency: grant vs demotion, both orderings, cannot leave an enabled grant ──
+test('race grant-then-demote: the demotion trigger disables the just-made grant', async () => {
+  const db = await freshDb();
+  await apply(db, { company_financial: true });   // grant commits first
+  await setRole(db, 'manager');                    // then demotion → trigger disables
+  assert.strictEqual(await grantEnabled(db, CFO, 'company_financial'), false);
+});
+
+test('race demote-then-grant: the grant is refused because the member is no longer CEO/CFO', async () => {
+  const db = await freshDb();
+  await setRole(db, 'manager');                    // demotion commits first
+  const err = await fails(db, `SELECT apply_notification_grants('${BIZ_A}', ${CFO}, ${OWNER}, 'owner', '{"company_financial":true}'::jsonb)`);
+  assert.ok(err && /member_not_grantable/.test(err), `the grant was not refused after demotion: ${err}`);
+  assert.strictEqual(await grantEnabled(db, CFO, 'company_financial'), null);
+});
+
+test('the grant RPC locks the member row (FOR UPDATE) to serialise against transitions', () => {
+  // PGlite is single-connection, so the lock cannot be exercised concurrently here; its PRESENCE
+  // is what serialises the two transactions in production. Pin it so it cannot be dropped.
+  assert.match(SQL, /FROM business_members\s+WHERE business_id = p_business_id AND user_id = p_user_id\s+FOR UPDATE/,
+    'apply_notification_grants no longer locks the member row');
+});
+
+// ── Atomicity of the membership transition + trigger cleanup ─────────────────
+test('atomic: if the trigger audit insert fails, the MEMBERSHIP change rolls back', async () => {
+  const db = await freshDb();
+  await apply(db, { company_financial: true });
+  // Make the auto_revoke audit insert fail. Because the trigger runs in the membership UPDATE's
+  // transaction, the demotion must roll back too — role stays CFO, grant stays enabled.
+  await db.exec(`
+    CREATE FUNCTION _boom() RETURNS trigger LANGUAGE plpgsql AS $$
+    BEGIN IF NEW.action='auto_revoked' THEN RAISE EXCEPTION 'audit down'; END IF; RETURN NEW; END $$;
+    CREATE TRIGGER _boom_t BEFORE INSERT ON audit_events FOR EACH ROW EXECUTE FUNCTION _boom();`);
+  const err = await fails(db, `UPDATE business_members SET role='manager' WHERE user_id=${CFO}`);
+  assert.ok(err && /audit down/.test(err), `the audit failure did not surface: ${err}`);
+  const { rows } = await db.query(`SELECT role FROM business_members WHERE user_id=${CFO}`);
+  assert.strictEqual(rows[0].role, 'cfo', 'the demotion committed despite its cleanup failing — not atomic');
+  assert.strictEqual(await grantEnabled(db, CFO, 'company_financial'), true, 'the grant changed despite the transaction failing');
+});
+
+test('atomic: if the membership UPDATE itself fails, the grant cleanup does not happen', async () => {
+  const db = await freshDb();
+  await apply(db, { company_financial: true });
+  // A BEFORE trigger rejects the specific transition, so the UPDATE fails before commit. The
+  // trigger-driven cleanup shares that transaction and must not persist.
+  await db.exec(`
+    CREATE FUNCTION _reject() RETURNS trigger LANGUAGE plpgsql AS $$
+    BEGIN IF NEW.role='manager' THEN RAISE EXCEPTION 'membership rejected'; END IF; RETURN NEW; END $$;
+    CREATE TRIGGER _reject_t BEFORE UPDATE ON business_members FOR EACH ROW EXECUTE FUNCTION _reject();`);
+  const err = await fails(db, `UPDATE business_members SET role='manager' WHERE user_id=${CFO}`);
+  assert.ok(err && /membership rejected/.test(err), `the membership rejection did not surface: ${err}`);
+  assert.strictEqual(await grantEnabled(db, CFO, 'company_financial'), true, 'the grant was disabled even though the membership update failed');
+});
+
+test('flag independence: the trigger fires regardless of any app feature flag', async () => {
+  // The trigger is DB-level and has no knowledge of COMPANY_NOTIFICATION_GRANTS_ENABLED. A role
+  // change disables grants whether the app flag is on or off — which is the whole point of moving
+  // enforcement into the database.
+  const db = await freshDb();
+  await apply(db, { company_financial: true });
+  const prev = process.env.COMPANY_NOTIFICATION_GRANTS_ENABLED;
+  delete process.env.COMPANY_NOTIFICATION_GRANTS_ENABLED;   // "flag off"
+  try {
+    await setRole(db, 'manager');
+    assert.strictEqual(await grantEnabled(db, CFO, 'company_financial'), false, 'the trigger depended on the app flag');
+  } finally { if (prev !== undefined) process.env.COMPANY_NOTIFICATION_GRANTS_ENABLED = prev; }
+});
+
+test('the extended migration re-applies cleanly (trigger + function)', async () => {
   const db = await freshDb();
   assert.strictEqual(await fails(db, SQL), null, 're-applying the extended 046 failed');
 });
