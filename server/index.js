@@ -24,6 +24,7 @@ const { resolveTelegramActiveWorkspace, setTelegramActiveWorkspace } = require('
 // PR2.6: outbound Telegram recipients. A platform user id is NOT a chat id — migration 042
 // gave email-origin accounts negative ids, and Telegram reads a negative chat_id as a GROUP.
 const { resolveTelegramNotificationRecipients, resolveSingleTelegramRecipient, isSendableChatId } = require('./lib/telegramNotifications');
+const { resolveNotificationAudience } = require('./lib/notificationPolicy');
 // PR4a: connecting and disconnecting a Telegram account. Identity only — a link grants no
 // access of any kind, and membership stays entirely in business_members.
 const telegramLink = require('./lib/telegramLink');
@@ -1367,26 +1368,38 @@ function normalizeChannel(ch) {
 // TODO: when the bot supports callback actions, switch url-buttons for
 //       callback_data buttons (Approve / Reject / Ask details) that call
 //       PATCH /api/debts/:id/approve|reject with channel='telegram'.
-async function notifyBusinessAdminsViaTelegram(ownerUserId, text, buttons = []) {
+// The transport. It decides NOTHING about who may receive a notification: recipients come from
+// the policy resolver, and the only judgement left here is how to put bytes on the wire. This
+// function used to hold the role list ['owner','ceo','admin','cfo'] inline, which made every
+// caller's audience a side effect of a literal buried in the send path.
+//
+// `category` is required. A missing or unrecognised one resolves to NOBODY rather than to a
+// default audience — see resolveNotificationAudience.
+async function notifyBusinessAdminsViaTelegram(ownerUserId, text, buttons = [], {
+  category = null, businessId = null, preferences = null, excludeUserIds = [],
+  allowLegacy = true,
+} = {}) {
   const botToken = process.env.TELEGRAM_BOT_TOKEN || process.env.BOT_TOKEN;
   if (!botToken) return { sent: 0, skipped: 'no_bot_token' };
   try {
-    // Find the business this owner belongs to, then all active admin+ members
-    const { data: ownerMem } = await supabase.from('business_members')
-      .select('business_id').eq('user_id', ownerUserId).eq('status', 'active').limit(1);
-    let adminUserIds = [ownerUserId];
-    if (ownerMem?.length) {
-      const { data: admins } = await supabase.from('business_members')
-        .select('user_id').eq('business_id', ownerMem[0].business_id)
-        .eq('status', 'active').in('role', ['owner', 'ceo', 'admin', 'cfo']);
-      if (admins?.length) adminUserIds = admins.map(a => a.user_id);
-    }
-    // Resolution decides who is reachable, and de-dupes on the resolved chat id — two
-    // platform users can map to one Telegram account during the migration.
-    const { chatIds, dropped } = await resolveTelegramNotificationRecipients({
-      supabase, userIds: adminUserIds, reason: 'business-admins',
+    // Gate 1 — permission and preference. Platform user ids only.
+    const audience = await resolveNotificationAudience({
+      supabase, category, businessId, ownerUserId, preferences, excludeUserIds,
     });
-    if (!chatIds.length) return { sent: 0, dropped };
+    if (!audience.userIds.length) return { sent: 0, dropped: audience.dropped };
+
+    // Gate 2 — reachability. Link revocation, the negative-chat-id guard and de-duplication on
+    // the RESOLVED chat id live here: two platform users can share one Telegram account during
+    // the migration, and de-duping on user ids would message that person twice.
+    //
+    // allowLegacy stays true while TELEGRAM_NOTIFY_REVERSE_RESOLVER_ENABLED is off: with that
+    // flag off a positive-id owner has no link row to resolve, and flipping this to false here
+    // would stop their notifications entirely. It should become false for financial categories
+    // once that flag is on and owners have linked — flagged in the report.
+    const { chatIds, dropped } = await resolveTelegramNotificationRecipients({
+      supabase, userIds: audience.userIds, reason: `policy:${category}`, allowLegacy,
+    });
+    if (!chatIds.length) return { sent: 0, dropped: [...audience.dropped, ...dropped] };
 
     let sent = 0;
     for (const chatId of chatIds) {
@@ -2111,7 +2124,8 @@ app.post('/api/telegram/debts/attach-receipt', async (req, res) => {
     const lines = attachments.map((a, i) => `${i + 1}. ${a.amount ? Number(a.amount).toLocaleString('en-US') + ' ' + ccy : '— не распознано'}${a.counterparty ? ' · ' + a.counterparty : ''}`).join('\n');
     notifyBusinessAdminsViaTelegram(ownerId,
       `📎 Чек получен (${attachments.length}/${MAX_RECEIPTS}) по заявке\n\nОт: ${name}\n${lines}\n\nИтого по чекам: <b>${receiptsTotal.toLocaleString('en-US')} ${ccy}</b>`,
-      [[{ text: '🌐 Открыть заявку', url: `${webAppUrl}/${debt.type === 'receivable' ? 'receivables' : 'payables'}` }]]
+      [[{ text: '🌐 Открыть заявку', url: `${webAppUrl}/${debt.type === 'receivable' ? 'receivables' : 'payables'}` }]],
+      { category: 'payables_receivables' },
     ).catch(() => {});
 
     res.json({ ok: true, debt_id: data.id, counterparty: data.counterparty, count: attachments.length, receipts_total: receiptsTotal, recognized: !!ocr, item_amount: item.amount });
@@ -2211,7 +2225,7 @@ app.post('/api/telegram/debts/from-receipt', async (req, res) => {
         [ { text: '📊 View impact', callback_data: `debt_impact:${data.id}` } ],
         [ { text: '✅ Approve', callback_data: `debt_approve:${data.id}` }, { text: '❌ Reject', callback_data: `debt_reject:${data.id}` } ],
         [ { text: 'ℹ️ Ask details', callback_data: `debt_info:${data.id}` }, { text: '🌐 Open', url: `${webAppUrl}/payables` } ],
-      ]).catch(() => {});
+      ], { category: 'team_approvals' }).catch(() => {});
     }
 
     res.json({ ok: true, action: 'created', kind: isReimbursement ? 'expense_request' : 'payable', debt_id: data.id, amount: amountNum, counterparty: data.counterparty, needs_approval: !m.isPrivileged, currency: ccy });
@@ -2866,7 +2880,8 @@ app.post('/api/accountant/telegram/test', auth, async (req, res) => {
     if (!TAX_TG_TEMPLATES[tpl]) return res.status(400).json({ error: `Unknown template. One of: ${Object.keys(TAX_TG_TEMPLATES).join(', ')}` });
     const language = normalizeLanguage(await getUserLanguage(req.user.userId));
     const fn = TAX_TG_TEMPLATES[tpl][language] || TAX_TG_TEMPLATES[tpl].en;
-    const r = await notifyBusinessAdminsViaTelegram(biz.ownerUserId, fn(req.body?.detail || ''), taxTgButtons(language));
+    const r = await notifyBusinessAdminsViaTelegram(biz.ownerUserId, fn(req.body?.detail || ''), taxTgButtons(language),
+      { category: 'tax_compliance' });
     res.json({ ok: true, sent: r.sent ?? 0, template: tpl });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -2887,7 +2902,8 @@ app.post('/api/accountant/calendar/remind', auth, async (req, res) => {
     const lines = soon.slice(0, 8).map(e => `• ${e.title} — ${e.due_date}`).join('\n');
     const overdue = soon.filter(e => new Date(e.due_date) < today).length;
     const fn = COMPLIANCE_REMINDER[language] || COMPLIANCE_REMINDER.en;
-    const r = await notifyBusinessAdminsViaTelegram(biz.ownerUserId, fn(lines, overdue || null), []);
+    const r = await notifyBusinessAdminsViaTelegram(biz.ownerUserId, fn(lines, overdue || null), [],
+      { category: 'tax_compliance' });
     res.json({ ok: true, sent: r.sent ?? 0 });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -4317,7 +4333,7 @@ app.post('/api/debts/from-telegram', async (req, res) => {
           { text: '❌ Reject',  callback_data: `debt_reject:${data.id}` } ],
         [ { text: 'ℹ️ Ask details', callback_data: `debt_info:${data.id}` },
           { text: '🌐 Open', url: openUrl } ],
-      ]).catch(() => {});
+      ], { category: 'team_approvals' }).catch(() => {});
     }
 
     res.json({

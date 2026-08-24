@@ -334,9 +334,12 @@ test('admins: a negative member without a link is not notified', async () => {
   });
 });
 
-test('admins: a linked negative member IS notified, via the external id', async () => {
+test('owners: a linked negative member IS notified, via the external id', async () => {
+  // Was an 'admin' until financial notifications became owner-only. The property under test is
+  // the negative-id → external-id resolution, which is unchanged; only the role that may
+  // receive a financial notification changed.
   reset();
-  scenario.rows.business_members = [member(TG_USER, 'owner'), member(EMAIL_USER, 'admin')];
+  scenario.rows.business_members = [member(TG_USER, 'owner'), member(EMAIL_USER, 'owner')];
   scenario.rows.user_channel_links = [link(EMAIL_USER, EXTERNAL)];
   scenario.rows.compliance_events = [{ title: 'PPN', due_date: new Date().toISOString().slice(0, 10), business_id: BIZ }];
   await ON(async () => {
@@ -345,15 +348,31 @@ test('admins: a linked negative member IS notified, via the external id', async 
   });
 });
 
-test('admins: a resolver DB error drops the member without a raw fallback', async () => {
+test('owners: a resolver DB error drops the member without a raw fallback', async () => {
+  // Both members are owners so that the drop under test is the RESOLVER's, not the policy's.
+  // As an admin, EMAIL_USER was excluded before resolution ran and this passed vacuously.
   reset();
-  scenario.rows.business_members = [member(TG_USER, 'owner'), member(EMAIL_USER, 'admin')];
+  scenario.rows.business_members = [member(TG_USER, 'owner'), member(EMAIL_USER, 'owner')];
   scenario.rows.compliance_events = [{ title: 'PPN', due_date: new Date().toISOString().slice(0, 10), business_id: BIZ }];
   await ON(async () => {
     scenario.failTables.add('user_channel_links');
     const r = await remind(TG_USER);
     assert.strictEqual(r.status, 200, 'a notification failure must not fail the route');
     assert.deepStrictEqual(chatIdsSent(), [], 'a lookup failure still produced a send');
+  });
+});
+
+test('admins: a linked admin receives NO financial notification', async () => {
+  // The other half of the change above. Without this, the three edits could be read as quietly
+  // relaxing coverage; this states the new rule as a property in its own right.
+  reset();
+  scenario.rows.business_members = [member(TG_USER, 'owner'), member(EMAIL_USER, 'admin')];
+  scenario.rows.user_channel_links = [link(EMAIL_USER, EXTERNAL)];
+  scenario.rows.compliance_events = [{ title: 'PPN', due_date: new Date().toISOString().slice(0, 10), business_id: BIZ }];
+  await ON(async () => {
+    await remind(TG_USER);
+    assert.ok(!chatIdsSent().includes(EXTERNAL),
+      'a generic admin received a financial notification');
   });
 });
 
@@ -647,7 +666,10 @@ test('across EVERY combination, no negative or malformed chat_id ever goes on th
       for (const links of linkSets) {
         for (const failing of [false, true]) {
           reset();
-          scenario.rows.business_members = audience.map((u, i) => member(u, i === 0 ? 'owner' : 'admin', audience[0]));
+          // Every member is an owner: financial notifications are owner-only, so any other role
+          // would drop out at the policy gate and the sweep would stop covering the very ids it
+          // exists to check — negative, conflicting and legacy — ever reaching the wire.
+          scenario.rows.business_members = audience.map((u) => member(u, 'owner', audience[0]));
           scenario.rows.user_channel_links = links;
           scenario.rows.compliance_events = [{ title: 'PPN', due_date: new Date().toISOString().slice(0, 10), business_id: BIZ }];
           if (failing) scenario.failTables.add('user_channel_links');
