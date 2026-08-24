@@ -4416,6 +4416,24 @@ app.get('/api/team', auth, async (req, res) => {
 });
 
 // ── POST /api/team/invite ─────────────────────────────────────────────────────
+// When a member loses CEO/CFO eligibility — demotion, deactivation, or removal — disable ALL of
+// their enabled grants atomically, so a later re-promotion cannot silently resurrect a permission
+// only the owner should issue. This is what stops an admin (who may change roles) from indirectly
+// reactivating a stale grant: on the way out the grants are turned off, and coming back starts
+// from all-off. Gated by the flag: with grants off the table may not exist, and no grant could
+// have been created, so there is nothing to disable.
+async function disableStaleGrantsForMember({ businessId, userId, actorUserId, actorRole }) {
+  if (!isGrantsEnabled()) return { ok: true, skipped: 'flag_off' };
+  const { data, error } = await supabase.rpc('disable_member_notification_grants', {
+    p_business_id: businessId, p_user_id: userId, p_actor: actorUserId, p_actor_role: actorRole,
+  });
+  if (error || !data || typeof data.changed !== 'number') {
+    console.warn(`[grants] disable failed business=${businessId} user=${userId}: ${error?.message || 'unconfirmed'}`);
+    return { ok: false };
+  }
+  return { ok: true, changed: data.changed };
+}
+
 // ── Company Admin: notification grants (migration 046) ───────────────────────
 // Owner-only, business-scoped. An owner grants specific financial categories to a CEO/CFO of
 // the SAME business. Both endpoints are gated by COMPANY_NOTIFICATION_GRANTS_ENABLED: when the
@@ -4499,35 +4517,30 @@ app.put('/api/team/members/:memberId/notification-grants', auth, async (req, res
     if (!isGrantableRole(target.role))
       return res.status(409).json({ error: 'role_not_grantable', message: 'Only a CEO or CFO can be granted company notifications.' });
 
-    const { data: existing } = await supabase.from('business_member_notification_grants')
-      .select('category, enabled').eq('business_id', businessId).eq('user_id', target.user_id);
-    const before = Object.fromEntries((existing || []).map(r => [r.category, r.enabled === true]));
+    const before = Object.fromEntries((await supabase.from('business_member_notification_grants')
+      .select('category, enabled').eq('business_id', businessId).eq('user_id', target.user_id))
+      .data?.map(r => [r.category, r.enabled === true]) || []);
 
-    const now = new Date().toISOString();
-    const rows = entries.map(([category, enabled]) => ({
-      business_id: businessId, user_id: target.user_id, category, enabled,
-      granted_by_user_id: req.user.userId, updated_at: now,
-    }));
-    if (rows.length) {
-      const { error: uErr } = await supabase.from('business_member_notification_grants')
-        .upsert(rows, { onConflict: 'business_id,user_id,category' });
-      if (uErr) return res.status(500).json({ error: 'grant_write_failed' });
+    // Atomic: the grant change AND its audit rows commit together, or not at all. The old code
+    // upserted then audited in a second call that swallowed its error, so a permission could move
+    // with no audit trail. The RPC does both in one transaction and returns a confirming JSONB;
+    // anything else — an error, a null, a non-object — is treated as failure and claims nothing.
+    const { data: rpc, error: rpcErr } = await supabase.rpc('apply_notification_grants', {
+      p_business_id: businessId, p_user_id: target.user_id, p_granted_by: req.user.userId,
+      p_actor_role: biz.role, p_changes: Object.fromEntries(entries),
+    });
+    if (rpcErr || !rpc || typeof rpc.changed !== 'number') {
+      // Log the technical detail server-side; return a safe, detail-free error.
+      console.warn(`[grants] apply failed business=${businessId} member=${target.id}: ${rpcErr?.message || 'unconfirmed result'}`);
+      return res.status(500).json({ error: 'grant_write_failed', message: 'Could not update notification access. Please try again.' });
     }
 
-    // One audit row per category that actually changed.
-    for (const [category, enabled] of entries) {
-      if (before[category] === enabled) continue;
-      await recordAudit({
-        businessId, actorUserId: req.user.userId, actorRole: biz.role,
-        entityType: 'notification_grant', entityId: target.user_id,
-        action: enabled ? 'granted' : 'revoked',
-        before: { category, enabled: before[category] === true },
-        after: { category, enabled },
-      });
-    }
-
-    res.json({ member_id: target.id, role: target.role, granted: { ...before, ...Object.fromEntries(entries) } });
-  } catch (e) { res.status(500).json({ error: 'grants_write_failed' }); }
+    res.json({ member_id: target.id, role: target.role, changed: rpc.changed,
+      granted: { ...before, ...Object.fromEntries(entries) } });
+  } catch (e) {
+    console.warn(`[grants] write exception: ${e && e.message}`);
+    res.status(500).json({ error: 'grants_write_failed', message: 'Could not update notification access. Please try again.' });
+  }
 });
 
 // ── POST /api/team/invite ─────────────────────────────────────────────────────
@@ -4630,6 +4643,23 @@ app.patch('/api/team/members/:memberId', auth, async (req, res) => {
     if (role)   update.role   = role;
     if (status) update.status = status;
 
+    // Read the target first (scoped to this business) so we can tell whether the change removes
+    // CEO/CFO eligibility, and disable any stale grants BEFORE the role/status change commits.
+    const { data: targetRows } = await supabase.from('business_members')
+      .select('user_id, role, status').eq('id', req.params.memberId).eq('business_id', biz.business.id).limit(1);
+    const target = targetRows?.[0];
+    if (!target) return res.status(404).json({ error: 'Member not found in this business' });
+
+    const newRole = role || target.role;
+    const newStatus = status || target.status;
+    const stillEligible = newStatus === 'active' && ['ceo', 'cfo'].includes(newRole);
+    if (!stillEligible) {
+      // Losing (or never having) grant eligibility → clear grants first, fail closed if we cannot.
+      const d = await disableStaleGrantsForMember({
+        businessId: biz.business.id, userId: target.user_id, actorUserId: userId, actorRole: biz.role });
+      if (!d.ok) return res.status(500).json({ error: 'grant_cleanup_failed', message: 'Could not update the member. Please try again.' });
+    }
+
     // The target member MUST belong to the active business — never mutate a member of
     // another workspace via its id.
     const { data, error } = await supabase.from('business_members')
@@ -4662,6 +4692,12 @@ app.delete('/api/team/members/:memberId', auth, async (req, res) => {
       return res.status(400).json({ error: 'Cannot remove yourself' });
     if (target.role === 'owner')
       return res.status(403).json({ error: 'Cannot remove business owner' });
+
+    // Removal ends eligibility — disable any grants first so a re-invite starts from all-off and
+    // cannot inherit the removed member's old access. Fail closed if the cleanup cannot confirm.
+    const d = await disableStaleGrantsForMember({
+      businessId: biz.business.id, userId: target.user_id, actorUserId: userId, actorRole: biz.role });
+    if (!d.ok) return res.status(500).json({ error: 'grant_cleanup_failed', message: 'Could not remove the member. Please try again.' });
 
     await supabase.from('business_members')
       .update({ status: 'removed' })

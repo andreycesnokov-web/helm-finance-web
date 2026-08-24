@@ -25,11 +25,24 @@ async function freshDb() {
   await db.exec(`
     CREATE TABLE users (id BIGINT PRIMARY KEY);
     CREATE TABLE businesses (id uuid PRIMARY KEY, type text DEFAULT 'business');
+    CREATE TABLE business_members (
+      id BIGSERIAL PRIMARY KEY, business_id uuid, user_id BIGINT, role text, status text DEFAULT 'active');
+    CREATE TABLE audit_events (
+      id BIGSERIAL PRIMARY KEY, business_id uuid, actor_user_id BIGINT, actor_role text,
+      channel text, entity_type text, entity_id text, action text,
+      before_json jsonb, after_json jsonb, created_at timestamptz DEFAULT now());
     INSERT INTO users VALUES (${OWNER}), (${CFO}), (7700002);
-    INSERT INTO businesses VALUES ('${BIZ_A}','business'), ('${BIZ_B}','business');`);
+    INSERT INTO businesses VALUES ('${BIZ_A}','business'), ('${BIZ_B}','business');
+    INSERT INTO business_members (business_id, user_id, role, status) VALUES
+      ('${BIZ_A}', ${CFO}, 'cfo', 'active');`);
   await db.exec(SQL);
   return db;
 }
+const auditCount = async (db) =>
+  (await db.query(`SELECT count(*)::int AS n FROM audit_events WHERE entity_type = 'notification_grant'`)).rows[0].n;
+const grantEnabled = async (db, user, cat, biz = BIZ_A) =>
+  (await db.query(`SELECT enabled FROM business_member_notification_grants
+     WHERE business_id='${biz}' AND user_id=${user} AND category='${cat}'`)).rows[0]?.enabled ?? null;
 const fails = async (db, sql) => {
   try { await db.exec(sql); return null; } catch (e) { return e.message; }
 };
@@ -107,4 +120,96 @@ test('the updated_at trigger moves on UPDATE', async () => {
   await db.exec(`UPDATE business_member_notification_grants SET enabled = false WHERE user_id = ${CFO};`);
   const t1 = (await db.query('SELECT updated_at FROM business_member_notification_grants')).rows[0].updated_at;
   assert.ok(new Date(t1) >= new Date(t0), 'updated_at did not advance');
+});
+
+// ── Atomic grant change + audit (apply_notification_grants) ──────────────────
+const apply = (db, changes, { biz = BIZ_A, user = CFO, by = OWNER, role = 'owner' } = {}) =>
+  db.query(`SELECT apply_notification_grants('${biz}', ${user}, ${by}, '${role}', '${JSON.stringify(changes)}'::jsonb) AS r`);
+
+test('apply: a grant writes the row AND exactly one audit event, atomically', async () => {
+  const db = await freshDb();
+  const { rows } = await apply(db, { company_financial: true });
+  assert.strictEqual(rows[0].r.changed, 1);
+  assert.strictEqual(await grantEnabled(db, CFO, 'company_financial'), true);
+  assert.strictEqual(await auditCount(db), 1);
+});
+
+test('apply: repeating the same value is idempotent — no duplicate audit', async () => {
+  const db = await freshDb();
+  await apply(db, { company_financial: true });
+  const { rows } = await apply(db, { company_financial: true });   // same value again
+  assert.strictEqual(rows[0].r.changed, 0, 'a no-op change reported a change');
+  assert.strictEqual(await auditCount(db), 1, 'the idempotent repeat wrote a duplicate audit row');
+});
+
+test('apply: a revoke writes a revoked audit event', async () => {
+  const db = await freshDb();
+  await apply(db, { company_financial: true });
+  await apply(db, { company_financial: false });
+  assert.strictEqual(await grantEnabled(db, CFO, 'company_financial'), false);
+  const { rows } = await db.query(`SELECT action FROM audit_events WHERE entity_type='notification_grant' ORDER BY id`);
+  assert.deepStrictEqual(rows.map(r => r.action), ['granted', 'revoked']);
+});
+
+test('apply: a non-grantable target is rejected and writes nothing', async () => {
+  const db = await freshDb();
+  await db.exec(`UPDATE business_members SET role='manager' WHERE user_id=${CFO}`);   // no longer ceo/cfo
+  const err = await fails(db, `SELECT apply_notification_grants('${BIZ_A}', ${CFO}, ${OWNER}, 'owner', '{"company_financial":true}'::jsonb)`);
+  assert.ok(err && /member_not_grantable/.test(err), `expected member_not_grantable, got: ${err}`);
+  assert.strictEqual(await grantEnabled(db, CFO, 'company_financial'), null, 'a grant was written for an ineligible member');
+});
+
+test('apply: an unknown category is rejected and writes nothing', async () => {
+  const db = await freshDb();
+  const err = await fails(db, `SELECT apply_notification_grants('${BIZ_A}', ${CFO}, ${OWNER}, 'owner', '{"not_real":true}'::jsonb)`);
+  assert.ok(err && /unknown_category/.test(err), `expected unknown_category, got: ${err}`);
+  assert.strictEqual(await auditCount(db), 0);
+});
+
+test('apply: if the audit insert fails, the grant change ROLLS BACK', async () => {
+  const db = await freshDb();
+  // A trigger that rejects any audit insert simulates the audit write failing. Because the
+  // function is one transaction, the grant upsert that ran first must be undone.
+  await db.exec(`
+    CREATE FUNCTION _boom() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'audit down'; END $$;
+    CREATE TRIGGER _boom_t BEFORE INSERT ON audit_events FOR EACH ROW EXECUTE FUNCTION _boom();`);
+  const err = await fails(db, `SELECT apply_notification_grants('${BIZ_A}', ${CFO}, ${OWNER}, 'owner', '{"company_financial":true}'::jsonb)`);
+  assert.ok(err && /audit down/.test(err), `expected the audit failure to surface, got: ${err}`);
+  assert.strictEqual(await grantEnabled(db, CFO, 'company_financial'), null,
+    'the grant survived even though its audit event failed — not atomic');
+});
+
+// ── Stale-grant disable (disable_member_notification_grants) ─────────────────
+test('disable: turns off all enabled grants and audits each as auto_revoked', async () => {
+  const db = await freshDb();
+  await apply(db, { company_financial: true, tax_compliance: true });
+  const { rows } = await db.query(`SELECT disable_member_notification_grants('${BIZ_A}', ${CFO}, ${OWNER}, 'admin') AS r`);
+  assert.strictEqual(rows[0].r.changed, 2);
+  assert.strictEqual(await grantEnabled(db, CFO, 'company_financial'), false);
+  assert.strictEqual(await grantEnabled(db, CFO, 'tax_compliance'), false);
+  const { rows: a } = await db.query(`SELECT count(*)::int AS n FROM audit_events WHERE action='auto_revoked'`);
+  assert.strictEqual(a[0].n, 2);
+});
+
+test('disable: re-promotion does not restore — grants stay OFF until re-granted', async () => {
+  const db = await freshDb();
+  await apply(db, { company_financial: true });
+  await db.query(`SELECT disable_member_notification_grants('${BIZ_A}', ${CFO}, ${OWNER}, 'admin')`);
+  // Simulate a re-promotion: role is CFO again. The old row must remain disabled.
+  assert.strictEqual(await grantEnabled(db, CFO, 'company_financial'), false, 're-promotion silently restored a grant');
+});
+
+test('disable is business-scoped: business B grants are untouched', async () => {
+  const db = await freshDb();
+  await db.exec(`INSERT INTO business_members (business_id, user_id, role, status) VALUES ('${BIZ_B}', ${CFO}, 'cfo', 'active')`);
+  await apply(db, { company_financial: true }, { biz: BIZ_A });
+  await apply(db, { company_financial: true }, { biz: BIZ_B });
+  await db.query(`SELECT disable_member_notification_grants('${BIZ_A}', ${CFO}, ${OWNER}, 'admin')`);
+  assert.strictEqual(await grantEnabled(db, CFO, 'company_financial', BIZ_A), false);
+  assert.strictEqual(await grantEnabled(db, CFO, 'company_financial', BIZ_B), true, "business A's disable leaked into B");
+});
+
+test('the extended migration re-applies cleanly (functions included)', async () => {
+  const db = await freshDb();
+  assert.strictEqual(await fails(db, SQL), null, 're-applying the extended 046 failed');
 });
