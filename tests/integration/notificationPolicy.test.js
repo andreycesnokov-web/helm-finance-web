@@ -27,8 +27,9 @@ function reset() {
   scenario.rows = { business_members: [], user_channel_links: [], users: [] };
   scenario.failTables = new Set();
 }
-const member = (userId, role, status = 'active') =>
-  ({ user_id: userId, business_id: BIZ, role, status });
+const BIZ_B = '22222222-2222-2222-2222-222222222222';
+const member = (userId, role, status = 'active', businessId = BIZ) =>
+  ({ user_id: userId, business_id: businessId, role, status });
 const link = (userId, externalId, revokedAt = null) =>
   ({ channel: 'telegram', external_user_id: String(externalId), user_id: userId, revoked_at: revokedAt });
 
@@ -438,3 +439,193 @@ test('no send site interpolates a platform user id into the message body', () =>
 // Both are worth keeping as code: the first documents intent at the point of use, the second
 // avoids a pointless round trip. Neither can be pinned by a behavioural test, and writing one
 // that asserts their mere presence in the source would be testing the spelling, not the property.
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Multi-business isolation
+//
+// The bug: the resolver used to infer the business from the notifying user's FIRST active
+// membership (`.limit(1)`). A user who owns two companies would then have company B's payables
+// announced to company A's owners — non-deterministically, since no ordering was ever specified.
+// A user has many businesses; a notification belongs to exactly one. There is no safe inference.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const USER_A = -10;   // owns BOTH businesses
+const USER_B = -11;   // co-owns business B only
+const USER_C = -12;   // owns business A only
+
+function twoBusinesses(order = 'a-first') {
+  reset();
+  const rows = [
+    member(USER_A, 'owner', 'active', BIZ),      // business A
+    member(USER_A, 'owner', 'active', BIZ_B),    // business B
+    member(USER_B, 'owner', 'active', BIZ_B),
+    member(USER_C, 'owner', 'active', BIZ),
+  ];
+  scenario.rows.business_members = order === 'a-first' ? rows : rows.slice().reverse();
+}
+
+test('a business B notification reaches only business B owners', async () => {
+  twoBusinesses();
+  const r = await P.resolveNotificationAudience({ supabase, category: 'company_financial', businessId: BIZ_B });
+  assert.deepStrictEqual(r.userIds.slice().sort((x, y) => x - y), [USER_B, USER_A].sort((x, y) => x - y));
+  assert.ok(!r.userIds.includes(USER_C), 'an owner of a different business received it');
+});
+
+test('an owner of another business never receives', async () => {
+  twoBusinesses();
+  const r = await P.resolveNotificationAudience({ supabase, category: 'company_financial', businessId: BIZ });
+  assert.ok(r.userIds.includes(USER_C), 'the business A owner should receive their own notification');
+  assert.ok(!r.userIds.includes(USER_B), 'a business B-only owner received a business A notification');
+});
+
+test('membership ORDER cannot change the result', async () => {
+  // The old inference depended on which row came back first. If any ordering dependence
+  // survives, these two must disagree.
+  twoBusinesses('a-first');
+  const first = (await P.resolveNotificationAudience({ supabase, category: 'company_financial', businessId: BIZ_B })).userIds.slice().sort();
+  twoBusinesses('b-first');
+  const second = (await P.resolveNotificationAudience({ supabase, category: 'company_financial', businessId: BIZ_B })).userIds.slice().sort();
+  assert.deepStrictEqual(first, second, 'the recipient set depends on membership order');
+});
+
+test('a user who owns two businesses is not a bridge between them', async () => {
+  // USER_A is the only overlap. Each notification must reach them once, in the right context,
+  // and must not drag the other company's owners along.
+  twoBusinesses();
+  const a = await P.resolveNotificationAudience({ supabase, category: 'company_financial', businessId: BIZ });
+  const b = await P.resolveNotificationAudience({ supabase, category: 'company_financial', businessId: BIZ_B });
+  assert.strictEqual(a.userIds.filter((u) => u === USER_A).length, 1, 'duplicated across their memberships');
+  assert.strictEqual(b.userIds.filter((u) => u === USER_A).length, 1, 'duplicated across their memberships');
+  assert.deepStrictEqual(a.userIds.filter((u) => u === USER_B), [], 'business B owner leaked into A');
+  assert.deepStrictEqual(b.userIds.filter((u) => u === USER_C), [], 'business A owner leaked into B');
+});
+
+test('a missing businessId sends to NOBODY for every business-scoped category', async () => {
+  twoBusinesses();
+  for (const c of P.CATEGORIES) {
+    if (P.CATEGORY_POLICY[c].scope !== 'business') continue;
+    for (const bad of [undefined, null, '', '   ', 0, false, {}, []]) {
+      const r = await P.resolveNotificationAudience({ supabase, category: c, businessId: bad });
+      assert.deepStrictEqual(r.userIds, [], `${c} with businessId ${JSON.stringify(bad)} reached someone`);
+      assert.ok(r.dropped.some((d) => d.reason === 'missing_business_id'),
+        `${c} did not report missing_business_id`);
+    }
+  }
+});
+
+test('the resolver no longer accepts an owner id as a business hint', async () => {
+  // The old signature took ownerUserId and inferred from it. Passing one now must change
+  // nothing: a business-scoped call without businessId reaches nobody, whatever else is passed.
+  twoBusinesses();
+  const r = await P.resolveNotificationAudience({
+    supabase, category: 'company_financial', ownerUserId: USER_A, businessId: null,
+  });
+  assert.deepStrictEqual(r.userIds, []);
+  assert.ok(r.dropped.some((d) => d.reason === 'missing_business_id'));
+});
+
+test('a row for another business is rejected even if the query returns it', async () => {
+  // Defence in depth: if the business_id filter were ever dropped from the query, the returned
+  // rows are still checked. The cost of that filter silently disappearing is a cross-tenant
+  // disclosure, so it is verified on the way out as well as constrained on the way in.
+  const leaky = { from: () => ({
+    select: () => ({ eq: () => ({ eq: () => ({ in: () => Promise.resolve({
+      data: [
+        { user_id: USER_B, role: 'owner', status: 'active', business_id: BIZ_B },
+        { user_id: USER_C, role: 'owner', status: 'active', business_id: BIZ },
+      ], error: null }) }) }) }),
+  }) };
+  const r = await P.resolveNotificationAudience({ supabase: leaky, category: 'company_financial', businessId: BIZ_B });
+  assert.deepStrictEqual(r.userIds, [USER_B], 'a row from another business was accepted verbatim');
+});
+
+test('the membership query is scoped to the exact business', async () => {
+  const seen = [];
+  // The fake ignores projection, so the SELECT is captured explicitly. Dropping business_id from
+  // it would leave the row re-check comparing against undefined — which fails closed rather than
+  // leaking, but silently kills every business notification, and no fake row can reveal that.
+  let selected = null;
+  const recording = { from: () => {
+    const f = [];
+    const q = {
+      select: (cols) => { selected = cols; return q; },
+      eq: (c, v) => { f.push([c, v]); return q; },
+      in: (c, v) => { f.push([c, v]); return q; },
+      limit: () => { f.push(['limit', true]); return q; },
+      then: (res) => { seen.push(f); return Promise.resolve({ data: [], error: null }).then(res); },
+    };
+    return q;
+  } };
+  await P.resolveNotificationAudience({ supabase: recording, category: 'company_financial', businessId: BIZ_B });
+  assert.strictEqual(seen.length, 1, 'expected exactly one membership query');
+  const filters = Object.fromEntries(seen[0]);
+  assert.strictEqual(filters.business_id, BIZ_B, 'the query is not scoped to the requested business');
+  assert.strictEqual(filters.status, 'active');
+  assert.deepStrictEqual(filters.role, ['owner']);
+  assert.ok(!('limit' in filters), 'a .limit() narrowing is back in the membership query');
+  assert.match(String(selected), /business_id/,
+    'business_id is not selected, so the row re-check compares against undefined');
+});
+
+test('isolation holds through channel resolution, with de-duplication', async () => {
+  // Both gates composed: two business B owners sharing one Telegram account are messaged once,
+  // and the business A owner's link is never resolved at all.
+  twoBusinesses();
+  scenario.rows.user_channel_links = [
+    link(USER_A, EXTERNAL), link(USER_B, EXTERNAL), link(USER_C, '999000111'),
+  ];
+  const a = await P.resolveNotificationAudience({ supabase, category: 'company_financial', businessId: BIZ_B });
+  const d = await deliverable(a.userIds);
+  assert.deepStrictEqual(d.chatIds, [EXTERNAL], 'the shared account was messaged more than once');
+  assert.ok(!d.chatIds.includes('999000111'), "the other business's owner was reached");
+});
+
+test('isolation holds when the business B owner has a revoked link', async () => {
+  twoBusinesses();
+  scenario.rows.user_channel_links = [
+    link(USER_B, EXTERNAL, '2026-01-01T00:00:00Z'),
+    link(USER_C, '999000111'),
+  ];
+  const a = await P.resolveNotificationAudience({ supabase, category: 'company_financial', businessId: BIZ_B });
+  assert.ok(a.userIds.includes(USER_B), 'policy should still allow them');
+  const d = await deliverable(a.userIds);
+  assert.deepStrictEqual(d.chatIds, [], 'a revoked link was delivered to, or another business leaked in');
+});
+
+test('removed and inactive members of the target business still receive nothing', async () => {
+  reset();
+  scenario.rows.business_members = [
+    member(USER_B, 'owner', 'removed', BIZ_B),
+    member(USER_A, 'owner', 'inactive', BIZ_B),
+    member(USER_C, 'owner', 'active', BIZ),
+  ];
+  const r = await P.resolveNotificationAudience({ supabase, category: 'company_financial', businessId: BIZ_B });
+  assert.deepStrictEqual(r.userIds, []);
+});
+
+test('every business-scoped send site passes a businessId', () => {
+  const fsx = require('node:fs');
+  const pathx = require('node:path');
+  const SRC = fsx.readFileSync(pathx.join(__dirname, '../../server/index.js'), 'utf8').split('\r\n').join('\n');
+  const calls = [...SRC.matchAll(/notifyBusinessAdminsViaTelegram\(/g)]
+    .map((m) => SRC.slice(m.index, m.index + 1200))
+    .filter((c) => !c.startsWith('notifyBusinessAdminsViaTelegram(ownerUserId, text, buttons')
+                && !c.startsWith('notifyBusinessAdminsViaTelegram()'));
+  assert.strictEqual(calls.length, 5, `expected 5 call sites, found ${calls.length}`);
+  for (const call of calls) {
+    assert.match(call, /category: '[a-z_]+'/, 'a send site names no category');
+    assert.match(call, /businessId:/, `a send site passes no businessId:\n${call.slice(0, 200)}`);
+  }
+});
+
+test('the transport does not hand ownerUserId to the resolver as a business hint', () => {
+  const fsx = require('node:fs');
+  const pathx = require('node:path');
+  const SRC = fsx.readFileSync(pathx.join(__dirname, '../../server/index.js'), 'utf8').split('\r\n').join('\n');
+  const a = SRC.indexOf('async function notifyBusinessAdminsViaTelegram');
+  const b = SRC.indexOf('\nasync function', a + 10);
+  const fn = SRC.slice(a, b);
+  const call = fn.slice(fn.indexOf('resolveNotificationAudience'), fn.indexOf('});', fn.indexOf('resolveNotificationAudience')));
+  assert.ok(!/\bownerUserId\b/.test(call), 'ownerUserId is passed into recipient resolution again');
+  assert.match(call, /businessId/, 'the transport does not pass a businessId');
+});

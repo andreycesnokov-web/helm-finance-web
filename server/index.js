@@ -1373,8 +1373,12 @@ function normalizeChannel(ch) {
 // function used to hold the role list ['owner','ceo','admin','cfo'] inline, which made every
 // caller's audience a side effect of a literal buried in the send path.
 //
-// `category` is required. A missing or unrecognised one resolves to NOBODY rather than to a
-// default audience — see resolveNotificationAudience.
+// `category` and `businessId` are both required. A missing or unrecognised category resolves
+// to NOBODY, and so does a missing businessId — see resolveNotificationAudience.
+//
+// `ownerUserId` is retained for the call-site shape and for log context ONLY. It must never be
+// used to find the business again: that inference is what let a company B notification reach
+// company A recipients.
 async function notifyBusinessAdminsViaTelegram(ownerUserId, text, buttons = [], {
   category = null, businessId = null, preferences = null, excludeUserIds = [],
   allowLegacy = true,
@@ -1384,7 +1388,7 @@ async function notifyBusinessAdminsViaTelegram(ownerUserId, text, buttons = [], 
   try {
     // Gate 1 — permission and preference. Platform user ids only.
     const audience = await resolveNotificationAudience({
-      supabase, category, businessId, ownerUserId, preferences, excludeUserIds,
+      supabase, category, businessId, preferences, excludeUserIds,
     });
     if (!audience.userIds.length) return { sent: 0, dropped: audience.dropped };
 
@@ -2125,7 +2129,9 @@ app.post('/api/telegram/debts/attach-receipt', async (req, res) => {
     notifyBusinessAdminsViaTelegram(ownerId,
       `📎 Чек получен (${attachments.length}/${MAX_RECEIPTS}) по заявке\n\nОт: ${name}\n${lines}\n\nИтого по чекам: <b>${receiptsTotal.toLocaleString('en-US')} ${ccy}</b>`,
       [[{ text: '🌐 Открыть заявку', url: `${webAppUrl}/${debt.type === 'receivable' ? 'receivables' : 'payables'}` }]],
-      { category: 'payables_receivables' },
+      // The debt's own business, never the notifier's. A legacy row with a null business_id
+      // resolves to no recipients rather than to a guess.
+      { category: 'payables_receivables', businessId: data.business_id || debt.business_id || null },
     ).catch(() => {});
 
     res.json({ ok: true, debt_id: data.id, counterparty: data.counterparty, count: attachments.length, receipts_total: receiptsTotal, recognized: !!ocr, item_amount: item.amount });
@@ -2225,7 +2231,7 @@ app.post('/api/telegram/debts/from-receipt', async (req, res) => {
         [ { text: '📊 View impact', callback_data: `debt_impact:${data.id}` } ],
         [ { text: '✅ Approve', callback_data: `debt_approve:${data.id}` }, { text: '❌ Reject', callback_data: `debt_reject:${data.id}` } ],
         [ { text: 'ℹ️ Ask details', callback_data: `debt_info:${data.id}` }, { text: '🌐 Open', url: `${webAppUrl}/payables` } ],
-      ], { category: 'team_approvals' }).catch(() => {});
+      ], { category: 'team_approvals', businessId: m.businessId || null }).catch(() => {});
     }
 
     res.json({ ok: true, action: 'created', kind: isReimbursement ? 'expense_request' : 'payable', debt_id: data.id, amount: amountNum, counterparty: data.counterparty, needs_approval: !m.isPrivileged, currency: ccy });
@@ -2881,7 +2887,7 @@ app.post('/api/accountant/telegram/test', auth, async (req, res) => {
     const language = normalizeLanguage(await getUserLanguage(req.user.userId));
     const fn = TAX_TG_TEMPLATES[tpl][language] || TAX_TG_TEMPLATES[tpl].en;
     const r = await notifyBusinessAdminsViaTelegram(biz.ownerUserId, fn(req.body?.detail || ''), taxTgButtons(language),
-      { category: 'tax_compliance' });
+      { category: 'tax_compliance', businessId: biz.business?.id || null });
     res.json({ ok: true, sent: r.sent ?? 0, template: tpl });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -2903,7 +2909,7 @@ app.post('/api/accountant/calendar/remind', auth, async (req, res) => {
     const overdue = soon.filter(e => new Date(e.due_date) < today).length;
     const fn = COMPLIANCE_REMINDER[language] || COMPLIANCE_REMINDER.en;
     const r = await notifyBusinessAdminsViaTelegram(biz.ownerUserId, fn(lines, overdue || null), [],
-      { category: 'tax_compliance' });
+      { category: 'tax_compliance', businessId: biz.business?.id || null });
     res.json({ ok: true, sent: r.sent ?? 0 });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -4333,7 +4339,7 @@ app.post('/api/debts/from-telegram', async (req, res) => {
           { text: '❌ Reject',  callback_data: `debt_reject:${data.id}` } ],
         [ { text: 'ℹ️ Ask details', callback_data: `debt_info:${data.id}` },
           { text: '🌐 Open', url: openUrl } ],
-      ], { category: 'team_approvals' }).catch(() => {});
+      ], { category: 'team_approvals', businessId: targetBusinessId || null }).catch(() => {});
     }
 
     res.json({

@@ -125,6 +125,9 @@ function unavailableReason(category) {
 /**
  * Resolve who may receive this notification.
  *
+ * `businessId` is REQUIRED for business-scoped categories and is never inferred. `ownerUserId`
+ * is diagnostic only — it does not select recipients and must not be used to find a business.
+ *
  * @returns {Promise<{userIds:number[], dropped:{userId:(number|null),reason:string}[],
  *                    category:(string|null), scope:(string|null)}>}
  *
@@ -135,7 +138,6 @@ async function resolveNotificationAudience({
   supabase,
   category,
   businessId = null,
-  ownerUserId = null,
   subjectUserIds = [],
   excludeUserIds = [],
   preferences = null,
@@ -165,33 +167,23 @@ async function resolveNotificationAudience({
     // narrow the caller's list — it cannot discover additional recipients.
     candidates = (Array.isArray(subjectUserIds) ? subjectUserIds : []);
   } else {
-    let bizId = businessId;
-
-    // Legacy call sites know the owner, not the business. Derive it the same way the old send
-    // function did, so business resolution is unchanged; only the ROLE filter below tightens.
+    // The business must be NAMED by the event. It used to be inferred from the notifying
+    // user's first active membership (`.limit(1)`), which is wrong the moment anyone owns two
+    // companies: a payable in company B would be announced to whoever happened to come first,
+    // and that could be company A. Ordering was never specified, so the leak was not even
+    // deterministic. There is no safe inference here — a user has many businesses and a
+    // notification belongs to exactly one, so a missing id is a bug in the caller, not a gap
+    // for this resolver to paper over.
+    const bizId = typeof businessId === 'string' ? businessId.trim() : '';
     if (!bizId) {
-      const ownerId = normalizeUserId(ownerUserId);
-      if (ownerId === null) {
-        drop(null, 'no_business_context');
-        return { userIds: [], dropped, category, scope: policy.scope };
-      }
-      let mem;
-      try {
-        mem = await supabase.from('business_members')
-          .select('business_id').eq('user_id', ownerId).eq('status', 'active').limit(1);
-      } catch (e) {
-        drop(ownerId, 'membership_lookup_failed');
-        return { userIds: [], dropped, category, scope: policy.scope };
-      }
-      if (mem?.error) { drop(ownerId, 'membership_lookup_failed'); return { userIds: [], dropped, category, scope: policy.scope }; }
-      if (!mem?.data?.length) { drop(ownerId, 'no_active_membership'); return { userIds: [], dropped, category, scope: policy.scope }; }
-      bizId = mem.data[0].business_id;
+      drop(null, 'missing_business_id');
+      return { userIds: [], dropped, category, scope: policy.scope };
     }
 
     let members;
     try {
       members = await supabase.from('business_members')
-        .select('user_id, role, status')
+        .select('user_id, role, status, business_id')
         .eq('business_id', bizId)
         .eq('status', 'active')          // removed or inactive members receive nothing
         .in('role', policy.roles);
@@ -204,10 +196,15 @@ async function resolveNotificationAudience({
       drop(null, 'membership_lookup_failed');
       return { userIds: [], dropped, category, scope: policy.scope };
     }
-    // Re-check role and status on the returned rows rather than trusting the query shape. A
-    // filter that silently stops being applied is exactly the kind of change this guards.
+    // Re-check business, role and status on the returned rows rather than trusting the query
+    // shape. A filter that silently stops being applied is exactly the kind of change this
+    // guards — and for business_id the cost of that change is a cross-tenant disclosure, so it
+    // is verified on the way out as well as constrained on the way in.
     candidates = (members?.data || [])
-      .filter((m) => m && m.status === 'active' && policy.roles.includes(m.role))
+      .filter((m) => m
+        && String(m.business_id) === String(bizId)
+        && m.status === 'active'
+        && policy.roles.includes(m.role))
       .map((m) => m.user_id);
   }
 
