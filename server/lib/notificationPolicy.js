@@ -43,6 +43,40 @@ const CATEGORIES = Object.freeze([
 // by a role name. `ceo` and `cfo` are excluded on the same reasoning for MVP.
 const OWNER_ONLY = Object.freeze(['owner']);
 
+// Company-admin grants (Company Admin Notification Grants, migration 046). An owner may hand
+// specific financial categories to a CEO or CFO — and ONLY a CEO or CFO. Admin, manager and
+// employee are not grantable in this phase: widening those would re-open the "an operational
+// role silently sees company cash" hole the owner-only posture closed.
+//
+// A grant is not a role. It never bypasses role validation: eligibility is always the member's
+// CURRENT active role AND an explicit grant, checked together. So a grant row for a manager, or
+// a stale grant for someone who used to be CFO and is now a manager, is inert — the role no
+// longer matches, and no amount of forged grant data changes that.
+const GRANTABLE_ROLES = Object.freeze(['ceo', 'cfo']);
+
+function isGrantableRole(role) { return GRANTABLE_ROLES.includes(role); }
+// GRANTABLE_CATEGORIES and isGrantableCategory are defined just after CATEGORY_POLICY below,
+// because they read from it.
+
+/**
+ * Does an explicit grant let this user receive this category?
+ *
+ * Default is FALSE — the exact opposite of preferences. A CEO/CFO receives a financial category
+ * only when a row explicitly says so; absent map, absent user, absent category, or anything that
+ * is not strictly `true` all mean "not granted". A half-written or truthy-but-not-true value must
+ * never be read as a grant, because the failure mode here is disclosure.
+ *
+ * @param {object|null} grants  { [userId]: { [category]: boolean } }, already scoped to ONE
+ *        business by the loader. Passing grants from another business would be a bug in the
+ *        caller; the resolver additionally re-checks the member's business_id regardless.
+ */
+function grantEnabled(grants, userId, category) {
+  if (!grants || typeof grants !== 'object') return false;
+  const forUser = grants[userId] ?? grants[String(userId)];
+  if (!forUser || typeof forUser !== 'object') return false;
+  return forUser[category] === true;
+}
+
 // `scope` decides WHERE recipients come from, and the two are mutually exclusive:
 //   'business' — derived from active membership of the business. The caller cannot name them.
 //   'subject'  — supplied by the caller (the actor, the subject, the assignee). No role widening
@@ -57,6 +91,17 @@ const CATEGORY_POLICY = Object.freeze({
   own_request_status:   { scope: 'subject',  roles: null,       financial: false },
   system_identity:      { scope: 'subject',  roles: null,       financial: false },
 });
+
+// The categories an owner may grant — exactly the business-scoped (financial) ones. Subject
+// categories are per-person by nature and have nothing to grant. Defined here (after
+// CATEGORY_POLICY) because it reads from it.
+const GRANTABLE_CATEGORIES = Object.freeze(
+  CATEGORIES.filter((c) => CATEGORY_POLICY[c].scope === 'business'),
+);
+
+function isGrantableCategory(category) {
+  return typeof category === 'string' && GRANTABLE_CATEGORIES.includes(category);
+}
 
 /**
  * Unknown categories send to NOBODY.
@@ -110,7 +155,10 @@ function categoriesForRole(role) {
   return CATEGORIES.filter((c) => {
     const p = CATEGORY_POLICY[c];
     if (p.scope === 'subject') return true;          // everyone gets their own request updates
-    return p.roles.includes(role);
+    if (p.roles.includes(role)) return true;         // owner: baseline
+    // CEO/CFO can receive a business category, but only once explicitly granted. The UI renders
+    // these as toggles (off by default); every other role renders them disabled with a reason.
+    return isGrantableRole(role) && p.scope === 'business';
   });
 }
 
@@ -141,6 +189,7 @@ async function resolveNotificationAudience({
   subjectUserIds = [],
   excludeUserIds = [],
   preferences = null,
+  grants = null,
 } = {}) {
   const dropped = [];
   const drop = (userId, reason) => {
@@ -180,13 +229,20 @@ async function resolveNotificationAudience({
       return { userIds: [], dropped, category, scope: policy.scope };
     }
 
+    // Grants only ever ADD to the owner baseline, and only for grantable (business) categories.
+    // When `grants` is null — the backend flag is off, or the load failed — nobody but the owner
+    // is eligible, so behaviour is exactly what it was before grants existed. "Grant lookup
+    // failed" resolves to owner-only, never to a wider set: a failure is not a grant.
+    const grantsActive = grants && isGrantableCategory(category);
+    const queryRoles = grantsActive ? [...policy.roles, ...GRANTABLE_ROLES] : policy.roles;
+
     let members;
     try {
       members = await supabase.from('business_members')
         .select('user_id, role, status, business_id')
         .eq('business_id', bizId)
         .eq('status', 'active')          // removed or inactive members receive nothing
-        .in('role', policy.roles);
+        .in('role', queryRoles);
     } catch (e) {
       // Fail closed. "We could not read the members table" is not a reason to notify anyone.
       drop(null, 'membership_lookup_failed');
@@ -200,11 +256,19 @@ async function resolveNotificationAudience({
     // shape. A filter that silently stops being applied is exactly the kind of change this
     // guards — and for business_id the cost of that change is a cross-tenant disclosure, so it
     // is verified on the way out as well as constrained on the way in.
+    //
+    // Eligibility per row: an owner is always in; a CEO/CFO is in only when grantsActive AND an
+    // explicit grant names them for THIS category. The role is read from the live membership
+    // row, so a forged or stale grant cannot promote anyone — the role check runs first and the
+    // grant only qualifies a role that is already CEO/CFO right now.
     candidates = (members?.data || [])
-      .filter((m) => m
-        && String(m.business_id) === String(bizId)
-        && m.status === 'active'
-        && policy.roles.includes(m.role))
+      .filter((m) => {
+        if (!m || String(m.business_id) !== String(bizId) || m.status !== 'active') return false;
+        if (policy.roles.includes(m.role)) return true;                       // owner baseline
+        if (grantsActive && isGrantableRole(m.role) && grantEnabled(grants, m.user_id, category)) return true;
+        if (isGrantableRole(m.role)) drop(m.user_id, 'no_grant');             // eligible role, not granted
+        return false;
+      })
       .map((m) => m.user_id);
   }
 
@@ -226,9 +290,14 @@ async function resolveNotificationAudience({
 module.exports = {
   CATEGORIES,
   CATEGORY_POLICY,
+  GRANTABLE_ROLES,
+  GRANTABLE_CATEGORIES,
   categoryPolicy,
   isKnownCategory,
+  isGrantableRole,
+  isGrantableCategory,
   preferenceEnabled,
+  grantEnabled,
   categoriesForRole,
   unavailableReason,
   resolveNotificationAudience,

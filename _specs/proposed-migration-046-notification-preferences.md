@@ -1,16 +1,58 @@
-# Proposed migration 046 — notification preferences
+# 046 — company-admin notification grants (BUILT) · notification preferences (deferred)
 
-**Status: PROPOSAL. Not written, not applied.** The task said to stop and propose before adding
-schema, so this is the proposal. No file exists in `migrations/`.
+**This document once conflated two different features under one migration number. They are now
+separated.** The distinction is the whole point, so it is stated up front:
 
-## Why a table is needed at all
+| | who decides | direction | default | migration |
+| --- | --- | --- | --- | --- |
+| **Grants** (this PR) | the **owner**, for a CEO/CFO | opt-**in** — adds a recipient | **off** (nobody) | **046, written** |
+| **Preferences** (later) | the **user**, for themselves | opt-**out** — removes themselves | **on** | later, deferred |
 
-The policy layer (`server/lib/notificationPolicy.js`) is finished and tested without it: it takes
-preferences as an argument and defaults every category to ON. That is deliberate — the permission
-half of the system is useful on its own, and it ships in this PR with nothing to migrate.
+They must never share a table. A grant is one person deciding what *another* person may receive;
+a preference is a person muting *their own* alerts. Storing them together would make "who turned
+this off, the owner or the member?" unanswerable — and the answer changes whether re-enabling is a
+security decision or a personal one.
 
-What is missing is only **persistence**. Today a user cannot turn a category off, because there is
-nowhere to record that they did.
+## Part 1 — company-admin notification grants (migration 046, CREATED)
+
+**Status: WRITTEN as `migrations/046_company_notification_grants.sql`. NOT applied to production.**
+
+Table `business_member_notification_grants`: an owner grants specific financial categories to a
+CEO or CFO of the same business. Additive, idempotent, starts empty, no backfill, backend-only
+privileges (`REVOKE … FROM PUBLIC/anon/authenticated`, `GRANT` to `service_role`) matching 045.
+
+Key decisions, and why:
+
+- **`business_id NOT NULL`, no global grants.** A grant always names its business. There is no
+  "grant everywhere" — that would be a cross-tenant hole by construction. This also side-steps the
+  nullable-primary-key defect that sank the first preferences draft (see Part 2): with a natural
+  `NOT NULL` scope the surrogate key is a convenience, not a necessity.
+- **Unique `(business_id, user_id, category)`.** One row per grant; toggling UPSERTs it.
+- **No role or Telegram id stored.** Role lives in `business_members` and is read fresh at send
+  time, so a demotion makes a grant inert with no row to clean up. Telegram identity lives in
+  `user_channel_links` (045). Copying either here would be a second source of truth that drifts —
+  the exact failure the identity PRs spent months removing.
+- **`enabled BOOLEAN NOT NULL`** rather than presence-means-granted: an explicit `false` row
+  records a deliberate revoke and gives the audit trail a real before/after.
+- **`granted_by_user_id`** records who granted, for the audit trail; `ON DELETE SET NULL` so a
+  departed owner does not cascade-delete live grants.
+
+The resolver reads these as a widening of the owner-only baseline and re-checks the member's live
+role and business, so a forged or stale grant row cannot promote anyone. Default-off: the grant
+map defaults every category to **false**, the mirror of the preference map's **true**.
+
+## Part 2 — user self-service preferences (DEFERRED, not written)
+
+**Status: PROPOSAL only. No migration file. This is a LATER task, not part of this PR.**
+
+This is the opt-out half: a user muting their own categories. It is independent of grants and
+should ship on its own, with its own migration number when it comes.
+
+## Why a preferences table is needed (deferred)
+
+The policy layer (`server/lib/notificationPolicy.js`) takes preferences as an argument and defaults
+every category to ON. What is missing is only **persistence**. Today a user cannot turn a category
+off, because there is nowhere to record that they did.
 
 ## Shape
 
@@ -24,7 +66,7 @@ global case was unrepresentable — the schema contradicted the feature it exist
 ### Option A — surrogate key plus two partial unique indexes (recommended)
 
 ```sql
--- Migration 046 — notification preferences (PROPOSED, NOT APPLIED)
+-- Migration 04X — user notification preferences (DEFERRED, later task, NOT written)
 CREATE TABLE IF NOT EXISTS user_notification_preferences (
   id          BIGSERIAL   PRIMARY KEY,
   user_id     BIGINT      NOT NULL REFERENCES users(id) ON DELETE CASCADE,

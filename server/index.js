@@ -24,7 +24,11 @@ const { resolveTelegramActiveWorkspace, setTelegramActiveWorkspace } = require('
 // PR2.6: outbound Telegram recipients. A platform user id is NOT a chat id — migration 042
 // gave email-origin accounts negative ids, and Telegram reads a negative chat_id as a GROUP.
 const { resolveTelegramNotificationRecipients, resolveSingleTelegramRecipient, isSendableChatId } = require('./lib/telegramNotifications');
-const { resolveNotificationAudience } = require('./lib/notificationPolicy');
+const {
+  resolveNotificationAudience, isGrantableCategory, isGrantableRole,
+  GRANTABLE_CATEGORIES, categoriesForRole,
+} = require('./lib/notificationPolicy');
+const { loadBusinessGrants, isGrantsEnabled } = require('./lib/notificationGrants');
 // PR4a: connecting and disconnecting a Telegram account. Identity only — a link grants no
 // access of any kind, and membership stays entirely in business_members.
 const telegramLink = require('./lib/telegramLink');
@@ -1387,8 +1391,12 @@ async function notifyBusinessAdminsViaTelegram(ownerUserId, text, buttons = [], 
   if (!botToken) return { sent: 0, skipped: 'no_bot_token' };
   try {
     // Gate 1 — permission and preference. Platform user ids only.
+    // Company-admin grants: load the enabled grants for THIS business when the flag is on.
+    // Returns null when the flag is off or the load fails, and the resolver reads null as
+    // owner-only — so a grant lookup failure narrows to the owner, it never adds a CEO/CFO.
+    const grants = await loadBusinessGrants({ supabase, businessId });
     const audience = await resolveNotificationAudience({
-      supabase, category, businessId, preferences, excludeUserIds,
+      supabase, category, businessId, preferences, excludeUserIds, grants,
     });
     if (!audience.userIds.length) return { sent: 0, dropped: audience.dropped };
 
@@ -4405,6 +4413,121 @@ app.get('/api/team', auth, async (req, res) => {
 
     res.json({ members: enriched, invites: invites || [], my_role: myRole, business_id });
   } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── POST /api/team/invite ─────────────────────────────────────────────────────
+// ── Company Admin: notification grants (migration 046) ───────────────────────
+// Owner-only, business-scoped. An owner grants specific financial categories to a CEO/CFO of
+// the SAME business. Both endpoints are gated by COMPANY_NOTIFICATION_GRANTS_ENABLED: when the
+// flag is off the feature does not exist, and they answer 404 so a stray client sees exactly
+// what production sees — nothing. business_id NEVER comes from the request; it is the active
+// workspace, resolved the same way Team is.
+
+// GET /api/team/notification-grants — the grant matrix for the active business.
+app.get('/api/team/notification-grants', auth, async (req, res) => {
+  try {
+    if (!isGrantsEnabled()) return res.status(404).json({ error: 'not_found' });
+    const biz = await requireBusiness(req, res); if (!biz) return;
+    if (biz.role !== 'owner')
+      return res.status(403).json({ error: 'forbidden', message: 'Only the owner can manage notification access.' });
+
+    const businessId = biz.business.id;
+    const { data: members, error: mErr } = await supabase.from('business_members')
+      .select('id, user_id, role, status, display_name')
+      .eq('business_id', businessId)
+      .eq('status', 'active')
+      .order('joined_at', { ascending: true });
+    if (mErr) return res.status(500).json({ error: 'team_lookup_failed' });
+
+    const grantsMap = await loadBusinessGrants({ supabase, businessId }) || {};
+    const { data: users } = await supabase.from('users')
+      .select('id, first_name, username').in('id', (members || []).map(m => m.user_id));
+    const nameOf = Object.fromEntries((users || []).map(u => [u.id, u.first_name || u.username]));
+
+    // Key rows by the opaque member id the Team page already uses; describe eligibility rather
+    // than leaking user_id.
+    const rows = (members || []).map(m => ({
+      member_id: m.id,
+      name: m.display_name || nameOf[m.user_id] || 'Member',
+      role: m.role,
+      is_owner: m.role === 'owner',
+      grantable: isGrantableRole(m.role),
+      granted: isGrantableRole(m.role)
+        ? Object.fromEntries(GRANTABLE_CATEGORIES.map(c => [c, (grantsMap[m.user_id] || {})[c] === true]))
+        : {},
+    }));
+    res.json({ business_id: businessId, categories: GRANTABLE_CATEGORIES, members: rows });
+  } catch (e) { res.status(500).json({ error: 'grants_read_failed' }); }
+});
+
+// PUT /api/team/members/:memberId/notification-grants — set a member's grants.
+// Body: { grants: { <category>: boolean, … } }. Omitted categories are left unchanged; false
+// revokes.
+app.put('/api/team/members/:memberId/notification-grants', auth, async (req, res) => {
+  try {
+    if (!isGrantsEnabled()) return res.status(404).json({ error: 'not_found' });
+    const biz = await requireBusiness(req, res); if (!biz) return;
+    if (biz.role !== 'owner')
+      return res.status(403).json({ error: 'forbidden', message: 'Only the owner can manage notification access.' });
+
+    const businessId = biz.business.id;
+    const body = req.body?.grants;
+    if (!body || typeof body !== 'object' || Array.isArray(body))
+      return res.status(400).json({ error: 'invalid_grants', message: 'Expected a grants object.' });
+
+    // Validate every category BEFORE touching the database. An unknown category is a 400, not a
+    // silently ignored key.
+    const entries = Object.entries(body);
+    for (const [category, value] of entries) {
+      if (!isGrantableCategory(category))
+        return res.status(400).json({ error: 'unknown_category', message: 'That notification category cannot be granted.' });
+      if (typeof value !== 'boolean')
+        return res.status(400).json({ error: 'invalid_value', message: 'Each grant must be true or false.' });
+    }
+
+    // The target member must belong to the ACTIVE business — resolved by member id scoped to
+    // this business, never by any id from the body.
+    const { data: target, error: tErr } = await supabase.from('business_members')
+      .select('id, user_id, role, status')
+      .eq('id', req.params.memberId)
+      .eq('business_id', businessId)
+      .maybeSingle();
+    if (tErr) return res.status(500).json({ error: 'member_lookup_failed' });
+    if (!target) return res.status(404).json({ error: 'member_not_found', message: 'No such member in this business.' });
+    if (target.status !== 'active')
+      return res.status(409).json({ error: 'member_inactive', message: 'That member is not active.' });
+    if (!isGrantableRole(target.role))
+      return res.status(409).json({ error: 'role_not_grantable', message: 'Only a CEO or CFO can be granted company notifications.' });
+
+    const { data: existing } = await supabase.from('business_member_notification_grants')
+      .select('category, enabled').eq('business_id', businessId).eq('user_id', target.user_id);
+    const before = Object.fromEntries((existing || []).map(r => [r.category, r.enabled === true]));
+
+    const now = new Date().toISOString();
+    const rows = entries.map(([category, enabled]) => ({
+      business_id: businessId, user_id: target.user_id, category, enabled,
+      granted_by_user_id: req.user.userId, updated_at: now,
+    }));
+    if (rows.length) {
+      const { error: uErr } = await supabase.from('business_member_notification_grants')
+        .upsert(rows, { onConflict: 'business_id,user_id,category' });
+      if (uErr) return res.status(500).json({ error: 'grant_write_failed' });
+    }
+
+    // One audit row per category that actually changed.
+    for (const [category, enabled] of entries) {
+      if (before[category] === enabled) continue;
+      await recordAudit({
+        businessId, actorUserId: req.user.userId, actorRole: biz.role,
+        entityType: 'notification_grant', entityId: target.user_id,
+        action: enabled ? 'granted' : 'revoked',
+        before: { category, enabled: before[category] === true },
+        after: { category, enabled },
+      });
+    }
+
+    res.json({ member_id: target.id, role: target.role, granted: { ...before, ...Object.fromEntries(entries) } });
+  } catch (e) { res.status(500).json({ error: 'grants_write_failed' }); }
 });
 
 // ── POST /api/team/invite ─────────────────────────────────────────────────────
