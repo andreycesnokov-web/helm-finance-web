@@ -360,10 +360,13 @@ test('bot-secret authentication still runs BEFORE identity resolution', () => {
 
 test('no migration was added by PR2.5', () => {
   const migs = fs.readdirSync(path.join(__dirname, '../../migrations')).filter((f) => /^\d{3}_/.test(f));
-  // 046_company_notification_grants is a deliberate, separately-reviewed feature (Company Admin
-  // Notification Grants), not something that slipped in with the telegram-actor wiring. It is
-  // allowed by name; the guard still catches any OTHER unexpected 046+ migration.
-  const ALLOWED = new Set(['046_company_notification_grants.sql']);
+  // The Company Admin Notification Grants work (046 + its 047 actor-authorization follow-up) is a
+  // deliberate, separately-reviewed feature, not something that slipped in with the telegram-actor
+  // wiring. Both are allowed by name; the guard still catches any OTHER unexpected 046+ migration.
+  const ALLOWED = new Set([
+    '046_company_notification_grants.sql',
+    '047_notification_grants_actor_authorization.sql',
+  ]);
   const unexpected = migs.filter((f) => /^04[6-9]_|^0[5-9]\d_/.test(f) && !ALLOWED.has(f));
   assert.strictEqual(unexpected.length, 0, `unexpected migration(s): ${unexpected.join(', ')}`);
 });

@@ -14,11 +14,15 @@ const { PGlite } = require('@electric-sql/pglite');
 
 const MIG = path.join(__dirname, '../../migrations/046_company_notification_grants.sql');
 const SQL = fs.readFileSync(MIG, 'utf8');
+// 047 hardens apply_notification_grants with actor-side authorization (CREATE OR REPLACE).
+const MIG47 = path.join(__dirname, '../../migrations/047_notification_grants_actor_authorization.sql');
+const SQL47 = fs.readFileSync(MIG47, 'utf8');
 
 const BIZ_A = '11111111-1111-1111-1111-111111111111';
 const BIZ_B = '22222222-2222-2222-2222-222222222222';
-const OWNER = -1;
+const OWNER = -1;     // active owner of BIZ_A (the authorised actor)
 const CFO = -2;
+const OWNER_B = -10;  // active owner of BIZ_B
 
 async function freshDb() {
   const db = new PGlite();
@@ -32,11 +36,14 @@ async function freshDb() {
       id BIGSERIAL PRIMARY KEY, business_id uuid, actor_user_id BIGINT, actor_role text,
       channel text, entity_type text, entity_id text, action text,
       before_json jsonb, after_json jsonb, created_at timestamptz DEFAULT now());
-    INSERT INTO users VALUES (${OWNER}), (${CFO}), (7700002);
+    INSERT INTO users VALUES (${OWNER}), (${CFO}), (7700002), (${OWNER_B});
     INSERT INTO businesses VALUES ('${BIZ_A}','business'), ('${BIZ_B}','business');
     INSERT INTO business_members (business_id, user_id, role, status) VALUES
-      ('${BIZ_A}', ${CFO}, 'cfo', 'active');`);
+      ('${BIZ_A}', ${OWNER},   'owner', 'active'),
+      ('${BIZ_A}', ${CFO},     'cfo',   'active'),
+      ('${BIZ_B}', ${OWNER_B}, 'owner', 'active');`);
   await db.exec(SQL);
+  await db.exec(SQL47);
   return db;
 }
 const auditCount = async (db) =>
@@ -126,6 +133,13 @@ test('the updated_at trigger moves on UPDATE', async () => {
 // ── Atomic grant change + audit (apply_notification_grants) ──────────────────
 const apply = (db, changes, { biz = BIZ_A, user = CFO, by = OWNER, role = 'owner' } = {}) =>
   db.query(`SELECT apply_notification_grants('${biz}', ${user}, ${by}, '${role}', '${JSON.stringify(changes)}'::jsonb) AS r`);
+// Attempt an apply that is expected to be REJECTED; returns the error message (or null on success).
+const applyErr = async (db, changes, opts = {}) => {
+  try { await apply(db, changes, opts); return null; } catch (e) { return e.message; }
+};
+const lastAuditActorRole = async (db) =>
+  (await db.query(`SELECT actor_role FROM audit_events WHERE entity_type='notification_grant'
+     ORDER BY id DESC LIMIT 1`)).rows[0]?.actor_role ?? null;
 
 test('apply: a grant writes the row AND exactly one audit event, atomically', async () => {
   const db = await freshDb();
@@ -262,7 +276,7 @@ test('trigger: a Business A transition cannot affect Business B grants', async (
   const db = await freshDb();
   await db.exec(`INSERT INTO business_members (business_id, user_id, role, status) VALUES ('${BIZ_B}', ${CFO}, 'cfo', 'active')`);
   await apply(db, { company_financial: true }, { biz: BIZ_A });
-  await apply(db, { company_financial: true }, { biz: BIZ_B });
+  await apply(db, { company_financial: true }, { biz: BIZ_B, by: OWNER_B });
   await setRole(db, 'manager', { biz: BIZ_A });
   assert.strictEqual(await grantEnabled(db, CFO, 'company_financial', BIZ_A), false);
   assert.strictEqual(await grantEnabled(db, CFO, 'company_financial', BIZ_B), true, "business A's transition reached business B");
@@ -345,4 +359,116 @@ test('flag independence: the trigger fires regardless of any app feature flag', 
 test('the extended migration re-applies cleanly (trigger + function)', async () => {
   const db = await freshDb();
   assert.strictEqual(await fails(db, SQL), null, 're-applying the extended 046 failed');
+  assert.strictEqual(await fails(db, SQL47), null, 're-applying 047 failed');
+});
+
+// ── 047: actor-side authorization inside the RPC ─────────────────────────────
+// v0 policy: only an ACTIVE OWNER of the business may grant/revoke. The RPC derives the actor role
+// from business_members and never trusts p_actor_role. A forbidden actor changes nothing and writes
+// no audit row.
+
+test('047: an OWNER actor can grant a CFO', async () => {
+  const db = await freshDb();
+  const { rows } = await apply(db, { company_financial: true });   // by = OWNER (active owner)
+  assert.strictEqual(rows[0].r.changed, 1);
+  assert.strictEqual(await grantEnabled(db, CFO, 'company_financial'), true);
+});
+
+test('047: an OWNER actor can grant a CEO', async () => {
+  const db = await freshDb();
+  await db.exec(`INSERT INTO business_members (business_id, user_id, role, status)
+                 VALUES ('${BIZ_A}', 7700002, 'ceo', 'active')`);
+  const { rows } = await apply(db, { company_financial: true }, { user: 7700002 });
+  assert.strictEqual(rows[0].r.changed, 1);
+  assert.strictEqual(await grantEnabled(db, 7700002, 'company_financial'), true);
+});
+
+test('047: a NON-OWNER actor cannot grant, and writes no audit', async () => {
+  const db = await freshDb();
+  const err = await applyErr(db, { company_financial: true }, { by: CFO });   // CFO is not an owner
+  assert.ok(err && /actor_not_authorized/.test(err), `expected actor_not_authorized, got: ${err}`);
+  assert.strictEqual(await grantEnabled(db, CFO, 'company_financial'), null, 'a grant was written');
+  assert.strictEqual(await auditCount(db), 0, 'a forbidden actor wrote an audit row');
+});
+
+test('047: an INACTIVE actor cannot grant', async () => {
+  const db = await freshDb();
+  await db.exec(`UPDATE business_members SET status='inactive' WHERE user_id=${OWNER} AND business_id='${BIZ_A}'`);
+  const err = await applyErr(db, { company_financial: true });
+  assert.ok(err && /actor_not_authorized/.test(err), `expected actor_not_authorized, got: ${err}`);
+  assert.strictEqual(await auditCount(db), 0);
+});
+
+test('047: a REMOVED actor cannot grant', async () => {
+  const db = await freshDb();
+  await db.exec(`UPDATE business_members SET status='removed' WHERE user_id=${OWNER} AND business_id='${BIZ_A}'`);
+  const err = await applyErr(db, { company_financial: true });
+  assert.ok(err && /actor_not_authorized/.test(err), `expected actor_not_authorized, got: ${err}`);
+});
+
+test('047: an actor from ANOTHER business cannot grant', async () => {
+  const db = await freshDb();
+  // OWNER_B is an active owner of BIZ_B, but not of BIZ_A. Granting on BIZ_A must be refused.
+  const err = await applyErr(db, { company_financial: true }, { by: OWNER_B });
+  assert.ok(err && /actor_not_authorized/.test(err), `expected actor_not_authorized, got: ${err}`);
+  assert.strictEqual(await grantEnabled(db, CFO, 'company_financial'), null);
+  assert.strictEqual(await auditCount(db), 0);
+});
+
+test('047: a missing actor (no membership row) cannot grant', async () => {
+  const db = await freshDb();
+  const err = await applyErr(db, { company_financial: true }, { by: 7700002 });  // not a member of BIZ_A
+  assert.ok(err && /actor_not_authorized/.test(err), `expected actor_not_authorized, got: ${err}`);
+});
+
+test('047: the audit uses the DB-DERIVED actor role, not the trusted caller role', async () => {
+  const db = await freshDb();
+  // Caller lies about its role; the RPC must record the derived 'owner', not the spoofed string.
+  await apply(db, { company_financial: true }, { role: 'super_admin_hacker' });
+  assert.strictEqual(await lastAuditActorRole(db), 'owner',
+    'the audit trusted the caller-supplied actor role');
+});
+
+test('047: an EMPLOYEE/staff target cannot receive a grant', async () => {
+  const db = await freshDb();
+  await db.exec(`INSERT INTO business_members (business_id, user_id, role, status)
+                 VALUES ('${BIZ_A}', 7700002, 'employee', 'active')`);
+  const err = await applyErr(db, { company_financial: true }, { user: 7700002 });
+  assert.ok(err && /member_not_grantable/.test(err), `expected member_not_grantable, got: ${err}`);
+});
+
+test('047: an INACTIVE target cannot receive a grant', async () => {
+  const db = await freshDb();
+  await db.exec(`UPDATE business_members SET status='inactive' WHERE user_id=${CFO} AND business_id='${BIZ_A}'`);
+  const err = await applyErr(db, { company_financial: true });
+  assert.ok(err && /member_not_grantable/.test(err), `expected member_not_grantable, got: ${err}`);
+});
+
+test('047: a REMOVED target cannot receive a grant', async () => {
+  const db = await freshDb();
+  await db.exec(`UPDATE business_members SET status='removed' WHERE user_id=${CFO} AND business_id='${BIZ_A}'`);
+  const err = await applyErr(db, { company_financial: true });
+  assert.ok(err && /member_not_grantable/.test(err), `expected member_not_grantable, got: ${err}`);
+});
+
+test('047: the ACTOR membership row is locked FOR UPDATE (actor-demotion race)', () => {
+  // Source guard: the actor lookup must lock its row so a concurrent owner demotion serialises with
+  // the grant. PGlite is single-connection and cannot exercise true lock contention (that is the
+  // two-session procedure in the PR46.2 runbook); this pins the lock so it cannot be silently
+  // dropped, mirroring the existing target-row guard above.
+  assert.match(SQL47,
+    /user_id = p_granted_by AND status = 'active'\s*\n\s*LIMIT 1\s*\n\s*FOR UPDATE/,
+    'apply_notification_grants no longer locks the actor membership row');
+});
+
+test('047: demote-then-grant — a just-demoted owner cannot push a grant through', async () => {
+  // The sequential half of the actor-demotion race (the concurrent half needs two sessions). Once
+  // the owner is no longer an active owner, the RPC refuses: the FOR UPDATE lock is what makes this
+  // hold even when the demotion and the grant overlap.
+  const db = await freshDb();
+  await db.exec(`UPDATE business_members SET role='manager' WHERE user_id=${OWNER} AND business_id='${BIZ_A}'`);
+  const err = await applyErr(db, { company_financial: true });   // actor was owner, now manager
+  assert.ok(err && /actor_not_authorized/.test(err), `expected actor_not_authorized, got: ${err}`);
+  assert.strictEqual(await grantEnabled(db, CFO, 'company_financial'), null);
+  assert.strictEqual(await auditCount(db), 0);
 });
