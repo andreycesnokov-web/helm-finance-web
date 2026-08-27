@@ -543,3 +543,37 @@ review.
 - **No UI.** Backend + tests only; nothing appears in navigation.
 - **`raw_provider_payload` may carry payer PII.** It is excluded from list responses and
   returned only on detail. No redaction/retention policy exists yet.
+
+---
+
+## 14. PR2 — Bank import bridge, as built
+
+Migration `049_incoming_payments_bank_import_provenance.sql` (additive: two nullable
+provenance columns + one partial unique index). Bridge logic in
+`server/lib/incomingPaymentsBridge.js` (pure), called from the end of
+`POST /api/bank-import/batches/:id/confirm`.
+
+- **Entirely inside the flag.** With `INCOMING_PAYMENTS_ENABLED` off the bridge is not called,
+  nothing is read, and the confirm response keys are unchanged (asserted by a test).
+- **Credits only.** A debit line never produces a payment. An explicit `direction` wins over a
+  mis-suggested transaction type, and a row with neither is refused rather than guessed --
+  guessing permissively would record an expense as incoming revenue.
+- **Confirmed only.** The bridge reuses the confirm route's own notion of a reviewed row, so an
+  excluded or unreviewed line is never picked up.
+- **One payment per statement line**, guaranteed by
+  `incoming_payments_bank_row_uidx (business_id, bank_import_row_id)`. Re-confirming a batch
+  reports `duplicates`, not a second row.
+- **Idempotency key** is `bank_row:<dedup_hash>`, so a re-uploaded overlapping statement
+  collides on content rather than on row identity; falls back to the row id.
+- **Provenance:** `bank_import_batch_id` / `bank_import_row_id`, both `ON DELETE SET NULL` --
+  deleting import artefacts must not delete the evidence that money arrived.
+- **Bank reference goes to `payer_reference`, not `provider_transaction_id`.** Bank exports
+  repeat references across lines, and 048's provider-transaction unique index would then reject
+  legitimate rows as duplicates.
+- **Ledger-inert.** The bridge writes no transaction and no debt. The confirm flow's own ledger
+  write is unchanged and happens first. `linked_transaction_id` is left NULL even though the
+  transaction id is known -- copying it would assert a reviewed match nobody performed. The
+  matching step proposes it as a candidate instead.
+- **Fee semantics:** a bank credit is `gross = net` with a *confirmed* zero fee, because the
+  statement line shows what actually landed and carries no separate itemised fee. This is why
+  `bank_statement_import` is deliberately not in `GATEWAY_SOURCE_TYPES`.

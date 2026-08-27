@@ -3304,7 +3304,9 @@ const INCOMING_PAYMENT_LIST_COLS =
   'gross_amount, fee_amount, tax_or_withholding_amount, net_amount, currency, transaction_at, ' +
   'settled_at, payer_name, payer_reference, description, status, reconciliation_status, ' +
   'linked_transaction_id, linked_debt_id, idempotency_key, created_by_user_id, ' +
-  'reviewed_by_user_id, reviewed_at, created_at, updated_at';
+  'reviewed_by_user_id, reviewed_at, created_at, updated_at, ' +
+  // Provenance (049): which statement line this receipt came from.
+  'bank_import_batch_id, bank_import_row_id';
 
 // GET /api/incoming-payments — list for the ACTIVE business only.
 app.get('/api/incoming-payments', auth, async (req, res) => {
@@ -3481,6 +3483,73 @@ app.patch('/api/incoming-payments/:id/status', auth, async (req, res) => {
     res.json({ payment: updated });
   } catch { res.status(500).json({ error: 'incoming_payment_update_failed' }); }
 });
+
+// ── Bank import → incoming payments bridge (PR2, migration 049) ──────────────
+//
+// Called at the end of the bank-import confirm flow. Records one incoming_payment per
+// confirmed CREDIT line. Debits are skipped — they are expenses and belong to the payables
+// path, never to a table about money arriving.
+//
+// Ledger-inert: this creates no transaction and no debt. The confirm flow's own transaction
+// write is unchanged and happens before this runs. The payment is left draft/unmatched so
+// the matching step proposes the link for a human rather than asserting it here.
+//
+// Returns null when the flag is off (so the response shape is unchanged), otherwise a small
+// summary. Never throws: a bridge failure must not fail an import that already succeeded.
+const IPB = require('./lib/incomingPaymentsBridge');
+async function bridgeBankBatchToIncomingPayments({ batch, rows, biz, actingUserId }) {
+  if (!isIncomingPaymentsEnabled()) return null;
+  const businessId = biz?.business?.id;
+  if (!businessId || !batch) return null;
+
+  // The batch's wallet must belong to this workspace before it can be stamped onto evidence.
+  // A batch carrying another business's wallet id yields payments with no wallet rather than
+  // a cross-company link.
+  let walletOk = false;
+  if (batch.wallet_id) {
+    const { data: w } = await supabase.from('wallets').select('id, business_id').eq('id', batch.wallet_id).maybeSingle();
+    walletOk = !!w && w.business_id === businessId;
+  }
+  const scopedBatch = walletOk ? batch : { ...batch, wallet_id: null };
+
+  const summary = { created: 0, skipped: 0, duplicates: 0, failed: 0 };
+  for (const row of (rows || [])) {
+    const built = IPB.buildPaymentFromBankRow(row, scopedBatch, { businessId, actingUserId });
+    if (!built.ok) { summary.skipped++; continue; }
+    try {
+      // One payment per statement line. Checked here for a clean skip; the partial unique
+      // index on (business_id, bank_import_row_id) is the actual guarantee.
+      const { data: existing } = await supabase.from('incoming_payments')
+        .select('id').eq('business_id', businessId).eq('bank_import_row_id', row.id).maybeSingle();
+      if (existing) { summary.duplicates++; continue; }
+
+      const { data: created, error } = await supabase.from('incoming_payments')
+        .insert(built.value).select('id').single();
+      if (error) {
+        if (String(error.code) === '23505' || /duplicate key|unique constraint/i.test(error.message || '')) {
+          summary.duplicates++;
+        } else {
+          summary.failed++;
+          console.warn(`[incoming-payments] bank bridge insert failed row=${row.id}: ${error.message}`);
+        }
+        continue;
+      }
+      summary.created++;
+      await recordAudit({
+        businessId, actorUserId: actingUserId, actorRole: biz.role, channel: 'web',
+        entityType: 'incoming_payment', entityId: created?.id, action: 'created_from_bank_import',
+        after: { source_type: 'bank_statement_import', bank_import_batch_id: batch.id,
+                 bank_import_row_id: row.id, gross_amount: built.value.gross_amount,
+                 net_amount: built.value.net_amount, currency: built.value.currency,
+                 idempotency_key: built.value.idempotency_key },
+      });
+    } catch (e) {
+      summary.failed++;
+      console.warn(`[incoming-payments] bank bridge error row=${row?.id}: ${e.message}`);
+    }
+  }
+  return summary;
+}
 
 // POST /api/bank-import/batches — create a batch from client-parsed rows
 app.post('/api/bank-import/batches', auth, async (req, res) => {
@@ -3686,7 +3755,14 @@ app.post('/api/bank-import/batches/:id/confirm', auth, async (req, res) => {
     const newStatus = remaining > 0 ? 'partially_imported' : 'imported';
     await supabase.from('bank_import_batches').update({ imported_count: (batch.imported_count || 0) + imported, status: newStatus, updated_at: new Date().toISOString() }).eq('id', batch.id);
 
-    res.json({ ok: true, imported, status: newStatus, reconciliation });
+    // Bridge (PR2, migration 049): confirmed CREDIT lines also become incoming-payment
+    // evidence. Entirely inside the flag — with INCOMING_PAYMENTS_ENABLED off this call is
+    // not made, nothing is read, and the confirm response is byte-identical to before.
+    // Failures here never fail the import: the ledger write above already succeeded and is
+    // the user's actual outcome.
+    const incoming_payments = await bridgeBankBatchToIncomingPayments({ batch, rows, biz, actingUserId: req.user.userId });
+
+    res.json({ ok: true, imported, status: newStatus, reconciliation, ...(incoming_payments ? { incoming_payments } : {}) });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
