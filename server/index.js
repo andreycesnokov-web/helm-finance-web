@@ -3294,6 +3294,7 @@ async function loadBusinessCategoryMap(biz) {
 // balance, never mark accounting or tax final. A row is cash evidence awaiting human review.
 // business_id is ALWAYS the active workspace and never read from the body.
 const IP = require('./lib/incomingPayments');
+const GSI = require('./lib/gatewaySettlementImport');
 function isIncomingPaymentsEnabled() { return process.env.INCOMING_PAYMENTS_ENABLED === 'true'; }
 
 // Columns returned to the client. raw_provider_payload is deliberately excluded from LIST
@@ -3420,6 +3421,99 @@ app.post('/api/incoming-payments', auth, async (req, res) => {
 
     res.status(201).json({ payment: inserted });
   } catch { res.status(500).json({ error: 'incoming_payment_create_failed' }); }
+});
+
+// GET /api/incoming-payments/providers — the gateway providers this build recognises.
+// Advisory only: an unrecognised provider still imports (see gatewaySettlementImport.js).
+app.get('/api/incoming-payments/providers', auth, async (req, res) => {
+  if (!isIncomingPaymentsEnabled()) return res.status(404).json({ error: 'not_found' });
+  res.json({ providers: GSI.KNOWN_GATEWAY_PROVIDERS, source_type: GSI.SETTLEMENT_SOURCE_TYPE,
+             max_rows: GSI.MAX_ROWS, note: 'Unrecognised providers are accepted, not refused.' });
+});
+
+// POST /api/incoming-payments/gateway-import — import one parsed settlement report.
+//
+// The client parses the export (as it already does for bank statements) and posts a
+// settlement header plus rows. NO EXTERNAL API IS CALLED and no gateway credential exists
+// anywhere in this path — the data comes from a file a human downloaded.
+//
+// Ledger-inert like every other path here: rows become draft/unmatched evidence, never
+// transactions, never revenue.
+app.post('/api/incoming-payments/gateway-import', auth, async (req, res) => {
+  try {
+    if (!isIncomingPaymentsEnabled()) return res.status(404).json({ error: 'not_found' });
+    const biz = await requireBusiness(req, res); if (!biz) return;
+    if (!canCreateConfirmedFinancialRecord(biz.role))
+      return res.status(403).json({ error: 'forbidden', message: 'Your role cannot import settlements.' });
+
+    const businessId = biz.business.id;
+    const parsed = GSI.validateSettlementBatch(req.body);
+    if (!parsed.ok) {
+      return res.status(400).json({ error: parsed.error, message: parsed.message,
+                                    ...(parsed.row_index !== undefined ? { row_index: parsed.row_index } : {}) });
+    }
+
+    // The settlement lands in one wallet — typically the `payment_gateway` wallet for this
+    // provider. Same-business ownership is checked once for the batch.
+    let walletId = null;
+    if (req.body?.wallet_id) {
+      const { data: wallet, error: wErr } = await supabase.from('wallets')
+        .select('id, business_id').eq('id', req.body.wallet_id).maybeSingle();
+      if (wErr) return res.status(500).json({ error: 'wallet_lookup_failed' });
+      if (!wallet || wallet.business_id !== businessId)
+        return res.status(403).json({ error: 'wallet_not_in_business', message: 'That wallet does not belong to this workspace.' });
+      walletId = wallet.id;
+    }
+
+    const summary = { total: parsed.value.rows.length, created: 0, duplicates: 0, failed: 0 };
+    const created = [];
+    for (const v of parsed.value.rows) {
+      const row = {
+        ...v, business_id: businessId, wallet_id: walletId,
+        created_by_user_id: req.user.userId,
+        linked_transaction_id: null, linked_debt_id: null,
+      };
+      // Existing row wins: a re-uploaded settlement report reports duplicates rather than
+      // recording the same gateway transaction twice.
+      const { data: existingRows } = await supabase.from('incoming_payments')
+        .select('id, idempotency_key, provider, provider_transaction_id')
+        .eq('business_id', businessId).eq('source_type', v.source_type)
+        .eq('idempotency_key', v.idempotency_key);
+      if ((existingRows || []).some((e) => (e.provider || null) === (v.provider || null))) {
+        summary.duplicates++; continue;
+      }
+
+      const { data: ins, error } = await supabase.from('incoming_payments')
+        .insert(row).select(INCOMING_PAYMENT_LIST_COLS).single();
+      if (error) {
+        // Either unique index may fire: the idempotency key, or the provider-transaction guard.
+        if (String(error.code) === '23505' || /duplicate key|unique constraint/i.test(error.message || '')) {
+          summary.duplicates++;
+        } else {
+          summary.failed++;
+          console.warn(`[incoming-payments] settlement insert failed business=${businessId}: ${error.message}`);
+        }
+        continue;
+      }
+      summary.created++;
+      created.push(ins);
+      await recordAudit({
+        businessId, actorUserId: req.user.userId, actorRole: biz.role, channel: 'web',
+        entityType: 'incoming_payment', entityId: ins?.id, action: 'created_from_gateway_import',
+        after: { source_type: v.source_type, provider: v.provider,
+                 provider_settlement_id: v.provider_settlement_id,
+                 gross_amount: v.gross_amount, fee_amount: v.fee_amount, net_amount: v.net_amount,
+                 currency: v.currency, idempotency_key: v.idempotency_key },
+      });
+    }
+
+    res.status(summary.created ? 201 : 200).json({
+      provider: parsed.value.provider,
+      provider_known: parsed.value.provider_known,
+      summary,
+      payments: created,
+    });
+  } catch { res.status(500).json({ error: 'gateway_import_failed' }); }
 });
 
 // GET /api/incoming-payments/:id — one receipt, scoped to the active business.

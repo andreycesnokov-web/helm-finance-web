@@ -95,6 +95,18 @@ function fakeFrom(table) {
           const arr = (Array.isArray(st.values) ? st.values : [st.values])
             .map((r) => ({ id: r.id || crypto.randomUUID(), created_at: new Date().toISOString(),
                            updated_at: new Date().toISOString(), ...r }));
+          // Model 048's provider-transaction partial unique index, so a route relying on the
+          // DB to stop a duplicate gateway transaction is actually tested against one.
+          if (table === 'incoming_payments') {
+            for (const r of arr) {
+              if (r.provider_transaction_id && rows().some((x) => x.business_id === r.business_id
+                  && (x.provider || '') === (r.provider || '')
+                  && x.provider_transaction_id === r.provider_transaction_id)) {
+                return Promise.resolve({ data: null, error: { code: '23505',
+                  message: 'duplicate key value violates unique constraint' } }).then(resolve, reject);
+              }
+            }
+          }
           for (const r of arr) rows().push(r);
           const p = project(arr);
           out = { data: st.single ? p[0] : p, error: null };
@@ -428,4 +440,120 @@ test('the list response omits the raw provider payload; the detail route returns
   assert.ok(!('raw_provider_payload' in list.body.payments[0]), 'raw payload leaked into the list');
   const detail = await api('GET', `${URL_LIST}/${created.body.payment.id}`, { token: tok(OWNER_A), business: BIZ_A });
   assert.deepStrictEqual(detail.body.payment.raw_provider_payload, { secretish: 'payer detail' });
+});
+
+// ── Gateway settlement import (PR3) ──────────────────────────────────────────────────────
+const GW = '/api/incoming-payments/gateway-import';
+const stlRow = (o = {}) => ({ provider_transaction_id: 'TX-1', gross_amount: 100000, fee_amount: 2500, ...o });
+const stlBatch = (o = {}) => ({ provider: 'midtrans', provider_settlement_id: 'STL-1', currency: 'IDR', rows: [stlRow()], ...o });
+const gwImport = (body, biz = BIZ_A, user = OWNER_A) => api('POST', GW, { token: tok(user), business: biz, body });
+
+test('flag OFF: the gateway import and provider list are 404', async () => {
+  process.env[FLAG] = 'false';
+  assert.strictEqual((await gwImport(stlBatch())).status, 404);
+  assert.strictEqual((await api('GET', '/api/incoming-payments/providers', { token: tok(OWNER_A), business: BIZ_A })).status, 404);
+  assert.strictEqual(dbState.incoming_payments.length, 0);
+});
+
+test('the provider list is advisory and names the Indonesian gateways', async () => {
+  const r = await api('GET', '/api/incoming-payments/providers', { token: tok(OWNER_A), business: BIZ_A });
+  assert.strictEqual(r.status, 200);
+  for (const p of ['midtrans', 'doku', 'xendit', 'hitpay', 'duitku', 'ipaymu']) {
+    assert.ok(r.body.providers.includes(p), `${p} missing from the provider list`);
+  }
+});
+
+test('a settlement batch imports and separates gross, fee and net', async () => {
+  const r = await gwImport(stlBatch());
+  assert.strictEqual(r.status, 201);
+  assert.strictEqual(r.body.summary.created, 1);
+  const p = dbState.incoming_payments[0];
+  assert.strictEqual(p.source_type, 'manual_gateway_import');
+  assert.strictEqual(p.provider, 'midtrans');
+  assert.strictEqual(p.gross_amount, 100000);
+  assert.strictEqual(p.fee_amount, 2500);
+  assert.strictEqual(p.net_amount, 97500);
+  assert.strictEqual(p.provider_settlement_id, 'STL-1');
+});
+
+test('any provider imports through the same endpoint — no per-gateway path', async () => {
+  for (const provider of ['midtrans', 'doku', 'xendit', 'hitpay', 'duitku', 'ipaymu', 'brandnewpay']) {
+    const r = await gwImport(stlBatch({ provider, rows: [stlRow({ provider_transaction_id: `TX-${provider}` })] }));
+    assert.strictEqual(r.status, 201, `${provider} failed to import`);
+  }
+  assert.strictEqual(dbState.incoming_payments.length, 7);
+  assert.strictEqual((await gwImport(stlBatch({ provider: 'brandnewpay', rows: [stlRow({ provider_transaction_id: 'TX-NEW' })] }))).body.provider_known, false);
+});
+
+test('a settlement import creates NO transaction and NO debt', async () => {
+  await gwImport(stlBatch({ rows: [stlRow(), stlRow({ provider_transaction_id: 'TX-2' })] }));
+  assert.strictEqual(dbState.transactions.length, 0);
+  assert.strictEqual(dbState.debts.length, 0);
+  assert.ok(dbState.incoming_payments.every((p) => p.linked_transaction_id === null && p.linked_debt_id === null));
+});
+
+test('imported settlement rows are draft and unmatched', async () => {
+  await gwImport(stlBatch());
+  const p = dbState.incoming_payments[0];
+  assert.strictEqual(p.status, 'draft');
+  assert.strictEqual(p.reconciliation_status, 'unmatched');
+  assert.strictEqual(p.reviewed_by_user_id ?? null, null);
+});
+
+test('re-uploading the same settlement reports duplicates, not new money', async () => {
+  await gwImport(stlBatch());
+  const again = await gwImport(stlBatch());
+  assert.strictEqual(again.status, 200);
+  assert.strictEqual(again.body.summary.duplicates, 1);
+  assert.strictEqual(again.body.summary.created, 0);
+  assert.strictEqual(dbState.incoming_payments.length, 1, 'the same gateway transaction was recorded twice');
+});
+
+test('the same provider transaction under a DIFFERENT key is still blocked by the DB', async () => {
+  await gwImport(stlBatch());
+  // The idempotency pre-check misses (different key), so the provider-transaction index must
+  // be what stops it.
+  const again = await gwImport(stlBatch({ rows: [stlRow({ idempotency_key: 'a-different-key' })] }));
+  assert.strictEqual(again.body.summary.duplicates, 1);
+  assert.strictEqual(dbState.incoming_payments.length, 1);
+});
+
+test('the same provider transaction in another business does not collide', async () => {
+  await gwImport(stlBatch(), BIZ_A, OWNER_A);
+  const b = await gwImport(stlBatch(), BIZ_B, OWNER_B);
+  assert.strictEqual(b.status, 201);
+  assert.strictEqual(dbState.incoming_payments.length, 2);
+});
+
+test('a bad row rejects the WHOLE batch, naming its index', async () => {
+  const r = await gwImport(stlBatch({ rows: [stlRow(), stlRow({ provider_transaction_id: 'TX-2', gross_amount: -1 })] }));
+  assert.strictEqual(r.status, 400);
+  assert.strictEqual(r.body.row_index, 1);
+  assert.strictEqual(dbState.incoming_payments.length, 0, 'a partially imported settlement looks complete but is not');
+});
+
+test('an unknown-fee settlement row must state its net', async () => {
+  const r = await gwImport(stlBatch({ rows: [stlRow({ fee_amount: undefined })] }));
+  assert.strictEqual(r.status, 400);
+  assert.strictEqual(r.body.error, 'missing_net_amount');
+  const good = await gwImport(stlBatch({ rows: [stlRow({ fee_amount: undefined, gross_amount: 1000000, net_amount: 967810 })] }));
+  assert.strictEqual(good.status, 201);
+  assert.strictEqual(dbState.incoming_payments[0].fee_amount, null);
+});
+
+test('a settlement cannot be imported into another business or with its wallet', async () => {
+  assert.strictEqual((await gwImport(stlBatch(), BIZ_B, OWNER_A)).status, 403);
+  assert.strictEqual((await gwImport({ ...stlBatch(), wallet_id: WALLET_B })).status, 403);
+  assert.strictEqual(dbState.incoming_payments.length, 0);
+});
+
+test('an employee cannot import a settlement', async () => {
+  assert.strictEqual((await gwImport(stlBatch(), BIZ_A, EMPLOYEE_A)).status, 403);
+});
+
+test('settlement imports are audited', async () => {
+  await gwImport(stlBatch());
+  const rows = dbState.audit_events.filter((a) => a.action === 'created_from_gateway_import');
+  assert.strictEqual(rows.length, 1);
+  assert.strictEqual(rows[0].business_id, BIZ_A);
 });

@@ -577,3 +577,37 @@ provenance columns + one partial unique index). Bridge logic in
 - **Fee semantics:** a bank credit is `gross = net` with a *confirmed* zero fee, because the
   statement line shows what actually landed and carries no separate itemised fee. This is why
   `bank_statement_import` is deliberately not in `GATEWAY_SOURCE_TYPES`.
+
+---
+
+## 15. PR3 -- Gateway settlement import foundation, as built
+
+`server/lib/gatewaySettlementImport.js` (pure) plus two routes:
+`GET /api/incoming-payments/providers` and `POST /api/incoming-payments/gateway-import`.
+No migration: 048 already carries every provider column.
+
+**No external API is called and no gateway credential exists anywhere in this path.** The
+client parses a settlement export the owner downloaded -- exactly the pattern bank statements
+already use -- and posts a settlement header plus rows.
+
+- **No provider is privileged.** There is no Midtrans path and no DOKU path; `provider` is a
+  string on the row. `KNOWN_GATEWAY_PROVIDERS` (midtrans, doku, xendit, hitpay, duitku,
+  ipaymu, manual_gateway) normalises spelling and tells the caller when it is using something
+  unrecognised -- it is **not an allow-list**, and an unknown provider imports rather than
+  being refused. A test asserts two different providers produce byte-identical rows.
+- **Source type is `manual_gateway_import`**, not `gateway_settlement`: the latter is reserved
+  for a live feed from the gateway, which does not exist and is not built here.
+- **Settlement-level fields cascade to rows** (`provider_settlement_id`,
+  `settlement_batch_reference`, `provider_account_id`, `currency`, `settled_at`), each
+  overridable per row. This makes the three-level structure of section 2.3 -- gateway
+  transaction, settlement batch, bank credit -- expressible without a separate settlements
+  table in this PR.
+- **Every row goes through the same validator as single create**, so the gateway fee rule
+  holds for free: an omitted fee is unknown, and such a row must state its net.
+- **A bad row rejects the WHOLE batch, naming `row_index`.** A partially imported settlement
+  is worse than a refused one because it looks complete.
+- **Duplicates are caught at three levels:** within one upload (`duplicate_row_reference`), by
+  the idempotency pre-check, and by 048's provider-transaction unique index -- the last of
+  which is what catches a caller who resubmits the same transaction under a new key.
+- **Ledger-inert.** Rows become draft/unmatched evidence. A row arriving with a ledger link is
+  refused rather than silently stripped.
