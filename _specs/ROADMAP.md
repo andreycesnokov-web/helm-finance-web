@@ -1,6 +1,6 @@
 # Roadmap - CFO AI / Helm Finance
 
-Last updated: 2026-07-04.
+Last updated: 2026-08-27.
 
 This file lists the next practical work, not every idea.
 
@@ -30,9 +30,62 @@ This file lists the next practical work, not every idea.
   drilldown from risk rows, entitlements/billing once that layer exists.
 - Later direction (not now): dedicated `admin.cfo-ai.site` console + analytics warehouse.
 
+## Payment & Bank Ingestion Layer
+
+Status: **Phase 1 BUILT, NOT ENABLED (2026-08-27).** Migration 048 + flag-gated routes exist
+on `feature/incoming-payments-foundation` behind `INCOMING_PAYMENTS_ENABLED` (default OFF);
+048 is not applied to production and nothing is deployed. Phases 2–5 remain spec only.
+
+Spec: `_specs/incoming-payments-bank-gateway-ingestion.md` · Decision: [[D22]].
+
+The AI Accountant differentiator: ingest the money that actually arrived (payment gateways
+and bank accounts), match it where possible, separate gross/fee/net, draft the accounting
+and tax treatment, and hand the accountant a reviewable evidence package.
+
+Not greenfield — migration 021 (`bank_import_batches` / `_rows` / `_matches`,
+`bank_reconciliations`) and the live `/api/bank-import/*` endpoints already exist, and
+`wallets.type` already supports `payment_gateway`. `incoming_payments` normalizes **above**
+that pipeline; it does not replace it.
+
+Target workspaces: Helm Care Pay `HF-BIZ-000004` (Midtrans) and Helm Care Indonesia
+`HF-BIZ-000002` (bank transfers). Never mixed.
+
+Phases:
+
+1. **Incoming Payments Foundation** — ✅ built (not enabled). Migration 048, one additive
+   table, provider-agnostic source types, gross/fee/net separated, idempotency enforced by a
+   unique index, ledger-inert by construction. Manual + manual-gateway-import sources are
+   accepted; the two `future_*` sources are refused by the API. No matching engine, no UI.
+2. **Midtrans v0 for Helm Care Pay** — read-only gateway ingestion; gateway transaction →
+   settlement → bank credit modelled as three levels; fees first-class; flagged, Pay-only.
+   **Blocked on Q1/Q2** (integration mode + a real settlement sample).
+3. **Bank Statement Import v0 for Helm Care Indonesia** — confirmed credit rows from the
+   existing bank-import flow produce incoming payments. **Blocked on Q3** (real export
+   formats; PDF-only would change scope materially).
+4. **Reconciliation Engine** — deterministic cascade then AI, candidates with confidence
+   and rationale, human accept/reject, unmatched-receipt queue, settlement↔bank-credit
+   pairing, draft treatment, evidence packages, explainable period readiness.
+5. **Direct Bank APIs** — later, only after 1–4 are stable on real data, and only with its
+   own security spec (credentials, consent, revocation, audit).
+
+Hard rules carried from [[D22]]: cash evidence ≠ revenue · gross/fee/net always separate ·
+net settlement is never booked as gross revenue · exactly one workspace per payment · AI
+drafts, humans approve · no auto-submit · no duplicates from retried webhooks or re-uploads
+· no direct bank API in v0.
+
+Open questions blocking work: Midtrans integration mode · settlement report format · bank
+export formats · receiving accounts/wallets (plus the `counterparties` business-scoping
+gap) · tax treatment per revenue type · accountant export format · required evidence per
+payment type. See §11 of the spec.
+
 ## Current Strategic Direction
 
 Email account -> Personal Account -> Personal Finance -> optional Business Workspace -> optional Telegram paid integration.
+
+CFO AI / Helm Finance OS is positioning as an **AI Accountant / Finance OS**. The major
+differentiator is ingesting incoming payments from payment gateways and banks and preparing
+accounting/tax evidence packages a real accountant can review — see the Payment & Bank
+Ingestion Layer above and [[D22]].
 
 ## Current Near-Term Focus
 
@@ -43,7 +96,9 @@ Email account -> Personal Account -> Personal Finance -> optional Business Works
 
 ## Not Next
 
-- Full payment processing.
+- Full payment processing (taking payments / disbursing money). Note: **ingesting** incoming
+  payments as evidence is now in scope — see Payment & Bank Ingestion Layer. Processing is not.
+- Direct bank APIs / open banking (Payment & Bank Ingestion Phase 5, not before).
 - Personal-to-Business bridge implementation.
 - Telegram identity cutover.
 - Professional Partner Portal implementation.

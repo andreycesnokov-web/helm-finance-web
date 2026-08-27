@@ -3283,6 +3283,205 @@ async function loadBusinessCategoryMap(biz) {
   return map;
 }
 
+// ── Incoming Payments Foundation (migration 048, PR1) ────────────────────────
+//
+// Provider-agnostic STAGING for money that arrived — gateway settlements (Midtrans, DOKU,
+// Xendit, HitPay, …), bank statement imports, manual entry. Gated by
+// INCOMING_PAYMENTS_ENABLED: with the flag off the feature does not exist and every route
+// answers 404, so a stray client sees exactly what production sees — nothing.
+//
+// LEDGER-INERT (decision D22). These routes NEVER insert a transaction, never move a wallet
+// balance, never mark accounting or tax final. A row is cash evidence awaiting human review.
+// business_id is ALWAYS the active workspace and never read from the body.
+const IP = require('./lib/incomingPayments');
+function isIncomingPaymentsEnabled() { return process.env.INCOMING_PAYMENTS_ENABLED === 'true'; }
+
+// Columns returned to the client. raw_provider_payload is deliberately excluded from LIST
+// responses (it can be large and may carry payer PII); the detail route returns it.
+const INCOMING_PAYMENT_LIST_COLS =
+  'id, business_id, wallet_id, source_type, provider, provider_account_id, provider_transaction_id, ' +
+  'provider_order_id, provider_settlement_id, settlement_batch_reference, payment_method, ' +
+  'gross_amount, fee_amount, tax_or_withholding_amount, net_amount, currency, transaction_at, ' +
+  'settled_at, payer_name, payer_reference, description, status, reconciliation_status, ' +
+  'linked_transaction_id, linked_debt_id, idempotency_key, created_by_user_id, ' +
+  'reviewed_by_user_id, reviewed_at, created_at, updated_at';
+
+// GET /api/incoming-payments — list for the ACTIVE business only.
+app.get('/api/incoming-payments', auth, async (req, res) => {
+  try {
+    if (!isIncomingPaymentsEnabled()) return res.status(404).json({ error: 'not_found' });
+    const biz = await requireBusiness(req, res); if (!biz) return;
+    if (!canViewBusinessFinance(biz.role))
+      return res.status(403).json({ error: 'forbidden', message: 'Your role cannot view incoming payments.' });
+
+    let q = supabase.from('incoming_payments')
+      .select(INCOMING_PAYMENT_LIST_COLS)
+      .eq('business_id', biz.business.id);
+
+    // Filters are validated against the known vocabularies — an unknown value is a 400, not a
+    // silently empty list that reads as "no money arrived".
+    const { status, reconciliation_status, source_type, provider } = req.query || {};
+    if (status) {
+      if (!IP.STATUSES.includes(status)) return res.status(400).json({ error: 'invalid_status' });
+      q = q.eq('status', status);
+    }
+    if (reconciliation_status) {
+      if (!IP.RECONCILIATION_STATUSES.includes(reconciliation_status))
+        return res.status(400).json({ error: 'invalid_reconciliation_status' });
+      q = q.eq('reconciliation_status', reconciliation_status);
+    }
+    if (source_type) {
+      if (!IP.SOURCE_TYPES.includes(source_type)) return res.status(400).json({ error: 'invalid_source_type' });
+      q = q.eq('source_type', source_type);
+    }
+    if (provider) q = q.eq('provider', String(provider).toLowerCase());
+
+    const limit = Math.min(Math.max(parseInt(req.query?.limit, 10) || 100, 1), 500);
+    const { data, error } = await q.order('created_at', { ascending: false }).limit(limit);
+    if (error) return res.status(500).json({ error: 'incoming_payments_read_failed' });
+    res.json({ business_id: biz.business.id, payments: data || [] });
+  } catch { res.status(500).json({ error: 'incoming_payments_read_failed' }); }
+});
+
+// POST /api/incoming-payments — record one receipt. Creates NO transaction and NO debt.
+app.post('/api/incoming-payments', auth, async (req, res) => {
+  try {
+    if (!isIncomingPaymentsEnabled()) return res.status(404).json({ error: 'not_found' });
+    const biz = await requireBusiness(req, res); if (!biz) return;
+    if (!canCreateConfirmedFinancialRecord(biz.role))
+      return res.status(403).json({ error: 'forbidden', message: 'Your role cannot record incoming payments.' });
+
+    const businessId = biz.business.id;
+    const parsed = IP.validateCreate(req.body);
+    if (!parsed.ok) return res.status(400).json({ error: parsed.error, message: parsed.message });
+    const v = parsed.value;
+
+    // The receiving wallet must belong to THIS business. A wallet id from another workspace
+    // is a cross-company leak, not a bad request to be tolerated.
+    let walletId = null;
+    if (req.body?.wallet_id) {
+      const { data: wallet, error: wErr } = await supabase.from('wallets')
+        .select('id, business_id').eq('id', req.body.wallet_id).maybeSingle();
+      if (wErr) return res.status(500).json({ error: 'wallet_lookup_failed' });
+      if (!wallet || wallet.business_id !== businessId)
+        return res.status(403).json({ error: 'wallet_not_in_business', message: 'That wallet does not belong to this workspace.' });
+      walletId = wallet.id;
+    }
+
+    // Idempotency: the same receipt submitted twice returns the FIRST row instead of
+    // double-counting the money. Checked here for a clear answer, and again below via the
+    // unique index for the concurrent case.
+    const dupQuery = () => supabase.from('incoming_payments')
+      .select(INCOMING_PAYMENT_LIST_COLS)
+      .eq('business_id', businessId)
+      .eq('source_type', v.source_type)
+      .eq('idempotency_key', v.idempotency_key);
+    const { data: existingRows } = await dupQuery();
+    const sameProvider = (r) => (r.provider || null) === (v.provider || null);
+    const existing = (existingRows || []).find(sameProvider);
+    if (existing) return res.status(200).json({ payment: existing, idempotent_replay: true });
+
+    const row = {
+      ...v,
+      business_id: businessId,
+      wallet_id: walletId,
+      created_by_user_id: req.user.userId,
+      // Explicit, not merely omitted: PR1 performs no matching and books no ledger row.
+      linked_transaction_id: null,
+      linked_debt_id: null,
+    };
+
+    const { data: inserted, error: iErr } = await supabase.from('incoming_payments')
+      .insert(row).select(INCOMING_PAYMENT_LIST_COLS).single();
+    if (iErr) {
+      // 23505 = the unique index fired: another request won the race with the same key.
+      if (String(iErr.code) === '23505' || /duplicate key|unique constraint/i.test(iErr.message || '')) {
+        const { data: raceRows } = await dupQuery();
+        const raced = (raceRows || []).find(sameProvider);
+        if (raced) return res.status(200).json({ payment: raced, idempotent_replay: true });
+        return res.status(409).json({ error: 'duplicate_payment', message: 'That payment has already been recorded.' });
+      }
+      console.warn(`[incoming-payments] insert failed business=${businessId}: ${iErr.message}`);
+      return res.status(500).json({ error: 'incoming_payment_create_failed' });
+    }
+
+    await recordAudit({
+      businessId, actorUserId: req.user.userId, actorRole: biz.role, channel: 'web',
+      entityType: 'incoming_payment', entityId: inserted?.id, action: 'created',
+      // audit_events is append-only with a DB guard, so nothing written here can be corrected
+      // or redacted later. Payer identifiers stay out; idempotency_key goes in because it is
+      // non-PII and it is what you actually search on during a duplicate investigation.
+      after: { source_type: v.source_type, provider: v.provider, gross_amount: v.gross_amount,
+               fee_amount: v.fee_amount, net_amount: v.net_amount, currency: v.currency,
+               status: v.status, idempotency_key: v.idempotency_key },
+    });
+
+    res.status(201).json({ payment: inserted });
+  } catch { res.status(500).json({ error: 'incoming_payment_create_failed' }); }
+});
+
+// GET /api/incoming-payments/:id — one receipt, scoped to the active business.
+app.get('/api/incoming-payments/:id', auth, async (req, res) => {
+  try {
+    if (!isIncomingPaymentsEnabled()) return res.status(404).json({ error: 'not_found' });
+    const biz = await requireBusiness(req, res); if (!biz) return;
+    if (!canViewBusinessFinance(biz.role))
+      return res.status(403).json({ error: 'forbidden', message: 'Your role cannot view incoming payments.' });
+
+    // Filtered by business_id in the QUERY, so a row from another workspace is simply not
+    // found — the id itself never confirms or denies existence across tenants.
+    const { data, error } = await supabase.from('incoming_payments')
+      .select(`${INCOMING_PAYMENT_LIST_COLS}, raw_provider_payload`)
+      .eq('id', req.params.id).eq('business_id', biz.business.id).maybeSingle();
+    if (error) return res.status(500).json({ error: 'incoming_payments_read_failed' });
+    if (!data) return res.status(404).json({ error: 'not_found' });
+    res.json({ payment: data });
+  } catch { res.status(500).json({ error: 'incoming_payments_read_failed' }); }
+});
+
+// PATCH /api/incoming-payments/:id/status — a human review decision.
+// Review only: 'matched' is NOT settable here because PR1 performs no reconciliation, and a
+// status claiming a match with no link behind it would be a lie in the data.
+app.patch('/api/incoming-payments/:id/status', auth, async (req, res) => {
+  try {
+    if (!isIncomingPaymentsEnabled()) return res.status(404).json({ error: 'not_found' });
+    const biz = await requireBusiness(req, res); if (!biz) return;
+    if (!canApproveFinancialRecord(biz.role))
+      return res.status(403).json({ error: 'forbidden', message: 'Your role cannot review incoming payments.' });
+
+    const businessId = biz.business.id;
+    const { data: current, error: cErr } = await supabase.from('incoming_payments')
+      .select('id, status, reconciliation_status').eq('id', req.params.id)
+      .eq('business_id', businessId).maybeSingle();
+    if (cErr) return res.status(500).json({ error: 'incoming_payments_read_failed' });
+    if (!current) return res.status(404).json({ error: 'not_found' });
+
+    const decision = IP.validateStatusChange(current.status, req.body?.status);
+    if (!decision.ok) return res.status(400).json({ error: decision.error, message: decision.message });
+
+    // Reviewer and timestamp move together (the DB check enforces the same pairing). Both
+    // settable statuses are review decisions, so the stamp is always written and never
+    // cleared — there is no client path back to 'draft' that could erase it.
+    const patch = {
+      status: decision.value,
+      reviewed_by_user_id: req.user.userId,
+      reviewed_at: new Date().toISOString(),
+    };
+    const { data: updated, error: uErr } = await supabase.from('incoming_payments')
+      .update(patch).eq('id', current.id).eq('business_id', businessId)
+      .select(INCOMING_PAYMENT_LIST_COLS).single();
+    if (uErr) return res.status(500).json({ error: 'incoming_payment_update_failed' });
+
+    await recordAudit({
+      businessId, actorUserId: req.user.userId, actorRole: biz.role, channel: 'web',
+      entityType: 'incoming_payment', entityId: current.id, action: `status_${decision.value}`,
+      before: { status: current.status }, after: { status: decision.value },
+    });
+
+    res.json({ payment: updated });
+  } catch { res.status(500).json({ error: 'incoming_payment_update_failed' }); }
+});
+
 // POST /api/bank-import/batches — create a batch from client-parsed rows
 app.post('/api/bank-import/batches', auth, async (req, res) => {
   try {

@@ -15,6 +15,10 @@ Last updated: 2026-07-04.
 
 ## DARK / BEHIND FLAG
 
+- Incoming Payments Foundation (`/api/incoming-payments/*`, migration 048) behind
+  `INCOMING_PAYMENTS_ENABLED`. Ledger-inert staging for money received from any gateway or
+  bank; books nothing. Built, NOT applied to production, NOT enabled. See decision D22 and
+  §13 of `_specs/incoming-payments-bank-gateway-ingestion.md`.
 - Personal Account v1 finance backend (`/api/personal/*`).
 - Personal finance dashboard UI.
 - Premium Business UI.
@@ -23,6 +27,10 @@ Last updated: 2026-07-04.
 
 ## PLANNED / NOT IMPLEMENTED
 
+- Incoming Payments — reconciliation engine, Midtrans/gateway ingestion, evidence packages
+  (Phases 2–5). SPEC ONLY — `_specs/incoming-payments-bank-gateway-ingestion.md`, decision
+  D22. Note that the `bank_import_*` pipeline (migration 021) and `/api/bank-import/*`
+  already exist and are the feeder, not a duplicate.
 - Billing/entitlements foundation.
 - Personal-to-Business bridge.
 - Telegram linking/cutover.
