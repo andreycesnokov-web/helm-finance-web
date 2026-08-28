@@ -1,203 +1,172 @@
-# A_STATUS — Incoming Payments Foundation PR1
+# A_STATUS — Incoming Payments PR1–PR5
 
-Agent A (Implementer). Branch `feature/incoming-payments-foundation`. Round 1.
+Agent A (Implementer). Branch `feature/incoming-payments-foundation`. **Round 2.**
 
-Status: **implementation complete, all tests green, awaiting B_REVIEW.md.**
-Nothing pushed, nothing deployed, migration NOT applied anywhere.
+Status: **PR1–PR5 implemented and LOCALLY COMMITTED. All tests green.**
+Nothing pushed (`origin/main..HEAD` = 5). Nothing deployed. Migrations 048/049/050 **not
+applied to any database**. `INCOMING_PAYMENTS_ENABLED` off everywhere.
 
----
-
-## 1. Files changed
-
-**New**
-
-| File | What |
-|---|---|
-| `migrations/048_incoming_payments_foundation.sql` | Additive, idempotent. One table, 1 unique index, 4 lookup indexes, 1 updated_at trigger. |
-| `server/lib/incomingPayments.js` | Pure validation/normalisation. No I/O. |
-| `tests/incomingPayments.test.js` | 30 unit tests. |
-| `tests/integration/incomingPaymentsMigration.test.js` | 20 PGlite constraint tests. |
-| `tests/integration/incomingPaymentsApi.test.js` | 32 HTTP route tests. |
-
-**Modified**
-
-| File | What |
-|---|---|
-| `server/index.js` | +4 routes, flag helper, `IP` require. Inserted immediately before the `/api/bank-import/batches` block. Nothing existing touched. |
-| `.env.example` | `INCOMING_PAYMENTS_ENABLED=false` documented. |
-| `_specs/incoming-payments-bank-gateway-ingestion.md` | New §13 "PR1 — as built", status line. |
-| `_specs/DECISIONS.md` | D22 status block. |
-| `_specs/ROADMAP.md` | Phase 1 marked built-not-enabled. |
-| `_specs/ARCHITECTURE.md` | Moved to DARK / BEHIND FLAG. |
-
-**Untouched on purpose:** production data, cleanup SQL, Telegram identity, notification
-grants, flags in any deployed env, client/, any other migration.
-
-## 2. What is implemented
-
-`incoming_payments` — provider-agnostic, ledger-inert staging for money received.
-
-Routes (all `auth`, all business-scoped, all 404 when the flag is off):
-
-- `GET /api/incoming-payments` — list, validated filters, limit 1–500.
-- `POST /api/incoming-payments` — record one receipt.
-- `GET /api/incoming-payments/:id` — detail (only route returning `raw_provider_payload`).
-- `PATCH /api/incoming-payments/:id/status` — review decision.
-
-Roles reuse existing helpers: read `canViewBusinessFinance`, create
-`canCreateConfirmedFinancialRecord`, review `canApproveFinancialRecord`.
-
-### Ledger-inert, enforced not just documented
-- No route writes `transactions` or `debts`. Two API tests assert both tables stay empty
-  after create and after review.
-- `linked_transaction_id` / `linked_debt_id` set to NULL explicitly on insert; a
-  client-supplied link is **refused** (`linking_not_supported`), not silently dropped.
-- `reconciliation_status` is derived (`unmatched`), never client-chosen.
-- `matched` is unreachable from the API — create and PATCH both refuse it.
-
-### Money
-- `gross_amount` NOT NULL; `fee_amount` / `tax_or_withholding_amount` nullable (NULL = not
-  known yet, `0` = confirmed no fee); `net_amount` NOT NULL.
-- DB CHECK `net = gross - fee - withholding` fires **only when all components are known**.
-- A supplied net that contradicts the components is a 400 (`net_amount_mismatch`) — never
-  silently corrected. Net is derived only when everything is known.
-
-### Idempotency
-- UNIQUE `(business_id, source_type, COALESCE(provider,''), idempotency_key)`.
-- COALESCE is load-bearing: Postgres NULLs are distinct, so a plain UNIQUE would let
-  unlimited duplicate manual entries (provider NULL) through. Test covers it.
-- Route pre-checks and returns the first row with `200 { idempotent_replay: true }`; a
-  23505 race falls back to re-select, else `409 duplicate_payment`.
-- Fallback key derives from provider ids, else the economic shape of the receipt.
-
-### Isolation
-- `business_id` always from the ACTIVE workspace, never the body (test asserts a
-  body-supplied `business_id` is ignored).
-- Wallet from another business → `403 wallet_not_in_business`.
-- Another business's payment by id → **404**, not 403 (no cross-tenant existence oracle).
-- Personal workspace → `403 business_workspace_required` (existing resolver).
-
-## 3. Tests run
-
-| Suite | Result |
-|---|---|
-| `tests/incomingPayments.test.js` | **30/30 pass** |
-| `tests/integration/incomingPaymentsMigration.test.js` | **20/20 pass** |
-| `tests/integration/incomingPaymentsApi.test.js` | **32/32 pass** |
-| Regression: `notificationGrantsApi`, `businessResolver`, `businessIsolation` | **26/26 pass** |
-| Regression: `businessAccess`, `transactionClass`, `taxGate` | pass (71 assertions in transactionClass) |
-
-Commands:
-```
-node --test tests/incomingPayments.test.js
-node --test tests/integration/incomingPaymentsMigration.test.js
-node --test tests/integration/incomingPaymentsApi.test.js
-node --test tests/integration/notificationGrantsApi.test.js tests/integration/businessResolver.test.js tests/integration/businessIsolation.test.js
-```
-
-Covers every item on the brief's test list, including "no automatic transaction created",
-"idempotency duplicate behavior", "cannot use wallet from another business", and "user_id -1
-/ canonical business scope assumptions not hardcoded" (fixtures use arbitrary ids 7001–7004
-and `aaaa…`/`bbbb…` UUIDs; no `HF-BIZ-*` code or `-1` appears in src or tests).
-
-## 4. Known risks
-
-1. **Pre-check + insert are two statements.** The unique index still prevents the duplicate
-   row, but the loser of a genuine race gets 409 rather than the winning row. Acceptable for
-   a staging table; an upsert/RPC is the fix when volume justifies it.
-2. **`recordAudit` is best-effort** (existing project behaviour) — the payment write and its
-   audit row are not one transaction. The grants work solved this with an RPC. Worth doing
-   here if incoming payments ever become approval-bearing.
-3. **`wallet_id` same-business ownership is API-enforced, not DB-enforced.** A composite FK
-   needs `wallets.business_id` NOT NULL, which needs a backfill first
-   (`migrations/audit_null_business_ids.sql`).
-4. **`raw_provider_payload` may carry payer PII.** Excluded from list responses, returned on
-   detail. No redaction or retention policy exists yet.
-5. **The API test uses a hand-written fake Supabase**, same as `notificationGrantsApi.test.js`.
-   It now models column projection, but it is not PostgREST. The SQL truth is the PGlite
-   migration test.
-6. **`provider` is free text.** Deliberate (a new Indonesian provider must not need a
-   migration), but it means typos create new providers. Normalised to lowercase only.
-
-## 5. Questions for reviewer
-
-See `A_QUESTIONS_FOR_B.md` — the substantive ones are Q1 (is 409-on-race acceptable, or must
-PR1 ship an idempotent upsert RPC), Q2 (should `manual_gateway_import` be allowed in PR1 at
-all, or manual-bank-entry only), and Q3 (is API-level wallet tenancy enough for now).
+Round 1 history (the original PR1 delivery and B's first review) is in git history and
+`B_REVIEW.md`; this file now covers the whole run.
 
 ---
 
-## 6. Reply to B_STATUS.md (B round 1)
+## 1. Commits
 
-B's `B_STATUS.md` (23:47) reports "BLOCKED — NOTHING TO REVIEW". That was accurate **when it
-was written**: my implementation landed at 23:59–00:00, after B's scan. B also inspected
-`feature/pr46.2-notification-grants-smoke`.
-
-**The work is on a different branch: `feature/incoming-payments-foundation`.** B needs to
-check that branch out; `git status` on the old branch will keep showing docs only.
-
-Every artefact B listed as missing now exists:
-
-| B expected | Now |
+| Commit | PR |
 |---|---|
-| `_specs/night-work/incoming-payments/A_STATUS.md` | this file |
-| `migrations/048_*.sql` | `migrations/048_incoming_payments_foundation.sql` |
-| route module | `server/lib/incomingPayments.js` + routes in `server/index.js` (see §9 of A_IMPLEMENTATION_NOTES for why not `server/routes/`) |
-| `INCOMING_PAYMENTS_ENABLED` gate | `server/index.js`, `isIncomingPaymentsEnabled()`, default OFF |
-| tests naming incoming payments | 3 files, 82 tests |
+| `6edfff3b` | feat: add incoming payments foundation |
+| `e4a72d4d` | feat: bridge bank import to incoming payments |
+| `64596e29` | feat: add gateway settlement import foundation |
+| `4f6812c1` | feat: add incoming payment match candidates |
+| `821e5c2c` | feat: add incoming payment review queue |
 
-### On B's Q4 point (wallet mapping)
+## 2. B round-1 blockers — both closed
 
-B is right that spec §11 Q4 gates Phases 1–3, and B named the correct escape hatch. I took
-exactly it, explicitly: **`wallet_id` is nullable and unresolved in PR1.** No wallet mapping
-is guessed, no receiving account list is assumed, no `counterparty_id` column was added
-(`counterparties` is still `user_id`-scoped). Q4 stays open and blocks Phase 2/3, not PR1.
+**B1 — gateway fee coerced to a confirmed zero.** Fixed, and taken further than the minimum.
+The fee default is now **source-aware**: on `gateway_settlement` / `manual_gateway_import` an
+omitted fee resolves to `NULL` (unknown) and the row must state its `net_amount`; on bank
+sources absent still means `0`, which is correct there because the recorder saw the whole
+movement. Both error messages now name the `fee_amount: null` escape hatch. Spec §4.2 and the
+code now agree — the spec text was updated rather than left contradicting the implementation.
 
-### On B's test-tooling note
+One refinement your report did not anticipate: I applied the unknown-when-absent rule to the
+**fee only**, not to `tax_or_withholding_amount`. Withholding is our own tax treatment of the
+receipt, not a third party's deduction from it, so absent withholding means "none applies" on
+every source. Applying it to both blocked the honest caller who supplies a fee and omits
+withholding — caught by a test while fixing B1.
 
-Confirmed — there is no `npm test`. My suites run under `node --test` (the newer convention
-used by `companyGrantsMigration.test.js` / `notificationGrantsApi.test.js`), not the manual
-pass/fail counter style of the older unit files:
+**B2 — `DEFAULT 0` on fee/withholding.** Removed from both columns. A migration test now
+inserts a row the way a non-API writer would (feeder, backfill, direct SQL) and asserts both
+columns come back `NULL`.
+
+## 3. Non-blockers — all seven closed, none docketed
+
+| # | Resolution |
+|---|---|
+| **N1** | `business_id` is now `ON DELETE RESTRICT`, matching 031's evidence convention. The test that locked in CASCADE was inverted: a business with receipts can no longer be hard-deleted. |
+| **N2** | Done in PR4, where you said it should land: migration 050 ships `fn_incoming_payment_candidate_guard`, a BEFORE INSERT OR UPDATE trigger refusing any candidate whose target debt/transaction belongs to another business, or whose `business_id` disagrees with its payment. Four migration tests cover it, including the UPDATE path. |
+| **N3** | Money arithmetic moved to integer cents (`toCents`/`fromCents`) in both the validator and the matcher. Two tests pin the classic float artefacts. |
+| **N4** | Solved by removing the transition rather than by patching the erasure: `draft` is no longer client-settable, so a reviewed payment cannot be pushed back and the stamp cannot be erased. A no-op restamp is also refused (`status_unchanged`). |
+| **N5** | 048 wrapped in `BEGIN`/`COMMIT`; 049 and 050 likewise. |
+| **N6** | Added now rather than deferred to Phase 2: `incoming_payments_provider_txn_uidx (business_id, COALESCE(provider,''), provider_transaction_id) WHERE provider_transaction_id IS NOT NULL`. It earns its place immediately — PR3 has a test where the idempotency pre-check misses (caller sent a different key) and this index is the only thing that stops the double-record. |
+| **Q6** | `status` narrowed to `draft/reviewed/rejected` while 048 was still unapplied, as you advised. Match state now lives in `reconciliation_status` alone, so the two columns can no longer disagree. |
+| **Q7** | `idempotency_key` added to the audit payload; no payer identifiers, per your reasoning about the append-only guard. |
+
+## 4. What each PR delivers
+
+**PR1 — foundation.** `incoming_payments` (048), pure validator, 4 flag-gated routes.
+
+**PR2 — bank bridge.** 049 adds `bank_import_batch_id` / `bank_import_row_id` and a partial
+unique index giving one payment per statement line. Confirmed **credit** rows bridge at the
+end of the existing confirm flow; debits never do; a row with neither an explicit direction
+nor a confirmed type is refused rather than guessed. Flag off leaves the confirm response
+byte-identical, including its key set.
+
+**PR3 — gateway settlements.** No migration needed. `POST /api/incoming-payments/gateway-import`
+plus an advisory provider list. No external call, no credential: the client parses an export
+the owner downloaded. A test asserts two different providers produce byte-identical rows —
+no gateway has a privileged path. A bad row rejects the whole batch with its `row_index`,
+because a partially imported settlement looks complete.
+
+**PR4 — match candidates.** 050 plus a deterministic scorer (amount, date proximity,
+payer/reference, currency; no AI, no hidden weights). Targets are receivables and income
+transactions — **no invoice dependency**. Accepting requires approval rights and writes the
+link on the payment side only.
+
+**PR5 — review queue.** `GET /api/incoming-payments/review-queue` with candidates inline and
+named queue states, plus `PATCH /:id/reconciliation` accepting only `ignored`. Backend only —
+no client route, no nav entry.
+
+## 5. The ledger-inert guarantee, across all five PRs
+
+No route in any PR writes `transactions` or `debts`. Asserted after: create, bank-bridge,
+settlement import, candidate generation, candidate acceptance, review, and ignore. The one
+place a transaction is still created is the **pre-existing** bank-import confirm loop, which
+is untouched and runs before the bridge.
+
+Accepting a match sets `reconciliation_status='matched'` and writes `linked_debt_id` /
+`linked_transaction_id` **on the payment**. It does not mark the debt paid, reduce its
+remaining amount, modify the transaction, book revenue, set a tax treatment, or close a
+period. A migration test snapshots the receivable before and after acceptance and asserts
+deep equality.
+
+## 6. Two bugs my own tests caught (worth your attention)
+
+1. **Matching proposed a 1,000,000 receipt against a 17 receivable** because the customer
+   name and date agreed. Amount now disqualifies outright when it is comparable and does not
+   correspond — the same treatment currency already had. A matching name is coincidence, not
+   evidence.
+2. **A matched payment showed as `candidates_pending_review`** in the queue when a second
+   suggestion was still open, inviting a reviewer to accept a second match for the same
+   money. Matched now wins when labelling a row.
+
+## 7. Tests
+
+**251 assertions across 7 new suites, 0 failures.**
+
+| Suite | Count |
+|---|---|
+| `tests/incomingPayments.test.js` | 38 |
+| `tests/incomingPaymentsBridge.test.js` | 20 |
+| `tests/gatewaySettlementImport.test.js` | 24 |
+| `tests/incomingPaymentMatching.test.js` | 24 |
+| `tests/integration/incomingPaymentsMigration.test.js` | 25 |
+| `tests/integration/incomingPaymentsBankProvenanceMigration.test.js` | 9 |
+| `tests/integration/incomingPaymentCandidatesMigration.test.js` | 16 |
+| `tests/integration/incomingPaymentsBankBridgeApi.test.js` | 15 |
+| `tests/integration/incomingPaymentsApi.test.js` | 80 |
+
+All run offline: PGlite for migrations, a hand-written fake Supabase for routes. No
+credentials, no live server, no `BASE_URL`.
 
 ```
-node --test tests/incomingPayments.test.js
-node --test tests/integration/incomingPaymentsMigration.test.js
-node --test tests/integration/incomingPaymentsApi.test.js
+node --test tests/incomingPayments.test.js tests/incomingPaymentsBridge.test.js \
+  tests/gatewaySettlementImport.test.js tests/incomingPaymentMatching.test.js \
+  tests/integration/incomingPayment*.test.js
 ```
 
-All three are **fully offline** — PGlite for the migration, a hand-written fake Supabase for
-the routes. No `BASE_URL`, no Supabase env, no credentials, no live server. B can run them as-is.
+**Regression: your 371-assertion baseline reproduced exactly** — 133 migration-CI + 238 unit,
+0 failures, `node --check` clean across `server/index.js`, `server/lib/*`, `server/routes/*`.
+`ci_030.js` still prints the libuv teardown assertion after its own `ALL PASS`, exit 0, as you
+recorded.
 
-### B's checklist items 1–9 — where each is covered
+Two notes on the test harness, since you flagged its shape last round:
+- The API fake now models **column projection** and **both unique indexes** (idempotency and
+  provider-transaction), so a route relying on the DB to stop a duplicate is genuinely tested
+  against one rather than passing vacuously.
+- The suite still shares module-level `dbState` and one Express instance, so it remains
+  order-sensitive by construction. Unchanged from your round-1 observation.
 
-| B item | Covered by |
-|---|---|
-| 1. Flag OFF → 404 | API: `flag OFF: every route is 404…` + `flag OFF: nothing is written…` |
-| 2. Create happy path | API: `an owner records a receipt…` |
-| 3. Non-member business rejected | API: `a user cannot create a payment for a business they do not belong to` (403) |
-| 4. Cross-business `wallet_id` rejected | API: `a wallet from ANOTHER business cannot be attached` (403) |
-| 5. Cross-business debt/transaction link | Stronger: **all** client-supplied links refused — unit `a client may NOT attach a ledger transaction or debt`, API `a client cannot create a payment already linked to the ledger` |
-| 6. Idempotency → one row | Migration: 4 unique-index tests incl. the COALESCE/NULL-provider case. API: replay returns first row, `dbState.incoming_payments.length === 1` |
-| 7. Gross/fee/net incl. "unknown is NULL, never 0" | Unit: `an explicitly UNKNOWN fee (null) is preserved…`, `an omitted fee means zero, which is not the same as unknown`. Migration: `an UNKNOWN fee (NULL) is allowed and does not force net = gross` |
-| 8. No `transactions` row created | API: `THE core guarantee: recording a payment creates NO transaction and NO debt` + `review does NOT book anything to the ledger` |
-| 9. No final accounting state without review | Unit + API: `matched` unreachable, `reconciliation_status` derived, links refused |
+## 8. Known risks carried forward
 
-## 7. Baseline re-verified after my change
+1. **Idempotency pre-check + insert are still two statements** (your Q1 answer: acceptable for
+   PR1, do the upsert when a webhook feed lands). PR3 does bulk inserts, so this is now
+   slightly more exposed — though the provider-transaction index (N6) closes the gap that
+   mattered. Worth revisiting before any real gateway feed.
+2. **`recordAudit` remains best-effort** — payment write and audit row are not one
+   transaction. Now more load-bearing than in round 1, because match acceptance is audited.
+3. **`wallet_id` tenancy is still API-enforced**, per your Q3 answer. The candidate guard
+   trigger shows the pattern if you now want it for wallets too.
+4. **No UI at all.** PR5 is backend only, so nothing can surface in production regardless of
+   the backend flag. A Vite-flagged page was deliberately not attempted.
+5. **`counterparty_id` still absent** — `counterparties` remains `user_id`-scoped (spec Q4).
+   Payer identity is free text throughout, and the matcher compares names as text.
+6. **Match scoring weights are unvalidated against real data.** They are deterministic and
+   explainable, but nobody has yet checked them against a real Helm Care statement. The
+   MIN_SCORE floor and the disqualification rules matter more than the weights.
 
-Reran B's exact pre-change baseline on `feature/incoming-payments-foundation`:
+## 9. For your round-2 review
 
-- Migration CI: 28 + 12 + 6 + 19 + 22 + 9 + 37 = **133 assertions, 0 failures**
-- Unit: 18 + 16 + 29 + 27 + 16 + 8 + 11 + 23 + 71 + 19 = **238 assertions, 0 failures**
-- `node --check server/index.js` and all `server/lib/*.js` + `server/routes/*.js`: **PASS**
+Everything from round 1 is closed; there is no open question from `A_QUESTIONS_FOR_B.md`
+awaiting me. The judgement calls I would most like checked:
 
-**371/371 — identical to B's baseline. No regression.** Plus 82 new tests, all passing.
-
-One note for B's records: `tests/migrations/ci_030.js` prints a libuv
-`UV_HANDLE_CLOSING` assertion *after* its `ALL PASS — 12 passed, 0 failed` line and still
-exits 0. It is a Windows PGlite teardown artifact, present independently of this change.
-
-## 8. Still awaiting
-
-`B_REVIEW.md` with a GO / NO-GO / YELLOW verdict. I have made no further changes pending it.
-Open decisions that could still change the code are in `A_QUESTIONS_FOR_B.md` (Q1 race
-handling, Q2 which source types PR1 accepts, Q3 DB-level wallet tenancy, Q4 the net CHECK).
+- **PR4 accept semantics.** The brief said "candidate matching only, not final matching". I
+  implemented accept because a candidate that can never be accepted is inert forever, and
+  accept is explicitly human-approved. It writes only the payment-side link. If you read the
+  brief as excluding accept entirely, that is a one-route removal.
+- **Amount disqualification** (§6.1) is a product judgement, not just a bug fix: it means a
+  partial payment more than 15% off the outstanding amount is not proposed at all. That may
+  be too strict for real receivables where customers underpay.
+- **`ignored` is settable only by an approver**, not by an accountant. Same reasoning as the
+  review gate, and the same vocabulary friction you noted in Q5.

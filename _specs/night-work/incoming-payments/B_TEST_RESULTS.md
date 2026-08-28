@@ -1,178 +1,188 @@
-# B_TEST_RESULTS — Incoming Payments Foundation PR1
+# B_TEST_RESULTS — Incoming Payments (Round 2)
 
-Reviewer: Agent B · Round 1
-Tree: working tree, uncommitted. Code fingerprints (md5) verified identical before and after
-Agent A posted `A_STATUS.md`, so all results below refer to the settled implementation.
+Reviewer: Agent B
+PR1 state: committed `6edfff3b`, all PR1 files **frozen** (verified `git diff HEAD` per file).
+PR2 state: in progress, uncommitted, **no tests yet**.
 
-All tests were run **locally and offline**. No production credentials were supplied, no
-production SQL was run, no external API was called.
+All tests run locally and offline. No production credentials, no production SQL, no external
+API calls. Migrations 048/049 were never applied to any database — their behaviour is verified
+entirely in PGlite.
 
-## Test tooling — note for the record
+## Methodology note — why results are fingerprinted
 
-**There is no `npm test` script in this repo.** `package.json` defines only `dev`, `server`,
-`client`, `build`, `start`. The reviewer brief suggested `npm test -- --runInBand`; that command
-does not exist here and was not used. Tests are standalone Node files:
+Twice during this session I ran suites while Agent A was mid-write and got failures that were
+artifacts of a half-written tree, not defects. I now wrap every run in a before/after md5
+fingerprint of the file set and **discard any result where the bytes moved during the run**.
 
-- Unit / new suites: `node --test tests/<name>.test.js`
-- Legacy unit suites: `node tests/<name>.test.js` (own runner, prints `ALL PASS`)
-- Migration CI (PGlite, no DB): `node tests/migrations/ci_0NN.js`
+Discarded runs, recorded for honesty:
 
----
-
-## A. Agent A's new suites — **82 / 82 PASS**
-
-| Suite | Result |
-|---|---|
-| `tests/incomingPayments.test.js` | **30 pass / 0 fail** |
-| `tests/integration/incomingPaymentsMigration.test.js` | **20 pass / 0 fail** |
-| `tests/integration/incomingPaymentsApi.test.js` | **32 pass / 0 fail** |
-
-`incomingPaymentsApi.test.js` was run **4 consecutive times on the settled tree — 32/32 every
-run.**
-
-### Checklist item 4 coverage
-
-| Required by brief | Covered | Where |
+| Run | Reported | Disposition |
 |---|---|---|
-| flag OFF | ✅ | all 4 routes 404; **plus** "nothing is written even on a well-formed create" |
-| create valid incoming payment | ✅ | owner records receipt, 201, status `draft`/`unmatched` |
-| reject unauthorized business | ✅ | non-member refused; body `business_id` provably ignored |
-| reject cross-business wallet | ✅ | 403 `wallet_not_in_business`; same-business wallet accepted |
-| reject cross-business transaction/debt | ✅ | client linking refused `linking_not_supported` (links not implemented by design) |
-| idempotency duplicate | ✅ | replay → 200 + first row; explicit key; cross-business no collision; 23505 race returns winner not 500 |
-| gross/fee/net validation | ✅ | separation, derivation, contradiction → 400, unknown-fee (NULL) path |
-| no auto transaction created | ✅ | "THE core guarantee" asserts `transactions` and `debts` stay empty after create **and** after review |
-| no final accounting state | ✅ | cannot create as `matched`/`reviewed`; cannot self-declare `matched` |
+| Round 1, first pass | api 29/3 | **Discarded** — files changed mid-run; each test passed in isolation; settled tree 32/32 |
+| Round 2, first pass | unit 28/3, migration 18/2, api 31/1 | **Discarded** — files changed mid-run (A was landing the B1/B2 fixes) |
 
-Beyond the checklist: personal-workspace rejection, no cross-tenant existence oracle (404 not
-403), audit rows written on create and review, list-filter validation, `raw_provider_payload`
-excluded from list responses.
-
-### Transient failures observed during the review — resolved, not defects
-
-My first pass reported failures in three API tests:
-
-- `THE core guarantee: recording a payment creates NO transaction and NO debt`
-- `a replayed submission returns the FIRST row instead of duplicating the money`
-- `the list response omits the raw provider payload; the detail route returns it`
-
-**Cause: I was reading a moving target.** Agent A was still writing the files when I ran them.
-Evidence: each failing test passed when run in isolation via `--test-name-pattern`, and once the
-tree settled (md5-verified stable) the full file passed 32/32 on four consecutive runs.
-
-Recording rather than omitting, because one structural observation survives: the suite shares
-module-level `dbState` and a single Express instance across tests. It is order-sensitive by
-construction and could resurface under a parallel runner or `--test-concurrency > 1`. Not a
-defect in the current state.
-
-### Independent verification of a finding (not a test A wrote)
-
-To evidence blocker **B1** rather than assert it, I called the real validator directly
-(`server/lib/incomingPayments.js`, pure, no I/O):
-
-| Input | Output |
-|---|---|
-| `gateway_settlement` / `midtrans`, `gross 1,000,000`, fee omitted, net omitted | `fee=0, tax=0, net=1000000` |
-| same + true `net 967,810` | REJECTED `net_amount_mismatch` |
-| same + explicit `fee_amount: null` | `fee=null, net=967810` ✅ |
-| `manual_bank_entry`, `gross 500,000`, fee omitted | `fee=0, net=500000` ✅ |
-
-Row 1 is the blocking behaviour: a stored claim that the gateway charged nothing. Row 2 shows
-the honest caller is refused. See `B_REVIEW.md` §3 B1.
+Nothing below is from a discarded run.
 
 ---
 
-## B. Regression — **371 / 371 PASS, no regressions**
+## A. PR1 — **97 / 97 PASS**
+
+| Suite | Round 1 | Round 2 |
+|---|---|---|
+| `tests/incomingPayments.test.js` | 30 / 0 | **38 / 0** |
+| `tests/integration/incomingPaymentsMigration.test.js` | 20 / 0 | **25 / 0** |
+| `tests/integration/incomingPaymentsApi.test.js` | 32 / 0 | **34 / 0** |
+| **Total** | 82 | **97** |
+
+Assertion count rose by 15: A added coverage for the B1/B2 fixes and for the narrowed `status`
+vocabulary. Reproduced twice with identical results.
+
+### PR1 file freeze — verified
+
+```
+FROZEN: server/lib/incomingPayments.js
+FROZEN: migrations/048_incoming_payments_foundation.sql
+FROZEN: tests/incomingPayments.test.js
+FROZEN: tests/integration/incomingPaymentsApi.test.js
+FROZEN: tests/integration/incomingPaymentsMigration.test.js
+```
+
+Only `server/index.js` differs from the commit, and solely because of in-flight **PR2** bridge
+code. PR1's own routes (`3285-3479`) are unchanged apart from the `INCOMING_PAYMENT_LIST_COLS`
+edit, which is itself finding **P2-B2**.
+
+### Independent verification (not tests A wrote)
+
+Re-ran my round-1 probe directly against the validator to confirm B1 is genuinely fixed rather
+than merely re-described:
+
+| Input | Round 1 | Round 2 |
+|---|---|---|
+| `gateway_settlement`, gross 1,000,000, fee omitted, net omitted | `fee=0, net=1000000` ❌ | `REJECTED missing_net_amount` ✅ |
+| same + true net 967,810 | `REJECTED net_amount_mismatch` ❌ | `fee=null, tax=null, net=967810` ✅ |
+| same + fee 29,000, tax 3,190 | — | `net=967810` ✅ |
+| `manual_gateway_import`, gross only | — | `REJECTED missing_net_amount` ✅ |
+| `manual_bank_entry`, gross only | `fee=0` ✅ | `fee=0` ✅ |
+| `bank_statement_import`, gross only | — | `fee=0` ✅ |
+
+---
+
+## B. Regression — **262 / 262 PASS, no regressions**
 
 ### Migration CI (PGlite, offline)
 
-| Suite | Baseline | After PR1 |
+| Suite | Baseline | Now |
 |---|---|---|
 | `ci.js` | 28 / 0 | **28 / 0** |
-| `ci_030.js` | 12 / 0 | **12 / 0** (see note) |
 | `ci_035.js` | 6 / 0 | **6 / 0** |
 | `ci_036.js` | 19 / 0 | **19 / 0** |
 | `ci_037.js` | 22 / 0 | **22 / 0** |
 | `ci_038.js` | 9 / 0 | **9 / 0** |
 | `ci_039.js` | 37 / 0 | **37 / 0** |
 
-**133 assertions, 0 failures — identical to baseline.**
+**121 assertions, 0 failures.** (`ci_030.js` not re-run this round — see §D.)
 
-### Unit suites
+### Unit
 
-| Suite | Baseline | After PR1 |
+| Suite | Baseline | Now |
 |---|---|---|
-| `businessAccess` | 18 / 0 | **18 / 0** |
-| `documentAccess` | 16 / 0 | **16 / 0** |
-| `documentValidation` | 29 / 0 | **29 / 0** |
-| `documentsNoCashImpact` | 27 / 0 | **27 / 0** |
-| `dueDate` | 16 / 0 | **16 / 0** |
-| `orphanCleanup` | 8 / 0 | **8 / 0** |
-| `taxDocMath` | 11 / 0 | **11 / 0** |
-| `taxGate` | 23 / 0 | **23 / 0** |
 | `transactionClass` | 71 / 0 | **71 / 0** |
-| `money.mjs` | 19 / 0 | **19 / 0** |
+| `documentValidation` | 29 / 0 | **29 / 0** |
+| `businessAccess` | 18 / 0 | **18 / 0** |
+| `taxGate` | 23 / 0 | **23 / 0** |
 
-**238 assertions, 0 failures — identical to baseline.**
+**141 assertions, 0 failures.**
 
-### CI gate (mirrors `.github/workflows/ci.yml`)
+### Syntax / CI gate
 
-| Check | Result |
+`node --check server/index.js` PASS · `node --check server/lib/incomingPayments.js` PASS ·
+`node --check server/lib/incomingPaymentsBridge.js` PASS.
+
+Client build not run — PR1 and PR2 touch **zero** files under `client/`.
+
+---
+
+## C-bis. PR2 as committed (`e4a72d4d`) — **44 / 44 PASS, and that is not enough**
+
+| Suite | Result |
 |---|---|
-| `node --check server/index.js` | **PASS** |
-| `node --check server/lib/incomingPayments.js` | **PASS** |
-| `node --check` all `server/lib/*.js`, `server/routes/*.js` | **PASS** |
-| `cd client && npm run build` | **NOT RUN** — see below |
+| `tests/incomingPaymentsBridge.test.js` | **20 / 0** |
+| `tests/integration/incomingPaymentsBankBridgeApi.test.js` | **15 / 0** |
+| `tests/integration/incomingPaymentsBankProvenanceMigration.test.js` | **9 / 0** |
 
-The client build was skipped deliberately. `npm run build` runs `npm ci`, which deletes and
-reinstalls `client/node_modules`. PR1 touches **no** client file (`git status` confirms zero
-changes under `client/`), so the build has no review value here and the mutation is not worth
-it. It remains a CI gate on the eventual PR.
+Run with the fingerprint guard; bytes stable across the run, so these results are valid.
 
----
+**Both blockers survive a fully green suite.** This is the clearest example in this session of
+why a passing run is not by itself evidence:
 
-## C. Pre-existing environment artifact — not caused by this PR
+- **P2-B1** — `incomingPaymentsBankBridgeApi.test.js:152` drives
+  `/api/bank-import/batches/:id/confirm` (V1). The UI calls
+  `/api/bank-imports/:batchId/confirm` (cascade, `server/index.js:4255`), which is still
+  unbridged. The suite and production exercise different endpoints, so the suite passes while a
+  real import produces zero incoming payments.
+- **P2-B2** — the fake Supabase projects with `st.cols.filter((c) => c in r)`
+  (`incomingPaymentsApi.test.js:71`), silently dropping unknown columns. Selecting the 049
+  columns without 049 applied is therefore untestable here and would only surface against real
+  PostgREST, as a 500 on every incoming-payments route.
 
-`tests/migrations/ci_030.js` prints, on every run:
+Neither is a test-quality complaint about what A wrote — the 44 assertions are well constructed.
+The gap is that both defects live precisely where this harness cannot see.
 
-```
-ALL PASS — 12 passed, 0 failed
-Assertion failed: !(handle->flags & UV_HANDLE_CLOSING), file src\win\async.c, line 94
-```
+## C. PR2 — original assessment (superseded by C-bis; retained for the record)
 
-exit code **0**. All 12 assertions pass; the libuv assertion fires at process teardown after
-the run completes. It is a PGlite/libuv/Windows artifact, reproduced 3/3 times, on a file this
-PR does not touch (`migrations/030_*` and `tests/migrations/ci_030.js` are both unmodified).
-Recorded so it is not later misattributed to this PR.
+`migrations/049_*.sql` and `server/lib/incomingPaymentsBridge.js` are untracked and have no
+coverage. Nothing under `tests/` references the bridge, 049, or either confirm route.
 
----
+### What PR2 must add before it can be graded
 
-## D. Not run, and why
-
-- **Integration suites requiring live infrastructure** (`businessIsolation`, `httpE2E`,
-  `emailAuthHttp`, and similar) need `BASE_URL`, `JWT_SECRET`, `SUPABASE_URL`,
-  `SUPABASE_SECRET_KEY` and a running server. Supplying those means handling production
-  credentials, which the hard restrictions bar. They self-skip cleanly without env, which is not
-  a meaningful signal, so they are recorded as **not run** rather than as passing.
-
-  Note: Agent A reports running `businessResolver`, `businessIsolation` and
-  `notificationGrantsApi` (26/26). I could not independently reproduce the credential-dependent
-  ones and am not vouching for them.
-- **Any production SQL.** Not run. Schema facts in this review come from a local `pg_dump`
-  artifact dated 2026-08-27, never from a live query.
-- **Migration 048 was never applied** to any database. Its behaviour was verified entirely in
-  PGlite.
+1. **Migration CI for 049** (PGlite): additive + idempotent re-apply; the partial unique index
+   rejects a second payment for the same `bank_import_row_id`; the same row id is allowed in a
+   different business; `ON DELETE SET NULL` preserves the payment when a batch is deleted.
+2. **Bridge unit tests** (`buildPaymentFromBankRow` is pure and trivially testable): credit
+   accepted; debit rejected; unrecognised direction rejected; unconfirmed/excluded rejected;
+   cross-business row rejected; cross-business batch rejected; row/batch mismatch rejected;
+   gross = net with fee 0; idempotency key derived from `dedup_hash` with row-id fallback.
+3. **Route tests driving the CASCADE confirm** (`/api/bank-imports/:batchId/confirm`) — the
+   route the UI actually calls. A test that drives only the V1 route would pass while the
+   feature is dead in production. This is finding **P2-B1**.
+4. **Flag-OFF characterization of the existing bank-import confirm** — see §E.
 
 ---
 
-## Totals
+## D. Known environment artifact — unchanged, not caused by this work
+
+`tests/migrations/ci_030.js` prints `Assertion failed: !(handle->flags & UV_HANDLE_CLOSING)`
+(libuv/Windows) **after** reporting `ALL PASS — 12 passed, 0 failed`, exit code 0. Reproduced
+3/3 in round 1 on files this work does not touch. Excluded from this round's run to keep the
+signal clean; its status is unchanged.
+
+---
+
+## E. Standing gap — the repo has ZERO bank-import tests
+
+Verified again this round: no file under `tests/`, `tests/integration/`, or `tests/migrations/`
+matches `bank`. The bank-import path is 10 routes across roughly 980 lines
+(`server/index.js:3257-4240`) with two ledger-writing sites (`:3649`, `:4155`) and has never had
+a test.
+
+PR2's first checklist item — *"existing bank import behavior unchanged when flag OFF"* — cannot
+be regression-proven against a suite that does not exist. I have snapshotted the pre-PR2 code so
+I can diff it byte-for-byte on my side (`:3257-3688` md5 `ad1dd583…`, `:3689-4240` md5
+`0877d0f2…`), but a diff review is weaker than a passing characterization test, and this path
+writes real ledger transactions.
+
+---
+
+## Totals this round
 
 | Group | Assertions | Failures |
 |---|---|---|
-| Agent A's new suites | 82 | 0 |
-| Pre-existing regression | 371 | 0 |
-| **Total verified** | **453** | **0** |
+| PR1 suites | 97 | 0 |
+| Regression | 262 | 0 |
+| PR2 | 0 | — (no tests exist) |
+| **Verified** | **359** | **0** |
 
-Test evidence supports a GO. The YELLOW verdict in `B_REVIEW.md` rests on two code findings
-(B1, B2), not on any failing test — and B1 is precisely the kind of defect a green suite does
-not catch, because A's tests encode the current behaviour as intended.
+PR1's test evidence supports its **GO**. PR2's two blockers are **not** test failures — P2-B1 is
+a wiring gap no current test covers, and P2-B2 is provably invisible to the test suite because
+the fake Supabase silently drops unknown columns. Both are cases where a green run is not
+evidence of correctness.

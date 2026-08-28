@@ -1,12 +1,11 @@
 # Spec — Incoming Payments / Gateway & Bank Ingestion
 
-Status: **SPEC + PHASE 1 BUILT (not enabled).** Phase 1 is implemented on branch
-`feature/incoming-payments-foundation` behind `INCOMING_PAYMENTS_ENABLED` (default OFF) —
-see §13 for what was actually built and where it differs from this spec. Phases 2–5 remain
-plan only; their table shapes are still *conceptual* and must be re-approved before any
-further migration is written.
+Status: **PHASES 1-4 BUILT (not enabled).** Implemented on branch
+`feature/incoming-payments-foundation` behind `INCOMING_PAYMENTS_ENABLED` (default OFF),
+migrations 048/049/050 **not applied to any database**. See sections 13-16 for what was
+actually built. Phase 5 (direct bank APIs) remains plan only and unstarted.
 
-Last updated: 2026-08-27.
+Last updated: 2026-08-28.
 
 Related: [[D22]] (Incoming Payments Are Accounting Evidence) · [[D6]] (Engine Calculates,
 AI Explains) · [[D3]] (Personal and Business Money Are Separate) · [[D9]] (Archive-First) ·
@@ -611,3 +610,48 @@ already use -- and posts a settlement header plus rows.
   which is what catches a caller who resubmits the same transaction under a new key.
 - **Ledger-inert.** Rows become draft/unmatched evidence. A row arriving with a ledger link is
   refused rather than silently stripped.
+
+---
+
+## 16. PR4/PR5 -- matching and review surface, as built
+
+**PR4 -- match candidates.** Migration `050_incoming_payment_match_candidates.sql` plus
+`server/lib/incomingPaymentMatching.js` (pure, deterministic) and three routes.
+
+- Targets are receivables (`debts.type='receivable'`) and income transactions. **No invoice
+  target**: `invoices` is unapplied in production and a matching engine must not depend on a
+  table that does not exist there.
+- Scoring is deterministic and explainable -- amount 0.5, date proximity 0.2,
+  payer/reference 0.2, currency 0.1 -- with structured `match_reasons` on every candidate.
+  No AI, no hidden weights. Per D6 the engine computes and explains; the human decides.
+- Both **gross and net** are compared against the target amount, because which side absorbs
+  the gateway fee is exactly what is not yet known.
+- A currency mismatch, or an amount that is comparable and does not correspond, disqualifies
+  outright. A matching name and date are coincidence, not evidence.
+- Weak proposals below `MIN_SCORE` are withheld: a reviewer shown twenty weak candidates
+  stops reading them.
+- A **same-business guard trigger** (`fn_incoming_payment_candidate_guard`) refuses any
+  candidate whose target belongs to another business, or whose `business_id` disagrees with
+  its payment. The API checks this too; a cross-company match is the worst thing this feature
+  could do, so it belongs in the database as well.
+- Accepting requires approval rights and writes `linked_debt_id` / `linked_transaction_id`
+  and `reconciliation_status='matched'` **on the payment only**. It does not mark the debt
+  paid, change its remaining amount, modify the transaction, book revenue, set a tax
+  treatment, or close a period. A re-run of the engine never overwrites a human decision.
+
+**PR5 -- review queue.** `GET /api/incoming-payments/review-queue` and
+`PATCH /api/incoming-payments/:id/reconciliation`. No migration.
+
+- Outstanding receipts with their suggested matches inline, best-first, in named states:
+  `no_candidate`, `candidates_pending_review`, `matched_awaiting_review`.
+- A receipt with **no** candidate is shown, not hidden -- unexplained cash is what the queue
+  exists to surface (section 2.7).
+- `matched` wins over leftover suggestions when labelling a row, so a reviewer is never
+  invited to accept a second match for the same money.
+- Totals use the **net that landed** and refuse to sum mixed currencies rather than emit a
+  meaningless number.
+- `ignored` is the only value settable through the reconciliation route -- a human deciding a
+  receipt needs no match. It books nothing and cannot be applied to a matched payment.
+  Matching happens only by accepting a candidate.
+- Backend only: no client route and no navigation entry, so nothing can surface in production
+  regardless of the backend flag.
