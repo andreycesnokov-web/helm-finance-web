@@ -12,10 +12,21 @@ const payment = (o = {}) => ({
   transaction_at: '2026-08-10T00:00:00.000Z', payer_name: 'PT Maju Jaya',
   payer_reference: 'INV-100', description: 'transfer', ...o,
 });
-const debt = (o = {}) => ({
-  id: 11, business_id: BIZ_A, type: 'receivable', status: 'open', remaining_amount: 1000000,
-  due_date: '2026-08-10', counterparty: 'PT Maju Jaya', currency: 'IDR', ...o,
-});
+// PRODUCTION SHAPE. The candidate route feeds the matcher raw rows from `select('*')`, which
+// return database columns only. `remaining_amount` is NOT one of them - it is computed by
+// computeDebtStatus() when the debts API serves a row. A fixture that supplies it constructs a
+// shape production never produces, which is how B4-1 stayed invisible: the tests passed over a
+// row the matcher never actually receives. `outstanding` here sets paid_amount, not a computed
+// balance, so every test below exercises the real derivation.
+const debt = ({ outstanding = 1000000, invoiced, ...o } = {}) => {
+  const original = invoiced ?? outstanding;
+  return {
+    id: 11, business_id: BIZ_A, type: 'receivable', status: 'open',
+    original_amount: original, amount: original,
+    paid_amount: Math.round((original - outstanding) * 100) / 100,
+    due_date: '2026-08-10', counterparty: 'PT Maju Jaya', currency: 'IDR', ...o,
+  };
+};
 const tx = (o = {}) => ({
   id: 21, business_id: BIZ_A, type: 'income', amount_idr: 1000000,
   transaction_date: '2026-08-10', counterparty_name: 'PT Maju Jaya', currency_original: 'IDR', ...o,
@@ -64,7 +75,7 @@ test('there is no invoice target — invoices do not exist in production', () =>
 
 // ── Amount ───────────────────────────────────────────────────────────────────────────────
 test('an exact amount scores highest and says so', () => {
-  const [c] = build(payment(), { debts: [debt({ remaining_amount: 1000000 })] });
+  const [c] = build(payment(), { debts: [debt({ outstanding: 1000000 })] });
   assert.ok(c.match_reasons.some((r) => r.key === 'amount_exact'));
 });
 
@@ -72,24 +83,24 @@ test('NET is compared as well as gross — the fee side is not assumed', () => {
   // The receivable is for the net that landed; which side absorbs the gateway fee is exactly
   // what we do not know yet, so both are tried.
   const p = payment({ gross_amount: 1000000, net_amount: 967810 });
-  const [c] = build(p, { debts: [debt({ remaining_amount: 967810 })] });
+  const [c] = build(p, { debts: [debt({ outstanding: 967810 })] });
   assert.ok(c, 'a net-amount match was not proposed');
   assert.ok(c.match_reasons.some((r) => r.key === 'amount_exact' && /net/.test(r.detail)));
 });
 
 test('a wildly different amount is not proposed at all', () => {
-  assert.strictEqual(build(payment(), { debts: [debt({ remaining_amount: 17 })] }).length, 0);
+  assert.strictEqual(build(payment(), { debts: [debt({ outstanding: 17 })] }).length, 0);
 });
 
 test('a near amount scores lower than an exact one', () => {
-  const exact = build(payment(), { debts: [debt({ id: 1, remaining_amount: 1000000 })] })[0];
-  const near = build(payment(), { debts: [debt({ id: 2, remaining_amount: 1004000 })] })[0];
+  const exact = build(payment(), { debts: [debt({ id: 1, outstanding: 1000000 })] })[0];
+  const near = build(payment(), { debts: [debt({ id: 2, outstanding: 1004000 })] })[0];
   assert.ok(near.score < exact.score, 'a 0.4% gap scored as well as an exact match');
 });
 
 test('amount comparison runs in cents, not floats', () => {
   const p = payment({ gross_amount: 0.3, net_amount: 0.3 });
-  const [c] = build(p, { debts: [debt({ remaining_amount: 0.3 })] });
+  const [c] = build(p, { debts: [debt({ outstanding: 0.3 })] });
   assert.ok(c.match_reasons.some((r) => r.key === 'amount_exact'));
 });
 
@@ -141,7 +152,7 @@ test('an unknown currency is neutral, not disqualifying', () => {
 
 // ── Output shape ─────────────────────────────────────────────────────────────────────────
 test('candidates are sorted best-first and capped', () => {
-  const debts = Array.from({ length: 25 }, (_, i) => debt({ id: i + 1, remaining_amount: 1000000 }));
+  const debts = Array.from({ length: 25 }, (_, i) => debt({ id: i + 1, outstanding: 1000000 }));
   const out = build(payment(), { debts });
   assert.strictEqual(out.length, M.MAX_CANDIDATES);
   for (let i = 1; i < out.length; i++) assert.ok(out[i - 1].score >= out[i].score);
@@ -164,7 +175,7 @@ test('every candidate is explainable and correctly targeted', () => {
 test('weak proposals are withheld rather than shown as noise', () => {
   // Amount 15% off, no name, no reference, no date: below the floor.
   const p = payment({ payer_name: null, payer_reference: null, description: null, transaction_at: null });
-  assert.strictEqual(build(p, { debts: [debt({ remaining_amount: 1150000, counterparty: null, due_date: null })] }).length, 0);
+  assert.strictEqual(build(p, { debts: [debt({ outstanding: 1150000, counterparty: null, due_date: null })] }).length, 0);
 });
 
 test('the scorer never proposes a decision — only a score and reasons', () => {
@@ -179,24 +190,78 @@ test('the scorer never proposes a decision — only a score and reasons', () => 
 // had coverage, which is why they survived: each is a case where the code looks right and
 // the tests agree, because both make the same wrong assumption.
 
-// 1. Schema assumptions. The fake Supabase returns whatever the fixture holds, so a column
-//    that does not exist in the real database looks identical to one that does.
+// 1. Schema assumptions (B4-1). The fake Supabase returns whatever the fixture holds, so a
+//    column that does not exist in the real database looks identical to one that does. My first
+//    pass at these tests supplied `remaining_amount` and therefore asserted the bug was correct.
 test('the matcher reads only columns that actually exist on debts', () => {
   // `debts` has no `reference` column (migrations 006/015 + the production insert shape).
   // Reading one would silently evaluate to undefined and look like a working comparison.
   const t = M.receivableTarget({
-    id: 1, business_id: BIZ_A, remaining_amount: 1000, due_date: '2026-08-10',
-    counterparty: 'X', currency: 'IDR', notes: 'INV-100',
+    id: 1, business_id: BIZ_A, original_amount: 1000, amount: 1000, paid_amount: 0,
+    due_date: '2026-08-10', counterparty: 'X', currency: 'IDR', notes: 'INV-100',
   });
   assert.strictEqual(t.reference, 'INV-100', 'notes is the only free-text field to match on');
-  assert.strictEqual(t.amount, 1000, 'remaining_amount is what is still owed');
+  assert.strictEqual(t.amount, 1000);
 });
 
-test('a partial payment is compared against what is STILL OWED, not the original amount', () => {
-  // Comparing against original_amount would score a legitimate partial payment as a mismatch.
-  const t = M.receivableTarget({ id: 1, business_id: BIZ_A, original_amount: 5000,
-    amount: 5000, remaining_amount: 1000 });
-  assert.strictEqual(t.amount, 1000);
+// ── B4-1 regression: outstanding must be DERIVED, never read off a raw row ────────────────
+const partPaid = (o = {}) => ({
+  id: 11, business_id: BIZ_A, type: 'receivable', status: 'partial',
+  original_amount: 10000000, amount: 10000000, paid_amount: 7000000,
+  due_date: '2026-08-10', counterparty: 'PT Maju Jaya', currency: 'IDR', ...o,
+});
+
+test('B4-1: a partially-paid receivable is matched on a PRODUCTION-shaped row', () => {
+  // Exactly what select('*') returns: no remaining_amount, no computed fields at all.
+  // Before the fix this scored against the 10,000,000 invoice amount and produced NOTHING,
+  // while the old fixture (which supplied remaining_amount) reported a perfect match.
+  const production = partPaid();
+  assert.ok(!('remaining_amount' in production), 'fixture must not carry a computed field');
+  assert.strictEqual(M.outstandingAmount(production), 3000000);
+
+  const receipt = payment({ gross_amount: 3000000, net_amount: 3000000,
+    transaction_at: '2026-08-11T00:00:00.000Z', payer_reference: null });
+  const [c] = M.buildCandidates(receipt, { debts: [production] });
+  assert.ok(c, 'a partially-paid receivable was invisible to the matcher');
+  assert.ok(c.match_reasons.some((r) => r.key === 'amount_exact'));
+});
+
+test('B4-1 inverse: a receipt for the full INVOICE amount is not a match once part-paid', () => {
+  // The mirror hazard: scoring against the original amount made an unrelated 10,000,000
+  // receipt look like an exact match for a receivable with only 3,000,000 left to collect.
+  const receipt = payment({ gross_amount: 10000000, net_amount: 10000000,
+    transaction_at: '2026-08-11T00:00:00.000Z', payer_reference: null });
+  assert.strictEqual(M.buildCandidates(receipt, { debts: [partPaid()] }).length, 0);
+});
+
+test('B4-1: raw and enriched rows give the SAME answer', () => {
+  // computeDebtStatus() normalises original_amount/paid_amount and merges remaining_amount.
+  // Deriving from the base columns means both shapes agree, so it does not matter which the
+  // caller happens to pass.
+  const base = partPaid();
+  const enriched = { ...base, remaining_amount: 3000000 };   // what computeDebtStatus adds
+  const receipt = payment({ gross_amount: 3000000, net_amount: 3000000,
+    transaction_at: '2026-08-11T00:00:00.000Z', payer_reference: null });
+  assert.deepStrictEqual(
+    M.buildCandidates(receipt, { debts: [base] }),
+    M.buildCandidates(receipt, { debts: [enriched] }));
+});
+
+test('B4-1: a fully-paid receivable is excluded even if its stored status has drifted', () => {
+  // With a zero target the amount signal becomes uncomparable, so name + date agreement alone
+  // could otherwise carry a settled receivable over the floor.
+  const settled = partPaid({ status: 'open', original_amount: 1000000, amount: 1000000,
+    paid_amount: 1000000 });
+  assert.strictEqual(M.outstandingAmount(settled), 0);
+  assert.strictEqual(M.buildCandidates(payment(), { debts: [settled] }).length, 0);
+});
+
+test('outstanding falls back to amount when original_amount is absent', () => {
+  assert.strictEqual(M.outstandingAmount({ amount: 500, paid_amount: 200 }), 300);
+  assert.strictEqual(M.outstandingAmount({ amount: 500 }), 500);
+  assert.strictEqual(M.outstandingAmount({}), 0);
+  // Never negative, mirroring the Math.max(0, ...) in computeDebtStatus.
+  assert.strictEqual(M.outstandingAmount({ amount: 100, paid_amount: 250 }), 0);
 });
 
 test('transactions expose no reference, and the matcher does not pretend otherwise', () => {
@@ -208,23 +273,28 @@ test('transactions expose no reference, and the matcher does not pretend otherwi
 // 2. Production returns NUMERIC as strings; the fake returns JS numbers. Every money path
 //    must survive the real shape.
 test('scoring works on PostgREST string numerics, not just JS numbers', () => {
-  const payment = { id: 'p', business_id: BIZ_A, gross_amount: '1000000.00',
+  const p = { id: 'p', business_id: BIZ_A, gross_amount: '1000000.00',
     net_amount: '967810.00', currency: 'IDR', transaction_at: '2026-08-10T00:00:00.000Z',
     payer_name: 'PT Maju Jaya' };
-  const debt = { id: 11, business_id: BIZ_A, type: 'receivable', status: 'open',
-    remaining_amount: '967810.00', due_date: '2026-08-10', counterparty: 'PT Maju Jaya',
-    currency: 'IDR' };
-  const [c] = M.buildCandidates(payment, { debts: [debt] });
+  const d = { id: 11, business_id: BIZ_A, type: 'receivable', status: 'open',
+    original_amount: '967810.00', amount: '967810.00', paid_amount: '0.00',
+    due_date: '2026-08-10', counterparty: 'PT Maju Jaya', currency: 'IDR' };
+  const [c] = M.buildCandidates(p, { debts: [d] });
   assert.ok(c, 'string numerics produced no candidate');
   assert.ok(c.match_reasons.some((r) => r.key === 'amount_exact' && /net/.test(r.detail)));
 });
 
+test('outstanding is derived correctly from string numerics', () => {
+  assert.strictEqual(
+    M.outstandingAmount({ original_amount: '10000000.00', paid_amount: '7000000.00' }), 3000000);
+});
+
 test('a string-numeric amount mismatch still disqualifies', () => {
-  const payment = { id: 'p', business_id: BIZ_A, gross_amount: '1000000.00',
+  const p = { id: 'p', business_id: BIZ_A, gross_amount: '1000000.00',
     net_amount: '1000000.00', currency: 'IDR', payer_name: 'PT Maju Jaya',
     transaction_at: '2026-08-10T00:00:00.000Z' };
-  const debt = { id: 11, business_id: BIZ_A, type: 'receivable', status: 'open',
-    remaining_amount: '17.00', due_date: '2026-08-10', counterparty: 'PT Maju Jaya',
-    currency: 'IDR' };
-  assert.strictEqual(M.buildCandidates(payment, { debts: [debt] }).length, 0);
+  const d = { id: 11, business_id: BIZ_A, type: 'receivable', status: 'open',
+    original_amount: '17.00', amount: '17.00', paid_amount: '0.00',
+    due_date: '2026-08-10', counterparty: 'PT Maju Jaya', currency: 'IDR' };
+  assert.strictEqual(M.buildCandidates(p, { debts: [d] }).length, 0);
 });

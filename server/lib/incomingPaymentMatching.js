@@ -27,6 +27,7 @@ const DATE_FULL_MATCH_DAYS = 1;
 const DATE_MAX_DAYS = 30;
 
 const toCents = (n) => Math.round(Number(n) * 100);
+const fromCents = (c) => c / 100;
 const isNum = (n) => n !== null && n !== undefined && Number.isFinite(Number(n));
 
 function normalizeText(s) {
@@ -134,20 +135,39 @@ function scoreCurrency(payment, target) {
 }
 
 /**
+ * Outstanding balance of a receivable, derived from REAL `debts` columns.
+ *
+ * `remaining_amount` is NOT a database column. It is a computed field that
+ * `computeDebtStatus()` (server/index.js) merges in when serving the debts API. The matcher is
+ * fed raw rows from `select('*')`, which return database columns only — so reading
+ * `remaining_amount` here yielded `undefined` in production and silently fell back to the
+ * ORIGINAL invoice amount. A partially-paid receivable then became invisible to matching,
+ * while an unrelated receivable still open at its full amount looked like an exact match.
+ *
+ * This mirrors `computeDebtStatus` exactly — `original_amount || amount`, minus `paid_amount`,
+ * floored at zero — so both shapes agree. It is deliberately computed from the same base
+ * columns that `computeDebtStatus` itself normalises, which means it returns the same answer
+ * whether it is handed a raw row or an already-enriched one.
+ */
+function outstandingAmount(debt) {
+  const effective = Number(debt.original_amount || debt.amount || 0);
+  const paid = Number(debt.paid_amount || 0);
+  if (!Number.isFinite(effective) || !Number.isFinite(paid)) return 0;
+  // Integer cents, consistent with the rest of this module.
+  return fromCents(Math.max(0, toCents(effective) - toCents(paid)));
+}
+
+/**
  * Normalise a receivable into the shape the scorer compares against.
  *
- * Column names are the REAL `debts` columns (see migrations 006/015 and the insert at
- * server/index.js). `remaining_amount` is what is still owed and is the right comparison
- * target: matching a partial payment against the original amount would score it as a
- * mismatch. `debts` has no `reference` column, so `notes` is the only free-text field a
- * payer reference could agree with.
+ * Column names are the REAL `debts` columns (migrations 006/015/017 and the production insert
+ * shape). `debts` has no `reference` column, so `notes` is the only free-text field a payer
+ * reference could agree with.
  */
 function receivableTarget(debt) {
-  const outstanding = isNum(debt.remaining_amount) ? debt.remaining_amount
-    : (isNum(debt.amount) ? debt.amount : debt.original_amount);
   return {
     type: 'debt', id: debt.id, business_id: debt.business_id,
-    amount: outstanding,
+    amount: outstandingAmount(debt),
     date: debt.due_date || debt.created_at || null,
     counterparty: debt.counterparty || null,
     reference: debt.notes || null,
@@ -236,6 +256,11 @@ function buildCandidates(payment, { debts = [], transactions = [] } = {}) {
     // Receivables only: a payable is money we owe, and incoming money never settles one here.
     if (d.type !== 'receivable') continue;
     if (d.status === 'paid' || d.is_settled === true) continue;
+    // Nothing left to collect means nothing to match against. Checked on the DERIVED balance
+    // rather than trusting the stored status: a fully-paid receivable whose status column has
+    // drifted would otherwise still be proposed, and with a zero target the amount signal
+    // becomes uncomparable — letting name and date agreement alone carry it over the floor.
+    if (outstandingAmount(d) <= 0) continue;
     consider(receivableTarget(d));
   }
   for (const t of transactions) {
@@ -250,5 +275,5 @@ function buildCandidates(payment, { debts = [], transactions = [] } = {}) {
 module.exports = {
   WEIGHTS, MIN_SCORE, MAX_CANDIDATES,
   scoreAmount, scoreDate, scoreReference, scoreTarget,
-  receivableTarget, transactionTarget, buildCandidates,
+  outstandingAmount, receivableTarget, transactionTarget, buildCandidates,
 };

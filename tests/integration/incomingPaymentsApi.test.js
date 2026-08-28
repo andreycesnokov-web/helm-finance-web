@@ -566,12 +566,18 @@ const cand = (id) => `${URL_LIST}/${id}/candidates`;
 function seedTargets() {
   // A receivable and an income transaction in BIZ_A that a 1,000,000 receipt should match,
   // plus look-alikes in BIZ_B that it must never match.
+  // PRODUCTION SHAPE (B4-1): the candidate route feeds the matcher raw rows from select(*),
+  // which carry database columns only. remaining_amount is computed by computeDebtStatus and
+  // is never present here, so the fixture must not supply it.
   dbState.debts = [
-    { id: 11, business_id: BIZ_A, type: 'receivable', status: 'open', remaining_amount: 1000000,
+    { id: 11, business_id: BIZ_A, type: 'receivable', status: 'open',
+      original_amount: 1000000, amount: 1000000, paid_amount: 0,
       due_date: '2026-08-10', counterparty: 'PT Maju Jaya', currency: 'IDR' },
-    { id: 12, business_id: BIZ_B, type: 'receivable', status: 'open', remaining_amount: 1000000,
+    { id: 12, business_id: BIZ_B, type: 'receivable', status: 'open',
+      original_amount: 1000000, amount: 1000000, paid_amount: 0,
       due_date: '2026-08-10', counterparty: 'PT Maju Jaya', currency: 'IDR' },
-    { id: 13, business_id: BIZ_A, type: 'payable', status: 'open', remaining_amount: 1000000,
+    { id: 13, business_id: BIZ_A, type: 'payable', status: 'open',
+      original_amount: 1000000, amount: 1000000, paid_amount: 0,
       due_date: '2026-08-10', counterparty: 'PT Maju Jaya', currency: 'IDR' },
   ];
   dbState.transactions = [
