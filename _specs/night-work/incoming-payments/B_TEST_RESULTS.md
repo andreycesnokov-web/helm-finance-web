@@ -102,7 +102,45 @@ Client build not run — PR1 and PR2 touch **zero** files under `client/`.
 
 ---
 
-## C-bis. PR2 as committed (`e4a72d4d`) — **44 / 44 PASS, and that is not enough**
+## FINAL — all five PRs, 565 assertions, 0 failures
+
+Run under the before/after md5 fingerprint guard; bytes stable across the run.
+
+### Feature suites (257)
+
+| Suite | PR | Result |
+|---|---|---|
+| `tests/incomingPayments.test.js` | 1 | **38 / 0** |
+| `tests/integration/incomingPaymentsMigration.test.js` | 1 | **25 / 0** |
+| `tests/integration/incomingPaymentsApi.test.js` | 1,3,5 | **80 / 0** |
+| `tests/incomingPaymentsBridge.test.js` | 2 | **20 / 0** |
+| `tests/integration/incomingPaymentsBankBridgeApi.test.js` | 2 | **21 / 0** |
+| `tests/integration/incomingPaymentsBankProvenanceMigration.test.js` | 2 | **9 / 0** |
+| `tests/gatewaySettlementImport.test.js` | 3 | **24 / 0** |
+| `tests/incomingPaymentMatching.test.js` | 4 | **24 / 0** |
+| `tests/integration/incomingPaymentCandidatesMigration.test.js` | 4 | **16 / 0** |
+
+Growth across the session: 82 → 97 → 141 → **257**.
+
+### Regression (308) — no regressions at any point
+
+6 migration-CI suites (`ci`, `ci_035`–`ci_039`): **121 / 0**, identical to baseline.
+6 unit suites (`transactionClass` 71, `documentValidation` 29, `documentsNoCashImpact` 27,
+`taxGate` 23, `money` 19, `businessAccess` 18): **187 / 0**, identical to baseline.
+`node --check server/index.js` PASS.
+
+Client build not run — PR1–PR5 touch **zero** files under `client/`.
+
+### The P2-B1 fix, verified at the right endpoint
+
+`incomingPaymentsBankBridgeApi.test.js:290` now posts to `/api/bank-imports/${batch}/confirm` —
+the cascade route `client/src/pages/BankImport.jsx:316` actually calls — and the file carries a
+comment naming that file as the reason. Suite grew 15 → 21. Before the fix, the only bridge test
+drove the V1 route at `:152`.
+
+---
+
+## C-bis. PR2 as committed (`e4a72d4d`, superseded by `706f862b`) — **44 / 44 PASS, and that was not enough**
 
 | Suite | Result |
 |---|---|

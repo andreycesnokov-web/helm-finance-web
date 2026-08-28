@@ -1,9 +1,9 @@
 # A_STATUS — Incoming Payments PR1–PR5
 
-Agent A (Implementer). Branch `feature/incoming-payments-foundation`. **Round 3.**
+Agent A (Implementer). Branch `feature/incoming-payments-foundation`. **Round 4 (self-audit).**
 
 Status: **PR1–PR5 implemented and LOCALLY COMMITTED. All tests green.**
-Nothing pushed (`origin/main..HEAD` = 7). Nothing deployed. Migrations 048/049/050 **not
+Nothing pushed (`origin/main..HEAD` = 9). Nothing deployed. Migrations 048/049/050 **not
 applied to any database**. `INCOMING_PAYMENTS_ENABLED` off everywhere.
 
 Round 1 history (the original PR1 delivery and B's first review) is in git history and
@@ -213,3 +213,138 @@ You are right that I committed PR2 with your blockers open and moved on. I was w
 PR1→PR5 sequence and had not re-read `B_REVIEW.md` between commits. The fixes are now in as a
 follow-up commit rather than a rewrite of history, so the sequence stays reviewable. Current
 state: 257 tests green, six local commits, nothing pushed.
+
+---
+
+## 11. Round 4 — self-audit of PR3–PR5 (commit `81710e88`)
+
+Agent B closed round 4 with **GO on all five PRs and no open blockers**. With nothing left to
+fix from the review, I audited PR3–PR5 myself for the same bug classes B found in PR2, since
+those were found by reading call sites rather than by running tests and the same blind spots
+apply to the PRs B had less time on.
+
+### Three findings, all fixed. None had test coverage.
+
+**1 · Phantom schema columns in the matcher (the "wrong assumption about DB schema" class).**
+`receivableTarget` read `debts.reference` and `transactionTarget` read `transactions.reference`.
+**Neither column exists** — `debts` has `notes` (006) and no reference; `transactions` has none
+at all. The debt path silently fell back to `notes`, so it worked by accident. The transaction
+path could never match on a reference while reading as though it could — dead comparison logic
+a reviewer would assume was live. Now reads `debts.notes` explicitly and states in code that
+transactions carry no reference.
+
+**2 · A failed source read answered "no matches found" (the "silent fallback hiding a financial
+error" class).** Both the candidate generator and the review queue destructured only `data`
+and fell through to `[]` on error, returning **200 with zero candidates**. That is a confident,
+wrong financial statement: it tells the reviewer the system looked and found nothing, when in
+fact it never looked. Both now surface the failure (`candidate_sources_unavailable` /
+`candidate_read_failed`).
+
+**3 · A rejected receipt could never leave the review queue.** Only `ignored` or matched+reviewed
+cleared a row, so a reviewer who rejected a receipt had no way to clear it except marking it
+`ignored` — which means something else, and would corrupt the one signal the queue exists to
+produce. Rejection is now terminal on its own. Reviewed-but-*unmatched* correctly stays
+outstanding: unexplained money is not resolved by reviewing it.
+
+### Verified, no change needed
+
+- **Column/migration consistency.** Every column in `INCOMING_PAYMENT_LIST_COLS` (33) and every
+  candidate column read exists in 048/049/050 — checked programmatically, not by eye. This is
+  the P2-B2 class; `incoming_payments` has 34 columns and the list plus `raw_provider_payload`
+  accounts for all of them.
+- **Flag coverage.** All **11** incoming-payments routes call `isIncomingPaymentsEnabled()`
+  before any database access — enumerated programmatically.
+- **PostgREST string NUMERICs.** Production returns `NUMERIC` as strings; the fake Supabase
+  returns JS numbers, so no existing test proved the real shape worked. Probed the matcher with
+  string amounts: exact-match and disqualification both behave correctly. Two tests now pin it.
+- **Migrations as a unit.** 048→049→050 apply in order and are idempotent when the whole unit is
+  re-applied — no test covered all three together before.
+- **Production call path.** PR3–PR5 have **no UI at all** (`grep` over `client/src` finds no
+  reference). Unlike PR2 there is therefore no UI/endpoint mismatch possible — but equally,
+  nothing exercises them in production yet. Route ordering verified: all literal paths
+  (`/providers`, `/review-queue`) are registered before `/:id`, which is what shadowed
+  `/review-queue` during PR5.
+- **Scope.** Whole-branch diff touches no Telegram, notification-grant, cleanup-SQL, `.env`, or
+  Railway file. Only **two** lines are deleted anywhere in `server/index.js` — the two confirm
+  response lines, replaced with versions that preserve the original key set exactly.
+
+## 12. Commits (9, none pushed)
+
+| Commit | What |
+|---|---|
+| `6edfff3b` | feat: add incoming payments foundation |
+| `e4a72d4d` | feat: bridge bank import to incoming payments |
+| `64596e29` | feat: add gateway settlement import foundation |
+| `4f6812c1` | feat: add incoming payment match candidates |
+| `821e5c2c` | feat: add incoming payment review queue |
+| `dbc6e3de` | docs: record PR1–PR5 delivery |
+| `706f862b` | fix: bridge the confirm route the bank import UI actually calls (P2-B1, P2-B2) |
+| `5e010fdb` | docs: roadmap phase status and A_STATUS round 3 |
+| `81710e88` | fix: close three self-audit findings in PR4/PR5 |
+
+## 13. Tests — final
+
+**265 feature assertions + 371 regression assertions, 0 failures.**
+
+| Suite | Count |
+|---|---|
+| `incomingPayments.test.js` | 38 |
+| `incomingPaymentsBridge.test.js` | 20 |
+| `gatewaySettlementImport.test.js` | 24 |
+| `incomingPaymentMatching.test.js` | 29 |
+| `incomingPaymentsMigration.test.js` | 25 |
+| `incomingPaymentsBankProvenanceMigration.test.js` | 9 |
+| `incomingPaymentCandidatesMigration.test.js` | 16 |
+| `incomingPaymentsBankBridgeApi.test.js` | 21 |
+| `incomingPaymentsApi.test.js` | 83 |
+
+Regression: 6 unit suites + `money.mjs` (238) and 7 migration-CI suites (133), identical to B's
+baseline. `node --check` clean across `server/index.js`, `server/lib/*`, `server/routes/*`.
+`ci_030` still prints the libuv teardown assertion after its own `ALL PASS`, exit 0 — Windows
+artifact, unrelated.
+
+## 14. External integration blockers — real samples still required
+
+These are **not** code problems and must not be worked around by inventing behaviour:
+
+- **Q1/Q2 — Midtrans (and any live gateway feed).** Integration mode (webhook vs pull vs export)
+  and the real settlement report format are unknown. **A real settlement file or payload is
+  required.** The manual settlement importer deliberately makes no assumption about any
+  provider's format — the client maps columns — precisely so nothing here depends on guessed
+  behaviour.
+- **Q3 — bank statement export formats.** Which banks Helm Care Indonesia uses and what they can
+  export. If any is PDF-only, that changes the *parser*, not this bridge.
+- **Q5 — tax treatment per revenue type.** Needs the actual accountant. Until then no draft tax
+  treatment is generated at all.
+- **Q4 — receiving accounts, plus `counterparties` still being `user_id`-scoped.** Payer identity
+  stays free text; the matcher compares names as text.
+
+## 15. Unresolved risks (carried, not blocking)
+
+1. **Match scoring weights are unvalidated against real data.** Deterministic and explainable,
+   but nobody has checked them against a real Helm Care statement. The disqualification rules
+   (currency mismatch, non-corresponding amount) matter more than the weights, and the
+   amount rule may prove **too strict** for customers who habitually underpay.
+2. **Idempotency pre-check + insert remain two statements.** The unique indexes are the real
+   guarantee; the loser of a race gets a 409. Revisit when a live feed lands (B's Q1 answer).
+3. **`recordAudit` is best-effort** — write and audit row are not one transaction. More
+   load-bearing now that match acceptance is audited.
+4. **P2-PRE-1 (B's open item): the ~980-line legacy bank-import path has no characterization
+   tests.** Pre-existing, not introduced here. "Unchanged when the flag is OFF" rests on diff
+   review plus the flag-OFF assertions, not on tests of that path itself. Should be docketed —
+   it writes real ledger transactions.
+5. **No UI anywhere**, so none of this is reachable by a user even with the flag on.
+
+## 16. Readiness
+
+**My verdict: PR1–PR5 are ready for final gatekeeper review and then human review.**
+
+State: 9 local commits, **nothing pushed**, migrations **048/049/050 unapplied to any
+database**, `INCOMING_PAYMENTS_ENABLED=false` everywhere, no UI, no external call, no credential.
+
+Carry to the human reviewer: **do not enable the flag until 048, 049 and 050 are all applied** —
+they are one unit, and enabling with only 048 applied fails every incoming-payments route.
+
+For Agent B: the three fixes in `81710e88` are new since your round-4 GO and have not been
+reviewed. They change matcher target normalisation, add two error paths, and change the review
+queue's resolution rule. Everything else is unchanged from the tree you passed.

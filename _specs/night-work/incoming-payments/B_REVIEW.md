@@ -282,4 +282,107 @@ let the owner decide — not to proceed. I have not changed any code, and will n
 
 ---
 
+# Round-4 — PR2 blockers CLOSED · PR4 and PR5 reviewed
+
+Commits since round 3:
+
+```
+5e010fdb docs: roadmap phase status and A_STATUS round 3 (B PR2 blockers closed)
+706f862b fix: bridge the confirm route the bank import UI actually calls
+dbc6e3de docs: record PR1-PR5 delivery in spec, roadmap and A_STATUS
+821e5c2c feat: add incoming payment review queue          (PR5)
+4f6812c1 feat: add incoming payment match candidates      (PR4)
+```
+
+## PR2 — **NO-GO → GO**
+
+**P2-B1 closed** (`706f862b`). The bridge is now called from **both** confirm routes:
+
+```
+V1 confirm       server/index.js:4060  → bridge at :4134
+cascade confirm  server/index.js:4532  → bridge at :4649   ← the route the UI calls
+```
+
+And it is tested at the right endpoint: `incomingPaymentsBankBridgeApi.test.js:290` posts to
+`/api/bank-imports/${batch}/confirm`, with a comment naming `client/src/pages/BankImport.jsx`
+as the reason. That is the fix I asked for, tested the way I asked for it. Suite grew 15 → 21.
+
+**P2-B2 closed.** `.env.example` now reads:
+
+> `PREREQUISITE: do NOT enable this until migrations 048, 049 AND 050 are all applied. They are
+> one unit, not three optional steps: the routes select the provenance columns added by 049, and
+> the review queue reads the candidates table added by 050.`
+
+That is stronger than what I asked for — it anticipates 050 as well, and states *why* rather
+than just listing versions. The misleading "safe once 048 is applied" sentence is gone.
+
+## PR4 — Matching candidates · **GO**
+
+`migrations/050_incoming_payment_match_candidates.sql` · `server/lib/incomingPaymentMatching.js`
+
+| Checklist item | Result |
+|---|---|
+| candidate matching only | ✅ score is `NUMERIC(5,4)` advisory; comment states a high score never auto-accepts |
+| no invoice dependency | ✅ **explicitly designed out** — *"There is deliberately NO invoice target: `invoices` (041) is unapplied in production, and a matching engine must not depend on a table that does not exist there."* |
+| `debts.type='receivable'` handled carefully | ✅ `matching:222` `if (d.type !== 'receivable') continue;` — payables excluded with the reason stated (*"incoming money never settles one here"*); `:223` also skips `paid`/`is_settled` |
+| no final match without review | ✅ `incoming_payment_candidates_decision_stamp` CHECK: `suggested` must carry no decider, any decided state must carry both `decided_by_user_id` and `decided_at` |
+| no cross-business candidates | ✅ **DB trigger** `fn_incoming_payment_candidate_guard` validates the payment's, the debt's **and** the transaction's `business_id` |
+| no final accounting mutation | ✅ *"accepting a candidate does not touch the debt or the transaction it points at"* |
+
+Notable: this closes round-1 finding **N2**. I recommended a `fn_ic_funding_guard`-style trigger
+rather than a composite FK, no later than the matching PR — 050 implements exactly that and
+cites 033 as the precedent. Also good: `incoming_payment_candidates_one_target` prevents a row
+claiming `target_type='debt'` while pointing at a transaction, and the unique index means
+re-running the engine refreshes a candidate instead of accumulating duplicates.
+
+## PR5 — Minimal review queue · **GO**
+
+Two routes, +257 lines, **zero client files**.
+
+| Checklist item | Result |
+|---|---|
+| flag protected | ✅ both routes `404` before `requireBusiness` and before any DB access |
+| no production nav unless flag ON | ✅ **no client file touched in PR5** — there is no nav to leak |
+| review queue scoped by business | ✅ `.eq('business_id', businessId)` |
+| safe status transitions | ✅ `PATCH /:id/reconciliation` accepts **only** `ignored`, rejecting anything else with *"A match is made by accepting a candidate."* There is no client path to self-declare `matched` |
+| no final revenue booking | ✅ no `transactions` write anywhere in PR5 |
+
+Role split is coherent with the rest: reading the queue needs `canViewBusinessFinance`,
+resolving an item needs `canApproveFinancialRecord`.
+
+## Final tally — all five PRs
+
+| PR | Verdict | Commit |
+|---|---|---|
+| PR1 Foundation | **GO** | `6edfff3b` |
+| PR2 Bank-import bridge | **GO** (was NO-GO) | `e4a72d4d` + `706f862b` |
+| PR3 Gateway settlement | **GO** (was YELLOW) | `64596e29` |
+| PR4 Match candidates | **GO** | `4f6812c1` |
+| PR5 Review queue | **GO** | `821e5c2c` |
+
+PR3 moves YELLOW → GO: the YELLOW was for sitting on an uncleared PR2, which is now cleared, and
+its idempotency pass-through is consistent with the validator that owns key derivation.
+
+## Round-1/3 findings — final disposition
+
+Closed: **B1, B2, N1, N2, N3, N4, N5, Q6, P2-B1, P2-B2, P2-N3**.
+Deferred by agreement: **N6** (uniqueness on `provider_transaction_id`) — still sensible to add
+when a live gateway feed lands.
+Still open, and the one thing I would not close: **P2-PRE-1** — see below.
+
+## The one remaining gap
+
+**P2-PRE-1 · The pre-existing bank-import path still has no characterization tests.**
+
+The bridge is now well tested at both confirm routes, so PR2's *new* behaviour is covered. What
+is still untested is the ~980-line legacy bank-import path itself (`server/index.js:3257-4240`,
+two ledger-writing sites) that PR2 hooked into. "Existing behaviour unchanged when the flag is
+OFF" rests on diff review, not on a passing test.
+
+This is a pre-existing gap, not something PR2 introduced, and it should not block this work. It
+should be docketed: the next change to that path will have the same problem, and it writes real
+ledger transactions.
+
+---
+
 Agent B wrote no application code, no migration, and no Agent A file.
