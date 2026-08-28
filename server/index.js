@@ -3517,6 +3517,75 @@ app.post('/api/incoming-payments/gateway-import', auth, async (req, res) => {
   } catch { res.status(500).json({ error: 'gateway_import_failed' }); }
 });
 
+// GET /api/incoming-payments/review-queue
+app.get('/api/incoming-payments/review-queue', auth, async (req, res) => {
+  try {
+    if (!isIncomingPaymentsEnabled()) return res.status(404).json({ error: 'not_found' });
+    const biz = await requireBusiness(req, res); if (!biz) return;
+    if (!canViewBusinessFinance(biz.role))
+      return res.status(403).json({ error: 'forbidden', message: 'Your role cannot view incoming payments.' });
+
+    const businessId = biz.business.id;
+    const limit = Math.min(Math.max(parseInt(req.query?.limit, 10) || 100, 1), 500);
+
+    const { data: rows, error } = await supabase.from('incoming_payments')
+      .select(INCOMING_PAYMENT_LIST_COLS)
+      .eq('business_id', businessId)
+      .order('created_at', { ascending: false })
+      .limit(limit);
+    if (error) return res.status(500).json({ error: 'incoming_payments_read_failed' });
+
+    // Unresolved = still needs a human. A payment that is matched AND reviewed is done; an
+    // ignored one was deliberately set aside. Everything else is outstanding work.
+    const outstanding = (rows || []).filter((p) =>
+      p.reconciliation_status !== 'ignored'
+      && !(p.reconciliation_status === 'matched' && ['reviewed', 'rejected'].includes(p.status)));
+
+    const { data: cands } = await supabase.from('incoming_payment_match_candidates')
+      .select('*').eq('business_id', businessId).eq('status', 'suggested');
+    const byPayment = new Map();
+    for (const c of (cands || [])) {
+      if (!byPayment.has(c.incoming_payment_id)) byPayment.set(c.incoming_payment_id, []);
+      byPayment.get(c.incoming_payment_id).push(c);
+    }
+
+    const items = outstanding.map((p) => {
+      const candidates = (byPayment.get(p.id) || []).sort((a, b) => Number(b.score) - Number(a.score));
+      return {
+        payment: p,
+        candidates,
+        // Named states rather than a bare count, so the client does not re-derive meaning.
+        // Matched wins over leftover suggestions: a payment that already has an accepted
+        // match must not be presented as still needing one, or a reviewer is invited to
+        // accept a second match for the same money.
+        queue_state: p.reconciliation_status === 'matched' ? 'matched_awaiting_review'
+          : (candidates.length ? 'candidates_pending_review' : 'no_candidate'),
+      };
+    });
+
+    // Totals describe cash, so they use the NET that actually landed, and only within one
+    // currency — summing mixed currencies would produce a meaningless number.
+    const currencies = [...new Set(outstanding.map((p) => p.currency))];
+    const unresolved_total = currencies.length === 1
+      ? outstanding.reduce((s, p) => s + Math.round(Number(p.net_amount || 0) * 100), 0) / 100
+      : null;
+
+    res.json({
+      business_id: businessId,
+      counts: {
+        outstanding: items.length,
+        no_candidate: items.filter((i) => i.queue_state === 'no_candidate').length,
+        candidates_pending_review: items.filter((i) => i.queue_state === 'candidates_pending_review').length,
+        matched_awaiting_review: items.filter((i) => i.queue_state === 'matched_awaiting_review').length,
+      },
+      unresolved_total,
+      unresolved_total_currency: currencies.length === 1 ? (currencies[0] || null) : null,
+      unresolved_total_note: currencies.length > 1 ? 'mixed currencies — not summed' : null,
+      items,
+    });
+  } catch { res.status(500).json({ error: 'review_queue_failed' }); }
+});
+
 // GET /api/incoming-payments/:id — one receipt, scoped to the active business.
 app.get('/api/incoming-payments/:id', auth, async (req, res) => {
   try {
@@ -3534,6 +3603,57 @@ app.get('/api/incoming-payments/:id', auth, async (req, res) => {
     if (!data) return res.status(404).json({ error: 'not_found' });
     res.json({ payment: data });
   } catch { res.status(500).json({ error: 'incoming_payments_read_failed' }); }
+});
+
+// ── Review queue (PR5) ───────────────────────────────────────────────────────
+//
+// The one screen an accountant needs: money that arrived and has not been resolved, each row
+// carrying its proposed matches so a decision can be made without a second lookup.
+//
+// Read-only. It books nothing, resolves nothing, and hides nothing: a receipt with no
+// candidate is shown as exactly that rather than omitted, because unexplained cash is the
+// thing the queue exists to surface.
+//
+// PATCH /api/incoming-payments/:id/reconciliation — set a receipt aside.
+//
+// 'ignored' is the ONLY value settable here. It means "a human looked and decided this needs
+// no match" (a refund, a transfer between own accounts, a duplicate the bank reported twice).
+// It is a review outcome, not an accounting one: it books nothing and can be undone by
+// re-running matching.
+app.patch('/api/incoming-payments/:id/reconciliation', auth, async (req, res) => {
+  try {
+    if (!isIncomingPaymentsEnabled()) return res.status(404).json({ error: 'not_found' });
+    const biz = await requireBusiness(req, res); if (!biz) return;
+    if (!canApproveFinancialRecord(biz.role))
+      return res.status(403).json({ error: 'forbidden', message: 'Your role cannot resolve incoming payments.' });
+
+    const businessId = biz.business.id;
+    const next = String(req.body?.reconciliation_status || '').trim();
+    if (next !== 'ignored') {
+      return res.status(400).json({ error: 'invalid_reconciliation_status',
+        message: 'Only "ignored" can be set here. A match is made by accepting a candidate.' });
+    }
+
+    const { data: current } = await supabase.from('incoming_payments')
+      .select('id, reconciliation_status').eq('id', req.params.id).eq('business_id', businessId).maybeSingle();
+    if (!current) return res.status(404).json({ error: 'not_found' });
+    if (current.reconciliation_status === 'matched')
+      return res.status(409).json({ error: 'already_matched', message: 'A matched payment cannot be ignored.' });
+
+    const { data: updated, error } = await supabase.from('incoming_payments')
+      .update({ reconciliation_status: 'ignored' })
+      .eq('id', current.id).eq('business_id', businessId).select(INCOMING_PAYMENT_LIST_COLS).single();
+    if (error) return res.status(500).json({ error: 'incoming_payment_update_failed' });
+
+    await recordAudit({
+      businessId, actorUserId: req.user.userId, actorRole: biz.role, channel: 'web',
+      entityType: 'incoming_payment', entityId: current.id, action: 'reconciliation_ignored',
+      before: { reconciliation_status: current.reconciliation_status },
+      after: { reconciliation_status: 'ignored' },
+    });
+
+    res.json({ payment: updated });
+  } catch { res.status(500).json({ error: 'incoming_payment_update_failed' }); }
 });
 
 // ── Match candidates (PR4, migration 050) ────────────────────────────────────

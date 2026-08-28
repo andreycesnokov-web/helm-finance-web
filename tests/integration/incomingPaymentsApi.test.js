@@ -736,3 +736,140 @@ test('match decisions are audited', async () => {
   assert.strictEqual(rows.length, 1);
   assert.strictEqual(rows[0].action, 'candidate_accepted');
 });
+
+// ── Review queue (PR5) ───────────────────────────────────────────────────────────────────
+const QUEUE = '/api/incoming-payments/review-queue';
+const recon = (id) => `${URL_LIST}/${id}/reconciliation`;
+const queue = (biz = BIZ_A, user = OWNER_A) => api('GET', QUEUE, { token: tok(user), business: biz });
+
+test('flag OFF: the review queue and the ignore action are 404', async () => {
+  process.env[FLAG] = 'false';
+  assert.strictEqual((await queue()).status, 404);
+  assert.strictEqual((await api('PATCH', recon('x'), { token: tok(OWNER_A), business: BIZ_A, body: { reconciliation_status: 'ignored' } })).status, 404);
+});
+
+test('an unmatched receipt appears in the queue as having no candidate', async () => {
+  await createAsOwner(receipt({ payer_name: 'Budi' }));
+  const r = await queue();
+  assert.strictEqual(r.status, 200);
+  assert.strictEqual(r.body.counts.outstanding, 1);
+  assert.strictEqual(r.body.counts.no_candidate, 1);
+  assert.strictEqual(r.body.items[0].queue_state, 'no_candidate');
+});
+
+test('a receipt with no candidate is SHOWN, not hidden', async () => {
+  // Unexplained cash is exactly what the queue exists to surface.
+  await createAsOwner(receipt({ gross_amount: 12345, net_amount: 12345 }));
+  const r = await queue();
+  assert.strictEqual(r.body.items.length, 1);
+  assert.strictEqual(r.body.items[0].payment.gross_amount, 12345);
+});
+
+test('the queue carries each receipt candidates inline', async () => {
+  await paymentWithCandidates();
+  const r = await queue();
+  const item = r.body.items[0];
+  assert.strictEqual(item.queue_state, 'candidates_pending_review');
+  assert.strictEqual(item.candidates.length, 2);
+  // Best first, so a reviewer reads the strongest proposal at the top.
+  assert.ok(Number(item.candidates[0].score) >= Number(item.candidates[1].score));
+});
+
+test('the queue NEVER shows another business receipts', async () => {
+  await createAsOwner(receipt({ payer_name: 'A-only' }), BIZ_A);
+  await api('POST', URL_LIST, { token: tok(OWNER_B), business: BIZ_B, body: receipt({ payer_name: 'B-only' }) });
+  const a = await queue(BIZ_A, OWNER_A);
+  assert.strictEqual(a.body.items.length, 1);
+  assert.strictEqual(a.body.items[0].payment.payer_name, 'A-only');
+  const b = await queue(BIZ_B, OWNER_B);
+  assert.strictEqual(b.body.items[0].payment.payer_name, 'B-only');
+});
+
+test('an employee cannot open the queue', async () => {
+  assert.strictEqual((await queue(BIZ_A, EMPLOYEE_A)).status, 403);
+});
+
+test('totals use the NET that landed, and refuse to sum mixed currencies', async () => {
+  await createAsOwner(receipt({ gross_amount: 100000, fee_amount: 2500, net_amount: undefined }));
+  let r = await queue();
+  assert.strictEqual(r.body.unresolved_total, 97500, 'the total used gross rather than what landed');
+  assert.strictEqual(r.body.unresolved_total_currency, 'IDR');
+
+  await createAsOwner(receipt({ currency: 'USD', gross_amount: 50, net_amount: 50 }));
+  r = await queue();
+  assert.strictEqual(r.body.unresolved_total, null, 'mixed currencies were summed into a meaningless number');
+  assert.match(r.body.unresolved_total_note, /mixed currencies/);
+});
+
+// ── Resolving ────────────────────────────────────────────────────────────────────────────
+test('a receipt can be set aside as ignored and leaves the queue', async () => {
+  const created = await createAsOwner(receipt());
+  const id = created.body.payment.id;
+  const r = await api('PATCH', recon(id), { token: tok(OWNER_A), business: BIZ_A, body: { reconciliation_status: 'ignored' } });
+  assert.strictEqual(r.status, 200);
+  assert.strictEqual(r.body.payment.reconciliation_status, 'ignored');
+  assert.strictEqual((await queue()).body.counts.outstanding, 0);
+});
+
+test('ignoring books nothing', async () => {
+  const created = await createAsOwner(receipt());
+  await api('PATCH', recon(created.body.payment.id), { token: tok(OWNER_A), business: BIZ_A, body: { reconciliation_status: 'ignored' } });
+  assert.strictEqual(dbState.transactions.length, 0);
+  assert.strictEqual(dbState.debts.length, 0);
+  assert.strictEqual(dbState.incoming_payments[0].status, 'draft', 'ignoring silently reviewed the payment');
+});
+
+test('only "ignored" is settable here — matching is not done through this route', async () => {
+  const created = await createAsOwner(receipt());
+  for (const bad of ['matched', 'candidate', 'unmatched']) {
+    const r = await api('PATCH', recon(created.body.payment.id),
+      { token: tok(OWNER_A), business: BIZ_A, body: { reconciliation_status: bad } });
+    assert.strictEqual(r.status, 400, `${bad} should not be settable`);
+    assert.strictEqual(r.body.error, 'invalid_reconciliation_status');
+  }
+});
+
+test('a matched payment cannot be ignored', async () => {
+  const { id, gen } = await paymentWithCandidates();
+  await api('PATCH', `${cand(id)}/${gen.body.candidates[0].id}`,
+    { token: tok(OWNER_A), business: BIZ_A, body: { status: 'accepted' } });
+  const r = await api('PATCH', recon(id), { token: tok(OWNER_A), business: BIZ_A, body: { reconciliation_status: 'ignored' } });
+  assert.strictEqual(r.status, 409);
+  assert.strictEqual(r.body.error, 'already_matched');
+});
+
+test('another business cannot ignore this payment', async () => {
+  const created = await createAsOwner(receipt());
+  const r = await api('PATCH', recon(created.body.payment.id),
+    { token: tok(OWNER_B), business: BIZ_B, body: { reconciliation_status: 'ignored' } });
+  assert.strictEqual(r.status, 404);
+  assert.strictEqual(dbState.incoming_payments[0].reconciliation_status, 'unmatched');
+});
+
+test('an accountant cannot set a receipt aside', async () => {
+  const created = await createAsOwner(receipt());
+  const r = await api('PATCH', recon(created.body.payment.id),
+    { token: tok(ACCOUNTANT_A), business: BIZ_A, body: { reconciliation_status: 'ignored' } });
+  assert.strictEqual(r.status, 403);
+});
+
+test('a matched AND reviewed payment is done and leaves the queue', async () => {
+  const { id, gen } = await paymentWithCandidates();
+  await api('PATCH', `${cand(id)}/${gen.body.candidates[0].id}`,
+    { token: tok(OWNER_A), business: BIZ_A, body: { status: 'accepted' } });
+  // Matched but not yet reviewed: still outstanding, because accounting review is a
+  // separate decision from matching.
+  let r = await queue();
+  assert.strictEqual(r.body.counts.matched_awaiting_review, 1);
+  await api('PATCH', `${URL_LIST}/${id}/status`, { token: tok(OWNER_A), business: BIZ_A, body: { status: 'reviewed' } });
+  r = await queue();
+  assert.strictEqual(r.body.counts.outstanding, 0);
+});
+
+test('setting a receipt aside is audited', async () => {
+  const created = await createAsOwner(receipt());
+  await api('PATCH', recon(created.body.payment.id), { token: tok(OWNER_A), business: BIZ_A, body: { reconciliation_status: 'ignored' } });
+  const rows = dbState.audit_events.filter((a) => a.action === 'reconciliation_ignored');
+  assert.strictEqual(rows.length, 1);
+  assert.strictEqual(rows[0].business_id, BIZ_A);
+});
