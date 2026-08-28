@@ -1,9 +1,9 @@
 # A_STATUS — Incoming Payments PR1–PR5
 
-Agent A (Implementer). Branch `feature/incoming-payments-foundation`. **Round 2.**
+Agent A (Implementer). Branch `feature/incoming-payments-foundation`. **Round 3.**
 
 Status: **PR1–PR5 implemented and LOCALLY COMMITTED. All tests green.**
-Nothing pushed (`origin/main..HEAD` = 5). Nothing deployed. Migrations 048/049/050 **not
+Nothing pushed (`origin/main..HEAD` = 7). Nothing deployed. Migrations 048/049/050 **not
 applied to any database**. `INCOMING_PAYMENTS_ENABLED` off everywhere.
 
 Round 1 history (the original PR1 delivery and B's first review) is in git history and
@@ -170,3 +170,46 @@ awaiting me. The judgement calls I would most like checked:
   be too strict for real receivables where customers underpay.
 - **`ignored` is settable only by an approver**, not by an accountant. Same reasoning as the
   review gate, and the same vocabulary friction you noted in Q5.
+
+
+---
+
+## 10. Round 3 — Agent B PR2 blockers, both fixed (commit `706f862b`)
+
+B was right on both, and P2-B1 was the most valuable finding of the whole run.
+
+**P2-B1 — the bridge was wired to a confirm route the UI never calls.** Correct. There are two
+confirm endpoints; `client/src/pages/BankImport.jsx:316` posts to the **cascade** route
+(`/api/bank-imports/:batchId/confirm`), and I had bridged only V1
+(`/api/bank-import/batches/:id/confirm`). A real statement import produced zero incoming
+payments — the feature was dead code on the only path that matters, and my 44 green tests
+proved nothing about it because they drove V1.
+
+Fixed: the cascade route now bridges as well, re-reading rows after its import loop has
+stamped them `imported`. Six new tests drive the cascade route **specifically**, including one
+that runs both routes over the same batch and asserts they agree rather than double-recording.
+V1 stays bridged for any API client still using it.
+
+**P2-B2 — PR2 broke PR1's routes unless 049 is applied.** Also correct, and your note that no
+test could catch it is the important part: the fake Supabase projects with
+`st.cols.filter((c) => c in r)`, so it silently drops unknown columns and passes either way.
+Green tests were not evidence.
+
+Fixed by your simpler option: `.env.example` now documents **048 + 049 + 050 as one
+prerequisite unit** that must all be applied before the flag is enabled, and the roadmap
+carries the same rollout note. I did not split the column list, because PR5's review queue
+genuinely wants the provenance columns and the three migrations ship together on this branch.
+
+**P2-N1** — the bridge walking every confirmed credit row rather than only newly imported ones
+is now stated as intent in the code: it is what lets a batch confirmed before the flag was on
+be backfilled, and the partial unique index makes the repeat safe.
+
+**P2-N3** — bridge money math now uses the shared `toCents`/`fromCents` helpers exported from
+`incomingPayments.js`, rather than reintroducing the float rounding N3 removed.
+
+### On the process point
+
+You are right that I committed PR2 with your blockers open and moved on. I was working the
+PR1→PR5 sequence and had not re-read `B_REVIEW.md` between commits. The fixes are now in as a
+follow-up commit rather than a rewrite of history, so the sequence stays reviewable. Current
+state: 257 tests green, six local commits, nothing pushed.

@@ -1,6 +1,6 @@
 # Roadmap - CFO AI / Helm Finance
 
-Last updated: 2026-08-27.
+Last updated: 2026-08-28.
 
 This file lists the next practical work, not every idea.
 
@@ -32,9 +32,14 @@ This file lists the next practical work, not every idea.
 
 ## Payment & Bank Ingestion Layer
 
-Status: **Phase 1 BUILT, NOT ENABLED (2026-08-27).** Migration 048 + flag-gated routes exist
-on `feature/incoming-payments-foundation` behind `INCOMING_PAYMENTS_ENABLED` (default OFF);
-048 is not applied to production and nothing is deployed. Phases 2–5 remain spec only.
+Status: **Phases 1–4 BUILT, NOT ENABLED (2026-08-28).** Migrations 048/049/050 + flag-gated
+routes exist on `feature/incoming-payments-foundation` behind `INCOMING_PAYMENTS_ENABLED`
+(default OFF); no migration is applied to production and nothing is deployed. Phase 5
+(direct bank APIs) remains spec only and unstarted.
+
+**Rollout prerequisite:** 048, 049 and 050 are one unit. The routes select columns added by
+049 and the review queue reads the table added by 050, so the flag must not be enabled until
+all three are applied.
 
 Spec: `_specs/incoming-payments-bank-gateway-ingestion.md` · Decision: [[D22]].
 
@@ -56,15 +61,20 @@ Phases:
    table, provider-agnostic source types, gross/fee/net separated, idempotency enforced by a
    unique index, ledger-inert by construction. Manual + manual-gateway-import sources are
    accepted; the two `future_*` sources are refused by the API. No matching engine, no UI.
-2. **Midtrans v0 for Helm Care Pay** — read-only gateway ingestion; gateway transaction →
-   settlement → bank credit modelled as three levels; fees first-class; flagged, Pay-only.
-   **Blocked on Q1/Q2** (integration mode + a real settlement sample).
-3. **Bank Statement Import v0 for Helm Care Indonesia** — confirmed credit rows from the
-   existing bank-import flow produce incoming payments. **Blocked on Q3** (real export
-   formats; PDF-only would change scope materially).
-4. **Reconciliation Engine** — deterministic cascade then AI, candidates with confidence
-   and rationale, human accept/reject, unmatched-receipt queue, settlement↔bank-credit
-   pairing, draft treatment, evidence packages, explainable period readiness.
+2. **Gateway settlement import** — ✅ built (not enabled). Provider-agnostic manual import:
+   midtrans, doku, xendit, hitpay, duitku, ipaymu, or an unrecognised gateway, all through
+   one endpoint with no per-provider code path. A *direct* gateway feed is still **blocked on
+   Q1/Q2** (integration mode + a real settlement sample) and was deliberately not attempted.
+3. **Bank Statement Import v0** — ✅ built (not enabled). Confirmed credit rows from the
+   existing bank-import flow produce incoming payments, with batch/row provenance and one
+   payment per statement line, on both confirm routes. Still **blocked on Q3** for real use
+   (which formats the banks actually export; PDF-only would change the parser, not this
+   bridge).
+4. **Reconciliation Engine** — 🟡 candidate half built (not enabled): deterministic scoring
+   against receivables and income transactions with stated reasons, human accept/reject, and
+   an unmatched-receipt review queue. Accepting links the payment only — it settles no debt
+   and books no revenue. Still to come: settlement↔bank-credit pairing, draft tax treatment,
+   evidence packages, explainable period readiness.
 5. **Direct Bank APIs** — later, only after 1–4 are stable on real data, and only with its
    own security spec (credentials, consent, revocation, audit).
 
