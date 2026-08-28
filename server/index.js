@@ -3535,14 +3535,29 @@ app.get('/api/incoming-payments/review-queue', auth, async (req, res) => {
       .limit(limit);
     if (error) return res.status(500).json({ error: 'incoming_payments_read_failed' });
 
-    // Unresolved = still needs a human. A payment that is matched AND reviewed is done; an
-    // ignored one was deliberately set aside. Everything else is outstanding work.
-    const outstanding = (rows || []).filter((p) =>
-      p.reconciliation_status !== 'ignored'
-      && !(p.reconciliation_status === 'matched' && ['reviewed', 'rejected'].includes(p.status)));
+    // Unresolved = still needs a human. A receipt is RESOLVED when:
+    //   - it was deliberately set aside (`ignored`), or
+    //   - a reviewer rejected it — a terminal decision that this is not valid evidence, and
+    //     one that does not require a match to be meaningful, or
+    //   - it is both matched and reviewed, i.e. fully done.
+    // Rejected must count on its own: leaving a rejected receipt in the queue forever gives
+    // the reviewer no way to clear it except mislabelling it `ignored`, which means something
+    // different and would corrupt the one signal this queue exists to produce.
+    const isResolved = (p) =>
+      p.reconciliation_status === 'ignored'
+      || p.status === 'rejected'
+      || (p.reconciliation_status === 'matched' && p.status === 'reviewed');
+    const outstanding = (rows || []).filter((p) => !isResolved(p));
 
-    const { data: cands } = await supabase.from('incoming_payment_match_candidates')
+    const { data: cands, error: cErr } = await supabase.from('incoming_payment_match_candidates')
       .select('*').eq('business_id', businessId).eq('status', 'suggested');
+    // Same rule as candidate generation: if the candidate read fails, say so. Rendering the
+    // queue with every row showing "no candidate" would tell a reviewer the system found
+    // nothing, when in fact it never looked.
+    if (cErr) {
+      console.warn(`[incoming-payments] queue candidate read failed business=${businessId}: ${cErr.message}`);
+      return res.status(500).json({ error: 'candidate_read_failed' });
+    }
     const byPayment = new Map();
     for (const c of (cands || [])) {
       if (!byPayment.has(c.incoming_payment_id)) byPayment.set(c.incoming_payment_id, []);
@@ -3688,12 +3703,21 @@ app.post('/api/incoming-payments/:id/candidates', auth, async (req, res) => {
 
     // Both target sets are queried WITH the business filter, so nothing from another
     // workspace can even reach the scorer.
-    const [{ data: debts }, { data: txs }] = await Promise.all([
+    const [debtRes, txRes] = await Promise.all([
       supabase.from('debts').select('*').eq('business_id', businessId).eq('type', 'receivable'),
       supabase.from('transactions').select('*').eq('business_id', businessId).eq('type', 'income'),
     ]);
+    // A failed source read must NOT fall through to an empty list. Doing so would answer
+    // "no matches found" — a confident, wrong financial statement — when the truth is that
+    // we could not look. Surface it instead.
+    if (debtRes.error || txRes.error) {
+      console.warn(`[incoming-payments] candidate sources unavailable business=${businessId}: `
+        + `${debtRes.error?.message || ''} ${txRes.error?.message || ''}`);
+      return res.status(500).json({ error: 'candidate_sources_unavailable',
+        message: 'Could not read receivables or transactions, so no matches were calculated.' });
+    }
 
-    const proposals = IPM.buildCandidates(payment, { debts: debts || [], transactions: txs || [] });
+    const proposals = IPM.buildCandidates(payment, { debts: debtRes.data || [], transactions: txRes.data || [] });
 
     const saved = [];
     for (const p of proposals) {

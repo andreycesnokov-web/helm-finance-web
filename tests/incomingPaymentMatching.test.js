@@ -172,3 +172,59 @@ test('the scorer never proposes a decision — only a score and reasons', () => 
   assert.ok(!('status' in c), 'the scorer decided a status');
   assert.ok(!('accepted' in c));
 });
+
+// ── Self-audit regressions (post-B round 4) ──────────────────────────────────────────────
+//
+// Three findings from auditing PR3-PR5 for the classes Agent B found in PR2. None of them
+// had coverage, which is why they survived: each is a case where the code looks right and
+// the tests agree, because both make the same wrong assumption.
+
+// 1. Schema assumptions. The fake Supabase returns whatever the fixture holds, so a column
+//    that does not exist in the real database looks identical to one that does.
+test('the matcher reads only columns that actually exist on debts', () => {
+  // `debts` has no `reference` column (migrations 006/015 + the production insert shape).
+  // Reading one would silently evaluate to undefined and look like a working comparison.
+  const t = M.receivableTarget({
+    id: 1, business_id: BIZ_A, remaining_amount: 1000, due_date: '2026-08-10',
+    counterparty: 'X', currency: 'IDR', notes: 'INV-100',
+  });
+  assert.strictEqual(t.reference, 'INV-100', 'notes is the only free-text field to match on');
+  assert.strictEqual(t.amount, 1000, 'remaining_amount is what is still owed');
+});
+
+test('a partial payment is compared against what is STILL OWED, not the original amount', () => {
+  // Comparing against original_amount would score a legitimate partial payment as a mismatch.
+  const t = M.receivableTarget({ id: 1, business_id: BIZ_A, original_amount: 5000,
+    amount: 5000, remaining_amount: 1000 });
+  assert.strictEqual(t.amount, 1000);
+});
+
+test('transactions expose no reference, and the matcher does not pretend otherwise', () => {
+  const t = M.transactionTarget({ id: 2, business_id: BIZ_A, amount_idr: 1000,
+    transaction_date: '2026-08-10', counterparty_name: 'X', currency_original: 'IDR' });
+  assert.strictEqual(t.reference, null);
+});
+
+// 2. Production returns NUMERIC as strings; the fake returns JS numbers. Every money path
+//    must survive the real shape.
+test('scoring works on PostgREST string numerics, not just JS numbers', () => {
+  const payment = { id: 'p', business_id: BIZ_A, gross_amount: '1000000.00',
+    net_amount: '967810.00', currency: 'IDR', transaction_at: '2026-08-10T00:00:00.000Z',
+    payer_name: 'PT Maju Jaya' };
+  const debt = { id: 11, business_id: BIZ_A, type: 'receivable', status: 'open',
+    remaining_amount: '967810.00', due_date: '2026-08-10', counterparty: 'PT Maju Jaya',
+    currency: 'IDR' };
+  const [c] = M.buildCandidates(payment, { debts: [debt] });
+  assert.ok(c, 'string numerics produced no candidate');
+  assert.ok(c.match_reasons.some((r) => r.key === 'amount_exact' && /net/.test(r.detail)));
+});
+
+test('a string-numeric amount mismatch still disqualifies', () => {
+  const payment = { id: 'p', business_id: BIZ_A, gross_amount: '1000000.00',
+    net_amount: '1000000.00', currency: 'IDR', payer_name: 'PT Maju Jaya',
+    transaction_at: '2026-08-10T00:00:00.000Z' };
+  const debt = { id: 11, business_id: BIZ_A, type: 'receivable', status: 'open',
+    remaining_amount: '17.00', due_date: '2026-08-10', counterparty: 'PT Maju Jaya',
+    currency: 'IDR' };
+  assert.strictEqual(M.buildCandidates(payment, { debts: [debt] }).length, 0);
+});

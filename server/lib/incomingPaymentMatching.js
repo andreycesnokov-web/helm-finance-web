@@ -133,7 +133,15 @@ function scoreCurrency(payment, target) {
   return { score: 0, reason: { key: 'currency_differs', detail: 'currency does not match' } };
 }
 
-/** Normalise a receivable into the shape the scorer compares against. */
+/**
+ * Normalise a receivable into the shape the scorer compares against.
+ *
+ * Column names are the REAL `debts` columns (see migrations 006/015 and the insert at
+ * server/index.js). `remaining_amount` is what is still owed and is the right comparison
+ * target: matching a partial payment against the original amount would score it as a
+ * mismatch. `debts` has no `reference` column, so `notes` is the only free-text field a
+ * payer reference could agree with.
+ */
 function receivableTarget(debt) {
   const outstanding = isNum(debt.remaining_amount) ? debt.remaining_amount
     : (isNum(debt.amount) ? debt.amount : debt.original_amount);
@@ -142,19 +150,26 @@ function receivableTarget(debt) {
     amount: outstanding,
     date: debt.due_date || debt.created_at || null,
     counterparty: debt.counterparty || null,
-    reference: debt.reference || debt.notes || null,
+    reference: debt.notes || null,
     currency: debt.currency || null,
   };
 }
 
-/** Normalise a ledger transaction into the same shape. */
+/**
+ * Normalise a ledger transaction into the same shape.
+ *
+ * `transactions` has no reference column at all, so reference agreement can never fire for a
+ * transaction target — only payer-name and description agreement can. Stating that here
+ * rather than reading a column that does not exist, which would silently evaluate to
+ * undefined and look like a working comparison.
+ */
 function transactionTarget(tx) {
   return {
     type: 'transaction', id: tx.id, business_id: tx.business_id,
     amount: isNum(tx.amount_idr) ? tx.amount_idr : tx.amount_original,
     date: tx.transaction_date || tx.created_at || null,
     counterparty: tx.counterparty_name || null,
-    reference: tx.reference || null,
+    reference: null,
     currency: tx.currency_original || null,
   };
 }

@@ -873,3 +873,48 @@ test('setting a receipt aside is audited', async () => {
   assert.strictEqual(rows.length, 1);
   assert.strictEqual(rows[0].business_id, BIZ_A);
 });
+
+// ── Self-audit regression: the queue must be clearable ───────────────────────────────────
+test('a REJECTED receipt leaves the queue without being mislabelled as ignored', async () => {
+  // Previously only `ignored` or matched+reviewed cleared a row, so a reviewer who rejected a
+  // receipt had no way to clear it except marking it `ignored` — which means something else
+  // and would corrupt the one signal this queue exists to produce.
+  const created = await createAsOwner(receipt());
+  const id = created.body.payment.id;
+  assert.strictEqual((await queue()).body.counts.outstanding, 1);
+
+  const r = await api('PATCH', `${URL_LIST}/${id}/status`,
+    { token: tok(OWNER_A), business: BIZ_A, body: { status: 'rejected' } });
+  assert.strictEqual(r.status, 200);
+
+  assert.strictEqual((await queue()).body.counts.outstanding, 0, 'a rejected receipt is stuck in the queue');
+  // And rejecting still books nothing.
+  assert.strictEqual(dbState.transactions.length, 0);
+  assert.strictEqual(dbState.debts.length, 0);
+});
+
+test('a reviewed-but-unmatched receipt STAYS outstanding', async () => {
+  // Reviewing without matching is not resolution: the money is still unexplained.
+  const created = await createAsOwner(receipt());
+  await api('PATCH', `${URL_LIST}/${created.body.payment.id}/status`,
+    { token: tok(OWNER_A), business: BIZ_A, body: { status: 'reviewed' } });
+  assert.strictEqual((await queue()).body.counts.outstanding, 1);
+});
+
+test('a failed candidate source read reports an error, never "no matches found"', async () => {
+  // Answering 200 with zero candidates when the query actually failed is a confident, wrong
+  // financial statement: it says we looked and found nothing, when we never looked.
+  const created = await createAsOwner(matchable());
+  const id = created.body.payment.id;
+  const realFrom = supabase.from;
+  supabase.from = (t) => (t === 'debts'
+    ? { select: () => ({ eq: () => ({ eq: () => Promise.resolve({ data: null, error: { message: 'relation unavailable' } }) }) }) }
+    : realFrom(t));
+  try {
+    const r = await api('POST', cand(id), { token: tok(OWNER_A), business: BIZ_A });
+    assert.strictEqual(r.status, 500);
+    assert.strictEqual(r.body.error, 'candidate_sources_unavailable');
+  } finally {
+    supabase.from = realFrom;
+  }
+});
