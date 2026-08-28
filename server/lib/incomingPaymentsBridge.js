@@ -9,6 +9,8 @@
 // evidence sitting alongside it, deliberately left `unmatched` so the (later) reconciliation
 // step proposes the link for a human instead of this code asserting it.
 
+const { toCents, fromCents } = require('./incomingPayments');
+
 // A row counts as money arriving only on an explicit credit direction. `direction` is written
 // by the parser ('in' = credit, 'out' = debit); when it is missing we fall back to the
 // confirmed transaction type, and when that is missing too we refuse rather than guess.
@@ -70,7 +72,9 @@ function buildPaymentFromBankRow(row, batch, ctx = {}) {
 
   const amount = Number(row.amount);
   if (!Number.isFinite(amount) || amount <= 0) return { ok: false, reason: 'invalid_amount' };
-  const gross = Math.round(amount * 100) / 100;
+  // Integer cents via the shared helpers — this module must not be the one place that
+  // reintroduces the float money arithmetic the validator just removed.
+  const gross = fromCents(toCents(amount));
 
   return {
     ok: true,

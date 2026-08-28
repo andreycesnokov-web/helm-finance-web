@@ -270,6 +270,8 @@ function validateStatusChange(current, next) {
 }
 
 module.exports = {
+  toCents,
+  fromCents,
   SOURCE_TYPES,
   NOT_YET_INGESTIBLE_SOURCE_TYPES,
   GATEWAY_SOURCE_TYPES,

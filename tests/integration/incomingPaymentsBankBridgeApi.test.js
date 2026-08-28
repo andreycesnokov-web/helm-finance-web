@@ -279,3 +279,75 @@ test('a bridged payment writes its own audit row', async () => {
   assert.strictEqual(rows[0].action, 'created_from_bank_import');
   assert.strictEqual(rows[0].business_id, BIZ_A);
 });
+
+// ── The CASCADE confirm — the route the Bank Import screen actually calls ─────────────────
+//
+// client/src/pages/BankImport.jsx posts to /api/bank-imports/:batchId/confirm (plural
+// "imports"), not the V1 /api/bank-import/batches/:id/confirm. Bridging only V1 left the
+// feature dead on the one path production exercises, so these tests drive the cascade route
+// specifically. If the bridge is ever unwired from it again, these fail.
+const cascadeConfirm = (biz = BIZ_A, token = OWNER_A, batch = BATCH_A) =>
+  api('POST', `/api/bank-imports/${batch}/confirm`, { token: tok(token), business: biz,
+    // The real payload shape the review screen sends: one entry per reviewed row.
+    body: { rows: [
+      { row_id: 'row-credit', transaction_type: 'income' },
+      { row_id: 'row-debit', transaction_type: 'expense' },
+    ] } });
+
+function seedForCascade() {
+  // The cascade route reads review_status set by the review queue.
+  dbState.bank_import_rows[0].review_status = 'confirmed';
+  dbState.bank_import_rows[1].review_status = 'confirmed';
+  dbState.bank_import_batches[0].status = 'review_required';
+}
+
+test('CASCADE confirm: flag ON bridges the credit row', async () => {
+  seedForCascade();
+  const r = await cascadeConfirm();
+  assert.strictEqual(r.status, 200);
+  assert.strictEqual(payments().length, 1, 'the UI confirm path produced no incoming payment');
+  assert.strictEqual(payments()[0].bank_import_row_id, 'row-credit');
+  assert.strictEqual(payments()[0].source_type, 'bank_statement_import');
+});
+
+test('CASCADE confirm: the debit row is still never bridged', async () => {
+  seedForCascade();
+  await cascadeConfirm();
+  assert.strictEqual(payments().filter((p) => p.gross_amount === 90000).length, 0);
+});
+
+test('CASCADE confirm: flag OFF changes nothing and adds no response key', async () => {
+  seedForCascade();
+  process.env[FLAG] = 'false';
+  const r = await cascadeConfirm();
+  assert.strictEqual(r.status, 200);
+  assert.strictEqual(payments().length, 0);
+  assert.ok(!('incoming_payments' in r.body), 'flag-off cascade response gained a new field');
+});
+
+test('CASCADE confirm: re-confirming does not duplicate the payment', async () => {
+  seedForCascade();
+  await cascadeConfirm();
+  const second = await cascadeConfirm();
+  assert.strictEqual(payments().length, 1);
+  assert.strictEqual(second.body.incoming_payments.duplicates, 1);
+});
+
+test('CASCADE confirm: another business cannot reach this batch', async () => {
+  seedForCascade();
+  const r = await cascadeConfirm(BIZ_B, OWNER_B);
+  assert.notStrictEqual(r.status, 200);
+  assert.strictEqual(payments().length, 0);
+});
+
+test('BOTH confirm routes bridge, and they agree on the result', async () => {
+  // V1 first, then the cascade on the same batch: the second must find the row already
+  // bridged rather than recording the same money twice.
+  seedForCascade();
+  const v1 = await confirm();
+  assert.strictEqual(v1.body.incoming_payments.created, 1);
+  const cascade = await cascadeConfirm();
+  assert.strictEqual(cascade.body.incoming_payments.created, 0);
+  assert.strictEqual(cascade.body.incoming_payments.duplicates, 1);
+  assert.strictEqual(payments().length, 1);
+});

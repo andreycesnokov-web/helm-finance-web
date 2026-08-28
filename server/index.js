@@ -3862,6 +3862,11 @@ app.patch('/api/incoming-payments/:id/status', auth, async (req, res) => {
 //
 // Returns null when the flag is off (so the response shape is unchanged), otherwise a small
 // summary. Never throws: a bridge failure must not fail an import that already succeeded.
+//
+// INTENT: it walks EVERY confirmed credit row in the batch, not only the ones this confirm
+// call imported. That is deliberate — a batch confirmed before the flag was switched on would
+// otherwise have no evidence for ever, and re-confirming is the natural way to backfill it.
+// Idempotency (the partial unique index on bank_import_row_id) makes the repeat safe.
 const IPB = require('./lib/incomingPaymentsBridge');
 async function bridgeBankBatchToIncomingPayments({ batch, rows, biz, actingUserId }) {
   if (!isIncomingPaymentsEnabled()) return null;
@@ -4635,7 +4640,17 @@ app.post('/api/bank-imports/:batchId/confirm', auth, async (req, res) => {
       imported_count: (batch.imported_count || 0) + imported, status, updated_at: now,
     }).eq('id', batch.id);
 
-    res.json({ ok: true, imported, linked, status, reconciliation });
+    // Bridge (PR2). THIS is the confirm the Bank Import screen actually calls
+    // (client/src/pages/BankImport.jsx → upload → /suggest → /review → this route), so the
+    // bridge has to run here or a real statement import produces no evidence at all. The V1
+    // route above is bridged too, for API clients still using it.
+    // Rows are re-read because the loop above just changed their review_status to 'imported'.
+    const { data: bridgeRows } = await supabase.from('bank_import_rows').select('*').eq('batch_id', batch.id);
+    const incoming_payments = await bridgeBankBatchToIncomingPayments({
+      batch, rows: bridgeRows, biz, actingUserId: req.user.userId });
+
+    res.json({ ok: true, imported, linked, status, reconciliation,
+               ...(incoming_payments ? { incoming_payments } : {}) });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
