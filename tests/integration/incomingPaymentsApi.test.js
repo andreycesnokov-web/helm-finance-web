@@ -28,7 +28,8 @@ const WALLET_B = 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee';
 const OWNER_A = 7001, ACCOUNTANT_A = 7002, EMPLOYEE_A = 7003, OWNER_B = 7004;
 
 const dbState = { businesses: [], business_members: [], wallets: [], users: [],
-                  incoming_payments: [], transactions: [], debts: [], audit_events: [] };
+                  incoming_payments: [], transactions: [], debts: [], audit_events: [],
+                  incoming_payment_match_candidates: [] };
 const dbFlags = { insertError: null };
 
 function seed() {
@@ -50,6 +51,7 @@ function seed() {
   ];
   dbState.users = [OWNER_A, ACCOUNTANT_A, EMPLOYEE_A, OWNER_B].map((id) => ({ id, first_name: `U${id}` }));
   dbState.incoming_payments = [];
+  dbState.incoming_payment_match_candidates = [];
   dbState.transactions = [];
   dbState.debts = [];
   dbState.audit_events = [];
@@ -556,4 +558,181 @@ test('settlement imports are audited', async () => {
   const rows = dbState.audit_events.filter((a) => a.action === 'created_from_gateway_import');
   assert.strictEqual(rows.length, 1);
   assert.strictEqual(rows[0].business_id, BIZ_A);
+});
+
+// ── Match candidates (PR4) ───────────────────────────────────────────────────────────────
+const cand = (id) => `${URL_LIST}/${id}/candidates`;
+
+function seedTargets() {
+  // A receivable and an income transaction in BIZ_A that a 1,000,000 receipt should match,
+  // plus look-alikes in BIZ_B that it must never match.
+  dbState.debts = [
+    { id: 11, business_id: BIZ_A, type: 'receivable', status: 'open', remaining_amount: 1000000,
+      due_date: '2026-08-10', counterparty: 'PT Maju Jaya', currency: 'IDR' },
+    { id: 12, business_id: BIZ_B, type: 'receivable', status: 'open', remaining_amount: 1000000,
+      due_date: '2026-08-10', counterparty: 'PT Maju Jaya', currency: 'IDR' },
+    { id: 13, business_id: BIZ_A, type: 'payable', status: 'open', remaining_amount: 1000000,
+      due_date: '2026-08-10', counterparty: 'PT Maju Jaya', currency: 'IDR' },
+  ];
+  dbState.transactions = [
+    { id: 21, business_id: BIZ_A, type: 'income', amount_idr: 1000000, transaction_date: '2026-08-10',
+      counterparty_name: 'PT Maju Jaya', currency_original: 'IDR' },
+    { id: 22, business_id: BIZ_B, type: 'income', amount_idr: 1000000, transaction_date: '2026-08-10',
+      counterparty_name: 'PT Maju Jaya', currency_original: 'IDR' },
+  ];
+}
+const matchable = (o = {}) => receipt({
+  gross_amount: 1000000, net_amount: 1000000, payer_name: 'PT Maju Jaya',
+  transaction_at: '2026-08-10T00:00:00.000Z', ...o,
+});
+async function paymentWithCandidates() {
+  seedTargets();
+  const created = await createAsOwner(matchable());
+  const id = created.body.payment.id;
+  const gen = await api('POST', cand(id), { token: tok(OWNER_A), business: BIZ_A });
+  return { id, gen };
+}
+
+test('flag OFF: candidate routes are 404', async () => {
+  process.env[FLAG] = 'false';
+  assert.strictEqual((await api('POST', cand('x'), { token: tok(OWNER_A), business: BIZ_A })).status, 404);
+  assert.strictEqual((await api('GET', cand('x'), { token: tok(OWNER_A), business: BIZ_A })).status, 404);
+});
+
+test('candidates are generated for a matching receivable and income transaction', async () => {
+  const { gen } = await paymentWithCandidates();
+  assert.strictEqual(gen.status, 200);
+  assert.strictEqual(gen.body.count, 2);
+  assert.ok(gen.body.candidates.every((c) => c.score > 0 && c.match_reasons.length));
+});
+
+test('candidates NEVER include another business receivable or transaction', async () => {
+  const { gen } = await paymentWithCandidates();
+  const ids = gen.body.candidates.map((c) => c.target_debt_id ?? c.target_transaction_id);
+  assert.ok(!ids.includes(12), 'another company receivable was proposed');
+  assert.ok(!ids.includes(22), 'another company transaction was proposed');
+  assert.ok(gen.body.candidates.every((c) => c.business_id === BIZ_A));
+});
+
+test('a payable is never proposed for incoming money', async () => {
+  const { gen } = await paymentWithCandidates();
+  assert.ok(!gen.body.candidates.map((c) => c.target_debt_id).includes(13));
+});
+
+test('generating candidates creates NO transaction and NO debt, and mutates neither', async () => {
+  seedTargets();
+  const debtsBefore = JSON.parse(JSON.stringify(dbState.debts));
+  const txBefore = JSON.parse(JSON.stringify(dbState.transactions));
+  await paymentWithCandidates();
+  assert.deepStrictEqual(dbState.debts, debtsBefore, 'a receivable was mutated by matching');
+  assert.deepStrictEqual(dbState.transactions, txBefore, 'a transaction was mutated by matching');
+});
+
+test('a payment with candidates is candidate, which is still not matched', async () => {
+  const { id } = await paymentWithCandidates();
+  const p = dbState.incoming_payments.find((x) => x.id === id);
+  assert.strictEqual(p.reconciliation_status, 'candidate');
+  assert.notStrictEqual(p.reconciliation_status, 'matched');
+  assert.strictEqual(p.status, 'draft', 'matching silently reviewed the payment');
+});
+
+test('re-running the engine refreshes rather than accumulating', async () => {
+  const { id } = await paymentWithCandidates();
+  const again = await api('POST', cand(id), { token: tok(OWNER_A), business: BIZ_A });
+  assert.strictEqual(again.body.count, 2);
+  assert.strictEqual(dbState.incoming_payment_match_candidates.length, 2);
+});
+
+test('candidates for another business payment are a 404', async () => {
+  const { id } = await paymentWithCandidates();
+  assert.strictEqual((await api('GET', cand(id), { token: tok(OWNER_B), business: BIZ_B })).status, 404);
+  assert.strictEqual((await api('POST', cand(id), { token: tok(OWNER_B), business: BIZ_B })).status, 404);
+});
+
+test('an employee cannot generate or read candidates', async () => {
+  const { id } = await paymentWithCandidates();
+  assert.strictEqual((await api('POST', cand(id), { token: tok(EMPLOYEE_A), business: BIZ_A })).status, 403);
+  assert.strictEqual((await api('GET', cand(id), { token: tok(EMPLOYEE_A), business: BIZ_A })).status, 403);
+});
+
+// ── Accepting is a human decision, and books nothing ─────────────────────────────────────
+test('an accountant cannot accept a match — that needs approval rights', async () => {
+  const { id, gen } = await paymentWithCandidates();
+  const r = await api('PATCH', `${cand(id)}/${gen.body.candidates[0].id}`,
+    { token: tok(ACCOUNTANT_A), business: BIZ_A, body: { status: 'accepted' } });
+  assert.strictEqual(r.status, 403);
+});
+
+test('accepting links the payment but does NOT settle the debt or book revenue', async () => {
+  const { id, gen } = await paymentWithCandidates();
+  const c = gen.body.candidates.find((x) => x.target_type === 'debt');
+  const debtBefore = JSON.parse(JSON.stringify(dbState.debts.find((d) => d.id === 11)));
+
+  const r = await api('PATCH', `${cand(id)}/${c.id}`,
+    { token: tok(OWNER_A), business: BIZ_A, body: { status: 'accepted' } });
+  assert.strictEqual(r.status, 200);
+
+  const p = dbState.incoming_payments.find((x) => x.id === id);
+  assert.strictEqual(p.reconciliation_status, 'matched');
+  assert.strictEqual(p.linked_debt_id, 11);
+  // The receivable itself is untouched: not paid, not reduced, not closed.
+  assert.deepStrictEqual(dbState.debts.find((d) => d.id === 11), debtBefore);
+  assert.strictEqual(dbState.transactions.length, 2, 'accepting created a ledger transaction');
+  // And accepting a match is not an accounting review.
+  assert.strictEqual(p.status, 'draft');
+});
+
+test('a candidate cannot be decided twice', async () => {
+  const { id, gen } = await paymentWithCandidates();
+  const c = gen.body.candidates[0];
+  await api('PATCH', `${cand(id)}/${c.id}`, { token: tok(OWNER_A), business: BIZ_A, body: { status: 'accepted' } });
+  const again = await api('PATCH', `${cand(id)}/${c.id}`, { token: tok(OWNER_A), business: BIZ_A, body: { status: 'rejected' } });
+  assert.strictEqual(again.status, 409);
+  assert.strictEqual(again.body.error, 'already_decided');
+});
+
+test('a second candidate cannot be accepted once the payment is matched', async () => {
+  const { id, gen } = await paymentWithCandidates();
+  await api('PATCH', `${cand(id)}/${gen.body.candidates[0].id}`,
+    { token: tok(OWNER_A), business: BIZ_A, body: { status: 'accepted' } });
+  const second = await api('PATCH', `${cand(id)}/${gen.body.candidates[1].id}`,
+    { token: tok(OWNER_A), business: BIZ_A, body: { status: 'accepted' } });
+  assert.strictEqual(second.status, 409);
+  assert.strictEqual(second.body.error, 'already_matched');
+});
+
+test('rejecting a candidate leaves the payment unmatched', async () => {
+  const { id, gen } = await paymentWithCandidates();
+  const r = await api('PATCH', `${cand(id)}/${gen.body.candidates[0].id}`,
+    { token: tok(OWNER_A), business: BIZ_A, body: { status: 'rejected' } });
+  assert.strictEqual(r.status, 200);
+  const p = dbState.incoming_payments.find((x) => x.id === id);
+  assert.notStrictEqual(p.reconciliation_status, 'matched');
+  assert.strictEqual(p.linked_debt_id ?? null, null);
+});
+
+test('only accepted or rejected are valid decisions', async () => {
+  const { id, gen } = await paymentWithCandidates();
+  const r = await api('PATCH', `${cand(id)}/${gen.body.candidates[0].id}`,
+    { token: tok(OWNER_A), business: BIZ_A, body: { status: 'matched' } });
+  assert.strictEqual(r.status, 400);
+  assert.strictEqual(r.body.error, 'invalid_decision');
+});
+
+test('a re-run never overwrites a human decision', async () => {
+  const { id, gen } = await paymentWithCandidates();
+  await api('PATCH', `${cand(id)}/${gen.body.candidates[0].id}`,
+    { token: tok(OWNER_A), business: BIZ_A, body: { status: 'rejected' } });
+  await api('POST', cand(id), { token: tok(OWNER_A), business: BIZ_A });
+  const c = dbState.incoming_payment_match_candidates.find((x) => x.id === gen.body.candidates[0].id);
+  assert.strictEqual(c.status, 'rejected', 'the engine overwrote a reviewer decision');
+});
+
+test('match decisions are audited', async () => {
+  const { id, gen } = await paymentWithCandidates();
+  await api('PATCH', `${cand(id)}/${gen.body.candidates[0].id}`,
+    { token: tok(OWNER_A), business: BIZ_A, body: { status: 'accepted' } });
+  const rows = dbState.audit_events.filter((a) => a.entity_type === 'incoming_payment_match_candidate');
+  assert.strictEqual(rows.length, 1);
+  assert.strictEqual(rows[0].action, 'candidate_accepted');
 });

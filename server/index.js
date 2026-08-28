@@ -3295,6 +3295,7 @@ async function loadBusinessCategoryMap(biz) {
 // business_id is ALWAYS the active workspace and never read from the body.
 const IP = require('./lib/incomingPayments');
 const GSI = require('./lib/gatewaySettlementImport');
+const IPM = require('./lib/incomingPaymentMatching');
 function isIncomingPaymentsEnabled() { return process.env.INCOMING_PAYMENTS_ENABLED === 'true'; }
 
 // Columns returned to the client. raw_provider_payload is deliberately excluded from LIST
@@ -3533,6 +3534,157 @@ app.get('/api/incoming-payments/:id', auth, async (req, res) => {
     if (!data) return res.status(404).json({ error: 'not_found' });
     res.json({ payment: data });
   } catch { res.status(500).json({ error: 'incoming_payments_read_failed' }); }
+});
+
+// ── Match candidates (PR4, migration 050) ────────────────────────────────────
+//
+// A candidate is a PROPOSAL, never a decision. The engine scores receivables and income
+// transactions against a receipt and explains why; a human with approval rights accepts one.
+// Accepting writes the link on the PAYMENT side only — it does not settle the debt, does not
+// change the transaction, does not book revenue, and does not close any period.
+
+// Load the payment or answer for it. Every candidate route is scoped this way, so a payment
+// from another workspace is a 404 rather than a cross-tenant probe.
+async function loadScopedPayment(req, res, businessId) {
+  const { data, error } = await supabase.from('incoming_payments')
+    .select('id, business_id, gross_amount, net_amount, currency, transaction_at, settled_at, '
+          + 'payer_name, payer_reference, description, status, reconciliation_status')
+    .eq('id', req.params.id).eq('business_id', businessId).maybeSingle();
+  if (error) { res.status(500).json({ error: 'incoming_payments_read_failed' }); return null; }
+  if (!data) { res.status(404).json({ error: 'not_found' }); return null; }
+  return data;
+}
+
+// POST /api/incoming-payments/:id/candidates — (re)generate proposals for one receipt.
+app.post('/api/incoming-payments/:id/candidates', auth, async (req, res) => {
+  try {
+    if (!isIncomingPaymentsEnabled()) return res.status(404).json({ error: 'not_found' });
+    const biz = await requireBusiness(req, res); if (!biz) return;
+    if (!canViewBusinessFinance(biz.role))
+      return res.status(403).json({ error: 'forbidden', message: 'Your role cannot match incoming payments.' });
+
+    const businessId = biz.business.id;
+    const payment = await loadScopedPayment(req, res, businessId); if (!payment) return;
+
+    // Both target sets are queried WITH the business filter, so nothing from another
+    // workspace can even reach the scorer.
+    const [{ data: debts }, { data: txs }] = await Promise.all([
+      supabase.from('debts').select('*').eq('business_id', businessId).eq('type', 'receivable'),
+      supabase.from('transactions').select('*').eq('business_id', businessId).eq('type', 'income'),
+    ]);
+
+    const proposals = IPM.buildCandidates(payment, { debts: debts || [], transactions: txs || [] });
+
+    const saved = [];
+    for (const p of proposals) {
+      const row = { ...p, business_id: businessId, incoming_payment_id: payment.id, status: 'suggested' };
+      // One proposal per (payment, target): re-running refreshes rather than accumulating.
+      const { data: existing } = await supabase.from('incoming_payment_match_candidates')
+        .select('id, status').eq('incoming_payment_id', payment.id)
+        .eq('target_type', p.target_type)
+        .eq(p.target_type === 'debt' ? 'target_debt_id' : 'target_transaction_id',
+            p.target_type === 'debt' ? p.target_debt_id : p.target_transaction_id)
+        .maybeSingle();
+
+      if (existing) {
+        // A human decision is never overwritten by a re-run of the engine.
+        if (existing.status !== 'suggested') { saved.push(existing); continue; }
+        const { data: upd } = await supabase.from('incoming_payment_match_candidates')
+          .update({ score: p.score, match_reasons: p.match_reasons })
+          .eq('id', existing.id).select('*').single();
+        saved.push(upd); continue;
+      }
+      const { data: ins, error } = await supabase.from('incoming_payment_match_candidates')
+        .insert(row).select('*').single();
+      if (error) { console.warn(`[incoming-payments] candidate insert failed: ${error.message}`); continue; }
+      saved.push(ins);
+    }
+
+    // Reflect that proposals exist, without claiming a match. 'candidate' is still unmatched
+    // for every reporting purpose.
+    if (saved.length && payment.reconciliation_status === 'unmatched') {
+      await supabase.from('incoming_payments').update({ reconciliation_status: 'candidate' })
+        .eq('id', payment.id).eq('business_id', businessId);
+    }
+
+    res.json({ incoming_payment_id: payment.id, count: saved.length, candidates: saved });
+  } catch { res.status(500).json({ error: 'candidate_generation_failed' }); }
+});
+
+// GET /api/incoming-payments/:id/candidates — list proposals for one receipt.
+app.get('/api/incoming-payments/:id/candidates', auth, async (req, res) => {
+  try {
+    if (!isIncomingPaymentsEnabled()) return res.status(404).json({ error: 'not_found' });
+    const biz = await requireBusiness(req, res); if (!biz) return;
+    if (!canViewBusinessFinance(biz.role))
+      return res.status(403).json({ error: 'forbidden', message: 'Your role cannot view incoming payments.' });
+
+    const businessId = biz.business.id;
+    const payment = await loadScopedPayment(req, res, businessId); if (!payment) return;
+    const { data } = await supabase.from('incoming_payment_match_candidates')
+      .select('*').eq('business_id', businessId).eq('incoming_payment_id', payment.id)
+      .order('score', { ascending: false });
+    res.json({ incoming_payment_id: payment.id, candidates: data || [] });
+  } catch { res.status(500).json({ error: 'candidate_read_failed' }); }
+});
+
+// PATCH /api/incoming-payments/:id/candidates/:candidateId — accept or reject a proposal.
+//
+// Accepting is the ONLY way a payment becomes matched, and it always requires a human with
+// approval rights. It writes linked_debt_id / linked_transaction_id and sets
+// reconciliation_status='matched' on the PAYMENT. It deliberately does NOT:
+//   - mark the debt paid or change its remaining amount,
+//   - modify the transaction in any way,
+//   - book revenue, set a tax treatment, or close a period.
+// Those remain separate, later, explicitly-approved steps.
+app.patch('/api/incoming-payments/:id/candidates/:candidateId', auth, async (req, res) => {
+  try {
+    if (!isIncomingPaymentsEnabled()) return res.status(404).json({ error: 'not_found' });
+    const biz = await requireBusiness(req, res); if (!biz) return;
+    if (!canApproveFinancialRecord(biz.role))
+      return res.status(403).json({ error: 'forbidden', message: 'Your role cannot accept a match.' });
+
+    const businessId = biz.business.id;
+    const payment = await loadScopedPayment(req, res, businessId); if (!payment) return;
+
+    const decision = String(req.body?.status || '').trim();
+    if (!['accepted', 'rejected'].includes(decision))
+      return res.status(400).json({ error: 'invalid_decision', message: 'status must be accepted or rejected.' });
+
+    const { data: cand } = await supabase.from('incoming_payment_match_candidates')
+      .select('*').eq('id', req.params.candidateId)
+      .eq('business_id', businessId).eq('incoming_payment_id', payment.id).maybeSingle();
+    if (!cand) return res.status(404).json({ error: 'candidate_not_found' });
+    if (cand.status !== 'suggested')
+      return res.status(409).json({ error: 'already_decided', message: `This candidate was already ${cand.status}.` });
+    if (decision === 'accepted' && payment.reconciliation_status === 'matched')
+      return res.status(409).json({ error: 'already_matched', message: 'This payment is already matched.' });
+
+    const stamp = { decided_by_user_id: req.user.userId, decided_at: new Date().toISOString() };
+    const { data: updated, error: uErr } = await supabase.from('incoming_payment_match_candidates')
+      .update({ status: decision, ...stamp }).eq('id', cand.id).select('*').single();
+    if (uErr) return res.status(500).json({ error: 'candidate_update_failed' });
+
+    if (decision === 'accepted') {
+      await supabase.from('incoming_payments').update({
+        reconciliation_status: 'matched',
+        linked_debt_id: cand.target_type === 'debt' ? cand.target_debt_id : null,
+        linked_transaction_id: cand.target_type === 'transaction' ? cand.target_transaction_id : null,
+      }).eq('id', payment.id).eq('business_id', businessId);
+    }
+
+    await recordAudit({
+      businessId, actorUserId: req.user.userId, actorRole: biz.role, channel: 'web',
+      entityType: 'incoming_payment_match_candidate', entityId: cand.id,
+      action: `candidate_${decision}`,
+      before: { status: cand.status },
+      after: { status: decision, incoming_payment_id: payment.id, target_type: cand.target_type,
+               target_debt_id: cand.target_debt_id, target_transaction_id: cand.target_transaction_id,
+               score: cand.score },
+    });
+
+    res.json({ candidate: updated });
+  } catch { res.status(500).json({ error: 'candidate_update_failed' }); }
 });
 
 // PATCH /api/incoming-payments/:id/status — a human review decision.
