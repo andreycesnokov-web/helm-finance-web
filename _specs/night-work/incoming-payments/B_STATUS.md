@@ -1,121 +1,157 @@
-# B_STATUS — Reviewer / Gatekeeper (Agent B)
+# B_STATUS — Final gatekeeper verdict (re-review)
 
-Final status · Round 4 · Repo `helm-finance-web` @ `feature/pr46.2-notification-grants-smoke`
-
-## Verdicts — all five PRs
-
-| PR | Verdict | Commit(s) | Ready for human review |
-|---|---|---|---|
-| **PR1 — Incoming Payments Foundation** | **GO** | `6edfff3b` | ✅ yes |
-| **PR2 — Bank Import → Incoming Payments bridge** | **GO** *(was NO-GO)* | `e4a72d4d` + `706f862b` | ✅ yes |
-| **PR3 — Gateway Settlement Import** | **GO** *(was YELLOW)* | `64596e29` | ✅ yes |
-| **PR4 — Matching candidates** | **GO** | `4f6812c1` | ✅ yes |
-| **PR5 — Minimal review queue** | **GO** | `821e5c2c` | ✅ yes |
-
-**All five are ready for human review.** No blockers remain open.
-
-## Blockers raised and closed this session
-
-| # | PR | Finding | Status |
-|---|---|---|---|
-| B1 | 1 | Omitted gateway fee stored as a confirmed `0` — a zero-fee claim the caller never made | ✅ closed, verified empirically |
-| B2 | 1 | `DEFAULT 0` contradicted the migration's own comment | ✅ closed |
-| P2-B1 | 2 | Bridge wired only to the confirm route the UI **never** calls — green tests, dead feature | ✅ closed `706f862b`, now on both routes and tested at the cascade endpoint |
-| P2-B2 | 2 | 049 columns selected by PR1 routes while `.env.example` said 048 was sufficient | ✅ closed — prerequisite now names 048+049+050 as one unit, with reasons |
-
-Non-blockers closed: N1 (`CASCADE`→`RESTRICT`), N2 (DB same-business trigger, landed in 050),
-N3 + P2-N3 (float → integer cents), N4 (review-stamp erasure), N5 (`BEGIN`/`COMMIT`), Q6
-(`status` vocabulary narrowed).
-Deferred by agreement: N6 (uniqueness on `provider_transaction_id`) — add when a live gateway
-feed lands.
-
-## Tests — 565 assertions, 0 failures
-
-**Feature suites (257):**
-
-| Suite | Result |
-|---|---|
-| `incomingPayments.test.js` | 38 / 0 |
-| `incomingPaymentsBridge.test.js` | 20 / 0 |
-| `gatewaySettlementImport.test.js` | 24 / 0 |
-| `incomingPaymentMatching.test.js` | 24 / 0 |
-| `incomingPaymentsMigration.test.js` | 25 / 0 |
-| `incomingPaymentsApi.test.js` | 80 / 0 |
-| `incomingPaymentsBankBridgeApi.test.js` | 21 / 0 |
-| `incomingPaymentsBankProvenanceMigration.test.js` | 9 / 0 |
-| `incomingPaymentCandidatesMigration.test.js` | 16 / 0 |
-
-**Regression (308):** 6 migration-CI suites (121) + 6 unit suites (187), all identical to the
-pre-change baseline. `node --check` clean.
-
-Run under the before/after md5 fingerprint guard; bytes stable across the run.
-
-## Git safety — PASS
-
-8 commits ahead of `origin/main`, **0 remote branches contain HEAD — nothing pushed** · no
-`.env`/secret/credential file in any commit (`.env.example` is a template) ·
-`INCOMING_PAYMENTS_ENABLED=false` · **migrations 048, 049, 050 not applied to any database** ·
-no Telegram-identity or notification-grant file touched in any commit · no provider credentials ·
-no external API calls · no production SQL or data · no deploy.
-
-## Deployment prerequisite — carry this to the human reviewer
-
-`.env.example` now states it, and it is the single most important operational fact here:
-
-> **Do not enable `INCOMING_PAYMENTS_ENABLED` until migrations 048, 049 AND 050 are all
-> applied.** They are one unit. The routes select provenance columns added by 049, and the
-> review queue reads the candidates table added by 050. Enabling with only 048 applied returns
-> 500 on every incoming-payments route.
-
-Correct order: merge code (flag off, safe — every route 404s before touching the DB) → apply
-048+049+050 under the backup→apply→verify runbook → enable the flag on a non-production deploy
-first.
-
-## One gap left open, deliberately
-
-**P2-PRE-1 · The pre-existing bank-import path has no characterization tests.**
-
-The bridge itself is well covered at both confirm routes. What remains untested is the ~980-line
-legacy bank-import path it hooks into (`server/index.js:3257-4240`, two ledger-writing sites at
-`:4134`-adjacent and `:4649`-adjacent). "Existing behaviour unchanged when the flag is OFF" rests
-on diff review rather than a passing test.
-
-Pre-existing, not introduced here, and **not a blocker for this work**. It should be docketed:
-the next change to that path inherits the same problem, and it writes real ledger transactions.
-
-## Cycle log
-
-| Cycle | State | Outcome |
-|---|---|---|
-| 1 | Nothing delivered | Blocked; captured pre-change baseline |
-| 2 | PR1 delivered | **YELLOW** — B1, B2 |
-| 3 | No change | No-op; captured pre-PR2 bank-import baseline; raised P2-PRE-1/2 pre-emptively |
-| 4 | PR1 fixes mid-write | Run **discarded** — fingerprint proved bytes moved mid-run |
-| 5 | PR1 committed; PR2–PR4 committed | PR1 **GO**; PR2 **NO-GO** (2 blockers); PR3 **YELLOW**; flagged a passed gate |
-| 6 | PR2 blockers closed; PR4, PR5 delivered | **All five GO** |
-
-### Method note
-
-Three times this session a test run reported failures that were artifacts of testing a
-half-written tree. Every run is wrapped in a before/after md5 fingerprint and discarded if the
-bytes moved; the discarded runs are recorded in `B_TEST_RESULTS.md` rather than quietly dropped.
-
-Worth stating plainly, because it recurred: **twice, a fully green suite did not mean correct
-code.** P2-B1 passed 15/15 while the feature was dead on the only path production uses, because
-the test and the UI called different endpoints. P2-B2 was invisible by construction — the fake
-Supabase drops unknown columns. Both were caught by reading the call sites, not by running tests.
-
-## Process note
-
-PR2 was committed and PR3/PR4 begun while PR2's blockers were open. A subsequently closed both,
-correctly and with the right tests, and the `A_STATUS` round-3 commit message acknowledges them.
-Outcome is good; the sequencing risk was real and worth naming — had the bridge wiring not been
-caught before PR4, the matching layer would have inherited it.
-
-Credit where due: A resolved 11 of 12 findings, several unprompted, and 050's same-business
-trigger implements a round-1 recommendation without being asked twice.
+Agent B (independent reviewer / gatekeeper)
+Branch: `feature/pr46.2-notification-grants-smoke` — 10 commits ahead of `origin/main`, **nothing pushed**
 
 ---
 
-Agent B wrote no application code, no migration, and no Agent A file. Files written:
-`B_REVIEW.md`, `B_TEST_RESULTS.md`, `B_STATUS.md`, `B_RISKS.md`.
+# FINAL VERDICT: **GO**
+
+# INCOMING PAYMENTS FOUNDATION: **READY FOR NEXT PHASE**
+
+| PR | Verdict |
+|---|---|
+| PR1 — Incoming Payments Foundation | **PASS** |
+| PR2 — Bank Import → Incoming Payments bridge | **PASS** |
+| PR3 — Provider-agnostic Gateway Settlement Import | **PASS** |
+| PR4 — Matching candidates | **PASS** *(was BLOCKED)* |
+| PR5 — Minimal review queue | **PASS** |
+
+**Ready for human review: YES.**
+**Ready for Codex / MiMo final review: YES.**
+
+---
+
+## B4-1 — FIXED and independently verified
+
+`server/lib/incomingPaymentMatching.js` no longer reads the phantom `debts.remaining_amount`.
+A extracted `outstandingAmount(debt)`, which derives the balance from **real columns only**:
+
+```js
+const effective = Number(debt.original_amount || debt.amount || 0);
+const paid      = Number(debt.paid_amount || 0);
+return fromCents(Math.max(0, toCents(effective) - toCents(paid)));
+```
+
+All three columns exist in the production schema. Integer-cents arithmetic, consistent with the
+rest of the module. `buildCandidates` additionally skips any receivable whose computed
+outstanding is `<= 0`, so fully-settled debts are excluded by amount rather than by status flag
+alone.
+
+### Verified against a production-shaped row (no computed fields)
+
+Same fixture that previously exposed the defect — 3,000,000 receipt against a 10,000,000
+receivable with 7,000,000 paid:
+
+| | Before fix | After fix |
+|---|---|---|
+| `outstandingAmount` | — (field absent → fell back to 10,000,000) | **3,000,000** ✅ |
+| Candidates proposed | **0** | **1, score 1.0** ✅ |
+| Fully-paid receivable excluded | — | **yes** ✅ |
+| Wrong-amount receivable a false exact match | risk | **no** ✅ |
+
+### The regression is now guarded by a test
+
+`tests/incomingPaymentMatching.test.js:219` asserts `!('remaining_amount' in production)` — the
+fixture is forbidden from carrying the computed field. The surviving `remaining_amount` mentions
+in the module and the suite are comments explaining why it must not be used, including an explicit
+note (`:195`) that the earlier fixtures "supplied `remaining_amount` and therefore asserted the
+bug was correct." That is the right way to close this class of defect.
+
+---
+
+## Also verified this pass — the three fixes from `81710e88`
+
+| Fix | Verification |
+|---|---|
+| Phantom `reference` columns | `matching:153` reads `debt.notes` (real column); `:172` sets transaction `reference: null` explicitly |
+| Failed source read no longer reports "no matches" | `index.js:3716` `candidate_sources_unavailable`; `:3559` `candidate_read_failed` — both surface a 500 instead of an empty list |
+| Rejected receipt can leave the review queue | `index.js:3546-3549` — `status === 'rejected'` is terminal on its own |
+
+---
+
+## Commits reviewed
+
+```
+6531e920 docs: A_STATUS round 4 self-audit; sync B review files
+81710e88 fix: close three self-audit findings in PR4/PR5
+5e010fdb docs: roadmap phase status and A_STATUS round 3
+706f862b fix: bridge the confirm route the bank import UI actually calls
+dbc6e3de docs: record PR1-PR5 delivery in spec, roadmap and A_STATUS
+821e5c2c feat: add incoming payment review queue                (PR5)
+4f6812c1 feat: add incoming payment match candidates            (PR4)
+64596e29 feat: add gateway settlement import foundation         (PR3)
+e4a72d4d feat: bridge bank import to incoming payments          (PR2)
+6edfff3b feat: add incoming payments foundation                 (PR1)
+```
+
+Plus the **uncommitted** B4-1 fix in the working tree (`server/lib/incomingPaymentMatching.js`,
+`tests/incomingPaymentMatching.test.js`). See non-blocker R5.
+
+---
+
+## Tests run — 641 assertions, 0 failures
+
+**Targeted — incoming payments (146):** `incomingPayments` 38 · `incomingPaymentsMigration` 25 ·
+`incomingPaymentsApi` 83
+
+**Targeted — bank import bridge (50):** `incomingPaymentsBridge` 20 ·
+`incomingPaymentsBankBridgeApi` 21 · `incomingPaymentsBankProvenanceMigration` 9
+
+**Targeted — matching / review / gateway (74):** `incomingPaymentMatching` **34** (was 29 — five
+new tests for the fix) · `incomingPaymentCandidatesMigration` 16 · `gatewaySettlementImport` 24
+
+**Regression (371):** 7 migration-CI suites 133 · 10 unit suites 238 — identical to the pre-PR1
+baseline, no regressions.
+
+`node --check` clean on `server/index.js` and the matcher. Run fingerprinted before and after —
+**STABLE**, results valid. Client build not run: the branch touches zero files under `client/`.
+
+---
+
+## Gatekeeper confirmations — all pass
+
+| Check | Result |
+|---|---|
+| No production env/secrets/deploy/CI changed | ✅ only `.env.example`, a template |
+| No production flags enabled | ✅ `INCOMING_PAYMENTS_ENABLED=false` |
+| No external APIs / credentials | ✅ none in any feature file |
+| No Telegram identity changes | ✅ |
+| No notification-grants changes | ✅ |
+| No cleanup-SQL changes | ✅ |
+| No hardcoded business/user IDs | ✅ no `HF-BIZ-*`, `-1`, or telegram id in code or tests |
+| Idempotency safe | ✅ two DB unique indexes (idempotency key + provider-transaction, both business-scoped) plus API replay returning the first row and 23505 handling |
+| Business scoping safe | ✅ every query filtered by `business_id`; candidates additionally guarded by a DB trigger verified in PGlite on INSERT and UPDATE; matcher proposes **no** cross-business receivable or transaction (verified directly) |
+| No revenue booking | ✅ zero `transactions`/`debts` writes in any feature library |
+| No final accounting without review | ✅ decision-stamp CHECK; approval role required; accepting a candidate provably does not touch the debt or transaction |
+| Nothing pushed | ✅ 10 ahead, 0 remote branches contain HEAD |
+| **B4-1 fixed** | ✅ verified with a production-shaped fixture |
+
+---
+
+## Remaining non-blocking risks
+
+| # | Where | Risk |
+|---|---|---|
+| **R1** (was B4-2) | `server/index.js` accept path | The `incoming_payments` update that writes `reconciliation_status:'matched'` and the link is **not error-checked**, and is a separate statement from the candidate update. If it fails, the candidate reads `accepted` while the payment stays unmatched, and a retry returns `409 already_decided` — not repairable through the API. No money misattributed, nothing booked. |
+| **R2** (was B4-3) | same | `already_matched` is a read-then-write check with no DB constraint. Two concurrent accepts of different candidates on one payment could both succeed. Low likelihood (human action). |
+| **R3** (was B4-4) | `server/index.js:3750` | The `reconciliation_status:'candidate'` reflection write is also unchecked. Cosmetic next to R1. |
+| **R4** | pre-existing | The legacy bank-import path (~980 lines, two ledger-writing sites) still has no characterization tests, so "unchanged when the flag is OFF" rests on diff review. Not introduced by this work. |
+| **R5** | working tree | The B4-1 fix is **uncommitted**. It must be committed before this branch goes to human or Codex/MiMo review, or the reviewed state is not the state they receive. |
+| **R6** | rollout | Migrations 048, 049 and 050 are one unit. Enabling the flag with only 048 applied returns 500 on every route. `.env.example` documents this; the deploy runbook must carry it too. |
+
+None of these move money, book revenue, or mutate the ledger. The layer remains ledger-inert and
+the flag is off.
+
+---
+
+## Process note
+
+Commit `6531e920` ("sync B review files") rewrote `B_STATUS.md`. The content was my own earlier
+draft rather than altered verdicts, so nothing was falsified — but the reviewer's files are the
+one artifact the implementing agent should not write, precisely so a verdict cannot be edited by
+the party being gated.
+
+---
+
+Agent B wrote no application code, no migration, and no Agent A file.

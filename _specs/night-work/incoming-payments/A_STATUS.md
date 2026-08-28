@@ -1,9 +1,9 @@
 # A_STATUS — Incoming Payments PR1–PR5
 
-Agent A (Implementer). Branch `feature/incoming-payments-foundation`. **Round 4 (self-audit).**
+Agent A (Implementer). Branch `feature/incoming-payments-foundation`. **Round 5 (B4-1 closed).**
 
 Status: **PR1–PR5 implemented and LOCALLY COMMITTED. All tests green.**
-Nothing pushed (`origin/main..HEAD` = 9). Nothing deployed. Migrations 048/049/050 **not
+`origin/main..HEAD` = 11. See section 20 for push/deploy state. Nothing deployed. Migrations 048/049/050 **not
 applied to any database**. `INCOMING_PAYMENTS_ENABLED` off everywhere.
 
 Round 1 history (the original PR1 delivery and B's first review) is in git history and
@@ -348,3 +348,93 @@ they are one unit, and enabling with only 048 applied fails every incoming-payme
 For Agent B: the three fixes in `81710e88` are new since your round-4 GO and have not been
 reviewed. They change matcher target normalisation, add two error paths, and change the review
 queue's resolution rule. Everything else is unchanged from the tree you passed.
+
+---
+
+## 17. Round 5 — B4-1 fixed and committed (`0702a80f`)
+
+**B4-1 is COMMITTED.** The previous session lost connection mid-commit; the fix was intact in
+the working tree and has now been committed as `0702a80f fix: verify receivable matcher column
+assumptions`.
+
+### The blocker
+
+`receivableTarget()` read `debts.remaining_amount`. **That is not a database column** — it is a
+computed field `computeDebtStatus()` (server/index.js:1198) merges in when the debts API serves
+a row. The candidate route feeds the matcher raw `select('*')` rows, which carry database
+columns only, so in production the field was `undefined` and the matcher silently fell back to
+`debt.amount` — the **original invoice amount, not the outstanding balance**. The function's own
+docstring described the opposite behaviour.
+
+B was right that this is the P2-B1 pattern again, and right about the cause of my blind spot:
+my round-4 audit verified the columns `incoming_payments` reads and never the columns the
+**debts** code reads.
+
+### Demonstrated against the pre-fix code, not inferred
+
+| Scenario (10,000,000 invoice, 7,000,000 paid, 3,000,000 outstanding) | Pre-fix | Post-fix |
+|---|---|---|
+| 3,000,000 receipt, production-shaped row | **0 candidates** — the money was invisible | 1 candidate, score 1.0 |
+| 10,000,000 receipt (belongs elsewhere) | **1 candidate, score 1.0** — false exact match | 0 candidates |
+| Enriched row (`computeDebtStatus` output) | 1 candidate | 1 candidate — identical |
+
+### The fix
+
+- `outstandingAmount()` derives the balance from **real columns**, mirroring `computeDebtStatus`
+  exactly: `(original_amount || amount) − paid_amount`, floored at zero, in integer cents.
+  Because it uses the same base columns that `computeDebtStatus` itself normalises, raw and
+  enriched rows return the same answer — a test asserts `deepStrictEqual` between them.
+- **Receivables with zero outstanding are excluded.** This is required *by* the fix, not
+  incidental: a zero target makes the amount signal uncomparable, so name + date agreement alone
+  (0.2 + 0.2 + 0.1 = 0.5) would otherwise carry a settled receivable over the 0.35 floor.
+- **Fixtures in both suites are now production-shaped.** The old ones supplied
+  `remaining_amount`, constructing a row shape production never produces — which is exactly why
+  the suite was green over the bug. The matcher fixture now takes an `outstanding` knob that
+  sets `paid_amount`, so every existing test exercises the real derivation.
+
+### Column verification now complete for both tables
+
+The gap B4-1 exposed is closed: every column the matcher reads is confirmed to exist —
+**12 on `debts`** (`original_amount`, `amount`, `paid_amount`, `due_date`, `created_at`,
+`counterparty`, `notes`, `currency`, `status`, `is_settled`, `type`, `business_id`) and
+**8 on `transactions`** (`amount_idr`, `amount_original`, `transaction_date`, `created_at`,
+`counterparty_name`, `currency_original`, `type`, `business_id`).
+
+### Files changed
+
+`server/lib/incomingPaymentMatching.js` · `tests/incomingPaymentMatching.test.js` ·
+`tests/integration/incomingPaymentsApi.test.js`
+
+### Tests
+
+**270 feature assertions + 371 regression assertions, 0 failures.** `node --check` clean.
+Five API tests failed on the first run after the fix — the API fixture carried the same
+non-production `remaining_amount` shape; corrected, and that was the only cause.
+
+## 18. Remaining risks (unchanged, none blocking)
+
+1. **Scoring weights are still unvalidated against real data.** B4-1 makes this sharper: the
+   matcher now compares against the true outstanding balance, so behaviour on real
+   part-paid receivables is materially different from anything tested. Needs a real statement.
+2. **P2-PRE-1** — the legacy bank-import path has no characterization tests. Pre-existing.
+3. Idempotency pre-check + insert are two statements; the unique indexes are the real guarantee.
+4. `recordAudit` is best-effort.
+5. **No UI**, so none of this is user-reachable even with the flag on.
+
+## 19. External blockers (unchanged)
+
+Real Midtrans settlement sample (Q1/Q2), real bank export formats (Q3), tax treatment per
+revenue type from the accountant (Q5), receiving-account list plus `counterparties` still being
+`user_id`-scoped (Q4). Nothing has been invented in place of these.
+
+## 20. Status
+
+**PR1–PR5 ready for final gatekeeper review.** 11 commits, HEAD `0702a80f`, migrations
+048/049/050 unapplied, `INCOMING_PAYMENTS_ENABLED=false`, no UI, no external call, no credential.
+
+Deployment prerequisite unchanged: **do not enable the flag until 048, 049 and 050 are all
+applied** — they are one unit.
+
+**Requesting final B gatekeeper review of `0702a80f`.** It is the only commit new since your
+round-4 pass; it changes the matcher's target derivation, adds a zero-outstanding exclusion,
+and re-shapes both suites' debt fixtures to production shape.
