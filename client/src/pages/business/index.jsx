@@ -427,6 +427,96 @@ function DebtsView({ kind }) {
 export function BusinessPayables() { return <DebtsView kind="payable" /> }
 export function BusinessReceivables() { return <DebtsView kind="receivable" /> }
 
+// ── Incoming Payments — READ-ONLY view of /api/incoming-payments ─────────────
+//    Money that arrived (gateway settlements, bank statement credits, manual entry)
+//    staged as accounting EVIDENCE. This layer books nothing: no transaction, no
+//    wallet movement, no revenue. This page therefore only reads — there is no
+//    create, edit, delete or matching action anywhere in it, by design.
+//
+//    Gross / fee / withholding / net are shown as four SEPARATE columns because
+//    collapsing them is the accounting error this whole feature exists to prevent
+//    (decision D22). A NULL fee means "not known yet" and renders as an em dash,
+//    which is deliberately NOT the same as a confirmed zero.
+export function BusinessIncomingPayments() {
+  const w = useScoped('/incoming-payments')
+  const head = <PageHeader eyebrow="Business Workspace" title="Incoming Payments"
+    actions={<StatusBadge tone="info">Read-only</StatusBadge>} />
+
+  if (w.loading) return <>{head}<Card><LoadingSkeleton rows={5} height={18} /></Card></>
+
+  // With the backend flag off every route 404s before touching the database, so a
+  // "not found" here means the feature is disabled for this deployment — not a fault.
+  if (w.error) {
+    const disabled = /not_found|404/i.test(w.error)
+    return <>{head}{disabled
+      ? <EmptyState symbol={SYMBOL} title="Incoming Payments is not enabled"
+          description="This workspace does not have incoming payment ingestion turned on yet." />
+      : <ErrorState title="We couldn’t load incoming payments" description={w.error}
+          onRetry={() => location.reload()} />}</>
+  }
+
+  const payments = Array.isArray(w.data?.payments) ? w.data.payments : []
+
+  if (!payments.length) return <>{head}
+    <EmptyState symbol={SYMBOL} title="No incoming payments yet"
+      description="Money received through a payment gateway or bank account will appear here once it is ingested." />
+  </>
+
+  const ccy = (r) => r.currency || 'IDR'
+  // An unknown amount is NOT zero. NULL renders as a dash so nobody reads a missing
+  // gateway fee as a confirmed absence of one.
+  const amt = (v, r) => (v === null || v === undefined)
+    ? <span style={{ color: 'var(--text-muted)' }}>—</span>
+    : <span className="cfo-mono">{formatAmount(String(v), ccy(r))}</span>
+  const statusTone = (s) => s === 'reviewed' ? 'success' : s === 'rejected' ? 'danger' : 'neutral'
+  const reconTone = (s) => s === 'matched' ? 'success' : s === 'candidate' ? 'warning'
+    : s === 'ignored' ? 'neutral' : 'info'
+
+  return <>{head}
+    <div style={{ marginBottom: 16, color: 'var(--text-secondary)', fontSize: 14 }}>
+      Cash evidence awaiting review. Recording a payment here does not book revenue or create
+      a transaction — gross, fees and the net that actually landed are kept separate.
+    </div>
+
+    {/* desktop table */}
+    <Card className="cfo-rtable">
+      <ResponsiveTable
+        columns={[
+          { key: 'created_at', label: 'Received', render: r => <span className="cfo-mono">{(r.created_at || '').slice(0, 10)}</span> },
+          { key: 'source_type', label: 'Source', render: r => <StatusBadge tone="neutral">{r.source_type}</StatusBadge> },
+          { key: 'payer_name', label: 'Payer', render: r => r.payer_name || <span style={{ color: 'var(--text-muted)' }}>—</span> },
+          { key: 'gross_amount', label: 'Gross', num: true, render: r => amt(r.gross_amount, r) },
+          { key: 'fee_amount', label: 'Fee', num: true, render: r => amt(r.fee_amount, r) },
+          { key: 'tax_or_withholding_amount', label: 'Withholding', num: true, render: r => amt(r.tax_or_withholding_amount, r) },
+          { key: 'net_amount', label: 'Net', num: true, render: r => amt(r.net_amount, r) },
+          { key: 'currency', label: 'Currency', render: r => <span className="cfo-mono">{ccy(r)}</span> },
+          { key: 'status', label: 'Status', render: r => <StatusBadge tone={statusTone(r.status)}>{r.status}</StatusBadge> },
+          { key: 'reconciliation_status', label: 'Reconciliation', render: r => <StatusBadge tone={reconTone(r.reconciliation_status)}>{r.reconciliation_status}</StatusBadge> },
+        ]}
+        rows={payments} rowKey={r => r.id} />
+    </Card>
+
+    {/* mobile cards */}
+    <div className="cfo-mcards">
+      {payments.map(r => (
+        <div className="cfo-dcard" key={r.id}>
+          <div className="cfo-dcard-top">
+            <div className="cfo-dcard-name">{r.payer_name || r.source_type}</div>
+            <div className="cfo-dcard-amt cfo-mono">{formatAmount(String(r.net_amount ?? 0), ccy(r))} {ccy(r)}</div>
+          </div>
+          <div className="cfo-dcard-meta">
+            <StatusBadge tone={statusTone(r.status)}>{r.status}</StatusBadge>
+            <StatusBadge tone={reconTone(r.reconciliation_status)}>{r.reconciliation_status}</StatusBadge>
+            <span className="cfo-mono">{(r.created_at || '').slice(0, 10)}</span>
+            <span>gross {formatAmount(String(r.gross_amount ?? 0), ccy(r))}</span>
+            {(r.fee_amount !== null && r.fee_amount !== undefined) && <span>fee {formatAmount(String(r.fee_amount), ccy(r))}</span>}
+          </div>
+        </div>
+      ))}
+    </div>
+  </>
+}
+
 // ── Business Invoices — premium PLACEHOLDER (no invoice backend/table yet).
 //    Shows real receivable/payable/overdue counts derived from /api/debts (NOT fake
 //    invoice records) + routes to Receivables/Payables. No debt-logic change. ──────

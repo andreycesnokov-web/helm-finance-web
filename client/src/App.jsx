@@ -68,7 +68,7 @@ import EmailCallback from './pages/EmailCallback'
 import TelegramLogin from './pages/TelegramLogin'
 import PersonalProfile from './pages/PersonalProfile'
 import { PersonalLayout, PersonalShell, PersonalOverview, PersonalAccounts, PersonalTransactions, PersonalOnboarding } from './pages/personal'
-import { BusinessLayout, BusinessShell, BusinessPulse, BusinessAccounts, BusinessTransactions, BusinessPayables, BusinessReceivables, BusinessInvoices, BusinessFunding, BusinessNew, BusinessIntercompany } from './pages/business'
+import { BusinessLayout, BusinessShell, BusinessPulse, BusinessAccounts, BusinessTransactions, BusinessPayables, BusinessReceivables, BusinessInvoices, BusinessIncomingPayments, BusinessFunding, BusinessNew, BusinessIntercompany } from './pages/business'
 // Premium hub renders the Workbench/Calendar/Tax Draft module when
 // VITE_AI_ACCOUNTANT_PREMIUM=true; flag off → the existing profile page unchanged.
 import { BusinessAccountantHub } from './pages/business/AccountantPremium'
@@ -615,6 +615,7 @@ export default function App() {
             <Route path="/business/documents" element={<BusinessShell><Documents /></BusinessShell>} />
             <Route path="/business/settings" element={<BusinessShell><Settings /></BusinessShell>} />
             <Route path="/business/bank-import" element={<BusinessShell><BankImport /></BusinessShell>} />
+            <Route path="/business/incoming-payments" element={<BusinessShell><BusinessIncomingPayments /></BusinessShell>} />
             {/* Funding & Investors: premium placeholder when flag on; safe redirect to
                 pulse when flag off (route never crashes / dead-links). */}
             <Route path="/business/funding-investors" element={<BusinessShell><BusinessFunding /></BusinessShell>} />

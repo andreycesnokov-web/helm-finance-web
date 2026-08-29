@@ -50,6 +50,9 @@ export const BUSINESS_NAV = [
     // no Personal/Funding backend calls, no migrations required).
     { key: 'funding', label: 'Funding & Investors', to: '/business/funding-investors', icon: <Icon.fund /> },
     { key: 'bankimport', label: 'Bank Import', to: '/business/bank-import', icon: <Icon.bank /> },
+    // Read-only view of money that arrived (gateway/bank/manual). Renders an
+    // explanatory empty state when the backend feature is off, so there is no dead link.
+    { key: 'incomingpayments', label: 'Incoming Payments', to: '/business/incoming-payments', icon: <Icon.down /> },
   ] },
   { title: 'Operations', items: [
     { key: 'intercompany', label: 'Intercompany', to: '/business/intercompany', icon: <Icon.link /> },
