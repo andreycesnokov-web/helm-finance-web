@@ -4151,6 +4151,236 @@ app.get('/api/admin/payment-connections', auth, paymentConnectionsFlagGuard, req
   } catch { res.status(500).json({ error: 'payment_connections_read_failed' }); }
 });
 
+// ── Payment credential vault (migration 052) ─────────────────────────────────
+//
+// Stores provider secrets as AES-256-GCM ciphertext. Gated by
+// PAYMENT_CREDENTIALS_VAULT_ENABLED: with the flag off every route answers 404 BEFORE any
+// database access.
+//
+// NO PLAINTEXT LEAVES THIS FILE. No route returns a secret, an ciphertext, an IV or a tag;
+// no code path logs one; no error message contains one. The only decrypt function in the
+// codebase (credentialVault.decrypt) is called by nothing here -- it exists for a later,
+// separately-reviewed provider-integration phase.
+//
+// SANDBOX ONLY. A credential cannot be stored against a production connection.
+// INERT. No provider is contacted, no webhook exists, and no incoming_payment, transaction,
+// debt or wallet balance is created or changed.
+const VAULT = require('./lib/credentialVault');
+const PCRED = require('./lib/paymentCredentials');
+function isCredentialVaultEnabled() { return process.env.PAYMENT_CREDENTIALS_VAULT_ENABLED === 'true'; }
+function credentialVaultFlagGuard(req, res, next) {
+  if (!isCredentialVaultEnabled()) return res.status(404).json({ error: 'not_found' });
+  next();
+}
+
+// Every column EXCEPT the ciphertext triple. Read paths never pull key material out of the
+// database at all, so it cannot leak through a response, a log, or a debugger session.
+const CREDENTIAL_METADATA_COLS =
+  'id, connection_id, business_id, provider, environment, credential_type, status, ' +
+  'value_last4, value_fingerprint, created_by_user_id, revoked_by_user_id, revoked_at, ' +
+  'created_at, updated_at';
+
+// Load a connection scoped to the ACTIVE business. Answers on `res` and returns null when
+// absent, so another workspace's connection id is a 404 and never an existence oracle.
+async function loadScopedConnection(req, res, businessId) {
+  const { data, error } = await supabase.from('payment_provider_connections')
+    .select('id, business_id, provider, environment, display_name, status')
+    .eq('id', req.params.id).eq('business_id', businessId).maybeSingle();
+  if (error) { res.status(500).json({ error: 'payment_connections_read_failed' }); return null; }
+  if (!data) { res.status(404).json({ error: 'not_found' }); return null; }
+  return data;
+}
+
+// GET /api/payment-connections/:id/credentials — METADATA ONLY.
+app.get('/api/payment-connections/:id/credentials', auth, credentialVaultFlagGuard, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res); if (!biz) return;
+    if (!canViewBusinessFinance(biz.role))
+      return res.status(403).json({ error: 'forbidden', message: 'Your role cannot view payment credentials.' });
+
+    const connection = await loadScopedConnection(req, res, biz.business.id); if (!connection) return;
+
+    const { data, error } = await supabase.from('payment_provider_credentials')
+      .select(CREDENTIAL_METADATA_COLS)
+      .eq('business_id', biz.business.id).eq('connection_id', connection.id)
+      .order('created_at', { ascending: false });
+    if (error) return res.status(500).json({ error: 'payment_credentials_read_failed' });
+
+    res.json({
+      connection_id: connection.id,
+      environment: connection.environment,
+      credential_types: PCRED.CREDENTIAL_TYPES,
+      // toMetadata is the single place that decides what a client may see.
+      credentials: (data || []).map(PCRED.toMetadata),
+    });
+  } catch { res.status(500).json({ error: 'payment_credentials_read_failed' }); }
+});
+
+// POST /api/payment-connections/:id/credentials — store an encrypted sandbox credential.
+// Rotating replaces the active credential of that type: the previous one is REVOKED, not
+// deleted, so the history of what existed and when survives an incident review.
+app.post('/api/payment-connections/:id/credentials', auth, credentialVaultFlagGuard, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res); if (!biz) return;
+    // Same gate as wallets and connections: handing the system a provider key is a
+    // structural change, not day-to-day finance work.
+    if (!canManageWallets(biz.role))
+      return res.status(403).json({ error: 'forbidden', message: 'Your role cannot manage payment credentials.' });
+
+    // Fail closed BEFORE reading anything: with no usable key there is no safe way to
+    // accept a secret, and accepting one to store in plaintext is never the fallback.
+    if (!VAULT.isVaultConfigured()) {
+      console.warn('[credential-vault] write refused: encryption key missing or wrong length');
+      return res.status(500).json({ error: 'credential_vault_not_configured',
+        message: 'The credential vault is not configured on this deployment.' });
+    }
+
+    const businessId = biz.business.id;
+    const connection = await loadScopedConnection(req, res, businessId); if (!connection) return;
+
+    const parsed = PCRED.validateCreate(req.body, connection);
+    if (!parsed.ok) return res.status(400).json({ error: parsed.error, message: parsed.message });
+    const { credential_type, plaintext } = parsed.value;
+
+    let sealed;
+    try {
+      // AAD binds the ciphertext to this exact business/connection/type, so a row copied
+      // elsewhere fails authentication rather than decrypting cleanly.
+      sealed = VAULT.encrypt(plaintext, {
+        business_id: businessId, connection_id: connection.id, credential_type });
+    } catch (e) {
+      console.warn(`[credential-vault] encrypt failed: ${e.code || 'unknown'}`);   // never the value
+      return res.status(500).json({ error: 'credential_vault_not_configured' });
+    }
+
+    // Revoke the current active credential of this type FIRST. The partial unique index
+    // permits only one active row per (connection, type), so this ordering is what makes a
+    // rotation possible at all -- and if the insert then fails, the worst outcome is a
+    // revoked credential and no active one, which is safe. The reverse order could leave
+    // two live keys.
+    const nowIso = new Date().toISOString();
+    const { data: superseded, error: rErr } = await supabase.from('payment_provider_credentials')
+      .update({ status: 'revoked', revoked_at: nowIso, revoked_by_user_id: req.user.userId })
+      .eq('business_id', businessId).eq('connection_id', connection.id)
+      .eq('credential_type', credential_type).eq('status', 'active')
+      .select('id');
+    if (rErr) return res.status(500).json({ error: 'payment_credential_create_failed' });
+    const rotated = (superseded || []).length > 0;
+
+    const { data: inserted, error: iErr } = await supabase.from('payment_provider_credentials')
+      .insert({
+        connection_id: connection.id,
+        business_id: businessId,
+        provider: connection.provider,
+        environment: connection.environment,
+        credential_type,
+        ...sealed,
+        status: 'active',
+        created_by_user_id: req.user.userId,
+      })
+      .select(CREDENTIAL_METADATA_COLS).single();
+    if (iErr) {
+      console.warn(`[credential-vault] insert failed business=${businessId} type=${credential_type}`);
+      return res.status(500).json({ error: 'payment_credential_create_failed' });
+    }
+
+    await recordAudit({
+      businessId, actorUserId: req.user.userId, actorRole: biz.role, channel: 'web',
+      entityType: 'payment_provider_credential', entityId: inserted?.id,
+      action: rotated ? 'credential_rotated' : 'credential_created',
+      // audit_events is append-only, so nothing written here can ever be redacted. Only
+      // non-reversible metadata goes in: no value, no ciphertext, no fingerprint.
+      after: { connection_id: connection.id, provider: connection.provider,
+               environment: connection.environment, credential_type,
+               value_last4: sealed.value_last4 },
+    });
+
+    res.status(201).json({ credential: PCRED.toMetadata(inserted), rotated });
+  } catch { res.status(500).json({ error: 'payment_credential_create_failed' }); }
+});
+
+// DELETE /api/payment-connections/:id/credentials/:credentialId — REVOKE, never hard-delete.
+// The ciphertext stays; only its status changes. Knowing a key existed and when it was
+// retired is exactly what an incident review needs.
+app.delete('/api/payment-connections/:id/credentials/:credentialId', auth, credentialVaultFlagGuard, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res); if (!biz) return;
+    if (!canManageWallets(biz.role))
+      return res.status(403).json({ error: 'forbidden', message: 'Your role cannot manage payment credentials.' });
+
+    const businessId = biz.business.id;
+    const connection = await loadScopedConnection(req, res, businessId); if (!connection) return;
+
+    const { data: current, error: cErr } = await supabase.from('payment_provider_credentials')
+      .select('id, status, credential_type')
+      .eq('id', req.params.credentialId)
+      .eq('business_id', businessId).eq('connection_id', connection.id).maybeSingle();
+    if (cErr) return res.status(500).json({ error: 'payment_credentials_read_failed' });
+    if (!current) return res.status(404).json({ error: 'not_found' });
+    if (current.status === 'revoked')
+      return res.status(409).json({ error: 'already_revoked', message: 'That credential is already revoked.' });
+
+    const { data: updated, error: uErr } = await supabase.from('payment_provider_credentials')
+      .update({ status: 'revoked', revoked_at: new Date().toISOString(),
+                revoked_by_user_id: req.user.userId })
+      .eq('id', current.id).eq('business_id', businessId)
+      .select(CREDENTIAL_METADATA_COLS).single();
+    if (uErr) return res.status(500).json({ error: 'payment_credential_update_failed' });
+
+    await recordAudit({
+      businessId, actorUserId: req.user.userId, actorRole: biz.role, channel: 'web',
+      entityType: 'payment_provider_credential', entityId: current.id, action: 'credential_revoked',
+      before: { status: 'active' },
+      after: { status: 'revoked', connection_id: connection.id,
+               credential_type: current.credential_type },
+    });
+
+    res.json({ credential: PCRED.toMetadata(updated) });
+  } catch { res.status(500).json({ error: 'payment_credential_update_failed' }); }
+});
+
+// GET /api/admin/payment-credentials — platform-wide READ-ONLY metadata monitor.
+// Deliberately never selects the ciphertext triple: an admin needs to know a credential
+// exists, of what type, and whether it is live. Nothing more, and there is no admin write.
+app.get('/api/admin/payment-credentials', auth, credentialVaultFlagGuard, requireAdmin, async (req, res) => {
+  try {
+    const limit = Math.min(Math.max(parseInt(req.query?.limit, 10) || 300, 1), 500);
+    const { data: rows, error } = await supabase.from('payment_provider_credentials')
+      .select(CREDENTIAL_METADATA_COLS).order('created_at', { ascending: false }).limit(limit);
+    if (error) return res.status(500).json({ error: 'payment_credentials_read_failed' });
+
+    const creds = rows || [];
+    const bizIds = [...new Set(creds.map(c => c.business_id).filter(Boolean))];
+    const connIds = [...new Set(creds.map(c => c.connection_id).filter(Boolean))];
+    const [{ data: bizRows }, { data: connRows }] = await Promise.all([
+      bizIds.length ? supabase.from('businesses').select('id, name, business_code').in('id', bizIds)
+                    : Promise.resolve({ data: [] }),
+      connIds.length ? supabase.from('payment_provider_connections').select('id, display_name').in('id', connIds)
+                     : Promise.resolve({ data: [] }),
+    ]);
+    const bizById = Object.fromEntries((bizRows || []).map(b => [b.id, b]));
+    const connById = Object.fromEntries((connRows || []).map(c => [c.id, c]));
+
+    res.json({
+      credentials: creds.map(c => ({
+        id: c.id,
+        business_id: c.business_id,
+        business_name: bizById[c.business_id]?.name || null,
+        business_code: bizById[c.business_id]?.business_code || null,
+        connection_id: c.connection_id,
+        connection_display_name: connById[c.connection_id]?.display_name || null,
+        provider: c.provider,
+        environment: c.environment,
+        credential_type: c.credential_type,
+        status: c.status,
+        value_last4: c.value_last4,
+        created_at: c.created_at,
+        revoked_at: c.revoked_at,
+      })),
+    });
+  } catch { res.status(500).json({ error: 'payment_credentials_read_failed' }); }
+});
+
 // POST /api/bank-import/batches — create a batch from client-parsed rows
 app.post('/api/bank-import/batches', auth, async (req, res) => {
   try {
