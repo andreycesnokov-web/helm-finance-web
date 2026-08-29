@@ -3,7 +3,7 @@
 // to Pulse formulas, wallet-balance logic, classification, access, ledger or contracts.
 // Mounted at /business/* so the legacy /,/accounts routes stay untouched during migration.
 import { Navigate, Outlet, useNavigate } from 'react-router-dom'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { apiFetch } from '../../lib/api'
 import { useAuth } from '../../hooks/useAuth'
 import { formatAmount } from '../../lib/money'
@@ -426,6 +426,193 @@ function DebtsView({ kind }) {
 
 export function BusinessPayables() { return <DebtsView kind="payable" /> }
 export function BusinessReceivables() { return <DebtsView kind="receivable" /> }
+
+// ── Payment Connections — provider routing config (migration 051) ────────────
+//    Records WHICH provider a business receives money through and where it should be
+//    routed for accounting. No credential field exists on this page, because the API
+//    accepts none: a request carrying one is refused, not stored. Nothing here syncs,
+//    calls a provider, creates an incoming payment, or touches the ledger.
+const PC_PROVIDERS = [
+  { id: 'midtrans', label: 'Midtrans' }, { id: 'xendit', label: 'Xendit' },
+  { id: 'doku', label: 'DOKU' }, { id: 'hitpay', label: 'HitPay' },
+  { id: 'duitku', label: 'Duitku' }, { id: 'ipaymu', label: 'iPaymu' },
+  { id: 'manual', label: 'Manual' }, { id: 'bank', label: 'Bank' },
+]
+const PC_STATUS_TONE = { connected: 'success', error: 'danger', disabled: 'neutral', disconnected: 'info' }
+
+function PaymentConnectionModal({ token, wallets, onClose, onSuccess }) {
+  const [f, setF] = useState({ provider: 'midtrans', environment: 'sandbox', display_name: '',
+                               provider_account_id: '', linked_wallet_id: '', status: 'disconnected' })
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState(null)
+  const set = (k) => (e) => setF(s => ({ ...s, [k]: e.target.value }))
+
+  const submit = async () => {
+    setBusy(true); setErr(null)
+    try {
+      await apiFetch('/payment-connections', token, { method: 'POST', body: {
+        provider: f.provider,
+        environment: f.environment,
+        status: f.status,
+        display_name: f.display_name || null,
+        provider_account_id: f.provider_account_id || null,
+        linked_wallet_id: f.linked_wallet_id || null,
+      } })
+      onSuccess()
+    } catch (e) { setErr(e.message || 'Could not save the connection') }
+    finally { setBusy(false) }
+  }
+
+  const field = { width: '100%', padding: '9px 11px', borderRadius: 9, fontSize: 14,
+                  border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text-1)' }
+  const label = { display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 5 }
+
+  return (
+    <div className="cfo-modal-scrim" onClick={onClose}>
+      <div className="cfo-modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 460 }}>
+        <h3 style={{ margin: '0 0 4px', fontSize: 17, fontWeight: 800 }}>Add payment connection</h3>
+        <div style={{ fontSize: 12.5, color: 'var(--text-muted)', marginBottom: 16, lineHeight: 1.5 }}>
+          Credentials and webhooks are not enabled yet. This connection only prepares
+          accounting routing — no keys are requested and none are stored.
+        </div>
+
+        <div style={{ display: 'grid', gap: 12 }}>
+          <div><span style={label}>Provider</span>
+            <select style={field} value={f.provider} onChange={set('provider')}>
+              {PC_PROVIDERS.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}
+            </select></div>
+
+          <div><span style={label}>Environment</span>
+            <select style={field} value={f.environment} onChange={set('environment')}>
+              <option value="sandbox">Sandbox</option>
+              <option value="production">Production</option>
+            </select></div>
+
+          <div><span style={label}>Display name</span>
+            <input style={field} value={f.display_name} onChange={set('display_name')}
+              placeholder="e.g. Midtrans — main account" /></div>
+
+          <div><span style={label}>Provider account ID</span>
+            <input style={field} value={f.provider_account_id} onChange={set('provider_account_id')}
+              placeholder="Public merchant / account id" />
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
+              Public identifier only. Never paste a secret or API key here.
+            </div></div>
+
+          <div><span style={label}>Linked wallet</span>
+            <select style={field} value={f.linked_wallet_id} onChange={set('linked_wallet_id')}>
+              <option value="">— none —</option>
+              {wallets.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
+            </select></div>
+
+          <div><span style={label}>Status</span>
+            <select style={field} value={f.status} onChange={set('status')}>
+              <option value="disconnected">Disconnected</option>
+              <option value="connected">Connected</option>
+              <option value="disabled">Disabled</option>
+            </select></div>
+        </div>
+
+        {err && <div style={{ marginTop: 12, fontSize: 13, color: 'var(--danger, #B91C1C)' }}>{err}</div>}
+
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 18 }}>
+          <Btn variant="ghost" onClick={onClose} disabled={busy}>Cancel</Btn>
+          <Btn onClick={submit} disabled={busy}>{busy ? 'Saving…' : 'Add connection'}</Btn>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export function BusinessPaymentConnections() {
+  const { token } = useAuth()
+  const { active, scopeKey } = useWorkspace()
+  const [s, setS] = useState({ loading: true, error: null, connections: [], wallets: [] })
+  const [showAdd, setShowAdd] = useState(false)
+
+  const load = useCallback(() => {
+    if (!token || !active) return
+    setS(x => ({ ...x, loading: true, error: null }))
+    Promise.all([
+      apiFetch('/payment-connections', token),
+      apiFetch('/wallets', token).catch(() => ({ wallets: [] })),
+    ])
+      .then(([c, w]) => setS({ loading: false, error: null, connections: c.connections || [], wallets: w.wallets || [] }))
+      .catch(e => setS({ loading: false, error: e.message || 'Request failed', connections: [], wallets: [] }))
+  }, [token, active?.id, scopeKey])
+  useEffect(load, [token, active?.id, scopeKey]) // eslint-disable-line
+
+  const addBtn = <Btn onClick={() => setShowAdd(true)}>+ Add connection</Btn>
+  const head = <PageHeader eyebrow="Business Workspace" title="Payment Connections" actions={addBtn} />
+  const modal = showAdd && (
+    <PaymentConnectionModal token={token} wallets={s.wallets}
+      onClose={() => setShowAdd(false)} onSuccess={() => { setShowAdd(false); load() }} />
+  )
+
+  if (s.loading) return <>{head}<Card><LoadingSkeleton rows={4} height={18} /></Card></>
+
+  // With the backend flag off every route 404s before touching the database, so a
+  // "not found" means the feature is disabled here — not a fault.
+  if (s.error) {
+    const disabled = /not_found|404/i.test(s.error)
+    return <>{head}{disabled
+      ? <EmptyState symbol={SYMBOL} title="Payment Connections is not enabled"
+          description="Provider connections are not turned on for this deployment yet." />
+      : <ErrorState title="We couldn’t load payment connections" description={s.error} onRetry={load} />}</>
+  }
+
+  const note = (
+    <div style={{ marginBottom: 18, padding: '11px 14px', borderRadius: 10,
+      background: 'var(--info-soft, #EFF6FF)', color: 'var(--text-secondary)', fontSize: 13, lineHeight: 1.5 }}>
+      <b>Credentials and webhooks are not enabled yet.</b> This connection only prepares
+      accounting routing — it stores no API keys, calls no provider, and creates no payments
+      or ledger entries on its own.
+    </div>
+  )
+
+  const walletName = (id) => s.wallets.find(w => w.id === id)?.name || '—'
+  const providerLabel = (id) => PC_PROVIDERS.find(p => p.id === id)?.label || id
+
+  if (!s.connections.length) return <>{head}{note}
+    <EmptyState symbol={SYMBOL} title="No payment connections yet"
+      description="Connect Midtrans, Xendit, DOKU, HitPay, Duitku, iPaymu, a bank, or manual entry to prepare where incoming money is routed." />
+    <div style={{ display: 'flex', justifyContent: 'center', marginTop: 16 }}>{addBtn}</div>
+    {modal}
+  </>
+
+  return <>{head}{note}
+    <Card className="cfo-rtable">
+      <ResponsiveTable
+        columns={[
+          { key: 'provider', label: 'Provider', render: r => <b>{providerLabel(r.provider)}</b> },
+          { key: 'display_name', label: 'Name', render: r => r.display_name || <span style={{ color: 'var(--text-muted)' }}>—</span> },
+          { key: 'environment', label: 'Environment', render: r => <StatusBadge tone={r.environment === 'production' ? 'warning' : 'neutral'}>{r.environment}</StatusBadge> },
+          { key: 'status', label: 'Status', render: r => <StatusBadge tone={PC_STATUS_TONE[r.status] || 'neutral'}>{r.status}</StatusBadge> },
+          { key: 'provider_account_id', label: 'Account ID', render: r => <span className="cfo-mono">{r.provider_account_id || '—'}</span> },
+          { key: 'linked_wallet_id', label: 'Linked wallet', render: r => walletName(r.linked_wallet_id) },
+          { key: 'last_sync_at', label: 'Last sync', render: r => <span className="cfo-mono">{r.last_sync_at ? String(r.last_sync_at).slice(0, 10) : '—'}</span> },
+        ]}
+        rows={s.connections} rowKey={r => r.id} />
+    </Card>
+
+    <div className="cfo-mcards">
+      {s.connections.map(r => (
+        <div className="cfo-dcard" key={r.id}>
+          <div className="cfo-dcard-top">
+            <div className="cfo-dcard-name">{providerLabel(r.provider)}{r.display_name ? ` · ${r.display_name}` : ''}</div>
+            <StatusBadge tone={PC_STATUS_TONE[r.status] || 'neutral'}>{r.status}</StatusBadge>
+          </div>
+          <div className="cfo-dcard-meta">
+            <StatusBadge tone={r.environment === 'production' ? 'warning' : 'neutral'}>{r.environment}</StatusBadge>
+            {r.provider_account_id && <span className="cfo-mono">{r.provider_account_id}</span>}
+            {r.linked_wallet_id && <span>{walletName(r.linked_wallet_id)}</span>}
+          </div>
+        </div>
+      ))}
+    </div>
+    {modal}
+  </>
+}
 
 // ── Incoming Payments — READ-ONLY view of /api/incoming-payments ─────────────
 //    Money that arrived (gateway settlements, bank statement credits, manual entry)

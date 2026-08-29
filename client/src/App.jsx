@@ -57,6 +57,7 @@ import AdminDashboard from './pages/AdminDashboard'
 import AdminBusinesses from './pages/AdminBusinesses'
 import AdminBusinessDetail from './pages/AdminBusinessDetail'
 import AdminAccessAudit from './pages/AdminAccessAudit'
+import AdminPaymentConnections from './pages/AdminPaymentConnections'
 import TaxRulesAdmin from './pages/TaxRulesAdmin'
 import TaxProfile from './pages/TaxProfile'
 import ComplianceCalendar from './pages/ComplianceCalendar'
@@ -68,7 +69,7 @@ import EmailCallback from './pages/EmailCallback'
 import TelegramLogin from './pages/TelegramLogin'
 import PersonalProfile from './pages/PersonalProfile'
 import { PersonalLayout, PersonalShell, PersonalOverview, PersonalAccounts, PersonalTransactions, PersonalOnboarding } from './pages/personal'
-import { BusinessLayout, BusinessShell, BusinessPulse, BusinessAccounts, BusinessTransactions, BusinessPayables, BusinessReceivables, BusinessInvoices, BusinessIncomingPayments, BusinessFunding, BusinessNew, BusinessIntercompany } from './pages/business'
+import { BusinessLayout, BusinessShell, BusinessPulse, BusinessAccounts, BusinessTransactions, BusinessPayables, BusinessReceivables, BusinessInvoices, BusinessIncomingPayments, BusinessPaymentConnections, BusinessFunding, BusinessNew, BusinessIntercompany } from './pages/business'
 // Premium hub renders the Workbench/Calendar/Tax Draft module when
 // VITE_AI_ACCOUNTANT_PREMIUM=true; flag off → the existing profile page unchanged.
 import { BusinessAccountantHub } from './pages/business/AccountantPremium'
@@ -616,6 +617,7 @@ export default function App() {
             <Route path="/business/settings" element={<BusinessShell><Settings /></BusinessShell>} />
             <Route path="/business/bank-import" element={<BusinessShell><BankImport /></BusinessShell>} />
             <Route path="/business/incoming-payments" element={<BusinessShell><BusinessIncomingPayments /></BusinessShell>} />
+            <Route path="/business/payment-connections" element={<BusinessShell><BusinessPaymentConnections /></BusinessShell>} />
             {/* Funding & Investors: premium placeholder when flag on; safe redirect to
                 pulse when flag off (route never crashes / dead-links). */}
             <Route path="/business/funding-investors" element={<BusinessShell><BusinessFunding /></BusinessShell>} />
@@ -639,6 +641,7 @@ export default function App() {
           <Route path="/admin/businesses" element={<Layout><AdminBusinesses /></Layout>} />
           <Route path="/admin/businesses/:businessId" element={<Layout><AdminBusinessDetail /></Layout>} />
           <Route path="/admin/access-audit" element={<Layout><AdminAccessAudit /></Layout>} />
+          <Route path="/admin/payment-connections" element={<Layout><AdminPaymentConnections /></Layout>} />
           <Route path="/admin/tax-rules" element={<Layout><TaxRulesAdmin /></Layout>} />
         </Routes>
       </AuthProvider>

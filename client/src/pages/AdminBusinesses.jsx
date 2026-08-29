@@ -5,15 +5,15 @@ import { apiFetch } from '../lib/api'
 import { getLang } from '../i18n/index'
 
 const L = {
-  en: { title: 'Platform Admin', sub: 'Business registry & access', dashboard: 'Dashboard', users: 'Users', businesses: 'Businesses', audit: 'Audit Log',
+  en: { title: 'Platform Admin', sub: 'Business registry & access', dashboard: 'Dashboard', users: 'Users', businesses: 'Businesses', audit: 'Audit Log', payments: 'Payments',
     search: 'Search name or code…', allPlans: 'All plans', allTypes: 'All types', allTrials: 'All trials',
     name: 'Business', code: 'Code', owner: 'Owner', members: 'Members', stored: 'Stored', effective: 'Effective', source: 'Source',
     trial: 'Trial', tx: 'Tx (mo)', wallets: 'Wallets', manage: 'Manage', copyId: 'Copy ID', copyCode: 'Copy code', copied: 'Copied', none: 'No businesses' },
-  ru: { title: 'Платформенный админ', sub: 'Реестр бизнесов и доступ', dashboard: 'Дашборд', users: 'Пользователи', businesses: 'Бизнесы', audit: 'Аудит',
+  ru: { title: 'Платформенный админ', sub: 'Реестр бизнесов и доступ', dashboard: 'Дашборд', users: 'Пользователи', businesses: 'Бизнесы', audit: 'Аудит', payments: 'Платежи',
     search: 'Поиск по имени или коду…', allPlans: 'Все тарифы', allTypes: 'Все типы', allTrials: 'Все trial',
     name: 'Бизнес', code: 'Код', owner: 'Владелец', members: 'Участники', stored: 'Stored', effective: 'Effective', source: 'Источник',
     trial: 'Trial', tx: 'Tx (мес)', wallets: 'Кошельки', manage: 'Управлять', copyId: 'Копировать ID', copyCode: 'Копировать код', copied: 'Скопировано', none: 'Нет бизнесов' },
-  id: { title: 'Admin Platform', sub: 'Registri bisnis & akses', dashboard: 'Dasbor', users: 'Pengguna', businesses: 'Bisnis', audit: 'Log Audit',
+  id: { title: 'Admin Platform', sub: 'Registri bisnis & akses', dashboard: 'Dasbor', users: 'Pengguna', businesses: 'Bisnis', audit: 'Log Audit', payments: 'Pembayaran',
     search: 'Cari nama atau kode…', allPlans: 'Semua paket', allTypes: 'Semua tipe', allTrials: 'Semua trial',
     name: 'Bisnis', code: 'Kode', owner: 'Pemilik', members: 'Anggota', stored: 'Stored', effective: 'Effective', source: 'Sumber',
     trial: 'Trial', tx: 'Tx (bln)', wallets: 'Dompet', manage: 'Kelola', copyId: 'Salin ID', copyCode: 'Salin kode', copied: 'Tersalin', none: 'Tidak ada bisnis' },
@@ -31,7 +31,7 @@ export function AdminTabs({ active }) {
     <Link to={to} style={{ padding: '6px 14px', borderRadius: 20, textDecoration: 'none', fontWeight: 600, fontSize: 13,
       background: active === key ? 'var(--accent,#4F46E5)' : 'var(--bg-3)', color: active === key ? '#fff' : 'var(--text-2)' }}>{l[key]}</Link>
   )
-  return <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>{tab('/admin/dashboard', 'dashboard')}{tab('/admin', 'users')}{tab('/admin/businesses', 'businesses')}{tab('/admin/access-audit', 'audit')}</div>
+  return <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>{tab('/admin/dashboard', 'dashboard')}{tab('/admin', 'users')}{tab('/admin/businesses', 'businesses')}{tab('/admin/access-audit', 'audit')}{tab('/admin/payment-connections', 'payments')}</div>
 }
 
 export default function AdminBusinesses() {

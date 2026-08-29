@@ -3946,6 +3946,211 @@ async function bridgeBankBatchToIncomingPayments({ batch, rows, biz, actingUserI
   return summary;
 }
 
+// ── Payment provider connections (migration 051) ─────────────────────────────
+//
+// Records which provider a business receives money through and where it should be routed
+// for accounting. Gated by PAYMENT_CONNECTIONS_ENABLED: with the flag off the feature does
+// not exist and every route answers 404 BEFORE any database access, so the code is safe to
+// deploy before 051 is applied.
+//
+// NO CREDENTIALS, NO SYNC, NO LEDGER EFFECT. These routes accept no secret (a request
+// carrying one is refused, not silently stripped), call no provider API, create no
+// incoming_payment, and never touch transactions, debts or wallet balances. A connection
+// is configuration; it moves no money and asserts no live session.
+const PC = require('./lib/paymentConnections');
+function isPaymentConnectionsEnabled() { return process.env.PAYMENT_CONNECTIONS_ENABLED === 'true'; }
+// Express-middleware form, so the flag can be checked ahead of requireAdmin.
+function paymentConnectionsFlagGuard(req, res, next) {
+  if (!isPaymentConnectionsEnabled()) return res.status(404).json({ error: 'not_found' });
+  next();
+}
+
+// Server-owned observability columns are returned but never client-writable.
+const PAYMENT_CONNECTION_COLS =
+  'id, business_id, provider, environment, status, display_name, provider_account_id, ' +
+  'linked_wallet_id, last_sync_at, last_webhook_at, last_error, created_by_user_id, ' +
+  'created_at, updated_at';
+
+// Resolve a wallet that must belong to the ACTIVE business. Returns
+// { ok:true, walletId } or { ok:false } after already answering on `res`.
+async function resolveConnectionWallet(rawId, businessId, res) {
+  if (rawId === null || rawId === undefined || rawId === '') return { ok: true, walletId: null };
+  const { data: wallet, error } = await supabase.from('wallets')
+    .select('id, business_id').eq('id', rawId).maybeSingle();
+  if (error) { res.status(500).json({ error: 'wallet_lookup_failed' }); return { ok: false }; }
+  if (!wallet || wallet.business_id !== businessId) {
+    res.status(403).json({ error: 'wallet_not_in_business',
+      message: 'That wallet does not belong to this workspace.' });
+    return { ok: false };
+  }
+  return { ok: true, walletId: wallet.id };
+}
+
+// GET /api/payment-connections — connections for the ACTIVE business.
+app.get('/api/payment-connections', auth, async (req, res) => {
+  try {
+    if (!isPaymentConnectionsEnabled()) return res.status(404).json({ error: 'not_found' });
+    const biz = await requireBusiness(req, res); if (!biz) return;
+    if (!canViewBusinessFinance(biz.role))
+      return res.status(403).json({ error: 'forbidden', message: 'Your role cannot view payment connections.' });
+
+    const { data, error } = await supabase.from('payment_provider_connections')
+      .select(PAYMENT_CONNECTION_COLS)
+      .eq('business_id', biz.business.id)
+      .order('created_at', { ascending: false });
+    if (error) return res.status(500).json({ error: 'payment_connections_read_failed' });
+    res.json({ business_id: biz.business.id, providers: PC.PROVIDERS, connections: data || [] });
+  } catch { res.status(500).json({ error: 'payment_connections_read_failed' }); }
+});
+
+// POST /api/payment-connections — record a connection. Stores no secret and syncs nothing.
+app.post('/api/payment-connections', auth, async (req, res) => {
+  try {
+    if (!isPaymentConnectionsEnabled()) return res.status(404).json({ error: 'not_found' });
+    const biz = await requireBusiness(req, res); if (!biz) return;
+    // Same gate as wallets: deciding where company money is routed is a structural change.
+    if (!canManageWallets(biz.role))
+      return res.status(403).json({ error: 'forbidden', message: 'Your role cannot manage payment connections.' });
+
+    const businessId = biz.business.id;
+    const parsed = PC.validateCreate(req.body);
+    if (!parsed.ok) {
+      return res.status(400).json({ error: parsed.error, message: parsed.message,
+                                    ...(parsed.fields ? { fields: parsed.fields } : {}) });
+    }
+    const v = parsed.value;
+
+    const w = await resolveConnectionWallet(v.linked_wallet_id, businessId, res);
+    if (!w.ok) return;
+
+    const { data: inserted, error: iErr } = await supabase.from('payment_provider_connections')
+      .insert({ ...v, linked_wallet_id: w.walletId, business_id: businessId,
+                created_by_user_id: req.user.userId })
+      .select(PAYMENT_CONNECTION_COLS).single();
+    if (iErr) {
+      if (String(iErr.code) === '23505' || /duplicate key|unique constraint/i.test(iErr.message || '')) {
+        return res.status(409).json({ error: 'connection_exists',
+          message: 'That provider account is already connected for this environment.' });
+      }
+      console.warn(`[payment-connections] insert failed business=${businessId}: ${iErr.message}`);
+      return res.status(500).json({ error: 'payment_connection_create_failed' });
+    }
+
+    await recordAudit({
+      businessId, actorUserId: req.user.userId, actorRole: biz.role, channel: 'web',
+      entityType: 'payment_provider_connection', entityId: inserted?.id, action: 'created',
+      // provider_account_id is a public merchant identifier, not a secret. No credential
+      // exists to leak here because none is ever accepted.
+      after: { provider: v.provider, environment: v.environment, status: v.status,
+               provider_account_id: v.provider_account_id, linked_wallet_id: w.walletId },
+    });
+
+    res.status(201).json({ connection: inserted });
+  } catch { res.status(500).json({ error: 'payment_connection_create_failed' }); }
+});
+
+// PATCH /api/payment-connections/:id — update a connection.
+// provider and environment are immutable: changing them would silently re-point accounting
+// routing for everything already attributed to the connection.
+app.patch('/api/payment-connections/:id', auth, async (req, res) => {
+  try {
+    if (!isPaymentConnectionsEnabled()) return res.status(404).json({ error: 'not_found' });
+    const biz = await requireBusiness(req, res); if (!biz) return;
+    if (!canManageWallets(biz.role))
+      return res.status(403).json({ error: 'forbidden', message: 'Your role cannot manage payment connections.' });
+
+    const businessId = biz.business.id;
+    const parsed = PC.validatePatch(req.body);
+    if (!parsed.ok) {
+      return res.status(400).json({ error: parsed.error, message: parsed.message,
+                                    ...(parsed.fields ? { fields: parsed.fields } : {}) });
+    }
+
+    // Filtered by business_id in the QUERY, so another workspace's connection is simply not
+    // found -- the id never confirms existence across tenants.
+    const { data: current, error: cErr } = await supabase.from('payment_provider_connections')
+      .select('id, business_id, provider, environment, status')
+      .eq('id', req.params.id).eq('business_id', businessId).maybeSingle();
+    if (cErr) return res.status(500).json({ error: 'payment_connections_read_failed' });
+    if (!current) return res.status(404).json({ error: 'not_found' });
+
+    const patch = { ...parsed.value };
+    if ('linked_wallet_id' in patch) {
+      const w = await resolveConnectionWallet(patch.linked_wallet_id, businessId, res);
+      if (!w.ok) return;
+      patch.linked_wallet_id = w.walletId;
+    }
+
+    const { data: updated, error: uErr } = await supabase.from('payment_provider_connections')
+      .update(patch).eq('id', current.id).eq('business_id', businessId)
+      .select(PAYMENT_CONNECTION_COLS).single();
+    if (uErr) {
+      if (String(uErr.code) === '23505' || /duplicate key|unique constraint/i.test(uErr.message || '')) {
+        return res.status(409).json({ error: 'connection_exists',
+          message: 'That provider account is already connected for this environment.' });
+      }
+      return res.status(500).json({ error: 'payment_connection_update_failed' });
+    }
+
+    await recordAudit({
+      businessId, actorUserId: req.user.userId, actorRole: biz.role, channel: 'web',
+      entityType: 'payment_provider_connection', entityId: current.id, action: 'updated',
+      before: { status: current.status },
+      after: { ...patch, provider: current.provider, environment: current.environment },
+    });
+
+    res.json({ connection: updated });
+  } catch { res.status(500).json({ error: 'payment_connection_update_failed' }); }
+});
+
+// GET /api/admin/payment-connections — platform-wide READ-ONLY monitor.
+// Follows the existing admin pattern (auth + requireAdmin). No write endpoint exists here:
+// an admin observes connections, they do not reconfigure a customer's routing.
+// The flag guard sits BEFORE requireAdmin deliberately: with the feature off the route must
+// not exist for anyone, so a non-admin and an admin both get 404 rather than the 403 that
+// would reveal the endpoint is there.
+app.get('/api/admin/payment-connections', auth, paymentConnectionsFlagGuard, requireAdmin, async (req, res) => {
+  try {
+    const limit = Math.min(Math.max(parseInt(req.query?.limit, 10) || 200, 1), 500);
+    const { data: rows, error } = await supabase.from('payment_provider_connections')
+      .select(PAYMENT_CONNECTION_COLS).order('created_at', { ascending: false }).limit(limit);
+    if (error) return res.status(500).json({ error: 'payment_connections_read_failed' });
+
+    const conns = rows || [];
+    // Resolve business and wallet labels so the monitor shows names rather than raw uuids.
+    const bizIds = [...new Set(conns.map(c => c.business_id).filter(Boolean))];
+    const walletIds = [...new Set(conns.map(c => c.linked_wallet_id).filter(Boolean))];
+    const [{ data: bizRows }, { data: walletRows }] = await Promise.all([
+      bizIds.length ? supabase.from('businesses').select('id, name, business_code').in('id', bizIds)
+                    : Promise.resolve({ data: [] }),
+      walletIds.length ? supabase.from('wallets').select('id, name').in('id', walletIds)
+                       : Promise.resolve({ data: [] }),
+    ]);
+    const bizById = Object.fromEntries((bizRows || []).map(b => [b.id, b]));
+    const walletById = Object.fromEntries((walletRows || []).map(w => [w.id, w]));
+
+    res.json({
+      connections: conns.map(c => ({
+        id: c.id,
+        business_id: c.business_id,
+        business_name: bizById[c.business_id]?.name || null,
+        business_code: bizById[c.business_id]?.business_code || null,
+        provider: c.provider,
+        environment: c.environment,
+        status: c.status,
+        display_name: c.display_name,
+        provider_account_id: c.provider_account_id,
+        linked_wallet_id: c.linked_wallet_id,
+        linked_wallet_name: walletById[c.linked_wallet_id]?.name || null,
+        last_sync_at: c.last_sync_at,
+        last_webhook_at: c.last_webhook_at,
+        last_error: c.last_error,
+        created_at: c.created_at,
+      })),
+    });
+  } catch { res.status(500).json({ error: 'payment_connections_read_failed' }); }
+});
+
 // POST /api/bank-import/batches — create a batch from client-parsed rows
 app.post('/api/bank-import/batches', auth, async (req, res) => {
   try {

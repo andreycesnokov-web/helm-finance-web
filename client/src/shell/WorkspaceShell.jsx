@@ -53,6 +53,9 @@ export const BUSINESS_NAV = [
     // Read-only view of money that arrived (gateway/bank/manual). Renders an
     // explanatory empty state when the backend feature is off, so there is no dead link.
     { key: 'incomingpayments', label: 'Incoming Payments', to: '/business/incoming-payments', icon: <Icon.down /> },
+    // Provider routing config. Stores no credentials; renders an explanatory empty state
+    // when the backend feature is off, so there is no dead link.
+    { key: 'paymentconnections', label: 'Payment Connections', to: '/business/payment-connections', icon: <Icon.link /> },
   ] },
   { title: 'Operations', items: [
     { key: 'intercompany', label: 'Intercompany', to: '/business/intercompany', icon: <Icon.link /> },
