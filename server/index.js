@@ -4381,6 +4381,394 @@ app.get('/api/admin/payment-credentials', auth, credentialVaultFlagGuard, requir
   } catch { res.status(500).json({ error: 'payment_credentials_read_failed' }); }
 });
 
+// ── Support Center (migration 053) ───────────────────────────────────────────
+//
+// In-app support conversations. Gated by SUPPORT_CENTER_ENABLED: with the flag off every
+// route answers 404 BEFORE any database access.
+//
+// FOUNDATION ONLY. No AI is called, no email is sent, no websocket is opened, no external
+// helpdesk is contacted. `ai_mode`/`ai_confidence` stay at their defaults.
+//
+// NO FINANCIAL EFFECT. Nothing in this block reads or writes transactions, wallets, debts,
+// incoming_payments, payment connections or credentials. A support thread can describe
+// money; it can never move it.
+//
+// ⚠ Message bodies are stored in plaintext and are NOT redacted. Secrets must never be
+// posted into a support thread -- see the header of migration 053.
+const SUP = require('./lib/supportCenter');
+function isSupportCenterEnabled() { return process.env.SUPPORT_CENTER_ENABLED === 'true'; }
+function supportFlagGuard(req, res, next) {
+  if (!isSupportCenterEnabled()) return res.status(404).json({ error: 'not_found' });
+  next();
+}
+
+const SUPPORT_CONVERSATION_COLS =
+  'id, business_id, created_by_user_id, assigned_to_user_id, channel, status, priority, ' +
+  'category, subject, ai_mode, ai_confidence, last_message_at, closed_at, created_at, updated_at';
+const SUPPORT_MESSAGE_COLS =
+  'id, conversation_id, business_id, sender_type, sender_user_id, body, metadata, ' +
+  'is_internal, created_at';
+
+// The active business, or null.
+//
+// Deliberately does NOT use resolveActiveBusiness. That helper falls back to
+// ensureDefaultBusiness, which for a legacy positive-id user with no workspace CREATES a
+// business and starts a 7-day trial. Contacting support must never provision a workspace or
+// start a billing clock as a side effect -- so this resolves read-only: an explicit
+// x-business-id is honoured only if the caller is an active member of it, and anything else
+// yields null. Support must also work for a user with no business at all, which is precisely
+// the person most likely to need it.
+async function supportBusinessContext(req) {
+  const requested = req.headers['x-business-id'] || req.query?.business_id || null;
+  if (!requested) return { businessId: null, role: null };
+  const { data } = await supabase.from('business_members')
+    .select('role, status, business_id, businesses(type)')
+    .eq('user_id', req.user.userId).eq('business_id', requested).eq('status', 'active').limit(1);
+  const m = data?.[0];
+  // Personal workspaces are not a support scope; a personal thread is just the user's own.
+  if (!m || m.businesses?.type === 'personal') return { businessId: null, role: null };
+  return { businessId: m.business_id, role: m.role };
+}
+
+// Load a conversation the caller is entitled to see, or answer 404. Filtered in code rather
+// than the query because access has two independent grounds (creator, or same business).
+async function loadUserConversation(req, res, userId, businessId) {
+  const { data, error } = await supabase.from('support_conversations')
+    .select(SUPPORT_CONVERSATION_COLS).eq('id', req.params.id).maybeSingle();
+  if (error) { res.status(500).json({ error: 'support_read_failed' }); return null; }
+  if (!SUP.canUserAccessConversation(data, { userId, businessId })) {
+    // 404, never 403: a conversation id must not confirm its own existence to someone who
+    // cannot see it.
+    res.status(404).json({ error: 'not_found' });
+    return null;
+  }
+  return data;
+}
+
+// GET /api/support/conversations — the caller's threads.
+app.get('/api/support/conversations', auth, supportFlagGuard, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { businessId } = await supportBusinessContext(req);
+
+    // Two reads rather than one `.or()`: the creator branch and the business branch are
+    // independent, and combining them into a PostgREST or-filter makes the tenancy rule much
+    // harder to read and to prove.
+    const [mine, ofBusiness] = await Promise.all([
+      supabase.from('support_conversations').select(SUPPORT_CONVERSATION_COLS)
+        .eq('created_by_user_id', userId).order('created_at', { ascending: false }).limit(200),
+      businessId
+        ? supabase.from('support_conversations').select(SUPPORT_CONVERSATION_COLS)
+            .eq('business_id', businessId).order('created_at', { ascending: false }).limit(200)
+        : Promise.resolve({ data: [], error: null }),
+    ]);
+    if (mine.error || ofBusiness.error) return res.status(500).json({ error: 'support_read_failed' });
+
+    const byId = new Map();
+    for (const c of [...(mine.data || []), ...(ofBusiness.data || [])]) byId.set(c.id, c);
+    const conversations = [...byId.values()]
+      .sort((a, b) => new Date(b.last_message_at || b.created_at) - new Date(a.last_message_at || a.created_at))
+      .map(SUP.toConversationDto);
+
+    res.json({ business_id: businessId, categories: SUP.CATEGORIES, conversations });
+  } catch { res.status(500).json({ error: 'support_read_failed' }); }
+});
+
+// POST /api/support/conversations — open a thread, optionally with a first message.
+app.post('/api/support/conversations', auth, supportFlagGuard, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { businessId } = await supportBusinessContext(req);
+
+    const parsed = SUP.validateCreateConversation(req.body);
+    if (!parsed.ok) return res.status(400).json({ error: parsed.error, message: parsed.message });
+    const { firstMessage, ...conv } = parsed.value;
+
+    const { data: created, error: cErr } = await supabase.from('support_conversations')
+      .insert({ ...conv, business_id: businessId, created_by_user_id: userId })
+      .select(SUPPORT_CONVERSATION_COLS).single();
+    if (cErr) {
+      console.warn(`[support] conversation insert failed user=${userId}: ${cErr.message}`);
+      return res.status(500).json({ error: 'support_create_failed' });
+    }
+
+    if (firstMessage) {
+      // The 053 trigger sets last_message_at and writes the timeline event.
+      const { error: mErr } = await supabase.from('support_messages').insert({
+        conversation_id: created.id, business_id: businessId,
+        sender_type: 'user', sender_user_id: userId, body: firstMessage, is_internal: false,
+      });
+      // The thread exists and is usable even if the first message failed; losing the whole
+      // conversation would be the worse outcome for someone asking for help.
+      if (mErr) console.warn(`[support] first message failed conversation=${created.id}`);
+    }
+
+    res.status(201).json({ conversation: SUP.toConversationDto(created) });
+  } catch { res.status(500).json({ error: 'support_create_failed' }); }
+});
+
+// GET /api/support/conversations/:id
+app.get('/api/support/conversations/:id', auth, supportFlagGuard, async (req, res) => {
+  try {
+    const { businessId } = await supportBusinessContext(req);
+    const conv = await loadUserConversation(req, res, req.user.userId, businessId); if (!conv) return;
+    res.json({ conversation: SUP.toConversationDto(conv) });
+  } catch { res.status(500).json({ error: 'support_read_failed' }); }
+});
+
+// GET /api/support/conversations/:id/messages — INTERNAL NOTES ARE EXCLUDED.
+app.get('/api/support/conversations/:id/messages', auth, supportFlagGuard, async (req, res) => {
+  try {
+    const { businessId } = await supportBusinessContext(req);
+    const conv = await loadUserConversation(req, res, req.user.userId, businessId); if (!conv) return;
+
+    // Filtered in the QUERY as well as in the projection. Two layers on purpose: this is the
+    // one place where a mistake shows staff-only notes to a customer.
+    const { data, error } = await supabase.from('support_messages')
+      .select(SUPPORT_MESSAGE_COLS)
+      .eq('conversation_id', conv.id).eq('is_internal', false)
+      .order('created_at', { ascending: true });
+    if (error) return res.status(500).json({ error: 'support_read_failed' });
+
+    res.json({ conversation_id: conv.id, messages: SUP.visibleMessagesForUser(data || []) });
+  } catch { res.status(500).json({ error: 'support_read_failed' }); }
+});
+
+// POST /api/support/conversations/:id/messages — reply as the user.
+app.post('/api/support/conversations/:id/messages', auth, supportFlagGuard, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { businessId } = await supportBusinessContext(req);
+    const conv = await loadUserConversation(req, res, userId, businessId); if (!conv) return;
+    if (conv.status === 'closed') {
+      return res.status(409).json({ error: 'conversation_closed',
+        message: 'This conversation is closed. Please open a new one.' });
+    }
+
+    const parsed = SUP.validateMessage(req.body, { allowInternal: false });
+    if (!parsed.ok) return res.status(400).json({ error: parsed.error, message: parsed.message });
+
+    const { data: msg, error } = await supabase.from('support_messages').insert({
+      conversation_id: conv.id, business_id: conv.business_id,
+      sender_type: 'user', sender_user_id: userId,
+      body: parsed.value.body, is_internal: false,
+    }).select(SUPPORT_MESSAGE_COLS).single();
+    if (error) return res.status(500).json({ error: 'support_message_failed' });
+
+    res.status(201).json({ message: SUP.toMessageDto(msg) });
+  } catch { res.status(500).json({ error: 'support_message_failed' }); }
+});
+
+// POST /api/support/conversations/:id/escalate — ask for a human.
+app.post('/api/support/conversations/:id/escalate', auth, supportFlagGuard, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { businessId } = await supportBusinessContext(req);
+    const conv = await loadUserConversation(req, res, userId, businessId); if (!conv) return;
+
+    const parsed = SUP.validateEscalation(req.body, 'user');
+    if (!parsed.ok) return res.status(400).json({ error: parsed.error, message: parsed.message });
+
+    const { data: esc, error } = await supabase.from('support_escalations').insert({
+      ...parsed.value, conversation_id: conv.id, business_id: conv.business_id,
+    }).select('*').single();
+    if (error) return res.status(500).json({ error: 'support_escalation_failed' });
+
+    // Mark the thread as needing a person. Deliberately not done by a DB trigger: whether an
+    // escalation changes the thread status is a policy decision, and a closed thread should
+    // not silently reopen.
+    if (conv.status !== 'closed') {
+      await supabase.from('support_conversations')
+        .update({ status: 'human_needed' }).eq('id', conv.id);
+    }
+    await supabase.from('support_events').insert({
+      conversation_id: conv.id, business_id: conv.business_id, actor_user_id: userId,
+      event_type: 'escalation_requested', event_payload: { escalation_id: esc?.id, requested_by: 'user' },
+    });
+
+    res.status(201).json({ escalation: esc });
+  } catch { res.status(500).json({ error: 'support_escalation_failed' }); }
+});
+
+// PATCH /api/support/conversations/:id/close
+app.patch('/api/support/conversations/:id/close', auth, supportFlagGuard, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { businessId } = await supportBusinessContext(req);
+    const conv = await loadUserConversation(req, res, userId, businessId); if (!conv) return;
+    if (conv.status === 'closed') {
+      return res.status(409).json({ error: 'already_closed' });
+    }
+
+    // status and closed_at move together -- the 053 CHECK enforces the same pairing.
+    const { data: updated, error } = await supabase.from('support_conversations')
+      .update({ status: 'closed', closed_at: new Date().toISOString() })
+      .eq('id', conv.id).select(SUPPORT_CONVERSATION_COLS).single();
+    if (error) return res.status(500).json({ error: 'support_update_failed' });
+
+    await supabase.from('support_events').insert({
+      conversation_id: conv.id, business_id: conv.business_id, actor_user_id: userId,
+      event_type: 'conversation_closed', event_payload: { closed_by: 'user' },
+    });
+
+    res.json({ conversation: SUP.toConversationDto(updated) });
+  } catch { res.status(500).json({ error: 'support_update_failed' }); }
+});
+
+// ── Admin ────────────────────────────────────────────────────────────────────
+// The flag guard precedes requireAdmin so that with the feature off nobody -- admin or not --
+// learns the routes exist.
+
+// GET /api/admin/support/conversations — every thread, with filters.
+app.get('/api/admin/support/conversations', auth, supportFlagGuard, requireAdmin, async (req, res) => {
+  try {
+    const limit = Math.min(Math.max(parseInt(req.query?.limit, 10) || 200, 1), 500);
+    let q = supabase.from('support_conversations').select(SUPPORT_CONVERSATION_COLS);
+
+    // Unknown filter values are a 400, not a silently empty list that reads as "no tickets".
+    const { status, priority, category } = req.query || {};
+    if (status) {
+      if (!SUP.STATUSES.includes(status)) return res.status(400).json({ error: 'invalid_status' });
+      q = q.eq('status', status);
+    }
+    if (priority) {
+      if (!SUP.PRIORITIES.includes(priority)) return res.status(400).json({ error: 'invalid_priority' });
+      q = q.eq('priority', priority);
+    }
+    if (category) {
+      if (!SUP.CATEGORIES.includes(category)) return res.status(400).json({ error: 'invalid_category' });
+      q = q.eq('category', category);
+    }
+
+    const { data: rows, error } = await q.order('last_message_at', { ascending: false }).limit(limit);
+    if (error) return res.status(500).json({ error: 'support_read_failed' });
+
+    const convs = rows || [];
+    const bizIds = [...new Set(convs.map(c => c.business_id).filter(Boolean))];
+    const { data: bizRows } = bizIds.length
+      ? await supabase.from('businesses').select('id, name, business_code').in('id', bizIds)
+      : { data: [] };
+    const bizById = Object.fromEntries((bizRows || []).map(b => [b.id, b]));
+
+    res.json({
+      statuses: SUP.STATUSES, priorities: SUP.PRIORITIES, categories: SUP.CATEGORIES,
+      conversations: convs.map(c => ({
+        ...SUP.toConversationDto(c),
+        business_name: bizById[c.business_id]?.name || null,
+        business_code: bizById[c.business_id]?.business_code || null,
+      })),
+    });
+  } catch { res.status(500).json({ error: 'support_read_failed' }); }
+});
+
+// GET /api/admin/support/conversations/:id — full thread INCLUDING internal notes.
+app.get('/api/admin/support/conversations/:id', auth, supportFlagGuard, requireAdmin, async (req, res) => {
+  try {
+    const { data: conv, error } = await supabase.from('support_conversations')
+      .select(SUPPORT_CONVERSATION_COLS).eq('id', req.params.id).maybeSingle();
+    if (error) return res.status(500).json({ error: 'support_read_failed' });
+    if (!conv) return res.status(404).json({ error: 'not_found' });
+
+    const [{ data: msgs }, { data: escs }] = await Promise.all([
+      supabase.from('support_messages').select(SUPPORT_MESSAGE_COLS)
+        .eq('conversation_id', conv.id).order('created_at', { ascending: true }),
+      supabase.from('support_escalations').select('*')
+        .eq('conversation_id', conv.id).order('created_at', { ascending: false }),
+    ]);
+
+    res.json({
+      conversation: SUP.toConversationDto(conv),
+      // Staff see internal notes -- that is the difference between this route and the user one.
+      messages: (msgs || []).map(SUP.toMessageDto),
+      escalations: escs || [],
+    });
+  } catch { res.status(500).json({ error: 'support_read_failed' }); }
+});
+
+// PATCH /api/admin/support/conversations/:id/assign
+app.patch('/api/admin/support/conversations/:id/assign', auth, supportFlagGuard, requireAdmin, async (req, res) => {
+  try {
+    const raw = req.body?.assigned_to_user_id;
+    // null explicitly unassigns; anything else must be a real user id.
+    const assignee = (raw === null || raw === undefined || raw === '') ? null : Number(raw);
+    if (assignee !== null && !Number.isFinite(assignee)) {
+      return res.status(400).json({ error: 'invalid_assignee' });
+    }
+
+    const { data: conv } = await supabase.from('support_conversations')
+      .select('id, status').eq('id', req.params.id).maybeSingle();
+    if (!conv) return res.status(404).json({ error: 'not_found' });
+
+    const patch = { assigned_to_user_id: assignee };
+    // Assigning an open thread moves it to 'assigned'; a closed one stays closed, because
+    // assigning someone to review it must not silently reopen it for the customer.
+    if (assignee !== null && !['closed', 'assigned'].includes(conv.status)) patch.status = 'assigned';
+
+    const { data: updated, error } = await supabase.from('support_conversations')
+      .update(patch).eq('id', conv.id).select(SUPPORT_CONVERSATION_COLS).single();
+    if (error) return res.status(500).json({ error: 'support_update_failed' });
+
+    await supabase.from('support_events').insert({
+      conversation_id: conv.id, business_id: updated.business_id, actor_user_id: req.user.userId,
+      event_type: 'conversation_assigned', event_payload: { assigned_to_user_id: assignee },
+    });
+
+    res.json({ conversation: SUP.toConversationDto(updated) });
+  } catch { res.status(500).json({ error: 'support_update_failed' }); }
+});
+
+// PATCH /api/admin/support/conversations/:id/status
+app.patch('/api/admin/support/conversations/:id/status', auth, supportFlagGuard, requireAdmin, async (req, res) => {
+  try {
+    const decision = SUP.validateStatusChange(req.body?.status);
+    if (!decision.ok) return res.status(400).json({ error: decision.error, message: decision.message });
+
+    const { data: conv } = await supabase.from('support_conversations')
+      .select('id, status, business_id').eq('id', req.params.id).maybeSingle();
+    if (!conv) return res.status(404).json({ error: 'not_found' });
+
+    // closed_at is written and cleared alongside status so the 053 CHECK always holds.
+    const patch = { status: decision.value };
+    if (decision.value === 'closed') patch.closed_at = new Date().toISOString();
+    else if (conv.status === 'closed') patch.closed_at = null;   // reopening
+
+    const { data: updated, error } = await supabase.from('support_conversations')
+      .update(patch).eq('id', conv.id).select(SUPPORT_CONVERSATION_COLS).single();
+    if (error) return res.status(500).json({ error: 'support_update_failed' });
+
+    await supabase.from('support_events').insert({
+      conversation_id: conv.id, business_id: conv.business_id, actor_user_id: req.user.userId,
+      event_type: 'status_changed', event_payload: { from: conv.status, to: decision.value },
+    });
+
+    res.json({ conversation: SUP.toConversationDto(updated) });
+  } catch { res.status(500).json({ error: 'support_update_failed' }); }
+});
+
+// POST /api/admin/support/conversations/:id/internal-note — staff-only, never user-visible.
+app.post('/api/admin/support/conversations/:id/internal-note', auth, supportFlagGuard, requireAdmin, async (req, res) => {
+  try {
+    const { data: conv } = await supabase.from('support_conversations')
+      .select('id, business_id').eq('id', req.params.id).maybeSingle();
+    if (!conv) return res.status(404).json({ error: 'not_found' });
+
+    const parsed = SUP.validateMessage(req.body, { allowInternal: true });
+    if (!parsed.ok) return res.status(400).json({ error: parsed.error, message: parsed.message });
+
+    const { data: msg, error } = await supabase.from('support_messages').insert({
+      conversation_id: conv.id, business_id: conv.business_id,
+      sender_type: 'manager', sender_user_id: req.user.userId,
+      body: parsed.value.body,
+      // Forced true regardless of the body: this endpoint exists only for internal notes, and
+      // a caller omitting the flag must not accidentally publish to the customer.
+      is_internal: true,
+    }).select(SUPPORT_MESSAGE_COLS).single();
+    if (error) return res.status(500).json({ error: 'support_message_failed' });
+
+    res.status(201).json({ message: SUP.toMessageDto(msg) });
+  } catch { res.status(500).json({ error: 'support_message_failed' }); }
+});
+
 // POST /api/bank-import/batches — create a batch from client-parsed rows
 app.post('/api/bank-import/batches', auth, async (req, res) => {
   try {
