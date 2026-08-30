@@ -4769,6 +4769,416 @@ app.post('/api/admin/support/conversations/:id/internal-note', auth, supportFlag
   } catch { res.status(500).json({ error: 'support_message_failed' }); }
 });
 
+// ── Onboarding (migration 054) ───────────────────────────────────────────────
+//
+// Two modes: a short quick setup after registration, and a manually launched full product
+// tour. Gated by ONBOARDING_ENABLED: with the flag off every route answers 404 BEFORE any
+// database access.
+//
+// FOUNDATION ONLY. No guided-tour UI, no AI call, no email, no Telegram.
+//
+// NO FINANCIAL EFFECT and NO PROVISIONING. Nothing here reads or writes transactions,
+// wallets, debts, incoming_payments, payment connections, credentials or support threads --
+// and, critically, opening onboarding never creates a business or starts a trial. See
+// onboardingBusinessContext.
+//
+// LOCALE: ?locale=en|id|ru. Anything else falls back to English, as does any untranslated
+// string, so a partially translated flow always renders.
+const ONB = require('./lib/onboarding');
+function isOnboardingEnabled() { return process.env.ONBOARDING_ENABLED === 'true'; }
+function onboardingFlagGuard(req, res, next) {
+  if (!isOnboardingEnabled()) return res.status(404).json({ error: 'not_found' });
+  next();
+}
+
+const FLOW_COLS = 'id, flow_key, title, description, title_i18n, description_i18n, mode, ' +
+  'audience, is_active, sort_order, metadata, created_at, updated_at';
+const STEP_COLS = 'id, flow_id, step_key, title, description, title_i18n, description_i18n, ' +
+  'instructions_i18n, page_path, target_selector, action_type, product_area, required, ' +
+  'skippable, sort_order, metadata';
+const PROGRESS_COLS = 'id, user_id, business_id, flow_id, status, started_at, completed_at, ' +
+  'dismissed_at, current_step_id, progress_percent, metadata, created_at, updated_at';
+const STEP_PROGRESS_COLS = 'id, progress_id, step_id, status, first_viewed_at, completed_at, ' +
+  'skipped_at, completion_source, metadata';
+
+// Read-only business context.
+//
+// Deliberately NOT resolveActiveBusiness: that falls back to ensureDefaultBusiness, which for
+// a legacy positive-id user with no workspace CREATES a business and starts a 7-day trial.
+// Opening onboarding -- which by definition happens before a user has set anything up --
+// must never provision a workspace or start a billing clock.
+async function onboardingBusinessContext(req) {
+  const requested = req.headers['x-business-id'] || req.query?.business_id || null;
+  if (!requested) return { businessId: null };
+  const { data } = await supabase.from('business_members')
+    .select('business_id, status, businesses(type)')
+    .eq('user_id', req.user.userId).eq('business_id', requested).eq('status', 'active').limit(1);
+  const m = data?.[0];
+  if (!m || m.businesses?.type === 'personal') return { businessId: null };
+  return { businessId: m.business_id };
+}
+
+async function loadFlowByKey(flowKey) {
+  const { data } = await supabase.from('onboarding_flows')
+    .select(FLOW_COLS).eq('flow_key', flowKey).maybeSingle();
+  return data || null;
+}
+
+async function loadFlowSteps(flowId) {
+  const { data } = await supabase.from('onboarding_steps')
+    .select(STEP_COLS).eq('flow_id', flowId).order('sort_order', { ascending: true });
+  return data || [];
+}
+
+// The caller's progress row for a flow, honouring the null-business scope.
+async function loadProgress(userId, businessId, flowId) {
+  let q = supabase.from('onboarding_progress').select(PROGRESS_COLS)
+    .eq('user_id', userId).eq('flow_id', flowId);
+  q = businessId ? q.eq('business_id', businessId) : q.is('business_id', null);
+  const { data } = await q.maybeSingle();
+  return data || null;
+}
+
+async function loadStepProgress(progressId) {
+  const { data } = await supabase.from('onboarding_step_progress')
+    .select(STEP_PROGRESS_COLS).eq('progress_id', progressId);
+  return data || [];
+}
+
+async function writeOnboardingEvent({ userId, businessId, flowId, stepId, eventType, payload = {} }) {
+  try {
+    await supabase.from('onboarding_events').insert({
+      user_id: userId ?? null, business_id: businessId ?? null,
+      flow_id: flowId ?? null, step_id: stepId ?? null,
+      event_type: eventType, event_payload: payload,
+    });
+  } catch { /* analytics must never fail the user's action */ }
+}
+
+// Recompute percent + current step after any step change, and close the flow when done.
+async function recalcProgress(progress, steps) {
+  const stepProgress = await loadStepProgress(progress.id);
+  const calc = ONB.computeProgress(steps, stepProgress);
+  const patch = {
+    progress_percent: calc.progress_percent,
+    current_step_id: ONB.nextStepId(steps, stepProgress),
+  };
+  // A dismissed flow stays dismissed: finishing a step inside it must not silently revive it.
+  if (progress.status !== 'dismissed') {
+    if (calc.completed) {
+      patch.status = 'completed';
+      patch.completed_at = progress.completed_at || new Date().toISOString();
+    } else {
+      patch.status = 'in_progress';
+      patch.completed_at = null;
+    }
+  }
+  const { data } = await supabase.from('onboarding_progress')
+    .update(patch).eq('id', progress.id).select(PROGRESS_COLS).single();
+  return { progress: data, calc };
+}
+
+// GET /api/onboarding/flows — active flows, resolved for the requested locale.
+app.get('/api/onboarding/flows', auth, onboardingFlagGuard, async (req, res) => {
+  try {
+    const locale = ONB.resolveLocale(req.query?.locale);
+    const { data, error } = await supabase.from('onboarding_flows')
+      .select(FLOW_COLS).eq('is_active', true).order('sort_order', { ascending: true });
+    if (error) return res.status(500).json({ error: 'onboarding_read_failed' });
+    res.json({
+      locale, supported_locales: ONB.SUPPORTED_LOCALES,
+      flows: (data || []).map(f => ONB.toFlowDto(f, locale)),
+    });
+  } catch { res.status(500).json({ error: 'onboarding_read_failed' }); }
+});
+
+// GET /api/onboarding/flows/:flowKey — one flow with its steps and the caller's progress.
+app.get('/api/onboarding/flows/:flowKey', auth, onboardingFlagGuard, async (req, res) => {
+  try {
+    const locale = ONB.resolveLocale(req.query?.locale);
+    const { businessId } = await onboardingBusinessContext(req);
+
+    const flow = await loadFlowByKey(req.params.flowKey);
+    if (!flow) return res.status(404).json({ error: 'not_found' });
+    const steps = await loadFlowSteps(flow.id);
+    const progress = await loadProgress(req.user.userId, businessId, flow.id);
+    const stepProgress = progress ? await loadStepProgress(progress.id) : [];
+    const byStep = Object.fromEntries(stepProgress.map(p => [p.step_id, p]));
+
+    res.json({
+      locale,
+      flow: ONB.toFlowDto(flow, locale),
+      progress: progress || null,
+      steps: steps.map(s => ({
+        ...ONB.toStepDto(s, locale),
+        progress: byStep[s.id]
+          ? { status: byStep[s.id].status, completed_at: byStep[s.id].completed_at,
+              first_viewed_at: byStep[s.id].first_viewed_at, skipped_at: byStep[s.id].skipped_at }
+          : { status: 'not_started' },
+      })),
+    });
+  } catch { res.status(500).json({ error: 'onboarding_read_failed' }); }
+});
+
+// GET /api/onboarding/progress — every flow the caller has started, in this scope.
+app.get('/api/onboarding/progress', auth, onboardingFlagGuard, async (req, res) => {
+  try {
+    const { businessId } = await onboardingBusinessContext(req);
+    let q = supabase.from('onboarding_progress').select(PROGRESS_COLS).eq('user_id', req.user.userId);
+    q = businessId ? q.eq('business_id', businessId) : q.is('business_id', null);
+    const { data, error } = await q.order('created_at', { ascending: false });
+    if (error) return res.status(500).json({ error: 'onboarding_read_failed' });
+    res.json({ business_id: businessId, progress: data || [] });
+  } catch { res.status(500).json({ error: 'onboarding_read_failed' }); }
+});
+
+// POST /api/onboarding/flows/:flowKey/start
+app.post('/api/onboarding/flows/:flowKey/start', auth, onboardingFlagGuard, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { businessId } = await onboardingBusinessContext(req);
+    const flow = await loadFlowByKey(req.params.flowKey);
+    if (!flow) return res.status(404).json({ error: 'not_found' });
+
+    const steps = await loadFlowSteps(flow.id);
+    let progress = await loadProgress(userId, businessId, flow.id);
+
+    if (!progress) {
+      const { data, error } = await supabase.from('onboarding_progress').insert({
+        user_id: userId, business_id: businessId, flow_id: flow.id,
+        status: 'in_progress', started_at: new Date().toISOString(),
+        current_step_id: steps[0]?.id || null, progress_percent: 0,
+      }).select(PROGRESS_COLS).single();
+      if (error) return res.status(500).json({ error: 'onboarding_start_failed' });
+      progress = data;
+
+      // One step-progress row per step up front, so the client never has to distinguish
+      // "not started" from "row missing".
+      if (steps.length) {
+        await supabase.from('onboarding_step_progress').insert(
+          steps.map(s => ({ progress_id: progress.id, step_id: s.id, status: 'not_started' })));
+      }
+    } else if (['dismissed', 'completed'].includes(progress.status)) {
+      // Re-opening a dismissed or finished flow resumes it rather than wiping history.
+      const { data } = await supabase.from('onboarding_progress')
+        .update({ status: 'in_progress', dismissed_at: null })
+        .eq('id', progress.id).select(PROGRESS_COLS).single();
+      progress = data;
+    }
+
+    await writeOnboardingEvent({ userId, businessId, flowId: flow.id, eventType: 'flow_started' });
+    res.status(201).json({ progress });
+  } catch { res.status(500).json({ error: 'onboarding_start_failed' }); }
+});
+
+// Shared handler for view / complete / skip. Loads the step, proves the caller owns the
+// progress row, applies the transition, recalculates, and records the event.
+async function handleStepAction(req, res, action) {
+  const userId = req.user.userId;
+  const { businessId } = await onboardingBusinessContext(req);
+
+  const { data: step } = await supabase.from('onboarding_steps')
+    .select(STEP_COLS).eq('id', req.params.stepId).maybeSingle();
+  if (!step) return res.status(404).json({ error: 'not_found' });
+
+  const progress = await loadProgress(userId, businessId, step.flow_id);
+  // No progress row means this caller never started the flow -- 404 rather than starting it
+  // implicitly, so a stray step id cannot create state.
+  if (!progress) return res.status(404).json({ error: 'flow_not_started' });
+
+  const { data: current } = await supabase.from('onboarding_step_progress')
+    .select(STEP_PROGRESS_COLS).eq('progress_id', progress.id).eq('step_id', step.id).maybeSingle();
+
+  const nowIso = new Date().toISOString();
+  const nextStatus = action === 'view' ? 'viewed' : action === 'complete' ? 'completed' : 'skipped';
+  const currentStatus = current?.status || 'not_started';
+
+  if (!ONB.canTransitionStep(currentStatus, nextStatus)) {
+    // Viewing an already-resolved step is a no-op, not an error: the UI may legitimately
+    // re-render it.
+    return res.json({ step_progress: current, progress, unchanged: true });
+  }
+  if (action === 'skip' && step.skippable === false) {
+    return res.status(400).json({ error: 'step_not_skippable',
+      message: 'This step is required and cannot be skipped.' });
+  }
+
+  const patch = { status: nextStatus };
+  if (nextStatus === 'viewed') patch.first_viewed_at = current?.first_viewed_at || nowIso;
+  if (nextStatus === 'completed') { patch.completed_at = nowIso; patch.completion_source = 'user'; }
+  if (nextStatus === 'skipped') patch.skipped_at = nowIso;
+
+  let stepProgressRow;
+  if (current) {
+    const { data } = await supabase.from('onboarding_step_progress')
+      .update(patch).eq('id', current.id).select(STEP_PROGRESS_COLS).single();
+    stepProgressRow = data;
+  } else {
+    const { data } = await supabase.from('onboarding_step_progress')
+      .insert({ progress_id: progress.id, step_id: step.id, ...patch })
+      .select(STEP_PROGRESS_COLS).single();
+    stepProgressRow = data;
+  }
+
+  const steps = await loadFlowSteps(step.flow_id);
+  const { progress: updated } = await recalcProgress(progress, steps);
+
+  await writeOnboardingEvent({
+    userId, businessId, flowId: step.flow_id, stepId: step.id,
+    eventType: `step_${nextStatus === 'viewed' ? 'viewed' : nextStatus}`,
+    payload: { step_key: step.step_key },
+  });
+
+  res.json({ step_progress: stepProgressRow, progress: updated });
+}
+
+app.post('/api/onboarding/steps/:stepId/view', auth, onboardingFlagGuard, async (req, res) => {
+  try { await handleStepAction(req, res, 'view'); }
+  catch { res.status(500).json({ error: 'onboarding_step_failed' }); }
+});
+app.post('/api/onboarding/steps/:stepId/complete', auth, onboardingFlagGuard, async (req, res) => {
+  try { await handleStepAction(req, res, 'complete'); }
+  catch { res.status(500).json({ error: 'onboarding_step_failed' }); }
+});
+app.post('/api/onboarding/steps/:stepId/skip', auth, onboardingFlagGuard, async (req, res) => {
+  try { await handleStepAction(req, res, 'skip'); }
+  catch { res.status(500).json({ error: 'onboarding_step_failed' }); }
+});
+
+// POST /api/onboarding/flows/:flowKey/dismiss — hide the flow, keep the history.
+app.post('/api/onboarding/flows/:flowKey/dismiss', auth, onboardingFlagGuard, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { businessId } = await onboardingBusinessContext(req);
+    const flow = await loadFlowByKey(req.params.flowKey);
+    if (!flow) return res.status(404).json({ error: 'not_found' });
+
+    let progress = await loadProgress(userId, businessId, flow.id);
+    if (!progress) {
+      // Dismissing without starting is legitimate -- "I do not want this tour" -- and is
+      // recorded so the UI stops offering it.
+      const { data } = await supabase.from('onboarding_progress').insert({
+        user_id: userId, business_id: businessId, flow_id: flow.id,
+        status: 'dismissed', dismissed_at: new Date().toISOString(),
+      }).select(PROGRESS_COLS).single();
+      progress = data;
+    } else {
+      const { data } = await supabase.from('onboarding_progress')
+        .update({ status: 'dismissed', dismissed_at: new Date().toISOString() })
+        .eq('id', progress.id).select(PROGRESS_COLS).single();
+      progress = data;
+    }
+
+    await writeOnboardingEvent({ userId, businessId, flowId: flow.id, eventType: 'flow_dismissed' });
+    res.json({ progress });
+  } catch { res.status(500).json({ error: 'onboarding_update_failed' }); }
+});
+
+// POST /api/onboarding/flows/:flowKey/reset — start the flow over for this caller.
+// Step progress is reset in place; the event history is NOT deleted, so analytics keep the
+// record that the flow was attempted before.
+app.post('/api/onboarding/flows/:flowKey/reset', auth, onboardingFlagGuard, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { businessId } = await onboardingBusinessContext(req);
+    const flow = await loadFlowByKey(req.params.flowKey);
+    if (!flow) return res.status(404).json({ error: 'not_found' });
+
+    const progress = await loadProgress(userId, businessId, flow.id);
+    if (!progress) return res.status(404).json({ error: 'flow_not_started' });
+
+    const steps = await loadFlowSteps(flow.id);
+    await supabase.from('onboarding_step_progress').update({
+      status: 'not_started', first_viewed_at: null, completed_at: null,
+      skipped_at: null, completion_source: null,
+    }).eq('progress_id', progress.id);
+
+    const { data: updated, error } = await supabase.from('onboarding_progress').update({
+      status: 'in_progress', progress_percent: 0, completed_at: null, dismissed_at: null,
+      started_at: new Date().toISOString(), current_step_id: steps[0]?.id || null,
+    }).eq('id', progress.id).select(PROGRESS_COLS).single();
+    if (error) return res.status(500).json({ error: 'onboarding_update_failed' });
+
+    await writeOnboardingEvent({ userId, businessId, flowId: flow.id, eventType: 'flow_reset' });
+    res.json({ progress: updated });
+  } catch { res.status(500).json({ error: 'onboarding_update_failed' }); }
+});
+
+// ── Admin ────────────────────────────────────────────────────────────────────
+// Flag guard precedes requireAdmin so the feature does not exist for anyone when off.
+
+// GET /api/admin/onboarding/flows — content management view, with RAW i18n maps.
+app.get('/api/admin/onboarding/flows', auth, onboardingFlagGuard, requireAdmin, async (req, res) => {
+  try {
+    const locale = ONB.resolveLocale(req.query?.locale);
+    const { data: flows, error } = await supabase.from('onboarding_flows')
+      .select(FLOW_COLS).order('sort_order', { ascending: true });
+    if (error) return res.status(500).json({ error: 'onboarding_read_failed' });
+
+    const { data: steps } = await supabase.from('onboarding_steps')
+      .select(STEP_COLS).order('sort_order', { ascending: true });
+    const byFlow = new Map();
+    for (const s of (steps || [])) {
+      if (!byFlow.has(s.flow_id)) byFlow.set(s.flow_id, []);
+      byFlow.get(s.flow_id).push(ONB.toStepDto(s, locale, { includeRaw: true }));
+    }
+
+    res.json({
+      locale, supported_locales: ONB.SUPPORTED_LOCALES,
+      flows: (flows || []).map(f => ({
+        ...ONB.toFlowDto(f, locale, { includeRaw: true }),
+        steps: byFlow.get(f.id) || [],
+      })),
+    });
+  } catch { res.status(500).json({ error: 'onboarding_read_failed' }); }
+});
+
+// GET /api/admin/onboarding/progress — aggregate completion across all users.
+app.get('/api/admin/onboarding/progress', auth, onboardingFlagGuard, requireAdmin, async (req, res) => {
+  try {
+    const limit = Math.min(Math.max(parseInt(req.query?.limit, 10) || 300, 1), 500);
+    const { data: rows, error } = await supabase.from('onboarding_progress')
+      .select(PROGRESS_COLS).order('updated_at', { ascending: false }).limit(limit);
+    if (error) return res.status(500).json({ error: 'onboarding_read_failed' });
+
+    const progress = rows || [];
+    const flowIds = [...new Set(progress.map(p => p.flow_id).filter(Boolean))];
+    const { data: flows } = flowIds.length
+      ? await supabase.from('onboarding_flows').select('id, flow_key, mode').in('id', flowIds)
+      : { data: [] };
+    const flowById = Object.fromEntries((flows || []).map(f => [f.id, f]));
+
+    // Per-flow rollup so an admin sees adoption at a glance rather than counting rows.
+    const summary = {};
+    for (const p of progress) {
+      const key = flowById[p.flow_id]?.flow_key || 'unknown';
+      summary[key] = summary[key] || { started: 0, completed: 0, dismissed: 0, in_progress: 0 };
+      summary[key].started++;
+      if (p.status === 'completed') summary[key].completed++;
+      if (p.status === 'dismissed') summary[key].dismissed++;
+      if (p.status === 'in_progress') summary[key].in_progress++;
+    }
+
+    res.json({
+      summary,
+      progress: progress.map(p => ({ ...p, flow_key: flowById[p.flow_id]?.flow_key || null })),
+    });
+  } catch { res.status(500).json({ error: 'onboarding_read_failed' }); }
+});
+
+// GET /api/admin/onboarding/events — raw analytics stream.
+app.get('/api/admin/onboarding/events', auth, onboardingFlagGuard, requireAdmin, async (req, res) => {
+  try {
+    const limit = Math.min(Math.max(parseInt(req.query?.limit, 10) || 300, 1), 500);
+    let q = supabase.from('onboarding_events')
+      .select('id, user_id, business_id, flow_id, step_id, event_type, event_payload, created_at');
+    if (req.query?.event_type) q = q.eq('event_type', String(req.query.event_type));
+    const { data, error } = await q.order('created_at', { ascending: false }).limit(limit);
+    if (error) return res.status(500).json({ error: 'onboarding_read_failed' });
+    res.json({ events: data || [] });
+  } catch { res.status(500).json({ error: 'onboarding_read_failed' }); }
+});
+
 // POST /api/bank-import/batches — create a batch from client-parsed rows
 app.post('/api/bank-import/batches', auth, async (req, res) => {
   try {
