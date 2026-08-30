@@ -3,7 +3,7 @@
 // to Pulse formulas, wallet-balance logic, classification, access, ledger or contracts.
 // Mounted at /business/* so the legacy /,/accounts routes stay untouched during migration.
 import { Navigate, Outlet, useNavigate } from 'react-router-dom'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { apiFetch } from '../../lib/api'
 import { useAuth } from '../../hooks/useAuth'
 import { formatAmount } from '../../lib/money'
@@ -22,6 +22,18 @@ import {
   ExecutiveHero, EmptyWorkspaceCallout, TrendsSection, ReadinessBadge, ReadinessPanel,
   readinessOf, WorkingCapital, AdvancedInsights, CfoSummary, RecentActivity,
 } from './PulseBlocks'
+// Invoice Hub v1 blocks. Migration 041 (invoices) is an un-applied PROPOSAL and there are
+// no /api/invoices routes, so the hub explains the review-first flow and connects the
+// modules that DO exist rather than listing records that cannot be fetched.
+import {
+  InvoiceSummary, InvoiceIntake, ReviewPipeline, WorkQueues, TelegramFlow, InvoiceImpact,
+} from './InvoiceBlocks'
+// Evidence / invoice-requirement UX. Debt evidence is REAL (debts.attachments, migration
+// 019). Transaction evidence is policy-only — the transactions API returns no document link.
+import {
+  evidenceOfDebt, EvidenceBadge, DebtEvidencePanel, TransactionEvidencePanel,
+  EvidenceReadiness, TxPolicyChip,
+} from './EvidenceBlocks'
 
 const SYMBOL = '/brand/symbol_navy_blue_dot_transparent.svg'
 const SYMBOL_WHITE = '/brand/symbol_white_transparent.svg'
@@ -307,6 +319,7 @@ const ccyOf = (t) => t.currency_original || 'IDR'
 // ── Business Transactions (premium presentation of /api/transactions — read-only,
 //    filters preserved; no CRUD/classification change) ─────────────────────────
 export function BusinessTransactions() {
+  const navigate = useNavigate()
   const [period, setPeriod] = useState('month')
   const [type, setType] = useState('all')
   const q = type === 'all' ? `/transactions?period=${period}` : `/transactions?period=${period}&type=${type}`
@@ -321,7 +334,8 @@ export function BusinessTransactions() {
       {TYPES.map(ty => <button key={ty} className={`cfo-tab${type === ty ? ' is-active' : ''}`} onClick={() => setType(ty)} style={{ textTransform: 'capitalize' }}>{ty}</button>)}
     </div>
   )
-  if (tx.loading) return <>{head}{filters}<Card><LoadingSkeleton rows={6} height={18} /></Card></>
+  if (tx.loading) return <>{head}
+    <div style={{ marginBottom: 18 }}><TransactionEvidencePanel navigate={navigate} /></div>{filters}<Card><LoadingSkeleton rows={6} height={18} /></Card></>
   if (tx.error) return <>{head}{filters}<ErrorState description={tx.error} onRetry={() => location.reload()} /></>
   const rows = Array.isArray(tx.data) ? tx.data : []
   if (!rows.length) return <>{head}{filters}<EmptyState symbol={SYMBOL} title="No transactions" description="Transactions in this period will appear here." /></>
@@ -335,7 +349,9 @@ export function BusinessTransactions() {
           { key: 'date', label: 'Date', render: r => <span className="cfo-mono">{(r.transaction_date || r.created_at || '').slice(0, 10)}</span> },
           { key: 'description', label: 'Description', render: r => r.description || r.type },
           { key: 'type', label: 'Type', render: r => <StatusBadge tone="neutral">{r.type}</StatusBadge> },
-          { key: 'doc', label: 'Doc', render: r => (r.document_id || r.has_documents) ? <Icon.doc width="15" height="15" /> : '' },
+          // /api/transactions returns no document link, so this states what the TYPE
+          // normally needs — an expectation, never a claim about this row.
+          { key: 'doc', label: 'Evidence expected', render: r => <TxPolicyChip type={r.type} /> },
           { key: 'amount', label: 'Amount', num: true, render: r => <span className={amtTone(r)}>{formatAmount(String(r.amount_original ?? r.amount_idr ?? 0), ccyOf(r))} {ccyOf(r)}</span> },
         ]}
         rows={rows} rowKey={r => r.id} />
@@ -364,6 +380,7 @@ export function BusinessTransactions() {
 //    so Pay Now / Mark Received / partial logic is UNCHANGED. ────────────────────
 function DebtsView({ kind }) {
   const { token } = useAuth()
+  const navigate = useNavigate()
   const { active, scopeKey } = useWorkspace()
   const isPayable = kind === 'payable'
   const [data, setData] = useState({ loading: true, error: null, debts: null, wallets: [] })
@@ -391,6 +408,12 @@ function DebtsView({ kind }) {
   if (data.loading) return <>{head}<Card><LoadingSkeleton rows={5} height={18} /></Card></>
   if (data.error) return <>{head}<ErrorState description={data.error} onRetry={reload} /></>
   const debts = (data.debts || []).filter(d => d.type === kind && d.status !== 'cancelled')
+  // Evidence readiness sits above the list so the gap is visible before the numbers are.
+  const evidencePanel = debts.length
+    ? <div style={{ marginBottom: 18 }}>
+        <DebtEvidencePanel debts={debts} kind={kind} navigate={navigate} />
+      </div>
+    : null
   if (!debts.length) return <>{head}
     <EmptyState symbol={SYMBOL} title={isPayable ? 'No payables' : 'No receivables'}
       description={isPayable ? 'Bills you owe will appear here.' : 'Money owed to you will appear here.'} />
@@ -404,6 +427,7 @@ function DebtsView({ kind }) {
     <div style={{ marginBottom: 16 }}>
       <Stat k={isPayable ? 'Total outstanding (you owe)' : 'Total outstanding (owed to you)'} v={idr(total)} />
     </div>
+    {evidencePanel}
     {/* desktop table */}
     <Card className="cfo-rtable">
       <ResponsiveTable
@@ -412,7 +436,7 @@ function DebtsView({ kind }) {
           { key: 'due', label: 'Due', render: d => <span className="cfo-mono">{(d.due_date || '').slice(0, 10) || '—'}</span> },
           { key: 'status', label: 'Status', render: d => <StatusBadge tone={toneFor(d.status)}>{d.status}{d.days_overdue > 0 ? ` · ${d.days_overdue}d` : ''}</StatusBadge> },
           { key: 'progress', label: 'Paid', render: d => <span className="cfo-mono">{idr(d.paid_amount || 0)} / {idr(d.original_amount || d.amount)}</span> },
-          { key: 'doc', label: 'Doc', render: d => (d.document_id || d.has_documents) ? <Icon.doc width="15" height="15" /> : '' },
+          { key: 'doc', label: 'Evidence', render: d => <EvidenceBadge state={evidenceOfDebt(d)} sm /> },
           { key: 'amount', label: 'Remaining', num: true, render: d => <span className={isPayable ? 'cfo-neg' : 'cfo-pos'}>{isPayable ? '−' : '+'}{idr(d.remaining_amount ?? d.amount)}</span> },
           { key: 'act', label: '', render: d => d.status !== 'paid' ? <Btn sm variant="ghost" onClick={() => setPayDebt(d)}>{isPayable ? 'Pay Now' : (d.status === 'partial' ? 'More' : 'Mark received')}</Btn> : null },
         ]}
@@ -430,7 +454,7 @@ function DebtsView({ kind }) {
             <StatusBadge tone={toneFor(d.status)}>{d.status}{d.days_overdue > 0 ? ` · ${d.days_overdue}d` : ''}</StatusBadge>
             <span className="cfo-mono">Due {(d.due_date || '').slice(0, 10) || '—'}</span>
             <span className="cfo-mono">Paid {idr(d.paid_amount || 0)} / {idr(d.original_amount || d.amount)}</span>
-            {(d.document_id || d.has_documents) && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><Icon.doc width="13" height="13" /> doc</span>}
+            <EvidenceBadge state={evidenceOfDebt(d)} sm />
           </div>
           {d.status !== 'paid' && <div className="cfo-dcard-foot"><Btn sm onClick={() => setPayDebt(d)}>{isPayable ? 'Pay Now' : (d.status === 'partial' ? 'More' : 'Mark received')}</Btn></div>}
         </div>
@@ -728,50 +752,48 @@ export function BusinessIncomingPayments() {
 //    Shows real receivable/payable/overdue counts derived from /api/debts (NOT fake
 //    invoice records) + routes to Receivables/Payables. No debt-logic change. ──────
 export function BusinessInvoices() {
-  const w = useScoped('/debts')
   const navigate = useNavigate()
-  const head = <PageHeader eyebrow="Business Workspace" title="Invoices"
-    actions={<StatusBadge tone="info">Coming next</StatusBadge>} />
+  const w = useScoped('/debts')
+  // Document Center is plan-gated and can answer 403. Treated as "not connected" rather
+  // than as zero, so an unreachable endpoint never reads as "nothing to review".
+  const docs = useScoped('/documents')
+  const [queue, setQueue] = useState('drafts')
+  const flowRef = useRef(null)
+
   const debts = Array.isArray(w.data) ? w.data : []
-  const recv = debts.filter(d => d.type === 'receivable' && d.status !== 'cancelled')
-  const pay = debts.filter(d => d.type === 'payable' && d.status !== 'cancelled')
-  const overdue = debts.filter(d => d.status === 'overdue')
-  const cards = [
-    { k: 'Receivable invoices', v: recv.length, sub: 'from Receivables', icon: <Icon.down /> },
-    { k: 'Payable invoices', v: pay.length, sub: 'from Payables', icon: <Icon.up /> },
-    { k: 'Overdue invoices', v: overdue.length, sub: 'past due date', icon: <Icon.warn /> },
-    { k: 'Draft invoices', v: 0, sub: 'not yet issued', icon: <Icon.doc /> },
-  ]
+  const docList = Array.isArray(docs.data?.documents) ? docs.data.documents : []
+  const docState = {
+    available: !docs.loading && !docs.error && Array.isArray(docs.data?.documents),
+    needsReview: docList.filter((d) => d.review_status === 'needs_review').length,
+  }
+
+  const head = (
+    <PageHeader eyebrow="Business Workspace" title="Invoices"
+      actions={<StatusBadge tone="neutral">Review-first · foundation preview</StatusBadge>} />
+  )
+
+  if (w.error && !debts.length) {
+    return <>{head}<ErrorState title="We couldn’t load invoice data" description={w.error}
+      onRetry={() => location.reload()} /></>
+  }
+
   return <>{head}
-    <div style={{ marginBottom: 18, color: 'var(--text-secondary)', fontSize: 14 }}>
-      Invoices module is coming next. Receivables and Payables are already available below.
-    </div>
-    <div className="cfo-grid cfo-grid-4" style={{ marginBottom: 18 }}>
-      {cards.map(c => (
-        <Card key={c.k} title={c.k}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span className="cfo-state-ic" style={{ width: 36, height: 36, borderRadius: 10, background: 'var(--surface-card-muted)', color: 'var(--text-secondary)' }}>{c.icon}</span>
-            <div><div className="cfo-stat-v cfo-mono" style={{ fontSize: 22 }}>{w.loading ? '—' : c.v}</div>
-              <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{c.sub}</div></div>
-          </div>
-        </Card>
-      ))}
-    </div>
-    <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 18 }}>
-      <Btn onClick={() => navigate('/business/receivables')}>View Receivables</Btn>
-      <Btn variant="ghost" onClick={() => navigate('/business/payables')}>View Payables</Btn>
-    </div>
-    <Card title="Invoice views" action={<StatusBadge tone="neutral">Preview</StatusBadge>}>
-      <div className="cfo-tabs" style={{ marginBottom: 0, opacity: .55, pointerEvents: 'none' }}>
-        {['Cards', 'List', 'Kanban'].map((v, i) => <button key={v} className={`cfo-tab${i === 0 ? ' is-active' : ''}`} disabled>{v}</button>)}
-      </div>
-      <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 10 }}>Cards / List / Kanban views arrive with the Invoices module. No invoice records are created yet.</div>
-    </Card>
+    <p className="inv-note" style={{ marginBottom: 20 }}>
+      Track sales invoices, supplier invoices, drafts and payment matching. Uploaded invoices
+      first go through review before they affect your financial data.
+    </p>
+
+    <InvoiceSummary debts={debts} docs={docState} loading={w.loading} navigate={navigate} />
+    <EvidenceReadiness debts={debts} loading={w.loading} navigate={navigate} />
+    <InvoiceIntake navigate={navigate}
+      onShowFlow={() => flowRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' })} />
+    <ReviewPipeline />
+    <WorkQueues active={queue} onSelect={setQueue} navigate={navigate} />
+    <div ref={flowRef} style={{ marginBottom: 22 }}><TelegramFlow /></div>
+    <InvoiceImpact />
   </>
 }
 
-// ── Funding & Investors — premium placeholder (no backend calls; full module gated
-//    until Personal/Funding is enabled). Renders inside WorkspaceShell. ───────────
 export function BusinessFunding() {
   // Premium LOCKED page — no Personal/Funding backend calls, no migrations required.
   const cards = [
