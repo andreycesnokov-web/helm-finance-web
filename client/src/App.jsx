@@ -64,6 +64,7 @@ import ComplianceCalendar from './pages/ComplianceCalendar'
 import WalletDetail from './pages/WalletDetail'
 import Onboarding, { shouldShowOnboarding, clearOnboardingFlags } from './pages/Onboarding'
 import PreviewApp from './pages/PreviewApp'
+import OnboardingPreview from './pages/OnboardingPreview'
 import EmailLogin from './pages/EmailLogin'
 import EmailCallback from './pages/EmailCallback'
 import TelegramLogin from './pages/TelegramLogin'
@@ -579,6 +580,8 @@ export default function App() {
           {/* Premium UI preview — standalone, synthetic only, gated by VITE_PREMIUM_UI_PREVIEW.
               404s in any build without the flag (e.g. production). */}
           <Route path="/demo/personal-overview" element={<PreviewApp />} />
+          {/* Local design review only. Hidden from navigation and omitted from production routes. */}
+          {import.meta.env.DEV && <Route path="/_preview/onboarding" element={<OnboardingPreview />} />}
           {/* Live Personal Workspace (Phase 2) — premium shell, real endpoints, no synthetic data. */}
           {/* Personal/Funding UI depends on migrations 037–039. Gated so production
               (without those migrations) hides the routes instead of hitting missing
