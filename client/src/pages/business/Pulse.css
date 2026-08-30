@@ -6,82 +6,138 @@
    Class prefix: pulse-
    ========================================================================== */
 
-/* ── executive hero ─────────────────────────────────────────────────────── */
-.pulse-hero {
+/* ── executive hero ─────────────────────────────────────────────────────────
+   Brandbook surfaces only: Navy #003366 corporate panel, White cards, Pale Grey
+   page ground, Electric Blue #3399FF as accent. All via brand tokens. */
+.pulse-exec {
   display: grid;
-  grid-template-columns: minmax(260px, 340px) minmax(0, 1fr);
-  gap: 0;
+  grid-template-columns: minmax(0, 42fr) minmax(0, 58fr);
+  gap: 14px;
   margin-bottom: 22px;
-  border-radius: var(--radius-lg);
-  overflow: hidden;
-  box-shadow: var(--shadow-md);
+  align-items: stretch;
 }
-.pulse-hero-main {
-  padding: 26px 28px;
-  background: var(--brand-navy);
-  color: #fff;
+
+/* ── total cash (navy) ──────────────────────────────────────────────────── */
+.pulse-cash {
+  position: relative;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
   justify-content: center;
+  min-width: 0;
+  padding: 26px 28px;
+  border-radius: 20px;
+  background: var(--brand-navy);
+  color: var(--brand-white);
+  box-shadow: var(--shadow-md);
 }
-.pulse-hero-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
-.pulse-hero-label {
+/* Electric Blue used strictly as an accent glow, never as a surface. */
+.pulse-cash::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(120% 90% at 100% 0%, rgba(51, 153, 255, .22), rgba(51, 153, 255, 0) 62%);
+}
+/* Official mark, unmodified, as a subtle watermark. */
+.pulse-cash-mark {
+  position: absolute;
+  right: -34px;
+  bottom: -38px;
+  width: 210px;
+  height: 210px;
+  opacity: .07;
+  pointer-events: none;
+  user-select: none;
+}
+.pulse-cash-top,
+.pulse-cash-value,
+.pulse-cash-flag,
+.pulse-cash-meta { position: relative; z-index: 1; }
+
+.pulse-cash-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.pulse-cash-label {
+  font-family: var(--font-ui);
   font-size: 11px;
   font-weight: 800;
   letter-spacing: .12em;
   text-transform: uppercase;
-  opacity: .72;
+  opacity: .74;
 }
-.pulse-hero-value {
+.pulse-cash-top .cfo-badge { background: rgba(255, 255, 255, .14); color: var(--brand-white); border: 0; }
+
+/* One line, guaranteed: mono tabular figures, no wrap, ellipsis only as a last resort. */
+.pulse-cash-value {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
-  font-size: clamp(26px, 3.4vw, 38px);
+  font-size: clamp(32px, 3.4vw, 52px);
   font-weight: 700;
-  line-height: 1.1;
-  overflow-wrap: anywhere;
+  line-height: .98;
+  letter-spacing: -.02em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
 }
-.pulse-hero-meta { font-size: 12.5px; opacity: .72; line-height: 1.5; }
-/* the readiness badge sits on navy — give it a legible surface */
-.pulse-hero-top .cfo-badge { background: rgba(255, 255, 255, .14); color: #fff; border: 0; }
+.pulse-cash-flag {
+  align-self: flex-start;
+  padding: 4px 11px;
+  border-radius: 999px;
+  background: rgba(198, 40, 40, .22);
+  color: var(--danger-soft);
+  font-size: 11.5px;
+  font-weight: 700;
+}
+.pulse-cash-meta { margin: 0; font-size: 12.5px; line-height: 1.5; opacity: .74; }
 
-.pulse-hero-tiles {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  background: var(--surface-card);
-  border: 1px solid var(--border-default);
-  border-left: 0;
-}
-.pulse-tile {
-  padding: 20px 18px;
+/* ── KPI cards (white) ──────────────────────────────────────────────────── */
+.pulse-kpis { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; min-width: 0; }
+.pulse-kpi {
   display: flex;
   flex-direction: column;
   gap: 5px;
+  justify-content: center;
   min-width: 0;
-  border-left: 1px solid var(--border-subtle);
+  padding: 18px 18px;
+  border: 1px solid var(--border-default);
+  border-radius: 18px;
+  background: var(--surface-card);
+  box-shadow: var(--shadow-sm);
 }
-.pulse-tile:first-child { border-left: 0; }
-.pulse-tile-label {
-  font-size: 11px;
+.pulse-kpi-label {
+  font-family: var(--font-ui);
+  font-size: 10.5px;
   font-weight: 800;
-  letter-spacing: .08em;
+  letter-spacing: .1em;
   text-transform: uppercase;
   color: var(--text-muted);
 }
-.pulse-tile-value {
+.pulse-kpi-value {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
-  font-size: 19px;
+  font-size: clamp(17px, 1.5vw, 21px);
   font-weight: 700;
+  line-height: 1.1;
   color: var(--brand-navy);
-  overflow-wrap: anywhere;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
-.pulse-tile-value.pos { color: var(--success); }
-.pulse-tile-value.neg { color: var(--danger); }
-/* Empty workspace: zeros are true, so they stay - but they stop shouting. */
-.pulse-tile-value.is-muted { color: var(--text-muted); font-weight: 600; }
-.pulse-hero.is-empty .pulse-hero-value { opacity: .92; }
-.pulse-tile-hint { font-size: 11.5px; line-height: 1.45; color: var(--text-muted); }
+/* Financial status only, and kept restrained — never a decorative colour. */
+.pulse-kpi-value.pos { color: var(--success); }
+.pulse-kpi-value.neg { color: var(--danger); }
+.pulse-kpi-value.is-muted { color: var(--text-muted); font-weight: 600; }
+.pulse-kpi-chip {
+  align-self: flex-start;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--warning-soft);
+  color: var(--warning);
+  font-size: 10.5px;
+  font-weight: 800;
+}
+.pulse-kpi-hint { font-size: 11.5px; line-height: 1.45; color: var(--text-muted); }
 
 /* -- empty-workspace callout -------------------------------------------- */
 .pulse-start {
@@ -115,7 +171,7 @@
 }
 /* One obvious first move, without dimming the others into dead ends. */
 .pulse-start-action.is-primary { border-color: var(--brand-electric-blue); background: var(--info-soft); }
-.pulse-start-action.is-primary .pulse-start-action-ic { background: var(--brand-electric-blue); color: #fff; }
+.pulse-start-action.is-primary .pulse-start-action-ic { background: var(--brand-electric-blue); color: var(--brand-white); }
 .pulse-start-action-ic {
   display: inline-flex; align-items: center; justify-content: center;
   width: 36px; height: 36px; flex: 0 0 auto; border-radius: 10px;
@@ -132,6 +188,7 @@
   background: var(--surface-card); border-radius: 999px; padding: 2px 8px;
 }
 .pulse-start-action-sub { font-size: 12.5px; line-height: 1.45; color: var(--text-muted); }
+.pulse-start-chev { color: var(--text-muted); transform: rotate(-90deg); flex: 0 0 auto; }
 
 /* -- shared empty state inside a card ----------------------------------- */
 .pulse-empty { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding: 6px 0 2px; }
@@ -152,68 +209,137 @@
 .pulse-progress-bar { display: block; height: 8px; border-radius: 999px; background: var(--border-subtle); overflow: hidden; }
 .pulse-progress-fill { display: block; height: 100%; border-radius: 999px; background: var(--brand-electric-blue); transition: width .3s ease; }
 
-/* -- financial trends (chart-ready placeholders) ------------------------- */
-.pulse-trends {
+/* -- financial trends ---------------------------------------------------- */
+.pulse-trends,
+.pulse-insights {
   padding: 22px 24px;
   margin-bottom: 22px;
   border: 1px solid var(--border-default);
-  border-radius: var(--radius-lg);
+  border-radius: 20px;
   background: var(--surface-card);
   box-shadow: var(--shadow-sm);
 }
-.pulse-trends-head {
+.pulse-trends-head,
+.pulse-insights-head {
   display: flex; align-items: flex-start; justify-content: space-between;
-  gap: 14px; flex-wrap: wrap; margin-bottom: 16px;
+  gap: 14px; flex-wrap: wrap; margin-bottom: 18px;
 }
-.pulse-trends-title {
-  margin: 0 0 4px; font-family: var(--font-display);
+.pulse-trends-title,
+.pulse-insights-title {
+  margin: 0 0 5px; font-family: var(--font-display);
   font-size: 18px; line-height: 1.3; color: var(--brand-navy);
 }
-.pulse-trends-sub { margin: 0; font-size: 13.5px; line-height: 1.6; color: var(--text-secondary); max-width: 78ch; }
+.pulse-trends-sub,
+.pulse-insights-sub {
+  margin: 0; font-size: 13.5px; line-height: 1.6;
+  color: var(--text-secondary); max-width: 82ch;
+}
 
-/* 2x2 on desktop, single column on mobile */
 .pulse-trends-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .pulse-trend {
-  display: flex; flex-direction: column; gap: 8px;
-  padding: 14px 15px 12px;
+  display: flex; flex-direction: column; gap: 9px;
+  padding: 15px 16px 14px;
   border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
+  border-radius: 18px;
   background: var(--surface-card);
 }
-.pulse-trend-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.pulse-trend-name { margin: 0; font-size: 13.5px; font-weight: 700; color: var(--text-primary); }
+.pulse-trend-name { margin: 0; font-family: var(--font-ui); font-size: 14px; font-weight: 800; color: var(--brand-navy); }
 
-/* The frame reads as a real chart panel waiting for data, not a disabled box:
-   soft brand wash under a light grid, never grey-on-grey. */
+/* Ready for data, not broken: Pale Grey ground with an Electric Blue #3399FF wash. */
 .pulse-trend-frame {
   position: relative;
-  height: 104px;
-  border-radius: var(--radius-sm);
+  height: 100px;
+  border-radius: 12px;
+  border: 1px solid var(--border-subtle);
   background:
-    linear-gradient(to bottom, rgba(51, 153, 255, .07), rgba(51, 153, 255, 0) 78%),
-    var(--surface-card-muted);
+    linear-gradient(to bottom, rgba(51, 153, 255, .08), rgba(51, 153, 255, 0) 72%),
+    var(--brand-pale-grey);
   overflow: hidden;
 }
 .pulse-trend-svg { display: block; width: 100%; height: 100%; }
-.pulse-trend-grid { stroke: var(--border-strong); stroke-width: 1; opacity: .5; }
-.pulse-trend-axis { stroke: var(--border-strong); stroke-width: 1; opacity: .75; }
-.pulse-trend-slot { fill: none; stroke: var(--border-strong); stroke-width: 1; stroke-dasharray: 4 4; opacity: .75; }
-
-.pulse-trend-caption {
-  position: absolute;
-  left: 50%; top: 50%; transform: translate(-50%, -50%);
-  max-width: 88%;
-  padding: 6px 12px;
+.pulse-trend-grid { stroke: var(--brand-electric-blue); stroke-width: 1; opacity: .28; }
+.pulse-trend-axis { stroke: var(--brand-electric-blue); stroke-width: 1; opacity: .42; }
+.pulse-trend-slot { fill: none; stroke: var(--brand-electric-blue); stroke-width: 1; stroke-dasharray: 5 5; opacity: .42; }
+.pulse-trend-pill {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  max-width: 86%;
+  padding: 7px 14px;
   border-radius: 999px;
   background: var(--surface-card);
   border: 1px solid var(--border-default);
   box-shadow: var(--shadow-sm);
-  font-size: 11.5px;
-  line-height: 1.4;
-  font-weight: 600;
-  color: var(--text-secondary);
-  text-align: center;
+  font-size: 12px; font-weight: 700; line-height: 1.4;
+  color: var(--brand-navy);
+  text-align: center; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis;
 }
+.pulse-trend-body { margin: 0; font-size: 13px; line-height: 1.6; color: var(--text-secondary); }
+
+/* -- shared requirement chips -------------------------------------------- */
+.pulse-chips { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.pulse-chip {
+  padding: 5px 11px;
+  border-radius: 999px;
+  background: var(--info-soft);
+  color: var(--brand-navy);
+  font-size: 11.5px;
+  font-weight: 700;
+  line-height: 1.4;
+  letter-spacing: .002em;
+}
+
+/* -- advanced financial insights (locked) -------------------------------- */
+.pulse-insights-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+/* Solid border and a real surface — a locked insight is high-value, not disabled. */
+.pulse-insight {
+  display: flex; flex-direction: column; gap: 9px;
+  padding: 20px;
+  border: 1px solid var(--border-default);
+  border-radius: 20px;
+  background: var(--surface-card);
+  box-shadow: var(--shadow-sm);
+}
+.pulse-insight-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.pulse-insight-ic {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 34px; height: 34px; flex: 0 0 auto; border-radius: 999px;
+  background: var(--info-soft); color: var(--brand-electric-blue-ink);
+}
+.pulse-insight-status {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 3px 9px; border-radius: 999px;
+  background: var(--brand-pale-grey);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-muted);
+  font-size: 10px; font-weight: 800; letter-spacing: .02em;
+  white-space: nowrap;
+}
+.pulse-insight-title {
+  margin: 2px 0 0; font-family: var(--font-ui);
+  font-size: 18px; font-weight: 800; line-height: 1.25; color: var(--brand-navy);
+}
+.pulse-insight-body { margin: 0; font-size: 13.5px; line-height: 1.65; color: var(--text-secondary); }
+.pulse-insight-label {
+  margin-top: 3px;
+  font-size: 10px; font-weight: 800; letter-spacing: .11em;
+  text-transform: uppercase; color: var(--text-muted);
+}
+.pulse-insight-cta {
+  align-self: flex-start; margin-top: auto;
+  display: inline-flex; align-items: center; gap: 6px;
+  min-height: 34px; padding: 7px 13px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  background: var(--surface-card);
+  font: inherit; font-size: 12.5px; font-weight: 700;
+  color: var(--brand-electric-blue-ink); cursor: pointer;
+  transition: background .16s ease, border-color .16s ease;
+}
+.pulse-insight-cta svg { transform: rotate(-90deg); }
+.pulse-insight-cta:hover { background: var(--info-soft); border-color: var(--brand-electric-blue); }
+
+/* contextual actions inside a card */
+.pulse-card-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
 
 /* ── shared note / section heads ────────────────────────────────────────── */
 .pulse-note {
@@ -248,8 +374,8 @@
 }
 .pulse-readiness li.is-on .pulse-readiness-mark { background: var(--success-soft); color: var(--success); }
 .pulse-readiness-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
-.pulse-readiness-label { font-size: 13.5px; font-weight: 600; color: var(--text-primary); }
-.pulse-readiness-unlocks { font-size: 11.5px; color: var(--text-muted); }
+.pulse-readiness-label { font-size: 14px; font-weight: 600; color: var(--text-primary); }
+.pulse-readiness-unlocks { font-size: 12px; line-height: 1.45; color: var(--text-muted); }
 .pulse-readiness-n { font-family: var(--font-mono); font-size: 12.5px; font-weight: 700; color: var(--text-muted); }
 .pulse-readiness-go {
   border: 1px solid var(--border-default);
@@ -284,75 +410,6 @@
 .pulse-wc-fill.neg { background: var(--danger); }
 .pulse-wc-pending { font-size: 11.5px; color: var(--text-muted); }
 
-/* -- metrics not available yet (compact, inside one card) --------------- */
-.pulse-locked-intro { margin-bottom: 14px; }
-.pulse-locked-grid {
-  list-style: none; margin: 0; padding: 0; display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(216px, 1fr)); gap: 10px;
-}
-/* A readiness state, not a disabled control: calm dashed edge, no grey-out. */
-.pulse-locked {
-  display: flex; flex-direction: column; gap: 6px; padding: 14px 15px;
-  border: 1px dashed var(--border-strong); border-radius: var(--radius-md);
-  background: var(--surface-card-muted);
-}
-.pulse-locked-title { font-family: var(--font-display); font-size: 14.5px; color: var(--brand-navy); }
-.pulse-locked-needs { font-size: 12.5px; line-height: 1.5; color: var(--text-secondary); flex: 1; }
-.pulse-locked-needs em {
-  display: block; font-style: normal; font-size: 10px; font-weight: 800;
-  letter-spacing: .1em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 3px;
-}
-.pulse-locked-go {
-  align-self: flex-start; display: inline-flex; align-items: center; gap: 3px;
-  margin-top: 2px; padding: 0; border: 0; background: none; font: inherit;
-  font-size: 12.5px; font-weight: 700; color: var(--brand-electric-blue-ink); cursor: pointer;
-}
-.pulse-locked-go svg { transform: rotate(-90deg); }
-.pulse-locked-go:hover { text-decoration: underline; }
-
-/* ── action center ──────────────────────────────────────────────────────── */
-.pulse-actions {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-  gap: 10px;
-}
-.pulse-action {
-  display: flex;
-  align-items: center;
-  gap: 11px;
-  width: 100%;
-  min-height: 56px;
-  padding: 11px 13px;
-  text-align: left;
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-md);
-  background: var(--surface-card);
-  font: inherit;
-  color: inherit;
-  cursor: pointer;
-  transition: border-color .16s ease, background .16s ease, box-shadow .16s ease;
-}
-.pulse-action:hover {
-  border-color: var(--brand-electric-blue);
-  background: var(--surface-card-muted);
-  box-shadow: var(--shadow-sm);
-}
-.pulse-action-ic {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 34px;
-  height: 34px;
-  flex: 0 0 auto;
-  border-radius: 10px;
-  background: var(--info-soft);
-  color: var(--brand-electric-blue-ink);
-}
-.pulse-action-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
-.pulse-action-label { font-size: 13.5px; font-weight: 700; color: var(--text-primary); }
-.pulse-action-sub { font-size: 11.5px; color: var(--text-muted); }
-.pulse-action-chev { color: var(--text-muted); transform: rotate(-90deg); flex: 0 0 auto; }
-
 /* ── AI CFO summary ─────────────────────────────────────────────────────── */
 .pulse-cfo { display: flex; gap: 12px; }
 .pulse-cfo-ic {
@@ -376,34 +433,39 @@
   text-transform: uppercase;
   color: var(--text-muted);
 }
-.pulse-cfo-p { margin: 0; font-size: 13.5px; line-height: 1.6; color: var(--text-secondary); max-width: 76ch; }
+.pulse-cfo-p { margin: 0; font-size: 14px; line-height: 1.65; color: var(--text-secondary); max-width: 76ch; }
 .pulse-cfo-list { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; }
-.pulse-cfo-list li { font-size: 13.5px; line-height: 1.6; color: var(--text-secondary); }
+.pulse-cfo-list li { font-size: 14px; line-height: 1.65; color: var(--text-secondary); }
 
 /* ── responsive ─────────────────────────────────────────────────────────── */
-@media (max-width: 1100px) {
-  .pulse-hero { grid-template-columns: 1fr; }
-  .pulse-hero-tiles { border-left: 1px solid var(--border-default); grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .pulse-tile:nth-child(3) { border-left: 0; }
-  .pulse-tile { border-top: 1px solid var(--border-subtle); }
-  .pulse-tile:nth-child(-n+2) { border-top: 0; }
+/* Wide-desktop only: 4 locked insights across. Below that they wrap to 2x2. */
+@media (max-width: 1439px) {
+  .pulse-insights-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+/* Tablet: cash card full width, KPIs stay 2x2 beneath it. */
+@media (max-width: 1179px) {
+  .pulse-exec { grid-template-columns: 1fr; }
+  .pulse-cash { padding: 24px; }
 }
 @media (max-width: 640px) {
-  .pulse-hero-main { padding: 20px; }
-  .pulse-hero-tiles { grid-template-columns: 1fr; }
-  .pulse-tile { border-left: 0; border-top: 1px solid var(--border-subtle); }
-  .pulse-tile:first-child { border-top: 0; }
+  .pulse-cash { padding: 20px; border-radius: 18px; }
+  .pulse-cash-value { font-size: clamp(28px, 8.5vw, 38px); }
+  .pulse-cash-mark { width: 150px; height: 150px; right: -26px; bottom: -30px; }
+  .pulse-kpi { padding: 15px 16px; border-radius: 16px; }
   .pulse-note, .pulse-cfo-p, .pulse-cfo-list li { font-size: 14px; }
   .pulse-start { padding: 20px; }
   .pulse-start-head { flex-direction: column; gap: 12px; }
   .pulse-start-sub, .pulse-empty-body { font-size: 14.5px; }
   .pulse-start-action { min-height: 64px; }
   .pulse-trends { padding: 18px; }
-  .pulse-trends-grid { grid-template-columns: 1fr; }
-  .pulse-trend-caption { font-size: 12.5px; }
-  .pulse-action { min-height: 60px; }
+  .pulse-trends-grid, .pulse-insights-grid { grid-template-columns: 1fr; }
+  .pulse-trends, .pulse-insights { padding: 18px; }
+  .pulse-insight { padding: 18px; }
+}
+@media (max-width: 420px) {
+  .pulse-kpis { grid-template-columns: 1fr; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .pulse-wc-fill, .pulse-action { transition: none !important; }
+  .pulse-wc-fill, .pulse-start-action { transition: none !important; }
 }

@@ -20,7 +20,7 @@ import { upcomingDeadlines } from './AccountantPremium'          // static statu
 // /api/pulse or /api/business/financial-counts; nothing is derived into a new metric.
 import {
   ExecutiveHero, EmptyWorkspaceCallout, TrendsSection, ReadinessBadge, ReadinessPanel,
-  readinessOf, WorkingCapital, UnavailableMetrics, ActionCenter, CfoSummary, RecentActivity,
+  readinessOf, WorkingCapital, AdvancedInsights, CfoSummary, RecentActivity,
 } from './PulseBlocks'
 
 const SYMBOL = '/brand/symbol_navy_blue_dot_transparent.svg'
@@ -109,17 +109,18 @@ export function BusinessPulse() {
       <ExecutiveHero d={d} idr={idr} empty={workspaceEmpty}
         readiness={<ReadinessBadge readiness={readiness} loading={countsLoading} />} />
 
-      {/* 1b. First-run lead. The zeros above are all legitimately zero, so the useful thing
+      {/* 2. Alerts row */}
+      {BUSINESS_PREMIUM && <RadarStrip d={d} navigate={navigate} />}
+
+      {/* 3. First-run lead. The zeros above are all legitimately zero, so the useful thing
              to say next is what unlocks them. */}
       {workspaceEmpty && <EmptyWorkspaceCallout navigate={navigate} />}
 
-      {BUSINESS_PREMIUM && <RadarStrip d={d} navigate={navigate} />}
+      {/* 4. Where charts will live. Frames only — the future source is GET /api/pulse/trends,
+             which does not exist yet, so nothing is plotted rather than plotted from guesses. */}
+      <TrendsSection />
 
-      {/* 1c. Where charts will live. Frames only — no endpoint returns monthly history,
-             so nothing is plotted rather than plotted from guesses. */}
-      <TrendsSection empty={workspaceEmpty} />
-
-      {/* 2. Working capital + setup progress */}
+      {/* 5. Working capital + setup progress */}
       <div className="cfo-grid cfo-grid-2" style={{ marginBottom: 26 }}>
         <WorkingCapital d={d} idr={idr} navigate={navigate} />
         <ReadinessPanel readiness={readiness} loading={countsLoading} navigate={navigate} />
@@ -132,16 +133,12 @@ export function BusinessPulse() {
         </div>
       )}
 
-      {/* 3. Metrics the ledger cannot support yet — stated, never estimated */}
-      <UnavailableMetrics navigate={navigate} />
+      {/* 6. Locked insights — stated, never estimated */}
+      <AdvancedInsights navigate={navigate} />
 
-      {/* 4. Action center — suppressed while empty; the callout above already leads with
-             the same first moves and repeating them dilutes both. */}
-      {!workspaceEmpty && (
-        <div style={{ marginBottom: 26 }}><ActionCenter navigate={navigate} /></div>
-      )}
-
-      {/* 5. Narrative + ledger sanity check */}
+      {/* 7. Narrative + ledger sanity check. The standalone Action Center was removed: every
+             action it listed already exists contextually (first-run callout, setup progress
+             rows, insight CTAs, working-capital actions, Ask AI CFO). */}
       <div className="cfo-grid cfo-grid-2">
         <CfoSummary d={d} readiness={readiness} countsLoading={countsLoading}
           navigate={navigate} premium={BUSINESS_PREMIUM} empty={workspaceEmpty} />
