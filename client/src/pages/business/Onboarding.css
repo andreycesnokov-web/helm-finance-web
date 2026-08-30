@@ -17,6 +17,41 @@
 
 .ob-skeleton { display: flex; flex-direction: column; gap: 18px; }
 
+/* ── App-shell scroll stability (scoped to this page only) ────────────────────
+   shell.css carries a global horizontal-overflow guard:
+       html, body, #root { max-width: 100%; overflow-x: hidden }
+   Per CSS Overflow, an `overflow-x` other than `visible` forces the computed
+   `overflow-y` to `auto`, which turns #root into a scroll container. Every
+   `position: sticky` inside it then resolves against #root — which never actually
+   scrolls, because it is sized by `min-height` — so the sticky sidebar silently
+   stops sticking and scrolls away with the document. On a long page (the 20-module
+   tour) that reads as the whole shell sliding upward.
+
+   Fix, applied ONLY while onboarding is mounted, using the `:has()` scoping
+   convention shell.css already uses for `.cfo-shell:has(.personal-app)`: give the
+   shell the viewport height and move scrolling into the work area. The sidebar then
+   cannot move because nothing around it scrolls, and the document gains no
+   body-level scroll to over-scroll. No global rule is altered; a browser without
+   `:has()` simply keeps today's behaviour.
+
+   Desktop only — on mobile the sidebar is hidden and natural document scrolling
+   (with the address bar collapsing) is the ergonomic behaviour. */
+@media (min-width: 1025px) {
+  .cfo-shell:has(.ob-root) {
+    height: 100vh;
+    height: 100dvh;
+    grid-template-rows: 100%;
+    min-height: 0;
+    overflow: hidden;
+  }
+  .cfo-shell:has(.ob-root) > .cfo-main {
+    min-height: 0;
+    height: 100%;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+}
+
 /* ── progress bar ───────────────────────────────────────────────────────── */
 .ob-bar {
   display: block;
@@ -82,20 +117,97 @@
   box-shadow: var(--shadow-sm);
 }
 
-/* ── setup progress summary ─────────────────────────────────────────────── */
-.ob-summary {
+/* ── guided hero + next action ──────────────────────────────────────────── */
+.ob-hero {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1.1fr) minmax(280px, .9fr);
   gap: 28px;
   align-items: center;
-  padding: 24px 26px;
-  margin-bottom: 20px;
+  padding: 26px 28px;
+  margin-bottom: 16px;
   border: 1px solid var(--border-default);
   border-radius: var(--radius-lg);
   background: var(--surface-card);
   box-shadow: var(--shadow-sm);
 }
-.ob-summary-main { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.ob-hero-text { min-width: 0; }
+.ob-hero-title {
+  margin: 0 0 8px;
+  font-family: var(--font-display);
+  font-size: clamp(22px, 2.8vw, 30px);
+  line-height: 1.2;
+  color: var(--brand-navy);
+}
+.ob-hero-body {
+  margin: 0;
+  font-size: 14.5px;
+  line-height: 1.7;
+  color: var(--text-secondary);
+  max-width: 56ch;
+}
+.ob-hero-progress { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.ob-hero-progress-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.ob-hero-pct { font-family: var(--font-mono); font-size: 13px; font-weight: 700; color: var(--brand-navy); }
+.ob-hero-guides { font-size: 13px; font-weight: 600; color: var(--text-secondary); }
+.ob-hero-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 6px; }
+
+.ob-next {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 20px 24px;
+  margin-bottom: 20px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-lg);
+  background: var(--info-soft);
+  box-shadow: var(--shadow-sm);
+}
+.ob-next--done { background: var(--success-soft); }
+.ob-next-ic {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  flex: 0 0 auto;
+  border-radius: 13px;
+  background: var(--surface-card);
+  color: var(--brand-electric-blue-ink);
+}
+.ob-next--done .ob-next-ic { color: var(--success); }
+.ob-next-text { flex: 1; min-width: 0; }
+.ob-next-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 3px;
+}
+.ob-next-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(17px, 2vw, 20px);
+  line-height: 1.3;
+  color: var(--brand-navy);
+}
+.ob-next-desc {
+  margin: 5px 0 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text-secondary);
+  max-width: 72ch;
+}
+.ob-next-meta {
+  display: inline-block;
+  margin-top: 7px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+.ob-next > .cfo-btn { flex: 0 0 auto; }
+
 .ob-summary-label {
   font-size: 11.5px;
   font-weight: 800;
@@ -103,15 +215,6 @@
   text-transform: uppercase;
   color: var(--text-muted);
 }
-.ob-summary-value {
-  font-family: var(--font-display);
-  font-size: clamp(20px, 2.4vw, 26px);
-  line-height: 1.25;
-  color: var(--brand-navy);
-}
-.ob-summary-pct { font-size: 13px; color: var(--text-secondary); font-weight: 600; }
-
-.ob-summary-stats { display: flex; gap: 12px; }
 .ob-stat {
   min-width: 92px;
   padding: 12px 14px;
@@ -151,10 +254,59 @@
   border-radius: var(--radius-lg);
   background: var(--surface-card);
   box-shadow: var(--shadow-sm);
-  font: inherit;
-  color: inherit;
   cursor: pointer;
   transition: border-color .18s ease, box-shadow .18s ease, background .18s ease;
+}
+/* The quick-setup track leads the page: wider, warmer ground, primary CTA. */
+.ob-card--feature { grid-column: 1 / -1; background: var(--surface-card); border-color: var(--border-strong); }
+.ob-card-badges { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+
+.ob-card-inside {
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  background: var(--surface-card-muted);
+  border: 1px solid var(--border-subtle);
+}
+.ob-card-inside-label {
+  display: block;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: .11em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 7px;
+}
+.ob-card-steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 5px; }
+.ob-card-steps li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--text-secondary);
+}
+.ob-card-steps-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: var(--border-subtle);
+  color: var(--text-muted);
+}
+.ob-card-steps li.is-done .ob-card-steps-mark { background: var(--success-soft); color: var(--success); }
+.ob-card-steps li.is-done { color: var(--text-muted); }
+.ob-card-steps li.is-more { padding-left: 24px; font-size: 12px; font-weight: 700; color: var(--text-muted); }
+
+.ob-card-foot {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 14px;
+  margin-top: auto;
+  padding-top: 14px;
 }
 .ob-card:hover { border-color: var(--ob-accent); box-shadow: var(--shadow-md); }
 .ob-card--blue  { --ob-accent: var(--brand-electric-blue); }
@@ -186,19 +338,8 @@
   color: var(--text-secondary);
   flex: 1;
 }
-.ob-card-progress { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; }
+.ob-card-progress { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 0; }
 .ob-card-pct { font-size: 12.5px; color: var(--text-muted); font-weight: 600; }
-.ob-card-cta {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  margin-top: 6px;
-  color: var(--ob-accent-ink);
-  font-size: 14px;
-  font-weight: 800;
-}
-.ob-card--navy .ob-card-cta { color: var(--brand-navy); }
-.ob-card--green .ob-card-cta { color: var(--success); }
 
 /* ── flow screen ────────────────────────────────────────────────────────── */
 .ob-flow--blue  { --ob-accent: var(--brand-electric-blue); --ob-accent-ink: var(--brand-electric-blue-ink); --ob-accent-soft: var(--info-soft); }
@@ -262,7 +403,36 @@
   color: var(--text-secondary);
   max-width: 68ch;
 }
+.ob-flowhead-copy { flex: 1; min-width: 0; }
+.ob-flowhead-sub {
+  margin: 8px 0 0;
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--text-muted);
+  max-width: 68ch;
+}
 .ob-flowhead-progress { display: flex; flex-direction: column; gap: 8px; }
+/* Always answers "what now?" without the user having to read the rail. */
+.ob-flowhead-next {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 11px 14px;
+  border-radius: var(--radius-md);
+  background: var(--ob-accent-soft);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--brand-navy);
+}
+.ob-flowhead-next-label {
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: .11em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
 .ob-flowhead-meta {
   display: flex;
   justify-content: space-between;
@@ -318,13 +488,21 @@
   border-radius: var(--radius-lg);
   background: var(--surface-card);
   box-shadow: var(--shadow-sm);
-  max-height: 68vh;
+  max-height: calc(100dvh - 40px);
   overflow-y: auto;
+  /* Keeps the rail's own scrolling from chaining out into the work area once it
+     reaches an end — the "weird jump" when a nested list bottoms out. */
+  overscroll-behavior: contain;
   position: sticky;
-  top: 18px;
+  top: 8px;
 }
 .ob-rail-groups { display: flex; flex-direction: column; gap: 12px; }
+.ob-rail-group + .ob-rail-group { border-top: 1px solid var(--border-subtle); padding-top: 6px; }
 .ob-rail-title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
   padding: 8px 10px 4px;
   font-size: 11px;
   font-weight: 800;
@@ -332,6 +510,7 @@
   text-transform: uppercase;
   color: var(--text-muted);
 }
+.ob-rail-count { font-family: var(--font-mono); font-size: 11px; font-weight: 700; color: var(--text-muted); letter-spacing: 0; text-transform: none; }
 .ob-rail-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
 
 .ob-step {
@@ -434,29 +613,29 @@
   color: var(--brand-navy);
 }
 .ob-detail-chips { display: flex; gap: 8px; flex-wrap: wrap; }
-.ob-detail-desc {
+.ob-sections { display: flex; flex-direction: column; gap: 14px; }
+.ob-section { display: flex; flex-direction: column; gap: 5px; }
+.ob-section p {
   margin: 0;
   font-size: 15px;
   line-height: 1.7;
   color: var(--text-secondary);
   max-width: 70ch;
 }
-.ob-instructions {
-  padding: 14px 16px;
+.ob-section-label {
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: .11em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+/* "What to do next" is the action half of the card, so it carries the accent rule. */
+.ob-section--todo {
+  padding: 13px 16px;
   border-left: 3px solid var(--ob-accent);
   border-radius: 0 var(--radius-md) var(--radius-md) 0;
   background: var(--surface-card-muted);
 }
-.ob-instructions-label {
-  display: block;
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: .1em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-  margin-bottom: 5px;
-}
-.ob-instructions p { margin: 0; font-size: 14px; line-height: 1.65; color: var(--text-secondary); max-width: 70ch; }
 
 .ob-detail-actions {
   display: flex;
@@ -541,17 +720,24 @@
 }
 
 /* ── responsive ─────────────────────────────────────────────────────────── */
-@media (max-width: 1023px) {
+@media (max-width: 1024px) {
   .ob-layout { grid-template-columns: 1fr; }
-  .ob-rail { position: static; max-height: none; }
+  /* Below the shell's own breakpoint the sidebar is gone and the document scrolls
+     naturally, so the rail must not become a second nested scroll area. */
+  .ob-rail { position: static; max-height: none; overflow: visible; }
+  .ob-hero { grid-template-columns: 1fr; gap: 20px; }
 }
 @media (max-width: 767px) {
-  .ob-summary { grid-template-columns: 1fr; gap: 18px; padding: 20px; }
-  .ob-summary-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .ob-hero { padding: 20px; }
   .ob-stat { min-width: 0; padding: 10px; }
+  .ob-next { flex-wrap: wrap; padding: 18px; }
+  .ob-next > .cfo-btn { width: 100%; min-height: 44px; }
+  .ob-card-foot { flex-direction: column; align-items: stretch; gap: 12px; }
+  .ob-card-foot > .cfo-btn { min-height: 44px; }
+  .ob-card--feature { grid-column: auto; }
   .ob-flowhead, .ob-detail { padding: 20px; }
   .ob-flowhead-main { flex-wrap: wrap; }
-  .ob-card-desc, .ob-detail-desc, .ob-drawer-body, .ob-drawer-list li { font-size: 16px; }
+  .ob-card-desc, .ob-section p, .ob-drawer-body, .ob-drawer-list li { font-size: 16px; }
   .ob-detail-actions > .cfo-btn { flex: 1 1 auto; min-height: 44px; }
   .ob-spacer { display: none; }
   .ob-drawer { width: 100%; }

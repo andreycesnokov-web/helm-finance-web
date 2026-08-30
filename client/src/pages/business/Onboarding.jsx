@@ -3,14 +3,14 @@
 //
 // DATA-DRIVEN, NOT SCRIPTED. Every flow, step, title, description and instruction on this
 // page comes from GET /api/onboarding/*, already resolved for the requested locale. There is
-// no hardcoded step list here: if a deployment seeds a fourth flow or renames a step, this
-// page renders it. The only fixed content is UI chrome (button labels, notices) in
+// no hardcoded step list: screens are chosen from the flow's own `mode`, and the guidance
+// framing from its own `metadata.guidance_only`. A deployment that seeds a fourth flow gets a
+// fourth card without a code change. The only fixed content is UI chrome in
 // ./onboardingStrings.
 //
-// NO FINANCIAL EFFECT. Nothing on this page reads or writes transactions, wallets, debts,
-// documents, payments, credentials, Telegram or support threads. The only writes are the
-// caller's own onboarding progress rows. Opening this page never provisions a business or
-// starts a trial — the backend deliberately uses a read-only business context.
+// NO FINANCIAL EFFECT. Nothing here reads or writes transactions, wallets, debts, documents,
+// payments, credentials, Telegram or support threads. The only writes are the caller's own
+// onboarding progress rows. Opening this page never provisions a business or starts a trial.
 //
 // DISABLED DEPLOYMENTS. With ONBOARDING_ENABLED off, every route answers 404 before touching
 // the database. That is a valid state, not a fault: it renders an explanatory panel, and the
@@ -27,6 +27,8 @@ import { uiStrings } from './onboardingStrings'
 import './Onboarding.css'
 
 const SYMBOL = '/brand/symbol_navy_blue_dot_transparent.svg'
+const MAX_DETAIL_PREFETCH = 6   // bounds the home fan-out that builds the card previews
+const PREVIEW_STEPS = 4
 
 // product_area → icon. Areas come from a CHECK constraint in migration 054; an area added
 // later without an entry here falls back to the neutral book icon rather than crashing.
@@ -39,8 +41,8 @@ const AREA_ICON = {
   support: 'book', admin: 'cog',
 }
 
-// Rail grouping for the full product tour. Purely presentational — it buckets whatever
-// steps the API returns; an unlisted area lands in "workspace" rather than disappearing.
+// Rail grouping for the full product tour. Purely presentational — it buckets whatever steps
+// the API returns; an unlisted area lands in "workspace" rather than disappearing.
 const TOUR_GROUPS = [
   { key: 'overview', areas: ['general', 'pulse', 'radar', 'ai_cfo', 'ai_accountant'] },
   { key: 'finance', areas: ['transactions', 'accounts', 'invoices', 'receivables', 'payables', 'funding'] },
@@ -48,23 +50,32 @@ const TOUR_GROUPS = [
   { key: 'operations', areas: ['intercompany', 'payroll', 'approvals', 'team'] },
   { key: 'workspace', areas: ['documents', 'settings', 'support', 'admin'] },
 ]
+const bucketOf = (step) => TOUR_GROUPS.find((g) => g.areas.includes(step.product_area))?.key || 'workspace'
 
-// Per-flow accent + icon. Keyed by the seeded flow_key; an unknown flow still renders with
-// the neutral default, so the page never depends on a specific seed being present.
-const FLOW_VISUAL = {
-  [FLOW_KEYS.quick]: { icon: 'play', accent: 'blue', screen: 'quick' },
-  [FLOW_KEYS.tour]: { icon: 'book', accent: 'navy', screen: 'tour' },
-  [FLOW_KEYS.accountant]: { icon: 'acct', accent: 'green', screen: 'accountant' },
+/**
+ * How a flow presents itself — derived from the flow's own fields, not from its key.
+ *
+ * `mode` picks the screen (a page-by-page tour reads differently from a checklist) and
+ * `metadata.guidance_only` — set by the seed on the AI Accountant flow — turns on the
+ * readiness framing and the advice disclaimers. An unrecognised flow still renders.
+ */
+function shapeOf(flow) {
+  const guidance = flow?.metadata?.guidance_only === true
+  const mode = flow?.mode
+  if (mode === 'full_tour') return { variant: 'tour', accent: 'navy', icon: 'book', guidance }
+  if (guidance) return { variant: 'checklist', accent: 'green', icon: 'acct', guidance: true }
+  if (mode === 'quick_setup') return { variant: 'checklist', accent: 'blue', icon: 'play', guidance: false }
+  return { variant: 'checklist', accent: 'navy', icon: 'book', guidance }
 }
-const DEFAULT_VISUAL = { icon: 'book', accent: 'navy', screen: 'quick' }
-const visualFor = (flowKey) => FLOW_VISUAL[flowKey] || DEFAULT_VISUAL
 
-// ?flow= short names, so the single /business/onboarding route stays deep-linkable.
+// ?flow= short names, so the single /business/onboarding route stays deep-linkable. An
+// unknown flow falls back to its own flow_key as the parameter.
 const PARAM_TO_FLOW = { quick: FLOW_KEYS.quick, tour: FLOW_KEYS.tour, accountant: FLOW_KEYS.accountant }
 const FLOW_TO_PARAM = Object.fromEntries(Object.entries(PARAM_TO_FLOW).map(([k, v]) => [v, k]))
 
 const pct = (v) => Math.max(0, Math.min(100, Math.round(Number(v) || 0)))
 const isResolved = (s) => s === 'completed' || s === 'skipped'
+const resolvedCount = (steps) => steps.filter((st) => isResolved(st.progress?.status)).length
 
 function AreaIcon({ area, size = 18 }) {
   const C = Icon[AREA_ICON[area] || 'book'] || Icon.dot
@@ -101,8 +112,8 @@ function LanguageSwitcher({ locale, onChange, label }) {
   )
 }
 
-// Visual help entry point ONLY. It opens a static panel; it does not call any API and does
-// not create a support conversation.
+// Visual help entry point ONLY. Opens a static panel; calls no API and creates no support
+// conversation.
 function HelpDrawer({ open, onClose, s }) {
   useEffect(() => {
     if (!open) return undefined
@@ -149,61 +160,164 @@ function Notice({ tone = 'info', icon, title, children }) {
 
 /* ── home ─────────────────────────────────────────────────────────────────── */
 
-function FlowCard({ flow, progress, s, onOpen }) {
-  const v = visualFor(flow.flow_key)
-  const status = progress?.status || 'not_started'
-  const percent = pct(progress?.progress_percent)
-  const cta = status === 'completed' ? s.review : status === 'in_progress' ? s.continue : s.start
-  const tone = status === 'completed' ? 'success' : status === 'in_progress' ? 'info' : 'neutral'
-  const guidanceOnly = flow.metadata?.guidance_only === true
+/**
+ * The single clearest thing to do next.
+ *
+ * Resuming beats starting: a half-finished guide is more useful to return to than a new one.
+ * Both come from server state — the current step is whatever the backend recomputed, never a
+ * client-side guess.
+ */
+function deriveNextAction(flows, progressByFlow, details) {
+  const ordered = [...flows].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
+  const running = ordered.find((f) => progressByFlow[f.id]?.status === 'in_progress')
+  if (running) {
+    const d = details[running.flow_key]
+    const cur = d?.steps?.find((st) => st.id === progressByFlow[running.id]?.current_step_id)
+      || d?.steps?.find((st) => !isResolved(st.progress?.status))
+    return { kind: 'continue', flow: running, step: cur || null }
+  }
+  const fresh = ordered.find((f) => {
+    const st = progressByFlow[f.id]?.status
+    return !st || st === 'not_started'
+  })
+  if (fresh) return { kind: 'start', flow: fresh, step: details[fresh.flow_key]?.steps?.[0] || null }
+  return { kind: 'done', flow: null, step: null }
+}
 
+function NextActionCard({ next, s, onOpen }) {
+  if (next.kind === 'done') {
+    return (
+      <section className="ob-next ob-next--done">
+        <span className="ob-next-ic"><Icon.check width="20" height="20" aria-hidden="true" /></span>
+        <div className="ob-next-text">
+          <span className="ob-next-label">{s.summaryCompleted}</span>
+          <h2 className="ob-next-title">{s.allDone}</h2>
+          <p className="ob-next-desc">{s.allDoneBody}</p>
+        </div>
+      </section>
+    )
+  }
+  const { flow, step, kind } = next
   return (
-    <button type="button" className={`ob-card ob-card--${v.accent}`} onClick={() => onOpen(flow)}>
-      <span className="ob-card-top">
-        <span className="ob-card-ic"><NamedIcon name={v.icon} size={20} /></span>
-        <StatusBadge tone={tone}>{s.status[status] || status}</StatusBadge>
-      </span>
-      <span className="ob-card-title">{safeText(flow.title, flow.flow_key)}</span>
-      <span className="ob-card-desc">{safeText(flow.description)}</span>
-      {guidanceOnly && <span className="ob-chip ob-chip--green">{s.guidanceTitle}</span>}
-      <span className="ob-card-progress">
-        <ProgressBar value={percent} label={safeText(flow.title, flow.flow_key)} />
-        <span className="ob-card-pct">{s.percentDone(percent)}</span>
-      </span>
-      <span className="ob-card-cta">{cta}<Icon.chev width="16" height="16" style={{ transform: 'rotate(-90deg)' }} aria-hidden="true" /></span>
-    </button>
+    <section className="ob-next">
+      <span className="ob-next-ic"><NamedIcon name={shapeOf(flow).icon} size={20} /></span>
+      <div className="ob-next-text">
+        <span className="ob-next-label">{s.nextLabel}</span>
+        <h2 className="ob-next-title">{safeText(step?.title, safeText(flow.title, flow.flow_key))}</h2>
+        <p className="ob-next-desc">{safeText(step?.description, safeText(flow.description))}</p>
+        <span className="ob-next-meta">{safeText(flow.title, flow.flow_key)}</span>
+      </div>
+      <Btn variant="primary" onClick={() => onOpen(flow)} icon={<Icon.play width="15" height="15" />}>
+        {kind === 'continue' ? s.continue : s.startHere}
+      </Btn>
+    </section>
   )
 }
 
-function HomeScreen({ flows, progressByFlow, s, onOpen }) {
-  const total = flows.length
+function FlowCard({ flow, progress, detail, s, onOpen, feature }) {
+  const shape = shapeOf(flow)
+  const status = progress?.status || 'not_started'
+  const steps = detail?.steps || []
+  // Percent from the server when it has an opinion; otherwise derived from the step statuses
+  // we just loaded, so a card is never blank while the data is right there.
+  const percent = progress ? pct(progress.progress_percent)
+    : steps.length ? pct((resolvedCount(steps) / steps.length) * 100) : 0
+  const cta = status === 'completed' ? s.review : status === 'in_progress' ? s.continue : s.start
+  const tone = status === 'completed' ? 'success' : status === 'in_progress' ? 'info' : 'neutral'
+  const preview = steps.slice(0, PREVIEW_STEPS)
+  const rest = Math.max(0, steps.length - preview.length)
+
+  return (
+    <article className={`ob-card ob-card--${shape.accent}${feature ? ' ob-card--feature' : ''}`}
+      onClick={() => onOpen(flow)}>
+      <div className="ob-card-top">
+        <span className="ob-card-ic"><NamedIcon name={shape.icon} size={20} /></span>
+        <div className="ob-card-badges">
+          {feature && <span className="ob-chip ob-chip--navy">{s.recommended}</span>}
+          {shape.guidance && <span className="ob-chip ob-chip--green">{s.guidanceTitle}</span>}
+          <StatusBadge tone={tone}>{s.status[status] || status}</StatusBadge>
+        </div>
+      </div>
+
+      <h3 className="ob-card-title">{safeText(flow.title, flow.flow_key)}</h3>
+      <p className="ob-card-desc">{safeText(flow.description)}</p>
+
+      {/* "What's inside" is the flow's own first steps, not a written-up marketing list —
+          it tells the user what the track will actually ask of them. */}
+      {preview.length > 0 && (
+        <div className="ob-card-inside">
+          <span className="ob-card-inside-label">{s.whatsInside}</span>
+          <ul className="ob-card-steps">
+            {preview.map((st) => {
+              const done = isResolved(st.progress?.status)
+              return (
+                <li key={st.id} className={done ? 'is-done' : ''}>
+                  <span className="ob-card-steps-mark" aria-hidden="true">
+                    {done ? <Icon.check width="11" height="11" /> : <Icon.dot width="7" height="7" />}
+                  </span>
+                  {safeText(st.title, st.step_key)}
+                </li>
+              )
+            })}
+            {rest > 0 && <li className="is-more">{s.moreItems(rest)}</li>}
+          </ul>
+        </div>
+      )}
+
+      <div className="ob-card-foot">
+        <div className="ob-card-progress">
+          <ProgressBar value={percent} label={safeText(flow.title, flow.flow_key)} />
+          <span className="ob-card-pct">
+            {steps.length ? s.stepsResolved(resolvedCount(steps), steps.length) : s.percentDone(percent)}
+          </span>
+        </div>
+        <Btn variant={feature ? 'primary' : 'ghost'}
+          onClick={(e) => { e.stopPropagation(); onOpen(flow) }}>{cta}</Btn>
+      </div>
+    </article>
+  )
+}
+
+function HomeScreen({ flows, progressByFlow, details, s, onOpen }) {
+  if (!flows.length) return <EmptyState symbol={SYMBOL} title={s.heroTitle} description={s.noFlows} />
+
   const rows = flows.map((f) => progressByFlow[f.id] || null)
   const done = rows.filter((p) => p?.status === 'completed').length
   const running = rows.filter((p) => p?.status === 'in_progress').length
-  const idle = total - done - running
-  const overall = total ? Math.round(rows.reduce((a, p) => a + pct(p?.progress_percent), 0) / total) : 0
-
-  if (!total) return <EmptyState symbol={SYMBOL} title={s.title} description={s.noFlows} />
+  const idle = flows.length - done - running
+  const overall = Math.round(rows.reduce((a, p) => a + pct(p?.progress_percent), 0) / flows.length)
+  const next = deriveNextAction(flows, progressByFlow, details)
+  // The quick-setup track leads: it is the shortest path to a usable workspace.
+  const featureKey = flows.find((f) => f.mode === 'quick_setup')?.flow_key
 
   return (
     <>
-      <section className="ob-summary">
-        <div className="ob-summary-main">
-          <span className="ob-summary-label">{s.summaryLabel}</span>
-          <span className="ob-summary-value">{s.guidesDone(done, total)}</span>
-          <ProgressBar value={overall} label={s.summaryLabel} />
-          <span className="ob-summary-pct">{s.percentDone(overall)}</span>
+      <section className="ob-hero">
+        <div className="ob-hero-text">
+          <h1 className="ob-hero-title">{s.heroTitle}</h1>
+          <p className="ob-hero-body">{s.heroBody}</p>
         </div>
-        <div className="ob-summary-stats">
-          <div className="ob-stat"><span className="ob-stat-v">{running}</span><span className="ob-stat-k">{s.summaryInProgress}</span></div>
-          <div className="ob-stat"><span className="ob-stat-v ok">{done}</span><span className="ob-stat-k">{s.summaryCompleted}</span></div>
-          <div className="ob-stat"><span className="ob-stat-v muted">{idle}</span><span className="ob-stat-k">{s.summaryNotStarted}</span></div>
+        <div className="ob-hero-progress">
+          <div className="ob-hero-progress-head">
+            <span className="ob-summary-label">{s.summaryLabel}</span>
+            <span className="ob-hero-pct">{s.percentDone(overall)}</span>
+          </div>
+          <ProgressBar value={overall} label={s.summaryLabel} />
+          <span className="ob-hero-guides">{s.guidesDone(done, flows.length)}</span>
+          <div className="ob-hero-stats">
+            <div className="ob-stat"><span className="ob-stat-v">{running}</span><span className="ob-stat-k">{s.summaryInProgress}</span></div>
+            <div className="ob-stat"><span className="ob-stat-v ok">{done}</span><span className="ob-stat-k">{s.summaryCompleted}</span></div>
+            <div className="ob-stat"><span className="ob-stat-v muted">{idle}</span><span className="ob-stat-k">{s.summaryNotStarted}</span></div>
+          </div>
         </div>
       </section>
 
+      <NextActionCard next={next} s={s} onOpen={onOpen} />
+
       <div className="ob-cards">
         {flows.map((f) => (
-          <FlowCard key={f.id} flow={f} progress={progressByFlow[f.id]} s={s} onOpen={onOpen} />
+          <FlowCard key={f.id} flow={f} progress={progressByFlow[f.id]} detail={details[f.flow_key]}
+            s={s} onOpen={onOpen} feature={f.flow_key === featureKey} />
         ))}
       </div>
     </>
@@ -243,9 +357,8 @@ function StepRail({ steps, activeId, onSelect, s, variant }) {
       </ol>
     )
   }
-  // Tour: 20 modules read better bucketed by product area than as one long list.
-  const bucketOf = (step) =>
-    TOUR_GROUPS.find((g) => g.areas.includes(step.product_area))?.key || 'workspace'
+  // Tour: 20 modules read better bucketed by product area, each group carrying its own count
+  // so the user can see how far through a section they are.
   const groups = TOUR_GROUPS
     .map((g) => ({ key: g.key, items: steps.filter((step) => bucketOf(step) === g.key) }))
     .filter((g) => g.items.length)
@@ -253,8 +366,11 @@ function StepRail({ steps, activeId, onSelect, s, variant }) {
   return (
     <div className="ob-rail-groups">
       {groups.map((g) => (
-        <div key={g.key}>
-          <div className="ob-rail-title">{s.groups[g.key] || g.key}</div>
+        <div key={g.key} className="ob-rail-group">
+          <div className="ob-rail-title">
+            <span>{s.groups[g.key] || g.key}</span>
+            <span className="ob-rail-count">{resolvedCount(g.items)}/{g.items.length}</span>
+          </div>
           <ol className="ob-rail-list">
             {g.items.map((step) => (
               <StepRow key={step.id} step={step} index={steps.indexOf(step)} active={step.id === activeId}
@@ -272,14 +388,20 @@ function StepDetail({ step, index, total, s, variant, busy, started, onComplete,
   const st = step.progress?.status || 'not_started'
   const resolved = isResolved(st)
   const counter = variant === 'tour' ? s.moduleOf(index + 1, total) : s.stepOf(index + 1, total)
+  const group = variant === 'tour' ? (s.groups[bucketOf(step)] || null) : null
+  const purpose = safeText(step.description)
+  // "What to do next" prefers the step's own instructions. Only where the API has none does
+  // the tour fall back to generic navigation guidance — no invented product, legal or tax
+  // claims in either branch.
   const instructions = safeText(step.instructions)
+  const todo = instructions || (variant === 'tour' ? s.genericNext : '')
 
   return (
     <article className="ob-detail">
       <header className="ob-detail-head">
         <span className="ob-detail-ic"><AreaIcon area={step.product_area} size={22} /></span>
         <div className="ob-detail-heading">
-          <span className="ob-detail-counter">{counter}</span>
+          <span className="ob-detail-counter">{group ? `${group} · ${counter}` : counter}</span>
           <h2 className="ob-detail-title">{safeText(step.title, step.step_key)}</h2>
         </div>
         <div className="ob-detail-chips">
@@ -288,13 +410,20 @@ function StepDetail({ step, index, total, s, variant, busy, started, onComplete,
         </div>
       </header>
 
-      {safeText(step.description) && <p className="ob-detail-desc">{step.description}</p>}
-      {instructions && (
-        <div className="ob-instructions">
-          <span className="ob-instructions-label">{s.needHelp}</span>
-          <p>{instructions}</p>
-        </div>
-      )}
+      <div className="ob-sections">
+        {purpose && (
+          <section className="ob-section">
+            <span className="ob-section-label">{s.forLabel}</span>
+            <p>{purpose}</p>
+          </section>
+        )}
+        {todo && (
+          <section className="ob-section ob-section--todo">
+            <span className="ob-section-label">{s.todoLabel}</span>
+            <p>{todo}</p>
+          </section>
+        )}
+      </div>
 
       <footer className="ob-detail-actions">
         {variant === 'tour' && (
@@ -324,19 +453,26 @@ function StepDetail({ step, index, total, s, variant, busy, started, onComplete,
 }
 
 function FlowScreen({
-  flow, steps, progress, variant, s, busy, actionError,
+  flow, steps, progress, s, busy, actionError,
   activeId, onSelect, onBack, onStart, onContinue, onComplete, onSkip, onDismiss, onReset, onOpenPage,
 }) {
-  const v = visualFor(flow.flow_key)
+  const shape = shapeOf(flow)
+  const { variant, guidance } = shape
   const status = progress?.status || 'not_started'
-  const started = !!progress && status !== 'not_started'
+  // "Started" means the flow actually began — not merely that a progress row exists.
+  // Dismissing a flow BEFORE starting it creates a row with status 'dismissed', no
+  // started_at and no current_step_id; treating that as started left the screen showing a
+  // permanently disabled Continue with no way to begin the guide at all.
+  const started = !!progress?.started_at || status === 'in_progress' || status === 'completed'
+  const finished = status === 'completed'
   const index = Math.max(0, steps.findIndex((st) => st.id === activeId))
   const step = steps[index] || null
-  const resolvedCount = steps.filter((st) => isResolved(st.progress?.status)).length
+  const doneCount = resolvedCount(steps)
   const percent = pct(progress?.progress_percent)
+  const currentStep = steps.find((st) => st.id === progress?.current_step_id) || null
 
   return (
-    <div className={`ob-flow ob-flow--${v.accent}`}>
+    <div className={`ob-flow ob-flow--${shape.accent}`}>
       <button type="button" className="ob-back" onClick={onBack}>
         <Icon.chev width="15" height="15" style={{ transform: 'rotate(90deg)' }} aria-hidden="true" />
         {s.allGuides}
@@ -344,10 +480,17 @@ function FlowScreen({
 
       <section className="ob-flowhead">
         <div className="ob-flowhead-main">
-          <span className="ob-flowhead-ic"><NamedIcon name={v.icon} size={22} /></span>
-          <div>
-            <h1 className="ob-flowhead-title">{safeText(flow.title, flow.flow_key)}</h1>
-            {safeText(flow.description) && <p className="ob-flowhead-desc">{flow.description}</p>}
+          <span className="ob-flowhead-ic"><NamedIcon name={shape.icon} size={22} /></span>
+          <div className="ob-flowhead-copy">
+            {/* A guidance flow is framed as preparation for a human review, never as an
+                authority on what the company owes. */}
+            <h1 className="ob-flowhead-title">
+              {guidance ? s.readinessTitle : safeText(flow.title, flow.flow_key)}
+            </h1>
+            {guidance && <p className="ob-flowhead-desc">{s.readinessBody}</p>}
+            {safeText(flow.description) && (
+              <p className={guidance ? 'ob-flowhead-sub' : 'ob-flowhead-desc'}>{flow.description}</p>
+            )}
           </div>
           <StatusBadge tone={status === 'completed' ? 'success' : status === 'in_progress' ? 'info' : 'neutral'}>
             {s.status[status] || status}
@@ -357,22 +500,35 @@ function FlowScreen({
         <div className="ob-flowhead-progress">
           <ProgressBar value={percent} label={safeText(flow.title, flow.flow_key)} />
           <div className="ob-flowhead-meta">
-            <span>{s.stepsResolved(resolvedCount, steps.length)}</span>
+            <span>{guidance ? s.prepared(doneCount, steps.length) : s.stepsResolved(doneCount, steps.length)}</span>
             <span className="ob-flowhead-pct">{s.percentDone(percent)}</span>
           </div>
         </div>
 
+        {started && currentStep && (
+          <p className="ob-flowhead-next">
+            <span className="ob-flowhead-next-label">{s.nextStepIs}</span>
+            {safeText(currentStep.title, currentStep.step_key)}
+          </p>
+        )}
+
         <div className="ob-flowhead-actions">
-          {!started
-            ? <Btn variant="primary" onClick={onStart} disabled={busy === 'start'} icon={<Icon.play width="15" height="15" />}>{s.start}</Btn>
-            : <Btn variant="primary" onClick={onContinue} disabled={!!busy || !progress?.current_step_id}
-                icon={<Icon.play width="15" height="15" />}>{s.continue}</Btn>}
-          <Btn variant="ghost" onClick={onReset} disabled={!started || busy === 'reset'}>{s.reset}</Btn>
+          {!started ? (
+            <Btn variant="primary" onClick={onStart} disabled={busy === 'start'}
+              icon={<Icon.play width="15" height="15" />}>{s.start}</Btn>
+          ) : finished ? (
+            // A finished flow has no current step, so Continue could only ever be disabled.
+            <Btn variant="primary" onClick={onReset} disabled={busy === 'reset'}>{s.reset}</Btn>
+          ) : (
+            <Btn variant="primary" onClick={onContinue} disabled={!!busy || !progress?.current_step_id}
+              icon={<Icon.play width="15" height="15" />}>{s.continue}</Btn>
+          )}
+          {started && !finished && <Btn variant="ghost" onClick={onReset} disabled={busy === 'reset'}>{s.reset}</Btn>}
           <Btn variant="ghost" onClick={onDismiss} disabled={busy === 'dismiss' || status === 'dismissed'}>{s.dismiss}</Btn>
         </div>
       </section>
 
-      {!started && <Notice tone="info" icon="lock" title={s.status.not_started}>{s.notStartedBanner}</Notice>}
+      {!progress && <Notice tone="info" icon="lock" title={s.status.not_started}>{s.notStartedBanner}</Notice>}
       {status === 'dismissed' && <Notice tone="warn" icon="warn" title={s.status.dismissed}>{s.dismissedBanner}</Notice>}
       {status === 'completed' && <Notice tone="ok" icon="check" title={s.status.completed}>{s.completedBanner}</Notice>}
       {actionError && (
@@ -381,7 +537,7 @@ function FlowScreen({
         </Notice>
       )}
 
-      {variant === 'accountant' && (
+      {guidance && (
         <div className="ob-notices">
           <Notice tone="info" icon="book" title={s.guidanceTitle}>{s.guidanceBody}</Notice>
           <Notice tone="ok" icon="users" title={s.reviewTitle}>{s.reviewBody}</Notice>
@@ -415,12 +571,14 @@ export default function BusinessOnboarding() {
   const navigate = useNavigate()
   const [params, setParams] = useSearchParams()
 
-  // Locale: URL first (shareable, and what the API is asked for), then the app language,
-  // then English. An unsupported value is normalised rather than sent or rendered.
+  // Locale: URL first (shareable, and what the API is asked for), then the app language, then
+  // English. An unsupported value is normalised rather than sent or rendered.
   const locale = resolveLocale(params.get('locale') || getLang())
   const s = useMemo(() => uiStrings(locale), [locale])
 
-  const flowKey = PARAM_TO_FLOW[params.get('flow')] || null
+  const flowParam = params.get('flow')
+  const flowKey = flowParam ? (PARAM_TO_FLOW[flowParam] || flowParam) : null
+
   const [help, setHelp] = useState(false)
   const [nonce, setNonce] = useState(0)
   const [busy, setBusy] = useState(null)
@@ -429,6 +587,7 @@ export default function BusinessOnboarding() {
   const viewedRef = useRef(new Set())
 
   const [home, setHome] = useState({ loading: true, error: null, flows: [], progress: [] })
+  const [details, setDetails] = useState({})
   const [detail, setDetail] = useState({ loading: false, error: null, flow: null, steps: [], progress: null })
 
   const setParam = useCallback((key, value) => {
@@ -439,17 +598,32 @@ export default function BusinessOnboarding() {
 
   // ── home data ──────────────────────────────────────────────────────────────
   useEffect(() => {
-    // No token means nothing can be fetched. Resolve the loading state rather than leaving
-    // a spinner running for a session that will never load.
+    // No token means nothing can be fetched. Resolve the loading state rather than leaving a
+    // spinner running for a session that will never load.
     if (!token) { setHome({ loading: false, error: null, flows: [], progress: [] }); return undefined }
     let on = true
-    setHome((h) => ({ ...h, loading: true, error: null }))
-    Promise.all([onboardingApi.flows(token, locale), onboardingApi.progress(token)])
-      .then(([f, p]) => {
+    setHome((h) => ({ ...h, loading: true, error: null }));
+    (async () => {
+      try {
+        const [f, p] = await Promise.all([onboardingApi.flows(token, locale), onboardingApi.progress(token)])
         if (!on) return
-        setHome({ loading: false, error: null, flows: f.flows || [], progress: p.progress || [] })
-      })
-      .catch((e) => { if (on) setHome({ loading: false, error: e, flows: [], progress: [] }) })
+        const flows = f.flows || []
+        setHome({ loading: false, error: null, flows, progress: p.progress || [] })
+
+        // Step previews and exact counts for the cards, from the same per-flow endpoint the
+        // flow screens use. Best-effort and bounded: a failure here degrades a card to its
+        // title and description; it never fails the page.
+        const subset = flows.slice(0, MAX_DETAIL_PREFETCH)
+        const settled = await Promise.allSettled(
+          subset.map((fl) => onboardingApi.flow(token, fl.flow_key, locale)))
+        if (!on) return
+        const map = {}
+        settled.forEach((r, i) => { if (r.status === 'fulfilled') map[subset[i].flow_key] = r.value })
+        setDetails(map)
+      } catch (e) {
+        if (on) setHome({ loading: false, error: e, flows: [], progress: [] })
+      }
+    })()
     return () => { on = false }
   }, [token, locale, nonce])
 
@@ -467,8 +641,8 @@ export default function BusinessOnboarding() {
     return () => { on = false }
   }, [token, flowKey, locale, nonce])
 
-  // Reset the per-flow cursor when the flow changes; the server's current_step_id then
-  // decides where the user lands.
+  // Switching to a DIFFERENT flow must not briefly show the previous flow's content while the
+  // new one loads. (A same-flow refetch after an action still updates in place.)
   useEffect(() => {
     setActiveId(null)
     setActionError(null)
@@ -486,8 +660,8 @@ export default function BusinessOnboarding() {
     return firstOpen?.id || steps[0]?.id || null
   }, [activeId, steps, detail.progress])
 
-  // First-look telemetry. Fire-and-forget: a failed view must never block reading a step,
-  // and the backend 404s it entirely when the flow was not started.
+  // First-look telemetry. Fire-and-forget: a failed view must never block reading a step, and
+  // the backend 404s it entirely when the flow was not started.
   useEffect(() => {
     if (!token || !resolvedActiveId || !detail.progress) return
     const current = steps.find((st) => st.id === resolvedActiveId)
@@ -541,8 +715,7 @@ export default function BusinessOnboarding() {
   const head = (
     <PageHeader eyebrow={s.eyebrow} title={s.title}
       actions={<>
-        <LanguageSwitcher locale={locale} label={s.language}
-          onChange={(l) => setParam('locale', l)} />
+        <LanguageSwitcher locale={locale} label={s.language} onChange={(l) => setParam('locale', l)} />
         <Btn variant="ghost" onClick={() => setHelp(true)} icon={<Icon.book width="15" height="15" />}>
           {s.needHelp}
         </Btn>
@@ -560,9 +733,10 @@ export default function BusinessOnboarding() {
   if (home.loading && !home.flows.length) {
     return frame(
       <div className="ob-skeleton">
-        <div className="cfo-skel" style={{ height: 132, borderRadius: 16 }} />
+        <div className="cfo-skel" style={{ height: 148, borderRadius: 16 }} />
+        <div className="cfo-skel" style={{ height: 96, borderRadius: 16 }} />
         <div className="ob-cards">
-          {[0, 1, 2].map((i) => <div key={i} className="cfo-skel" style={{ height: 216, borderRadius: 16 }} />)}
+          {[0, 1, 2].map((i) => <div key={i} className="cfo-skel" style={{ height: 260, borderRadius: 16 }} />)}
         </div>
       </div>,
     )
@@ -579,7 +753,8 @@ export default function BusinessOnboarding() {
   const progressByFlow = Object.fromEntries((home.progress || []).map((p) => [p.flow_id, p]))
 
   if (!flowKey) {
-    return frame(<HomeScreen flows={home.flows} progressByFlow={progressByFlow} s={s} onOpen={openFlow} />)
+    return frame(<HomeScreen flows={home.flows} progressByFlow={progressByFlow} details={details}
+      s={s} onOpen={openFlow} />)
   }
 
   if (detail.loading && !detail.flow) {
@@ -598,11 +773,9 @@ export default function BusinessOnboarding() {
     )
   }
 
-  const variant = visualFor(detail.flow.flow_key).screen
-
   return frame(
     <FlowScreen
-      flow={detail.flow} steps={steps} progress={detail.progress} variant={variant} s={s}
+      flow={detail.flow} steps={steps} progress={detail.progress} s={s}
       busy={busy} actionError={actionError} activeId={resolvedActiveId}
       onSelect={(id) => { if (id) setActiveId(id) }}
       onBack={() => setParam('flow', null)}
