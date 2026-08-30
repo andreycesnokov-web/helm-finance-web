@@ -1,0 +1,409 @@
+/* ============================================================================
+   Financial Pulse Dashboard v1
+   Executive finance surface on the canonical token layer (src/brand/tokens.css).
+   Navy hero, restrained accents, one clear hierarchy: hero → working capital →
+   readiness → not-yet-available → actions → narrative.
+   Class prefix: pulse-
+   ========================================================================== */
+
+/* ── executive hero ─────────────────────────────────────────────────────── */
+.pulse-hero {
+  display: grid;
+  grid-template-columns: minmax(260px, 340px) minmax(0, 1fr);
+  gap: 0;
+  margin-bottom: 22px;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow-md);
+}
+.pulse-hero-main {
+  padding: 26px 28px;
+  background: var(--brand-navy);
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  justify-content: center;
+}
+.pulse-hero-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.pulse-hero-label {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  opacity: .72;
+}
+.pulse-hero-value {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: clamp(26px, 3.4vw, 38px);
+  font-weight: 700;
+  line-height: 1.1;
+  overflow-wrap: anywhere;
+}
+.pulse-hero-meta { font-size: 12.5px; opacity: .72; line-height: 1.5; }
+/* the readiness badge sits on navy — give it a legible surface */
+.pulse-hero-top .cfo-badge { background: rgba(255, 255, 255, .14); color: #fff; border: 0; }
+
+.pulse-hero-tiles {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  background: var(--surface-card);
+  border: 1px solid var(--border-default);
+  border-left: 0;
+}
+.pulse-tile {
+  padding: 20px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+  border-left: 1px solid var(--border-subtle);
+}
+.pulse-tile:first-child { border-left: 0; }
+.pulse-tile-label {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.pulse-tile-value {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 19px;
+  font-weight: 700;
+  color: var(--brand-navy);
+  overflow-wrap: anywhere;
+}
+.pulse-tile-value.pos { color: var(--success); }
+.pulse-tile-value.neg { color: var(--danger); }
+/* Empty workspace: zeros are true, so they stay - but they stop shouting. */
+.pulse-tile-value.is-muted { color: var(--text-muted); font-weight: 600; }
+.pulse-hero.is-empty .pulse-hero-value { opacity: .92; }
+.pulse-tile-hint { font-size: 11.5px; line-height: 1.45; color: var(--text-muted); }
+
+/* -- empty-workspace callout -------------------------------------------- */
+.pulse-start {
+  padding: 24px 26px;
+  margin-bottom: 22px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  background: var(--surface-card);
+  box-shadow: var(--shadow-sm);
+}
+.pulse-start-head { display: flex; align-items: flex-start; gap: 14px; margin-bottom: 18px; }
+.pulse-start-ic {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 42px; height: 42px; flex: 0 0 auto; border-radius: 12px;
+  background: var(--info-soft); color: var(--brand-electric-blue-ink);
+}
+.pulse-start-title {
+  margin: 0 0 6px; font-family: var(--font-display);
+  font-size: clamp(19px, 2.2vw, 23px); line-height: 1.25; color: var(--brand-navy);
+}
+.pulse-start-sub { margin: 0; font-size: 14.5px; line-height: 1.65; color: var(--text-secondary); max-width: 76ch; }
+.pulse-start-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 10px; }
+.pulse-start-action {
+  display: flex; align-items: center; gap: 11px; min-height: 62px; padding: 12px 14px;
+  text-align: left; border: 1px solid var(--border-default); border-radius: var(--radius-md);
+  background: var(--surface-card); font: inherit; color: inherit; cursor: pointer;
+  transition: border-color .16s ease, background .16s ease, box-shadow .16s ease;
+}
+.pulse-start-action:hover {
+  border-color: var(--brand-electric-blue); background: var(--surface-card-muted); box-shadow: var(--shadow-sm);
+}
+/* One obvious first move, without dimming the others into dead ends. */
+.pulse-start-action.is-primary { border-color: var(--brand-electric-blue); background: var(--info-soft); }
+.pulse-start-action.is-primary .pulse-start-action-ic { background: var(--brand-electric-blue); color: #fff; }
+.pulse-start-action-ic {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 36px; height: 36px; flex: 0 0 auto; border-radius: 10px;
+  background: var(--info-soft); color: var(--brand-electric-blue-ink);
+}
+.pulse-start-action-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.pulse-start-action-label {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  font-size: 14px; font-weight: 700; color: var(--text-primary);
+}
+.pulse-start-action-label em {
+  font-style: normal; font-size: 10.5px; font-weight: 800; letter-spacing: .08em;
+  text-transform: uppercase; color: var(--brand-electric-blue-ink);
+  background: var(--surface-card); border-radius: 999px; padding: 2px 8px;
+}
+.pulse-start-action-sub { font-size: 12.5px; line-height: 1.45; color: var(--text-muted); }
+
+/* -- shared empty state inside a card ----------------------------------- */
+.pulse-empty { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding: 6px 0 2px; }
+.pulse-empty-ic {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 38px; height: 38px; border-radius: 11px;
+  background: var(--surface-card-muted); border: 1px solid var(--border-subtle);
+  color: var(--text-muted); margin-bottom: 2px;
+}
+.pulse-empty-title { margin: 0; font-size: 14.5px; font-weight: 700; color: var(--brand-navy); }
+.pulse-empty-body { margin: 0 0 4px; font-size: 13.5px; line-height: 1.65; color: var(--text-secondary); max-width: 62ch; }
+
+/* -- setup progress ----------------------------------------------------- */
+.pulse-progress { display: flex; flex-direction: column; gap: 7px; margin-bottom: 6px; }
+.pulse-progress-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.pulse-progress-count { font-size: 13.5px; font-weight: 700; color: var(--text-primary); }
+.pulse-progress-pct { font-family: var(--font-mono); font-size: 13px; font-weight: 700; color: var(--text-muted); }
+.pulse-progress-bar { display: block; height: 8px; border-radius: 999px; background: var(--border-subtle); overflow: hidden; }
+.pulse-progress-fill { display: block; height: 100%; border-radius: 999px; background: var(--brand-electric-blue); transition: width .3s ease; }
+
+/* -- financial trends (chart-ready placeholders) ------------------------- */
+.pulse-trends {
+  padding: 22px 24px;
+  margin-bottom: 22px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  background: var(--surface-card);
+  box-shadow: var(--shadow-sm);
+}
+.pulse-trends-head {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 14px; flex-wrap: wrap; margin-bottom: 16px;
+}
+.pulse-trends-title {
+  margin: 0 0 4px; font-family: var(--font-display);
+  font-size: 18px; line-height: 1.3; color: var(--brand-navy);
+}
+.pulse-trends-sub { margin: 0; font-size: 13.5px; line-height: 1.6; color: var(--text-secondary); max-width: 78ch; }
+
+/* 2x2 on desktop, single column on mobile */
+.pulse-trends-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.pulse-trend {
+  display: flex; flex-direction: column; gap: 8px;
+  padding: 14px 15px 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-card);
+}
+.pulse-trend-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.pulse-trend-name { margin: 0; font-size: 13.5px; font-weight: 700; color: var(--text-primary); }
+
+/* The frame reads as a real chart panel waiting for data, not a disabled box:
+   soft brand wash under a light grid, never grey-on-grey. */
+.pulse-trend-frame {
+  position: relative;
+  height: 104px;
+  border-radius: var(--radius-sm);
+  background:
+    linear-gradient(to bottom, rgba(51, 153, 255, .07), rgba(51, 153, 255, 0) 78%),
+    var(--surface-card-muted);
+  overflow: hidden;
+}
+.pulse-trend-svg { display: block; width: 100%; height: 100%; }
+.pulse-trend-grid { stroke: var(--border-strong); stroke-width: 1; opacity: .5; }
+.pulse-trend-axis { stroke: var(--border-strong); stroke-width: 1; opacity: .75; }
+.pulse-trend-slot { fill: none; stroke: var(--border-strong); stroke-width: 1; stroke-dasharray: 4 4; opacity: .75; }
+
+.pulse-trend-caption {
+  position: absolute;
+  left: 50%; top: 50%; transform: translate(-50%, -50%);
+  max-width: 88%;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: var(--surface-card);
+  border: 1px solid var(--border-default);
+  box-shadow: var(--shadow-sm);
+  font-size: 11.5px;
+  line-height: 1.4;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-align: center;
+}
+
+/* ── shared note / section heads ────────────────────────────────────────── */
+.pulse-note {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-muted);
+  max-width: 74ch;
+}
+
+/* ── data readiness ─────────────────────────────────────────────────────── */
+.pulse-readiness { list-style: none; margin: 14px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.pulse-readiness li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 11px;
+  border-radius: var(--radius-md);
+  background: var(--surface-card-muted);
+  border: 1px solid var(--border-subtle);
+}
+.pulse-readiness-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: var(--border-subtle);
+  color: var(--text-muted);
+}
+.pulse-readiness li.is-on .pulse-readiness-mark { background: var(--success-soft); color: var(--success); }
+.pulse-readiness-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.pulse-readiness-label { font-size: 13.5px; font-weight: 600; color: var(--text-primary); }
+.pulse-readiness-unlocks { font-size: 11.5px; color: var(--text-muted); }
+.pulse-readiness-n { font-family: var(--font-mono); font-size: 12.5px; font-weight: 700; color: var(--text-muted); }
+.pulse-readiness-go {
+  border: 1px solid var(--border-default);
+  background: var(--surface-card);
+  color: var(--brand-electric-blue-ink);
+  border-radius: var(--radius-sm);
+  padding: 4px 10px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.pulse-readiness-go:hover { background: var(--info-soft); }
+
+/* ── working capital ────────────────────────────────────────────────────── */
+.pulse-wc { display: flex; flex-direction: column; gap: 16px; margin-bottom: 14px; }
+.pulse-wc-row { display: flex; flex-direction: column; gap: 6px; }
+.pulse-wc-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.pulse-wc-label { font-size: 13.5px; font-weight: 700; color: var(--text-primary); }
+.pulse-wc-label em { display: block; font-style: normal; font-size: 11.5px; font-weight: 600; color: var(--text-muted); margin-top: 1px; }
+.pulse-wc-v {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 17px;
+  font-weight: 700;
+}
+.pulse-wc-v.pos { color: var(--success); }
+.pulse-wc-v.neg { color: var(--danger); }
+.pulse-wc-bar { display: block; height: 9px; border-radius: 999px; background: var(--border-subtle); overflow: hidden; }
+.pulse-wc-fill { display: block; height: 100%; border-radius: 999px; transition: width .3s ease; }
+.pulse-wc-fill.pos { background: var(--success); }
+.pulse-wc-fill.neg { background: var(--danger); }
+.pulse-wc-pending { font-size: 11.5px; color: var(--text-muted); }
+
+/* -- metrics not available yet (compact, inside one card) --------------- */
+.pulse-locked-intro { margin-bottom: 14px; }
+.pulse-locked-grid {
+  list-style: none; margin: 0; padding: 0; display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(216px, 1fr)); gap: 10px;
+}
+/* A readiness state, not a disabled control: calm dashed edge, no grey-out. */
+.pulse-locked {
+  display: flex; flex-direction: column; gap: 6px; padding: 14px 15px;
+  border: 1px dashed var(--border-strong); border-radius: var(--radius-md);
+  background: var(--surface-card-muted);
+}
+.pulse-locked-title { font-family: var(--font-display); font-size: 14.5px; color: var(--brand-navy); }
+.pulse-locked-needs { font-size: 12.5px; line-height: 1.5; color: var(--text-secondary); flex: 1; }
+.pulse-locked-needs em {
+  display: block; font-style: normal; font-size: 10px; font-weight: 800;
+  letter-spacing: .1em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 3px;
+}
+.pulse-locked-go {
+  align-self: flex-start; display: inline-flex; align-items: center; gap: 3px;
+  margin-top: 2px; padding: 0; border: 0; background: none; font: inherit;
+  font-size: 12.5px; font-weight: 700; color: var(--brand-electric-blue-ink); cursor: pointer;
+}
+.pulse-locked-go svg { transform: rotate(-90deg); }
+.pulse-locked-go:hover { text-decoration: underline; }
+
+/* ── action center ──────────────────────────────────────────────────────── */
+.pulse-actions {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 10px;
+}
+.pulse-action {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  width: 100%;
+  min-height: 56px;
+  padding: 11px 13px;
+  text-align: left;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--surface-card);
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  transition: border-color .16s ease, background .16s ease, box-shadow .16s ease;
+}
+.pulse-action:hover {
+  border-color: var(--brand-electric-blue);
+  background: var(--surface-card-muted);
+  box-shadow: var(--shadow-sm);
+}
+.pulse-action-ic {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  border-radius: 10px;
+  background: var(--info-soft);
+  color: var(--brand-electric-blue-ink);
+}
+.pulse-action-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.pulse-action-label { font-size: 13.5px; font-weight: 700; color: var(--text-primary); }
+.pulse-action-sub { font-size: 11.5px; color: var(--text-muted); }
+.pulse-action-chev { color: var(--text-muted); transform: rotate(-90deg); flex: 0 0 auto; }
+
+/* ── AI CFO summary ─────────────────────────────────────────────────────── */
+.pulse-cfo { display: flex; gap: 12px; }
+.pulse-cfo-ic {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  flex: 0 0 auto;
+  border-radius: 11px;
+  background: var(--info-soft);
+  color: var(--brand-navy);
+}
+.pulse-cfo-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 14px; }
+.pulse-cfo-read { margin: 0; font-size: 14px; line-height: 1.6; color: var(--text-primary); font-weight: 600; }
+.pulse-cfo-block { display: flex; flex-direction: column; gap: 4px; }
+.pulse-cfo-label {
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: .11em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.pulse-cfo-p { margin: 0; font-size: 13.5px; line-height: 1.6; color: var(--text-secondary); max-width: 76ch; }
+.pulse-cfo-list { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; }
+.pulse-cfo-list li { font-size: 13.5px; line-height: 1.6; color: var(--text-secondary); }
+
+/* ── responsive ─────────────────────────────────────────────────────────── */
+@media (max-width: 1100px) {
+  .pulse-hero { grid-template-columns: 1fr; }
+  .pulse-hero-tiles { border-left: 1px solid var(--border-default); grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .pulse-tile:nth-child(3) { border-left: 0; }
+  .pulse-tile { border-top: 1px solid var(--border-subtle); }
+  .pulse-tile:nth-child(-n+2) { border-top: 0; }
+}
+@media (max-width: 640px) {
+  .pulse-hero-main { padding: 20px; }
+  .pulse-hero-tiles { grid-template-columns: 1fr; }
+  .pulse-tile { border-left: 0; border-top: 1px solid var(--border-subtle); }
+  .pulse-tile:first-child { border-top: 0; }
+  .pulse-note, .pulse-cfo-p, .pulse-cfo-list li { font-size: 14px; }
+  .pulse-start { padding: 20px; }
+  .pulse-start-head { flex-direction: column; gap: 12px; }
+  .pulse-start-sub, .pulse-empty-body { font-size: 14.5px; }
+  .pulse-start-action { min-height: 64px; }
+  .pulse-trends { padding: 18px; }
+  .pulse-trends-grid { grid-template-columns: 1fr; }
+  .pulse-trend-caption { font-size: 12.5px; }
+  .pulse-action { min-height: 60px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pulse-wc-fill, .pulse-action { transition: none !important; }
+}

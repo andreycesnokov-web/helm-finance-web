@@ -16,6 +16,12 @@ import {
 import DebtPaymentModal from '../../components/DebtPaymentModal' // reused VERBATIM — Pay Now / Mark Received logic unchanged
 import DebtFormModal from '../../components/DebtFormModal'       // create payable/receivable (business-scope locked)
 import { upcomingDeadlines } from './AccountantPremium'          // static statutory schedule (premium P1)
+// Financial Pulse Dashboard v1 blocks. Presentation only — every figure comes from
+// /api/pulse or /api/business/financial-counts; nothing is derived into a new metric.
+import {
+  ExecutiveHero, EmptyWorkspaceCallout, TrendsSection, ReadinessBadge, ReadinessPanel,
+  readinessOf, WorkingCapital, UnavailableMetrics, ActionCenter, CfoSummary, RecentActivity,
+} from './PulseBlocks'
 
 const SYMBOL = '/brand/symbol_navy_blue_dot_transparent.svg'
 const SYMBOL_WHITE = '/brand/symbol_white_transparent.svg'
@@ -62,6 +68,10 @@ export function BusinessPulse() {
   const { active } = useWorkspace()
   const navigate = useNavigate()
   const p = useScoped('/pulse')
+  // Data readiness. The endpoint answers 200 with { ok:false, counts:{} } on any failure,
+  // so it can never block the dashboard — the readiness panel simply stays hidden.
+  const counts = useScoped('/business/financial-counts')
+
   const head = (
     <PageHeader eyebrow="Business Workspace" title={active?.name || 'Business'}
       actions={<>
@@ -72,57 +82,70 @@ export function BusinessPulse() {
   )
   if (p.loading) return <>{head}<PulseSkeleton /></>
   if (p.error) return <>{head}<ErrorState title="We couldn’t load Pulse" description={p.error} onRetry={() => location.reload()} /></>
+
   const d = p.data || {}
-  const emptyBusiness = Number(d.totalBalance || 0) === 0
-    && Number(d.income || 0) === 0
-    && Number(d.expenses || 0) === 0
-    && Number(d.receivables || 0) === 0
-    && Number(d.payables || 0) === 0
+  const readiness = readinessOf(counts.data?.counts)
+  const countsLoading = counts.loading || counts.data?.ok === false
+
+  // A workspace is "empty" only when BOTH signals agree: every headline figure is zero AND
+  // no data source has records. Requiring both means a real zero-balance business with
+  // recorded activity still gets the full dashboard rather than a first-run screen.
+  const pulseEmpty = Number(d.totalBalance || 0) === 0
+    && Number(d.income || 0) === 0 && Number(d.expenses || 0) === 0
+    && Number(d.receivables || 0) === 0 && Number(d.payables || 0) === 0
     && !(d.recentTxs || []).length
+  const workspaceEmpty = pulseEmpty && (countsLoading || readiness.present === 0)
+
   const recent = (d.recentTxs || []).slice(0, 6).map(t => ({
     id: t.id, label: t.description || t.type, sub: `${(t.currency_original || 'IDR')} · ${(t.transaction_date || t.created_at || '').slice(0, 10)}`,
     dir: t.type === 'income' ? 'in' : ['expense', 'payroll'].includes(t.type) ? 'out' : 'neutral',
     amount: `${formatAmount(String(t.amount_original ?? t.amount_idr ?? 0), t.currency_original || 'IDR')} ${t.currency_original || 'IDR'}`,
     amountTone: t.type === 'income' ? 'cfo-pos' : ['expense', 'payroll'].includes(t.type) ? 'cfo-neg' : '',
   }))
+
   return (
     <>{head}
-      <div style={{ marginBottom: 26 }}>
-        <SummaryCard symbol={SYMBOL_WHITE} label="Total Cash · IDR" value={idr(d.totalBalance)}
-          meta={<><span className="dot"><Icon.dot width="9" height="9" /></span> Runway {d.runway === 999 ? '—' : `${d.runway} days`} · burn {idr(d.burnRate)}/day</>}
-          metrics={[
-            { k: 'Revenue (this month)', v: '+ ' + idr(d.income), tone: 'pos' },
-            { k: 'Operating expenses', v: '− ' + idr(d.expenses), tone: 'neg' },
-            { k: 'Net position', v: idr(d.netPosition), tone: Number(d.netPosition) >= 0 ? 'pos' : 'neg' },
-          ]} />
-      </div>
+      {/* 1. Executive snapshot — every figure straight from /api/pulse */}
+      <ExecutiveHero d={d} idr={idr} empty={workspaceEmpty}
+        readiness={<ReadinessBadge readiness={readiness} loading={countsLoading} />} />
+
+      {/* 1b. First-run lead. The zeros above are all legitimately zero, so the useful thing
+             to say next is what unlocks them. */}
+      {workspaceEmpty && <EmptyWorkspaceCallout navigate={navigate} />}
+
       {BUSINESS_PREMIUM && <RadarStrip d={d} navigate={navigate} />}
-      <div className="cfo-grid cfo-grid-4" style={{ marginBottom: 26 }}>
-        <Card title="Receivables"><div className="cfo-stat-v cfo-mono" style={{ fontSize: 20 }}>{idr(d.receivables)}</div>{!!d.pendingReceivables && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>+{idr(d.pendingReceivables)} pending</div>}</Card>
-        <Card title="Payables"><div className="cfo-stat-v cfo-mono" style={{ fontSize: 20 }}>{idr(d.payables)}</div>{!!d.pendingPayables && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>+{idr(d.pendingPayables)} pending</div>}</Card>
-        <Card title="Burn rate"><div className="cfo-stat-v cfo-mono" style={{ fontSize: 20 }}>{idr(d.burnRate)}</div><div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>per day · {d.burnWindowDays || 30}d window</div></Card>
-        <Card title="Runway"><div className="cfo-stat-v cfo-mono" style={{ fontSize: 20 }}>{d.runway === 999 ? '—' : `${d.runway} days`}</div><div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>at current burn</div></Card>
+
+      {/* 1c. Where charts will live. Frames only — no endpoint returns monthly history,
+             so nothing is plotted rather than plotted from guesses. */}
+      <TrendsSection empty={workspaceEmpty} />
+
+      {/* 2. Working capital + setup progress */}
+      <div className="cfo-grid cfo-grid-2" style={{ marginBottom: 26 }}>
+        <WorkingCapital d={d} idr={idr} navigate={navigate} />
+        <ReadinessPanel readiness={readiness} loading={countsLoading} navigate={navigate} />
       </div>
-      {emptyBusiness && <BusinessStarterActions navigate={navigate} />}
+
       {BUSINESS_PREMIUM && (
         <div className="cfo-grid cfo-grid-2" style={{ marginBottom: 26 }}>
           <DecisionEngineCard d={d} />
           <ComplianceSnapshotCard navigate={navigate} />
         </div>
       )}
+
+      {/* 3. Metrics the ledger cannot support yet — stated, never estimated */}
+      <UnavailableMetrics navigate={navigate} />
+
+      {/* 4. Action center — suppressed while empty; the callout above already leads with
+             the same first moves and repeating them dilutes both. */}
+      {!workspaceEmpty && (
+        <div style={{ marginBottom: 26 }}><ActionCenter navigate={navigate} /></div>
+      )}
+
+      {/* 5. Narrative + ledger sanity check */}
       <div className="cfo-grid cfo-grid-2">
-        <Card title="AI CFO summary" action={<span style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <StatusBadge tone="info"><Icon.cfo width="13" height="13" /> Live</StatusBadge>
-          {BUSINESS_PREMIUM && <Btn sm variant="ghost" onClick={() => navigate('/business/ai-cfo')}>Ask AI CFO</Btn>}
-        </span>}>
-          <div style={{ display: 'flex', gap: 12 }}>
-            <span className="cfo-state-ic" style={{ background: 'var(--info-soft)', color: 'var(--brand-navy)', width: 40, height: 40, borderRadius: 11, flexShrink: 0 }}><Icon.cfo width="20" height="20" /></span>
-            <div style={{ fontSize: 14, color: 'var(--text-secondary)', lineHeight: 1.5 }}>{d.aiText || 'No urgent actions detected.'}</div>
-          </div>
-        </Card>
-        <Card title="Recent activity">
-          {recent.length === 0 ? <div style={{ color: 'var(--text-muted)', fontSize: 14 }}>No recent transactions.</div> : <DataList items={recent} />}
-        </Card>
+        <CfoSummary d={d} readiness={readiness} countsLoading={countsLoading}
+          navigate={navigate} premium={BUSINESS_PREMIUM} empty={workspaceEmpty} />
+        <RecentActivity items={recent} navigate={navigate} />
       </div>
     </>
   )
