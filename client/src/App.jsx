@@ -74,6 +74,9 @@ import { BusinessLayout, BusinessShell, BusinessPulse, BusinessAccounts, Busines
 // Premium hub renders the Workbench/Calendar/Tax Draft module when
 // VITE_AI_ACCOUNTANT_PREMIUM=true; flag off → the existing profile page unchanged.
 import { BusinessAccountantHub } from './pages/business/AccountantPremium'
+// Production onboarding (migration 054 API). Always routed: with ONBOARDING_ENABLED off the
+// backend 404s and the page renders an explanatory "not enabled yet" state.
+import BusinessOnboarding from './pages/business/Onboarding'
 
 // Personal/Funding UI requires migrations 037–039. OFF by default so production stays
 // safe until they're applied. Enable in env: VITE_PERSONAL_FUNDING_UI_ENABLED=true.
@@ -628,6 +631,9 @@ export default function App() {
             <Route path="/business/new" element={<BusinessShell><BusinessNew /></BusinessShell>} />
             {/* Holding / Intercompany Transfers — premium foundation + plan (no ledger writes yet). */}
             <Route path="/business/intercompany" element={<BusinessShell><BusinessIntercompany /></BusinessShell>} />
+            {/* Guided onboarding — flow content and progress from /api/onboarding/*. Explains the
+                product; writes nothing but the caller's own progress. */}
+            <Route path="/business/onboarding" element={<BusinessShell><BusinessOnboarding /></BusinessShell>} />
           </Route>
           {/* Public invite page — no auth required to view, Telegram widget handles login */}
           <Route path="/invite/:code" element={<JoinInvite />} />

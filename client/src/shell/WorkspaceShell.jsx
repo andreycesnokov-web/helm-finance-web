@@ -34,6 +34,11 @@ export const PERSONAL_NAV = [
 // matches the legacy label. Non-migrated items point at legacy routes so access is
 // never lost during the migration (Pulse/Accounts use the new premium routes).
 export const BUSINESS_NAV = [
+  // Always visible. With ONBOARDING_ENABLED off the page renders an explanatory
+  // "not enabled yet" state rather than dead-linking or erroring.
+  { title: 'Get started', items: [
+    { key: 'onboarding', label: 'Onboarding', to: '/business/onboarding', icon: <Icon.play /> },
+  ] },
   { title: 'Overview', items: [
     { key: 'pulse', label: 'Pulse', to: '/business/pulse', icon: <Icon.pulse /> },
     { key: 'radar', label: 'Radar', to: '/business/radar', icon: <Icon.radar /> },
