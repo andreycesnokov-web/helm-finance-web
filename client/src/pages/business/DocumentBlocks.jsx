@@ -172,7 +172,7 @@ const makeDocCfg = (cpName) => ({
 })
 
 export function DocumentQueue({
-  docs, loading, active, onSelect, cpName, selected, onToggle, onClearSel, onBulkArchive, busy,
+  docs, loading, active, onSelect, cpName, selected, onToggle, onClearSel, onBulkArchive, busy, blockCreate,
   onReview, onView, onArchive, onCreate, onLink, onClassify, onUpload, navigate,
 }) {
   const inQueue = docs.filter((QUEUES.find((q) => q.key === active) || QUEUES[0]).match)
@@ -232,8 +232,12 @@ export function DocumentQueue({
                   const cp = cpName(d.issuer_counterparty_id)
                   // Primary stays visible; the rest collapse so a narrow row never wraps
                   // into a wall of equal-weight buttons.
-                  const primary = a.create
-                    ? { label: `Create ${a.create}`, onClick: () => onCreate(d, a.create) }
+                  // Already created once without a link — offer linking, never a second create.
+                  const blocked = blockCreate?.has(d.id)
+                  const primary = blocked && !dl
+                    ? { label: 'Link existing', onClick: () => onLink(d, 'debt', a.link === 'receivable' ? 'receivable' : 'payable') }
+                    : a.create
+                      ? { label: `Create ${a.create}`, onClick: () => onCreate(d, a.create) }
                     : a.classify ? { label: 'Classify', onClick: () => onClassify(d) }
                       : { label: 'Review', onClick: () => onReview(d) }
                   const more = [

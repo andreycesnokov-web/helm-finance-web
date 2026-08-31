@@ -178,7 +178,7 @@ const makeInvCfg = (cpName) => ({
   ],
 })
 
-export function InvoiceQueue({ docs, loading, cpName, onReview, onView, onCreate, onLinkDebt, onMatch, onUpload, navigate }) {
+export function InvoiceQueue({ docs, loading, cpName, blockCreate, onReview, onView, onCreate, onLinkDebt, onMatch, onUpload, navigate }) {
   const cfg = useMemo(() => makeInvCfg(cpName), [cpName])
   const wb = useWorkbench(docs, cfg)
 
@@ -212,8 +212,13 @@ export function InvoiceQueue({ docs, loading, cpName, onReview, onView, onCreate
     const amt = amountOf(d)
     const cp = cpName(d.issuer_counterparty_id)
     // Primary stays visible, the rest collapse — a long row never becomes a button wall.
-    const primary = !dl && dir
+    // A record already created for this document but not yet linked must not offer
+    // "Create" again — that is how duplicates happen.
+    const blocked = blockCreate?.has(d.id)
+    const primary = !dl && dir && !blocked
       ? { label: `Create ${dir}`, onClick: () => onCreate(d, dir) }
+      : blocked && !dl
+        ? { label: 'Link existing', onClick: () => onLinkDebt(d) }
       : dl && !txLink(d)
         ? { label: 'Match payment', onClick: () => onMatch(d) }
         : { label: 'Review', onClick: () => onReview(d) }

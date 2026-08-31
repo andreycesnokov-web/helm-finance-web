@@ -254,3 +254,18 @@ export function NoMatches({ onClear }) {
     </div>
   )
 }
+
+/* ── created-record id resolution ─────────────────────────────────────────── */
+
+/**
+ * Pull the new record's id out of whatever POST /api/debts returned.
+ *
+ * Today it answers the raw row (res.json(computeDebtStatus(data))), so `res.id` is right —
+ * but the create→link chain must not silently break if that is ever wrapped. Returns null
+ * when no id can be found, so the caller can report honestly instead of linking `undefined`.
+ */
+export function resolveRecordId(res) {
+  if (res == null) return null
+  if (typeof res === 'string' || typeof res === 'number') return res
+  return res.id ?? res.debt?.id ?? res.data?.id ?? res.record?.id ?? null
+}

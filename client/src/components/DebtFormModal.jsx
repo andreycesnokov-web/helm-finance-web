@@ -67,16 +67,26 @@ function defaultDueDate() {
   return d.toISOString().slice(0, 10)
 }
 
-export default function DebtFormModal({ mode, token, onClose, onSuccess, initialDebt = null, lockBusinessScope = false }) {
-  const isEdit = !!initialDebt
+export default function DebtFormModal({
+  mode, token, onClose, onSuccess,
+  initialDebt = null,          // editing an existing record — carries a real id
+  prefill = null,              // seed values for a NEW record (create-from-invoice)
+  title = null, subtitle = null,
+  lockBusinessScope = false,
+}) {
+  // `prefill` seeds the fields WITHOUT switching to edit mode. Passing prefill data as
+  // `initialDebt` used to flip this to a PATCH against `initialDebt.id` — which is
+  // undefined for a create — producing "Debt not found" and creating nothing.
+  const isEdit = !!(initialDebt && initialDebt.id)
+  const seed = initialDebt || prefill
   const c = cfg(mode)
   const l = LABELS[getLang()] || LABELS.en
 
-  const [counterparty, setCounterparty] = useState(initialDebt?.counterparty || '')
-  const [description,  setDescription]  = useState(initialDebt?.description || '')
-  const [amount,       setAmount]        = useState(initialDebt ? String(initialDebt.original_amount || initialDebt.amount || '') : '')
-  const [dueDate,      setDueDate]       = useState(initialDebt?.due_date ? initialDebt.due_date.slice(0, 10) : defaultDueDate())
-  const [scope,        setScope]         = useState(lockBusinessScope ? 'business' : (initialDebt?.scope || 'business'))
+  const [counterparty, setCounterparty] = useState(seed?.counterparty || '')
+  const [description,  setDescription]  = useState(seed?.description || '')
+  const [amount,       setAmount]        = useState(seed ? String(seed.original_amount || seed.amount || '') : '')
+  const [dueDate,      setDueDate]       = useState(seed?.due_date ? String(seed.due_date).slice(0, 10) : defaultDueDate())
+  const [scope,        setScope]         = useState(lockBusinessScope ? 'business' : (seed?.scope || 'business'))
   const [saving,       setSaving]        = useState(false)
   const [error,        setError]         = useState('')
 
@@ -110,9 +120,9 @@ export default function DebtFormModal({ mode, token, onClose, onSuccess, initial
         <button className="modal-close-btn" onClick={onClose}>✕</button>
 
         <div style={{ fontSize: 'var(--text-lg)', fontWeight: 600, color: 'var(--text)', marginBottom: 3 }}>
-          {isEdit ? ({ en: 'Edit record', ru: 'Редактировать заявку', id: 'Edit catatan' }[getLang()] || 'Edit record') : c.title}
+          {isEdit ? ({ en: 'Edit record', ru: 'Редактировать заявку', id: 'Edit catatan' }[getLang()] || 'Edit record') : (title || c.title)}
         </div>
-        <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-3)', marginBottom: 20 }}>{c.subtitle}</div>
+        <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-3)', marginBottom: 20 }}>{(subtitle || c.subtitle)}</div>
 
         <label className="modal-label">{c.counterpartyLabel}</label>
         <input type="text" className="modal-input" value={counterparty}

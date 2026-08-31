@@ -25,6 +25,7 @@ import {
 // Invoice Hub v1 blocks. Migration 041 (invoices) is an un-applied PROPOSAL and there are
 // no /api/invoices routes, so the hub explains the review-first flow and connects the
 // modules that DO exist rather than listing records that cannot be fetched.
+import { resolveRecordId } from './Workbench'
 import {
   InvoiceSummary, InvoiceQueue, InvoiceReview, LinkPicker, InvoiceFooterNote,
   isInvoiceDoc, directionOf, debtLink,
@@ -183,6 +184,8 @@ export function BusinessDocuments() {
   const [err, setErr] = useState(null)
   const [upload, setUpload] = useState(false)
   const [sel, setSel] = useState(() => new Set())
+  const [outcome, setOutcome] = useState(null)
+  const [blocked, setBlocked] = useState(() => new Set())
 
   const load = useCallback(() => {
     if (!token || !active) return
@@ -280,9 +283,10 @@ export function BusinessDocuments() {
       Review uploaded evidence, link it to records, and keep your books clean.
     </p>
 
+    <CreateOutcome note={outcome} onDismiss={() => setOutcome(null)} />
     <DocumentSummary docs={st.docs} loading={st.loading} />
     <DocumentQueue docs={st.docs} loading={st.loading} active={queue} onSelect={setQueue} cpName={cpName}
-      selected={sel} onToggle={toggleSel} onClearSel={() => setSel(new Set())}
+      selected={sel} onToggle={toggleSel} onClearSel={() => setSel(new Set())} blockCreate={blocked}
       onBulkArchive={bulkArchive} busy={busy}
       onReview={setReview} onView={onView} onArchive={onArchive}
       onCreate={(doc, dir) => setCreate({ doc, dir })}
@@ -305,17 +309,36 @@ export function BusinessDocuments() {
 
     {create && (
       <DebtFormModal mode={create.dir} token={token} lockBusinessScope
-        initialDebt={{
+        title={`Create ${create.dir} from document`}
+        subtitle="Review and confirm before this affects your books."
+        prefill={{
           counterparty: cpName(create.doc.issuer_counterparty_id) || '',
           description: `Document ${create.doc.document_number || create.doc.file?.file_name || ''}`.trim(),
           original_amount: create.doc.gross_amount,
           due_date: create.doc.document_date || null,
         }}
         onClose={() => setCreate(null)}
-        onSuccess={async (debt) => {
+        onSuccess={async (created) => {
           const doc = create.doc
           setCreate(null)
-          if (debt?.id) await linkDoc(doc, 'debt', debt.id); else load()
+          const id = resolveRecordId(created)
+          if (!id) {
+            // The record exists but we cannot address it — never link `undefined`.
+            setOutcome({ docId: doc.id, kind: 'noId' })
+            setBlocked((b) => new Set(b).add(doc.id))
+            load(); return
+          }
+          try {
+            await apiFetch(`/documents/${doc.id}/links`, token, {
+              method: 'POST', body: { target_type: 'debt', target_id: id },
+            })
+            setOutcome(null)
+            setBlocked((b) => { const n = new Set(b); n.delete(doc.id); return n })
+          } catch (e) {
+            setOutcome({ docId: doc.id, kind: /not found/i.test(e.message || '') ? 'notFound' : 'linkFailed', msg: e.message })
+            setBlocked((b) => new Set(b).add(doc.id))
+          }
+          load()
         }} />
     )}
 
@@ -917,6 +940,29 @@ export function BusinessIncomingPayments() {
 // ── Business Invoices — premium PLACEHOLDER (no invoice backend/table yet).
 //    Shows real receivable/payable/overdue counts derived from /api/debts (NOT fake
 //    invoice records) + routes to Receivables/Payables. No debt-logic change. ──────
+/**
+ * Outcome banner for create→link. The two failures are reported separately, because
+ * "the payable was not created" and "the payable exists but the evidence is not attached"
+ * need different next steps from the user.
+ */
+function CreateOutcome({ note, onDismiss }) {
+  if (!note) return null
+  const text = note.kind === 'noId'
+    ? 'Payable was created, but the app could not read its id. Please refresh and link the document manually.'
+    : note.kind === 'notFound'
+      ? 'The record could not be found for linking. Refresh and try Link existing.'
+      : 'The record was created, but the document was not linked as evidence. Use Link existing to attach it.'
+  return (
+    <div className="wb-outcome" role="status">
+      <span className="wb-outcome-ic"><Icon.warn width="16" height="16" aria-hidden="true" /></span>
+      <p className="wb-outcome-text">{text}{note.msg ? ` (${note.msg})` : ''}</p>
+      <button type="button" className="wb-outcome-x" onClick={onDismiss} aria-label="Dismiss">
+        <Icon.plus width="14" height="14" style={{ transform: 'rotate(45deg)' }} />
+      </button>
+    </div>
+  )
+}
+
 export function BusinessInvoices() {
   const { token } = useAuth()
   const navigate = useNavigate()
@@ -928,6 +974,8 @@ export function BusinessInvoices() {
   const [busy, setBusy] = useState(false)
   const [pickErr, setPickErr] = useState(null)
   const [upload, setUpload] = useState(false)
+  const [outcome, setOutcome] = useState(null)
+  const [blocked, setBlocked] = useState(() => new Set())
 
   const load = useCallback(() => {
     if (!token || !active) return
@@ -1000,8 +1048,9 @@ export function BusinessInvoices() {
       Review uploaded invoices, create receivables or payables, and match them to payments.
     </p>
 
+    <CreateOutcome note={outcome} onDismiss={() => setOutcome(null)} />
     <InvoiceSummary docs={st.docs} loading={st.loading} />
-    <InvoiceQueue docs={st.docs} loading={st.loading} cpName={cpName}
+    <InvoiceQueue docs={st.docs} loading={st.loading} cpName={cpName} blockCreate={blocked}
       onReview={setReview} onView={onView}
       onCreate={(doc, dir) => setCreate({ doc, dir })}
       onLinkDebt={openDebtPicker} onMatch={openTxPicker}
@@ -1021,18 +1070,36 @@ export function BusinessInvoices() {
         user confirms, and only then is the document linked to the record it created. */}
     {create && (
       <DebtFormModal mode={create.dir} token={token} lockBusinessScope
-        initialDebt={{
+        title={`Create ${create.dir} from invoice`}
+        subtitle="Review and confirm before this affects your books."
+        prefill={{
           counterparty: cpName(create.doc.issuer_counterparty_id) || '',
           description: `Invoice ${create.doc.document_number || create.doc.file?.file_name || ''}`.trim(),
           original_amount: create.doc.gross_amount,
           due_date: create.doc.document_date || null,
         }}
         onClose={() => setCreate(null)}
-        onSuccess={async (debt) => {
+        onSuccess={async (created) => {
           const doc = create.doc
           setCreate(null)
-          if (debt?.id) await linkDoc(doc, 'debt', debt.id)
-          else load()
+          const id = resolveRecordId(created)
+          if (!id) {
+            // The record exists but we cannot address it — never link `undefined`.
+            setOutcome({ docId: doc.id, kind: 'noId' })
+            setBlocked((b) => new Set(b).add(doc.id))
+            load(); return
+          }
+          try {
+            await apiFetch(`/documents/${doc.id}/links`, token, {
+              method: 'POST', body: { target_type: 'debt', target_id: id },
+            })
+            setOutcome(null)
+            setBlocked((b) => { const n = new Set(b); n.delete(doc.id); return n })
+          } catch (e) {
+            setOutcome({ docId: doc.id, kind: /not found/i.test(e.message || '') ? 'notFound' : 'linkFailed', msg: e.message })
+            setBlocked((b) => new Set(b).add(doc.id))
+          }
+          load()
         }} />
     )}
 
