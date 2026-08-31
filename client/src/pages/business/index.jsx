@@ -26,7 +26,8 @@ import {
 // no /api/invoices routes, so the hub explains the review-first flow and connects the
 // modules that DO exist rather than listing records that cannot be fetched.
 import {
-  InvoiceSummary, InvoiceIntake, ReviewPipeline, WorkQueues, TelegramFlow, InvoiceImpact,
+  InvoiceSummary, InvoiceQueue, InvoiceReview, LinkPicker, InvoiceFooterNote,
+  isInvoiceDoc, directionOf, debtLink,
 } from './InvoiceBlocks'
 // Evidence / invoice-requirement UX. Debt evidence is REAL (debts.attachments, migration
 // 019). Transaction evidence is policy-only — the transactions API returns no document link.
@@ -34,6 +35,12 @@ import {
   evidenceOfDebt, EvidenceBadge, DebtEvidencePanel, TransactionEvidencePanel,
   EvidenceReadiness, TxPolicyChip,
 } from './EvidenceBlocks'
+// Document Intake & Review Queue. Every status is derived from fields GET /api/documents
+// genuinely returns (review_status, extraction_status, links[], file.upload_channel).
+import {
+  DocumentSummary, DocumentQueue, DocumentReview, ClassifyDrawer, DocumentFlowStrip,
+} from './DocumentBlocks'
+import DocumentIntakeModal from '../../components/DocumentIntakeModal'
 
 const SYMBOL = '/brand/symbol_navy_blue_dot_transparent.svg'
 const SYMBOL_WHITE = '/brand/symbol_white_transparent.svg'
@@ -158,6 +165,165 @@ export function BusinessPulse() {
       </div>
     </>
   )
+}
+
+// ── Business Documents — intake & review queue (premium presentation of the same
+//    /api/documents data; upload, view and archive routes are unchanged) ──────────
+export function BusinessDocuments() {
+  const { token } = useAuth()
+  const navigate = useNavigate()
+  const { active, scopeKey } = useWorkspace()
+  const [st, setSt] = useState({ loading: true, error: null, docs: [], debts: [], cps: [] })
+  const [queue, setQueue] = useState('review')
+  const [review, setReview] = useState(null)
+  const [classify, setClassify] = useState(null)
+  const [create, setCreate] = useState(null)          // { doc, dir }
+  const [picker, setPicker] = useState(null)          // { kind, doc, rows }
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState(null)
+  const [upload, setUpload] = useState(false)
+  const [sel, setSel] = useState(() => new Set())
+
+  const load = useCallback(() => {
+    if (!token || !active) return
+    setSt((v) => ({ ...v, loading: true, error: null }))
+    Promise.all([
+      apiFetch('/documents', token),
+      apiFetch('/debts', token).catch(() => []),
+      apiFetch('/counterparties', token).catch(() => ({ counterparties: [] })),
+    ]).then(([docs, debts, cps]) => setSt({
+      loading: false, error: null, docs: docs.documents || [],
+      debts: Array.isArray(debts) ? debts : [], cps: cps.counterparties || [],
+    })).catch((e) => setSt({ loading: false, error: e.message || 'Request failed', docs: [], debts: [], cps: [] }))
+  }, [token, active])
+  useEffect(() => { load() }, [load, scopeKey])
+
+  const cpName = useCallback((id) => (id ? (st.cps.find((c) => c.id === id)?.name || null) : null), [st.cps])
+
+  const toggleSel = useCallback((id) => setSel((s0) => {
+    const n = new Set(s0); if (n.has(id)) n.delete(id); else n.add(id); return n
+  }), [])
+  // Bulk archive is the existing per-document archive route, applied to the selection after
+  // an explicit confirm. No new endpoint, no silent mutation.
+  const bulkArchive = async () => {
+    const ids = [...sel]
+    if (!ids.length || !confirm(`Archive ${ids.length} document${ids.length > 1 ? 's' : ''}?`)) return
+    setBusy(true)
+    try {
+      for (const id of ids) {
+        await apiFetch(`/documents/${id}/archive`, token, { method: 'POST', body: {} }).catch(() => {})
+      }
+      setSel(new Set()); load()
+    } finally { setBusy(false) }
+  }
+
+  const head = (
+    <PageHeader eyebrow="Business Workspace" title="Documents"
+      actions={<>
+        <StatusBadge tone="neutral">Review-first</StatusBadge>
+        <Btn sm variant="ghost" onClick={() => navigate('/business/accountant')}>AI Accountant review</Btn>
+        <Btn sm onClick={() => setUpload(true)}>Upload document</Btn>
+      </>} />
+  )
+
+  const onView = async (d) => {
+    try {
+      const r = await apiFetch(`/documents/${d.id}/signed-url`, token, { method: 'POST', body: {} })
+      if (r?.url) window.open(r.url, '_blank', 'noopener')
+    } catch (e) { alert(e.message) }
+  }
+  const onArchive = async (d) => {
+    if (!confirm('Archive this document?')) return
+    try { await apiFetch(`/documents/${d.id}/archive`, token, { method: 'POST', body: {} }); setReview(null); load() }
+    catch (e) { alert(e.message) }
+  }
+  const linkDoc = async (doc, target_type, target_id) => {
+    setBusy(true); setErr(null)
+    try {
+      await apiFetch(`/documents/${doc.id}/links`, token, { method: 'POST', body: { target_type, target_id } })
+      setPicker(null); setReview(null); load()
+    } catch (e) { setErr(e.message || 'Could not link') } finally { setBusy(false) }
+  }
+  // Real: rpc_document_update_metadata accepts document_type.
+  const applyType = async (documentType) => {
+    setBusy(true); setErr(null)
+    try {
+      await apiFetch(`/documents/${classify.id}`, token, { method: 'PATCH', body: { document_type: documentType } })
+      setClassify(null); setReview(null); load()
+    } catch (e) { setErr(e.message || 'Could not classify') } finally { setBusy(false) }
+  }
+
+  const openPicker = async (doc, kind, dir) => {
+    setErr(null)
+    if (kind === 'debt') {
+      setPicker({ kind: 'debt', doc, rows: st.debts.filter((x) => x.status !== 'cancelled' && (!dir || x.type === dir)) })
+      return
+    }
+    setBusy(true)
+    try {
+      const r = await apiFetch('/transactions?period=all', token)
+      setPicker({ kind: 'transaction', doc, rows: Array.isArray(r) ? r : (r.transactions || []) })
+    } catch (e) { alert(e.message) } finally { setBusy(false) }
+  }
+
+  if (st.loading) return <>{head}<Card><LoadingSkeleton rows={6} height={18} /></Card></>
+  if (st.error) {
+    const gated = /not enabled|upgrade/i.test(st.error)
+    return <>{head}{gated
+      ? <EmptyState symbol={SYMBOL} title="Document Center is not enabled"
+          description="This workspace does not have the Document Center turned on yet." />
+      : <ErrorState title="We couldn’t load documents" description={st.error} onRetry={load} />}</>
+  }
+
+  return <>{head}
+    <p className="doc-note" style={{ marginBottom: 18 }}>
+      Review uploaded evidence, link it to records, and keep your books clean.
+    </p>
+
+    <DocumentSummary docs={st.docs} loading={st.loading} />
+    <DocumentQueue docs={st.docs} loading={st.loading} active={queue} onSelect={setQueue} cpName={cpName}
+      selected={sel} onToggle={toggleSel} onClearSel={() => setSel(new Set())}
+      onBulkArchive={bulkArchive} busy={busy}
+      onReview={setReview} onView={onView} onArchive={onArchive}
+      onCreate={(doc, dir) => setCreate({ doc, dir })}
+      onLink={(doc, kind, dir) => openPicker(doc, kind, dir)}
+      onClassify={setClassify} onUpload={() => setUpload(true)} navigate={navigate} />
+    <DocumentFlowStrip navigate={navigate} onUpload={() => setUpload(true)} />
+
+    <DocumentReview doc={review} cpName={cpName} onClose={() => setReview(null)} onView={onView}
+      onCreate={(doc, dir) => { setReview(null); setCreate({ doc, dir }) }}
+      onLink={(doc, kind, dir) => { setReview(null); openPicker(doc, kind, dir) }}
+      onClassify={(doc) => { setReview(null); setClassify(doc) }}
+      onArchive={onArchive} />
+
+    <ClassifyDrawer doc={classify} busy={busy} error={err}
+      onPick={applyType} onClose={() => setClassify(null)} />
+
+    <LinkPicker open={!!picker} kind={picker?.kind} doc={picker?.doc} rows={picker?.rows || []}
+      busy={busy} error={err} onClose={() => setPicker(null)}
+      onPick={(row) => linkDoc(picker.doc, picker.kind, row.id)} />
+
+    {create && (
+      <DebtFormModal mode={create.dir} token={token} lockBusinessScope
+        initialDebt={{
+          counterparty: cpName(create.doc.issuer_counterparty_id) || '',
+          description: `Document ${create.doc.document_number || create.doc.file?.file_name || ''}`.trim(),
+          original_amount: create.doc.gross_amount,
+          due_date: create.doc.document_date || null,
+        }}
+        onClose={() => setCreate(null)}
+        onSuccess={async (debt) => {
+          const doc = create.doc
+          setCreate(null)
+          if (debt?.id) await linkDoc(doc, 'debt', debt.id); else load()
+        }} />
+    )}
+
+    {upload && (
+      <DocumentIntakeModal business={active} onClose={() => setUpload(false)}
+        onUploaded={() => { setUpload(false); load() }} />
+    )}
+  </>
 }
 
 // ── Premium P1: Radar strip — REAL signals only (pulse data + statutory calendar) ──
@@ -752,45 +918,128 @@ export function BusinessIncomingPayments() {
 //    Shows real receivable/payable/overdue counts derived from /api/debts (NOT fake
 //    invoice records) + routes to Receivables/Payables. No debt-logic change. ──────
 export function BusinessInvoices() {
+  const { token } = useAuth()
   const navigate = useNavigate()
-  const w = useScoped('/debts')
-  // Document Center is plan-gated and can answer 403. Treated as "not connected" rather
-  // than as zero, so an unreachable endpoint never reads as "nothing to review".
-  const docs = useScoped('/documents')
-  const [queue, setQueue] = useState('drafts')
-  const flowRef = useRef(null)
+  const { active, scopeKey } = useWorkspace()
+  const [st, setSt] = useState({ loading: true, error: null, docs: [], debts: [], cps: [] })
+  const [review, setReview] = useState(null)
+  const [create, setCreate] = useState(null)      // { doc, dir }
+  const [picker, setPicker] = useState(null)      // { kind, doc, rows }
+  const [busy, setBusy] = useState(false)
+  const [pickErr, setPickErr] = useState(null)
+  const [upload, setUpload] = useState(false)
 
-  const debts = Array.isArray(w.data) ? w.data : []
-  const docList = Array.isArray(docs.data?.documents) ? docs.data.documents : []
-  const docState = {
-    available: !docs.loading && !docs.error && Array.isArray(docs.data?.documents),
-    needsReview: docList.filter((d) => d.review_status === 'needs_review').length,
-  }
+  const load = useCallback(() => {
+    if (!token || !active) return
+    setSt((v) => ({ ...v, loading: true, error: null }))
+    Promise.all([
+      apiFetch('/documents', token),
+      apiFetch('/debts', token).catch(() => []),
+      apiFetch('/counterparties', token).catch(() => ({ counterparties: [] })),
+    ]).then(([docs, debts, cps]) => setSt({
+      loading: false, error: null,
+      docs: (docs.documents || []).filter(isInvoiceDoc),
+      debts: Array.isArray(debts) ? debts : [],
+      cps: cps.counterparties || [],
+    })).catch((e) => setSt({ loading: false, error: e.message || 'Request failed', docs: [], debts: [], cps: [] }))
+  }, [token, active])
+  useEffect(() => { load() }, [load, scopeKey])
+
+  const cpName = useCallback((id) => (id ? (st.cps.find((c) => c.id === id)?.name || null) : null), [st.cps])
 
   const head = (
     <PageHeader eyebrow="Business Workspace" title="Invoices"
-      actions={<StatusBadge tone="neutral">Review-first · foundation preview</StatusBadge>} />
+      actions={<>
+        <StatusBadge tone="neutral">Review-first</StatusBadge>
+        <Btn sm variant="ghost" onClick={() => navigate('/business/documents')}>Open documents</Btn>
+        <Btn sm onClick={() => setUpload(true)}>Upload invoice</Btn>
+      </>} />
   )
 
-  if (w.error && !debts.length) {
-    return <>{head}<ErrorState title="We couldn’t load invoice data" description={w.error}
-      onRetry={() => location.reload()} /></>
+  const onView = async (d) => {
+    try {
+      const r = await apiFetch(`/documents/${d.id}/signed-url`, token, { method: 'POST', body: {} })
+      if (r?.url) window.open(r.url, '_blank', 'noopener')
+    } catch (e) { alert(e.message) }
+  }
+
+  // Real link write — the same route the Document Center uses.
+  const linkDoc = async (doc, target_type, target_id) => {
+    setBusy(true); setPickErr(null)
+    try {
+      await apiFetch(`/documents/${doc.id}/links`, token, { method: 'POST', body: { target_type, target_id } })
+      setPicker(null); setReview(null); load()
+    } catch (e) { setPickErr(e.message || 'Could not link') } finally { setBusy(false) }
+  }
+
+  const openDebtPicker = (doc) => {
+    const dir = directionOf(doc)
+    const rows = st.debts.filter((d) => d.status !== 'cancelled' && (!dir || d.type === dir))
+    setPickErr(null); setPicker({ kind: 'debt', doc, rows })
+  }
+  const openTxPicker = async (doc) => {
+    setPickErr(null); setBusy(true)
+    try {
+      const r = await apiFetch('/transactions?period=all', token)
+      const rows = Array.isArray(r) ? r : (r.transactions || [])
+      setPicker({ kind: 'transaction', doc, rows })
+    } catch (e) { alert(e.message) } finally { setBusy(false) }
+  }
+
+  if (st.loading) return <>{head}<Card><LoadingSkeleton rows={6} height={18} /></Card></>
+  if (st.error) {
+    const gated = /not enabled|upgrade/i.test(st.error)
+    return <>{head}{gated
+      ? <EmptyState symbol={SYMBOL} title="Document Center is not enabled"
+          description="Invoices are built from uploaded documents. Enable the Document Center to use this workspace." />
+      : <ErrorState title="We couldn’t load invoices" description={st.error} onRetry={load} />}</>
   }
 
   return <>{head}
     <p className="inv-note" style={{ marginBottom: 20 }}>
-      Track sales invoices, supplier invoices, drafts and payment matching. Uploaded invoices
-      first go through review before they affect your financial data.
+      Review uploaded invoices, create receivables or payables, and match them to payments.
     </p>
 
-    <InvoiceSummary debts={debts} docs={docState} loading={w.loading} navigate={navigate} />
-    <EvidenceReadiness debts={debts} loading={w.loading} navigate={navigate} />
-    <InvoiceIntake navigate={navigate}
-      onShowFlow={() => flowRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' })} />
-    <ReviewPipeline />
-    <WorkQueues active={queue} onSelect={setQueue} navigate={navigate} />
-    <div ref={flowRef} style={{ marginBottom: 22 }}><TelegramFlow /></div>
-    <InvoiceImpact />
+    <InvoiceSummary docs={st.docs} loading={st.loading} />
+    <InvoiceQueue docs={st.docs} loading={st.loading} cpName={cpName}
+      onReview={setReview} onView={onView}
+      onCreate={(doc, dir) => setCreate({ doc, dir })}
+      onLinkDebt={openDebtPicker} onMatch={openTxPicker}
+      onUpload={() => setUpload(true)} navigate={navigate} />
+    <InvoiceFooterNote navigate={navigate} />
+
+    <InvoiceReview doc={review} cpName={cpName} onClose={() => setReview(null)} onView={onView}
+      onCreate={(doc, dir) => { setReview(null); setCreate({ doc, dir }) }}
+      onLinkDebt={(doc) => { setReview(null); openDebtPicker(doc) }}
+      onMatch={(doc) => { setReview(null); openTxPicker(doc) }} />
+
+    <LinkPicker open={!!picker} kind={picker?.kind} doc={picker?.doc} rows={picker?.rows || []}
+      busy={busy} error={pickErr} onClose={() => setPicker(null)}
+      onPick={(row) => linkDoc(picker.doc, picker.kind, row.id)} />
+
+    {/* Real creation, always user-submitted: the form is prefilled from the invoice, the
+        user confirms, and only then is the document linked to the record it created. */}
+    {create && (
+      <DebtFormModal mode={create.dir} token={token} lockBusinessScope
+        initialDebt={{
+          counterparty: cpName(create.doc.issuer_counterparty_id) || '',
+          description: `Invoice ${create.doc.document_number || create.doc.file?.file_name || ''}`.trim(),
+          original_amount: create.doc.gross_amount,
+          due_date: create.doc.document_date || null,
+        }}
+        onClose={() => setCreate(null)}
+        onSuccess={async (debt) => {
+          const doc = create.doc
+          setCreate(null)
+          if (debt?.id) await linkDoc(doc, 'debt', debt.id)
+          else load()
+        }} />
+    )}
+
+    {upload && (
+      <DocumentIntakeModal business={active} onClose={() => setUpload(false)}
+        onUploaded={() => { setUpload(false); load() }} />
+    )}
   </>
 }
 

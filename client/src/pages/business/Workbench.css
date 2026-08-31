@@ -1,0 +1,150 @@
+/* ============================================================================
+   Shared workbench chrome — toolbar, grouping, selection, overflow menu.
+   Brandbook tokens only: Navy #003366, Electric Blue #3399FF, White,
+   Pale Grey #F4F6F8.  Class prefix: wb-
+   ========================================================================== */
+
+.wb-toolbar { display: flex; flex-direction: column; gap: 10px; margin-bottom: 14px; }
+
+/* ── search ─────────────────────────────────────────────────────────────── */
+.wb-search {
+  display: flex; align-items: center; gap: 9px;
+  min-height: 40px; padding: 0 12px;
+  border: 1px solid var(--border-default); border-radius: var(--radius-sm);
+  background: var(--surface-card); color: var(--text-muted);
+}
+.wb-search:focus-within { border-color: var(--brand-electric-blue); box-shadow: 0 0 0 3px rgba(51, 153, 255, .14); }
+.wb-search input {
+  flex: 1; min-width: 0; border: 0; outline: 0; background: transparent;
+  font: inherit; font-size: 13.5px; color: var(--text-primary);
+}
+.wb-search input::placeholder { color: var(--text-muted); }
+.wb-search-x {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px; border: 0; border-radius: 999px;
+  background: var(--brand-pale-grey); color: var(--text-muted); cursor: pointer;
+}
+.wb-search-x:hover { color: var(--brand-navy); }
+
+/* ── filters row ────────────────────────────────────────────────────────── */
+.wb-filters { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end; }
+.wb-select { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.wb-select-label {
+  font-size: 10px; font-weight: 800; letter-spacing: .08em;
+  text-transform: uppercase; color: var(--text-muted);
+}
+.wb-select select {
+  min-height: 34px; max-width: 190px; padding: 6px 10px;
+  border: 1px solid var(--border-default); border-radius: var(--radius-sm);
+  background: var(--surface-card); font: inherit; font-size: 12.5px; font-weight: 600;
+  color: var(--text-primary); cursor: pointer;
+}
+.wb-select select:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 1px; }
+
+.wb-density { display: inline-flex; gap: 2px; padding: 2px; border-radius: var(--radius-sm); background: var(--brand-pale-grey); align-self: flex-end; }
+.wb-density-btn {
+  min-height: 30px; padding: 5px 10px; border: 0; border-radius: 6px;
+  background: transparent; font: inherit; font-size: 12px; font-weight: 700;
+  color: var(--text-muted); cursor: pointer; transition: background .16s ease, color .16s ease;
+}
+.wb-density-btn.is-active { background: var(--surface-card); color: var(--brand-navy); box-shadow: var(--shadow-sm); }
+
+.wb-clear {
+  display: inline-flex; align-items: center; gap: 7px; align-self: flex-end;
+  min-height: 34px; padding: 6px 12px;
+  border: 1px solid var(--border-default); border-radius: 999px;
+  background: var(--surface-card); font: inherit; font-size: 12.5px; font-weight: 700;
+  color: var(--brand-electric-blue-ink); cursor: pointer;
+}
+.wb-clear:hover { background: var(--info-soft); border-color: var(--brand-electric-blue); }
+.wb-clear-n {
+  font-family: var(--font-mono); font-size: 11px; padding: 1px 6px;
+  border-radius: 999px; background: var(--info-soft); color: var(--brand-navy);
+}
+
+/* ── selection bar ──────────────────────────────────────────────────────── */
+.wb-selbar {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 9px 13px; border-radius: var(--radius-md);
+  background: var(--info-soft); border: 1px solid transparent;
+}
+.wb-selbar-n { font-size: 13px; font-weight: 800; color: var(--brand-navy); }
+
+/* ── group header ───────────────────────────────────────────────────────── */
+.wb-group {
+  display: flex; align-items: center; gap: 9px;
+  margin: 16px 0 8px; padding-bottom: 6px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.wb-group:first-child { margin-top: 0; }
+.wb-group-label {
+  font-size: 11.5px; font-weight: 800; letter-spacing: .06em;
+  text-transform: uppercase; color: var(--brand-navy);
+}
+.wb-group-n {
+  font-family: var(--font-mono); font-size: 11px; font-weight: 700;
+  padding: 1px 8px; border-radius: 999px;
+  background: var(--brand-pale-grey); color: var(--text-muted);
+}
+
+/* ── overflow menu ──────────────────────────────────────────────────────── */
+.wb-more { position: relative; display: inline-flex; }
+.wb-more-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 32px; height: 32px; border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm); background: var(--surface-card);
+  color: var(--text-secondary); cursor: pointer;
+}
+.wb-more-btn:hover { background: var(--surface-card-muted); color: var(--brand-navy); }
+.wb-more-menu {
+  position: absolute; top: calc(100% + 6px); right: 0; z-index: 30;
+  min-width: 176px; padding: 6px;
+  background: var(--surface-card); border: 1px solid var(--border-default);
+  border-radius: var(--radius-md); box-shadow: var(--shadow-lg);
+  display: flex; flex-direction: column; gap: 2px;
+}
+.wb-more-item {
+  padding: 8px 10px; border: 0; border-radius: var(--radius-sm);
+  background: none; text-align: left; font: inherit; font-size: 13px; font-weight: 600;
+  color: var(--text-primary); cursor: pointer; white-space: nowrap;
+}
+.wb-more-item:hover { background: var(--brand-pale-grey); color: var(--brand-navy); }
+
+/* ── no matches ─────────────────────────────────────────────────────────── */
+.wb-nomatch {
+  display: flex; align-items: flex-start; gap: 13px; flex-wrap: wrap; padding: 20px;
+  border: 1px solid var(--border-subtle); border-radius: 16px; background: var(--brand-pale-grey);
+}
+.wb-nomatch-ic {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 38px; height: 38px; flex: 0 0 auto; border-radius: 11px;
+  background: var(--surface-card); border: 1px solid var(--border-default); color: var(--brand-electric-blue-ink);
+}
+.wb-nomatch > div { flex: 1; min-width: 200px; }
+.wb-nomatch-title { margin: 0 0 3px; font-size: 14.5px; font-weight: 800; color: var(--brand-navy); }
+.wb-nomatch-body { margin: 0; font-size: 13px; line-height: 1.6; color: var(--text-secondary); }
+
+/* ── row checkbox ───────────────────────────────────────────────────────── */
+.wb-check {
+  width: 17px; height: 17px; flex: 0 0 auto; margin-top: 3px;
+  accent-color: var(--brand-electric-blue); cursor: pointer;
+}
+
+/* ── compact density (applies to both queues) ───────────────────────────── */
+.is-compact .doc-row, .is-compact .inv-row { padding: 11px 14px; gap: 10px; }
+.is-compact .doc-row-name, .is-compact .inv-row-name { font-size: 13.5px; }
+.is-compact .doc-row-meta, .is-compact .inv-row-meta { font-size: 12px; gap: 4px 14px; }
+.is-compact .doc-rows, .is-compact .inv-rows { gap: 7px; }
+
+/* ── responsive ─────────────────────────────────────────────────────────── */
+@media (max-width: 1023px) {
+  .wb-select select { max-width: none; width: 100%; }
+  .wb-select { flex: 1 1 160px; }
+}
+@media (max-width: 640px) {
+  .wb-filters { gap: 8px; }
+  .wb-select { flex: 1 1 100%; }
+  .wb-density, .wb-clear { align-self: stretch; justify-content: center; }
+  .wb-search input { font-size: 16px; }   /* no iOS zoom on focus */
+}
+@media (prefers-reduced-motion: reduce) { .wb-density-btn { transition: none !important; } }

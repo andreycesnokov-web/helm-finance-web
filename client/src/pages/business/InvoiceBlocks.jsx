@@ -1,296 +1,431 @@
-// Invoice Hub v1 — commercial documents and payment obligations.
+// Invoice Workbench — an action queue over real uploaded documents.
 //
-// WHY THIS IS A HUB AND NOT A LIST: migration 041 (invoices / invoice_line_items /
-// invoice_counters) is an explicit, un-applied PROPOSAL, and there are no /api/invoices
-// routes. So there is no invoice record to list. Rather than a "coming next" stub, this
-// page explains the review-first architecture and connects the parts that DO exist today —
-// Receivables, Payables, Documents, Transactions, Payment connections.
+// RUNTIME SOURCE: there is no invoice table (migration 041 is an un-applied PROPOSAL and
+// there are no /api/invoices routes), so rows come from GET /api/documents filtered to the
+// invoice-like document_type values the backend actually defines:
+//   vendor_invoice → payable side, customer_invoice → receivable side, tax_invoice → either.
+// Rows are labelled "From uploaded documents" so nothing reads as an invoice record.
 //
-// DATA HONESTY:
-//   • Sales / supplier / overdue / settled counts come from GET /api/debts, which is real,
-//     and are labelled as coming FROM Receivables and Payables — never as invoice records.
-//   • The review count comes from GET /api/documents when that endpoint is reachable
-//     (it is plan-gated and may 403); otherwise the card says so instead of showing 0.
-//   • Everything the backend cannot answer renders an explicit readiness state. No metric
-//     is estimated, and no count is invented.
-import { Card, StatusBadge, Btn, Icon } from '../../shell/ui'
+// WHAT IS GENUINELY REAL HERE:
+//   • Create payable/receivable — POST /api/debts via the existing DebtFormModal, which the
+//     user must submit. Nothing is auto-created.
+//   • Link document → debt, and document → transaction — POST /api/documents/:id/links
+//     ({target_type, target_id}), the same route the Document Center uses.
+//   • Status, amounts, dates, links, source channel — all read from real fields.
+//
+// WHAT IS DELIBERATELY NOT CLAIMED:
+//   • "Review complete" is not persistable — PATCH /api/documents/:id (rpc_document_update_
+//     metadata) can write document_type/number/date/currency/gross_amount/counterparty id,
+//     but NOT review_status. So no button pretends to mark a document reviewed.
+//   • Tax/withholding is never computed — there is no tax engine behind this page.
+import { useState, useMemo } from 'react'
+import { StatusBadge, Btn, Icon, LoadingSkeleton } from '../../shell/ui'
+import {
+  useWorkbench, WorkbenchToolbar, GroupHeader, MoreMenu, NoMatches,
+  monthGroup, DATE_OPTIONS, AMOUNT_OPTIONS,
+} from './Workbench'
 import './Invoices.css'
+
+/* ── classification over real document_type values ────────────────────────── */
+
+export const INVOICE_TYPES = ['vendor_invoice', 'customer_invoice', 'tax_invoice']
+export const isInvoiceDoc = (d) => INVOICE_TYPES.includes(d.document_type)
+
+// vendor → we owe (payable). customer → we are owed (receivable). tax_invoice can be
+// either, so it is left undirected rather than guessed.
+export function directionOf(d) {
+  if (d.document_type === 'vendor_invoice') return 'payable'
+  if (d.document_type === 'customer_invoice') return 'receivable'
+  return null
+}
+const DIR_LABEL = { payable: 'Supplier invoice', receivable: 'Sales invoice' }
+
+const has = (v) => v !== null && v !== undefined && v !== '' && Number(v) !== 0
+export const amountOf = (d) => (has(d.gross_amount) ? Number(d.gross_amount) : null)
+export const debtLink = (d) => (d.links || []).find((l) => l.target_type === 'debt') || null
+export const txLink = (d) => (d.links || []).find((l) => l.target_type === 'transaction') || null
+
+export function gapsOf(d) {
+  const g = []
+  if (amountOf(d) === null) g.push('amount')
+  if (!d.document_date) g.push('date')
+  if (!directionOf(d)) g.push('direction')
+  return g
+}
+
+/** Row status — every branch is decided by a field or link that genuinely exists. */
+export function statusOf(d) {
+  const dl = debtLink(d)
+  const tl = txLink(d)
+  if (dl && tl) return 'closed'
+  if (dl) return 'matchPayment'
+  const gaps = gapsOf(d)
+  if (gaps.length) return 'missing'
+  const dir = directionOf(d)
+  if (dir === 'payable') return 'readyPayable'
+  if (dir === 'receivable') return 'readyReceivable'
+  return 'review'
+}
+
+const STATUS = {
+  review: { label: 'Needs review', tone: 'info' },
+  readyPayable: { label: 'Ready to create payable', tone: 'warning' },
+  readyReceivable: { label: 'Ready to create receivable', tone: 'warning' },
+  matchPayment: { label: 'Match payment', tone: 'info' },
+  closed: { label: 'Closed', tone: 'success' },
+  missing: { label: 'Missing data', tone: 'warning' },
+}
+export const statusLabel = (k) => (STATUS[k] || STATUS.review).label
+
+const idr = (n, ccy = 'IDR') => `${ccy} ${Number(n).toLocaleString('de-DE')}`
+const fmtDate = (s) => (s ? new Date(s).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : null)
 
 /* ── summary ──────────────────────────────────────────────────────────────── */
 
-export function InvoiceSummary({ debts, docs, loading, navigate }) {
-  const live = debts.filter((d) => d.status !== 'cancelled')
-  const sales = live.filter((d) => d.type === 'receivable')
-  const supplier = live.filter((d) => d.type === 'payable')
-  const overdue = live.filter((d) => d.status === 'overdue')
-  // A settled or part-settled obligation had a payment recorded against it. That is the
-  // closest honest analogue of "matched" until invoice↔transaction matching exists.
-  const settled = live.filter((d) => d.status === 'paid' || d.status === 'partial')
-
+export function InvoiceSummary({ docs, loading }) {
+  const s = (k) => docs.filter((d) => statusOf(d) === k).length
   const cards = [
-    { key: 'sales', label: 'Sales invoices', icon: 'down', tone: 'ink',
-      value: loading ? null : sales.length, source: 'From receivables',
-      body: 'Invoices you issued to customers.', cta: 'View receivables', to: '/business/receivables' },
-    { key: 'supplier', label: 'Supplier invoices', icon: 'up', tone: 'ink',
-      value: loading ? null : supplier.length, source: 'From payables',
-      body: 'Invoices sent to you by suppliers.', cta: 'View payables', to: '/business/payables' },
-    { key: 'review', label: 'Needs review', icon: 'doc', tone: 'ink',
-      value: docs.available ? docs.needsReview : undefined,
-      source: docs.available ? 'Documents awaiting review' : 'Document intake not connected',
-      body: 'Uploaded documents waiting for extraction or confirmation.',
-      cta: 'Open documents', to: '/business/documents' },
-    { key: 'overdue', label: 'Overdue', icon: 'warn', tone: overdue.length ? 'warn' : 'ink',
-      value: loading ? null : overdue.length, source: 'Past due date',
-      body: 'Invoices or obligations past their due date.', cta: 'Open Radar', to: '/business/radar' },
-    { key: 'matched', label: 'Matched / paid', icon: 'check', tone: 'ink',
-      value: loading ? null : settled.length, source: 'Settled in receivables & payables',
-      body: 'Obligations with a payment recorded against them.',
-      cta: 'Open transactions', to: '/business/transactions' },
+    { k: 'review', label: 'Needs review', value: loading ? null : s('review') + s('missing'),
+      note: 'Invoice-like documents not yet confirmed' },
+    { k: 'ready', label: 'Ready to create', value: loading ? null : s('readyPayable') + s('readyReceivable'),
+      note: 'Enough data, no linked record yet' },
+    { k: 'linked', label: 'Linked to payable / receivable', value: loading ? null : docs.filter((d) => debtLink(d)).length,
+      note: 'Evidence attached to an obligation' },
+    { k: 'match', label: 'Ready to match payment', value: loading ? null : s('matchPayment'),
+      note: 'Linked to a record, not to a payment' },
+    { k: 'closed', label: 'Closed / matched', value: loading ? null : s('closed'),
+      note: 'Linked to both a record and a payment' },
   ]
-
   return (
     <div className="inv-summary">
-      {cards.map((c) => {
-        const C = Icon[c.icon] || Icon.dot
-        const unknown = c.value === undefined
-        return (
-          <article key={c.key} className="inv-sum">
-            <header className="inv-sum-top">
-              <span className={`inv-sum-ic ${c.tone}`}><C width="16" height="16" aria-hidden="true" /></span>
-              <span className="inv-sum-label">{c.label}</span>
-            </header>
-            <span className={`inv-sum-value${unknown ? ' is-unknown' : ''}`}>
-              {unknown ? '—' : c.value === null ? '·' : c.value}
-            </span>
-            <span className="inv-sum-source">{c.source}</span>
-            <p className="inv-sum-body">{c.body}</p>
-            <button type="button" className="inv-link" onClick={() => navigate(c.to)}>
-              {c.cta}<Icon.chev width="12" height="12" aria-hidden="true" />
-            </button>
-          </article>
-        )
-      })}
+      {cards.map((c) => (
+        <article key={c.k} className="inv-sum">
+          <span className="inv-sum-label">{c.label}</span>
+          <span className="inv-sum-value">{c.value === null ? '·' : c.value}</span>
+          <span className="inv-sum-body">{c.note}</span>
+        </article>
+      ))}
     </div>
   )
 }
 
-/* ── intake ───────────────────────────────────────────────────────────────── */
+/* ── queue ────────────────────────────────────────────────────────────────── */
 
-// `live: false` marks a channel that is designed but not wired yet. Those CTAs route to the
-// nearest real page and say what is missing — never a dead link, never a false claim.
-const INTAKE = [
-  { key: 'upload', icon: 'cloud', title: 'Upload invoice', live: true,
-    body: 'Upload a PDF, photo or document. AI extracts the details before review.',
-    cta: 'Upload document', to: '/business/documents' },
-  { key: 'telegram', icon: 'phone', title: 'Send via Telegram', live: false,
-    tag: 'Planned flow',
-    body: 'Forward invoices to the CFO AI Telegram bot. They arrive as drafts for review, never straight into your books.',
-    cta: 'See the flow', to: null },
-  { key: 'manual', icon: 'doc', title: 'Create manually', live: false,
-    tag: 'Needs invoice records',
-    body: 'Draft a sales or supplier invoice by hand. Until invoice records exist, obligations are recorded directly.',
-    cta: 'Add a receivable', to: '/business/receivables' },
-  { key: 'provider', icon: 'link', title: 'Import from payment provider', live: true,
-    body: 'Connect incoming payments so settlements can be matched to what you are owed.',
-    cta: 'Payment connections', to: '/business/payment-connections' },
-]
+// Filter/group/sort config. Every accessor reads a field GET /api/documents returns, or a
+// link the API genuinely attached — nothing is inferred.
+const makeInvCfg = (cpName) => ({
+  text: (d) => [d.file?.file_name, d.document_number, d.document_type, d.currency,
+    d.gross_amount, d.document_date, cpName(d.issuer_counterparty_id),
+    DIR_LABEL[directionOf(d)], statusLabel(statusOf(d))].filter(Boolean).join(' '),
+  date: (d) => d.document_date || null,
+  amount: (d) => amountOf(d),
+  priority: (d) => ({ missing: 0, review: 1, readyPayable: 2, readyReceivable: 2,
+    matchPayment: 3, closed: 4 }[statusOf(d)] ?? 9),
+  filters: [
+    { key: 'direction', label: 'Direction',
+      options: [{ value: '', label: 'All directions' },
+        { value: 'payable', label: 'Supplier invoices' }, { value: 'receivable', label: 'Sales invoices' }],
+      match: (d, v) => directionOf(d) === v },
+    { key: 'status', label: 'Status',
+      options: [{ value: '', label: 'All statuses' },
+        { value: 'review', label: 'Needs review' },
+        { value: 'ready', label: 'Ready to create' },
+        { value: 'matchPayment', label: 'Match payment' },
+        { value: 'closed', label: 'Closed' },
+        { value: 'missing', label: 'Missing data' }],
+      match: (d, v) => {
+        const st = statusOf(d)
+        if (v === 'ready') return st === 'readyPayable' || st === 'readyReceivable'
+        return st === v
+      } },
+    { key: 'link', label: 'Link',
+      options: [{ value: '', label: 'All' },
+        { value: 'none', label: 'Not linked' },
+        { value: 'payable', label: 'Linked to payable' },
+        { value: 'receivable', label: 'Linked to receivable' },
+        { value: 'transaction', label: 'Linked to transaction' }],
+      match: (d, v) => {
+        if (v === 'none') return !debtLink(d) && !txLink(d)
+        if (v === 'transaction') return !!txLink(d)
+        return !!debtLink(d) && directionOf(d) === v
+      } },
+    // Derived from the rows present, so no source is offered that does not exist here.
+    { key: 'source', label: 'Source', allLabel: 'All sources',
+      derive: (d) => (d.file?.upload_channel
+        ? { value: d.file.upload_channel, label: d.file.upload_channel === 'telegram' ? 'Telegram' : d.file.upload_channel === 'bank' ? 'Bank import' : 'Upload' }
+        : null),
+      match: (d, v) => d.file?.upload_channel === v },
+    { key: 'date', label: 'Date', options: DATE_OPTIONS,
+      match: (d, v) => {
+        const m = (d.document_date || '').slice(0, 7)
+        if (v === 'none') return !d.document_date
+        if (v === 'this') return m === new Date().toISOString().slice(0, 7)
+        const l = new Date(); l.setMonth(l.getMonth() - 1)
+        return m === l.toISOString().slice(0, 7)
+      } },
+    { key: 'amount', label: 'Amount', options: AMOUNT_OPTIONS,
+      match: (d, v) => (v === 'has' ? amountOf(d) !== null : amountOf(d) === null) },
+  ],
+  groups: [
+    { value: 'status', label: 'Status', of: (d) => ({ key: statusOf(d), label: statusLabel(statusOf(d)) }) },
+    { value: 'direction', label: 'Direction',
+      of: (d) => ({ key: directionOf(d) || 'none', label: DIR_LABEL[directionOf(d)] || 'Direction needed' }) },
+    { value: 'counterparty', label: 'Counterparty',
+      of: (d) => ({ key: d.issuer_counterparty_id || 'none', label: cpName(d.issuer_counterparty_id) || 'No counterparty' }) },
+    { value: 'month', label: 'Month', of: monthGroup((d) => d.document_date) },
+    { value: 'link', label: 'Link status',
+      of: (d) => (debtLink(d) || txLink(d) ? { key: 'l', label: 'Linked' } : { key: 'u', label: 'Not linked' }) },
+  ],
+})
 
-export function InvoiceIntake({ navigate, onShowFlow }) {
-  return (
-    <section className="inv-section">
-      <div className="inv-section-head">
-        <div>
-          <h2 className="inv-section-title">Invoice intake</h2>
-          <p className="inv-section-sub">Every way a commercial document can enter the workspace.</p>
+export function InvoiceQueue({ docs, loading, cpName, onReview, onView, onCreate, onLinkDebt, onMatch, onUpload, navigate }) {
+  const cfg = useMemo(() => makeInvCfg(cpName), [cpName])
+  const wb = useWorkbench(docs, cfg)
+
+  if (loading) return <section className="inv-section"><LoadingSkeleton rows={5} height={20} /></section>
+
+  if (!docs.length) {
+    return (
+      <section className="inv-section">
+        <div className="inv-empty">
+          <span className="inv-empty-ic"><Icon.doc width="20" height="20" aria-hidden="true" /></span>
+          <div>
+            <p className="inv-empty-title">Upload a supplier or sales invoice to start.</p>
+            <p className="inv-note">
+              Invoices appear here as soon as a document is uploaded with an invoice type.
+              Nothing affects your books until you confirm it.
+            </p>
+          </div>
+          <div className="inv-empty-actions">
+            <Btn sm onClick={onUpload}>Upload invoice</Btn>
+            <Btn sm variant="ghost" onClick={() => navigate('/business/documents')}>Open documents</Btn>
+          </div>
         </div>
-      </div>
-      <div className="inv-intake-grid">
-        {INTAKE.map((a) => {
-          const C = Icon[a.icon] || Icon.dot
-          return (
-            <article key={a.key} className={`inv-intake${a.live ? '' : ' is-planned'}`}>
-              <header className="inv-intake-top">
-                <span className="inv-intake-ic"><C width="17" height="17" aria-hidden="true" /></span>
-                {a.tag && <span className="inv-tag">{a.tag}</span>}
-              </header>
-              <h3 className="inv-intake-title">{a.title}</h3>
-              <p className="inv-intake-body">{a.body}</p>
-              <button type="button" className="inv-btn"
-                onClick={() => (a.to ? navigate(a.to) : onShowFlow())}>
-                {a.cta}<Icon.chev width="13" height="13" aria-hidden="true" />
-              </button>
-            </article>
-          )
-        })}
-      </div>
-    </section>
-  )
-}
+      </section>
+    )
+  }
 
-/* ── review pipeline ──────────────────────────────────────────────────────── */
+  const renderRow = (d) => {
+    const st = statusOf(d)
+    const dir = directionOf(d)
+    const dl = debtLink(d)
+    const amt = amountOf(d)
+    const cp = cpName(d.issuer_counterparty_id)
+    // Primary stays visible, the rest collapse — a long row never becomes a button wall.
+    const primary = !dl && dir
+      ? { label: `Create ${dir}`, onClick: () => onCreate(d, dir) }
+      : dl && !txLink(d)
+        ? { label: 'Match payment', onClick: () => onMatch(d) }
+        : { label: 'Review', onClick: () => onReview(d) }
+    const more = [
+      primary.label !== 'Review' && { label: 'Review', onClick: () => onReview(d) },
+      { label: 'View document', onClick: () => onView(d) },
+      !dl && { label: 'Link existing', onClick: () => onLinkDebt(d) },
+      dl && { label: `Open ${dir === 'receivable' ? 'receivable' : 'payable'}`,
+        onClick: () => navigate(dir === 'receivable' ? '/business/receivables' : '/business/payables') },
+    ]
+    return (
+      <article key={d.id} className="inv-row">
+        <div className="inv-row-main">
+          <div className="inv-row-head">
+            <span className="inv-row-dir">{dir ? DIR_LABEL[dir] : 'Invoice · direction needed'}</span>
+            <StatusBadge tone={STATUS[st].tone}>{STATUS[st].label}</StatusBadge>
+            {d.file?.upload_channel === 'telegram' && <span className="inv-tag">Telegram</span>}
+          </div>
+          <span className="inv-row-name">{d.file?.file_name || d.document_number || 'Untitled invoice'}</span>
+          <div className="inv-row-meta">
+            <span>{cp || <em>Counterparty needed</em>}</span>
+            <span>{fmtDate(d.document_date) || <em>Date needed</em>}</span>
+            <span className="inv-mono">{amt !== null ? idr(amt, d.currency) : <em>Amount needed</em>}</span>
+            <span>{dl ? `Linked · ${dir === 'receivable' ? 'receivable' : 'payable'} #${dl.target_id}` : <em>Not linked</em>}</span>
+          </div>
+        </div>
+        <div className="inv-row-actions">
+          <Btn sm onClick={primary.onClick}>{primary.label}</Btn>
+          <MoreMenu items={more} />
+        </div>
+      </article>
+    )
+  }
 
-// The lifecycle, stated once. `state: 'live'` means the step is backed by something that
-// exists today; 'planned' means the step is designed but not wired.
-const PIPELINE = [
-  { key: 'received', label: 'Received', state: 'live', note: 'Document arrives by upload or provider.' },
-  { key: 'extracted', label: 'Extracted', state: 'live', note: 'AI reads the details from the file.' },
-  { key: 'review', label: 'Needs review', state: 'live', note: 'You or your accountant confirm what was read.' },
-  { key: 'confirmed', label: 'Confirmed invoice', state: 'planned', note: 'Becomes a sales or supplier invoice.' },
-  { key: 'obligation', label: 'Receivable / payable', state: 'live', note: 'The obligation enters working capital.' },
-  { key: 'matched', label: 'Matched to payment', state: 'planned', note: 'Linked to the transaction that settled it.' },
-  { key: 'closed', label: 'Closed', state: 'live', note: 'Nothing outstanding remains.' },
-]
-
-export function ReviewPipeline() {
   return (
-    <section className="inv-section">
+    <section className={`inv-section${wb.density === 'compact' ? ' is-compact' : ''}`}>
       <div className="inv-section-head">
         <div>
-          <h2 className="inv-section-title">Review pipeline</h2>
+          <h2 className="inv-section-title">Invoice queue</h2>
           <p className="inv-section-sub">
-            Invoices do not affect financial reports until they are confirmed.
+            From uploaded documents · {wb.visible.length} of {docs.length} shown
           </p>
         </div>
-        <StatusBadge tone="neutral">Review-first</StatusBadge>
+        <Btn sm onClick={onUpload}>Upload invoice</Btn>
       </div>
-      <ol className="inv-pipe">
-        {PIPELINE.map((s, i) => (
-          <li key={s.key} className={`inv-pipe-step is-${s.state}`}>
-            <span className="inv-pipe-dot" aria-hidden="true">{i + 1}</span>
-            <span className="inv-pipe-label">{s.label}</span>
-            <span className="inv-pipe-note">{s.note}</span>
-            {s.state === 'planned' && <span className="inv-pipe-tag">Planned</span>}
-          </li>
+
+      <WorkbenchToolbar wb={wb} groups={cfg.groups}
+        placeholder="Search invoices, supplier, customer, amount, file name…" />
+
+      {wb.visible.length === 0
+        ? <NoMatches onClear={wb.clear} />
+        : wb.grouped.map((g) => (
+          <div key={g.key}>
+            <GroupHeader label={g.label} count={g.rows.length} />
+            <div className="inv-rows">{g.rows.map(renderRow)}</div>
+          </div>
         ))}
-      </ol>
     </section>
   )
 }
 
-/* ── work queues ──────────────────────────────────────────────────────────── */
+/* ── review drawer ────────────────────────────────────────────────────────── */
 
-const QUEUES = [
-  { key: 'drafts', label: 'Drafts',
-    body: 'Invoices saved but not yet issued will appear here.',
-    unlock: 'Needs invoice records', to: null, toLabel: null },
-  { key: 'review', label: 'Needs review',
-    body: 'Uploaded invoices from Documents or Telegram appear here after extraction.',
-    unlock: 'Lives in Documents today', to: '/business/documents', toLabel: 'Open documents' },
-  { key: 'sales', label: 'Sales invoices',
-    body: 'Confirmed customer invoices will appear here. Customer obligations are tracked in Receivables today.',
-    unlock: 'Lives in Receivables today', to: '/business/receivables', toLabel: 'View receivables' },
-  { key: 'supplier', label: 'Supplier invoices',
-    body: 'Confirmed supplier invoices will appear here. Supplier obligations are tracked in Payables today.',
-    unlock: 'Lives in Payables today', to: '/business/payables', toLabel: 'View payables' },
-  { key: 'overdue', label: 'Overdue',
-    body: 'Invoices past their due date, ranked by how late they are.',
-    unlock: 'Lives in Radar today', to: '/business/radar', toLabel: 'Open Radar' },
-  { key: 'matched', label: 'Matched / paid',
-    body: 'Invoices matched with bank transactions or incoming payments will appear here.',
-    unlock: 'Needs payment matching', to: '/business/transactions', toLabel: 'Open transactions' },
-]
+export function InvoiceReview({ doc, cpName, onClose, onView, onCreate, onLinkDebt, onMatch }) {
+  if (!doc) return null
+  const dir = directionOf(doc)
+  const amt = amountOf(doc)
+  const dl = debtLink(doc)
+  const cp = cpName(doc.issuer_counterparty_id)
+  const need = <em className="inv-need">Needs review</em>
 
-export function WorkQueues({ active, onSelect, navigate }) {
-  const q = QUEUES.find((x) => x.key === active) || QUEUES[0]
+  const fields = [
+    ['Document type', doc.document_type || null],
+    ['Invoice number', doc.document_number || null],
+    ['Invoice date', fmtDate(doc.document_date)],
+    ['Counterparty', cp],
+    ['Amount', amt !== null ? idr(amt, doc.currency) : null],
+    ['Currency', doc.currency || null],
+    ['Tax amount', has(doc.commercial_tax_amount) ? idr(doc.commercial_tax_amount, doc.currency) : null],
+    ['Extraction status', doc.extraction_status || null],
+  ]
+
+  const impact = dir === 'payable' ? 'Create a payable — this is money your business owes.'
+    : dir === 'receivable' ? 'Create a receivable — this is money expected from a customer.'
+      : 'Set the document type to a supplier or sales invoice before a record can be created.'
+
   return (
-    <section className="inv-section">
-      <div className="inv-section-head">
-        <div>
-          <h2 className="inv-section-title">Work queues</h2>
-          <p className="inv-section-sub">
-            Where each kind of commercial document will be worked once invoice records exist.
+    <div className="inv-drawer-scrim" onClick={onClose}>
+      <aside className="inv-drawer" role="dialog" aria-modal="true" aria-label="Invoice review"
+        onClick={(e) => e.stopPropagation()}>
+        <header className="inv-drawer-head">
+          <div>
+            <span className="inv-drawer-eyebrow">{dir ? DIR_LABEL[dir] : 'Invoice'}</span>
+            <h2 className="inv-drawer-title">{doc.file?.file_name || doc.document_number || 'Invoice'}</h2>
+          </div>
+          <button type="button" className="inv-drawer-x" onClick={onClose} aria-label="Close">
+            <Icon.plus width="16" height="16" style={{ transform: 'rotate(45deg)' }} />
+          </button>
+        </header>
+
+        <section className="inv-drawer-sec">
+          <span className="inv-drawer-label">Document</span>
+          <div className="inv-kv"><span>Source</span><span>{doc.file?.upload_channel === 'telegram' ? 'Telegram' : 'Upload'}</span></div>
+          <div className="inv-kv"><span>File</span><span>{doc.file?.file_name || '—'}</span></div>
+          <Btn sm variant="ghost" onClick={() => onView(doc)}>View document</Btn>
+        </section>
+
+        <section className="inv-drawer-sec">
+          <span className="inv-drawer-label">Extracted invoice fields</span>
+          {fields.map(([k, v]) => (
+            <div className="inv-kv" key={k}><span>{k}</span><span>{v || need}</span></div>
+          ))}
+        </section>
+
+        <section className="inv-drawer-sec">
+          <span className="inv-drawer-label">Suggested financial impact</span>
+          <p className="inv-note">{impact}</p>
+        </section>
+
+        <section className="inv-drawer-sec">
+          <span className="inv-drawer-label">Tax review</span>
+          <p className="inv-note">
+            Tax and withholding require accountant review — nothing is calculated here.
+            {dir === 'payable' && ' For services, a withholding tax review may be needed.'}
           </p>
-        </div>
-      </div>
-      <div className="inv-tabs" role="tablist" aria-label="Invoice work queues">
-        {QUEUES.map((t) => (
-          <button key={t.key} type="button" role="tab" aria-selected={t.key === active}
-            className={`inv-tab${t.key === active ? ' is-active' : ''}`}
-            onClick={() => onSelect(t.key)}>{t.label}</button>
-        ))}
-      </div>
-      <div className="inv-queue" role="tabpanel">
-        <span className="inv-queue-ic"><Icon.doc width="19" height="19" aria-hidden="true" /></span>
-        <div className="inv-queue-text">
-          <h3 className="inv-queue-title">{q.label}</h3>
-          <p className="inv-queue-body">{q.body}</p>
-          <span className="inv-tag">{q.unlock}</span>
-        </div>
-        {q.to && (
-          <Btn sm variant="ghost" onClick={() => navigate(q.to)}>{q.toLabel}</Btn>
-        )}
-      </div>
-    </section>
+        </section>
+
+        <footer className="inv-drawer-actions">
+          {!dl && dir && <Btn onClick={() => onCreate(doc, dir)}>Create {dir} draft</Btn>}
+          {!dl && <Btn variant="ghost" onClick={() => onLinkDebt(doc)}>Link to existing</Btn>}
+          {dl && !txLink(doc) && <Btn onClick={() => onMatch(doc)}>Match to payment</Btn>}
+          <p className="inv-note inv-note-muted">
+            Marking a document reviewed is not stored yet — the review status field is
+            read-only through the API.
+          </p>
+        </footer>
+      </aside>
+    </div>
   )
 }
 
-/* ── telegram flow ────────────────────────────────────────────────────────── */
+/* ── link picker (debts or transactions) ──────────────────────────────────── */
 
-const TG_FLOW = ['Telegram upload', 'Document intake', 'AI extraction', 'Review',
-  'Invoice', 'Receivable / payable', 'Transaction match']
-
-export function TelegramFlow() {
+export function LinkPicker({ open, kind, doc, rows, busy, error, onPick, onClose }) {
+  const [q, setQ] = useState('')
+  const list = useMemo(() => {
+    const t = q.trim().toLowerCase()
+    if (!t) return rows.slice(0, 40)
+    return rows.filter((r) => JSON.stringify(r).toLowerCase().includes(t)).slice(0, 40)
+  }, [q, rows])
+  if (!open) return null
+  const isDebt = kind === 'debt'
   return (
-    <Card title="Invoices sent through Telegram"
-      action={<StatusBadge tone="neutral">Planned flow</StatusBadge>}>
+    <div className="inv-drawer-scrim" onClick={onClose}>
+      <aside className="inv-drawer" role="dialog" aria-modal="true"
+        aria-label={isDebt ? 'Link to an existing record' : 'Match to a payment'}
+        onClick={(e) => e.stopPropagation()}>
+        <header className="inv-drawer-head">
+          <div>
+            <span className="inv-drawer-eyebrow">{doc?.file?.file_name || 'Invoice'}</span>
+            <h2 className="inv-drawer-title">{isDebt ? 'Link to existing record' : 'Match to a payment'}</h2>
+          </div>
+          <button type="button" className="inv-drawer-x" onClick={onClose} aria-label="Close">
+            <Icon.plus width="16" height="16" style={{ transform: 'rotate(45deg)' }} />
+          </button>
+        </header>
+        <p className="inv-note">
+          {isDebt
+            ? 'Attach this invoice as evidence for a receivable or payable that already exists.'
+            : 'Attach this invoice to the transaction that settled it.'}
+        </p>
+        <input className="inv-search" value={q} onChange={(e) => setQ(e.target.value)}
+          placeholder={isDebt ? 'Search counterparty or amount' : 'Search description or amount'} />
+        {error && <p className="inv-note inv-error">{error}</p>}
+        <div className="inv-pick-list">
+          {list.length === 0 && <p className="inv-note inv-note-muted">Nothing to choose from yet.</p>}
+          {list.map((r) => (
+            <button key={r.id} type="button" className="inv-pick" disabled={!!busy}
+              onClick={() => onPick(r)}>
+              <span className="inv-pick-main">
+                <span className="inv-pick-title">
+                  {isDebt ? (r.counterparty || r.description || `Record #${r.id}`) : (r.description || r.type)}
+                </span>
+                <span className="inv-pick-sub">
+                  {isDebt
+                    ? `${r.type} · due ${(r.due_date || '').slice(0, 10) || '—'} · ${r.status}`
+                    : `${r.type} · ${(r.transaction_date || r.created_at || '').slice(0, 10)}`}
+                </span>
+              </span>
+              <span className="inv-mono inv-pick-amt">
+                {idr(isDebt ? (r.remaining_amount ?? r.amount ?? 0) : (r.amount_original ?? 0), r.currency_original || 'IDR')}
+              </span>
+            </button>
+          ))}
+        </div>
+      </aside>
+    </div>
+  )
+}
+
+/* ── compact footer strip ─────────────────────────────────────────────────── */
+
+export function InvoiceFooterNote({ navigate }) {
+  return (
+    <section className="inv-strip">
+      <span className="inv-strip-ic"><Icon.phone width="16" height="16" aria-hidden="true" /></span>
       <p className="inv-note">
-        When an invoice is sent through Telegram it should first enter Document Intake. AI
-        extracts the details, then you or your accountant confirms them. Only after
-        confirmation does it become a sales or supplier invoice.
-        {' '}<strong>Uploaded invoices are reviewed before they affect your books.</strong>
+        <strong>Uploaded invoices are reviewed before they affect your books.</strong> Confirming
+        an invoice creates a receivable or payable and links the document as evidence. Telegram
+        intake is planned and will land in the same queue for review.
       </p>
-      <ol className="inv-flow">
-        {TG_FLOW.map((step, i) => (
-          <li key={step} className="inv-flow-step">
-            <span className="inv-flow-n" aria-hidden="true">{i + 1}</span>{step}
-          </li>
-        ))}
-      </ol>
-      <p className="inv-note inv-note-muted">
-        Telegram invoice intake is not wired yet. Documents uploaded in the workspace already
-        follow this review-first path.
-      </p>
-    </Card>
-  )
-}
-
-/* ── architecture impact ──────────────────────────────────────────────────── */
-
-const IMPACT = [
-  { key: 'cash', icon: 'pulse', title: 'Cash forecast',
-    body: 'Confirmed sales and supplier invoices sharpen the expected cash position.' },
-  { key: 'wc', icon: 'transfer', title: 'Working capital',
-    body: 'Sales invoices feed Receivables. Supplier invoices feed Payables.' },
-  { key: 'radar', icon: 'radar', title: 'Radar',
-    body: 'Overdue and upcoming invoices raise risk signals.' },
-  { key: 'acct', icon: 'acct', title: 'AI Accountant',
-    body: 'Invoice details help prepare accounting and tax review packages.' },
-]
-
-export function InvoiceImpact() {
-  return (
-    <section className="inv-section">
-      <div className="inv-section-head">
-        <div>
-          <h2 className="inv-section-title">How invoices affect your finance system</h2>
-          <p className="inv-section-sub">
-            An invoice is evidence of an obligation. Confirming it is what lets the rest of the
-            product reason about your cash.
-          </p>
-        </div>
-      </div>
-      <div className="inv-impact-grid">
-        {IMPACT.map((m) => {
-          const C = Icon[m.icon] || Icon.dot
-          return (
-            <article key={m.key} className="inv-impact">
-              <span className="inv-impact-ic"><C width="16" height="16" aria-hidden="true" /></span>
-              <h3 className="inv-impact-title">{m.title}</h3>
-              <p className="inv-impact-body">{m.body}</p>
-            </article>
-          )
-        })}
-      </div>
+      <Btn sm variant="ghost" onClick={() => navigate('/business/documents')}>Open documents</Btn>
     </section>
   )
 }
