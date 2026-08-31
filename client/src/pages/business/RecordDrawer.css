@@ -1,0 +1,102 @@
+/* ============================================================================
+   Payable / Receivable detail drawer. Brandbook tokens only.
+   Class prefix: rec-
+   ========================================================================== */
+.rec-scrim { position: fixed; inset: 0; z-index: 60; background: var(--surface-overlay); display: flex; justify-content: flex-end; }
+.rec-drawer {
+  width: min(480px, 100%); height: 100%; overflow-y: auto; padding: 24px;
+  background: var(--surface-card); box-shadow: var(--shadow-lg);
+  display: flex; flex-direction: column; gap: 16px;
+}
+.rec-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.rec-head-main { min-width: 0; }
+.rec-eyebrow { font-size: 10.5px; font-weight: 800; letter-spacing: .09em; text-transform: uppercase; color: var(--text-muted); }
+.rec-title { margin: 4px 0 4px; font-family: var(--font-display); font-size: 20px; line-height: 1.25; color: var(--brand-navy); overflow-wrap: anywhere; }
+.rec-sub { margin: 0; font-size: 13px; line-height: 1.55; color: var(--text-secondary); }
+.rec-x {
+  display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px;
+  border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--text-muted); cursor: pointer;
+}
+.rec-x:hover { background: var(--surface-card-muted); color: var(--brand-navy); }
+
+.rec-chips { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.rec-amount {
+  margin-left: auto; font-family: var(--font-mono); font-variant-numeric: tabular-nums;
+  font-size: 18px; font-weight: 700; color: var(--brand-navy);
+}
+
+.rec-note { margin: 0; font-size: 13px; line-height: 1.6; color: var(--text-secondary); }
+.rec-note-muted { color: var(--text-muted); font-size: 12.5px; }
+.rec-note-warn {
+  padding: 10px 12px; border-radius: var(--radius-md);
+  background: var(--warning-soft); color: var(--brand-navy); font-weight: 600;
+}
+
+.rec-sec {
+  display: flex; flex-direction: column; gap: 7px;
+  padding: 15px 16px; border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md); background: var(--surface-card);
+}
+/* opened straight from "Add evidence" — the section the user asked for is highlighted */
+.rec-sec.is-focus { border-color: var(--brand-electric-blue); background: var(--info-soft); }
+.rec-label { font-size: 10.5px; font-weight: 800; letter-spacing: .11em; text-transform: uppercase; color: var(--text-muted); }
+.rec-sec > .cfo-btn { align-self: flex-start; margin-top: 4px; }
+
+.rec-kv { display: flex; align-items: baseline; justify-content: space-between; gap: 14px; font-size: 13px; }
+.rec-kv > span:first-child { color: var(--text-muted); flex: 0 0 auto; }
+.rec-kv > span:last-child { color: var(--text-primary); font-weight: 600; text-align: right; overflow-wrap: anywhere; }
+.rec-miss { font-style: normal; color: var(--text-muted); font-weight: 500; }
+
+.rec-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 6px; }
+
+.rec-doc {
+  display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px 11px; text-align: left;
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-md);
+  background: var(--surface-card); font: inherit; color: inherit; cursor: pointer;
+  transition: border-color .16s ease, background .16s ease;
+}
+.rec-doc:hover:not(:disabled) { border-color: var(--brand-electric-blue); background: var(--brand-pale-grey); }
+.rec-doc:disabled { opacity: .5; cursor: default; }
+.rec-doc-ic {
+  display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px;
+  flex: 0 0 auto; border-radius: 8px; background: var(--info-soft); color: var(--brand-electric-blue-ink);
+}
+.rec-doc-main { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.rec-doc-name { font-size: 13px; font-weight: 700; color: var(--brand-navy); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rec-doc-sub { font-size: 11.5px; color: var(--text-muted); }
+
+.rec-checks { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-direction: column; gap: 7px; }
+.rec-checks li { display: flex; align-items: flex-start; gap: 9px; font-size: 13px; line-height: 1.55; color: var(--text-secondary); }
+.rec-check-mark {
+  display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px;
+  flex: 0 0 auto; margin-top: 1px; border-radius: 999px;
+  background: var(--border-subtle); color: var(--text-muted);
+}
+.rec-checks li.is-ok .rec-check-mark { background: var(--success-soft); color: var(--success); }
+.rec-checks li.is-ok { color: var(--text-primary); }
+
+.rec-search {
+  width: 100%; min-height: 40px; padding: 9px 12px;
+  border: 1px solid var(--border-default); border-radius: var(--radius-sm);
+  background: var(--surface-card); font: inherit; font-size: 13.5px; color: var(--text-primary);
+}
+.rec-search:focus { outline: 2px solid var(--border-focus); outline-offset: 1px; }
+.rec-picklist { display: flex; flex-direction: column; gap: 8px; }
+
+.rec-drawer :is(button):focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
+
+/* ── row affordances on the debts table ────────────────────────────────── */
+.rec-evbtn {
+  display: inline-flex; align-items: center; gap: 7px; padding: 0;
+  border: 0; background: none; font: inherit; cursor: pointer;
+}
+.rec-evbtn-cta { font-size: 11.5px; font-weight: 700; color: var(--brand-electric-blue-ink); }
+.rec-evbtn:hover .rec-evbtn-cta { text-decoration: underline; }
+.rec-rowacts { display: inline-flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+
+@media (max-width: 640px) {
+  .rec-drawer { width: 100%; padding: 20px; }
+  .rec-note, .rec-kv { font-size: 14px; }
+  .rec-amount { margin-left: 0; }
+}
+@media (prefers-reduced-motion: reduce) { .rec-doc { transition: none !important; } }

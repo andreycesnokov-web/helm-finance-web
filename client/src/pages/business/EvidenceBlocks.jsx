@@ -214,7 +214,7 @@ export function EvidenceReadiness({ debts, loading, navigate }) {
               {c.value === undefined ? '—' : c.value === null ? '·' : c.value}
             </span>
             <span className="ev-card-source">{c.source}</span>
-            <button type="button" className="inv-link" onClick={() => navigate(c.to)}>
+            <button type="button" className="ev-card-cta" onClick={() => navigate(c.to)}>
               {c.cta}<Icon.chev width="12" height="12" aria-hidden="true" />
             </button>
           </article>

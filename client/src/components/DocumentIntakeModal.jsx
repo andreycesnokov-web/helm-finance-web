@@ -17,7 +17,10 @@ import { Btn, StatusBadge } from '../shell/ui'
 const ACCEPT = '.pdf,.jpg,.jpeg,.png,.csv,.xlsx'
 const CONF_TONE = { high: 'success', medium: 'warning', low: 'warning', unknown: 'neutral' }
 
-export default function DocumentIntakeModal({ business, onClose, onUploaded }) {
+export default function DocumentIntakeModal({ business, onClose, onUploaded, link = null, heading = null }) {
+  // `link` = { target_type, target_id }. /api/documents/upload-complete already accepts it
+  // and links best-effort, so uploading evidence FOR a specific record is one real call —
+  // no global upload the user then has to hunt down and attach by hand.
   const { token } = useAuth()
   const [items, setItems] = useState([])       // { file, status, detected, error }
   const [busy, setBusy] = useState(false)
@@ -56,7 +59,7 @@ export default function DocumentIntakeModal({ business, onClose, onUploaded }) {
       try {
         // document_type is deliberately left to the backend default/mapping; the AI Accountant
         // taxonomy is stored separately and confirmed by the user in the intake list.
-        await uploadDocument(token, it.file, { title: it.file.name })
+        await uploadDocument(token, it.file, { title: it.file.name }, link || undefined)
         // The server reads the document's content during upload-complete, so by the time
         // this resolves the real classification already exists — the list below refreshes.
         setItems(prev => prev.map((x, idx) => idx === i ? { ...x, status: 'uploaded' } : x))
@@ -77,7 +80,7 @@ export default function DocumentIntakeModal({ business, onClose, onUploaded }) {
   return (
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16 }}>
       <div onClick={e => e.stopPropagation()} style={{ background: 'var(--surface-card,#fff)', borderRadius: 16, padding: 20, width: 620, maxWidth: '100%', maxHeight: '88vh', overflow: 'auto' }}>
-        <div style={{ fontSize: 17, fontWeight: 800, marginBottom: 4 }}>Upload documents</div>
+        <div style={{ fontSize: 17, fontWeight: 800, marginBottom: 4 }}>{heading || 'Upload documents'}</div>
         <div style={{ fontSize: 12.5, color: 'var(--text-secondary,#555)', marginBottom: 12, lineHeight: 1.5 }}>
           Drop everything in at once — CFO AI will detect each document type and file it.
         </div>

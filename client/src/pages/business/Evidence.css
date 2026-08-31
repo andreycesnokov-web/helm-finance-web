@@ -116,6 +116,15 @@
 }
 .ev-card-value.is-unknown { color: var(--text-muted); }
 .ev-card-source { font-size: 11.5px; line-height: 1.45; color: var(--text-secondary); flex: 1; }
+/* Card CTA reads as a link, not a button: the card itself is the surface. */
+.ev-card-cta {
+  display: inline-flex; align-items: center; gap: 4px; align-self: flex-start;
+  margin-top: 2px; padding: 0; border: 0; background: none;
+  font: inherit; font-size: 12.5px; font-weight: 700; color: var(--text-link);
+  cursor: pointer;
+}
+.ev-card-cta:hover { text-decoration: underline; }
+.ev-card-cta:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; border-radius: var(--radius-sm); }
 
 /* ── legend ─────────────────────────────────────────────────────────────── */
 .ev-legend {

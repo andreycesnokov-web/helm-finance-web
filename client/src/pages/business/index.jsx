@@ -3,7 +3,7 @@
 // to Pulse formulas, wallet-balance logic, classification, access, ledger or contracts.
 // Mounted at /business/* so the legacy /,/accounts routes stay untouched during migration.
 import { Navigate, Outlet, useNavigate } from 'react-router-dom'
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { apiFetch } from '../../lib/api'
 import { useAuth } from '../../hooks/useAuth'
 import { formatAmount } from '../../lib/money'
@@ -26,8 +26,10 @@ import {
 // no /api/invoices routes, so the hub explains the review-first flow and connects the
 // modules that DO exist rather than listing records that cannot be fetched.
 import { resolveRecordId } from './Workbench'
+import RecordDrawer, { DocPicker } from './RecordDrawer'
+import InvoiceReviewDrawer from './InvoiceReviewDrawer'
 import {
-  InvoiceSummary, InvoiceQueue, InvoiceReview, LinkPicker, InvoiceFooterNote,
+  InvoiceSummary, InvoiceQueue, LinkPicker, InvoiceFooterNote,
   isInvoiceDoc, directionOf, debtLink,
 } from './InvoiceBlocks'
 // Evidence / invoice-requirement UX. Debt evidence is REAL (debts.attachments, migration
@@ -575,6 +577,15 @@ function DebtsView({ kind }) {
   const [data, setData] = useState({ loading: true, error: null, debts: null, wallets: [] })
   const [payDebt, setPayDebt] = useState(null)
   const [showCreate, setShowCreate] = useState(false)
+  // Record detail: the drawer is the record's home — open, edit, add evidence, pay.
+  const [openRec, setOpenRec] = useState(null)        // { debt, focus }
+  const [recDocs, setRecDocs] = useState({ loading: false, rows: [] })
+  const [allDocs, setAllDocs] = useState([])
+  const [editDebt, setEditDebt] = useState(null)
+  const [uploadFor, setUploadFor] = useState(null)
+  const [pickFor, setPickFor] = useState(null)
+  const [recBusy, setRecBusy] = useState(false)
+  const [recErr, setRecErr] = useState(null)
   const reload = () => {
     if (!token || !active) return
     setData(d => ({ ...d, loading: true, error: null }))
@@ -583,6 +594,53 @@ function DebtsView({ kind }) {
       .catch(e => setData({ loading: false, error: e.message || 'Request failed', debts: null, wallets: [] }))
   }
   useEffect(() => { let on = true; if (token && active) { setData(d => ({ ...d, loading: true })); Promise.all([apiFetch('/debts', token), apiFetch('/wallets', token).catch(() => ({ wallets: [] }))]).then(([debts, w]) => on && setData({ loading: false, error: null, debts, wallets: w.wallets || [] })).catch(e => on && setData({ loading: false, error: e.message, debts: null, wallets: [] })) } return () => { on = false } }, [token, active?.id, scopeKey]) // eslint-disable-line
+
+  // Evidence for THIS record — GET /api/documents?debt_id=<id> is a real server-side filter.
+  const loadRecDocs = useCallback(async (debt) => {
+    if (!debt?.id || !token) return
+    setRecDocs({ loading: true, rows: [] })
+    try {
+      const r = await apiFetch(`/documents?debt_id=${encodeURIComponent(debt.id)}`, token)
+      setRecDocs({ loading: false, rows: r.documents || [] })
+    } catch { setRecDocs({ loading: false, rows: [] }) }
+  }, [token])
+
+  const openRecord = useCallback((debt, focus = null) => {
+    setRecErr(null); setOpenRec({ debt, focus }); loadRecDocs(debt)
+  }, [loadRecDocs])
+
+  const refreshRecord = useCallback(async (debt) => {
+    reload()
+    if (debt?.id) await loadRecDocs(debt)
+  }, [reload, loadRecDocs])
+
+  const openDocPicker = useCallback(async (debt) => {
+    setRecErr(null); setRecBusy(true)
+    try {
+      const r = await apiFetch('/documents', token)
+      setAllDocs(r.documents || [])
+      setPickFor(debt)
+    } catch (e) { setRecErr(e.message || 'Could not load documents') } finally { setRecBusy(false) }
+  }, [token])
+
+  const linkExisting = useCallback(async (doc) => {
+    const debt = pickFor
+    if (!debt?.id || !doc?.id) return
+    setRecBusy(true); setRecErr(null)
+    try {
+      await apiFetch(`/documents/${doc.id}/links`, token, {
+        method: 'POST', body: { target_type: 'debt', target_id: debt.id },
+      })
+      setPickFor(null); await refreshRecord(debt)
+    } catch (e) { setRecErr(e.message || 'Could not link the document') } finally { setRecBusy(false) }
+  }, [pickFor, token, refreshRecord])
+
+  const viewDoc = useCallback(async (d) => {
+    try {
+      const r = await apiFetch(`/documents/${d.id}/signed-url`, token, { method: 'POST', body: {} })
+      if (r?.url) window.open(r.url, '_blank', 'noopener')
+    } catch (e) { setRecErr(e.message) }
+  }, [token])
 
   const title = isPayable ? 'Payables' : 'Receivables'
   const newLabel = isPayable ? '+ New payable' : '+ New receivable'
@@ -625,11 +683,27 @@ function DebtsView({ kind }) {
           { key: 'due', label: 'Due', render: d => <span className="cfo-mono">{(d.due_date || '').slice(0, 10) || '—'}</span> },
           { key: 'status', label: 'Status', render: d => <StatusBadge tone={toneFor(d.status)}>{d.status}{d.days_overdue > 0 ? ` · ${d.days_overdue}d` : ''}</StatusBadge> },
           { key: 'progress', label: 'Paid', render: d => <span className="cfo-mono">{idr(d.paid_amount || 0)} / {idr(d.original_amount || d.amount)}</span> },
-          { key: 'doc', label: 'Evidence', render: d => <EvidenceBadge state={evidenceOfDebt(d)} sm /> },
+          // The badge is the affordance: clicking it opens this record focused on Evidence,
+          // so "Upload document" is never ambiguous about which record it attaches to.
+          { key: 'doc', label: 'Evidence', render: d => (
+            <button type="button" className="rec-evbtn" onClick={(e) => { e.stopPropagation(); openRecord(d, 'evidence') }}>
+              <EvidenceBadge state={evidenceOfDebt(d)} sm />
+              {evidenceOfDebt(d) !== 'complete' && <span className="rec-evbtn-cta">Add evidence</span>}
+            </button>
+          ) },
           { key: 'amount', label: 'Remaining', num: true, render: d => <span className={isPayable ? 'cfo-neg' : 'cfo-pos'}>{isPayable ? '−' : '+'}{idr(d.remaining_amount ?? d.amount)}</span> },
-          { key: 'act', label: '', render: d => d.status !== 'paid' ? <Btn sm variant="ghost" onClick={() => setPayDebt(d)}>{isPayable ? 'Pay Now' : (d.status === 'partial' ? 'More' : 'Mark received')}</Btn> : null },
+          { key: 'act', label: '', render: d => (
+            <span className="rec-rowacts">
+              <Btn sm variant="ghost" onClick={(e) => { e.stopPropagation(); openRecord(d) }}>Open</Btn>
+              {d.status !== 'paid' && (
+                <Btn sm variant="ghost" onClick={(e) => { e.stopPropagation(); setPayDebt(d) }}>
+                  {isPayable ? 'Pay Now' : (d.status === 'partial' ? 'More' : 'Mark received')}
+                </Btn>
+              )}
+            </span>
+          ) },
         ]}
-        rows={debts} rowKey={d => d.id} />
+        rows={debts} rowKey={d => d.id} onRowClick={d => openRecord(d)} />
     </Card>
     {/* mobile cards */}
     <div className="cfo-mcards">
@@ -645,7 +719,10 @@ function DebtsView({ kind }) {
             <span className="cfo-mono">Paid {idr(d.paid_amount || 0)} / {idr(d.original_amount || d.amount)}</span>
             <EvidenceBadge state={evidenceOfDebt(d)} sm />
           </div>
-          {d.status !== 'paid' && <div className="cfo-dcard-foot"><Btn sm onClick={() => setPayDebt(d)}>{isPayable ? 'Pay Now' : (d.status === 'partial' ? 'More' : 'Mark received')}</Btn></div>}
+          <div className="cfo-dcard-foot">
+            <Btn sm variant="ghost" onClick={() => openRecord(d)}>Open</Btn>
+            {d.status !== 'paid' && <Btn sm onClick={() => setPayDebt(d)}>{isPayable ? 'Pay Now' : (d.status === 'partial' ? 'More' : 'Mark received')}</Btn>}
+          </div>
         </div>
       ))}
     </div>
@@ -654,6 +731,34 @@ function DebtsView({ kind }) {
         onClose={() => setPayDebt(null)} onSuccess={() => { setPayDebt(null); reload() }} />
     )}
     {createModal}
+
+    <RecordDrawer open={!!openRec} debt={openRec?.debt} kind={kind} focus={openRec?.focus}
+      docs={recDocs.rows} docsLoading={recDocs.loading} busy={recBusy} error={recErr}
+      onClose={() => { setOpenRec(null); setRecErr(null) }}
+      onEdit={(d) => setEditDebt(d)}
+      onUpload={(d) => setUploadFor(d)}
+      onLinkDoc={(d) => openDocPicker(d)}
+      onViewDoc={viewDoc}
+      onPay={(d) => { setOpenRec(null); setPayDebt(d) }}
+      onOpenDocuments={() => navigate('/business/documents')} />
+
+    <DocPicker open={!!pickFor} docs={allDocs} busy={recBusy} error={recErr}
+      onPick={linkExisting} onClose={() => setPickFor(null)} />
+
+    {/* Real edit: the debt carries an id, so DebtFormModal takes the PATCH path. */}
+    {editDebt && (
+      <DebtFormModal mode={kind} token={token} initialDebt={editDebt} lockBusinessScope
+        onClose={() => setEditDebt(null)}
+        onSuccess={() => { setEditDebt(null); refreshRecord(openRec?.debt) }} />
+    )}
+
+    {/* Upload scoped to THIS record — upload-complete links it in the same call. */}
+    {uploadFor && (
+      <DocumentIntakeModal business={active} link={{ target_type: 'debt', target_id: uploadFor.id }}
+        heading={`Upload evidence for ${uploadFor.counterparty || (isPayable ? 'this payable' : 'this receivable')}`}
+        onClose={() => setUploadFor(null)}
+        onUploaded={() => { setUploadFor(null); refreshRecord(uploadFor) }} />
+    )}
   </>
 }
 
@@ -976,6 +1081,17 @@ export function BusinessInvoices() {
   const [upload, setUpload] = useState(false)
   const [outcome, setOutcome] = useState(null)
   const [blocked, setBlocked] = useState(() => new Set())
+  // Real tax rule engine: active tax_rules for this jurisdiction + official source.
+  const [rules, setRules] = useState({ loading: true, rows: [], failed: false })
+  useEffect(() => {
+    if (!token || !active) return
+    let on = true
+    apiFetch('/accountant/rules', token)
+      .then((r) => on && setRules({ loading: false, rows: Array.isArray(r?.rules) ? r.rules : [], failed: false }))
+      // A missing or failing rule engine is a state to report, not a reason to break the page.
+      .catch(() => on && setRules({ loading: false, rows: [], failed: true }))
+    return () => { on = false }
+  }, [token, active])
 
   const load = useCallback(() => {
     if (!token || !active) return
@@ -1057,10 +1173,16 @@ export function BusinessInvoices() {
       onUpload={() => setUpload(true)} navigate={navigate} />
     <InvoiceFooterNote navigate={navigate} />
 
-    <InvoiceReview doc={review} cpName={cpName} onClose={() => setReview(null)} onView={onView}
-      onCreate={(doc, dir) => { setReview(null); setCreate({ doc, dir }) }}
-      onLinkDebt={(doc) => { setReview(null); openDebtPicker(doc) }}
-      onMatch={(doc) => { setReview(null); openTxPicker(doc) }} />
+    <InvoiceReviewDrawer doc={review} open={!!review} cpName={cpName}
+      rules={rules.rows} rulesLoading={rules.loading} rulesError={rules.failed} busy={busy} error={pickErr}
+      onClose={() => setReview(null)} onView={onView}
+      onLinkExisting={(doc) => { setReview(null); openDebtPicker(doc) }}
+      onCreate={(plan) => {
+        // The confirmed amount is what gets created — gross or net, chosen explicitly in
+        // the drawer. Never a silent substitution.
+        setReview(null)
+        setCreate({ doc: plan.doc, dir: 'payable', plan })
+      }} />
 
     <LinkPicker open={!!picker} kind={picker?.kind} doc={picker?.doc} rows={picker?.rows || []}
       busy={busy} error={pickErr} onClose={() => setPicker(null)}
@@ -1074,8 +1196,15 @@ export function BusinessInvoices() {
         subtitle="Review and confirm before this affects your books."
         prefill={{
           counterparty: cpName(create.doc.issuer_counterparty_id) || '',
-          description: `Invoice ${create.doc.document_number || create.doc.file?.file_name || ''}`.trim(),
-          original_amount: create.doc.gross_amount,
+          // The tax decision travels in the description because debts have no tax fields —
+          // a note, never a stored breakdown.
+          description: [
+            `Invoice ${create.doc.document_number || create.doc.file?.file_name || ''}`.trim(),
+            create.plan?.withheld ? `gross ${create.plan.gross} · withheld ${create.plan.withheld} (${create.plan.rate}%)` : null,
+            create.plan?.treatment === 'review' ? 'tax review pending' : null,
+            create.plan?.note || null,
+          ].filter(Boolean).join(' · '),
+          original_amount: create.plan?.amount ?? create.doc.gross_amount,
           due_date: create.doc.document_date || null,
         }}
         onClose={() => setCreate(null)}

@@ -1,0 +1,102 @@
+/* ============================================================================
+   AI Invoice Review drawer. Brandbook tokens only — blue for suggestions,
+   amber for needs-review, no alarm red. Class prefix: ir-
+   ========================================================================== */
+.ir-scrim { position: fixed; inset: 0; z-index: 60; background: var(--surface-overlay); display: flex; justify-content: flex-end; }
+.ir-drawer {
+  width: min(520px, 100%); height: 100%; overflow-y: auto; padding: 24px;
+  background: var(--surface-card); box-shadow: var(--shadow-lg);
+  display: flex; flex-direction: column; gap: 14px;
+}
+.ir-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.ir-eyebrow { font-size: 10.5px; font-weight: 800; letter-spacing: .09em; text-transform: uppercase; color: var(--text-muted); }
+.ir-title { margin: 4px 0 4px; font-family: var(--font-display); font-size: 20px; line-height: 1.25; color: var(--brand-navy); overflow-wrap: anywhere; }
+.ir-sub { margin: 0; font-size: 13px; line-height: 1.55; color: var(--text-secondary); }
+.ir-x {
+  display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px;
+  border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--text-muted); cursor: pointer;
+}
+.ir-x:hover { background: var(--surface-card-muted); color: var(--brand-navy); }
+
+.ir-chips { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
+.ir-gross { margin-left: auto; font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 17px; font-weight: 700; color: var(--brand-navy); }
+
+.ir-sec {
+  display: flex; flex-direction: column; gap: 7px; padding: 15px 16px;
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-md); background: var(--surface-card);
+}
+.ir-sec-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.ir-label { font-size: 10.5px; font-weight: 800; letter-spacing: .11em; text-transform: uppercase; color: var(--text-muted); }
+
+.ir-kv { display: flex; align-items: baseline; justify-content: space-between; gap: 14px; font-size: 13px; }
+.ir-kv > span:first-child { color: var(--text-muted); flex: 0 0 auto; }
+.ir-kv > span:last-child { color: var(--text-primary); font-weight: 600; text-align: right; display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.ir-miss { font-style: normal; color: var(--warning); font-weight: 600; }
+
+.ir-conf { padding: 2px 7px; border-radius: 999px; font-size: 9.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; white-space: nowrap; }
+.ir-conf--high { background: var(--success-soft); color: var(--success); }
+.ir-conf--med { background: var(--warning-soft); color: var(--warning); }
+.ir-conf--low { background: var(--brand-pale-grey); color: var(--text-muted); }
+
+.ir-note { margin: 0; font-size: 12.5px; line-height: 1.6; color: var(--text-secondary); }
+.ir-note-muted { color: var(--text-muted); }
+.ir-note-amber { padding: 9px 11px; border-radius: var(--radius-sm); background: var(--warning-soft); color: var(--brand-navy); font-weight: 600; }
+.ir-warn { padding: 9px 11px; border-radius: var(--radius-sm); background: var(--warning-soft); color: var(--brand-navy); font-weight: 600; }
+.ir-mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+/* ── payment breakdown — the visual centre ──────────────────────────────── */
+.ir-break { border-color: var(--brand-electric-blue); background: var(--info-soft); }
+.ir-row { display: flex; align-items: baseline; justify-content: space-between; gap: 14px; font-size: 13.5px; color: var(--text-secondary); padding: 3px 0; }
+.ir-row-total {
+  margin-top: 4px; padding-top: 9px; border-top: 1px solid var(--border-strong);
+  font-weight: 800; color: var(--brand-navy); font-size: 14.5px;
+}
+.ir-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
+.ir-card {
+  display: flex; flex-direction: column; gap: 3px; padding: 13px 14px;
+  border-radius: var(--radius-md); background: var(--surface-card); border: 1px solid var(--border-default);
+}
+.ir-card--tax { background: var(--brand-navy); border-color: transparent; }
+.ir-card-k { font-size: 10.5px; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; color: var(--text-muted); }
+.ir-card--tax .ir-card-k { color: rgba(255, 255, 255, .7); }
+.ir-card-v { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 17px; font-weight: 700; color: var(--brand-navy); overflow-wrap: anywhere; }
+.ir-card--tax .ir-card-v { color: var(--brand-white); }
+
+/* ── edit calculation ───────────────────────────────────────────────────── */
+.ir-form { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 4px; }
+.ir-field { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.ir-field-wide { grid-column: 1 / -1; }
+.ir-field > span { font-size: 10.5px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--text-muted); }
+.ir-field input, .ir-field select {
+  min-height: 36px; padding: 7px 10px; border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm); background: var(--surface-card);
+  font: inherit; font-size: 13px; color: var(--text-primary);
+}
+.ir-field input:focus, .ir-field select:focus { outline: 2px solid var(--border-focus); outline-offset: 1px; }
+.ir-form > .ir-note { grid-column: 1 / -1; }
+
+/* ── what will be created ───────────────────────────────────────────────── */
+.ir-will { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-direction: column; gap: 9px; counter-reset: w; }
+.ir-will li { display: flex; flex-direction: column; gap: 2px; padding-left: 26px; position: relative; }
+.ir-will li::before {
+  counter-increment: w; content: counter(w);
+  position: absolute; left: 0; top: 1px;
+  display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px;
+  border-radius: 999px; background: var(--info-soft); color: var(--brand-navy);
+  font-family: var(--font-mono); font-size: 10px; font-weight: 700;
+}
+.ir-will li.is-blocked::before { background: var(--brand-pale-grey); color: var(--text-muted); }
+.ir-will strong { font-size: 13.5px; font-weight: 800; color: var(--brand-navy); }
+.ir-will span { font-size: 12.5px; line-height: 1.6; color: var(--text-secondary); }
+.ir-will li.is-blocked strong { color: var(--text-muted); }
+
+.ir-actions { display: flex; flex-direction: column; gap: 9px; margin-top: auto; padding-top: 4px; }
+.ir-actions > .cfo-btn { width: 100%; }
+.ir-drawer :is(button, input, select):focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
+
+@media (max-width: 640px) {
+  .ir-drawer { width: 100%; padding: 20px; }
+  .ir-cards, .ir-form { grid-template-columns: 1fr; }
+  .ir-gross { margin-left: 0; }
+  .ir-note, .ir-kv, .ir-row { font-size: 14px; }
+}

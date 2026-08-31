@@ -20,6 +20,7 @@
 //   • Tax/withholding is never computed — there is no tax engine behind this page.
 import { useState, useMemo } from 'react'
 import { StatusBadge, Btn, Icon, LoadingSkeleton } from '../../shell/ui'
+import { inferService } from './InvoiceReviewDrawer'
 import {
   useWorkbench, WorkbenchToolbar, GroupHeader, MoreMenu, NoMatches,
   monthGroup, DATE_OPTIONS, AMOUNT_OPTIONS,
@@ -211,11 +212,15 @@ export function InvoiceQueue({ docs, loading, cpName, blockCreate, onReview, onV
     const dl = debtLink(d)
     const amt = amountOf(d)
     const cp = cpName(d.issuer_counterparty_id)
+    // Name-based inference only — there is no OCR, so this is never presented as extracted.
+    const svc = dir === 'payable' ? inferService(cp || d.file?.file_name) : null
     // Primary stays visible, the rest collapse — a long row never becomes a button wall.
     // A record already created for this document but not yet linked must not offer
     // "Create" again — that is how duplicates happen.
     const blocked = blockCreate?.has(d.id)
-    const primary = !dl && dir && !blocked
+    const primary = !dl && dir === 'payable' && !blocked
+      ? { label: 'Review tax & payable', onClick: () => onReview(d) }
+      : !dl && dir && !blocked
       ? { label: `Create ${dir}`, onClick: () => onCreate(d, dir) }
       : blocked && !dl
         ? { label: 'Link existing', onClick: () => onLinkDebt(d) }
@@ -244,6 +249,13 @@ export function InvoiceQueue({ docs, loading, cpName, blockCreate, onReview, onV
             <span className="inv-mono">{amt !== null ? idr(amt, d.currency) : <em>Amount needed</em>}</span>
             <span>{dl ? `Linked · ${dir === 'receivable' ? 'receivable' : 'payable'} #${dl.target_id}` : <em>Not linked</em>}</span>
           </div>
+          {/* Service type is a name-based inference, never extraction — labelled as such. */}
+          {dir === 'payable' && !dl && (
+            <span className="inv-row-tax">
+              {svc ? `${svc.label} — inferred, needs review` : 'Service type needs review'}
+              {' · Tax review needed'}
+            </span>
+          )}
         </div>
         <div className="inv-row-actions">
           <Btn sm onClick={primary.onClick}>{primary.label}</Btn>
@@ -281,84 +293,6 @@ export function InvoiceQueue({ docs, loading, cpName, blockCreate, onReview, onV
 }
 
 /* ── review drawer ────────────────────────────────────────────────────────── */
-
-export function InvoiceReview({ doc, cpName, onClose, onView, onCreate, onLinkDebt, onMatch }) {
-  if (!doc) return null
-  const dir = directionOf(doc)
-  const amt = amountOf(doc)
-  const dl = debtLink(doc)
-  const cp = cpName(doc.issuer_counterparty_id)
-  const need = <em className="inv-need">Needs review</em>
-
-  const fields = [
-    ['Document type', doc.document_type || null],
-    ['Invoice number', doc.document_number || null],
-    ['Invoice date', fmtDate(doc.document_date)],
-    ['Counterparty', cp],
-    ['Amount', amt !== null ? idr(amt, doc.currency) : null],
-    ['Currency', doc.currency || null],
-    ['Tax amount', has(doc.commercial_tax_amount) ? idr(doc.commercial_tax_amount, doc.currency) : null],
-    ['Extraction status', doc.extraction_status || null],
-  ]
-
-  const impact = dir === 'payable' ? 'Create a payable — this is money your business owes.'
-    : dir === 'receivable' ? 'Create a receivable — this is money expected from a customer.'
-      : 'Set the document type to a supplier or sales invoice before a record can be created.'
-
-  return (
-    <div className="inv-drawer-scrim" onClick={onClose}>
-      <aside className="inv-drawer" role="dialog" aria-modal="true" aria-label="Invoice review"
-        onClick={(e) => e.stopPropagation()}>
-        <header className="inv-drawer-head">
-          <div>
-            <span className="inv-drawer-eyebrow">{dir ? DIR_LABEL[dir] : 'Invoice'}</span>
-            <h2 className="inv-drawer-title">{doc.file?.file_name || doc.document_number || 'Invoice'}</h2>
-          </div>
-          <button type="button" className="inv-drawer-x" onClick={onClose} aria-label="Close">
-            <Icon.plus width="16" height="16" style={{ transform: 'rotate(45deg)' }} />
-          </button>
-        </header>
-
-        <section className="inv-drawer-sec">
-          <span className="inv-drawer-label">Document</span>
-          <div className="inv-kv"><span>Source</span><span>{doc.file?.upload_channel === 'telegram' ? 'Telegram' : 'Upload'}</span></div>
-          <div className="inv-kv"><span>File</span><span>{doc.file?.file_name || '—'}</span></div>
-          <Btn sm variant="ghost" onClick={() => onView(doc)}>View document</Btn>
-        </section>
-
-        <section className="inv-drawer-sec">
-          <span className="inv-drawer-label">Extracted invoice fields</span>
-          {fields.map(([k, v]) => (
-            <div className="inv-kv" key={k}><span>{k}</span><span>{v || need}</span></div>
-          ))}
-        </section>
-
-        <section className="inv-drawer-sec">
-          <span className="inv-drawer-label">Suggested financial impact</span>
-          <p className="inv-note">{impact}</p>
-        </section>
-
-        <section className="inv-drawer-sec">
-          <span className="inv-drawer-label">Tax review</span>
-          <p className="inv-note">
-            Tax and withholding require accountant review — nothing is calculated here.
-            {dir === 'payable' && ' For services, a withholding tax review may be needed.'}
-          </p>
-        </section>
-
-        <footer className="inv-drawer-actions">
-          {!dl && dir && <Btn onClick={() => onCreate(doc, dir)}>Create {dir} draft</Btn>}
-          {!dl && <Btn variant="ghost" onClick={() => onLinkDebt(doc)}>Link to existing</Btn>}
-          {dl && !txLink(doc) && <Btn onClick={() => onMatch(doc)}>Match to payment</Btn>}
-          <p className="inv-note inv-note-muted">
-            Marking a document reviewed is not stored yet — the review status field is
-            read-only through the API.
-          </p>
-        </footer>
-      </aside>
-    </div>
-  )
-}
 
 /* ── link picker (debts or transactions) ──────────────────────────────────── */
 
