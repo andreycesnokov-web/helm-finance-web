@@ -27,6 +27,7 @@ import {
 // modules that DO exist rather than listing records that cannot be fetched.
 import { resolveRecordId } from './Workbench'
 import RecordDrawer, { DocPicker } from './RecordDrawer'
+import { findWithholdingRule } from './InvoiceReviewDrawer'
 import InvoiceReviewDrawer from './InvoiceReviewDrawer'
 import {
   InvoiceSummary, InvoiceQueue, LinkPicker, InvoiceFooterNote,
@@ -586,6 +587,12 @@ function DebtsView({ kind }) {
   const [pickFor, setPickFor] = useState(null)
   const [recBusy, setRecBusy] = useState(false)
   const [recErr, setRecErr] = useState(null)
+  const [recNotice, setRecNotice] = useState(null)
+  const [pickPrefer, setPickPrefer] = useState(null)   // 'payment_proof' when the gap is payment
+  const [uploadType, setUploadType] = useState(null)
+  // Tax rules power the readiness checklist's tax item. If the engine is
+  // unavailable the checklist says so; it never guesses a rule.
+  const [recRules, setRecRules] = useState({ rows: [], failed: false })
   const reload = () => {
     if (!token || !active) return
     setData(d => ({ ...d, loading: true, error: null }))
@@ -594,6 +601,15 @@ function DebtsView({ kind }) {
       .catch(e => setData({ loading: false, error: e.message || 'Request failed', debts: null, wallets: [] }))
   }
   useEffect(() => { let on = true; if (token && active) { setData(d => ({ ...d, loading: true })); Promise.all([apiFetch('/debts', token), apiFetch('/wallets', token).catch(() => ({ wallets: [] }))]).then(([debts, w]) => on && setData({ loading: false, error: null, debts, wallets: w.wallets || [] })).catch(e => on && setData({ loading: false, error: e.message, debts: null, wallets: [] })) } return () => { on = false } }, [token, active?.id, scopeKey]) // eslint-disable-line
+
+  useEffect(() => {
+    if (!token || !active) return
+    let on = true
+    apiFetch('/accountant/rules', token)
+      .then((r) => on && setRecRules({ rows: Array.isArray(r?.rules) ? r.rules : [], failed: false }))
+      .catch(() => on && setRecRules({ rows: [], failed: true }))
+    return () => { on = false }
+  }, [token, active?.id])
 
   // Evidence for THIS record — GET /api/documents?debt_id=<id> is a real server-side filter.
   const loadRecDocs = useCallback(async (debt) => {
@@ -606,7 +622,7 @@ function DebtsView({ kind }) {
   }, [token])
 
   const openRecord = useCallback((debt, focus = null) => {
-    setRecErr(null); setOpenRec({ debt, focus }); loadRecDocs(debt)
+    setRecErr(null); setRecNotice(null); setOpenRec({ debt, focus }); loadRecDocs(debt)
   }, [loadRecDocs])
 
   const refreshRecord = useCallback(async (debt) => {
@@ -614,14 +630,31 @@ function DebtsView({ kind }) {
     if (debt?.id) await loadRecDocs(debt)
   }, [reload, loadRecDocs])
 
-  const openDocPicker = useCallback(async (debt) => {
-    setRecErr(null); setRecBusy(true)
+  const openDocPicker = useCallback(async (debt, prefer = null) => {
+    setRecErr(null); setRecNotice(null); setRecBusy(true); setPickPrefer(prefer)
     try {
       const r = await apiFetch('/documents', token)
       setAllDocs(r.documents || [])
       setPickFor(debt)
     } catch (e) { setRecErr(e.message || 'Could not load documents') } finally { setRecBusy(false) }
   }, [token])
+
+  // REAL unlink: DELETE /api/documents/:id/links/:linkId → rpc_document_unlink
+  // removes the link row and audits it. The document and its file are untouched.
+  const unlinkDoc = useCallback(async (doc, linkId) => {
+    const debt = openRec?.debt
+    if (!doc?.id || !linkId || !debt) return
+    setRecBusy(true); setRecErr(null); setRecNotice(null)
+    try {
+      await apiFetch(`/documents/${doc.id}/links/${linkId}`, token, { method: 'DELETE' })
+      await refreshRecord(debt)
+      setRecNotice('Document unlinked from this record. The file is still in Documents.')
+    } catch (e) {
+      setRecErr(e.status === 404
+        ? 'That link no longer exists. Refresh to see the current evidence.'
+        : 'Could not unlink this document. Please refresh and try again.')
+    } finally { setRecBusy(false) }
+  }, [openRec, token, refreshRecord])
 
   const linkExisting = useCallback(async (doc) => {
     const debt = pickFor
@@ -632,8 +665,32 @@ function DebtsView({ kind }) {
         method: 'POST', body: { target_type: 'debt', target_id: debt.id },
       })
       setPickFor(null); await refreshRecord(debt)
-    } catch (e) { setRecErr(e.message || 'Could not link the document') } finally { setRecBusy(false) }
+      setRecNotice('Document linked to this record.')
+    } catch (e) {
+      // The DB enforces UNIQUE(document_id, debt_id); the route reports it as 409.
+      setRecErr(e.code === 'already_linked'
+        ? 'That document is already attached to this record.'
+        : (e.message || 'Could not link the document'))
+    } finally { setRecBusy(false) }
   }, [pickFor, token, refreshRecord])
+
+  // Shared by the picker and by the upload modal's duplicate path.
+  const linkExistingById = useCallback(async (docId, debt) => {
+    if (!docId || !debt?.id) return
+    setRecBusy(true); setRecErr(null)
+    try {
+      await apiFetch(`/documents/${docId}/links`, token, {
+        method: 'POST', body: { target_type: 'debt', target_id: debt.id },
+      })
+      setUploadFor(null); setUploadType(null)
+      await refreshRecord(debt)
+      setRecNotice('The existing document is now attached to this record.')
+    } catch (e) {
+      setRecErr(e.code === 'already_linked'
+        ? 'That document is already attached to this record.'
+        : (e.message || 'Could not link the document'))
+    } finally { setRecBusy(false) }
+  }, [token, refreshRecord])
 
   const viewDoc = useCallback(async (d) => {
     try {
@@ -733,17 +790,21 @@ function DebtsView({ kind }) {
     {createModal}
 
     <RecordDrawer open={!!openRec} debt={openRec?.debt} kind={kind} focus={openRec?.focus}
-      docs={recDocs.rows} docsLoading={recDocs.loading} busy={recBusy} error={recErr}
-      onClose={() => { setOpenRec(null); setRecErr(null) }}
+      docs={recDocs.rows} docsLoading={recDocs.loading} busy={recBusy} error={recErr} notice={recNotice}
+      taxRule={findWithholdingRule(recRules.rows)?.rule || null} rulesError={recRules.failed}
+      onClose={() => { setOpenRec(null); setRecErr(null); setRecNotice(null) }}
       onEdit={(d) => setEditDebt(d)}
-      onUpload={(d) => setUploadFor(d)}
-      onLinkDoc={(d) => openDocPicker(d)}
+      onUpload={(d, type = null) => { setUploadType(type); setUploadFor(d) }}
+      onLinkDoc={(d, prefer = null) => openDocPicker(d, prefer)}
       onViewDoc={viewDoc}
+      onUnlink={unlinkDoc}
       onPay={(d) => { setOpenRec(null); setPayDebt(d) }}
       onOpenDocuments={() => navigate('/business/documents')} />
 
+    {/* The picker needs the record's context to judge compatibility and duplicates. */}
     <DocPicker open={!!pickFor} docs={allDocs} busy={recBusy} error={recErr}
-      onPick={linkExisting} onClose={() => setPickFor(null)} />
+      kind={kind} debtId={pickFor?.id} linkedDocs={recDocs.rows} prefer={pickPrefer}
+      onPick={linkExisting} onClose={() => { setPickFor(null); setPickPrefer(null) }} />
 
     {/* Real edit: the debt carries an id, so DebtFormModal takes the PATCH path. */}
     {editDebt && (
@@ -755,9 +816,16 @@ function DebtsView({ kind }) {
     {/* Upload scoped to THIS record — upload-complete links it in the same call. */}
     {uploadFor && (
       <DocumentIntakeModal business={active} link={{ target_type: 'debt', target_id: uploadFor.id }}
-        heading={`Upload evidence for ${uploadFor.counterparty || (isPayable ? 'this payable' : 'this receivable')}`}
-        onClose={() => setUploadFor(null)}
-        onUploaded={() => { setUploadFor(null); refreshRecord(uploadFor) }} />
+        defaultType={uploadType}
+        onLinkExisting={(docId) => linkExistingById(docId, uploadFor)}
+        heading={uploadType === 'payment_proof'
+          ? `Upload payment proof for ${uploadFor.counterparty || 'this record'}`
+          : `Upload evidence for ${uploadFor.counterparty || (isPayable ? 'this payable' : 'this receivable')}`}
+        onClose={() => { setUploadFor(null); setUploadType(null) }}
+        onUploaded={() => {
+          setUploadFor(null); setUploadType(null); refreshRecord(uploadFor)
+          setRecNotice('Evidence uploaded and attached to this record.')
+        }} />
     )}
   </>
 }

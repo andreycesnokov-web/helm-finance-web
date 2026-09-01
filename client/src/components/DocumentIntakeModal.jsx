@@ -11,13 +11,15 @@
 import { useState, useCallback, useRef } from 'react'
 import { useAuth } from '../hooks/useAuth'
 import { apiFetch } from '../lib/api'
-import { uploadDocument, MAX_FILE_BYTES } from '../lib/documents'
+import { uploadDocument, getSignedUrl, MAX_FILE_BYTES } from '../lib/documents'
 import { Btn, StatusBadge } from '../shell/ui'
+import { TYPE_LABEL } from '../pages/business/evidenceModel'
 
 const ACCEPT = '.pdf,.jpg,.jpeg,.png,.csv,.xlsx'
 const CONF_TONE = { high: 'success', medium: 'warning', low: 'warning', unknown: 'neutral' }
 
-export default function DocumentIntakeModal({ business, onClose, onUploaded, link = null, heading = null }) {
+export default function DocumentIntakeModal({ business, onClose, onUploaded, link = null,
+  heading = null, defaultType = null, onLinkExisting = null }) {
   // `link` = { target_type, target_id }. /api/documents/upload-complete already accepts it
   // and links best-effort, so uploading evidence FOR a specific record is one real call —
   // no global upload the user then has to hunt down and attach by hand.
@@ -59,19 +61,35 @@ export default function DocumentIntakeModal({ business, onClose, onUploaded, lin
       try {
         // document_type is deliberately left to the backend default/mapping; the AI Accountant
         // taxonomy is stored separately and confirmed by the user in the intake list.
-        await uploadDocument(token, it.file, { title: it.file.name }, link || undefined)
+        // When the caller asked for a specific role (payment proof), file it AS that type.
+        // Left to the default it would land as `other` and could never satisfy a
+        // role-specific evidence requirement.
+        const meta = { title: it.file.name }
+        if (defaultType) meta.document_type = defaultType
+        await uploadDocument(token, it.file, meta, link || undefined)
         // The server reads the document's content during upload-complete, so by the time
         // this resolves the real classification already exists — the list below refreshes.
         setItems(prev => prev.map((x, idx) => idx === i ? { ...x, status: 'uploaded' } : x))
       } catch (e) {
-        const dup = /duplicate/i.test(e.message || '')
+        // upload-init answers a SHA-256 match with 409 { duplicate, existing_document_id }.
+        // That id is the real existing document — surfaced, never guessed.
+        const dup = e.code === 'duplicate' || /duplicate/i.test(e.message || '')
+        const existingId = e.data?.existing_document_id || null
         setItems(prev => prev.map((x, idx) => idx === i
-          ? { ...x, status: dup ? 'duplicate' : 'failed', error: dup ? 'Already uploaded to this workspace' : (e.message || 'Upload failed') }
+          ? { ...x, status: dup ? 'duplicate' : 'failed', existingId,
+              error: dup
+                ? 'This file is already uploaded to this workspace.'
+                : (e.message || 'Upload failed') }
           : x))
       }
     }
     setBusy(false)
     onUploaded?.()
+  }
+
+  const openExisting = async (id) => {
+    try { const url = await getSignedUrl(token, id); if (url) window.open(url, '_blank', 'noopener') }
+    catch { /* the row already shows the duplicate; a failed preview changes nothing */ }
   }
 
   const queued = items.filter(i => i.status === 'queued').length
@@ -90,6 +108,13 @@ export default function DocumentIntakeModal({ business, onClose, onUploaded, lin
           Uploading to <b>{business?.name || 'this business workspace'}</b>.
           Files are stored in this business workspace only — never in your personal workspace or any other company.
         </div>
+
+        {defaultType && (
+          <div style={{ background: 'var(--warning-soft,#FBF1DF)', borderRadius: 10, padding: '9px 12px', fontSize: 12.5, marginBottom: 12, lineHeight: 1.5 }}>
+            Filing as <b>{TYPE_LABEL[defaultType] || defaultType}</b> so it counts as the right
+            kind of evidence on this record. You can change the type afterwards in Documents.
+          </div>
+        )}
 
         {/* Drop zone */}
         <div
@@ -134,6 +159,30 @@ export default function DocumentIntakeModal({ business, onClose, onUploaded, lin
                 </StatusBadge>
               </div>
             ))}
+            {items.some(it => it.status === 'duplicate' && it.existingId) && (
+              <div style={{ padding: '9px 12px', borderTop: '0.5px solid var(--border-subtle,#eee)', background: 'var(--warning-soft,#FBF1DF)' }}>
+                <div style={{ fontSize: 12.5, fontWeight: 700, marginBottom: 2 }}>Possible duplicate document</div>
+                <div style={{ fontSize: 12, lineHeight: 1.5, color: 'var(--text-secondary,#555)' }}>
+                  This file already exists in this workspace, so it was not uploaded again.
+                </div>
+                <div style={{ display: 'flex', gap: 12, marginTop: 6, flexWrap: 'wrap' }}>
+                  {items.filter(it => it.status === 'duplicate' && it.existingId).slice(0, 1).map((it, i) => (
+                    <span key={i} style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                      <button type="button" onClick={() => openExisting(it.existingId)}
+                        style={{ padding: 0, border: 0, background: 'none', font: 'inherit', fontSize: 12, fontWeight: 700, color: 'var(--text-link,#1565C0)', cursor: 'pointer' }}>
+                        Open existing document
+                      </button>
+                      {onLinkExisting && link && (
+                        <button type="button" onClick={() => onLinkExisting(it.existingId)}
+                          style={{ padding: 0, border: 0, background: 'none', font: 'inherit', fontSize: 12, fontWeight: 700, color: 'var(--text-link,#1565C0)', cursor: 'pointer' }}>
+                          Link the existing one to this record instead
+                        </button>
+                      )}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
 

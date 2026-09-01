@@ -42,7 +42,12 @@ export async function apiFetch(path, token, options = {}) {
     if (res.status === 403 && data?.error === 'workspace_not_accessible') {
       try { setActiveBusinessId(null) } catch { /* */ }
     }
-    const err = new Error(data.error || 'Request failed'); err.status = res.status; throw err
+    // Keep the whole error payload: routes return actionable detail alongside the
+    // code (e.g. upload-init 409 duplicate carries existing_document_id). Callers
+    // that only read err.message/err.status are unaffected.
+    const err = new Error(data.error || 'Request failed')
+    err.status = res.status; err.code = data?.error || null; err.data = data
+    throw err
   }
   return data
 }

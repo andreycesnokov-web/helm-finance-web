@@ -94,7 +94,93 @@
 .rec-evbtn:hover .rec-evbtn-cta { text-decoration: underline; }
 .rec-rowacts { display: inline-flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
 
+/* ── evidence items ─────────────────────────────────────────────────────────
+   Compatibility is carried by a left accent, not a filled alarm panel: amber for
+   "may not support", red only for a real contradiction (a sales invoice filed
+   against money you owe). Everything else stays calm. */
+.rec-ev {
+  display: flex; flex-direction: column; gap: 5px;
+  padding: 11px 12px 10px; border: 1px solid var(--border-default);
+  border-left-width: 3px; border-radius: var(--radius-sm); background: var(--surface-card);
+}
+.rec-ev--suitable   { border-left-color: var(--success); }
+.rec-ev--caution    { border-left-color: var(--warning); background: var(--warning-soft); }
+.rec-ev--unsuitable { border-left-color: var(--danger);  background: var(--danger-soft); }
+.rec-ev--plain      { border-left-color: var(--border-strong); }
+
+.rec-ev-top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.rec-ev-ic {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px; flex: 0 0 auto; border-radius: var(--radius-sm);
+  background: var(--brand-pale-grey); color: var(--brand-navy);
+}
+.rec-ev-name {
+  flex: 1 1 auto; min-width: 0; padding: 0; border: 0; background: none; text-align: left;
+  font: inherit; font-size: 13px; font-weight: 700; color: var(--brand-navy);
+  overflow-wrap: anywhere; cursor: pointer;
+}
+.rec-ev-name:hover { text-decoration: underline; }
+.rec-ev-name.as-text { cursor: default; }
+.rec-ev-name.as-text:hover { text-decoration: none; }
+
+.rec-ev-meta { display: flex; flex-wrap: wrap; gap: 3px 12px; font-size: 11.5px; color: var(--text-muted); }
+.rec-mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+.rec-ev-why { margin: 2px 0 0; font-size: 12px; line-height: 1.5; color: var(--brand-navy); font-weight: 600; }
+.rec-ev-why--muted { color: var(--text-secondary); font-weight: 500; }
+
+.rec-ev-acts { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 3px; }
+.rec-ev-nolink { font-size: 11.5px; color: var(--text-muted); }
+.rec-ev-confirm {
+  display: flex; flex-direction: column; gap: 8px; margin-top: 4px; padding: 9px 10px;
+  border-radius: var(--radius-sm); background: var(--surface-card-muted);
+  font-size: 12.5px; line-height: 1.5; color: var(--text-secondary);
+}
+
+/* Text-weight action: an evidence row should not become a wall of buttons. */
+.rec-link {
+  padding: 0; border: 0; background: none; font: inherit; font-size: 12px; font-weight: 700;
+  color: var(--text-link); cursor: pointer;
+}
+.rec-link:hover:not(:disabled) { text-decoration: underline; }
+.rec-link:disabled { color: var(--text-muted); cursor: default; }
+.rec-link--warn { color: var(--danger); }
+
+/* ── readiness checklist ─────────────────────────────────────────────────── */
+.rec-check-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.rec-check-body > .rec-link { align-self: flex-start; margin-top: 1px; }
+.rec-check-note { font-size: 11.5px; line-height: 1.5; color: var(--text-muted); }
+.rec-checks li.is-na { color: var(--text-muted); }
+.rec-checks li.is-na .rec-check-mark { background: var(--brand-pale-grey); color: var(--text-muted); }
+
+.rec-gate {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border-subtle);
+}
+.rec-gate-why { font-size: 12px; line-height: 1.5; color: var(--text-muted); flex: 1 1 180px; }
+
+.rec-note-ok {
+  padding: 9px 11px; border-radius: var(--radius-sm);
+  background: var(--success-soft); color: var(--success); font-weight: 600;
+}
+
+/* ── link confirmation (duplicate / compatibility) ───────────────────────── */
+.rec-confirm { display: flex; flex-direction: column; gap: 12px; }
+.rec-confirm-title {
+  margin: 0; font-family: var(--font-display); font-size: 15px; line-height: 1.3; color: var(--brand-navy);
+}
+.rec-warn-block {
+  padding: 10px 12px; border-radius: var(--radius-sm);
+  background: var(--warning-soft); border-left: 3px solid var(--warning);
+}
+.rec-warn-lead { margin: 0 0 4px; font-size: 13px; font-weight: 700; color: var(--brand-navy); }
+.rec-reasons { list-style: disc; margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 3px; }
+.rec-reasons li { font-size: 12.5px; line-height: 1.5; color: var(--text-secondary); }
+
 @media (max-width: 640px) {
+  .rec-ev-meta, .rec-ev-why, .rec-check-note, .rec-gate-why, .rec-reasons li { font-size: 13px; }
+  .rec-ev-acts { gap: 14px; }
+  .rec-link { font-size: 13px; }
   .rec-drawer { width: 100%; padding: 20px; }
   .rec-note, .rec-kv { font-size: 14px; }
   .rec-amount { margin-left: 0; }
