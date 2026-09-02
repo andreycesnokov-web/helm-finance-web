@@ -204,6 +204,42 @@ if os.path.exists(inv_p2):
             err(f"{c.get('candidate_id')}: currentness present but legal_verified/active not false")
 ok("no candidate treats currentness evidence as legal verification")
 
+
+# 8. Evidence precedence: raw_sources/ is authoritative, summaries/_extracted/ is derived.
+#    Nothing may cite derived text as a source, and derived text is never hashed as evidence.
+valid_ids = {s["source_id"] for s in reg["sources"]}
+bad_ref = 0
+def _check_ids(where, ids):
+    global bad_ref
+    for i in ids or []:
+        if not isinstance(i, str):
+            continue
+        if "_extracted" in i or i.endswith(".txt") or "/" in i:
+            err(f"{where}: source_ids must name a registry source, not derived text ({i})")
+            bad_ref += 1
+        elif i not in valid_ids:
+            err(f"{where}: source_ids references unknown source {i}")
+            bad_ref += 1
+
+for fn, key in (("tax_rule_candidates.json", "tax_rule_candidates"),
+                ("evidence_rule_candidates.json", "evidence_rule_candidates"),
+                ("compliance_rule_candidates.json", "compliance_rule_candidates")):
+    for c in cands[fn].get(key, []):
+        _check_ids(f"{fn}:{c.get('candidate_id') or c.get('evidence_type')}", c.get("source_ids"))
+_inv = load(os.path.join(KB, "rule_candidates", "invoice_transaction_candidates.json"))
+for c in (_inv or {}).get("invoice_transaction_candidates", []):
+    _check_ids(f"invoice:{c.get('candidate_id')}", c.get("source_ids"))
+
+for e in man["entries"]:
+    lf = e.get("local_file", "")
+    if lf and "_extracted" in lf:
+        err(f"manifest {e['source_id']}: derived text must never be hashed as evidence ({lf})")
+for s in reg["sources"]:
+    df = s.get("downloaded_file", "")
+    if df and not df.replace("\\", "/").startswith("knowledge/indonesia_official_kb/raw_sources/"):
+        err(f"registry {s['source_id']}: downloaded_file must live under raw_sources/ ({df})")
+ok("evidence precedence held: no candidate cites derived text; only raw_sources/ is hashed")
+
 print("\n".join(f"  ok   {m}" for m in oks))
 if warns:
     print("\n".join(f"  warn {m}" for m in warns))

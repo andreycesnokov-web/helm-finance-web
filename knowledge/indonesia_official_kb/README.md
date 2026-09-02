@@ -1,6 +1,6 @@
-# Indonesia Official Knowledge Base — v1 (first pass)
+# Indonesia Official Knowledge Base — v1
 
-Collected **2026-09-02**. Jurisdiction: Indonesia.
+Jurisdiction: Indonesia. Last pass: **2026-09-02, Phase 2 (source verification + currentness evidence)**.
 
 This folder is a **research artifact**, not application data. Nothing here is wired into the
 product, and nothing here may be treated as a statement of Indonesian law.
@@ -37,33 +37,37 @@ empty by design — see its README.
 
 ## What is authoritative here
 
-**Nothing yet.** Every registry entry is `status: collected`. Every rule candidate is
-`status: under_review` with `needs_reviewer: true`.
+**No legal conclusion is authoritative.** Every registry entry is `status: collected`. Every rule
+candidate is `status: under_review`, `legal_verified: false`, `active: false`.
 
-Two distinct verification steps are still outstanding, and they are different things:
+Three distinct things are tracked separately, and they are **not** the same:
 
-1. **URL verification** — only `DJP_PPN_001` was individually fetched and read. Every other entry
-   was returned by a search restricted to official domains, so its title and URL come from that
-   domain's own index, but the page content has not been read. Each entry records this in `notes`
-   as either `fetch-verified` or `search-listed`.
-2. **Legal verification** — a licensed Indonesian tax reviewer confirming rate, base, effective
-   dates and applicability against the **primary regulation text**.
+1. **Retrieval** (`verification_status`) — 31 sources are `fetch_verified`: bytes downloaded,
+   SHA-256 recorded, title confirmed. The remaining entries are `search_listed` (found on an
+   official domain, page never opened) or `unreachable`.
+2. **Currentness** (`currentness_result`) — what an official status page *said* on
+   `currentness_checked_at`. Evidence of publication status only. It never sets `legal_verified`.
+3. **Legal verification** — a licensed Indonesian reviewer confirming rate, base, effective dates
+   and applicability against primary text. **This has not happened for anything here.**
 
 ## What is under review
 
-All of it. Concretely, the rates that appear anywhere in `rule_candidates/`:
+All of it. The position after Phase 2:
 
-- PPh 23 services `0.02` / `0.04` — from DJP guidance summaries, **not** from PMK-141/PMK.03/2015 text
-- PPh 4(2) rental `0.10` final — from DJP guidance summaries, **not** from the governing PP
-- PPN `0.12` with `11/12` DPP nilai lain — the DJP page for **PMK 11/2025** was fetch-verified, but an
-  amendment exists that has not been read, so the *current* position is not established
-- PPh Badan UMKM `0.005` — from DJP guidance; PP 55/2022 vs PP 20/2026 interaction unresolved
-- PPh 21 — deliberately `null`; it is a TER **table**, not a scalar
-- PPh Badan general — deliberately `null`; **no source collected**
+| Candidate | Rate | Base | Grounding |
+|---|---|---|---|
+| PPh 23 services | `0.02` | gross **excl. PPN** | **Primary text** — PMK 141/2015 Pasal 1(1); *Jasa hukum* is item (d) |
+| PPh 4(2) rental | `0.10` final | gross **incl.** service/facility charges | **Primary text** — PP 34/2017 Pasal 4(1)–(2) |
+| PPN output | `null` | `needs_reviewer` | PMK 11/2025 primary text states **no rate**; 11/12 applies per enumerated category only |
+| PPh Badan UMKM | `0.005` | monthly gross turnover | DJP guidance only — content not mined |
+| PPh 21 | `null` | `needs_reviewer` | TER is a **table**, not a scalar — out of v1 scope |
+| PPh Badan general | `null` | `needs_reviewer` | **No source collected** |
 
-> The existing codebase seeds `ID_PPN_MONTHLY` with `{"rate":0.11}` and `ID_PPH_BADAN_ANNUAL` with
-> `{"rate":0.22}` in migration 020. Neither value has a verified source in this registry. They must
-> be re-derived, not reused.
+> The codebase seeds `ID_PPN_MONTHLY` with `{"rate":0.11}` and `ID_PPH_BADAN_ANNUAL` with
+> `{"rate":0.22}` in migration 020. **Neither has a verified source in this registry.** They must be
+> re-derived, not reused.
+
+Open gaps, with severity and next step, are tracked in `gap_register.md`.
 
 ## How this connects to the Tax Engine
 
@@ -83,25 +87,53 @@ verified by **someone other than the reviewer**.
 **Nothing in this folder shortcuts that.** Copying a candidate straight into `tax_rules` with
 `status='active'` via SQL would bypass the gate entirely and leave no audit trail. Don't.
 
+## Evidence precedence — the rule for this KB
+
+Two directories look similar and are **not** equal in authority:
+
+| Directory | What it is | Authority |
+|---|---|---|
+| `raw_sources/` | The archived official bytes, exactly as retrieved, with SHA-256 in `raw_sources/MANIFEST.json` | **Authoritative archived evidence** |
+| `summaries/_extracted/` | Text mechanically derived *from* those bytes (HTML tags stripped, PDF text pulled) | **Derived review text — not a legal source of truth** |
+
+`_extracted/` exists for traceability: it is what lets a reviewer see the sentence a grounded
+summary rests on without re-downloading anything. It is kept in the repository deliberately, as a
+review artifact rather than a build artifact.
+
+**If the two ever disagree, `raw_sources/` plus the SHA-256 manifest wins.** The extraction is
+lossy by construction — tag stripping, PDF encodings, whitespace collapsing — so a discrepancy
+means the extraction is wrong, never that the archived bytes are.
+
+Consequences, enforced by `tools/validate_kb.py`:
+
+- A rule candidate's `source_ids` must name a **registry source**, never an `_extracted` file.
+- RAG ingestion, when it happens, chunks `raw_sources/` — never `_extracted/` and never `summaries/`.
+- A hash is always computed over `raw_sources/` bytes. `_extracted/` is never hashed as evidence.
+
 ## Layout
 
 | Path | Contents |
 |---|---|
-| `source_registry.json` / `.csv` | All 66 sources, same data, generated together |
+| `source_registry.json` / `.csv` | All 75 sources, same data, generated together |
 | `ingestion_plan.md` | How this becomes Supabase rows later |
 | `reviewer_notes.md` | The questions for the Indonesian tax reviewer |
 | `tax/`, `compliance/`, `accounting_evidence/` | Per-topic README with scope, sources, gaps |
 | `rule_candidates/` | Draft candidates — all `under_review` |
-| `raw_sources/` | Downloaded primary documents — **empty**, see `raw_sources/MANIFEST.md` |
-| `summaries/` | Per-topic notes written from the sources |
+| `raw_sources/` | **31 archived official documents (~14 MB), SHA-256 in `MANIFEST.json`** |
+| `summaries/` | Grounded summaries + `_extracted/` derived review text |
+| `gap_register.md` | Open gaps with severity and next step |
+| `tools/validate_kb.py` | Integrity validator — 12 checks |
 | `secondary_references/` | Non-authoritative material — empty by design |
 
-## Honest limits of this pass
+## Honest limits
 
-- **No files were downloaded.** `raw_sources/` is empty and every `downloaded_file` is `""`.
-  Retrieval here produced page text, not archived PDFs. `raw_sources/MANIFEST.md` lists the
-  priority documents to download so the claim "we hold the primary text" is never made falsely.
-- **Summaries are written from search-result content**, not from full regulation text. They are
-  orientation for a reviewer, not a substitute for reading the PMK/PP.
-- Regulation text is **not reproduced** here. Summaries paraphrase and cite; go to the source.
-- BPJS Kesehatan, faktur pajak PER, and PT PMA-specific sources were **not** collected — see gaps.
+- **Nothing is legally verified.** No licensed reviewer has approved anything here.
+- **7 archived sources are `not_chunkable`** — bytes preserved and hashed, but no readable text
+  (2 scanned/encoded PDFs, 2 image PDFs, 3 client-rendered SPAs). **No fact in this KB derives from
+  them**, and `tools/validate_kb.py` enforces that no rate rests solely on one.
+- **Currentness is evidence, not proof.** For PMK 141/2015, BPK holds no relationship data
+  (`STATUS PERATURAN: Belum Tersedia`), so the absence of a recorded amendment is not proof of none.
+- Regulation text is **not reproduced** here. Summaries paraphrase and cite; go to the archived bytes.
+- **RAG is not ready.** Only three instruments have usable primary text.
+- Not collected: faktur pajak PER, PT PMA, BPJS Kesehatan content (host confirmed as
+  `www.bpjs-kesehatan.go.id`), general corporate PPh Badan rate.

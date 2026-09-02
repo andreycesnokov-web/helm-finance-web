@@ -2,6 +2,8 @@
 
 Regenerated 2026-09-02 (source verification pass v2 / Phase 2).
 
+**This directory is the authoritative evidence layer.** `summaries/_extracted/` holds derived review text only; if the two disagree, these bytes and their hashes win.
+
 `sha256` is over the exact bytes at `local_file`. No hash without a file; no `local_file` without bytes.
 
 **31 archived / 31 attempted.**
