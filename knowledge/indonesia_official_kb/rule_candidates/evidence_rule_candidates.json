@@ -1,0 +1,154 @@
+{
+  "schema_version": "1.0",
+  "generated_at": "2026-09-02",
+  "jurisdiction": "Indonesia",
+  "activation_policy": "EVERY candidate here is status=under_review and needs_reviewer=true. None of these may be written into tax_rules with status='active'. Activation requires a verified official_source AND an approved tax_rule_reviews row with a licensed reviewer, per server/lib/taxGate.js. Values marked confidence=low were read from DJP guidance page summaries, NOT from the primary regulation text, and must be confirmed against the PMK/PP.",
+  "candidate_count": 8,
+  "evidence_rule_candidates": [
+    {
+      "evidence_type": "supplier_invoice",
+      "what_it_proves": "the obligation exists and its amount",
+      "used_for": "payable",
+      "required_fields": [
+        "supplier name",
+        "invoice number",
+        "invoice date",
+        "amount",
+        "currency"
+      ],
+      "related_document_types": [
+        "vendor_invoice"
+      ],
+      "risk_if_missing": "payable has no documentary basis",
+      "source_ids": [],
+      "status": "under_review",
+      "notes": "NEEDS OFFICIAL SOURCE for any legally-required field list. Fields above are product requirements, not law."
+    },
+    {
+      "evidence_type": "faktur_pajak",
+      "what_it_proves": "VAT was charged and is potentially creditable",
+      "used_for": "tax",
+      "required_fields": [
+        "needs official source"
+      ],
+      "related_document_types": [
+        "tax_invoice"
+      ],
+      "risk_if_missing": "input VAT may not be creditable",
+      "source_ids": [
+        "DJP_PPN_001",
+        "DJP_CORETAX_004"
+      ],
+      "status": "under_review",
+      "notes": "Required-field list must come from the PER on faktur pajak — NOT yet sourced. GAP."
+    },
+    {
+      "evidence_type": "bukti_potong",
+      "what_it_proves": "tax was withheld and by whom",
+      "used_for": "tax",
+      "required_fields": [
+        "needs official source"
+      ],
+      "related_document_types": [
+        "bukti_potong"
+      ],
+      "risk_if_missing": "counterparty cannot credit the withheld tax; the withholder cannot evidence remittance",
+      "source_ids": [
+        "DJP_BUPOT_001",
+        "DJP_BUPOT_002"
+      ],
+      "status": "under_review",
+      "notes": "Coretax bukti potong manual (DJP_BUPOT_001) is the best operational source found; read it before defining fields."
+    },
+    {
+      "evidence_type": "payment_proof",
+      "what_it_proves": "money actually moved",
+      "used_for": "payable | receivable | bank reconciliation",
+      "required_fields": [
+        "payer",
+        "payee",
+        "amount",
+        "date"
+      ],
+      "related_document_types": [
+        "payment_proof",
+        "bank_document"
+      ],
+      "risk_if_missing": "an invoice proves the obligation, never the settlement",
+      "source_ids": [],
+      "status": "under_review",
+      "notes": "NEEDS OFFICIAL SOURCE. Currently a product/accounting-control requirement, not a cited legal one."
+    },
+    {
+      "evidence_type": "bank_statement",
+      "what_it_proves": "the movement as recorded by the bank",
+      "used_for": "bank reconciliation",
+      "required_fields": [
+        "account",
+        "period",
+        "transaction lines"
+      ],
+      "related_document_types": [
+        "bank_document"
+      ],
+      "risk_if_missing": "no independent confirmation of settlement",
+      "source_ids": [],
+      "status": "under_review",
+      "notes": "NEEDS OFFICIAL SOURCE."
+    },
+    {
+      "evidence_type": "payroll_documents",
+      "what_it_proves": "employment cost and PPh 21 basis",
+      "used_for": "payroll | tax",
+      "required_fields": [
+        "needs official source"
+      ],
+      "related_document_types": [
+        "other"
+      ],
+      "risk_if_missing": "PPh 21 basis unverifiable",
+      "source_ids": [
+        "KEMENKEU_PPH21_001",
+        "BPJSTK_004",
+        "BPJSTK_005"
+      ],
+      "status": "under_review",
+      "notes": "PMK 168/2023 and BPJS forms both bear on required payroll data; neither has been read."
+    },
+    {
+      "evidence_type": "rental_agreement",
+      "what_it_proves": "the rental relationship, period, and base rent",
+      "used_for": "payable | tax",
+      "required_fields": [
+        "parties",
+        "object",
+        "period",
+        "rent amount"
+      ],
+      "related_document_types": [
+        "other"
+      ],
+      "risk_if_missing": "rental period and base cannot be established for PPh 4(2)",
+      "source_ids": [
+        "DJP_PPH42_002"
+      ],
+      "status": "under_review",
+      "notes": "Central to Test Case 2. The distinction between base rent and service charge is tax-relevant — see DJP_PPH42_006."
+    },
+    {
+      "evidence_type": "receipt_kwitansi",
+      "what_it_proves": "receipt of payment by the payee",
+      "used_for": "payable | receivable",
+      "required_fields": [
+        "needs official source"
+      ],
+      "related_document_types": [
+        "payment_proof"
+      ],
+      "risk_if_missing": "settlement asserted without payee acknowledgement",
+      "source_ids": [],
+      "status": "under_review",
+      "notes": "NEEDS OFFICIAL SOURCE."
+    }
+  ]
+}
