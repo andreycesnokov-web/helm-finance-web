@@ -15,6 +15,8 @@
 //     intake CLASSIFICATION (doc_type + confidence + signals); it is reported as a
 //     classification, never as something read off the document.
 
+import { isCompanyDoc } from './companyVault'
+
 /* ── document types ────────────────────────────────────────────────────────────
    This is the real CHECK-constrained enum from migration 031. Types like
    "receipt", "contract", "supplier_invoice" and "sales_invoice" do NOT exist in
@@ -310,8 +312,11 @@ export function readyGate({ debt, kind, docs, taxRule = null, rulesError = false
   }
 
   // An unresolved wrong-document warning blocks readiness: evidence that contradicts
-  // the record is worse than missing evidence.
-  const wrong = (docs || []).filter((d) => compatibilityOf(d, kind).level === 'unsuitable')
+  // the record is worse than missing evidence. A permanent company/compliance file
+  // (NIB, NPWP, BPJS…) is the same class of mistake — it evidences the company, not
+  // this obligation — so it blocks too, and the drawer already says why on the row.
+  const wrong = (docs || []).filter((d) =>
+    compatibilityOf(d, kind).level === 'unsuitable' || isCompanyDoc(d))
   if (wrong.length) blockers.push('Remove or explain the wrong document attached')
 
   return {

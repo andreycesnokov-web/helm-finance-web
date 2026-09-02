@@ -5,15 +5,35 @@
    Class prefix: doc-
    ========================================================================== */
 
-/* ── summary (compact) ──────────────────────────────────────────────────── */
-.doc-summary { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; margin-bottom: 18px; }
+/* ── summary (compact) — each card jumps to the view it counts ──────────── */
+.doc-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-bottom: 14px; }
 .doc-sum {
   display: flex; flex-direction: column; gap: 3px; min-width: 0; padding: 14px 15px;
-  border: 1px solid var(--border-default); border-radius: 16px;
+  border: 1px solid var(--border-default); border-radius: 16px; text-align: left;
   background: var(--surface-card); box-shadow: var(--shadow-sm);
+  font: inherit; color: inherit; cursor: pointer;
+  transition: border-color .16s ease, box-shadow .16s ease;
 }
+.doc-sum:hover { border-color: var(--brand-electric-blue); }
+.doc-sum.is-current { border-color: var(--brand-navy); box-shadow: var(--shadow-md, var(--shadow-sm)); }
 .doc-sum-label { font-size: 10.5px; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; color: var(--text-muted); line-height: 1.3; }
 .doc-sum-value { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 24px; font-weight: 700; line-height: 1.1; color: var(--brand-navy); }
+.doc-sum-meta { font-size: 11.5px; line-height: 1.4; color: var(--text-muted); }
+
+/* ── primary view switch: work queue vs storage ─────────────────────────── */
+.doc-views {
+  display: inline-flex; gap: 4px; padding: 4px; margin-bottom: 16px;
+  border: 1px solid var(--border-default); border-radius: 999px; background: var(--brand-pale-grey);
+}
+.doc-view {
+  display: inline-flex; align-items: center; gap: 8px; min-height: 34px; padding: 6px 16px;
+  border: 0; border-radius: 999px; background: transparent; font: inherit;
+  font-size: 13.5px; font-weight: 700; color: var(--text-secondary); cursor: pointer;
+  transition: background .16s ease, color .16s ease;
+}
+.doc-view:hover { color: var(--brand-navy); }
+.doc-view.is-active { background: var(--surface-card); color: var(--brand-navy); box-shadow: var(--shadow-sm); }
+.doc-view.is-active .doc-tab-n { background: var(--brand-pale-grey); color: var(--brand-navy); }
 
 /* ── section ────────────────────────────────────────────────────────────── */
 .doc-section {
@@ -82,6 +102,45 @@
 .doc-empty > div { flex: 1; min-width: 200px; }
 .doc-empty-title { margin: 0 0 4px; font-size: 14.5px; font-weight: 800; color: var(--brand-navy); }
 
+/* ── company vault ──────────────────────────────────────────────────────────
+   A storage area, not a work queue. Same Workbench bones as .doc-section, but
+   quieter: pale ground, softer row borders, no hover lift, no action colour
+   unless a row genuinely has an open question. */
+.doc-vault {
+  padding: 20px 22px; margin-bottom: 18px;
+  border: 1px solid var(--border-subtle); border-radius: 20px;
+  background: var(--brand-pale-grey);
+}
+.doc-vault .doc-section-title { color: var(--brand-navy); }
+.doc-vault .doc-rows { margin-bottom: 4px; }
+.doc-vault .doc-row {
+  border-color: var(--border-subtle); background: var(--surface-card); box-shadow: none;
+}
+.doc-vault .doc-row:hover { border-color: var(--border-default); }
+.doc-vault .doc-row-meta { color: var(--text-muted); }
+.doc-vault .doc-note-muted { margin-top: 14px; }
+
+.doc-vault-bar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+.doc-vault-search {
+  flex: 1 1 240px; min-width: 0; min-height: 36px; padding: 8px 13px;
+  border: 1px solid var(--border-default); border-radius: 999px;
+  background: var(--surface-card); font: inherit; font-size: 13px; color: var(--text-primary);
+}
+.doc-vault-search::placeholder { color: var(--text-muted); }
+.doc-vault-toggle {
+  display: inline-flex; align-items: center; gap: 7px; flex: 0 0 auto;
+  font-size: 12.5px; font-weight: 600; color: var(--text-secondary); cursor: pointer;
+}
+
+.doc-vault-empty {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 6px; padding: 22px 20px;
+  border: 1px dashed var(--border-default); border-radius: 16px; background: var(--surface-card);
+}
+
+/* A suggested classification is the only "open question" a vault row can carry. */
+.doc-vrow.is-suggested { border-left: 3px solid var(--warning); }
+.doc-vrow-note { font-size: 12px; font-weight: 600; color: var(--warning); }
+
 /* ── drawer ─────────────────────────────────────────────────────────────── */
 .doc-drawer-scrim { position: fixed; inset: 0; z-index: 60; background: var(--surface-overlay); display: flex; justify-content: flex-end; }
 .doc-drawer {
@@ -131,20 +190,31 @@
 .doc-strip-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 
 .doc-section :is(button):focus-visible,
+.doc-vault :is(button, input):focus-visible,
+.doc-views :is(button):focus-visible,
+.doc-summary :is(button):focus-visible,
 .doc-drawer :is(button):focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
 
 /* ── responsive ─────────────────────────────────────────────────────────── */
-@media (max-width: 1439px) { .doc-summary { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 @media (max-width: 1023px) {
   .doc-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .doc-row { flex-direction: column; }
   .doc-row-actions { max-width: none; justify-content: flex-start; width: 100%; }
 }
 @media (max-width: 640px) {
-  .doc-section { padding: 18px; }
+  .doc-section, .doc-vault { padding: 18px; }
   .doc-summary { grid-template-columns: 1fr; }
   .doc-drawer { width: 100%; padding: 20px; }
   .doc-note, .doc-row-meta { font-size: 14px; }
-  .doc-tab { min-height: 40px; }
+  .doc-tab, .doc-view { min-height: 40px; }
+  .doc-views { display: flex; width: 100%; }
+  .doc-view { flex: 1; justify-content: center; }
 }
-@media (prefers-reduced-motion: reduce) { .doc-row, .doc-tab, .doc-pick { transition: none !important; } }
+@media (prefers-reduced-motion: reduce) {
+  .doc-row, .doc-tab, .doc-pick, .doc-sum, .doc-view { transition: none !important; }
+}
+
+/* Classify pickers render as a grid inside an inline panel (a single tall column
+   inside a drawer becomes an unusable scroll on a wide screen). */
+.doc-pick-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px; }
+.doc-drawer .doc-pick-grid { grid-template-columns: 1fr; }

@@ -21,6 +21,8 @@
 import { useState, useMemo } from 'react'
 import { StatusBadge, Btn, Icon, LoadingSkeleton } from '../../shell/ui'
 import { inferService } from './InvoiceReviewDrawer'
+import { directionOf, directionMeta, metaOf } from './invoiceDirection'
+import ReviewPanel, { RpCols, RpCol, RpActions } from './ReviewPanel'
 import {
   useWorkbench, WorkbenchToolbar, GroupHeader, MoreMenu, NoMatches,
   monthGroup, DATE_OPTIONS, AMOUNT_OPTIONS,
@@ -32,14 +34,12 @@ import './Invoices.css'
 export const INVOICE_TYPES = ['vendor_invoice', 'customer_invoice', 'tax_invoice']
 export const isInvoiceDoc = (d) => INVOICE_TYPES.includes(d.document_type)
 
-// vendor → we owe (payable). customer → we are owed (receivable). tax_invoice can be
-// either, so it is left undirected rather than guessed.
-export function directionOf(d) {
-  if (d.document_type === 'vendor_invoice') return 'payable'
-  if (d.document_type === 'customer_invoice') return 'receivable'
-  return null
-}
-const DIR_LABEL = { payable: 'Supplier invoice', receivable: 'Sales invoice' }
+// Direction and every word that depends on it now live in ONE module, so a customer
+// invoice can never be described with supplier wording. Re-exported as well as imported,
+// because this file was the previous home of directionOf and other modules still import
+// it from here (a bare `export ... from` would not create a local binding).
+export { directionOf, directionMeta, metaOf } from './invoiceDirection'
+const dirLabelOf = (d) => metaOf(d).rowLabel
 
 const has = (v) => v !== null && v !== undefined && v !== '' && Number(v) !== 0
 export const amountOf = (d) => (has(d.gross_amount) ? Number(d.gross_amount) : null)
@@ -117,7 +117,7 @@ export function InvoiceSummary({ docs, loading }) {
 const makeInvCfg = (cpName) => ({
   text: (d) => [d.file?.file_name, d.document_number, d.document_type, d.currency,
     d.gross_amount, d.document_date, cpName(d.issuer_counterparty_id),
-    DIR_LABEL[directionOf(d)], statusLabel(statusOf(d))].filter(Boolean).join(' '),
+    dirLabelOf(d), statusLabel(statusOf(d))].filter(Boolean).join(' '),
   date: (d) => d.document_date || null,
   amount: (d) => amountOf(d),
   priority: (d) => ({ missing: 0, review: 1, readyPayable: 2, readyReceivable: 2,
@@ -170,7 +170,7 @@ const makeInvCfg = (cpName) => ({
   groups: [
     { value: 'status', label: 'Status', of: (d) => ({ key: statusOf(d), label: statusLabel(statusOf(d)) }) },
     { value: 'direction', label: 'Direction',
-      of: (d) => ({ key: directionOf(d) || 'none', label: DIR_LABEL[directionOf(d)] || 'Direction needed' }) },
+      of: (d) => ({ key: directionOf(d) || 'none', label: dirLabelOf(d) }) },
     { value: 'counterparty', label: 'Counterparty',
       of: (d) => ({ key: d.issuer_counterparty_id || 'none', label: cpName(d.issuer_counterparty_id) || 'No counterparty' }) },
     { value: 'month', label: 'Month', of: monthGroup((d) => d.document_date) },
@@ -179,7 +179,10 @@ const makeInvCfg = (cpName) => ({
   ],
 })
 
-export function InvoiceQueue({ docs, loading, cpName, blockCreate, onReview, onView, onCreate, onLinkDebt, onMatch, onUpload, navigate }) {
+export function InvoiceQueue({ docs, loading, cpName, blockCreate, onReview, onView, onCreate, onLinkDebt, onMatch, onUpload, navigate,
+  // Inline review (desktop): the page passes the id of the expanded row and a renderer
+  // for its panel. Both default to inert, so the mobile/drawer path is unchanged.
+  expandedId = null, renderPanel = null }) {
   const cfg = useMemo(() => makeInvCfg(cpName), [cpName])
   const wb = useWorkbench(docs, cfg)
 
@@ -209,6 +212,7 @@ export function InvoiceQueue({ docs, loading, cpName, blockCreate, onReview, onV
   const renderRow = (d) => {
     const st = statusOf(d)
     const dir = directionOf(d)
+    const meta = directionMeta(dir)
     const dl = debtLink(d)
     const amt = amountOf(d)
     const cp = cpName(d.issuer_counterparty_id)
@@ -217,11 +221,12 @@ export function InvoiceQueue({ docs, loading, cpName, blockCreate, onReview, onV
     // Primary stays visible, the rest collapse — a long row never becomes a button wall.
     // A record already created for this document but not yet linked must not offer
     // "Create" again — that is how duplicates happen.
+    // Review is the primary for BOTH directions now: a sales invoice deserves the same
+    // review step as a supplier one, and the panel is what makes direction explicit.
     const blocked = blockCreate?.has(d.id)
-    const primary = !dl && dir === 'payable' && !blocked
-      ? { label: 'Review tax & payable', onClick: () => onReview(d) }
-      : !dl && dir && !blocked
-      ? { label: `Create ${dir}`, onClick: () => onCreate(d, dir) }
+    const primary = !dl && dir && !blocked
+      ? { label: dir === 'payable' ? 'Review tax & payable' : 'Review tax & receivable',
+          onClick: () => onReview(d) }
       : blocked && !dl
         ? { label: 'Link existing', onClick: () => onLinkDebt(d) }
       : dl && !txLink(d)
@@ -230,15 +235,23 @@ export function InvoiceQueue({ docs, loading, cpName, blockCreate, onReview, onV
     const more = [
       primary.label !== 'Review' && { label: 'Review', onClick: () => onReview(d) },
       { label: 'View document', onClick: () => onView(d) },
-      !dl && { label: 'Link existing', onClick: () => onLinkDebt(d) },
-      dl && { label: `Open ${dir === 'receivable' ? 'receivable' : 'payable'}`,
+      !dl && { label: meta.linkExistingLabel, onClick: () => onLinkDebt(d) },
+      dl && { label: meta.openRecordLabel,
         onClick: () => navigate(dir === 'receivable' ? '/business/receivables' : '/business/payables') },
     ]
+    const isOpen = expandedId === d.id
+    // Clicking the row body expands/collapses. The actions column is a SIBLING of this
+    // div, so buttons and the More menu never reach this handler at all.
+    const rowOpen = () => onReview(d)
     return (
-      <article key={d.id} className="inv-row">
-        <div className="inv-row-main">
+      <div key={d.id} className="inv-rowgroup">
+      <article className={`inv-row${isOpen ? ' is-rp-open' : ''}`}>
+        <div className="inv-row-main" role="button" tabIndex={0}
+          aria-expanded={isOpen}
+          onClick={rowOpen}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); rowOpen() } }}>
           <div className="inv-row-head">
-            <span className="inv-row-dir">{dir ? DIR_LABEL[dir] : 'Invoice · direction needed'}</span>
+            <span className="inv-row-dir">{meta.rowLabel}</span>
             <StatusBadge tone={STATUS[st].tone}>{STATUS[st].label}</StatusBadge>
             {d.file?.upload_channel === 'telegram' && <span className="inv-tag">Telegram</span>}
           </div>
@@ -247,7 +260,7 @@ export function InvoiceQueue({ docs, loading, cpName, blockCreate, onReview, onV
             <span>{cp || <em>Counterparty needed</em>}</span>
             <span>{fmtDate(d.document_date) || <em>Date needed</em>}</span>
             <span className="inv-mono">{amt !== null ? idr(amt, d.currency) : <em>Amount needed</em>}</span>
-            <span>{dl ? `Linked · ${dir === 'receivable' ? 'receivable' : 'payable'} #${dl.target_id}` : <em>Not linked</em>}</span>
+            <span>{dl ? `Linked · ${meta.recordNoun} #${dl.target_id}` : <em>Not linked</em>}</span>
           </div>
           {/* Service type is a name-based inference, never extraction — labelled as such. */}
           {dir === 'payable' && !dl && (
@@ -262,6 +275,8 @@ export function InvoiceQueue({ docs, loading, cpName, blockCreate, onReview, onV
           <MoreMenu items={more} />
         </div>
       </article>
+      {isOpen && renderPanel?.(d)}
+      </div>
     )
   }
 
@@ -294,7 +309,106 @@ export function InvoiceQueue({ docs, loading, cpName, blockCreate, onReview, onV
 
 /* ── review drawer ────────────────────────────────────────────────────────── */
 
-/* ── link picker (debts or transactions) ──────────────────────────────────── */
+/* ══════════════════════════════════════════════════════════════════════════
+   INLINE PICKER PANEL — desktop replacement for the LinkPicker drawer.
+
+   Covers both "Match payment" (kind='transaction') and "Link existing record"
+   (kind='debt'). The drawer below is kept for narrow viewports only.
+
+   HONESTY — what "Match payment" actually is:
+   There is no route that attaches an existing transaction to a debt. The only real
+   write here is POST /api/documents/:id/links {target_type:'transaction'}, which links
+   the DOCUMENT to the transaction. So the action is labelled "Link document to
+   transaction" and the panel states plainly that the record itself is not settled by it.
+   Nothing marks a payable paid.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+export function InvoicePickerPanel({ kind, doc, rows, busy, error, onPick, onClose, cpName }) {
+  const [q, setQ] = useState('')
+  const isDebt = kind === 'debt'
+  const meta = metaOf(doc)
+  const list = useMemo(() => {
+    const t = q.trim().toLowerCase()
+    const base = rows || []
+    if (!t) return base.slice(0, 25)
+    return base.filter((r) => JSON.stringify(r).toLowerCase().includes(t)).slice(0, 25)
+  }, [q, rows])
+
+  if (!doc) return null
+  const amt = amountOf(doc)
+
+  return (
+    <ReviewPanel
+      eyebrow={isDebt ? meta.linkExistingLabel : 'Match payment'}
+      title={doc.file?.file_name || doc.document_number || 'Invoice'}
+      sub={isDebt
+        ? `Attach this invoice as evidence for a ${meta.recordNoun} that already exists.`
+        : 'Attach this invoice to the transaction that settled it.'}
+      onClose={onClose}>
+
+      {error && <p className="rp-note rp-note-warn" style={{ marginBottom: 10 }}>{error}</p>}
+
+      <RpCols>
+        <RpCol label="Invoice">
+          <div className="rp-kv"><span>Direction</span><span>{meta.rowLabel}</span></div>
+          <div className="rp-kv"><span>{meta.party}</span>
+            <span>{cpName?.(doc.issuer_counterparty_id) || <em className="rp-miss">Not set</em>}</span></div>
+          <div className="rp-kv"><span>Invoice number</span><span>{doc.document_number || <em className="rp-miss">Not set</em>}</span></div>
+          <div className="rp-kv"><span>Date</span><span>{fmtDate(doc.document_date) || <em className="rp-miss">Not set</em>}</span></div>
+          <div className="rp-kv"><span>Amount</span>
+            <span className="rp-mono">{amt !== null ? idr(amt, doc.currency) : <em className="rp-miss">Not set</em>}</span></div>
+        </RpCol>
+
+        <RpCol label={isDebt ? 'Existing records' : 'Transactions'} wide>
+          <input className="inv-search" value={q} onChange={(e) => setQ(e.target.value)}
+            placeholder={isDebt ? 'Search counterparty or amount' : 'Search description or amount'}
+            aria-label={isDebt ? 'Search records' : 'Search transactions'} />
+          <div className="inv-pick-list">
+            {list.length === 0 && (
+              <p className="rp-note rp-note-muted">
+                {isDebt
+                  ? 'No matching records found yet.'
+                  : 'No matching transactions found yet.'}
+              </p>
+            )}
+            {list.map((r) => (
+              <button key={r.id} type="button" className="inv-pick" disabled={!!busy}
+                onClick={() => onPick(r)}>
+                <span className="inv-pick-main">
+                  <span className="inv-pick-title">
+                    {isDebt ? (r.counterparty || r.description || `Record #${r.id}`) : (r.description || r.type)}
+                  </span>
+                  <span className="inv-pick-sub">
+                    {isDebt
+                      ? `${r.type} · due ${(r.due_date || '').slice(0, 10) || '—'} · ${r.status}`
+                      : `${r.type} · ${(r.transaction_date || r.created_at || '').slice(0, 10)}`}
+                  </span>
+                </span>
+                <span className="rp-mono inv-pick-amt">
+                  {idr(isDebt ? (r.remaining_amount ?? r.amount ?? 0) : (r.amount_original ?? 0), r.currency_original || 'IDR')}
+                </span>
+              </button>
+            ))}
+          </div>
+        </RpCol>
+      </RpCols>
+
+      {!isDebt && (
+        <p className="rp-note rp-note-muted" style={{ marginTop: 12 }}>
+          <strong>This links the document, not the record.</strong> Picking a transaction
+          creates a document→transaction link. Attaching an existing transaction to the{' '}
+          {meta.recordNoun} itself requires backend support, so nothing here marks it paid.
+        </p>
+      )}
+
+      <RpActions>
+        <Btn sm variant="ghost" onClick={onClose} disabled={busy}>Cancel</Btn>
+      </RpActions>
+    </ReviewPanel>
+  )
+}
+
+/* ── link picker (debts or transactions) — mobile/tablet only ─────────────── */
 
 export function LinkPicker({ open, kind, doc, rows, busy, error, onPick, onClose }) {
   const [q, setQ] = useState('')

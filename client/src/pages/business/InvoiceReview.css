@@ -100,3 +100,15 @@
   .ir-gross { margin-left: 0; }
   .ir-note, .ir-kv, .ir-row { font-size: 14px; }
 }
+
+/* ── direction chooser — shown only when document_type carries no direction ── */
+.ir-dirpick {
+  display: flex; align-items: center; justify-content: space-between; gap: 14px;
+  flex-wrap: wrap; margin-bottom: 16px; padding: 12px 14px;
+  border: 1px solid var(--warning); border-radius: 14px;
+  background: var(--warning-soft);
+}
+.ir-dirpick-main { display: flex; flex-direction: column; gap: 2px; min-width: 220px; flex: 1; }
+.ir-dirpick-title { font-size: 13px; font-weight: 800; color: var(--brand-navy); }
+.ir-dirpick-sub { font-size: 12px; line-height: 1.5; color: var(--text-secondary); }
+.ir-dirpick-acts { display: flex; gap: 8px; flex-wrap: wrap; }

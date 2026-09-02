@@ -26,11 +26,14 @@ import {
 // no /api/invoices routes, so the hub explains the review-first flow and connects the
 // modules that DO exist rather than listing records that cannot be fetched.
 import { resolveRecordId } from './Workbench'
-import RecordDrawer, { DocPicker } from './RecordDrawer'
-import { findWithholdingRule } from './InvoiceReviewDrawer'
+import RecordDrawer, { DocPicker, RecordPanel } from './RecordDrawer'
+import { findWithholdingRule, InvoiceReviewPanel } from './InvoiceReviewDrawer'
 import InvoiceReviewDrawer from './InvoiceReviewDrawer'
+// Inline review panels replace the side drawer on desktop; below 1024px each page keeps
+// its existing drawer/sheet untouched, so the mobile path cannot regress.
+import { useIsDesktop } from './ReviewPanel'
 import {
-  InvoiceSummary, InvoiceQueue, LinkPicker, InvoiceFooterNote,
+  InvoiceSummary, InvoiceQueue, LinkPicker, InvoicePickerPanel, InvoiceFooterNote,
   isInvoiceDoc, directionOf, debtLink,
 } from './InvoiceBlocks'
 // Evidence / invoice-requirement UX. Debt evidence is REAL (debts.attachments, migration
@@ -43,7 +46,9 @@ import {
 // genuinely returns (review_status, extraction_status, links[], file.upload_channel).
 import {
   DocumentSummary, DocumentQueue, DocumentReview, ClassifyDrawer, DocumentFlowStrip,
+  DocumentViewTabs, CompanyVault, VaultReclassifyDrawer, documentCounts, DocumentReviewPanel,
 } from './DocumentBlocks'
+import { partitionDocuments } from './companyVault'
 import DocumentIntakeModal from '../../components/DocumentIntakeModal'
 
 const SYMBOL = '/brand/symbol_navy_blue_dot_transparent.svg'
@@ -179,8 +184,12 @@ export function BusinessDocuments() {
   const { active, scopeKey } = useWorkspace()
   const [st, setSt] = useState({ loading: true, error: null, docs: [], debts: [], cps: [] })
   const [queue, setQueue] = useState('review')
+  // Action-first default: the work queue, never the storage area.
+  const [view, setView] = useState('inbox')
   const [review, setReview] = useState(null)
+  const isDesktop = useIsDesktop()
   const [classify, setClassify] = useState(null)
+  const [vaultDoc, setVaultDoc] = useState(null)      // reclassify drawer target
   const [create, setCreate] = useState(null)          // { doc, dir }
   const [picker, setPicker] = useState(null)          // { kind, doc, rows }
   const [busy, setBusy] = useState(false)
@@ -238,6 +247,24 @@ export function BusinessDocuments() {
       if (r?.url) window.open(r.url, '_blank', 'noopener')
     } catch (e) { alert(e.message) }
   }
+  // Same audited route as View — `mode: 'download'` makes the signed URL a download.
+  const onDownload = async (d) => {
+    try {
+      const r = await apiFetch(`/documents/${d.id}/signed-url`, token, { method: 'POST', body: { mode: 'download' } })
+      if (r?.url) window.open(r.url, '_blank', 'noopener')
+    } catch (e) { alert(e.message) }
+  }
+  // Preview source for DocumentPreview — the same audited signed-url route, nothing new.
+  const getSignedUrl = useCallback(async (d, mode = 'view') => {
+    const r = await apiFetch(`/documents/${d.id}/signed-url`, token,
+      { method: 'POST', body: mode === 'download' ? { mode: 'download' } : {} })
+    return r?.url || null
+  }, [token])
+  // One row expanded at a time: clicking the open row collapses it, another switches.
+  const toggleReview = (d) => {
+    setPicker(null)
+    setReview((cur) => (cur && cur.id === d.id ? null : d))
+  }
   const onArchive = async (d) => {
     if (!confirm('Archive this document?')) return
     try { await apiFetch(`/documents/${d.id}/archive`, token, { method: 'POST', body: {} }); setReview(null); load() }
@@ -258,9 +285,20 @@ export function BusinessDocuments() {
       setClassify(null); setReview(null); load()
     } catch (e) { setErr(e.message || 'Could not classify') } finally { setBusy(false) }
   }
+  // Real and PERSISTED: this existing route writes extracted_json.ai_intake.doc_type and
+  // sets classification_status='manually_confirmed', keeping document_type CHECK-valid.
+  // It is what turns a *suggested* company document into a confirmed one.
+  const applyVaultType = async (docType) => {
+    setBusy(true); setErr(null)
+    try {
+      await apiFetch(`/ai-accountant/documents/${vaultDoc.id}/classification`, token,
+        { method: 'PATCH', body: { doc_type: docType } })
+      setVaultDoc(null); load()
+    } catch (e) { setErr(e.message || 'Could not save the classification') } finally { setBusy(false) }
+  }
 
   const openPicker = async (doc, kind, dir) => {
-    setErr(null)
+    setErr(null); setReview(null)
     if (kind === 'debt') {
       setPicker({ kind: 'debt', doc, rows: st.debts.filter((x) => x.status !== 'cancelled' && (!dir || x.type === dir)) })
       return
@@ -281,34 +319,86 @@ export function BusinessDocuments() {
       : <ErrorState title="We couldn’t load documents" description={st.error} onRetry={load} />}</>
   }
 
-  return <>{head}
-    <p className="doc-note" style={{ marginBottom: 18 }}>
-      Review uploaded evidence, link it to records, and keep your books clean.
-    </p>
+  // Company/legal documents are separated by classification, not removed: every row is in
+  // exactly one of the two lists and neither list drops anything. See ./companyVault.js.
+  const { evidence: evidenceDocs, vault: vaultDocs } = partitionDocuments(st.docs)
 
-    <CreateOutcome note={outcome} onDismiss={() => setOutcome(null)} />
-    <DocumentSummary docs={st.docs} loading={st.loading} />
-    <DocumentQueue docs={st.docs} loading={st.loading} active={queue} onSelect={setQueue} cpName={cpName}
-      selected={sel} onToggle={toggleSel} onClearSel={() => setSel(new Set())} blockCreate={blocked}
-      onBulkArchive={bulkArchive} busy={busy}
-      onReview={setReview} onView={onView} onArchive={onArchive}
+  // One renderer serves both views — the panel decides what to offer from the document's
+  // own vault verdict, so the Inbox/Vault separation stays the single source of truth.
+  const renderDocPanel = (d) => (
+    classify?.id === d.id ? (
+      <ClassifyDrawer inline doc={classify} busy={busy} error={err}
+        onPick={applyType} onClose={() => setClassify(null)} />
+    ) : vaultDoc?.id === d.id ? (
+      <VaultReclassifyDrawer inline doc={vaultDoc} busy={busy} error={err}
+        onPick={applyVaultType} onClose={() => setVaultDoc(null)} />
+    ) : picker?.doc?.id === d.id ? (
+      <InvoicePickerPanel kind={picker.kind} doc={picker.doc} rows={picker.rows || []}
+        busy={busy} error={err} cpName={cpName}
+        onClose={() => setPicker(null)}
+        onPick={(row) => linkDoc(picker.doc, picker.kind, row.id)} />
+    ) : (
+    <DocumentReviewPanel doc={d} cpName={cpName} getSignedUrl={getSignedUrl} busy={busy}
+      onClose={() => setReview(null)} onView={onView} onDownload={onDownload}
       onCreate={(doc, dir) => setCreate({ doc, dir })}
       onLink={(doc, kind, dir) => openPicker(doc, kind, dir)}
-      onClassify={setClassify} onUpload={() => setUpload(true)} navigate={navigate} />
-    <DocumentFlowStrip navigate={navigate} onUpload={() => setUpload(true)} />
-
-    <DocumentReview doc={review} cpName={cpName} onClose={() => setReview(null)} onView={onView}
-      onCreate={(doc, dir) => { setReview(null); setCreate({ doc, dir }) }}
-      onLink={(doc, kind, dir) => { setReview(null); openPicker(doc, kind, dir) }}
-      onClassify={(doc) => { setReview(null); setClassify(doc) }}
+      onClassify={setClassify}
+      onReclassify={setVaultDoc}
+      onMoveToVault={setVaultDoc}
+      onOpenAccountant={() => navigate('/business/accountant')}
       onArchive={onArchive} />
+    )
+  )
 
-    <ClassifyDrawer doc={classify} busy={busy} error={err}
-      onPick={applyType} onClose={() => setClassify(null)} />
+  return <>{head}
+    <CreateOutcome note={outcome} onDismiss={() => setOutcome(null)} />
+    <DocumentSummary docs={st.docs} loading={st.loading} view={view} onView={setView} />
+    <DocumentViewTabs view={view} onView={setView} counts={documentCounts(st.docs)} />
 
-    <LinkPicker open={!!picker} kind={picker?.kind} doc={picker?.doc} rows={picker?.rows || []}
-      busy={busy} error={err} onClose={() => setPicker(null)}
-      onPick={(row) => linkDoc(picker.doc, picker.kind, row.id)} />
+    {view === 'inbox' ? (
+      <DocumentQueue docs={evidenceDocs} loading={st.loading} active={queue} onSelect={setQueue} cpName={cpName}
+        selected={sel} onToggle={toggleSel} onClearSel={() => setSel(new Set())} blockCreate={blocked}
+        onBulkArchive={bulkArchive} busy={busy}
+        onReview={toggleReview} onView={onView} onArchive={onArchive}
+        onCreate={(doc, dir) => setCreate({ doc, dir })}
+        onLink={(doc, kind, dir) => openPicker(doc, kind, dir)}
+        onClassify={setClassify} onUpload={() => setUpload(true)} navigate={navigate}
+        expandedId={isDesktop ? (review?.id ?? picker?.doc?.id ?? classify?.id ?? vaultDoc?.id ?? null) : null}
+        renderPanel={isDesktop ? renderDocPanel : null} />
+    ) : (
+      <CompanyVault docs={vaultDocs} loading={st.loading}
+        onView={onView} onDownload={onDownload} onArchive={onArchive}
+        onReclassify={setVaultDoc} onMoveToInbox={setClassify}
+        onOpenAccountant={() => navigate('/business/accountant')}
+        onUpload={() => setUpload(true)}
+        onReview={isDesktop ? toggleReview : null}
+        expandedId={isDesktop ? (review?.id ?? picker?.doc?.id ?? classify?.id ?? vaultDoc?.id ?? null) : null}
+        renderPanel={isDesktop ? renderDocPanel : null} />
+    )}
+    {view === 'inbox' && <DocumentFlowStrip navigate={navigate} onUpload={() => setUpload(true)} />}
+
+    {/* Below 1024px the original review drawer is still the review surface. */}
+    {!isDesktop && (
+      <DocumentReview doc={review} cpName={cpName} onClose={() => setReview(null)} onView={onView}
+        onCreate={(doc, dir) => { setReview(null); setCreate({ doc, dir }) }}
+        onLink={(doc, kind, dir) => { setReview(null); openPicker(doc, kind, dir) }}
+        onClassify={(doc) => { setReview(null); setClassify(doc) }}
+        onArchive={onArchive} />
+    )}
+
+    {/* Mobile/tablet only — on desktop these render inline under the row. */}
+    {!isDesktop && <ClassifyDrawer doc={classify} busy={busy} error={err}
+      onPick={applyType} onClose={() => setClassify(null)} />}
+
+    {!isDesktop && <VaultReclassifyDrawer doc={vaultDoc} busy={busy} error={err}
+      onPick={applyVaultType} onClose={() => setVaultDoc(null)} />}
+
+    {/* Mobile/tablet only — on desktop this is an inline panel under the row. */}
+    {!isDesktop && (
+      <LinkPicker open={!!picker} kind={picker?.kind} doc={picker?.doc} rows={picker?.rows || []}
+        busy={busy} error={err} onClose={() => setPicker(null)}
+        onPick={(row) => linkDoc(picker.doc, picker.kind, row.id)} />
+    )}
 
     {create && (
       <DebtFormModal mode={create.dir} token={token} lockBusinessScope
@@ -578,8 +668,10 @@ function DebtsView({ kind }) {
   const [data, setData] = useState({ loading: true, error: null, debts: null, wallets: [] })
   const [payDebt, setPayDebt] = useState(null)
   const [showCreate, setShowCreate] = useState(false)
-  // Record detail: the drawer is the record's home — open, edit, add evidence, pay.
+  // Record detail: the panel (desktop) / drawer (mobile) is the record's home —
+  // open, edit, add evidence, pay.
   const [openRec, setOpenRec] = useState(null)        // { debt, focus }
+  const isDesktop = useIsDesktop()
   const [recDocs, setRecDocs] = useState({ loading: false, rows: [] })
   const [allDocs, setAllDocs] = useState([])
   const [editDebt, setEditDebt] = useState(null)
@@ -621,8 +713,15 @@ function DebtsView({ kind }) {
     } catch { setRecDocs({ loading: false, rows: [] }) }
   }, [token])
 
+  // One row expanded at a time. Re-clicking the open row collapses it; clicking a
+  // different row (or the same row with a different focus) switches to that one.
   const openRecord = useCallback((debt, focus = null) => {
-    setRecErr(null); setRecNotice(null); setOpenRec({ debt, focus }); loadRecDocs(debt)
+    setRecErr(null); setRecNotice(null)
+    setOpenRec((cur) => {
+      if (cur && cur.debt?.id === debt.id && cur.focus === focus) return null
+      return { debt, focus }
+    })
+    loadRecDocs(debt)
   }, [loadRecDocs])
 
   const refreshRecord = useCallback(async (debt) => {
@@ -727,6 +826,32 @@ function DebtsView({ kind }) {
 
   const toneFor = (s) => s === 'paid' ? 'success' : s === 'overdue' ? 'danger' : s === 'partial' ? 'warning' : 'neutral'
   const total = debts.reduce((s, d) => s + Number(d.remaining_amount ?? d.amount ?? 0), 0)
+
+  // Every prop below is the same one the drawer receives — same unlink, same upload
+  // scoping, same picker, same derived gate. Only the presentation differs.
+  const recordPanelProps = {
+    debt: openRec?.debt, kind, focus: openRec?.focus,
+    docs: recDocs.rows, docsLoading: recDocs.loading,
+    busy: recBusy, error: recErr, notice: recNotice,
+    taxRule: findWithholdingRule(recRules.rows)?.rule || null, rulesError: recRules.failed,
+    onClose: () => { setOpenRec(null); setRecErr(null); setRecNotice(null) },
+    onEdit: (d) => setEditDebt(d),
+    onUpload: (d, type = null) => { setUploadType(type); setUploadFor(d) },
+    onLinkDoc: (d, prefer = null) => openDocPicker(d, prefer),
+    onViewDoc: viewDoc,
+    onUnlink: unlinkDoc,
+    onPay: (d) => { setOpenRec(null); setPayDebt(d) },
+    onOpenDocuments: () => navigate('/business/documents'),
+  }
+  const renderRecordPanel = () => (
+    // Linking an existing document takes over the expanded row rather than opening an
+    // overlay. Same DocPicker component, same compatibility/duplicate logic.
+    pickFor && pickFor.id === openRec?.debt?.id ? (
+      <DocPicker inline open docs={allDocs} busy={recBusy} error={recErr}
+        kind={kind} debtId={pickFor.id} linkedDocs={recDocs.rows} prefer={pickPrefer}
+        onPick={linkExisting} onClose={() => { setPickFor(null); setPickPrefer(null) }} />
+    ) : <RecordPanel {...recordPanelProps} />
+  )
   return <>{head}
     <div style={{ marginBottom: 16 }}>
       <Stat k={isPayable ? 'Total outstanding (you owe)' : 'Total outstanding (owed to you)'} v={idr(total)} />
@@ -760,7 +885,9 @@ function DebtsView({ kind }) {
             </span>
           ) },
         ]}
-        rows={debts} rowKey={d => d.id} onRowClick={d => openRecord(d)} />
+        rows={debts} rowKey={d => d.id} onRowClick={d => openRecord(d)}
+        expandedKey={isDesktop ? openRec?.debt?.id ?? null : null}
+        renderExpanded={isDesktop ? () => renderRecordPanel() : null} />
     </Card>
     {/* mobile cards */}
     <div className="cfo-mcards">
@@ -789,22 +916,16 @@ function DebtsView({ kind }) {
     )}
     {createModal}
 
-    <RecordDrawer open={!!openRec} debt={openRec?.debt} kind={kind} focus={openRec?.focus}
-      docs={recDocs.rows} docsLoading={recDocs.loading} busy={recBusy} error={recErr} notice={recNotice}
-      taxRule={findWithholdingRule(recRules.rows)?.rule || null} rulesError={recRules.failed}
-      onClose={() => { setOpenRec(null); setRecErr(null); setRecNotice(null) }}
-      onEdit={(d) => setEditDebt(d)}
-      onUpload={(d, type = null) => { setUploadType(type); setUploadFor(d) }}
-      onLinkDoc={(d, prefer = null) => openDocPicker(d, prefer)}
-      onViewDoc={viewDoc}
-      onUnlink={unlinkDoc}
-      onPay={(d) => { setOpenRec(null); setPayDebt(d) }}
-      onOpenDocuments={() => navigate('/business/documents')} />
+    {/* Below 1024px the original side drawer is still the record surface. */}
+    {!isDesktop && <RecordDrawer open={!!openRec} {...recordPanelProps} />}
 
     {/* The picker needs the record's context to judge compatibility and duplicates. */}
-    <DocPicker open={!!pickFor} docs={allDocs} busy={recBusy} error={recErr}
-      kind={kind} debtId={pickFor?.id} linkedDocs={recDocs.rows} prefer={pickPrefer}
-      onPick={linkExisting} onClose={() => { setPickFor(null); setPickPrefer(null) }} />
+    {/* Mobile/tablet only — on desktop this renders inline under the record row. */}
+    {!isDesktop && (
+      <DocPicker open={!!pickFor} docs={allDocs} busy={recBusy} error={recErr}
+        kind={kind} debtId={pickFor?.id} linkedDocs={recDocs.rows} prefer={pickPrefer}
+        onPick={linkExisting} onClose={() => { setPickFor(null); setPickPrefer(null) }} />
+    )}
 
     {/* Real edit: the debt carries an id, so DebtFormModal takes the PATCH path. */}
     {editDebt && (
@@ -1142,6 +1263,7 @@ export function BusinessInvoices() {
   const { active, scopeKey } = useWorkspace()
   const [st, setSt] = useState({ loading: true, error: null, docs: [], debts: [], cps: [] })
   const [review, setReview] = useState(null)
+  const isDesktop = useIsDesktop()
   const [create, setCreate] = useState(null)      // { doc, dir }
   const [picker, setPicker] = useState(null)      // { kind, doc, rows }
   const [busy, setBusy] = useState(false)
@@ -1194,6 +1316,29 @@ export function BusinessInvoices() {
       if (r?.url) window.open(r.url, '_blank', 'noopener')
     } catch (e) { alert(e.message) }
   }
+  // Preview source for DocumentPreview — the same audited signed-url route, nothing new.
+  const getSignedUrl = useCallback(async (d, mode = 'view') => {
+    const r = await apiFetch(`/documents/${d.id}/signed-url`, token,
+      { method: 'POST', body: mode === 'download' ? { mode: 'download' } : {} })
+    return r?.url || null
+  }, [token])
+  // One row expanded at a time: clicking the open row collapses it, another switches.
+  const toggleReview = (d) => {
+    setPicker(null)
+    setReview((cur) => (cur && cur.id === d.id ? null : d))
+  }
+  // Shared by the inline panel and the drawer. The confirmed amount is what gets created —
+  // gross or net, chosen explicitly by the user. Never a silent substitution.
+  // NOTE: this hands the plan to DebtFormModal via `prefill`, never `initialDebt` — an
+  // id-less initialDebt is what previously made create look like edit mode.
+  // The direction comes from the PLAN the user confirmed (document type, or their explicit
+  // choice for an undirected tax invoice). Hardcoding 'payable' here is what previously made
+  // a reviewed sales invoice create a payable.
+  const onReviewCreate = (plan) => {
+    const dir = plan.dir === 'receivable' ? 'receivable' : 'payable'
+    setReview(null)
+    setCreate({ doc: plan.doc, dir, plan })
+  }
 
   // Real link write — the same route the Document Center uses.
   const linkDoc = async (doc, target_type, target_id) => {
@@ -1204,18 +1349,20 @@ export function BusinessInvoices() {
     } catch (e) { setPickErr(e.message || 'Could not link') } finally { setBusy(false) }
   }
 
+  // Opening a picker closes the review panel and vice versa — one panel per row, one row
+  // per page.
   const openDebtPicker = (doc) => {
     const dir = directionOf(doc)
     const rows = st.debts.filter((d) => d.status !== 'cancelled' && (!dir || d.type === dir))
-    setPickErr(null); setPicker({ kind: 'debt', doc, rows })
+    setPickErr(null); setReview(null); setPicker({ kind: 'debt', doc, rows })
   }
   const openTxPicker = async (doc) => {
     setPickErr(null); setBusy(true)
     try {
       const r = await apiFetch('/transactions?period=all', token)
       const rows = Array.isArray(r) ? r : (r.transactions || [])
-      setPicker({ kind: 'transaction', doc, rows })
-    } catch (e) { alert(e.message) } finally { setBusy(false) }
+      setReview(null); setPicker({ kind: 'transaction', doc, rows })
+    } catch (e) { setPickErr(e.message || 'Could not load transactions') } finally { setBusy(false) }
   }
 
   if (st.loading) return <>{head}<Card><LoadingSkeleton rows={6} height={18} /></Card></>
@@ -1235,26 +1382,45 @@ export function BusinessInvoices() {
     <CreateOutcome note={outcome} onDismiss={() => setOutcome(null)} />
     <InvoiceSummary docs={st.docs} loading={st.loading} />
     <InvoiceQueue docs={st.docs} loading={st.loading} cpName={cpName} blockCreate={blocked}
-      onReview={setReview} onView={onView}
+      onReview={toggleReview} onView={onView}
       onCreate={(doc, dir) => setCreate({ doc, dir })}
       onLinkDebt={openDebtPicker} onMatch={openTxPicker}
-      onUpload={() => setUpload(true)} navigate={navigate} />
+      onUpload={() => setUpload(true)} navigate={navigate}
+      expandedId={isDesktop ? (review?.id ?? picker?.doc?.id ?? null) : null}
+      renderPanel={isDesktop ? (d) => (
+        // Review and the two pickers share one mount point, so a row can only ever
+        // show one panel and no flow falls back to an overlay on desktop.
+        picker?.doc?.id === d.id ? (
+          <InvoicePickerPanel kind={picker.kind} doc={picker.doc} rows={picker.rows || []}
+            busy={busy} error={pickErr} cpName={cpName}
+            onClose={() => setPicker(null)}
+            onPick={(row) => linkDoc(picker.doc, picker.kind, row.id)} />
+        ) : (
+          <InvoiceReviewPanel doc={d} cpName={cpName} getSignedUrl={getSignedUrl}
+            rules={rules.rows} rulesLoading={rules.loading} rulesError={rules.failed}
+            busy={busy} error={pickErr}
+            onClose={() => setReview(null)} onView={onView}
+            onLinkExisting={(doc) => openDebtPicker(doc)}
+            onCreate={onReviewCreate} />
+        )
+      ) : null} />
     <InvoiceFooterNote navigate={navigate} />
 
-    <InvoiceReviewDrawer doc={review} open={!!review} cpName={cpName}
-      rules={rules.rows} rulesLoading={rules.loading} rulesError={rules.failed} busy={busy} error={pickErr}
-      onClose={() => setReview(null)} onView={onView}
-      onLinkExisting={(doc) => { setReview(null); openDebtPicker(doc) }}
-      onCreate={(plan) => {
-        // The confirmed amount is what gets created — gross or net, chosen explicitly in
-        // the drawer. Never a silent substitution.
-        setReview(null)
-        setCreate({ doc: plan.doc, dir: 'payable', plan })
-      }} />
+    {/* Below 1024px the original side drawer is still the review surface. */}
+    {!isDesktop && (
+      <InvoiceReviewDrawer doc={review} open={!!review} cpName={cpName}
+        rules={rules.rows} rulesLoading={rules.loading} rulesError={rules.failed} busy={busy} error={pickErr}
+        onClose={() => setReview(null)} onView={onView}
+        onLinkExisting={(doc) => { setReview(null); openDebtPicker(doc) }}
+        onCreate={onReviewCreate} />
+    )}
 
-    <LinkPicker open={!!picker} kind={picker?.kind} doc={picker?.doc} rows={picker?.rows || []}
-      busy={busy} error={pickErr} onClose={() => setPicker(null)}
-      onPick={(row) => linkDoc(picker.doc, picker.kind, row.id)} />
+    {/* Mobile/tablet only — on desktop this is an inline panel under the row. */}
+    {!isDesktop && (
+      <LinkPicker open={!!picker} kind={picker?.kind} doc={picker?.doc} rows={picker?.rows || []}
+        busy={busy} error={pickErr} onClose={() => setPicker(null)}
+        onPick={(row) => linkDoc(picker.doc, picker.kind, row.id)} />
+    )}
 
     {/* Real creation, always user-submitted: the form is prefilled from the invoice, the
         user confirms, and only then is the document linked to the record it created. */}

@@ -26,6 +26,8 @@ import {
   compatibilityOf, COMPAT_LABEL, typeLabel, linkIdFor, otherLinksOf,
   duplicateWarning, evidenceOf, isPaid, readyGate, CAPABILITIES, CAPABILITY_NOTE,
 } from './evidenceModel'
+import { companyDocWarning } from './companyVault'
+import ReviewPanel, { RpCols, RpCol, RpActions } from './ReviewPanel'
 import './RecordDrawer.css'
 
 const money = (n, ccy = 'IDR') => `${ccy || 'IDR'} ${Number(n || 0).toLocaleString('de-DE')}`
@@ -44,30 +46,43 @@ const COMPAT_TONE = { suitable: 'success', caution: 'warning', unsuitable: 'dang
 function EvidenceItem({ doc, kind, debtId, busy, onView, onOpenDocuments, onUnlink }) {
   const [confirming, setConfirming] = useState(false)
   const compat = compatibilityOf(doc, kind)
+  // A permanent company/compliance file (NIB, NPWP, BPJS…) attached to a payable or
+  // receivable is almost always a filing mistake. Say so — never unlink on our own.
+  const company = companyDocWarning(doc)
   const linkId = linkIdFor(doc, debtId)
   const alsoLinked = otherLinksOf(doc, debtId).length
   const src = doc.file?.upload_channel
 
   return (
-    <div className={`rec-ev rec-ev--${compat.level}`}>
+    <div className={`rec-ev rec-ev--${company ? 'unsuitable' : compat.level}`}>
       <div className="rec-ev-top">
         <span className="rec-ev-ic"><Icon.doc width="14" height="14" aria-hidden="true" /></span>
         <button type="button" className="rec-ev-name" onClick={() => onView(doc)} title="View document">
           {doc.file?.file_name || doc.document_number || 'Document'}
         </button>
-        <StatusBadge tone={COMPAT_TONE[compat.level]}>{COMPAT_LABEL[compat.level]}</StatusBadge>
+        <StatusBadge tone={company ? 'danger' : COMPAT_TONE[compat.level]}>
+          {company ? 'Company document' : COMPAT_LABEL[compat.level]}
+        </StatusBadge>
       </div>
 
+      {company && (
+        <p className="rec-ev-company">
+          {company.text}<span className="rec-ev-company-why">{company.detail}</span>
+        </p>
+      )}
+
       <div className="rec-ev-meta">
-        <span>{typeLabel(doc.document_type)}</span>
+        <span>{company ? company.verdict.label : typeLabel(doc.document_type)}</span>
         {doc.document_date && <span>{fmtDate(doc.document_date)}</span>}
         {doc.gross_amount != null && <span className="rec-mono">{money(doc.gross_amount, doc.currency)}</span>}
         {src && <span>via {src}</span>}
         {alsoLinked > 0 && <span>also linked to {alsoLinked} other record{alsoLinked > 1 ? 's' : ''}</span>}
       </div>
 
-      {compat.reason && <p className="rec-ev-why">{compat.reason}</p>}
-      {compat.disagreement && <p className="rec-ev-why rec-ev-why--muted">{compat.disagreement}</p>}
+      {/* The company-document warning already says why this evidence is wrong — the
+          generic "type is other" note underneath would only repeat it. */}
+      {!company && compat.reason && <p className="rec-ev-why">{compat.reason}</p>}
+      {!company && compat.disagreement && <p className="rec-ev-why rec-ev-why--muted">{compat.disagreement}</p>}
 
       {!confirming ? (
         <div className="rec-ev-acts">
@@ -290,9 +305,198 @@ export default function RecordDrawer({
   )
 }
 
+/* ══════════════════════════════════════════════════════════════════════════
+   INLINE RECORD PANEL (desktop)
+
+   The same record, the same evidence and the same gate as RecordDrawer above — it
+   reuses EvidenceItem (so unlink, compatibility and the company-document warning are
+   literally the same component) and the same readyGate()/evidenceOf() calls. Only the
+   arrangement changes: three columns, with the readiness checklist as the strongest
+   element because that is the question a record page has to answer.
+
+   Nothing here persists readiness. The gate button stays disabled and says why.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+export function RecordPanel({
+  debt, kind, docs, docsLoading, busy, error, notice,
+  onClose, onEdit, onUpload, onLinkDoc, onViewDoc, onPay, onOpenDocuments, onUnlink,
+  focus, taxRule = null, rulesError = false,
+}) {
+  if (!debt) return null
+  const isPayable = kind !== 'receivable'
+  const ev = evidenceOf(debt, docs)
+  const gate = readyGate({ debt, kind, docs, taxRule, rulesError })
+  const remaining = Number(debt.remaining_amount ?? debt.amount ?? 0)
+  const paid = Number(debt.paid_amount || 0)
+  const settled = isPaid(debt)
+  const matched = !!debt.linked_transaction_id
+  const paymentMissing = settled && !ev.hasPayment && !matched
+
+  return (
+    <ReviewPanel
+      eyebrow={isPayable ? 'Payable details' : 'Receivable details'}
+      title={debt.counterparty || debt.description || 'Record'}
+      sub={isPayable ? 'Money your business needs to pay.' : 'Money owed to your business.'}
+      chips={<>
+        <StatusBadge tone={STATUS_TONE(debt.status)}>
+          {debt.status}{debt.days_overdue > 0 ? ` · ${debt.days_overdue}d` : ''}
+        </StatusBadge>
+        <StatusBadge tone={ev.hasObligation ? 'success' : 'warning'}>
+          {ev.hasObligation ? 'Invoice attached' : 'Invoice needed'}
+        </StatusBadge>
+        {settled && (
+          <StatusBadge tone={ev.hasPayment || matched ? 'success' : 'warning'}>
+            {ev.hasPayment ? 'Payment proof attached' : matched ? 'Transaction matched' : 'Payment proof missing'}
+          </StatusBadge>
+        )}
+        <span className="rec-amount">{money(remaining, debt.currency)}</span>
+      </>}
+      onClose={onClose}>
+
+      {notice && <p className="rp-note rp-note-ok" style={{ marginBottom: 10 }}>{notice}</p>}
+      {error && <p className="rp-note rp-note-warn" style={{ marginBottom: 10 }}>{error}</p>}
+      {paymentMissing && (
+        <p className="rp-note rp-note-warn" style={{ marginBottom: 12 }}>
+          <strong>Paid, but payment proof is missing.</strong> The invoice proves the obligation;
+          it does not show the money moved.
+        </p>
+      )}
+
+      <RpCols>
+        {/* ── 1 — summary ────────────────────────────────────────────────── */}
+        <RpCol label="Record summary">
+          {[
+            ['Counterparty', debt.counterparty],
+            ['Amount', money(debt.original_amount ?? debt.amount, debt.currency)],
+            ['Currency', debt.currency || 'IDR'],
+            ['Due date', fmtDate(debt.due_date)],
+            ['Status', debt.status],
+            ['Paid', money(paid, debt.currency)],
+            ['Remaining', money(remaining, debt.currency)],
+            ['Description', debt.description],
+          ].map(([k, v]) => (
+            <div className="rp-kv" key={k}>
+              <span>{k}</span><span>{v || <em className="rp-miss">Not set</em>}</span>
+            </div>
+          ))}
+          <Btn sm variant="ghost" onClick={() => onEdit(debt)} disabled={busy}>Edit details</Btn>
+        </RpCol>
+
+        {/* ── 2 — evidence ───────────────────────────────────────────────── */}
+        <RpCol label="Evidence" wide={false}>
+          <p className="rp-note rp-note-muted">
+            {isPayable
+              ? 'The supplier invoice proves the obligation. A payment proof proves it was paid.'
+              : 'The sales invoice proves the customer owes this. A payment proof proves it was received.'}
+          </p>
+          <div className={focus === 'evidence' ? 'rec-focus' : undefined}>
+            {docsLoading ? <LoadingSkeleton rows={2} height={16} /> : (
+              <>
+                {(docs || []).map((d) => (
+                  <EvidenceItem key={d.id} doc={d} kind={kind} debtId={debt.id} busy={busy}
+                    onView={onViewDoc} onOpenDocuments={onOpenDocuments} onUnlink={onUnlink} />
+                ))}
+                {!docs?.length && (
+                  <p className="rp-note rp-note-muted">No document is linked to this record yet.</p>
+                )}
+                {ev.legacyCount > 0 && (
+                  <p className="rp-note rp-note-muted">
+                    {ev.legacyCount} legacy attachment{ev.legacyCount > 1 ? 's' : ''} on this record
+                    (added before the Document Center). No document type, so it cannot satisfy a
+                    specific evidence requirement.
+                  </p>
+                )}
+              </>
+            )}
+          </div>
+          <div className="rec-actions">
+            <Btn sm onClick={() => onUpload(debt)} disabled={busy}>Upload evidence</Btn>
+            <Btn sm variant="ghost" onClick={() => onLinkDoc(debt)} disabled={busy}>Link existing document</Btn>
+            <Btn sm variant="ghost" onClick={() => onOpenDocuments(debt)}>Open documents</Btn>
+          </div>
+        </RpCol>
+
+        {/* ── 3 — payments + readiness: the strongest column here ────────── */}
+        <RpCol label="Payments & accounting readiness" emphasis>
+          <div className="rp-kv"><span>Paid</span><span className="rp-mono">{money(paid, debt.currency)}</span></div>
+          <div className="rp-kv"><span>Remaining</span><span className="rp-mono">{money(remaining, debt.currency)}</span></div>
+          <div className="rp-kv">
+            <span>Linked transaction</span>
+            <span>{debt.linked_transaction_id ? `#${debt.linked_transaction_id}` : <em className="rp-miss">None</em>}</span>
+          </div>
+
+          <div className="rec-actions">
+            {!settled && (
+              <Btn sm onClick={() => onPay(debt)} disabled={busy}>
+                {isPayable ? 'Pay now' : 'Mark received'}
+              </Btn>
+            )}
+            {paymentMissing && (
+              <>
+                <Btn sm onClick={() => onUpload(debt, 'payment_proof')} disabled={busy}>Upload payment proof</Btn>
+                <Btn sm variant="ghost" onClick={() => onLinkDoc(debt, 'payment_proof')} disabled={busy}>Link payment proof</Btn>
+              </>
+            )}
+          </div>
+
+          <span className="rp-col-label" style={{ marginTop: 8 }}>Readiness checklist</span>
+          <ul className="rec-checks">
+            {gate.items.map((c) => (
+              <li key={c.key} className={c.ok ? 'is-ok' : c.notRequired ? 'is-na' : ''}>
+                <span className="rec-check-mark" aria-hidden="true">
+                  {c.ok && !c.notRequired ? <Icon.check width="11" height="11" /> : <Icon.dot width="6" height="6" />}
+                </span>
+                <span className="rec-check-body">
+                  <span>{c.ok ? c.label : c.missing || c.label}</span>
+                  {c.note && <span className="rec-check-note">{c.note}</span>}
+                  {!c.ok && c.action && (
+                    <button type="button" className="rec-link" disabled={busy}
+                      onClick={() => {
+                        if (c.action.kind === 'edit') onEdit(debt)
+                        else if (c.action.kind === 'payment') onUpload(debt, 'payment_proof')
+                        else if (c.action.kind === 'evidence') onUpload(debt)
+                      }}>
+                      {c.action.label}
+                    </button>
+                  )}
+                </span>
+              </li>
+            ))}
+          </ul>
+
+          <div className="rec-gate">
+            <Btn sm disabled title={gate.ready ? CAPABILITY_NOTE.persistReady : gate.reason}>
+              Mark accounting-ready
+            </Btn>
+            <span className="rec-gate-why">
+              {gate.ready ? CAPABILITY_NOTE.persistReady : gate.reason}
+            </span>
+          </div>
+          {!CAPABILITIES.explainException && !gate.ready && (
+            <p className="rp-note rp-note-muted">
+              Recording an exception (“no payment proof because…”) needs a place to store it.
+              {' '}{CAPABILITY_NOTE.explainException}
+            </p>
+          )}
+          <p className="rp-note rp-note-muted">{CAPABILITY_NOTE.matchExistingTransaction}</p>
+        </RpCol>
+      </RpCols>
+
+      <RpActions>
+        <Btn sm variant="ghost" onClick={() => onEdit(debt)} disabled={busy}>Edit details</Btn>
+        <Btn sm variant="ghost" onClick={() => onOpenDocuments(debt)}>Open documents</Btn>
+        <Btn sm variant="ghost" onClick={onClose}>Close</Btn>
+        <span className="rp-note rp-note-muted" style={{ marginLeft: 'auto' }}>
+          Activity history requires audit log support.
+        </span>
+      </RpActions>
+    </ReviewPanel>
+  )
+}
+
 /* ── picker for linking an existing document to this record ───────────────── */
 
-export function DocPicker({ open, docs, busy, error, onPick, onClose, kind, linkedDocs, debtId, prefer }) {
+export function DocPicker({ open, docs, busy, error, onPick, onClose, kind, linkedDocs, debtId, prefer, inline = false }) {
   const [q, setQ] = useState('')
   const [confirm, setConfirm] = useState(null)   // { doc, compat, dup }
 
@@ -315,25 +519,14 @@ export function DocPicker({ open, docs, busy, error, onPick, onClose, kind, link
     setConfirm({ doc, compat, dup })
   }
 
-  return (
-    <div className="rec-scrim" onClick={onClose}>
-      <aside className="rec-drawer" role="dialog" aria-modal="true" aria-label="Link existing document"
-        onClick={(e) => e.stopPropagation()}>
-        <header className="rec-head">
-          <div className="rec-head-main">
-            <span className="rec-eyebrow">Evidence</span>
-            <h2 className="rec-title">Link existing document</h2>
-            <p className="rec-sub">
-              {prefer === 'payment_proof'
-                ? 'Payment proofs are listed first — pick the one that shows this payment.'
-                : 'Pick the document that proves this record.'}
-            </p>
-          </div>
-          <button type="button" className="rec-x" onClick={onClose} aria-label="Close">
-            <Icon.plus width="16" height="16" style={{ transform: 'rotate(45deg)' }} />
-          </button>
-        </header>
+  const sub = prefer === 'payment_proof'
+    ? 'Payment proofs are listed first — pick the one that shows this payment.'
+    : 'Pick the document that proves this record.'
 
+  // The body is identical in both presentations — compatibility, duplicate detection and
+  // the confirm step are the same code, only the container differs.
+  const body = (
+      <>
         {error && <p className="rec-note rec-note-warn">{error}</p>}
 
         {confirm ? (
@@ -423,6 +616,31 @@ export function DocPicker({ open, docs, busy, error, onPick, onClose, kind, link
             </div>
           </>
         )}
+      </>
+  )
+
+  if (inline) {
+    return (
+      <ReviewPanel eyebrow="Evidence" title="Link existing document" sub={sub} onClose={onClose}>
+        {body}
+      </ReviewPanel>
+    )
+  }
+  return (
+    <div className="rec-scrim" onClick={onClose}>
+      <aside className="rec-drawer" role="dialog" aria-modal="true" aria-label="Link existing document"
+        onClick={(e) => e.stopPropagation()}>
+        <header className="rec-head">
+          <div className="rec-head-main">
+            <span className="rec-eyebrow">Evidence</span>
+            <h2 className="rec-title">Link existing document</h2>
+            <p className="rec-sub">{sub}</p>
+          </div>
+          <button type="button" className="rec-x" onClick={onClose} aria-label="Close">
+            <Icon.plus width="16" height="16" style={{ transform: 'rotate(45deg)' }} />
+          </button>
+        </header>
+        {body}
       </aside>
     </div>
   )

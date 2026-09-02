@@ -1,6 +1,6 @@
 // CFO AI — shared UI primitives (Phase 1). One set for Personal + Business.
 // Brand-token styled (shell.css). Stateless/presentational; no business logic.
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, Fragment } from 'react'
 
 /* ── icons (stroke = currentColor) ─────────────────────────────────────────── */
 export const Icon = {
@@ -171,16 +171,31 @@ export const ActionMenu = ({ items }) => {
 
 // ResponsiveTable: real <table> on desktop; on mobile each row becomes a stacked card.
 // columns = [{key, label, num, render}], rows = array of objects, rowKey = fn
-export const ResponsiveTable = ({ columns, rows, rowKey, onRowClick }) => (
+// `expandedKey` + `renderExpanded` are OPTIONAL and additive: when omitted (every existing
+// call site) the table renders exactly as before. When provided, the matching row is marked
+// and a full-width row carrying the panel is inserted directly beneath it.
+export const ResponsiveTable = ({ columns, rows, rowKey, onRowClick, expandedKey = null, renderExpanded = null }) => (
   <div className="cfo-table-wrap">
     <table className="cfo-table">
       <thead><tr>{columns.map(c => <th key={c.key} className={c.num ? 'num' : ''}>{c.label}</th>)}</tr></thead>
       <tbody>
-        {rows.map((r, i) => (
-          <tr key={rowKey ? rowKey(r) : i} onClick={onRowClick ? () => onRowClick(r) : undefined} style={onRowClick ? { cursor: 'pointer' } : undefined}>
-            {columns.map(c => <td key={c.key} className={c.num ? 'num' : ''}>{c.render ? c.render(r) : r[c.key]}</td>)}
-          </tr>
-        ))}
+        {rows.map((r, i) => {
+          const key = rowKey ? rowKey(r) : i
+          const isOpen = expandedKey != null && key === expandedKey
+          return (
+            <Fragment key={key}>
+              <tr className={isOpen ? 'is-rp-open' : undefined}
+                onClick={onRowClick ? () => onRowClick(r) : undefined} style={onRowClick ? { cursor: 'pointer' } : undefined}>
+                {columns.map(c => <td key={c.key} className={c.num ? 'num' : ''}>{c.render ? c.render(r) : r[c.key]}</td>)}
+              </tr>
+              {isOpen && renderExpanded && (
+                <tr className="cfo-row-exp">
+                  <td colSpan={columns.length}>{renderExpanded(r)}</td>
+                </tr>
+              )}
+            </Fragment>
+          )
+        })}
       </tbody>
     </table>
   </div>

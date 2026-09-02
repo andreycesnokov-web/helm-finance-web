@@ -129,6 +129,13 @@
 .rec-ev-why { margin: 2px 0 0; font-size: 12px; line-height: 1.5; color: var(--brand-navy); font-weight: 600; }
 .rec-ev-why--muted { color: var(--text-secondary); font-weight: 500; }
 
+/* Misfiled company document — the strongest evidence warning on a record. */
+.rec-ev-company {
+  display: flex; flex-direction: column; gap: 2px; margin: 3px 0 0;
+  font-size: 12.5px; line-height: 1.5; font-weight: 700; color: var(--danger);
+}
+.rec-ev-company-why { font-size: 12px; font-weight: 500; color: var(--text-secondary); }
+
 .rec-ev-acts { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 3px; }
 .rec-ev-nolink { font-size: 11.5px; color: var(--text-muted); }
 .rec-ev-confirm {

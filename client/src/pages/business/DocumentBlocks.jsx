@@ -18,12 +18,17 @@
 // NOT CLAIMED: review_status is NOT writable through the API, so nothing marks a document
 // "reviewed". Extraction is never described as having run — extraction_status is shown
 // verbatim, and a blank field reads as missing rather than as an AI result.
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { StatusBadge, Btn, Icon, LoadingSkeleton } from '../../shell/ui'
 import {
   useWorkbench, WorkbenchToolbar, GroupHeader, MoreMenu, NoMatches, SelectionBar,
   monthGroup, DATE_OPTIONS, AMOUNT_OPTIONS,
 } from './Workbench'
+import {
+  vaultVerdictOf, partitionDocuments, VAULT_TYPES, vaultLabel, shelfLabel, VAULT_SHELVES,
+} from './companyVault'
+import ReviewPanel, { RpCols, RpCol, RpActions } from './ReviewPanel'
+import DocumentPreview from './DocumentPreview'
 import './Documents.css'
 
 /* ── derivation over real fields ──────────────────────────────────────────── */
@@ -101,19 +106,65 @@ export const QUEUES = [
 
 /* ── summary ──────────────────────────────────────────────────────────────── */
 
-export function DocumentSummary({ docs, loading }) {
-  const n = (k) => docs.filter(QUEUES.find((q) => q.key === k).match).length
+// Counts the two views the page is built around, plus the two states that decide
+// whether the inbox is actually clean. Archived and accounting-ready still have
+// their own queue tabs — they are not work, so they do not need a headline number.
+export function documentCounts(docs = []) {
+  const { evidence, vault } = partitionDocuments(docs)
+  const live = (rows) => rows.filter((d) => !d.archived_at)
+  const liveEvidence = live(evidence)
+  const liveVault = live(vault)
+  return {
+    evidence: liveEvidence.length,
+    vault: liveVault.length,
+    // Needs review spans BOTH views: an unconfirmed vault suggestion is a real
+    // open question, the same way an unreviewed invoice is.
+    needsReview: liveEvidence.filter((d) => ['review', 'extracting'].includes(statusOf(d))).length
+      + liveVault.filter((d) => !vaultVerdictOf(d)?.confirmed).length,
+    unlinked: liveEvidence.filter((d) => !isLinked(d)).length,
+    vaultSuggested: liveVault.filter((d) => !vaultVerdictOf(d)?.confirmed).length,
+  }
+}
+
+export function DocumentSummary({ docs, loading, view, onView }) {
+  const c = documentCounts(docs)
   const cards = [
-    ['Needs review', 'review'], ['Unlinked', 'unlinked'], ['Missing data', 'missing'],
-    ['Accounting-ready', 'ready'], ['Archived', 'archived'],
+    { key: 'inbox', label: 'Evidence inbox', value: c.evidence, meta: 'need accounting action' },
+    { key: 'review', label: 'Needs review', value: c.needsReview, meta: 'across both views' },
+    { key: 'inbox_unlinked', label: 'Unlinked evidence', value: c.unlinked, meta: 'not attached to a record' },
+    { key: 'vault', label: 'Company vault', value: c.vault,
+      meta: c.vaultSuggested ? `${c.vaultSuggested} suggested` : 'permanent company files' },
   ]
+  const target = { inbox: 'inbox', review: 'inbox', inbox_unlinked: 'inbox', vault: 'vault' }
   return (
     <div className="doc-summary">
-      {cards.map(([label, key]) => (
-        <article key={key} className="doc-sum">
-          <span className="doc-sum-label">{label}</span>
-          <span className="doc-sum-value">{loading ? '·' : n(key)}</span>
-        </article>
+      {cards.map((card) => (
+        <button key={card.key} type="button"
+          className={`doc-sum${view === target[card.key] ? ' is-current' : ''}`}
+          onClick={() => onView?.(target[card.key])}>
+          <span className="doc-sum-label">{card.label}</span>
+          <span className="doc-sum-value">{loading ? '·' : card.value}</span>
+          <span className="doc-sum-meta">{card.meta}</span>
+        </button>
+      ))}
+    </div>
+  )
+}
+
+/* ── primary view switch: work queue vs storage ───────────────────────────── */
+
+export function DocumentViewTabs({ view, onView, counts }) {
+  const tabs = [
+    { key: 'inbox', label: 'Evidence Inbox', n: counts.evidence },
+    { key: 'vault', label: 'Company Vault', n: counts.vault },
+  ]
+  return (
+    <div className="doc-views" role="tablist" aria-label="Document views">
+      {tabs.map((t) => (
+        <button key={t.key} type="button" role="tab" aria-selected={t.key === view}
+          className={`doc-view${t.key === view ? ' is-active' : ''}`} onClick={() => onView(t.key)}>
+          {t.label}<span className="doc-tab-n">{t.n}</span>
+        </button>
       ))}
     </div>
   )
@@ -174,6 +225,8 @@ const makeDocCfg = (cpName) => ({
 export function DocumentQueue({
   docs, loading, active, onSelect, cpName, selected, onToggle, onClearSel, onBulkArchive, busy, blockCreate,
   onReview, onView, onArchive, onCreate, onLink, onClassify, onUpload, navigate,
+  // Inline review (desktop). Both default to inert, so the drawer path is unchanged.
+  expandedId = null, renderPanel = null,
 }) {
   const inQueue = docs.filter((QUEUES.find((q) => q.key === active) || QUEUES[0]).match)
   const cfg = useMemo(() => makeDocCfg(cpName), [cpName])
@@ -184,8 +237,8 @@ export function DocumentQueue({
     <section className={`doc-section${wb.density === 'compact' ? ' is-compact' : ''}`}>
       <div className="doc-section-head">
         <div>
-          <h2 className="doc-section-title">Document work queue</h2>
-          <p className="doc-section-sub">AI extraction is reviewed before it affects your books.</p>
+          <h2 className="doc-section-title">Evidence Inbox</h2>
+          <p className="doc-section-sub">Documents that need accounting action.</p>
         </div>
         <Btn sm onClick={onUpload}>Upload document</Btn>
       </div>
@@ -251,11 +304,16 @@ export function DocumentQueue({
                     dl && { label: 'Open record', onClick: () => navigate('/business/payables') },
                     !d.archived_at && { label: 'Archive', onClick: () => onArchive(d) },
                   ]
+                  const isOpen = expandedId === d.id
                   return (
-                    <article key={d.id} className="doc-row">
+                    <div key={d.id} className="doc-rowgroup">
+                    <article className={`doc-row${isOpen ? ' is-rp-open' : ''}`}>
                       <input type="checkbox" className="wb-check" checked={selected.has(d.id)}
+                        onClick={(e) => e.stopPropagation()}
                         onChange={() => onToggle(d.id)} aria-label={`Select ${d.file?.file_name || 'document'}`} />
-                      <div className="doc-row-main">
+                      <div className="doc-row-main" role="button" tabIndex={0} aria-expanded={isOpen}
+                        onClick={() => onReview(d)}
+                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onReview(d) } }}>
                         <div className="doc-row-head">
                           <span className="doc-row-type">{typeLabel(d.document_type)}</span>
                           <StatusBadge tone={STATUS[st].tone}>{STATUS[st].label}</StatusBadge>
@@ -275,6 +333,8 @@ export function DocumentQueue({
                         <MoreMenu items={more} />
                       </div>
                     </article>
+                    {isOpen && renderPanel?.(d)}
+                    </div>
                   )
                 })}
               </div>
@@ -371,8 +431,43 @@ export function DocumentReview({ doc, cpName, onClose, onView, onCreate, onLink,
 
 /* ── classify drawer — real: PATCH writes document_type ───────────────────── */
 
-export function ClassifyDrawer({ doc, busy, error, onPick, onClose }) {
+export function ClassifyDrawer({ doc, busy, error, onPick, onClose, inline = false }) {
   if (!doc) return null
+  const body = (
+      <>
+        <p className="doc-note">
+          Choosing the type decides which financial record this evidence can be attached to.
+        </p>
+        {error && <p className="doc-note doc-error">{error}</p>}
+        <div className="doc-pick-grid">
+          {DOC_TYPES.map((t) => (
+            <button key={t} type="button" className="doc-pick" disabled={busy || t === doc.document_type}
+              onClick={() => onPick(t)}>
+              <span className="doc-pick-title">{typeLabel(t)}</span>
+              <span className="doc-pick-sub">{t}</span>
+            </button>
+          ))}
+        </div>
+      </>
+  )
+  if (inline) {
+    return (
+      <ReviewPanel eyebrow={doc.file?.file_name || 'Document'} title="Classify document"
+        sub="Choosing the type decides which financial record this evidence can be attached to."
+        onClose={onClose}>
+        {error && <p className="rp-note rp-note-warn" style={{ marginBottom: 10 }}>{error}</p>}
+        <div className="doc-pick-grid">
+          {DOC_TYPES.map((t) => (
+            <button key={t} type="button" className="doc-pick" disabled={busy || t === doc.document_type}
+              onClick={() => onPick(t)}>
+              <span className="doc-pick-title">{typeLabel(t)}</span>
+              <span className="doc-pick-sub">{t}</span>
+            </button>
+          ))}
+        </div>
+      </ReviewPanel>
+    )
+  }
   return (
     <div className="doc-drawer-scrim" onClick={onClose}>
       <aside className="doc-drawer" role="dialog" aria-modal="true" aria-label="Classify document"
@@ -386,19 +481,371 @@ export function ClassifyDrawer({ doc, busy, error, onPick, onClose }) {
             <Icon.plus width="16" height="16" style={{ transform: 'rotate(45deg)' }} />
           </button>
         </header>
-        <p className="doc-note">
-          Choosing the type decides which financial record this evidence can be attached to.
-        </p>
-        {error && <p className="doc-note doc-error">{error}</p>}
-        <div className="doc-pick-list">
-          {DOC_TYPES.map((t) => (
-            <button key={t} type="button" className="doc-pick" disabled={busy || t === doc.document_type}
+        {body}
+      </aside>
+    </div>
+  )
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   INLINE DOCUMENT REVIEW PANEL (desktop)
+
+   Same derivations as the DocumentReview drawer — statusOf / gapsOf / actionsFor /
+   vaultVerdictOf — laid out in three columns with the PREVIEW as the strongest
+   element, because "what is this file?" is the question this page answers.
+
+   The preview shows the file. It is not extraction: no value below is read from the
+   document, and `extracted_json` is never written from here.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+export function DocumentReviewPanel({
+  doc, cpName, getSignedUrl, busy,
+  onClose, onView, onDownload, onCreate, onLink, onClassify, onArchive,
+  onReclassify, onMoveToVault, onOpenAccountant,
+}) {
+  if (!doc) return null
+  const a = actionsFor(doc)
+  const st = statusOf(doc)
+  const amt = amountOf(doc)
+  const gaps = gapsOf(doc)
+  const dl = debtLink(doc)
+  const tl = txLink(doc)
+  const vault = vaultVerdictOf(doc)
+  const intake = doc.extracted_json?.ai_intake || null
+  const need = <em className="rp-miss">Needs review</em>
+
+  const suggestion = vault
+    ? 'This looks like a permanent company document. Confirm its classification to keep it in the Company Vault.'
+    : a.create === 'payable' ? 'Create a payable — this is money your business owes.'
+      : a.create === 'receivable' ? 'Create a receivable — this is money expected from a customer.'
+        : a.link === 'transaction' ? 'Link this to the transaction it explains.'
+          : a.link === 'both' ? 'Link this to the payable or receivable it belongs to.'
+            : 'Classify the document so the right action becomes available.'
+
+  return (
+    <ReviewPanel
+      eyebrow={vault ? vault.label : typeLabel(doc.document_type)}
+      title={doc.file?.file_name || doc.document_number || 'Document'}
+      sub={vault ? 'Permanent company / compliance file.' : 'Accounting evidence — review, then link it to a record.'}
+      chips={<>
+        <StatusBadge tone={vault ? (vault.confirmed ? 'success' : 'warning') : STATUS[st].tone}>
+          {vault ? (vault.confirmed ? 'Confirmed' : 'Suggested') : STATUS[st].label}
+        </StatusBadge>
+        {channelOf(doc) && <span className="doc-tag">{channelOf(doc)}</span>}
+      </>}
+      onClose={onClose}>
+
+      <RpCols>
+        {/* ── 1 — the file itself ────────────────────────────────────────── */}
+        <RpCol label="Document preview">
+          <DocumentPreview doc={doc} getSignedUrl={getSignedUrl} />
+        </RpCol>
+
+        {/* ── 2 — fields and classification ──────────────────────────────── */}
+        <RpCol label="Fields & classification">
+          <div className="rp-kv"><span>Document type</span><span>{typeLabel(doc.document_type)}</span></div>
+          <div className="rp-kv"><span>Document number</span><span>{doc.document_number || need}</span></div>
+          <div className="rp-kv"><span>Date</span><span>{fmtDate(doc.document_date) || need}</span></div>
+          <div className="rp-kv"><span>Counterparty</span><span>{cpName?.(doc.issuer_counterparty_id) || need}</span></div>
+          <div className="rp-kv"><span>Amount</span>
+            <span className="rp-mono">{amt !== null ? money(amt, doc.currency) : need}</span></div>
+          <div className="rp-kv"><span>Currency</span><span>{doc.currency || need}</span></div>
+          <div className="rp-kv"><span>Extraction status</span><span>{doc.extraction_status || need}</span></div>
+          <div className="rp-kv"><span>Source</span><span>{channelOf(doc) || '—'}</span></div>
+
+          {intake ? (
+            <>
+              <span className="rp-col-label" style={{ marginTop: 8 }}>AI intake classification</span>
+              {/* vaultLabel() falls back to "Company document", which would be wrong for a
+                  finance intake type — so it is only used for actual vault types. */}
+              <div className="rp-kv"><span>Classified as</span>
+                <span>{vault ? vaultLabel(intake.doc_type) : (intake.doc_type || 'Unclassified').replace(/_/g, ' ')}</span></div>
+              <div className="rp-kv"><span>Status</span>
+                <span>{String(intake.classification_status || 'needs review').replace(/_/g, ' ')}</span></div>
+              {intake.confidence && <div className="rp-kv"><span>Confidence</span><span>{intake.confidence}</span></div>}
+            </>
+          ) : (
+            <p className="rp-note rp-note-muted">
+              No stored classification for this document yet.
+            </p>
+          )}
+
+          {vault && (
+            <p className={`rp-note ${vault.confirmed ? 'rp-note-muted' : 'rp-note-amber'}`}>
+              {vault.note}
+              {vault.source === 'filename' && ' · matched on the file name, nothing was saved'}
+            </p>
+          )}
+
+          {gaps.length > 0 && (
+            <p className="rp-note rp-note-amber">Missing {gaps.join(', ')}.</p>
+          )}
+          <p className="rp-note rp-note-muted">
+            Fields come from the stored record. There is no OCR behind this page — a blank
+            field means nothing was entered, not that the document was read and found empty.
+          </p>
+        </RpCol>
+
+        {/* ── 3 — routing and actions ────────────────────────────────────── */}
+        <RpCol label="Actions & routing" emphasis>
+          <div className="rp-kv"><span>Evidence status</span><span>{STATUS[st].label}</span></div>
+          <div className="rp-kv"><span>Linked</span>
+            <span>{dl ? `Record #${dl.target_id}` : tl ? `Transaction #${tl.target_id}` : <em className="rp-miss">Not linked</em>}</span></div>
+
+          <p className="rp-note">{suggestion}</p>
+
+          <div className="doc-panel-acts">
+            {!vault && a.create && !dl && (
+              <Btn sm onClick={() => onCreate(doc, a.create)} disabled={busy}>Create {a.create} draft</Btn>
+            )}
+            {!vault && (a.link === 'payable' || a.link === 'both') && !dl && (
+              <Btn sm variant="ghost" onClick={() => onLink(doc, 'debt', 'payable')} disabled={busy}>Link to payable</Btn>
+            )}
+            {!vault && (a.link === 'receivable' || a.link === 'both') && !dl && (
+              <Btn sm variant="ghost" onClick={() => onLink(doc, 'debt', 'receivable')} disabled={busy}>Link to receivable</Btn>
+            )}
+            {!vault && a.link === 'transaction' && !tl && (
+              <Btn sm variant="ghost" onClick={() => onLink(doc, 'transaction')} disabled={busy}>Link to transaction</Btn>
+            )}
+            {vault && onReclassify && (
+              <Btn sm onClick={() => onReclassify(doc)} disabled={busy}>
+                {vault.confirmed ? 'Change classification' : 'Confirm classification'}
+              </Btn>
+            )}
+            {vault && onOpenAccountant && (
+              <Btn sm variant="ghost" onClick={onOpenAccountant}>Open in AI Accountant</Btn>
+            )}
+            {/* Both directions of the Inbox/Vault separation stay reachable from here. */}
+            {vault
+              ? <Btn sm variant="ghost" onClick={() => onClassify(doc)} disabled={busy}>Move to Evidence Inbox</Btn>
+              : onMoveToVault && <Btn sm variant="ghost" onClick={() => onMoveToVault(doc)} disabled={busy}>Move to Company Vault</Btn>}
+            {!vault && <Btn sm variant="ghost" onClick={() => onClassify(doc)} disabled={busy}>Reclassify</Btn>}
+          </div>
+        </RpCol>
+      </RpCols>
+
+      <RpActions>
+        <Btn sm variant="ghost" onClick={() => onView(doc)}>View document</Btn>
+        {onDownload && <Btn sm variant="ghost" onClick={() => onDownload(doc)}>Download</Btn>}
+        {!doc.archived_at && <Btn sm variant="ghost" onClick={() => onArchive(doc)} disabled={busy}>Archive</Btn>}
+        <Btn sm variant="ghost" onClick={onClose}>Close</Btn>
+        <span className="rp-note rp-note-muted" style={{ marginLeft: 'auto' }}>
+          Marking a document reviewed is not stored — review_status is read-only through the API.
+        </span>
+      </RpActions>
+    </ReviewPanel>
+  )
+}
+
+/* ── Company Vault ─────────────────────────────────────────────────────────
+   Permanent company and compliance files. A storage area, not a work queue:
+   calmer surface, no bulk selection, no "create record" action, and the only
+   open question a row can carry is whether its classification is right.
+
+   Nothing here is moved or hidden. The vault is a VIEW over the same
+   /api/documents rows, decided by companyVault.vaultVerdictOf. */
+
+const VAULT_SOURCE_BADGE = {
+  confirmed: { label: 'Confirmed', tone: 'success' },
+  classified: { label: 'Suggested', tone: 'warning' },
+  filename: { label: 'Suggested', tone: 'warning' },
+}
+
+export function CompanyVault({
+  docs, loading, onView, onDownload, onReclassify, onArchive, onOpenAccountant, onUpload,
+  onMoveToInbox, onReview, expandedId = null, renderPanel = null,
+}) {
+  const [q, setQ] = useState('')
+  const [onlyReview, setOnlyReview] = useState(false)
+
+  const shelves = useMemo(() => {
+    const needle = q.trim().toLowerCase()
+    const rows = docs.filter((d) => {
+      const v = vaultVerdictOf(d)
+      if (onlyReview && v?.confirmed) return false
+      if (!needle) return true
+      return [d.file?.file_name, d.document_number, v?.label, v?.docType]
+        .filter(Boolean).join(' ').toLowerCase().includes(needle)
+    })
+    return VAULT_SHELVES
+      .map((s) => ({ ...s, rows: rows.filter((d) => vaultVerdictOf(d)?.shelf === s.key) }))
+      .filter((s) => s.rows.length > 0)
+  }, [docs, q, onlyReview])
+
+  const shown = shelves.reduce((n, s) => n + s.rows.length, 0)
+
+  if (loading) return <section className="doc-vault"><LoadingSkeleton rows={4} height={20} /></section>
+
+  return (
+    <section className="doc-vault">
+      <div className="doc-section-head">
+        <div>
+          <h2 className="doc-section-title">Company Vault</h2>
+          <p className="doc-section-sub">Permanent company and compliance files.</p>
+        </div>
+        <Btn sm variant="ghost" onClick={onUpload}>Upload document</Btn>
+      </div>
+
+      {docs.length > 0 && (
+        <div className="doc-vault-bar">
+          <input type="search" className="doc-vault-search" value={q} placeholder="Search company files…"
+            onChange={(e) => setQ(e.target.value)} aria-label="Search company files" />
+          <label className="doc-vault-toggle">
+            <input type="checkbox" checked={onlyReview} onChange={(e) => setOnlyReview(e.target.checked)} />
+            Needs classification review
+          </label>
+        </div>
+      )}
+
+      {docs.length === 0 ? (
+        <div className="doc-vault-empty">
+          <p className="doc-empty-title">No company documents yet</p>
+          <p className="doc-note">
+            NIB, NPWP, BPJS, OSS licences, akta and company certificates land here instead of the
+            work queue. Upload one, or classify an existing document as a company document.
+          </p>
+        </div>
+      ) : shown === 0 ? (
+        <div className="doc-vault-empty">
+          <p className="doc-empty-title">No company files match</p>
+          <Btn sm variant="ghost" onClick={() => { setQ(''); setOnlyReview(false) }}>Clear</Btn>
+        </div>
+      ) : shelves.map((s) => (
+        <div key={s.key}>
+          <GroupHeader label={s.label} count={s.rows.length} />
+          <div className="doc-rows">
+            {s.rows.map((d) => {
+              const v = vaultVerdictOf(d)
+              const badge = VAULT_SOURCE_BADGE[v.source]
+              const linked = isLinked(d)
+              const more = [
+                { label: 'View document', onClick: () => onView(d) },
+                { label: 'Download', onClick: () => onDownload(d) },
+                { label: 'Open in AI Accountant', onClick: onOpenAccountant },
+                { label: v.confirmed ? 'Change classification' : 'Reclassify', onClick: () => onReclassify(d) },
+                { label: 'Move to Evidence Inbox', onClick: () => onMoveToInbox(d) },
+                !d.archived_at && { label: 'Archive', onClick: () => onArchive(d) },
+              ]
+              const isOpen = expandedId === d.id
+              return (
+                <div key={d.id} className="doc-rowgroup">
+                <article className={`doc-row doc-vrow${v.confirmed ? '' : ' is-suggested'}${isOpen ? ' is-rp-open' : ''}`}>
+                  <div className="doc-row-main"
+                    role={onReview ? 'button' : undefined} tabIndex={onReview ? 0 : undefined}
+                    aria-expanded={onReview ? isOpen : undefined}
+                    onClick={onReview ? () => onReview(d) : undefined}
+                    onKeyDown={onReview ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onReview(d) } } : undefined}>
+                    <div className="doc-row-head">
+                      <span className="doc-row-type">{v.label}</span>
+                      <StatusBadge tone={badge.tone}>{badge.label}</StatusBadge>
+                      {channelOf(d) && <span className="doc-tag">{channelOf(d)}</span>}
+                      {d.archived_at && <span className="doc-tag">Archived</span>}
+                    </div>
+                    <span className="doc-row-name">{d.file?.file_name || d.document_number || 'Untitled document'}</span>
+                    <div className="doc-row-meta">
+                      <span>{shelfLabel(v.shelf)}</span>
+                      <span>Uploaded {fmtDate(d.created_at) || '—'}</span>
+                    </div>
+                    {!v.confirmed && (
+                      <span className="doc-vrow-note">
+                        {v.note}
+                        {v.source === 'filename' && ' · matched on the file name, nothing was saved'}
+                      </span>
+                    )}
+                    {linked && (
+                      <span className="doc-row-gap">
+                        Linked to a financial record — a company document is not evidence for one.
+                      </span>
+                    )}
+                  </div>
+                  <div className="doc-row-actions">
+                    <Btn sm onClick={() => (onReview ? onReview(d) : onView(d))}>
+                      {onReview ? 'Review' : 'View'}
+                    </Btn>
+                    <MoreMenu items={more} />
+                  </div>
+                </article>
+                {isOpen && renderPanel?.(d)}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      ))}
+
+      <p className="doc-note doc-note-muted">
+        Company documents are separated by classification, not moved — every file is still in
+        the same document store and nothing here is deleted. Confirming a type saves it, so the
+        document stays out of the work queue.
+      </p>
+    </section>
+  )
+}
+
+/* ── reclassify drawer — real: PATCH /ai-accountant/documents/:id/classification
+       persists the intake type and marks it manually confirmed ─────────────── */
+
+export function VaultReclassifyDrawer({ doc, busy, error, onPick, onClose, inline = false }) {
+  if (!doc) return null
+  const v = vaultVerdictOf(doc)
+  if (inline) {
+    return (
+      <ReviewPanel eyebrow={doc.file?.file_name || 'Document'} title="Classify company document"
+        sub={v?.confirmed
+          ? `Currently confirmed as ${v.label}.`
+          : `Currently ${v ? `suggested as ${v.label}` : 'unclassified'}. Confirming saves the type, so this document stays out of the Evidence Inbox.`}
+        onClose={onClose}>
+        {error && <p className="rp-note rp-note-warn" style={{ marginBottom: 10 }}>{error}</p>}
+        <div className="doc-pick-grid">
+          {VAULT_TYPES.map((t) => (
+            <button key={t} type="button" className="doc-pick"
+              disabled={busy || (v?.confirmed && t === v.docType)}
               onClick={() => onPick(t)}>
-              <span className="doc-pick-title">{typeLabel(t)}</span>
+              <span className="doc-pick-title">{vaultLabel(t)}</span>
               <span className="doc-pick-sub">{t}</span>
             </button>
           ))}
         </div>
+        <p className="rp-note rp-note-muted" style={{ marginTop: 12 }}>
+          Not a company document? Use “Move to Evidence Inbox” on the row — that gives it an
+          accounting type and returns it to the work queue.
+        </p>
+      </ReviewPanel>
+    )
+  }
+  return (
+    <div className="doc-drawer-scrim" onClick={onClose}>
+      <aside className="doc-drawer" role="dialog" aria-modal="true" aria-label="Reclassify company document"
+        onClick={(e) => e.stopPropagation()}>
+        <header className="doc-drawer-head">
+          <div>
+            <span className="doc-drawer-eyebrow">{doc.file?.file_name || 'Document'}</span>
+            <h2 className="doc-drawer-title">Classify company document</h2>
+          </div>
+          <button type="button" className="doc-drawer-x" onClick={onClose} aria-label="Close">
+            <Icon.plus width="16" height="16" style={{ transform: 'rotate(45deg)' }} />
+          </button>
+        </header>
+        <p className="doc-note">
+          {v?.confirmed
+            ? `Currently confirmed as ${v.label}.`
+            : `Currently ${v ? `suggested as ${v.label}` : 'unclassified'}. Confirming saves the type, so this document stays out of the Evidence Inbox.`}
+        </p>
+        {error && <p className="doc-note doc-error">{error}</p>}
+        <div className="doc-pick-list">
+          {VAULT_TYPES.map((t) => (
+            <button key={t} type="button" className="doc-pick"
+              disabled={busy || (v?.confirmed && t === v.docType)}
+              onClick={() => onPick(t)}>
+              <span className="doc-pick-title">{vaultLabel(t)}</span>
+              <span className="doc-pick-sub">{t}</span>
+            </button>
+          ))}
+        </div>
+        <p className="doc-note doc-note-muted">
+          Not a company document? Use “Move to Evidence Inbox” on the row — that gives it an
+          accounting type and returns it to the work queue.
+        </p>
       </aside>
     </div>
   )

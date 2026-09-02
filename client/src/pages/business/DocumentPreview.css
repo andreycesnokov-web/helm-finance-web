@@ -1,0 +1,75 @@
+/* ============================================================================
+   Document preview. Brandbook tokens only. Class prefix: dp-
+   The stage has a fixed height so a panel never jumps as a file loads.
+   ========================================================================== */
+
+.dp { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+
+.dp-stage {
+  position: relative;
+  height: 300px;
+  display: flex; align-items: center; justify-content: center;
+  overflow: hidden;
+  border: 1px solid var(--border-default); border-radius: 14px;
+  background: var(--brand-pale-grey);
+}
+.dp--compact .dp-stage { height: 168px; }
+
+.dp-frame { width: 100%; height: 100%; border: 0; background: var(--surface-card); }
+.dp-img { max-width: 100%; max-height: 100%; object-fit: contain; display: block; }
+
+/* ── messages / fallback card ───────────────────────────────────────────── */
+.dp-msg {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 7px; padding: 22px; width: 100%; max-width: 340px; text-align: center;
+}
+.dp-file-ic {
+  display: inline-flex; align-items: center; justify-content: center; width: 42px; height: 42px;
+  border-radius: 12px; background: var(--surface-card); border: 1px solid var(--border-default);
+  color: var(--brand-electric-blue-ink);
+}
+.dp-msg-text { margin: 0; font-size: 13px; font-weight: 700; color: var(--brand-navy); }
+.dp-msg-detail { margin: 0; font-size: 12px; line-height: 1.5; color: var(--text-secondary); }
+.dp-msg-file {
+  font-size: 11.5px; color: var(--text-muted); font-family: var(--font-mono);
+  overflow-wrap: anywhere; max-width: 100%;
+}
+
+/* ── spreadsheet table ──────────────────────────────────────────────────── */
+.dp-sheet { width: 100%; height: 100%; overflow: auto; background: var(--surface-card); }
+.dp-table { border-collapse: collapse; font-size: 11.5px; width: max-content; min-width: 100%; }
+.dp-table td {
+  border: 1px solid var(--border-subtle); padding: 5px 9px;
+  color: var(--text-primary); white-space: nowrap;
+  max-width: 220px; overflow: hidden; text-overflow: ellipsis;
+  font-variant-numeric: tabular-nums;
+}
+.dp-table tr.is-head td {
+  background: var(--brand-pale-grey); font-weight: 800; color: var(--brand-navy);
+  position: sticky; top: 0; z-index: 1;
+}
+
+/* ── footer ─────────────────────────────────────────────────────────────── */
+.dp-foot { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.dp-name {
+  font-size: 12.5px; font-weight: 700; color: var(--brand-navy);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.dp-meta { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 11.5px; color: var(--text-muted); }
+.dp-tag {
+  display: inline-flex; align-items: center; padding: 1px 7px; border-radius: 999px;
+  background: var(--brand-pale-grey); border: 1px solid var(--border-subtle);
+  font-size: 10px; font-weight: 800; color: var(--text-muted);
+}
+.dp-acts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 2px; }
+.dp-link {
+  font-size: 12px; font-weight: 700; color: var(--brand-electric-blue-ink); text-decoration: none;
+}
+.dp-link:hover { text-decoration: underline; }
+
+.dp-note { margin: 0; font-size: 11.5px; line-height: 1.5; color: var(--text-muted); }
+
+@media (max-width: 1439px) {
+  .dp-stage { height: 250px; }
+  .dp--compact .dp-stage { height: 150px; }
+}
