@@ -240,6 +240,47 @@ for s in reg["sources"]:
         err(f"registry {s['source_id']}: downloaded_file must live under raw_sources/ ({df})")
 ok("evidence precedence held: no candidate cites derived text; only raw_sources/ is hashed")
 
+
+# 9. Invoice Review Matrix V1 — never active, never verified, never drifted from its source
+mx_p = os.path.join(KB, "rule_candidates", "invoice_review_matrix_v1.json")
+if os.path.exists(mx_p):
+    mx = load(mx_p)
+    if mx:
+        rows_m = mx.get("matrix", [])
+        if mx.get("hard_rule") != "This is a review matrix, not a tax advice engine.":
+            err("matrix: hard_rule banner missing or altered")
+        src_c = load(os.path.join(KB, "rule_candidates", "invoice_transaction_candidates.json")) or {}
+        by_t = {c["transaction_type"]: c for c in src_c.get("invoice_transaction_candidates", [])}
+        for r in rows_m:
+            t = r.get("transaction_type")
+            if r.get("active") is not False:
+                err(f"matrix {t}: active must be false")
+            if r.get("legal_verified") is not False:
+                err(f"matrix {t}: legal_verified must be false")
+            if r.get("status") != "under_review":
+                err(f"matrix {t}: status must be under_review")
+            if not r.get("accountant_review_required"):
+                err(f"matrix {t}: accountant_review_required must be true")
+            tb = r.get("tax_base")
+            if tb is None or (isinstance(tb, str) and not tb.strip()):
+                err(f"matrix {t}: tax_base must be a value or 'needs_reviewer'")
+            if r.get("possible_rate") is not None and not r.get("source_ids"):
+                err(f"matrix {t}: possible_rate set with no source_ids")
+            _check_ids(f"matrix:{t}", r.get("source_ids"))
+            # must not drift from the candidates file it is generated from
+            c = by_t.get(t)
+            if not c:
+                err(f"matrix {t}: no matching candidate in invoice_transaction_candidates.json")
+            else:
+                if c.get("possible_rate") != r.get("possible_rate"):
+                    err(f"matrix {t}: possible_rate drifted from candidate")
+                if c.get("tax_base") != r.get("tax_base"):
+                    err(f"matrix {t}: tax_base drifted from candidate")
+        missing_t = set(by_t) - {r.get("transaction_type") for r in rows_m}
+        if missing_t:
+            err(f"matrix: transaction types present in candidates but absent from matrix: {sorted(missing_t)}")
+        ok(f"invoice review matrix: {len(rows_m)} rows, none active/verified, none drifted from candidates")
+
 print("\n".join(f"  ok   {m}" for m in oks))
 if warns:
     print("\n".join(f"  warn {m}" for m in warns))
