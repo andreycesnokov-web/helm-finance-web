@@ -1,35 +1,59 @@
 # raw_sources — MANIFEST
 
-**This directory is intentionally empty.**
+Regenerated 2026-09-02 (source verification pass v2 / Phase 2).
 
-No primary documents were downloaded in this pass. Retrieval produced page text, not archived PDFs, and claiming otherwise would make `downloaded_file` a lie. Every registry entry therefore has `downloaded_file: ""`.
+`sha256` is over the exact bytes at `local_file`. No hash without a file; no `local_file` without bytes.
 
-## Priority downloads for the next pass
+**31 archived / 31 attempted.**
 
-These are the `trust_level: regulation` entries — the primary text a reviewer actually needs:
+| source_id | local_file | bytes | sha256 (first 16) | type |
+|---|---|---|---|---|
+| `BPK_PPH23_PMK141_002` | `BPK_PPH23_PMK141_002.html` | 39260 | `c1605b55c5031077…` | text/html |
+| `BPK_PPH42_PP34_001` | `BPK_PPH42_PP34_001.pdf` | 1114110 | `2f5af8d0c92628fa…` | application/pdf |
+| `BPK_PPH42_PP34_002` | `BPK_PPH42_PP34_002.html` | 40423 | `b55b5439d6d1f363…` | text/html |
+| `BPK_PPN_003` | `BPK_PPN_003.html` | 42018 | `80364cee6cb0c17c…` | text/html |
+| `DJP_BUPOT_001` | `DJP_BUPOT_001.pdf` | 2825675 | `94bc1cc4599519f7…` | application/pdf |
+| `DJP_BUPOT_002` | `DJP_BUPOT_002.html` | 54448 | `50fcd1dfafbba0e3…` | text/html |
+| `DJP_CORETAX_001` | `DJP_CORETAX_001.html` | 314936 | `d90d43ef3fbf9a56…` | text/html |
+| `DJP_CORETAX_004` | `DJP_CORETAX_004.html` | 48547 | `61e786bb69838794…` | text/html |
+| `DJP_PPH23_002` | `DJP_PPH23_002.html` | 91384 | `7cf184691b72f0d6…` | text/html |
+| `DJP_PPH23_003` | `DJP_PPH23_003.html` | 74101 | `b692705e1b8d55c8…` | text/html |
+| `DJP_PPH23_005` | `DJP_PPH23_005.html` | 57775 | `ec9c9ece5df39dd7…` | text/html |
+| `DJP_PPH23_006` | `DJP_PPH23_006.html` | 147923 | `11900c3022d98f15…` | text/html |
+| `DJP_PPH23_PENGACARA_004` | `DJP_PPH23_PENGACARA_004.html` | 73621 | `c9e1f4b0c7179f5b…` | text/html |
+| `DJP_PPH23_PMK141_003` | `DJP_PPH23_PMK141_003.html` | 125331 | `21ce9d3d7991b109…` | text/html |
+| `DJP_PPH42_002` | `DJP_PPH42_002.html` | 84525 | `42de5946abca061c…` | text/html |
+| `DJP_PPH42_003` | `DJP_PPH42_003.html` | 57008 | `5fdae0edca213b1d…` | text/html |
+| `DJP_PPH42_006` | `DJP_PPH42_006.html` | 59390 | `ed0fc790e2200748…` | text/html |
+| `DJP_PPH42_PP34_004` | `DJP_PPH42_PP34_004.html` | 104244 | `c0da95b7cf5c2408…` | text/html |
+| `DJP_PPHBADAN_001` | `DJP_PPHBADAN_001.html` | 57458 | `16fadae0088f3f34…` | text/html |
+| `DJP_PPN_001` | `DJP_PPN_001.html` | 247989 | `7f289680104e11a4…` | text/html |
+| `DJP_PPN_004` | `DJP_PPN_004.html` | 59040 | `9ebb22a0273df653…` | text/html |
+| `DJP_PPN_007` | `DJP_PPN_007.html` | 71548 | `42d17e4cedca56a1…` | text/html |
+| `KEMENKEU_PPH21_001` | `KEMENKEU_PPH21_001.pdf` | 5374488 | `6b06a241f9cd6fc6…` | application/pdf |
+| `KEMENKEU_PPH23_009` | `KEMENKEU_PPH23_009.html` | 122513 | `6ce514a335aa0d78…` | text/html |
+| `KEMENKEU_PPH23_PMK141_001` | `KEMENKEU_PPH23_PMK141_001.pdf` | 598778 | `cd107a9b7de8ad12…` | application/pdf |
+| `KEMENKEU_PPH42_PP34_003` | `KEMENKEU_PPH42_PP34_003.html` | 186014 | `5e6a4f3db6d7abf9…` | text/html |
+| `KEMENKEU_PPN_002` | `KEMENKEU_PPN_002.pdf` | 914438 | `373a13e091cc6971…` | application/pdf |
+| `OSS_001` | `OSS_001.html` | 212361 | `bd0888ca5dec166e…` | text/html |
+| `OSS_003` | `OSS_003.html` | 116950 | `3b85e4dbbc05681d…` | text/html |
+| `OSS_KBLI_001` | `OSS_KBLI_001.html` | 183200 | `910475d7c2582f0a…` | text/html |
+| `KEMENKEU_PPH23_PMK141_004` | `KEMENKEU_PPH23_PMK141_004.html` | 188405 | `af20708ebc18b9d0…` | text/html |
 
-| source_id | trust | title |
+## Not archived
+
+| source_id | status | why |
 |---|---|---|
-| `DJP_PPN_001` | regulation | [Ketentuan Nilai Lain sebagai Dasar Pengenaan Pajak dan Besaran Tertentu PPN (PMK 11/2025)](https://www.pajak.go.id/en/node/113878) |
-| `KEMENKEU_PPN_002` | regulation | [PMK Nomor 11 Tahun 2025 (PDF, JDIH Kemenkeu)](https://jdih.kemenkeu.go.id/api/download/52955502-8733-4fdd-98ce-bb03c31cda0b/2025pmkeuangan11.pdf) |
-| `BPK_PPN_003` | regulation | [PMK No. 11 Tahun 2025 (peraturan.bpk.go.id)](https://peraturan.bpk.go.id/Details/313574/pmk-no-11-tahun-2025) |
-| `DJP_PPN_007` | regulation | [Perubahan atas PMK 11 Tahun 2025 tentang Nilai Lain sebagai DPP dan Besaran Tertentu PPN](https://www.pajak.go.id/en/node/117215) |
-| `DJP_PPH23_003` | regulation | [Jenis Jasa Lain yang atas Imbalannya Dipotong PPh Pasal 23 ayat (1) huruf c](https://pajak.go.id/index.php/id/peraturan/jenis-jasa-lain-yang-atas-imbalannya-dipotong-pajak-penghasilan-berdasarkan-pasal-23-0) |
-| `KEMENKEU_PPH21_001` | regulation | [PMK Nomor 168 Tahun 2023 — PPh Pasal 21 (PDF, JDIH Kemenkeu)](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf) |
-| `DJP_PPH21_002` | regulation | [PMK 168 Tahun 2023 Tentang PPh Pasal 21 TER (PDF, DJP mirror)](https://pajak.go.id/sites/default/files/2024-02/PMK%20168%20Tahun%202023%20Tentang%20PPh%20Pasal%2021%20TER.pdf) |
-| `BPK_PPH21_003` | regulation | [PMK No. 168 Tahun 2023 (peraturan.bpk.go.id)](https://peraturan.bpk.go.id/Details/286951/pmk-no-168-tahun-2023) |
-| `BPJSTK_003` | regulation | [Peraturan BPJS Nomor 1 Tahun 2016 (PDF)](https://www.bpjsketenagakerjaan.go.id/assets/uploads/peraturan/16122016_111825_PER%20BPJS%2001%202016.pdf) |
+| `BKPM_OSS_001` | `unreachable` | DNS did not resolve for host www4.bkpm.go.id. Kept in registry, not summarised. |
 
-## Still missing entirely
+## not_chunkable — archived but no readable text
 
-- The PP governing PPh 4(2) land/building rental (**highest priority**)
-- PMK-141/PMK.03/2015 (or its current replacement) for the PPh 23 *jasa lain* list
-- The PER governing faktur pajak
-- The amendment to PMK 11/2025
-- UU PPh, UU PPN and UU HPP consolidated texts
-- BPJS Kesehatan employer obligations
-- PT PMA registration regulation
+No fact in this KB derives from any of these:
 
-## Convention when downloading
+- `BPK_PPH42_PP34_001` — scanned: /Font=15, 0 text operators, 14 CCITTFaxDecode streams — OCR would be required
+- `KEMENKEU_PPH23_PMK141_001` — /Font=117, ~72 text operators, 41 DCTDecode — text exists but encoding not decodable by the repo extractor
+- `DJP_BUPOT_001` — /Font=28, ~9 text operators — largely image-based
+- `KEMENKEU_PPH21_001` — /Font=304, ~315 text operators, 66 JBIG2Decode — text exists but encoding not decodable by the repo extractor
+- `OSS_001/OSS_003/OSS_KBLI_001` — client-rendered SPA; archived HTML is page chrome only
 
-`raw_sources/<section>/<topic>/<source_id>.<ext>`, then set `downloaded_file` in the registry to that path and record a `content_hash`.
+For PP 34/2017 and PMK 141/2015 this is NOT a blocker: the same instruments were read as HTML at DJP_PPH42_PP34_004 and DJP_PPH23_PMK141_003 respectively. OCR was NOT attempted — no OCR tooling is available here and hand-rolling a CID decoder would risk plausible-looking garbage in a legal KB.

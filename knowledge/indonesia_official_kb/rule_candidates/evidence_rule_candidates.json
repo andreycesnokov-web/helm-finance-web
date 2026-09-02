@@ -36,15 +36,16 @@
       ],
       "risk_if_missing": "input VAT may not be creditable",
       "source_ids": [
-        "DJP_PPN_001",
-        "DJP_CORETAX_004"
+        "KEMENKEU_PPN_002",
+        "DJP_PPN_001"
       ],
       "status": "under_review",
-      "notes": "Required-field list must come from the PER on faktur pajak — NOT yet sourced. GAP."
+      "notes": "Still NOT supported for required fields. The primary PPN text (KEMENKEU_PPN_002) is a nilai-lain regulation and does not define faktur pajak content. No PER on faktur pajak was located. GAP REMAINS.",
+      "source_verification_status": "fetch_verified"
     },
     {
       "evidence_type": "bukti_potong",
-      "what_it_proves": "tax was withheld and by whom",
+      "what_it_proves": "that tax was withheld, by whom, and through which reporting channel",
       "used_for": "tax",
       "required_fields": [
         "needs official source"
@@ -54,11 +55,13 @@
       ],
       "risk_if_missing": "counterparty cannot credit the withheld tax; the withholder cannot evidence remittance",
       "source_ids": [
-        "DJP_BUPOT_001",
+        "DJP_PPH23_002",
+        "DJP_PPH42_002",
         "DJP_BUPOT_002"
       ],
       "status": "under_review",
-      "notes": "Coretax bukti potong manual (DJP_BUPOT_001) is the best operational source found; read it before defining fields."
+      "notes": "SUPPORTED by fetch-verified pages: DJP_PPH23_002 states a bukti potong is issued via e-bupot for PPh 23; DJP_PPH42_002 states it is issued via e-SPT for PPh 4(2). The REQUIRED-FIELD list is still unsourced: the Coretax bukti potong manual (DJP_BUPOT_001) was archived but has no text layer and was not read.",
+      "source_verification_status": "fetch_verified"
     },
     {
       "evidence_type": "payment_proof",
@@ -77,7 +80,7 @@
       "risk_if_missing": "an invoice proves the obligation, never the settlement",
       "source_ids": [],
       "status": "under_review",
-      "notes": "NEEDS OFFICIAL SOURCE. Currently a product/accounting-control requirement, not a cited legal one."
+      "notes": "UNCHANGED and still unsourced. No official Indonesian source was found in this pass stating that a payment proof is legally required. It remains an accounting control we choose to enforce, and the KB must not imply otherwise."
     },
     {
       "evidence_type": "bank_statement",
@@ -130,10 +133,12 @@
       ],
       "risk_if_missing": "rental period and base cannot be established for PPh 4(2)",
       "source_ids": [
-        "DJP_PPH42_002"
+        "DJP_PPH42_002",
+        "DJP_PPH42_006"
       ],
       "status": "under_review",
-      "notes": "Central to Test Case 2. The distinction between base rent and service charge is tax-relevant — see DJP_PPH42_006."
+      "notes": "Elevated in importance. DJP_PPH42_006 (verified) shows rent and third-party service charges can attract DIFFERENT taxes, so the agreement is what lets a reviewer split a mixed invoice. Required fields remain a product requirement, not a sourced legal one.",
+      "source_verification_status": "fetch_verified"
     },
     {
       "evidence_type": "receipt_kwitansi",
@@ -150,5 +155,6 @@
       "status": "under_review",
       "notes": "NEEDS OFFICIAL SOURCE."
     }
-  ]
+  ],
+  "last_refined": "2026-09-02 source_verification_v1"
 }

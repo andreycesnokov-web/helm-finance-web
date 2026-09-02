@@ -22,7 +22,8 @@
       ],
       "confidence": "low",
       "needs_reviewer": true,
-      "notes": "Underlying law cited as UU 11/2020 (Cipta Kerja) via BKPM guidance; primary text NOT retrieved."
+      "notes": "Underlying law cited as UU 11/2020 (Cipta Kerja) via BKPM guidance; primary text NOT retrieved. | 2026-09-02: OSS pages archived and title-confirmed (OSS_001, OSS_003, OSS_KBLI_001) but they are client-rendered SPAs — the archived bytes contain no substantive content. BKPM_OSS_001 was UNREACHABLE (DNS). No new support obtained.",
+      "source_verification_status": "fetch_verified_bytes_only"
     },
     {
       "candidate_id": "COMP_ID_KBLI_001",
@@ -41,7 +42,8 @@
       ],
       "confidence": "low",
       "needs_reviewer": true,
-      "notes": "KBLI code determines risk tier and therefore which licences are required. Mapping logic NOT sourced."
+      "notes": "KBLI code determines risk tier and therefore which licences are required. Mapping logic NOT sourced. | 2026-09-02: OSS pages archived and title-confirmed (OSS_001, OSS_003, OSS_KBLI_001) but they are client-rendered SPAs — the archived bytes contain no substantive content. BKPM_OSS_001 was UNREACHABLE (DNS). No new support obtained.",
+      "source_verification_status": "fetch_verified_bytes_only"
     },
     {
       "candidate_id": "COMP_ID_LICENCE_RISK_001",
@@ -60,7 +62,8 @@
       ],
       "confidence": "low",
       "needs_reviewer": true,
-      "notes": "Low / low-medium risk described as issuable directly via OSS. Confirm against the primary regulation."
+      "notes": "Low / low-medium risk described as issuable directly via OSS. Confirm against the primary regulation. | 2026-09-02: OSS pages archived and title-confirmed (OSS_001, OSS_003, OSS_KBLI_001) but they are client-rendered SPAs — the archived bytes contain no substantive content. BKPM_OSS_001 was UNREACHABLE (DNS). No new support obtained.",
+      "source_verification_status": "fetch_verified_bytes_only"
     },
     {
       "candidate_id": "COMP_ID_LKPM_001",
@@ -103,5 +106,6 @@
       "needs_reviewer": true,
       "notes": "Cited basis: UU 24/2011. Registration described as requiring NIB or business licence plus NPWP. Covers BPJS Ketenagakerjaan; BPJS Kesehatan sources were NOT collected — GAP."
     }
-  ]
+  ],
+  "last_refined": "2026-09-02 source_verification_v1"
 }

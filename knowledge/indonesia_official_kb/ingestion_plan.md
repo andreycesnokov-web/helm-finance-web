@@ -128,3 +128,51 @@ is why the product says "Tax review needed". After Stage 4 the Tax Engine can ci
 3. Get a licensed reviewer for **one** rule — PPh 23 services.
 4. Run that one rule end to end through review and activation.
 5. Only then consider RAG, and only then the remaining rules.
+
+---
+
+## Update — source verification pass v1 (2026-09-02)
+
+**Stage 1 readiness changed.** 22 sources now have archived bytes with recorded SHA-256 hashes, so
+`official_sources.content_hash` can be populated from real data rather than left null. That matters:
+the hash is how a later re-verification detects that a regulation page changed underneath an active
+rule.
+
+### What is now ready to load as `official_sources` drafts
+
+The 22 `verification_status: fetch_verified` rows. Each carries `official_url`, `downloaded_file`,
+`sha256`, `retrieved_at` and a `verified_excerpt_notes` recording what was actually confirmed.
+Load them with `status='draft'` and `content_hash` set. **Still not `verified`** — that remains a
+licensed-reviewer judgement, not an HTTP 200.
+
+### What is NOT ready, and must not be ingested
+
+1. **The 43 `search_listed` rows.** Title and URL come from an official domain's index, but the page
+   was never opened. Loading them would put unchecked claims into the registry.
+2. **`BKPM_OSS_001`** — `unreachable` (DNS failure for `www4.bkpm.go.id`).
+3. **`DJP_BUPOT_001` and `KEMENKEU_PPH21_001`** — bytes archived and hashed, but **no embedded text
+   layer**. They can be stored as `official_sources` rows, but they must **never** be chunked for RAG:
+   there is no text to chunk, and no fact in this KB derives from them.
+4. **`OSS_001`, `OSS_003`, `OSS_KBLI_001`** — client-rendered SPAs. The archived HTML contains page
+   chrome only. Chunking them would embed navigation text as if it were regulation.
+
+### Consequence for Stage 2 (RAG)
+
+Only **one** document in the whole KB currently has usable primary text: `KEMENKEU_PPN_002`
+(PMK 11/2025, 103,878 characters extracted). Everything else is either guidance HTML or unreadable.
+
+**A RAG index built today would be one regulation plus a pile of DJP explainer pages.** That is not
+worth building yet. Close gaps 1, 2 and 4 in `reviewer_notes.md` first — the PPh 4(2) PP, the faktur
+pajak PER, and PMK-141/PMK.03/2015 — then reconsider.
+
+### Consequence for Stage 3 (rule drafts)
+
+Two candidates were **corrected downward** by this pass, which is the system working as intended:
+
+- `TAX_ID_PPH23_LEGAL_001.base` → `needs_reviewer` (the archived page says *jumlah bruto*, not
+  ex-VAT, as we had assumed).
+- `TAX_ID_PPN_OUTPUT_001.rate` → `null` (the primary text states no rate and applies 11/12 only to
+  enumerated categories, so the blanket effective rate we had drafted was unsupported).
+
+Loading these as drafts is fine. **Activating either would be wrong**, and the gate would refuse it
+anyway: neither has a verified source or an approved licensed review.

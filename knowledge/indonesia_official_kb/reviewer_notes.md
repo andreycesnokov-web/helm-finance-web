@@ -125,3 +125,119 @@ Candidates in `rule_candidates/compliance_rule_candidates.json`
    drives Test Case 1 and is the most common supplier situation.
 2. Are you willing to be recorded as the reviewer for that rule, with licence details stored?
 3. How often should activated rules be re-verified, and what should trigger a re-review?
+
+---
+
+# Verification pass v1 — 2026-09-02
+
+22 of 23 priority sources were downloaded, SHA-256 hashed and title-confirmed. Three findings
+change what we previously believed. **Please read this section before the questions above.**
+
+## Corrections we made to ourselves
+
+1. **PPh 23 base was wrong in our draft.** We had recorded `gross_excluding_vat`. The archived DJP
+   page says only *"2% dari jumlah bruto nilai jasa"* — it does **not** say excluding PPN. The
+   candidate is now `base: "needs_reviewer"`. **Q: is the DPP gross, or gross excluding PPN?**
+
+2. **PPN had no supportable rate.** We had `rate: 0.12` with an 11% effective variant, taken from DJP
+   explanatory pages. We then retrieved and text-extracted the **primary regulation** (PMK 11/2025).
+   It does **not state a rate at all** — it refers to Pasal 7(1) of the VAT Law — and it applies the
+   11/12 construction only to **enumerated categories** (self-use, gratuitous transfer, film,
+   inventory, intermediary sales). We have set `rate: null`.
+   **Q: for an ordinary commercial service invoice, what is the correct DPP and rate today?**
+
+3. **The PPN amendment is identified.** It is **PMK Nomor 53 Tahun 2025**, and Pasal II states it
+   *"mulai berlaku pada tanggal 1 Agustus 2025"*. **Q: what is the consolidated position after
+   1 August 2025, and is anything newer than PMK 53/2025 in force?**
+
+## Gap register
+
+| # | Gap | Status after this pass | Severity | Why it matters | Next step |
+|---|---|---|---|---|---|
+| 1 | PPh 4(2) rental **PP** not retrieved | **still open** | **blocker** | 10% final drives Test Case 2; guidance alone cannot activate a rule | Search `peraturan.bpk.go.id` for the PP on *persewaan tanah dan/atau bangunan* |
+| 2 | Faktur pajak required fields | **still open** | **important** | Blocks input-VAT creditability and evidence rules | Look for a **PER** (Peraturan Dirjen Pajak) on faktur pajak on `pajak.go.id/peraturan` |
+| 3 | PPN current treatment | **partly closed** | important | Amendment now identified as PMK 53/2025 eff. 2025-08-01 | Retrieve the full PMK 53/2025 text from `jdih.kemenkeu.go.id` |
+| 4 | PMK-141/PMK.03/2015 *jasa lain* list | **still open** | **blocker** | Decides whether legal/paralegal is even a PPh 23 object | `jdih.kemenkeu.go.id` search for PMK 141/PMK.03/2015 and any replacement |
+| 5 | PT PMA sources | **still open** | later | Company Vault context only; no tax effect modelled | `bkpm.go.id` / `oss.go.id/regulasi` |
+| 6 | BPJS Kesehatan sources | **still open** | later | Employer obligation completeness | `bpjs-kesehatan.go.id` (note: this domain was **not** in our allowlist; confirm the correct official host) |
+| 7 | General PPh Badan rate | **still open** | important | Our code seeds 22% with no source | `peraturan.bpk.go.id` for UU PPh consolidated + current PP/PMK |
+| 8 | NPWP / no-NPWP variants | **partly closed** | important | Doubles the rate; we still have no counterparty NPWP field | Confirm against PMK-141 text (gap 4) |
+| 9 | Rent vs service-charge classification | **partly closed** | **blocker for Test Case 2** | A mixed invoice may carry two different taxes | See below |
+
+## New question, and it is the important one
+
+`DJP_PPH42_006` (fetch-verified) states that building services supplied by a **third-party provider**
+are *jasa manajemen*, taxed at **2% under Pasal 23** — not as rental under PPh 4(2).
+
+So a rental invoice that bundles base rent and a service charge may carry **two different taxes**.
+
+**Q9a.** What is the general test for rent versus service charge?
+**Q9b.** If a single invoice contains both, must they be split, and on what basis?
+**Q9c.** Does the answer change when the landlord provides the services directly rather than through
+a third party?
+
+We have flagged this in the candidate as `related_risk.severity: high` and the engine must not apply
+a single rate to a mixed rental invoice.
+
+## Two files we hold but cannot read
+
+Both were downloaded and hashed, but have **no embedded text layer**, so nothing in this KB is
+derived from them:
+
+- `DJP_BUPOT_001` — Coretax bukti potong manual (2.8 MB)
+- `KEMENKEU_PPH21_001` — PMK 168/2023 (5.4 MB)
+
+**Q: can you read these and confirm the bukti potong required fields?** They are in
+`raw_sources/tax/` with hashes recorded.
+
+---
+
+# Phase 2 — 2026-09-02
+
+Both Phase-1 blockers are closed with **operative regulation text read from archived bytes**.
+
+## What changed
+
+1. **PPh 4(2) — PP 34/2017 obtained and read.** Pasal 4(1): 10% of *jumlah bruto nilai persewaan*.
+   Pasal 4(2): gross **includes** maintenance, upkeep, security, service and facility charges,
+   *"baik yang perjanjiannya dibuat secara terpisah maupun yang disatukan"*. Pasal 3: the tenant
+   withholds where it is a Pemotong. Lodging with accommodation is excluded.
+
+2. **PPh 23 — PMK 141/PMK.03/2015 obtained and read.** *"2% dari jumlah bruto **tidak termasuk Pajak
+   Pertambahan Nilai**"*, and the enumerated list includes **(d) Jasa hukum**.
+
+3. **We corrected our own correction.** Phase 1 downgraded the PPh 23 base to `needs_reviewer`
+   because the DJP guidance page said only *jumlah bruto*. The regulation is explicit that PPN is
+   excluded. The base is now cited to primary text — still `under_review`.
+
+## The one question everything now rests on
+
+**Q: Is PMK 141/PMK.03/2015 still current, and is PP 34/2017 unamended?**
+
+Both candidates are now cited to these two instruments. If either has been superseded, both
+candidates fall. We could not establish currency from the archived pages.
+
+## Other new questions
+
+- **Q:** Where does the no-NPWP 100% uplift come from? It is **not** in PMK 141/2015 — DJP guidance
+  attributes it to the UU. Which article?
+- **Q:** Does a paralegal engagement fall within *jasa hukum* (item d)? The PMK does not define it.
+- **Q:** Mixed invoices — is "who pays whom" the correct boundary between PP 34/2017 rental gross and
+  PPh 23 *jasa manajemen*? See `gap_register.md` gap 9.
+- **Q:** Software subscriptions — PMK 141 item (u) covers software/hardware/system services including
+  maintenance. Is a pure SaaS licence a service under (u), or a royalty?
+- **Q:** Confirm the interlock: rent taxed finally under PP 34/2017 is excluded from PPh 23 by the
+  final-PPh exemption in PMK 141 Pasal 1(2)?
+
+## Still unreadable
+
+`DJP_BUPOT_001` and `KEMENKEU_PPH21_001` remain archived, hashed and **not readable here**. Diagnostics
+are recorded in `raw_sources/MANIFEST.json` under `not_chunkable`. OCR was **not** attempted: no OCR
+tooling is available in this environment, and hand-rolling a font decoder risks producing
+plausible-looking garbage in a legal KB. **Q: can you read these two and confirm the bukti potong
+required fields?**
+
+## BPJS
+
+`BPJS source target` is now **confirmed**: `www.bpjs-kesehatan.go.id`. The allowlisted
+`bpjskesehatan.go.id` does not resolve. No content collected yet.

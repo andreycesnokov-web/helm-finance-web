@@ -1,0 +1,6 @@
+# Archived official-source bytes are EVIDENCE. Their SHA-256 hashes are recorded in
+# MANIFEST.json and re-verified by tools/validate_kb.py.
+#
+# Git must never transform them: an LF->CRLF normalisation on checkout would change the
+# bytes and silently break every recorded hash. Treat everything here as binary.
+* -text -diff
