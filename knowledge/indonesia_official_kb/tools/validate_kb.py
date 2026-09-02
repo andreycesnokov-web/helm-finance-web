@@ -12,7 +12,7 @@ Enforces the invariants this KB depends on:
   * all JSON parses
 Exit code 1 on any failure.
 """
-import json, csv, os, sys, hashlib
+import json, csv, os, sys, hashlib, re
 
 KB = os.path.join("knowledge", "indonesia_official_kb")
 errs, warns, oks = [], [], []
@@ -280,6 +280,70 @@ if os.path.exists(mx_p):
         if missing_t:
             err(f"matrix: transaction types present in candidates but absent from matrix: {sorted(missing_t)}")
         ok(f"invoice review matrix: {len(rows_m)} rows, none active/verified, none drifted from candidates")
+
+
+# 10. Knowledge Graph V1 — structural integrity + nothing legally claimed
+gp = os.path.join(KB, "graph", "knowledge_graph_v1.json")
+if os.path.exists(gp):
+    g = load(gp)
+    if g:
+        gn, ge = g.get("nodes", []), g.get("edges", [])
+        gids = [n.get("id") for n in gn]
+        if len(gids) != len(set(gids)):
+            dup = sorted({i for i in gids if gids.count(i) > 1})
+            err(f"graph: duplicate node ids {dup[:5]}")
+        idset = set(gids)
+        REG_BASIS = {"official_source", "product_interpretation"}
+        REGULATORY = {"derives_from", "supports", "may_apply_to", "amends", "supersedes",
+                      "revokes", "currentness_supported_by"}
+        for e in ge:
+            eid = e.get("id")
+            if e.get("from") not in idset:
+                err(f"graph edge {eid}: dangling from -> {e.get('from')}")
+            if e.get("to") not in idset:
+                err(f"graph edge {eid}: dangling to -> {e.get('to')}")
+            if e.get("status") != "under_review":
+                err(f"graph edge {eid}: status must be under_review")
+            if e.get("active") is not False:
+                err(f"graph edge {eid}: active must be false")
+            if e.get("legal_verified") is not False:
+                err(f"graph edge {eid}: legal_verified must be false")
+            if e.get("relationship_basis") not in REG_BASIS:
+                err(f"graph edge {eid}: relationship_basis must be one of {sorted(REG_BASIS)}")
+            if not e.get("review_required"):
+                err(f"graph edge {eid}: review_required must be true")
+            for s in e.get("source_ids") or []:
+                if "_extracted" in str(s):
+                    err(f"graph edge {eid}: source_ids must not cite derived text ({s})")
+                elif s not in valid_ids:
+                    err(f"graph edge {eid}: unknown source_id {s}")
+            # an edge asserting a regulatory relationship on official basis must cite something
+            if e.get("type") in REGULATORY and e.get("relationship_basis") == "official_source" \
+               and not (e.get("source_ids") or []):
+                err(f"graph edge {eid}: {e.get('type')} claims official basis with no source_ids")
+        for n in gn:
+            if n.get("status") != "under_review":
+                err(f"graph node {n.get('id')}: status must be under_review")
+            if n.get("legal_verified") is True or n.get("active") is True:
+                err(f"graph node {n.get('id')}: must not be active/legal_verified")
+            for s in n.get("source_ids") or []:
+                if s not in valid_ids or "_extracted" in str(s):
+                    err(f"graph node {n.get('id')}: bad source_id {s}")
+        # stated counts must match reality
+        cc = g.get("counts", {})
+        if cc.get("nodes") != len(gn):
+            err(f"graph: counts.nodes={cc.get('nodes')} but {len(gn)} nodes present")
+        if cc.get("edges") != len(ge):
+            err(f"graph: counts.edges={cc.get('edges')} but {len(ge)} edges present")
+        # the markdown must not state different totals than the json
+        mdp = os.path.join(KB, "graph", "knowledge_graph_v1.md")
+        if os.path.exists(mdp):
+            mtext = io.open(mdp, encoding="utf-8").read() if False else open(mdp, encoding="utf-8").read()
+            m = re.search(r"\*\*(\d+) nodes . (\d+) edges", mtext)
+            if m and (int(m.group(1)) != len(gn) or int(m.group(2)) != len(ge)):
+                err(f"graph: markdown states {m.group(1)}/{m.group(2)}, json has {len(gn)}/{len(ge)}")
+        ok(f"knowledge graph: {len(gn)} nodes / {len(ge)} edges, ids unique, no dangling edges, "
+           f"none active or legally verified")
 
 print("\n".join(f"  ok   {m}" for m in oks))
 if warns:
