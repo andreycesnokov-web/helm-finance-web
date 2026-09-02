@@ -1,0 +1,111 @@
+{
+  "schema_version": "1.0",
+  "generated_at": "2026-09-02",
+  "jurisdiction": "Indonesia",
+  "activation_policy": "EVERY candidate here is status=under_review and needs_reviewer=true. None of these may be written into tax_rules with status='active'. Activation requires a verified official_source AND an approved tax_rule_reviews row with a licensed reviewer, per server/lib/taxGate.js. Values marked confidence=low were read from DJP guidance page summaries, NOT from the primary regulation text, and must be confirmed against the PMK/PP.",
+  "candidate_count": 5,
+  "compliance_rule_candidates": [
+    {
+      "candidate_id": "COMP_ID_NIB_001",
+      "status": "under_review",
+      "topic": "nib",
+      "obligation": "Business must hold a NIB issued through OSS as its single business identity",
+      "applies_to": "Indonesian business entities",
+      "trigger": "company registration",
+      "evidence": [
+        "nib_document"
+      ],
+      "source_ids": [
+        "OSS_001",
+        "BKPM_NIB_001",
+        "BKPM_OSS_001"
+      ],
+      "confidence": "low",
+      "needs_reviewer": true,
+      "notes": "Underlying law cited as UU 11/2020 (Cipta Kerja) via BKPM guidance; primary text NOT retrieved. | 2026-09-02: OSS pages archived and title-confirmed (OSS_001, OSS_003, OSS_KBLI_001) but they are client-rendered SPAs — the archived bytes contain no substantive content. BKPM_OSS_001 was UNREACHABLE (DNS). No new support obtained.",
+      "source_verification_status": "fetch_verified_bytes_only"
+    },
+    {
+      "candidate_id": "COMP_ID_KBLI_001",
+      "status": "under_review",
+      "topic": "kbli",
+      "obligation": "Business activity must be classified under KBLI 2020, which drives licensing requirements",
+      "applies_to": "all businesses in OSS",
+      "trigger": "registration / activity change",
+      "evidence": [
+        "nib_document",
+        "oss_licence"
+      ],
+      "source_ids": [
+        "OSS_KBLI_001",
+        "OSS_KBLI_002"
+      ],
+      "confidence": "low",
+      "needs_reviewer": true,
+      "notes": "KBLI code determines risk tier and therefore which licences are required. Mapping logic NOT sourced. | 2026-09-02: OSS pages archived and title-confirmed (OSS_001, OSS_003, OSS_KBLI_001) but they are client-rendered SPAs — the archived bytes contain no substantive content. BKPM_OSS_001 was UNREACHABLE (DNS). No new support obtained.",
+      "source_verification_status": "fetch_verified_bytes_only"
+    },
+    {
+      "candidate_id": "COMP_ID_LICENCE_RISK_001",
+      "status": "under_review",
+      "topic": "business_licenses",
+      "obligation": "Licensing follows a risk tier: Rendah (R), Menengah Rendah (MR), Menengah Tinggi (MT), Tinggi (T)",
+      "applies_to": "all businesses in OSS",
+      "trigger": "KBLI selection",
+      "evidence": [
+        "oss_licence"
+      ],
+      "source_ids": [
+        "BKPM_OSS_001",
+        "OSS_003",
+        "OSS_LIC_001"
+      ],
+      "confidence": "low",
+      "needs_reviewer": true,
+      "notes": "Low / low-medium risk described as issuable directly via OSS. Confirm against the primary regulation. | 2026-09-02: OSS pages archived and title-confirmed (OSS_001, OSS_003, OSS_KBLI_001) but they are client-rendered SPAs — the archived bytes contain no substantive content. BKPM_OSS_001 was UNREACHABLE (DNS). No new support obtained.",
+      "source_verification_status": "fetch_verified_bytes_only"
+    },
+    {
+      "candidate_id": "COMP_ID_LKPM_001",
+      "status": "under_review",
+      "topic": "lkpm",
+      "obligation": "Investment companies must submit periodic LKPM investment activity reports",
+      "applies_to": "investment companies above an investment-value threshold",
+      "trigger": "quarterly / semi-annual period end",
+      "evidence": [
+        "lkpm_submission"
+      ],
+      "source_ids": [
+        "OSS_LKPM_001",
+        "OSS_LKPM_003",
+        "BKPM_LKPM_001"
+      ],
+      "confidence": "low",
+      "needs_reviewer": true,
+      "notes": "Cited basis: UU 25/2007 Pasal 15 and Peraturan BKPM 6/2020. The threshold (Rp500,000,000) and the 10th-of-month deadline appear in a 2021 period-specific announcement and MUST NOT be generalised to today without checking the current Perka."
+    },
+    {
+      "candidate_id": "COMP_ID_BPJS_001",
+      "status": "under_review",
+      "topic": "bpjs",
+      "obligation": "Employers must register themselves and their workers with BPJS",
+      "applies_to": "employers",
+      "trigger": "employing staff",
+      "evidence": [
+        "bpjs_registration",
+        "nib_document",
+        "npwp"
+      ],
+      "source_ids": [
+        "BPJSTK_001",
+        "BPJSTK_002",
+        "BPJSTK_003",
+        "BPJSTK_004"
+      ],
+      "confidence": "low",
+      "needs_reviewer": true,
+      "notes": "Cited basis: UU 24/2011. Registration described as requiring NIB or business licence plus NPWP. Covers BPJS Ketenagakerjaan; BPJS Kesehatan sources were NOT collected — GAP."
+    }
+  ],
+  "last_refined": "2026-09-02 source_verification_v1"
+}

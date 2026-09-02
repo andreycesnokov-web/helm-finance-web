@@ -1,0 +1,340 @@
+{
+  "schema_version": "1.0",
+  "generated_at": "2026-09-02",
+  "jurisdiction": "Indonesia",
+  "activation_policy": "EVERY candidate here is status=under_review and needs_reviewer=true. None of these may be written into tax_rules with status='active'. Activation requires a verified official_source AND an approved tax_rule_reviews row with a licensed reviewer, per server/lib/taxGate.js. Values marked confidence=low were read from DJP guidance page summaries, NOT from the primary regulation text, and must be confirmed against the PMK/PP.",
+  "candidate_count": 8,
+  "tax_rule_candidates": [
+    {
+      "candidate_id": "TAX_ID_PPH23_LEGAL_001",
+      "status": "under_review",
+      "jurisdiction": "Indonesia",
+      "tax_type": "PPh 23",
+      "transaction_type": "legal_service",
+      "direction": "payable",
+      "rate": 0.02,
+      "rate_variants": [
+        {
+          "condition": "counterparty_has_npwp",
+          "rate": 0.02,
+          "confidence": "medium",
+          "source_ids": [
+            "DJP_PPH23_002"
+          ],
+          "source_verification_status": "fetch_verified"
+        },
+        {
+          "condition": "counterparty_no_npwp",
+          "rate": 0.04,
+          "confidence": "medium",
+          "source_ids": [
+            "DJP_PPH23_002"
+          ],
+          "source_verification_status": "fetch_verified",
+          "note": "archived page states the rate becomes 100% higher, since 1 Jan 2009"
+        }
+      ],
+      "base": "jumlah_bruto_excluding_ppn",
+      "base_note": "RESOLVED 2026-09-02 from primary text. PMK 141/PMK.03/2015 Pasal 1(1), read from archived bytes (DJP_PPH23_PMK141_003): '2% dari jumlah bruto TIDAK TERMASUK Pajak Pertambahan Nilai'. Phase 1 had downgraded this to needs_reviewer because the DJP guidance page said only 'jumlah bruto'; the regulation is explicit.",
+      "who_withholds": "payer (service recipient) as pemotong",
+      "final_or_creditable": "creditable",
+      "evidence_required": [
+        "supplier_invoice",
+        "bukti_potong_pph23",
+        "payment_proof"
+      ],
+      "source_ids": [
+        "DJP_PPH23_PMK141_003",
+        "KEMENKEU_PPH23_PMK141_001",
+        "BPK_PPH23_PMK141_002",
+        "DJP_PPH23_002",
+        "DJP_PPH23_005",
+        "DJP_PPH23_PENGACARA_004"
+      ],
+      "confidence": "medium",
+      "needs_reviewer": true,
+      "notes": "Rate 2% and base (gross excl. PPN) now cited to PRIMARY regulation text read from archived bytes. Jasa hukum is an enumerated jasa lain. STILL under_review: currency of the PMK is unconfirmed, the no-NPWP uplift is not in this PMK, and entity-vs-individual remains a blocking precondition.",
+      "source_verification_status": "fetch_verified",
+      "preconditions": [
+        {
+          "check": "counterparty_is_entity_not_individual",
+          "reason": "an individual provider is PPh 21, not PPh 23",
+          "source_ids": [
+            "DJP_PPH23_005"
+          ],
+          "blocking": true,
+          "data_gap": "counterparties has no legal-form or NPWP field; the engine must ask"
+        }
+      ],
+      "category_support": {
+        "supported": true,
+        "citation": "PMK 141/2015 Pasal 1(6)(d) 'Jasa hukum'",
+        "source_ids": [
+          "DJP_PPH23_PMK141_003"
+        ],
+        "caveat": "The instrument does not define jasa hukum; whether a paralegal engagement qualifies remains a reviewer judgement."
+      },
+      "open_question": "Currentness evidence now archived (PMK 141/2015 shows Berlaku, JDIH records only an outgoing revocation). CAVEAT: BPK holds no relationship data for this PMK, so this is evidence of status, not proof no superseding instrument exists.",
+      "currentness_result": "berlaku",
+      "currentness_checked_at": "2026-09-02",
+      "currentness_status_source": [
+        "BPK_PPH23_PMK141_002",
+        "KEMENKEU_PPH23_PMK141_004"
+      ],
+      "currentness_note": "JDIH Kemenkeu details page (KEMENKEU_PPH23_PMK141_004) records status 'Berlaku', 'Tanggal Berlaku 24 Jul 2015 - s.d. Dicabut' (in force UNTIL revoked), and a 'Riwayat Dokumen (1)' whose single entry is OUTGOING — this PMK Mencabut PMK 244/PMK.03/2008. BPK details page (BPK_PPH23_PMK141_002) records 'Status Berlaku'. CAVEAT recorded honestly: BPK's 'STATUS PERATURAN' section for this PMK reads 'Belum Tersedia', so BPK holds no relationship data — absence of a recorded amendment there is not evidence of absence. FALSE-POSITIVE NOTE: the string 'Diubah' appears 3x on these pages but belongs to the TITLE of UU PPh ('...Nomor 7 Tahun 1983 ... Sebagaimana Telah Beberapa Kali Diubah Terakhir Dengan Undang-Undang Nomor 36 Tahun 2008') and does NOT indicate that the PMK itself was amended. Still under_review. Not legally_verified. Accountant/legal reviewer confirmation required before activation."
+    },
+    {
+      "candidate_id": "TAX_ID_PPH23_PROFESSIONAL_002",
+      "status": "under_review",
+      "jurisdiction": "Indonesia",
+      "tax_type": "PPh 23",
+      "transaction_type": "professional_service",
+      "direction": "payable",
+      "rate": 0.02,
+      "rate_variants": [],
+      "base": "needs_reviewer",
+      "base_note": "Same open question as PPH23_LEGAL_001: archived page says 'jumlah bruto'.",
+      "who_withholds": "payer (service recipient)",
+      "final_or_creditable": "creditable",
+      "evidence_required": [
+        "supplier_invoice",
+        "bukti_potong_pph23",
+        "payment_proof"
+      ],
+      "source_ids": [
+        "DJP_PPH23_002",
+        "DJP_PPH23_003",
+        "DJP_PPH23_006"
+      ],
+      "confidence": "medium",
+      "needs_reviewer": true,
+      "notes": "Category supported and 2% now cited to a fetch-verified page. The per-service scoping still depends on the PMK-141 list, which was NOT retrieved — so per-service applicability remains open.",
+      "source_verification_status": "fetch_verified",
+      "currentness_result": "berlaku",
+      "currentness_checked_at": "2026-09-02",
+      "currentness_status_source": [
+        "BPK_PPH23_PMK141_002",
+        "KEMENKEU_PPH23_PMK141_004"
+      ],
+      "currentness_note": "JDIH Kemenkeu details page (KEMENKEU_PPH23_PMK141_004) records status 'Berlaku', 'Tanggal Berlaku 24 Jul 2015 - s.d. Dicabut' (in force UNTIL revoked), and a 'Riwayat Dokumen (1)' whose single entry is OUTGOING — this PMK Mencabut PMK 244/PMK.03/2008. BPK details page (BPK_PPH23_PMK141_002) records 'Status Berlaku'. CAVEAT recorded honestly: BPK's 'STATUS PERATURAN' section for this PMK reads 'Belum Tersedia', so BPK holds no relationship data — absence of a recorded amendment there is not evidence of absence. FALSE-POSITIVE NOTE: the string 'Diubah' appears 3x on these pages but belongs to the TITLE of UU PPh ('...Nomor 7 Tahun 1983 ... Sebagaimana Telah Beberapa Kali Diubah Terakhir Dengan Undang-Undang Nomor 36 Tahun 2008') and does NOT indicate that the PMK itself was amended. Still under_review. Not legally_verified. Accountant/legal reviewer confirmation required before activation.",
+      "open_question": "Currentness evidence now archived (PMK 141/2015 shows Berlaku, JDIH records only an outgoing revocation). CAVEAT: BPK holds no relationship data for this PMK, so this is evidence of status, not proof no superseding instrument exists."
+    },
+    {
+      "candidate_id": "TAX_ID_PPH42_RENTAL_001",
+      "status": "under_review",
+      "jurisdiction": "Indonesia",
+      "tax_type": "PPh 4(2)",
+      "transaction_type": "rental_land_building",
+      "direction": "payable",
+      "rate": 0.1,
+      "rate_variants": [],
+      "base": "jumlah_bruto_nilai_persewaan_including_service_and_facility_charges",
+      "base_note": "RESOLVED 2026-09-02 from primary text. PP 34/2017 Pasal 4(2), read from archived bytes (DJP_PPH42_PP34_004): jumlah bruto is all amounts paid or owed by the Penyewa relating to the rented property INCLUDING biaya perawatan, pemeliharaan, keamanan, layanan dan fasilitas lainnya, 'baik yang perjanjiannya dibuat secara terpisah maupun yang disatukan'.",
+      "who_withholds": "PP 34/2017 Pasal 3(1)-(2): the Penyewa withholds where it acts as or is appointed Pemotong; Pemotong includes badan pemerintah and subjek pajak badan dalam negeri.",
+      "final_or_creditable": "final",
+      "evidence_required": [
+        "rental_agreement",
+        "supplier_invoice_or_kwitansi",
+        "faktur_pajak_if_pkp",
+        "bukti_potong_pph42",
+        "payment_proof"
+      ],
+      "source_ids": [
+        "DJP_PPH42_PP34_004",
+        "BPK_PPH42_PP34_001",
+        "KEMENKEU_PPH42_PP34_003",
+        "BPK_PPH42_PP34_002",
+        "DJP_PPH42_002",
+        "DJP_PPH42_006"
+      ],
+      "confidence": "medium",
+      "needs_reviewer": true,
+      "notes": "Rate 10% final and the gross definition now cited to PRIMARY regulation text (PP 34/2017). BLOCKER CLOSED. Remains under_review: currency of PP 34/2017 unconfirmed, the full Pemotong list was not read, and the mixed-invoice boundary is unresolved — see TXN_MIXED_INVOICE.",
+      "source_verification_status": "fetch_verified",
+      "related_risk": {
+        "risk": "mixed_invoice_rent_vs_service_charge",
+        "detail": "DJP_PPH42_006 (fetch-verified) states that building services from a THIRD-PARTY provider are 'jasa manajemen' taxed at 2% under Pasal 23. A rental invoice bundling rent and a service charge may therefore carry TWO different taxes. The engine must not apply one rate to the whole invoice.",
+        "source_ids": [
+          "DJP_PPH42_006"
+        ],
+        "severity": "high"
+      },
+      "operational": {
+        "bukti_potong_channel": "e-SPT PPh Pasal 4(2)",
+        "billing_code": "MAP-KJS 411128-403",
+        "source_ids": [
+          "DJP_PPH42_002"
+        ]
+      },
+      "exclusions": [
+        "jasa pelayanan penginapan beserta akomodasinya (PP 34/2017 Pasal 2)"
+      ],
+      "open_question": "Currentness evidence now archived (PP 34/2017 shows Berlaku, no incoming amendment). Remaining: the mixed-invoice boundary with DJP_PPH42_006 — 'who pays whom' is our reading, not the regulation's.",
+      "currentness_result": "berlaku",
+      "currentness_checked_at": "2026-09-02",
+      "currentness_status_source": [
+        "BPK_PPH42_PP34_002",
+        "KEMENKEU_PPH42_PP34_003"
+      ],
+      "currentness_note": "BPK details page (BPK_PPH42_PP34_002) records 'Status Berlaku', Tanggal Berlaku 02 Januari 2018, and under 'STATUS PERATURAN' only OUTGOING relations — it Mencabut PP 5/2002 and PP 29/1996. JDIH Kemenkeu (KEMENKEU_PPH42_PP34_003) records 'Tanggal Berlaku 06 Sep 2017 - s.d. Dicabut' (in force UNTIL revoked) and a 'Riwayat Dokumen (2)' in which both entries are outgoing 'Mencabut'. NO incoming amendment or revocation is recorded on either page as of the archived retrieval date. Still under_review. Not legally_verified. Accountant/legal reviewer confirmation required before activation."
+    },
+    {
+      "candidate_id": "TAX_ID_PPN_OUTPUT_001",
+      "status": "under_review",
+      "jurisdiction": "Indonesia",
+      "tax_type": "PPN",
+      "transaction_type": "taxable_supply",
+      "direction": "both",
+      "rate": null,
+      "rate_variants": [
+        {
+          "condition": "nilai_lain_categories_enumerated_in_PMK_11_2025",
+          "formula": "11/12 of the ordinary base",
+          "confidence": "high",
+          "source_ids": [
+            "KEMENKEU_PPN_002"
+          ],
+          "source_verification_status": "fetch_verified",
+          "note": "PRIMARY TEXT verified: 11/12 appears 48x but is applied PER ENUMERATED CATEGORY (self-use, gratuitous transfer, film, inventory, intermediary sales), NOT as a blanket rate"
+        }
+      ],
+      "base": "needs_reviewer",
+      "base_note": "PMK 11/2025 does not state a rate; it refers to Pasal 7 ayat (1) of the VAT Law. Whether an ordinary commercial service invoice uses an 11/12 base is NOT established by the primary text.",
+      "who_withholds": "PKP seller charges output VAT; PKP buyer may credit input VAT",
+      "final_or_creditable": "creditable",
+      "evidence_required": [
+        "faktur_pajak",
+        "supplier_invoice"
+      ],
+      "source_ids": [
+        "KEMENKEU_PPN_002",
+        "DJP_PPN_001",
+        "DJP_PPN_007",
+        "DJP_PPN_004",
+        "BPK_PPN_003"
+      ],
+      "confidence": "medium",
+      "needs_reviewer": true,
+      "notes": "CORRECTED 2026-09-02. Previous draft carried rate 0.12 with an 11% effective variant taken from DJP explanatory pages. The PRIMARY text (KEMENKEU_PPN_002) does not state a rate at all and applies 11/12 only to enumerated categories, so a blanket effective rate is NOT supported. rate set to null. Migration 020's hardcoded {'rate':0.11} has no verified basis and must not be reused.",
+      "source_verification_status": "fetch_verified",
+      "amended_by": {
+        "instrument": "PMK Nomor 53 Tahun 2025",
+        "effective_from": "2025-08-01",
+        "source_ids": [
+          "DJP_PPN_007"
+        ],
+        "source_verification_status": "fetch_verified",
+        "note": "GAP CLOSED: amendment identified and dated; full amending text still not retrieved"
+      }
+    },
+    {
+      "candidate_id": "TAX_ID_PPN_INPUT_002",
+      "status": "under_review",
+      "jurisdiction": "Indonesia",
+      "tax_type": "PPN",
+      "transaction_type": "input_vat_credit",
+      "direction": "payable",
+      "rate": null,
+      "rate_variants": [],
+      "base": "needs_reviewer",
+      "base_note": " | Set to explicit 'needs_reviewer' 2026-09-02: no archived source supports a base.",
+      "who_withholds": "n/a — creditability question, not a withholding",
+      "final_or_creditable": "creditable",
+      "evidence_required": [
+        "faktur_pajak"
+      ],
+      "source_ids": [
+        "DJP_PPN_001",
+        "DJP_CORETAX_004"
+      ],
+      "confidence": "low",
+      "needs_reviewer": true,
+      "notes": "Unchanged and still unsupported. No PER on faktur pajak was found in this pass; KEMENKEU_PPN_002 (primary text, verified) does NOT cover input VAT creditability or faktur pajak content. Remains a gap."
+    },
+    {
+      "candidate_id": "TAX_ID_PPH21_PAYROLL_001",
+      "status": "under_review",
+      "jurisdiction": "Indonesia",
+      "tax_type": "PPh 21",
+      "transaction_type": "employment_income",
+      "direction": "payable",
+      "rate": null,
+      "rate_variants": [
+        {
+          "condition": "monthly_periods_jan_to_nov",
+          "method": "TER table (Tarif Efektif Rata-Rata)",
+          "note": "a TABLE, not a scalar — cannot be modelled as a single rate"
+        }
+      ],
+      "base": "gross_employment_income",
+      "base_note": "CONFIRM against PMK 168/2023",
+      "who_withholds": "employer",
+      "final_or_creditable": "creditable",
+      "evidence_required": [
+        "payroll_register",
+        "payslip",
+        "bukti_potong_pph21",
+        "payment_proof"
+      ],
+      "source_ids": [
+        "KEMENKEU_PPH21_001",
+        "DJP_PPH21_002",
+        "BPK_PPH21_003",
+        "DJP_PPH21_004"
+      ],
+      "confidence": "low",
+      "needs_reviewer": true,
+      "notes": "PMK 168/2023 PDF was downloaded and hashed (KEMENKEU_PPH21_001), but it has NO embedded text layer, so its CONTENT WAS NOT READ. Nothing in this candidate derives from it. rate stays null: TER is a lookup table, not a scalar. Out of scope for v1 arithmetic.",
+      "source_verification_status": "fetch_verified_bytes_only"
+    },
+    {
+      "candidate_id": "TAX_ID_PPHBADAN_UMKM_001",
+      "status": "under_review",
+      "jurisdiction": "Indonesia",
+      "tax_type": "PPh Badan (final UMKM)",
+      "transaction_type": "small_business_turnover",
+      "direction": "receivable",
+      "rate": 0.005,
+      "rate_variants": [],
+      "base": "monthly_gross_turnover",
+      "base_note": "threshold described as gross turnover not exceeding Rp4,800,000,000 in a tax year — CONFIRM",
+      "who_withholds": "self-assessed by the taxpayer",
+      "final_or_creditable": "final",
+      "evidence_required": [
+        "sales_records",
+        "payment_proof"
+      ],
+      "source_ids": [
+        "DJP_PPHBADAN_001",
+        "DJP_PPHBADAN_002",
+        "DJP_PPHBADAN_003"
+      ],
+      "confidence": "low",
+      "needs_reviewer": true,
+      "notes": "DJP_PPHBADAN_001 archived and title-confirmed, but its content was not mined this pass, so the 0.5% rate and the Rp4.8bn threshold remain UNVERIFIED against the archived bytes. Treat as unchanged from v0.",
+      "source_verification_status": "fetch_verified"
+    },
+    {
+      "candidate_id": "TAX_ID_PPHBADAN_GENERAL_002",
+      "status": "under_review",
+      "jurisdiction": "Indonesia",
+      "tax_type": "PPh Badan",
+      "transaction_type": "annual_corporate_income",
+      "direction": "n/a",
+      "rate": null,
+      "rate_variants": [],
+      "base": "needs_reviewer",
+      "base_note": " | Set to explicit 'needs_reviewer' 2026-09-02: no archived source supports a base.",
+      "who_withholds": "self-assessed",
+      "final_or_creditable": "n/a",
+      "evidence_required": [
+        "annual_financial_statements"
+      ],
+      "source_ids": [],
+      "confidence": "low",
+      "needs_reviewer": true,
+      "notes": "NEEDS OFFICIAL SOURCE — not collected in this pass. Migration 020 seeds ID_PPH_BADAN_ANNUAL with {\"rate\":0.22}; that value has NO source in this registry and must not be trusted."
+    }
+  ],
+  "last_refined": "2026-09-02 currentness_evidence_patch"
+}
