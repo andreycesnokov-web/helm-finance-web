@@ -2690,6 +2690,119 @@ app.get('/api/accountant/sources', auth, async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+
+// ── AI Tax Split V1 ──────────────────────────────────────────────────────────
+// Suggests how an invoice splits between vendor payment and withheld tax, and records
+// the suggestion for accountant review. Business-scoped throughout.
+//
+// WHAT THESE ROUTES DO NOT DO:
+//   * They never pay anything, never contact a bank and never submit to Coretax/DJP.
+//   * /suggest performs NO writes at all.
+//   * /review only writes tax_treatments, which is an advisory table (migration 031).
+//     It never creates or edits a debt, a transaction or a tax rule. Payables are created
+//     by the caller through the existing POST /api/debts, so plan limits, approval rules
+//     and audit behave exactly as they do everywhere else.
+//   * Nothing here reads or writes `tax_rules`. The rate for rent comes from a knowledge-base
+//     candidate that is status=under_review and legal_verified=false, and every response says so.
+const TAXSPLIT = require('./lib/taxSplit');
+
+// POST /api/tax-split/suggest — pure computation. No writes.
+app.post('/api/tax-split/suggest', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res); if (!biz) return;
+    if (!canViewBusinessFinance(biz.role)) return res.status(403).json({ error: 'Your role cannot view business finance' });
+    const b = req.body || {};
+    const gross = Number(b.gross_amount);
+    if (b.gross_amount !== undefined && b.gross_amount !== null && b.gross_amount !== '' && !Number.isFinite(gross))
+      return res.status(400).json({ error: 'gross_amount must be a number' });
+    if (Number.isFinite(gross) && gross < 0)
+      return res.status(400).json({ error: 'gross_amount must not be negative' });
+
+    const split = TAXSPLIT.buildTaxSplit({
+      invoice_number: b.invoice_number, vendor_name: b.vendor_name, vendor_npwp: b.vendor_npwp,
+      invoice_date: b.invoice_date, due_date: b.due_date, description: b.description,
+      gross_amount: Number.isFinite(gross) ? gross : null, currency: b.currency || 'IDR',
+      document_id: b.document_id,
+    }, { treatment_key: b.treatment_key });
+
+    res.json({ split, business_id: biz.business.id });
+  } catch (e) {
+    console.error(`[tax-split] suggest failed: ${e.message}`);
+    res.status(500).json({ error: 'tax_split_suggest_failed' });
+  }
+});
+
+// POST /api/tax-split/review — record the suggestion + its review state in tax_treatments.
+// Advisory only: this row does not move money and does not change any debt.
+app.post('/api/tax-split/review', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res); if (!biz) return;
+    if (!canCreateConfirmedFinancialRecord(biz.role))
+      return res.status(403).json({ error: 'Your role cannot submit a tax review' });
+
+    const b = req.body || {};
+    const state = String(b.review_status || 'sent_to_accountant_review');
+    if (!TAXSPLIT.REVIEW_STATES.includes(state))
+      return res.status(400).json({ error: 'invalid_review_status', allowed: TAXSPLIT.REVIEW_STATES });
+
+    const split = TAXSPLIT.buildTaxSplit({
+      invoice_number: b.invoice_number, vendor_name: b.vendor_name, vendor_npwp: b.vendor_npwp,
+      invoice_date: b.invoice_date, due_date: b.due_date, description: b.description,
+      gross_amount: Number(b.gross_amount) || 0, currency: b.currency || 'IDR',
+      document_id: b.document_id,
+    }, { treatment_key: b.treatment_key });
+
+    // Only link a document that belongs to THIS business — never trust a caller-supplied id.
+    let invoiceDocumentId = null;
+    if (b.document_id) {
+      const { data: doc } = await supabase.from('financial_documents')
+        .select('id').eq('id', b.document_id).eq('business_id', biz.business.id).limit(1);
+      if (!doc || !doc.length) return res.status(404).json({ error: 'document_not_found_in_this_business' });
+      invoiceDocumentId = b.document_id;
+    }
+    // Same for a debt the caller says this relates to.
+    let debtId = null;
+    if (b.debt_id) {
+      const { data: d } = await supabase.from('debts')
+        .select('id').eq('id', b.debt_id).or(bizOrFilter(biz)).limit(1);
+      if (!d || !d.length) return res.status(404).json({ error: 'debt_not_found_in_this_business' });
+      debtId = b.debt_id;
+    }
+
+    const row = {
+      business_id: biz.business.id,
+      debt_id: debtId,
+      invoice_document_id: invoiceDocumentId,
+      treatment_status: state,
+      tax_type: split.tax_type,
+      context_type: 'vendor_invoice',
+      commercial_base: split.gross_amount,
+      withholding_dpp: split.auto_calculated ? split.gross_amount : null,
+      withholding_rate: split.tax_rate,
+      withholding_amount: split.tax_payment_amount,
+      expected_vendor_net: split.vendor_payment_amount,
+      suggestion_source: 'ai_tax_split_v1',
+      // Confidence is a label in V1, not a probability; store only a real number.
+      confidence: split.confidence_score === 'High' ? 0.8
+        : split.confidence_score === 'Medium' ? 0.5 : null,
+    };
+
+    const { data, error } = await supabase.from('tax_treatments').insert(row).select().single();
+    if (error) {
+      console.error(`[tax-split] review insert failed: ${error.message}`);
+      return res.status(500).json({ error: 'tax_review_create_failed', detail: error.message });
+    }
+    await recordAudit({
+      businessId: biz.business.id, actorUserId: req.user.userId, actorRole: biz.role,
+      entityType: 'tax_treatment', entityId: data.id, action: `tax_split_${state}`, after: data,
+    });
+    res.json({ treatment: data, split });
+  } catch (e) {
+    console.error(`[tax-split] review failed: ${e.message}`);
+    res.status(500).json({ error: 'tax_split_review_failed' });
+  }
+});
+
 // ── Compliance Calendar — deterministic generation from profile + rules ──────
 // Due dates come only from each rule (never invented). Applicability is decided
 // by the tax profile (PKP for VAT, PT for corporate tax, employees for PPh 21).

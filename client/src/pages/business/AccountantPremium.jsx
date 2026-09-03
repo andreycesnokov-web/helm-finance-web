@@ -87,7 +87,10 @@ function PremiumAccountant() {
 
   const head = (
     <PageHeader eyebrow="AI Accountant · Indonesia" title="Tax & Compliance Workbench"
-      actions={<StatusBadge tone="info">Preview — engine wiring in progress</StatusBadge>} />
+      actions={<>
+        <StatusBadge tone="info">Preview — engine wiring in progress</StatusBadge>
+        <Btn sm onClick={() => navigate('/business/accountant/tax-split')}>AI Tax Split</Btn>
+      </>} />
   )
   const tabs = [
     { key: 'workbench', label: 'Workbench' },
