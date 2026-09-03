@@ -20,7 +20,7 @@ import { upcomingDeadlines } from './AccountantPremium'          // static statu
 // /api/pulse or /api/business/financial-counts; nothing is derived into a new metric.
 import {
   ExecutiveHero, EmptyWorkspaceCallout, TrendsSection, ReadinessBadge, ReadinessPanel,
-  readinessOf, WorkingCapital, AdvancedInsights, CfoSummary, RecentActivity,
+  readinessOf, WorkingCapital, AdvancedInsights, CfoSummary, RecentActivity, NeedsReviewNotice,
 } from './PulseBlocks'
 // Invoice Hub v1 blocks. Migration 041 (invoices) is an un-applied PROPOSAL and there are
 // no /api/invoices routes, so the hub explains the review-first flow and connects the
@@ -139,6 +139,9 @@ export function BusinessPulse() {
       {/* 1. Executive snapshot — every figure straight from /api/pulse */}
       <ExecutiveHero d={d} idr={idr} empty={workspaceEmpty}
         readiness={<ReadinessBadge readiness={readiness} loading={countsLoading} />} />
+
+      {/* 1b. Classification gap — stated before any figure is trusted. */}
+      <NeedsReviewNotice count={d.needs_review_count} navigate={navigate} />
 
       {/* 2. Alerts row */}
       {BUSINESS_PREMIUM && <RadarStrip d={d} navigate={navigate} />}
