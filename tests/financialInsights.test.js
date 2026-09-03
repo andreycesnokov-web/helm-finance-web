@@ -59,9 +59,67 @@ t('unrecognised rows stay unknown and are flagged for review', () => {
   assert.strictEqual(i.class, 'unknown');
 });
 
-t('transfers and corrections never become P&L lines', () => {
-  assert.strictEqual(classifyTransaction(tx('transfer', 'Move to cash', 1, '2026-08-01')).class, 'other');
-  assert.strictEqual(classifyTransaction(tx('correction', 'Balance Correction', 1, '2026-08-01')).class, 'other');
+t('transfers and corrections get their own classes, never a P&L line', () => {
+  assert.strictEqual(classifyTransaction(tx('transfer', 'Move to cash', 1, '2026-08-01')).class, 'transfer');
+  assert.strictEqual(classifyTransaction(tx('correction', 'Balance Correction', 1, '2026-08-01')).class, 'balance_correction');
+});
+
+// ── KPI semantics V2: what must never count as operating revenue ───────────
+t('a wallet opening balance is NOT revenue, even though it is type=income', () => {
+  // POST /api/wallets writes exactly this row when opening_balance is non-zero.
+  const opening = { type: 'income', description: 'Opening balance · DEMO - Cash',
+                    source: 'DEMO - Cash', amount_original: 5000000, transaction_date: '2026-09-03' };
+  assert.strictEqual(classifyTransaction(opening).class, 'opening_balance');
+  const r = computeInsights([opening]);
+  assert.strictEqual(r.metrics.operating_revenue, 0, 'opening balance must not inflate revenue');
+  assert.strictEqual(r.metrics.other_cash_movement.opening_balance, 5000000, 'but it must still be reported');
+  assert.strictEqual(r.status.ebitda, 'locked');
+});
+
+t('owner funding and capital contributions are NOT revenue', () => {
+  for (const c of ['Owner funding', 'Capital contribution', 'Shareholder loan', 'Loan proceeds']) {
+    assert.strictEqual(classifyTransaction(tx('income', c, 1, '2026-08-01')).class, 'financing', c);
+  }
+  const r = computeInsights([tx('income', 'Owner funding', 50000000, '2026-08-01')]);
+  assert.strictEqual(r.metrics.operating_revenue, 0);
+  assert.strictEqual(r.metrics.other_cash_movement.funding, 50000000);
+});
+
+t('intercompany and wallet transfers are NOT revenue', () => {
+  assert.strictEqual(classifyTransaction(tx('income', 'Intercompany transfer', 1, '2026-08-01')).class, 'transfer');
+  const r = computeInsights([tx('income', 'Bank transfer in', 9000000, '2026-08-01')]);
+  assert.strictEqual(r.metrics.operating_revenue, 0);
+  assert.strictEqual(r.metrics.other_cash_movement.transfers, 9000000);
+});
+
+t('a balance correction is NOT revenue and NOT operating cash out', () => {
+  const r = computeInsights([
+    { type: 'correction', category: 'Balance Correction', amount_original: 7000000, transaction_date: '2026-08-01' },
+  ]);
+  assert.strictEqual(r.metrics.operating_revenue, 0);
+  assert.strictEqual(r.metrics.operating_cash_out, 0);
+  assert.strictEqual(r.metrics.other_cash_movement.balance_corrections, 7000000);
+});
+
+t('every non-operating class is reported, never silently dropped', () => {
+  const rows = [
+    tx('income',  'wash revenue',        1000, '2026-08-01'),
+    { type: 'income', description: 'Opening balance · W', amount_original: 2000, transaction_date: '2026-08-01' },
+    tx('income',  'Owner funding',       3000, '2026-08-01'),
+    tx('income',  'Intercompany transfer', 4000, '2026-08-01'),
+    { type: 'correction', category: 'Balance Correction', amount_original: 5000, transaction_date: '2026-08-01' },
+    tx('income',  'Zzz mystery',         6000, '2026-08-01'),
+  ];
+  const r = computeInsights(rows);
+  assert.strictEqual(r.metrics.operating_revenue, 1000, 'only the real revenue row counts');
+  const o = r.metrics.other_cash_movement;
+  assert.strictEqual(o.opening_balance, 2000);
+  assert.strictEqual(o.funding, 3000);
+  assert.strictEqual(o.transfers, 4000);
+  assert.strictEqual(o.balance_corrections, 5000);
+  assert.strictEqual(o.needs_review, 6000);
+  assert.strictEqual(o.total, 2000 + 3000 + 4000 + 5000 + 6000, 'nothing may be dropped');
+  assert.strictEqual(r.needs_review_count, 1);
 });
 
 // ── metric maths ───────────────────────────────────────────────────────────
@@ -82,6 +140,14 @@ t('revenue minus direct costs = gross profit, and margin is correct', () => {
   assert.strictEqual(r.metrics.gross_profit, 12000);
   assert.strictEqual(r.metrics.gross_margin, 12000 / 15000);
   assert.strictEqual(r.status.gross_profit, 'available');
+});
+
+t('operating cash out is direct costs + OPEX only', () => {
+  const r = computeInsights(BASE);
+  assert.strictEqual(r.metrics.operating_cash_out, 3000 + 2000);
+  // capex 8000, tax 500, interest 250 must all stay out of it
+  assert.notStrictEqual(r.metrics.operating_cash_out, 3000 + 2000 + 8000);
+  assert.strictEqual(r.metrics.net_operating_position, 15000 - 5000);
 });
 
 t('CAPEX is captured but EXCLUDED from EBITDA', () => {

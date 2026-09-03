@@ -52,6 +52,13 @@ mem.__seed('transactions', [
   tx(A, 'expense', 'equipment purchase',  8000, '2026-07-09', '2026-09-03T10:00:00Z'),
   tx(A, 'expense', 'PPh tax payment',      500, '2026-07-10', '2026-09-03T10:00:00Z'),
   tx(A, 'expense', 'loan interest',        250, '2026-07-11', '2026-09-03T10:00:00Z'),
+  // Non-operating rows in A: each is real cash, none is operating revenue.
+  { business_id: A, type: 'income', description: 'Opening balance - BCA', source: 'wallet_opening_balance',
+    amount_original: 75000000, transaction_date: '2026-07-01', created_at: '2026-09-03T10:00:00Z' },
+  tx(A, 'income', 'Owner funding', 40000000, '2026-07-02', '2026-09-03T10:00:00Z'),
+  tx(A, 'income', 'Intercompany transfer', 6000000, '2026-07-03', '2026-09-03T10:00:00Z'),
+  { business_id: A, type: 'correction', category: 'Balance Correction', description: 'Balance Correction',
+    amount_original: 1234, transaction_date: '2026-07-04', created_at: '2026-09-03T10:00:00Z' },
   // Business C — must never be visible to USER.
   tx(C, 'income',  'wash revenue',      999999, '2026-07-05', '2026-09-03T10:00:00Z'),
 ]);
@@ -92,6 +99,20 @@ const t = async (name, fn) => {
     assert.strictEqual(m.capex, 8000);
     assert.strictEqual(m.estimated_ebitda, 10000, 'capex/tax/interest must not reduce EBITDA');
     assert.strictEqual(m.estimated_net_profit, 9250);
+  });
+
+  await t('opening balance, funding, transfers and corrections are NOT revenue', async () => {
+    const r = await get('/pulse/advanced-insights', { biz: A });
+    const m = r.body.metrics;
+    // 75,000,000 opening + 40,000,000 funding + 6,000,000 transfer are all in the data
+    // and none of them may reach revenue, which stays the two real sales rows.
+    assert.strictEqual(m.operating_revenue, 15000, 'non-operating cash leaked into revenue');
+    assert.strictEqual(m.operating_cash_out, 5000, 'only direct costs + opex');
+    const o = m.other_cash_movement;
+    assert.strictEqual(o.opening_balance, 75000000);
+    assert.strictEqual(o.funding, 40000000);
+    assert.strictEqual(o.transfers, 6000000);
+    assert.strictEqual(o.balance_corrections, 1234);
   });
 
   await t('statuses and warnings ship with the numbers', async () => {

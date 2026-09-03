@@ -53,14 +53,20 @@ export function ExecutiveHero({ d, idr, readiness, empty }) {
   const runway = d.runway === 999 || d.runway == null ? null : Number(d.runway)
   const lowRunway = runway !== null && runway < 30
 
+  // These two are OPERATING figures: the API classifies every transaction before
+  // summing, so an opening balance, a transfer or owner funding is real cash that
+  // moved but never appears here. Whatever was excluded is shown below the cards.
+  const other = d.other_cash_movement || {}
+  const otherTotal = Number(other.total || 0)
+
   const kpis = [
-    { key: 'revenue', label: 'Revenue this month', value: '+ ' + idr(d.income), tone: 'pos',
-      hint: 'Money received this month' },
-    { key: 'outflow', label: 'Operating cash out', value: '− ' + idr(d.expenses), tone: 'neg',
-      hint: 'Expenses and payroll · excludes bank, FX and network fees' },
+    { key: 'revenue', label: 'Operating revenue this month', value: '+ ' + idr(d.income), tone: 'pos',
+      hint: 'Earned revenue only · excludes opening balances, funding and transfers' },
+    { key: 'outflow', label: 'Operating cash out this month', value: '− ' + idr(d.expenses), tone: 'neg',
+      hint: 'Direct costs and operating expenses · excludes CAPEX, tax and financing' },
     { key: 'net', label: 'Net position', value: idr(d.netPosition),
       tone: Number(d.netPosition) >= 0 ? 'pos' : 'neg',
-      hint: 'Cash + receivables − payables' },
+      hint: 'Balance sheet view: cash + receivables − payables. Not operating performance.' },
     { key: 'runway', label: 'Runway', value: runway === null ? '—' : `${runway} days`,
       tone: lowRunway ? 'neg' : undefined,
       chip: lowRunway ? 'Below 30 days' : null,
@@ -102,7 +108,52 @@ export function ExecutiveHero({ d, idr, readiness, empty }) {
           </div>
         ))}
       </div>
+
+      {/* What moved but is not operating performance. Shown so the excluded money is
+          accounted for rather than quietly missing from the figures above. */}
+      {!empty && otherTotal > 0 && (
+        <div className="pulse-other">
+          <span className="pulse-other-label">Other cash movement this month</span>
+          <ul className="pulse-other-list">
+            {[['Opening balances', other.opening_balance],
+              ['Funding', other.funding],
+              ['Transfers', other.transfers],
+              ['Balance corrections', other.balance_corrections],
+              ['CAPEX', other.capex],
+              ['Tax', other.tax],
+              ['Needs review', other.needs_review]]
+              .filter(([, v]) => Number(v || 0) > 0)
+              .map(([label, v]) => (
+                <li key={label}><span>{label}</span><span className="pulse-other-amt">{idr(v)}</span></li>
+              ))}
+          </ul>
+          <p className="pulse-other-note">
+            Real cash movement, excluded from operating revenue and operating cash out so
+            it cannot distort performance.
+          </p>
+        </div>
+      )}
     </section>
+  )
+}
+
+/**
+ * Unclassified transactions. The figures above are only as good as the classification
+ * behind them, so the count is stated plainly with a route to fix it — never hidden.
+ */
+export function NeedsReviewNotice({ count, navigate }) {
+  if (!count) return null
+  return (
+    <div className="pulse-review-note">
+      <Icon.warn width="15" height="15" aria-hidden="true" />
+      <span>
+        {count} transaction{count === 1 ? '' : 's'} need{count === 1 ? 's' : ''} classification review.
+        {' '}Until classified {count === 1 ? 'it is' : 'they are'} excluded from every figure on this page.
+      </span>
+      <button type="button" className="pulse-review-cta" onClick={() => navigate('/business/transactions')}>
+        Review classification<Icon.chev width="13" height="13" aria-hidden="true" />
+      </button>
+    </div>
   )
 }
 

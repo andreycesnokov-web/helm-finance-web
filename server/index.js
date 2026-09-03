@@ -1091,10 +1091,18 @@ app.get('/api/pulse', auth, async (req, res) => {
         .slice(0, 10);
     }
 
-    // -- This month metrics (display only — income/expenses KPIs) -----------
-    // Uses the same CASH_IN / CASH_OUT model for consistency.
-    const income   = (txs || []).filter(t => CASH_IN.includes(t.type)).reduce((s, t) => s + Number(t.amount_original), 0);
-    const expenses = (txs || []).filter(t => CASH_OUT.includes(t.type)).reduce((s, t) => s + Number(t.amount_original), 0);
+    // -- This month metrics (display only) -----------------------------------
+    // These use the SAME classifier as Advanced Insights, not raw CASH_IN / CASH_OUT
+    // by transaction type. A wallet opening balance is written as type='income', so the
+    // old type-only model reported it as revenue the business had earned; transfers,
+    // owner funding and balance corrections had the same problem.
+    //
+    // `income` and `expenses` keep their names because the client reads them, but they
+    // now mean OPERATING revenue and OPERATING cash out. Everything excluded is
+    // reported separately below rather than hidden.
+    const monthInsights = FININ.computeInsights(txs || []);
+    const income   = monthInsights.metrics.operating_revenue;
+    const expenses = monthInsights.metrics.operating_cash_out;
 
     // -- Burn rate & runway via rolling 30-day window ----------------------
     // allTxs has created_at (select('*')), so computeBurnAndRunway works here.
@@ -1157,6 +1165,15 @@ app.get('/api/pulse', auth, async (req, res) => {
       scope, totalBalance, income, expenses, burnRate, runway,
       burnWindowDays: burnMetrics.burn_window_days,
       receivables, payables, netPosition,
+      // Operating performance for the month, and the cash that moved but is NOT
+      // operating performance. Kept apart so neither can distort the other.
+      operating: {
+        revenue: income,
+        cash_out: expenses,
+        net_position: monthInsights.metrics.net_operating_position,
+      },
+      other_cash_movement: monthInsights.metrics.other_cash_movement,
+      needs_review_count: monthInsights.needs_review_count,
       // Pending (Telegram drafts) — not in confirmed cash but visible in UI
       pendingReceivables, pendingPayables,
       aiStatus, aiText,
@@ -8416,8 +8433,12 @@ app.post('/api/wallets', auth, async (req, res) => {
         amount_original:  Math.abs(ob),
         currency_original: currency || 'IDR',
         amount_idr:       Math.abs(ob),
+        // Marked so the classifier identifies this as seeded balance, never revenue.
+        // The description carries the same signal, so wallets created before this
+        // marker existed still classify correctly.
+        category:         'Opening balance',
         description:      `Opening balance · ${name}`,
-        source:           name,
+        source:           'wallet_opening_balance',
         wallet_id:        wallet.id,
         scope:            walletScope,
       });
