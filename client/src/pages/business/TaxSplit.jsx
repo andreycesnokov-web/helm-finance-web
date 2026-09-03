@@ -12,8 +12,9 @@
 //     (PP 34/2017) — and even that rests on a knowledge-base candidate still under review.
 //
 // Records are created through the EXISTING business-scoped routes: POST /api/debts for the
-// vendor and tax payables, POST /api/reminders for the deadline. The only new write is an
-// advisory row in tax_treatments via POST /api/tax-split/review.
+// vendor and tax payables, POST /api/reminders for the deadline — both business-scoped by
+// the server. The only new write is an advisory row in tax_treatments via
+// POST /api/tax-split/review.
 import { useState, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { apiFetch } from '../../lib/api'
@@ -118,13 +119,13 @@ export default function TaxSplit() {
 
   // Suggested only, and editable: V1 does not assert a statutory deadline.
   const addDeadline = () => act('add_tax_deadline', () => {
-    // POST /api/reminders is shared with Personal, so it does not resolve a business
-    // itself. Refuse rather than create a reminder with no business_id.
+    // POST /api/reminders now resolves and stamps business_id server-side from the
+    // active workspace, so nothing here needs to send it. Fail fast with a clear
+    // message rather than letting the server 409 when no workspace is active.
     if (!active?.id) throw new Error('No active business workspace — open this page from a business workspace')
     const base = split.invoice.invoice_date ? new Date(split.invoice.invoice_date) : new Date()
     const d = new Date(base.getFullYear(), base.getMonth() + 1, 10)
     return apiFetch('/reminders', token, { method: 'POST', body: {
-      business_id: active?.id,
       title: `Suggested: remit ${split.tax_type} for ${split.invoice.invoice_number || 'invoice'} — confirm date with accountant`,
       due_date: d.toISOString().slice(0, 10),
     } })

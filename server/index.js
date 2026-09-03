@@ -7,6 +7,7 @@ const { calculateDueDate, ymd } = require('./lib/dueDate');
 const { computeActivationBlockers, isEffectiveApprovedReview, validReviewTransition } = require('./lib/taxGate');
 const { VALID_PLANS, computeBusinessAccess } = require('./lib/businessAccess');
 const docV = require('./lib/documentValidation');
+const { buildReminderRow } = require('./lib/reminderScope');
 const docA = require('./lib/documentAccess');
 const TX = require('./lib/transactionClass');
 // Telegram-created payables are IDR-only until multi-currency payables exist end to end.
@@ -7369,9 +7370,19 @@ app.patch('/api/transactions/:id', auth, async (req, res) => {
 
 // --- Reminders API ---------------------------------------------------------
 
+// Business-scoped, like every other write. `business_id` is decided by the server from
+// the membership-verified active business — requireBusiness honours x-business-id, 403s
+// an inaccessible or stale id, refuses personal workspaces, and 409s when the user has no
+// business yet. A client-supplied business_id in the body is overwritten, never trusted.
+//
+// This also repairs a silent bug: GET /api/pulse reads reminders with a strict
+// business_id filter, so rows written without one (the web form sends no business_id)
+// were invisible. See server/lib/reminderScope.js for why user_id stays the actor.
 app.post('/api/reminders', auth, async (req, res) => {
+  const biz = await requireBusiness(req, res);
+  if (!biz) return;
   const { data, error } = await supabase.from('reminders')
-    .insert({ ...req.body, user_id: req.user.userId }).select().single();
+    .insert(buildReminderRow(req.body, biz, req.user.userId)).select().single();
   if (error) return res.status(500).json({ error: error.message });
   res.json(data);
 });
