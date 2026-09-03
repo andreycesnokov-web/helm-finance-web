@@ -8,6 +8,7 @@ const { computeActivationBlockers, isEffectiveApprovedReview, validReviewTransit
 const { VALID_PLANS, computeBusinessAccess } = require('./lib/businessAccess');
 const docV = require('./lib/documentValidation');
 const { buildReminderRow } = require('./lib/reminderScope');
+const FININ = require('./lib/financialInsights');
 const docA = require('./lib/documentAccess');
 const TX = require('./lib/transactionClass');
 // Telegram-created payables are IDR-only until multi-currency payables exist end to end.
@@ -924,8 +925,12 @@ function computeBurnAndRunway(allTxs, totalBalance) {
   const now      = new Date();
   const cutoff30 = new Date(now.getTime() - 30 * 86400000);
 
+  // Burn is about when money MOVED, not when the row was typed. Using created_at made
+  // every back-dated entry land in the current window, so a bulk import of last
+  // quarter's spend read as if it had all been spent this month.
+  const eff = (t) => FININ.effectiveDate(t);
   // All expense transactions with a valid date
-  const allExpTxs = (allTxs || []).filter(t => CASH_OUT.includes(t.type) && t.created_at);
+  const allExpTxs = (allTxs || []).filter(t => CASH_OUT.includes(t.type) && eff(t));
 
   if (allExpTxs.length === 0) {
     // No expense data — cannot compute burn rate
@@ -934,7 +939,7 @@ function computeBurnAndRunway(allTxs, totalBalance) {
 
   // Days since oldest expense transaction (data window we actually have)
   const oldestDate  = allExpTxs.reduce((oldest, t) => {
-    const d = new Date(t.created_at);
+    const d = new Date(eff(t));
     return d < oldest ? d : oldest;
   }, now);
   const daysOfData  = Math.max(1, Math.round((now - oldestDate) / 86400000));
@@ -944,7 +949,7 @@ function computeBurnAndRunway(allTxs, totalBalance) {
   if (daysOfData >= 30) {
     // ── Full rolling 30-day window ────────────────────────────────────────
     const last30Exp = allExpTxs
-      .filter(t => new Date(t.created_at) >= cutoff30)
+      .filter(t => new Date(eff(t)) >= cutoff30)
       .reduce((s, t) => s + Number(t.amount_original || 0), 0);
     dailyBurn  = last30Exp / 30;
     windowDays = 30;
@@ -985,11 +990,17 @@ app.get('/api/pulse', auth, async (req, res) => {
     if (scope !== 'all') allTxQuery = allTxQuery.eq('scope', scope);
     const { data: allTxs } = await allTxQuery;
 
-    // This month transactions · for burn rate
-    let txQuery = supabase.from('transactions').select('*')
-      .or(bizOr).gte('created_at', monthStart);
-    if (scope !== 'all') txQuery = txQuery.eq('scope', scope);
-    const { data: txs } = await txQuery;
+    // This month transactions · for the MTD KPIs.
+    // Derived from allTxs rather than re-queried on created_at: a back-dated entry
+    // belongs to the month the money moved, not the month it was entered. Filtering on
+    // created_at put every seeded or imported row into the current month.
+    const monthStartD = new Date(monthStart);
+    const txs = (allTxs || []).filter(t => {
+      const d = new Date(FININ.effectiveDate(t));
+      return !Number.isNaN(d.getTime())
+        && d.getFullYear() === monthStartD.getFullYear()
+        && d.getMonth() === monthStartD.getMonth();
+    });
 
     // Debts — fetch all (including settled) so UI can show history; enrich with status
     // Training records (tutorial test submissions) are never financial data.
@@ -2691,6 +2702,42 @@ app.get('/api/accountant/sources', auth, async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+
+
+// ── Advanced Financial Insights V1 ───────────────────────────────────────────
+// GET /api/pulse/advanced-insights — cash-basis estimates over the transaction ledger.
+//
+// Read-only. Business-scoped through requireBusiness + bizOrFilter, exactly like every
+// other financial read, so a client-supplied business_id cannot widen the scope and a
+// personal workspace is refused outright.
+//
+// This does NOT produce audited accounting. Classification is keyword matching, anything
+// unrecognised stays `unknown` and is excluded from every metric, and each figure ships
+// with a status the UI must render instead of a bare number when it is not computable.
+app.get('/api/pulse/advanced-insights', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res); if (!biz) return;
+    if (!canViewBusinessFinance(biz.role))
+      return res.status(403).json({ error: 'Your role cannot view business finance' });
+
+    let q = supabase.from('transactions')
+      .select('id, type, amount_original, amount_idr, currency_original, category, description, transaction_date, created_at, scope')
+      .or(bizOrFilter(biz));
+    const scope = req.query.scope;
+    if (scope && scope !== 'all') q = q.eq('scope', scope);
+    const { data, error } = await q;
+    if (error) throw error;
+
+    const insights = FININ.computeInsights(data || [], {
+      from: req.query.from || null,
+      to: req.query.to || null,
+    });
+    res.json({ ok: true, business_id: biz.business.id, ...insights });
+  } catch (e) {
+    console.error(`[advanced-insights] failed: ${e.message}`);
+    res.status(500).json({ ok: false, error: 'advanced_insights_failed' });
+  }
+});
 
 // ── AI Tax Split V1 ──────────────────────────────────────────────────────────
 // Suggests how an invoice splits between vendor payment and withheld tax, and records
