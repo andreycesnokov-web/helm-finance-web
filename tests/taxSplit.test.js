@@ -123,4 +123,49 @@ t('review flow vocabulary is complete', () => {
   }
 });
 
+// ── non-IDR safety: V1 auto-calculates for IDR only ───────────────────────
+t('non-IDR rent: refuses to auto-calculate', () => {
+  const r = buildTaxSplit({
+    vendor_name: 'PT ABC Properti', description: 'Office rent September 2026',
+    invoice_date: '2026-09-01', gross_amount: 10000000, currency: 'USD',
+  });
+  // still recognised as rent — we refuse on currency, not by pretending not to know
+  assert.strictEqual(r.detected_payment_type, 'rent_land_building');
+  assert.strictEqual(r.currency_supported, false);
+  assert.strictEqual(r.auto_calculated, false);
+  assert.strictEqual(r.tax_rate, null);
+  assert.strictEqual(r.tax_payment_amount, null);
+  assert.strictEqual(r.vendor_payment_amount, null);
+  assert.strictEqual(r.status, 'needs_accountant_review');
+  assert.ok(/FX/i.test(r.review_reasons[0]), 'the currency reason must lead');
+  assert.ok(/USD/.test(r.payment_instruction.warning));
+});
+
+t('non-IDR rent: no DJP tax payable can be created, review still can', () => {
+  const r = buildTaxSplit({ vendor_name: 'V', description: 'sewa gedung', gross_amount: 500, currency: 'SGD' });
+  const on = r.next_actions.filter((a) => a.enabled).map((a) => a.key);
+  assert.deepStrictEqual(on, ['request_accountant_review']);
+  assert.strictEqual(r.payment_instruction.pay_tax_to_djp, null);
+});
+
+t('currency is normalised, not string-compared blindly', () => {
+  for (const c of ['idr', ' IDR ', 'Idr']) {
+    const r = buildTaxSplit({ vendor_name: 'V', description: 'office rent', gross_amount: 10000000, currency: c });
+    assert.strictEqual(r.currency_supported, true, c);
+    assert.strictEqual(r.tax_payment_amount, 1000000, c);
+    assert.strictEqual(r.invoice.currency, 'IDR', c);
+  }
+  // absent/empty currency keeps the IDR default rather than blocking
+  assert.strictEqual(buildTaxSplit({ description: 'rent', gross_amount: 100 }).currency_supported, true);
+});
+
+t('no treatment ever calculates in a non-IDR currency', () => {
+  for (const key of Object.keys(TREATMENTS)) {
+    const r = buildTaxSplit(
+      { vendor_name: 'V', description: 'x', gross_amount: 1000, currency: 'EUR' }, { treatment_key: key });
+    assert.strictEqual(r.auto_calculated, false, key);
+    assert.strictEqual(r.tax_payment_amount, null, key);
+  }
+});
+
 console.log(`\n${pass} passed`);

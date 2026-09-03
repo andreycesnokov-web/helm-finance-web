@@ -14,7 +14,7 @@
 // Records are created through the EXISTING business-scoped routes: POST /api/debts for the
 // vendor and tax payables, POST /api/reminders for the deadline. The only new write is an
 // advisory row in tax_treatments via POST /api/tax-split/review.
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { apiFetch } from '../../lib/api'
 import { useAuth } from '../../hooks/useAuth'
@@ -64,12 +64,17 @@ export default function TaxSplit() {
   const [err, setErr] = useState(null)
   const [done, setDone] = useState({})          // action key → outcome text
   const [tracker, setTracker] = useState('tax_suggested')
+  // Duplicate protection. `done` disables each button after a success, but React state
+  // is asynchronous: a fast double-click can fire the handler twice before a re-render.
+  // This ref is the synchronous guard, so each action creates at most ONE financial
+  // record. A failed action is released again so a genuine retry still works.
+  const guard = useRef(new Set())
 
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }))
 
   const suggest = useCallback(async (e) => {
     e?.preventDefault()
-    setBusy(true); setErr(null); setDone({})
+    setBusy(true); setErr(null); setDone({}); guard.current.clear()
     try {
       const r = await apiFetch('/tax-split/suggest', token, {
         method: 'POST',
@@ -82,9 +87,11 @@ export default function TaxSplit() {
 
   // Each action is a separate, explicit write through an existing route.
   const act = async (key, fn, okMsg) => {
+    if (guard.current.has(key)) return           // in flight, or already succeeded
+    guard.current.add(key)
     setBusy(true); setErr(null)
     try { const out = await fn(); setDone((d) => ({ ...d, [key]: okMsg(out) })) }
-    catch (e2) { setErr(e2.message || 'Action failed') }
+    catch (e2) { guard.current.delete(key); setErr(e2.message || 'Action failed') }
     finally { setBusy(false) }
   }
 
@@ -111,6 +118,9 @@ export default function TaxSplit() {
 
   // Suggested only, and editable: V1 does not assert a statutory deadline.
   const addDeadline = () => act('add_tax_deadline', () => {
+    // POST /api/reminders is shared with Personal, so it does not resolve a business
+    // itself. Refuse rather than create a reminder with no business_id.
+    if (!active?.id) throw new Error('No active business workspace — open this page from a business workspace')
     const base = split.invoice.invoice_date ? new Date(split.invoice.invoice_date) : new Date()
     const d = new Date(base.getFullYear(), base.getMonth() + 1, 10)
     return apiFetch('/reminders', token, { method: 'POST', body: {
@@ -125,7 +135,8 @@ export default function TaxSplit() {
       ...form,
       gross_amount: Number(form.gross_amount) || 0,
       review_status: 'sent_to_accountant_review',
-    } }), () => { setTracker('waiting_for_accountant_review'); return 'Recorded for accountant review' })
+    } }), (r) => { setTracker('waiting_for_accountant_review')
+      return `Recorded for accountant review — review #${r?.treatment?.id ?? '—'}` })
 
   const head = (
     <PageHeader eyebrow="Business Workspace" title="AI Tax Split"
@@ -173,7 +184,8 @@ export default function TaxSplit() {
           <div className="ts-form-actions">
             <Btn type="submit" disabled={busy}>Analyze invoice</Btn>
             <Btn type="button" variant="ghost" disabled={busy}
-              onClick={() => { setForm(BLANK); setSplit(null); setDone({}); setErr(null) }}>Clear</Btn>
+              onClick={() => { setForm(BLANK); setSplit(null); setDone({}); setErr(null); guard.current.clear() }}>
+              Clear</Btn>
           </div>
         </form>
         {err && <p className="ts-err">{err}</p>}
@@ -279,23 +291,31 @@ export default function TaxSplit() {
           <section className="ts-sec">
             <span className="ts-label">Required actions</span>
             <div className="ts-actions">
-              <Btn sm disabled={busy || !canAct('create_vendor_payable')} onClick={createVendorPayable}>
-                Create vendor payable</Btn>
-              <Btn sm disabled={busy || !canAct('create_tax_payable')} onClick={createTaxPayable}>
-                Create tax payable</Btn>
-              <Btn sm variant="ghost" disabled={busy || !canAct('add_tax_deadline')} onClick={addDeadline}>
-                Add tax deadline</Btn>
+              <Btn sm disabled={busy || !!done.create_vendor_payable || !canAct('create_vendor_payable')}
+                onClick={createVendorPayable}>
+                {done.create_vendor_payable ? 'Vendor payable created' : 'Create vendor payable'}</Btn>
+              <Btn sm disabled={busy || !!done.create_tax_payable || !canAct('create_tax_payable')}
+                onClick={createTaxPayable}>
+                {done.create_tax_payable ? 'Tax payable created' : 'Create tax payable'}</Btn>
+              <Btn sm variant="ghost" disabled={busy || !!done.add_tax_deadline || !canAct('add_tax_deadline')}
+                onClick={addDeadline}>
+                {done.add_tax_deadline ? 'Deadline added' : 'Add tax deadline'}</Btn>
               <Btn sm variant="ghost" disabled title="Available once the tax payable exists and a proof document is uploaded">
                 Upload tax payment proof</Btn>
               <Btn sm variant="ghost" disabled title="Prepared in Coretax e-Bupot; CFO AI records it, it does not file it">
                 Prepare bukti potong</Btn>
-              <Btn sm variant="ghost" disabled={busy || !canAct('request_accountant_review')} onClick={requestReview}>
-                Request accountant review</Btn>
+              <Btn sm variant="ghost"
+                disabled={busy || !!done.request_accountant_review || !canAct('request_accountant_review')}
+                onClick={requestReview}>
+                {done.request_accountant_review ? 'Sent to accountant' : 'Request accountant review'}</Btn>
             </div>
             {!split.auto_calculated && (
               <p className="ts-note">
-                Payable actions are disabled because no split is suggested. Confirm the treatment with your
-                accountant first.
+                {split.currency_supported === false
+                  ? `Payable actions are disabled because this invoice is in ${split.invoice.currency}. `
+                    + 'V1 suggests a split for IDR invoices only — a non-IDR amount needs FX and tax-base '
+                    + 'confirmation from your accountant before any rupiah is remitted to DJP.'
+                  : 'Payable actions are disabled because no split is suggested. Confirm the treatment with your accountant first.'}
               </p>
             )}
             {Object.entries(done).map(([k, v]) => <p className="ts-ok" key={k}>{v}</p>)}

@@ -179,7 +179,12 @@ const round = (n) => Math.round(Number(n) || 0);
  */
 function buildTaxSplit(invoice = {}, opts = {}) {
   const gross = Number(invoice.gross_amount || 0);
-  const currency = invoice.currency || 'IDR';
+  const currency = String(invoice.currency || 'IDR').trim().toUpperCase() || 'IDR';
+  // V1 auto-calculates for IDR only. Withholding is remitted to DJP in rupiah, so a
+  // foreign-currency invoice needs an FX rate and a confirmed tax base before any
+  // amount can be asserted. CFO AI holds neither, so it refuses to compute rather
+  // than guessing a conversion — see canCompute below.
+  const isIdr = currency === 'IDR';
   const detected = detectTreatment(invoice);
   const key = opts.treatment_key && TREATMENTS[opts.treatment_key] ? opts.treatment_key : detected.treatment_key;
   const t = TREATMENTS[key];
@@ -191,7 +196,7 @@ function buildTaxSplit(invoice = {}, opts = {}) {
   if (!invoice.invoice_date) missing.push('invoice date');
   if (!invoice.description) missing.push('description');
 
-  const canCompute = t.auto_calculate && gross > 0;
+  const canCompute = t.auto_calculate && gross > 0 && isIdr;
   let withholding = null;
   let vendorPayment = null;
   let reconciliation = null;
@@ -205,6 +210,13 @@ function buildTaxSplit(invoice = {}, opts = {}) {
     });
     vendorPayment = reconciliation.expected_vendor_net_amount;
   }
+
+  // Lead with the currency reason: it is why an otherwise-computable invoice did not compute.
+  const reviewReasons = (t.auto_calculate && !isIdr)
+    ? [`Non-IDR invoice (${currency}) requires FX and tax-base confirmation before any withholding is suggested.`,
+       'CFO AI does not convert currency and holds no official exchange rate, so it will not create a DJP tax payable from a non-IDR amount in V1.',
+       ...t.review_reasons]
+    : t.review_reasons;
 
   const status = !gross ? 'missing_data'
     : canCompute ? 'suggested'
@@ -232,7 +244,7 @@ function buildTaxSplit(invoice = {}, opts = {}) {
     confidence_score: overridden ? 'Needs accountant review' : detected.confidence,
 
     tax_type: t.tax_type,
-    tax_rate: t.auto_calculate ? t.rate : null,
+    tax_rate: canCompute ? t.rate : null,
     tax_base: t.base,
     tax_base_label: t.base_label,
     tax_base_note: t.base_note,
@@ -244,6 +256,7 @@ function buildTaxSplit(invoice = {}, opts = {}) {
     reconciliation,
 
     auto_calculated: canCompute,
+    currency_supported: isIdr,
     status,
     accountant_review_required: true,
     accountant_review_status: 'ai_suggested',
@@ -256,7 +269,7 @@ function buildTaxSplit(invoice = {}, opts = {}) {
     kb_status: t.kb_status,
 
     required_documents: t.required_documents,
-    review_reasons: t.review_reasons,
+    review_reasons: reviewReasons,
     missing_data: missing,
     asset_hook: !!t.asset_hook,
 
@@ -269,7 +282,9 @@ function buildTaxSplit(invoice = {}, opts = {}) {
         }
       : {
           pay_vendor: null, pay_tax_to_djp: null, currency,
-          warning: 'No tax split is suggested. Confirm the treatment with your accountant before paying.',
+          warning: (t.auto_calculate && !isIdr)
+            ? `No tax split is suggested: this invoice is in ${currency}, and a non-IDR amount requires FX and tax-base confirmation by your accountant.`
+            : 'No tax split is suggested. Confirm the treatment with your accountant before paying.',
         },
 
     // Steps are guidance, not automation. CFO AI never pays anything.
