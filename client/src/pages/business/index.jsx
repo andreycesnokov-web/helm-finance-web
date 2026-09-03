@@ -99,6 +99,9 @@ export function BusinessPulse() {
   // Data readiness. The endpoint answers 200 with { ok:false, counts:{} } on any failure,
   // so it can never block the dashboard — the readiness panel simply stays hidden.
   const counts = useScoped('/business/financial-counts')
+  // Cash-basis estimates for the trends charts and the Advanced insights cards.
+  // Failure is non-fatal: both sections fall back to their locked/needs-history state.
+  const insights = useScoped('/pulse/advanced-insights')
 
   const head = (
     <PageHeader eyebrow="Business Workspace" title={active?.name || 'Business'}
@@ -146,7 +149,7 @@ export function BusinessPulse() {
 
       {/* 4. Where charts will live. Frames only — the future source is GET /api/pulse/trends,
              which does not exist yet, so nothing is plotted rather than plotted from guesses. */}
-      <TrendsSection />
+      <TrendsSection insights={insights} />
 
       {/* 5. Working capital + setup progress */}
       <div className="cfo-grid cfo-grid-2" style={{ marginBottom: 26 }}>
@@ -162,7 +165,7 @@ export function BusinessPulse() {
       )}
 
       {/* 6. Locked insights — stated, never estimated */}
-      <AdvancedInsights navigate={navigate} />
+      <AdvancedInsights navigate={navigate} insights={insights} idr={idr} />
 
       {/* 7. Narrative + ledger sanity check. The standalone Action Center was removed: every
              action it listed already exists contextually (first-run callout, setup progress

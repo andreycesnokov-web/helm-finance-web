@@ -192,38 +192,115 @@ function ChartFrame({ variant = 'line' }) {
   )
 }
 
-// Product-facing copy only. The future data source is GET /api/pulse/trends — a developer
-// detail that deliberately never reaches the screen.
-const TRENDS = [
-  { key: 'revenue', title: 'Revenue trend', variant: 'line', pill: 'Revenue history needed',
-    body: 'Needs revenue recorded across more than one month.',
-    chips: ['Revenue history', 'Monthly transactions'] },
-  { key: 'outflow', title: 'Operating cash out trend', variant: 'line', pill: 'Expense history needed',
-    body: 'Needs expenses or payroll recorded over time.',
-    chips: ['Expense history', 'Payroll / operating spend'] },
-  { key: 'runway', title: 'Cash runway forecast', variant: 'line', pill: 'Cash + burn history needed',
-    body: 'Needs a cash balance plus some spending history.',
-    chips: ['Cash balance', 'Burn history'] },
-  { key: 'workingcap', title: 'Receivables vs payables', variant: 'bars', pill: 'AR/AP records needed',
-    body: 'Needs invoices or debt records on both sides.',
-    chips: ['Receivables', 'Payables'] },
-]
+/* Compact SVG series plot. Dependency-free on purpose: two polylines on one scale. */
+function SeriesChart({ series, lines }) {
+  const pts = series.length
+  if (pts < 2) return null
+  const vals = lines.flatMap((l) => series.map((s) => Number(l.get(s) || 0)))
+  const max = Math.max(...vals, 0)
+  const min = Math.min(...vals, 0)
+  const span = (max - min) || 1
+  const x = (i) => 26 + (i * (282 / Math.max(1, pts - 1)))
+  const y = (v) => 82 - ((Number(v || 0) - min) / span) * 74
+  return (
+    <svg viewBox="0 0 320 92" className="pulse-trend-svg" role="img"
+      aria-label={`${lines.map((l) => l.label).join(' and ')} by month`}>
+      {[20, 42, 64].map((gy) => (
+        <line key={gy} x1="26" y1={gy} x2="308" y2={gy} className="pulse-trend-grid" strokeDasharray="3 6" />
+      ))}
+      <line x1="26" y1="8" x2="26" y2="82" className="pulse-trend-axis" />
+      <line x1="26" y1="82" x2="308" y2="82" className="pulse-trend-axis" />
+      {min < 0 && <line x1="26" y1={y(0)} x2="308" y2={y(0)} className="pulse-trend-axis" strokeDasharray="2 4" />}
+      {lines.map((l) => (
+        <polyline key={l.label} fill="none" stroke={l.color} strokeWidth="2"
+          strokeLinejoin="round" strokeLinecap="round"
+          points={series.map((sp, i) => `${x(i)},${y(l.get(sp))}`).join(' ')} />
+      ))}
+      {lines.map((l) => (
+        <circle key={`${l.label}-end`} cx={x(pts - 1)} cy={y(l.get(series[pts - 1]))} r="3" fill={l.color} />
+      ))}
+    </svg>
+  )
+}
 
-export function TrendsSection() {
+const Legend = ({ lines }) => (
+  <ul className="pulse-legend">
+    {lines.map((l) => (
+      <li key={l.label}><span className="pulse-legend-dot" style={{ background: l.color }} />{l.label}</li>
+    ))}
+  </ul>
+)
+
+const C_REV = '#1f9d55'
+const C_OUT = '#d64545'
+const C_GP = '#3399FF'
+const C_EB = '#003366'
+
+/**
+ * Financial trends.
+ *
+ * Plots real monthly series from GET /api/pulse/advanced-insights once at least two
+ * months exist. Below that there is no trend to draw, so the frame keeps its honest
+ * "needs history" state rather than rendering a single point as a line. Every plotted
+ * figure is cash-basis and estimated, and the caption says so on screen.
+ *
+ * The two forward-looking frames stay locked: V1 has no forecast model, and a projection
+ * drawn from a couple of months of history would be a guess wearing a chart.
+ */
+export function TrendsSection({ insights }) {
+  const data = insights?.data
+  const series = Array.isArray(data?.series) ? data.series : []
+  const enough = series.length >= 2
+
+  const charts = [
+    { key: 'revenue', title: 'Revenue vs operating cash out',
+      lines: [{ label: 'Revenue', color: C_REV, get: (s) => s.revenue },
+        { label: 'Direct + operating costs', color: C_OUT, get: (s) => s.direct_costs + s.opex }],
+      pill: 'Revenue history needed', body: 'Needs revenue recorded across more than one month.',
+      chips: ['Revenue history', 'Monthly transactions'] },
+    { key: 'profit', title: 'Gross profit / estimated EBITDA',
+      lines: [{ label: 'Gross profit', color: C_GP, get: (s) => s.gross_profit },
+        { label: 'Estimated EBITDA', color: C_EB, get: (s) => s.estimated_ebitda }],
+      pill: 'Cost structure needed', body: 'Needs revenue and classified costs across more than one month.',
+      chips: ['Direct costs', 'Operating costs'] },
+  ]
+  const frames = [
+    { key: 'runway', title: 'Cash runway forecast', variant: 'line', pill: 'Forecast model needed',
+      body: 'Needs a forward projection model - V1 does not estimate the future from past months.',
+      chips: ['Cash balance', 'Burn history'] },
+    { key: 'workingcap', title: 'Receivables vs payables forecast', variant: 'bars', pill: 'Due-date forecast needed',
+      body: 'Open balances appear in Working capital below; a dated forecast is not modelled in V1.',
+      chips: ['Receivables', 'Payables'] },
+  ]
+
   return (
     <section className="pulse-trends">
       <div className="pulse-trends-head">
         <div>
           <h2 className="pulse-trends-title">Financial trends</h2>
           <p className="pulse-trends-sub">
-            Monthly trend charts will appear once the system has enough transaction history.
-            We do not estimate trends from incomplete data.
+            {enough
+              ? 'Monthly cash-basis figures from your recorded transactions. Estimates, not audited accounting.'
+              : 'Monthly trend charts will appear once the system has enough transaction history. We do not estimate trends from incomplete data.'}
           </p>
         </div>
-        <StatusBadge tone="neutral">Needs monthly history</StatusBadge>
+        <StatusBadge tone={enough ? 'info' : 'neutral'}>
+          {insights?.loading ? 'Loading' : enough ? `${series.length} months - cash-basis` : 'Needs monthly history'}
+        </StatusBadge>
       </div>
       <div className="pulse-trends-grid">
-        {TRENDS.map((t) => (
+        {charts.map((c) => (
+          <article key={c.key} className="pulse-trend">
+            <h3 className="pulse-trend-name">{c.title}</h3>
+            <div className="pulse-trend-frame">
+              {enough ? <SeriesChart series={series} lines={c.lines} />
+                : <><ChartFrame variant="line" /><span className="pulse-trend-pill">{c.pill}</span></>}
+            </div>
+            {enough ? <Legend lines={c.lines} /> : <p className="pulse-trend-body">{c.body}</p>}
+            {!enough && <ul className="pulse-chips">{c.chips.map((x) => <li key={x} className="pulse-chip">{x}</li>)}</ul>}
+          </article>
+        ))}
+        {frames.map((t) => (
           <article key={t.key} className="pulse-trend">
             <h3 className="pulse-trend-name">{t.title}</h3>
             <div className="pulse-trend-frame">
@@ -231,17 +308,13 @@ export function TrendsSection() {
               <span className="pulse-trend-pill">{t.pill}</span>
             </div>
             <p className="pulse-trend-body">{t.body}</p>
-            <ul className="pulse-chips">
-              {t.chips.map((c) => <li key={c} className="pulse-chip">{c}</li>)}
-            </ul>
+            <ul className="pulse-chips">{t.chips.map((c) => <li key={c} className="pulse-chip">{c}</li>)}</ul>
           </article>
         ))}
       </div>
     </section>
   )
 }
-
-/* ── data readiness ───────────────────────────────────────────────────────── */
 
 /**
  * Factual, not scored: how many of the four data sources this workspace actually has, and
@@ -373,73 +446,122 @@ export function WorkingCapital({ d, idr, navigate }) {
 }
 
 /* ── advanced financial insights (locked) ─────────────────────────────────── */
+/* -- advanced financial insights ------------------------------------------- */
 
-// Locked because the ledger cannot support them honestly — never because a screen is
-// unfinished. Each card explains the metric, states the structure it needs, and offers a
-// concrete next step. CTA labels describe the WORK, not the destination page: sending
-// everything to "AI Accountant" made that page read as a dumping ground.
-const LOCKED_INSIGHTS = [
-  {
-    key: 'ebitda', title: 'EBITDA', icon: 'cfo', status: 'Locked insight',
-    body: 'How profitable the business is before interest, tax and non-cash charges like depreciation.',
-    needs: ['Depreciation classified', 'Amortisation classified', 'Interest mapped', 'Tax expense mapped'],
-    cta: 'View requirements', to: '/business/accountant',
-  },
-  {
-    key: 'capex', title: 'CAPEX', icon: 'bank', status: 'Needs asset structure',
-    body: 'What you spend on assets like equipment — separate from the day-to-day running costs.',
-    needs: ['Asset purchases classified', 'Equipment / long-term spend tagged', 'Operating spend separated'],
-    cta: 'Review asset structure', to: '/business/transactions',
-  },
-  {
-    key: 'gross', title: 'Gross profit', icon: 'fund', status: 'Needs cost structure',
-    body: 'What is left from revenue after the direct cost of delivering it.',
-    needs: ['COGS tracked', 'Direct costs categorised', 'Revenue lines mapped'],
-    cta: 'Set up cost structure', to: '/business/transactions',
-  },
-  {
-    key: 'net', title: 'Estimated net profit', icon: 'acct', status: 'Needs full profit structure',
-    body: 'What the business actually keeps once every cost is accounted for.',
-    needs: ['Gross profit available', 'Interest mapped', 'Tax mapped', 'Depreciation / amortisation mapped'],
-    cta: 'Complete finance structure', to: '/business/accountant',
-  },
-]
+/**
+ * Each card is unlocked ONLY by its own status from GET /api/pulse/advanced-insights.
+ * A metric the ledger cannot support keeps its locked state and says what it needs - the
+ * point of this section is that it never shows a number it cannot stand behind. Unlocked
+ * cards are labelled cash-basis estimates requiring accountant review, because that is
+ * exactly what they are: keyword-classified cash movements, not audited accounting.
+ */
+export function AdvancedInsights({ navigate, insights, idr }) {
+  const data = insights?.data
+  const m = data?.metrics
+  const st = data?.status || {}
+  const fmt = (v) => (typeof idr === 'function' ? idr(v) : `IDR ${Number(v || 0).toLocaleString('de-DE')}`)
+  const pct = (v) => (v === null || v === undefined ? null : `${(v * 100).toFixed(1)}%`)
 
-export function AdvancedInsights({ navigate }) {
+  const CARDS = [
+    { key: 'gross', title: 'Gross profit', icon: 'fund',
+      unlocked: st.gross_profit === 'available',
+      value: m && fmt(m.gross_profit),
+      note: m && m.gross_margin !== null ? `Gross margin ${pct(m.gross_margin)} - cash-basis` : 'Cash-basis estimate',
+      lockedStatus: 'Needs cost structure',
+      body: 'What is left from revenue after the direct cost of delivering it.',
+      needs: ['COGS tracked', 'Direct costs categorised', 'Revenue lines mapped'],
+      cta: 'Set up cost structure', to: '/business/transactions' },
+    { key: 'capex', title: 'CAPEX', icon: 'bank',
+      unlocked: st.capex === 'available',
+      value: m && fmt(m.capex),
+      note: 'Equipment / long-term spend tagged - cash-basis, not depreciated',
+      lockedStatus: 'Needs asset structure',
+      body: 'What you spend on assets like equipment - separate from the day-to-day running costs.',
+      needs: ['Asset purchases classified', 'Equipment / long-term spend tagged', 'Operating spend separated'],
+      cta: 'Review asset structure', to: '/business/transactions' },
+    { key: 'ebitda', title: 'Estimated EBITDA', icon: 'cfo',
+      unlocked: st.ebitda === 'estimated',
+      value: m && fmt(m.estimated_ebitda),
+      note: 'Cash-basis, before depreciation and amortisation - needs accountant review',
+      lockedStatus: 'Locked insight',
+      body: 'How profitable the business is before interest, tax and non-cash charges like depreciation.',
+      needs: ['Depreciation classified', 'Amortisation classified', 'Interest mapped', 'Tax expense mapped'],
+      cta: 'View requirements', to: '/business/accountant' },
+    { key: 'net', title: 'Estimated net profit', icon: 'acct',
+      unlocked: st.net_profit === 'estimated',
+      value: m && fmt(m.estimated_net_profit),
+      note: 'Incomplete until tax, interest and depreciation are fully mapped - needs accountant review',
+      lockedStatus: 'Needs full profit structure',
+      body: 'What the business actually keeps once every cost is accounted for.',
+      needs: ['Gross profit available', 'Interest mapped', 'Tax mapped', 'Depreciation / amortisation mapped'],
+      cta: 'Complete finance structure', to: '/business/accountant' },
+  ]
+
+  const anyUnlocked = CARDS.some((c) => c.unlocked)
+
   return (
     <section className="pulse-insights">
       <div className="pulse-insights-head">
         <div>
           <h2 className="pulse-insights-title">Advanced financial insights</h2>
           <p className="pulse-insights-sub">
-            These metrics require structured accounting data. We leave them locked until the
-            system can calculate them honestly.
+            {anyUnlocked
+              ? 'Cash-basis estimates from your recorded transactions. These are not audited accounting figures - your accountant must confirm them.'
+              : 'These metrics require structured accounting data. We leave them locked until the system can calculate them honestly.'}
           </p>
         </div>
-        <StatusBadge tone="neutral">Locked until structured</StatusBadge>
+        <StatusBadge tone={anyUnlocked ? 'warning' : 'neutral'}>
+          {insights?.loading ? 'Loading' : anyUnlocked ? 'Estimated - review required' : 'Locked until structured'}
+        </StatusBadge>
       </div>
+
+      {anyUnlocked && data?.period?.from && (
+        <p className="pulse-insights-period">
+          Period {String(data.period.from).slice(0, 10)} to {String(data.period.to).slice(0, 10)} - {data.transactions_considered} transactions classified
+        </p>
+      )}
+
       <div className="pulse-insights-grid">
-        {LOCKED_INSIGHTS.map((m) => {
-          const C = Icon[m.icon] || Icon.dot
+        {CARDS.map((c) => {
+          const C = Icon[c.icon] || Icon.dot
           return (
-            <article key={m.key} className="pulse-insight">
+            <article key={c.key} className={`pulse-insight${c.unlocked ? ' is-live' : ''}`}>
               <header className="pulse-insight-top">
                 <span className="pulse-insight-ic"><C width="17" height="17" aria-hidden="true" /></span>
-                <span className="pulse-insight-status"><Icon.lock width="10" height="10" aria-hidden="true" />{m.status}</span>
+                <span className="pulse-insight-status">
+                  {c.unlocked ? 'Estimated'
+                    : <><Icon.lock width="10" height="10" aria-hidden="true" />{c.lockedStatus}</>}
+                </span>
               </header>
-              <h3 className="pulse-insight-title">{m.title}</h3>
-              <p className="pulse-insight-body">{m.body}</p>
-              <span className="pulse-insight-label">Unlocks when</span>
-              <ul className="pulse-chips">
-                {m.needs.map((n) => <li key={n} className="pulse-chip">{n}</li>)}
-              </ul>
-              <button type="button" className="pulse-insight-cta" onClick={() => navigate(m.to)}>
-                {m.cta}<Icon.chev width="13" height="13" aria-hidden="true" />
+              <h3 className="pulse-insight-title">{c.title}</h3>
+              {c.unlocked ? (
+                <>
+                  <p className="pulse-insight-value">{c.value}</p>
+                  <p className="pulse-insight-note">{c.note}</p>
+                </>
+              ) : (
+                <>
+                  <p className="pulse-insight-body">{c.body}</p>
+                  <span className="pulse-insight-label">Unlocks when</span>
+                  <ul className="pulse-chips">
+                    {c.needs.map((n) => <li key={n} className="pulse-chip">{n}</li>)}
+                  </ul>
+                </>
+              )}
+              <button type="button" className="pulse-insight-cta" onClick={() => navigate(c.to)}>
+                {c.unlocked ? 'Review with accountant' : c.cta}
+                <Icon.chev width="13" height="13" aria-hidden="true" />
               </button>
             </article>
           )
         })}
       </div>
+
+      {anyUnlocked && Array.isArray(data?.warnings) && data.warnings.length > 0 && (
+        <ul className="pulse-insights-warnings">
+          {data.warnings.map((w) => <li key={w}>{w}</li>)}
+        </ul>
+      )}
     </section>
   )
 }
