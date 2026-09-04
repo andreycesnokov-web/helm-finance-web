@@ -382,4 +382,65 @@ t('invoices and payment proofs are untouched by the receipt rule', () => {
   assert.strictEqual(run(INCOMING_PROOF).document.direction, 'incoming_payment');
 });
 
+/* ── OCR tax safety ────────────────────────────────────────────────────────
+   Production returned no PPN on one run of a kwitansi and 1,122,000 on the next —
+   a figure equal to 11/111 of the total, i.e. back-calculated rather than read.
+   The pipeline reported it as "stated on the document". A tax number presented as
+   printed fact when nothing printed it is the worst thing this reader can do. */
+const ocrRun = (text, extra = {}) => O.processDocument({
+  document: { id: 'doc-ocr' },
+  extraction: { ...X.extractFromText(text, {}), ...(extra.extraction || {}) },
+  businessName: US,
+  counterparties: [], existingLinks: {}, taxRules: [],
+  readSource: 'ocr_vision',
+});
+
+t('a kwitansi with only a gross amount claims no PPN', () => {
+  const r = ocrRun(KWT_WE_PAID);
+  assert.strictEqual(r.tax.ppn_detected, false);
+  assert.strictEqual(r.tax.ppn_amount, null);
+  assert.strictEqual(r.tax.tax_status, 'tax_not_confirmed');
+  assert.ok(r.tax.notes.every((n) => !/stated on the document/i.test(n)), r.tax.notes.join(' | '));
+});
+
+t('an OCR figure with nothing on the page to back it is a possibility, not a reading', () => {
+  // exactly the production case: a number arrives, but the transcript never says "PPN"
+  const r = ocrRun(KWT_WE_PAID, { extraction: { fields: { ...X.extractFromText(KWT_WE_PAID, {}).fields,
+    commercial_tax_amount: 1122000 } } });
+  assert.strictEqual(r.tax.ppn_detected, false, 'must not be presented as detected');
+  assert.strictEqual(r.tax.ppn_amount, null, 'and the number must not be published');
+  assert.strictEqual(r.tax.tax_status, 'tax_not_confirmed');
+  assert.ok(r.tax.notes.some((n) => /needs accountant review/i.test(n)), r.tax.notes.join(' | '));
+  assert.ok(r.tax.notes.every((n) => !/stated on the document/i.test(n)),
+    'never claim a computed figure was printed');
+});
+
+t('an OCR figure WITH a PPN line is reported, but as something to verify', () => {
+  const withPpn = KWT_WE_PAID + ' PPN : Rp 1.122.000';
+  const r = ocrRun(withPpn, { extraction: { fields: { ...X.extractFromText(withPpn, {}).fields,
+    commercial_tax_amount: 1122000 } } });
+  assert.strictEqual(r.tax.ppn_detected, true);
+  assert.strictEqual(r.tax.ppn_amount, 1122000);
+  assert.strictEqual(r.tax.tax_status, 'tax_needs_review', 'never plain "detected" from vision');
+  assert.ok(r.tax.notes.some((n) => /read by OCR\/Vision.*[Vv]erify/i.test(n)), r.tax.notes.join(' | '));
+  assert.ok(r.tax.notes.every((n) => !/stated on the document/i.test(n)));
+});
+
+t('an embedded-text faktur pajak still detects its PPN plainly', () => {
+  const r = run(FAKTUR);
+  assert.strictEqual(r.tax.ppn_detected, true);
+  assert.ok(r.tax.ppn_amount > 0);
+  assert.ok(r.tax.notes.some((n) => /is stated on the document/i.test(n)),
+    'a parsed PPN line IS stated on the document');
+});
+
+t('OCR tax never removes the accountant, and creates nothing', () => {
+  for (const r of [ocrRun(KWT_WE_PAID), ocrRun(KWT_WE_RECEIVED)]) {
+    assert.strictEqual(r.tax.accountant_review_required, true);
+    assert.strictEqual(r.financial_record.can_create_draft, false);
+    assert.strictEqual(r.financial_record.suggested_record_type, 'supporting_document');
+    assert.strictEqual(r.tax.withholding_status, 'not_detected');
+  }
+});
+
 console.log(`\n${pass} passed`);

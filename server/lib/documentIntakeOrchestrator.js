@@ -134,12 +134,27 @@ function resolveDirection(type, fields, businessName) {
    with its status and never treated as settled. */
 function assessTax(type, fields, opts = {}) {
   const ppn = parseAmount(fields.commercial_tax_amount);
-  const detected = ppn !== null && ppn > 0;
+  const hasNumber = ppn !== null && ppn > 0;
+
+  // WHERE THE NUMBER CAME FROM decides what we may say about it.
+  //
+  // The text parser sets commercial_tax_amount only after matching a real label
+  // ("Jumlah PPN", "Dasar Pengenaan Pajak"), so for embedded text the number IS
+  // evidence of itself. A vision reader has no such discipline: it can return a
+  // plausible figure it worked out from the gross rather than one printed on the page.
+  // Production proved it — the same kwitansi came back with no PPN on one run and
+  // 1,122,000 on the next, a value equal to 11/111 of the total.
+  //
+  // So a vision number is only treated as a reading when the transcript actually
+  // mentions tax. Otherwise it is a possibility for an accountant, not a figure.
+  const fromVision = opts.readSource === 'ocr_vision';
+  const evidence = !fromVision || !!opts.taxEvidence;
+  const detected = hasNumber && evidence;
 
   const out = {
     ppn_detected: detected,
     ppn_amount: detected ? ppn : null,
-    tax_status: detected ? 'tax_detected' : 'tax_not_detected',
+    tax_status: detected ? (fromVision ? 'tax_needs_review' : 'tax_detected') : 'tax_not_detected',
     withholding_status: 'not_detected',
     withholding_suggestion: null,
     rule_citation: null,
@@ -149,7 +164,21 @@ function assessTax(type, fields, opts = {}) {
     notes: [],
   };
 
-  if (detected) out.notes.push(`PPN of ${ppn} is stated on the document.`);
+  if (detected && fromVision) {
+    out.notes.push(`A PPN amount of ${ppn} was read by OCR/Vision. Verify it against the document before using it.`);
+  } else if (detected) {
+    out.notes.push(`PPN of ${ppn} is stated on the document.`);
+  } else if (hasNumber) {
+    // A number with nothing on the page to back it: never presented as read.
+    out.tax_status = 'tax_not_confirmed';
+    out.notes.push('Possible tax component needs accountant review. No PPN line could be '
+      + 'confirmed on the document, so no tax amount is being claimed.');
+  } else if (type === 'receipt') {
+    // A kwitansi is a payment record; PPN is not implied by one and is never derived
+    // from the total.
+    out.tax_status = 'tax_not_confirmed';
+    out.notes.push('No PPN is stated on this receipt. Tax treatment needs accountant review.');
+  }
   if (type === 'faktur_pajak' && !detected) {
     out.notes.push('This looks like a Faktur Pajak but no PPN amount could be read. Confirm it manually.');
     out.tax_status = 'tax_needs_review';
@@ -180,6 +209,18 @@ function assessTax(type, fields, opts = {}) {
     out.notes.push('No verified rule covers this document, so no withholding is suggested.');
   }
   return out;
+}
+
+/* Does the document itself mention tax? Only this licenses a vision-read PPN figure
+   to be reported as a reading rather than a possibility. Deliberately generous about
+   WHERE it looks — a label in the text, a DPP figure, or a faktur serial all count —
+   and deliberately strict about what follows when none of them is present. */
+const TAX_MARKERS = /\bppn\b|pajak\s+pertambahan\s+nilai|\bdpp\b|dasar\s+pengenaan\s+pajak|faktur\s+pajak|\bvat\b|\bpph\b/i;
+function taxEvidenceIn(extraction = {}) {
+  const f = extraction.fields || {};
+  if (f.commercial_base_amount !== null && f.commercial_base_amount !== undefined) return true;
+  if (f.tax_invoice_serial) return true;
+  return TAX_MARKERS.test(String(extraction.raw_text_excerpt || ''));
 }
 
 /* Why a scan could not be read. The two cases need different sentences: if vision is
@@ -249,7 +290,7 @@ function processDocument(input = {}) {
       counterparty: { status: 'needs_review', suggested_role: null, matched_counterparty_id: null, suggested_counterparty: null },
       financial_record: { suggested_record_type: 'none', amount: null, currency: fields.currency || 'IDR',
         date: null, can_create_draft: false },
-      tax: assessTax('unknown', {}, input),
+      tax: assessTax('unknown', {}, { ...input, readSource, taxEvidence: false }),
       next_actions: [
         { key: 'enter_manually', label: 'Enter the values manually', enabled: true },
         { key: 'request_accountant_review', label: 'Send to accountant review', enabled: true },
@@ -301,7 +342,9 @@ function processDocument(input = {}) {
   else if (recordKind === 'supporting_document') suggestedRecordType = 'supporting_document';
   else if (recordKind === 'tax_review') suggestedRecordType = 'tax_review';
 
-  const tax = assessTax(type, fields, input);
+  // The reader and the evidence travel with the request, so assessTax can tell a parsed
+  // PPN line from a figure a vision model produced.
+  const tax = assessTax(type, fields, { ...input, readSource, taxEvidence: taxEvidenceIn(ex) });
 
   // ── what is missing ──────────────────────────────────────────────────────
   const missing = [...(ex.missing_fields || [])];

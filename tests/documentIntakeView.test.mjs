@@ -274,6 +274,38 @@ t('a receipt offers no payable or receivable draft', () => {
   assert.strictEqual(V.draftOffer(OCR_RECEIPT).show, false);
 });
 
+/* ── tax wording by reader ──────────────────────────────────────────────────── */
+t('a vision-read PPN is offered for verification, never as a plain reading', () => {
+  const v2 = { ...OCR_RECEIPT, ppn_detected: true, ppn_amount: 1122000, tax_status: 'tax_needs_review' };
+  assert.strictEqual(V.taxBadgeLabel(v2), 'PPN — verify OCR value');
+  assert.ok(/verify/i.test(V.taxLine(v2)), V.taxLine(v2));
+  assert.ok(!/^PPN IDR/.test(V.taxLine(v2)), 'must not read like a printed figure');
+});
+
+t('a PPN parsed from document text keeps the plain wording', () => {
+  const v2 = { ...OCR_RECEIPT, source: 'embedded_text', ppn_detected: true, ppn_amount: 1320000 };
+  assert.strictEqual(V.taxBadgeLabel(v2), 'PPN detected');
+  assert.strictEqual(V.taxLine(v2), 'PPN IDR 1.320.000');
+});
+
+t('an unconfirmed tax figure says exactly that, on the card too', () => {
+  const v2 = { ...OCR_RECEIPT, ppn_detected: false, ppn_amount: null, tax_status: 'tax_not_confirmed' };
+  assert.strictEqual(V.taxBadgeLabel(v2), 'Tax not confirmed');
+  assert.strictEqual(V.taxLine(v2), 'Not confirmed from the document');
+  assert.ok(V.intakeRowLines(v2).some((l) => /Tax: Not confirmed from the document/.test(l)),
+    V.intakeRowLines(v2).join(' | '));
+  assert.ok(V.intakeBadges(v2).some((b) => b.label === 'Tax not confirmed'));
+});
+
+t('7. the suggested record reads in words, not as an enum', () => {
+  assert.strictEqual(V.recordLabelOf('supporting_document'), 'Save as supporting document');
+  assert.strictEqual(V.recordLabelOf('payable'), 'Create payable draft');
+  assert.strictEqual(V.recordLabelOf('transaction'), 'Record as a transaction');
+  assert.ok(!/_/.test(V.recordLabelOf('supporting_document')), 'no underscores reach the user');
+  assert.ok(!/^Create/.test(V.recordLabelOf('supporting_document')),
+    'nothing is "created" for a kind that is never created');
+});
+
 /* ── 5/6. the analyze button ────────────────────────────────────────────────── */
 t('5. a stored run says the analysis was updated', () => {
   assert.strictEqual(V.analyzeMessage({ stored: true }), 'Analysis updated.');
