@@ -115,3 +115,19 @@
 .is-raw { font-size: 11.5px; color: var(--text-muted); }
 .is-raw summary { cursor: pointer; }
 .is-raw p { margin: 6px 0 0; line-height: 1.5; word-break: break-word; }
+
+/* ── intake pipeline result ──────────────────────────────────────────────────
+   What the document is, who it involves, what it implies, and what to do next.
+   Every action here navigates to the step that creates something; nothing is
+   created by viewing this panel. */
+.is-intake {
+  margin: 10px 0 2px; padding: 12px 14px;
+  border: 1px solid var(--brand-electric-blue, #3399FF); border-radius: 12px;
+  background: var(--surface-card);
+  display: flex; flex-direction: column; gap: 8px;
+}
+.is-intake .is-label { text-transform: uppercase; }
+.is-intake-kv { list-style: none; margin: 2px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.is-intake-kv li { display: flex; justify-content: space-between; gap: 14px; font-size: 12.5px; }
+.is-intake-kv li > span:first-child { color: var(--text-muted); }
+.is-intake-kv li > span:last-child { color: var(--text-primary); font-weight: 600; text-align: right; }

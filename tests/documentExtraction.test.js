@@ -56,6 +56,25 @@ t('2. Faktur Pajak serial is read and normalised, separate from the invoice numb
   assert.notStrictEqual(r.fields.tax_invoice_serial, r.fields.document_number);
 });
 
+t('a party name stops at the next label, even with no line breaks', () => {
+  // Real PDF text often arrives as one long line. Without a stop, "Dari" would
+  // capture both party names, and direction detection would see us on both sides.
+  const oneLine = 'Invoice No. Invoice INV-1 Dari : PT Alpha Sentosa NPWP : 01.222.333.4-555.666 '
+    + 'Kepada : PT Beta Nusantara Netto 1.000.000';
+  const r = X.extractFromText(oneLine, {});
+  assert.strictEqual(r.fields.issuer_name, 'PT Alpha Sentosa', `issuer was "${r.fields.issuer_name}"`);
+  assert.strictEqual(r.fields.buyer_name, 'PT Beta Nusantara', `buyer was "${r.fields.buyer_name}"`);
+  assert.ok(!/Kepada|NPWP|Netto/i.test(r.fields.issuer_name), 'no label may bleed into a name');
+});
+
+t('an account holder name stops before the next field', () => {
+  const oneLine = 'Dari 111-2223334 / PT ALPHA SENTOSA Ke 555-6667778 / PT BETA NUSANTARA '
+    + 'Amount Rp 1.000.000 Status Successful Reference No. 123456789012';
+  const r = X.extractFromText(oneLine, { document_type: 'payment_proof' });
+  assert.strictEqual(r.fields.from_account_name, 'PT ALPHA SENTOSA', `from was "${r.fields.from_account_name}"`);
+  assert.strictEqual(r.fields.to_account_name, 'PT BETA NUSANTARA', `to was "${r.fields.to_account_name}"`);
+});
+
 t('identifies the document as a faktur pajak and names both parties', () => {
   const r = X.extractFromText(FAKTUR_TEXT, {});
   assert.strictEqual(r.document_type, 'faktur_pajak');

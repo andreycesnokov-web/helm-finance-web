@@ -40,6 +40,7 @@ export default function InvoiceSettlement() {
   const [form, setForm] = useState({})
   const [saveMsg, setSaveMsg] = useState(null)
   const [extract, setExtract] = useState(null)   // { documentId, result, duplicate }
+  const [intake, setIntake] = useState(null)     // { documentId, ...pipeline result }
 
   useEffect(() => {
     if (!token) return
@@ -71,6 +72,18 @@ export default function InvoiceSettlement() {
       gross_amount: d.gross_amount ?? '',
       currency: 'IDR',
     })
+  }
+
+  // The full intake pipeline: what is this, who with, what record does it imply,
+  // what is missing, what next. It writes only review metadata — no counterparty,
+  // payable or transaction is created by running it.
+  const runIntake = async (docId) => {
+    setBusy(true); setErr(null); setSaveMsg(null); setIntake(null); setExtract(null)
+    try {
+      const r = await apiFetch(`/documents/${docId}/intake`, token, { method: 'POST' })
+      setIntake({ documentId: docId, ...r })
+    } catch (e2) { setErr(e2.message || 'Could not process the document') }
+    finally { setBusy(false) }
   }
 
   // Extraction is a SUGGESTION: this call writes nothing. Applying is a second,
@@ -259,12 +272,82 @@ export default function InvoiceSettlement() {
                           : 'no figures recorded'}
                       </span>
                       <Btn sm variant="ghost" disabled={busy}
+                        onClick={() => runIntake(d.id)}>What is this?</Btn>
+                      <Btn sm variant="ghost" disabled={busy}
                         onClick={() => runExtract(d.id)}>Extract fields</Btn>
                       <Btn sm variant="ghost" disabled={busy}
                         onClick={() => (editing === d.id ? setEditing(null) : openEditor(d))}>
                         {editing === d.id ? 'Cancel' : 'Edit figures'}
                       </Btn>
                     </div>
+
+                    {/* ── intake result ─────────────────────────────────── */}
+                    {intake && intake.documentId === d.id && (
+                      <div className="is-intake">
+                        <div className="is-extract-top">
+                          <span className="is-label">
+                            {intake.document.type.replace(/_/g, ' ')} · {intake.document.direction.replace(/_/g, ' ')}
+                          </span>
+                          <StatusBadge tone={
+                            intake.status === 'ready_to_confirm' ? 'success'
+                              : intake.status === 'unsupported' ? 'neutral' : 'warning'}>
+                            {intake.status.replace(/_/g, ' ')}
+                          </StatusBadge>
+                        </div>
+
+                        <p className="is-hint">{intake.document.business_meaning}</p>
+                        {intake.document.direction_reason && (
+                          <p className="is-hint">{intake.document.direction_reason}</p>
+                        )}
+
+                        <ul className="is-intake-kv">
+                          <li><span>Counterparty</span><span>
+                            {intake.counterparty.status === 'matched' ? 'Recognised'
+                              : intake.counterparty.status === 'possible_match' ? 'Possible match — confirm'
+                                : intake.counterparty.status === 'not_found'
+                                  ? `Not found${intake.counterparty.suggested_counterparty?.legal_name ? ` — suggest "${intake.counterparty.suggested_counterparty.legal_name}"` : ''}`
+                                  : 'Needs review'}
+                          </span></li>
+                          <li><span>Suggested record</span><span>
+                            {intake.financial_record.suggested_record_type.replace(/_/g, ' ')}
+                            {intake.financial_record.amount != null
+                              ? ` · ${money(intake.financial_record.amount, intake.financial_record.currency)}` : ''}
+                          </span></li>
+                          <li><span>Tax</span><span>
+                            {intake.tax.tax_status.replace(/_/g, ' ')}
+                            {intake.tax.ppn_amount != null ? ` · PPN ${money(intake.tax.ppn_amount, intake.financial_record.currency)}` : ''}
+                          </span></li>
+                        </ul>
+
+                        {intake.missing_fields?.length > 0 && (
+                          <p className="is-warn">Missing: {intake.missing_fields.join(', ')}.</p>
+                        )}
+                        {(intake.blockers || []).map((b) => <p key={b} className="is-warn">{b}</p>)}
+                        {(intake.warnings || []).slice(0, 3).map((w) => <p key={w} className="is-hint">{w}</p>)}
+
+                        <span className="is-label">Next</span>
+                        <div className="is-actions">
+                          {(intake.next_actions || []).map((a) => (
+                            <Btn key={a.key} sm variant="ghost" disabled={!a.enabled || busy}
+                              title={a.note || ''}
+                              onClick={() => {
+                                if (a.key === 'create_counterparty' || a.key === 'review_counterparty_match'
+                                  || a.key === 'view_counterparty') navigate('/business/counterparties')
+                                else if (a.key === 'create_payable_draft' || a.key === 'link_to_existing_record'
+                                  || a.key === 'create_transaction_draft') navigate('/business/payables')
+                                else if (a.key === 'create_receivable_draft') navigate('/business/receivables')
+                                else if (a.key === 'request_accountant_review') navigate('/business/accountant')
+                                else if (a.key === 'review_fields' || a.key === 'enter_manually') openEditor(d)
+                                else setIntake(null)
+                              }}>{a.label}</Btn>
+                          ))}
+                        </div>
+                        <p className="is-hint">
+                          CFO AI suggests; you confirm. Nothing here has been created — each action
+                          takes you to the step that creates it.
+                        </p>
+                      </div>
+                    )}
 
                     {/* ── extraction review ─────────────────────────────── */}
                     {extract && extract.documentId === d.id && (
