@@ -180,16 +180,38 @@ export function draftOffer(v2, { alreadyLinked = false } = {}) {
 // that is true. On a bank payment proof both sides are named and the issuer is the BANK,
 // so a link there would record something false — offer it, but say why it is held back.
 const ISSUER_IS_COUNTERPARTY = ['invoice', 'faktur_pajak', 'receipt', 'contract'];
+// Documents that genuinely name both sides, so picking one as "the issuer" would be a guess.
+const NAMES_BOTH_PARTIES = ['payment_proof', 'bank_statement'];
+
+// Why a counterparty cannot be attached automatically. Three DIFFERENT situations that
+// were previously collapsed into one sentence — which is how an unreadable scan came to
+// claim it "names more than one party", when in fact nothing was read at all. Each
+// sentence is now only said where it is true.
+const CP_LIMITATION = {
+  unreadable: 'CFO AI could not read who the parties are. Enter the counterparty yourself, '
+    + 'or send it to accountant review.',
+  multiple_parties: 'This document names more than one party, so CFO AI will not attach a '
+    + 'counterparty to it automatically. Link it from the record it belongs to instead.',
+  not_an_issuer_document: 'CFO AI does not attach a counterparty to this kind of document '
+    + 'automatically. Link it from the record it belongs to instead.',
+};
+
 export function counterpartyOffer(v2) {
   if (!v2) return { show: false };
   const linkable = ISSUER_IS_COUNTERPARTY.includes(v2.document_type);
+  // Nothing was read: a scan with no text layer, or text that identified nothing.
+  const unreadable = isUnsupported(v2) || v2.document_type === 'unknown' || !v2.document_type;
+  const reason = linkable ? null
+    : unreadable ? 'unreadable'
+      : NAMES_BOTH_PARTIES.includes(v2.document_type) ? 'multiple_parties'
+        : 'not_an_issuer_document';
   return {
     show: true,
     status: v2.counterparty_status || 'needs_review',
     matchedId: v2.matched_counterparty_id || null,
     canLink: linkable,
-    limitation: linkable ? null
-      : 'This document names more than one party, so CFO AI will not attach a counterparty to it automatically. Link it from the record it belongs to instead.',
+    reason,
+    limitation: reason ? CP_LIMITATION[reason] : null,
   };
 }
 

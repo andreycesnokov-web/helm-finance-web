@@ -125,12 +125,40 @@ t('9/10. an invoice can be linked to a counterparty; a payment proof cannot', ()
   const inv = V.counterpartyOffer(INVOICE);
   assert.strictEqual(inv.canLink, true);
   assert.strictEqual(inv.limitation, null);
+  assert.strictEqual(inv.reason, null);
   assert.strictEqual(inv.status, 'not_found');
 
   const proof = V.counterpartyOffer({ ...INVOICE, document_type: 'payment_proof' });
   assert.strictEqual(proof.show, true, 'the section still appears');
   assert.strictEqual(proof.canLink, false, 'the issuer is the bank, not the counterparty');
+  assert.strictEqual(proof.reason, 'multiple_parties');
   assert.ok(/more than one party/i.test(proof.limitation), proof.limitation);
+});
+
+// Production found this: an unreadable scan claimed it "names more than one party",
+// when in fact no party — and no text — had been read at all.
+t('an unsupported scan says nothing could be READ, not that parties conflicted', () => {
+  const scan = V.counterpartyOffer(SCAN);
+  assert.strictEqual(scan.show, true, 'the section still appears, with manual routes');
+  assert.strictEqual(scan.canLink, false);
+  assert.strictEqual(scan.reason, 'unreadable');
+  assert.ok(/could not read who the parties are/i.test(scan.limitation), scan.limitation);
+  assert.ok(!/more than one party/i.test(scan.limitation),
+    'must not claim it read parties it never read');
+  assert.ok(/accountant review/i.test(scan.limitation), 'and it must offer a way forward');
+});
+
+t('an unrecognised but readable document is also treated as unreadable parties', () => {
+  // document_type 'unknown' means the text identified nothing — same honest answer.
+  const r = V.counterpartyOffer({ ...INVOICE, status: 'needs_accountant_review', document_type: 'unknown' });
+  assert.strictEqual(r.reason, 'unreadable');
+});
+
+t('a document that simply is not issued by a counterparty claims neither', () => {
+  const payroll = V.counterpartyOffer({ ...INVOICE, document_type: 'payroll_document' });
+  assert.strictEqual(payroll.reason, 'not_an_issuer_document');
+  assert.ok(!/more than one party/i.test(payroll.limitation), payroll.limitation);
+  assert.ok(!/could not read/i.test(payroll.limitation), payroll.limitation);
 });
 
 t('a matched counterparty is reported without being linked', () => {
