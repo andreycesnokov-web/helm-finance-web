@@ -53,6 +53,7 @@ export const BUSINESS_NAV = [
     { key: 'payables', label: 'Payables', to: '/business/payables', icon: <Icon.up /> },
     // Always visible — renders a premium locked page when the gate is off (no dead link,
     // no Personal/Funding backend calls, no migrations required).
+    { key: 'counterparties', label: 'Counterparties', to: '/business/counterparties', icon: <Icon.users /> },
     { key: 'funding', label: 'Funding & Investors', to: '/business/funding-investors', icon: <Icon.fund /> },
     { key: 'bankimport', label: 'Bank Import', to: '/business/bank-import', icon: <Icon.bank /> },
     // Read-only view of money that arrived (gateway/bank/manual). Renders an

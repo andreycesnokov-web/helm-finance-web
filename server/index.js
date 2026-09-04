@@ -7959,61 +7959,285 @@ app.delete('/api/cashflow-categories/:id', auth, async (req, res) => {
   }
 });
 
-// GET /api/counterparties — user's counterparties, optional ?q=search
+// ── Counterparty Intelligence V1 ─────────────────────────────────────────────
+// The financial memory for vendors, customers, banks and tax authorities.
+//
+// REQUIRES migration 055 (counterparties identity columns +
+// counterparty_bank_accounts). Reads degrade gracefully if it has not been applied
+// yet — a missing bank-account table yields an empty list rather than a 500 — but
+// writes to the new columns need it. Apply the migration before deploying.
+//
+// WHAT THESE ROUTES NEVER DO:
+//   * create a counterparty implicitly. Extraction and suggestion write nothing;
+//     creating is an explicit POST the user triggers.
+//   * merge two counterparties. A likely duplicate is reported and the create is
+//     refused with the candidates, because merging is effectively irreversible.
+//   * trust a client-supplied business_id. Scope comes from the active workspace.
+const CPI = require('./lib/counterpartyIntelligence');
+
+const CP_ROLES = CPI.ROLES;
+
+// `display_name`/`legal_name` fall back to `name`: rows created by the pre-055
+// route (and by the legacy POST shape) only set `name`.
+function cpPublic(row, accounts) {
+  if (!row) return row;
+  return {
+    id: row.id,
+    business_id: row.business_id,
+    name: row.name,
+    legal_name: row.legal_name || row.name,
+    display_name: row.display_name || row.name,
+    role: row.type || null,
+    type: row.type || null,
+    npwp: row.npwp || null,
+    pkp_status: row.pkp_status || 'unknown',
+    address: row.address || null,
+    email: row.email || null,
+    phone: row.phone || null,
+    notes: row.notes || null,
+    aliases: row.aliases || [],
+    group_name: row.group_name || null,
+    default_category: row.default_category || null,
+    default_tax_treatment: row.default_tax_treatment || null,
+    status: row.status || (row.is_active === false ? 'archived' : 'active'),
+    is_active: row.is_active !== false,
+    source_system: row.source_system || null,
+    external_id: row.external_id || null,
+    external_url: row.external_url || null,
+    last_synced_at: row.last_synced_at || null,
+    bank_accounts: accounts || [],
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+  };
+}
+
+// Bank accounts live in their own table (055). Absent table -> empty list, so the
+// directory still renders on a database where the migration has not run yet.
+async function cpBankAccounts(biz, counterpartyIds) {
+  if (!counterpartyIds || !counterpartyIds.length) return {};
+  try {
+    const { data, error } = await supabase.from('counterparty_bank_accounts')
+      .select('id, counterparty_id, bank_name, account_number, account_name, currency, is_primary')
+      .eq('business_id', biz.business.id).in('counterparty_id', counterpartyIds);
+    if (error) return {};
+    const byCp = {};
+    for (const a of data || []) (byCp[a.counterparty_id] ||= []).push(a);
+    return byCp;
+  } catch { return {}; }
+}
+
+// Everything the matching engine needs, for THIS business only.
+async function cpDirectoryForMatching(biz) {
+  const { data } = await supabase.from('counterparties').select('*').or(bizOrFilter(biz));
+  const rows = data || [];
+  const accounts = await cpBankAccounts(biz, rows.map((r) => r.id));
+  return rows.map((r) => ({ ...r, bank_accounts: accounts[r.id] || [] }));
+}
+
+// GET /api/counterparties — directory. Archived excluded unless asked for.
+// Response shape { counterparties: [...] } is unchanged; existing callers keep working.
 app.get('/api/counterparties', auth, async (req, res) => {
   try {
     const biz = await requireBusiness(req, res);
     if (!biz) return;
-    let query = supabase
-      .from('counterparties')
-      .select('*')
-      .or(bizOrFilter(biz))
-      .eq('is_active', true)
-      .order('name', { ascending: true });
-    if (req.query.q) query = query.ilike('name', `%${req.query.q}%`);
-    const { data, error } = await query;
+    let q = supabase.from('counterparties').select('*').or(bizOrFilter(biz));
+    if (req.query.q) q = q.ilike('name', `%${String(req.query.q).trim()}%`);
+    const { data, error } = await q.order('name', { ascending: true });
     if (error) throw error;
-    res.json({ counterparties: data || [] });
+
+    const includeArchived = /^(1|true|yes)$/i.test(String(req.query.include_archived || ''));
+    const rows = (data || []).filter((r) =>
+      includeArchived || (r.status !== 'archived' && r.is_active !== false));
+    const accounts = await cpBankAccounts(biz, rows.map((r) => r.id));
+    res.json({ counterparties: rows.map((r) => cpPublic(r, accounts[r.id])) });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
 });
 
-// POST /api/counterparties — create counterparty
-app.post('/api/counterparties', auth, async (req, res) => {
+// GET /api/counterparties/:id — one record with its bank accounts.
+app.get('/api/counterparties/:id', auth, async (req, res) => {
   try {
-    const userId = req.user.userId;
-    const { name, group_name, type, email, phone, notes } = req.body;
-    if (!name) return res.status(400).json({ error: 'name required' });
     const biz = await requireBusiness(req, res);
     if (!biz) return;
-    const { data, error } = await supabase
-      .from('counterparties')
-      .insert({ user_id: biz.ownerUserId, business_id: biz.business.id, name, group_name: group_name || null, type: type || null, email: email || null, phone: phone || null, notes: notes || null })
-      .select()
-      .single();
-    if (error) throw error;
-    res.json({ counterparty: data });
+    const { data } = await supabase.from('counterparties').select('*')
+      .eq('id', req.params.id).or(bizOrFilter(biz)).limit(1);
+    const row = data?.[0];
+    if (!row) return res.status(404).json({ error: 'counterparty_not_found_in_this_business' });
+    const accounts = await cpBankAccounts(biz, [row.id]);
+    res.json({ counterparty: cpPublic(row, accounts[row.id]) });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
 });
 
-// PATCH /api/counterparties/:id
+// POST /api/counterparties — create, after a duplicate check.
+// Accepts the legacy body ({ name }) and the V1 body. Duplicate candidates are
+// returned with 409 rather than merged; `create_new_anyway: true` is the explicit
+// override, and it is audited.
+app.post('/api/counterparties', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    const b = req.body || {};
+    const name = (b.legal_name || b.name || b.display_name || '').trim();
+    if (!name) return res.status(400).json({ error: 'name is required' });
+    if (b.role && !CP_ROLES.includes(b.role))
+      return res.status(400).json({ error: 'invalid_role', allowed: CP_ROLES });
+    if (b.pkp_status && !['unknown', 'pkp', 'non_pkp'].includes(b.pkp_status))
+      return res.status(400).json({ error: 'invalid_pkp_status' });
+
+    const bankAccounts = Array.isArray(b.bank_accounts) ? b.bank_accounts : [];
+    const candidate = {
+      legal_name: name, display_name: b.display_name || name,
+      npwp: b.npwp || null, aliases: b.aliases || [],
+      bank_accounts: bankAccounts, email: b.email || null,
+    };
+
+    if (!b.create_new_anyway) {
+      const dup = CPI.findDuplicates(candidate, await cpDirectoryForMatching(biz));
+      if (dup.blocking) {
+        return res.status(409).json({
+          error: 'possible_duplicate_counterparty',
+          message: dup.message,
+          matched_counterparty_id: dup.matched_counterparty_id || null,
+          possible_matches: dup.possible_matches || [],
+          reasons: dup.reasons,
+          hint: 'Link to the existing counterparty, or resend with create_new_anyway: true.',
+        });
+      }
+    }
+
+    const row = {
+      user_id: biz.ownerUserId, business_id: biz.business.id,
+      name, legal_name: name, display_name: b.display_name || name,
+      group_name: b.group_name || null, type: b.role || b.type || null,
+      email: b.email || null, phone: b.phone || null, notes: b.notes || null,
+      npwp: b.npwp || null, pkp_status: b.pkp_status || 'unknown',
+      address: b.address || null,
+      aliases: Array.isArray(b.aliases) && b.aliases.length ? b.aliases : null,
+      default_category: b.default_category || null,
+      default_tax_treatment: b.default_tax_treatment || null,
+      status: 'active',
+      source_system: b.source_system || null, external_id: b.external_id || null,
+      external_url: b.external_url || null,
+    };
+    const { data, error } = await supabase.from('counterparties').insert(row).select().single();
+    if (error) {
+      console.error(`[counterparties] create failed: ${error.message}`);
+      return res.status(500).json({ error: error.message });
+    }
+
+    const created = [];
+    for (const a of bankAccounts) {
+      const number = a && (a.account_number || a.number);
+      if (!number) continue;
+      const { data: acct, error: aErr } = await supabase.from('counterparty_bank_accounts').insert({
+        business_id: biz.business.id, counterparty_id: data.id,
+        bank_name: a.bank_name || null, account_number: String(number),
+        account_name: a.account_name || null, currency: a.currency || 'IDR',
+        is_primary: !!a.is_primary, created_by_user_id: req.user.userId,
+      }).select().single();
+      if (!aErr && acct) created.push(acct);
+    }
+
+    await recordAudit({
+      businessId: biz.business.id, actorUserId: req.user.userId, actorRole: biz.role,
+      entityType: 'counterparty', entityId: data.id,
+      action: b.create_new_anyway ? 'counterparty_created_duplicate_override' : 'counterparty_created',
+      after: data,
+    });
+    res.json({ counterparty: cpPublic(data, created) });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// PATCH /api/counterparties/:id — edit.
+//
+// ISOLATION FIX: this route previously scoped by `.eq('user_id', userId)` while GET
+// and POST scoped by business. For a user who owns two businesses that read the
+// wrong set. It is now business-scoped like its siblings, and the row is verified
+// to belong to the active business before anything is written.
 app.patch('/api/counterparties/:id', auth, async (req, res) => {
   try {
-    const userId = req.user.userId;
-    const { name, group_name, type, email, phone, notes, is_active } = req.body;
-    const { data, error } = await supabase
-      .from('counterparties')
-      .update({ name, group_name, type, email, phone, notes, is_active, updated_at: new Date().toISOString() })
-      .eq('id', req.params.id)
-      .eq('user_id', userId)
-      .select()
-      .single();
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    const { data: rows } = await supabase.from('counterparties').select('*')
+      .eq('id', req.params.id).or(bizOrFilter(biz)).limit(1);
+    const existing = rows?.[0];
+    if (!existing) return res.status(404).json({ error: 'counterparty_not_found_in_this_business' });
+
+    const b = req.body || {};
+    if (b.role && !CP_ROLES.includes(b.role))
+      return res.status(400).json({ error: 'invalid_role', allowed: CP_ROLES });
+    if (b.pkp_status && !['unknown', 'pkp', 'non_pkp'].includes(b.pkp_status))
+      return res.status(400).json({ error: 'invalid_pkp_status' });
+
+    const patch = { updated_at: new Date().toISOString() };
+    const setIf = (key, val) => { if (val !== undefined) patch[key] = val; };
+    setIf('name', b.legal_name ?? b.name);
+    setIf('legal_name', b.legal_name ?? b.name);
+    setIf('display_name', b.display_name);
+    setIf('group_name', b.group_name);
+    setIf('type', b.role ?? b.type);
+    setIf('email', b.email);
+    setIf('phone', b.phone);
+    setIf('notes', b.notes);
+    setIf('npwp', b.npwp);
+    setIf('pkp_status', b.pkp_status);
+    setIf('address', b.address);
+    setIf('aliases', b.aliases);
+    setIf('default_category', b.default_category);
+    setIf('default_tax_treatment', b.default_tax_treatment);
+    setIf('source_system', b.source_system);
+    setIf('external_id', b.external_id);
+    setIf('external_url', b.external_url);
+    if (b.is_active !== undefined) {
+      patch.is_active = !!b.is_active;
+      patch.status = b.is_active ? 'active' : 'archived';
+    }
+
+    const { data, error } = await supabase.from('counterparties')
+      .update(patch).eq('id', existing.id).eq('business_id', existing.business_id)
+      .select().single();
     if (error) throw error;
-    if (!data) return res.status(404).json({ error: 'Counterparty not found' });
-    res.json({ counterparty: data });
+
+    await recordAudit({
+      businessId: biz.business.id, actorUserId: req.user.userId, actorRole: biz.role,
+      entityType: 'counterparty', entityId: existing.id,
+      action: 'counterparty_updated', before: existing, after: data,
+    });
+    const accounts = await cpBankAccounts(biz, [existing.id]);
+    res.json({ counterparty: cpPublic(data, accounts[existing.id]) });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// POST /api/counterparties/:id/archive — soft archive. Nothing is deleted, and the
+// record stays linked to whatever history already references it.
+app.post('/api/counterparties/:id/archive', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    const { data: rows } = await supabase.from('counterparties').select('*')
+      .eq('id', req.params.id).or(bizOrFilter(biz)).limit(1);
+    const existing = rows?.[0];
+    if (!existing) return res.status(404).json({ error: 'counterparty_not_found_in_this_business' });
+
+    const archive = req.body && req.body.unarchive ? false : true;
+    const { data, error } = await supabase.from('counterparties')
+      .update({ status: archive ? 'archived' : 'active', is_active: !archive,
+        updated_at: new Date().toISOString() })
+      .eq('id', existing.id).eq('business_id', existing.business_id).select().single();
+    if (error) throw error;
+    await recordAudit({
+      businessId: biz.business.id, actorUserId: req.user.userId, actorRole: biz.role,
+      entityType: 'counterparty', entityId: existing.id,
+      action: archive ? 'counterparty_archived' : 'counterparty_unarchived', after: data,
+    });
+    res.json({ counterparty: cpPublic(data, []) });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -13093,6 +13317,66 @@ app.post('/api/documents/:id/extract', auth, async (req, res) => {
   } catch (e) {
     console.error(`[doc-extract] failed: ${e.message}`);
     res.status(500).json({ ok: false, error: 'document_extract_failed' });
+  }
+});
+
+// POST /api/documents/:id/counterparty-suggestion — who is the other party here?
+//
+// ZERO-WRITE. Reads the document's embedded text, works out which side is the
+// counterparty, matches against this business's directory, and returns either a
+// recognised record, possible matches, or a suggested new profile. Creating
+// remains an explicit POST /api/counterparties the user triggers.
+app.post('/api/documents/:id/counterparty-suggestion', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res); if (!biz) return;
+    if (!canViewBusinessFinance(biz.role))
+      return res.status(403).json({ error: 'Your role cannot view business finance' });
+    if (!await hasDocumentsAccess(biz))
+      return res.status(403).json({ error: 'Document Center is not enabled', upgrade_required: true });
+
+    const doc = await loadDocumentScoped(biz, req.params.id);
+    if (!doc) return res.status(404).json({ error: 'document_not_found_in_this_business' });
+    if (doc.archived_at) return res.status(409).json({ error: 'document_archived' });
+
+    const { data: fileRows } = await supabase.from('document_files')
+      .select('id, storage_path, file_name, mime_type')
+      .eq('id', doc.file_id).eq('business_id', biz.business.id).limit(1);
+    const file = fileRows?.[0];
+    if (!file) return res.status(404).json({ error: 'file_not_found' });
+
+    const { data: blob, error: dlErr } = await supabase.storage.from(DOC_BUCKET).download(file.storage_path);
+    if (dlErr || !blob) return res.status(503).json({ error: 'document_unavailable' });
+    const buf = Buffer.from(await blob.arrayBuffer());
+    const isPdf = /pdf/i.test(file.mime_type || '') || /\.pdf$/i.test(file.file_name || '');
+    const ex = isPdf ? extractPdfText(buf)
+      : { text: '', text_available: false, method: 'not_a_pdf', reason: 'not_a_pdf' };
+    const extraction = docExtract.extractFromText(ex.text, {
+      text_available: ex.text_available, document_type: doc.document_type,
+      file_name: file.file_name, extraction_reason: ex.reason,
+    });
+
+    const suggestion = CPI.suggestFromDocument(extraction, { business_name: biz.business?.name });
+    const match = CPI.matchCounterparty(suggestion.suggested_counterparty, await cpDirectoryForMatching(biz));
+
+    res.json({
+      ok: true, business_id: biz.business.id, document_id: doc.id,
+      saved: false,                       // nothing was created
+      text_source: { available: ex.text_available, reason: ex.reason },
+      extraction_status: extraction.status,
+      status: match.status,               // matched | possible_match | not_found
+      confidence: match.confidence,
+      matched_counterparty_id: match.matched_counterparty_id,
+      possible_matches: match.possible_matches,
+      match_reasons: match.match_reasons,
+      suggested_counterparty: suggestion.suggested_counterparty,
+      direction: suggestion.direction,
+      role_reason: suggestion.role_reason,
+      warnings: [...suggestion.warnings, ...match.warnings],
+      requires_confirmation: true,
+    });
+  } catch (e) {
+    console.error(`[counterparty-suggestion] failed: ${e.message}`);
+    res.status(500).json({ ok: false, error: 'counterparty_suggestion_failed' });
   }
 });
 
