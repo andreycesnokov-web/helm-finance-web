@@ -33,6 +33,7 @@ import {
   intakeOf, intakeBadges, intakeHeadline, intakeRowLines, intakeCopy, storedVsSuggested,
   typeLabelOf as intakeTypeLabel, directionLabelOf, statusLabelOf, nextActionLabels,
   draftOffer, counterpartyOffer, isUnsupported,
+  uploadIntentOf, readSourceLabel, conflictMessage,
 } from './documentIntakeView'
 import './Documents.css'
 
@@ -268,9 +269,14 @@ export function IntakeRowSummary({ doc, onAnalyze, analyzing }) {
           <StatusBadge key={b.key} tone={b.tone}>{b.label}</StatusBadge>
         ))}
       </span>
-      {pair.showPair && (
-        <span className="doc-ai-pair">Stored type: {pair.storedLabel} · AI suggestion: {pair.suggestedLabel}</span>
+      {(pair.showPair || pair.showUploadedAs) && (
+        <span className="doc-ai-pair">
+          Stored type: {pair.storedLabel}
+          {pair.showUploadedAs && <> · Uploaded as: {pair.uploadedAs}</>}
+          {pair.showPair && <> · AI suggestion: {pair.suggestedLabel}</>}
+        </span>
       )}
+      {pair.conflict && <span className="doc-ai-conflict">{conflictMessage(doc)}</span>}
       {intakeRowLines(v2).map((l) => <span key={l} className="doc-ai-line">{l}</span>)}
     </div>
   )
@@ -706,14 +712,28 @@ export function IntakeResult({
   const cpOffer = counterpartyOffer(v2)
   const matchedName = cpOffer.matchedId ? cpName?.(cpOffer.matchedId) : null
 
+  const intent = uploadIntentOf(doc)
+  const conflict = conflictMessage(doc)
+
   return (
     <RpCol label="AI Intake Result" emphasis>
       <p className={`rp-note ${unsupported ? 'rp-note-amber' : ''}`}>{intakeCopy(v2)}</p>
+
+      {/* Three separate readings, never merged: the column a person owns, what the user
+          said they were uploading, and what the document itself says. */}
+      <div className="rp-kv"><span>Stored type</span><span>{typeLabel(doc.document_type)}</span></div>
+      {intent && (
+        <div className="rp-kv"><span>Uploaded as</span><span>{intent.label}</span></div>
+      )}
+      {conflict && <p className="rp-note rp-note-amber">{conflict}</p>}
 
       <div className="rp-kv"><span>Document type suggestion</span>
         <span>{intakeTypeLabel(v2.document_type) || <em className="rp-miss">Unrecognised</em>}</span></div>
       <div className="rp-kv"><span>Confidence</span>
         <span>{String(v2.confidence || 'needs review').replace(/_/g, ' ')}</span></div>
+      {readSourceLabel(v2) && (
+        <div className="rp-kv"><span>Read by</span><span>{readSourceLabel(v2)}</span></div>
+      )}
       <div className="rp-kv"><span>Direction</span>
         <span>{directionLabelOf(v2.direction) || <em className="rp-miss">Unknown</em>}</span></div>
       {v2.business_meaning && (

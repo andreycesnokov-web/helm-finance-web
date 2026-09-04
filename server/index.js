@@ -12586,7 +12586,9 @@ const docIntake = require('./lib/documentIntake');
 const docContent = require('./lib/documentContent');
 const { extractPdfText } = require('./lib/pdfText');
 const docExtract = require('./lib/documentExtraction');
-const { publicIntakeV2 } = require('./lib/documentPublicView');
+const docOcr = require('./lib/documentOcr');
+const uploadIntentLib = require('./lib/uploadIntent');
+const { publicIntakeV2, publicUploadIntent } = require('./lib/documentPublicView');
 
 const INTAKE_DOC_CAP = 500;
 
@@ -12707,6 +12709,9 @@ const publicExtractedJson = (ej) => {
     // Without this the Document Center could not show what intake concluded, so a
     // recognised invoice still read as "Unclassified".
     ai_intake_v2: publicIntakeV2(ej.ai_intake_v2),
+    // Which screen the upload came from. The UI shows it beside the AI's reading so a
+    // disagreement is visible instead of silently resolved.
+    upload_intent: publicUploadIntent(ej.upload_intent),
   };
 };
 const publicDocRow = (d) => (d ? { ...d, extracted_json: publicExtractedJson(d.extracted_json) } : d);
@@ -13091,6 +13096,10 @@ app.post('/api/documents/upload-complete', auth, async (req, res) => {
       gross_amount: (b.amount != null && isFinite(Number(b.amount))) ? Number(b.amount) : null,
       extracted_json: notes ? { notes } : null,
     };
+    // Which screen the upload came from. Review metadata only: it never becomes the
+    // document_type column, and an unrecognised value is discarded rather than stored.
+    const intentRow = uploadIntentLib.buildUploadIntent(b.upload_source, { declaredType: b.document_type });
+    if (intentRow) pDoc.extracted_json = { ...(pDoc.extracted_json || {}), upload_intent: intentRow };
     // ── Phase 2: content-based classification, best effort ──────────────────
     // The verified bytes are already in memory, so no second storage read is needed.
     // Never blocks or fails the upload: on any problem this falls back to the Phase 1
@@ -13342,10 +13351,36 @@ async function runDocumentIntake(biz, doc, opts = {}) {
   const isPdf = /pdf/i.test(file.mime_type || '') || /\.pdf$/i.test(file.file_name || '');
   const ex = isPdf ? extractPdfText(buf)
     : { text: '', text_available: false, method: 'not_a_pdf', reason: 'not_a_pdf' };
-  const extraction = docExtract.extractFromText(ex.text, {
+  let extraction = docExtract.extractFromText(ex.text, {
     text_available: ex.text_available, document_type: doc.document_type,
     file_name: file.file_name, extraction_reason: ex.reason,
   });
+
+  // ── OCR / Vision fallback ────────────────────────────────────────────────
+  // Embedded text first, always: it is free, deterministic and exact. Vision runs ONLY
+  // when there was no text to read, so a readable PDF never costs a vision call and its
+  // result can never be overridden by a model's reading of the same page.
+  //
+  // Gated by DOCUMENT_OCR_VISION_ENABLED. Fail-open throughout: readDocumentWithVision
+  // never throws, and a result that is not `ok` leaves `extraction` exactly as the
+  // no-text path produced it — the same "unsupported" answer as before OCR existed.
+  let readSource = ex.text_available ? 'embedded_text' : 'filename_only';
+  let ocr = null;
+  if (!ex.text_available && docOcr.ocrEnabled()) {
+    ocr = await docOcr.readDocumentWithVision(buf, {
+      mime_type: file.mime_type, file_name: file.file_name, client: anthropic,
+    });
+    if (ocr.ok && (ocr.text || ocr.document_type !== 'unknown')) {
+      // Re-run the SAME parser over the transcript, then let the reader's own structured
+      // fields fill what the parser could not find. One extraction shape downstream, so
+      // the orchestrator, the UI and the tests do not care which reader produced it.
+      const fromText = docExtract.extractFromText(ocr.text, {
+        text_available: !!ocr.text, document_type: doc.document_type, file_name: file.file_name,
+      });
+      extraction = docOcr.mergeIntoExtraction(fromText, ocr);
+      readSource = 'ocr_vision';
+    }
+  }
 
   // Counterparty directory + anything this document is already attached to. Both are
   // business-scoped reads; a failure degrades to "unknown" rather than a 500.
@@ -13382,6 +13417,10 @@ async function runDocumentIntake(biz, doc, opts = {}) {
   const intake = intakeOrchestrator.processDocument({
     document: doc, extraction, businessName: biz.business?.name,
     counterparties, existingLinks, taxRules,
+    // What the user said they were uploading, kept from upload-complete. It is a hint
+    // and a cross-check — never a classification.
+    uploadIntent: (doc.extracted_json || {}).upload_intent || null,
+    readSource, ocr,
   });
 
   let stored = false;

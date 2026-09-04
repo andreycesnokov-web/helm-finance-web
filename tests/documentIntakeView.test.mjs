@@ -167,6 +167,82 @@ t('a matched counterparty is reported without being linked', () => {
   assert.strictEqual(m.matchedId, 'cp-1');
 });
 
+/* ── 19. stored type / uploaded as / AI suggestion, as three things ─────────── */
+const intent = (source = 'invoice_upload', label = 'Invoice', type = 'invoice') => ({
+  source, label, suggested_document_type: type, suggested_direction: null,
+  created_at: '2026-09-04T10:00:00.000Z',
+});
+const docWith = (v2, up, extra = {}) => ({
+  document_type: 'other',
+  extracted_json: { ...(v2 ? { ai_intake_v2: v2 } : {}), ...(up ? { upload_intent: up } : {}) },
+  ...extra,
+});
+
+t('19. all three readings are shown separately, never merged', () => {
+  const p = V.storedVsSuggested(docWith({ ...INVOICE, document_type: 'receipt' }, intent()), 'Unclassified');
+  assert.strictEqual(p.storedLabel, 'Unclassified');
+  assert.strictEqual(p.uploadedAs, 'Invoice');
+  assert.strictEqual(p.suggestedLabel, 'Receipt');
+  assert.strictEqual(p.showUploadedAs, true);
+  assert.strictEqual(p.showPair, true);
+});
+
+t('1/2. the upload intent is read back and never becomes the stored type', () => {
+  const d = docWith(INVOICE, intent());
+  assert.strictEqual(V.uploadIntentOf(d).source, 'invoice_upload');
+  assert.strictEqual(d.document_type, 'other', 'the column is untouched by intent');
+});
+
+t('an unreadable scan still shows what it was uploaded as', () => {
+  // The only thing known about the document — so it is exactly when intent matters most.
+  const p = V.storedVsSuggested(docWith(SCAN, intent()), 'Unclassified');
+  assert.strictEqual(p.showUploadedAs, true);
+  assert.strictEqual(p.uploadedAs, 'Invoice');
+  assert.strictEqual(p.showPair, false, 'and no AI suggestion is invented');
+});
+
+t('once a person has classified it, neither hint second-guesses them', () => {
+  const p = V.storedVsSuggested(docWith(INVOICE, intent(), { document_type: 'vendor_invoice' }), 'Supplier invoice');
+  assert.strictEqual(p.showPair, false);
+  assert.strictEqual(p.showUploadedAs, false);
+});
+
+/* ── 9. the conflict ────────────────────────────────────────────────────────── */
+t('9. uploaded as Invoice but read as Receipt is surfaced as a conflict', () => {
+  const d = docWith({ ...INVOICE, document_type: 'receipt', intent_conflict: true }, intent());
+  assert.strictEqual(V.storedVsSuggested(d, 'Unclassified').conflict, true);
+  const msg = V.conflictMessage(d);
+  assert.ok(/Uploaded as Invoice/.test(msg), msg);
+  assert.ok(/reads this as Receipt/.test(msg), msg);
+  assert.ok(/confirm/i.test(msg), 'the user decides, the system does not');
+});
+
+t('no conflict flag means no conflict sentence', () => {
+  assert.strictEqual(V.conflictMessage(docWith(INVOICE, intent())), null);
+  assert.strictEqual(V.conflictMessage(docWith(INVOICE, null)), null);
+});
+
+/* ── 5/6. OCR disclosure ────────────────────────────────────────────────────── */
+t('5. a document read by vision says so, rather than claiming it read text', () => {
+  const v2 = { ...INVOICE, source: 'ocr_vision', document_type: 'receipt' };
+  assert.strictEqual(V.wasReadByOcr(v2), true);
+  assert.strictEqual(V.intakeCopy(v2), V.OCR_READ_COPY);
+  assert.ok(/OCR\/Vision read this document/.test(V.intakeCopy(v2)));
+  assert.strictEqual(V.readSourceLabel(v2), 'Read by OCR/Vision');
+});
+
+t('6. with OCR off, a scan says so and points at the manual routes', () => {
+  const copy = V.intakeCopy({ ...SCAN, source: 'filename_only' });
+  assert.strictEqual(copy, V.UNSUPPORTED_COPY);
+  assert.ok(/OCR\/Vision is not enabled yet/.test(copy), copy);
+  assert.ok(/manually|accountant review/i.test(copy), copy);
+});
+
+t('embedded text is still labelled as the source it is', () => {
+  assert.strictEqual(V.readSourceLabel({ ...INVOICE, source: 'embedded_text' }), 'Read from the document text');
+  assert.strictEqual(V.readSourceLabel(INVOICE), null, 'an older summary without a source says nothing');
+});
+
 /* ── 5/6. the analyze button ────────────────────────────────────────────────── */
 t('5. a stored run says the analysis was updated', () => {
   assert.strictEqual(V.analyzeMessage({ stored: true }), 'Analysis updated.');

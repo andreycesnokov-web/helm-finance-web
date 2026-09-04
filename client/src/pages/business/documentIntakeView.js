@@ -20,6 +20,19 @@
 
 export const intakeOf = (d) => d?.extracted_json?.ai_intake_v2 || null;
 
+/** What the user said they were uploading, kept from the screen they used. */
+export const uploadIntentOf = (d) => d?.extracted_json?.upload_intent || null;
+
+/** How the fields in front of us were obtained. */
+export const READ_SOURCE_LABEL = {
+  embedded_text: 'Read from the document text',
+  ocr_vision: 'Read by OCR/Vision',
+  filename_only: 'Not read — file name only',
+  manual: 'Set by a person',
+};
+export const readSourceLabel = (v2) => READ_SOURCE_LABEL[v2?.source] || null;
+export const wasReadByOcr = (v2) => v2?.source === 'ocr_vision';
+
 /** Legacy intake (documentIntake.js). Still shown for vault classification; distinct thing. */
 export const legacyIntakeOf = (d) => d?.extracted_json?.ai_intake || null;
 
@@ -110,7 +123,9 @@ export function intakeRowLines(v2) {
 
 /* ── the copy ──────────────────────────────────────────────────────────────── */
 
-export const UNSUPPORTED_COPY = 'Automatic extraction needs OCR/Vision. Enter values manually for now.';
+export const UNSUPPORTED_COPY = 'This looks like a scanned document. OCR/Vision is not enabled yet. '
+  + 'Enter fields manually or request accountant review.';
+export const OCR_READ_COPY = 'OCR/Vision read this document. Please review before creating records.';
 
 /** The sentence at the top of the intake result. Never states a fact it does not have. */
 export function intakeCopy(v2) {
@@ -118,21 +133,46 @@ export function intakeCopy(v2) {
   if (isUnsupported(v2)) return UNSUPPORTED_COPY;
   const t = typeLabelOf(v2.document_type);
   if (!t || v2.document_type === 'unknown') return 'CFO AI could not tell what this document is. Please review it.';
+  // A vision reading is disclosed as one: the user should weigh a photographed page
+  // differently from text the document actually carries.
+  if (wasReadByOcr(v2)) return OCR_READ_COPY;
   const article = /^[aeiou]/i.test(t) ? 'an' : 'a';
   return `AI thinks this is ${article} ${t.toLowerCase()}. Please review before creating records.`;
 }
 
-/** Shown when the stored column and the suggestion disagree — both, never merged. */
+/** Shown when the stored column and the suggestion disagree — both, never merged.
+ *
+ *  Three separate concepts, deliberately never collapsed into one label:
+ *    · stored     — the column a person owns. Only a human writes it.
+ *    · uploadedAs — what the user believed when they chose the upload screen.
+ *    · suggested  — what the reader made of the document itself.
+ *  Any of the three can be right, so the UI shows whichever are known. */
 export function storedVsSuggested(doc, storedLabel) {
   const v2 = intakeOf(doc);
+  const intent = uploadIntentOf(doc);
   const suggested = v2 ? typeLabelOf(v2.document_type) : null;
   const storedIsBlank = !doc?.document_type || doc.document_type === 'other';
+  const uploadedAs = intent?.label || null;
   return {
     storedLabel,
+    uploadedAs,
     suggestedLabel: suggested,
+    conflict: !!v2?.intent_conflict,
     // Only worth showing the pair when the AI actually adds something the column lacks.
     showPair: !!(storedIsBlank && suggested && v2.document_type !== 'unknown'),
+    // The upload intent is worth showing whenever the column is still blank — including
+    // for a scan the reader could not classify, where it is the only thing known.
+    showUploadedAs: !!(uploadedAs && storedIsBlank),
   };
+}
+
+/** The sentence for a disagreement. Names both readings; decides nothing. */
+export function conflictMessage(doc) {
+  const v2 = intakeOf(doc);
+  const intent = uploadIntentOf(doc);
+  if (!v2?.intent_conflict || !intent) return null;
+  return `Uploaded as ${intent.label}, but CFO AI reads this as ${typeLabelOf(v2.document_type)}. `
+    + 'Please confirm the correct workflow before anything is created.';
 }
 
 /* ── next actions ──────────────────────────────────────────────────────────── */

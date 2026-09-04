@@ -24,6 +24,7 @@
 const docExtract = require('./documentExtraction');
 const CPI = require('./counterpartyIntelligence');
 const { parseAmount } = require('./invoiceSettlement');
+const INTENT = require('./uploadIntent');
 
 /** Terminal states. Every document lands on exactly one. */
 const STATUSES = [
@@ -49,6 +50,14 @@ const MEANING = {
   asset_purchase: 'A purchase that may be a capital asset rather than an expense.',
   funding_document: 'Financing, not trading. Never operating revenue or expense.',
   unknown: 'Not recognised from the text available.',
+};
+
+// Plain words for the conflict sentence: "reads this as a Faktur Pajak", not "faktur_pajak".
+const TYPE_WORD = {
+  invoice: 'an Invoice', faktur_pajak: 'a Faktur Pajak', payment_proof: 'a Payment proof',
+  receipt: 'a Receipt / Kwitansi', contract: 'a Contract', bank_statement: 'a Bank statement',
+  tax_document: 'a Tax document', payroll_document: 'a Payroll document', bank_fee: 'a Bank fee',
+  asset_purchase: 'an Asset purchase', funding_document: 'a Funding document', unknown: 'unrecognised',
 };
 
 const RECORD_BY_TYPE = {
@@ -154,6 +163,22 @@ function assessTax(type, fields, opts = {}) {
   return out;
 }
 
+/* Why a scan could not be read. The two cases need different sentences: if vision is
+   simply switched off, saying "needs OCR/Vision" tells the operator what to turn on; if
+   vision RAN and still failed, repeating that would be misleading. */
+function ocrBlockerFor(input = {}) {
+  const ocr = input.ocr || null;
+  if (!ocr || ocr.reason === 'ocr_disabled' || ocr.reason === 'ocr_not_configured') {
+    return 'This looks like a scanned document. OCR/Vision is not enabled yet. '
+      + 'Enter fields manually or request accountant review.';
+  }
+  if (ocr.reason === 'file_too_large_for_ocr') {
+    return 'This document is too large to read automatically. Enter the values manually.';
+  }
+  return 'CFO AI tried to read this document automatically and could not. '
+    + 'Enter the values manually or request accountant review.';
+}
+
 /* ── the pipeline ──────────────────────────────────────────────────────────*/
 
 /**
@@ -174,6 +199,12 @@ function processDocument(input = {}) {
   const links = input.existingLinks || {};
   const alreadyLinked = (links.debt_ids || []).length > 0 || (links.transaction_ids || []).length > 0;
 
+  // How the fields in front of us were obtained. 'manual' outranks everything: once a
+  // human has classified the document, no reader gets to contradict them.
+  const readSource = doc.document_type && doc.document_type !== 'other' ? 'manual'
+    : (input.readSource || (ex.reason || ex.text_available === false ? 'filename_only' : 'embedded_text'));
+  const intent = input.uploadIntent || null;
+
   const warnings = [...(ex.warnings || [])];
   const blockers = [];
   const next = [];
@@ -185,9 +216,15 @@ function processDocument(input = {}) {
   // further down. extractFromText sets `reason` only on the no-text path.
   const noTextAtAll = !!ex.reason || ex.text_available === false;
   if (noTextAtAll) {
+    // Nothing was read, so nothing can contradict the upload intent — but the intent
+    // itself is still worth carrying, because it is the only thing known about this
+    // document and it is what the manual form should be pre-set to.
     return {
       document_id: doc.id || null,
       status: 'unsupported',
+      source: readSource,
+      upload_intent: intent,
+      intent_conflict: false,
       document: { type: ex.document_type || 'unknown', confidence: 'needs_review',
         direction: 'unknown', business_meaning: MEANING.unknown },
       counterparty: { status: 'needs_review', suggested_role: null, matched_counterparty_id: null, suggested_counterparty: null },
@@ -198,7 +235,7 @@ function processDocument(input = {}) {
         { key: 'enter_manually', label: 'Enter the values manually', enabled: true },
         { key: 'request_accountant_review', label: 'Send to accountant review', enabled: true },
       ],
-      blockers: ['Automatic extraction needs OCR/Vision for a scanned document. Enter values manually for now.'],
+      blockers: [ocrBlockerFor(input)],
       warnings,
       requires_confirmation: true,
     };
@@ -298,9 +335,23 @@ function processDocument(input = {}) {
   next.push({ key: 'save_document_only', label: 'Save as supporting document', enabled: true });
   next.push({ key: 'request_accountant_review', label: 'Send to accountant review', enabled: true });
 
+  // The user said what they were uploading; the document says what it is. When those
+  // disagree, BOTH are reported and neither is acted on — the upload button a person
+  // pressed is not evidence about the paper in front of them.
+  const conflict = INTENT.detectIntentConflict(intent, type, { unsupported: false });
+  if (conflict) {
+    blockers.push(INTENT.intentConflictMessage(intent, type, (t) => TYPE_WORD[t] || t));
+    if (!next.some((a) => a.key === 'review_fields')) {
+      next.unshift({ key: 'review_fields', label: 'Confirm what this document is', enabled: true });
+    }
+  }
+
   return {
     document_id: doc.id || null,
     status,
+    source: readSource,
+    upload_intent: intent,
+    intent_conflict: conflict,
     document: {
       type,
       confidence: ex.confidence || 'needs_review',
@@ -341,6 +392,10 @@ function toStoredIntake(result, opts = {}) {
   return {
     version: 'intake-v1',
     status: result.status,
+    // How the fields were obtained, and whether the reading contradicts the upload.
+    // Both are review state, so they belong with the rest of the summary.
+    source: result.source || null,
+    intent_conflict: !!result.intent_conflict,
     document_type: result.document.type,
     confidence: result.document.confidence,
     direction: result.document.direction,
