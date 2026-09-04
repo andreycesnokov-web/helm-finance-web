@@ -524,9 +524,15 @@ test('H8. the generic /api/documents endpoints do not leak extraction internals'
   const doc = list.body.documents.find(d => d.id === contentDocId);
   assert.ok(doc, 'the document is listed');
   if (doc.extracted_json) {
-    assert.deepStrictEqual(Object.keys(doc.extracted_json).sort(), ['ai_intake', 'notes']);
+    // ai_intake_v2 joined the whitelist so the Document Center can show what the intake
+    // pipeline concluded; it is itself a field-by-field whitelist of review metadata
+    // (server/lib/documentPublicView.js). The key set stays pinned here on purpose —
+    // adding a third key must be a deliberate decision, not a side effect.
+    assert.deepStrictEqual(Object.keys(doc.extracted_json).sort(), ['ai_intake', 'ai_intake_v2', 'notes']);
     assert.ok(!('classified_at' in (doc.extracted_json.ai_intake || {})), 'internals stay private');
     assert.ok(!('extraction_ms' in (doc.extracted_json.ai_intake || {})));
+    // No intake has run for this document, so the new key carries nothing.
+    assert.strictEqual(doc.extracted_json.ai_intake_v2, null);
   }
 
   const detail = await call('GET', `/api/documents/${contentDocId}`, { userId: OWNER, businessId: BIZ_A });

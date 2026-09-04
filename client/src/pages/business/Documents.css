@@ -218,3 +218,46 @@
    inside a drawer becomes an unusable scroll on a wide screen). */
 .doc-pick-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px; }
 .doc-drawer .doc-pick-grid { grid-template-columns: 1fr; }
+
+/* ── AI intake on a document row ──────────────────────────────────────────────
+   The summary the Document Intake Orchestrator stored. It sits under the row head,
+   above the existing field line, so scanning the queue answers "what is this and what
+   does it need?" without opening anything. */
+.doc-ai-row { display: flex; flex-direction: column; gap: 4px; margin: 6px 0 2px; }
+.doc-ai-head { font-size: 12.5px; font-weight: 700; color: var(--brand-navy); }
+.doc-ai-badges { display: flex; flex-wrap: wrap; gap: 5px; }
+.doc-ai-line { font-size: 12px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.doc-ai-pair { font-size: 11.5px; color: var(--text-muted); }
+.doc-ai-hint { font-size: 11px; color: var(--text-muted); font-style: italic; }
+/* A document nobody has analysed states that plainly, and offers the one button
+   that changes it — an empty space here is what made the page look dead. */
+.doc-ai-none { font-size: 12px; color: var(--text-muted); font-style: italic; }
+.doc-ai-run {
+  align-self: flex-start; font: inherit; font-size: 12px; font-weight: 700;
+  color: var(--brand-navy); background: none; border: 0; padding: 0;
+  text-decoration: underline; text-underline-offset: 3px; cursor: pointer;
+}
+.doc-ai-run:disabled { color: var(--text-muted); cursor: default; text-decoration: none; }
+
+/* Ordered, because the next actions are a sequence: review, then counterparty,
+   then the record, then the accountant. */
+.doc-ai-next { margin: 2px 0 6px; padding-left: 18px; display: flex; flex-direction: column; gap: 3px; }
+.doc-ai-next li { font-size: 12.5px; color: var(--text-body); }
+
+/* The zero-write counterparty suggestion, once fetched. */
+.doc-cp-suggest {
+  display: flex; flex-direction: column; gap: 4px; margin-top: 8px;
+  padding: 10px; border: 1px solid var(--border-subtle); border-radius: 10px;
+  background: var(--surface-card-muted);
+}
+
+/* Manual field entry — the way out of an unreadable scan. */
+.doc-field-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; margin: 8px 0; }
+.doc-drawer .doc-field-grid { grid-template-columns: 1fr; }
+.doc-field { display: flex; flex-direction: column; gap: 4px; }
+.doc-field > span { font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--text-muted); }
+.doc-field input, .doc-field select {
+  font: inherit; font-size: 13px; padding: 8px 10px; border-radius: 8px;
+  border: 1px solid var(--border-subtle); background: var(--surface-card); color: var(--text-body);
+}
+.doc-field input:focus-visible, .doc-field select:focus-visible { outline: 2px solid var(--brand-navy); outline-offset: 1px; }
