@@ -1,6 +1,6 @@
-// Migration smoke for migrations/drafts/055_counterparty_intelligence_v1.DRAFT.sql
+// Migration smoke for migrations/055_counterparty_intelligence_v1.sql
 //
-// Applies the DRAFT to a real Postgres (PGlite, in-process) on top of the schema as
+// Applies the migration to a real Postgres (PGlite, in-process) on top of the schema as
 // it exists TODAY, with legacy rows already in it. Proves the migration is additive,
 // that existing data survives unchanged, and that the new constraints and trigger
 // actually fire.
@@ -13,14 +13,14 @@ const path = require('node:path');
 const assert = require('node:assert');
 const { PGlite } = require('@electric-sql/pglite');
 
-const DRAFT = path.join(__dirname, '..', '..', 'migrations', 'drafts',
-  '055_counterparty_intelligence_v1.DRAFT.sql');
+const MIGRATION = path.join(__dirname, '..', '..', 'migrations',
+  '055_counterparty_intelligence_v1.sql');
 
 const BIZ_A = '11111111-1111-4111-8111-111111111111';
 const BIZ_B = '22222222-2222-4222-8222-222222222222';
 
 // The schema as it is in production today: counterparties from migration 002 plus
-// the business_id column added by 017. Nothing from the draft.
+// the business_id column added by 017. Nothing from migration 055.
 const PRE_MIGRATION = `
   CREATE TABLE businesses (
     id uuid PRIMARY KEY, owner_user_id bigint, name text, type text, created_at timestamptz DEFAULT now());
@@ -68,13 +68,13 @@ const t = async (name, fn) => {
   const beforeCount = before.rows.length;
 
   console.log('\nApply');
-  await t('the draft applies cleanly to the current schema', async () => {
-    const sql = fs.readFileSync(DRAFT, 'utf8');
+  await t('the migration applies cleanly to the current schema', async () => {
+    const sql = fs.readFileSync(MIGRATION, 'utf8');
     await db.exec(sql);
   });
 
   await t('and is re-runnable — applying it twice changes nothing', async () => {
-    const sql = fs.readFileSync(DRAFT, 'utf8');
+    const sql = fs.readFileSync(MIGRATION, 'utf8');
     await db.exec(sql);
     const after = await db.query('SELECT count(*)::int AS n FROM counterparties');
     assert.strictEqual(after.rows[0].n, beforeCount, 'row count must not change');

@@ -1,9 +1,14 @@
 -- ═══════════════════════════════════════════════════════════════════════════
--- DRAFT — NOT APPLIED. NOT PART OF THE MIGRATION SEQUENCE.
---
 -- 055_counterparty_intelligence_v1
--- Proposed for: Counterparty Intelligence V1
--- Status: awaiting explicit approval. Do not run this file without it.
+-- For: Counterparty Intelligence V1
+--
+-- APPLIED to production (Supabase project cbsbnzttkndlgdpjxcxe) on 2026-09-04,
+-- manually via the SQL Editor. Verified after apply: 13 new columns, the
+-- counterparty_bank_accounts table, 6 indexes, trg_iso_cp_bank_accounts, the single
+-- existing counterparty row intact and backfilled, and businesses/debts/documents/
+-- transactions untouched.
+--
+-- Pre-apply backup of the only modified table: public.counterparties_backup_20260904.
 --
 -- WHY THIS IS NEEDED
 -- `counterparties` (migration 002, business_id added in 017) currently holds only:
