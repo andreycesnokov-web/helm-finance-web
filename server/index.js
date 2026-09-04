@@ -13337,7 +13337,18 @@ app.patch('/api/documents/:id/financial-fields', auth, async (req, res) => {
 // actually changed.
 const intakeOrchestrator = require('./lib/documentIntakeOrchestrator');
 
-async function runDocumentIntake(biz, doc, opts = {}) {
+/**
+ * Read one document the SAME way for every caller.
+ *
+ * This exists because it once did not. The intake pipeline gained an OCR fallback while
+ * /counterparty-suggestion kept its own embedded-text-only copy of the same steps, so a
+ * scanned document that intake could read perfectly well came back from the counterparty
+ * endpoint as "No counterparty name could be read" — two readers, two answers, one
+ * document. Any future reader change now lands in both places by construction.
+ *
+ * Returns { file, buf, extraction, readSource, ocr } or { error, status }.
+ */
+async function readDocumentForIntake(biz, doc) {
   const { data: fileRows } = await supabase.from('document_files')
     .select('id, storage_path, file_name, mime_type')
     .eq('id', doc.file_id).eq('business_id', biz.business.id).limit(1);
@@ -13381,6 +13392,14 @@ async function runDocumentIntake(biz, doc, opts = {}) {
       readSource = 'ocr_vision';
     }
   }
+  return { file, buf, extraction, readSource, ocr };
+}
+
+async function runDocumentIntake(biz, doc, opts = {}) {
+  const read = await readDocumentForIntake(biz, doc);
+  if (read.error) return { error: read.error, status: read.status };
+  const { extraction, readSource, ocr } = read;
+  const ex = extraction;
 
   // Counterparty directory + anything this document is already attached to. Both are
   // business-scoped reads; a failure degrades to "unknown" rather than a 500.
@@ -13471,26 +13490,12 @@ app.post('/api/documents/:id/extract', auth, async (req, res) => {
     if (!doc) return res.status(404).json({ error: 'document_not_found_in_this_business' });
     if (doc.archived_at) return res.status(409).json({ error: 'document_archived' });
 
-    const { data: fileRows } = await supabase.from('document_files')
-      .select('id, storage_path, file_name, mime_type')
-      .eq('id', doc.file_id).eq('business_id', biz.business.id).limit(1);
-    const file = fileRows?.[0];
-    if (!file) return res.status(404).json({ error: 'file_not_found' });
-
-    const { data: blob, error: dlErr } = await supabase.storage.from(DOC_BUCKET).download(file.storage_path);
-    if (dlErr || !blob) return res.status(503).json({ error: 'document_unavailable' });
-    const buf = Buffer.from(await blob.arrayBuffer());
-
-    const isPdf = /pdf/i.test(file.mime_type || '') || /\.pdf$/i.test(file.file_name || '');
-    const ex = isPdf ? extractPdfText(buf)
-      : { text: '', text_available: false, method: 'not_a_pdf', reason: 'not_a_pdf' };
-
-    const result = docExtract.extractFromText(ex.text, {
-      text_available: ex.text_available,
-      document_type: doc.document_type,
-      file_name: file.file_name,
-      extraction_reason: ex.reason,
-    });
+    // Same shared reader as intake and counterparty-suggestion: embedded text first,
+    // OCR fallback when enabled. Three endpoints, one reading of the document.
+    // (The file lookup and the business-scoped download live inside the helper.)
+    const read = await readDocumentForIntake(biz, doc);
+    if (read.error) return res.status(read.status || 500).json({ error: read.error });
+    const result = read.extraction;
 
     // Duplicate check across this business, using references already recorded.
     let duplicate = { duplicate: false };
@@ -13515,7 +13520,8 @@ app.post('/api/documents/:id/extract', auth, async (req, res) => {
       saved: false,
       extraction: result,
       duplicate,
-      text_source: { available: ex.text_available, method: ex.method, reason: ex.reason },
+      source: read.readSource,
+      text_source: { available: read.readSource !== 'filename_only', method: read.readSource, reason: result.reason },
     });
   } catch (e) {
     console.error(`[doc-extract] failed: ${e.message}`);
@@ -13541,22 +13547,13 @@ app.post('/api/documents/:id/counterparty-suggestion', auth, async (req, res) =>
     if (!doc) return res.status(404).json({ error: 'document_not_found_in_this_business' });
     if (doc.archived_at) return res.status(409).json({ error: 'document_archived' });
 
-    const { data: fileRows } = await supabase.from('document_files')
-      .select('id, storage_path, file_name, mime_type')
-      .eq('id', doc.file_id).eq('business_id', biz.business.id).limit(1);
-    const file = fileRows?.[0];
-    if (!file) return res.status(404).json({ error: 'file_not_found' });
-
-    const { data: blob, error: dlErr } = await supabase.storage.from(DOC_BUCKET).download(file.storage_path);
-    if (dlErr || !blob) return res.status(503).json({ error: 'document_unavailable' });
-    const buf = Buffer.from(await blob.arrayBuffer());
-    const isPdf = /pdf/i.test(file.mime_type || '') || /\.pdf$/i.test(file.file_name || '');
-    const ex = isPdf ? extractPdfText(buf)
-      : { text: '', text_available: false, method: 'not_a_pdf', reason: 'not_a_pdf' };
-    const extraction = docExtract.extractFromText(ex.text, {
-      text_available: ex.text_available, document_type: doc.document_type,
-      file_name: file.file_name, extraction_reason: ex.reason,
-    });
+    // The SAME reader the intake pipeline uses — embedded text first, OCR fallback when
+    // enabled. Before this shared helper existed, a scanned document intake could read
+    // fine answered "No counterparty name could be read" here, because this endpoint had
+    // its own embedded-text-only copy of the steps.
+    const read = await readDocumentForIntake(biz, doc);
+    if (read.error) return res.status(read.status || 500).json({ error: read.error });
+    const { extraction, readSource } = read;
 
     const suggestion = CPI.suggestFromDocument(extraction, { business_name: biz.business?.name });
     const match = CPI.matchCounterparty(suggestion.suggested_counterparty, await cpDirectoryForMatching(biz));
@@ -13564,7 +13561,8 @@ app.post('/api/documents/:id/counterparty-suggestion', auth, async (req, res) =>
     res.json({
       ok: true, business_id: biz.business.id, document_id: doc.id,
       saved: false,                       // nothing was created
-      text_source: { available: ex.text_available, reason: ex.reason },
+      source: readSource,
+      text_source: { available: readSource !== 'filename_only', reason: extraction.reason },
       extraction_status: extraction.status,
       status: match.status,               // matched | possible_match | not_found
       confidence: match.confidence,

@@ -405,6 +405,52 @@ const t = async (name, fn) => {
     OCR_MODE = 'ok';
   });
 
+  // ── one reader for every endpoint ─────────────────────────────────────────
+  // The counterparty endpoint used to keep its own embedded-text-only copy of the
+  // reading steps, so a scanned document intake could read fine came back from it as
+  // "No counterparty name could be read".
+  console.log('\n1/2/3. one reader, three endpoints');
+  await t('1/2. counterparty-suggestion uses the OCR fallback when there is no text', async () => {
+    process.env.DOCUMENT_OCR_VISION_ENABLED = 'true';
+    const r = await call('POST', '/documents/d-scan/counterparty-suggestion', { biz: A });
+    assert.strictEqual(r.status, 200, JSON.stringify(r.body));
+    assert.strictEqual(r.body.source, 'ocr_vision', `source was ${r.body.source}`);
+    const name = r.body.suggested_counterparty?.legal_name || '';
+    assert.ok(/Alfaria/i.test(name), `no name was read: ${JSON.stringify(r.body.suggested_counterparty)}`);
+  });
+
+  await t('3/4. it is still zero-write — nothing is created by asking', async () => {
+    const before = (mem.__db.counterparties || []).length;
+    const r = await call('POST', '/documents/d-scan/counterparty-suggestion', { biz: A });
+    assert.strictEqual(r.body.saved, false);
+    assert.strictEqual((mem.__db.counterparties || []).length, before, 'no counterparty may be created');
+    assert.strictEqual((mem.__db.debts || []).length, 0);
+  });
+
+  await t('the extract endpoint reads the same scanned document too', async () => {
+    const r = await call('POST', '/documents/d-scan/extract', { biz: A });
+    assert.strictEqual(r.status, 200, JSON.stringify(r.body));
+    assert.strictEqual(r.body.source, 'ocr_vision');
+    assert.strictEqual(r.body.saved, false, 'extraction never writes');
+    assert.strictEqual(r.body.extraction.document_type, 'receipt');
+  });
+
+  await t('with OCR off, the same endpoint is honest instead of silent', async () => {
+    delete process.env.DOCUMENT_OCR_VISION_ENABLED;
+    const r = await call('POST', '/documents/d-scan/counterparty-suggestion', { biz: A });
+    assert.strictEqual(r.status, 200);
+    assert.strictEqual(r.body.source, 'filename_only');
+    assert.strictEqual(r.body.text_source.available, false);
+  });
+
+  await t('15/16. the shared reader keeps its scoping', async () => {
+    const other = await call('POST', '/documents/d-b/counterparty-suggestion', { biz: A });
+    assert.strictEqual(other.status, 404, 'a document of another business is refused');
+    const personal = await call('POST', '/documents/d-sup/counterparty-suggestion', { biz: P });
+    assert.strictEqual(personal.status, 403);
+    assert.strictEqual(personal.body.error, 'business_workspace_required');
+  });
+
   delete process.env.DOCUMENT_OCR_VISION_ENABLED;
 
   console.log(`\n${fail === 0 ? `ALL PASS — ${pass} passed, 0 failed` : `${pass} passed, ${fail} FAILED`}`);
