@@ -90,6 +90,7 @@ function PremiumAccountant() {
       actions={<>
         <StatusBadge tone="info">Preview — engine wiring in progress</StatusBadge>
         <Btn sm onClick={() => navigate('/business/accountant/tax-split')}>AI Tax Split</Btn>
+        <Btn sm variant="ghost" onClick={() => navigate('/business/accountant/settlement')}>Invoice settlement</Btn>
       </>} />
   )
   const tabs = [
