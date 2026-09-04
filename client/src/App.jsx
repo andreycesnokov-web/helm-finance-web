@@ -79,6 +79,7 @@ import { BusinessAccountantHub } from './pages/business/AccountantPremium'
 import BusinessOnboarding from './pages/business/Onboarding'
 import TaxSplit from './pages/business/TaxSplit'
 import InvoiceSettlement from './pages/business/InvoiceSettlement'
+import Counterparties from './pages/business/Counterparties'
 
 // Personal/Funding UI requires migrations 037–039. OFF by default so production stays
 // safe until they're applied. Enable in env: VITE_PERSONAL_FUNDING_UI_ENABLED=true.
@@ -617,6 +618,8 @@ export default function App() {
             {/* Invoice settlement V1 — partial payment tracking and closeout gates. */}
             <Route path="/business/accountant/settlement" element={<BusinessShell><InvoiceSettlement /></BusinessShell>} />
             <Route path="/business/invoices" element={<BusinessShell><BusinessInvoices /></BusinessShell>} />
+            {/* Counterparty Intelligence V1 — vendor/customer directory. */}
+            <Route path="/business/counterparties" element={<BusinessShell><Counterparties /></BusinessShell>} />
             {/* Not-yet-migrated modules: existing components rendered INSIDE the premium
                 shell (real content + premium sidebar/header), so the user never sees the
                 legacy Layout. Legacy routes (/cfo,/payroll,…) remain by direct URL only. */}
