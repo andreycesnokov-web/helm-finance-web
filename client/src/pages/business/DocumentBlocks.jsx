@@ -31,7 +31,7 @@ import ReviewPanel, { RpCols, RpCol, RpActions } from './ReviewPanel'
 import DocumentPreview from './DocumentPreview'
 import {
   intakeOf, intakeBadges, intakeHeadline, intakeRowLines, intakeCopy, storedVsSuggested,
-  typeLabelOf as intakeTypeLabel, directionLabelOf, statusLabelOf, statusLabelFor, nextActionLabels,
+  typeLabelOf as intakeTypeLabel, directionLabelOf, statusLabelOf, statusLabelFor, nextActionLabels, taxLine, recordLabelOf,
   draftOffer, counterpartyOffer, isUnsupported,
   uploadIntentOf, readSourceLabel, conflictMessage,
 } from './documentIntakeView'
@@ -742,7 +742,7 @@ export function IntakeResult({
       <div className="rp-kv"><span>Status</span><span>{statusLabelFor(v2)}</span></div>
       <div className="rp-kv"><span>Suggested record</span>
         <span>{v2.suggested_record_type && v2.suggested_record_type !== 'none'
-          ? `Create ${v2.suggested_record_type} draft`
+          ? recordLabelOf(v2.suggested_record_type)
           : <em className="rp-miss">None suggested</em>}</span></div>
       <div className="rp-kv"><span>Amount</span>
         <span className="rp-mono">{v2.amount != null
@@ -751,9 +751,7 @@ export function IntakeResult({
       {/* ── tax ─────────────────────────────────────────────────────────── */}
       <span className="rp-col-label" style={{ marginTop: 8 }}>Tax</span>
       <div className="rp-kv"><span>PPN</span>
-        <span>{v2.ppn_detected
-          ? `Detected: ${v2.ppn_amount != null ? money(v2.ppn_amount, v2.currency) : 'amount not read'}`
-          : 'Not detected'}</span></div>
+        <span>{taxLine(v2)}</span></div>
       <div className="rp-kv"><span>Withholding / PPh</span>
         <span>{v2.accountant_review_required
           ? 'Needs accountant review'

@@ -102,7 +102,7 @@ export function intakeBadges(v2) {
     tone: v2.status === 'ready_to_confirm' || v2.status === 'linked' ? 'success'
       : v2.status === 'unsupported' ? 'neutral' : 'warning',
   });
-  if (v2.ppn_detected) out.push({ key: 'ppn', label: 'PPN detected', tone: 'info' });
+  if (v2.ppn_detected || v2.tax_status === 'tax_not_confirmed') out.push({ key: 'ppn', label: taxBadgeLabel(v2), tone: v2.ppn_detected ? 'info' : 'neutral' });
   if (v2.accountant_review_required) out.push({ key: 'acct', label: 'Accountant review', tone: 'warning' });
   return out;
 }
@@ -110,6 +110,25 @@ export function intakeBadges(v2) {
 /* ── one-line summary for a list row ───────────────────────────────────────── */
 
 const money = (n, ccy) => `${ccy || 'IDR'} ${Number(n).toLocaleString('de-DE')}`;
+
+/* ── how tax may be described ──────────────────────────────────────────────
+   What we are allowed to SAY about a tax figure depends on who read it. Text
+   parsed off the document is a reading; a figure a vision model produced is a
+   value to verify — production returned a PPN on one run and none on the next
+   for the same page, at a number equal to 11/111 of the total. Nothing here
+   ever presents a computed figure as printed. */
+export function taxBadgeLabel(v2) {
+  if (!v2?.ppn_detected) return 'Tax not confirmed';
+  return wasReadByOcr(v2) ? 'PPN — verify OCR value' : 'PPN detected';
+}
+
+export function taxLine(v2) {
+  if (!v2?.ppn_detected) return 'Not confirmed from the document';
+  const amt = v2.ppn_amount != null ? money(v2.ppn_amount, v2.currency) : 'amount not read';
+  return wasReadByOcr(v2)
+    ? `PPN may be present — verify ${amt}`
+    : `PPN ${amt}`;
+}
 
 /** "Invoice · Payable · Needs counterparty" — the row's headline. */
 export function intakeHeadline(v2) {
@@ -126,7 +145,8 @@ export function intakeRowLines(v2) {
   if (!v2) return [];
   const lines = [];
   if (v2.amount !== null && v2.amount !== undefined) lines.push(`Amount: ${money(v2.amount, v2.currency)}`);
-  if (v2.ppn_detected && v2.ppn_amount != null) lines.push(`Tax: PPN ${money(v2.ppn_amount, v2.currency)}`);
+  if (v2.ppn_detected && v2.ppn_amount != null) lines.push(`Tax: ${taxLine(v2)}`);
+  else if (v2.tax_status === 'tax_not_confirmed') lines.push('Tax: Not confirmed from the document');
   else if (v2.accountant_review_required) lines.push('Tax: Needs review');
   if (v2.missing_fields?.length) lines.push(`Missing: ${v2.missing_fields.join(', ')}`);
   return lines;
@@ -185,6 +205,19 @@ export function conflictMessage(doc) {
   return `Uploaded as ${intent.label}, but CFO AI reads this as ${typeLabelOf(v2.document_type)}. `
     + 'Please confirm the correct workflow before anything is created.';
 }
+
+/** What the suggested record actually means, in words. The raw enum leaked into the
+ *  panel as "Create supporting_document draft" — an underscore, and the word "Create"
+ *  for the one kind that is never created. */
+export const RECORD_LABEL = {
+  payable: 'Create payable draft',
+  receivable: 'Create receivable draft',
+  transaction: 'Record as a transaction',
+  supporting_document: 'Save as supporting document',
+  tax_review: 'Send for tax review',
+  none: 'None suggested',
+};
+export const recordLabelOf = (t) => RECORD_LABEL[t] || String(t || '').replace(/_/g, ' ');
 
 /* ── next actions ──────────────────────────────────────────────────────────── */
 
