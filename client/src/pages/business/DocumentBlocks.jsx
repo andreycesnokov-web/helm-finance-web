@@ -31,7 +31,7 @@ import ReviewPanel, { RpCols, RpCol, RpActions } from './ReviewPanel'
 import DocumentPreview from './DocumentPreview'
 import {
   intakeOf, intakeBadges, intakeHeadline, intakeRowLines, intakeCopy, storedVsSuggested,
-  typeLabelOf as intakeTypeLabel, directionLabelOf, statusLabelOf, nextActionLabels,
+  typeLabelOf as intakeTypeLabel, directionLabelOf, statusLabelOf, statusLabelFor, nextActionLabels,
   draftOffer, counterpartyOffer, isUnsupported,
   uploadIntentOf, readSourceLabel, conflictMessage,
 } from './documentIntakeView'
@@ -467,7 +467,7 @@ export function DocumentReview({ doc, cpName, onClose, onView, onCreate, onLink,
             <>
               <div className="doc-kv"><span>Type</span><span>{intakeTypeLabel(intakeOf(doc).document_type) || '—'}</span></div>
               <div className="doc-kv"><span>Direction</span><span>{directionLabelOf(intakeOf(doc).direction) || '—'}</span></div>
-              <div className="doc-kv"><span>Status</span><span>{statusLabelOf(intakeOf(doc).status)}</span></div>
+              <div className="doc-kv"><span>Status</span><span>{statusLabelFor(intakeOf(doc))}</span></div>
               {intakeRowLines(intakeOf(doc)).map((l) => <p key={l} className="doc-note">{l}</p>)}
             </>
           )}
@@ -739,7 +739,7 @@ export function IntakeResult({
       {v2.business_meaning && (
         <div className="rp-kv"><span>Business meaning</span><span>{v2.business_meaning}</span></div>
       )}
-      <div className="rp-kv"><span>Status</span><span>{statusLabelOf(v2.status)}</span></div>
+      <div className="rp-kv"><span>Status</span><span>{statusLabelFor(v2)}</span></div>
       <div className="rp-kv"><span>Suggested record</span>
         <span>{v2.suggested_record_type && v2.suggested_record_type !== 'none'
           ? `Create ${v2.suggested_record_type} draft`

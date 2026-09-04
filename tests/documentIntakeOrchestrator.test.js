@@ -317,4 +317,69 @@ t('no result ever claims to have created anything', () => {
   }
 });
 
+/* ── receipt / kwitansi direction ──────────────────────────────────────────
+   Production read a real kwitansi correctly as a receipt, then labelled it
+   "Payable" — because it was going through the invoice role check, which says
+   "they issued it to us, so we owe them". Backwards: a receipt proves the money
+   already moved, so it points the way a PAYMENT points. */
+const KWT_WE_PAID = 'KWITANSI PT Sumber Alfaria Trijaya Tbk '
+  + 'Sudah terima dari : PT Helm Care Indonesia Berupa : TRANSFER '
+  + 'Jumlah : Rp 11.322.000 Tanggal : 04-08-2026';
+const KWT_WE_RECEIVED = 'KWITANSI PT Helm Care Indonesia '
+  + 'Sudah terima dari : PT Ritel Nusantara Jaya Berupa : TRANSFER '
+  + 'Jumlah : Rp 4.500.000 Tanggal : 04-08-2026';
+const KWT_UNCLEAR = 'KWITANSI PT Alpha Sentosa Sudah terima dari : PT Beta Nusantara '
+  + 'Berupa : TUNAI Jumlah : Rp 1.000.000';
+
+t('a kwitansi we PAID is an outgoing payment, not a payable', () => {
+  const r = run(KWT_WE_PAID);
+  assert.strictEqual(r.document.type, 'receipt');
+  assert.strictEqual(r.document.direction, 'outgoing_payment', `direction was ${r.document.direction}`);
+  assert.ok(/paid the counterparty/i.test(r.document.direction_reason), r.document.direction_reason);
+});
+
+t('a kwitansi we RECEIVED is an incoming payment', () => {
+  const r = run(KWT_WE_RECEIVED);
+  assert.strictEqual(r.document.type, 'receipt');
+  assert.strictEqual(r.document.direction, 'incoming_payment', `direction was ${r.document.direction}`);
+});
+
+t('a kwitansi between two other parties needs review, and says so', () => {
+  const r = run(KWT_UNCLEAR);
+  assert.strictEqual(r.document.direction, 'supporting_document');
+  assert.ok(/needs review/i.test(r.document.direction_reason), r.document.direction_reason);
+});
+
+t('a receipt NEVER returns a payable or receivable direction', () => {
+  for (const text of [KWT_WE_PAID, KWT_WE_RECEIVED, KWT_UNCLEAR]) {
+    const d = run(text).document.direction;
+    assert.ok(!['payable', 'receivable'].includes(d), `receipt direction must not be ${d}`);
+  }
+});
+
+t('a receipt stays supporting evidence and drafts nothing', () => {
+  for (const text of [KWT_WE_PAID, KWT_WE_RECEIVED, KWT_UNCLEAR]) {
+    const r = run(text);
+    assert.strictEqual(r.financial_record.suggested_record_type, 'supporting_document');
+    assert.strictEqual(r.financial_record.can_create_draft, false);
+    assert.ok(!r.next_actions.some((a) => /create_(payable|receivable|transaction)/.test(a.key) && a.enabled),
+      'no record-creating action may be offered from a receipt');
+  }
+});
+
+t('the counterparty on a kwitansi is still the other party', () => {
+  // The direction change must not reroute this to the bank-account parser, which a
+  // kwitansi has no fields for.
+  const r = run(KWT_WE_PAID);
+  assert.ok(/Alfaria/i.test(r.counterparty.suggested_counterparty?.legal_name || ''),
+    JSON.stringify(r.counterparty.suggested_counterparty));
+});
+
+t('invoices and payment proofs are untouched by the receipt rule', () => {
+  assert.strictEqual(run(SUPPLIER_INVOICE).document.direction, 'payable');
+  assert.strictEqual(run(CUSTOMER_INVOICE).document.direction, 'receivable');
+  assert.strictEqual(run(OUTGOING_PROOF).document.direction, 'outgoing_payment');
+  assert.strictEqual(run(INCOMING_PROOF).document.direction, 'incoming_payment');
+});
+
 console.log(`\n${pass} passed`);
