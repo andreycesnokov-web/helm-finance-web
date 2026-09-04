@@ -197,6 +197,75 @@ const t = async (name, fn) => {
     assert.strictEqual(r.status, 404, `status ${r.status}`);
   });
 
+
+  console.log('\nEdit (UX polish V1)');
+  await t('3. edit updates display name and legal name', async () => {
+    const r = await call('PATCH', '/counterparties/cp-a1', { biz: A, body: {
+      display_name: 'Circleka', legal_name: 'PT Circleka Indonesia Utama' } });
+    assert.strictEqual(r.status, 200, `status ${r.status}`);
+    assert.strictEqual(r.body.counterparty.display_name, 'Circleka');
+    assert.strictEqual(r.body.counterparty.legal_name, 'PT Circleka Indonesia Utama');
+  });
+
+  await t('4. role can be changed between customer, vendor and both', async () => {
+    for (const role of ['customer', 'both', 'vendor']) {
+      const r = await call('PATCH', '/counterparties/cp-a1', { biz: A, body: { role } });
+      assert.strictEqual(r.status, 200, `${role}: status ${r.status}`);
+      assert.strictEqual(r.body.counterparty.role, role);
+    }
+  });
+
+  await t('5. a bank account can be added by edit, and existing ones are kept', async () => {
+    const r = await call('PATCH', '/counterparties/cp-a1', { biz: A, body: {
+      bank_accounts: [{ bank_name: 'Mandiri', account_number: '999-8887776' }] } });
+    assert.strictEqual(r.status, 200, `status ${r.status}`);
+    const accts = (mem.__db.counterparty_bank_accounts || []).filter((a) => a.counterparty_id === 'cp-a1');
+    assert.strictEqual(accts.length, 2, 'the original BCA account must survive');
+    assert.ok(accts.some((a) => a.account_number === '075-3020192'));
+    assert.ok(accts.some((a) => a.account_number === '999-8887776'));
+  });
+
+  await t('re-sending an existing account does not duplicate it', async () => {
+    const before = (mem.__db.counterparty_bank_accounts || []).filter((a) => a.counterparty_id === 'cp-a1').length;
+    // the edit form resends the whole list on save, punctuated differently
+    const r = await call('PATCH', '/counterparties/cp-a1', { biz: A, body: {
+      bank_accounts: [{ bank_name: 'BCA', account_number: '0753020192' }] } });
+    assert.strictEqual(r.status, 200, `status ${r.status}`);
+    const after = (mem.__db.counterparty_bank_accounts || []).filter((a) => a.counterparty_id === 'cp-a1').length;
+    assert.strictEqual(after, before, 'the same account must not be added twice');
+  });
+
+  await t('a bank account can be removed explicitly', async () => {
+    const acct = (mem.__db.counterparty_bank_accounts || []).find((a) => a.account_number === '999-8887776');
+    const r = await call('DELETE', `/counterparties/cp-a1/bank-accounts/${acct.id}`, { biz: A });
+    assert.strictEqual(r.status, 200, `status ${r.status}`);
+    const left = (mem.__db.counterparty_bank_accounts || []).filter((a) => a.counterparty_id === 'cp-a1');
+    assert.strictEqual(left.length, 1);
+    assert.strictEqual(left[0].account_number, '075-3020192');
+  });
+
+  await t('a bank account in another business cannot be removed', async () => {
+    const r = await call('DELETE', '/counterparties/cp-b1/bank-accounts/ba-1', { biz: A });
+    assert.strictEqual(r.status, 404, `status ${r.status}`);
+  });
+
+  await t('status can be set directly, and an invalid one is rejected', async () => {
+    const bad = await call('PATCH', '/counterparties/cp-a1', { biz: A, body: { status: 'nonsense' } });
+    assert.strictEqual(bad.status, 400, `status ${bad.status}`);
+    assert.strictEqual(bad.body.error, 'invalid_status');
+    const ok = await call('PATCH', '/counterparties/cp-a1', { biz: A, body: { status: 'archived' } });
+    assert.strictEqual(ok.body.counterparty.status, 'archived');
+    await call('PATCH', '/counterparties/cp-a1', { biz: A, body: { status: 'active' } });
+  });
+
+  await t('6. duplicate detection still fires after an edit', async () => {
+    const before = cps().length;
+    const r = await call('POST', '/counterparties', { biz: A, body: {
+      legal_name: 'PT Circleka Indonesia Utama', role: 'vendor' } });
+    assert.strictEqual(r.status, 409, `status ${r.status}`);
+    assert.strictEqual(cps().length, before);
+  });
+
   console.log('\nArchive');
   await t('archive is a soft flag, and unarchive restores', async () => {
     const r = await call('POST', '/counterparties/cp-a1/archive', { biz: A });

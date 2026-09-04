@@ -8197,11 +8197,38 @@ app.patch('/api/counterparties/:id', auth, async (req, res) => {
       patch.is_active = !!b.is_active;
       patch.status = b.is_active ? 'active' : 'archived';
     }
+    if (b.status !== undefined) {
+      if (!['active', 'archived'].includes(b.status))
+        return res.status(400).json({ error: 'invalid_status', allowed: ['active', 'archived'] });
+      patch.status = b.status;
+      patch.is_active = b.status === 'active';
+    }
 
     const { data, error } = await supabase.from('counterparties')
       .update(patch).eq('id', existing.id).eq('business_id', existing.business_id)
       .select().single();
     if (error) throw error;
+
+    // Bank accounts are ADDED here, never silently replaced: dropping an account a
+    // payment already matched on would break that match. Removal is its own explicit
+    // DELETE. A repeat of an existing account is skipped rather than erroring, since
+    // the UI resends the full list on save.
+    if (Array.isArray(b.bank_accounts)) {
+      const { data: current } = await supabase.from('counterparty_bank_accounts')
+        .select('account_number').eq('business_id', biz.business.id).eq('counterparty_id', existing.id);
+      const digits = (v) => String(v || '').replace(/\D/g, '');
+      const have = new Set((current || []).map((a) => digits(a.account_number)));
+      for (const a of b.bank_accounts) {
+        const number = a && (a.account_number || a.number);
+        if (!number || have.has(digits(number))) continue;
+        await supabase.from('counterparty_bank_accounts').insert({
+          business_id: biz.business.id, counterparty_id: existing.id,
+          bank_name: a.bank_name || null, account_number: String(number),
+          account_name: a.account_name || null, currency: a.currency || 'IDR',
+          is_primary: !!a.is_primary, created_by_user_id: req.user.userId,
+        });
+      }
+    }
 
     await recordAudit({
       businessId: biz.business.id, actorUserId: req.user.userId, actorRole: biz.role,
@@ -8210,6 +8237,36 @@ app.patch('/api/counterparties/:id', auth, async (req, res) => {
     });
     const accounts = await cpBankAccounts(biz, [existing.id]);
     res.json({ counterparty: cpPublic(data, accounts[existing.id]) });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// DELETE /api/counterparties/:id/bank-accounts/:accountId — remove one account.
+// Explicit because an account is a matching key: removing it can change which
+// counterparty a future payment resolves to.
+app.delete('/api/counterparties/:id/bank-accounts/:accountId', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    const { data: rows } = await supabase.from('counterparties').select('id')
+      .eq('id', req.params.id).or(bizOrFilter(biz)).limit(1);
+    if (!rows?.length) return res.status(404).json({ error: 'counterparty_not_found_in_this_business' });
+
+    const { data: acct } = await supabase.from('counterparty_bank_accounts').select('*')
+      .eq('id', req.params.accountId).eq('counterparty_id', req.params.id)
+      .eq('business_id', biz.business.id).limit(1);
+    if (!acct?.length) return res.status(404).json({ error: 'bank_account_not_found' });
+
+    const { error } = await supabase.from('counterparty_bank_accounts')
+      .delete().eq('id', req.params.accountId).eq('business_id', biz.business.id);
+    if (error) throw error;
+    await recordAudit({
+      businessId: biz.business.id, actorUserId: req.user.userId, actorRole: biz.role,
+      entityType: 'counterparty_bank_account', entityId: req.params.accountId,
+      action: 'counterparty_bank_account_removed', before: acct[0],
+    });
+    res.json({ ok: true, removed: req.params.accountId });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
