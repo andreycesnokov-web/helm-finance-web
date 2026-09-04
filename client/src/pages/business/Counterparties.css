@@ -82,3 +82,58 @@
 .cp-hint { margin: 0; font-size: 11.5px; line-height: 1.55; color: var(--text-muted); max-width: 84ch; }
 .cp-empty { margin: 0; font-size: 12.5px; color: var(--text-muted); }
 @media (max-width: 720px) { .cp-form { grid-template-columns: 1fr; } }
+
+/* ── UX polish V1: role tabs, close action, badges, activity ───────────────── */
+.cp-tabs {
+  display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 16px;
+  border-bottom: 1px solid var(--border-subtle); padding-bottom: 10px;
+}
+.cp-tab {
+  display: inline-flex; align-items: center; gap: 7px; cursor: pointer; font: inherit;
+  font-size: 12.5px; font-weight: 600; padding: 6px 12px; border-radius: 999px;
+  border: 1px solid var(--border-subtle); background: var(--surface-card);
+  color: var(--text-secondary);
+}
+.cp-tab:hover { border-color: var(--border-default); }
+.cp-tab.is-on { background: var(--brand-navy); border-color: transparent; color: var(--brand-white); }
+.cp-tab:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
+.cp-tab-n {
+  font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 11px;
+  padding: 1px 6px; border-radius: 999px; background: var(--brand-pale-grey);
+  color: var(--text-muted);
+}
+.cp-tab.is-on .cp-tab-n { background: rgba(255,255,255,.18); color: var(--brand-white); }
+
+.cp-head-main { min-width: 0; }
+.cp-badges { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.cp-close {
+  display: inline-flex; align-items: center; gap: 6px; cursor: pointer; font: inherit;
+  font-size: 12px; font-weight: 700; padding: 5px 11px; border-radius: 999px;
+  border: 1px solid var(--border-default); background: var(--surface-card);
+  color: var(--text-muted); flex: 0 0 auto;
+}
+.cp-close span { font-size: 15px; line-height: 1; }
+.cp-close:hover { border-color: var(--brand-navy); color: var(--brand-navy); }
+.cp-close:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
+
+/* Role colour on the list row, so vendors and customers separate at a glance. */
+.cp-role-customer { color: var(--success); }
+.cp-role-vendor   { color: var(--brand-electric-blue-ink); }
+.cp-role-both     { color: var(--warning); }
+.cp-role-none, .cp-role-other, .cp-role-bank,
+.cp-role-employee, .cp-role-tax_authority { color: var(--text-muted); }
+
+.cp-activity { list-style: none; margin: 2px 0 0; padding: 0; display: flex; flex-direction: column; gap: 3px; }
+.cp-activity li {
+  display: flex; justify-content: space-between; gap: 12px;
+  font-size: 12.5px; color: var(--text-secondary);
+}
+.cp-soon { color: var(--text-muted); font-size: 11.5px; }
+
+.cp-banks li { align-items: baseline; }
+.cp-remove {
+  cursor: pointer; font: inherit; font-size: 11.5px; font-weight: 600;
+  border: 0; background: none; color: var(--danger); padding: 0 0 0 10px;
+}
+.cp-remove:hover { text-decoration: underline; }
+.cp-remove:disabled { color: var(--text-muted); cursor: default; text-decoration: none; }
