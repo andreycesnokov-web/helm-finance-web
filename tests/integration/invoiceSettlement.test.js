@@ -49,11 +49,20 @@ mem.__seed('transactions', [
   { id: 9003, business_id: B, type: 'expense', amount_original: 500, description: 'Other business payment' },
 ]);
 mem.__seed('financial_documents', [
-  { id: 'doc-inv-A', business_id: A, document_type: 'vendor_invoice', document_number: 'X2610001139',
+  { id: 'doc-inv-A', business_id: A, file_id: 'file-A', currency: 'IDR', document_type: 'vendor_invoice', document_number: 'X2610001139',
     commercial_base_amount: 129600000, commercial_tax_amount: 14256000, gross_amount: 143856000 },
-  { id: 'doc-proof-A', business_id: A, document_type: 'payment_proof',
+  { id: 'doc-proof-A', business_id: A, file_id: 'file-A', currency: 'IDR', document_type: 'payment_proof',
     extracted_json: { bank_name: 'BCA', reference_number: '26090400308936' } },
-  { id: 'doc-B', business_id: B, document_type: 'payment_proof', extracted_json: {} },
+  { id: 'doc-B', business_id: B, file_id: 'file-B', currency: 'IDR', document_type: 'payment_proof', extracted_json: {} },
+]);
+// The documents routes are entitlement-gated (hasDocumentsAccess). Grant the addon so the
+// gate is exercised for real rather than bypassed.
+mem.__seed('business_addons', [
+  { id: 'ad-A', business_id: A, addon: 'ai_accountant', status: 'active' },
+]);
+mem.__seed('document_files', [
+  { id: 'file-A', business_id: A, storage_path: 'businesses/A/x.pdf' },
+  { id: 'file-B', business_id: B, storage_path: 'businesses/B/y.pdf' },
 ]);
 mem.__seed('document_debt_links', [
   { id: 'l1', business_id: A, document_id: 'doc-inv-A', debt_id: 501 },
@@ -141,6 +150,87 @@ const t = async (name, fn) => {
   await t('a non-positive allocation is refused', async () => {
     const r = await call('POST', '/invoices/501/allocate', { biz: A, body: { transaction_id: 9002, allocated_amount: 0 } });
     assert.strictEqual(r.status, 400, `status ${r.status}`);
+  });
+
+
+  console.log('\nDocument financial fields');
+  const FF = (id, body, biz = A) => call('PATCH', `/documents/${id}/financial-fields`, { biz, body });
+
+  await t('1. accepts the Circleka DPP / PPN / total', async () => {
+    const r = await FF('doc-inv-A', {
+      commercial_base_amount: 129600000, commercial_tax_amount: 14256000,
+      commercial_total_amount: 143856000, currency: 'IDR', invoice_number: 'X2610001139',
+    });
+    assert.strictEqual(r.status, 200, `status ${r.status} ${JSON.stringify(r.body)}`);
+    const d = r.body.document;
+    assert.strictEqual(Number(d.commercial_base_amount), 129600000);
+    assert.strictEqual(Number(d.commercial_tax_amount), 14256000);
+    assert.strictEqual(Number(d.gross_amount), 143856000);
+    assert.strictEqual(d.document_number, 'X2610001139');
+  });
+
+  await t('2. rejects a negative amount', async () => {
+    const r = await FF('doc-inv-A', { commercial_base_amount: -1 });
+    assert.strictEqual(r.status, 400, `status ${r.status}`);
+    assert.ok(/must not be negative/.test(r.body.error));
+  });
+
+  await t('3. rejects tax greater than the total', async () => {
+    // Base is set low in the same call so the total-vs-base rule cannot fire first — this
+    // case must isolate the tax rule rather than depend on what an earlier test left.
+    const r = await FF('doc-inv-A', { commercial_base_amount: 100, commercial_tax_amount: 999999999, gross_amount: 1000 });
+    assert.strictEqual(r.status, 400, `status ${r.status}`);
+    assert.strictEqual(r.body.error, 'tax_exceeds_total');
+  });
+
+  await t('4. rejects a total below the base', async () => {
+    const r = await FF('doc-inv-A', { commercial_base_amount: 500, gross_amount: 100 });
+    assert.strictEqual(r.status, 400, `status ${r.status}`);
+    assert.strictEqual(r.body.error, 'total_less_than_base');
+  });
+
+  await t('derives the total from base + tax, and says that it did', async () => {
+    const r = await FF('doc-proof-A', { commercial_base_amount: 100, commercial_tax_amount: 11, currency: 'IDR' });
+    assert.strictEqual(r.status, 200, `status ${r.status}`);
+    assert.strictEqual(r.body.derived_gross_amount, true);
+    assert.strictEqual(Number(r.body.document.gross_amount), 111);
+  });
+
+  await t('5/6. a document in another business cannot be updated', async () => {
+    const r = await FF('doc-B', { commercial_base_amount: 1 }, A);
+    assert.strictEqual(r.status, 404, `status ${r.status}`);
+    const row = (mem.__db.financial_documents || []).find((d) => d.id === 'doc-B');
+    assert.strictEqual(row.commercial_base_amount, undefined, 'row must be untouched');
+  });
+
+  await t('5b. a client-supplied business_id cannot redirect the write', async () => {
+    const r = await FF('doc-inv-A', { commercial_base_amount: 129600000, business_id: B, file_id: 'file-B' });
+    assert.strictEqual(r.status, 200, `status ${r.status}`);
+    const row = (mem.__db.financial_documents || []).find((d) => d.id === 'doc-inv-A');
+    assert.strictEqual(row.business_id, A, 'business_id must not move');
+    assert.strictEqual(row.file_id, 'file-A', 'file_id is not addressable here');
+  });
+
+  await t('a personal workspace cannot update document fields', async () => {
+    const r = await FF('doc-inv-A', { commercial_base_amount: 1 }, P);
+    assert.strictEqual(r.status, 403, `status ${r.status}`);
+    assert.strictEqual(r.body.error, 'business_workspace_required');
+  });
+
+  await t('9/10. settlement now shows the base remaining context', async () => {
+    await FF('doc-inv-A', { commercial_base_amount: 129600000, commercial_tax_amount: 14256000,
+      gross_amount: 143856000, currency: 'IDR' });
+    const r = await call('GET', '/invoices/501/settlement', { biz: A });
+    const s2 = r.body.settlement;
+    assert.strictEqual(s2.invoice_total, 143856000);
+    assert.strictEqual(s2.paid_amount, 29600000);
+    assert.strictEqual(s2.remaining_amount, 114256000);
+    assert.strictEqual(s2.status, 'partially_paid');
+    assert.ok(s2.base_view, 'base_view must now be populated');
+    assert.strictEqual(s2.base_view.base_amount, 129600000);
+    assert.strictEqual(s2.base_view.base_remaining, 100000000);
+    assert.strictEqual(Number(s2.tax_amount), 14256000);
+    assert.strictEqual(r.body.closeout.can_close, false);
   });
 
   console.log('\nIsolation');

@@ -36,6 +36,9 @@ export default function InvoiceSettlement() {
   const [data, setData] = useState(null)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState(null)
+  const [editing, setEditing] = useState(null)   // document id being edited
+  const [form, setForm] = useState({})
+  const [saveMsg, setSaveMsg] = useState(null)
 
   useEffect(() => {
     if (!token) return
@@ -57,6 +60,38 @@ export default function InvoiceSettlement() {
     catch (e) { setErr(e.message || 'Could not load settlement') }
     finally { setBusy(false) }
   }, [token])
+
+  const openEditor = (d) => {
+    setSaveMsg(null); setErr(null); setEditing(d.id)
+    setForm({
+      document_number: d.document_number || '',
+      commercial_base_amount: d.commercial_base_amount ?? '',
+      commercial_tax_amount: d.commercial_tax_amount ?? '',
+      gross_amount: d.gross_amount ?? '',
+      currency: 'IDR',
+    })
+  }
+
+  const saveFields = async () => {
+    setBusy(true); setErr(null); setSaveMsg(null)
+    const num = (v) => (v === '' || v === null ? null : Number(v))
+    try {
+      await apiFetch(`/documents/${editing}/financial-fields`, token, {
+        method: 'PATCH',
+        body: {
+          document_number: form.document_number || null,
+          commercial_base_amount: num(form.commercial_base_amount),
+          commercial_tax_amount: num(form.commercial_tax_amount),
+          gross_amount: num(form.gross_amount),
+          currency: form.currency || 'IDR',
+        },
+      })
+      setSaveMsg('Saved. Settlement recalculated from the recorded figures.')
+      setEditing(null)
+      await load(selected)                 // re-read so the balance reflects the save
+    } catch (e2) { setErr(e2.message || 'Could not save document fields') }
+    finally { setBusy(false) }
+  }
 
   const head = (
     <PageHeader eyebrow="Business Workspace" title="Invoice settlement"
@@ -159,6 +194,68 @@ export default function InvoiceSettlement() {
               ))}
             </ul>
           </section>
+
+          {/* ── document financial figures ─────────────────────────────── */}
+          {(data.linked_documents || []).length > 0 && (
+            <section className="is-sec">
+              <span className="is-label">Document figures</span>
+              <p className="is-hint">
+                These values can be entered manually now and will later be filled by
+                automatic extraction. CFO AI does not read PDFs yet.
+              </p>
+              <ul className="is-docs">
+                {data.linked_documents.map((d) => (
+                  <li key={d.id}>
+                    <div className="is-doc-row">
+                      <span className="is-doc-type">
+                        {d.document_type} {d.document_number ? `· ${d.document_number}` : ''}
+                      </span>
+                      <span className="is-mono is-doc-amt">
+                        {d.gross_amount != null
+                          ? money(d.gross_amount, data.invoice.currency)
+                          : 'no figures recorded'}
+                      </span>
+                      <Btn sm variant="ghost" disabled={busy}
+                        onClick={() => (editing === d.id ? setEditing(null) : openEditor(d))}>
+                        {editing === d.id ? 'Cancel' : 'Edit figures'}
+                      </Btn>
+                    </div>
+
+                    {editing === d.id && (
+                      <div className="is-form">
+                        <label className="is-field"><span>Reference / invoice number</span>
+                          <input value={form.document_number}
+                            onChange={(e) => setForm((f) => ({ ...f, document_number: e.target.value }))}
+                            placeholder="X2610001139" /></label>
+                        <label className="is-field"><span>Base amount / DPP</span>
+                          <input type="number" min="0" value={form.commercial_base_amount}
+                            onChange={(e) => setForm((f) => ({ ...f, commercial_base_amount: e.target.value }))}
+                            placeholder="129600000" /></label>
+                        <label className="is-field"><span>Tax amount / PPN</span>
+                          <input type="number" min="0" value={form.commercial_tax_amount}
+                            onChange={(e) => setForm((f) => ({ ...f, commercial_tax_amount: e.target.value }))}
+                            placeholder="14256000" /></label>
+                        <label className="is-field"><span>Total amount</span>
+                          <input type="number" min="0" value={form.gross_amount}
+                            onChange={(e) => setForm((f) => ({ ...f, gross_amount: e.target.value }))}
+                            placeholder="143856000" /></label>
+                        <label className="is-field"><span>Currency</span>
+                          <input value={form.currency}
+                            onChange={(e) => setForm((f) => ({ ...f, currency: e.target.value }))} /></label>
+                        <div className="is-form-actions">
+                          <Btn sm disabled={busy} onClick={saveFields}>Save figures</Btn>
+                          <span className="is-hint">
+                            Leave the total blank to derive it from base + tax.
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                  </li>
+                ))}
+              </ul>
+              {saveMsg && <p className="is-ok">{saveMsg}</p>}
+            </section>
+          )}
 
           {/* ── closeout ───────────────────────────────────────────────── */}
           <section className="is-sec">

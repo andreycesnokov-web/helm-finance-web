@@ -2862,6 +2862,14 @@ app.get('/api/invoices/:debtId/settlement', auth, async (req, res) => {
       allocations: { count: allocationList.length, total: allocatedTotal,
         matches_paid_amount: Math.abs(allocatedTotal - paidAmount) < 0.01 },
       documents, closeout,
+      // The linked documents themselves, so the UI can show which figures are recorded
+      // and offer to fill the ones that are still empty.
+      linked_documents: docs.map((d) => ({
+        id: d.id, document_type: d.document_type, document_number: d.document_number,
+        commercial_base_amount: d.commercial_base_amount,
+        commercial_tax_amount: d.commercial_tax_amount,
+        gross_amount: d.gross_amount,
+      })),
     });
   } catch (e) {
     console.error(`[settlement] read failed: ${e.message}`);
@@ -12887,6 +12895,125 @@ app.patch('/api/documents/:id', auth, async (req, res) => {
     }
     res.json({ document: publicDocRow(data) });
   } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+
+// PATCH /api/documents/:id/financial-fields — the commercial figures a settlement needs.
+//
+// WHY THIS IS SEPARATE FROM PATCH /api/documents/:id
+// That route writes through rpc_document_update_metadata, whose column list is fixed in
+// SQL (migration 036) and does not include commercial_base_amount / commercial_tax_amount.
+// Adding them there would mean altering the function — a migration. This route writes the
+// two missing columns directly and reproduces the RPC's two guarantees itself: an archived
+// document is refused, and a document_audit row is written.
+//
+// These are MANUAL OR EXTRACTED values. Nothing here reads a PDF. The columns exist so a
+// person (or, later, a real extraction pipeline) can record what the invoice says.
+app.patch('/api/documents/:id/financial-fields', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res); if (!biz) return;
+    if (!canManageDocuments(biz.role))
+      return res.status(403).json({ error: 'Your role cannot edit documents' });
+    if (!await hasDocumentsAccess(biz))
+      return res.status(403).json({ error: 'Document Center is not enabled', upgrade_required: true });
+
+    const doc = await loadDocumentScoped(biz, req.params.id);
+    if (!doc) return res.status(404).json({ error: 'document_not_found_in_this_business' });
+    if (doc.archived_at) return res.status(409).json({ error: 'document_archived' });
+
+    const b = req.body || {};
+    // Money fields only. business_id, file_id, storage path, owner and uploader are not
+    // addressable here by construction — they are simply never read off the body.
+    const money = (v, name) => {
+      if (v === undefined) return undefined;
+      if (v === null || v === '') return null;
+      const n = Number(v);
+      if (!Number.isFinite(n)) return { err: `${name} must be a number` };
+      if (n < 0) return { err: `${name} must not be negative` };
+      return n;
+    };
+    const base = money(b.commercial_base_amount, 'commercial_base_amount');
+    const tax = money(b.commercial_tax_amount, 'commercial_tax_amount');
+    // The schema column is gross_amount; commercial_total_amount is accepted as an alias
+    // because that is what callers tend to name it.
+    const grossIn = b.gross_amount !== undefined ? b.gross_amount : b.commercial_total_amount;
+    const gross = money(grossIn, 'gross_amount');
+    for (const v of [base, tax, gross]) if (v && v.err) return res.status(400).json({ error: v.err });
+
+    const patch = {};
+    if (base !== undefined) patch.commercial_base_amount = base;
+    if (tax !== undefined) patch.commercial_tax_amount = tax;
+    if (gross !== undefined) patch.gross_amount = gross;
+
+    // Effective values after the patch, so validation sees the row as it will be.
+    const effBase = patch.commercial_base_amount !== undefined ? patch.commercial_base_amount : doc.commercial_base_amount;
+    const effTax = patch.commercial_tax_amount !== undefined ? patch.commercial_tax_amount : doc.commercial_tax_amount;
+    let effGross = patch.gross_amount !== undefined ? patch.gross_amount : doc.gross_amount;
+
+    // Derive the total only when it was not supplied, and say so in the response rather
+    // than quietly inventing a number.
+    let derived = false;
+    if (effGross == null && effBase != null && effTax != null) {
+      effGross = Number(effBase) + Number(effTax);
+      patch.gross_amount = effGross;
+      derived = true;
+    }
+    if (effGross != null && effBase != null && Number(effGross) + 0.01 < Number(effBase))
+      return res.status(400).json({ error: 'total_less_than_base', gross_amount: effGross, commercial_base_amount: effBase });
+    if (effGross != null && effTax != null && Number(effTax) > Number(effGross) + 0.01)
+      return res.status(400).json({ error: 'tax_exceeds_total', commercial_tax_amount: effTax, gross_amount: effGross });
+
+    const hasAmount = [effBase, effTax, effGross].some((v) => v != null);
+    const effCurrency = b.currency != null ? String(b.currency).trim().toUpperCase() : doc.currency;
+    if (hasAmount && !effCurrency)
+      return res.status(400).json({ error: 'currency_required_when_amounts_present' });
+    if (b.currency != null) patch.currency = effCurrency;
+
+    if (b.document_number !== undefined || b.invoice_number !== undefined || b.document_reference !== undefined) {
+      const ref = b.document_number ?? b.invoice_number ?? b.document_reference;
+      patch.document_number = ref ? String(ref).slice(0, 200) : null;
+    }
+    for (const f of ['document_date', 'period_start', 'period_end']) {
+      if (b[f] !== undefined) patch[f] = b[f] || null;
+    }
+    if (b.counterparty_id !== undefined && b.counterparty_id) {
+      // Must be a counterparty of THIS business; the 031 isolation trigger enforces it
+      // too, but a 400 is a better answer than a database exception.
+      const { data: cp } = await supabase.from('counterparties')
+        .select('id').eq('id', b.counterparty_id).eq('business_id', biz.business.id).limit(1);
+      if (!cp || !cp.length) return res.status(404).json({ error: 'counterparty_not_found_in_this_business' });
+      patch.issuer_counterparty_id = b.counterparty_id;
+    }
+
+    if (Object.keys(patch).length === 0)
+      return res.status(400).json({ error: 'no_editable_fields_supplied' });
+    patch.updated_at = new Date().toISOString();
+
+    const { data, error } = await supabase.from('financial_documents')
+      .update(patch).eq('id', doc.id).eq('business_id', biz.business.id).select().single();
+    if (error) {
+      console.error(`[doc-financial-fields] update failed: ${error.message}`);
+      return res.status(500).json({ error: 'document_update_failed', detail: error.message });
+    }
+
+    // Same audit trail the RPC writes, so document history stays consistent.
+    try {
+      await supabase.from('document_audit').insert({
+        business_id: biz.business.id, document_id: doc.id,
+        actor_user_id: req.user.userId, channel: 'web', action: 'metadata_changed',
+      });
+    } catch { /* audit is best-effort, exactly as elsewhere */ }
+    await recordAudit({
+      businessId: biz.business.id, actorUserId: req.user.userId, actorRole: biz.role,
+      entityType: 'financial_document', entityId: doc.id,
+      action: 'document_financial_fields_updated', after: patch,
+    });
+
+    res.json({ ok: true, derived_gross_amount: derived, document: publicDocRow(data) });
+  } catch (e) {
+    console.error(`[doc-financial-fields] failed: ${e.message}`);
+    res.status(500).json({ error: 'document_financial_fields_failed' });
+  }
 });
 
 // POST /api/documents/:id/archive — soft archive (no hard-delete of evidence).

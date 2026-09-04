@@ -43,6 +43,16 @@ class Q {
   lte(c, v) { this.filters.push((r) => r[c] <= v); return this; }
   in(c, vs) { this.filters.push((r) => vs.map(String).includes(String(r[c]))); return this; }
   is(c, v) { this.filters.push((r) => (v === null ? r[c] == null : r[c] === v)); return this; }
+  // PostgREST LIKE: % is the wildcard. Used by the entitlement/addon lookups.
+  // Split on % first, escape each literal segment, then rejoin with .* so a % in the
+  // pattern can never be mistaken for a regex metacharacter.
+  like(c, pat) {
+    const esc = (x) => x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const rx = new RegExp('^' + String(pat).split('%').map(esc).join('.*') + '$');
+    this.filters.push((r) => rx.test(String(r[c] == null ? '' : r[c])));
+    return this;
+  }
+  ilike(c, pat) { return this.like(c, pat); }
   or(expr) {
     // Only the single-term form the code emits: `business_id.eq.<uuid>`
     const parts = String(expr).split(',').map((p) => {
