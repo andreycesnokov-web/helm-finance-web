@@ -13121,7 +13121,23 @@ app.post('/api/documents/upload-complete', auth, async (req, res) => {
       const r = await linkDocument(biz, doc, b.link.target_type, b.link.target_id, req.user.userId);
       link_result = r.ok ? { ok: true } : { ok: false, error: r.error };
     }
-    res.json({ document: publicDocRow(doc), link_result });
+
+    // Run the intake pipeline so a freshly uploaded document arrives with its meaning
+    // already worked out, rather than sitting inert until someone opens it. It writes
+    // only review metadata — no counterparty, payable or transaction is created here.
+    //
+    // FAIL-OPEN by construction: the file is already stored and the row already exists,
+    // so a parsing problem must never turn a successful upload into an error. A failure
+    // leaves the document without an intake summary, and /intake can be called again.
+    let intake = null;
+    try {
+      const r = await runDocumentIntake(biz, doc, { persist: true, actorUserId: req.user.userId });
+      if (!r.error) intake = r.intake;
+    } catch (e) {
+      console.error(`[doc-intake-v2] post-upload run failed for ${doc.id}: ${e.message}`);
+    }
+
+    res.json({ document: publicDocRow(doc), link_result, intake });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -13299,6 +13315,91 @@ app.patch('/api/documents/:id/financial-fields', auth, async (req, res) => {
 });
 
 
+// ── Document intake pipeline (shared) ────────────────────────────────────────
+// Used by POST /api/documents/:id/intake and, best-effort, straight after upload.
+// Reads the file, extracts, resolves the counterparty against this business, and
+// returns the orchestrator result. Writes only review metadata, and only when it
+// actually changed.
+const intakeOrchestrator = require('./lib/documentIntakeOrchestrator');
+
+async function runDocumentIntake(biz, doc, opts = {}) {
+  const { data: fileRows } = await supabase.from('document_files')
+    .select('id, storage_path, file_name, mime_type')
+    .eq('id', doc.file_id).eq('business_id', biz.business.id).limit(1);
+  const file = fileRows?.[0];
+  if (!file) return { error: 'file_not_found', status: 404 };
+
+  const { data: blob, error: dlErr } = await supabase.storage.from(DOC_BUCKET).download(file.storage_path);
+  if (dlErr || !blob) return { error: 'document_unavailable', status: 503 };
+  const buf = Buffer.from(await blob.arrayBuffer());
+
+  const isPdf = /pdf/i.test(file.mime_type || '') || /\.pdf$/i.test(file.file_name || '');
+  const ex = isPdf ? extractPdfText(buf)
+    : { text: '', text_available: false, method: 'not_a_pdf', reason: 'not_a_pdf' };
+  const extraction = docExtract.extractFromText(ex.text, {
+    text_available: ex.text_available, document_type: doc.document_type,
+    file_name: file.file_name, extraction_reason: ex.reason,
+  });
+
+  // Counterparty directory + anything this document is already attached to. Both are
+  // business-scoped reads; a failure degrades to "unknown" rather than a 500.
+  let counterparties = [];
+  try { counterparties = await cpDirectoryForMatching(biz); } catch { counterparties = []; }
+
+  const existingLinks = { debt_ids: [], transaction_ids: [] };
+  try {
+    const [{ data: dl }, { data: tl }] = await Promise.all([
+      supabase.from('document_debt_links').select('debt_id')
+        .eq('document_id', doc.id).eq('business_id', biz.business.id),
+      supabase.from('document_transaction_links').select('transaction_id')
+        .eq('document_id', doc.id).eq('business_id', biz.business.id),
+    ]);
+    existingLinks.debt_ids = (dl || []).map((x) => x.debt_id);
+    existingLinks.transaction_ids = (tl || []).map((x) => x.transaction_id);
+  } catch { /* links unknown; the pipeline still runs */ }
+
+  // Tax rules the caller may safely act on. effectiveRuleActive is the existing gate:
+  // active status, verified rule, cited source, and the source itself still good.
+  // Anything failing it is passed through as under_review so the result can quote it
+  // without treating it as settled law.
+  let taxRules = [];
+  try {
+    const { data: rules } = await supabase.from('tax_rules')
+      .select('rule_code, status, rate, last_verified_at, official_source_id, official_sources(status, last_verified_at)')
+      .limit(50);
+    taxRules = (rules || []).map((r) => ({
+      rule_code: r.rule_code, status: r.status, rate: r.rate,
+      citation: r.rule_code, effective_active: effectiveRuleActive(r, r.official_sources),
+    }));
+  } catch { taxRules = []; }
+
+  const intake = intakeOrchestrator.processDocument({
+    document: doc, extraction, businessName: biz.business?.name,
+    counterparties, existingLinks, taxRules,
+  });
+
+  let stored = false;
+  if (opts.persist) {
+    const summary = intakeOrchestrator.toStoredIntake(intake);
+    const previous = (doc.extracted_json || {}).ai_intake_v2 || null;
+    // Re-running must not churn the row or the audit trail.
+    if (!intakeOrchestrator.sameIntake(previous, summary)) {
+      try {
+        await supabase.from('financial_documents')
+          .update({
+            extracted_json: { ...(doc.extracted_json || {}), ai_intake_v2: summary },
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', doc.id).eq('business_id', biz.business.id);
+        stored = true;
+      } catch (e) {
+        console.error(`[doc-intake-v2] persist failed: ${e.message}`);
+      }
+    }
+  }
+  return { intake, stored };
+}
+
 // POST /api/documents/:id/extract — suggest structured fields from the document's text.
 //
 // ZERO-WRITE. This route reads the stored file, pulls whatever text the PDF already
@@ -13434,6 +13535,43 @@ app.post('/api/documents/:id/counterparty-suggestion', auth, async (req, res) =>
   } catch (e) {
     console.error(`[counterparty-suggestion] failed: ${e.message}`);
     res.status(500).json({ ok: false, error: 'counterparty_suggestion_failed' });
+  }
+});
+
+// POST /api/documents/:id/intake — run the full intake pipeline for one document.
+//
+// Classify, extract, resolve the counterparty, work out what record it implies, read
+// the tax signals, and say what to do next. Business-scoped throughout.
+//
+// WRITES ONLY REVIEW METADATA. The stored summary lands in
+// extracted_json.ai_intake_v2 and contains no financial record — no debt, no
+// transaction, no counterparty is created here. Those need an explicit user action
+// through their own endpoints.
+//
+// Idempotent: re-running produces the same summary, and an unchanged summary is not
+// written again. `?persist=false` makes it a pure read.
+app.post('/api/documents/:id/intake', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res); if (!biz) return;
+    if (!canViewBusinessFinance(biz.role))
+      return res.status(403).json({ error: 'Your role cannot view business finance' });
+    if (!await hasDocumentsAccess(biz))
+      return res.status(403).json({ error: 'Document Center is not enabled', upgrade_required: true });
+
+    const doc = await loadDocumentScoped(biz, req.params.id);
+    if (!doc) return res.status(404).json({ error: 'document_not_found_in_this_business' });
+    if (doc.archived_at) return res.status(409).json({ error: 'document_archived' });
+
+    const result = await runDocumentIntake(biz, doc, {
+      persist: !/^(0|false|no)$/i.test(String(req.query.persist ?? 'true')),
+      actorUserId: req.user.userId,
+    });
+    if (result.error) return res.status(result.status || 500).json({ error: result.error });
+
+    res.json({ ok: true, business_id: biz.business.id, ...result.intake, stored: result.stored });
+  } catch (e) {
+    console.error(`[doc-intake-v2] failed: ${e.message}`);
+    res.status(500).json({ ok: false, error: 'document_intake_failed' });
   }
 });
 

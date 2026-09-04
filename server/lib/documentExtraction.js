@@ -20,7 +20,11 @@
 
 const { parseAmount } = require('./invoiceSettlement');
 
-const TYPES = ['invoice', 'faktur_pajak', 'payment_proof', 'unknown'];
+const TYPES = [
+  'invoice', 'faktur_pajak', 'payment_proof', 'receipt', 'contract',
+  'bank_statement', 'tax_document', 'payroll_document', 'bank_fee',
+  'asset_purchase', 'funding_document', 'unknown',
+];
 
 /* ── type detection ────────────────────────────────────────────────────────
    Anchors are phrases that are close to unique for a document kind. Generic
@@ -40,6 +44,26 @@ const ANCHORS = {
     /\binvoice\b/i, /\btagihan\b/i, /\bno\.?\s*invoice\b/i,
     /\bbill\s+to\b/i, /\bkepada\s+yth\b/i, /\bnetto\b/i, /harga\s+jual/i,
   ],
+  // A receipt records money already handed over; an invoice asks for it. Kwitansi is
+  // the Indonesian form and is a strong signal on its own.
+  receipt: [/\bkwitansi\b/i, /\breceipt\b/i, /\bnota\b/i, /\btelah\s+terima\s+dari\b/i,
+    /\bsudah\s+dibayar\b/i, /\bpaid\s+in\s+full\b/i],
+  contract: [/\bperjanjian\b/i, /\bkontrak\b/i, /\bcontract\b/i, /\bagreement\b/i,
+    /\bsyarat\s+dan\s+ketentuan\b/i, /terms\s+and\s+conditions/i, /\bpara\s+pihak\b/i,
+    /\bpasal\s+\d/i, /\bmemorandum\s+of\s+understanding\b/i],
+  bank_statement: [/rekening\s+koran/i, /bank\s+statement/i, /account\s+statement/i,
+    /mutasi\s+rekening/i, /saldo\s+akhir/i, /opening\s+balance[\s\S]{0,40}closing\s+balance/i],
+  tax_document: [/\bspt\b/i, /surat\s+setoran\s+pajak/i, /\bssp\b/i, /\bbukti\s+potong\b/i,
+    /\be-?bupot\b/i, /\bntpn\b/i, /kode\s+billing/i, /\bdjp\s+online\b/i, /surat\s+ketetapan\s+pajak/i],
+  payroll_document: [/\bslip\s+gaji\b/i, /\bpayslip\b/i, /\bpayroll\b/i, /\bdaftar\s+gaji\b/i,
+    /\bthr\b/i, /\btunjangan\b/i, /\bbpjs\s+ketenagakerjaan\b/i],
+  bank_fee: [/biaya\s+admin/i, /admin\s+fee/i, /\bbank\s+charge/i, /biaya\s+transfer/i,
+    /monthly\s+maintenance\s+fee/i],
+  asset_purchase: [/\bfaktur\s+pembelian\s+(mesin|peralatan)\b/i, /purchase\s+order/i,
+    /\bdelivery\s+order\b/i, /\bsurat\s+jalan\b/i, /\basset\s+purchase\b/i],
+  funding_document: [/perjanjian\s+(kredit|pinjaman)/i, /loan\s+agreement/i,
+    /\bfacility\s+agreement\b/i, /\bpromissory\s+note\b/i, /setoran\s+modal/i,
+    /capital\s+injection/i, /\bshareholder\s+loan\b/i],
 };
 
 function detectType(text = '', hints = {}) {
@@ -92,6 +116,32 @@ function amountAfter(text, labelRe) {
   return num ? parseAmount(num[1].trim()) : null;
 }
 
+/* A captured party name must stop where the next field begins. PDF text often has
+   no line breaks, so "Dari : PT Sumber Makmur NPWP : 01... Kepada : PT Helm Care"
+   would otherwise capture everything after "Dari" — which then contains BOTH party
+   names and makes direction detection impossible. Truncate at the next known label. */
+const NAME_STOPS = [
+  /\bnpwp\b/i, /\bkepada\b/i, /\bbill\s+to\b/i, /\bpembeli\b/i, /\bpengusaha\b/i,
+  /\bbuyer\b/i, /\bdari\b/i, /\bfrom\b/i, /\bvendor\b/i, /\bpenjual\b/i,
+  /\bnetto\b/i, /\btotal\b/i, /\bjumlah\b/i, /\bdasar\b/i, /\bharga\b/i,
+  /\balamat\b/i, /\baddress\b/i, /\btanggal\b/i, /\bdate\b/i, /\bperiode\b/i,
+  /\bno\.?\s*(invoice|faktur)\b/i, /\binvoice\b/i, /\bppn\b/i, /\bqty\b/i, /\brp\b/i,
+  /\d{2}\.\d{3}\.\d{3}/,
+];
+
+function trimName(v) {
+  if (!v) return null;
+  let s = String(v).replace(/^[\s:.\-]+/, '');
+  let cut = s.length;
+  for (const re of NAME_STOPS) {
+    const m = new RegExp(re.source, 'i').exec(s);
+    // Ignore a hit at position 0: that is the label itself, not the next field.
+    if (m && m.index > 0 && m.index < cut) cut = m.index;
+  }
+  s = s.slice(0, cut).replace(/[\s:,.\-]+$/, '').trim();
+  return s.length >= 3 ? s : null;
+}
+
 /* ── invoice / faktur pajak ────────────────────────────────────────────────*/
 function extractInvoiceFields(text) {
   const f = {};
@@ -110,10 +160,12 @@ function extractInvoiceFields(text) {
     || (/\b([A-Z]\d{9,12})\b/.exec(text) || [])[1]
     || null;
 
-  f.issuer_name = afterLabel(text, /pengusaha\s+kena\s+pajak[\s\S]{0,40}?nama/i, String.raw`[^\r\n]{3,120}`)
-    || afterLabel(text, /\b(?:dari|from|vendor|penjual)\b/i, String.raw`[^\r\n]{3,120}`) || null;
-  f.buyer_name = afterLabel(text, /pembeli\s+barang\s+kena\s+pajak[\s\S]{0,40}?nama/i, String.raw`[^\r\n]{3,120}`)
-    || afterLabel(text, /\b(?:kepada|bill\s+to|buyer|pembeli)\b/i, String.raw`[^\r\n]{3,120}`) || null;
+  f.issuer_name = trimName(
+    afterLabel(text, /pengusaha\s+kena\s+pajak[\s\S]{0,40}?nama/i, String.raw`[^\r\n]{3,120}`)
+    || afterLabel(text, /\b(?:dari|from|vendor|penjual)\b/i, String.raw`[^\r\n]{3,120}`));
+  f.buyer_name = trimName(
+    afterLabel(text, /pembeli\s+barang\s+kena\s+pajak[\s\S]{0,40}?nama/i, String.raw`[^\r\n]{3,120}`)
+    || afterLabel(text, /\b(?:kepada|bill\s+to|buyer|pembeli)\b/i, String.raw`[^\r\n]{3,120}`));
 
   const npwps = [...String(text).matchAll(/\b(\d{2}\.\d{3}\.\d{3}\.\d[-.]\d{3}\.\d{3})\b/g)].map((m) => m[1]);
   if (npwps[0]) f.issuer_npwp = npwps[0];
@@ -171,10 +223,15 @@ function extractPaymentProofFields(text) {
   if (dt) f.transfer_date_text = dt[1];
 
   // "772-1538064 / HELM CARE INDONESIA PT" — number and holder on one line.
-  const accounts = [...String(text).matchAll(/(\d{3}[-\s]?\d{6,10})\s*[/|]\s*([A-Z][A-Z\s.&']{3,60})/g)]
+  // The holder must END on an upper-case character and be followed by either a
+  // Capitalised word (the next label, e.g. "Ke", "Amount"), a line break, or the end.
+  // Without that lookahead the run of capitals eats the first letter of the next
+  // label, giving "PT ALPHA SENTOSA K".
+  const accounts = [...String(text).matchAll(
+    /(\d{3}[-\s]?\d{6,10})\s*[/|]\s*([A-Z][A-Z\s.&']*[A-Z])(?=\s+[A-Z][a-z]|\s*\r?\n|\s*$)/g)]
     .map((m) => ({ number: m[1].trim(), name: m[2].trim() }));
-  if (accounts[0]) { f.from_account_number = accounts[0].number; f.from_account_name = accounts[0].name; }
-  if (accounts[1]) { f.to_account_number = accounts[1].number; f.to_account_name = accounts[1].name; }
+  if (accounts[0]) { f.from_account_number = accounts[0].number; f.from_account_name = trimName(accounts[0].name); }
+  if (accounts[1]) { f.to_account_number = accounts[1].number; f.to_account_name = trimName(accounts[1].name); }
   if (accounts.length === 1) warnings.push('Only one account could be read; confirm which side is the payee.');
 
   f.amount = amountAfter(text, /\b(?:amount|jumlah|nominal)\b/i);
@@ -202,10 +259,18 @@ const EMPTY_FIELDS = {
   to_account_number: null, to_account_name: null,
 };
 
+// Kinds that are evidence rather than a transaction: nothing is created from them.
+const SUPPORTING_TYPES = ['contract', 'bank_statement', 'tax_document', 'payroll_document', 'funding_document'];
+
 const REQUIRED_BY_TYPE = {
   invoice: ['document_number', 'gross_amount'],
   faktur_pajak: ['commercial_base_amount', 'commercial_tax_amount', 'gross_amount'],
   payment_proof: ['amount', 'payment_reference_number'],
+  receipt: ['gross_amount'],
+  asset_purchase: ['gross_amount'],
+  bank_fee: ['gross_amount'],
+  contract: [], bank_statement: [], tax_document: [],
+  payroll_document: [], funding_document: [],
   unknown: [],
 };
 
@@ -231,10 +296,14 @@ function extractFromText(text = '', opts = {}) {
   }
 
   const det = detectType(text, opts);
-  const isInvoiceLike = det.type === 'invoice' || det.type === 'faktur_pajak';
+  // Amount-bearing kinds get the invoice parser; a receipt or an asset purchase still
+  // carries a total and a party, so it is worth reading even though it is not a bill.
+  const isInvoiceLike = ['invoice', 'faktur_pajak', 'receipt', 'asset_purchase', 'bank_fee'].includes(det.type);
   const part = isInvoiceLike ? extractInvoiceFields(text)
     : det.type === 'payment_proof' ? extractPaymentProofFields(text)
-      : { fields: {}, warnings: ['Document kind not recognised from its text.'] };
+      : SUPPORTING_TYPES.includes(det.type)
+        ? { fields: {}, warnings: [`Recognised as a ${det.type.replace(/_/g, ' ')}. No financial record is created from it; it is supporting evidence.`] }
+        : { fields: {}, warnings: ['Document kind not recognised from its text.'] };
 
   const fields = { ...EMPTY_FIELDS, ...part.fields };
   const required = REQUIRED_BY_TYPE[det.type] || [];
@@ -285,6 +354,6 @@ function findDuplicateDocument(candidate = {}, existing = []) {
 }
 
 module.exports = {
-  TYPES, EMPTY_FIELDS, detectType, extractFromText,
+  TYPES, SUPPORTING_TYPES, EMPTY_FIELDS, detectType, extractFromText,
   extractInvoiceFields, extractPaymentProofFields, findDuplicateDocument,
 };
