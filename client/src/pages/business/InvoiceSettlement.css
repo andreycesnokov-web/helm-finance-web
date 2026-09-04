@@ -68,3 +68,29 @@
 .is-empty { margin: 0; font-size: 12.5px; color: var(--text-muted); }
 
 @media (max-width: 720px) { .is-actions { flex-direction: column; align-items: stretch; } }
+
+/* ── document figures editor ─────────────────────────────────────────────────
+   Manual entry now; an extraction pipeline can fill the same fields later. */
+.is-docs { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.is-doc-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.is-doc-type { font-size: 12.5px; color: var(--text-secondary); flex: 1 1 200px; }
+.is-doc-amt { font-size: 12.5px; color: var(--text-primary); font-weight: 600; }
+.is-form {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 10px 0 2px;
+  padding: 12px 14px; border: 1px solid var(--border-subtle); border-radius: 12px;
+  background: var(--brand-pale-grey);
+}
+.is-field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.is-field > span {
+  font-size: 10.5px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--text-muted);
+}
+.is-field input {
+  min-height: 36px; padding: 7px 10px; font: inherit; font-size: 13px;
+  border: 1px solid var(--border-default); border-radius: 9px;
+  background: var(--surface-card); color: var(--text-primary);
+}
+.is-field input:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 1px; }
+.is-form-actions { grid-column: 1 / -1; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.is-ok { margin: 8px 0 0; font-size: 12.5px; color: var(--success); font-weight: 600; }
+@media (max-width: 720px) { .is-form { grid-template-columns: 1fr; } }
