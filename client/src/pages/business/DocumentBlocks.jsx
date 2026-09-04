@@ -32,6 +32,7 @@ import DocumentPreview from './DocumentPreview'
 import {
   intakeOf, intakeBadges, intakeHeadline, intakeRowLines, intakeCopy, storedVsSuggested,
   typeLabelOf as intakeTypeLabel, directionLabelOf, statusLabelOf, statusLabelFor, nextActionLabels, taxLine, recordLabelOf,
+  documentWorkflowState, primaryActionLabel,
   draftOffer, counterpartyOffer, isUnsupported,
   uploadIntentOf, readSourceLabel, conflictMessage,
 } from './documentIntakeView'
@@ -348,12 +349,24 @@ export function DocumentQueue({
                   // into a wall of equal-weight buttons.
                   // Already created once without a link — offer linking, never a second create.
                   const blocked = blockCreate?.has(d.id)
+                  // The row's primary button comes from the same workflow decision the
+                  // detail panel uses, so the two can never disagree about what should
+                  // happen next to this document.
+                  const wf = documentWorkflowState(d)
+                  const PRIMARY = {
+                    create_payable: { label: 'Create payable', onClick: () => onCreate(d, 'payable') },
+                    create_receivable: { label: 'Create receivable', onClick: () => onCreate(d, 'receivable') },
+                    link_transaction: { label: 'Link to transaction', onClick: () => onLink(d, 'transaction') },
+                    create_counterparty: { label: 'Review & confirm', onClick: () => onReview(d) },
+                    save_supporting: { label: 'Review', onClick: () => onReview(d) },
+                    review_confirm: { label: 'Review & confirm', onClick: () => onReview(d) },
+                    review_fields: { label: 'Review', onClick: () => onReview(d) },
+                    open_record: { label: 'Open record', onClick: () => navigate('/business/payables') },
+                    analyze: { label: 'Classify', onClick: () => onClassify(d) },
+                  }
                   const primary = blocked && !dl
                     ? { label: 'Link existing', onClick: () => onLink(d, 'debt', a.link === 'receivable' ? 'receivable' : 'payable') }
-                    : a.create
-                      ? { label: `Create ${a.create}`, onClick: () => onCreate(d, a.create) }
-                    : a.classify ? { label: 'Classify', onClick: () => onClassify(d) }
-                      : { label: 'Review', onClick: () => onReview(d) }
+                    : (PRIMARY[wf.recommendedPrimaryAction] || { label: 'Review', onClick: () => onReview(d) })
                   const more = [
                     primary.label !== 'Review' && { label: 'Review', onClick: () => onReview(d) },
                     { label: 'View document', onClick: () => onView(d) },
@@ -881,6 +894,8 @@ export function DocumentReviewPanel({
   const tl = txLink(doc)
   const vault = vaultVerdictOf(doc)
   const intake = doc.extracted_json?.ai_intake || null
+  // The single source of truth for what this panel may offer.
+  const wf = documentWorkflowState(doc)
   const need = <em className="rp-miss">Needs review</em>
 
   const suggestion = vault
@@ -965,7 +980,11 @@ export function DocumentReviewPanel({
           </p>
         </RpCol>
 
-        {/* ── 3 — what intake concluded, and what follows from it ─────────── */}
+        {/* ── 3 — the workflow column ──────────────────────────────────────
+            AI Intake Result and Actions & routing are ONE cell of the grid. As
+            separate columns they made a fourth, which wrapped onto a second row and
+            left Actions stranded far below the tall document preview. */}
+        <div className="rp-workflow-stack">
         {onAnalyze && (
           <IntakeResult doc={doc} cpName={cpName} busy={busy}
             analyzing={analyzing} analyzeNote={analyzeNote}
@@ -977,25 +996,40 @@ export function DocumentReviewPanel({
             onAccountantReview={onOpenAccountant} onTaxSplit={onTaxSplit} />
         )}
 
-        {/* ── 3 — routing and actions ────────────────────────────────────── */}
+        {/* ── 3 — routing and actions ─────────────────────────────────────
+            Everything offered here comes from documentWorkflowState, the single
+            decision the panel makes. Before that existed this column keyed off the
+            stored document_type alone, so a document whose reading said "direction
+            unknown, no record suggested" still had "Create payable draft" as its
+            primary button. */}
         <RpCol label="Actions & routing" emphasis>
           <div className="rp-kv"><span>Evidence status</span><span>{STATUS[st].label}</span></div>
           <div className="rp-kv"><span>Linked</span>
             <span>{dl ? `Record #${dl.target_id}` : tl ? `Transaction #${tl.target_id}` : <em className="rp-miss">Not linked</em>}</span></div>
+          <div className="rp-kv"><span>Next step</span>
+            <span>{primaryActionLabel(wf.recommendedPrimaryAction)}</span></div>
 
-          <p className="rp-note">{suggestion}</p>
+          <p className={`rp-note ${wf.warningReason ? 'rp-note-amber' : ''}`}>
+            {wf.warningReason || suggestion}
+          </p>
 
           <div className="doc-panel-acts">
-            {!vault && a.create && !dl && (
-              <Btn sm onClick={() => onCreate(doc, a.create)} disabled={busy}>Create {a.create} draft</Btn>
+            {!vault && wf.mustReviewFirst && (
+              <Btn sm onClick={() => onReviewFields?.(doc)} disabled={busy}>Review &amp; confirm</Btn>
             )}
-            {!vault && (a.link === 'payable' || a.link === 'both') && !dl && (
+            {!vault && wf.canShowCreatePayable && !dl && (
+              <Btn sm onClick={() => onCreate(doc, 'payable')} disabled={busy}>Create payable draft</Btn>
+            )}
+            {!vault && wf.canShowCreateReceivable && !dl && (
+              <Btn sm onClick={() => onCreate(doc, 'receivable')} disabled={busy}>Create receivable draft</Btn>
+            )}
+            {!vault && wf.canShowCreatePayable && !dl && (
               <Btn sm variant="ghost" onClick={() => onLink(doc, 'debt', 'payable')} disabled={busy}>Link to payable</Btn>
             )}
-            {!vault && (a.link === 'receivable' || a.link === 'both') && !dl && (
+            {!vault && wf.canShowCreateReceivable && !dl && (
               <Btn sm variant="ghost" onClick={() => onLink(doc, 'debt', 'receivable')} disabled={busy}>Link to receivable</Btn>
             )}
-            {!vault && a.link === 'transaction' && !tl && (
+            {!vault && wf.canShowLinkTransaction && !tl && (
               <Btn sm variant="ghost" onClick={() => onLink(doc, 'transaction')} disabled={busy}>Link to transaction</Btn>
             )}
             {vault && onReclassify && (
@@ -1013,6 +1047,7 @@ export function DocumentReviewPanel({
             {!vault && <Btn sm variant="ghost" onClick={() => onClassify(doc)} disabled={busy}>Reclassify</Btn>}
           </div>
         </RpCol>
+        </div>
       </RpCols>
 
       <RpActions>

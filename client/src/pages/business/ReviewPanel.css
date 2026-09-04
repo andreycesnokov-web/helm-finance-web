@@ -142,3 +142,17 @@ tr.is-rp-open > td:first-child { box-shadow: inset 3px 0 0 var(--brand-electric-
 @media (prefers-reduced-motion: reduce) {
   .rp { animation: none; }
 }
+
+/* The right-hand workflow column: what the document is, then what to do about it.
+   These are ONE cell of .rp-cols. As two separate columns they made a fourth in a
+   three-column grid, which wrapped onto a second row and stranded "Actions & routing"
+   far below the tall document preview — a scroll away from the reading it belongs to. */
+.rp-workflow-stack {
+  display: flex; flex-direction: column; gap: 18px; min-width: 0;
+  align-self: start;
+}
+/* Below the two-column breakpoint the stack is already vertical, so the sections
+   simply follow each other: preview, fields, intake, actions. */
+@media (max-width: 1279px) {
+  .rp-workflow-stack { gap: 16px; }
+}

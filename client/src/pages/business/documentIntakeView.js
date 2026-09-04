@@ -299,6 +299,158 @@ export function counterpartyOffer(v2) {
   };
 }
 
+/* ── the single workflow decision ──────────────────────────────────────────
+   Every action the panel offers comes from HERE, so the page can no longer say two
+   things at once. It used to: "Actions & Routing" keyed off the stored document_type
+   column alone, so a document whose OCR reading said *direction unknown, no record
+   suggested* still had "Create payable draft" as its primary button — because a human
+   had once filed it as a supplier invoice.
+
+   The ordering below is the whole point. A stored type only drives the workflow once
+   nothing more urgent is outstanding: an unreviewed machine reading, a disagreement
+   between the two, a missing direction, a missing counterparty, a missing amount. */
+
+const HAS = (v) => v !== null && v !== undefined && v !== '';
+
+export function documentWorkflowState(doc) {
+  const v2 = intakeOf(doc);
+  const stored = doc?.document_type || null;
+  // The column is only written by a person, so a real value in it IS a human decision.
+  const manuallyConfirmed = !!stored && stored !== 'other';
+  const links = Array.isArray(doc?.links) ? doc.links : [];
+  const alreadyLinked = links.some((l) => l.target_type === 'debt');
+  const linkedToTx = links.some((l) => l.target_type === 'transaction');
+  const fromOcr = wasReadByOcr(v2);
+  const aiType = v2?.document_type || null;
+  const direction = v2?.direction || null;
+  const hasCounterparty = !!doc?.issuer_counterparty_id || v2?.counterparty_status === 'matched';
+  const amount = HAS(v2?.amount) ? v2.amount : (HAS(doc?.gross_amount) ? Number(doc.gross_amount) : null);
+  const missing = v2?.missing_fields || [];
+
+  const out = {
+    canShowCreatePayable: false,
+    canShowCreateReceivable: false,
+    canShowLinkTransaction: false,
+    canShowSaveSupporting: false,
+    mustReviewFirst: false,
+    canCreateCounterparty: false,
+    recommendedPrimaryAction: 'review_fields',
+    warningReason: null,
+  };
+
+  if (alreadyLinked) {
+    return { ...out, recommendedPrimaryAction: 'open_record',
+      warningReason: 'This document is already attached to a record.' };
+  }
+
+  // No reading at all: fall back to the stored column, exactly as before intake existed.
+  if (!v2) {
+    if (stored === 'vendor_invoice') return { ...out, canShowCreatePayable: true, canShowLinkTransaction: true, recommendedPrimaryAction: 'create_payable' };
+    if (stored === 'customer_invoice') return { ...out, canShowCreateReceivable: true, canShowLinkTransaction: true, recommendedPrimaryAction: 'create_receivable' };
+    if (stored === 'payment_proof' || stored === 'bank_document') return { ...out, canShowLinkTransaction: true, recommendedPrimaryAction: 'link_transaction' };
+    return { ...out, recommendedPrimaryAction: manuallyConfirmed ? 'review_fields' : 'analyze' };
+  }
+
+  // 1 — a machine reading is not a decision. Until a person confirms the type, an
+  //     OCR-read document may not put a record-creating button in front of them.
+  if (fromOcr && !manuallyConfirmed) {
+    return { ...out, mustReviewFirst: true, canCreateCounterparty: true,
+      canShowSaveSupporting: true, recommendedPrimaryAction: 'review_confirm',
+      warningReason: 'This document was read by OCR/Vision. Confirm the type, direction and '
+        + 'figures before any record is created from it.' };
+  }
+
+  // 2 — the stored column and the reading disagree. Both are shown; neither acts.
+  if (v2.intent_conflict || (manuallyConfirmed && aiType && aiType !== 'unknown'
+      && !storedMatchesAi(stored, aiType))) {
+    return { ...out, mustReviewFirst: true, canCreateCounterparty: true,
+      canShowSaveSupporting: true, recommendedPrimaryAction: 'review_confirm',
+      warningReason: 'Stored type and AI reading disagree. Review & confirm before creating records.' };
+  }
+
+  // 3 — a receipt is settled money. It never becomes a bill.
+  if (aiType === 'receipt') {
+    return { ...out, canShowSaveSupporting: true, canShowLinkTransaction: !linkedToTx,
+      canCreateCounterparty: true, recommendedPrimaryAction: 'save_supporting',
+      warningReason: 'A receipt is evidence that money moved. It is not a bill.' };
+  }
+
+  // 4 — a payment proof explains a transaction; it does not create a bill.
+  if (aiType === 'payment_proof') {
+    return { ...out, canShowLinkTransaction: !linkedToTx, canCreateCounterparty: true,
+      canShowSaveSupporting: true, recommendedPrimaryAction: 'link_transaction' };
+  }
+
+  // 5 — no direction means we do not know who owes whom. Nothing may be drafted.
+  if (!direction || direction === 'unknown') {
+    return { ...out, mustReviewFirst: true, canCreateCounterparty: true,
+      canShowSaveSupporting: true, recommendedPrimaryAction: 'review_fields',
+      warningReason: 'The direction of this document could not be determined. '
+        + 'Review it or send it to accountant review.' };
+  }
+
+  if (direction === 'supporting_document' || v2.suggested_record_type === 'supporting_document') {
+    return { ...out, canShowSaveSupporting: true, canCreateCounterparty: true,
+      canShowLinkTransaction: !linkedToTx, recommendedPrimaryAction: 'save_supporting' };
+  }
+
+  // 6 — a bill, pointed the right way. What is still missing decides the button.
+  const wantsPayable = direction === 'payable' || v2.suggested_record_type === 'payable';
+  const wantsReceivable = direction === 'receivable' || v2.suggested_record_type === 'receivable';
+  if (wantsPayable || wantsReceivable) {
+    const blocking = missing.filter((f) => f !== 'counterparty');
+    if (!HAS(amount) || blocking.length) {
+      return { ...out, mustReviewFirst: true, canCreateCounterparty: true,
+        recommendedPrimaryAction: 'review_fields',
+        warningReason: !HAS(amount)
+          ? 'No amount could be read, so no record can be drafted yet.'
+          : `Enter ${blocking.join(', ')} before creating a record.` };
+    }
+    if (!hasCounterparty) {
+      return { ...out, canCreateCounterparty: true, canShowSaveSupporting: true,
+        recommendedPrimaryAction: 'create_counterparty',
+        warningReason: 'The counterparty is not in your directory yet. Create or link it first.' };
+    }
+    return { ...out,
+      canShowCreatePayable: wantsPayable, canShowCreateReceivable: wantsReceivable,
+      canShowLinkTransaction: !linkedToTx, canCreateCounterparty: true,
+      recommendedPrimaryAction: wantsPayable ? 'create_payable' : 'create_receivable' };
+  }
+
+  return { ...out, canShowSaveSupporting: true, canCreateCounterparty: true,
+    recommendedPrimaryAction: 'review_fields' };
+}
+
+// Which stored column values a given AI reading is consistent with. A stored
+// "tax_invoice" and an AI "faktur_pajak" are the same thing under two names.
+const STORED_FOR_AI = {
+  invoice: ['vendor_invoice', 'customer_invoice'],
+  faktur_pajak: ['tax_invoice'],
+  payment_proof: ['payment_proof', 'bank_document'],
+  receipt: ['payment_proof', 'other'],
+  bank_statement: ['bank_document'],
+  tax_document: ['tax_billing', 'bukti_potong', 'filing_confirmation', 'tax_invoice'],
+};
+export function storedMatchesAi(stored, aiType) {
+  if (!stored || stored === 'other') return true;   // nothing to disagree with
+  const ok = STORED_FOR_AI[aiType];
+  return ok ? ok.includes(stored) : true;           // unmapped kinds never raise a conflict
+}
+
+/** The label for whatever the workflow decided should happen first. */
+export const PRIMARY_ACTION_LABEL = {
+  review_confirm: 'Review & confirm',
+  review_fields: 'Review fields',
+  create_payable: 'Create payable draft',
+  create_receivable: 'Create receivable draft',
+  create_counterparty: 'Create or link counterparty',
+  link_transaction: 'Link to transaction',
+  save_supporting: 'Save as supporting document',
+  open_record: 'Open record',
+  analyze: 'Analyze document',
+};
+export const primaryActionLabel = (k) => PRIMARY_ACTION_LABEL[k] || 'Review fields';
+
 /* ── analyze button ────────────────────────────────────────────────────────── */
 
 // `stored:false` means the summary was already up to date — an unchanged re-run. It must

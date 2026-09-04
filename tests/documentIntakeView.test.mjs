@@ -306,6 +306,126 @@ t('7. the suggested record reads in words, not as an enum', () => {
     'nothing is "created" for a kind that is never created');
 });
 
+/* ── the single workflow decision ───────────────────────────────────────────
+   Production showed the panel saying two things at once: the reading said
+   "direction unknown, no record suggested" while Actions & Routing offered
+   "Create payable draft", because that column keyed off the stored column alone. */
+const wfDoc = (v2, extra = {}) => ({ document_type: 'other', links: [], extracted_json: v2 ? { ai_intake_v2: v2 } : {}, ...extra });
+
+t('5. an OCR document does not offer Create payable before confirmation', () => {
+  const w = V.documentWorkflowState(wfDoc({ ...INVOICE, source: 'ocr_vision' }));
+  assert.strictEqual(w.canShowCreatePayable, false);
+  assert.strictEqual(w.mustReviewFirst, true);
+  assert.strictEqual(w.recommendedPrimaryAction, 'review_confirm');
+  assert.ok(/OCR\/Vision/.test(w.warningReason), w.warningReason);
+});
+
+t('6. OCR plus an unknown direction still offers no draft', () => {
+  const w = V.documentWorkflowState(wfDoc({ ...INVOICE, source: 'ocr_vision', direction: 'unknown', suggested_record_type: 'none' }));
+  assert.strictEqual(w.canShowCreatePayable, false);
+  assert.strictEqual(w.canShowCreateReceivable, false);
+});
+
+t('an unknown direction from EMBEDDED text also blocks a draft', () => {
+  const w = V.documentWorkflowState(wfDoc({ ...INVOICE, source: 'embedded_text', direction: 'unknown' }));
+  assert.strictEqual(w.canShowCreatePayable, false);
+  assert.strictEqual(w.mustReviewFirst, true);
+  assert.ok(/direction/i.test(w.warningReason), w.warningReason);
+});
+
+t('7. a stored supplier invoice that AI reads as a faktur asks for review first', () => {
+  // exactly the production KWT state
+  const w = V.documentWorkflowState(wfDoc(
+    { ...INVOICE, source: 'ocr_vision', document_type: 'faktur_pajak', direction: 'unknown', suggested_record_type: 'none' },
+    { document_type: 'vendor_invoice' }));
+  assert.strictEqual(w.canShowCreatePayable, false, 'the stored column alone may not drive this');
+  assert.strictEqual(w.mustReviewFirst, true);
+  assert.strictEqual(w.recommendedPrimaryAction, 'review_confirm');
+  assert.ok(/disagree|OCR/i.test(w.warningReason), w.warningReason);
+});
+
+t('a stored type consistent with the reading raises no conflict', () => {
+  assert.strictEqual(V.storedMatchesAi('vendor_invoice', 'invoice'), true);
+  assert.strictEqual(V.storedMatchesAi('tax_invoice', 'faktur_pajak'), true);
+  assert.strictEqual(V.storedMatchesAi('vendor_invoice', 'receipt'), false);
+  assert.strictEqual(V.storedMatchesAi('other', 'receipt'), true, 'an unset column cannot disagree');
+});
+
+t('8. a receipt never offers Create payable, whatever the column says', () => {
+  for (const stored of ['other', 'vendor_invoice']) {
+    const w = V.documentWorkflowState(wfDoc(
+      { ...INVOICE, source: 'embedded_text', document_type: 'receipt', direction: 'outgoing_payment',
+        suggested_record_type: 'supporting_document' }, { document_type: stored }));
+    assert.strictEqual(w.canShowCreatePayable, false, `stored ${stored} must not create a payable`);
+    assert.strictEqual(w.canShowCreateReceivable, false);
+  }
+});
+
+t('a receipt read from text offers supporting evidence and a transaction link', () => {
+  const w = V.documentWorkflowState(wfDoc({ ...INVOICE, source: 'embedded_text', document_type: 'receipt',
+    direction: 'outgoing_payment', suggested_record_type: 'supporting_document' }));
+  assert.strictEqual(w.recommendedPrimaryAction, 'save_supporting');
+  assert.strictEqual(w.canShowSaveSupporting, true);
+  assert.strictEqual(w.canShowLinkTransaction, true);
+});
+
+t('a payment proof links rather than bills', () => {
+  const w = V.documentWorkflowState(wfDoc({ ...INVOICE, source: 'embedded_text', document_type: 'payment_proof',
+    direction: 'outgoing_payment', suggested_record_type: 'transaction' }));
+  assert.strictEqual(w.recommendedPrimaryAction, 'link_transaction');
+  assert.strictEqual(w.canShowCreatePayable, false);
+});
+
+t('9. an embedded-text invoice with everything known still offers the draft', () => {
+  const w = V.documentWorkflowState(wfDoc(
+    { ...INVOICE, source: 'embedded_text', counterparty_status: 'matched', missing_fields: [] },
+    { issuer_counterparty_id: 'cp-1' }));
+  assert.strictEqual(w.canShowCreatePayable, true);
+  assert.strictEqual(w.recommendedPrimaryAction, 'create_payable');
+  assert.strictEqual(w.mustReviewFirst, false);
+});
+
+t('10. a missing amount blocks the draft and says so', () => {
+  const w = V.documentWorkflowState(wfDoc(
+    { ...INVOICE, source: 'embedded_text', amount: null, counterparty_status: 'matched', missing_fields: ['amount'] },
+    { issuer_counterparty_id: 'cp-1' }));
+  assert.strictEqual(w.canShowCreatePayable, false);
+  assert.strictEqual(w.mustReviewFirst, true);
+  assert.ok(/amount/i.test(w.warningReason), w.warningReason);
+});
+
+t('11. a missing counterparty reroutes to creating one, not to a payable', () => {
+  const w = V.documentWorkflowState(wfDoc({ ...INVOICE, source: 'embedded_text', counterparty_status: 'not_found', missing_fields: [] }));
+  assert.strictEqual(w.canShowCreatePayable, false);
+  assert.strictEqual(w.canCreateCounterparty, true);
+  assert.strictEqual(w.recommendedPrimaryAction, 'create_counterparty');
+  assert.ok(/counterparty/i.test(w.warningReason), w.warningReason);
+});
+
+t('a document already on a record points at the record', () => {
+  const w = V.documentWorkflowState(wfDoc(INVOICE, { links: [{ target_type: 'debt', target_id: 7 }] }));
+  assert.strictEqual(w.recommendedPrimaryAction, 'open_record');
+  assert.strictEqual(w.canShowCreatePayable, false, 'never a second record from one document');
+});
+
+t('a document with no reading falls back to the stored column, as before', () => {
+  assert.strictEqual(V.documentWorkflowState(wfDoc(null, { document_type: 'vendor_invoice' })).recommendedPrimaryAction, 'create_payable');
+  assert.strictEqual(V.documentWorkflowState(wfDoc(null, { document_type: 'customer_invoice' })).recommendedPrimaryAction, 'create_receivable');
+  assert.strictEqual(V.documentWorkflowState(wfDoc(null)).recommendedPrimaryAction, 'analyze');
+});
+
+t('17. no workflow state creates anything — they are all offers', () => {
+  const states = [
+    V.documentWorkflowState(wfDoc({ ...INVOICE, source: 'ocr_vision' })),
+    V.documentWorkflowState(wfDoc({ ...INVOICE, source: 'embedded_text' })),
+    V.documentWorkflowState(wfDoc(SCAN)),
+  ];
+  for (const w of states) {
+    assert.ok('canShowCreatePayable' in w && typeof w.canShowCreatePayable === 'boolean');
+    assert.ok(!('created' in w) && !('payable_id' in w), 'a decision is never a record');
+  }
+});
+
 /* ── 5/6. the analyze button ────────────────────────────────────────────────── */
 t('5. a stored run says the analysis was updated', () => {
   assert.strictEqual(V.analyzeMessage({ stored: true }), 'Analysis updated.');
