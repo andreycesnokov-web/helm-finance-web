@@ -78,6 +78,7 @@ import { BusinessAccountantHub } from './pages/business/AccountantPremium'
 // backend 404s and the page renders an explanatory "not enabled yet" state.
 import BusinessOnboarding from './pages/business/Onboarding'
 import TaxSplit from './pages/business/TaxSplit'
+import InvoiceSettlement from './pages/business/InvoiceSettlement'
 
 // Personal/Funding UI requires migrations 037–039. OFF by default so production stays
 // safe until they're applied. Enable in env: VITE_PERSONAL_FUNDING_UI_ENABLED=true.
@@ -613,6 +614,8 @@ export default function App() {
             <Route path="/business/accountant" element={<BusinessShell><BusinessAccountantHub /></BusinessShell>} />
             {/* AI Tax Split V1 — suggestion-only invoice→tax→accountant flow. */}
             <Route path="/business/accountant/tax-split" element={<BusinessShell><TaxSplit /></BusinessShell>} />
+            {/* Invoice settlement V1 — partial payment tracking and closeout gates. */}
+            <Route path="/business/accountant/settlement" element={<BusinessShell><InvoiceSettlement /></BusinessShell>} />
             <Route path="/business/invoices" element={<BusinessShell><BusinessInvoices /></BusinessShell>} />
             {/* Not-yet-migrated modules: existing components rendered INSIDE the premium
                 shell (real content + premium sidebar/header), so the user never sees the

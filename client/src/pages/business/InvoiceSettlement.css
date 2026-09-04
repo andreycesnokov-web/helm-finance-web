@@ -1,0 +1,70 @@
+/* Invoice settlement V1. Brandbook tokens only. Prefix: is-
+   The remaining balance is the strongest element — it is the decision. */
+.is-note {
+  display: flex; align-items: flex-start; gap: 9px;
+  margin: 0 0 18px; padding: 11px 14px;
+  border: 1px solid var(--warning); border-radius: 12px; background: var(--warning-soft);
+  font-size: 12.5px; line-height: 1.55; color: var(--text-primary); max-width: 96ch;
+}
+.is-note svg { flex: 0 0 auto; color: var(--warning); margin-top: 2px; }
+
+.is-grid { display: grid; gap: 18px; align-items: start; }
+@media (min-width: 1180px) { .is-grid { grid-template-columns: minmax(300px, 380px) 1fr; } }
+
+.is-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.is-item {
+  width: 100%; text-align: left; cursor: pointer; font: inherit;
+  display: flex; flex-direction: column; gap: 3px; padding: 10px 12px;
+  border: 1px solid var(--border-subtle); border-radius: 10px; background: var(--surface-card);
+}
+.is-item:hover { border-color: var(--border-default); }
+.is-item.is-on { border-color: var(--brand-navy); background: var(--brand-pale-grey); }
+.is-item:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 1px; }
+.is-item-top { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; }
+.is-item-cp { font-weight: 700; font-size: 13px; color: var(--text-primary); }
+.is-item-amt { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 12.5px; }
+.is-item-sub { font-size: 11.5px; color: var(--text-muted); }
+
+.is-head {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 14px;
+  flex-wrap: wrap; padding-bottom: 14px; border-bottom: 1px solid var(--border-subtle);
+}
+.is-eyebrow {
+  font-size: 10.5px; font-weight: 800; letter-spacing: .09em; text-transform: uppercase;
+  color: var(--brand-electric-blue-ink);
+}
+.is-title { margin: 3px 0 0; font-family: var(--font-display); font-size: 18px; color: var(--brand-navy); }
+.is-sub { margin: 3px 0 0; font-size: 12.5px; color: var(--text-muted); max-width: 70ch; }
+
+.is-sec { display: flex; flex-direction: column; gap: 7px; padding: 14px 0; border-bottom: 1px solid var(--border-subtle); }
+.is-sec:last-child { border-bottom: 0; }
+.is-context { background: var(--brand-pale-grey); border-radius: 12px; padding: 12px 14px; border-bottom: 0; }
+.is-label {
+  font-size: 10.5px; font-weight: 800; letter-spacing: .11em; text-transform: uppercase;
+  color: var(--text-muted);
+}
+.is-row { display: flex; align-items: baseline; justify-content: space-between; gap: 14px; font-size: 13px; }
+.is-row > span:first-child { color: var(--text-muted); }
+.is-row > span:last-child { font-weight: 700; color: var(--text-primary); }
+.is-row-strong { padding-top: 7px; border-top: 1px solid var(--border-subtle); font-size: 16px; }
+.is-row-strong > span:last-child { font-size: 19px; color: var(--brand-navy); }
+.is-mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.is-pos { color: var(--success); }
+
+.is-state { margin: 0; font-size: 14px; font-weight: 700; color: var(--brand-navy); }
+.is-checks, .is-blockers {
+  margin: 2px 0 0; padding-left: 0; list-style: none;
+  font-size: 12.5px; line-height: 1.7; color: var(--text-secondary);
+}
+.is-checks li { display: flex; gap: 8px; align-items: baseline; }
+.is-checks li.is-ok { color: var(--success); }
+.is-checks li.is-missing { color: var(--text-primary); font-weight: 600; }
+.is-checks em { font-style: normal; color: var(--text-muted); font-size: 11.5px; }
+.is-blockers { padding-left: 18px; list-style: disc; color: var(--warning); font-weight: 600; }
+.is-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+.is-hint { margin: 0; font-size: 11.5px; line-height: 1.55; color: var(--text-muted); max-width: 84ch; }
+.is-warn { margin: 0; font-size: 12.5px; line-height: 1.6; color: var(--warning); font-weight: 600; max-width: 84ch; }
+.is-err { margin: 0; font-size: 12.5px; color: var(--danger); font-weight: 600; }
+.is-empty { margin: 0; font-size: 12.5px; color: var(--text-muted); }
+
+@media (max-width: 720px) { .is-actions { flex-direction: column; align-items: stretch; } }

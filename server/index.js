@@ -9,6 +9,7 @@ const { VALID_PLANS, computeBusinessAccess } = require('./lib/businessAccess');
 const docV = require('./lib/documentValidation');
 const { buildReminderRow } = require('./lib/reminderScope');
 const FININ = require('./lib/financialInsights');
+const SETTLE = require('./lib/invoiceSettlement');
 const docA = require('./lib/documentAccess');
 const TX = require('./lib/transactionClass');
 // Telegram-created payables are IDR-only until multi-currency payables exist end to end.
@@ -2753,6 +2754,199 @@ app.get('/api/pulse/advanced-insights', auth, async (req, res) => {
   } catch (e) {
     console.error(`[advanced-insights] failed: ${e.message}`);
     res.status(500).json({ ok: false, error: 'advanced_insights_failed' });
+  }
+});
+
+
+// ── Invoice Payment Matching V1 ──────────────────────────────────────────────
+// Settlement state for one payable/receivable: what it totals, what has been paid
+// against it, what remains, which documents are attached, and whether it may be
+// closed. Business-scoped throughout.
+//
+// WHAT THESE ROUTES DO NOT DO:
+//   * They never pay anything, never contact a bank and never submit to Coretax.
+//   * They never close an invoice. /settlement REPORTS whether the gates are open;
+//     closing stays a deliberate human action.
+//   * /allocate does NOT move money. The money path is the existing
+//     POST /api/debts/:id/pay, which already validates against the remaining
+//     balance and writes the transaction. This records the AUDIT TRAIL that route
+//     never wrote: which transaction and which payment proof settled which invoice.
+
+// GET /api/invoices/:debtId/settlement — read-only.
+app.get('/api/invoices/:debtId/settlement', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res); if (!biz) return;
+    if (!canViewBusinessFinance(biz.role))
+      return res.status(403).json({ error: 'Your role cannot view business finance' });
+
+    const { data: debtRows } = await supabase.from('debts')
+      .select('*').eq('id', req.params.debtId).or(bizOrFilter(biz)).limit(1);
+    const debt = debtRows?.[0];
+    if (!debt) return res.status(404).json({ error: 'invoice_not_found_in_this_business' });
+
+    const [{ data: allocs }, { data: links }] = await Promise.all([
+      supabase.from('debt_settlement_allocations').select('*')
+        .eq('debt_id', debt.id).eq('business_id', biz.business.id),
+      supabase.from('document_debt_links').select('document_id')
+        .eq('debt_id', debt.id).eq('business_id', biz.business.id),
+    ]);
+
+    // Resolved with an explicit second query rather than a PostgREST embed: the join is
+    // then visible in the code, and the business_id filter is applied to the documents
+    // themselves instead of being inherited from the link row.
+    const docIds = (links || []).map((l) => l.document_id).filter(Boolean);
+    let docs = [];
+    if (docIds.length) {
+      const { data: docRows } = await supabase.from('financial_documents')
+        .select('id, document_type, document_number, commercial_base_amount, commercial_tax_amount, gross_amount, extracted_json')
+        .eq('business_id', biz.business.id).in('id', docIds);
+      docs = docRows || [];
+    }
+    const byType = (t) => docs.filter((d) => d && d.document_type === t);
+    const taxDocs = byType('tax_invoice');
+    const invoiceDoc = byType('vendor_invoice')[0] || byType('customer_invoice')[0] || null;
+
+    // Invoice total: prefer the linked invoice document, fall back to the debt itself.
+    const invoiceTotal = invoiceDoc && invoiceDoc.gross_amount != null
+      ? Number(invoiceDoc.gross_amount)
+      : Number(debt.original_amount || debt.amount || 0);
+    const baseAmount = invoiceDoc ? invoiceDoc.commercial_base_amount : null;
+    const taxAmount = invoiceDoc ? invoiceDoc.commercial_tax_amount
+      : (taxDocs[0] ? taxDocs[0].commercial_tax_amount : null);
+
+    // `debts.paid_amount` is the authority on money (POST /pay maintains it).
+    // Allocation rows are the audit trail and may lag behind it, so both are reported.
+    const allocationList = (allocs || []).map((a) => ({ allocated_amount: Number(a.allocated_amount) }));
+    const allocatedTotal = allocationList.reduce((x, a) => x + a.allocated_amount, 0);
+    const paidAmount = Number(debt.paid_amount || 0);
+    const settlement = SETTLE.settlementOf({
+      invoice_total: invoiceTotal, base_amount: baseAmount, tax_amount: taxAmount,
+      allocations: paidAmount > 0 ? [{ allocated_amount: paidAmount }] : [],
+    });
+
+    const documents = {
+      invoice: !!invoiceDoc,
+      tax_invoice: taxDocs.length > 0,
+      payment_proof: byType('payment_proof').length > 0,
+      contract: byType('other').length > 0,
+      accountant_confirmation: debt.accountant_review_status === 'accountant_approved',
+    };
+
+    // Duplicate bank references among the attached payment proofs.
+    const proofs = byType('payment_proof').map((d) => ({
+      reference_number: d.extracted_json && d.extracted_json.reference_number,
+      bank_name: d.extracted_json && d.extracted_json.bank_name,
+    }));
+    const seen = new Set(); const duplicates = [];
+    for (const pr of proofs) {
+      const k = SETTLE.duplicateKeyOf(pr);
+      if (!k) continue;
+      if (seen.has(k)) duplicates.push(pr); else seen.add(k);
+    }
+
+    const closeout = SETTLE.closeoutState({
+      settlement, documents, duplicates,
+      accountant_review: debt.accountant_review_status || null,
+      has_tax: Number(taxAmount || 0) > 0 || taxDocs.length > 0,
+    });
+
+    res.json({
+      ok: true, business_id: biz.business.id,
+      invoice: {
+        debt_id: debt.id, type: debt.type, counterparty: debt.counterparty,
+        description: debt.description, due_date: debt.due_date,
+        currency: debt.currency || 'IDR',
+        document_number: invoiceDoc ? invoiceDoc.document_number : null,
+      },
+      settlement,
+      allocations: { count: allocationList.length, total: allocatedTotal,
+        matches_paid_amount: Math.abs(allocatedTotal - paidAmount) < 0.01 },
+      documents, closeout,
+    });
+  } catch (e) {
+    console.error(`[settlement] read failed: ${e.message}`);
+    res.status(500).json({ ok: false, error: 'settlement_read_failed' });
+  }
+});
+
+// POST /api/invoices/:debtId/allocate — record that a transaction settled this invoice.
+// Audit trail only: no money moves here, and no invoice is closed.
+app.post('/api/invoices/:debtId/allocate', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res); if (!biz) return;
+    if (!canCreateConfirmedFinancialRecord(biz.role))
+      return res.status(403).json({ error: 'Your role cannot record settlements' });
+
+    const b = req.body || {};
+    const amount = Number(b.allocated_amount);
+    if (!Number.isFinite(amount) || amount <= 0)
+      return res.status(400).json({ error: 'allocated_amount must be a positive number' });
+    if (!b.transaction_id)
+      return res.status(400).json({ error: 'transaction_id is required' });
+
+    const { data: debtRows } = await supabase.from('debts')
+      .select('*').eq('id', req.params.debtId).or(bizOrFilter(biz)).limit(1);
+    const debt = debtRows?.[0];
+    if (!debt) return res.status(404).json({ error: 'invoice_not_found_in_this_business' });
+
+    // Never trust a caller-supplied id: the transaction must be ours.
+    const { data: txRows } = await supabase.from('transactions')
+      .select('id').eq('id', b.transaction_id).or(bizOrFilter(biz)).limit(1);
+    if (!txRows?.length) return res.status(404).json({ error: 'transaction_not_found_in_this_business' });
+
+    let documentId = null;
+    if (b.document_id) {
+      const { data: docRows } = await supabase.from('financial_documents')
+        .select('id').eq('id', b.document_id).eq('business_id', biz.business.id).limit(1);
+      if (!docRows?.length) return res.status(404).json({ error: 'document_not_found_in_this_business' });
+      documentId = b.document_id;
+    }
+
+    // Over-allocation guard, measured against the invoice total.
+    const { data: existing } = await supabase.from('debt_settlement_allocations')
+      .select('allocated_amount, transaction_id').eq('debt_id', debt.id).eq('business_id', biz.business.id);
+    const already = (existing || []).reduce((x, a) => x + Number(a.allocated_amount || 0), 0);
+    const total = Number(debt.original_amount || debt.amount || 0);
+    if (already + amount > total + SETTLE.DEFAULT_TOLERANCE) {
+      return res.status(400).json({ error: 'allocation_exceeds_invoice_total',
+        invoice_total: total, already_allocated: already, requested: amount });
+    }
+    // The DB also holds UNIQUE(debt_id, transaction_id); this is the friendly message.
+    if ((existing || []).some((a) => String(a.transaction_id) === String(b.transaction_id))) {
+      return res.status(409).json({ error: 'transaction_already_allocated_to_this_invoice' });
+    }
+
+    const { data: alloc, error } = await supabase.from('debt_settlement_allocations').insert({
+      business_id: biz.business.id, debt_id: debt.id,
+      settlement_source_type: 'transaction', transaction_id: b.transaction_id,
+      allocated_amount: amount, created_by_user_id: req.user.userId,
+    }).select().single();
+    if (error) {
+      console.error(`[settlement] allocate insert failed: ${error.message}`);
+      return res.status(500).json({ error: 'allocation_create_failed', detail: error.message });
+    }
+
+    // Attach the payment proof to both the invoice and the transaction it settled.
+    if (documentId) {
+      await supabase.from('document_debt_links').insert({
+        business_id: biz.business.id, document_id: documentId, debt_id: debt.id,
+        created_by_user_id: req.user.userId,
+      });
+      await supabase.from('document_transaction_links').insert({
+        business_id: biz.business.id, document_id: documentId, transaction_id: b.transaction_id,
+        created_by_user_id: req.user.userId,
+      });
+    }
+
+    await recordAudit({
+      businessId: biz.business.id, actorUserId: req.user.userId, actorRole: biz.role,
+      entityType: 'debt_settlement_allocation', entityId: alloc.id,
+      action: 'settlement_allocated', after: alloc,
+    });
+    res.json({ ok: true, allocation: alloc });
+  } catch (e) {
+    console.error(`[settlement] allocate failed: ${e.message}`);
+    res.status(500).json({ ok: false, error: 'settlement_allocate_failed' });
   }
 });
 
