@@ -12304,6 +12304,7 @@ app.get('/api/documents/health', auth, async (req, res) => {
 const docIntake = require('./lib/documentIntake');
 const docContent = require('./lib/documentContent');
 const { extractPdfText } = require('./lib/pdfText');
+const docExtract = require('./lib/documentExtraction');
 
 const INTAKE_DOC_CAP = 500;
 
@@ -13013,6 +13014,85 @@ app.patch('/api/documents/:id/financial-fields', auth, async (req, res) => {
   } catch (e) {
     console.error(`[doc-financial-fields] failed: ${e.message}`);
     res.status(500).json({ error: 'document_financial_fields_failed' });
+  }
+});
+
+
+// POST /api/documents/:id/extract — suggest structured fields from the document's text.
+//
+// ZERO-WRITE. This route reads the stored file, pulls whatever text the PDF already
+// carries, parses it, and returns a SUGGESTION. It never updates the document. Saving
+// is a separate, explicit call to PATCH /api/documents/:id/financial-fields, so a user
+// always sees the values before they land on a financial record.
+//
+// NOT OCR. server/lib/pdfText.js reads embedded text only. A scanned page carries none,
+// and the response then says needs_manual_review rather than guessing.
+//
+// This deliberately does NOT consult DOCUMENT_CONTENT_CLASSIFICATION_ENABLED. That flag
+// gates the AUTOMATIC classify-and-write that runs during upload; the risk it manages is
+// an unattended write. Extraction here is user-initiated and writes nothing, and the
+// same hardened, bounded reader does the work.
+app.post('/api/documents/:id/extract', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res); if (!biz) return;
+    if (!canViewBusinessFinance(biz.role))
+      return res.status(403).json({ error: 'Your role cannot view business finance' });
+    if (!await hasDocumentsAccess(biz))
+      return res.status(403).json({ error: 'Document Center is not enabled', upgrade_required: true });
+
+    const doc = await loadDocumentScoped(biz, req.params.id);
+    if (!doc) return res.status(404).json({ error: 'document_not_found_in_this_business' });
+    if (doc.archived_at) return res.status(409).json({ error: 'document_archived' });
+
+    const { data: fileRows } = await supabase.from('document_files')
+      .select('id, storage_path, file_name, mime_type')
+      .eq('id', doc.file_id).eq('business_id', biz.business.id).limit(1);
+    const file = fileRows?.[0];
+    if (!file) return res.status(404).json({ error: 'file_not_found' });
+
+    const { data: blob, error: dlErr } = await supabase.storage.from(DOC_BUCKET).download(file.storage_path);
+    if (dlErr || !blob) return res.status(503).json({ error: 'document_unavailable' });
+    const buf = Buffer.from(await blob.arrayBuffer());
+
+    const isPdf = /pdf/i.test(file.mime_type || '') || /\.pdf$/i.test(file.file_name || '');
+    const ex = isPdf ? extractPdfText(buf)
+      : { text: '', text_available: false, method: 'not_a_pdf', reason: 'not_a_pdf' };
+
+    const result = docExtract.extractFromText(ex.text, {
+      text_available: ex.text_available,
+      document_type: doc.document_type,
+      file_name: file.file_name,
+      extraction_reason: ex.reason,
+    });
+
+    // Duplicate check across this business, using references already recorded.
+    let duplicate = { duplicate: false };
+    const candidateRef = result.fields.payment_reference_number || result.fields.document_number;
+    if (candidateRef) {
+      const { data: others } = await supabase.from('financial_documents')
+        .select('id, document_number, gross_amount, extracted_json')
+        .eq('business_id', biz.business.id).neq('id', doc.id).limit(200);
+      const existing = (others || []).map((d) => ({
+        id: d.id,
+        document_number: d.document_number,
+        payment_reference_number: d.extracted_json && d.extracted_json.payment_reference_number,
+        amount: d.gross_amount == null ? null : Number(d.gross_amount),
+      }));
+      duplicate = docExtract.findDuplicateDocument(
+        { ...result.fields, amount: result.fields.amount ?? result.fields.gross_amount }, existing);
+    }
+
+    res.json({
+      ok: true, business_id: biz.business.id, document_id: doc.id,
+      // Nothing was written. The client must call financial-fields to save.
+      saved: false,
+      extraction: result,
+      duplicate,
+      text_source: { available: ex.text_available, method: ex.method, reason: ex.reason },
+    });
+  } catch (e) {
+    console.error(`[doc-extract] failed: ${e.message}`);
+    res.status(500).json({ ok: false, error: 'document_extract_failed' });
   }
 });
 

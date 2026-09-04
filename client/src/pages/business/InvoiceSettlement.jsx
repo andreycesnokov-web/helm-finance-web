@@ -39,6 +39,7 @@ export default function InvoiceSettlement() {
   const [editing, setEditing] = useState(null)   // document id being edited
   const [form, setForm] = useState({})
   const [saveMsg, setSaveMsg] = useState(null)
+  const [extract, setExtract] = useState(null)   // { documentId, result, duplicate }
 
   useEffect(() => {
     if (!token) return
@@ -70,6 +71,48 @@ export default function InvoiceSettlement() {
       gross_amount: d.gross_amount ?? '',
       currency: 'IDR',
     })
+  }
+
+  // Extraction is a SUGGESTION: this call writes nothing. Applying is a second,
+  // deliberate click that goes through the financial-fields endpoint.
+  const runExtract = async (docId) => {
+    setBusy(true); setErr(null); setSaveMsg(null); setExtract(null)
+    try {
+      const r = await apiFetch(`/documents/${docId}/extract`, token, { method: 'POST' })
+      setExtract({ documentId: docId, ...r })
+    } catch (e2) { setErr(e2.message || 'Could not extract document fields') }
+    finally { setBusy(false) }
+  }
+
+  const applyExtracted = async (intoEditor) => {
+    const f = extract?.extraction?.fields || {}
+    const next = {
+      document_number: f.document_number || '',
+      commercial_base_amount: f.commercial_base_amount ?? '',
+      commercial_tax_amount: f.commercial_tax_amount ?? '',
+      gross_amount: f.gross_amount ?? '',
+      currency: f.currency || 'IDR',
+    }
+    setForm(next); setEditing(extract.documentId)
+    if (intoEditor) { setExtract(null); return }   // "Edit before saving"
+    setBusy(true); setErr(null)
+    try {
+      const num = (v) => (v === '' || v === null ? null : Number(v))
+      await apiFetch(`/documents/${extract.documentId}/financial-fields`, token, {
+        method: 'PATCH',
+        body: {
+          document_number: next.document_number || null,
+          commercial_base_amount: num(next.commercial_base_amount),
+          commercial_tax_amount: num(next.commercial_tax_amount),
+          gross_amount: num(next.gross_amount),
+          currency: next.currency,
+        },
+      })
+      setSaveMsg('Extracted values applied. Settlement recalculated.')
+      setExtract(null); setEditing(null)
+      await load(selected)
+    } catch (e2) { setErr(e2.message || 'Could not apply extracted fields') }
+    finally { setBusy(false) }
   }
 
   const saveFields = async () => {
@@ -216,10 +259,83 @@ export default function InvoiceSettlement() {
                           : 'no figures recorded'}
                       </span>
                       <Btn sm variant="ghost" disabled={busy}
+                        onClick={() => runExtract(d.id)}>Extract fields</Btn>
+                      <Btn sm variant="ghost" disabled={busy}
                         onClick={() => (editing === d.id ? setEditing(null) : openEditor(d))}>
                         {editing === d.id ? 'Cancel' : 'Edit figures'}
                       </Btn>
                     </div>
+
+                    {/* ── extraction review ─────────────────────────────── */}
+                    {extract && extract.documentId === d.id && (
+                      <div className="is-extract">
+                        <div className="is-extract-top">
+                          <span className="is-label">
+                            Detected: {extract.extraction.document_type} · confidence {extract.extraction.confidence}
+                          </span>
+                          <StatusBadge tone={extract.extraction.status === 'needs_manual_review' ? 'warning' : 'info'}>
+                            {extract.extraction.status === 'needs_manual_review' ? 'Needs manual review' : 'Suggested'}
+                          </StatusBadge>
+                        </div>
+
+                        {extract.extraction.status === 'needs_manual_review' ? (
+                          <p className="is-warn">
+                            Automatic extraction needs OCR/Vision for a scanned document.
+                            Enter the values manually for now.
+                          </p>
+                        ) : (
+                          <ul className="is-extract-fields">
+                            {[['Reference', extract.extraction.fields.document_number],
+                              ['Faktur serial', extract.extraction.fields.tax_invoice_serial],
+                              ['Issuer', extract.extraction.fields.issuer_name],
+                              ['Buyer', extract.extraction.fields.buyer_name],
+                              ['Base / DPP', extract.extraction.fields.commercial_base_amount],
+                              ['Tax / PPN', extract.extraction.fields.commercial_tax_amount],
+                              ['Total', extract.extraction.fields.gross_amount],
+                              ['Payment reference', extract.extraction.fields.payment_reference_number],
+                              ['Payment status', extract.extraction.fields.payment_status],
+                              ['Amount paid', extract.extraction.fields.amount]]
+                              .filter(([, v]) => v !== null && v !== undefined && v !== '')
+                              .map(([k, v]) => (
+                                <li key={k}><span>{k}</span><span className="is-mono">
+                                  {typeof v === 'number' ? money(v, data.invoice.currency) : String(v)}
+                                </span></li>
+                              ))}
+                          </ul>
+                        )}
+
+                        {extract.duplicate?.duplicate && (
+                          <p className="is-warn">Possible duplicate: {extract.duplicate.reason}</p>
+                        )}
+                        {(extract.extraction.missing_fields || []).length > 0 && (
+                          <p className="is-hint">
+                            Not found: {extract.extraction.missing_fields.join(', ')}.
+                          </p>
+                        )}
+                        {(extract.extraction.warnings || []).map((w) => (
+                          <p key={w} className="is-hint">{w}</p>
+                        ))}
+                        {extract.extraction.raw_text_excerpt && (
+                          <details className="is-raw">
+                            <summary>Raw text excerpt</summary>
+                            <p>{extract.extraction.raw_text_excerpt}</p>
+                          </details>
+                        )}
+
+                        <div className="is-actions">
+                          <Btn sm disabled={busy || extract.extraction.status === 'needs_manual_review'}
+                            onClick={() => applyExtracted(false)}>Apply extracted fields</Btn>
+                          <Btn sm variant="ghost" disabled={busy || extract.extraction.status === 'needs_manual_review'}
+                            onClick={() => applyExtracted(true)}>Edit before saving</Btn>
+                          <Btn sm variant="ghost" disabled={busy}
+                            onClick={() => setExtract(null)}>Reject extraction</Btn>
+                        </div>
+                        <p className="is-hint">
+                          Extraction reads text the document already carries. It is a suggestion —
+                          nothing is saved until you apply it.
+                        </p>
+                      </div>
+                    )}
 
                     {editing === d.id && (
                       <div className="is-form">
