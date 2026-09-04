@@ -261,3 +261,10 @@
   border: 1px solid var(--border-subtle); background: var(--surface-card); color: var(--text-body);
 }
 .doc-field input:focus-visible, .doc-field select:focus-visible { outline: 2px solid var(--brand-navy); outline-offset: 1px; }
+
+/* A disagreement between what the user uploaded and what the document says. Amber, not
+   red: nothing is wrong yet — the two readings simply differ and a person decides. */
+.doc-ai-conflict {
+  font-size: 12px; font-weight: 600; line-height: 1.45;
+  color: var(--warning);
+}

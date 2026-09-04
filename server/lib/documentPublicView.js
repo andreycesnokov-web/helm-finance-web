@@ -31,6 +31,8 @@ function publicIntakeV2(v2) {
   return {
     version: STR(v2.version),
     status: STR(v2.status),
+    source: STR(v2.source),
+    intent_conflict: BOOL(v2.intent_conflict),
     document_type: STR(v2.document_type),
     confidence: STR(v2.confidence),
     direction: STR(v2.direction),
@@ -55,4 +57,16 @@ function publicIntakeV2(v2) {
 /** The exact key set above — used by the tests to prove nothing else can slip through. */
 const PUBLIC_INTAKE_V2_FIELDS = Object.keys(publicIntakeV2({ version: 'x' }));
 
-module.exports = { publicIntakeV2, PUBLIC_INTAKE_V2_FIELDS };
+/** What the user said they were uploading. Four short fields, all our own vocabulary. */
+function publicUploadIntent(intent) {
+  if (!intent || typeof intent !== 'object') return null;
+  return {
+    source: STR(intent.source),
+    label: STR(intent.label),
+    suggested_document_type: STR(intent.suggested_document_type),
+    suggested_direction: STR(intent.suggested_direction),
+    created_at: STR(intent.created_at),
+  };
+}
+
+module.exports = { publicIntakeV2, publicUploadIntent, PUBLIC_INTAKE_V2_FIELDS };

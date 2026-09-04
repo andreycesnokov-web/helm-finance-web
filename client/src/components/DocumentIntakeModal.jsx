@@ -19,7 +19,11 @@ const ACCEPT = '.pdf,.jpg,.jpeg,.png,.csv,.xlsx'
 const CONF_TONE = { high: 'success', medium: 'warning', low: 'warning', unknown: 'neutral' }
 
 export default function DocumentIntakeModal({ business, onClose, onUploaded, link = null,
-  heading = null, defaultType = null, onLinkExisting = null }) {
+  heading = null, defaultType = null, onLinkExisting = null,
+  // Which screen this upload came from. Stored as review metadata so a document that
+  // cannot be read still carries what the user believed they were filing. It never
+  // becomes the document_type column.
+  uploadSource = 'document_center_upload' }) {
   // `link` = { target_type, target_id }. /api/documents/upload-complete already accepts it
   // and links best-effort, so uploading evidence FOR a specific record is one real call —
   // no global upload the user then has to hunt down and attach by hand.
@@ -64,7 +68,7 @@ export default function DocumentIntakeModal({ business, onClose, onUploaded, lin
         // When the caller asked for a specific role (payment proof), file it AS that type.
         // Left to the default it would land as `other` and could never satisfy a
         // role-specific evidence requirement.
-        const meta = { title: it.file.name }
+        const meta = { title: it.file.name, upload_source: uploadSource }
         if (defaultType) meta.document_type = defaultType
         await uploadDocument(token, it.file, meta, link || undefined)
         // The server reads the document's content during upload-complete, so by the time

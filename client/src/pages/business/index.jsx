@@ -570,7 +570,8 @@ export function BusinessDocuments() {
     )}
 
     {upload && (
-      <DocumentIntakeModal business={active} onClose={() => setUpload(false)}
+      <DocumentIntakeModal business={active} uploadSource="document_center_upload"
+        onClose={() => setUpload(false)}
         onUploaded={() => { setUpload(false); load() }} />
     )}
   </>
@@ -1072,6 +1073,8 @@ function DebtsView({ kind }) {
     {uploadFor && (
       <DocumentIntakeModal business={active} link={{ target_type: 'debt', target_id: uploadFor.id }}
         defaultType={uploadType}
+        uploadSource={uploadType === 'payment_proof' ? 'payment_proof_upload'
+          : isPayable ? 'payable_upload' : 'receivable_upload'}
         onLinkExisting={(docId) => linkExistingById(docId, uploadFor)}
         heading={uploadType === 'payment_proof'
           ? `Upload payment proof for ${uploadFor.counterparty || 'this record'}`
@@ -1601,7 +1604,8 @@ export function BusinessInvoices() {
     )}
 
     {upload && (
-      <DocumentIntakeModal business={active} onClose={() => setUpload(false)}
+      <DocumentIntakeModal business={active} uploadSource="invoice_upload"
+        onClose={() => setUpload(false)}
         onUploaded={() => { setUpload(false); load() }} />
     )}
   </>

@@ -528,11 +528,16 @@ test('H8. the generic /api/documents endpoints do not leak extraction internals'
     // pipeline concluded; it is itself a field-by-field whitelist of review metadata
     // (server/lib/documentPublicView.js). The key set stays pinned here on purpose —
     // adding a third key must be a deliberate decision, not a side effect.
-    assert.deepStrictEqual(Object.keys(doc.extracted_json).sort(), ['ai_intake', 'ai_intake_v2', 'notes']);
+    // `upload_intent` joined the whitelist so the UI can show what the user believed they
+    // were uploading beside what the reader made of it. Like ai_intake_v2 it is a
+    // field-by-field whitelist of our own vocabulary — no document content.
+    assert.deepStrictEqual(Object.keys(doc.extracted_json).sort(),
+      ['ai_intake', 'ai_intake_v2', 'notes', 'upload_intent']);
     assert.ok(!('classified_at' in (doc.extracted_json.ai_intake || {})), 'internals stay private');
     assert.ok(!('extraction_ms' in (doc.extracted_json.ai_intake || {})));
-    // No intake has run for this document, so the new key carries nothing.
+    // Neither has run for this document, so both keys carry nothing.
     assert.strictEqual(doc.extracted_json.ai_intake_v2, null);
+    assert.strictEqual(doc.extracted_json.upload_intent, null);
   }
 
   const detail = await call('GET', `/api/documents/${contentDocId}`, { userId: OWNER, businessId: BIZ_A });

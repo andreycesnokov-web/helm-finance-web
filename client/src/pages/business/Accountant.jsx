@@ -525,6 +525,7 @@ export function BusinessAccountant({ onProfileSaved, onDocumentsChanged } = {}) 
       {showUpload && (
         <DocumentIntakeModal
           business={intake?.business || active}
+          uploadSource="accountant_upload"
           onClose={() => setShowUpload(false)}
           onUploaded={loadIntake}
         />

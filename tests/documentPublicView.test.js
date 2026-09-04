@@ -1,7 +1,7 @@
 // The ai_intake_v2 whitelist: everything the Document Center needs, nothing else.
 // Run: node tests/documentPublicView.test.js
 const assert = require('node:assert');
-const { publicIntakeV2, PUBLIC_INTAKE_V2_FIELDS } = require('../server/lib/documentPublicView');
+const { publicIntakeV2, publicUploadIntent, PUBLIC_INTAKE_V2_FIELDS } = require('../server/lib/documentPublicView');
 
 let pass = 0;
 const t = (name, fn) => { fn(); pass++; console.log(`  ok  ${name}`); };
@@ -57,8 +57,33 @@ t('2. anything not named is dropped — including future additions', () => {
   assert.deepStrictEqual(Object.keys(p).sort(), PUBLIC_INTAKE_V2_FIELDS.slice().sort());
 });
 
-t('the exposed key set is exactly the 20 review fields', () => {
-  assert.strictEqual(PUBLIC_INTAKE_V2_FIELDS.length, 20);
+t('the exposed key set is exactly the 22 review fields', () => {
+  // 20 from the intake summary, plus `source` and `intent_conflict` added with the
+  // OCR/upload-intent work. Pinned on purpose: growing it must be a decision.
+  assert.strictEqual(PUBLIC_INTAKE_V2_FIELDS.length, 22);
+  assert.ok(PUBLIC_INTAKE_V2_FIELDS.includes('source'));
+  assert.ok(PUBLIC_INTAKE_V2_FIELDS.includes('intent_conflict'));
+});
+
+t('how a document was read is exposed; what was read is not', () => {
+  const p = publicIntakeV2({ ...SUMMARY, source: 'ocr_vision', intent_conflict: true,
+    ocr_text: 'KWITANSI PT Sumber Alfaria Trijaya Tbk …', raw_text_excerpt: 'secret' });
+  assert.strictEqual(p.source, 'ocr_vision');
+  assert.strictEqual(p.intent_conflict, true);
+  assert.ok(!('ocr_text' in p), 'the OCR transcript must never reach the client');
+  assert.ok(!('raw_text_excerpt' in p));
+});
+
+t('the upload intent is exposed as four safe fields, nothing more', () => {
+  const p = publicUploadIntent({
+    source: 'invoice_upload', label: 'Invoice', suggested_document_type: 'invoice',
+    suggested_direction: 'payable', created_at: '2026-09-04T10:00:00.000Z',
+    actor_user_id: 950101, storage_path: 'biz/a/f.pdf',
+  });
+  assert.deepStrictEqual(Object.keys(p).sort(),
+    ['created_at', 'label', 'source', 'suggested_direction', 'suggested_document_type']);
+  assert.strictEqual(p.source, 'invoice_upload');
+  assert.strictEqual(publicUploadIntent(null), null);
 });
 
 t('no summary means null, not an empty shell', () => {

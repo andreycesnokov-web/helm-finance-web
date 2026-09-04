@@ -46,8 +46,12 @@ const ANCHORS = {
   ],
   // A receipt records money already handed over; an invoice asks for it. Kwitansi is
   // the Indonesian form and is a strong signal on its own.
-  receipt: [/\bkwitansi\b/i, /\breceipt\b/i, /\bnota\b/i, /\btelah\s+terima\s+dari\b/i,
-    /\bsudah\s+dibayar\b/i, /\bpaid\s+in\s+full\b/i],
+  // A kwitansi is the Indonesian receipt, and its own label vocabulary identifies it on
+  // its own — which matters, because one uploaded through the invoice flow must still be
+  // read as a receipt rather than filed as a bill.
+  receipt: [/\bkwitansi\b/i, /\bkuitansi\b/i, /\breceipt\b/i, /\bnota\b/i,
+    /\b(?:telah|sudah)\s+terima\s+dari\b/i, /\bsudah\s+dibayar\b/i,
+    /\bterbilang\b/i, /\buntuk\s+pembayaran\b/i, /\bpaid\s+in\s+full\b/i],
   contract: [/\bperjanjian\b/i, /\bkontrak\b/i, /\bcontract\b/i, /\bagreement\b/i,
     /\bsyarat\s+dan\s+ketentuan\b/i, /terms\s+and\s+conditions/i, /\bpara\s+pihak\b/i,
     /\bpasal\s+\d/i, /\bmemorandum\s+of\s+understanding\b/i],
@@ -126,6 +130,10 @@ const NAME_STOPS = [
   /\bnetto\b/i, /\btotal\b/i, /\bjumlah\b/i, /\bdasar\b/i, /\bharga\b/i,
   /\balamat\b/i, /\baddress\b/i, /\btanggal\b/i, /\bdate\b/i, /\bperiode\b/i,
   /\bno\.?\s*(invoice|faktur)\b/i, /\binvoice\b/i, /\bppn\b/i, /\bqty\b/i, /\brp\b/i,
+  // Kwitansi labels. Without these a one-line kwitansi (real PDF text often has no line
+  // breaks) captures every following field into whichever party name came first.
+  /\b(?:sudah|telah)\s+terima\b/i, /\bberupa\b/i, /\buntuk\s+pembayaran\b/i,
+  /\bterbilang\b/i, /\bsebesar\b/i,
   /\d{2}\.\d{3}\.\d{3}/,
 ];
 
@@ -140,6 +148,64 @@ function trimName(v) {
   }
   s = s.slice(0, cut).replace(/[\s:,.\-]+$/, '').trim();
   return s.length >= 3 ? s : null;
+}
+
+/* ── kwitansi / receipt ────────────────────────────────────────────────────
+   A kwitansi reads in the opposite direction to an invoice. The company printed at
+   the top RECEIVED the money; the party named after "Sudah terima dari" PAID it. Get
+   that backwards and a receipt becomes a bill owed to the payer, so the two roles are
+   assigned explicitly here rather than reusing the invoice parser's issuer/buyer. */
+function extractReceiptFields(text) {
+  const f = {};
+  const warnings = [];
+
+  // Who paid. "Sudah terima dari : HELM CARE INDONESIA"
+  const payer = trimName(afterLabel(text, /(?:sudah|telah)\s+terima\s+dari/i, String.raw`[^\n]{3,80}`));
+  if (payer) f.buyer_name = payer;
+
+  // Who received. A kwitansi rarely labels it, so take the first company-looking line
+  // that is not the payer — and say nothing when there is no such line.
+  // A literal space, never \s: on a kwitansi the next label sits on the following line,
+  // and a class that matches newline swallows it into the company name.
+  const issuer = (/\b(?:PT|CV|UD|PD)[. ][A-Z][A-Za-z.&'\- ]{2,60}/.exec(text) || [])[0];
+  const issuerName = trimName(issuer);
+  if (issuerName && (!payer || !issuerName.toUpperCase().includes(payer.toUpperCase()))) {
+    f.issuer_name = issuerName;
+  }
+
+  // The total. "Jumlah : Rp 11.322.000" — "Terbilang" is the words version of the same
+  // number and is deliberately not parsed; digits are the safer source.
+  const amount = amountAfter(text, /\bjumlah\s*(?:uang)?\b/i)
+    ?? amountAfter(text, /\bsebesar\b/i)
+    ?? amountAfter(text, /\btotal\b/i);
+  if (amount !== null) { f.gross_amount = amount; f.amount = amount; }
+
+  // How it moved. "Berupa : TRANSFER" / "Berupa : TUNAI"
+  const method = afterLabel(text, /\bberupa\b/i, String.raw`[A-Za-z][A-Za-z /]{2,30}`);
+  if (method) {
+    // Stop at the next label even when the text arrives as one unbroken line.
+    f.payment_method = method.split(/\b(?:untuk|jumlah|terbilang|tanggal|sebesar)\b/i)[0]
+      .replace(/\s+/g, ' ').trim().slice(0, 40) || null;
+  }
+
+  // What it was for. "Untuk pembayaran : ..."
+  const purpose = afterLabel(text, /untuk\s+pembayaran/i, String.raw`[^\n]{3,160}`);
+  if (purpose) {
+    f.description = purpose.split(/\b(?:jumlah|terbilang|tanggal|sebesar)\b/i)[0]
+      .replace(/\s+/g, ' ').replace(/[\s:,.\-]+$/, '').trim().slice(0, 300) || null;
+  }
+
+  const dateText = afterLabel(text, /\btanggal\b/i, String.raw`\d{1,2}[-/.]\d{1,2}[-/.]\d{2,4}`);
+  if (dateText) f.transfer_date_text = dateText;
+
+  const ref = afterLabel(text, /\b(?:no\.?|nomor)\s*(?:kwitansi|kuitansi)?\b/i, String.raw`[A-Z0-9][A-Z0-9\-/.]{3,40}`);
+  if (ref) f.document_number = ref;
+
+  if (f.gross_amount === null || f.gross_amount === undefined) {
+    warnings.push('No amount could be read from this receipt. Enter it manually.');
+  }
+  warnings.push('A receipt is evidence that money moved. It is not a bill, so no payable is suggested from it.');
+  return { fields: f, warnings };
 }
 
 /* ── invoice / faktur pajak ────────────────────────────────────────────────*/
@@ -254,7 +320,7 @@ const EMPTY_FIELDS = {
   currency: 'IDR',
   commercial_base_amount: null, commercial_tax_amount: null, gross_amount: null,
   payment_reference_number: null, payment_status: null, bank_name: null,
-  transfer_date_text: null, amount: null, fee: null,
+  transfer_date_text: null, amount: null, fee: null, payment_method: null,
   from_account_number: null, from_account_name: null,
   to_account_number: null, to_account_name: null,
 };
@@ -298,8 +364,9 @@ function extractFromText(text = '', opts = {}) {
   const det = detectType(text, opts);
   // Amount-bearing kinds get the invoice parser; a receipt or an asset purchase still
   // carries a total and a party, so it is worth reading even though it is not a bill.
-  const isInvoiceLike = ['invoice', 'faktur_pajak', 'receipt', 'asset_purchase', 'bank_fee'].includes(det.type);
-  const part = isInvoiceLike ? extractInvoiceFields(text)
+  const isInvoiceLike = ['invoice', 'faktur_pajak', 'asset_purchase', 'bank_fee'].includes(det.type);
+  const part = det.type === 'receipt' ? extractReceiptFields(text)
+    : isInvoiceLike ? extractInvoiceFields(text)
     : det.type === 'payment_proof' ? extractPaymentProofFields(text)
       : SUPPORTING_TYPES.includes(det.type)
         ? { fields: {}, warnings: [`Recognised as a ${det.type.replace(/_/g, ' ')}. No financial record is created from it; it is supporting evidence.`] }
