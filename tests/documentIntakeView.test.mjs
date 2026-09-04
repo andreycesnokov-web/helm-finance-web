@@ -243,6 +243,37 @@ t('embedded text is still labelled as the source it is', () => {
   assert.strictEqual(V.readSourceLabel(INVOICE), null, 'an older summary without a source says nothing');
 });
 
+/* ── the receipt card, and OCR wording ──────────────────────────────────────── */
+const OCR_RECEIPT = {
+  ...INVOICE, source: 'ocr_vision', document_type: 'receipt', direction: 'outgoing_payment',
+  status: 'ready_to_confirm', suggested_record_type: 'supporting_document',
+  amount: 11322000, missing_fields: [], ppn_detected: false, ppn_amount: null,
+};
+
+t('the card never reads "Receipt · Payable"', () => {
+  const head = V.intakeHeadline(OCR_RECEIPT);
+  assert.ok(!/Payable/.test(head), head);
+  assert.ok(!/Receivable/.test(head), head);
+  assert.ok(/^Receipt · Outgoing payment/.test(head), head);
+});
+
+t('a vision reading is labelled for review, not for confirmation', () => {
+  assert.strictEqual(V.statusLabelFor(OCR_RECEIPT), 'Ready for review');
+  assert.ok(/Ready for review/.test(V.intakeHeadline(OCR_RECEIPT)), V.intakeHeadline(OCR_RECEIPT));
+  assert.ok(V.intakeBadges(OCR_RECEIPT).some((b) => b.label === 'Ready for review'));
+});
+
+t('the same status read from document text keeps its confident wording', () => {
+  const fromText = { ...OCR_RECEIPT, source: 'embedded_text' };
+  assert.strictEqual(V.statusLabelFor(fromText), 'Ready to confirm');
+  // the enum itself is untouched either way
+  assert.strictEqual(V.statusLabelOf('ready_to_confirm'), 'Ready to confirm');
+});
+
+t('a receipt offers no payable or receivable draft', () => {
+  assert.strictEqual(V.draftOffer(OCR_RECEIPT).show, false);
+});
+
 /* ── 5/6. the analyze button ────────────────────────────────────────────────── */
 t('5. a stored run says the analysis was updated', () => {
   assert.strictEqual(V.analyzeMessage({ stored: true }), 'Analysis updated.');

@@ -75,6 +75,17 @@ const STATUS_LABEL = {
 };
 export const statusLabelOf = (s) => STATUS_LABEL[s] || 'Needs review';
 
+/** The label actually shown, which depends on HOW the document was read.
+ *
+ *  "Ready to confirm" is honest for values parsed out of a document's own text. For a
+ *  page read by vision it overstates the case: those values came from pixels and must be
+ *  checked before anything is built on them. The status ENUM is unchanged — only the
+ *  word the user sees. */
+export function statusLabelFor(v2) {
+  if (wasReadByOcr(v2) && v2?.status === 'ready_to_confirm') return 'Ready for review';
+  return statusLabelOf(v2?.status);
+}
+
 /* ── badges ────────────────────────────────────────────────────────────────── */
 
 /** Badges for a row or panel header: what it is, which way it points, where it stands. */
@@ -87,7 +98,7 @@ export function intakeBadges(v2) {
   if (dir) out.push({ key: 'direction', label: dir, tone: v2.direction === 'supporting' ? 'neutral' : 'info' });
   out.push({
     key: 'status',
-    label: statusLabelOf(v2.status),
+    label: statusLabelFor(v2),
     tone: v2.status === 'ready_to_confirm' || v2.status === 'linked' ? 'success'
       : v2.status === 'unsupported' ? 'neutral' : 'warning',
   });
@@ -106,7 +117,7 @@ export function intakeHeadline(v2) {
   return [
     typeLabelOf(v2.document_type),
     directionLabelOf(v2.direction),
-    statusLabelOf(v2.status),
+    statusLabelFor(v2),
   ].filter(Boolean).join(' · ');
 }
 

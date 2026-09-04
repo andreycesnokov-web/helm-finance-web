@@ -90,12 +90,31 @@ function resolveDirection(type, fields, businessName) {
       reason: 'Neither account holder matches this business. Confirm which side is ours.' };
   }
 
+  // A receipt records money that has ALREADY moved, so it points the way a payment
+  // points — never the way a bill does. Running it through the invoice role check said
+  // "they issued it to us, so we owe them", which is exactly backwards: the debt it
+  // refers to is settled, and that is what the paper proves.
+  //
+  // On a kwitansi the roles are fixed by the form itself: the company printed at the top
+  // RECEIVED the money (issuer_name), and the party after "Sudah terima dari" PAID it
+  // (buyer_name). See extractReceiptFields in documentExtraction.js.
+  if (type === 'receipt') {
+    const weReceived = CPI.nameSimilarity(fields.issuer_name, businessName) >= 0.85;
+    const wePaid = CPI.nameSimilarity(fields.buyer_name, businessName) >= 0.85;
+    if (wePaid && !weReceived) return { direction: 'outgoing_payment', confidence: 'high',
+      reason: 'This business paid the counterparty; the receipt is evidence of that payment.' };
+    if (weReceived && !wePaid) return { direction: 'incoming_payment', confidence: 'high',
+      reason: 'This business received the money; the receipt is evidence of an incoming payment.' };
+    return { direction: 'supporting_document', confidence: 'needs_review',
+      reason: 'Receipt detected, but which side is this business needs review.' };
+  }
+
   if (docExtract.SUPPORTING_TYPES.includes(type)) {
     return { direction: 'supporting_document', confidence: 'high',
       reason: 'This kind of document is evidence, not a transaction.' };
   }
 
-  if (['invoice', 'faktur_pajak', 'receipt', 'asset_purchase', 'bank_fee'].includes(type)) {
+  if (['invoice', 'faktur_pajak', 'asset_purchase', 'bank_fee'].includes(type)) {
     const role = CPI.detectRole({
       issuer_name: fields.issuer_name, buyer_name: fields.buyer_name, business_name: businessName,
     });
@@ -252,7 +271,12 @@ function processDocument(input = {}) {
   let suggestedRole = null;
 
   if (!docExtract.SUPPORTING_TYPES.includes(type) && type !== 'unknown') {
-    const suggestion = (dir.direction === 'incoming_payment' || dir.direction === 'outgoing_payment')
+    // Which parser finds the other party depends on the DOCUMENT, not on the direction.
+    // A bank proof names two accounts; a kwitansi names an issuer and a payer. Keying
+    // this off direction alone would send a receipt — now correctly an outgoing_payment —
+    // to the account-name parser, which a kwitansi has no fields for.
+    const isBankProof = type === 'payment_proof';
+    const suggestion = isBankProof
       ? CPI.suggestFromPayment(fields, { direction: dir.direction === 'incoming_payment' ? 'incoming' : 'outgoing' })
       : CPI.suggestFromDocument({ fields }, { business_name: businessName });
     suggestedCp = suggestion.suggested_counterparty;
