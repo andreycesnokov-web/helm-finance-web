@@ -29,6 +29,11 @@ import {
 } from './companyVault'
 import ReviewPanel, { RpCols, RpCol, RpActions } from './ReviewPanel'
 import DocumentPreview from './DocumentPreview'
+import {
+  intakeOf, intakeBadges, intakeHeadline, intakeRowLines, intakeCopy, storedVsSuggested,
+  typeLabelOf as intakeTypeLabel, directionLabelOf, statusLabelOf, nextActionLabels,
+  draftOffer, counterpartyOffer, isUnsupported,
+} from './documentIntakeView'
 import './Documents.css'
 
 /* ── derivation over real fields ──────────────────────────────────────────── */
@@ -83,13 +88,26 @@ export const channelOf = (d) => CHANNEL[d.file?.upload_channel] || d.file?.uploa
 const fmtDate = (s) => (s ? new Date(s).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : null)
 const money = (n, ccy = 'IDR') => `${ccy} ${Number(n).toLocaleString('de-DE')}`
 
-/** Which financial record a document type should end up against. */
+/** Which financial record a document type should end up against.
+ *
+ *  The stored column decides whenever a human has set it. Only when it is still 'other'
+ *  does the intake suggestion get a say — otherwise a recognised invoice offers nothing
+ *  but "Classify", which is the dead end this page used to be. The suggestion changes
+ *  which action is OFFERED; it never writes the column and never creates anything. */
 export function actionsFor(d) {
   const t = d.document_type
   if (t === 'vendor_invoice') return { create: 'payable', link: 'payable' }
   if (t === 'customer_invoice') return { create: 'receivable', link: 'receivable' }
   if (t === 'tax_invoice') return { link: 'both' }
   if (t === 'payment_proof' || t === 'bank_document') return { link: 'transaction' }
+  const v2 = intakeOf(d)
+  if (!t || t === 'other') {
+    const offer = draftOffer(v2, { alreadyLinked: !!debtLink(d) })
+    if (offer.show && offer.type === 'payable') return { create: 'payable', link: 'payable', fromIntake: true }
+    if (offer.show && offer.type === 'receivable') return { create: 'receivable', link: 'receivable', fromIntake: true }
+    if (v2?.direction === 'incoming_payment' || v2?.direction === 'outgoing_payment')
+      return { classify: true, link: 'transaction', fromIntake: true }
+  }
   return { classify: true, link: 'transaction' }
 }
 
@@ -222,9 +240,46 @@ const makeDocCfg = (cpName) => ({
   ],
 })
 
+/* ── the intake summary on a list row ─────────────────────────────────────────
+   What intake concluded, in one glance: what the document is, which way it points,
+   where it stands, and what it is still missing. A document nobody has analysed says
+   so plainly and offers the one button that fixes that — never a blank space. */
+export function IntakeRowSummary({ doc, onAnalyze, analyzing }) {
+  const v2 = intakeOf(doc)
+  if (!v2) {
+    return (
+      <div className="doc-ai-row">
+        <span className="doc-ai-none">Not processed yet</span>
+        {onAnalyze && (
+          <button type="button" className="doc-ai-run" disabled={analyzing === doc.id}
+            onClick={(e) => { e.stopPropagation(); onAnalyze(doc) }}>
+            {analyzing === doc.id ? 'Analyzing…' : 'Analyze document'}
+          </button>
+        )}
+      </div>
+    )
+  }
+  const pair = storedVsSuggested(doc, typeLabel(doc.document_type))
+  return (
+    <div className="doc-ai-row">
+      <span className="doc-ai-head">{intakeHeadline(v2)}</span>
+      <span className="doc-ai-badges">
+        {intakeBadges(v2).map((b) => (
+          <StatusBadge key={b.key} tone={b.tone}>{b.label}</StatusBadge>
+        ))}
+      </span>
+      {pair.showPair && (
+        <span className="doc-ai-pair">Stored type: {pair.storedLabel} · AI suggestion: {pair.suggestedLabel}</span>
+      )}
+      {intakeRowLines(v2).map((l) => <span key={l} className="doc-ai-line">{l}</span>)}
+    </div>
+  )
+}
+
 export function DocumentQueue({
   docs, loading, active, onSelect, cpName, selected, onToggle, onClearSel, onBulkArchive, busy, blockCreate,
   onReview, onView, onArchive, onCreate, onLink, onClassify, onUpload, navigate,
+  onAnalyze, analyzing,
   // Inline review (desktop). Both default to inert, so the drawer path is unchanged.
   expandedId = null, renderPanel = null,
 }) {
@@ -319,6 +374,7 @@ export function DocumentQueue({
                           <StatusBadge tone={STATUS[st].tone}>{STATUS[st].label}</StatusBadge>
                           {channelOf(d) && <span className="doc-tag">{channelOf(d)}</span>}
                         </div>
+                        <IntakeRowSummary doc={d} onAnalyze={onAnalyze} analyzing={analyzing} />
                         <span className="doc-row-name">{d.file?.file_name || d.document_number || 'Untitled document'}</span>
                         <div className="doc-row-meta">
                           <span>{cp || <em>Counterparty needed</em>}</span>
@@ -348,7 +404,8 @@ export function DocumentQueue({
 
 /* ── review drawer (aligned with the invoice drawer) ──────────────────────── */
 
-export function DocumentReview({ doc, cpName, onClose, onView, onCreate, onLink, onClassify, onArchive }) {
+export function DocumentReview({ doc, cpName, onClose, onView, onCreate, onLink, onClassify, onArchive,
+  onAnalyze, analyzing, analyzeNote, onReviewFields }) {
   if (!doc) return null
   const a = actionsFor(doc)
   const st = statusOf(doc)
@@ -396,6 +453,31 @@ export function DocumentReview({ doc, cpName, onClose, onView, onCreate, onLink,
           {fields.map(([k, v]) => <div className="doc-kv" key={k}><span>{k}</span><span>{v || need}</span></div>)}
         </section>
 
+        {/* The same intake conclusion the desktop panel shows, in the narrow layout. */}
+        <section className="doc-drawer-sec">
+          <span className="doc-drawer-label">AI Intake Result</span>
+          <p className="doc-note">{intakeCopy(intakeOf(doc))}</p>
+          {intakeOf(doc) && (
+            <>
+              <div className="doc-kv"><span>Type</span><span>{intakeTypeLabel(intakeOf(doc).document_type) || '—'}</span></div>
+              <div className="doc-kv"><span>Direction</span><span>{directionLabelOf(intakeOf(doc).direction) || '—'}</span></div>
+              <div className="doc-kv"><span>Status</span><span>{statusLabelOf(intakeOf(doc).status)}</span></div>
+              {intakeRowLines(intakeOf(doc)).map((l) => <p key={l} className="doc-note">{l}</p>)}
+            </>
+          )}
+          {onAnalyze && (
+            <Btn sm variant="ghost" onClick={() => onAnalyze(doc)} disabled={analyzing === doc.id}>
+              {analyzing === doc.id ? 'Analyzing…' : intakeOf(doc) ? 'Re-analyze' : 'Analyze document'}
+            </Btn>
+          )}
+          {onReviewFields && (
+            <Btn sm variant="ghost" onClick={() => onReviewFields(doc)}>
+              {isUnsupported(intakeOf(doc)) ? 'Enter fields manually' : 'Review fields'}
+            </Btn>
+          )}
+          {analyzeNote && <p className="doc-note">{analyzeNote}</p>}
+        </section>
+
         <section className="doc-drawer-sec">
           <span className="doc-drawer-label">Evidence status</span>
           <div className="doc-kv"><span>Status</span><span>{STATUS[st].label}</span></div>
@@ -430,6 +512,97 @@ export function DocumentReview({ doc, cpName, onClose, onView, onCreate, onLink,
 }
 
 /* ── classify drawer — real: PATCH writes document_type ───────────────────── */
+
+/* ── review / enter the fields by hand ───────────────────────────────────────
+   The route out of every blocked intake state — missing fields, no counterparty, and
+   above all a scan CFO AI cannot read. Everything here is typed by the user and saved
+   through the two existing endpoints:
+     · PATCH /api/documents/:id                  → document_type (CHECK-valid column)
+     · PATCH /api/documents/:id/financial-fields → reference, dates, base / tax / total
+   Nothing is prefilled from the AI suggestion: a suggestion the user never looked at
+   must not become a saved figure just because they pressed Save. */
+export function ReviewFieldsDrawer({ doc, busy, error, note, onSave, onClose, inline = false }) {
+  const v2 = intakeOf(doc)
+  const [f, setF] = useState(() => ({
+    document_type: doc?.document_type || 'other',
+    document_number: doc?.document_number || '',
+    document_date: doc?.document_date || '',
+    currency: doc?.currency || 'IDR',
+    commercial_base_amount: doc?.commercial_base_amount ?? '',
+    commercial_tax_amount: doc?.commercial_tax_amount ?? '',
+    gross_amount: doc?.gross_amount ?? '',
+  }))
+  if (!doc) return null
+  const set = (k) => (e) => setF((v) => ({ ...v, [k]: e.target.value }))
+
+  const body = (
+    <>
+      {isUnsupported(v2) && (
+        <p className="rp-note rp-note-amber">
+          I cannot read this document automatically yet. Automatic extraction needs OCR/Vision.
+          You can still record it by entering the values below.
+        </p>
+      )}
+      {v2?.missing_fields?.length > 0 && (
+        <p className="rp-note rp-note-amber">Intake is waiting on {v2.missing_fields.join(', ')}.</p>
+      )}
+      {error && <p className="rp-note rp-note-warn">{error}</p>}
+      <div className="doc-field-grid">
+        <label className="doc-field"><span>Document type</span>
+          <select value={f.document_type} onChange={set('document_type')} disabled={busy}>
+            {DOC_TYPES.map((t) => <option key={t} value={t}>{typeLabel(t)}</option>)}
+          </select>
+        </label>
+        <label className="doc-field"><span>Document / reference number</span>
+          <input value={f.document_number} onChange={set('document_number')} disabled={busy} /></label>
+        <label className="doc-field"><span>Document date</span>
+          <input type="date" value={f.document_date || ''} onChange={set('document_date')} disabled={busy} /></label>
+        <label className="doc-field"><span>Currency</span>
+          <input value={f.currency} onChange={set('currency')} disabled={busy} /></label>
+        <label className="doc-field"><span>Base / DPP</span>
+          <input inputMode="decimal" value={f.commercial_base_amount} onChange={set('commercial_base_amount')} disabled={busy} /></label>
+        <label className="doc-field"><span>Tax / PPN</span>
+          <input inputMode="decimal" value={f.commercial_tax_amount} onChange={set('commercial_tax_amount')} disabled={busy} /></label>
+        <label className="doc-field"><span>Total / gross</span>
+          <input inputMode="decimal" value={f.gross_amount} onChange={set('gross_amount')} disabled={busy} /></label>
+      </div>
+      <p className="rp-note rp-note-muted">
+        Leave the total blank and it is derived from base + tax. Saving updates this document
+        only — it creates no payable, receivable or tax record.
+      </p>
+      {note && <p className="rp-note rp-note-muted">{note}</p>}
+      <div className="doc-panel-acts">
+        <Btn sm onClick={() => onSave(doc, f)} disabled={busy}>{busy ? 'Saving…' : 'Save fields'}</Btn>
+        <Btn sm variant="ghost" onClick={onClose} disabled={busy}>Cancel</Btn>
+      </div>
+    </>
+  )
+
+  if (inline) {
+    return (
+      <ReviewPanel eyebrow={doc.file?.file_name || 'Document'} title="Review fields"
+        sub="Values you enter here are stored on the document. Nothing is filled in for you."
+        onClose={onClose}>{body}</ReviewPanel>
+    )
+  }
+  return (
+    <div className="doc-drawer-scrim" onClick={onClose}>
+      <aside className="doc-drawer" role="dialog" aria-modal="true" aria-label="Review document fields"
+        onClick={(e) => e.stopPropagation()}>
+        <header className="doc-drawer-head">
+          <div>
+            <span className="doc-drawer-eyebrow">{doc.file?.file_name || 'Document'}</span>
+            <h2 className="doc-drawer-title">Review fields</h2>
+          </div>
+          <button type="button" className="doc-drawer-x" onClick={onClose} aria-label="Close">
+            <Icon.plus width="16" height="16" style={{ transform: 'rotate(45deg)' }} />
+          </button>
+        </header>
+        {body}
+      </aside>
+    </div>
+  )
+}
 
 export function ClassifyDrawer({ doc, busy, error, onPick, onClose, inline = false }) {
   if (!doc) return null
@@ -498,10 +671,188 @@ export function ClassifyDrawer({ doc, busy, error, onPick, onClose, inline = fal
    document, and `extracted_json` is never written from here.
    ═══════════════════════════════════════════════════════════════════════ */
 
+/* ── AI Intake Result ─────────────────────────────────────────────────────────
+   The whole point of the Document Center change: what intake worked out, and the
+   actions that follow from it. Every action here is a user click that goes through an
+   existing endpoint. NOTHING on this panel creates a counterparty, a payable, a
+   receivable, a transaction or a tax record on its own. */
+export function IntakeResult({
+  doc, cpName, busy, analyzing, analyzeNote, cpSuggestion, cpBusy, cpError,
+  onAnalyze, onReviewFields, onCreateDraft, onSuggestCounterparty, onCreateCounterparty,
+  onLinkCounterparty, onViewCounterparty, onAccountantReview, onTaxSplit,
+}) {
+  const v2 = intakeOf(doc)
+  const analysing = analyzing === doc.id
+
+  if (!v2) {
+    return (
+      <RpCol label="AI Intake Result" emphasis>
+        <p className="rp-note rp-note-muted">
+          This document has not been analysed yet. Running the analysis reads the document
+          and stores a review summary — it creates no records.
+        </p>
+        <div className="doc-panel-acts">
+          <Btn sm onClick={() => onAnalyze(doc)} disabled={analysing || busy}>
+            {analysing ? 'Analyzing…' : 'Analyze document'}
+          </Btn>
+        </div>
+        {analyzeNote && <p className="rp-note rp-note-muted">{analyzeNote}</p>}
+      </RpCol>
+    )
+  }
+
+  const unsupported = isUnsupported(v2)
+  const offer = draftOffer(v2, { alreadyLinked: !!debtLink(doc) })
+  const cpOffer = counterpartyOffer(v2)
+  const matchedName = cpOffer.matchedId ? cpName?.(cpOffer.matchedId) : null
+
+  return (
+    <RpCol label="AI Intake Result" emphasis>
+      <p className={`rp-note ${unsupported ? 'rp-note-amber' : ''}`}>{intakeCopy(v2)}</p>
+
+      <div className="rp-kv"><span>Document type suggestion</span>
+        <span>{intakeTypeLabel(v2.document_type) || <em className="rp-miss">Unrecognised</em>}</span></div>
+      <div className="rp-kv"><span>Confidence</span>
+        <span>{String(v2.confidence || 'needs review').replace(/_/g, ' ')}</span></div>
+      <div className="rp-kv"><span>Direction</span>
+        <span>{directionLabelOf(v2.direction) || <em className="rp-miss">Unknown</em>}</span></div>
+      {v2.business_meaning && (
+        <div className="rp-kv"><span>Business meaning</span><span>{v2.business_meaning}</span></div>
+      )}
+      <div className="rp-kv"><span>Status</span><span>{statusLabelOf(v2.status)}</span></div>
+      <div className="rp-kv"><span>Suggested record</span>
+        <span>{v2.suggested_record_type && v2.suggested_record_type !== 'none'
+          ? `Create ${v2.suggested_record_type} draft`
+          : <em className="rp-miss">None suggested</em>}</span></div>
+      <div className="rp-kv"><span>Amount</span>
+        <span className="rp-mono">{v2.amount != null
+          ? money(v2.amount, v2.currency) : <em className="rp-miss">Not detected</em>}</span></div>
+
+      {/* ── tax ─────────────────────────────────────────────────────────── */}
+      <span className="rp-col-label" style={{ marginTop: 8 }}>Tax</span>
+      <div className="rp-kv"><span>PPN</span>
+        <span>{v2.ppn_detected
+          ? `Detected: ${v2.ppn_amount != null ? money(v2.ppn_amount, v2.currency) : 'amount not read'}`
+          : 'Not detected'}</span></div>
+      <div className="rp-kv"><span>Withholding / PPh</span>
+        <span>{v2.accountant_review_required
+          ? 'Needs accountant review'
+          : String(v2.withholding_status || 'unknown').replace(/_/g, ' ')}</span></div>
+
+      {/* ── counterparty ────────────────────────────────────────────────── */}
+      <span className="rp-col-label" style={{ marginTop: 8 }}>Counterparty</span>
+      {cpOffer.status === 'matched' ? (
+        <>
+          <p className="rp-note">Counterparty recognized: <strong>{matchedName || 'a record in your directory'}</strong></p>
+          <div className="doc-panel-acts">
+            {cpOffer.canLink && !doc.issuer_counterparty_id && (
+              <Btn sm onClick={() => onLinkCounterparty(doc, cpOffer.matchedId)} disabled={busy || cpBusy}>Link counterparty</Btn>
+            )}
+            <Btn sm variant="ghost" onClick={() => onViewCounterparty(cpOffer.matchedId)}>View counterparty</Btn>
+            <Btn sm variant="ghost" onClick={() => onSuggestCounterparty(doc)} disabled={cpBusy}>Change</Btn>
+          </div>
+        </>
+      ) : cpOffer.status === 'possible_match' ? (
+        <>
+          <p className="rp-note rp-note-amber">Possible existing counterparty found. Confirm before anything is linked.</p>
+          <div className="doc-panel-acts">
+            {cpOffer.canLink && cpOffer.matchedId && !doc.issuer_counterparty_id && (
+              <Btn sm onClick={() => onLinkCounterparty(doc, cpOffer.matchedId)} disabled={busy || cpBusy}>Use existing</Btn>
+            )}
+            <Btn sm variant="ghost" onClick={() => onSuggestCounterparty(doc)} disabled={cpBusy}>Review</Btn>
+          </div>
+        </>
+      ) : (
+        <>
+          <p className="rp-note">Counterparty not found in your directory.</p>
+          <div className="doc-panel-acts">
+            <Btn sm variant="ghost" onClick={() => onSuggestCounterparty(doc)} disabled={cpBusy}>
+              {cpBusy ? 'Reading document…' : 'Review and create counterparty'}
+            </Btn>
+          </div>
+        </>
+      )}
+      {cpError && <p className="rp-note rp-note-warn">{cpError}</p>}
+      {!cpOffer.canLink && <p className="rp-note rp-note-muted">{cpOffer.limitation}</p>}
+      {doc.issuer_counterparty_id && (
+        <p className="rp-note rp-note-muted">
+          Already attached to {cpName?.(doc.issuer_counterparty_id) || 'a counterparty'}.
+        </p>
+      )}
+
+      {/* The zero-write suggestion, once fetched. Creating is still a separate click. */}
+      {cpSuggestion?.documentId === doc.id && (
+        <div className="doc-cp-suggest">
+          <div className="rp-kv"><span>Suggested profile</span>
+            <span>{cpSuggestion.suggested_counterparty?.legal_name || <em className="rp-miss">No name read</em>}</span></div>
+          {cpSuggestion.suggested_counterparty?.npwp && (
+            <div className="rp-kv"><span>NPWP</span><span>{cpSuggestion.suggested_counterparty.npwp}</span></div>
+          )}
+          <div className="rp-kv"><span>Match</span><span>{String(cpSuggestion.status || '').replace(/_/g, ' ')}</span></div>
+          {(cpSuggestion.warnings || []).map((w) => <p key={w} className="rp-note rp-note-amber">{w}</p>)}
+          <div className="doc-panel-acts">
+            {cpSuggestion.suggested_counterparty?.legal_name && (
+              <Btn sm onClick={() => onCreateCounterparty(doc, cpSuggestion)} disabled={cpBusy}>Create counterparty</Btn>
+            )}
+            <Btn sm variant="ghost" onClick={() => onViewCounterparty(null)}>Edit before creating</Btn>
+            <Btn sm variant="ghost" onClick={() => onSuggestCounterparty(null)}>Ignore</Btn>
+          </div>
+          <p className="rp-note rp-note-muted">
+            Nothing has been created. Duplicate detection runs again when you confirm.
+          </p>
+        </div>
+      )}
+
+      {/* ── what is missing ─────────────────────────────────────────────── */}
+      {(v2.missing_fields?.length > 0 || v2.blockers?.length > 0) && (
+        <>
+          <span className="rp-col-label" style={{ marginTop: 8 }}>Missing</span>
+          {v2.missing_fields?.length > 0 && (
+            <p className="rp-note rp-note-amber">Missing {v2.missing_fields.join(', ')}.</p>
+          )}
+          {(v2.blockers || []).map((b) => <p key={b} className="rp-note rp-note-amber">{b}</p>)}
+        </>
+      )}
+
+      {/* ── next ────────────────────────────────────────────────────────── */}
+      <span className="rp-col-label" style={{ marginTop: 8 }}>Next</span>
+      <ol className="doc-ai-next">
+        {nextActionLabels(v2).map((a) => <li key={a.key}>{a.label}</li>)}
+      </ol>
+
+      <div className="doc-panel-acts">
+        <Btn sm variant="ghost" onClick={() => onReviewFields(doc)} disabled={busy}>
+          {unsupported ? 'Enter fields manually' : 'Review fields'}
+        </Btn>
+        {offer.show && (
+          <Btn sm onClick={() => onCreateDraft(doc, offer.type)} disabled={busy || !offer.enabled}>
+            Create {offer.type} draft
+          </Btn>
+        )}
+        {v2.ppn_detected && <Btn sm variant="ghost" onClick={onTaxSplit}>Open AI Tax Split</Btn>}
+        <Btn sm variant="ghost" onClick={onAccountantReview}>Request accountant review</Btn>
+        <Btn sm variant="ghost" onClick={() => onAnalyze(doc)} disabled={analysing || busy}>
+          {analysing ? 'Analyzing…' : 'Re-analyze'}
+        </Btn>
+      </div>
+      {offer.show && !offer.enabled && <p className="rp-note rp-note-amber">{offer.reason}</p>}
+      {analyzeNote && <p className="rp-note rp-note-muted">{analyzeNote}</p>}
+      <p className="rp-note rp-note-muted">
+        CFO AI suggests; you confirm. Running the analysis stores a review summary only —
+        no counterparty, payable, receivable, transaction or tax record is created by it.
+        {v2.processed_at && ` Last analysed ${new Date(v2.processed_at).toLocaleString('en-GB')}.`}
+      </p>
+    </RpCol>
+  )
+}
+
 export function DocumentReviewPanel({
   doc, cpName, getSignedUrl, busy,
   onClose, onView, onDownload, onCreate, onLink, onClassify, onArchive,
   onReclassify, onMoveToVault, onOpenAccountant,
+  // intake surface — all optional, so any other caller of this panel is unchanged
+  analyzing, analyzeNote, cpSuggestion, cpBusy, cpError, onAnalyze, onReviewFields,
+  onSuggestCounterparty, onCreateCounterparty, onLinkCounterparty, onViewCounterparty, onTaxSplit,
 }) {
   if (!doc) return null
   const a = actionsFor(doc)
@@ -531,6 +882,9 @@ export function DocumentReviewPanel({
         <StatusBadge tone={vault ? (vault.confirmed ? 'success' : 'warning') : STATUS[st].tone}>
           {vault ? (vault.confirmed ? 'Confirmed' : 'Suggested') : STATUS[st].label}
         </StatusBadge>
+        {intakeBadges(intakeOf(doc)).map((b) => (
+          <StatusBadge key={b.key} tone={b.tone}>{b.label}</StatusBadge>
+        ))}
         {channelOf(doc) && <span className="doc-tag">{channelOf(doc)}</span>}
       </>}
       onClose={onClose}>
@@ -543,7 +897,13 @@ export function DocumentReviewPanel({
 
         {/* ── 2 — fields and classification ──────────────────────────────── */}
         <RpCol label="Fields & classification">
-          <div className="rp-kv"><span>Document type</span><span>{typeLabel(doc.document_type)}</span></div>
+          <div className="rp-kv"><span>Stored type</span><span>{typeLabel(doc.document_type)}</span></div>
+          {/* Stored column and AI suggestion side by side — never merged, never overwritten. */}
+          {storedVsSuggested(doc, typeLabel(doc.document_type)).showPair && (
+            <div className="rp-kv"><span>AI suggestion</span>
+              <span>{storedVsSuggested(doc, typeLabel(doc.document_type)).suggestedLabel}
+                {' '}<em className="doc-ai-hint">needs confirmation</em></span></div>
+          )}
           <div className="rp-kv"><span>Document number</span><span>{doc.document_number || need}</span></div>
           <div className="rp-kv"><span>Date</span><span>{fmtDate(doc.document_date) || need}</span></div>
           <div className="rp-kv"><span>Counterparty</span><span>{cpName?.(doc.issuer_counterparty_id) || need}</span></div>
@@ -581,10 +941,23 @@ export function DocumentReviewPanel({
             <p className="rp-note rp-note-amber">Missing {gaps.join(', ')}.</p>
           )}
           <p className="rp-note rp-note-muted">
-            Fields come from the stored record. There is no OCR behind this page — a blank
-            field means nothing was entered, not that the document was read and found empty.
+            Fields come from the stored record. A blank field means nothing was entered — the
+            AI Intake Result alongside is a suggestion and is never written into these fields
+            for you.
           </p>
         </RpCol>
+
+        {/* ── 3 — what intake concluded, and what follows from it ─────────── */}
+        {onAnalyze && (
+          <IntakeResult doc={doc} cpName={cpName} busy={busy}
+            analyzing={analyzing} analyzeNote={analyzeNote}
+            cpSuggestion={cpSuggestion} cpBusy={cpBusy} cpError={cpError}
+            onAnalyze={onAnalyze} onReviewFields={onReviewFields}
+            onCreateDraft={onCreate} onSuggestCounterparty={onSuggestCounterparty}
+            onCreateCounterparty={onCreateCounterparty} onLinkCounterparty={onLinkCounterparty}
+            onViewCounterparty={onViewCounterparty}
+            onAccountantReview={onOpenAccountant} onTaxSplit={onTaxSplit} />
+        )}
 
         {/* ── 3 — routing and actions ────────────────────────────────────── */}
         <RpCol label="Actions & routing" emphasis>

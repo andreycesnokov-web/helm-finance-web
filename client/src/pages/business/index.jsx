@@ -47,6 +47,7 @@ import {
 import {
   DocumentSummary, DocumentQueue, DocumentReview, ClassifyDrawer, DocumentFlowStrip,
   DocumentViewTabs, CompanyVault, VaultReclassifyDrawer, documentCounts, DocumentReviewPanel,
+  ReviewFieldsDrawer,
 } from './DocumentBlocks'
 import { partitionDocuments } from './companyVault'
 import DocumentIntakeModal from '../../components/DocumentIntakeModal'
@@ -204,6 +205,13 @@ export function BusinessDocuments() {
   const [sel, setSel] = useState(() => new Set())
   const [outcome, setOutcome] = useState(null)
   const [blocked, setBlocked] = useState(() => new Set())
+  // ── Document Intake Orchestrator surface ──────────────────────────────────
+  const [analyzing, setAnalyzing] = useState(null)     // document id currently running
+  const [analyzeNote, setAnalyzeNote] = useState(null) // "updated" vs "already up to date"
+  const [cpSuggestion, setCpSuggestion] = useState(null)
+  const [cpBusy, setCpBusy] = useState(false)
+  const [cpError, setCpError] = useState(null)
+  const [fieldsDoc, setFieldsDoc] = useState(null)     // review-fields drawer target
 
   const load = useCallback(() => {
     if (!token || !active) return
@@ -303,6 +311,102 @@ export function BusinessDocuments() {
     } catch (e) { setErr(e.message || 'Could not save the classification') } finally { setBusy(false) }
   }
 
+  /* ── intake pipeline actions ────────────────────────────────────────────────
+     Every one of these is a deliberate user click. Analyze stores review metadata
+     only; the counterparty and draft actions go through their own endpoints and are
+     confirmed by the user in a form or by the server's duplicate guard. */
+
+  // POST /documents/:id/intake — writes extracted_json.ai_intake_v2 and nothing else.
+  // `stored:false` means the summary was already current; it must not read as a create.
+  const analyzeDoc = async (d) => {
+    setAnalyzing(d.id); setAnalyzeNote(null); setErr(null)
+    try {
+      const r = await apiFetch(`/documents/${d.id}/intake`, token, { method: 'POST' })
+      setAnalyzeNote(r?.stored ? 'Analysis updated.' : 'Analysis is already up to date.')
+      load()
+    } catch (e) {
+      // Shown next to the button that failed — the panel does not render the page-level
+      // error, so routing it to setErr alone would fail silently.
+      setAnalyzeNote(`Could not analyse this document: ${e.message || 'request failed'}`)
+    } finally { setAnalyzing(null) }
+  }
+
+  // POST /documents/:id/counterparty-suggestion — ZERO-WRITE. Reads the document and
+  // says who the other party looks like. Creating is the separate click below.
+  const suggestCounterparty = async (d) => {
+    if (!d) { setCpSuggestion(null); return }
+    setCpBusy(true); setCpError(null)
+    try {
+      const r = await apiFetch(`/documents/${d.id}/counterparty-suggestion`, token, { method: 'POST' })
+      setCpSuggestion({ documentId: d.id, ...r })
+    } catch (e) { setCpError(e.message || 'Could not read the counterparty from this document') }
+    finally { setCpBusy(false) }
+  }
+
+  // POST /counterparties — explicit. The server runs duplicate detection and answers 409
+  // with the existing record rather than creating a second one; that answer is surfaced
+  // instead of being retried with create_new_anyway.
+  const createCounterparty = async (d, sugg) => {
+    const p = sugg?.suggested_counterparty
+    if (!p?.legal_name) return
+    if (!confirm(`Create counterparty "${p.legal_name}"?`)) return
+    setCpBusy(true); setCpError(null)
+    try {
+      const created = await apiFetch('/counterparties', token, {
+        method: 'POST',
+        body: {
+          legal_name: p.legal_name, display_name: p.display_name || p.legal_name,
+          npwp: p.npwp || null, role: p.role || null, aliases: p.aliases || [],
+        },
+      })
+      setCpSuggestion(null)
+      const id = created?.counterparty?.id || created?.id || null
+      if (id && sugg.status !== 'matched') await linkCounterparty(d, id, { quiet: true })
+      load()
+    } catch (e) {
+      setCpError(/duplicate/i.test(e.message || '')
+        ? 'A similar counterparty already exists. Use the existing record, or create it from the Counterparties page if it is genuinely different.'
+        : (e.message || 'Could not create the counterparty'))
+    } finally { setCpBusy(false) }
+  }
+
+  // PATCH /documents/:id { counterparty_id } — writes issuer_counterparty_id, i.e. "this
+  // document was issued by them". Offered only where that is semantically true; the panel
+  // withholds it for payment proofs, where the issuer is the bank.
+  const linkCounterparty = async (d, counterpartyId, opts = {}) => {
+    if (!counterpartyId) return
+    setCpBusy(true); if (!opts.quiet) setCpError(null)
+    try {
+      await apiFetch(`/documents/${d.id}`, token, { method: 'PATCH', body: { counterparty_id: counterpartyId } })
+      setCpSuggestion(null); load()
+    } catch (e) { setCpError(e.message || 'Could not link the counterparty') }
+    finally { setCpBusy(false) }
+  }
+
+  // Manual field entry — the way out of an unreadable scan and of any missing-field state.
+  // document_type goes through the metadata RPC, the figures through financial-fields.
+  const saveFields = async (d, f) => {
+    setBusy(true); setErr(null)
+    try {
+      const num = (v) => (v === '' || v === null || v === undefined ? null : Number(v))
+      if (f.document_type && f.document_type !== d.document_type) {
+        await apiFetch(`/documents/${d.id}`, token, { method: 'PATCH', body: { document_type: f.document_type } })
+      }
+      await apiFetch(`/documents/${d.id}/financial-fields`, token, {
+        method: 'PATCH',
+        body: {
+          document_number: f.document_number || null,
+          document_date: f.document_date || null,
+          currency: f.currency || 'IDR',
+          commercial_base_amount: num(f.commercial_base_amount),
+          commercial_tax_amount: num(f.commercial_tax_amount),
+          gross_amount: num(f.gross_amount),
+        },
+      })
+      setFieldsDoc(null); load()
+    } catch (e) { setErr(e.message || 'Could not save the fields') } finally { setBusy(false) }
+  }
+
   const openPicker = async (doc, kind, dir) => {
     setErr(null); setReview(null)
     if (kind === 'debt') {
@@ -343,6 +447,9 @@ export function BusinessDocuments() {
         busy={busy} error={err} cpName={cpName}
         onClose={() => setPicker(null)}
         onPick={(row) => linkDoc(picker.doc, picker.kind, row.id)} />
+    ) : fieldsDoc?.id === d.id ? (
+      <ReviewFieldsDrawer inline doc={fieldsDoc} busy={busy} error={err}
+        onSave={saveFields} onClose={() => setFieldsDoc(null)} />
     ) : (
     <DocumentReviewPanel doc={d} cpName={cpName} getSignedUrl={getSignedUrl} busy={busy}
       onClose={() => setReview(null)} onView={onView} onDownload={onDownload}
@@ -352,7 +459,15 @@ export function BusinessDocuments() {
       onReclassify={setVaultDoc}
       onMoveToVault={setVaultDoc}
       onOpenAccountant={() => navigate('/business/accountant')}
-      onArchive={onArchive} />
+      onArchive={onArchive}
+      analyzing={analyzing} analyzeNote={analyzeNote} cpSuggestion={cpSuggestion} cpBusy={cpBusy} cpError={cpError}
+      onAnalyze={analyzeDoc}
+      onReviewFields={(doc) => { setCpSuggestion(null); setFieldsDoc(doc) }}
+      onSuggestCounterparty={suggestCounterparty}
+      onCreateCounterparty={createCounterparty}
+      onLinkCounterparty={linkCounterparty}
+      onViewCounterparty={() => navigate('/business/counterparties')}
+      onTaxSplit={() => navigate('/business/accountant/tax-split')} />
     )
   )
 
@@ -369,7 +484,8 @@ export function BusinessDocuments() {
         onCreate={(doc, dir) => setCreate({ doc, dir })}
         onLink={(doc, kind, dir) => openPicker(doc, kind, dir)}
         onClassify={setClassify} onUpload={() => setUpload(true)} navigate={navigate}
-        expandedId={isDesktop ? (review?.id ?? picker?.doc?.id ?? classify?.id ?? vaultDoc?.id ?? null) : null}
+        onAnalyze={analyzeDoc} analyzing={analyzing}
+        expandedId={isDesktop ? (review?.id ?? picker?.doc?.id ?? classify?.id ?? vaultDoc?.id ?? fieldsDoc?.id ?? null) : null}
         renderPanel={isDesktop ? renderDocPanel : null} />
     ) : (
       <CompanyVault docs={vaultDocs} loading={st.loading}
@@ -389,12 +505,20 @@ export function BusinessDocuments() {
         onCreate={(doc, dir) => { setReview(null); setCreate({ doc, dir }) }}
         onLink={(doc, kind, dir) => { setReview(null); openPicker(doc, kind, dir) }}
         onClassify={(doc) => { setReview(null); setClassify(doc) }}
+        onAnalyze={analyzeDoc} analyzing={analyzing} analyzeNote={analyzeNote}
+        onReviewFields={(doc) => { setReview(null); setFieldsDoc(doc) }}
         onArchive={onArchive} />
     )}
 
     {/* Mobile/tablet only — on desktop these render inline under the row. */}
     {!isDesktop && <ClassifyDrawer doc={classify} busy={busy} error={err}
       onPick={applyType} onClose={() => setClassify(null)} />}
+
+    {/* Manual field entry stays reachable below 1024px too — it is the only route out
+        of an unreadable scan, so it must not be desktop-only. */}
+    {/* keyed by document: switching documents must reset the form, not carry figures over */}
+    {!isDesktop && fieldsDoc && <ReviewFieldsDrawer key={fieldsDoc.id} doc={fieldsDoc} busy={busy} error={err}
+      onSave={saveFields} onClose={() => setFieldsDoc(null)} />}
 
     {!isDesktop && <VaultReclassifyDrawer doc={vaultDoc} busy={busy} error={err}
       onPick={applyVaultType} onClose={() => setVaultDoc(null)} />}
@@ -410,10 +534,14 @@ export function BusinessDocuments() {
       <DebtFormModal mode={create.dir} token={token} lockBusinessScope
         title={`Create ${create.dir} from document`}
         subtitle="Review and confirm before this affects your books."
+        // Prefilled from the stored record first; the intake summary only fills what the
+        // record does not have. The form is still shown and still saved by the user — a
+        // suggestion reaches the books only through a field they looked at.
         prefill={{
-          counterparty: cpName(create.doc.issuer_counterparty_id) || '',
+          counterparty: cpName(create.doc.issuer_counterparty_id)
+            || cpName(create.doc.extracted_json?.ai_intake_v2?.matched_counterparty_id) || '',
           description: `Document ${create.doc.document_number || create.doc.file?.file_name || ''}`.trim(),
-          original_amount: create.doc.gross_amount,
+          original_amount: create.doc.gross_amount ?? create.doc.extracted_json?.ai_intake_v2?.amount ?? null,
           due_date: create.doc.document_date || null,
         }}
         onClose={() => setCreate(null)}

@@ -217,6 +217,56 @@ const t = async (name, fn) => {
     assert.ok(!(bDoc.extracted_json || {}).ai_intake_v2, 'B document must not be processed');
   });
 
+  // ── the Document Center has to be able to READ the summary ────────────────
+  console.log('\nExposure through /api/documents');
+  await t('the intake summary reaches the client through GET /api/documents', async () => {
+    const r = await call('GET', '/documents', { biz: A });
+    assert.strictEqual(r.status, 200, `status ${r.status}`);
+    const row = (r.body.documents || []).find((d) => d.id === 'd-sup');
+    assert.ok(row, 'the document must be listed');
+    const v2 = row.extracted_json?.ai_intake_v2;
+    assert.ok(v2, 'ai_intake_v2 must no longer be stripped on read');
+    assert.strictEqual(v2.document_type, 'invoice');
+    assert.strictEqual(v2.direction, 'payable');
+    assert.strictEqual(v2.suggested_record_type, 'payable');
+    assert.strictEqual(v2.amount, 25000000);
+    assert.ok(Array.isArray(v2.next_action_keys) && v2.next_action_keys.length > 0);
+  });
+
+  await t('the stored document_type column is still "other" on that same row', async () => {
+    // The card must be able to show BOTH: the column a human owns, and the suggestion.
+    const r = await call('GET', '/documents', { biz: A });
+    const row = (r.body.documents || []).find((d) => d.id === 'd-sup');
+    assert.strictEqual(row.document_type, 'other');
+  });
+
+  await t('the summary is a whitelist — extraction internals stay server-side', async () => {
+    // Plant private fields on the stored summary and confirm the serialiser drops them.
+    const row = docRow('d-sup');
+    row.extracted_json.ai_intake_v2.raw_text = 'PT Sumber Makmur Sentosa … Netto 25.000.000';
+    row.extracted_json.ai_intake_v2.storage_path = 'b/a/supplier.pdf';
+    const r = await call('GET', '/documents', { biz: A });
+    const v2 = (r.body.documents || []).find((d) => d.id === 'd-sup').extracted_json.ai_intake_v2;
+    assert.ok(!('raw_text' in v2), 'document text must never be exposed');
+    assert.ok(!('storage_path' in v2), 'storage paths must never be exposed');
+    assert.strictEqual(JSON.stringify(r.body).includes('b/a/supplier.pdf'), false,
+      'no storage path anywhere in the payload');
+  });
+
+  await t('an unreadable scan is exposed as unsupported, not as an empty invoice', async () => {
+    const r = await call('GET', '/documents', { biz: A });
+    const v2 = (r.body.documents || []).find((d) => d.id === 'd-scan').extracted_json.ai_intake_v2;
+    assert.strictEqual(v2.status, 'unsupported');
+    assert.strictEqual(v2.amount, null);
+    assert.strictEqual(v2.suggested_record_type, 'none');
+  });
+
+  await t('a personal workspace cannot read the summary either', async () => {
+    const r = await call('GET', '/documents', { biz: P });
+    assert.strictEqual(r.status, 403, `status ${r.status}`);
+    assert.strictEqual(r.body.error, 'business_workspace_required');
+  });
+
   console.log(`\n${fail === 0 ? `ALL PASS — ${pass} passed, 0 failed` : `${pass} passed, ${fail} FAILED`}`);
   process.exitCode = fail === 0 ? 0 : 1;
   for (const h of process._getActiveHandles()) { try { h.unref?.(); } catch { /* ignore */ } }

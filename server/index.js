@@ -12586,6 +12586,7 @@ const docIntake = require('./lib/documentIntake');
 const docContent = require('./lib/documentContent');
 const { extractPdfText } = require('./lib/pdfText');
 const docExtract = require('./lib/documentExtraction');
+const { publicIntakeV2 } = require('./lib/documentPublicView');
 
 const INTAKE_DOC_CAP = 500;
 
@@ -12701,6 +12702,11 @@ const publicExtractedJson = (ej) => {
         ? { text_available: !!ai.extraction.text_available, method: ai.extraction.method ?? null }
         : null,
     } : null,
+    // The Document Intake Orchestrator's review summary. Whitelisted field-by-field in
+    // server/lib/documentPublicView.js — review metadata only, never document text.
+    // Without this the Document Center could not show what intake concluded, so a
+    // recognised invoice still read as "Unclassified".
+    ai_intake_v2: publicIntakeV2(ej.ai_intake_v2),
   };
 };
 const publicDocRow = (d) => (d ? { ...d, extracted_json: publicExtractedJson(d.extracted_json) } : d);
