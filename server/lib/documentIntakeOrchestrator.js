@@ -362,11 +362,29 @@ function toStoredIntake(result, opts = {}) {
   };
 }
 
+/** Canonical serialisation: keys sorted at every level, arrays kept in order.
+ *
+ *  Needed because one side of the comparison has been through Postgres JSONB, which
+ *  does NOT preserve object key order — it stores keys sorted by length then bytes.
+ *  A plain JSON.stringify therefore reports "changed" on every re-read of identical
+ *  data, which silently defeated the idempotency guard in production even though an
+ *  in-memory test (where insertion order survives) passed. */
+function canonical(v) {
+  if (Array.isArray(v)) return `[${v.map(canonical).join(',')}]`;
+  if (v && typeof v === 'object') {
+    return `{${Object.keys(v).sort().map((k) => `${JSON.stringify(k)}:${canonical(v[k])}`).join(',')}}`;
+  }
+  return JSON.stringify(v === undefined ? null : v);
+}
+
 /** True when a re-run would store exactly the same thing (timestamp aside). */
 function sameIntake(a, b) {
   if (!a || !b) return false;
-  const strip = (x) => { const { processed_at, ...rest } = x || {}; return JSON.stringify(rest); };
+  const strip = (x) => { const { processed_at, ...rest } = x || {}; return canonical(rest); };
   return strip(a) === strip(b);
 }
 
-module.exports = { STATUSES, MEANING, RECORD_BY_TYPE, resolveDirection, assessTax, processDocument, toStoredIntake, sameIntake };
+module.exports = {
+  STATUSES, MEANING, RECORD_BY_TYPE, resolveDirection, assessTax,
+  processDocument, toStoredIntake, sameIntake, canonical,
+};

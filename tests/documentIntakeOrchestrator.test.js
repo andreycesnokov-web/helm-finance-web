@@ -267,6 +267,30 @@ t('22. repeated processing is stable', () => {
     'the stored summary must be identical apart from the timestamp');
 });
 
+t('the idempotency check survives JSONB key reordering', () => {
+  // Postgres JSONB does not preserve object key order — it stores keys sorted by
+  // length then bytes. The previous summary therefore comes back with a DIFFERENT
+  // key order than the freshly-built one. A plain JSON.stringify comparison reported
+  // "changed" on every re-read, so the guard never fired in production even though an
+  // in-memory test (where insertion order survives) passed. Simulate the reordering.
+  const stored = O.toStoredIntake(run(SUPPLIER_INVOICE, { counterparties: KNOWN }));
+  const roundTripped = Object.fromEntries(
+    Object.keys(stored).sort((a, b) => a.length - b.length || a.localeCompare(b))
+      .map((k) => [k, stored[k]]));
+  assert.notStrictEqual(JSON.stringify(roundTripped), JSON.stringify(stored),
+    'the simulation must actually reorder the keys');
+  assert.strictEqual(O.sameIntake(stored, roundTripped), true,
+    'reordered keys with identical data must compare equal');
+});
+
+t('a genuine change is still detected', () => {
+  const a = O.toStoredIntake(run(SUPPLIER_INVOICE, { counterparties: KNOWN }));
+  const b = O.toStoredIntake(run(CUSTOMER_INVOICE, { counterparties: KNOWN }));
+  assert.strictEqual(O.sameIntake(a, b), false);
+  // and array ORDER is still significant, since it carries meaning
+  assert.strictEqual(O.sameIntake({ l: [1, 2] }, { l: [2, 1] }), false);
+});
+
 t('the stored summary carries no financial record, only review state', () => {
   const stored = O.toStoredIntake(run(SUPPLIER_INVOICE, { counterparties: KNOWN }));
   assert.strictEqual(stored.version, 'intake-v1');
