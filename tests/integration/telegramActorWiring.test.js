@@ -358,17 +358,47 @@ test('bot-secret authentication still runs BEFORE identity resolution', () => {
   }
 });
 
-test('no migration was added by PR2.5', () => {
-  const migs = fs.readdirSync(path.join(__dirname, '../../migrations')).filter((f) => /^\d{3}_/.test(f));
-  // The Company Admin Notification Grants work (046 + its 047 actor-authorization follow-up) is a
-  // deliberate, separately-reviewed feature, not something that slipped in with the telegram-actor
-  // wiring. Both are allowed by name; the guard still catches any OTHER unexpected 046+ migration.
-  const ALLOWED = new Set([
+// WHY THIS ASSERTION WAS REWRITTEN
+//
+// It used to read "no migration was added by PR2.5", and proved it by asserting that no
+// migration numbered 046 or higher existed except two named files. That worked on the day
+// it was written and decayed by construction: it measured how many migrations the whole
+// repository has, not what this change added. Migrations 048-055 (incoming payments,
+// payment providers, support center, onboarding, counterparty intelligence) all landed
+// afterwards through their own reviews, and each one broke this test without anything
+// being wrong. It has been failing on main ever since.
+//
+// The protection it was reaching for is real and does not decay: the telegram-actor route
+// wiring must carry NO schema change of its own. It rides on the channel-identity
+// foundation in 045 and adds nothing. So the invariant is stated against the actor
+// identity table rather than against a migration counter — a migration that quietly
+// redefined user_channel_links is exactly what this should catch, and now does, however
+// many unrelated migrations exist by then.
+test('the telegram actor wiring carries no schema of its own', () => {
+  const dir = path.join(__dirname, '../../migrations');
+  const migs = fs.readdirSync(dir).filter((f) => /^\d{3}_.*\.sql$/.test(f)).sort();
+
+  // 045 creates the actor identity mapping; 046 references it for notification grants.
+  // Both were separately reviewed. Nothing later may create or alter it.
+  const ALLOWED_TO_TOUCH_ACTOR_IDENTITY = new Set([
+    '045_channel_identity_foundation.sql',
     '046_company_notification_grants.sql',
-    '047_notification_grants_actor_authorization.sql',
   ]);
-  const unexpected = migs.filter((f) => /^04[6-9]_|^0[5-9]\d_/.test(f) && !ALLOWED.has(f));
-  assert.strictEqual(unexpected.length, 0, `unexpected migration(s): ${unexpected.join(', ')}`);
+
+  const offenders = migs.filter((f) => {
+    if (ALLOWED_TO_TOUCH_ACTOR_IDENTITY.has(f)) return false;
+    const sql = fs.readFileSync(path.join(dir, f), 'utf8');
+    // Creating, altering or dropping the table — not merely mentioning it in a comment.
+    return /(create|alter|drop)\s+(table|index|policy)[^;]{0,200}user_channel_links/is.test(sql);
+  });
+
+  assert.strictEqual(offenders.length, 0,
+    `migration(s) changed the actor identity schema: ${offenders.join(', ')}`);
+
+  // And the wiring itself is code, not schema: the resolver must exist without any
+  // migration having introduced a table for it.
+  assert.ok(fs.existsSync(path.join(__dirname, '../../server/lib/telegramActor.js')),
+    'telegramActor.js is the wiring; if it disappeared, this guard is meaningless');
 });
 
 // ════════════════════════════════════════════════════════════════════════════

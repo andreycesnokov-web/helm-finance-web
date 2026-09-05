@@ -11,6 +11,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # The secret scan diffs the branch against its base, so it needs history.
+          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:
@@ -26,14 +29,16 @@ jobs:
       - name: Unit tests
         run: npm test
 
-      # The integration suite is NOT wired in yet, and deliberately so.
-      # tests/integration/telegramActorWiring.test.js fails on main today: it asserts
-      # "no migration was added by PR2.5", and migrations 048-055 have legitimately
-      # landed since that PR merged. The guard's premise expired rather than being
-      # violated. Adding the suite now would make every build red for a reason unrelated
-      # to the change under review, and a red build nobody believes is worth less than no
-      # build at all. Run it locally with `npm run test:all`; wire it in once that guard
-      # is either updated or retired.
+      - name: Integration tests
+        run: node scripts/run-tests.js --integration
+
+      - name: Whitespace check
+        run: git diff --check ${{ github.event.pull_request.base.sha || 'HEAD~1' }} HEAD
+
+      # Credentials must never reach the history. Scans the branch's own diff, so an
+      # existing finding elsewhere in the repo cannot mask a new one here.
+      - name: Secret scan
+        run: node scripts/secret-scan.js ${{ github.event.pull_request.base.sha || 'HEAD~1' }}
 
       - name: Install client deps
         run: npm install --no-audit --no-fund

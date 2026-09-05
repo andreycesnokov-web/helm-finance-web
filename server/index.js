@@ -7,6 +7,9 @@ const { calculateDueDate, ymd } = require('./lib/dueDate');
 const { computeActivationBlockers, isEffectiveApprovedReview, validReviewTransition } = require('./lib/taxGate');
 const { VALID_PLANS, computeBusinessAccess } = require('./lib/businessAccess');
 const docV = require('./lib/documentValidation');
+// Which model may read a financial document. Required up here because recognizeReceipt,
+// far above the Document Center code, obeys the same policy.
+const modelPolicy = require('./lib/modelPolicy');
 const { buildReminderRow } = require('./lib/reminderScope');
 const FININ = require('./lib/financialInsights');
 const SETTLE = require('./lib/invoiceSettlement');
@@ -2083,24 +2086,63 @@ async function fetchTelegramFile(fileId) {
   return { base64: buf.toString('base64'), mime };
 }
 
+// Shown to the person who sent the receipt. Says what happened and what they can do,
+// and names no model, provider or cost — those stay in operator logs.
+const RECEIPT_FAIL_MESSAGE = 'Не удалось проанализировать документ. Попробуйте отправить ещё раз.';
+
 // Recognize amount + counterparty from a receipt image/PDF via Claude vision.
-// Returns { amount, counterparty, currency, date } or null on failure.
+//
+// This is a financial-document reader. It arrives by a different door from the Document
+// Center, but it is the same act — a picture of a receipt turned into an amount, a
+// counterparty and a date — and the amount it returns goes on to set the obligation
+// amount of a debt. So it obeys the same policy as every other reader: Opus, no silent
+// fallback, and the answer refused if it did not come from Opus.
+//
+// @returns { ok:true, amount, currency, counterparty, date }
+//        | { ok:false, reason, retryable, user_message }
+//        | null  when there was nothing to try (no API key, no file)
 async function recognizeReceipt(file) {
   if (!process.env.ANTHROPIC_API_KEY || !file) return null;
+  const fail = (reason, retryable) => ({ ok: false, reason, retryable, user_message: RECEIPT_FAIL_MESSAGE });
   try {
     const isPdf = /pdf/i.test(file.mime);
     const block = isPdf
       ? { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: file.base64 } }
       : { type: 'image',    source: { type: 'base64', media_type: file.mime.startsWith('image/') ? file.mime : 'image/jpeg', data: file.base64 } };
     const resp = await anthropic.messages.create({
-      model: 'claude-sonnet-4-5', max_tokens: 300,
+      // Centralised, so this path cannot drift away from the policy on its own.
+      model: modelPolicy.modelFor('receipt_extraction'), max_tokens: 300,
       messages: [{ role: 'user', content: [block, { type: 'text', text:
         'Это чек/счёт. Верни ТОЛЬКО JSON без markdown: {"amount":число_итоговой_суммы,"currency":"IDR","counterparty":"продавец/магазин или null","date":"YYYY-MM-DD или null"}. amount — итоговая сумма к оплате (total/grand total). Если не уверен — поставь null.' }] }],
     });
-    const raw = (resp.content?.[0]?.text || '').trim().replace(/```json\n?/g, '').replace(/```/g, '').trim();
+    // The same guarantee the Document Center has: an answer from anything but Opus is
+    // refused rather than stored, whatever we asked for.
+    if (resp?.model && !modelPolicy.isOpus(resp.model)) {
+      console.warn('[receipt-ocr] refused a non-Opus answer');
+      return fail('model_policy_violation', false);
+    }
+
+    // NOT content[0]. Opus 5 puts a thinking block first, so index 0 carries no .text and
+    // this would have returned null for every receipt ever sent. Take the first actual
+    // text block instead.
+    const textBlock = (resp?.content || []).find((c) => c.type === 'text');
+    const raw = (textBlock?.text || '').trim().replace(/```json\n?/g, '').replace(/```/g, '').trim();
+    if (!raw) return fail('no_text_output', true);
     const j = JSON.parse(raw);
-    return { amount: Number(j.amount) || null, currency: j.currency || 'IDR', counterparty: j.counterparty || null, date: j.date || null };
-  } catch (e) { console.warn('[receipt-ocr] failed:', e.message); return null; }
+    return {
+      ok: true,
+      amount: Number(j.amount) || null,
+      currency: j.currency || 'IDR',
+      counterparty: j.counterparty || null,
+      date: j.date || null,
+    };
+  } catch (e) {
+    // A provider failure is worth another attempt; a request the provider rejected outright
+    // is not. Neither is answered by quietly reading the receipt with a weaker model.
+    console.warn('[receipt-ocr] failed:', e.message);
+    const status = Number(e?.status || e?.statusCode || 0);
+    return fail(status ? `provider_${status}` : 'analysis_failed', status !== 400 && status !== 413);
+  }
 }
 
 // ── POST /api/telegram/debts/attach-receipt — creator sends a receipt ────────
@@ -2136,8 +2178,15 @@ app.post('/api/telegram/debts/attach-receipt', async (req, res) => {
 
     // OCR (best-effort — never blocks the attach)
     const file = await fetchTelegramFile(file_id).catch(() => null);
-    const ocr = await recognizeReceipt(file).catch(() => null);
+    const read = await recognizeReceipt(file).catch(() => null);
+    // A reading only counts when it succeeded. A failed analysis is recorded as such so
+    // the receipt is not silently filed as "nothing on it", and so a retry is possible.
+    const ocr = read && read.ok ? read : null;
     const item = { file_id, mime: file?.mime || null, amount: ocr?.amount ?? null, counterparty: ocr?.counterparty ?? null, date: ocr?.date ?? null, recognized: !!ocr };
+    if (read && read.ok === false) {
+      item.analysis_failed = read.reason;
+      item.analysis_retryable = read.retryable;
+    }
     const attachments = [...existing, item];
 
     // Recompute total from recognized receipt amounts (if any recognized).
@@ -2214,7 +2263,13 @@ app.post('/api/telegram/debts/from-receipt', async (req, res) => {
     if (gate) return res.status(402).json(gate);
 
     const file = await fetchTelegramFile(file_id).catch(() => null);
-    const ocr = await recognizeReceipt(file).catch(() => null);
+    const read = await recognizeReceipt(file).catch(() => null);
+    // An analysis that failed is a different answer from a receipt with no amount on
+    // it, and only one of the two is worth trying again. Saying so beats a 422 that
+    // blames the document.
+    if (read && read.ok === false && read.retryable)
+      return res.status(503).json({ error: 'analysis_failed', message: read.user_message, retryable: true });
+    const ocr = read && read.ok ? read : null;
     if (!ocr || !ocr.amount)
       return res.status(422).json({ error: 'amount_not_recognized', message: 'Не удалось распознать сумму на счёте.' });
 
@@ -13433,7 +13488,10 @@ async function readDocumentForIntake(biz, doc) {
   // an answer under the same label, the user gets a worse reading with no way to tell.
   // A visible, retryable failure beats a silent downgrade, so an analysis that was
   // attempted and failed stays a failure.
-  const v3Attempted = !!v3 && v3.reason !== 'vision_not_configured';
+  // A cache hit IS a reading: we already hold v3's answer for exactly these bytes. Not
+  // counting it as attempted is what let the legacy path fire on every cached re-analysis,
+  // so a "free" repeat quietly bought a second, worse reading of the same document.
+  const v3Attempted = v3FromCache || (!!v3 && v3.reason !== 'vision_not_configured');
   let readSource = ex.text_available ? 'embedded_text' : 'filename_only';
   let ocr = null;
   if (!v3?.ok && !v3Attempted && !ex.text_available && docOcr.ocrEnabled()) {

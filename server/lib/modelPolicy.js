@@ -34,6 +34,16 @@ const TASKS = {
   // Deciding how many documents a PDF contains and where each begins. This is still a
   // reading of a financial document, so it does not get a cheaper model either.
   bundle_segmentation: { model: PRIMARY_EXTRACTION_MODEL, requiresOpus: true },
+  // Reading a receipt or invoice sent through Telegram. It arrives by a different door,
+  // but it is the same act: a picture of a financial document turned into an amount, a
+  // counterparty and a date. That result then sets the obligation amount on a debt, so
+  // it is an accounting fact and gets the same model as any other.
+  receipt_extraction: { model: PRIMARY_EXTRACTION_MODEL, requiresOpus: true },
+  // The legacy transcript reader. It is unreachable today — it and v3 read the same
+  // DOCUMENT_OCR_VISION_ENABLED flag, so whenever it could run, v3 has already run
+  // instead — but it is still a financial-document reader, and leaving a cheaper model
+  // named in one is how the next person finds a shortcut.
+  legacy_ocr_transcript: { model: PRIMARY_EXTRACTION_MODEL, requiresOpus: true },
 };
 
 /**
