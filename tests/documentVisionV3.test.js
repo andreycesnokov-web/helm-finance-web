@@ -101,6 +101,34 @@ const BUSINESS = { legal_name: 'PT Helm Care Indonesia', display_name: 'Helm Car
     assert.ok(req.tools[0].input_schema.required.includes('parties'));
   });
 
+  // ── proven against the live API, 2026-09-05 ───────────────────────────────
+  // Probe run inside the production container: SDK 0.20.9 / claude-sonnet-4-5 accepted
+  // the PDF document block, the tools array and a forced tool_choice, and answered with
+  // stop_reason "tool_use" and a single tool_use block. These assertions encode that
+  // contract so a regression in the request shape fails here rather than in production.
+  await t('LIVE-VERIFIED: the request shape the provider accepted', async () => {
+    SENT = [];
+    await V3.extractDocumentV3(PDF_BYTES, { mime_type: 'application/pdf', business: BUSINESS, client: stub(GOOD) });
+    const req = SENT[0];
+    assert.strictEqual(req.model, 'claude-sonnet-4-5', 'the model the probe used');
+    assert.strictEqual(req.messages[0].content[0].type, 'document');
+    assert.strictEqual(req.messages[0].content[0].source.media_type, 'application/pdf');
+    assert.ok(Array.isArray(req.tools) && req.tools[0].input_schema, 'tools[] with a JSON Schema');
+    assert.deepStrictEqual(req.tool_choice, { type: 'tool', name: 'record_financial_document' });
+    assert.ok(typeof req.max_tokens === 'number' && req.max_tokens > 0);
+  });
+
+  await t('LIVE-VERIFIED: schema_version is stamped by us, not by the model', async () => {
+    // The first live run returned "1.0" for schema_version, because the field was a free
+    // string. It is pinned in the schema now AND overwritten on the way out.
+    const wrong = { ...GOOD, schema_version: '1.0' };
+    const r = await V3.extractDocumentV3(PDF_BYTES, { mime_type: 'application/pdf', client: stub(wrong) });
+    assert.strictEqual(r.extraction.schema_version, V3.SCHEMA_VERSION, 'ours wins');
+    assert.strictEqual(r.model_reported_schema_version, '1.0', 'what the model said is kept, separately');
+    const enumField = V3.EXTRACTION_SCHEMA.properties.schema_version;
+    assert.deepStrictEqual(enumField.enum, [V3.SCHEMA_VERSION], 'and the schema pins it');
+  });
+
   await t('the returned tool input is handed back as the extraction', async () => {
     const r = await V3.extractDocumentV3(PDF_BYTES, { mime_type: 'application/pdf', client: stub(GOOD) });
     assert.strictEqual(r.ok, true);

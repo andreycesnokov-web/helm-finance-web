@@ -103,7 +103,10 @@ const amountField = (description) => ({
 const EXTRACTION_SCHEMA = {
   type: 'object',
   properties: {
-    schema_version: { type: 'string' },
+    // The live probe returned "1.0" here: declared as a free string, the model fills it
+    // with a version of its own. Pinned to a constant so the field identifies OUR schema.
+    schema_version: { type: 'string', enum: [SCHEMA_VERSION],
+      description: `Always exactly "${SCHEMA_VERSION}".` },
     document_type: {
       type: 'object',
       properties: {
@@ -362,7 +365,11 @@ async function extractDocumentV3(buffer, opts = {}) {
     usage: resp?.usage
       ? { input_tokens: resp.usage.input_tokens ?? null, output_tokens: resp.usage.output_tokens ?? null }
       : null,
-    extraction: block.input,
+    // Stamped, not trusted: the version of the schema WE sent is a fact we hold, and a
+    // model that echoes something else must not be able to mislabel the record.
+    extraction: { ...block.input, schema_version: SCHEMA_VERSION },
+    model_reported_schema_version: block.input?.schema_version ?? null,
+    stop_reason: resp?.stop_reason ?? null,
   };
 }
 
