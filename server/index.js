@@ -13583,7 +13583,7 @@ async function readDocumentForIntake(biz, doc) {
       counterparty_status: storedV3.counterparty_status,
       normalized: storedV3.fields || {},
       warnings: storedV3.warnings || [],
-    });
+    }, storedV3.party_fields || null);
   }
   if (v3?.ok) {
     v3Validation = extractionValidator.validateExtraction(v3.extraction, {
@@ -13700,10 +13700,12 @@ async function runDocumentIntake(biz, doc, opts = {}) {
 /* Fold the v3 structure into the legacy extraction shape.
    The model's values win wherever it has one; the regex reading survives only in the
    gaps. Field names are the v2 vocabulary so nothing downstream needs to change. */
-function mergeV3IntoExtraction(base, ex, validation) {
+function mergeV3IntoExtraction(base, ex, validation, storedParties = null) {
   const n = validation?.normalized || {};
-  // `ex` is null on the cache path: the stored record keeps the conclusions, not the
-  // raw party objects, so party-derived fields simply stay as they were.
+  // `ex` is null on the cache path, where the raw party objects are not kept. The three
+  // party-derived fields are therefore persisted alongside the conclusions and restored
+  // here, so a cached answer is the SAME answer — not a thinner one that happened to look
+  // fine while the legacy reader was quietly backfilling it.
   const parties = Array.isArray(ex?.parties) ? ex.parties : [];
   const byId = (id) => parties.find((p) => p.party_id === id) || null;
   const usName = byId(ex?.current_business_party_id)?.legal_name?.value || null;
@@ -13720,9 +13722,9 @@ function mergeV3IntoExtraction(base, ex, validation) {
   set('commercial_tax_amount', n.ppn);
   set('gross_amount', n.total);
   set('amount', n.total ?? n.amount_due);
-  set('issuer_name', cpIsBuyer ? usName : cpName);
-  set('buyer_name', cpIsBuyer ? cpName : usName);
-  set('issuer_npwp', cpIsBuyer ? null : (cpParty?.npwp?.value || null));
+  set('issuer_name', ex ? (cpIsBuyer ? usName : cpName) : (storedParties?.issuer_name ?? null));
+  set('buyer_name', ex ? (cpIsBuyer ? cpName : usName) : (storedParties?.buyer_name ?? null));
+  set('issuer_npwp', ex ? (cpIsBuyer ? null : (cpParty?.npwp?.value || null)) : (storedParties?.issuer_npwp ?? null));
   set('transfer_date_text', n.payment_date || n.document_date);
 
   return {
@@ -13805,6 +13807,20 @@ function buildV3Summary(read, doc) {
     analysis_complete: read.v3.extraction?.analysis_complete !== false,
     validation_status: v.status,
     counterparty_status: v.counterparty_status,
+    // Persisted so the cache path reproduces the same reading rather than a thinner one.
+    party_fields: (() => {
+      const parties = Array.isArray(read.v3.extraction?.parties) ? read.v3.extraction.parties : [];
+      const byId = (id) => parties.find((p) => p.party_id === id) || null;
+      const usName = byId(read.v3.extraction?.current_business_party_id)?.legal_name?.value || null;
+      const cpParty = byId(read.v3.extraction?.counterparty_candidate_party_id);
+      const cpName = v.counterparty_status === 'self_match' ? null : (cpParty?.legal_name?.value || null);
+      const cpIsBuyer = ['customer', 'buyer', 'payer', 'taxable_entrepreneur_buyer'].includes(cpParty?.role);
+      return {
+        issuer_name: cpIsBuyer ? usName : cpName,
+        buyer_name: cpIsBuyer ? cpName : usName,
+        issuer_npwp: cpIsBuyer ? null : (cpParty?.npwp?.value || null),
+      };
+    })(),
     can_create_counterparty: v.can_create_counterparty,
     can_create_financial_record: v.can_create_financial_record,
     fields: v.normalized,
