@@ -13408,12 +13408,18 @@ async function readDocumentForIntake(biz, doc) {
     }));
   }
 
-  // ── legacy OCR fallback ──────────────────────────────────────────────────
-  // Kept for the case where v3 could not run or did not return: a document must never
-  // become less readable than it was before this change.
+  // ── legacy OCR (only when Opus was never asked) ──────────────────────────────────────────────────
+  // Runs only when the strong model was never asked — vision switched off, or no client
+  // configured. It is NOT a rescue for an Opus failure.
+  //
+  // That distinction is the point. If Opus times out and a weaker reader quietly supplies
+  // an answer under the same label, the user gets a worse reading with no way to tell.
+  // A visible, retryable failure beats a silent downgrade, so an analysis that was
+  // attempted and failed stays a failure.
+  const v3Attempted = !!v3 && v3.reason !== 'vision_not_configured';
   let readSource = ex.text_available ? 'embedded_text' : 'filename_only';
   let ocr = null;
-  if (!v3?.ok && !ex.text_available && docOcr.ocrEnabled()) {
+  if (!v3?.ok && !v3Attempted && !ex.text_available && docOcr.ocrEnabled()) {
     ocr = await docOcr.readDocumentWithVision(buf, {
       mime_type: file.mime_type, file_name: file.file_name, client: anthropic,
     });
@@ -13522,6 +13528,9 @@ async function runDocumentIntake(biz, doc, opts = {}) {
     // and a cross-check — never a classification.
     uploadIntent: (doc.extracted_json || {}).upload_intent || null,
     readSource, ocr,
+    // So a failed analysis is reported as a failed analysis, with its own retryability,
+    // rather than as a document nobody tried to read.
+    v3: read.v3 || null,
   });
 
   // The v3 summary: the model's structure, the validator's verdict, and the operational
@@ -13609,13 +13618,42 @@ function buildV3Summary(read, doc) {
   // A cache hit re-persists exactly what is already there, so the idempotency guard
   // sees no change and the row is not touched.
   if (read?.v3FromCache && read.storedV3) return read.storedV3;
+
+  // A failure is recorded, not discarded. Storing nothing leaves the document
+  // indistinguishable from one that was never analysed, and leaves the user with no way
+  // to ask for another attempt short of uploading the file again.
+  if (read?.v3 && !read.v3.ok) {
+    const prior = (doc?.extracted_json || {}).ai_intake_v3 || null;
+    const priorAttempts = prior && prior.analyzed === false ? Number(prior.attempts || 0) : 0;
+    return {
+      analyzed: false,
+      fingerprint: read.fingerprint || null,
+      schema_version: read.v3.schema_version || null,
+      prompt_version: read.v3.prompt_version || null,
+      model: read.v3.model || null,
+      failure: {
+        reason: read.v3.reason || 'unknown',
+        retryable: read.v3.retryable !== false,
+        user_message: read.v3.user_message || 'Analysis could not be completed.',
+        // Operator diagnostics; kept out of the public view.
+        provider_status: read.v3.provider_status ?? null,
+        provider_message: read.v3.provider_message ?? null,
+        responded_model: read.v3.responded_model ?? null,
+      },
+      attempts: priorAttempts + 1,
+      last_attempt_at: new Date().toISOString(),
+      duration_ms: read.v3.duration_ms ?? null,
+    };
+  }
   if (!read?.v3?.ok || !read.v3Validation) return null;
   const v = read.v3Validation;
   return {
+    analyzed: true,
     fingerprint: read.fingerprint || null,
     schema_version: read.v3.schema_version,
     prompt_version: read.v3.prompt_version,
     model: read.v3.model,
+    responded_model: read.v3.responded_model ?? null,
     source: read.v3.source,
     processed_at: new Date().toISOString(),
     duration_ms: read.v3.duration_ms ?? null,

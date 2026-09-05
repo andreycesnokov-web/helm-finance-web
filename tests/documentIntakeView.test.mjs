@@ -536,5 +536,76 @@ t('6. an unchanged re-run never reads as though something was created', () => {
   assert.ok(!/creat|new|added/i.test(msg), msg);
 });
 
+console.log('\nWhat the user is told is happening');
+
+const failedDoc = (failure, extra = {}) => ({
+  extracted_json: { ai_intake_v3: { analyzed: false, failure, attempts: 1, ...extra } },
+});
+const readDoc = { extracted_json: { ai_intake_v3: { analyzed: true, fields: { document_type: 'faktur_pajak' }, source: 'native_pdf_vision' } } };
+
+t('every state the brief names has a distinct label', () => {
+  const seen = new Set();
+  const states = [
+    V.analysisState({}, { uploading: true }),
+    V.analysisState({}, { uploadFailed: true }),
+    V.analysisState({}),
+    V.analysisState({}, { analyzing: true }),
+    V.analysisState(readDoc),
+    V.analysisState(failedDoc({ reason: 'vision_timeout', retryable: true, user_message: 'Analysis did not finish in time. You can retry it.' })),
+    V.analysisState({ extracted_json: { ai_intake_v3: { analyzed: true, bundle: { children: [1, 2, 3] } } } }),
+    V.analysisState({ document_type: 'faktur_pajak' }),
+  ];
+  for (const s of states) {
+    assert.ok(s.label && s.detail, JSON.stringify(s));
+    assert.ok(!seen.has(s.label), `two states share the label "${s.label}"`);
+    seen.add(s.label);
+  }
+  assert.strictEqual(seen.size, 8);
+});
+
+t('a failed analysis says the FILE is safe, and offers a retry', () => {
+  const s = V.analysisState(failedDoc({ reason: 'vision_timeout', retryable: true,
+    user_message: 'Analysis did not finish in time. You can retry it.' }));
+  assert.strictEqual(s.state, V.ANALYSIS_STATE.ANALYSIS_FAILED);
+  assert.strictEqual(s.canRetry, true);
+  // The whole point of separating the two: an upload failure and an analysis failure
+  // are different problems, and only one of them means the document is gone.
+  assert.notStrictEqual(s.state, V.ANALYSIS_STATE.UPLOAD_FAILED);
+  assert.ok(/retry/i.test(s.detail), s.detail);
+});
+
+t('a permanent failure does not offer a retry that cannot help', () => {
+  const s = V.analysisState(failedDoc({ reason: 'file_too_large', retryable: false,
+    user_message: 'This document is too large to analyse automatically. Enter the values manually.' }));
+  assert.strictEqual(s.canRetry, false);
+});
+
+t('a stored failure is never mistaken for a reading', () => {
+  const doc = failedDoc({ reason: 'vision_timeout', retryable: true, user_message: 'x' });
+  assert.strictEqual(V.readingV3Of(doc), null);
+  assert.strictEqual(V.primaryIntakeSource(doc), null, 'a failure must not supersede v2');
+  assert.deepStrictEqual(V.v3Warnings(doc), []);
+  assert.strictEqual(V.v3Headline(doc), null);
+  assert.strictEqual(V.v3FieldRows(doc).every((r) => r.status === V.FIELD_STATUS.NOT_FOUND), true);
+});
+
+t('a bundle is announced with its real count, not a guess', () => {
+  const s = V.analysisState({ extracted_json: { ai_intake_v3: { analyzed: true, bundle: { children: [1, 2, 3] } } } });
+  assert.strictEqual(s.state, V.ANALYSIS_STATE.BUNDLE_DETECTED);
+  assert.strictEqual(s.childCount, 3);
+  assert.ok(s.detail.includes('3'), s.detail);
+});
+
+t('no state shown to the user names a model or a cost', () => {
+  const docs = [{}, readDoc, failedDoc({ reason: 'model_policy_violation', retryable: false, user_message: 'Analysis could not be completed. Support has been notified.' })];
+  for (const d of docs) {
+    const s = V.analysisState(d);
+    const text = `${s.label} ${s.detail}`;
+    for (const leak of [/opus/i, /sonnet/i, /claude/i, /token/i, /[$]/]) {
+      assert.ok(!leak.test(text), `${leak} leaked: ${text}`);
+    }
+  }
+});
+
 console.log(`\n${fail === 0 ? `ALL PASS — ${pass} passed, 0 failed` : `${pass} passed, ${fail} FAILED`}`);
 process.exitCode = fail === 0 ? 0 : 1;

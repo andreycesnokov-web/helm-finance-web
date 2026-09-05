@@ -9,7 +9,7 @@ const t = async (name, fn) => {
   catch (e) { fail++; console.log(`  XX  ${name}\n      ${e.message}`); }
 };
 
-const CFG = { model: 'claude-sonnet-4-5', promptVersion: 'fin-doc-id-v3.1',
+const CFG = { model: require('../server/lib/modelPolicy').PRIMARY_EXTRACTION_MODEL, promptVersion: 'fin-doc-id-v3.2',
   schemaVersion: 'financial_document_extraction_v3' };
 const A = Buffer.from('%PDF document A');
 const B = Buffer.from('%PDF document B');
@@ -101,6 +101,15 @@ const B = Buffer.from('%PDF document B');
     const rs = await Promise.allSettled([C.singleFlight(fp, boom), C.singleFlight(fp, boom)]);
     assert.strictEqual(calls, 1, 'one attempt, not two');
     assert.ok(rs.every((r) => r.status === 'rejected'));
+  });
+
+  await t('a recorded failure is never a cache hit, or retry could never call again', () => {
+    const fp = C.fingerprintOf(Buffer.from('scan'), CFG);
+    assert.strictEqual(C.isFresh({ fingerprint: fp, analyzed: false, failure: { reason: 'vision_timeout' } }, fp), false);
+    // the successful reading of the same bytes still is
+    assert.strictEqual(C.isFresh({ fingerprint: fp, analyzed: true }, fp), true);
+    // and a record from before this field existed keeps working
+    assert.strictEqual(C.isFresh({ fingerprint: fp }, fp), true);
   });
 
   console.log(`\n${fail === 0 ? `ALL PASS — ${pass} passed, 0 failed` : `${pass} passed, ${fail} FAILED`}`);

@@ -298,17 +298,70 @@ function contextBlock(business = {}, opts = {}) {
       + 'document above is the source of truth; use this only to confirm characters you '
       + 'can already see:\n' + String(opts.embedded_text).slice(0, 4000));
   }
+  // Scoping a child of a bundle. The WHOLE file still travels — the model needs the
+  // surrounding pages to tell where one document ends and the next begins — but only
+  // the named pages are extracted. Nothing is re-rendered and nothing is cut.
+  if (opts.pageRange && Number.isFinite(opts.pageRange.start) && Number.isFinite(opts.pageRange.end)) {
+    const { start, end } = opts.pageRange;
+    const where = start === end ? `page ${start}` : `pages ${start} to ${end}`;
+    lines.push(`\nThis file contains SEVERAL separate documents. Extract ONLY the one on ${where}`
+      + `${opts.childLabel ? ` (${opts.childLabel})` : ''}. Ignore every other page: its parties, `
+      + 'dates and amounts belong to a different document and must not appear in your answer. '
+      + 'Set pages_analyzed to the pages you actually read for THIS document.');
+  }
   lines.push('\nExtract the document using the record_financial_document tool.');
   return lines.join('\n');
 }
 
 /* ── failure shapes ────────────────────────────────────────────────────────── */
 
+// A failure the user can act on by trying again, versus one that will happen
+// identically every time. Presenting the second as "try again" wastes their afternoon;
+// presenting the first as permanent throws away a document that would have read fine.
+const RETRYABLE = new Set([
+  'vision_timeout', 'vision_request_failed', 'no_tool_output',
+  'provider_overloaded', 'provider_rate_limited', 'model_unavailable',
+]);
+
+// What the person looking at the document should see. Deliberately says nothing about
+// models or providers: that belongs in operator diagnostics, not the customer view.
+const USER_MESSAGE = {
+  vision_disabled: 'Automatic analysis is switched off. Enter the values manually.',
+  vision_not_configured: 'Automatic analysis is unavailable right now. Enter the values manually.',
+  empty_file: 'This file is empty.',
+  file_too_large: 'This document is too large to analyse automatically. Enter the values manually.',
+  too_many_pages: 'This document has more pages than automatic analysis covers.',
+  unsupported_media_type: 'This file type cannot be analysed. Upload a PDF or an image.',
+  vision_timeout: 'Analysis did not finish in time. You can retry it.',
+  vision_request_failed: 'Analysis could not be completed. You can retry it.',
+  no_tool_output: 'Analysis returned nothing usable. You can retry it.',
+  provider_overloaded: 'Analysis is busy at the moment. You can retry it.',
+  provider_rate_limited: 'Analysis is busy at the moment. You can retry it.',
+  model_unavailable: 'Analysis is temporarily unavailable. You can retry it.',
+  model_policy_violation: 'Analysis could not be completed. Support has been notified.',
+};
+
 const failure = (reason, warning) => ({
   ok: false, reason,
+  retryable: RETRYABLE.has(reason),
+  // The document is NOT analysed. Nothing downstream may present it as read.
+  analyzed: false,
   schema_version: SCHEMA_VERSION, prompt_version: PROMPT_VERSION, model: MODEL,
+  user_message: USER_MESSAGE[reason] || 'Analysis could not be completed.',
   warnings: warning ? [warning] : [],
 });
+
+/** Map a provider error onto a reason, without echoing provider text to the user. */
+function classifyProviderError(e) {
+  if (/vision_timeout/.test(e?.message || '')) return 'vision_timeout';
+  const status = Number(e?.status || e?.statusCode || 0);
+  if (status === 429) return 'provider_rate_limited';
+  if (status === 529 || status === 503) return 'provider_overloaded';
+  // A 404 on a request whose only named resource is the model means the model is not
+  // reachable for this account. That is the one blocker worth naming precisely.
+  if (status === 404) return 'model_unavailable';
+  return 'vision_request_failed';
+}
 
 /* ── the call ──────────────────────────────────────────────────────────────── */
 
@@ -372,12 +425,26 @@ async function extractDocumentV3(buffer, opts = {}) {
       new Promise((_, reject) => setTimeout(() => reject(new Error('vision_timeout')), TIMEOUT_MS)),
     ]);
   } catch (e) {
-    const timedOut = /vision_timeout/.test(e.message || '');
     return {
-      ...failure(timedOut ? 'vision_timeout' : 'vision_request_failed',
-        'Automatic analysis did not finish. Try again or enter the values manually.'),
+      ...failure(classifyProviderError(e)),
       duration_ms: Date.now() - started,
-      provider_message: String(e.message || '').slice(0, 200),
+      // Operator diagnostics only. Never surfaced in the customer interface, and it
+      // carries no headers, no key and no document content.
+      provider_message: String(e?.message || '').slice(0, 200),
+      provider_status: Number(e?.status || e?.statusCode || 0) || null,
+    };
+  }
+
+  // The policy is that Opus read this document. Verify it against what the provider says
+  // it answered with, not only against what we asked for — a silently substituted model
+  // would otherwise produce a stored extraction under the wrong label.
+  const answeredBy = resp?.model || null;
+  if (answeredBy && !modelPolicy.isOpus(answeredBy)) {
+    return {
+      ...failure('model_policy_violation'),
+      duration_ms: Date.now() - started,
+      requested_model: MODEL,
+      responded_model: answeredBy,
     };
   }
 
@@ -386,10 +453,12 @@ async function extractDocumentV3(buffer, opts = {}) {
 
   return {
     ok: true,
+    analyzed: true,
     source: isPdf ? 'native_pdf_vision' : 'native_image_vision',
     schema_version: SCHEMA_VERSION,
     prompt_version: PROMPT_VERSION,
     model: MODEL,
+    responded_model: resp?.model || null,
     duration_ms: Date.now() - started,
     usage: resp?.usage
       ? { input_tokens: resp.usage.input_tokens ?? null, output_tokens: resp.usage.output_tokens ?? null }
@@ -415,6 +484,7 @@ function buildRequestForInspection(buffer, opts = {}) {
 
 module.exports = {
   extractDocumentV3, buildRequestForInspection, visionEnabled,
+  classifyProviderError, RETRYABLE, USER_MESSAGE,
   EXTRACTION_SCHEMA, SYSTEM_PROMPT, contextBlock,
   SCHEMA_VERSION, PROMPT_VERSION, MODEL,
   DOCUMENT_TYPES, PARTY_ROLES, MAX_BYTES, MAX_PAGES, TIMEOUT_MS,

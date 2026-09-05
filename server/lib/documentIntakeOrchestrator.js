@@ -227,6 +227,16 @@ function taxEvidenceIn(extraction = {}) {
    simply switched off, saying "needs OCR/Vision" tells the operator what to turn on; if
    vision RAN and still failed, repeating that would be misleading. */
 function ocrBlockerFor(input = {}) {
+  // v3 is the primary reader now, so its failure is the one to report. Saying
+  // "OCR/Vision is not enabled" about a document whose analysis was attempted and timed
+  // out sends the operator to a setting that is already on, and tells the user nothing
+  // about the retry that would actually help.
+  const v3 = input.v3 || null;
+  if (v3 && v3.ok === false && v3.reason !== 'vision_disabled' && v3.reason !== 'vision_not_configured') {
+    return v3.user_message || 'CFO AI tried to read this document automatically and could not. '
+      + 'Enter the values manually or request accountant review.';
+  }
+
   const ocr = input.ocr || null;
   if (!ocr || ocr.reason === 'ocr_disabled' || ocr.reason === 'ocr_not_configured') {
     return 'This looks like a scanned document. OCR/Vision is not enabled yet. '

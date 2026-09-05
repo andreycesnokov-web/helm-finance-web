@@ -79,7 +79,25 @@ function publicIntakeV3(v3) {
   if (!v3 || typeof v3 !== 'object') return null;
   const f = v3.fields && typeof v3.fields === 'object' ? v3.fields : {};
   const cp = f.counterparty && typeof f.counterparty === 'object' ? f.counterparty : null;
+
+  // An analysis that did not complete. The client needs enough to show the state and
+  // offer a retry, and nothing more: provider status codes, provider text and the model
+  // that actually answered are operator diagnostics and stay server-side.
+  if (v3.analyzed === false) {
+    const fail = v3.failure && typeof v3.failure === 'object' ? v3.failure : {};
+    return {
+      analyzed: false,
+      schema_version: STR(v3.schema_version),
+      failure_reason: STR(fail.reason),
+      retryable: fail.retryable !== false,
+      message: STR(fail.user_message),
+      attempts: NUM(v3.attempts),
+      last_attempt_at: STR(v3.last_attempt_at),
+    };
+  }
+
   return {
+    analyzed: true,
     schema_version: STR(v3.schema_version),
     prompt_version: STR(v3.prompt_version),
     model: STR(v3.model),

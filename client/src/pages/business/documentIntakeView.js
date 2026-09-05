@@ -459,8 +459,85 @@ export const primaryActionLabel = (k) => PRIMARY_ACTION_LABEL[k] || 'Review fiel
 
 export const intakeV3Of = (d) => d?.extracted_json?.ai_intake_v3 || null;
 
+/** The v3 record only when it is an actual READING. A stored failure lives in the same
+ *  place and must never be mistaken for one — it has no fields to show. */
+export const readingV3Of = (d) => {
+  const v3 = intakeV3Of(d);
+  return v3 && v3.analyzed !== false ? v3 : null;
+};
+
 /** v3 supersedes v2 as the visible suggestion. v2 stays stored for compatibility. */
-export const primaryIntakeSource = (d) => (intakeV3Of(d) ? 'v3' : (intakeOf(d) ? 'v2' : null));
+export const primaryIntakeSource = (d) => (readingV3Of(d) ? 'v3' : (intakeOf(d) ? 'v2' : null));
+
+/* ── what the user is told is happening ──────────────────────────────────────
+   Upload and analysis are two different things, and conflating them is what made the
+   earlier version confusing: a document that uploaded perfectly but failed to analyse
+   looked identical to one that never arrived. Each state below answers one question —
+   is my file safe, is anything happening, and what can I do about it. */
+
+export const ANALYSIS_STATE = {
+  UPLOADING: 'uploading',
+  UPLOADED_WAITING: 'uploaded_waiting',
+  ANALYZING: 'analyzing',
+  ANALYZED: 'analyzed',
+  UPLOAD_FAILED: 'upload_failed',
+  ANALYSIS_FAILED: 'analysis_failed',
+  BUNDLE_DETECTED: 'bundle_detected',
+  CONFIRMED: 'confirmed',
+};
+
+const ANALYSIS_COPY = {
+  uploading: { label: 'Uploading', detail: 'Sending the file.' },
+  uploaded_waiting: { label: 'Uploaded', detail: 'Waiting to be analysed. Your file is saved.' },
+  analyzing: { label: 'Analysing', detail: 'Reading the document.' },
+  analyzed: { label: 'Analysis complete', detail: 'Review the suggested fields and confirm them.' },
+  upload_failed: { label: 'Upload failed', detail: 'The file was not saved. Upload it again.' },
+  // The distinction that matters: the file IS safe, only the reading failed.
+  analysis_failed: { label: 'Analysis failed', detail: 'Your file is saved. The reading did not complete.' },
+  bundle_detected: { label: 'Multiple documents detected', detail: 'This file contains more than one document.' },
+  confirmed: { label: 'Confirmed', detail: 'You have confirmed the details on this document.' },
+};
+
+/**
+ * The single state a document is in, for display.
+ * @param doc   the document row
+ * @param opts  { uploading, uploadFailed } — transient states the list cannot know about
+ */
+export function analysisState(doc, opts = {}) {
+  const shape = (state, extra = {}) => ({ state, ...ANALYSIS_COPY[state], canRetry: false, ...extra });
+
+  if (opts.uploadFailed) return shape(ANALYSIS_STATE.UPLOAD_FAILED);
+  if (opts.uploading) return shape(ANALYSIS_STATE.UPLOADING);
+
+  const v3 = intakeV3Of(doc);
+
+  if (v3 && v3.analyzed === false) {
+    const f = v3.failure || {};
+    return shape(ANALYSIS_STATE.ANALYSIS_FAILED, {
+      // The message comes from the server, which knows WHY. Retry is offered only when
+      // trying again could actually produce a different answer.
+      detail: f.user_message || ANALYSIS_COPY.analysis_failed.detail,
+      canRetry: f.retryable !== false,
+      attempts: Number(v3.attempts || 0) || null,
+      reason: f.reason || null,
+    });
+  }
+
+  const stored = doc?.document_type || null;
+  if (stored && stored !== 'other') return shape(ANALYSIS_STATE.CONFIRMED);
+
+  const bundle = v3 && v3.bundle && Array.isArray(v3.bundle.children) ? v3.bundle.children.length : 0;
+  if (bundle > 1) {
+    return shape(ANALYSIS_STATE.BUNDLE_DETECTED, {
+      detail: `This file contains ${bundle} documents. Review each one before confirming.`,
+      childCount: bundle,
+    });
+  }
+
+  if (readingV3Of(doc) || intakeOf(doc)) return shape(ANALYSIS_STATE.ANALYZED);
+  if (opts.analyzing) return shape(ANALYSIS_STATE.ANALYZING);
+  return shape(ANALYSIS_STATE.UPLOADED_WAITING);
+}
 
 export const FIELD_STATUS = {
   CONFIRMED: 'confirmed',           // a person stored this value
@@ -501,7 +578,7 @@ const moneyOrNull = (n, ccy) => (n === null || n === undefined ? null : money(n,
  * `suggested` values come from ai_intake_v3 — never written anywhere by themselves.
  */
 export function v3FieldRows(doc, cpName = null) {
-  const v3 = intakeV3Of(doc);
+  const v3 = readingV3Of(doc);
   const f = v3?.fields || {};
   const ccy = f.currency || doc?.currency || 'IDR';
   const storedType = doc?.document_type && doc.document_type !== 'other' ? doc.document_type : null;
@@ -530,7 +607,7 @@ export function v3FieldRows(doc, cpName = null) {
 
 /** The one-line summary above the table. */
 export function v3Headline(doc) {
-  const v3 = intakeV3Of(doc);
+  const v3 = readingV3Of(doc);
   if (!v3) return null;
   const t = typeLabelOf(v3.fields?.document_type);
   return `${t || 'Document'} · read by ${v3.source === 'native_image_vision' ? 'image analysis' : 'document analysis'}`;
@@ -541,7 +618,16 @@ export function v3Headline(doc) {
 export function v3Diagnostics(doc) {
   const v3 = intakeV3Of(doc);
   if (!v3) return null;
+  if (v3.analyzed === false) {
+    return {
+      analyzed: false, model: v3.model, schema_version: v3.schema_version,
+      failure_reason: v3.failure?.reason || null,
+      retryable: v3.failure?.retryable !== false,
+      attempts: v3.attempts || 0, last_attempt_at: v3.last_attempt_at || null,
+    };
+  }
   return {
+    analyzed: true,
     model: v3.model, schema_version: v3.schema_version, source: v3.source,
     processed_at: v3.processed_at, duration_ms: v3.duration_ms,
     pages_analyzed: v3.pages_analyzed, page_count: v3.page_count,
@@ -549,8 +635,8 @@ export function v3Diagnostics(doc) {
   };
 }
 
-export const v3Warnings = (doc) => intakeV3Of(doc)?.warnings || [];
-export const v3Blockers = (doc) => intakeV3Of(doc)?.blockers || [];
+export const v3Warnings = (doc) => readingV3Of(doc)?.warnings || [];
+export const v3Blockers = (doc) => readingV3Of(doc)?.blockers || [];
 
 /* ── analyze button ────────────────────────────────────────────────────────── */
 

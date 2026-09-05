@@ -19,11 +19,16 @@ const stub = (input, opts = {}) => ({
   messages: {
     create(req) {
       SENT.push(req);
-      if (opts.throws) return Promise.reject(new Error(opts.throws));
+      if (opts.throws) {
+        const e = new Error(opts.throws);
+        if (opts.status) e.status = opts.status;
+        return Promise.reject(e);
+      }
       if (opts.hang) return new Promise(() => {});
       if (opts.noTool) return Promise.resolve({ content: [{ type: 'text', text: 'here you go' }] });
       return Promise.resolve({
         content: [{ type: 'tool_use', name: 'record_financial_document', input }],
+        model: opts.respondedModel || V3.MODEL,
         usage: { input_tokens: 4210, output_tokens: 830 },
       });
     },
@@ -207,7 +212,58 @@ const BUSINESS = { legal_name: 'PT Helm Care Indonesia', display_name: 'Helm Car
     assert.strictEqual(r.ok, false);
     assert.strictEqual(r.reason, 'vision_request_failed');
     assert.ok(typeof r.duration_ms === 'number');
-    assert.ok(/Try again or enter the values manually/i.test(r.warnings[0]), r.warnings[0]);
+    // The document is not analysed, the user is told so, and the failure is retryable.
+    assert.strictEqual(r.analyzed, false);
+    assert.strictEqual(r.retryable, true);
+    assert.ok(/retry/i.test(r.user_message), r.user_message);
+  });
+
+  await t('a retryable failure is told apart from a permanent one', async () => {
+    const retryable = await V3.extractDocumentV3(PDF_BYTES,
+      { mime_type: 'application/pdf', client: stub(GOOD, { throws: 'overloaded', status: 529 }) });
+    assert.strictEqual(retryable.reason, 'provider_overloaded');
+    assert.strictEqual(retryable.retryable, true);
+
+    const permanent = await V3.extractDocumentV3(Buffer.alloc(V3.MAX_BYTES + 1, 1),
+      { mime_type: 'application/pdf', client: stub(GOOD) });
+    assert.strictEqual(permanent.reason, 'file_too_large');
+    assert.strictEqual(permanent.retryable, false,
+      'retrying an oversized file forever is not a plan');
+  });
+
+  await t('the model being unreachable is named, not folded into a generic error', async () => {
+    const r = await V3.extractDocumentV3(PDF_BYTES,
+      { mime_type: 'application/pdf', client: stub(GOOD, { throws: 'not_found', status: 404 }) });
+    assert.strictEqual(r.reason, 'model_unavailable');
+    assert.strictEqual(r.retryable, true);
+  });
+
+  await t('an answer from a non-Opus model is refused, not stored', async () => {
+    // The single guarantee the whole policy rests on: even if the provider answered with
+    // something else, that answer never becomes an extraction.
+    const r = await V3.extractDocumentV3(PDF_BYTES,
+      { mime_type: 'application/pdf', client: stub(GOOD, { respondedModel: 'claude-sonnet-5' }) });
+    assert.strictEqual(r.ok, false);
+    assert.strictEqual(r.reason, 'model_policy_violation');
+    assert.strictEqual(r.analyzed, false);
+    assert.strictEqual(r.retryable, false);
+    assert.strictEqual(r.extraction, undefined, 'no extraction may survive a policy violation');
+    assert.strictEqual(r.responded_model, 'claude-sonnet-5');
+  });
+
+  await t('a successful reading records which model actually answered', async () => {
+    const r = await V3.extractDocumentV3(PDF_BYTES, { mime_type: 'application/pdf', client: stub(GOOD) });
+    assert.strictEqual(r.ok, true);
+    assert.strictEqual(r.analyzed, true);
+    assert.ok(modelPolicy.isOpus(r.responded_model), r.responded_model);
+  });
+
+  await t('no user-facing message mentions a model, a provider or a cost', async () => {
+    for (const [reason, msg] of Object.entries(V3.USER_MESSAGE)) {
+      for (const leak of [/opus/i, /sonnet/i, /claude/i, /anthropic/i, /token/i, /[$]/]) {
+        assert.ok(!leak.test(msg), `${reason} leaks ${leak} to the customer: ${msg}`);
+      }
+    }
   });
 
   await t('no client configured is a reason, not a crash', async () => {

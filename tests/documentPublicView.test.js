@@ -1,7 +1,7 @@
 // The ai_intake_v2 whitelist: everything the Document Center needs, nothing else.
 // Run: node tests/documentPublicView.test.js
 const assert = require('node:assert');
-const { publicIntakeV2, publicUploadIntent, PUBLIC_INTAKE_V2_FIELDS } = require('../server/lib/documentPublicView');
+const { publicIntakeV2, publicIntakeV3, publicUploadIntent, PUBLIC_INTAKE_V2_FIELDS } = require('../server/lib/documentPublicView');
 
 let pass = 0;
 const t = (name, fn) => { fn(); pass++; console.log(`  ok  ${name}`); };
@@ -111,6 +111,37 @@ t('lists are capped and entries bounded', () => {
   });
   assert.strictEqual(p.blockers.length, 20);
   assert.strictEqual(p.missing_fields[0].length, 200);
+});
+
+t('a failed analysis is exposed as a state the user can act on', () => {
+  const v = publicIntakeV3({
+    analyzed: false, fingerprint: 'abc', schema_version: 'financial_document_extraction_v3',
+    model: 'claude-opus-5',
+    failure: { reason: 'vision_timeout', retryable: true, user_message: 'Analysis did not finish in time. You can retry it.',
+      provider_status: 529, provider_message: 'overloaded_error: server busy', responded_model: 'claude-opus-5' },
+    attempts: 2, last_attempt_at: '2026-09-05T09:00:00Z',
+  });
+  assert.strictEqual(v.analyzed, false);
+  assert.strictEqual(v.retryable, true);
+  assert.strictEqual(v.failure_reason, 'vision_timeout');
+  assert.ok(/retry/i.test(v.message), v.message);
+  assert.strictEqual(v.attempts, 2);
+});
+
+t('operator diagnostics never reach the client payload', () => {
+  const v = publicIntakeV3({
+    analyzed: false, model: 'claude-opus-5',
+    failure: { reason: 'model_policy_violation', retryable: false, user_message: 'Analysis could not be completed.',
+      provider_status: 500, provider_message: 'internal: routed to claude-sonnet-5', responded_model: 'claude-sonnet-5' },
+  });
+  const json = JSON.stringify(v);
+  for (const leak of ['claude', 'opus', 'sonnet', 'provider_message', 'provider_status', 'internal:', 'fingerprint']) {
+    assert.ok(!json.toLowerCase().includes(leak), `${leak} leaked into the client payload: ${json}`);
+  }
+});
+
+t('a successful reading says so', () => {
+  assert.strictEqual(publicIntakeV3({ schema_version: 'v3', fields: {} }).analyzed, true);
 });
 
 console.log(`\n${pass} passed`);
