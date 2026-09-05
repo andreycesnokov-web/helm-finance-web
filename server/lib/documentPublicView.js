@@ -99,17 +99,57 @@ function publicIntakeV3(v3) {
   const b = v3.bundle && typeof v3.bundle === 'object' ? v3.bundle : null;
   return {
     analyzed: true,
-    // What the file holds. A person confirms each child separately; this creates nothing.
+    // What the file holds, and what each child says, so the split can actually be
+    // reviewed rather than merely announced. A person confirms each child separately;
+    // nothing here is a record and nothing here creates one.
+    //
+    // Token counts stay behind: they are an operator's concern, not something a person
+    // checking an invoice needs to see.
     bundle: b ? {
       shared_reference: STR(b.shared_reference),
-      children: (Array.isArray(b.children) ? b.children : []).slice(0, 10).map((c) => ({
-        index: NUM(c.index),
-        document_type: STR(c.document_type),
-        title_printed_text: STR(c.title_printed_text),
-        page_start: NUM(c.page_start),
-        page_end: NUM(c.page_end),
-        identifier: STR(c.identifier),
-      })),
+      requires_confirmation: true,
+      children: (Array.isArray(b.children) ? b.children : []).slice(0, 10).map((c) => {
+        const f = c.fields && typeof c.fields === 'object' ? c.fields : {};
+        const cp = f.counterparty && typeof f.counterparty === 'object' ? f.counterparty : null;
+        return {
+          index: NUM(c.index),
+          document_type: STR(c.document_type),
+          title_printed_text: STR(c.title_printed_text),
+          page_start: NUM(c.page_start),
+          page_end: NUM(c.page_end),
+          identifier: STR(c.identifier),
+          analyzed: c.analyzed !== false,
+          // Each child's own parties. Never merged across children.
+          parties: (Array.isArray(c.parties) ? c.parties : []).slice(0, 6).map((party) => ({
+            role: STR(party.role),
+            legal_name: STR(party.legal_name),
+            npwp: STR(party.npwp),
+          })),
+          fields: {
+            document_number: STR(f.document_number),
+            currency: STR(f.currency),
+            subtotal: NUM(f.subtotal),
+            dpp: NUM(f.dpp),
+            dpp_nilai_lain: NUM(f.dpp_nilai_lain),
+            ppn: NUM(f.ppn),
+            withholding_tax: NUM(f.withholding_tax),
+            total: NUM(f.total),
+            amount_paid: NUM(f.amount_paid),
+            amount_due: NUM(f.amount_due),
+            document_date: STR(f.document_date),
+            due_date: STR(f.due_date),
+            payment_date: STR(f.payment_date),
+            counterparty: cp ? { legal_name: STR(cp.legal_name), npwp: STR(cp.npwp) } : null,
+          },
+          tax_shape: STR(c.tax_shape),
+          validation_status: STR(c.validation_status),
+          counterparty_status: STR(c.counterparty_status),
+          can_create_counterparty: BOOL(c.can_create_counterparty),
+          can_create_financial_record: BOOL(c.can_create_financial_record),
+          warnings: (Array.isArray(c.warnings) ? c.warnings : []).slice(0, 20).map((w) => String(w).slice(0, 300)),
+          blockers: (Array.isArray(c.blockers) ? c.blockers : []).slice(0, 10).map((w) => String(w).slice(0, 300)),
+        };
+      }),
     } : null,
     schema_version: STR(v3.schema_version),
     prompt_version: STR(v3.prompt_version),

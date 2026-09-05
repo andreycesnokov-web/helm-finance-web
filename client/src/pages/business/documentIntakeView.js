@@ -526,11 +526,11 @@ export function analysisState(doc, opts = {}) {
   const stored = doc?.document_type || null;
   if (stored && stored !== 'other') return shape(ANALYSIS_STATE.CONFIRMED);
 
-  const bundle = v3 && v3.bundle && Array.isArray(v3.bundle.children) ? v3.bundle.children.length : 0;
-  if (bundle > 1) {
+  const children = v3 && v3.bundle && Array.isArray(v3.bundle.children) ? v3.bundle.children.length : 0;
+  if (children > 1) {
     return shape(ANALYSIS_STATE.BUNDLE_DETECTED, {
-      detail: `This file contains ${bundle} documents. Review each one before confirming.`,
-      childCount: bundle,
+      detail: `This file contains ${children} documents. Review each one before confirming.`,
+      childCount: children,
     });
   }
 
@@ -637,6 +637,107 @@ export function v3Diagnostics(doc) {
 
 export const v3Warnings = (doc) => readingV3Of(doc)?.warnings || [];
 export const v3Blockers = (doc) => readingV3Of(doc)?.blockers || [];
+
+/* ── the bundle review ──────────────────────────────────────────────────────
+   One file, several documents, and a person who has to decide whether the split is
+   right before anything is created from it. "3 documents detected" alone is an
+   announcement, not a review: to confirm a split you have to see what each child says
+   and be able to disagree with it.
+
+   Everything below is a SUGGESTION. Nothing here creates a record, a counterparty, a
+   transaction or a payment, and each child is confirmed on its own — a kwitansi sitting
+   in the same file as a faktur does not inherit the faktur's ability to imply a bill. */
+
+export const bundleOf = (doc) => {
+  const v3 = readingV3Of(doc);
+  const b = v3 && v3.bundle && typeof v3.bundle === 'object' ? v3.bundle : null;
+  return b && Array.isArray(b.children) && b.children.length > 1 ? b : null;
+};
+
+export const CHILD_ACTION = {
+  REVIEW: 'review',                  // a normal suggestion awaiting confirmation
+  REVIEW_ONLY: 'review_only',        // can never imply a record — a receipt, an agreement
+  NEEDS_ATTENTION: 'needs_attention',// the validator raised something blocking
+  NOT_ANALYSED: 'not_analysed',      // its own extraction failed
+};
+
+const CHILD_ACTION_LABEL = {
+  review: 'Suggested — confirm to use',
+  review_only: 'Supporting document — review only',
+  needs_attention: 'Needs your attention',
+  not_analysed: 'Could not be read',
+};
+
+const pageLabel = (c) => (c.page_start === c.page_end
+  ? `Page ${c.page_start}`
+  : `Pages ${c.page_start}–${c.page_end}`);
+
+/**
+ * The review rows for a detected bundle.
+ * @returns null when this document is not a bundle, otherwise
+ *          { count, headline, sharedReference, requiresConfirmation, children[] }
+ */
+export function bundleReview(doc) {
+  const b = bundleOf(doc);
+  if (!b) return null;
+
+  const children = b.children.map((c) => {
+    const f = c.fields || {};
+    let action = CHILD_ACTION.REVIEW;
+    if (c.analyzed === false) action = CHILD_ACTION.NOT_ANALYSED;
+    else if ((c.blockers || []).length) action = CHILD_ACTION.NEEDS_ATTENTION;
+    else if (c.can_create_financial_record === false) action = CHILD_ACTION.REVIEW_ONLY;
+
+    return {
+      index: c.index,
+      pages: pageLabel(c),
+      pageStart: c.page_start,
+      pageEnd: c.page_end,
+      typeLabel: typeLabelOf(c.document_type) || c.title_printed_text || 'Document',
+      documentType: c.document_type,
+      title: c.title_printed_text || null,
+      reference: c.identifier || null,
+      // Each child's own parties, as printed on its own pages.
+      parties: (c.parties || []).map((p) => ({
+        role: p.role || null,
+        name: p.legal_name || null,
+        npwp: p.npwp || null,
+      })),
+      dates: {
+        document_date: f.document_date || null,
+        due_date: f.due_date || null,
+        payment_date: f.payment_date || null,
+      },
+      amounts: {
+        currency: f.currency || 'IDR',
+        subtotal: f.subtotal ?? null,
+        dpp: f.dpp ?? null,
+        dpp_nilai_lain: f.dpp_nilai_lain ?? null,
+        ppn: f.ppn ?? null,
+        withholding_tax: f.withholding_tax ?? null,
+        total: f.total ?? null,
+        amount_paid: f.amount_paid ?? null,
+      },
+      warnings: c.warnings || [],
+      blockers: c.blockers || [],
+      action,
+      actionLabel: CHILD_ACTION_LABEL[action],
+      // Stated per child so no caller can read a bundle as permission.
+      canCreateFinancialRecord: c.can_create_financial_record === true,
+      canCreateCounterparty: c.can_create_counterparty === true,
+      analyzed: c.analyzed !== false,
+    };
+  });
+
+  return {
+    count: children.length,
+    headline: `${children.length} documents detected`,
+    sharedReference: b.shared_reference || null,
+    // A shared reference relates these documents. It does not merge them.
+    requiresConfirmation: true,
+    children,
+  };
+}
 
 /* ── analyze button ────────────────────────────────────────────────────────── */
 

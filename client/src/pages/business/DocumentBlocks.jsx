@@ -35,6 +35,7 @@ import {
   typeLabelOf as intakeTypeLabel, directionLabelOf, statusLabelOf, statusLabelFor, nextActionLabels, taxLine, recordLabelOf,
   documentWorkflowState, primaryActionLabel,
   intakeV3Of, v3FieldRows, v3Headline, v3Warnings, v3Blockers,
+  bundleReview, CHILD_ACTION,
   FIELD_STATUS, FIELD_STATUS_LABEL,
   draftOffer, counterpartyOffer, isUnsupported,
   uploadIntentOf, readSourceLabel, conflictMessage,
@@ -703,6 +704,99 @@ export function ClassifyDrawer({ doc, busy, error, onPick, onClose, inline = fal
    actions that follow from it. Every action here is a user click that goes through an
    existing endpoint. NOTHING on this panel creates a counterparty, a payable, a
    receivable, a transaction or a tax record on its own. */
+/* One file holding several documents. Shown BEFORE anything can be created from it,
+   because the split itself is the thing the person has to agree with — and each child is
+   confirmed separately, so a receipt filed next to an invoice never inherits the
+   invoice's ability to imply a bill. */
+export function BundleReview({ doc }) {
+  const review = bundleReview(doc)
+  if (!review) return null
+
+  const money = (v, ccy) => (v === null || v === undefined
+    ? null
+    : `${ccy || 'IDR'} ${Number(v).toLocaleString('en-US')}`)
+
+  const tone = (action) => (
+    action === CHILD_ACTION.NEEDS_ATTENTION ? 'danger'
+      : action === CHILD_ACTION.NOT_ANALYSED ? 'neutral'
+        : action === CHILD_ACTION.REVIEW_ONLY ? 'neutral' : 'warning')
+
+  return (
+    <RpCol label="Multiple documents in one file" emphasis>
+      <p className="rp-note">
+        <strong>{review.headline}.</strong> Review each one below. Nothing is created until
+        you confirm it, and each document is confirmed on its own.
+      </p>
+      {review.sharedReference && (
+        <div className="rp-kv">
+          <span>Shared reference</span>
+          <span>{review.sharedReference} <em className="doc-v3-hint">relates these documents; they stay separate</em></span>
+        </div>
+      )}
+
+      <ol className="doc-bundle-list">
+        {review.children.map((c) => (
+          <li key={c.index} className={`doc-bundle-child is-${c.action}`}>
+            <div className="doc-bundle-head">
+              <span className="doc-bundle-pages">{c.pages}</span>
+              <span className="doc-bundle-type">{c.typeLabel}</span>
+              <StatusBadge tone={tone(c.action)}>{c.actionLabel}</StatusBadge>
+            </div>
+
+            {c.reference && (
+              <div className="rp-kv"><span>Number</span><span className="doc-bundle-ref">{c.reference}</span></div>
+            )}
+
+            {c.parties.map((party, i) => (
+              <div className="rp-kv" key={`${c.index}-p${i}`}>
+                <span>{party.role ? party.role.replace(/_/g, ' ') : 'Party'}</span>
+                <span>{party.name || <em className="rp-miss">—</em>}{party.npwp ? ` · NPWP ${party.npwp}` : ''}</span>
+              </div>
+            ))}
+
+            {c.dates.document_date && (
+              <div className="rp-kv"><span>Document date</span><span>{c.dates.document_date}</span></div>
+            )}
+            {c.dates.due_date && (
+              <div className="rp-kv"><span>Due date</span><span>{c.dates.due_date}</span></div>
+            )}
+            {c.dates.payment_date && (
+              <div className="rp-kv"><span>Payment date</span><span>{c.dates.payment_date}</span></div>
+            )}
+
+            {[
+              ['Commercial base', c.amounts.subtotal],
+              ['DPP', c.amounts.dpp],
+              ['DPP Nilai Lain', c.amounts.dpp_nilai_lain],
+              ['PPN', c.amounts.ppn],
+              ['Withholding', c.amounts.withholding_tax],
+              ['Total', c.amounts.total],
+              ['Paid', c.amounts.amount_paid],
+            ].filter(([, v]) => v !== null && v !== undefined).map(([label, v]) => (
+              <div className="rp-kv" key={`${c.index}-${label}`}>
+                <span>{label}</span><span>{money(v, c.amounts.currency)}</span>
+              </div>
+            ))}
+
+            {c.warnings.map((w) => <p key={w} className="rp-note rp-note-amber">{w}</p>)}
+            {c.blockers.map((b) => <p key={b} className="rp-note rp-note-warn">{b}</p>)}
+
+            {!c.analyzed && (
+              <p className="rp-note rp-note-warn">
+                This document could not be read. The file is saved; you can retry the analysis.
+              </p>
+            )}
+          </li>
+        ))}
+      </ol>
+
+      <p className="rp-note">
+        If the split above is wrong, do not confirm — the whole file can be reviewed manually.
+      </p>
+    </RpCol>
+  )
+}
+
 export function IntakeResult({
   doc, cpName, busy, analyzing, analyzeNote, cpSuggestion, cpBusy, cpError,
   onAnalyze, onReviewFields, onCreateDraft, onSuggestCounterparty, onCreateCounterparty,
@@ -742,6 +836,8 @@ export function IntakeResult({
 
   if (v3) {
     return (
+      <>
+      <BundleReview doc={doc} />
       <RpCol label="AI Intake Result" emphasis>
         <p className="rp-note">
           Please verify the extracted information. These are AI suggestions — nothing is
@@ -804,6 +900,7 @@ export function IntakeResult({
           confirmed, and it creates no counterparty, payable, receivable or transaction.
         </p>
       </RpCol>
+      </>
     )
   }
 

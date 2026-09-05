@@ -607,5 +607,167 @@ t('no state shown to the user names a model or a cost', () => {
   }
 });
 
+console.log('\nThe bundle review — the real KWT packet');
+
+// The shape the server stores for the three-page Alfamart packet: a kwitansi, the faktur
+// pajak for the same rent, and the agreement they both reference.
+const KWT_DOC = {
+  extracted_json: {
+    ai_intake_v3: {
+      analyzed: true,
+      fields: {},
+      bundle: {
+        shared_reference: 'TC-2607-0342',
+        requires_confirmation: true,
+        children: [
+          {
+            index: 1, document_type: 'kwitansi', title_printed_text: 'KWITANSI',
+            page_start: 1, page_end: 1, identifier: 'SAT/Z001/K-P/26/VIII/0133',
+            analyzed: true,
+            parties: [{ role: 'supplier', legal_name: 'PT SUMBER ALFARIA TRIJAYA TBK', npwp: null }],
+            fields: { currency: 'IDR', total: 11322000, dpp: null, ppn: null,
+              document_date: '2026-08-04', due_date: null, payment_date: null },
+            validation_status: 'needs_review', counterparty_status: 'ok',
+            can_create_counterparty: true, can_create_financial_record: false,
+            warnings: ['Only page 1 (KWITANSI) was extracted as instructed; pages 2-3 belong to other documents.'],
+            blockers: [],
+          },
+          {
+            index: 2, document_type: 'faktur_pajak', title_printed_text: 'Faktur Pajak',
+            page_start: 2, page_end: 2, identifier: '04002600300202886',
+            analyzed: true,
+            parties: [
+              { role: 'taxable_entrepreneur_seller', legal_name: 'SUMBER ALFARIA TRIJAYA', npwp: '0013362389054000' },
+              { role: 'taxable_entrepreneur_buyer', legal_name: 'HELM CARE INDONESIA', npwp: '1000000002284592' },
+            ],
+            fields: { currency: 'IDR', subtotal: 10200000, dpp: 9350000, dpp_nilai_lain: 9350000,
+              ppn: 1122000, withholding_tax: null, total: null, document_date: '2026-08-04' },
+            tax_shape: 'nilai_lain_11_12',
+            validation_status: 'needs_review', counterparty_status: 'ok',
+            can_create_counterparty: true, can_create_financial_record: false,
+            warnings: [], blockers: [],
+          },
+          {
+            index: 3, document_type: 'contract', title_printed_text: 'SURAT KESEPAKATAN - SEWA TEMPAT',
+            page_start: 3, page_end: 3, identifier: 'TC-2607-0342',
+            analyzed: true,
+            parties: [{ role: 'supplier', legal_name: 'PT SUMBER ALFARIA TRIJAYA Tbk', npwp: null }],
+            fields: { currency: 'IDR', subtotal: 10200000, total: 11322000,
+              document_date: '2026-07-30', due_date: '2026-08-14' },
+            validation_status: 'needs_review', counterparty_status: 'ok',
+            can_create_counterparty: true, can_create_financial_record: false,
+            warnings: ['Pihak Kedua NPWP is not stated on page 3; NPWP from other pages was deliberately not used.'],
+            blockers: [],
+          },
+        ],
+      },
+    },
+  },
+};
+
+t('the review announces the count and lists every child', () => {
+  const r = V.bundleReview(KWT_DOC);
+  assert.ok(r, 'a three-child bundle must produce a review');
+  assert.strictEqual(r.count, 3);
+  assert.strictEqual(r.headline, '3 documents detected');
+  assert.strictEqual(r.children.length, 3);
+});
+
+t('each child shows its page range, type and reference', () => {
+  const [a, b, c] = V.bundleReview(KWT_DOC).children;
+  assert.strictEqual(a.pages, 'Page 1');
+  assert.strictEqual(a.reference, 'SAT/Z001/K-P/26/VIII/0133');
+  assert.strictEqual(b.pages, 'Page 2');
+  assert.strictEqual(b.reference, '04002600300202886');
+  assert.strictEqual(c.pages, 'Page 3');
+  assert.strictEqual(c.reference, 'TC-2607-0342');
+  // three distinct references — nothing flattened into one
+  assert.strictEqual(new Set([a.reference, b.reference, c.reference]).size, 3);
+});
+
+t('each child shows its parties, dates and amounts', () => {
+  const [kwitansi, faktur] = V.bundleReview(KWT_DOC).children;
+  assert.strictEqual(kwitansi.amounts.total, 11322000);
+  assert.strictEqual(kwitansi.dates.document_date, '2026-08-04');
+  assert.strictEqual(kwitansi.dates.payment_date, null, 'a kwitansi date is not a payment date');
+  assert.strictEqual(faktur.amounts.subtotal, 10200000);
+  assert.strictEqual(faktur.amounts.dpp_nilai_lain, 9350000);
+  assert.strictEqual(faktur.amounts.ppn, 1122000);
+  assert.strictEqual(faktur.amounts.total, null, 'the faktur prints no total; none is invented');
+  assert.strictEqual(faktur.amounts.withholding_tax, null, 'no withholding amount was printed');
+  assert.strictEqual(faktur.parties.length, 2);
+});
+
+t('no NPWP leaks between children', () => {
+  const children = V.bundleReview(KWT_DOC).children;
+  const npwpsOf = (c) => c.parties.map((p) => p.npwp).filter(Boolean);
+  // The faktur carries two tax numbers. The kwitansi and the agreement carry none, and
+  // must not borrow them from a neighbouring page.
+  assert.deepStrictEqual(npwpsOf(children[0]), []);
+  assert.deepStrictEqual(npwpsOf(children[2]), []);
+  assert.strictEqual(npwpsOf(children[1]).length, 2);
+});
+
+t('the kwitansi can never produce a payable', () => {
+  const kwitansi = V.bundleReview(KWT_DOC).children[0];
+  assert.strictEqual(kwitansi.canCreateFinancialRecord, false);
+  assert.strictEqual(kwitansi.action, V.CHILD_ACTION.REVIEW_ONLY);
+  assert.ok(/review only/i.test(kwitansi.actionLabel), kwitansi.actionLabel);
+});
+
+t('nothing in the review reads as something already created', () => {
+  const r = V.bundleReview(KWT_DOC);
+  assert.strictEqual(r.requiresConfirmation, true);
+  for (const c of r.children) {
+    assert.strictEqual(c.canCreateFinancialRecord, false,
+      'no child of this packet may imply a record without confirmation');
+  }
+  const json = JSON.stringify(r);
+  for (const forbidden of ['"created"', 'debt_id', 'transaction_id', 'counterparty_id', 'payment_id']) {
+    assert.ok(!json.includes(forbidden), `${forbidden} must not appear in a review`);
+  }
+});
+
+t('a shared reference relates the documents without merging them', () => {
+  const r = V.bundleReview(KWT_DOC);
+  assert.strictEqual(r.sharedReference, 'TC-2607-0342');
+  assert.strictEqual(r.count, 3, 'a shared reference is a relationship, not a merge');
+});
+
+t('the review exposes no model name and no token cost', () => {
+  const json = JSON.stringify(V.bundleReview(KWT_DOC)).toLowerCase();
+  for (const leak of ['claude', 'opus', 'sonnet', 'token', 'input_tokens', 'output_tokens', '$']) {
+    assert.ok(!json.includes(leak), `${leak} leaked into the customer review`);
+  }
+});
+
+t('a child that could not be read says so instead of showing blanks', () => {
+  const doc = JSON.parse(JSON.stringify(KWT_DOC));
+  doc.extracted_json.ai_intake_v3.bundle.children[1] = {
+    index: 2, document_type: 'faktur_pajak', title_printed_text: 'Faktur Pajak',
+    page_start: 2, page_end: 2, identifier: null, analyzed: false, failure_reason: 'vision_timeout',
+  };
+  const child = V.bundleReview(doc).children[1];
+  assert.strictEqual(child.analyzed, false);
+  assert.strictEqual(child.action, V.CHILD_ACTION.NOT_ANALYSED);
+  assert.strictEqual(child.canCreateFinancialRecord, false);
+});
+
+t('a single document is not a bundle and has no review', () => {
+  assert.strictEqual(V.bundleReview({ extracted_json: { ai_intake_v3: { analyzed: true, fields: {} } } }), null);
+  assert.strictEqual(V.bundleReview({}), null);
+  // one child is not several
+  assert.strictEqual(V.bundleReview({ extracted_json: { ai_intake_v3: { analyzed: true,
+    bundle: { children: [{ index: 1, page_start: 1, page_end: 1 }] } } } }), null);
+});
+
+t('a failed analysis has no bundle review at all', () => {
+  const failed = { extracted_json: { ai_intake_v3: { analyzed: false,
+    failure: { reason: 'vision_timeout', retryable: true },
+    bundle: { children: [{ index: 1 }, { index: 2 }] } } } };
+  assert.strictEqual(V.bundleReview(failed), null,
+    'a stored failure must not present a bundle review');
+});
+
 console.log(`\n${fail === 0 ? `ALL PASS — ${pass} passed, 0 failed` : `${pass} passed, ${fail} FAILED`}`);
 process.exitCode = fail === 0 ? 0 : 1;

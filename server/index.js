@@ -13474,10 +13474,63 @@ async function readDocumentForIntake(biz, doc) {
   let bundle = null;
   const pdfPages = docBundle.countPdfPages(buf);
   if (docBundle.bundleDetectionEnabled() && visionV3.visionEnabled() && (pdfPages || 0) > 1) {
-    const seg = await docBundle.segmentDocuments(buf, {
-      mime_type: file.mime_type, file_name: file.file_name, client: anthropic, pageCount: pdfPages,
+    const bizProfile = {
+      legal_name: biz.business?.legal_name || biz.business?.name,
+      display_name: biz.business?.name,
+      name: biz.business?.name,
+      npwp: biz.business?.npwp || null,
+      aliases: biz.business?.aliases || [],
+    };
+    // Segment, then read each child on its own pages. A review that showed only "3
+    // documents detected" would tell the user nothing they could check: to confirm a
+    // split they need to see what each child actually says.
+    const packet = await docBundle.extractBundle(buf, {
+      mime_type: file.mime_type, file_name: file.file_name,
+      business: bizProfile, client: anthropic, pageCount: pdfPages,
     });
-    if (seg.ok && seg.is_bundle) bundle = seg;
+    if (packet.ok && packet.is_bundle) {
+      bundle = {
+        ...packet.segmentation,
+        // Each child is judged on its OWN extraction. The validator is what decides
+        // whether a child could ever imply a record, so the kwitansi in a packet is
+        // refused here exactly as it would be on its own.
+        children: packet.children.map((child) => {
+          const ex = child.extraction;
+          if (!ex?.ok) {
+            return { ...child.segment, analyzed: false, failure_reason: ex?.reason || 'unknown' };
+          }
+          const v = extractionValidator.validateExtraction(ex.extraction, {
+            business: bizProfile,
+            pagesProvided: (Number(child.segment.page_end) - Number(child.segment.page_start)) + 1,
+            uploadedAt: doc.created_at || null,
+          });
+          const parties = (ex.extraction.parties || []).map((party) => ({
+            role: party.role || null,
+            legal_name: party.legal_name?.value ?? null,
+            // Each child keeps its own party block. A number printed two pages away
+            // belongs to a different document and is not borrowed to fill a gap here.
+            npwp: party.npwp?.value ?? null,
+          }));
+          return {
+            ...child.segment,
+            analyzed: true,
+            pages_analyzed: Array.isArray(ex.extraction.pages_analyzed) ? ex.extraction.pages_analyzed : [],
+            parties,
+            fields: v.normalized,
+            tax_shape: v.tax_shape,
+            validation_status: v.status,
+            counterparty_status: v.counterparty_status,
+            can_create_counterparty: v.can_create_counterparty,
+            can_create_financial_record: v.can_create_financial_record,
+            warnings: (v.warnings || []).concat(
+              (ex.extraction.warnings || []).map((w) => String(w))).slice(0, 20),
+            blockers: (v.blockers || []).slice(0, 10),
+            input_tokens: ex.usage?.input_tokens ?? null,
+            output_tokens: ex.usage?.output_tokens ?? null,
+          };
+        }),
+      };
+    }
   }
 
   // ── legacy OCR (only when Opus was never asked) ──────────────────────────────────────────────────
@@ -13731,14 +13784,10 @@ function buildV3Summary(read, doc) {
         detected_at: new Date().toISOString(),
         segmentation_version: read.bundle.segmentation_version,
         shared_reference: read.bundle.shared_reference ?? null,
-        children: (read.bundle.documents || []).map((d) => ({
-          index: d.index,
-          document_type: d.document_type,
-          title_printed_text: d.title_printed_text,
-          page_start: d.page_start,
-          page_end: d.page_end,
-          identifier: d.identifier ?? null,
-        })),
+        // Suggestions, one per child, for a person to confirm separately. Nothing here
+        // is a record, and nothing here creates one.
+        requires_confirmation: true,
+        children: read.bundle.children || [],
       },
     } : {}),
     fingerprint: read.fingerprint || null,
