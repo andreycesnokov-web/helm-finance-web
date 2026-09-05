@@ -1,7 +1,7 @@
 // The validator: accept, warn, require confirmation, reject — and never invent.
 // Run: node tests/documentExtractionValidator.test.js
 const assert = require('node:assert');
-const { validateExtraction, STATUS } = require('../server/lib/documentExtractionValidator');
+const { validateExtraction, assessIndonesianVat, STATUS } = require('../server/lib/documentExtractionValidator');
 
 let pass = 0, fail = 0;
 const t = (name, fn) => {
@@ -229,6 +229,98 @@ t('the validator never adds an accounting fact of its own', () => {
   for (const k of ['dpp', 'ppn', 'total', 'document_date', 'due_date', 'payment_date']) {
     assert.strictEqual(r.normalized[k], null, `${k} must stay null — the validator invents nothing`);
   }
+});
+
+console.log('\nIndonesian VAT — DPP Nilai Lain 11/12');
+
+// The reference document. The commercial base is 10,200,000; the taxable base is
+// deliberately smaller. DPP + PPN is 10,472,000, which is NOT the 11,322,000 payable —
+// and that is correct, not a discrepancy.
+const nilaiLain = (over = {}) => base({
+  amounts: {
+    currency: 'IDR',
+    subtotal: amt(10200000, ev(1, 'Harga Jual 10.200.000')),
+    dpp_nilai_lain: amt(9350000, ev(1, 'DPP Nilai Lain 9.350.000')),
+    dpp: amt(9350000, ev(1, 'Dasar Pengenaan Pajak 9.350.000')),
+    ppn: amt(1122000, ev(1, 'PPN 12% 1.122.000')),
+    total: amt(11322000, ev(1, 'Jumlah 11.322.000')),
+    ...(over.amounts || {}),
+  },
+});
+
+t('the reference faktur is NOT reported as a discrepancy', () => {
+  const r = validateExtraction(nilaiLain(), ctx);
+  const consistency = r.checks.find((c) => c.id === 'amount.consistency');
+  assert.ok(consistency, 'the consistency check should still run');
+  assert.strictEqual(consistency.pass, true, consistency.detail || '');
+  assert.ok(!r.warnings.some((w) => /does not equal the total/i.test(w)),
+    `no discrepancy may be raised: ${r.warnings.join(' | ')}`);
+  assert.strictEqual(r.tax_shape, 'nilai_lain_11_12');
+});
+
+t('the printed figures survive unchanged — nothing is recomputed', () => {
+  const r = validateExtraction(nilaiLain(), ctx);
+  assert.strictEqual(r.normalized.subtotal, 10200000);
+  assert.strictEqual(r.normalized.dpp_nilai_lain, 9350000);
+  assert.strictEqual(r.normalized.ppn, 1122000);
+  assert.strictEqual(r.normalized.total, 11322000);
+});
+
+t('the arithmetic is stated back to the user rather than hidden', () => {
+  const r = validateExtraction(nilaiLain(), ctx);
+  const note = r.warnings.find((w) => /reduced taxable base/i.test(w));
+  assert.ok(note, `the user must be told what was checked: ${r.warnings.join(' | ')}`);
+  for (const n of ['10200000', '9350000', '1122000', '11322000']) {
+    assert.ok(note.includes(n), `the note should show ${n}: ${note}`);
+  }
+});
+
+t('the note stays an arithmetic observation, never a tax determination', () => {
+  // The KB holds this construction as an UNREVIEWED candidate with an unread amendment.
+  // The validator may say the numbers agree; it may not endorse a rate or state liability.
+  const note = validateExtraction(nilaiLain(), ctx).warnings.find((w) => /taxable base/i.test(w));
+  assert.ok(/not a tax determination/i.test(note), note);
+  for (const forbidden of [/tax owed/i, /you owe/i, /must pay/i, /correct rate/i, /approved/i]) {
+    assert.ok(!forbidden.test(note), `the note must not assert ${forbidden}: ${note}`);
+  }
+});
+
+t('the 11/12 rule is NOT applied to an ordinary faktur', () => {
+  const r = validateExtraction(base({
+    amounts: { currency: 'IDR', subtotal: amt(25000000), dpp: amt(25000000),
+      ppn: amt(2750000), total: amt(27750000) },
+  }), ctx);
+  assert.strictEqual(r.tax_shape, 'standard');
+  assert.strictEqual(r.checks.find((c) => c.id === 'amount.consistency').pass, true);
+});
+
+t('the rule cannot excuse figures that genuinely do not add up', () => {
+  // 9,000,000 is neither 10,200,000 x 11/12 nor a base for a 1,122,000 PPN at 12%.
+  const r = validateExtraction(nilaiLain({ amounts: { dpp_nilai_lain: amt(9000000), dpp: amt(9000000) } }), ctx);
+  assert.strictEqual(r.tax_shape, 'standard');
+  assert.ok(r.warnings.some((w) => /does not equal the total/i.test(w)),
+    'a real discrepancy must still be raised');
+});
+
+t('a taxable base equal to the commercial base is an ordinary faktur, not this shape', () => {
+  assert.strictEqual(assessIndonesianVat({
+    subtotal: 9350000, dpp: 9350000, nilaiLain: 9350000, ppn: 1122000, total: 10472000,
+  }).shape, 'standard');
+});
+
+t('incomplete figures fall back to the ordinary check, never to the rule', () => {
+  const full = { subtotal: 10200000, dpp: 9350000, nilaiLain: 9350000, ppn: 1122000, total: 11322000 };
+  for (const missing of ['ppn', 'total']) {
+    assert.strictEqual(assessIndonesianVat({ ...full, [missing]: null }).shape, 'standard', `missing ${missing}`);
+  }
+  // with no subtotal AND no total the commercial base cannot be established at all
+  assert.strictEqual(assessIndonesianVat({ ...full, subtotal: null, total: null }).shape, 'standard');
+});
+
+t('the taxable base may be carried in dpp alone, as most fakturs print it', () => {
+  assert.strictEqual(assessIndonesianVat({
+    subtotal: 10200000, dpp: 9350000, nilaiLain: null, ppn: 1122000, total: 11322000,
+  }).shape, 'nilai_lain_11_12');
 });
 
 console.log(`\n${fail === 0 ? `ALL PASS — ${pass} passed, 0 failed` : `${pass} passed, ${fail} FAILED`}`);

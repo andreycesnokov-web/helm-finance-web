@@ -3,6 +3,7 @@
 // Run: node tests/documentVisionV3.test.js
 const assert = require('node:assert');
 const V3 = require('../server/lib/documentVisionV3');
+const modelPolicy = require('../server/lib/modelPolicy');
 
 let pass = 0, fail = 0;
 const t = async (name, fn) => {
@@ -101,16 +102,40 @@ const BUSINESS = { legal_name: 'PT Helm Care Indonesia', display_name: 'Helm Car
     assert.ok(req.tools[0].input_schema.required.includes('parties'));
   });
 
+  console.log('\nModel policy — every document is read by Opus');
+  await t('POLICY: primary extraction resolves to Opus, never anything cheaper', () => {
+    assert.strictEqual(V3.MODEL, modelPolicy.PRIMARY_EXTRACTION_MODEL);
+    assert.ok(modelPolicy.isOpus(V3.MODEL), `primary extraction used ${V3.MODEL}`);
+    assert.ok(/^claude-opus-/.test(V3.MODEL));
+    // and the module must not carry a hard-coded model of its own
+    const src = require('fs').readFileSync(require.resolve('../server/lib/documentVisionV3'), 'utf8');
+    assert.ok(!/claude-sonnet|claude-haiku|claude-fable/.test(src),
+      'no non-Opus model name may appear in the primary extraction path');
+  });
+
+  await t('POLICY: every Opus-required task really resolves to Opus', () => {
+    for (const task of modelPolicy.OPUS_REQUIRED_TASKS) {
+      assert.ok(modelPolicy.isOpus(modelPolicy.modelFor(task)), `${task} must use Opus`);
+    }
+    assert.throws(() => modelPolicy.modelFor('nonexistent_task'), /unknown task/);
+  });
+
+  await t('POLICY: an auxiliary model can never satisfy primary extraction', () => {
+    for (const m of modelPolicy.AUXILIARY_MODELS) {
+      assert.strictEqual(modelPolicy.isOpus(m), false, `${m} must not pass as Opus`);
+    }
+  });
+
   // ── proven against the live API, 2026-09-05 ───────────────────────────────
-  // Probe run inside the production container: SDK 0.20.9 / claude-sonnet-4-5 accepted
-  // the PDF document block, the tools array and a forced tool_choice, and answered with
-  // stop_reason "tool_use" and a single tool_use block. These assertions encode that
-  // contract so a regression in the request shape fails here rather than in production.
+  // Probe run inside the production container: SDK 0.20.9 accepted the PDF document
+  // block, the tools array and a forced tool_choice, answering with stop_reason
+  // "tool_use". These assertions encode that contract so a regression in the request
+  // shape fails here rather than in production.
   await t('LIVE-VERIFIED: the request shape the provider accepted', async () => {
     SENT = [];
     await V3.extractDocumentV3(PDF_BYTES, { mime_type: 'application/pdf', business: BUSINESS, client: stub(GOOD) });
     const req = SENT[0];
-    assert.strictEqual(req.model, 'claude-sonnet-4-5', 'the model the probe used');
+    assert.ok(modelPolicy.isOpus(req.model), `the request went out with ${req.model}`);
     assert.strictEqual(req.messages[0].content[0].type, 'document');
     assert.strictEqual(req.messages[0].content[0].source.media_type, 'application/pdf');
     assert.ok(Array.isArray(req.tools) && req.tools[0].input_schema, 'tools[] with a JSON Schema');

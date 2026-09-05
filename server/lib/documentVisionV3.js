@@ -26,9 +26,13 @@
 // and the user confirms it; only then may a record be created.
 'use strict';
 
+const modelPolicy = require('./modelPolicy');
+
 const SCHEMA_VERSION = 'financial_document_extraction_v3';
-const PROMPT_VERSION = 'fin-doc-id-v3.1';
-const MODEL = 'claude-sonnet-4-5';
+const PROMPT_VERSION = 'fin-doc-id-v3.2';
+// Never a literal. The policy module is the single place a model name lives, and it
+// throws rather than let primary extraction resolve to anything but Opus.
+const MODEL = modelPolicy.modelFor('primary_extraction');
 
 // Vision is billed per document, so the guards are size, pages and time.
 const MAX_BYTES = 8 * 1024 * 1024;
@@ -173,10 +177,13 @@ const EXTRACTION_SCHEMA = {
       type: 'object',
       properties: {
         currency: { type: ['string', 'null'], description: 'ISO code; IDR for Rp' },
-        subtotal: amountField('Subtotal before tax, if printed'),
-        dpp: amountField('Dasar Pengenaan Pajak — the taxable base'),
-        ppn: amountField('PPN / VAT amount'),
-        withholding_tax: amountField('PPh withheld, if printed'),
+        subtotal: amountField('Commercial base / subtotal before tax, as printed'),
+        dpp: amountField('Dasar Pengenaan Pajak — the taxable base as printed'),
+        dpp_nilai_lain: amountField('DPP Nilai Lain, when the faktur states one separately. '
+          + 'Under the 11/12 mechanism this is smaller than the commercial base. null unless printed.'),
+        ppn: amountField('PPN / VAT amount as printed'),
+        withholding_tax: amountField('PPh withheld. null unless an amount is actually printed — '
+          + 'never 0 to mean "none stated"'),
         total: amountField('The grand total payable'),
         amount_paid: amountField('Amount already paid, if the document states it'),
         amount_due: amountField('Amount still due, if the document states it'),
@@ -232,6 +239,28 @@ Distinguish carefully, and return each separately:
 Do not infer a field merely because such a field usually exists. If the document does not
 show it, return null. Do not calculate a figure and present it as printed: set
 "calculated": true if you derived it at all.
+
+NULL IS NOT ZERO. A missing value is null. Use 0 only when the document actually prints a
+zero, or a zero is unambiguously established (for example a stated "Fee: Rp 0"). Never use
+0, "" or "-" to mean "not stated" — a zero withholding tax is a factual claim that no tax
+was withheld, and that claim needs printed evidence.
+
+PAYMENT DATE IS CONSERVATIVE. A kwitansi is dated, but its date is the date the RECEIPT
+was written; that is a document_date. Only set payment_date when the document itself
+establishes when money moved — a bank transfer timestamp, a "dibayar pada" line, a
+settlement stamp. If a kwitansi merely carries a date, put it in document_date and leave
+payment_date null. When in doubt, null.
+
+INDONESIAN VAT — DPP NILAI LAIN. Some faktur pajak use "DPP Nilai Lain", a taxable base
+DIFFERENT from the commercial amount. Under the 11/12 mechanism the commercial base is
+multiplied by 11/12 to give the Nilai Lain base, and PPN is 12% of THAT. So
+DPP + PPN does NOT equal the total, and that is correct, not an error:
+  commercial base 10,200,000 -> DPP Nilai Lain 9,350,000 -> PPN 1,122,000
+  -> total payable 10,200,000 + 1,122,000 = 11,322,000
+When you see a separate "DPP Nilai Lain", put the commercial base in subtotal, the Nilai
+Lain figure in dpp_nilai_lain, the printed DPP in dpp, and the total actually payable in
+total. Do not reconcile them yourself and do not adjust any printed figure to make the
+arithmetic look neat.
 
 For dates, return ISO YYYY-MM-DD in "value" and the exact printed form in "printed_text".
 Indonesian documents are day-first: 04/08/2026 is 4 August 2026. If a date is genuinely

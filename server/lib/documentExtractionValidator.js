@@ -57,6 +57,7 @@ function validateExtraction(ex, context = {}) {
     };
   }
   const parties = Array.isArray(ex.parties) ? ex.parties : [];
+  let out_taxShape = 'standard';
   const dates = ex.dates || {};
   const amounts = ex.amounts || {};
   const docType = val(ex.document_type) || 'unknown';
@@ -200,7 +201,23 @@ function validateExtraction(ex, context = {}) {
 
   // 10 — arithmetic is a CHECK, never a repair. A mismatch is reported with both figures
   //      and the user decides; nothing is recomputed.
-  if (dpp !== null && ppn !== null && total !== null) {
+  //
+  // But "DPP + PPN must equal the total" is NOT universally true in Indonesia. Where a
+  // faktur uses DPP Nilai Lain under the 11/12 mechanism, the taxable base is
+  // deliberately smaller than the commercial amount:
+  //     commercial base x 11/12 = DPP Nilai Lain,  PPN = 12% of that,
+  //     total payable = commercial base + PPN
+  // Applying the naive identity there raises a discrepancy on a perfectly correct
+  // document. So the Nilai Lain shape is recognised FIRST — and only when the document
+  // itself supports it, never as a way to explain away an inconsistency.
+  const subtotal = num(amounts.subtotal);
+  const nilaiLain = num(amounts.dpp_nilai_lain);
+  const tax = assessIndonesianVat({ subtotal, dpp, nilaiLain, ppn, total });
+  out_taxShape = tax.shape;
+  if (tax.shape === 'nilai_lain_11_12') {
+    add('amount.consistency', true, null);
+    warnings.push(tax.note);
+  } else if (dpp !== null && ppn !== null && total !== null) {
     const drift = Math.abs(dpp + ppn - total);
     if (drift > 1) {
       add('amount.consistency', false,
@@ -251,11 +268,15 @@ function validateExtraction(ex, context = {}) {
     counterparty_status: counterpartyStatus,
     can_create_counterparty: canCreateCounterparty && counterpartyStatus === 'ok',
     can_create_financial_record: canCreateFinancialRecord,
+    tax_shape: out_taxShape,
     normalized: {
       document_type: docType,
       document_number: val(ex.document_number) ?? null,
       currency,
       dpp, ppn, total,
+      subtotal: num(amounts.subtotal),
+      dpp_nilai_lain: num(amounts.dpp_nilai_lain),
+      withholding_tax: num(amounts.withholding_tax),
       amount_paid: num(amounts.amount_paid),
       amount_due: num(amounts.amount_due),
       document_date: docDate, due_date: dueDate, payment_date: dateVal('payment_date'),
@@ -270,4 +291,62 @@ function validateExtraction(ex, context = {}) {
   };
 }
 
-module.exports = { validateExtraction, STATUS, SUPPORTED_CURRENCIES, SETTLED_TYPES, normNpwp };
+/* ── Indonesian VAT shapes ───────────────────────────────────────────────
+   What this is: an ARITHMETIC observation about the figures printed on one document.
+   What this is NOT: a tax determination.
+
+   The distinction is load-bearing. knowledge/indonesia_official_kb records the 11/12 DPP
+   nilai lain construction (PMK 11/2025) as a rule CANDIDATE — status under_review,
+   needs_reviewer, and with an unread amendment (DJP_PPN_007) that leaves the current
+   position unestablished. No tax rule in this product is active, and activation runs
+   through taxGate.js with a licensed reviewer. So nothing here may compute tax owed,
+   assert a rate, or claim the mechanism is correct.
+
+   All it does is choose which internal-consistency identity to check. The default
+   identity — DPP + PPN = total — is simply false for a faktur whose taxable base is
+   deliberately smaller than the commercial base, and applying it there raises a
+   discrepancy on a perfectly ordinary document. Recognising that arrangement is a
+   statement about five numbers agreeing with each other, which needs no reviewer.
+
+   Two independent identities must hold within a rupiah before the shape is recognised:
+       base × 11/12 = taxable base      and      taxable base × 12% = PPN
+   plus total = base + PPN. Anything less is not this shape and the ordinary check
+   applies — the rule may never be used to wave through arithmetic that does not add up.
+   Nothing is rewritten either way. */
+const RUPIAH = 1.5;   // tolerance: these are whole-rupiah documents, not floats
+const NILAI_LAIN_RATIO = 11 / 12;
+const NILAI_LAIN_RATE = 0.12;
+
+function assessIndonesianVat({ subtotal, dpp, nilaiLain, ppn, total }) {
+  const base = subtotal ?? (total !== null && total !== undefined
+    && ppn !== null && ppn !== undefined ? total - ppn : null);
+  // The taxable base may be printed in its own field or in dpp.
+  const nl = nilaiLain ?? dpp;
+  const known = [base, nl, ppn, total].every((v) => typeof v === 'number' && Number.isFinite(v));
+  if (!known) return { shape: 'standard', note: null };
+
+  // A nilai lain base is SMALLER than the commercial base. Equal means an ordinary
+  // faktur, and the ordinary identity is the right check for it.
+  if (!(nl < base)) return { shape: 'standard', note: null };
+
+  const ratioHolds = Math.abs(base * NILAI_LAIN_RATIO - nl) <= RUPIAH;
+  const rateHolds = Math.abs(nl * NILAI_LAIN_RATE - ppn) <= RUPIAH;
+  const totalAdds = Math.abs(base + ppn - total) <= RUPIAH;
+  if (ratioHolds && rateHolds && totalAdds) {
+    return {
+      shape: 'nilai_lain_11_12',
+      // Reports what the figures do, and stops there. No rate is endorsed, no liability
+      // stated, and the user is told the arrangement rather than it being hidden.
+      note: `The printed figures are internally consistent as a reduced taxable base: `
+        + `${base} × 11/12 = ${nl}, and ${ppn} is 12% of ${nl}, giving ${base} + ${ppn} `
+        + `= ${total} payable. On this arrangement the taxable base plus PPN is not `
+        + `expected to equal the total, so no discrepancy is raised. This is an `
+        + `arithmetic check only — it is not a tax determination and confirms no rate.`,
+    };
+  }
+  return { shape: 'standard', note: null };
+}
+
+module.exports = {
+  validateExtraction, assessIndonesianVat, STATUS, SUPPORTED_CURRENCIES, SETTLED_TYPES, normNpwp,
+};
