@@ -41,6 +41,13 @@ const FILES = {
   'b/a/kwt.pdf': makePdf('KWITANSI PT Sumber Alfaria Trijaya Tbk '
     + 'Sudah terima dari : HELM CARE INDONESIA Berupa : TRANSFER '
     + 'Jumlah : Rp 11.322.000 Tanggal : 04-08-2026'),
+  // Only OUR company appears — the production self-match case.
+  'b/a/self.pdf': makePdf('Invoice No. Invoice SELF-1 Kepada : PT HELM CARE INDONESIA '
+    + 'NPWP : 09.876.543.2-101.000 Netto 2.000.000'),
+  // Two dates that must not be confused with each other.
+  'b/a/dates.pdf': makePdf('Invoice No. Invoice DATE-1 Dari : PT Sumber Makmur Sentosa '
+    + 'Kepada : PT Helm Care Indonesia Tanggal : 15 Agustus 2026 '
+    + 'Jatuh Tempo : 14 September 2026 Netto 3.000.000'),
   'b/b/other.pdf': makePdf('Invoice Netto 1.000'),
 };
 
@@ -108,6 +115,8 @@ mem.__seed('document_files', [
   { id: 'f-scan', business_id: A, storage_path: 'b/a/scan.pdf', file_name: 'scan.pdf', mime_type: 'application/pdf' },
   { id: 'f-scan2', business_id: A, storage_path: 'b/a/scan2.pdf', file_name: 'scan2.pdf', mime_type: 'application/pdf' },
   { id: 'f-kwt', business_id: A, storage_path: 'b/a/kwt.pdf', file_name: 'kwitansi.pdf', mime_type: 'application/pdf' },
+  { id: 'f-self', business_id: A, storage_path: 'b/a/self.pdf', file_name: 'self.pdf', mime_type: 'application/pdf' },
+  { id: 'f-dates', business_id: A, storage_path: 'b/a/dates.pdf', file_name: 'dates.pdf', mime_type: 'application/pdf' },
   { id: 'f-b', business_id: B, storage_path: 'b/b/other.pdf', file_name: 'other.pdf', mime_type: 'application/pdf' },
 ]);
 mem.__seed('financial_documents', [
@@ -122,6 +131,8 @@ mem.__seed('financial_documents', [
     extracted_json: { upload_intent: { source: 'invoice_upload', label: 'Invoice',
       suggested_document_type: 'invoice', suggested_direction: null,
       created_at: '2026-09-04T10:00:00.000Z' } } },
+  { id: 'd-self', business_id: A, file_id: 'f-self', document_type: 'other', currency: 'IDR' },
+  { id: 'd-dates', business_id: A, file_id: 'f-dates', document_type: 'other', currency: 'IDR' },
   { id: 'd-arch', business_id: A, file_id: 'f-sup', document_type: 'other', archived_at: '2026-08-01T00:00:00Z' },
   { id: 'd-b', business_id: B, file_id: 'f-b', document_type: 'other', currency: 'IDR' },
 ]);
@@ -441,6 +452,46 @@ const t = async (name, fn) => {
     assert.strictEqual(r.status, 200);
     assert.strictEqual(r.body.source, 'filename_only');
     assert.strictEqual(r.body.text_source.available, false);
+  });
+
+  // ── parties, dates and the self-match rule, over HTTP ─────────────────────
+  console.log('\n17-23. parties, dates, self-match');
+  await t('17/18. name and NPWP stay with their own party', async () => {
+    const r = await call('POST', '/documents/d-sup/counterparty-suggestion', { biz: A });
+    assert.strictEqual(r.status, 200, JSON.stringify(r.body));
+    const cp = r.body.suggested_counterparty;
+    assert.ok(/Sumber Makmur/i.test(cp?.legal_name || ''), JSON.stringify(cp));
+    // The supplier's own NPWP, never the buyer's.
+    assert.ok(!cp.npwp || /01\.222\.333/.test(cp.npwp), `npwp was ${cp.npwp}`);
+  });
+
+  await t('19/20. the business is never offered as its own counterparty', async () => {
+    const r = await call('POST', '/documents/d-self/counterparty-suggestion', { biz: A });
+    assert.strictEqual(r.status, 200, JSON.stringify(r.body));
+    assert.strictEqual(r.body.status, 'self_match');
+    assert.strictEqual(r.body.can_create, false, 'no create may be offered');
+    assert.strictEqual(r.body.suggested_counterparty, null);
+    assert.ok(/your own company/i.test(r.body.reason), r.body.reason);
+  });
+
+  await t('23. nothing is created by any of that', async () => {
+    assert.strictEqual((mem.__db.counterparties || []).length, 1);
+    assert.strictEqual((mem.__db.debts || []).length, 0);
+    assert.strictEqual((mem.__db.transactions || []).length, 0);
+  });
+
+  await t('11/12. the extract endpoint separates the dates', async () => {
+    const r = await call('POST', '/documents/d-dates/extract', { biz: A });
+    assert.strictEqual(r.status, 200, JSON.stringify(r.body));
+    assert.strictEqual(r.body.dates.document_date.value, '2026-08-15');
+    assert.strictEqual(r.body.dates.due_date.value, '2026-09-14');
+    assert.notStrictEqual(r.body.dates.document_date.value, r.body.dates.due_date.value);
+  });
+
+  await t('16. a document with no date gets none — not today\'s', async () => {
+    const r = await call('POST', '/documents/d-cus/extract', { biz: A });
+    const today = new Date().toISOString().slice(0, 10);
+    assert.notStrictEqual(r.body.dates.document_date.value, today);
   });
 
   await t('15/16. the shared reader keeps its scoping', async () => {

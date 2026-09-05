@@ -12587,6 +12587,8 @@ const docContent = require('./lib/documentContent');
 const { extractPdfText } = require('./lib/pdfText');
 const docExtract = require('./lib/documentExtraction');
 const docOcr = require('./lib/documentOcr');
+const docDates = require('./lib/documentDates');
+const docParties = require('./lib/documentParties');
 const uploadIntentLib = require('./lib/uploadIntent');
 const { publicIntakeV2, publicUploadIntent } = require('./lib/documentPublicView');
 
@@ -13392,7 +13394,15 @@ async function readDocumentForIntake(biz, doc) {
       readSource = 'ocr_vision';
     }
   }
-  return { file, buf, extraction, readSource, ocr };
+  // Dates and parties are read from the SAME text the fields came from, so every
+  // caller of this helper gets the same structured answer. The FULL text, not the
+  // 600-character excerpt stored on the row — a due date or a second party block
+  // routinely sits past that cut.
+  const readText = (readSource === 'ocr_vision' ? (ocr && ocr.text) : ex.text) || '';
+  const dates = docDates.extractDates(readText, { document_type: extraction.document_type });
+  const parties = docParties.extractParties(readText);
+
+  return { file, buf, extraction, readSource, ocr, dates, parties };
 }
 
 async function runDocumentIntake(biz, doc, opts = {}) {
@@ -13521,6 +13531,9 @@ app.post('/api/documents/:id/extract', auth, async (req, res) => {
       extraction: result,
       duplicate,
       source: read.readSource,
+      // Each date, told apart and status-tagged. Never a fallback to the upload date.
+      dates: read.dates,
+      parties: read.parties?.parties || [],
       text_source: { available: read.readSource !== 'filename_only', method: read.readSource, reason: result.reason },
     });
   } catch (e) {
@@ -13555,7 +13568,38 @@ app.post('/api/documents/:id/counterparty-suggestion', auth, async (req, res) =>
     if (read.error) return res.status(read.status || 500).json({ error: read.error });
     const { extraction, readSource } = read;
 
+    // Parties first, as whole objects. This is what stops a name from one company
+    // being paired with another company's tax number — and what stops the business
+    // being offered as its own counterparty.
+    const partyRead = docParties.resolveCounterparty(
+      (read.readSource === 'ocr_vision' ? (read.ocr && read.ocr.text) : null) || extraction.raw_text_excerpt || '',
+      { legal_name: biz.business?.legal_name || biz.business?.name, display_name: biz.business?.name,
+        name: biz.business?.name, npwp: biz.business?.npwp, aliases: biz.business?.aliases || [] });
+
+    if (partyRead.status === 'self_match') {
+      return res.json({
+        ok: true, business_id: biz.business.id, document_id: doc.id, saved: false,
+        source: read.readSource,
+        status: 'self_match',
+        can_create: false,                 // the hard rule: nothing to create
+        suggested_counterparty: null,
+        parties: partyRead.parties,
+        reason: partyRead.reason,
+        warnings: [partyRead.reason, ...(partyRead.warnings || [])],
+      });
+    }
+
     const suggestion = CPI.suggestFromDocument(extraction, { business_name: biz.business?.name });
+    // The structured read wins where it has an answer: its name and NPWP came from one
+    // party block, whereas the field-level suggestion pairs whatever it found.
+    if (partyRead.counterparty) {
+      suggestion.suggested_counterparty = {
+        ...(suggestion.suggested_counterparty || {}),
+        legal_name: partyRead.counterparty.legal_name,
+        display_name: partyRead.counterparty.legal_name,
+        npwp: partyRead.counterparty.npwp,
+      };
+    }
     const match = CPI.matchCounterparty(suggestion.suggested_counterparty, await cpDirectoryForMatching(biz));
 
     res.json({
@@ -13570,6 +13614,11 @@ app.post('/api/documents/:id/counterparty-suggestion', auth, async (req, res) =>
       possible_matches: match.possible_matches,
       match_reasons: match.match_reasons,
       suggested_counterparty: suggestion.suggested_counterparty,
+      // Whether a one-click create may be offered at all. A guess the reader could not
+      // tie to this business is reviewed, not created.
+      can_create: partyRead.status === 'ok',
+      party_status: partyRead.status,
+      parties: partyRead.parties,
       direction: suggestion.direction,
       role_reason: suggestion.role_reason,
       warnings: [...suggestion.warnings, ...match.warnings],

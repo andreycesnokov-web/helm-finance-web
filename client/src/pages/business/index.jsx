@@ -49,7 +49,7 @@ import {
   DocumentViewTabs, CompanyVault, VaultReclassifyDrawer, documentCounts, DocumentReviewPanel,
   ReviewFieldsDrawer,
 } from './DocumentBlocks'
-import { partitionDocuments } from './companyVault'
+import { partitionDocuments, VAULT_TYPES } from './companyVault'
 import DocumentIntakeModal from '../../components/DocumentIntakeModal'
 
 const SYMBOL = '/brand/symbol_navy_blue_dot_transparent.svg'
@@ -212,6 +212,9 @@ export function BusinessDocuments() {
   const [cpBusy, setCpBusy] = useState(false)
   const [cpError, setCpError] = useState(null)
   const [fieldsDoc, setFieldsDoc] = useState(null)     // review-fields drawer target
+  // Just-uploaded document ids, highlighted so a new row is findable in a long list.
+  const [fresh, setFresh] = useState(() => new Set())
+  const [moved, setMoved] = useState(null)   // { id, name, previousType } after a vault move
 
   const load = useCallback(() => {
     if (!token || !active) return
@@ -303,12 +306,31 @@ export function BusinessDocuments() {
   // sets classification_status='manually_confirmed', keeping document_type CHECK-valid.
   // It is what turns a *suggested* company document into a confirmed one.
   const applyVaultType = async (docType) => {
+    const target = vaultDoc
+    const previousType = target?.extracted_json?.ai_intake?.doc_type || null
     setBusy(true); setErr(null)
     try {
-      await apiFetch(`/ai-accountant/documents/${vaultDoc.id}/classification`, token,
+      await apiFetch(`/ai-accountant/documents/${target.id}/classification`, token,
         { method: 'PATCH', body: { doc_type: docType } })
-      setVaultDoc(null); load()
+      setVaultDoc(null)
+      // Confirming a company type is the ONE action that moves a document out of the
+      // Evidence Inbox, so it is announced — with a way back.
+      if (VAULT_TYPES.includes(docType)) {
+        setMoved({ id: target.id, name: target.file?.file_name || 'Document', previousType })
+      }
+      load()
     } catch (e) { setErr(e.message || 'Could not save the classification') } finally { setBusy(false) }
+  }
+
+  // Undo: re-confirm the type it had before. Same audited route, no new endpoint.
+  const undoVaultMove = async () => {
+    if (!moved) return
+    setBusy(true); setErr(null)
+    try {
+      await apiFetch(`/ai-accountant/documents/${moved.id}/classification`, token,
+        { method: 'PATCH', body: { doc_type: moved.previousType || 'unknown' } })
+      setMoved(null); load()
+    } catch (e) { setErr(e.message || 'Could not undo the move') } finally { setBusy(false) }
   }
 
   /* ── intake pipeline actions ────────────────────────────────────────────────
@@ -473,6 +495,18 @@ export function BusinessDocuments() {
 
   return <>{head}
     <CreateOutcome note={outcome} onDismiss={() => setOutcome(null)} />
+    {moved && (
+      <Card>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 13 }}>
+            <b>Document moved to Company Vault</b> — {moved.name}
+          </span>
+          <Btn sm variant="ghost" onClick={undoVaultMove} disabled={busy}>Undo</Btn>
+          <Btn sm variant="ghost" onClick={() => { setView('vault'); setMoved(null) }}>Open Company Vault</Btn>
+          <Btn sm variant="ghost" onClick={() => setMoved(null)}>Dismiss</Btn>
+        </div>
+      </Card>
+    )}
     <DocumentSummary docs={st.docs} loading={st.loading} view={view} onView={setView} />
     <DocumentViewTabs view={view} onView={setView} counts={documentCounts(st.docs)} />
 
@@ -484,7 +518,7 @@ export function BusinessDocuments() {
         onCreate={(doc, dir) => setCreate({ doc, dir })}
         onLink={(doc, kind, dir) => openPicker(doc, kind, dir)}
         onClassify={setClassify} onUpload={() => setUpload(true)} navigate={navigate}
-        onAnalyze={analyzeDoc} analyzing={analyzing}
+        onAnalyze={analyzeDoc} analyzing={analyzing} freshIds={fresh}
         expandedId={isDesktop ? (review?.id ?? picker?.doc?.id ?? classify?.id ?? vaultDoc?.id ?? fieldsDoc?.id ?? null) : null}
         renderPanel={isDesktop ? renderDocPanel : null} />
     ) : (
@@ -572,7 +606,20 @@ export function BusinessDocuments() {
     {upload && (
       <DocumentIntakeModal business={active} uploadSource="document_center_upload"
         onClose={() => setUpload(false)}
-        onUploaded={() => { setUpload(false); load() }} />
+        // The moment a document row exists, make it visible: reset to the queue that
+        // shows everything, clear any search that would hide it, and highlight the row.
+        // A new upload must never depend on the user finding the right tab.
+        onDocumentCreated={({ id }) => {
+          setQueue('all'); setView('inbox')
+          setFresh((f) => new Set(f).add(id))
+          load()
+        }}
+        onOpenDocument={(id) => {
+          setUpload(false)
+          const found = st.docs.find((d) => d.id === id)
+          if (found) setReview(found)
+        }}
+        onUploaded={() => load()} />
     )}
   </>
 }
