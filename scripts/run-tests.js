@@ -48,9 +48,19 @@ for (const file of files) {
     failures.push(file);
     console.log(`FAIL  ${file}`);
     // Only the failing assertions, so a red build is readable without scrolling.
-    const detail = output.split('\n').filter((l) => /^\s*(XX|not ok|AssertionError|Error:)/.test(l));
+    const lines = output.split('\n');
+    const detail = lines.filter((l) => /^\s*(XX|not ok|AssertionError|Error:)/.test(l));
     for (const line of detail.slice(0, 8)) console.log(`      ${line.trim()}`);
-    if (detail.length === 0) console.log(output.split('\n').slice(-8).join('\n'));
+    // The reason, not only the verdict. node:test puts the cause in an `error:` block
+    // under each failing assertion; printing just the "not ok" lines threw it away, which
+    // is how a CI failure arrived with nothing in it to act on.
+    const firstError = lines.findIndex((l) => /^\s*error:/.test(l));
+    if (firstError > -1) {
+      console.log('      ---- cause of the first failure ----');
+      for (const line of lines.slice(firstError, firstError + 12)) console.log(`      ${line}`);
+    } else if (detail.length === 0) {
+      console.log(lines.slice(-12).join('\n'));
+    }
   } else {
     console.log(`ok    ${file}  ${summary.trim()}`);
   }
