@@ -313,35 +313,42 @@ function contextBlock(business = {}, opts = {}) {
   return lines.join('\n');
 }
 
-/* ── the wrapper key ───────────────────────────────────────────────────────
-   Occasionally the whole tool input arrives nested one level down, under a single
-   wrapper key. Observed live on 2026-09-05: one call in fifteen returned
-   { params: { schema_version, document_type, parties, ... } }. The reading itself was
-   perfectly correct — the invoice, its number and its supplier were all there — but
-   every consumer looked at the top level, found none of it, and the document silently
-   became blank.
+/* ── the wrapper key ──────────────────────────────────────────────────────
+   Sometimes the whole tool input arrives nested one level down, under a single wrapper
+   key. Seen live on 2026-09-05: the same document returned { params: {...} } on one run
+   and { parameters: {...} } on the next. Both readings were entirely correct — the
+   invoice, its number and its supplier were all there — but every consumer looked at the
+   top level, found none of it, and the document silently became blank.
 
-   That is the worst failure mode available to this pipeline: a correct answer discarded
-   without anyone noticing. So the wrapper is unwrapped, and the fact that it happened is
-   recorded rather than smoothed over.
+   That is the worst failure available to this pipeline: a correct answer discarded with
+   nobody noticing. So the wrapper is removed, and the fact is recorded rather than
+   smoothed over.
 
-   Safe because a real extraction always carries several top-level fields. A single-key
-   object is never a valid one. */
-const WRAPPER_KEYS = new Set(['params', 'input', 'arguments', 'properties', 'result', 'data']);
+   The test is STRUCTURAL, not a list of names. Guessing wrapper names is how the first
+   attempt at this missed `parameters` after handling `params`. Instead: a valid input for
+   these schemas always carries several required top-level fields, so a top level holding
+   exactly one key, whose value is an object that does look like the real payload, cannot
+   be the payload itself. */
+function unwrapToolInput(input, expectedKeys = []) {
+  const empty = { value: input, unwrapped_from: null };
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return empty;
 
-function unwrapToolInput(input) {
-  if (!input || typeof input !== 'object' || Array.isArray(input)) {
-    return { value: input, unwrapped_from: null };
-  }
   const keys = Object.keys(input);
-  if (keys.length === 1 && WRAPPER_KEYS.has(keys[0])) {
-    const inner = input[keys[0]];
-    if (inner && typeof inner === 'object' && !Array.isArray(inner)) {
-      return { value: inner, unwrapped_from: keys[0] };
-    }
-  }
-  return { value: input, unwrapped_from: null };
+  if (keys.length !== 1) return empty;
+
+  const inner = input[keys[0]];
+  if (!inner || typeof inner !== 'object' || Array.isArray(inner)) return empty;
+
+  // The inner object must actually resemble the payload: either it carries a field the
+  // schema names, or it is simply richer than the single-key shell around it.
+  const innerKeys = Object.keys(inner);
+  const looksRight = expectedKeys.some((k) => innerKeys.includes(k)) || innerKeys.length > 1;
+  return looksRight ? { value: inner, unwrapped_from: keys[0] } : empty;
 }
+
+/** The top-level fields a real extraction carries. Used to recognise a wrapped one. */
+const EXTRACTION_KEYS = ['schema_version', 'document_type', 'document_number', 'parties',
+  'dates', 'amounts', 'page_count', 'pages_analyzed'];
 
 /* ── failure shapes ────────────────────────────────────────────────────────── */
 
@@ -484,7 +491,7 @@ async function extractDocumentV3(buffer, opts = {}) {
 
   const block = (resp?.content || []).find((c) => c.type === 'tool_use');
   if (!block || !block.input) return { ...failure('no_tool_output'), duration_ms: Date.now() - started };
-  const { value: extracted, unwrapped_from } = unwrapToolInput(block.input);
+  const { value: extracted, unwrapped_from } = unwrapToolInput(block.input, EXTRACTION_KEYS);
 
   return {
     ok: true,
@@ -522,7 +529,7 @@ function buildRequestForInspection(buffer, opts = {}) {
 
 module.exports = {
   extractDocumentV3, buildRequestForInspection, visionEnabled,
-  classifyProviderError, unwrapToolInput, RETRYABLE, USER_MESSAGE,
+  classifyProviderError, unwrapToolInput, EXTRACTION_KEYS, RETRYABLE, USER_MESSAGE,
   EXTRACTION_SCHEMA, SYSTEM_PROMPT, contextBlock,
   SCHEMA_VERSION, PROMPT_VERSION, MODEL,
   DOCUMENT_TYPES, PARTY_ROLES, MAX_BYTES, MAX_PAGES, TIMEOUT_MS,

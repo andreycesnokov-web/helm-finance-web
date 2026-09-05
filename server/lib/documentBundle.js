@@ -193,7 +193,8 @@ async function segmentDocuments(buffer, opts = {}) {
   const block = (resp?.content || []).find((c) => c.type === 'tool_use');
   if (!block?.input) return failure('no_tool_output', { duration_ms: Date.now() - started });
   // Same wrapper-key defence as primary extraction; see documentVisionV3.unwrapToolInput.
-  const { value: seg, unwrapped_from } = visionV3.unwrapToolInput(block.input);
+  const { value: seg, unwrapped_from } = visionV3.unwrapToolInput(block.input,
+    ['is_bundle', 'documents', 'shared_reference', 'reasoning']);
 
   const docs = Array.isArray(seg.documents) ? seg.documents : [];
   const problems = validateSegments(docs, opts.pageCount || null);

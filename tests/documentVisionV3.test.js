@@ -289,7 +289,10 @@ const BUSINESS = { legal_name: 'PT Helm Care Indonesia', display_name: 'Helm Car
   await t('an extraction nested under a wrapper key is recovered, not lost', async () => {
     // Seen live on 2026-09-05: one call in fifteen returned the whole tool input under
     // `params`. The reading was correct; everything downstream saw an empty document.
-    for (const key of ['params', 'input', 'arguments', 'result', 'data']) {
+    // The name varies run to run: the SAME document returned `params` on one live run
+    // and `parameters` on the next, which is why the rule is structural rather than a
+    // list of names anyone has to keep guessing at.
+    for (const key of ['params', 'parameters', 'input', 'arguments', 'tool_input', 'payload']) {
       const r = await V3.extractDocumentV3(PDF_BYTES,
         { mime_type: 'application/pdf', client: stub(GOOD, { wrapIn: key }) });
       assert.strictEqual(r.ok, true, key);
@@ -307,11 +310,12 @@ const BUSINESS = { legal_name: 'PT Helm Care Indonesia', display_name: 'Helm Car
 
   await t('a genuine single-field extraction is left alone', async () => {
     // The rule keys off a lone WRAPPER key, so a real one-field answer must survive.
-    const { value, unwrapped_from } = V3.unwrapToolInput({ document_type: { value: 'invoice' } });
+    const { value, unwrapped_from } = V3.unwrapToolInput({ document_type: { value: 'invoice' } }, V3.EXTRACTION_KEYS);
     assert.strictEqual(unwrapped_from, null);
     assert.strictEqual(value.document_type.value, 'invoice');
     // and a wrapper holding something that is not an object is not a wrapper
-    assert.strictEqual(V3.unwrapToolInput({ params: 'nope' }).unwrapped_from, null);
+    assert.strictEqual(V3.unwrapToolInput({ params: 'nope' }, V3.EXTRACTION_KEYS).unwrapped_from, null);
+    assert.strictEqual(V3.unwrapToolInput({ junk: { a: 1 } }, V3.EXTRACTION_KEYS).unwrapped_from, null);
   });
 
   await t('no client configured is a reason, not a crash', async () => {
