@@ -75,11 +75,19 @@ export const PageHeader = ({
       {description && <p className="cfo-pagehead-desc">{description}</p>}
     </div>
     {(primaryAction || secondaryActions || context || actions) && (
-      <div className="cfo-pagehead-actions">
-        {context}
-        {actions}
-        {secondaryActions}
-        {primaryAction}
+      <div className="cfo-pagehead-right">
+        {/* Context (metadata badges) and actions (controls) are separate boxes on
+            purpose. On mobile the actions box becomes a full-width grid so a
+            primary button spans the screen — right for buttons, wrong for badges,
+            which stretched edge to edge while they shared that box. */}
+        {context && <div className="cfo-pagehead-context">{context}</div>}
+        {(actions || secondaryActions || primaryAction) && (
+          <div className="cfo-pagehead-actions">
+            {actions}
+            {secondaryActions}
+            {primaryAction}
+          </div>
+        )}
       </div>
     )}
   </div>

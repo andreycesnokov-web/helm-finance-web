@@ -1,0 +1,104 @@
+/* Design preview harness. Class prefix: dsp-
+   NOT dp- — that prefix is already owned by pages/business/DocumentPreview.css, whose
+   .dp-stage is a fixed 300px flex box with overflow:hidden. Using it here silently
+   clipped every example and laid the header out beside the hero.
+   Layout only — every component inside a stage styles
+   itself from the shipped token layer, which is the whole point of the page. */
+
+/* #root is display:flex, so the preview must claim the row or it shrinks to its
+   content width and leaves a dead gutter. */
+.dsp-root {
+  background: var(--surface-page);
+  min-height: 100vh;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.dsp-banner {
+  background: var(--brand-navy);
+  color: var(--text-inverse);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: .12em;
+  text-align: center;
+  padding: 8px 12px;
+}
+
+.dsp-wrap { max-width: 1180px; margin: 0 auto; padding: 28px var(--page-gutter) 80px; }
+
+.dsp-title {
+  font-family: var(--font-display);
+  font-size: var(--text-2xl);
+  color: var(--text-primary);
+  margin: 8px 0 6px;
+  line-height: var(--line-tight);
+}
+.dsp-lede { color: var(--text-secondary); margin: 0 0 var(--space-8); max-width: 70ch; }
+.dsp-lede code {
+  font-family: var(--font-mono);
+  font-size: .86em;
+  background: var(--surface-card-muted);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 1px 5px;
+}
+
+.dsp-section { margin-bottom: var(--space-10); }
+.dsp-section-head { margin-bottom: var(--space-4); }
+.dsp-h2 {
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  color: var(--text-primary);
+  margin: 0 0 4px;
+}
+.dsp-note { color: var(--text-muted); font-size: var(--text-sm); margin: 0; max-width: 76ch; }
+
+/* The stage is a plain page ground so a component looks exactly as it does in
+   the product — no card, no frame, nothing that could flatter it. */
+.dsp-stage {
+  background: var(--surface-page);
+  border: 1px dashed var(--border-default);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5);
+}
+.dsp-stage-wide { padding: var(--space-5); }
+
+.dsp-row { display: flex; gap: var(--space-3); align-items: center; flex-wrap: wrap; }
+.dsp-link { color: var(--text-link); font-weight: 600; }
+.dsp-link:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring);
+  outline-offset: var(--focus-ring-offset);
+  border-radius: var(--radius-sm);
+}
+
+.dsp-chips { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-4); }
+.dsp-chip {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+}
+.dsp-ok   { background: var(--success-soft); color: var(--success); }
+.dsp-warn { background: var(--warning-soft); color: var(--warning-ink); }
+.dsp-bad  { background: var(--danger-soft);  color: var(--danger); }
+.dsp-info { background: var(--info-soft);    color: var(--text-link); }
+
+.dsp-values {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-5);
+  margin-top: var(--space-4);
+  font-size: var(--text-lg);
+  font-weight: 700;
+}
+.dsp-v-pos  { color: var(--success); }
+.dsp-v-ink  { color: var(--text-primary); }
+.dsp-v-warn { color: var(--warning-ink); }
+.dsp-v-neg  { color: var(--danger); }
+
+@media (max-width: 640px) {
+  .dsp-wrap { padding: 20px var(--page-gutter-sm) 56px; }
+  .dsp-stage { padding: var(--space-4); }
+  .dsp-values { gap: var(--space-3); font-size: var(--text-md); }
+}

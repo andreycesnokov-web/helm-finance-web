@@ -69,6 +69,8 @@
 .cfo-pagehead{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;margin-bottom:22px}
 .cfo-eyebrow{font-size:12px;letter-spacing:.13em;text-transform:uppercase;color:var(--text-muted);font-weight:700}
 .cfo-h1{font-family:var(--font-display);font-size:30px;line-height:var(--line-tight);margin:4px 0 0;color:var(--brand-navy)}
+.cfo-pagehead-right{display:flex;align-items:center;justify-content:flex-end;gap:10px;flex-wrap:wrap}
+.cfo-pagehead-context{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .cfo-pagehead-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 
 /* ── Badges ──────────────────────────────────────────────────────────────── */
@@ -86,8 +88,11 @@
 .cfo-btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;font-family:var(--font-ui);font-weight:700;
   font-size:14px;border-radius:var(--radius-md);padding:10px 16px;cursor:pointer;border:1px solid transparent;line-height:1}
 .cfo-btn svg{width:16px;height:16px}
-.cfo-btn-primary{background:var(--brand-electric-blue);color:#fff;box-shadow:var(--shadow-sm)}
-.cfo-btn-primary:hover{background:#2486e6}
+/* The token layer owns this pair. --brand-electric-blue is the brand accent, not an
+   action surface: white on #3399FF is 2.94:1, which fails WCAG AA for button text.
+   --action-primary is the accessible ink of that same blue (#1565C0, 5.68:1). */
+.cfo-btn-primary{background:var(--action-primary);color:var(--action-primary-text);box-shadow:var(--shadow-sm)}
+.cfo-btn-primary:hover{background:var(--action-primary-hover)}
 .cfo-btn-secondary{background:var(--brand-navy);color:#fff}
 .cfo-btn-secondary:hover{background:#00284f}
 .cfo-btn-ghost{background:var(--surface-card);border-color:var(--border-default);color:var(--text-primary)}
@@ -121,6 +126,9 @@
 }
 @media (max-width:640px){
   .cfo-pagehead{flex-direction:column;align-items:stretch;gap:12px}
+  /* Badges hug their text; only the actions box goes full width (see :357). */
+  .cfo-pagehead-right{justify-content:flex-start;align-items:flex-start;flex-direction:column;gap:12px;width:100%}
+  .cfo-pagehead-context{width:auto}
   .cfo-pagehead-actions{flex-wrap:wrap}
   .cfo-pagehead-desc{font-size:var(--text-sm)}
 }
@@ -142,7 +150,11 @@
   font-feature-settings:'tnum' 1,'lnum' 1;
 }
 
-.cfo-summary-sym{position:absolute;right:-18px;top:-18px;width:180px;opacity:.10}
+/* The hero watermark. One oversized mark, cropped by the card, decorative only.
+   Kept in step with .pulse-cash-mark in pages/business/Pulse.css — same surface,
+   same brand moment, so they must not drift apart again. */
+.cfo-summary-sym{position:absolute;right:-18px;top:-18px;width:180px;height:180px;opacity:.10;pointer-events:none;user-select:none}
+@media (max-width:640px){.cfo-summary-sym{width:132px;height:132px;right:-20px;top:-14px}}
 .cfo-summary-label{font-size:13px;color:#AFC6DE;font-weight:600}
 .cfo-summary-value{font-family:var(--font-display);font-size:40px;line-height:1.1;margin-top:6px}
 .cfo-summary-meta{display:flex;align-items:center;gap:8px;margin-top:12px;color:#C5D6E7;font-size:13px;flex-wrap:wrap}
