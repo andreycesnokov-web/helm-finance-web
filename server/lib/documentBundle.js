@@ -155,7 +155,11 @@ async function segmentDocuments(buffer, opts = {}) {
       client.messages.create({
         model: MODEL,
         max_tokens: MAX_OUTPUT_TOKENS,
-        temperature: 0,
+        // NO temperature. Opus 5 rejects the field outright — `temperature is deprecated for
+        // this model`, HTTP 400 — so setting it does not make extraction more deterministic,
+        // it stops the request happening at all. Verified live on 2026-09-05: identical
+        // requests differing only in this field returned 400 with it and stop_reason
+        // "tool_use" without it. Do not re-add it.
         system: SEGMENTATION_PROMPT,
         tools: [{
           name: 'segment_documents',
@@ -188,22 +192,25 @@ async function segmentDocuments(buffer, opts = {}) {
 
   const block = (resp?.content || []).find((c) => c.type === 'tool_use');
   if (!block?.input) return failure('no_tool_output', { duration_ms: Date.now() - started });
+  // Same wrapper-key defence as primary extraction; see documentVisionV3.unwrapToolInput.
+  const { value: seg, unwrapped_from } = visionV3.unwrapToolInput(block.input);
 
-  const docs = Array.isArray(block.input.documents) ? block.input.documents : [];
+  const docs = Array.isArray(seg.documents) ? seg.documents : [];
   const problems = validateSegments(docs, opts.pageCount || null);
 
   // One document, or a claim of a bundle that only found one: not a bundle.
-  const isBundle = block.input.is_bundle === true && docs.length > 1;
+  const isBundle = seg.is_bundle === true && docs.length > 1;
 
   return {
     ok: true,
     is_bundle: isBundle && problems.length === 0,
+    unwrapped_from,
     // A segmentation we could not trust is reported as a single document with the reason
     // attached, rather than acted on. Reading the file whole is the safe default; reading
     // it as children whose boundaries we doubt is not.
     documents: isBundle && problems.length === 0 ? docs.slice(0, MAX_CHILDREN) : [],
-    shared_reference: block.input.shared_reference ?? null,
-    reasoning: String(block.input.reasoning || '').slice(0, 500),
+    shared_reference: seg.shared_reference ?? null,
+    reasoning: String(seg.reasoning || '').slice(0, 500),
     problems,
     truncated: docs.length > MAX_CHILDREN,
     model: MODEL,

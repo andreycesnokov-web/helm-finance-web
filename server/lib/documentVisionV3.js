@@ -313,6 +313,36 @@ function contextBlock(business = {}, opts = {}) {
   return lines.join('\n');
 }
 
+/* ── the wrapper key ───────────────────────────────────────────────────────
+   Occasionally the whole tool input arrives nested one level down, under a single
+   wrapper key. Observed live on 2026-09-05: one call in fifteen returned
+   { params: { schema_version, document_type, parties, ... } }. The reading itself was
+   perfectly correct — the invoice, its number and its supplier were all there — but
+   every consumer looked at the top level, found none of it, and the document silently
+   became blank.
+
+   That is the worst failure mode available to this pipeline: a correct answer discarded
+   without anyone noticing. So the wrapper is unwrapped, and the fact that it happened is
+   recorded rather than smoothed over.
+
+   Safe because a real extraction always carries several top-level fields. A single-key
+   object is never a valid one. */
+const WRAPPER_KEYS = new Set(['params', 'input', 'arguments', 'properties', 'result', 'data']);
+
+function unwrapToolInput(input) {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) {
+    return { value: input, unwrapped_from: null };
+  }
+  const keys = Object.keys(input);
+  if (keys.length === 1 && WRAPPER_KEYS.has(keys[0])) {
+    const inner = input[keys[0]];
+    if (inner && typeof inner === 'object' && !Array.isArray(inner)) {
+      return { value: inner, unwrapped_from: keys[0] };
+    }
+  }
+  return { value: input, unwrapped_from: null };
+}
+
 /* ── failure shapes ────────────────────────────────────────────────────────── */
 
 // A failure the user can act on by trying again, versus one that will happen
@@ -405,7 +435,11 @@ async function extractDocumentV3(buffer, opts = {}) {
   const request = {
     model: MODEL,
     max_tokens: MAX_OUTPUT_TOKENS,
-    temperature: 0,              // extraction is not a creative task
+    // NO temperature. Opus 5 rejects the field outright — `temperature is deprecated for
+    // this model`, HTTP 400 — so setting it does not make extraction more deterministic,
+    // it stops the request happening at all. Verified live on 2026-09-05: identical
+    // requests differing only in this field returned 400 with it and stop_reason
+    // "tool_use" without it. Do not re-add it.
     system: SYSTEM_PROMPT,
     tools: [{
       name: 'record_financial_document',
@@ -450,6 +484,7 @@ async function extractDocumentV3(buffer, opts = {}) {
 
   const block = (resp?.content || []).find((c) => c.type === 'tool_use');
   if (!block || !block.input) return { ...failure('no_tool_output'), duration_ms: Date.now() - started };
+  const { value: extracted, unwrapped_from } = unwrapToolInput(block.input);
 
   return {
     ok: true,
@@ -465,8 +500,11 @@ async function extractDocumentV3(buffer, opts = {}) {
       : null,
     // Stamped, not trusted: the version of the schema WE sent is a fact we hold, and a
     // model that echoes something else must not be able to mislabel the record.
-    extraction: { ...block.input, schema_version: SCHEMA_VERSION },
-    model_reported_schema_version: block.input?.schema_version ?? null,
+    extraction: { ...extracted, schema_version: SCHEMA_VERSION },
+    model_reported_schema_version: extracted?.schema_version ?? null,
+    // Null in the ordinary case. Names the wrapper key when one had to be removed, so a
+    // change in response shape shows up in diagnostics instead of as a blank document.
+    unwrapped_from,
     stop_reason: resp?.stop_reason ?? null,
   };
 }
@@ -484,7 +522,7 @@ function buildRequestForInspection(buffer, opts = {}) {
 
 module.exports = {
   extractDocumentV3, buildRequestForInspection, visionEnabled,
-  classifyProviderError, RETRYABLE, USER_MESSAGE,
+  classifyProviderError, unwrapToolInput, RETRYABLE, USER_MESSAGE,
   EXTRACTION_SCHEMA, SYSTEM_PROMPT, contextBlock,
   SCHEMA_VERSION, PROMPT_VERSION, MODEL,
   DOCUMENT_TYPES, PARTY_ROLES, MAX_BYTES, MAX_PAGES, TIMEOUT_MS,

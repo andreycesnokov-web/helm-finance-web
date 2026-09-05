@@ -26,6 +26,13 @@ const stub = (input, opts = {}) => ({
       }
       if (opts.hang) return new Promise(() => {});
       if (opts.noTool) return Promise.resolve({ content: [{ type: 'text', text: 'here you go' }] });
+      if (opts.wrapIn) {
+        return Promise.resolve({
+          content: [{ type: 'tool_use', name: 'record_financial_document', input: { [opts.wrapIn]: input } }],
+          model: V3.MODEL,
+          usage: { input_tokens: 4210, output_tokens: 830 },
+        });
+      }
       return Promise.resolve({
         content: [{ type: 'tool_use', name: 'record_financial_document', input }],
         model: opts.respondedModel || V3.MODEL,
@@ -103,7 +110,9 @@ const BUSINESS = { legal_name: 'PT Helm Care Indonesia', display_name: 'Helm Car
     assert.strictEqual(req.tools[0].name, 'record_financial_document');
     assert.strictEqual(req.tool_choice.type, 'tool', 'the tool must be FORCED, not offered');
     assert.strictEqual(req.tool_choice.name, 'record_financial_document');
-    assert.strictEqual(req.temperature, 0, 'extraction is not a creative task');
+    // temperature is deliberately absent: Opus 5 returns 400 for it. See the dedicated
+    // test below; determinism comes from the forced tool and the schema, not from sampling.
+    assert.ok(!('temperature' in req), 'Opus 5 rejects temperature');
     assert.ok(req.tools[0].input_schema.required.includes('parties'));
   });
 
@@ -264,6 +273,45 @@ const BUSINESS = { legal_name: 'PT Helm Care Indonesia', display_name: 'Helm Car
         assert.ok(!leak.test(msg), `${reason} leaks ${leak} to the customer: ${msg}`);
       }
     }
+  });
+
+  await t('the request never sets temperature — Opus 5 rejects the field with a 400', async () => {
+    // Not a style preference. A live request differing only in `temperature: 0` returned
+    // 400 "`temperature` is deprecated for this model", so the field silently broke every
+    // extraction. This test exists so it cannot come back as a tidy-up.
+    SENT.length = 0;
+    await V3.extractDocumentV3(PDF_BYTES, { mime_type: 'application/pdf', client: stub(GOOD) });
+    assert.ok(SENT.length > 0, 'no request was sent');
+    assert.ok(!('temperature' in SENT[0]), 'temperature must not be sent');
+    assert.ok(!('top_p' in SENT[0]) && !('top_k' in SENT[0]), 'nor the other sampling knobs');
+  });
+
+  await t('an extraction nested under a wrapper key is recovered, not lost', async () => {
+    // Seen live on 2026-09-05: one call in fifteen returned the whole tool input under
+    // `params`. The reading was correct; everything downstream saw an empty document.
+    for (const key of ['params', 'input', 'arguments', 'result', 'data']) {
+      const r = await V3.extractDocumentV3(PDF_BYTES,
+        { mime_type: 'application/pdf', client: stub(GOOD, { wrapIn: key }) });
+      assert.strictEqual(r.ok, true, key);
+      assert.strictEqual(r.extraction.document_type?.value, 'faktur_pajak', `${key}: lost the reading`);
+      assert.strictEqual(r.extraction.document_number?.value, 'X2610001139', key);
+      assert.strictEqual(r.unwrapped_from, key, 'the unwrap must be recorded, not hidden');
+    }
+  });
+
+  await t('an ordinary answer is not unwrapped, and says so', async () => {
+    const r = await V3.extractDocumentV3(PDF_BYTES, { mime_type: 'application/pdf', client: stub(GOOD) });
+    assert.strictEqual(r.unwrapped_from, null);
+    assert.strictEqual(r.extraction.document_number?.value, 'X2610001139');
+  });
+
+  await t('a genuine single-field extraction is left alone', async () => {
+    // The rule keys off a lone WRAPPER key, so a real one-field answer must survive.
+    const { value, unwrapped_from } = V3.unwrapToolInput({ document_type: { value: 'invoice' } });
+    assert.strictEqual(unwrapped_from, null);
+    assert.strictEqual(value.document_type.value, 'invoice');
+    // and a wrapper holding something that is not an object is not a wrapper
+    assert.strictEqual(V3.unwrapToolInput({ params: 'nope' }).unwrapped_from, null);
   });
 
   await t('no client configured is a reason, not a crash', async () => {

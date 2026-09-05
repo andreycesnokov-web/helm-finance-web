@@ -40,7 +40,8 @@ const stub = (segInput, opts = {}) => ({
       if (isSegmentation) {
         if (opts.segNoTool) return { content: [{ type: 'text', text: 'nope' }] };
         return {
-          content: [{ type: 'tool_use', name: 'segment_documents', input: segInput }],
+          content: [{ type: 'tool_use', name: 'segment_documents',
+            input: opts.wrapIn ? { [opts.wrapIn]: segInput } : segInput }],
           model: opts.respondedModel || B.MODEL,
           usage: { input_tokens: 2500, output_tokens: 400 },
         };
@@ -77,6 +78,22 @@ const stub = (segInput, opts = {}) => ({
     // and the ORIGINAL bytes travel, not a transcript
     const doc = SENT[0].messages[0].content.find((c) => c.type === 'document');
     assert.strictEqual(doc.source.data, PDF.toString('base64'));
+  });
+
+  await t('segmentation never sets temperature either', async () => {
+    SENT.length = 0;
+    await B.segmentDocuments(PDF, { mime_type: 'application/pdf', client: stub(KWT_BUNDLE), pageCount: 3 });
+    assert.ok(!('temperature' in SENT[0]), 'Opus 5 returns 400 when temperature is sent');
+  });
+
+  await t('a segmentation nested under a wrapper key is recovered too', async () => {
+    const r = await B.segmentDocuments(PDF, {
+      mime_type: 'application/pdf', pageCount: 3,
+      client: stub(KWT_BUNDLE, { wrapIn: 'params' }),
+    });
+    assert.strictEqual(r.is_bundle, true, 'a wrapped segmentation must not read as "not a bundle"');
+    assert.strictEqual(r.documents.length, 3);
+    assert.strictEqual(r.unwrapped_from, 'params');
   });
 
   await t('a multi-page single document is not a bundle', async () => {
