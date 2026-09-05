@@ -25,6 +25,12 @@ jobs:
       - name: Server syntax check
         run: node --check server/index.js
 
+      # Four integration files boot the server as a child with stdio ignored, so when it
+      # fails to start they report "app did not start" and nothing else. This boots it the
+      # same way and keeps the output, so the reason is in the log.
+      - name: Server boot smoke
+        run: node scripts/boot-smoke.js
+
       # A green build should mean the software works, not only that it parses.
       - name: Unit tests
         run: npm test
