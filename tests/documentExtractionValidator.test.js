@@ -308,12 +308,28 @@ t('a taxable base equal to the commercial base is an ordinary faktur, not this s
   }).shape, 'standard');
 });
 
-t('incomplete figures fall back to the ordinary check, never to the rule', () => {
+t('a faktur that prints no total is still recognised — real ones often do not', () => {
+  // The actual customer faktur pajak checked on 2026-09-05 prints Harga Jual, DPP Nilai
+  // Lain and PPN and stops. Requiring a grand total would leave the commonest real shape
+  // unexplained, so the total is checked when present and not required when absent.
+  const real = assessIndonesianVat({
+    subtotal: 10200000, dpp: 9350000, nilaiLain: 9350000, ppn: 1122000, total: null,
+  });
+  assert.strictEqual(real.shape, 'nilai_lain_11_12');
+  assert.ok(!/payable/.test(real.note), 'a total nobody printed must not appear in the note');
+});
+
+t('a printed total that contradicts the figures still refuses the rule', () => {
+  assert.strictEqual(assessIndonesianVat({
+    subtotal: 10200000, dpp: 9350000, nilaiLain: 9350000, ppn: 1122000, total: 99999999,
+  }).shape, 'standard');
+});
+
+t('figures too incomplete to check fall back to the ordinary check', () => {
   const full = { subtotal: 10200000, dpp: 9350000, nilaiLain: 9350000, ppn: 1122000, total: 11322000 };
-  for (const missing of ['ppn', 'total']) {
-    assert.strictEqual(assessIndonesianVat({ ...full, [missing]: null }).shape, 'standard', `missing ${missing}`);
-  }
-  // with no subtotal AND no total the commercial base cannot be established at all
+  // no PPN: there is no second identity to test
+  assert.strictEqual(assessIndonesianVat({ ...full, ppn: null }).shape, 'standard');
+  // no subtotal and no total: the commercial base cannot be established at all
   assert.strictEqual(assessIndonesianVat({ ...full, subtotal: null, total: null }).shape, 'standard');
 });
 

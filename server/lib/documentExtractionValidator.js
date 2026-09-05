@@ -318,12 +318,14 @@ const NILAI_LAIN_RATIO = 11 / 12;
 const NILAI_LAIN_RATE = 0.12;
 
 function assessIndonesianVat({ subtotal, dpp, nilaiLain, ppn, total }) {
-  const base = subtotal ?? (total !== null && total !== undefined
-    && ppn !== null && ppn !== undefined ? total - ppn : null);
+  const isNum = (v) => typeof v === 'number' && Number.isFinite(v);
+  // A real faktur pajak often prints no grand total at all — the actual customer
+  // document this was checked against prints Harga Jual, DPP Nilai Lain and PPN, and
+  // stops. So the total is used when present and simply not required when it is not.
+  const base = isNum(subtotal) ? subtotal : (isNum(total) && isNum(ppn) ? total - ppn : null);
   // The taxable base may be printed in its own field or in dpp.
-  const nl = nilaiLain ?? dpp;
-  const known = [base, nl, ppn, total].every((v) => typeof v === 'number' && Number.isFinite(v));
-  if (!known) return { shape: 'standard', note: null };
+  const nl = isNum(nilaiLain) ? nilaiLain : dpp;
+  if (![base, nl, ppn].every(isNum)) return { shape: 'standard', note: null };
 
   // A nilai lain base is SMALLER than the commercial base. Equal means an ordinary
   // faktur, and the ordinary identity is the right check for it.
@@ -331,17 +333,19 @@ function assessIndonesianVat({ subtotal, dpp, nilaiLain, ppn, total }) {
 
   const ratioHolds = Math.abs(base * NILAI_LAIN_RATIO - nl) <= RUPIAH;
   const rateHolds = Math.abs(nl * NILAI_LAIN_RATE - ppn) <= RUPIAH;
-  const totalAdds = Math.abs(base + ppn - total) <= RUPIAH;
+  // Only checked when a total is actually printed. Absence is not a failed check.
+  const totalAdds = !isNum(total) || Math.abs(base + ppn - total) <= RUPIAH;
   if (ratioHolds && rateHolds && totalAdds) {
     return {
       shape: 'nilai_lain_11_12',
       // Reports what the figures do, and stops there. No rate is endorsed, no liability
       // stated, and the user is told the arrangement rather than it being hidden.
       note: `The printed figures are internally consistent as a reduced taxable base: `
-        + `${base} × 11/12 = ${nl}, and ${ppn} is 12% of ${nl}, giving ${base} + ${ppn} `
-        + `= ${total} payable. On this arrangement the taxable base plus PPN is not `
-        + `expected to equal the total, so no discrepancy is raised. This is an `
-        + `arithmetic check only — it is not a tax determination and confirms no rate.`,
+        + `${base} × 11/12 = ${nl}, and ${ppn} is 12% of ${nl}`
+        + (isNum(total) ? `, giving ${base} + ${ppn} = ${total} payable` : '')
+        + `. On this arrangement the taxable base plus PPN is not expected to equal the `
+        + `commercial amount, so no discrepancy is raised. This is an arithmetic check `
+        + `only — it is not a tax determination and confirms no rate.`,
     };
   }
   return { shape: 'standard', note: null };

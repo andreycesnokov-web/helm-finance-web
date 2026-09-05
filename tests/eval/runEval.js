@@ -193,7 +193,12 @@ async function runBundle() {
   const rows = [];
   let inTok = 0, outTok = 0, skipped = 0;
 
-  for (const c of CASES) {
+  // EVAL_ONLY=id[,id] re-runs a single case. Re-buying fifteen readings to check one
+  // fix is a waste of money the harness should not force on anyone.
+  const only = String(process.env.EVAL_ONLY || '').split(',').map((x) => x.trim()).filter(Boolean);
+  const cases = only.length ? CASES.filter((c) => only.includes(c.id)) : CASES;
+
+  for (const c of cases) {
     const r = await runCase(c);
     if (r.skipped) { skipped++; rows.push({ id: c.id, skipped: r.skipped }); continue; }
     if (!r.v3?.ok) { rows.push({ id: c.id, failed: r.v3?.reason || 'no result' }); continue; }
@@ -244,7 +249,8 @@ async function runBundle() {
   }
 
   // ── the bundle ────────────────────────────────────────────────────────────
-  const bundle = await runBundle();
+  const bundle = only.length && !only.includes('kwt_bundle')
+    ? { skipped: 'not selected by EVAL_ONLY' } : await runBundle();
   console.log('\n── BUNDLE (3 documents in 1 file) ' + '\u2500'.repeat(30));
   if (bundle.skipped) {
     console.log(`SKIPPED — ${bundle.skipped}`);
