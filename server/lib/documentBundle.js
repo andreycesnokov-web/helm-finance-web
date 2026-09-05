@@ -21,6 +21,11 @@ const modelPolicy = require('./modelPolicy');
 const visionV3 = require('./documentVisionV3');
 
 const MODEL = modelPolicy.modelFor('bundle_segmentation');
+
+/* Off until switched on, like every other reading capability before it. Segmentation is
+   a second Opus call per multi-page document, so turning it on is a cost decision as much
+   as a behavioural one and belongs to whoever pays the bill. */
+const bundleDetectionEnabled = () => process.env.DOCUMENT_BUNDLE_DETECTION_ENABLED === 'true';
 const SEGMENTATION_VERSION = 'bundle-seg-v1';
 const MAX_CHILDREN = 10;          // beyond this it is an archive, not a document
 const TIMEOUT_MS = 60000;
@@ -107,6 +112,26 @@ const failure = (reason, extra = {}) => ({
   ok: false, reason, is_bundle: false, model: MODEL,
   segmentation_version: SEGMENTATION_VERSION, ...extra,
 });
+
+/**
+ * How many pages does this PDF have?
+ *
+ * Needed for one decision only: a bundle needs at least two pages, so a single-page file
+ * can skip segmentation entirely and cost nothing. Counting page objects directly is
+ * exact on every document checked (both real customer scans and every fixture); the
+ * /Count fallback covers files whose page objects sit inside compressed object streams.
+ *
+ * @returns the count, or null when it cannot be established.
+ */
+function countPdfPages(buffer) {
+  if (!Buffer.isBuffer(buffer)) return null;
+  const s = buffer.toString('latin1');
+  const direct = (s.match(/\/Type\s*\/Page[^sA-Za-z]/g) || []).length;
+  if (direct > 0) return direct;
+  const counts = [...s.matchAll(/\/Type\s*\/Pages\b[\s\S]{0,300}?\/Count\s+(\d+)/g)]
+    .map((m) => Number(m[1])).filter((n) => Number.isFinite(n) && n > 0);
+  return counts.length ? Math.max(...counts) : null;
+}
 
 /** Pages must be real, in order, inside the file, and must not overlap another child. */
 function validateSegments(docs, pageCount) {
@@ -272,7 +297,7 @@ async function extractBundle(buffer, opts = {}) {
 }
 
 module.exports = {
-  segmentDocuments, extractBundle, validateSegments,
+  segmentDocuments, extractBundle, validateSegments, countPdfPages, bundleDetectionEnabled,
   SEGMENTATION_SCHEMA, SEGMENTATION_PROMPT, SEGMENTATION_VERSION,
   MODEL, MAX_CHILDREN,
 };

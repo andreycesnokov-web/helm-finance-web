@@ -96,8 +96,21 @@ function publicIntakeV3(v3) {
     };
   }
 
+  const b = v3.bundle && typeof v3.bundle === 'object' ? v3.bundle : null;
   return {
     analyzed: true,
+    // What the file holds. A person confirms each child separately; this creates nothing.
+    bundle: b ? {
+      shared_reference: STR(b.shared_reference),
+      children: (Array.isArray(b.children) ? b.children : []).slice(0, 10).map((c) => ({
+        index: NUM(c.index),
+        document_type: STR(c.document_type),
+        title_printed_text: STR(c.title_printed_text),
+        page_start: NUM(c.page_start),
+        page_end: NUM(c.page_end),
+        identifier: STR(c.identifier),
+      })),
+    } : null,
     schema_version: STR(v3.schema_version),
     prompt_version: STR(v3.prompt_version),
     model: STR(v3.model),

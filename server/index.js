@@ -13343,6 +13343,7 @@ app.patch('/api/documents/:id/financial-fields', auth, async (req, res) => {
 // returns the orchestrator result. Writes only review metadata, and only when it
 // actually changed.
 const intakeOrchestrator = require('./lib/documentIntakeOrchestrator');
+const docBundle = require('./lib/documentBundle');
 
 /**
  * Read one document the SAME way for every caller.
@@ -13406,6 +13407,22 @@ async function readDocumentForIntake(biz, doc) {
       },
       client: anthropic,
     }));
+  }
+
+  // ── is this file actually several documents? ─────────────────────────────
+  // Asked BEFORE the result is presented as one reading, and only for a file that could
+  // hold more than one document. A single page cannot be a bundle, so the common case
+  // costs nothing extra.
+  //
+  // Detection only. Children are suggestions a person confirms one at a time; no record,
+  // counterparty or link is created here, and the parent document is never split.
+  let bundle = null;
+  const pdfPages = docBundle.countPdfPages(buf);
+  if (docBundle.bundleDetectionEnabled() && visionV3.visionEnabled() && (pdfPages || 0) > 1) {
+    const seg = await docBundle.segmentDocuments(buf, {
+      mime_type: file.mime_type, file_name: file.file_name, client: anthropic, pageCount: pdfPages,
+    });
+    if (seg.ok && seg.is_bundle) bundle = seg;
   }
 
   // ── legacy OCR (only when Opus was never asked) ──────────────────────────────────────────────────
@@ -13480,7 +13497,8 @@ async function readDocumentForIntake(biz, doc) {
     }
   }
 
-  return { file, buf, extraction, readSource, ocr, dates, parties, v3, v3Validation, fingerprint, v3FromCache, storedV3 };
+  return { file, buf, extraction, readSource, ocr, dates, parties, v3, v3Validation,
+    fingerprint, v3FromCache, storedV3, bundle, pdfPages };
 }
 
 async function runDocumentIntake(biz, doc, opts = {}) {
@@ -13649,6 +13667,22 @@ function buildV3Summary(read, doc) {
   const v = read.v3Validation;
   return {
     analyzed: true,
+    // Detection only: what the file contains, never what was created from it.
+    ...(read.bundle ? {
+      bundle: {
+        detected_at: new Date().toISOString(),
+        segmentation_version: read.bundle.segmentation_version,
+        shared_reference: read.bundle.shared_reference ?? null,
+        children: (read.bundle.documents || []).map((d) => ({
+          index: d.index,
+          document_type: d.document_type,
+          title_printed_text: d.title_printed_text,
+          page_start: d.page_start,
+          page_end: d.page_end,
+          identifier: d.identifier ?? null,
+        })),
+      },
+    } : {}),
     fingerprint: read.fingerprint || null,
     schema_version: read.v3.schema_version,
     prompt_version: read.v3.prompt_version,

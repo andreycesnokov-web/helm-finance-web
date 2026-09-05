@@ -221,6 +221,35 @@ const stub = (segInput, opts = {}) => ({
     assert.strictEqual(r.segmentation.ok, false);
   });
 
+  console.log('\nPage counting and the rollout flag');
+
+  await t('a single page cannot be a bundle, so it never costs a segmentation call', () => {
+    const { CASES } = require('./eval/fixtures');
+    assert.strictEqual(B.countPdfPages(CASES.find((c) => c.id === 'scanned_kwitansi').bytes), 1);
+  });
+
+  await t('the page count is exact on the fixtures the pipeline is judged by', () => {
+    const { CASES, BUNDLE_CASE } = require('./eval/fixtures');
+    assert.strictEqual(B.countPdfPages(BUNDLE_CASE.bytes), 3);
+    assert.strictEqual(B.countPdfPages(CASES.find((c) => c.id === 'multi_page').bytes), 2);
+    assert.strictEqual(B.countPdfPages(CASES.find((c) => c.id === 'supplier_invoice').bytes), 1);
+  });
+
+  await t('an unreadable buffer gives null, not a confident wrong number', () => {
+    assert.strictEqual(B.countPdfPages(Buffer.from('not a pdf at all')), null);
+    assert.strictEqual(B.countPdfPages(null), null);
+  });
+
+  await t('detection is off until switched on', () => {
+    const prev = process.env.DOCUMENT_BUNDLE_DETECTION_ENABLED;
+    delete process.env.DOCUMENT_BUNDLE_DETECTION_ENABLED;
+    assert.strictEqual(B.bundleDetectionEnabled(), false, 'a second Opus call per document is opt-in');
+    process.env.DOCUMENT_BUNDLE_DETECTION_ENABLED = 'true';
+    assert.strictEqual(B.bundleDetectionEnabled(), true);
+    if (prev === undefined) delete process.env.DOCUMENT_BUNDLE_DETECTION_ENABLED;
+    else process.env.DOCUMENT_BUNDLE_DETECTION_ENABLED = prev;
+  });
+
   console.log(`\n${fail === 0 ? `ALL PASS — ${pass} passed, 0 failed` : `${pass} passed, ${fail} FAILED`}`);
   process.exitCode = fail === 0 ? 0 : 1;
 })();
