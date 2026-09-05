@@ -5,6 +5,7 @@ import { useAuth } from '../hooks/useAuth'
 import { useAccess } from '../hooks/useAccess'
 import { useTranslation } from '../hooks/useTranslation'
 import { apiFetch, fmt, fmtFull } from '../lib/api'
+import { PageHeader, SummaryCard } from '../shell/ui'
 
 // ── Wallet type config ────────────────────────────────────────────────────────
 const WALLET_TYPES = [
@@ -292,16 +293,16 @@ export default function Accounts() {
   return (
     <div className="hf-page">
 
-      {/* Page header */}
-      <div className="hf-page-header">
-        <div>
-          <div className="hf-page-title">{t('accounts.walletsAccounts')}</div>
-          <div className="hf-page-subtitle">{t('accounts.walletsSubtitle')}</div>
-        </div>
-        <div className="hf-page-actions">
+      {/* The shared header. This page previously rendered its title as a plain
+          <div>, so Accounts shipped no <h1> at all — a real accessibility gap and
+          the reason it never looked related to Pulse. */}
+      <PageHeader
+        title={t('accounts.walletsAccounts')}
+        description={t('accounts.walletsSubtitle')}
+        primaryAction={
           <button onClick={openAdd} className="btn btn-primary btn-md">{t('accounts.addWallet')}</button>
-        </div>
-      </div>
+        }
+      />
 
       {/* Scope tabs */}
       {wallets.length > 0 && (
@@ -326,18 +327,15 @@ export default function Accounts() {
 
       {/* Total balance hero */}
       {wallets.length > 0 && (
-        <div style={{ background: 'linear-gradient(135deg, #0F172A 0%, #1e293b 100%)', borderRadius: 20, padding: '24px 26px 20px', boxShadow: '0 8px 32px rgba(15,23,42,.22)', marginBottom: 20, position: 'relative', overflow: 'hidden' }}>
-          <div style={{ position: 'absolute', inset: 0, opacity: 0.03, backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 28px, #fff 28px, #fff 29px), repeating-linear-gradient(90deg, transparent, transparent 28px, #fff 28px, #fff 29px)', pointerEvents: 'none' }} />
-          <div style={{ position: 'relative' }}>
-            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 10, fontWeight: 700 }}>
-              {scopeTab === 'business' ? t('accounts.totalBusiness') : scopeTab === 'personal' ? t('accounts.totalPersonal') : t('accounts.totalBalance')}
-            </div>
-            <div style={{ fontSize: 'clamp(28px, 9vw, 38px)', fontWeight: 800, color: '#fff', letterSpacing: -1, lineHeight: 1, wordBreak: 'break-word' }}>
-              {fmtFull(filteredBalance)}
-            </div>
-            <div style={{ fontSize: 'var(--text-xs)', color: 'rgba(255,255,255,0.4)', marginTop: 8 }}>IDR · {filteredWallets.length} wallet{filteredWallets.length !== 1 ? 's' : ''}</div>
-          </div>
-        </div>
+        /* The same navy surface Pulse uses, from the same component. It was a
+           one-off inline gradient with a graph-paper grid and hardcoded #0F172A,
+           which is why the product's two dark heroes did not look related. The
+           watermark now comes from SummaryCard's default. */
+        <SummaryCard
+          label={scopeTab === 'business' ? t('accounts.totalBusiness') : scopeTab === 'personal' ? t('accounts.totalPersonal') : t('accounts.totalBalance')}
+          value={<span className="fin">{fmtFull(filteredBalance)}</span>}
+          meta={`IDR · ${filteredWallets.length} wallet${filteredWallets.length !== 1 ? 's' : ''}`}
+        />
       )}
 
       {loading && (

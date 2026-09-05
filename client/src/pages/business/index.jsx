@@ -106,7 +106,8 @@ export function BusinessPulse() {
 
   const head = (
     <PageHeader eyebrow="Business Workspace" title={active?.name || 'Business'}
-      actions={<>
+      description="Cash position, this month's operating figures and anything waiting on you."
+      context={<>
         <StatusBadge tone="shared" icon={<Icon.users />}>Shared business workspace</StatusBadge>
         {active?.role && <StatusBadge tone="neutral">Role: {active.role}</StatusBadge>}
         {active?.business_code && <StatusBadge tone="info">{active.business_code}</StatusBadge>}

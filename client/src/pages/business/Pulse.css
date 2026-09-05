@@ -126,6 +126,8 @@
 }
 /* Financial status only, and kept restrained — never a decorative colour. */
 .pulse-kpi-value.pos { color: var(--success); }
+/* Warning, not danger: a short runway needs attention, it is not a loss. */
+.pulse-kpi-value.warn { color: var(--warning-ink); }
 .pulse-kpi-value.neg { color: var(--danger); }
 .pulse-kpi-value.is-muted { color: var(--text-muted); font-weight: 600; }
 .pulse-kpi-chip {

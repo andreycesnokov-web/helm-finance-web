@@ -1,6 +1,24 @@
 /* ============================================================================
    CFO AI — Canonical Design Token Layer (Brand Book aligned)
-   Single source of truth for color, type, space, radius, elevation.
+
+   OWNERSHIP — read before adding a variable anywhere else.
+
+   This file owns: brand colour, semantic status colour, text colour, borders,
+   elevation, radius, spacing, focus and the financial numeral treatment.
+   Nothing else may declare those names. index.css previously redeclared several
+   of them in its own :root; because both files have equal specificity and
+   index.css is imported later (main.jsx:15 vs :12), the values below were
+   silently losing — the whole product ran on the legacy slate palette while
+   this file described navy. That is fixed by removing the duplicates from
+   index.css, not by reordering imports, so the fix cannot regress if the import
+   order changes again. tests/design/tokenOwnership.test.mjs enforces it.
+
+   index.css still owns (deliberately, for now): the type scale, font weights,
+   layout widths, the legacy --brand/--blue/--green/--red/--amber families, the
+   --status-* set and the sidebar tokens. Those migrate in a later PR; folding
+   them in here would have made this change unreviewable.
+
+   Single source of truth for color, space, radius, elevation.
    Master task §7. Navy #003366 confirmed by owner (supersedes the preliminary
    #0A192F in docs/brand/BRAND_GUIDELINES_V1.md and the legacy app #0F172A).
 
@@ -32,7 +50,11 @@
   /* ── Text ──────────────────────────────────────────────────────────────── */
   --text-primary:    var(--brand-navy);
   --text-secondary:  #3D556E;
-  --text-muted:      #6B7E92;
+  /* Was #6B7E92, which measures 4.18:1 on white and 3.86:1 on the paper ground —
+     below AA for body text, and this is the most-used token in the product (246
+     call sites). Darkened until it passes on all three grounds: 5.27 on white,
+     4.86 on paper, 5.03 on the muted card. */
+  --text-muted:      #5A6E82;
   --text-inverse:    var(--brand-white);
   --text-link:       var(--brand-electric-blue-ink);
 
@@ -45,6 +67,9 @@
   /* ── Semantic status (accessible; never recolor the logo) ──────────────── */
   --success:       #0F7A52;  --success-soft: #E5F4EE;
   --warning:       #B5740B;  --warning-soft: #FBF1DF;
+  /* #B5740B is 3.84:1 on white and 3.43:1 on its own soft chip — fine for a
+     fill, an icon or a border, not for the label sitting on it. */
+  --warning-ink:   #8B5A08;
   --danger:        #C62828;  --danger-soft:  #FBEAEA;
   --info:          var(--brand-electric-blue-ink);  --info-soft: #E6F1FB;
 
@@ -79,4 +104,34 @@
   --line-tight:   1.15;
   --line-normal:  1.45;
   --line-relaxed: 1.65;
+
+  /* ── Financial numerals ────────────────────────────────────────────────────
+     Every figure a person might compare against another figure. Tabular so
+     columns align and a changing value does not make the row twitch. Applied
+     through the .fin utility in hf-system.css — not to body text or controls. */
+  --font-num:        var(--font-mono);
+  --num-features:    tabular-nums lining-nums;
+
+  /* ── Action & focus ────────────────────────────────────────────────────────
+     Electric blue is the brand's interactive colour, but white on #3399FF is
+     2.94:1 — a primary button label would fail AA. The Brand Book already
+     anticipates this: electric blue for fills and large UI, the ink for text.
+     A button label is text on a fill, so the FILL is the ink (5.75:1 with
+     white) and #3399FF stays the accent: focus rings, chart strokes, selected
+     states, anything that is not carrying words. */
+  --action-primary:       var(--brand-electric-blue-ink);
+  --action-primary-hover: #10529C;
+  --action-primary-text:  var(--brand-white);
+
+  --focus-ring:        var(--brand-electric-blue);
+  --focus-ring-width:  2px;
+  --focus-ring-offset: 2px;
+
+  /* ── Page rhythm ───────────────────────────────────────────────────────────
+     One scale for the shell so pages stop inventing their own gutters. */
+  --page-gutter:       var(--space-8);   /* 32px desktop */
+  --page-gutter-sm:    var(--space-5);   /* 20px mobile  */
+  --section-gap:       var(--space-8);
+  --card-padding:      var(--space-5);   /* 20px desktop */
+  --card-padding-sm:   var(--space-4);   /* 16px mobile  */
 }
