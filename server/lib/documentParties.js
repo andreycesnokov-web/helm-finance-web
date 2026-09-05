@@ -51,13 +51,22 @@ const LEGAL_FORM = /\b(?:PT|CV|UD|PD|PERUM|PERSERO)\b[.\s]+[A-Z][A-Za-z.&'\- ]{2
 const CAPS_RUN = /[A-Z][A-Z.&'\- ]{6,70}\b/;
 const TITLE_WORDS = /^(?:KWITANSI|KUITANSI|INVOICE|FAKTUR|NOTA|RECEIPT|TAGIHAN|BUKTI|SURAT)\b/i;
 
-/** The company named in this block, or null. */
+/** The company named in this block, or null.
+ *
+ *  The all-caps fallback is deliberately hard to satisfy. Left loose it answered with
+ *  "TRACE-B" — a fragment of the invoice REFERENCE printed in the letterhead — and that
+ *  fragment then became the suggested counterparty. A company name printed without a
+ *  legal form still reads as a name: at least two words, and no digits. */
 function companyIn(section) {
   const legal = LEGAL_FORM.exec(section);
   if (legal) return legal[0];
   const caps = CAPS_RUN.exec(section);
-  if (caps && !TITLE_WORDS.test(caps[0].trim())) return caps[0];
-  return null;
+  if (!caps) return null;
+  const v = caps[0].trim();
+  if (TITLE_WORDS.test(v)) return null;
+  if (/\d/.test(v)) return null;               // a reference code, not a company
+  if (!/[A-Z]\s+[A-Z]/.test(v)) return null;   // a single token is not a company name
+  return caps[0];
 }
 
 /** Everything from a label up to the next label — one party's block of text. */
