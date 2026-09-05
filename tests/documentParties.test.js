@@ -66,6 +66,19 @@ t('a party with no NPWP in its own block does not borrow one', () => {
   assert.strictEqual(beta.npwp, null, 'no NPWP is better than the wrong NPWP');
 });
 
+t('a reference code in the letterhead is not mistaken for a company', () => {
+  // Production smoke caught this: "TRACE-B", a fragment of the invoice reference, was
+  // read as a party from the letterhead and became the suggested counterparty.
+  const txt = 'Invoice No. Invoice TRACE-B-905B Dari : PT Trace Diagnostik Nusantara '
+    + 'NPWP : 04.777.888.1-033.000 Kepada : PT Helm Care Indonesia Netto 5.550.000';
+  const { parties } = P.extractParties(txt);
+  assert.ok(!parties.some((x) => /^TRACE/i.test(x.legal_name)),
+    `a reference code became a party: ${JSON.stringify(parties.map((x) => x.legal_name))}`);
+  const r = P.resolveCounterparty(txt, US);
+  assert.strictEqual(r.counterparty.legal_name, 'PT Trace Diagnostik Nusantara');
+  assert.strictEqual(r.counterparty.npwp, '04.777.888.1-033.000', 'and it keeps its own NPWP');
+});
+
 console.log('\n19/20. the business is never its own counterparty');
 t('19/20. a self-match blocks counterparty creation', () => {
   // Only our own company appears — exactly what OCR produced in production.
