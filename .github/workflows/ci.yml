@@ -15,9 +15,13 @@ jobs:
           # The secret scan diffs the branch against its base, so it needs history.
           fetch-depth: 0
 
+      # The version the repo declares. CI pinned 20 while .nvmrc said 22, and nothing
+      # noticed because CI never started the server: @supabase/realtime-js needs a native
+      # WebSocket, which Node 20 does not have, so server/index.js throws at require time
+      # on 20. Testing on a version the application cannot run on proves nothing.
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version-file: '.nvmrc'
 
       - name: Install server deps
         run: npm install --no-audit --no-fund
