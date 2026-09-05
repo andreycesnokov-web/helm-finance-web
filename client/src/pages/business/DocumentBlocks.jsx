@@ -34,6 +34,8 @@ import {
   intakeOf, intakeBadges, intakeHeadline, intakeRowLines, intakeCopy, storedVsSuggested,
   typeLabelOf as intakeTypeLabel, directionLabelOf, statusLabelOf, statusLabelFor, nextActionLabels, taxLine, recordLabelOf,
   documentWorkflowState, primaryActionLabel,
+  intakeV3Of, v3FieldRows, v3Headline, v3Warnings, v3Blockers,
+  FIELD_STATUS, FIELD_STATUS_LABEL,
   draftOffer, counterpartyOffer, isUnsupported,
   uploadIntentOf, readSourceLabel, conflictMessage,
 } from './documentIntakeView'
@@ -733,6 +735,77 @@ export function IntakeResult({
 
   const intent = uploadIntentOf(doc)
   const conflict = conflictMessage(doc)
+  // v3 is the visible reading whenever it exists. v2 stays stored for compatibility but
+  // must not appear beside it — two AI answers competing on one panel is not a review,
+  // it is a puzzle.
+  const v3 = intakeV3Of(doc)
+
+  if (v3) {
+    return (
+      <RpCol label="AI Intake Result" emphasis>
+        <p className="rp-note">
+          Please verify the extracted information. These are AI suggestions — nothing is
+          saved to this document until you confirm it.
+        </p>
+        <div className="rp-kv"><span>Reading</span><span>{v3Headline(doc)}</span></div>
+        <div className="rp-kv"><span>Stored type</span><span>{typeLabel(doc.document_type)}</span></div>
+        {intent && <div className="rp-kv"><span>Uploaded as</span><span>{intent.label}</span></div>}
+
+        <table className="doc-v3-table">
+          <tbody>
+            {v3FieldRows(doc, cpName).map((r) => (
+              <tr key={r.key} className={`is-${r.status}`}>
+                <th scope="row">{r.label}</th>
+                <td className="doc-v3-val">
+                  {r.status === FIELD_STATUS.CONFLICT ? (
+                    <>
+                      <span className="doc-v3-confirmed">{r.confirmed}</span>
+                      <span className="doc-v3-vs">vs</span>
+                      <span className="doc-v3-suggested">{r.suggested}</span>
+                    </>
+                  ) : (
+                    <span className={r.status === FIELD_STATUS.CONFIRMED ? 'doc-v3-confirmed' : 'doc-v3-suggested'}>
+                      {r.confirmed ?? r.suggested ?? <em className="rp-miss">—</em>}
+                    </span>
+                  )}
+                  {r.hint && <span className="doc-v3-hint">{r.hint}</span>}
+                </td>
+                <td className="doc-v3-status">
+                  <StatusBadge tone={
+                    r.status === FIELD_STATUS.CONFIRMED ? 'success'
+                      : r.status === FIELD_STATUS.CONFLICT ? 'danger'
+                        : r.status === FIELD_STATUS.NOT_FOUND ? 'neutral' : 'warning'
+                  }>{FIELD_STATUS_LABEL[r.status]}</StatusBadge>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+
+        {v3Warnings(doc).map((w) => <p key={w} className="rp-note rp-note-amber">{w}</p>)}
+        {v3Blockers(doc).map((b) => <p key={b} className="rp-note rp-note-warn">{b}</p>)}
+
+        <div className="doc-panel-acts">
+          <Btn sm onClick={() => onReviewFields(doc)} disabled={busy}>Review &amp; confirm</Btn>
+          {v3.counterparty_status === 'ok' && v3.can_create_counterparty && (
+            <Btn sm variant="ghost" onClick={() => onSuggestCounterparty(doc)} disabled={cpBusy}>
+              Review counterparty
+            </Btn>
+          )}
+          <Btn sm variant="ghost" onClick={onAccountantReview}>Request accountant review</Btn>
+          <Btn sm variant="ghost" onClick={() => onAnalyze(doc)} disabled={analysing || busy}>
+            {analysing ? 'Analyzing…' : 'Re-analyze'}
+          </Btn>
+        </div>
+        {cpError && <p className="rp-note rp-note-warn">{cpError}</p>}
+        {analyzeNote && <p className="rp-note rp-note-muted">{analyzeNote}</p>}
+        <p className="rp-note rp-note-muted">
+          Re-analysing produces a new suggestion. It never changes a value you have
+          confirmed, and it creates no counterparty, payable, receivable or transaction.
+        </p>
+      </RpCol>
+    )
+  }
 
   return (
     <RpCol label="AI Intake Result" emphasis>

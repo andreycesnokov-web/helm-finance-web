@@ -12591,6 +12591,7 @@ const docDates = require('./lib/documentDates');
 const docParties = require('./lib/documentParties');
 const visionV3 = require('./lib/documentVisionV3');
 const extractionValidator = require('./lib/documentExtractionValidator');
+const visionCache = require('./lib/visionCache');
 const uploadIntentLib = require('./lib/uploadIntent');
 const { publicIntakeV2, publicIntakeV3, publicUploadIntent } = require('./lib/documentPublicView');
 
@@ -13382,8 +13383,19 @@ async function readDocumentForIntake(biz, doc) {
   // Embedded text still travels, as supplementary evidence. It never replaces the
   // visual read and it never overrides the result.
   let v3 = null;
-  if (visionV3.visionEnabled()) {
-    v3 = await visionV3.extractDocumentV3(buf, {
+  let v3FromCache = false;
+  const fingerprint = visionCache.fingerprintOf(buf, {
+    model: visionV3.MODEL, promptVersion: visionV3.PROMPT_VERSION, schemaVersion: visionV3.SCHEMA_VERSION,
+  });
+  const storedV3 = (doc.extracted_json || {}).ai_intake_v3 || null;
+
+  if (visionV3.visionEnabled() && visionCache.isFresh(storedV3, fingerprint)) {
+    // Same bytes, same model, same prompt, same schema — the answer cannot have changed,
+    // so re-reading it would be paying twice for a result we already hold.
+    v3FromCache = true;
+  } else if (visionV3.visionEnabled()) {
+    // One call per identity, even if two requests arrive together.
+    v3 = await visionCache.singleFlight(fingerprint, () => visionV3.extractDocumentV3(buf, {
       mime_type: file.mime_type, file_name: file.file_name,
       embedded_text: ex.text_available ? ex.text : null,
       business: {
@@ -13393,7 +13405,7 @@ async function readDocumentForIntake(biz, doc) {
         aliases: biz.business?.aliases || [],
       },
       client: anthropic,
-    });
+    }));
   }
 
   // ── legacy OCR fallback ──────────────────────────────────────────────────
@@ -13429,6 +13441,16 @@ async function readDocumentForIntake(biz, doc) {
   // confirmation or reject — it never repairs a value or fills a gap, because that is
   // precisely how the previous pipeline invented accounting facts.
   let v3Validation = null;
+  if (v3FromCache) {
+    // Reuse the stored conclusion verbatim. Nothing was read, nothing was spent.
+    readSource = storedV3.source || readSource;
+    extraction = mergeV3IntoExtraction(extraction, null, {
+      status: storedV3.validation_status,
+      counterparty_status: storedV3.counterparty_status,
+      normalized: storedV3.fields || {},
+      warnings: storedV3.warnings || [],
+    });
+  }
   if (v3?.ok) {
     v3Validation = extractionValidator.validateExtraction(v3.extraction, {
       business: {
@@ -13452,7 +13474,7 @@ async function readDocumentForIntake(biz, doc) {
     }
   }
 
-  return { file, buf, extraction, readSource, ocr, dates, parties, v3, v3Validation };
+  return { file, buf, extraction, readSource, ocr, dates, parties, v3, v3Validation, fingerprint, v3FromCache, storedV3 };
 }
 
 async function runDocumentIntake(biz, doc, opts = {}) {
@@ -13542,6 +13564,8 @@ async function runDocumentIntake(biz, doc, opts = {}) {
    gaps. Field names are the v2 vocabulary so nothing downstream needs to change. */
 function mergeV3IntoExtraction(base, ex, validation) {
   const n = validation?.normalized || {};
+  // `ex` is null on the cache path: the stored record keeps the conclusions, not the
+  // raw party objects, so party-derived fields simply stay as they were.
   const parties = Array.isArray(ex?.parties) ? ex.parties : [];
   const byId = (id) => parties.find((p) => p.party_id === id) || null;
   const usName = byId(ex?.current_business_party_id)?.legal_name?.value || null;
@@ -13582,9 +13606,13 @@ function mergeV3IntoExtraction(base, ex, validation) {
    headers, no keys, no prompt text, and never the document's own contents beyond the
    fields the user is being asked to confirm. */
 function buildV3Summary(read, doc) {
+  // A cache hit re-persists exactly what is already there, so the idempotency guard
+  // sees no change and the row is not touched.
+  if (read?.v3FromCache && read.storedV3) return read.storedV3;
   if (!read?.v3?.ok || !read.v3Validation) return null;
   const v = read.v3Validation;
   return {
+    fingerprint: read.fingerprint || null,
     schema_version: read.v3.schema_version,
     prompt_version: read.v3.prompt_version,
     model: read.v3.model,

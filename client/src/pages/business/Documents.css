@@ -286,3 +286,21 @@
 /* The document's parties, shown side by side so a pairing can be judged at a glance
    rather than trusted. */
 .doc-cp-parties { display: flex; flex-direction: column; gap: 2px; margin: 6px 0; }
+
+/* The v3 confirmation table. Three columns: what the field is, what we have, and where
+   that value came from — because "the AI said so" and "a person decided" must never
+   look the same. */
+.doc-v3-table { width: 100%; border-collapse: collapse; margin: 8px 0; }
+.doc-v3-table th[scope="row"] {
+  text-align: left; font-size: 11.5px; font-weight: 700; color: var(--text-muted);
+  padding: 5px 8px 5px 0; vertical-align: top; white-space: nowrap;
+}
+.doc-v3-table td { padding: 5px 0; vertical-align: top; font-size: 12.5px; }
+.doc-v3-table tr + tr { border-top: 0.5px solid var(--border-subtle); }
+.doc-v3-val { display: flex; flex-direction: column; gap: 2px; overflow-wrap: anywhere; }
+.doc-v3-status { text-align: right; white-space: nowrap; padding-left: 8px; }
+/* A confirmed value reads as settled; a suggestion reads as provisional. */
+.doc-v3-confirmed { font-weight: 700; color: var(--text-body); }
+.doc-v3-suggested { color: var(--text-secondary); font-style: italic; }
+.doc-v3-vs { font-size: 11px; color: var(--text-muted); }
+.doc-v3-hint { font-size: 11.5px; color: var(--warning); }

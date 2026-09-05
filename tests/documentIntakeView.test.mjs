@@ -426,6 +426,105 @@ t('17. no workflow state creates anything — they are all offers', () => {
   }
 });
 
+/* ── Phase 7: v3 as the primary suggestion ──────────────────────────────────
+   The rule: a model match is not a human decision. Every row says which it is. */
+const V3 = (over = {}) => ({
+  schema_version: 'financial_document_extraction_v3', model: 'claude-sonnet-4-5',
+  source: 'native_pdf_vision', validation_status: 'ok', counterparty_status: 'ok',
+  can_create_counterparty: true, can_create_financial_record: true,
+  fields: {
+    document_type: 'faktur_pajak', document_number: 'X2610001139',
+    document_date: '2026-08-04', due_date: '2026-09-03', payment_date: null,
+    currency: 'IDR', dpp: 10200000, ppn: 1122000, total: 11322000,
+    counterparty: { legal_name: 'PT ALPHA SENTOSA NUSANTARA', npwp: '01.111.222.3-041.000', role: 'supplier' },
+  },
+  warnings: [], blockers: [], ...over,
+});
+const docV3 = (v3 = V3(), extra = {}) => ({
+  document_type: 'other', document_number: null, document_date: null,
+  gross_amount: null, commercial_base_amount: null, commercial_tax_amount: null,
+  currency: null, issuer_counterparty_id: null, links: [],
+  extracted_json: { ai_intake_v3: v3 }, ...extra,
+});
+const rowFor = (doc, key, cpName) => V.v3FieldRows(doc, cpName).find((r) => r.key === key);
+
+t('v3 supersedes v2 as the visible suggestion', () => {
+  const both = { ...docV3(), extracted_json: { ai_intake_v2: INVOICE, ai_intake_v3: V3() } };
+  assert.strictEqual(V.primaryIntakeSource(both), 'v3');
+  assert.strictEqual(V.primaryIntakeSource(doc(INVOICE)), 'v2', 'v2 still shows when v3 is absent');
+  assert.strictEqual(V.primaryIntakeSource(doc(null)), null);
+});
+
+t('an unconfirmed model value is labelled a suggestion, never a fact', () => {
+  const r = rowFor(docV3(), 'total');
+  assert.strictEqual(r.status, V.FIELD_STATUS.SUGGESTED);
+  assert.strictEqual(r.confirmed, null);
+  assert.strictEqual(V.FIELD_STATUS_LABEL[r.status], 'AI suggestion');
+});
+
+t('a value a person stored is labelled confirmed', () => {
+  const r = rowFor(docV3(V3(), { gross_amount: 11322000, currency: 'IDR' }), 'total');
+  assert.strictEqual(r.status, V.FIELD_STATUS.CONFIRMED);
+  assert.strictEqual(r.confirmed, 'IDR 11.322.000');
+});
+
+t('agreement between the two is confirmed, not a conflict', () => {
+  const r = rowFor(docV3(V3(), { document_number: 'X2610001139' }), 'document_number');
+  assert.strictEqual(r.status, V.FIELD_STATUS.CONFIRMED);
+});
+
+t('disagreement is a CONFLICT, and both values are kept', () => {
+  const r = rowFor(docV3(V3(), { document_number: 'DIFFERENT-1' }), 'document_number');
+  assert.strictEqual(r.status, V.FIELD_STATUS.CONFLICT);
+  assert.strictEqual(r.confirmed, 'DIFFERENT-1');
+  assert.strictEqual(r.suggested, 'X2610001139');
+});
+
+t('a field neither side has is "not found", not an empty suggestion', () => {
+  const r = rowFor(docV3(V3({ fields: { ...V3().fields, payment_date: null } })), 'payment_date');
+  assert.strictEqual(r.status, V.FIELD_STATUS.NOT_FOUND);
+});
+
+t('a self-match counterparty needs confirmation and says why', () => {
+  const r = rowFor(docV3(V3({ counterparty_status: 'self_match', can_create_counterparty: false })), 'counterparty');
+  assert.strictEqual(r.status, V.FIELD_STATUS.NEEDS_CONFIRMATION);
+  assert.ok(/your own company/i.test(r.hint), r.hint);
+});
+
+t('a counterparty is confirmed only once it is attached to the document', () => {
+  const attached = docV3(V3(), { issuer_counterparty_id: 'cp-1' });
+  const r = rowFor(attached, 'counterparty', () => 'PT ALPHA SENTOSA NUSANTARA');
+  assert.strictEqual(r.status, V.FIELD_STATUS.CONFIRMED,
+    'a model match alone is never confirmation — the link is');
+});
+
+t('every required field is present in the table', () => {
+  const keys = V.v3FieldRows(docV3()).map((r) => r.key);
+  for (const k of ['document_type', 'document_number', 'document_date', 'due_date', 'payment_date',
+    'counterparty', 'counterparty_npwp', 'dpp', 'ppn', 'total', 'currency']) {
+    assert.ok(keys.includes(k), `missing ${k}`);
+  }
+});
+
+t('the three dates and the three amounts stay separate rows', () => {
+  const rows = V.v3FieldRows(docV3());
+  const val = (k) => rows.find((r) => r.key === k).suggested;
+  assert.strictEqual(val('document_date'), '2026-08-04');
+  assert.strictEqual(val('due_date'), '2026-09-03');
+  assert.notStrictEqual(val('dpp'), val('total'));
+  assert.notStrictEqual(val('ppn'), val('total'));
+});
+
+t('cost and model are diagnostics, not part of the user table', () => {
+  const rows = V.v3FieldRows(docV3()).map((r) => r.label.toLowerCase()).join(' ');
+  for (const leak of ['token', 'cost', 'model', 'prompt']) {
+    assert.ok(!rows.includes(leak), `${leak} must not appear as a user-facing field`);
+  }
+  const d = V.v3Diagnostics(docV3());
+  assert.strictEqual(d.model, 'claude-sonnet-4-5', 'but they are available separately');
+  assert.ok(!('input_tokens' in d), 'and cost is not even in the client diagnostics');
+});
+
 /* ── 5/6. the analyze button ────────────────────────────────────────────────── */
 t('5. a stored run says the analysis was updated', () => {
   assert.strictEqual(V.analyzeMessage({ stored: true }), 'Analysis updated.');

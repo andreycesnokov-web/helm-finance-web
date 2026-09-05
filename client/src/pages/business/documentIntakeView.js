@@ -451,6 +451,107 @@ export const PRIMARY_ACTION_LABEL = {
 };
 export const primaryActionLabel = (k) => PRIMARY_ACTION_LABEL[k] || 'Review fields';
 
+/* ── v3: the native-vision reading, presented for confirmation ─────────────
+   The rule this encodes: a model match is NOT a human decision. Every row below
+   separates what a person stored on the document from what the reader suggested, and
+   says plainly which is which. Where both exist and differ, that is a conflict for the
+   user to settle — the UI never picks a winner. */
+
+export const intakeV3Of = (d) => d?.extracted_json?.ai_intake_v3 || null;
+
+/** v3 supersedes v2 as the visible suggestion. v2 stays stored for compatibility. */
+export const primaryIntakeSource = (d) => (intakeV3Of(d) ? 'v3' : (intakeOf(d) ? 'v2' : null));
+
+export const FIELD_STATUS = {
+  CONFIRMED: 'confirmed',           // a person stored this value
+  SUGGESTED: 'suggested',           // the reader proposed it; nobody has confirmed
+  CONFLICT: 'conflict',             // both exist and disagree
+  NEEDS_CONFIRMATION: 'needs_confirmation',
+  NOT_FOUND: 'not_found',
+};
+export const FIELD_STATUS_LABEL = {
+  confirmed: 'Confirmed', suggested: 'AI suggestion', conflict: 'Conflict',
+  needs_confirmation: 'Needs confirmation', not_found: 'Not found',
+};
+
+const sameValue = (a, b) => {
+  if (a === null || a === undefined || b === null || b === undefined) return false;
+  if (typeof a === 'number' || typeof b === 'number') return Number(a) === Number(b);
+  return String(a).trim().toUpperCase() === String(b).trim().toUpperCase();
+};
+
+/** One row of the confirmation table. */
+function fieldRow(label, confirmed, suggested, opts = {}) {
+  const hasC = confirmed !== null && confirmed !== undefined && confirmed !== '';
+  const hasS = suggested !== null && suggested !== undefined && suggested !== '';
+  let status;
+  if (hasC && hasS) status = sameValue(confirmed, suggested) ? FIELD_STATUS.CONFIRMED : FIELD_STATUS.CONFLICT;
+  else if (hasC) status = FIELD_STATUS.CONFIRMED;
+  else if (hasS) status = opts.needsConfirmation ? FIELD_STATUS.NEEDS_CONFIRMATION : FIELD_STATUS.SUGGESTED;
+  else status = FIELD_STATUS.NOT_FOUND;
+  return { key: opts.key || label, label, confirmed: hasC ? confirmed : null,
+    suggested: hasS ? suggested : null, status, hint: opts.hint || null };
+}
+
+const moneyOrNull = (n, ccy) => (n === null || n === undefined ? null : money(n, ccy));
+
+/**
+ * The confirmation table for a document.
+ * `confirmed` values come from the document row — the columns a person owns.
+ * `suggested` values come from ai_intake_v3 — never written anywhere by themselves.
+ */
+export function v3FieldRows(doc, cpName = null) {
+  const v3 = intakeV3Of(doc);
+  const f = v3?.fields || {};
+  const ccy = f.currency || doc?.currency || 'IDR';
+  const storedType = doc?.document_type && doc.document_type !== 'other' ? doc.document_type : null;
+  // A counterparty is only "confirmed" once it is actually attached to the document.
+  const confirmedCp = doc?.issuer_counterparty_id ? (cpName?.(doc.issuer_counterparty_id) || 'Linked counterparty') : null;
+  const needsCp = v3?.counterparty_status === 'needs_confirmation' || v3?.counterparty_status === 'self_match';
+
+  return [
+    fieldRow('Document type', storedType ? TYPE_LABEL[storedType] || storedType : null,
+      f.document_type ? typeLabelOf(f.document_type) : null, { key: 'document_type' }),
+    fieldRow('Document number', doc?.document_number || null, f.document_number, { key: 'document_number' }),
+    fieldRow('Document date', doc?.document_date || null, f.document_date, { key: 'document_date' }),
+    fieldRow('Due date', null, f.due_date, { key: 'due_date' }),
+    fieldRow('Payment date', null, f.payment_date, { key: 'payment_date' }),
+    fieldRow('Counterparty', confirmedCp, f.counterparty?.legal_name || null,
+      { key: 'counterparty', needsConfirmation: needsCp,
+        hint: v3?.counterparty_status === 'self_match'
+          ? 'CFO AI may have identified your own company. Review the parties before continuing.' : null }),
+    fieldRow('Counterparty NPWP', null, f.counterparty?.npwp || null, { key: 'counterparty_npwp' }),
+    fieldRow('DPP', moneyOrNull(doc?.commercial_base_amount, ccy), moneyOrNull(f.dpp, ccy), { key: 'dpp' }),
+    fieldRow('PPN', moneyOrNull(doc?.commercial_tax_amount, ccy), moneyOrNull(f.ppn, ccy), { key: 'ppn' }),
+    fieldRow('Total', moneyOrNull(doc?.gross_amount, ccy), moneyOrNull(f.total, ccy), { key: 'total' }),
+    fieldRow('Currency', doc?.currency || null, f.currency, { key: 'currency' }),
+  ];
+}
+
+/** The one-line summary above the table. */
+export function v3Headline(doc) {
+  const v3 = intakeV3Of(doc);
+  if (!v3) return null;
+  const t = typeLabelOf(v3.fields?.document_type);
+  return `${t || 'Document'} · read by ${v3.source === 'native_image_vision' ? 'image analysis' : 'document analysis'}`;
+}
+
+/** Operational facts. Deliberately NOT shown in the normal panel — cost and model are
+ *  an operator's concern, not something a user reviewing an invoice needs. */
+export function v3Diagnostics(doc) {
+  const v3 = intakeV3Of(doc);
+  if (!v3) return null;
+  return {
+    model: v3.model, schema_version: v3.schema_version, source: v3.source,
+    processed_at: v3.processed_at, duration_ms: v3.duration_ms,
+    pages_analyzed: v3.pages_analyzed, page_count: v3.page_count,
+    validation_status: v3.validation_status,
+  };
+}
+
+export const v3Warnings = (doc) => intakeV3Of(doc)?.warnings || [];
+export const v3Blockers = (doc) => intakeV3Of(doc)?.blockers || [];
+
 /* ── analyze button ────────────────────────────────────────────────────────── */
 
 // `stored:false` means the summary was already up to date — an unchanged re-run. It must
