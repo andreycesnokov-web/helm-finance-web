@@ -451,6 +451,294 @@ export const PRIMARY_ACTION_LABEL = {
 };
 export const primaryActionLabel = (k) => PRIMARY_ACTION_LABEL[k] || 'Review fields';
 
+/* ── v3: the native-vision reading, presented for confirmation ─────────────
+   The rule this encodes: a model match is NOT a human decision. Every row below
+   separates what a person stored on the document from what the reader suggested, and
+   says plainly which is which. Where both exist and differ, that is a conflict for the
+   user to settle — the UI never picks a winner. */
+
+export const intakeV3Of = (d) => d?.extracted_json?.ai_intake_v3 || null;
+
+/** The v3 record only when it is an actual READING. A stored failure lives in the same
+ *  place and must never be mistaken for one — it has no fields to show. */
+export const readingV3Of = (d) => {
+  const v3 = intakeV3Of(d);
+  return v3 && v3.analyzed !== false ? v3 : null;
+};
+
+/** v3 supersedes v2 as the visible suggestion. v2 stays stored for compatibility. */
+export const primaryIntakeSource = (d) => (readingV3Of(d) ? 'v3' : (intakeOf(d) ? 'v2' : null));
+
+/* ── what the user is told is happening ──────────────────────────────────────
+   Upload and analysis are two different things, and conflating them is what made the
+   earlier version confusing: a document that uploaded perfectly but failed to analyse
+   looked identical to one that never arrived. Each state below answers one question —
+   is my file safe, is anything happening, and what can I do about it. */
+
+export const ANALYSIS_STATE = {
+  UPLOADING: 'uploading',
+  UPLOADED_WAITING: 'uploaded_waiting',
+  ANALYZING: 'analyzing',
+  ANALYZED: 'analyzed',
+  UPLOAD_FAILED: 'upload_failed',
+  ANALYSIS_FAILED: 'analysis_failed',
+  BUNDLE_DETECTED: 'bundle_detected',
+  CONFIRMED: 'confirmed',
+};
+
+const ANALYSIS_COPY = {
+  uploading: { label: 'Uploading', detail: 'Sending the file.' },
+  uploaded_waiting: { label: 'Uploaded', detail: 'Waiting to be analysed. Your file is saved.' },
+  analyzing: { label: 'Analysing', detail: 'Reading the document.' },
+  analyzed: { label: 'Analysis complete', detail: 'Review the suggested fields and confirm them.' },
+  upload_failed: { label: 'Upload failed', detail: 'The file was not saved. Upload it again.' },
+  // The distinction that matters: the file IS safe, only the reading failed.
+  analysis_failed: { label: 'Analysis failed', detail: 'Your file is saved. The reading did not complete.' },
+  bundle_detected: { label: 'Multiple documents detected', detail: 'This file contains more than one document.' },
+  confirmed: { label: 'Confirmed', detail: 'You have confirmed the details on this document.' },
+};
+
+/**
+ * The single state a document is in, for display.
+ * @param doc   the document row
+ * @param opts  { uploading, uploadFailed } — transient states the list cannot know about
+ */
+export function analysisState(doc, opts = {}) {
+  const shape = (state, extra = {}) => ({ state, ...ANALYSIS_COPY[state], canRetry: false, ...extra });
+
+  if (opts.uploadFailed) return shape(ANALYSIS_STATE.UPLOAD_FAILED);
+  if (opts.uploading) return shape(ANALYSIS_STATE.UPLOADING);
+
+  const v3 = intakeV3Of(doc);
+
+  if (v3 && v3.analyzed === false) {
+    const f = v3.failure || {};
+    return shape(ANALYSIS_STATE.ANALYSIS_FAILED, {
+      // The message comes from the server, which knows WHY. Retry is offered only when
+      // trying again could actually produce a different answer.
+      detail: f.user_message || ANALYSIS_COPY.analysis_failed.detail,
+      canRetry: f.retryable !== false,
+      attempts: Number(v3.attempts || 0) || null,
+      reason: f.reason || null,
+    });
+  }
+
+  const stored = doc?.document_type || null;
+  if (stored && stored !== 'other') return shape(ANALYSIS_STATE.CONFIRMED);
+
+  const children = v3 && v3.bundle && Array.isArray(v3.bundle.children) ? v3.bundle.children.length : 0;
+  if (children > 1) {
+    return shape(ANALYSIS_STATE.BUNDLE_DETECTED, {
+      detail: `This file contains ${children} documents. Review each one before confirming.`,
+      childCount: children,
+    });
+  }
+
+  if (readingV3Of(doc) || intakeOf(doc)) return shape(ANALYSIS_STATE.ANALYZED);
+  if (opts.analyzing) return shape(ANALYSIS_STATE.ANALYZING);
+  return shape(ANALYSIS_STATE.UPLOADED_WAITING);
+}
+
+export const FIELD_STATUS = {
+  CONFIRMED: 'confirmed',           // a person stored this value
+  SUGGESTED: 'suggested',           // the reader proposed it; nobody has confirmed
+  CONFLICT: 'conflict',             // both exist and disagree
+  NEEDS_CONFIRMATION: 'needs_confirmation',
+  NOT_FOUND: 'not_found',
+};
+export const FIELD_STATUS_LABEL = {
+  confirmed: 'Confirmed', suggested: 'AI suggestion', conflict: 'Conflict',
+  needs_confirmation: 'Needs confirmation', not_found: 'Not found',
+};
+
+const sameValue = (a, b) => {
+  if (a === null || a === undefined || b === null || b === undefined) return false;
+  if (typeof a === 'number' || typeof b === 'number') return Number(a) === Number(b);
+  return String(a).trim().toUpperCase() === String(b).trim().toUpperCase();
+};
+
+/** One row of the confirmation table. */
+function fieldRow(label, confirmed, suggested, opts = {}) {
+  const hasC = confirmed !== null && confirmed !== undefined && confirmed !== '';
+  const hasS = suggested !== null && suggested !== undefined && suggested !== '';
+  let status;
+  if (hasC && hasS) status = sameValue(confirmed, suggested) ? FIELD_STATUS.CONFIRMED : FIELD_STATUS.CONFLICT;
+  else if (hasC) status = FIELD_STATUS.CONFIRMED;
+  else if (hasS) status = opts.needsConfirmation ? FIELD_STATUS.NEEDS_CONFIRMATION : FIELD_STATUS.SUGGESTED;
+  else status = FIELD_STATUS.NOT_FOUND;
+  return { key: opts.key || label, label, confirmed: hasC ? confirmed : null,
+    suggested: hasS ? suggested : null, status, hint: opts.hint || null };
+}
+
+const moneyOrNull = (n, ccy) => (n === null || n === undefined ? null : money(n, ccy));
+
+/**
+ * The confirmation table for a document.
+ * `confirmed` values come from the document row — the columns a person owns.
+ * `suggested` values come from ai_intake_v3 — never written anywhere by themselves.
+ */
+export function v3FieldRows(doc, cpName = null) {
+  const v3 = readingV3Of(doc);
+  const f = v3?.fields || {};
+  const ccy = f.currency || doc?.currency || 'IDR';
+  const storedType = doc?.document_type && doc.document_type !== 'other' ? doc.document_type : null;
+  // A counterparty is only "confirmed" once it is actually attached to the document.
+  const confirmedCp = doc?.issuer_counterparty_id ? (cpName?.(doc.issuer_counterparty_id) || 'Linked counterparty') : null;
+  const needsCp = v3?.counterparty_status === 'needs_confirmation' || v3?.counterparty_status === 'self_match';
+
+  return [
+    fieldRow('Document type', storedType ? TYPE_LABEL[storedType] || storedType : null,
+      f.document_type ? typeLabelOf(f.document_type) : null, { key: 'document_type' }),
+    fieldRow('Document number', doc?.document_number || null, f.document_number, { key: 'document_number' }),
+    fieldRow('Document date', doc?.document_date || null, f.document_date, { key: 'document_date' }),
+    fieldRow('Due date', null, f.due_date, { key: 'due_date' }),
+    fieldRow('Payment date', null, f.payment_date, { key: 'payment_date' }),
+    fieldRow('Counterparty', confirmedCp, f.counterparty?.legal_name || null,
+      { key: 'counterparty', needsConfirmation: needsCp,
+        hint: v3?.counterparty_status === 'self_match'
+          ? 'CFO AI may have identified your own company. Review the parties before continuing.' : null }),
+    fieldRow('Counterparty NPWP', null, f.counterparty?.npwp || null, { key: 'counterparty_npwp' }),
+    fieldRow('DPP', moneyOrNull(doc?.commercial_base_amount, ccy), moneyOrNull(f.dpp, ccy), { key: 'dpp' }),
+    fieldRow('PPN', moneyOrNull(doc?.commercial_tax_amount, ccy), moneyOrNull(f.ppn, ccy), { key: 'ppn' }),
+    fieldRow('Total', moneyOrNull(doc?.gross_amount, ccy), moneyOrNull(f.total, ccy), { key: 'total' }),
+    fieldRow('Currency', doc?.currency || null, f.currency, { key: 'currency' }),
+  ];
+}
+
+/** The one-line summary above the table. */
+export function v3Headline(doc) {
+  const v3 = readingV3Of(doc);
+  if (!v3) return null;
+  const t = typeLabelOf(v3.fields?.document_type);
+  return `${t || 'Document'} · read by ${v3.source === 'native_image_vision' ? 'image analysis' : 'document analysis'}`;
+}
+
+/** Operational facts. Deliberately NOT shown in the normal panel — cost and model are
+ *  an operator's concern, not something a user reviewing an invoice needs. */
+export function v3Diagnostics(doc) {
+  const v3 = intakeV3Of(doc);
+  if (!v3) return null;
+  if (v3.analyzed === false) {
+    return {
+      analyzed: false, model: v3.model, schema_version: v3.schema_version,
+      failure_reason: v3.failure?.reason || null,
+      retryable: v3.failure?.retryable !== false,
+      attempts: v3.attempts || 0, last_attempt_at: v3.last_attempt_at || null,
+    };
+  }
+  return {
+    analyzed: true,
+    model: v3.model, schema_version: v3.schema_version, source: v3.source,
+    processed_at: v3.processed_at, duration_ms: v3.duration_ms,
+    pages_analyzed: v3.pages_analyzed, page_count: v3.page_count,
+    validation_status: v3.validation_status,
+  };
+}
+
+export const v3Warnings = (doc) => readingV3Of(doc)?.warnings || [];
+export const v3Blockers = (doc) => readingV3Of(doc)?.blockers || [];
+
+/* ── the bundle review ──────────────────────────────────────────────────────
+   One file, several documents, and a person who has to decide whether the split is
+   right before anything is created from it. "3 documents detected" alone is an
+   announcement, not a review: to confirm a split you have to see what each child says
+   and be able to disagree with it.
+
+   Everything below is a SUGGESTION. Nothing here creates a record, a counterparty, a
+   transaction or a payment, and each child is confirmed on its own — a kwitansi sitting
+   in the same file as a faktur does not inherit the faktur's ability to imply a bill. */
+
+export const bundleOf = (doc) => {
+  const v3 = readingV3Of(doc);
+  const b = v3 && v3.bundle && typeof v3.bundle === 'object' ? v3.bundle : null;
+  return b && Array.isArray(b.children) && b.children.length > 1 ? b : null;
+};
+
+export const CHILD_ACTION = {
+  REVIEW: 'review',                  // a normal suggestion awaiting confirmation
+  REVIEW_ONLY: 'review_only',        // can never imply a record — a receipt, an agreement
+  NEEDS_ATTENTION: 'needs_attention',// the validator raised something blocking
+  NOT_ANALYSED: 'not_analysed',      // its own extraction failed
+};
+
+const CHILD_ACTION_LABEL = {
+  review: 'Suggested — confirm to use',
+  review_only: 'Supporting document — review only',
+  needs_attention: 'Needs your attention',
+  not_analysed: 'Could not be read',
+};
+
+const pageLabel = (c) => (c.page_start === c.page_end
+  ? `Page ${c.page_start}`
+  : `Pages ${c.page_start}–${c.page_end}`);
+
+/**
+ * The review rows for a detected bundle.
+ * @returns null when this document is not a bundle, otherwise
+ *          { count, headline, sharedReference, requiresConfirmation, children[] }
+ */
+export function bundleReview(doc) {
+  const b = bundleOf(doc);
+  if (!b) return null;
+
+  const children = b.children.map((c) => {
+    const f = c.fields || {};
+    let action = CHILD_ACTION.REVIEW;
+    if (c.analyzed === false) action = CHILD_ACTION.NOT_ANALYSED;
+    else if ((c.blockers || []).length) action = CHILD_ACTION.NEEDS_ATTENTION;
+    else if (c.can_create_financial_record === false) action = CHILD_ACTION.REVIEW_ONLY;
+
+    return {
+      index: c.index,
+      pages: pageLabel(c),
+      pageStart: c.page_start,
+      pageEnd: c.page_end,
+      typeLabel: typeLabelOf(c.document_type) || c.title_printed_text || 'Document',
+      documentType: c.document_type,
+      title: c.title_printed_text || null,
+      reference: c.identifier || null,
+      // Each child's own parties, as printed on its own pages.
+      parties: (c.parties || []).map((p) => ({
+        role: p.role || null,
+        name: p.legal_name || null,
+        npwp: p.npwp || null,
+      })),
+      dates: {
+        document_date: f.document_date || null,
+        due_date: f.due_date || null,
+        payment_date: f.payment_date || null,
+      },
+      amounts: {
+        currency: f.currency || 'IDR',
+        subtotal: f.subtotal ?? null,
+        dpp: f.dpp ?? null,
+        dpp_nilai_lain: f.dpp_nilai_lain ?? null,
+        ppn: f.ppn ?? null,
+        withholding_tax: f.withholding_tax ?? null,
+        total: f.total ?? null,
+        amount_paid: f.amount_paid ?? null,
+      },
+      warnings: c.warnings || [],
+      blockers: c.blockers || [],
+      action,
+      actionLabel: CHILD_ACTION_LABEL[action],
+      // Stated per child so no caller can read a bundle as permission.
+      canCreateFinancialRecord: c.can_create_financial_record === true,
+      canCreateCounterparty: c.can_create_counterparty === true,
+      analyzed: c.analyzed !== false,
+    };
+  });
+
+  return {
+    count: children.length,
+    headline: `${children.length} documents detected`,
+    sharedReference: b.shared_reference || null,
+    // A shared reference relates these documents. It does not merge them.
+    requiresConfirmation: true,
+    children,
+  };
+}
+
 /* ── analyze button ────────────────────────────────────────────────────────── */
 
 // `stored:false` means the summary was already up to date — an unchanged re-run. It must

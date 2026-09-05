@@ -286,3 +286,74 @@
 /* The document's parties, shown side by side so a pairing can be judged at a glance
    rather than trusted. */
 .doc-cp-parties { display: flex; flex-direction: column; gap: 2px; margin: 6px 0; }
+
+/* The v3 confirmation table. Three columns: what the field is, what we have, and where
+   that value came from — because "the AI said so" and "a person decided" must never
+   look the same. */
+.doc-v3-table { width: 100%; border-collapse: collapse; margin: 8px 0; }
+.doc-v3-table th[scope="row"] {
+  text-align: left; font-size: 11.5px; font-weight: 700; color: var(--text-muted);
+  padding: 5px 8px 5px 0; vertical-align: top; white-space: nowrap;
+}
+.doc-v3-table td { padding: 5px 0; vertical-align: top; font-size: 12.5px; }
+.doc-v3-table tr + tr { border-top: 0.5px solid var(--border-subtle); }
+.doc-v3-val { display: flex; flex-direction: column; gap: 2px; overflow-wrap: anywhere; }
+.doc-v3-status { text-align: right; white-space: nowrap; padding-left: 8px; }
+/* A confirmed value reads as settled; a suggestion reads as provisional. */
+.doc-v3-confirmed { font-weight: 700; color: var(--text-body); }
+.doc-v3-suggested { color: var(--text-secondary); font-style: italic; }
+.doc-v3-vs { font-size: 11px; color: var(--text-muted); }
+.doc-v3-hint { font-size: 11.5px; color: var(--warning); }
+
+/* ── bundle review ──────────────────────────────────────────────────────────
+   One file, several documents. Each child is its own card because each is
+   confirmed on its own — a visual grouping that let them read as one list of
+   fields would be the same mistake the backend refuses to make. */
+.doc-bundle-list {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.doc-bundle-child {
+  border: 1px solid var(--line, #e3e6e8);
+  border-left: 3px solid var(--line, #e3e6e8);
+  border-radius: 6px;
+  padding: 10px 12px;
+  background: var(--surface, #fff);
+}
+
+/* State reads before the text does: what needs attention, and what can only ever
+   be supporting evidence. */
+.doc-bundle-child.is-needs_attention { border-left-color: #b3261e; }
+.doc-bundle-child.is-not_analysed { border-left-color: #9aa0a6; }
+.doc-bundle-child.is-review { border-left-color: #b8860b; }
+.doc-bundle-child.is-review_only { border-left-color: #6b7280; }
+
+.doc-bundle-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+
+.doc-bundle-pages {
+  font-family: var(--mono, ui-monospace, monospace);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted, #6b7280);
+  white-space: nowrap;
+}
+
+.doc-bundle-type { font-weight: 600; }
+
+.doc-bundle-ref {
+  font-family: var(--mono, ui-monospace, monospace);
+  font-variant-numeric: tabular-nums;
+  word-break: break-all;
+}

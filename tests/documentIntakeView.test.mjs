@@ -426,6 +426,105 @@ t('17. no workflow state creates anything — they are all offers', () => {
   }
 });
 
+/* ── Phase 7: v3 as the primary suggestion ──────────────────────────────────
+   The rule: a model match is not a human decision. Every row says which it is. */
+const V3 = (over = {}) => ({
+  schema_version: 'financial_document_extraction_v3', model: 'claude-sonnet-4-5',
+  source: 'native_pdf_vision', validation_status: 'ok', counterparty_status: 'ok',
+  can_create_counterparty: true, can_create_financial_record: true,
+  fields: {
+    document_type: 'faktur_pajak', document_number: 'X2610001139',
+    document_date: '2026-08-04', due_date: '2026-09-03', payment_date: null,
+    currency: 'IDR', dpp: 10200000, ppn: 1122000, total: 11322000,
+    counterparty: { legal_name: 'PT ALPHA SENTOSA NUSANTARA', npwp: '01.111.222.3-041.000', role: 'supplier' },
+  },
+  warnings: [], blockers: [], ...over,
+});
+const docV3 = (v3 = V3(), extra = {}) => ({
+  document_type: 'other', document_number: null, document_date: null,
+  gross_amount: null, commercial_base_amount: null, commercial_tax_amount: null,
+  currency: null, issuer_counterparty_id: null, links: [],
+  extracted_json: { ai_intake_v3: v3 }, ...extra,
+});
+const rowFor = (doc, key, cpName) => V.v3FieldRows(doc, cpName).find((r) => r.key === key);
+
+t('v3 supersedes v2 as the visible suggestion', () => {
+  const both = { ...docV3(), extracted_json: { ai_intake_v2: INVOICE, ai_intake_v3: V3() } };
+  assert.strictEqual(V.primaryIntakeSource(both), 'v3');
+  assert.strictEqual(V.primaryIntakeSource(doc(INVOICE)), 'v2', 'v2 still shows when v3 is absent');
+  assert.strictEqual(V.primaryIntakeSource(doc(null)), null);
+});
+
+t('an unconfirmed model value is labelled a suggestion, never a fact', () => {
+  const r = rowFor(docV3(), 'total');
+  assert.strictEqual(r.status, V.FIELD_STATUS.SUGGESTED);
+  assert.strictEqual(r.confirmed, null);
+  assert.strictEqual(V.FIELD_STATUS_LABEL[r.status], 'AI suggestion');
+});
+
+t('a value a person stored is labelled confirmed', () => {
+  const r = rowFor(docV3(V3(), { gross_amount: 11322000, currency: 'IDR' }), 'total');
+  assert.strictEqual(r.status, V.FIELD_STATUS.CONFIRMED);
+  assert.strictEqual(r.confirmed, 'IDR 11.322.000');
+});
+
+t('agreement between the two is confirmed, not a conflict', () => {
+  const r = rowFor(docV3(V3(), { document_number: 'X2610001139' }), 'document_number');
+  assert.strictEqual(r.status, V.FIELD_STATUS.CONFIRMED);
+});
+
+t('disagreement is a CONFLICT, and both values are kept', () => {
+  const r = rowFor(docV3(V3(), { document_number: 'DIFFERENT-1' }), 'document_number');
+  assert.strictEqual(r.status, V.FIELD_STATUS.CONFLICT);
+  assert.strictEqual(r.confirmed, 'DIFFERENT-1');
+  assert.strictEqual(r.suggested, 'X2610001139');
+});
+
+t('a field neither side has is "not found", not an empty suggestion', () => {
+  const r = rowFor(docV3(V3({ fields: { ...V3().fields, payment_date: null } })), 'payment_date');
+  assert.strictEqual(r.status, V.FIELD_STATUS.NOT_FOUND);
+});
+
+t('a self-match counterparty needs confirmation and says why', () => {
+  const r = rowFor(docV3(V3({ counterparty_status: 'self_match', can_create_counterparty: false })), 'counterparty');
+  assert.strictEqual(r.status, V.FIELD_STATUS.NEEDS_CONFIRMATION);
+  assert.ok(/your own company/i.test(r.hint), r.hint);
+});
+
+t('a counterparty is confirmed only once it is attached to the document', () => {
+  const attached = docV3(V3(), { issuer_counterparty_id: 'cp-1' });
+  const r = rowFor(attached, 'counterparty', () => 'PT ALPHA SENTOSA NUSANTARA');
+  assert.strictEqual(r.status, V.FIELD_STATUS.CONFIRMED,
+    'a model match alone is never confirmation — the link is');
+});
+
+t('every required field is present in the table', () => {
+  const keys = V.v3FieldRows(docV3()).map((r) => r.key);
+  for (const k of ['document_type', 'document_number', 'document_date', 'due_date', 'payment_date',
+    'counterparty', 'counterparty_npwp', 'dpp', 'ppn', 'total', 'currency']) {
+    assert.ok(keys.includes(k), `missing ${k}`);
+  }
+});
+
+t('the three dates and the three amounts stay separate rows', () => {
+  const rows = V.v3FieldRows(docV3());
+  const val = (k) => rows.find((r) => r.key === k).suggested;
+  assert.strictEqual(val('document_date'), '2026-08-04');
+  assert.strictEqual(val('due_date'), '2026-09-03');
+  assert.notStrictEqual(val('dpp'), val('total'));
+  assert.notStrictEqual(val('ppn'), val('total'));
+});
+
+t('cost and model are diagnostics, not part of the user table', () => {
+  const rows = V.v3FieldRows(docV3()).map((r) => r.label.toLowerCase()).join(' ');
+  for (const leak of ['token', 'cost', 'model', 'prompt']) {
+    assert.ok(!rows.includes(leak), `${leak} must not appear as a user-facing field`);
+  }
+  const d = V.v3Diagnostics(docV3());
+  assert.strictEqual(d.model, 'claude-sonnet-4-5', 'but they are available separately');
+  assert.ok(!('input_tokens' in d), 'and cost is not even in the client diagnostics');
+});
+
 /* ── 5/6. the analyze button ────────────────────────────────────────────────── */
 t('5. a stored run says the analysis was updated', () => {
   assert.strictEqual(V.analyzeMessage({ stored: true }), 'Analysis updated.');
@@ -435,6 +534,239 @@ t('6. an unchanged re-run never reads as though something was created', () => {
   const msg = V.analyzeMessage({ stored: false });
   assert.strictEqual(msg, 'Analysis is already up to date.');
   assert.ok(!/creat|new|added/i.test(msg), msg);
+});
+
+console.log('\nWhat the user is told is happening');
+
+const failedDoc = (failure, extra = {}) => ({
+  extracted_json: { ai_intake_v3: { analyzed: false, failure, attempts: 1, ...extra } },
+});
+const readDoc = { extracted_json: { ai_intake_v3: { analyzed: true, fields: { document_type: 'faktur_pajak' }, source: 'native_pdf_vision' } } };
+
+t('every state the brief names has a distinct label', () => {
+  const seen = new Set();
+  const states = [
+    V.analysisState({}, { uploading: true }),
+    V.analysisState({}, { uploadFailed: true }),
+    V.analysisState({}),
+    V.analysisState({}, { analyzing: true }),
+    V.analysisState(readDoc),
+    V.analysisState(failedDoc({ reason: 'vision_timeout', retryable: true, user_message: 'Analysis did not finish in time. You can retry it.' })),
+    V.analysisState({ extracted_json: { ai_intake_v3: { analyzed: true, bundle: { children: [1, 2, 3] } } } }),
+    V.analysisState({ document_type: 'faktur_pajak' }),
+  ];
+  for (const s of states) {
+    assert.ok(s.label && s.detail, JSON.stringify(s));
+    assert.ok(!seen.has(s.label), `two states share the label "${s.label}"`);
+    seen.add(s.label);
+  }
+  assert.strictEqual(seen.size, 8);
+});
+
+t('a failed analysis says the FILE is safe, and offers a retry', () => {
+  const s = V.analysisState(failedDoc({ reason: 'vision_timeout', retryable: true,
+    user_message: 'Analysis did not finish in time. You can retry it.' }));
+  assert.strictEqual(s.state, V.ANALYSIS_STATE.ANALYSIS_FAILED);
+  assert.strictEqual(s.canRetry, true);
+  // The whole point of separating the two: an upload failure and an analysis failure
+  // are different problems, and only one of them means the document is gone.
+  assert.notStrictEqual(s.state, V.ANALYSIS_STATE.UPLOAD_FAILED);
+  assert.ok(/retry/i.test(s.detail), s.detail);
+});
+
+t('a permanent failure does not offer a retry that cannot help', () => {
+  const s = V.analysisState(failedDoc({ reason: 'file_too_large', retryable: false,
+    user_message: 'This document is too large to analyse automatically. Enter the values manually.' }));
+  assert.strictEqual(s.canRetry, false);
+});
+
+t('a stored failure is never mistaken for a reading', () => {
+  const doc = failedDoc({ reason: 'vision_timeout', retryable: true, user_message: 'x' });
+  assert.strictEqual(V.readingV3Of(doc), null);
+  assert.strictEqual(V.primaryIntakeSource(doc), null, 'a failure must not supersede v2');
+  assert.deepStrictEqual(V.v3Warnings(doc), []);
+  assert.strictEqual(V.v3Headline(doc), null);
+  assert.strictEqual(V.v3FieldRows(doc).every((r) => r.status === V.FIELD_STATUS.NOT_FOUND), true);
+});
+
+t('a bundle is announced with its real count, not a guess', () => {
+  const s = V.analysisState({ extracted_json: { ai_intake_v3: { analyzed: true, bundle: { children: [1, 2, 3] } } } });
+  assert.strictEqual(s.state, V.ANALYSIS_STATE.BUNDLE_DETECTED);
+  assert.strictEqual(s.childCount, 3);
+  assert.ok(s.detail.includes('3'), s.detail);
+});
+
+t('no state shown to the user names a model or a cost', () => {
+  const docs = [{}, readDoc, failedDoc({ reason: 'model_policy_violation', retryable: false, user_message: 'Analysis could not be completed. Support has been notified.' })];
+  for (const d of docs) {
+    const s = V.analysisState(d);
+    const text = `${s.label} ${s.detail}`;
+    for (const leak of [/opus/i, /sonnet/i, /claude/i, /token/i, /[$]/]) {
+      assert.ok(!leak.test(text), `${leak} leaked: ${text}`);
+    }
+  }
+});
+
+console.log('\nThe bundle review — the real KWT packet');
+
+// The shape the server stores for the three-page Alfamart packet: a kwitansi, the faktur
+// pajak for the same rent, and the agreement they both reference.
+const KWT_DOC = {
+  extracted_json: {
+    ai_intake_v3: {
+      analyzed: true,
+      fields: {},
+      bundle: {
+        shared_reference: 'TC-2411-0865',
+        requires_confirmation: true,
+        children: [
+          {
+            index: 1, document_type: 'kwitansi', title_printed_text: 'KWITANSI',
+            page_start: 1, page_end: 1, identifier: 'BRN/Z001/K-P/26/VIII/0177',
+            analyzed: true,
+            parties: [{ role: 'supplier', legal_name: 'PT BINTANG RITEL NUSANTARA TBK', npwp: null }],
+            fields: { currency: 'IDR', total: 11322000, dpp: null, ppn: null,
+              document_date: '2026-08-04', due_date: null, payment_date: null },
+            validation_status: 'needs_review', counterparty_status: 'ok',
+            can_create_counterparty: true, can_create_financial_record: false,
+            warnings: ['Only page 1 (KWITANSI) was extracted as instructed; pages 2-3 belong to other documents.'],
+            blockers: [],
+          },
+          {
+            index: 2, document_type: 'faktur_pajak', title_printed_text: 'Faktur Pajak',
+            page_start: 2, page_end: 2, identifier: '04002600300455129',
+            analyzed: true,
+            parties: [
+              { role: 'taxable_entrepreneur_seller', legal_name: 'BINTANG RITEL NUSANTARA', npwp: '0067788991062000' },
+              { role: 'taxable_entrepreneur_buyer', legal_name: 'HELM CARE INDONESIA', npwp: '1000000009114703' },
+            ],
+            fields: { currency: 'IDR', subtotal: 10200000, dpp: 9350000, dpp_nilai_lain: 9350000,
+              ppn: 1122000, withholding_tax: null, total: null, document_date: '2026-08-04' },
+            tax_shape: 'nilai_lain_11_12',
+            validation_status: 'needs_review', counterparty_status: 'ok',
+            can_create_counterparty: true, can_create_financial_record: false,
+            warnings: [], blockers: [],
+          },
+          {
+            index: 3, document_type: 'contract', title_printed_text: 'SURAT KESEPAKATAN - SEWA TEMPAT',
+            page_start: 3, page_end: 3, identifier: 'TC-2411-0865',
+            analyzed: true,
+            parties: [{ role: 'supplier', legal_name: 'PT BINTANG RITEL NUSANTARA Tbk', npwp: null }],
+            fields: { currency: 'IDR', subtotal: 10200000, total: 11322000,
+              document_date: '2026-07-30', due_date: '2026-08-14' },
+            validation_status: 'needs_review', counterparty_status: 'ok',
+            can_create_counterparty: true, can_create_financial_record: false,
+            warnings: ['Pihak Kedua NPWP is not stated on page 3; NPWP from other pages was deliberately not used.'],
+            blockers: [],
+          },
+        ],
+      },
+    },
+  },
+};
+
+t('the review announces the count and lists every child', () => {
+  const r = V.bundleReview(KWT_DOC);
+  assert.ok(r, 'a three-child bundle must produce a review');
+  assert.strictEqual(r.count, 3);
+  assert.strictEqual(r.headline, '3 documents detected');
+  assert.strictEqual(r.children.length, 3);
+});
+
+t('each child shows its page range, type and reference', () => {
+  const [a, b, c] = V.bundleReview(KWT_DOC).children;
+  assert.strictEqual(a.pages, 'Page 1');
+  assert.strictEqual(a.reference, 'BRN/Z001/K-P/26/VIII/0177');
+  assert.strictEqual(b.pages, 'Page 2');
+  assert.strictEqual(b.reference, '04002600300455129');
+  assert.strictEqual(c.pages, 'Page 3');
+  assert.strictEqual(c.reference, 'TC-2411-0865');
+  // three distinct references — nothing flattened into one
+  assert.strictEqual(new Set([a.reference, b.reference, c.reference]).size, 3);
+});
+
+t('each child shows its parties, dates and amounts', () => {
+  const [kwitansi, faktur] = V.bundleReview(KWT_DOC).children;
+  assert.strictEqual(kwitansi.amounts.total, 11322000);
+  assert.strictEqual(kwitansi.dates.document_date, '2026-08-04');
+  assert.strictEqual(kwitansi.dates.payment_date, null, 'a kwitansi date is not a payment date');
+  assert.strictEqual(faktur.amounts.subtotal, 10200000);
+  assert.strictEqual(faktur.amounts.dpp_nilai_lain, 9350000);
+  assert.strictEqual(faktur.amounts.ppn, 1122000);
+  assert.strictEqual(faktur.amounts.total, null, 'the faktur prints no total; none is invented');
+  assert.strictEqual(faktur.amounts.withholding_tax, null, 'no withholding amount was printed');
+  assert.strictEqual(faktur.parties.length, 2);
+});
+
+t('no NPWP leaks between children', () => {
+  const children = V.bundleReview(KWT_DOC).children;
+  const npwpsOf = (c) => c.parties.map((p) => p.npwp).filter(Boolean);
+  // The faktur carries two tax numbers. The kwitansi and the agreement carry none, and
+  // must not borrow them from a neighbouring page.
+  assert.deepStrictEqual(npwpsOf(children[0]), []);
+  assert.deepStrictEqual(npwpsOf(children[2]), []);
+  assert.strictEqual(npwpsOf(children[1]).length, 2);
+});
+
+t('the kwitansi can never produce a payable', () => {
+  const kwitansi = V.bundleReview(KWT_DOC).children[0];
+  assert.strictEqual(kwitansi.canCreateFinancialRecord, false);
+  assert.strictEqual(kwitansi.action, V.CHILD_ACTION.REVIEW_ONLY);
+  assert.ok(/review only/i.test(kwitansi.actionLabel), kwitansi.actionLabel);
+});
+
+t('nothing in the review reads as something already created', () => {
+  const r = V.bundleReview(KWT_DOC);
+  assert.strictEqual(r.requiresConfirmation, true);
+  for (const c of r.children) {
+    assert.strictEqual(c.canCreateFinancialRecord, false,
+      'no child of this packet may imply a record without confirmation');
+  }
+  const json = JSON.stringify(r);
+  for (const forbidden of ['"created"', 'debt_id', 'transaction_id', 'counterparty_id', 'payment_id']) {
+    assert.ok(!json.includes(forbidden), `${forbidden} must not appear in a review`);
+  }
+});
+
+t('a shared reference relates the documents without merging them', () => {
+  const r = V.bundleReview(KWT_DOC);
+  assert.strictEqual(r.sharedReference, 'TC-2411-0865');
+  assert.strictEqual(r.count, 3, 'a shared reference is a relationship, not a merge');
+});
+
+t('the review exposes no model name and no token cost', () => {
+  const json = JSON.stringify(V.bundleReview(KWT_DOC)).toLowerCase();
+  for (const leak of ['claude', 'opus', 'sonnet', 'token', 'input_tokens', 'output_tokens', '$']) {
+    assert.ok(!json.includes(leak), `${leak} leaked into the customer review`);
+  }
+});
+
+t('a child that could not be read says so instead of showing blanks', () => {
+  const doc = JSON.parse(JSON.stringify(KWT_DOC));
+  doc.extracted_json.ai_intake_v3.bundle.children[1] = {
+    index: 2, document_type: 'faktur_pajak', title_printed_text: 'Faktur Pajak',
+    page_start: 2, page_end: 2, identifier: null, analyzed: false, failure_reason: 'vision_timeout',
+  };
+  const child = V.bundleReview(doc).children[1];
+  assert.strictEqual(child.analyzed, false);
+  assert.strictEqual(child.action, V.CHILD_ACTION.NOT_ANALYSED);
+  assert.strictEqual(child.canCreateFinancialRecord, false);
+});
+
+t('a single document is not a bundle and has no review', () => {
+  assert.strictEqual(V.bundleReview({ extracted_json: { ai_intake_v3: { analyzed: true, fields: {} } } }), null);
+  assert.strictEqual(V.bundleReview({}), null);
+  // one child is not several
+  assert.strictEqual(V.bundleReview({ extracted_json: { ai_intake_v3: { analyzed: true,
+    bundle: { children: [{ index: 1, page_start: 1, page_end: 1 }] } } } }), null);
+});
+
+t('a failed analysis has no bundle review at all', () => {
+  const failed = { extracted_json: { ai_intake_v3: { analyzed: false,
+    failure: { reason: 'vision_timeout', retryable: true },
+    bundle: { children: [{ index: 1 }, { index: 2 }] } } } };
+  assert.strictEqual(V.bundleReview(failed), null,
+    'a stored failure must not present a bundle review');
 });
 
 console.log(`\n${fail === 0 ? `ALL PASS — ${pass} passed, 0 failed` : `${pass} passed, ${fail} FAILED`}`);

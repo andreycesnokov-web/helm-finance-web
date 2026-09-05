@@ -69,4 +69,121 @@ function publicUploadIntent(intent) {
   };
 }
 
-module.exports = { publicIntakeV2, publicUploadIntent, PUBLIC_INTAKE_V2_FIELDS };
+/** The v3 record, field by field.
+ *
+ *  What is deliberately NOT here: the prompt, the request, any key or header, the raw
+ *  tool payload, page images, and the evidence excerpts (which quote the document's own
+ *  text). The client gets the CONCLUSION and the operational facts about the run — never
+ *  the document's contents beyond the values it is asking the user to confirm. */
+function publicIntakeV3(v3) {
+  if (!v3 || typeof v3 !== 'object') return null;
+  const f = v3.fields && typeof v3.fields === 'object' ? v3.fields : {};
+  const cp = f.counterparty && typeof f.counterparty === 'object' ? f.counterparty : null;
+
+  // An analysis that did not complete. The client needs enough to show the state and
+  // offer a retry, and nothing more: provider status codes, provider text and the model
+  // that actually answered are operator diagnostics and stay server-side.
+  if (v3.analyzed === false) {
+    const fail = v3.failure && typeof v3.failure === 'object' ? v3.failure : {};
+    return {
+      analyzed: false,
+      schema_version: STR(v3.schema_version),
+      failure_reason: STR(fail.reason),
+      retryable: fail.retryable !== false,
+      message: STR(fail.user_message),
+      attempts: NUM(v3.attempts),
+      last_attempt_at: STR(v3.last_attempt_at),
+    };
+  }
+
+  const b = v3.bundle && typeof v3.bundle === 'object' ? v3.bundle : null;
+  return {
+    analyzed: true,
+    // What the file holds, and what each child says, so the split can actually be
+    // reviewed rather than merely announced. A person confirms each child separately;
+    // nothing here is a record and nothing here creates one.
+    //
+    // Token counts stay behind: they are an operator's concern, not something a person
+    // checking an invoice needs to see.
+    bundle: b ? {
+      shared_reference: STR(b.shared_reference),
+      requires_confirmation: true,
+      children: (Array.isArray(b.children) ? b.children : []).slice(0, 10).map((c) => {
+        const f = c.fields && typeof c.fields === 'object' ? c.fields : {};
+        const cp = f.counterparty && typeof f.counterparty === 'object' ? f.counterparty : null;
+        return {
+          index: NUM(c.index),
+          document_type: STR(c.document_type),
+          title_printed_text: STR(c.title_printed_text),
+          page_start: NUM(c.page_start),
+          page_end: NUM(c.page_end),
+          identifier: STR(c.identifier),
+          analyzed: c.analyzed !== false,
+          // Each child's own parties. Never merged across children.
+          parties: (Array.isArray(c.parties) ? c.parties : []).slice(0, 6).map((party) => ({
+            role: STR(party.role),
+            legal_name: STR(party.legal_name),
+            npwp: STR(party.npwp),
+          })),
+          fields: {
+            document_number: STR(f.document_number),
+            currency: STR(f.currency),
+            subtotal: NUM(f.subtotal),
+            dpp: NUM(f.dpp),
+            dpp_nilai_lain: NUM(f.dpp_nilai_lain),
+            ppn: NUM(f.ppn),
+            withholding_tax: NUM(f.withholding_tax),
+            total: NUM(f.total),
+            amount_paid: NUM(f.amount_paid),
+            amount_due: NUM(f.amount_due),
+            document_date: STR(f.document_date),
+            due_date: STR(f.due_date),
+            payment_date: STR(f.payment_date),
+            counterparty: cp ? { legal_name: STR(cp.legal_name), npwp: STR(cp.npwp) } : null,
+          },
+          tax_shape: STR(c.tax_shape),
+          validation_status: STR(c.validation_status),
+          counterparty_status: STR(c.counterparty_status),
+          can_create_counterparty: BOOL(c.can_create_counterparty),
+          can_create_financial_record: BOOL(c.can_create_financial_record),
+          warnings: (Array.isArray(c.warnings) ? c.warnings : []).slice(0, 20).map((w) => String(w).slice(0, 300)),
+          blockers: (Array.isArray(c.blockers) ? c.blockers : []).slice(0, 10).map((w) => String(w).slice(0, 300)),
+        };
+      }),
+    } : null,
+    schema_version: STR(v3.schema_version),
+    prompt_version: STR(v3.prompt_version),
+    model: STR(v3.model),
+    source: STR(v3.source),
+    processed_at: STR(v3.processed_at),
+    duration_ms: NUM(v3.duration_ms),
+    page_count: NUM(v3.page_count),
+    pages_analyzed: Array.isArray(v3.pages_analyzed)
+      ? v3.pages_analyzed.filter((n) => Number.isFinite(n)).slice(0, 50) : [],
+    analysis_complete: BOOL(v3.analysis_complete),
+    validation_status: STR(v3.validation_status),
+    counterparty_status: STR(v3.counterparty_status),
+    can_create_counterparty: BOOL(v3.can_create_counterparty),
+    can_create_financial_record: BOOL(v3.can_create_financial_record),
+    fields: {
+      document_type: STR(f.document_type),
+      document_number: STR(f.document_number),
+      currency: STR(f.currency),
+      dpp: NUM(f.dpp), ppn: NUM(f.ppn), total: NUM(f.total),
+      amount_paid: NUM(f.amount_paid), amount_due: NUM(f.amount_due),
+      document_date: STR(f.document_date),
+      due_date: STR(f.due_date),
+      payment_date: STR(f.payment_date),
+      counterparty: cp ? {
+        legal_name: STR(cp.legal_name),
+        npwp: STR(cp.npwp),
+        role: STR(cp.role),
+      } : null,
+    },
+    warnings: LIST(v3.warnings),
+    blockers: LIST(v3.blockers),
+    failed_checks: LIST(v3.failed_checks),
+  };
+}
+
+module.exports = { publicIntakeV2, publicIntakeV3, publicUploadIntent, PUBLIC_INTAKE_V2_FIELDS };

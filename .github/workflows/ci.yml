@@ -11,16 +11,44 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # The secret scan diffs the branch against its base, so it needs history.
+          fetch-depth: 0
 
+      # The version the repo declares. CI pinned 20 while .nvmrc said 22, and nothing
+      # noticed because CI never started the server: @supabase/realtime-js needs a native
+      # WebSocket, which Node 20 does not have, so server/index.js throws at require time
+      # on 20. Testing on a version the application cannot run on proves nothing.
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version-file: '.nvmrc'
 
       - name: Install server deps
         run: npm install --no-audit --no-fund
 
       - name: Server syntax check
         run: node --check server/index.js
+
+      # Four integration files boot the server as a child with stdio ignored, so when it
+      # fails to start they report "app did not start" and nothing else. This boots it the
+      # same way and keeps the output, so the reason is in the log.
+      - name: Server boot smoke
+        run: node scripts/boot-smoke.js
+
+      # A green build should mean the software works, not only that it parses.
+      - name: Unit tests
+        run: npm test
+
+      - name: Integration tests
+        run: node scripts/run-tests.js --integration
+
+      - name: Whitespace check
+        run: git diff --check ${{ github.event.pull_request.base.sha || 'HEAD~1' }} HEAD
+
+      # Credentials must never reach the history. Scans the branch's own diff, so an
+      # existing finding elsewhere in the repo cannot mask a new one here.
+      - name: Secret scan
+        run: node scripts/secret-scan.js ${{ github.event.pull_request.base.sha || 'HEAD~1' }}
 
       - name: Install client deps
         run: npm install --no-audit --no-fund

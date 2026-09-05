@@ -7,6 +7,9 @@ const { calculateDueDate, ymd } = require('./lib/dueDate');
 const { computeActivationBlockers, isEffectiveApprovedReview, validReviewTransition } = require('./lib/taxGate');
 const { VALID_PLANS, computeBusinessAccess } = require('./lib/businessAccess');
 const docV = require('./lib/documentValidation');
+// Which model may read a financial document. Required up here because recognizeReceipt,
+// far above the Document Center code, obeys the same policy.
+const modelPolicy = require('./lib/modelPolicy');
 const { buildReminderRow } = require('./lib/reminderScope');
 const FININ = require('./lib/financialInsights');
 const SETTLE = require('./lib/invoiceSettlement');
@@ -2083,24 +2086,63 @@ async function fetchTelegramFile(fileId) {
   return { base64: buf.toString('base64'), mime };
 }
 
+// Shown to the person who sent the receipt. Says what happened and what they can do,
+// and names no model, provider or cost — those stay in operator logs.
+const RECEIPT_FAIL_MESSAGE = 'Не удалось проанализировать документ. Попробуйте отправить ещё раз.';
+
 // Recognize amount + counterparty from a receipt image/PDF via Claude vision.
-// Returns { amount, counterparty, currency, date } or null on failure.
+//
+// This is a financial-document reader. It arrives by a different door from the Document
+// Center, but it is the same act — a picture of a receipt turned into an amount, a
+// counterparty and a date — and the amount it returns goes on to set the obligation
+// amount of a debt. So it obeys the same policy as every other reader: Opus, no silent
+// fallback, and the answer refused if it did not come from Opus.
+//
+// @returns { ok:true, amount, currency, counterparty, date }
+//        | { ok:false, reason, retryable, user_message }
+//        | null  when there was nothing to try (no API key, no file)
 async function recognizeReceipt(file) {
   if (!process.env.ANTHROPIC_API_KEY || !file) return null;
+  const fail = (reason, retryable) => ({ ok: false, reason, retryable, user_message: RECEIPT_FAIL_MESSAGE });
   try {
     const isPdf = /pdf/i.test(file.mime);
     const block = isPdf
       ? { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: file.base64 } }
       : { type: 'image',    source: { type: 'base64', media_type: file.mime.startsWith('image/') ? file.mime : 'image/jpeg', data: file.base64 } };
     const resp = await anthropic.messages.create({
-      model: 'claude-sonnet-4-5', max_tokens: 300,
+      // Centralised, so this path cannot drift away from the policy on its own.
+      model: modelPolicy.modelFor('receipt_extraction'), max_tokens: 300,
       messages: [{ role: 'user', content: [block, { type: 'text', text:
         'Это чек/счёт. Верни ТОЛЬКО JSON без markdown: {"amount":число_итоговой_суммы,"currency":"IDR","counterparty":"продавец/магазин или null","date":"YYYY-MM-DD или null"}. amount — итоговая сумма к оплате (total/grand total). Если не уверен — поставь null.' }] }],
     });
-    const raw = (resp.content?.[0]?.text || '').trim().replace(/```json\n?/g, '').replace(/```/g, '').trim();
+    // The same guarantee the Document Center has: an answer from anything but Opus is
+    // refused rather than stored, whatever we asked for.
+    if (resp?.model && !modelPolicy.isOpus(resp.model)) {
+      console.warn('[receipt-ocr] refused a non-Opus answer');
+      return fail('model_policy_violation', false);
+    }
+
+    // NOT content[0]. Opus 5 puts a thinking block first, so index 0 carries no .text and
+    // this would have returned null for every receipt ever sent. Take the first actual
+    // text block instead.
+    const textBlock = (resp?.content || []).find((c) => c.type === 'text');
+    const raw = (textBlock?.text || '').trim().replace(/```json\n?/g, '').replace(/```/g, '').trim();
+    if (!raw) return fail('no_text_output', true);
     const j = JSON.parse(raw);
-    return { amount: Number(j.amount) || null, currency: j.currency || 'IDR', counterparty: j.counterparty || null, date: j.date || null };
-  } catch (e) { console.warn('[receipt-ocr] failed:', e.message); return null; }
+    return {
+      ok: true,
+      amount: Number(j.amount) || null,
+      currency: j.currency || 'IDR',
+      counterparty: j.counterparty || null,
+      date: j.date || null,
+    };
+  } catch (e) {
+    // A provider failure is worth another attempt; a request the provider rejected outright
+    // is not. Neither is answered by quietly reading the receipt with a weaker model.
+    console.warn('[receipt-ocr] failed:', e.message);
+    const status = Number(e?.status || e?.statusCode || 0);
+    return fail(status ? `provider_${status}` : 'analysis_failed', status !== 400 && status !== 413);
+  }
 }
 
 // ── POST /api/telegram/debts/attach-receipt — creator sends a receipt ────────
@@ -2136,8 +2178,15 @@ app.post('/api/telegram/debts/attach-receipt', async (req, res) => {
 
     // OCR (best-effort — never blocks the attach)
     const file = await fetchTelegramFile(file_id).catch(() => null);
-    const ocr = await recognizeReceipt(file).catch(() => null);
+    const read = await recognizeReceipt(file).catch(() => null);
+    // A reading only counts when it succeeded. A failed analysis is recorded as such so
+    // the receipt is not silently filed as "nothing on it", and so a retry is possible.
+    const ocr = read && read.ok ? read : null;
     const item = { file_id, mime: file?.mime || null, amount: ocr?.amount ?? null, counterparty: ocr?.counterparty ?? null, date: ocr?.date ?? null, recognized: !!ocr };
+    if (read && read.ok === false) {
+      item.analysis_failed = read.reason;
+      item.analysis_retryable = read.retryable;
+    }
     const attachments = [...existing, item];
 
     // Recompute total from recognized receipt amounts (if any recognized).
@@ -2214,7 +2263,13 @@ app.post('/api/telegram/debts/from-receipt', async (req, res) => {
     if (gate) return res.status(402).json(gate);
 
     const file = await fetchTelegramFile(file_id).catch(() => null);
-    const ocr = await recognizeReceipt(file).catch(() => null);
+    const read = await recognizeReceipt(file).catch(() => null);
+    // An analysis that failed is a different answer from a receipt with no amount on
+    // it, and only one of the two is worth trying again. Saying so beats a 422 that
+    // blames the document.
+    if (read && read.ok === false && read.retryable)
+      return res.status(503).json({ error: 'analysis_failed', message: read.user_message, retryable: true });
+    const ocr = read && read.ok ? read : null;
     if (!ocr || !ocr.amount)
       return res.status(422).json({ error: 'amount_not_recognized', message: 'Не удалось распознать сумму на счёте.' });
 
@@ -12589,8 +12644,11 @@ const docExtract = require('./lib/documentExtraction');
 const docOcr = require('./lib/documentOcr');
 const docDates = require('./lib/documentDates');
 const docParties = require('./lib/documentParties');
+const visionV3 = require('./lib/documentVisionV3');
+const extractionValidator = require('./lib/documentExtractionValidator');
+const visionCache = require('./lib/visionCache');
 const uploadIntentLib = require('./lib/uploadIntent');
-const { publicIntakeV2, publicUploadIntent } = require('./lib/documentPublicView');
+const { publicIntakeV2, publicIntakeV3, publicUploadIntent } = require('./lib/documentPublicView');
 
 const INTAKE_DOC_CAP = 500;
 
@@ -12711,6 +12769,8 @@ const publicExtractedJson = (ej) => {
     // Without this the Document Center could not show what intake concluded, so a
     // recognised invoice still read as "Unclassified".
     ai_intake_v2: publicIntakeV2(ej.ai_intake_v2),
+    // The native-vision reading and the validator's verdict.
+    ai_intake_v3: publicIntakeV3(ej.ai_intake_v3),
     // Which screen the upload came from. The UI shows it beside the AI's reading so a
     // disagreement is visible instead of silently resolved.
     upload_intent: publicUploadIntent(ej.upload_intent),
@@ -13338,6 +13398,7 @@ app.patch('/api/documents/:id/financial-fields', auth, async (req, res) => {
 // returns the orchestrator result. Writes only review metadata, and only when it
 // actually changed.
 const intakeOrchestrator = require('./lib/documentIntakeOrchestrator');
+const docBundle = require('./lib/documentBundle');
 
 /**
  * Read one document the SAME way for every caller.
@@ -13369,17 +13430,124 @@ async function readDocumentForIntake(biz, doc) {
     file_name: file.file_name, extraction_reason: ex.reason,
   });
 
-  // ── OCR / Vision fallback ────────────────────────────────────────────────
-  // Embedded text first, always: it is free, deterministic and exact. Vision runs ONLY
-  // when there was no text to read, so a readable PDF never costs a vision call and its
-  // result can never be overridden by a model's reading of the same page.
+  // ── V3: native visual understanding, PRIMARY ─────────────────────────────
+  // The model is shown the ORIGINAL document and returns a structure. This runs for
+  // every financial document, including PDFs that carry embedded text — a text layer
+  // tells us what characters are present, not what the document means, and skipping
+  // vision whenever text existed is what left classification to regexes.
   //
-  // Gated by DOCUMENT_OCR_VISION_ENABLED. Fail-open throughout: readDocumentWithVision
-  // never throws, and a result that is not `ok` leaves `extraction` exactly as the
-  // no-text path produced it — the same "unsupported" answer as before OCR existed.
+  // Embedded text still travels, as supplementary evidence. It never replaces the
+  // visual read and it never overrides the result.
+  let v3 = null;
+  let v3FromCache = false;
+  const fingerprint = visionCache.fingerprintOf(buf, {
+    model: visionV3.MODEL, promptVersion: visionV3.PROMPT_VERSION, schemaVersion: visionV3.SCHEMA_VERSION,
+  });
+  const storedV3 = (doc.extracted_json || {}).ai_intake_v3 || null;
+
+  if (visionV3.visionEnabled() && visionCache.isFresh(storedV3, fingerprint)) {
+    // Same bytes, same model, same prompt, same schema — the answer cannot have changed,
+    // so re-reading it would be paying twice for a result we already hold.
+    v3FromCache = true;
+  } else if (visionV3.visionEnabled()) {
+    // One call per identity, even if two requests arrive together.
+    v3 = await visionCache.singleFlight(fingerprint, () => visionV3.extractDocumentV3(buf, {
+      mime_type: file.mime_type, file_name: file.file_name,
+      embedded_text: ex.text_available ? ex.text : null,
+      business: {
+        legal_name: biz.business?.legal_name || biz.business?.name,
+        display_name: biz.business?.name,
+        npwp: biz.business?.npwp || null,
+        aliases: biz.business?.aliases || [],
+      },
+      client: anthropic,
+    }));
+  }
+
+  // ── is this file actually several documents? ─────────────────────────────
+  // Asked BEFORE the result is presented as one reading, and only for a file that could
+  // hold more than one document. A single page cannot be a bundle, so the common case
+  // costs nothing extra.
+  //
+  // Detection only. Children are suggestions a person confirms one at a time; no record,
+  // counterparty or link is created here, and the parent document is never split.
+  let bundle = null;
+  const pdfPages = docBundle.countPdfPages(buf);
+  if (docBundle.bundleDetectionEnabled() && visionV3.visionEnabled() && (pdfPages || 0) > 1) {
+    const bizProfile = {
+      legal_name: biz.business?.legal_name || biz.business?.name,
+      display_name: biz.business?.name,
+      name: biz.business?.name,
+      npwp: biz.business?.npwp || null,
+      aliases: biz.business?.aliases || [],
+    };
+    // Segment, then read each child on its own pages. A review that showed only "3
+    // documents detected" would tell the user nothing they could check: to confirm a
+    // split they need to see what each child actually says.
+    const packet = await docBundle.extractBundle(buf, {
+      mime_type: file.mime_type, file_name: file.file_name,
+      business: bizProfile, client: anthropic, pageCount: pdfPages,
+    });
+    if (packet.ok && packet.is_bundle) {
+      bundle = {
+        ...packet.segmentation,
+        // Each child is judged on its OWN extraction. The validator is what decides
+        // whether a child could ever imply a record, so the kwitansi in a packet is
+        // refused here exactly as it would be on its own.
+        children: packet.children.map((child) => {
+          const ex = child.extraction;
+          if (!ex?.ok) {
+            return { ...child.segment, analyzed: false, failure_reason: ex?.reason || 'unknown' };
+          }
+          const v = extractionValidator.validateExtraction(ex.extraction, {
+            business: bizProfile,
+            pagesProvided: (Number(child.segment.page_end) - Number(child.segment.page_start)) + 1,
+            uploadedAt: doc.created_at || null,
+          });
+          const parties = (ex.extraction.parties || []).map((party) => ({
+            role: party.role || null,
+            legal_name: party.legal_name?.value ?? null,
+            // Each child keeps its own party block. A number printed two pages away
+            // belongs to a different document and is not borrowed to fill a gap here.
+            npwp: party.npwp?.value ?? null,
+          }));
+          return {
+            ...child.segment,
+            analyzed: true,
+            pages_analyzed: Array.isArray(ex.extraction.pages_analyzed) ? ex.extraction.pages_analyzed : [],
+            parties,
+            fields: v.normalized,
+            tax_shape: v.tax_shape,
+            validation_status: v.status,
+            counterparty_status: v.counterparty_status,
+            can_create_counterparty: v.can_create_counterparty,
+            can_create_financial_record: v.can_create_financial_record,
+            warnings: (v.warnings || []).concat(
+              (ex.extraction.warnings || []).map((w) => String(w))).slice(0, 20),
+            blockers: (v.blockers || []).slice(0, 10),
+            input_tokens: ex.usage?.input_tokens ?? null,
+            output_tokens: ex.usage?.output_tokens ?? null,
+          };
+        }),
+      };
+    }
+  }
+
+  // ── legacy OCR (only when Opus was never asked) ──────────────────────────────────────────────────
+  // Runs only when the strong model was never asked — vision switched off, or no client
+  // configured. It is NOT a rescue for an Opus failure.
+  //
+  // That distinction is the point. If Opus times out and a weaker reader quietly supplies
+  // an answer under the same label, the user gets a worse reading with no way to tell.
+  // A visible, retryable failure beats a silent downgrade, so an analysis that was
+  // attempted and failed stays a failure.
+  // A cache hit IS a reading: we already hold v3's answer for exactly these bytes. Not
+  // counting it as attempted is what let the legacy path fire on every cached re-analysis,
+  // so a "free" repeat quietly bought a second, worse reading of the same document.
+  const v3Attempted = v3FromCache || (!!v3 && v3.reason !== 'vision_not_configured');
   let readSource = ex.text_available ? 'embedded_text' : 'filename_only';
   let ocr = null;
-  if (!ex.text_available && docOcr.ocrEnabled()) {
+  if (!v3?.ok && !v3Attempted && !ex.text_available && docOcr.ocrEnabled()) {
     ocr = await docOcr.readDocumentWithVision(buf, {
       mime_type: file.mime_type, file_name: file.file_name, client: anthropic,
     });
@@ -13402,7 +13570,46 @@ async function readDocumentForIntake(biz, doc) {
   const dates = docDates.extractDates(readText, { document_type: extraction.document_type });
   const parties = docParties.extractParties(readText);
 
-  return { file, buf, extraction, readSource, ocr, dates, parties };
+  // ── validate the structure the model returned ────────────────────────────
+  // The model extracts, this judges. The validator may accept, warn, require
+  // confirmation or reject — it never repairs a value or fills a gap, because that is
+  // precisely how the previous pipeline invented accounting facts.
+  let v3Validation = null;
+  if (v3FromCache) {
+    // Reuse the stored conclusion verbatim. Nothing was read, nothing was spent.
+    readSource = storedV3.source || readSource;
+    extraction = mergeV3IntoExtraction(extraction, null, {
+      status: storedV3.validation_status,
+      counterparty_status: storedV3.counterparty_status,
+      normalized: storedV3.fields || {},
+      warnings: storedV3.warnings || [],
+    }, storedV3.party_fields || null);
+  }
+  if (v3?.ok) {
+    v3Validation = extractionValidator.validateExtraction(v3.extraction, {
+      business: {
+        legal_name: biz.business?.legal_name || biz.business?.name,
+        display_name: biz.business?.name, name: biz.business?.name,
+        npwp: biz.business?.npwp || null, aliases: biz.business?.aliases || [],
+      },
+      pagesProvided: v3.extraction?.page_count || null,
+      uploadedAt: doc.created_at || null,
+    });
+    // A rejected structure is not a reading. Fall back rather than carry it forward.
+    if (v3Validation.status === 'rejected') {
+      v3 = { ...v3, ok: false, reason: 'validation_rejected' };
+    } else {
+      readSource = v3.source;             // native_pdf_vision | native_image_vision
+      // Bridge the structure into the shape the existing orchestrator consumes, so the
+      // v2 summary is derived from the MODEL rather than from a second, regex reading.
+      // Without this a scanned document — where v3 succeeds and the legacy reader no
+      // longer runs — would degrade to "unknown" in ai_intake_v2 during the rollout.
+      extraction = mergeV3IntoExtraction(extraction, v3.extraction, v3Validation);
+    }
+  }
+
+  return { file, buf, extraction, readSource, ocr, dates, parties, v3, v3Validation,
+    fingerprint, v3FromCache, storedV3, bundle, pdfPages };
 }
 
 async function runDocumentIntake(biz, doc, opts = {}) {
@@ -13450,18 +13657,34 @@ async function runDocumentIntake(biz, doc, opts = {}) {
     // and a cross-check — never a classification.
     uploadIntent: (doc.extracted_json || {}).upload_intent || null,
     readSource, ocr,
+    // So a failed analysis is reported as a failed analysis, with its own retryability,
+    // rather than as a document nobody tried to read.
+    v3: read.v3 || null,
   });
+
+  // The v3 summary: the model's structure, the validator's verdict, and the operational
+  // metadata needed to reason about a run later. Kept ALONGSIDE ai_intake and
+  // ai_intake_v2 — a rollout never erases what the previous version concluded.
+  const v3Summary = buildV3Summary(read, doc);
 
   let stored = false;
   if (opts.persist) {
     const summary = intakeOrchestrator.toStoredIntake(intake);
-    const previous = (doc.extracted_json || {}).ai_intake_v2 || null;
+    const prevJson = doc.extracted_json || {};
+    const previous = prevJson.ai_intake_v2 || null;
+    const prevV3 = prevJson.ai_intake_v3 || null;
     // Re-running must not churn the row or the audit trail.
-    if (!intakeOrchestrator.sameIntake(previous, summary)) {
+    const v2Changed = !intakeOrchestrator.sameIntake(previous, summary);
+    const v3Changed = !!v3Summary && !intakeOrchestrator.sameIntake(prevV3, v3Summary);
+    if (v2Changed || v3Changed) {
       try {
         await supabase.from('financial_documents')
           .update({
-            extracted_json: { ...(doc.extracted_json || {}), ai_intake_v2: summary },
+            extracted_json: {
+              ...prevJson,
+              ai_intake_v2: summary,
+              ...(v3Summary ? { ai_intake_v3: v3Summary } : {}),
+            },
             updated_at: new Date().toISOString(),
           })
           .eq('id', doc.id).eq('business_id', biz.business.id);
@@ -13471,7 +13694,140 @@ async function runDocumentIntake(biz, doc, opts = {}) {
       }
     }
   }
-  return { intake, stored };
+  return { intake, stored, v3: v3Summary };
+}
+
+/* Fold the v3 structure into the legacy extraction shape.
+   The model's values win wherever it has one; the regex reading survives only in the
+   gaps. Field names are the v2 vocabulary so nothing downstream needs to change. */
+function mergeV3IntoExtraction(base, ex, validation, storedParties = null) {
+  const n = validation?.normalized || {};
+  // `ex` is null on the cache path, where the raw party objects are not kept. The three
+  // party-derived fields are therefore persisted alongside the conclusions and restored
+  // here, so a cached answer is the SAME answer — not a thinner one that happened to look
+  // fine while the legacy reader was quietly backfilling it.
+  const parties = Array.isArray(ex?.parties) ? ex.parties : [];
+  const byId = (id) => parties.find((p) => p.party_id === id) || null;
+  const usName = byId(ex?.current_business_party_id)?.legal_name?.value || null;
+  const cpParty = byId(ex?.counterparty_candidate_party_id);
+  const cpName = validation?.counterparty_status === 'self_match' ? null : (cpParty?.legal_name?.value || null);
+  // On a document we ISSUED the counterparty is the buyer; otherwise they issued it.
+  const cpIsBuyer = ['customer', 'buyer', 'payer', 'taxable_entrepreneur_buyer'].includes(cpParty?.role);
+
+  const fields = { ...(base.fields || {}) };
+  const set = (k, v) => { if (v !== null && v !== undefined) fields[k] = v; };
+  set('document_number', n.document_number);
+  set('currency', n.currency);
+  set('commercial_base_amount', n.dpp);
+  set('commercial_tax_amount', n.ppn);
+  set('gross_amount', n.total);
+  set('amount', n.total ?? n.amount_due);
+  set('issuer_name', ex ? (cpIsBuyer ? usName : cpName) : (storedParties?.issuer_name ?? null));
+  set('buyer_name', ex ? (cpIsBuyer ? cpName : usName) : (storedParties?.buyer_name ?? null));
+  set('issuer_npwp', ex ? (cpIsBuyer ? null : (cpParty?.npwp?.value || null)) : (storedParties?.issuer_npwp ?? null));
+  set('transfer_date_text', n.payment_date || n.document_date);
+
+  return {
+    ...base,
+    document_type: n.document_type && n.document_type !== 'unknown' ? n.document_type : base.document_type,
+    // Vision is not the same class of certainty as parsed text, so it never earns 'high'.
+    confidence: validation?.status === 'ok' ? 'medium' : 'low',
+    status: 'suggested',
+    fields,
+    missing_fields: (base.missing_fields || []).filter((k) => fields[k] === null || fields[k] === undefined),
+    warnings: [...new Set([...(base.warnings || []), ...(validation?.warnings || [])])],
+    reason: null,
+    text_available: true,
+    read_source: 'native_vision',
+  };
+}
+
+/* The stored v3 record. Review metadata and operational facts only — no request
+   headers, no keys, no prompt text, and never the document's own contents beyond the
+   fields the user is being asked to confirm. */
+function buildV3Summary(read, doc) {
+  // A cache hit re-persists exactly what is already there, so the idempotency guard
+  // sees no change and the row is not touched.
+  if (read?.v3FromCache && read.storedV3) return read.storedV3;
+
+  // A failure is recorded, not discarded. Storing nothing leaves the document
+  // indistinguishable from one that was never analysed, and leaves the user with no way
+  // to ask for another attempt short of uploading the file again.
+  if (read?.v3 && !read.v3.ok) {
+    const prior = (doc?.extracted_json || {}).ai_intake_v3 || null;
+    const priorAttempts = prior && prior.analyzed === false ? Number(prior.attempts || 0) : 0;
+    return {
+      analyzed: false,
+      fingerprint: read.fingerprint || null,
+      schema_version: read.v3.schema_version || null,
+      prompt_version: read.v3.prompt_version || null,
+      model: read.v3.model || null,
+      failure: {
+        reason: read.v3.reason || 'unknown',
+        retryable: read.v3.retryable !== false,
+        user_message: read.v3.user_message || 'Analysis could not be completed.',
+        // Operator diagnostics; kept out of the public view.
+        provider_status: read.v3.provider_status ?? null,
+        provider_message: read.v3.provider_message ?? null,
+        responded_model: read.v3.responded_model ?? null,
+      },
+      attempts: priorAttempts + 1,
+      last_attempt_at: new Date().toISOString(),
+      duration_ms: read.v3.duration_ms ?? null,
+    };
+  }
+  if (!read?.v3?.ok || !read.v3Validation) return null;
+  const v = read.v3Validation;
+  return {
+    analyzed: true,
+    // Detection only: what the file contains, never what was created from it.
+    ...(read.bundle ? {
+      bundle: {
+        detected_at: new Date().toISOString(),
+        segmentation_version: read.bundle.segmentation_version,
+        shared_reference: read.bundle.shared_reference ?? null,
+        // Suggestions, one per child, for a person to confirm separately. Nothing here
+        // is a record, and nothing here creates one.
+        requires_confirmation: true,
+        children: read.bundle.children || [],
+      },
+    } : {}),
+    fingerprint: read.fingerprint || null,
+    schema_version: read.v3.schema_version,
+    prompt_version: read.v3.prompt_version,
+    model: read.v3.model,
+    responded_model: read.v3.responded_model ?? null,
+    source: read.v3.source,
+    processed_at: new Date().toISOString(),
+    duration_ms: read.v3.duration_ms ?? null,
+    input_tokens: read.v3.usage?.input_tokens ?? null,
+    output_tokens: read.v3.usage?.output_tokens ?? null,
+    page_count: read.v3.extraction?.page_count ?? null,
+    pages_analyzed: Array.isArray(read.v3.extraction?.pages_analyzed) ? read.v3.extraction.pages_analyzed : [],
+    analysis_complete: read.v3.extraction?.analysis_complete !== false,
+    validation_status: v.status,
+    counterparty_status: v.counterparty_status,
+    // Persisted so the cache path reproduces the same reading rather than a thinner one.
+    party_fields: (() => {
+      const parties = Array.isArray(read.v3.extraction?.parties) ? read.v3.extraction.parties : [];
+      const byId = (id) => parties.find((p) => p.party_id === id) || null;
+      const usName = byId(read.v3.extraction?.current_business_party_id)?.legal_name?.value || null;
+      const cpParty = byId(read.v3.extraction?.counterparty_candidate_party_id);
+      const cpName = v.counterparty_status === 'self_match' ? null : (cpParty?.legal_name?.value || null);
+      const cpIsBuyer = ['customer', 'buyer', 'payer', 'taxable_entrepreneur_buyer'].includes(cpParty?.role);
+      return {
+        issuer_name: cpIsBuyer ? usName : cpName,
+        buyer_name: cpIsBuyer ? cpName : usName,
+        issuer_npwp: cpIsBuyer ? null : (cpParty?.npwp?.value || null),
+      };
+    })(),
+    can_create_counterparty: v.can_create_counterparty,
+    can_create_financial_record: v.can_create_financial_record,
+    fields: v.normalized,
+    warnings: (v.warnings || []).slice(0, 20),
+    blockers: (v.blockers || []).slice(0, 20),
+    failed_checks: (v.checks || []).filter((c) => !c.pass).map((c) => c.id).slice(0, 20),
+  };
 }
 
 // POST /api/documents/:id/extract — suggest structured fields from the document's text.
@@ -13660,7 +14016,12 @@ app.post('/api/documents/:id/intake', auth, async (req, res) => {
     });
     if (result.error) return res.status(result.status || 500).json({ error: result.error });
 
-    res.json({ ok: true, business_id: biz.business.id, ...result.intake, stored: result.stored });
+    res.json({
+      ok: true, business_id: biz.business.id, ...result.intake, stored: result.stored,
+      // The native-vision reading, already validated. A SUGGESTION — the client must
+      // present it for confirmation, never as a confirmed value.
+      ai_intake_v3: publicIntakeV3(result.v3),
+    });
   } catch (e) {
     console.error(`[doc-intake-v2] failed: ${e.message}`);
     res.status(500).json({ ok: false, error: 'document_intake_failed' });

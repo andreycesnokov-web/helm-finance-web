@@ -27,7 +27,10 @@ const ocrEnabled = () => process.env.DOCUMENT_OCR_VISION_ENABLED === 'true';
 const MAX_OCR_BYTES = 8 * 1024 * 1024;   // ~10.7 MB base64, well inside the API limit
 const OCR_TIMEOUT_MS = 45000;
 const MAX_TEXT_CHARS = 6000;             // transcript we keep; the rest is not needed
-const MODEL = 'claude-sonnet-4-5';
+const modelPolicy = require('./modelPolicy');
+// Asked, not named. This path is unreachable in both flag states (see modelPolicy), but a
+// reader that names its own model is a reader that can drift away from the policy.
+const MODEL = modelPolicy.modelFor('legacy_ocr_transcript');
 
 const IMAGE_MIME = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
 
@@ -183,7 +186,10 @@ async function readDocumentWithVision(buffer, opts = {}) {
       'Automatic reading did not finish. Enter the values manually or try again.');
   }
 
-  const raw = (resp?.content?.[0]?.text || '').trim()
+  // NOT content[0]. Opus puts a thinking block first, so index 0 carries no .text and
+  // every reading would come back empty. Take the first actual text block.
+  const textBlock = (resp?.content || []).find((c) => c.type === 'text');
+  const raw = (textBlock?.text || '').trim()
     .replace(/^```(?:json)?/i, '').replace(/```$/, '').trim();
   if (!raw) return failure('ocr_empty_response');
   let parsed;
