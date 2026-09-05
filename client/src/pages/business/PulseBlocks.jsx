@@ -59,16 +59,27 @@ export function ExecutiveHero({ d, idr, readiness, empty }) {
   const other = d.other_cash_movement || {}
   const otherTotal = Number(other.total || 0)
 
+  // Colour carries meaning here, so it is spent carefully.
+  //
+  // Red used to mark "operating cash out", which made every ordinary month look
+  // like something had gone wrong — and left nothing louder for the cases that
+  // genuinely are wrong. Red is now reserved for a real negative position; a
+  // short runway is a warning, not a loss; and green only appears when there is
+  // actually something positive to report, so "+ Rp 0" no longer reads as good
+  // news. Cash out is simply ink: large, important, not a failure.
+  const income = Number(d.income || 0)
+  const net = Number(d.netPosition || 0)
   const kpis = [
-    { key: 'revenue', label: 'Operating revenue this month', value: '+ ' + idr(d.income), tone: 'pos',
+    { key: 'revenue', label: 'Operating revenue this month', value: '+ ' + idr(d.income),
+      tone: income > 0 ? 'pos' : undefined,
       hint: 'Earned revenue only · excludes opening balances, funding and transfers' },
-    { key: 'outflow', label: 'Operating cash out this month', value: '− ' + idr(d.expenses), tone: 'neg',
+    { key: 'outflow', label: 'Operating cash out this month', value: '− ' + idr(d.expenses),
       hint: 'Direct costs and operating expenses · excludes CAPEX, tax and financing' },
     { key: 'net', label: 'Net position', value: idr(d.netPosition),
-      tone: Number(d.netPosition) >= 0 ? 'pos' : 'neg',
+      tone: net < 0 ? 'neg' : net > 0 ? 'pos' : undefined,
       hint: 'Balance sheet view: cash + receivables − payables. Not operating performance.' },
     { key: 'runway', label: 'Runway', value: runway === null ? '—' : `${runway} days`,
-      tone: lowRunway ? 'neg' : undefined,
+      tone: lowRunway ? 'warn' : undefined,
       chip: lowRunway ? 'Below 30 days' : null,
       hint: runway === null ? 'Needs expense history' : `At ${idr(d.burnRate)}/day · ${d.burnWindowDays || 30}d window` },
   ]

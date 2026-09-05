@@ -107,6 +107,41 @@
 
 /* Summary / hero card (navy) */
 .cfo-summary{position:relative;overflow:hidden;background:var(--brand-navy);color:#fff;border-radius:var(--radius-lg);padding:24px 26px;box-shadow:var(--shadow-md)}
+/* ── page header ───────────────────────────────────────────────────────────
+   Title and description sit together on the left; context chips and actions
+   collect on the right and wrap underneath on narrow screens rather than
+   squeezing the title. */
+.cfo-pagehead-text{min-width:0}
+.cfo-pagehead-desc{
+  margin:6px 0 0;
+  max-width:64ch;
+  color:var(--text-secondary);
+  font-size:var(--text-sm);
+  line-height:var(--line-normal);
+}
+@media (max-width:640px){
+  .cfo-pagehead{flex-direction:column;align-items:stretch;gap:12px}
+  .cfo-pagehead-actions{flex-wrap:wrap}
+  .cfo-pagehead-desc{font-size:var(--text-sm)}
+}
+
+/* Focus is visible everywhere, in the brand accent rather than the UA default. */
+.cfo-pagehead-actions :is(button,a):focus-visible,
+.cfo-summary :is(button,a):focus-visible{
+  outline:var(--focus-ring-width) solid var(--focus-ring);
+  outline-offset:var(--focus-ring-offset);
+  border-radius:var(--radius-sm);
+}
+
+/* ── financial numerals ────────────────────────────────────────────────────
+   Applied to figures a person may compare against another figure. Deliberately
+   NOT applied to body copy or controls. */
+.fin{
+  font-family:var(--font-num);
+  font-variant-numeric:var(--num-features);
+  font-feature-settings:'tnum' 1,'lnum' 1;
+}
+
 .cfo-summary-sym{position:absolute;right:-18px;top:-18px;width:180px;opacity:.10}
 .cfo-summary-label{font-size:13px;color:#AFC6DE;font-weight:600}
 .cfo-summary-value{font-family:var(--font-display);font-size:40px;line-height:1.1;margin-top:6px}

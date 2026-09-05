@@ -48,10 +48,40 @@ export const StatusBadge = ({ tone = 'neutral', icon, children }) => (
   <span className={`cfo-badge cfo-badge-${tone}`}>{icon}{children}</span>
 )
 
-export const PageHeader = ({ eyebrow, title, actions }) => (
+/**
+ * The header every business-workspace page wears.
+ *
+ * There were two of these: this component, and a hand-rolled `.hf-page-header`
+ * div copied across Accounts, AI CFO, Approvals and Invoices. They disagreed on
+ * whether a page gets a description, where the action sits, and whether the
+ * title is an <h1> at all — five pages shipped no <h1> whatsoever. One contract
+ * now, so a page can leave a slot empty but cannot reinvent it.
+ *
+ * @param eyebrow    small label above the title (optional)
+ * @param title      the page name — always rendered as the page's single <h1>
+ * @param description one sentence on what the page is for (optional but expected)
+ * @param primaryAction the one thing this page is for (optional)
+ * @param secondaryActions supporting actions, shown before the primary (optional)
+ * @param context    status chips / metadata, wrapped below on narrow screens
+ * @param actions    legacy slot, kept so unmigrated pages keep working
+ */
+export const PageHeader = ({
+  eyebrow, title, description, primaryAction, secondaryActions, context, actions,
+}) => (
   <div className="cfo-pagehead">
-    <div>{eyebrow && <div className="cfo-eyebrow">{eyebrow}</div>}<h1 className="cfo-h1">{title}</h1></div>
-    {actions && <div className="cfo-pagehead-actions">{actions}</div>}
+    <div className="cfo-pagehead-text">
+      {eyebrow && <div className="cfo-eyebrow">{eyebrow}</div>}
+      <h1 className="cfo-h1">{title}</h1>
+      {description && <p className="cfo-pagehead-desc">{description}</p>}
+    </div>
+    {(primaryAction || secondaryActions || context || actions) && (
+      <div className="cfo-pagehead-actions">
+        {context}
+        {actions}
+        {secondaryActions}
+        {primaryAction}
+      </div>
+    )}
   </div>
 )
 
@@ -62,10 +92,25 @@ export const Card = ({ title, action, children, className = '', style }) => (
   </section>
 )
 
-// Summary / hero card. `metrics` = [{k, v, tone}]
-export const SummaryCard = ({ label, value, meta, metrics, symbol }) => (
+/** The official symbol, white, for use on the navy hero. Served from the
+ *  existing /brand asset pipeline — no new file, no per-render request beyond
+ *  the one cached copy the browser already holds. */
+export const HERO_SYMBOL = '/brand/symbol_white_transparent.svg'
+
+/**
+ * Summary / hero card — the one branded surface a page is allowed.
+ *
+ * The watermark is no longer a per-page choice. Pulse passed a symbol and
+ * Accounts drew a graph-paper grid instead, so the two navy heroes in the
+ * product did not look related. It now defaults to the official mark: one
+ * instance, oversized, cropped at the corner, ~10% opacity, decorative and
+ * hidden from assistive technology. Pass `symbol={null}` to opt out.
+ *
+ * `metrics` = [{k, v, tone}]
+ */
+export const SummaryCard = ({ label, value, meta, metrics, symbol = HERO_SYMBOL }) => (
   <section className="cfo-summary">
-    {symbol && <img className="cfo-summary-sym" src={symbol} alt="" aria-hidden />}
+    {symbol && <img className="cfo-summary-sym" src={symbol} alt="" aria-hidden="true" />}
     <div className="cfo-summary-label">{label}</div>
     <div className="cfo-summary-value">{value}</div>
     {meta && <div className="cfo-summary-meta">{meta}</div>}
