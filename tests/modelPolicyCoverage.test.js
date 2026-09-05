@@ -36,6 +36,43 @@ function serverFiles(dir = ROOT, out = []) {
 
 const rel = (abs) => path.relative(path.join(__dirname, '..'), abs).split(path.sep).join('/');
 
+/**
+ * The request body for one provider call.
+ *
+ * Three shapes exist in this codebase and all three must be read, because the one that
+ * matters most is the least convenient: documentVisionV3 builds `request` first and calls
+ * `messages.create(request)`, so a window taken from the call site contains none of the
+ * body. Reading only the window scored the primary reader as sending no media and matched
+ * its `model:` from an unrelated return statement further down — a guard that looked
+ * green while checking nothing.
+ */
+function requestBody(src, callIndex) {
+  const after = src.slice(callIndex);
+  const arg = after.match(/^messages\.create\(\s*([A-Za-z_$][\w$]*)\s*\)/);
+  if (arg) {
+    const decl = src.match(new RegExp(`(?:const|let|var)\\s+${arg[1]}\\s*=\\s*\\{`));
+    if (decl) {
+      // Take a generous slice from the declaration; the body is an object literal.
+      const start = src.indexOf('{', decl.index);
+      return src.slice(start, start + 2500);
+    }
+  }
+  return after.slice(0, 1500);
+}
+
+/**
+ * Does a document or an image travel with this call?
+ * An inline `type: 'document'` is the easy case; a block assembled into a variable first
+ * is the one that hid the primary reader from this check.
+ */
+function sendsMedia(body, src) {
+  if (/type:\s*'(document|image)'/.test(body)) return true;
+  const arr = body.match(/content:\s*\[\s*([A-Za-z_$][\w$]*)\s*[,\]]/);
+  if (!arr) return false;
+  const decl = src.match(new RegExp(`(?:const|let|var)\\s+${arr[1]}\\s*=([\\s\\S]{0,700}?);`));
+  return !!decl && /type:\s*'(document|image)'/.test(decl[1]);
+}
+
 /** Find every messages.create( call and the model expression it uses. */
 function providerCalls() {
   const calls = [];
@@ -44,8 +81,8 @@ function providerCalls() {
     const re = /messages\.create\(/g;
     let m;
     while ((m = re.exec(src)) !== null) {
-      const window = src.slice(m.index, m.index + 1200);
-      const model = window.match(/model:\s*([^,\n]+)/);
+      const body = requestBody(src, m.index);
+      const model = body.match(/model:\s*([^,\n]+)/);
       const line = src.slice(0, m.index).split('\n').length;
       let expr = model ? model[1].trim() : null;
       // `model: MODEL` says nothing on its own. Follow a bare identifier to the
@@ -59,8 +96,14 @@ function providerCalls() {
         file: rel(abs),
         line,
         model: expr,
-        // A call that sends a document or an image is reading a document, whatever it is called.
-        sendsMedia: /type:\s*'(document|image)'/.test(window),
+        // Does a document or an image travel with this call?
+        //
+        // Matching only an inline `type: 'document'` was not enough: documentVisionV3
+        // builds the block into a `media` variable first, so the strongest reader in the
+        // codebase was scoring as "sends no media" and skipping the check that matters
+        // most. A content array opening with a bare identifier counts too — the variable
+        // it names is resolved below.
+        sendsMedia: sendsMedia(body, src),
       });
     }
   }
