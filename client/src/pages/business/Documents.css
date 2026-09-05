@@ -268,3 +268,21 @@
   font-size: 12px; font-weight: 600; line-height: 1.45;
   color: var(--warning);
 }
+
+/* A just-uploaded row. The list is long and sorted by date, so "it is at the top"
+   is not good enough — the row the user just created says which one it is. */
+.doc-row.is-fresh {
+  border-color: var(--brand-blue, #3399FF);
+  box-shadow: 0 0 0 2px rgba(51, 153, 255, .16);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .doc-row.is-fresh { animation: doc-fresh-in 900ms ease-out; }
+  @keyframes doc-fresh-in {
+    from { background: var(--info-soft, #EFF6FF); }
+    to   { background: transparent; }
+  }
+}
+
+/* The document's parties, shown side by side so a pairing can be judged at a glance
+   rather than trusted. */
+.doc-cp-parties { display: flex; flex-direction: column; gap: 2px; margin: 6px 0; }

@@ -16,7 +16,17 @@ async function sha256Hex(file) {
 // Signed-upload flow: init → PUT to storage → complete. Returns the created
 // document (or throws with a friendly message). `meta` carries document fields;
 // `link` is an optional { target_type, target_id }.
-export async function uploadDocument(token, file, meta = {}, link = null) {
+/**
+ * Upload one document.
+ *
+ * `onStage` reports where we are, because the three steps fail differently and the
+ * user is entitled to know which one they are waiting on:
+ *   'storing'  → PUTting the bytes into storage
+ *   'creating' → asking the server to create the document record
+ * The promise resolves with the upload-complete body, whose `document.id` is the ONLY
+ * evidence that the upload actually succeeded. A stored object alone is not.
+ */
+export async function uploadDocument(token, file, meta = {}, link = null, onStage = null) {
   const payload = {
     file_name: file.name, mime_type: file.type || 'application/octet-stream',
     file_size: file.size, document_type: meta.document_type || null,
@@ -24,6 +34,7 @@ export async function uploadDocument(token, file, meta = {}, link = null) {
   // Preliminary hash so the backend can short-circuit a same-business duplicate
   // before we waste an upload. The backend re-verifies the hash server-side.
   const sha256 = await sha256Hex(file)
+  onStage?.('storing')
   const init = await apiFetch('/documents/upload-init', token, { method: 'POST', body: { ...payload, sha256 } })
   const putRes = await fetch(init.upload_url, {
     method: 'PUT',
@@ -31,6 +42,7 @@ export async function uploadDocument(token, file, meta = {}, link = null) {
     body: file,
   })
   if (!putRes.ok) throw new Error('Upload to storage failed')
+  onStage?.('creating')
   return apiFetch('/documents/upload-complete', token, {
     method: 'POST',
     body: {

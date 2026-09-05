@@ -29,7 +29,7 @@
 //     filed a document as a supplier invoice it stays in the Evidence Inbox even
 //     if the file name says "NPWP" — a stored human decision outranks a regex.
 
-import { DOCUMENT_KNOWLEDGE } from '../../lib/documentKnowledge'
+import { DOCUMENT_KNOWLEDGE } from '../../lib/documentKnowledge.js'
 
 /* ── which intake types are permanent company documents ────────────────────
    Deliberately NOT vault: bank_statement, invoice, receipt, contract,
@@ -161,13 +161,43 @@ export function vaultVerdictOf(doc) {
   }
 }
 
+/* ── what may actually LEAVE the Evidence Inbox ────────────────────────────
+   Production bug, found by uploading two byte-identical invoices whose only
+   difference was the file name: the one called "…npwp….pdf" was filed into the
+   Company Vault and vanished from the inbox the user was watching. Upload,
+   storage, both database rows and the API response were all fine — the document
+   was simply routed away by a regex over its NAME, with "high confidence".
+
+   Indonesian invoices routinely carry a tax number, or "PKP"/"NIB"/"OSS", in the
+   file name. So this hid real invoices, silently.
+
+   The rule now: a classification — from a file name OR from content/OCR — is a
+   SUGGESTION. Only a person moves a document out of the Evidence Inbox. */
+
+/** True only for a vault classification a HUMAN confirmed. */
+export const isConfirmedCompanyDoc = (doc) => {
+  const v = vaultVerdictOf(doc)
+  return !!v && v.confirmed
+}
+
+/** A vault type was suggested but nobody confirmed it: the document stays in the
+ *  inbox and says so, rather than disappearing. */
+export const needsClassificationReview = (doc) => {
+  const v = vaultVerdictOf(doc)
+  return !!v && !v.confirmed
+}
+export const CLASSIFICATION_REVIEW_LABEL = 'Needs classification review'
+
+/** Kept for callers asking "does this LOOK like a company document?" — a question
+ *  about appearance, not about where the row belongs. */
 export const isCompanyDoc = (doc) => vaultVerdictOf(doc) !== null
 
-/** Split a document list into the two views. Neither side loses a row. */
+/** Split a document list into the two views. Neither side loses a row.
+ *  Confirmed vault documents only — a suggestion never moves anything. */
 export function partitionDocuments(docs = []) {
   const evidence = []
   const vault = []
-  for (const d of docs) (isCompanyDoc(d) ? vault : evidence).push(d)
+  for (const d of docs) (isConfirmedCompanyDoc(d) ? vault : evidence).push(d)
   return { evidence, vault }
 }
 

@@ -26,6 +26,7 @@ import {
 } from './Workbench'
 import {
   vaultVerdictOf, partitionDocuments, VAULT_TYPES, vaultLabel, shelfLabel, VAULT_SHELVES,
+  needsClassificationReview, CLASSIFICATION_REVIEW_LABEL,
 } from './companyVault'
 import ReviewPanel, { RpCols, RpCol, RpActions } from './ReviewPanel'
 import DocumentPreview from './DocumentPreview'
@@ -286,7 +287,7 @@ export function IntakeRowSummary({ doc, onAnalyze, analyzing }) {
 export function DocumentQueue({
   docs, loading, active, onSelect, cpName, selected, onToggle, onClearSel, onBulkArchive, busy, blockCreate,
   onReview, onView, onArchive, onCreate, onLink, onClassify, onUpload, navigate,
-  onAnalyze, analyzing,
+  onAnalyze, analyzing, freshIds = null,
   // Inline review (desktop). Both default to inert, so the drawer path is unchanged.
   expandedId = null, renderPanel = null,
 }) {
@@ -381,7 +382,7 @@ export function DocumentQueue({
                   const isOpen = expandedId === d.id
                   return (
                     <div key={d.id} className="doc-rowgroup">
-                    <article className={`doc-row${isOpen ? ' is-rp-open' : ''}`}>
+                    <article className={`doc-row${isOpen ? ' is-rp-open' : ''}${freshIds?.has(d.id) ? ' is-fresh' : ''}`}>
                       <input type="checkbox" className="wb-check" checked={selected.has(d.id)}
                         onClick={(e) => e.stopPropagation()}
                         onChange={() => onToggle(d.id)} aria-label={`Select ${d.file?.file_name || 'document'}`} />
@@ -391,6 +392,11 @@ export function DocumentQueue({
                         <div className="doc-row-head">
                           <span className="doc-row-type">{typeLabel(d.document_type)}</span>
                           <StatusBadge tone={STATUS[st].tone}>{STATUS[st].label}</StatusBadge>
+                          {/* A suggested company type no longer removes the row from
+                              this list — it says so here instead. */}
+                          {needsClassificationReview(d) && (
+                            <StatusBadge tone="warning">{CLASSIFICATION_REVIEW_LABEL}</StatusBadge>
+                          )}
                           {channelOf(d) && <span className="doc-tag">{channelOf(d)}</span>}
                         </div>
                         <IntakeRowSummary doc={d} onAnalyze={onAnalyze} analyzing={analyzing} />
@@ -821,8 +827,29 @@ export function IntakeResult({
           )}
           <div className="rp-kv"><span>Match</span><span>{String(cpSuggestion.status || '').replace(/_/g, ' ')}</span></div>
           {(cpSuggestion.warnings || []).map((w) => <p key={w} className="rp-note rp-note-amber">{w}</p>)}
+          {/* The server decides whether a create may be offered. It refuses when the
+              reader may have identified the user's own company, or when the name and
+              tax number could not be tied to one party. */}
+          {cpSuggestion.can_create === false && (
+            <p className="rp-note rp-note-amber">
+              {cpSuggestion.reason || cpSuggestion.role_reason
+                || 'CFO AI may have identified your own company instead of the counterparty. '
+                   + 'Review the document parties before continuing.'}
+            </p>
+          )}
+          {(cpSuggestion.parties || []).length > 0 && (
+            <div className="doc-cp-parties">
+              {cpSuggestion.parties.map((p, i) => (
+                <div key={i} className="rp-kv">
+                  <span>{p.role === 'buyer_or_payer' ? 'Buyer / payer' : 'Issuer / receiver'}</span>
+                  <span>{p.legal_name}{p.npwp ? ` · NPWP ${p.npwp}` : ''}
+                    {p.is_business?.match ? ' · this business' : ''}</span>
+                </div>
+              ))}
+            </div>
+          )}
           <div className="doc-panel-acts">
-            {cpSuggestion.suggested_counterparty?.legal_name && (
+            {cpSuggestion.can_create !== false && cpSuggestion.suggested_counterparty?.legal_name && (
               <Btn sm onClick={() => onCreateCounterparty(doc, cpSuggestion)} disabled={cpBusy}>Create counterparty</Btn>
             )}
             <Btn sm variant="ghost" onClick={() => onViewCounterparty(null)}>Edit before creating</Btn>

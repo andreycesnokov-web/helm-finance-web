@@ -16,6 +16,21 @@ import { Btn, StatusBadge } from '../shell/ui'
 import { TYPE_LABEL } from '../pages/business/evidenceModel'
 
 const ACCEPT = '.pdf,.jpg,.jpeg,.png,.csv,.xlsx'
+
+/* An unambiguous state per file. "Ready" used to mean "chosen, nothing sent yet", which
+   read as "done" — so a user could close the window believing a file had been uploaded
+   when nothing had left the browser. Each state now says exactly where the file is. */
+const STATE_LABEL = (it) => {
+  if (it.status === 'queued') return 'Selected — not uploaded yet'
+  if (it.status === 'uploading') {
+    return it.stage === 'creating' ? 'Creating document…' : 'Uploading file…'
+  }
+  if (it.status === 'uploaded') return 'Document uploaded'
+  if (it.status === 'too_large') return 'Too large'
+  if (it.status === 'duplicate') return 'Already uploaded'
+  if (it.status === 'failed') return 'Not uploaded'
+  return it.status.replace('_', ' ')
+}
 const CONF_TONE = { high: 'success', medium: 'warning', low: 'warning', unknown: 'neutral' }
 
 export default function DocumentIntakeModal({ business, onClose, onUploaded, link = null,
@@ -23,7 +38,11 @@ export default function DocumentIntakeModal({ business, onClose, onUploaded, lin
   // Which screen this upload came from. Stored as review metadata so a document that
   // cannot be read still carries what the user believed they were filing. It never
   // becomes the document_type column.
-  uploadSource = 'document_center_upload' }) {
+  uploadSource = 'document_center_upload',
+  // Called with { id, file_name } the moment a document row really exists, so the
+  // list can show it immediately instead of waiting for the modal to close.
+  onDocumentCreated = null,
+  onOpenDocument = null }) {
   // `link` = { target_type, target_id }. /api/documents/upload-complete already accepts it
   // and links best-effort, so uploading evidence FOR a specific record is one real call —
   // no global upload the user then has to hunt down and attach by hand.
@@ -57,11 +76,14 @@ export default function DocumentIntakeModal({ business, onClose, onUploaded, lin
   }, [token])
 
   const upload = async () => {
+    // One click, one pass. A second click while a request is in flight would issue a
+    // second upload-init and create a second document row for the same file.
+    if (busy) return
     setBusy(true)
     for (let i = 0; i < items.length; i++) {
       const it = items[i]
-      if (it.status !== 'queued') continue
-      setItems(prev => prev.map((x, idx) => idx === i ? { ...x, status: 'uploading' } : x))
+      if (it.status !== 'queued' && it.status !== 'failed') continue
+      setItems(prev => prev.map((x, idx) => idx === i ? { ...x, status: 'uploading', stage: 'storing', error: null } : x))
       try {
         // document_type is deliberately left to the backend default/mapping; the AI Accountant
         // taxonomy is stored separately and confirmed by the user in the intake list.
@@ -70,17 +92,30 @@ export default function DocumentIntakeModal({ business, onClose, onUploaded, lin
         // role-specific evidence requirement.
         const meta = { title: it.file.name, upload_source: uploadSource }
         if (defaultType) meta.document_type = defaultType
-        await uploadDocument(token, it.file, meta, link || undefined)
-        // The server reads the document's content during upload-complete, so by the time
-        // this resolves the real classification already exists — the list below refreshes.
-        setItems(prev => prev.map((x, idx) => idx === i ? { ...x, status: 'uploaded' } : x))
+        const res = await uploadDocument(token, it.file, meta, link || undefined,
+          (stage) => setItems(prev => prev.map((x, idx) => idx === i ? { ...x, stage } : x)))
+
+        // A stored object is NOT a successful upload. Success requires the document row,
+        // and the row is what the Evidence Inbox lists — so we confirm its id before
+        // claiming anything. Without this a storage PUT that succeeded while the
+        // database insert failed would have read as "uploaded".
+        const documentId = res?.document?.id || null
+        if (!documentId) throw Object.assign(new Error('The file was stored but no document record was created.'), { partial: true })
+        setItems(prev => prev.map((x, idx) => idx === i
+          ? { ...x, status: 'uploaded', stage: 'done', documentId, fileId: res?.document?.file_id || null,
+              // Where it actually went. Routing is confirmed-only now, so a fresh
+              // upload always lands in the Evidence Inbox.
+              destination: 'inbox' }
+          : x))
+        onDocumentCreated?.({ id: documentId, file_name: it.file.name })
       } catch (e) {
         // upload-init answers a SHA-256 match with 409 { duplicate, existing_document_id }.
         // That id is the real existing document — surfaced, never guessed.
         const dup = e.code === 'duplicate' || /duplicate/i.test(e.message || '')
         const existingId = e.data?.existing_document_id || null
         setItems(prev => prev.map((x, idx) => idx === i
-          ? { ...x, status: dup ? 'duplicate' : 'failed', existingId,
+          ? { ...x, status: dup ? 'duplicate' : 'failed', existingId, stage: null,
+              partial: !!e.partial,
               error: dup
                 ? 'This file is already uploaded to this workspace.'
                 : (e.message || 'Upload failed') }
@@ -88,6 +123,8 @@ export default function DocumentIntakeModal({ business, onClose, onUploaded, lin
       }
     }
     setBusy(false)
+    // Refresh the list either way — a partial batch still has documents to show. The
+    // modal stays open so a failure is read, not dismissed.
     onUploaded?.()
   }
 
@@ -97,7 +134,11 @@ export default function DocumentIntakeModal({ business, onClose, onUploaded, lin
   }
 
   const queued = items.filter(i => i.status === 'queued').length
-  const done = items.filter(i => i.status === 'uploaded').length
+  const uploaded = items.filter(i => i.status === 'uploaded')
+  const failed = items.filter(i => i.status === 'failed')
+  // A failed file keeps its place in the queue so "Try again" can resend exactly it.
+  const retryable = failed.length > 0
+  const done = uploaded.length
 
   return (
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16 }}>
@@ -159,7 +200,7 @@ export default function DocumentIntakeModal({ business, onClose, onUploaded, lin
                       : it.status === 'duplicate' ? 'warning'
                         : it.detected ? CONF_TONE[it.detected.confidence] || 'neutral' : 'neutral'
                 }>
-                  {it.status === 'queued' ? 'Ready' : it.status === 'uploading' ? 'Uploading…' : it.status.replace('_', ' ')}
+                  {STATE_LABEL(it)}
                 </StatusBadge>
               </div>
             ))}
@@ -192,13 +233,64 @@ export default function DocumentIntakeModal({ business, onClose, onUploaded, lin
 
         <div style={{ fontSize: 11.5, color: 'var(--text-muted,#888)', marginBottom: 12, lineHeight: 1.5 }}>
           Detected types are a preliminary guess from the file name — you confirm each one after upload.
-          Nothing here verifies that a document is officially valid.
+          A file name never decides where a document is filed.
         </div>
+
+        {/* ── the outcome ───────────────────────────────────────────────────
+            Stated only once a document_id came back, and it names the destination
+            so nobody has to go looking for the file afterwards. */}
+        {uploaded.length > 0 && (
+          <div style={{ background: 'var(--success-soft,#E8F6EE)', borderRadius: 10, padding: '10px 12px', marginBottom: 12, lineHeight: 1.5 }}>
+            <div style={{ fontSize: 13, fontWeight: 800 }}>
+              {uploaded.length === 1 ? 'Document uploaded successfully' : `${uploaded.length} documents uploaded successfully`}
+            </div>
+            {uploaded.map((it, i) => (
+              <div key={i} style={{ fontSize: 12.5, marginTop: 4 }}>
+                <div style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis' }}>{it.file.name}</div>
+                <div style={{ color: 'var(--text-secondary,#555)' }}>
+                  {it.destination === 'vault' ? 'Saved to Company Vault' : 'Added to Evidence Inbox'}
+                  {' · Analysis in progress'}
+                </div>
+                {onOpenDocument && it.documentId && (
+                  <button type="button" onClick={() => onOpenDocument(it.documentId)}
+                    style={{ padding: 0, border: 0, background: 'none', font: 'inherit', fontSize: 12, fontWeight: 700, color: 'var(--text-link,#1565C0)', cursor: 'pointer', marginTop: 2 }}>
+                    Open document
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {failed.length > 0 && (
+          <div style={{ background: 'var(--danger-soft,#FDECEC)', borderRadius: 10, padding: '10px 12px', marginBottom: 12, lineHeight: 1.5 }}>
+            <div style={{ fontSize: 13, fontWeight: 800 }}>Document was not uploaded</div>
+            <div style={{ fontSize: 12.5, color: 'var(--text-secondary,#555)' }}>
+              {failed.length === 1 ? 'It was not added to Evidence Inbox.' : 'They were not added to Evidence Inbox.'}
+            </div>
+            {failed.map((it, i) => (
+              <div key={i} style={{ fontSize: 12.5, marginTop: 4 }}>
+                <span style={{ fontWeight: 600 }}>{it.file.name}</span>
+                {it.error ? <span style={{ color: 'var(--text-secondary,#555)' }}> — {it.error}</span> : null}
+                {it.partial && (
+                  <div style={{ color: 'var(--text-secondary,#555)' }}>
+                    The file reached storage but no document record was created, so it is not in your
+                    workspace. Try again — a repeat upload of the same file is detected as a duplicate.
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
 
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
           <Btn variant="ghost" onClick={onClose}>{done ? 'Done' : 'Cancel'}</Btn>
-          <Btn onClick={upload} disabled={busy || !queued}>
-            {busy ? 'Uploading…' : queued ? `Upload ${queued} file${queued > 1 ? 's' : ''}` : 'Upload'}
+          <Btn onClick={upload} disabled={busy || (!queued && !retryable)}>
+            {busy
+              ? (items.some(i => i.stage === 'creating') ? 'Creating document…' : 'Uploading file…')
+              : retryable && !queued ? `Try again`
+                : queued ? `Upload and analyze ${queued} file${queued > 1 ? 's' : ''}`
+                  : 'Upload'}
           </Btn>
         </div>
       </div>
