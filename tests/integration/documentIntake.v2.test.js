@@ -38,7 +38,7 @@ const FILES = {
   // A kwitansi that DOES carry embedded text: it must be read by the parser and must
   // never reach the vision reader, which is what proves OCR is a fallback and not a
   // first resort.
-  'b/a/kwt.pdf': makePdf('KWITANSI PT Sumber Alfaria Trijaya Tbk '
+  'b/a/kwt.pdf': makePdf('KWITANSI PT Bintang Ritel Nusantara Tbk '
     + 'Sudah terima dari : HELM CARE INDONESIA Berupa : TRANSFER '
     + 'Jumlah : Rp 11.322.000 Tanggal : 04-08-2026'),
   // Only OUR company appears — the production self-match case.
@@ -93,8 +93,8 @@ const V3_INVOICE = () => ({
   language: ['id'],
   parties: [
     { party_id: 'party_1', role: 'supplier',
-      legal_name: { value: 'PT SUMBER ALFARIA TRIJAYA TBK', confidence: 0.98, evidence: ev('PT SUMBER ALFARIA TRIJAYA TBK', 'issuer_header') },
-      npwp: { value: '01.336.238.9-054.000', normalized_value: '013362389054000', confidence: 0.96, evidence: ev('NPWP: 01.336.238.9-054.000', 'issuer_header') },
+      legal_name: { value: 'PT BINTANG RITEL NUSANTARA TBK', confidence: 0.98, evidence: ev('PT BINTANG RITEL NUSANTARA TBK', 'issuer_header') },
+      npwp: { value: '06.778.899.1-062.000', normalized_value: '067788991062000', confidence: 0.96, evidence: ev('NPWP: 06.778.899.1-062.000', 'issuer_header') },
       address: { value: null, confidence: 0, evidence: [] }, bank_accounts: [] },
     { party_id: 'party_2', role: 'buyer',
       legal_name: { value: 'PT Helm Care Indonesia', confidence: 0.98, evidence: ev('PT Helm Care Indonesia', 'buyer_header') },
@@ -118,10 +118,10 @@ const V3_INVOICE = () => ({
   warnings: [], pages_analyzed: [1], page_count: 1, analysis_complete: true,
 });
 const KWITANSI_JSON = JSON.stringify({
-  text: 'KWITANSI PT Sumber Alfaria Trijaya Tbk Sudah terima dari : HELM CARE INDONESIA '
+  text: 'KWITANSI PT Bintang Ritel Nusantara Tbk Sudah terima dari : HELM CARE INDONESIA '
     + 'Berupa : TRANSFER Untuk pembayaran : Sewa lokasi Jumlah : Rp 11.322.000 Tanggal : 04-08-2026',
   document_type: 'receipt', confidence: 'high',
-  fields: { document_number: 'KWT/TC-2607/0342', issuer_name: 'PT Sumber Alfaria Trijaya Tbk',
+  fields: { document_number: 'KWT/TC-2607/0342', issuer_name: 'PT Bintang Ritel Nusantara Tbk',
     buyer_name: null, counterparty_name: 'HELM CARE INDONESIA', date: '2026-08-04',
     currency: 'IDR', amount: 11322000, gross_amount: 11322000,
     commercial_base_amount: null, commercial_tax_amount: null, payment_method: 'TRANSFER',
@@ -500,7 +500,7 @@ const t = async (name, fn) => {
     assert.strictEqual(r.status, 200, JSON.stringify(r.body));
     assert.strictEqual(r.body.source, 'native_pdf_vision', `source was ${r.body.source}`);
     const name = r.body.suggested_counterparty?.legal_name || '';
-    assert.ok(/Alfaria/i.test(name), `no name was read: ${JSON.stringify(r.body.suggested_counterparty)}`);
+    assert.ok(/Bintang Ritel/i.test(name), `no name was read: ${JSON.stringify(r.body.suggested_counterparty)}`);
   });
 
   await t('3/4. it is still zero-write — nothing is created by asking', async () => {

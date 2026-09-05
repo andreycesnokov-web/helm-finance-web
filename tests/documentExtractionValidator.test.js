@@ -19,9 +19,9 @@ const dt = (value, printed, evidence = []) => ({ value, printed_text: printed, c
 
 const supplier = {
   party_id: 'party_1', role: 'supplier',
-  legal_name: f('PT SUMBER ALFARIA TRIJAYA TBK', ev(1, 'PT SUMBER ALFARIA TRIJAYA TBK', 'issuer_header')),
-  npwp: { value: '01.336.238.9-054.000', normalized_value: '013362389054000', confidence: 0.96,
-    evidence: ev(1, 'NPWP: 01.336.238.9-054.000', 'issuer_header') },
+  legal_name: f('PT BINTANG RITEL NUSANTARA TBK', ev(1, 'PT BINTANG RITEL NUSANTARA TBK', 'issuer_header')),
+  npwp: { value: '06.778.899.1-062.000', normalized_value: '067788991062000', confidence: 0.96,
+    evidence: ev(1, 'NPWP: 06.778.899.1-062.000', 'issuer_header') },
   address: f(null), bank_accounts: [],
 };
 const us = {
@@ -63,8 +63,8 @@ t('a clean faktur pajak validates and keeps every relationship', () => {
   assert.strictEqual(r.counterparty_status, 'ok');
   assert.strictEqual(r.can_create_counterparty, true);
   // 7/8 — the counterparty is the supplier, carrying the SUPPLIER's npwp
-  assert.strictEqual(r.normalized.counterparty.legal_name, 'PT SUMBER ALFARIA TRIJAYA TBK');
-  assert.strictEqual(r.normalized.counterparty.npwp, '01.336.238.9-054.000');
+  assert.strictEqual(r.normalized.counterparty.legal_name, 'PT BINTANG RITEL NUSANTARA TBK');
+  assert.strictEqual(r.normalized.counterparty.npwp, '06.778.899.1-062.000');
   assert.notStrictEqual(r.normalized.counterparty.npwp, '09.876.543.2-101.000');
   // 17 — three distinct money fields
   assert.strictEqual(r.normalized.dpp, 10200000);
@@ -101,8 +101,8 @@ t('10. an alias identifies the business too', () => {
 console.log('\n4/8. cross-party pairing');
 t('4/8. a name and an NPWP read from different places is flagged', () => {
   const mixed = { ...supplier,
-    npwp: { value: '01.336.238.9-054.000', normalized_value: '013362389054000', confidence: 0.5,
-      evidence: ev(2, 'NPWP: 01.336.238.9-054.000', 'buyer_header') } };  // other page AND other section
+    npwp: { value: '06.778.899.1-062.000', normalized_value: '067788991062000', confidence: 0.5,
+      evidence: ev(2, 'NPWP: 06.778.899.1-062.000', 'buyer_header') } };  // other page AND other section
   const r = validateExtraction(base({ parties: [mixed, us] }), ctx);
   assert.strictEqual(r.status, STATUS.NEEDS_REVIEW);
   assert.ok(r.warnings.some((w) => /different\s+places/i.test(w)), r.warnings.join(' | '));

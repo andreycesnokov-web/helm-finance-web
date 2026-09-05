@@ -617,14 +617,14 @@ const KWT_DOC = {
       analyzed: true,
       fields: {},
       bundle: {
-        shared_reference: 'TC-2607-0342',
+        shared_reference: 'TC-2411-0865',
         requires_confirmation: true,
         children: [
           {
             index: 1, document_type: 'kwitansi', title_printed_text: 'KWITANSI',
-            page_start: 1, page_end: 1, identifier: 'SAT/Z001/K-P/26/VIII/0133',
+            page_start: 1, page_end: 1, identifier: 'BRN/Z001/K-P/26/VIII/0177',
             analyzed: true,
-            parties: [{ role: 'supplier', legal_name: 'PT SUMBER ALFARIA TRIJAYA TBK', npwp: null }],
+            parties: [{ role: 'supplier', legal_name: 'PT BINTANG RITEL NUSANTARA TBK', npwp: null }],
             fields: { currency: 'IDR', total: 11322000, dpp: null, ppn: null,
               document_date: '2026-08-04', due_date: null, payment_date: null },
             validation_status: 'needs_review', counterparty_status: 'ok',
@@ -634,11 +634,11 @@ const KWT_DOC = {
           },
           {
             index: 2, document_type: 'faktur_pajak', title_printed_text: 'Faktur Pajak',
-            page_start: 2, page_end: 2, identifier: '04002600300202886',
+            page_start: 2, page_end: 2, identifier: '04002600300455129',
             analyzed: true,
             parties: [
-              { role: 'taxable_entrepreneur_seller', legal_name: 'SUMBER ALFARIA TRIJAYA', npwp: '0013362389054000' },
-              { role: 'taxable_entrepreneur_buyer', legal_name: 'HELM CARE INDONESIA', npwp: '1000000002284592' },
+              { role: 'taxable_entrepreneur_seller', legal_name: 'BINTANG RITEL NUSANTARA', npwp: '0067788991062000' },
+              { role: 'taxable_entrepreneur_buyer', legal_name: 'HELM CARE INDONESIA', npwp: '1000000009114703' },
             ],
             fields: { currency: 'IDR', subtotal: 10200000, dpp: 9350000, dpp_nilai_lain: 9350000,
               ppn: 1122000, withholding_tax: null, total: null, document_date: '2026-08-04' },
@@ -649,9 +649,9 @@ const KWT_DOC = {
           },
           {
             index: 3, document_type: 'contract', title_printed_text: 'SURAT KESEPAKATAN - SEWA TEMPAT',
-            page_start: 3, page_end: 3, identifier: 'TC-2607-0342',
+            page_start: 3, page_end: 3, identifier: 'TC-2411-0865',
             analyzed: true,
-            parties: [{ role: 'supplier', legal_name: 'PT SUMBER ALFARIA TRIJAYA Tbk', npwp: null }],
+            parties: [{ role: 'supplier', legal_name: 'PT BINTANG RITEL NUSANTARA Tbk', npwp: null }],
             fields: { currency: 'IDR', subtotal: 10200000, total: 11322000,
               document_date: '2026-07-30', due_date: '2026-08-14' },
             validation_status: 'needs_review', counterparty_status: 'ok',
@@ -676,11 +676,11 @@ t('the review announces the count and lists every child', () => {
 t('each child shows its page range, type and reference', () => {
   const [a, b, c] = V.bundleReview(KWT_DOC).children;
   assert.strictEqual(a.pages, 'Page 1');
-  assert.strictEqual(a.reference, 'SAT/Z001/K-P/26/VIII/0133');
+  assert.strictEqual(a.reference, 'BRN/Z001/K-P/26/VIII/0177');
   assert.strictEqual(b.pages, 'Page 2');
-  assert.strictEqual(b.reference, '04002600300202886');
+  assert.strictEqual(b.reference, '04002600300455129');
   assert.strictEqual(c.pages, 'Page 3');
-  assert.strictEqual(c.reference, 'TC-2607-0342');
+  assert.strictEqual(c.reference, 'TC-2411-0865');
   // three distinct references — nothing flattened into one
   assert.strictEqual(new Set([a.reference, b.reference, c.reference]).size, 3);
 });
@@ -730,7 +730,7 @@ t('nothing in the review reads as something already created', () => {
 
 t('a shared reference relates the documents without merging them', () => {
   const r = V.bundleReview(KWT_DOC);
-  assert.strictEqual(r.sharedReference, 'TC-2607-0342');
+  assert.strictEqual(r.sharedReference, 'TC-2411-0865');
   assert.strictEqual(r.count, 3, 'a shared reference is a relationship, not a merge');
 });
 

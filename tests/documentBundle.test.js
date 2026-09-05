@@ -18,15 +18,15 @@ const PDF = Buffer.from('%PDF-1.4 three documents in one scan');
 // and the agreement they both refer to.
 const KWT_BUNDLE = {
   is_bundle: true,
-  shared_reference: 'TC-2607-0342',
+  shared_reference: 'TC-2411-0865',
   reasoning: 'Three headings, three issuers, three numbers.',
   documents: [
     { index: 1, document_type: 'kwitansi', title_printed_text: 'KWITANSI', page_start: 1, page_end: 1,
-      identifier: 'SAT/Z001/K-P/26/VIII/0133', confidence: 0.96 },
+      identifier: 'BRN/Z001/K-P/26/VIII/0177', confidence: 0.96 },
     { index: 2, document_type: 'faktur_pajak', title_printed_text: 'Faktur Pajak', page_start: 2, page_end: 2,
-      identifier: '04002600300202886', confidence: 0.97 },
+      identifier: '04002600300455129', confidence: 0.97 },
     { index: 3, document_type: 'contract', title_printed_text: 'Surat Kesepakatan Sewa Tempat', page_start: 3, page_end: 3,
-      identifier: 'TC-2607-0342', confidence: 0.93 },
+      identifier: 'TC-2411-0865', confidence: 0.93 },
   ],
 };
 
@@ -65,8 +65,8 @@ const stub = (segInput, opts = {}) => ({
     assert.strictEqual(r.is_bundle, true);
     assert.strictEqual(r.documents.length, 3);
     assert.deepStrictEqual(r.documents.map((d) => d.identifier),
-      ['SAT/Z001/K-P/26/VIII/0133', '04002600300202886', 'TC-2607-0342']);
-    assert.strictEqual(r.shared_reference, 'TC-2607-0342');
+      ['BRN/Z001/K-P/26/VIII/0177', '04002600300455129', 'TC-2411-0865']);
+    assert.strictEqual(r.shared_reference, 'TC-2411-0865');
     assert.deepStrictEqual(r.problems, []);
   });
 
@@ -179,7 +179,7 @@ const stub = (segInput, opts = {}) => ({
   await t('the children keep their own identities — nothing is flattened', async () => {
     const r = await B.extractBundle(PDF, { mime_type: 'application/pdf', client: stub(KWT_BUNDLE), pageCount: 3 });
     const ids = r.children.map((c) => c.segment.identifier);
-    assert.deepStrictEqual(ids, ['SAT/Z001/K-P/26/VIII/0133', '04002600300202886', 'TC-2607-0342']);
+    assert.deepStrictEqual(ids, ['BRN/Z001/K-P/26/VIII/0177', '04002600300455129', 'TC-2411-0865']);
     assert.strictEqual(new Set(ids).size, 3, 'three documents must stay three');
     const types = r.children.map((c) => c.segment.document_type);
     assert.deepStrictEqual(types, ['kwitansi', 'faktur_pajak', 'contract']);
@@ -187,7 +187,7 @@ const stub = (segInput, opts = {}) => ({
 
   await t('a shared reference relates the documents without merging them', async () => {
     const r = await B.extractBundle(PDF, { mime_type: 'application/pdf', client: stub(KWT_BUNDLE), pageCount: 3 });
-    assert.strictEqual(r.shared_reference, 'TC-2607-0342');
+    assert.strictEqual(r.shared_reference, 'TC-2411-0865');
     assert.strictEqual(r.children.length, 3, 'a shared reference is a relationship, not a merge');
   });
 
