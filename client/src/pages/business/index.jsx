@@ -216,9 +216,16 @@ export function BusinessDocuments() {
   const [fresh, setFresh] = useState(() => new Set())
   const [moved, setMoved] = useState(null)   // { id, name, previousType } after a vault move
 
-  const load = useCallback(() => {
+  // `quiet` refreshes the data WITHOUT flipping the page into its loading state.
+  //
+  // That matters more than it sounds: while st.loading is true this component returns a
+  // skeleton early, which unmounts everything below it — including the upload modal.
+  // A refresh triggered from inside that modal was therefore destroying it mid-flight,
+  // so the "Document uploaded successfully / Open document" panel never survived long
+  // enough to be read. It is also what made every Re-analyze collapse the whole page.
+  const load = useCallback((opts = {}) => {
     if (!token || !active) return
-    setSt((v) => ({ ...v, loading: true, error: null }))
+    if (!opts.quiet) setSt((v) => ({ ...v, loading: true, error: null }))
     Promise.all([
       apiFetch('/documents', token),
       apiFetch('/debts', token).catch(() => []),
@@ -226,7 +233,9 @@ export function BusinessDocuments() {
     ]).then(([docs, debts, cps]) => setSt({
       loading: false, error: null, docs: docs.documents || [],
       debts: Array.isArray(debts) ? debts : [], cps: cps.counterparties || [],
-    })).catch((e) => setSt({ loading: false, error: e.message || 'Request failed', docs: [], debts: [], cps: [] }))
+    })).catch((e) => (opts.quiet
+      ? setSt((v) => ({ ...v, loading: false, error: e.message || 'Request failed' }))
+      : setSt({ loading: false, error: e.message || 'Request failed', docs: [], debts: [], cps: [] })))
   }, [token, active])
   useEffect(() => { load() }, [load, scopeKey])
 
@@ -329,7 +338,7 @@ export function BusinessDocuments() {
     try {
       await apiFetch(`/ai-accountant/documents/${moved.id}/classification`, token,
         { method: 'PATCH', body: { doc_type: moved.previousType || 'unknown' } })
-      setMoved(null); load()
+      setMoved(null); load({ quiet: true })
     } catch (e) { setErr(e.message || 'Could not undo the move') } finally { setBusy(false) }
   }
 
@@ -345,7 +354,7 @@ export function BusinessDocuments() {
     try {
       const r = await apiFetch(`/documents/${d.id}/intake`, token, { method: 'POST' })
       setAnalyzeNote(r?.stored ? 'Analysis updated.' : 'Analysis is already up to date.')
-      load()
+      load({ quiet: true })
     } catch (e) {
       // Shown next to the button that failed — the panel does not render the page-level
       // error, so routing it to setErr alone would fail silently.
@@ -384,7 +393,7 @@ export function BusinessDocuments() {
       setCpSuggestion(null)
       const id = created?.counterparty?.id || created?.id || null
       if (id && sugg.status !== 'matched') await linkCounterparty(d, id, { quiet: true })
-      load()
+      load({ quiet: true })
     } catch (e) {
       setCpError(/duplicate/i.test(e.message || '')
         ? 'A similar counterparty already exists. Use the existing record, or create it from the Counterparties page if it is genuinely different.'
@@ -400,7 +409,7 @@ export function BusinessDocuments() {
     setCpBusy(true); if (!opts.quiet) setCpError(null)
     try {
       await apiFetch(`/documents/${d.id}`, token, { method: 'PATCH', body: { counterparty_id: counterpartyId } })
-      setCpSuggestion(null); load()
+      setCpSuggestion(null); load({ quiet: true })
     } catch (e) { setCpError(e.message || 'Could not link the counterparty') }
     finally { setCpBusy(false) }
   }
@@ -425,7 +434,7 @@ export function BusinessDocuments() {
           gross_amount: num(f.gross_amount),
         },
       })
-      setFieldsDoc(null); load()
+      setFieldsDoc(null); load({ quiet: true })
     } catch (e) { setErr(e.message || 'Could not save the fields') } finally { setBusy(false) }
   }
 
@@ -612,14 +621,14 @@ export function BusinessDocuments() {
         onDocumentCreated={({ id }) => {
           setQueue('all'); setView('inbox')
           setFresh((f) => new Set(f).add(id))
-          load()
+          load({ quiet: true })
         }}
         onOpenDocument={(id) => {
           setUpload(false)
           const found = st.docs.find((d) => d.id === id)
           if (found) setReview(found)
         }}
-        onUploaded={() => load()} />
+        onUploaded={() => load({ quiet: true })} />
     )}
   </>
 }
