@@ -55,7 +55,68 @@ const FILES = {
 // OCR path under test with no network and no key — and proves the flag really gates it,
 // because a call arriving while OCR is off would show up in OCR_CALLS.
 let OCR_MODE = 'ok';
+let V3_MODE = 'ok';
 const OCR_CALLS = [];
+
+// The structure a native visual read returns: two whole parties, three distinct dates,
+// three distinct amounts. Nothing here is prose to be re-parsed.
+const ev = (t, section) => [{ page: 1, printed_text: t, section }];
+// A real model answers differently per document, so the stub must too — otherwise the
+// tests only prove the plumbing. It reads the weak file-name hint in the request, which
+// is the one thing that differs between our fixtures.
+const V3_RESULT = (args) => {
+  const text = args?.messages?.[0]?.content?.[1]?.text || '';
+  const isKwitansi = /kwitansi|scan\.pdf/i.test(text);
+  const base = V3_INVOICE();
+  if (!isKwitansi) return base;
+  return {
+    ...base,
+    document_type: { value: 'receipt', confidence: 0.96, evidence: ev('KWITANSI', 'title') },
+    dates: {
+      document_date: { value: '2026-08-04', printed_text: '04-08-2026', confidence: 0.95, evidence: ev('Tanggal: 04-08-2026') },
+      due_date: { value: null, printed_text: null, confidence: 0, evidence: [] },
+      payment_date: { value: '2026-08-04', printed_text: '04-08-2026', confidence: 0.95, evidence: ev('Tanggal: 04-08-2026') },
+    },
+    amounts: {
+      currency: 'IDR',
+      dpp: { value: null, calculated: false, confidence: 0, evidence: [] },
+      ppn: { value: null, calculated: false, confidence: 0, evidence: [] },
+      total: { value: 11322000, calculated: false, confidence: 0.97, evidence: ev('Jumlah: Rp 11.322.000') },
+    },
+  };
+};
+
+const V3_INVOICE = () => ({
+  schema_version: 'financial_document_extraction_v3',
+  document_type: { value: 'faktur_pajak', confidence: 0.97, evidence: ev('Faktur Pajak', 'title') },
+  document_number: { value: 'X2610001139', confidence: 0.95, evidence: [] },
+  language: ['id'],
+  parties: [
+    { party_id: 'party_1', role: 'supplier',
+      legal_name: { value: 'PT SUMBER ALFARIA TRIJAYA TBK', confidence: 0.98, evidence: ev('PT SUMBER ALFARIA TRIJAYA TBK', 'issuer_header') },
+      npwp: { value: '01.336.238.9-054.000', normalized_value: '013362389054000', confidence: 0.96, evidence: ev('NPWP: 01.336.238.9-054.000', 'issuer_header') },
+      address: { value: null, confidence: 0, evidence: [] }, bank_accounts: [] },
+    { party_id: 'party_2', role: 'buyer',
+      legal_name: { value: 'PT Helm Care Indonesia', confidence: 0.98, evidence: ev('PT Helm Care Indonesia', 'buyer_header') },
+      npwp: { value: null, normalized_value: null, confidence: 0, evidence: [] },
+      address: { value: null, confidence: 0, evidence: [] }, bank_accounts: [] },
+  ],
+  current_business_party_id: 'party_2',
+  counterparty_candidate_party_id: 'party_1',
+  relationship_confidence: 0.97,
+  dates: {
+    document_date: { value: '2026-08-04', printed_text: '04 Agustus 2026', confidence: 0.96, evidence: ev('Tanggal: 04 Agustus 2026') },
+    due_date: { value: '2026-09-03', printed_text: '03 September 2026', confidence: 0.9, evidence: ev('Jatuh Tempo') },
+    payment_date: { value: null, printed_text: null, confidence: 0, evidence: [] },
+  },
+  amounts: {
+    currency: 'IDR',
+    dpp: { value: 10200000, calculated: false, confidence: 0.96, evidence: ev('Dasar Pengenaan Pajak 10.200.000') },
+    ppn: { value: 1122000, calculated: false, confidence: 0.96, evidence: ev('Jumlah PPN 1.122.000') },
+    total: { value: 11322000, calculated: false, confidence: 0.97, evidence: ev('Netto 11.322.000') },
+  },
+  warnings: [], pages_analyzed: [1], page_count: 1, analysis_complete: true,
+});
 const KWITANSI_JSON = JSON.stringify({
   text: 'KWITANSI PT Sumber Alfaria Trijaya Tbk Sudah terima dari : HELM CARE INDONESIA '
     + 'Berupa : TRANSFER Untuk pembayaran : Sewa lokasi Jumlah : Rp 11.322.000 Tanggal : 04-08-2026',
@@ -76,6 +137,14 @@ Module._load = function (request) {
         this.messages = { create: async (args) => {
           OCR_CALLS.push(args);
           if (OCR_MODE === 'throw') throw new Error('provider unavailable');
+          // A v3 request forces a tool; anything else is the legacy prose reader.
+          if (args.tool_choice?.type === 'tool') {
+            if (V3_MODE === 'reject') return { content: [{ type: 'text', text: 'no tool for you' }] };
+            return {
+              content: [{ type: 'tool_use', name: 'record_financial_document', input: V3_RESULT(args) }],
+              usage: { input_tokens: 3000, output_tokens: 700 },
+            };
+          }
           return { content: [{ type: 'text', text: KWITANSI_JSON }] };
         } };
       }
@@ -337,15 +406,19 @@ const t = async (name, fn) => {
     assert.ok(!('actor_user_id' in up));
   });
 
-  await t('2/4. an embedded-text kwitansi is read WITHOUT calling the vision reader', async () => {
+  await t('3. an embedded-text PDF IS still analysed visually', async () => {
+    // The old rule was "if embedded text exists, skip Vision". That is exactly what left
+    // classification to regexes, so it is gone: a text layer says which characters are
+    // present, not what the document means.
     process.env.DOCUMENT_OCR_VISION_ENABLED = 'true';
     const before = OCR_CALLS.length;
     const r = await call('POST', '/documents/d-kwt/intake', { biz: A });
     assert.strictEqual(r.status, 200, JSON.stringify(r.body));
-    assert.strictEqual(r.body.source, 'embedded_text', 'text first, always');
-    assert.strictEqual(OCR_CALLS.length, before, 'a readable document must not cost a vision call');
-    assert.strictEqual(r.body.document.type, 'receipt');
-    assert.strictEqual(r.body.financial_record.amount, 11322000);
+    assert.strictEqual(r.body.source, 'native_pdf_vision', `source was ${r.body.source}`);
+    assert.ok(OCR_CALLS.length > before, 'a text-bearing PDF must still reach the model');
+    const sent = OCR_CALLS[OCR_CALLS.length - 1];
+    assert.strictEqual(sent.messages[0].content[0].type, 'document', 'the ORIGINAL pdf was sent');
+    assert.strictEqual(sent.tool_choice?.type, 'tool', 'the schema was forced');
     // …and the intent still does not touch the column.
     assert.strictEqual(docRow('d-kwt').document_type, 'other');
     delete process.env.DOCUMENT_OCR_VISION_ENABLED;
@@ -370,7 +443,7 @@ const t = async (name, fn) => {
   await t('5. with OCR enabled the same scan is read and classified', async () => {
     process.env.DOCUMENT_OCR_VISION_ENABLED = 'true';
     const r = await call('POST', '/documents/d-scan/intake', { biz: A });
-    assert.strictEqual(r.body.source, 'ocr_vision', `source was ${r.body.source}`);
+    assert.strictEqual(r.body.source, 'native_pdf_vision', `source was ${r.body.source}`);
     assert.strictEqual(r.body.document.type, 'receipt');
     assert.strictEqual(r.body.financial_record.amount, 11322000);
     assert.notStrictEqual(r.body.status, 'unsupported');
@@ -402,7 +475,7 @@ const t = async (name, fn) => {
     assert.ok(!/Sudah terima dari/i.test(s), 'document text must not be exposed');
     assert.ok(!/ocr_text/.test(s));
     const v2 = (r.body.documents || []).find((d) => d.id === 'd-scan').extracted_json.ai_intake_v2;
-    assert.strictEqual(v2.source, 'ocr_vision', 'how it was read is fine to expose');
+    assert.strictEqual(v2.source, 'native_pdf_vision', 'how it was read is fine to expose');
     assert.ok(!('text' in v2) && !('raw_text_excerpt' in v2));
   });
 
@@ -425,7 +498,7 @@ const t = async (name, fn) => {
     process.env.DOCUMENT_OCR_VISION_ENABLED = 'true';
     const r = await call('POST', '/documents/d-scan/counterparty-suggestion', { biz: A });
     assert.strictEqual(r.status, 200, JSON.stringify(r.body));
-    assert.strictEqual(r.body.source, 'ocr_vision', `source was ${r.body.source}`);
+    assert.strictEqual(r.body.source, 'native_pdf_vision', `source was ${r.body.source}`);
     const name = r.body.suggested_counterparty?.legal_name || '';
     assert.ok(/Alfaria/i.test(name), `no name was read: ${JSON.stringify(r.body.suggested_counterparty)}`);
   });
@@ -441,7 +514,7 @@ const t = async (name, fn) => {
   await t('the extract endpoint reads the same scanned document too', async () => {
     const r = await call('POST', '/documents/d-scan/extract', { biz: A });
     assert.strictEqual(r.status, 200, JSON.stringify(r.body));
-    assert.strictEqual(r.body.source, 'ocr_vision');
+    assert.strictEqual(r.body.source, 'native_pdf_vision');
     assert.strictEqual(r.body.saved, false, 'extraction never writes');
     assert.strictEqual(r.body.extraction.document_type, 'receipt');
   });

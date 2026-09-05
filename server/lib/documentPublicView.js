@@ -69,4 +69,50 @@ function publicUploadIntent(intent) {
   };
 }
 
-module.exports = { publicIntakeV2, publicUploadIntent, PUBLIC_INTAKE_V2_FIELDS };
+/** The v3 record, field by field.
+ *
+ *  What is deliberately NOT here: the prompt, the request, any key or header, the raw
+ *  tool payload, page images, and the evidence excerpts (which quote the document's own
+ *  text). The client gets the CONCLUSION and the operational facts about the run — never
+ *  the document's contents beyond the values it is asking the user to confirm. */
+function publicIntakeV3(v3) {
+  if (!v3 || typeof v3 !== 'object') return null;
+  const f = v3.fields && typeof v3.fields === 'object' ? v3.fields : {};
+  const cp = f.counterparty && typeof f.counterparty === 'object' ? f.counterparty : null;
+  return {
+    schema_version: STR(v3.schema_version),
+    prompt_version: STR(v3.prompt_version),
+    model: STR(v3.model),
+    source: STR(v3.source),
+    processed_at: STR(v3.processed_at),
+    duration_ms: NUM(v3.duration_ms),
+    page_count: NUM(v3.page_count),
+    pages_analyzed: Array.isArray(v3.pages_analyzed)
+      ? v3.pages_analyzed.filter((n) => Number.isFinite(n)).slice(0, 50) : [],
+    analysis_complete: BOOL(v3.analysis_complete),
+    validation_status: STR(v3.validation_status),
+    counterparty_status: STR(v3.counterparty_status),
+    can_create_counterparty: BOOL(v3.can_create_counterparty),
+    can_create_financial_record: BOOL(v3.can_create_financial_record),
+    fields: {
+      document_type: STR(f.document_type),
+      document_number: STR(f.document_number),
+      currency: STR(f.currency),
+      dpp: NUM(f.dpp), ppn: NUM(f.ppn), total: NUM(f.total),
+      amount_paid: NUM(f.amount_paid), amount_due: NUM(f.amount_due),
+      document_date: STR(f.document_date),
+      due_date: STR(f.due_date),
+      payment_date: STR(f.payment_date),
+      counterparty: cp ? {
+        legal_name: STR(cp.legal_name),
+        npwp: STR(cp.npwp),
+        role: STR(cp.role),
+      } : null,
+    },
+    warnings: LIST(v3.warnings),
+    blockers: LIST(v3.blockers),
+    failed_checks: LIST(v3.failed_checks),
+  };
+}
+
+module.exports = { publicIntakeV2, publicIntakeV3, publicUploadIntent, PUBLIC_INTAKE_V2_FIELDS };

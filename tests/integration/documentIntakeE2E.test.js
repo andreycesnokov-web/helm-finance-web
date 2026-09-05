@@ -531,8 +531,12 @@ test('H8. the generic /api/documents endpoints do not leak extraction internals'
     // `upload_intent` joined the whitelist so the UI can show what the user believed they
     // were uploading beside what the reader made of it. Like ai_intake_v2 it is a
     // field-by-field whitelist of our own vocabulary — no document content.
+    // ai_intake_v3 carries the native-vision reading and the validator's verdict. Like
+    // its predecessors it is a field-by-field whitelist: conclusions and run metadata,
+    // never the prompt, the request, or the document's own text.
     assert.deepStrictEqual(Object.keys(doc.extracted_json).sort(),
-      ['ai_intake', 'ai_intake_v2', 'notes', 'upload_intent']);
+      ['ai_intake', 'ai_intake_v2', 'ai_intake_v3', 'notes', 'upload_intent']);
+    assert.strictEqual(doc.extracted_json.ai_intake_v3, null, 'nothing ran for this document');
     assert.ok(!('classified_at' in (doc.extracted_json.ai_intake || {})), 'internals stay private');
     assert.ok(!('extraction_ms' in (doc.extracted_json.ai_intake || {})));
     // Neither has run for this document, so both keys carry nothing.

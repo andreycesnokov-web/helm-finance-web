@@ -12589,8 +12589,10 @@ const docExtract = require('./lib/documentExtraction');
 const docOcr = require('./lib/documentOcr');
 const docDates = require('./lib/documentDates');
 const docParties = require('./lib/documentParties');
+const visionV3 = require('./lib/documentVisionV3');
+const extractionValidator = require('./lib/documentExtractionValidator');
 const uploadIntentLib = require('./lib/uploadIntent');
-const { publicIntakeV2, publicUploadIntent } = require('./lib/documentPublicView');
+const { publicIntakeV2, publicIntakeV3, publicUploadIntent } = require('./lib/documentPublicView');
 
 const INTAKE_DOC_CAP = 500;
 
@@ -12711,6 +12713,8 @@ const publicExtractedJson = (ej) => {
     // Without this the Document Center could not show what intake concluded, so a
     // recognised invoice still read as "Unclassified".
     ai_intake_v2: publicIntakeV2(ej.ai_intake_v2),
+    // The native-vision reading and the validator's verdict.
+    ai_intake_v3: publicIntakeV3(ej.ai_intake_v3),
     // Which screen the upload came from. The UI shows it beside the AI's reading so a
     // disagreement is visible instead of silently resolved.
     upload_intent: publicUploadIntent(ej.upload_intent),
@@ -13369,17 +13373,35 @@ async function readDocumentForIntake(biz, doc) {
     file_name: file.file_name, extraction_reason: ex.reason,
   });
 
-  // ── OCR / Vision fallback ────────────────────────────────────────────────
-  // Embedded text first, always: it is free, deterministic and exact. Vision runs ONLY
-  // when there was no text to read, so a readable PDF never costs a vision call and its
-  // result can never be overridden by a model's reading of the same page.
+  // ── V3: native visual understanding, PRIMARY ─────────────────────────────
+  // The model is shown the ORIGINAL document and returns a structure. This runs for
+  // every financial document, including PDFs that carry embedded text — a text layer
+  // tells us what characters are present, not what the document means, and skipping
+  // vision whenever text existed is what left classification to regexes.
   //
-  // Gated by DOCUMENT_OCR_VISION_ENABLED. Fail-open throughout: readDocumentWithVision
-  // never throws, and a result that is not `ok` leaves `extraction` exactly as the
-  // no-text path produced it — the same "unsupported" answer as before OCR existed.
+  // Embedded text still travels, as supplementary evidence. It never replaces the
+  // visual read and it never overrides the result.
+  let v3 = null;
+  if (visionV3.visionEnabled()) {
+    v3 = await visionV3.extractDocumentV3(buf, {
+      mime_type: file.mime_type, file_name: file.file_name,
+      embedded_text: ex.text_available ? ex.text : null,
+      business: {
+        legal_name: biz.business?.legal_name || biz.business?.name,
+        display_name: biz.business?.name,
+        npwp: biz.business?.npwp || null,
+        aliases: biz.business?.aliases || [],
+      },
+      client: anthropic,
+    });
+  }
+
+  // ── legacy OCR fallback ──────────────────────────────────────────────────
+  // Kept for the case where v3 could not run or did not return: a document must never
+  // become less readable than it was before this change.
   let readSource = ex.text_available ? 'embedded_text' : 'filename_only';
   let ocr = null;
-  if (!ex.text_available && docOcr.ocrEnabled()) {
+  if (!v3?.ok && !ex.text_available && docOcr.ocrEnabled()) {
     ocr = await docOcr.readDocumentWithVision(buf, {
       mime_type: file.mime_type, file_name: file.file_name, client: anthropic,
     });
@@ -13402,7 +13424,35 @@ async function readDocumentForIntake(biz, doc) {
   const dates = docDates.extractDates(readText, { document_type: extraction.document_type });
   const parties = docParties.extractParties(readText);
 
-  return { file, buf, extraction, readSource, ocr, dates, parties };
+  // ── validate the structure the model returned ────────────────────────────
+  // The model extracts, this judges. The validator may accept, warn, require
+  // confirmation or reject — it never repairs a value or fills a gap, because that is
+  // precisely how the previous pipeline invented accounting facts.
+  let v3Validation = null;
+  if (v3?.ok) {
+    v3Validation = extractionValidator.validateExtraction(v3.extraction, {
+      business: {
+        legal_name: biz.business?.legal_name || biz.business?.name,
+        display_name: biz.business?.name, name: biz.business?.name,
+        npwp: biz.business?.npwp || null, aliases: biz.business?.aliases || [],
+      },
+      pagesProvided: v3.extraction?.page_count || null,
+      uploadedAt: doc.created_at || null,
+    });
+    // A rejected structure is not a reading. Fall back rather than carry it forward.
+    if (v3Validation.status === 'rejected') {
+      v3 = { ...v3, ok: false, reason: 'validation_rejected' };
+    } else {
+      readSource = v3.source;             // native_pdf_vision | native_image_vision
+      // Bridge the structure into the shape the existing orchestrator consumes, so the
+      // v2 summary is derived from the MODEL rather than from a second, regex reading.
+      // Without this a scanned document — where v3 succeeds and the legacy reader no
+      // longer runs — would degrade to "unknown" in ai_intake_v2 during the rollout.
+      extraction = mergeV3IntoExtraction(extraction, v3.extraction, v3Validation);
+    }
+  }
+
+  return { file, buf, extraction, readSource, ocr, dates, parties, v3, v3Validation };
 }
 
 async function runDocumentIntake(biz, doc, opts = {}) {
@@ -13452,16 +13502,29 @@ async function runDocumentIntake(biz, doc, opts = {}) {
     readSource, ocr,
   });
 
+  // The v3 summary: the model's structure, the validator's verdict, and the operational
+  // metadata needed to reason about a run later. Kept ALONGSIDE ai_intake and
+  // ai_intake_v2 — a rollout never erases what the previous version concluded.
+  const v3Summary = buildV3Summary(read, doc);
+
   let stored = false;
   if (opts.persist) {
     const summary = intakeOrchestrator.toStoredIntake(intake);
-    const previous = (doc.extracted_json || {}).ai_intake_v2 || null;
+    const prevJson = doc.extracted_json || {};
+    const previous = prevJson.ai_intake_v2 || null;
+    const prevV3 = prevJson.ai_intake_v3 || null;
     // Re-running must not churn the row or the audit trail.
-    if (!intakeOrchestrator.sameIntake(previous, summary)) {
+    const v2Changed = !intakeOrchestrator.sameIntake(previous, summary);
+    const v3Changed = !!v3Summary && !intakeOrchestrator.sameIntake(prevV3, v3Summary);
+    if (v2Changed || v3Changed) {
       try {
         await supabase.from('financial_documents')
           .update({
-            extracted_json: { ...(doc.extracted_json || {}), ai_intake_v2: summary },
+            extracted_json: {
+              ...prevJson,
+              ai_intake_v2: summary,
+              ...(v3Summary ? { ai_intake_v3: v3Summary } : {}),
+            },
             updated_at: new Date().toISOString(),
           })
           .eq('id', doc.id).eq('business_id', biz.business.id);
@@ -13471,7 +13534,77 @@ async function runDocumentIntake(biz, doc, opts = {}) {
       }
     }
   }
-  return { intake, stored };
+  return { intake, stored, v3: v3Summary };
+}
+
+/* Fold the v3 structure into the legacy extraction shape.
+   The model's values win wherever it has one; the regex reading survives only in the
+   gaps. Field names are the v2 vocabulary so nothing downstream needs to change. */
+function mergeV3IntoExtraction(base, ex, validation) {
+  const n = validation?.normalized || {};
+  const parties = Array.isArray(ex?.parties) ? ex.parties : [];
+  const byId = (id) => parties.find((p) => p.party_id === id) || null;
+  const usName = byId(ex?.current_business_party_id)?.legal_name?.value || null;
+  const cpParty = byId(ex?.counterparty_candidate_party_id);
+  const cpName = validation?.counterparty_status === 'self_match' ? null : (cpParty?.legal_name?.value || null);
+  // On a document we ISSUED the counterparty is the buyer; otherwise they issued it.
+  const cpIsBuyer = ['customer', 'buyer', 'payer', 'taxable_entrepreneur_buyer'].includes(cpParty?.role);
+
+  const fields = { ...(base.fields || {}) };
+  const set = (k, v) => { if (v !== null && v !== undefined) fields[k] = v; };
+  set('document_number', n.document_number);
+  set('currency', n.currency);
+  set('commercial_base_amount', n.dpp);
+  set('commercial_tax_amount', n.ppn);
+  set('gross_amount', n.total);
+  set('amount', n.total ?? n.amount_due);
+  set('issuer_name', cpIsBuyer ? usName : cpName);
+  set('buyer_name', cpIsBuyer ? cpName : usName);
+  set('issuer_npwp', cpIsBuyer ? null : (cpParty?.npwp?.value || null));
+  set('transfer_date_text', n.payment_date || n.document_date);
+
+  return {
+    ...base,
+    document_type: n.document_type && n.document_type !== 'unknown' ? n.document_type : base.document_type,
+    // Vision is not the same class of certainty as parsed text, so it never earns 'high'.
+    confidence: validation?.status === 'ok' ? 'medium' : 'low',
+    status: 'suggested',
+    fields,
+    missing_fields: (base.missing_fields || []).filter((k) => fields[k] === null || fields[k] === undefined),
+    warnings: [...new Set([...(base.warnings || []), ...(validation?.warnings || [])])],
+    reason: null,
+    text_available: true,
+    read_source: 'native_vision',
+  };
+}
+
+/* The stored v3 record. Review metadata and operational facts only — no request
+   headers, no keys, no prompt text, and never the document's own contents beyond the
+   fields the user is being asked to confirm. */
+function buildV3Summary(read, doc) {
+  if (!read?.v3?.ok || !read.v3Validation) return null;
+  const v = read.v3Validation;
+  return {
+    schema_version: read.v3.schema_version,
+    prompt_version: read.v3.prompt_version,
+    model: read.v3.model,
+    source: read.v3.source,
+    processed_at: new Date().toISOString(),
+    duration_ms: read.v3.duration_ms ?? null,
+    input_tokens: read.v3.usage?.input_tokens ?? null,
+    output_tokens: read.v3.usage?.output_tokens ?? null,
+    page_count: read.v3.extraction?.page_count ?? null,
+    pages_analyzed: Array.isArray(read.v3.extraction?.pages_analyzed) ? read.v3.extraction.pages_analyzed : [],
+    analysis_complete: read.v3.extraction?.analysis_complete !== false,
+    validation_status: v.status,
+    counterparty_status: v.counterparty_status,
+    can_create_counterparty: v.can_create_counterparty,
+    can_create_financial_record: v.can_create_financial_record,
+    fields: v.normalized,
+    warnings: (v.warnings || []).slice(0, 20),
+    blockers: (v.blockers || []).slice(0, 20),
+    failed_checks: (v.checks || []).filter((c) => !c.pass).map((c) => c.id).slice(0, 20),
+  };
 }
 
 // POST /api/documents/:id/extract — suggest structured fields from the document's text.
@@ -13660,7 +13793,12 @@ app.post('/api/documents/:id/intake', auth, async (req, res) => {
     });
     if (result.error) return res.status(result.status || 500).json({ error: result.error });
 
-    res.json({ ok: true, business_id: biz.business.id, ...result.intake, stored: result.stored });
+    res.json({
+      ok: true, business_id: biz.business.id, ...result.intake, stored: result.stored,
+      // The native-vision reading, already validated. A SUGGESTION — the client must
+      // present it for confirmation, never as a confirmed value.
+      ai_intake_v3: publicIntakeV3(result.v3),
+    });
   } catch (e) {
     console.error(`[doc-intake-v2] failed: ${e.message}`);
     res.status(500).json({ ok: false, error: 'document_intake_failed' });
