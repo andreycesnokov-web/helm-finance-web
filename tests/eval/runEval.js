@@ -12,11 +12,16 @@
 
 const path = require('path');
 const fs = require('fs');
-const { CASES, US } = require('./fixtures');
+const { CASES, BUNDLE_CASE, US } = require('./fixtures');
+const BUNDLE = require('../../server/lib/documentBundle');
 const V3 = require('../../server/lib/documentVisionV3');
 const { validateExtraction } = require('../../server/lib/documentExtractionValidator');
 
 const LIVE = process.argv.includes('--live');
+// Per million tokens. Override when the published rate changes; the harness must not
+// quietly report a cost computed for a different model than the one it called.
+const PRICE_IN = Number(process.env.EVAL_PRICE_IN || 15);
+const PRICE_OUT = Number(process.env.EVAL_PRICE_OUT || 75);
 const GOLDEN = path.join(__dirname, 'golden');
 
 const digits = (v) => String(v ?? '').replace(/\D/g, '');
@@ -140,6 +145,50 @@ async function runCase(c) {
   return { v3, usage: v3.usage || null };
 }
 
+/* ── the bundle ────────────────────────────────────────────────────────────
+   Scored on its own terms. The failure this guards against is not a wrong figure but a
+   wrong SHAPE: three documents read as one, with the faktur's tax attached to the
+   kwitansi's payment. So what is checked is the count, the boundaries and whether each
+   child kept its own number. */
+async function runBundle() {
+  const goldenPath = path.join(GOLDEN, 'kwt_bundle.json');
+  let result;
+  if (!LIVE) {
+    if (!fs.existsSync(goldenPath)) return { skipped: 'no recorded answer — run with --live first' };
+    result = JSON.parse(fs.readFileSync(goldenPath, 'utf8'));
+  } else {
+    const Anthropic = require('@anthropic-ai/sdk');
+    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+    process.env.DOCUMENT_OCR_VISION_ENABLED = 'true';
+    result = await BUNDLE.extractBundle(BUNDLE_CASE.bytes, {
+      mime_type: BUNDLE_CASE.mime, file_name: 'kwt_bundle.pdf', business: US, client, pageCount: 3,
+    });
+    fs.mkdirSync(GOLDEN, { recursive: true });
+    fs.writeFileSync(goldenPath, JSON.stringify(result, null, 1));
+  }
+
+  const e = BUNDLE_CASE.expect;
+  const seg = result.segmentation || {};
+  const got = (result.children || []).map((c) => c.segment || {});
+  const gotIds = got.map((g) => String(g.identifier || '').replace(/[^A-Z0-9]/gi, '').toUpperCase());
+  const wantIds = e.identifiers.map((i) => i.replace(/[^A-Z0-9]/gi, '').toUpperCase());
+
+  return {
+    detected_as_bundle: result.is_bundle === true,
+    correct_count: got.length === e.document_count,
+    // Every expected document number present, on its own child, in order.
+    identifiers_kept: wantIds.every((w, i) => gotIds[i] === w),
+    types_correct: got.map((g) => g.document_type).join(',') === e.types.join(','),
+    shared_reference: String(seg.shared_reference || '').toUpperCase() === e.shared_reference.toUpperCase(),
+    // The one that matters most: nothing was flattened.
+    not_flattened: new Set(gotIds.filter(Boolean)).size === e.document_count,
+    creates_nothing: result.requires_confirmation === true,
+    got_count: got.length,
+    got_identifiers: got.map((g) => g.identifier),
+    usage: seg.usage || null,
+  };
+}
+
 (async () => {
   const rows = [];
   let inTok = 0, outTok = 0, skipped = 0;
@@ -194,7 +243,23 @@ async function runCase(c) {
       : bad.map(([k, v]) => `${k}:${v}`).join(', ')}`);
   }
 
-  const cost = (inTok / 1e6 * 3 + outTok / 1e6 * 15);
+  // ── the bundle ────────────────────────────────────────────────────────────
+  const bundle = await runBundle();
+  console.log('\n── BUNDLE (3 documents in 1 file) ' + '\u2500'.repeat(30));
+  if (bundle.skipped) {
+    console.log(`SKIPPED — ${bundle.skipped}`);
+  } else {
+    for (const k of ['detected_as_bundle', 'correct_count', 'identifiers_kept', 'types_correct',
+      'shared_reference', 'not_flattened', 'creates_nothing']) {
+      console.log(`${k.padEnd(24)} ${bundle[k] ? 'PASS' : 'FAIL'}`);
+    }
+    console.log(`read as ${bundle.got_count} document(s): ${JSON.stringify(bundle.got_identifiers)}`);
+    inTok += bundle.usage?.input_tokens || 0;
+    outTok += bundle.usage?.output_tokens || 0;
+  }
+
+  // Priced for the model the policy names, not the one the harness used to use.
+  const cost = (inTok / 1e6 * PRICE_IN + outTok / 1e6 * PRICE_OUT);
   console.log('\n── COST ' + '─'.repeat(56));
   console.log(`documents scored ${scored.length}${skipped ? ` (${skipped} skipped)` : ''}`
     + ` · input ${inTok} tok · output ${outTok} tok · $${cost.toFixed(4)}`
@@ -209,6 +274,12 @@ async function runCase(c) {
     process.exitCode = 1;
     return;
   }
+  // A bundle read as one document is a critical failure, not a rough edge: it is how
+  // a receipt's payment gets the faktur's tax attached to it.
+  const bundleOk = bundle.skipped ? true
+    : (bundle.detected_as_bundle && bundle.correct_count && bundle.not_flattened && bundle.creates_nothing);
+  if (!bundleOk) failedCritical.push('bundle_flattened');
+
   console.log(`\n${failedCritical.length === 0 && allUnreadableOk
     ? 'CRITICAL CRITERIA: PASS' : `CRITICAL CRITERIA: FAIL — ${failedCritical.join(', ')}`}`);
   process.exitCode = failedCritical.length === 0 && allUnreadableOk ? 0 : 1;

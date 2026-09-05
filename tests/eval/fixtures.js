@@ -11,6 +11,7 @@
 'use strict';
 
 const zlib = require('zlib');
+const { scannedPdf } = require('./rasterPdf');
 
 const esc = (s) => String(s).replace(/([()\\])/g, '\\$1');
 
@@ -274,18 +275,160 @@ const CASES = [
       direction: 'blocked', must_self_match: true,
     },
   },
+  /* ── genuinely scanned pages ───────────────────────────────────────────────
+     Not text drawn in a PDF: pixels. tests/eval/rasterPdf.js paints the words into a
+     grey, speckled bitmap and wraps it in a PDF with no font and no text operator, so
+     pdfText finds exactly nothing — the same as the two real customer scans this was
+     checked against. The previous fixture here was a 52-byte file that was not a page
+     at all, and could only ever prove that nothing can be read from nothing. */
   {
-    id: 'scanned_no_text',
-    label: 'Scanned page with no text layer',
+    id: 'scanned_kwitansi',
+    label: 'Kwitansi as an actual scan (no text layer)',
     mime: 'application/pdf',
-    // Rendered as an image-only page: geometry exists, characters do not.
-    raw: Buffer.from('%PDF-1.4\n% image-only scan, no text operators\n%%EOF\n', 'latin1'),
+    raw: scannedPdf([[
+      { text: 'KWITANSI', scale: 6 },
+      { rule: true },
+      { text: 'NO: SAT/Z001/K-P/26/VIII/0133', scale: 3 },
+      { gap: 24 },
+      { text: 'SUDAH TERIMA DARI', scale: 3 },
+      { text: 'PT HELM CARE INDONESIA', scale: 4 },
+      { gap: 24 },
+      { text: 'UANG SEJUMLAH', scale: 3 },
+      { text: 'RP 11.322.000', scale: 5 },
+      { gap: 24 },
+      { text: 'UNTUK PEMBAYARAN', scale: 3 },
+      { text: 'SEWA TEMPAT AGUSTUS 2026', scale: 3 },
+      { text: 'REF TC-2607-0342', scale: 3 },
+      { gap: 40 },
+      { text: 'JAKARTA, 04 AGUSTUS 2026', scale: 3 },
+      { gap: 30 },
+      { text: 'PT SUMBER ALFARIA TRIJAYA TBK', scale: 3 },
+    ]]),
+    expect: {
+      document_type: ['receipt', 'kwitansi'], document_number: 'SAT/Z001/K-P/26/VIII/0133',
+      counterparty_name: 'PT SUMBER ALFARIA TRIJAYA TBK', counterparty_npwp: null,
+      document_date: '2026-08-04', due_date: null,
+      dpp: null, ppn: null, total: 11322000,
+      direction: 'not_payable', must_not_create_record: true,
+    },
+  },
+  {
+    id: 'scanned_faktur_nilai_lain',
+    label: 'Faktur pajak as a scan, with DPP Nilai Lain',
+    mime: 'application/pdf',
+    raw: scannedPdf([[
+      { text: 'FAKTUR PAJAK', scale: 5 },
+      { rule: true },
+      { text: 'KODE DAN NOMOR SERI FAKTUR PAJAK', scale: 2 },
+      { text: '040.026-00.30020288 6', scale: 3 },
+      { gap: 24 },
+      { text: 'PENGUSAHA KENA PAJAK', scale: 2 },
+      { text: 'PT SUMBER ALFARIA TRIJAYA TBK', scale: 3 },
+      { text: 'NPWP: 01.336.238.9-054.000', scale: 3 },
+      { gap: 20 },
+      { text: 'PEMBELI BARANG KENA PAJAK', scale: 2 },
+      { text: 'PT HELM CARE INDONESIA', scale: 3 },
+      { text: 'NPWP: 09.876.543.2-101.000', scale: 3 },
+      { gap: 24 },
+      { rule: true },
+      { text: 'HARGA JUAL           10.200.000', scale: 3 },
+      { text: 'DPP NILAI LAIN        9.350.000', scale: 3 },
+      { text: 'PPN 12%               1.122.000', scale: 3 },
+      { text: 'JUMLAH               11.322.000', scale: 3 },
+      { gap: 30 },
+      { text: 'JAKARTA, 04 AGUSTUS 2026', scale: 3 },
+    ]]),
+    expect: {
+      document_type: ['faktur_pajak'], document_number: '04002600300202886',
+      counterparty_name: 'PT SUMBER ALFARIA TRIJAYA TBK',
+      counterparty_npwp: '01.336.238.9-054.000',
+      document_date: '2026-08-04', due_date: null,
+      dpp: 9350000, ppn: 1122000, total: 11322000,
+      current_business_is_buyer: true, direction: 'payable',
+      pages: 1,
+    },
+  },
+  {
+    id: 'blank_scan',
+    label: 'A scanned page with nothing on it',
+    mime: 'application/pdf',
+    // A real page, legitimately unreadable. The only correct answer is to say so — and
+    // this is now a claim about a page that exists, not about a 52-byte non-file.
+    raw: scannedPdf([[{ gap: 200 }]]),
     expect: { unreadable: true },
   },
 ];
+
+/* The bundle packet, as a real three-page scan: a kwitansi, the faktur pajak for the
+   same rent, and the agreement they both reference. Kept out of CASES because it is
+   scored by the bundle evaluation rather than field-by-field. */
+const BUNDLE_CASE = {
+  id: 'kwt_bundle',
+  label: 'Three documents in one scanned file',
+  mime: 'application/pdf',
+  expect: {
+    is_bundle: true,
+    document_count: 3,
+    identifiers: ['SAT/Z001/K-P/26/VIII/0133', '04002600300202886', 'TC-2607-0342'],
+    types: ['kwitansi', 'faktur_pajak', 'contract'],
+    shared_reference: 'TC-2607-0342',
+  },
+  raw: scannedPdf([
+    [
+      { text: 'KWITANSI', scale: 6 },
+      { rule: true },
+      { text: 'NO: SAT/Z001/K-P/26/VIII/0133', scale: 3 },
+      { gap: 24 },
+      { text: 'SUDAH TERIMA DARI', scale: 3 },
+      { text: 'PT HELM CARE INDONESIA', scale: 4 },
+      { text: 'RP 11.322.000', scale: 5 },
+      { text: 'UNTUK SEWA TEMPAT REF TC-2607-0342', scale: 3 },
+      { gap: 30 },
+      { text: 'PT SUMBER ALFARIA TRIJAYA TBK', scale: 3 },
+      { text: 'JAKARTA, 04 AGUSTUS 2026', scale: 3 },
+    ],
+    [
+      { text: 'FAKTUR PAJAK', scale: 5 },
+      { rule: true },
+      { text: 'KODE DAN NOMOR SERI', scale: 2 },
+      { text: '040.026-00.30020288 6', scale: 3 },
+      { gap: 20 },
+      { text: 'PENGUSAHA KENA PAJAK', scale: 2 },
+      { text: 'PT SUMBER ALFARIA TRIJAYA TBK', scale: 3 },
+      { text: 'NPWP: 01.336.238.9-054.000', scale: 3 },
+      { gap: 16 },
+      { text: 'PEMBELI BARANG KENA PAJAK', scale: 2 },
+      { text: 'PT HELM CARE INDONESIA', scale: 3 },
+      { text: 'NPWP: 09.876.543.2-101.000', scale: 3 },
+      { gap: 20 },
+      { text: 'HARGA JUAL           10.200.000', scale: 3 },
+      { text: 'DPP NILAI LAIN        9.350.000', scale: 3 },
+      { text: 'PPN 12%               1.122.000', scale: 3 },
+      { text: 'JUMLAH               11.322.000', scale: 3 },
+    ],
+    [
+      { text: 'SURAT KESEPAKATAN SEWA TEMPAT', scale: 4 },
+      { rule: true },
+      { text: 'NOMOR: TC-2607-0342', scale: 3 },
+      { gap: 24 },
+      { text: 'PIHAK PERTAMA', scale: 3 },
+      { text: 'PT SUMBER ALFARIA TRIJAYA TBK', scale: 3 },
+      { gap: 16 },
+      { text: 'PIHAK KEDUA', scale: 3 },
+      { text: 'PT HELM CARE INDONESIA', scale: 3 },
+      { gap: 24 },
+      { text: 'JANGKA WAKTU 12 BULAN', scale: 3 },
+      { text: 'NILAI SEWA RP 10.200.000 PER TAHUN', scale: 3 },
+      { gap: 30 },
+      { text: 'DITANDATANGANI 26 JULI 2026', scale: 3 },
+    ],
+  ]),
+};
 
 function buildCase(c) {
   return { ...c, bytes: c.raw || makePdf(c.pages) };
 }
 
-module.exports = { CASES: CASES.map(buildCase), US, makePdf };
+module.exports = {
+  CASES: CASES.map(buildCase), BUNDLE_CASE: buildCase(BUNDLE_CASE), US, makePdf,
+};
