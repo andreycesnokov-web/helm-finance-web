@@ -388,7 +388,8 @@
   /* A page-level action is a thumb target, not a pointer target. 36px was usable
      and mean; 44px is the size a finger actually expects. Scoped to the page
      header so dense in-page controls elsewhere keep their own sizing. */
-  .cfo-pagehead-actions :is(.cfo-btn,.btn,button,a[role="button"]){
+  .cfo-pagehead-actions :is(.cfo-btn,.btn,button,a[role="button"]),
+  .cfo-state-actions :is(.cfo-btn,.btn,button,a[role="button"]){
     min-height:44px;
     padding-top:0;
     padding-bottom:0;
@@ -434,6 +435,10 @@
 }
 .cfo-summary-label{font-size:13px;color:#AFC6DE;font-weight:600}
 .cfo-summary-value{font-family:var(--font-display);font-size:40px;line-height:1.1;margin-top:6px}
+/* An abbreviated headline amount is short by construction, so it never needs to
+   wrap — and must not be allowed to, because "Rp 152." above "5M" is not a
+   figure anyone can read. The exact amount underneath may wrap freely. */
+.cfo-summary-value.is-compact{white-space:nowrap;overflow-wrap:normal}
 .cfo-summary-meta{display:flex;align-items:center;gap:8px;margin-top:12px;color:#C5D6E7;font-size:13px;flex-wrap:wrap}
 .cfo-summary-meta .dot{color:var(--brand-electric-blue);display:inline-flex}
 .cfo-summary-row{display:flex;gap:32px;margin-top:18px;padding-top:16px;border-top:1px solid rgba(255,255,255,.14);flex-wrap:wrap}

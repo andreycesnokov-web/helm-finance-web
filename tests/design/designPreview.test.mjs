@@ -92,9 +92,16 @@ t('the preview defines no look-alike of a component it is meant to prove', () =>
   }
 });
 
-t('money is formatted by the production formatter', () => {
-  assert.match(src, /import\s*\{\s*formatAmount\s*\}\s*from\s*'\.\.\/lib\/money'/,
-    'the preview must not hand-format currency');
+t('money is formatted by the production formatters', () => {
+  // Both of them: the preview shows the same abbreviated-over-exact pair the
+  // Wallets card does, so it needs compactIdr as well as formatAmount. Siblings
+  // in the import are fine; hand-rolled currency is not.
+  const fromMoney = /import\s*\{([^}]*)\}\s*from\s*'\.\.\/lib\/money'/.exec(src);
+  assert.ok(fromMoney, 'the preview does not import from lib/money at all');
+  const named = fromMoney[1].split(',').map((x) => x.trim());
+  assert.ok(named.includes('formatAmount'), 'the preview must not hand-format currency');
+  assert.ok(named.includes('compactIdr'),
+    'the preview must abbreviate with the production formatter, not its own');
 });
 
 console.log('\ndesign preview — it must not reach anything real');
@@ -207,6 +214,133 @@ t('no page styles a watermark of its own', () => {
     assert.ok(!/cfo-summary-sym|pulse-cash-mark/.test(code(f)),
       `${f} still renders an obsolete watermark class`);
   }
+});
+
+/* -- the Wallets zero state -------------------------------------------------
+   The page has three states a reader can be in, and only one of them invites a
+   first wallet. "No wallets" and "we could not find out" look identical in a
+   component that only tracks a list, and the page used to conflate them: a failed
+   load left wallets as [] with loading false, so a user whose request had just
+   errored was told they had no accounts and asked to create one. */
+
+t('the zero state is gated on a RESOLVED, empty collection', () => {
+  const acc = code('client/src/pages/Accounts.jsx');
+  assert.match(acc, /const resolvedEmpty = !loading && !loadError && wallets\.length === 0/,
+    'resolvedEmpty is not defined as "not loading, not failed, and empty"');
+  assert.match(acc, /\{resolvedEmpty && legacySources\.length === 0 && \(\s*<WalletsEmptyState/,
+    'the zero state is not gated on resolvedEmpty');
+  // The old gate tested only loading + length, which is what let a failed load
+  // render as an empty workspace.
+  assert.ok(!/!loading && wallets\.length === 0 && legacySources\.length === 0/.test(acc),
+    'the old loading-only gate is still in place');
+});
+
+t('a failed load gets the error treatment, never the zero state', () => {
+  const acc = code('client/src/pages/Accounts.jsx');
+  assert.match(acc, /setLoadError\(true\)/, 'a failed load does not record the failure');
+  assert.match(acc, /setLoadError\(false\)/, 'a retry does not clear the previous failure');
+  assert.match(acc, /\{loadError && \(\s*<ErrorState/, 'there is no error treatment rendered');
+  assert.match(acc, /onRetry=\{load\}/, 'the error state offers no retry');
+});
+
+t('the summary card never states a balance it does not know', () => {
+  const acc = code('client/src/pages/Accounts.jsx');
+  // Rendered once the collection resolves - including when it resolved to
+  // nothing - but never while loading and never after a failure.
+  assert.match(acc, /\{!loading && !loadError && \(\s*<SummaryCard/,
+    'the summary card is not gated on a resolved, successful load');
+  assert.match(acc, /meta=\{resolvedEmpty \? t\('accounts\.noWalletsYet'\)/,
+    'an empty workspace does not get the zero-state supporting line');
+  assert.match(acc, /value=\{<span className="fin">\{resolvedEmpty \? idr\(0\)/,
+    'an empty workspace does not show Rp 0 as its headline');
+});
+
+t('the zero state calls the page own add-wallet action', () => {
+  const acc = code('client/src/pages/Accounts.jsx');
+  assert.match(acc, /<WalletsEmptyState t=\{t\} onAddWallet=\{openAdd\} \/>/,
+    'the zero state is not wired to openAdd');
+  const ws = code('client/src/pages/WalletsEmptyState.jsx');
+  // It is a button that calls a prop. A second wallet form in here would be a
+  // second wallet-creation flow to keep in step with the first.
+  assert.match(ws, /onClick=\{onAddWallet\}/, 'the CTA does not call the passed action');
+  assert.ok(!/useState|apiFetch|showForm|<form/.test(ws),
+    'the zero-state component carries wallet-creation state of its own');
+});
+
+t('both amount formatters come from the shared money module', () => {
+  const acc = code('client/src/pages/Accounts.jsx');
+  assert.match(acc, /import \{ formatAmount, compactIdr \} from '\.\.\/lib\/money'/,
+    'Accounts does not import the shared formatters');
+  assert.match(acc, /const headlineAmount = compactIdr\(filteredBalance\) \|\| exactAmount/,
+    'the headline is not the compact figure falling back to the exact one');
+  assert.match(acc, /const exactAmount = idr\(filteredBalance\)/,
+    'the exact figure is not derived from the shared formatter');
+  // One implementation: Pulse must not keep a private copy of the compaction.
+  const pulse = code('client/src/pages/business/PulseBlocks.jsx');
+  assert.match(pulse, /import \{ compactIdr \} from '\.\.\/\.\.\/lib\/money'/,
+    'PulseBlocks does not use the shared compactIdr');
+  assert.ok(!/function compactIdr/.test(pulse),
+    'PulseBlocks still defines its own compactIdr');
+});
+
+t('an abbreviated headline is marked as one so it cannot wrap', () => {
+  const ui = code('client/src/shell/ui.jsx');
+  assert.match(ui, /compact = false/, 'SummaryCard has no compact prop, or it defaults on');
+  assert.match(ui, /cfo-summary-value\$\{compact \? ' is-compact' : ''\}/,
+    'the compact prop does not reach the value element');
+  const css = read('client/src/shell/shell.css').replace(/\/\*[\s\S]*?\*\//g, ' ');
+  assert.match(css, /\.cfo-summary-value\.is-compact\{[^}]*white-space:nowrap/,
+    'an abbreviated headline is still allowed to wrap');
+});
+
+t('the rejected ambient background mark is nowhere in the product', () => {
+  // Variant B put one oversized CFO AI symbol in the empty background under the
+  // Wallets card. It was reviewed and rejected: no ambient background logo behind
+  // wallet lists, tables, charts or financial data.
+  for (const f of ['client/src/pages/DesignPreview.jsx', 'client/src/pages/DesignPreview.css',
+                   'client/src/shell/shell.css', 'client/src/pages/Accounts.jsx',
+                   'client/src/pages/WalletsEmptyState.jsx']) {
+    const src = code(f);
+    assert.ok(!/dsp-exp|bgmark|params\.get\('exp'\)/.test(src),
+      `${f} still carries the rejected ambient-background experiment`);
+  }
+  const css = read('client/src/pages/DesignPreview.css');
+  assert.ok(!/dsp-exp/.test(css), 'DesignPreview.css still styles the experiment');
+  // And no page-level query parameter survives to switch it back on.
+  assert.ok(!/exp=/.test(read('tests/design/captureScreenshots.mjs')),
+    'the capture script still shoots the rejected variant');
+});
+
+t('the preview renders the real zero state, not a copy of it', () => {
+  const dp = code('client/src/pages/DesignPreview.jsx');
+  assert.match(dp, /import \{ WalletsEmptyState \} from '\.\/WalletsEmptyState'/,
+    'the preview does not import the production zero state');
+  // The copy comes out of the same translation file the page reads, so the two
+  // cannot drift the way the hand-written concept did.
+  assert.match(dp, /import en from '\.\.\/i18n\/en'/,
+    'the preview does not read its copy from the translation layer');
+  assert.ok(!/Your wallets will live here|Add your first wallet/.test(dp),
+    'the preview has its own copy of the zero-state wording');
+  // Both states come from one component taking a wallet collection, which is what
+  // makes "populated" and "empty" the same branch the product takes.
+  assert.match(dp, /const AccountsBody = \(\{ wallets = WALLETS_FIXTURE \}\)/,
+    'the preview does not drive Wallets from a wallet collection');
+  assert.match(dp, /shell=accounts-empty|'accounts-empty'/,
+    'the preview has no empty-Wallets route');
+});
+
+t('the preview fixture cannot show a balance and an empty state at once', () => {
+  const dp = code('client/src/pages/DesignPreview.jsx');
+  // The rejected concept rendered the zero state underneath a card claiming four
+  // wallets and Rp 152 450 000. Both now derive from the same array.
+  assert.match(dp, /const empty = wallets\.length === 0/,
+    'emptiness is not derived from the collection');
+  assert.match(dp, /\{empty && <WalletsEmptyState/,
+    'the zero state is not gated on the collection being empty');
+  assert.match(dp, /const total = wallets\.reduce/,
+    'the total is not derived from the collection');
+  assert.ok(!/idr\(152450000\)|meta="IDR · 4 wallets"/.test(dp),
+    'the preview still hardcodes a populated total or wallet count');
 });
 
 t('Radar is deferred, not half-migrated', () => {

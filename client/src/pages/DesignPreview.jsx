@@ -12,7 +12,9 @@
 //
 // Safety: no auth, no API, no Supabase, no customer data. Every figure below is invented
 // and every company name is fictional. Nothing here writes anything.
-import { formatAmount } from '../lib/money'
+import { formatAmount, compactIdr } from '../lib/money'
+import en from '../i18n/en'
+import { WalletsEmptyState } from './WalletsEmptyState'
 import { PageHeader, SummaryCard, Card, Btn, StatusBadge, Icon } from '../shell/ui'
 import { ExecutiveHero } from './business/PulseBlocks'
 import WorkspaceShell, { BUSINESS_NAV } from '../shell/WorkspaceShell'
@@ -35,6 +37,13 @@ function NotFound() {
 
 // The production formatter, byte for byte the one Pulse uses (index.jsx:57).
 const idr = (v) => 'Rp ' + formatAmount(String(v ?? 0), 'IDR')
+
+// The product's own English strings, read straight out of the translation layer
+// the real page uses. Not i18n/index's t(), because that resolves against the
+// stored language (ru by default) and a screenshot has to be deterministic — and
+// not a local copy of the words, because the last preview held its own copy of
+// the zero state and the two drifted within a day.
+const tEn = (key) => key.split('.').reduce((o, k) => (o == null ? o : o[k]), en) ?? key
 
 /* ── fixtures ──────────────────────────────────────────────────────────────
    Invented companies, invented figures. No real balance, tax number, bank
@@ -119,23 +128,57 @@ const PulseBody = () => (
   </>
 )
 
-const AccountsBody = () => (
-  <>
-    <PageHeader
-      title="Wallets &amp; Accounts"
-      description="Manage your bank accounts, cash, and payment wallets"
-      primaryAction={<Btn variant="primary">+ Add wallet</Btn>}
-    />
-    <SummaryCard
-      flagship
-      label="Total balance · all wallets"
-      value={<span className="fin">{idr(152450000)}</span>}
-      meta="IDR · 4 wallets"
-    />
-  </>
-)
+/* Wallets, in both of the states the page really has.
 
+   These are fixtures for the SAME branch the production page takes, not a second
+   rendering of it: the totals, the compact/exact split, the wallet count and the
+   zero state all come out of the same expressions and the same components
+   Accounts.jsx uses. That matters because the previous concept was hand-copied
+   markup, and it ended up showing "Add your first wallet" underneath a card
+   claiming four wallets and Rp 152 450 000 — a state the product cannot be in.
+
+   Four IDR wallets, summing to exactly Rp 152 450 000. */
+const WALLETS_FIXTURE = [
+  { id: 'w1', name: 'BCA · Operating', currency: 'IDR', balance: 94200000 },
+  { id: 'w2', name: 'Mandiri · Payroll', currency: 'IDR', balance: 38500000 },
+  { id: 'w3', name: 'Cash box · Denpasar', currency: 'IDR', balance: 12750000 },
+  { id: 'w4', name: 'Xendit settlement', currency: 'IDR', balance: 7000000 },
+]
+const WALLETS_EMPTY = []
+
+const AccountsBody = ({ wallets = WALLETS_FIXTURE }) => {
+  // Mirrors Accounts.jsx exactly — same formatters, same branch.
+  const total = wallets.reduce((sum, w) => sum + (w.balance || 0), 0)
+  const empty = wallets.length === 0
+  const exact = idr(total)
+  const headline = compactIdr(total) || exact
+  const count = wallets.length === 1
+    ? tEn('accounts.walletsCountOne')
+    : tEn('accounts.walletsCountMany').replace('{n}', wallets.length)
+  return (
+    <>
+      <PageHeader
+        title={tEn('accounts.walletsAccounts')}
+        description={tEn('accounts.walletsSubtitle')}
+        primaryAction={<Btn variant="primary">{tEn('accounts.addWallet')}</Btn>}
+      />
+      <SummaryCard
+        flagship
+        compact={!empty}
+        label={tEn('accounts.totalBalance')}
+        value={<span className="fin">{empty ? idr(0) : headline}</span>}
+        meta={empty ? tEn('accounts.noWalletsYet') : `${exact} · ${count}`}
+      />
+      {/* The real zero-state component, not a drawing of it. */}
+      {empty && <WalletsEmptyState t={tEn} onAddWallet={noop} />}
+    </>
+  )
+}
+
+// ?shell=accounts renders the populated page; ?shell=accounts-empty renders the
+// same page with the wallet collection resolved and empty.
 function ShellPreview({ page }) {
+  const isAccounts = page === 'accounts' || page === 'accounts-empty'
   return (
     // No preview banner here on purpose: these are pictures of the product frame,
     // and a strip of our own chrome above it would misrepresent what ships.
@@ -145,10 +188,12 @@ function ShellPreview({ page }) {
         activeId="demo-business"
         onSelectWorkspace={noop}
         nav={BUSINESS_NAV}
-        activeKey={page === 'accounts' ? 'accounts' : 'pulse'}
+        activeKey={isAccounts ? 'accounts' : 'pulse'}
         onNavigate={noop}
       >
-        {page === 'accounts' ? <AccountsBody /> : <PulseBody />}
+        {isAccounts
+          ? <AccountsBody wallets={page === 'accounts-empty' ? WALLETS_EMPTY : WALLETS_FIXTURE} />
+          : <PulseBody />}
       </WorkspaceShell>
     </div>
   )
@@ -179,6 +224,12 @@ export default function DesignPreview() {
         <Section id="pulse" title="Pulse" wide
           note="Shared header with a description, the navy flagship card wearing the shared mark, and the KPI row — which stays unbranded.">
           <PulseBody />
+        </Section>
+
+        {/* ── Accounts, empty ──────────────────────────────────────────── */}
+        <Section id="accounts-empty" title="Wallets — no accounts yet" wide
+          note="The zero state, from the component the real page renders. The card stays and tells the truth — Rp 0, no wallets added yet — rather than disappearing and rebuilding the page around the first wallet. One call to action, wired to the page's existing add-wallet flow.">
+          <AccountsBody wallets={WALLETS_EMPTY} />
         </Section>
 
         {/* ── Accounts ─────────────────────────────────────────────────── */}

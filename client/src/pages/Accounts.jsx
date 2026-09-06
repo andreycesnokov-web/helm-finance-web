@@ -5,7 +5,9 @@ import { useAuth } from '../hooks/useAuth'
 import { useAccess } from '../hooks/useAccess'
 import { useTranslation } from '../hooks/useTranslation'
 import { apiFetch, fmt, fmtFull } from '../lib/api'
-import { PageHeader, SummaryCard } from '../shell/ui'
+import { formatAmount, compactIdr } from '../lib/money'
+import { PageHeader, SummaryCard, ErrorState } from '../shell/ui'
+import { WalletsEmptyState } from './WalletsEmptyState'
 
 // ── Wallet type config ────────────────────────────────────────────────────────
 const WALLET_TYPES = [
@@ -105,6 +107,11 @@ export default function Accounts() {
   const [wallets,      setWallets]      = useState([])
   const [legacySources,setLegacySources]= useState([]) // source-based accounts not yet in wallets
   const [loading,      setLoading]      = useState(true)
+  // A failed load used to be swallowed into console.error, leaving wallets as []
+  // with loading false — which is indistinguishable from "this workspace has no
+  // wallets". The page then told a user with accounts that they had none and
+  // invited them to add their first. An unknown balance is not zero.
+  const [loadError,    setLoadError]    = useState(false)
   const [showForm,     setShowForm]     = useState(false)
   const [editWallet,   setEditWallet]   = useState(null)
   const [form,         setForm]         = useState(EMPTY_FORM)
@@ -123,6 +130,7 @@ export default function Accounts() {
   // ── Load wallets + legacy sources ─────────────────────────────────────────
   const load = async () => {
     setLoading(true)
+    setLoadError(false)
     try {
       const [wData, pData] = await Promise.all([
         apiFetch('/wallets', token),
@@ -138,6 +146,7 @@ export default function Accounts() {
       setLegacySources(legacy)
     } catch (e) {
       console.error(e)
+      setLoadError(true)
     } finally {
       setLoading(false)
     }
@@ -164,6 +173,23 @@ export default function Accounts() {
   const filteredBalance = scopeTab === 'all' ? totalBalance
     : scopeTab === 'business' ? businessBalance
     : personalBalance
+
+  // ── the summary card's two amounts ────────────────────────────────────────
+  // Pulse's hierarchy, adopted here: the abbreviated figure is the headline and
+  // the exact one sits underneath, so the card reads at a glance without rounding
+  // anything away. Both come from the shared formatters — compactIdr returns null
+  // below a million, which is what keeps an empty workspace at "Rp 0" rather than
+  // "Rp 0.0M", and what keeps small balances exact.
+  const idr = (v) => 'Rp ' + formatAmount(String(v ?? 0), 'IDR')
+  const walletCount = filteredWallets.length
+  const exactAmount = idr(filteredBalance)
+  const headlineAmount = compactIdr(filteredBalance) || exactAmount
+  const countLabel = walletCount === 1
+    ? t('accounts.walletsCountOne')
+    : t('accounts.walletsCountMany').replace('{n}', walletCount)
+  // The collection has resolved and holds nothing. Distinct from "still loading"
+  // and from "the request failed", and only this one invites a first wallet.
+  const resolvedEmpty = !loading && !loadError && wallets.length === 0
 
   // ── Backfill handler ──────────────────────────────────────────────────────
   const handleBackfill = async () => {
@@ -325,18 +351,26 @@ export default function Accounts() {
         </div>
       )}
 
-      {/* Total balance hero */}
-      {wallets.length > 0 && (
-        /* The same navy surface Pulse uses, from the same component. It was a
-           one-off inline gradient with a graph-paper grid and hardcoded #0F172A,
-           which is why the product's two dark heroes did not look related.
-           `flagship` is what earns the brand mark: this is the page's headline
-           money figure, and the only card here that gets one. */
+      {/* Total balance hero.
+          The same navy surface Pulse uses, from the same component. It was a
+          one-off inline gradient with a graph-paper grid and hardcoded #0F172A,
+          which is why the product's two dark heroes did not look related.
+          `flagship` is what earns the brand mark: this is the page's headline
+          money figure, and the only card here that gets one.
+
+          It stays on an empty workspace, showing Rp 0 and saying so. That keeps
+          the page's shape steady — the first wallet fills the card in rather than
+          rebuilding the page around it — and it is honest, because zero is the
+          true balance of a workspace with no accounts. What it must NOT do is
+          appear before we know: while loading, or after a failed load, there is
+          no figure to state and the card is not rendered. */}
+      {!loading && !loadError && (
         <SummaryCard
           flagship
+          compact={!resolvedEmpty}
           label={scopeTab === 'business' ? t('accounts.totalBusiness') : scopeTab === 'personal' ? t('accounts.totalPersonal') : t('accounts.totalBalance')}
-          value={<span className="fin">{fmtFull(filteredBalance)}</span>}
-          meta={`IDR · ${filteredWallets.length} wallet${filteredWallets.length !== 1 ? 's' : ''}`}
+          value={<span className="fin">{resolvedEmpty ? idr(0) : headlineAmount}</span>}
+          meta={resolvedEmpty ? t('accounts.noWalletsYet') : `${exactAmount} · ${countLabel}`}
         />
       )}
 
@@ -344,8 +378,18 @@ export default function Accounts() {
         <div style={{ padding: 32, textAlign: 'center', color: 'var(--text-3)', fontSize: 'var(--text-sm)' }}>{t('accounts.loadingWallets')}</div>
       )}
 
+      {/* A failed load gets the shared error treatment and a retry — never the
+          empty state, which would be a false claim about the account. */}
+      {loadError && (
+        <ErrorState
+          title={t('accounts.loadFailed')}
+          description={t('accounts.loadFailedSub')}
+          onRetry={load}
+        />
+      )}
+
       {/* Backfill banner — only when legacy accounts exist and no wallets yet */}
-      {!loading && wallets.length === 0 && legacySources.length > 0 && !backfillDone && (
+      {resolvedEmpty && legacySources.length > 0 && !backfillDone && (
         <div style={{ background: '#EEF2FF', border: '1px solid #C7D2FE', borderRadius: 14, padding: '16px 18px', marginBottom: 16, display: 'flex', alignItems: 'flex-start', gap: 14 }}>
           <div style={{ fontSize: 22, lineHeight: 1 }}>💡</div>
           <div style={{ flex: 1 }}>
@@ -366,16 +410,11 @@ export default function Accounts() {
         </div>
       )}
 
-      {/* Empty state — no wallets and no legacy */}
-      {!loading && wallets.length === 0 && legacySources.length === 0 && (
-        <div className="empty-state">
-          <div className="empty-state-icon">🏦</div>
-          <div className="empty-state-title">{t('accounts.noWallets')}</div>
-          <div className="empty-state-sub">
-            {t('accounts.noWalletsSub')}
-          </div>
-          <button className="empty-state-cta" onClick={openAdd}>{t('accounts.addFirstWallet')}</button>
-        </div>
+      {/* Empty state — the collection resolved, and it is empty. Not during a
+          load, not after a failure, and not once a single wallet exists. It calls
+          the page's own openAdd, so there is exactly one wallet-creation flow. */}
+      {resolvedEmpty && legacySources.length === 0 && (
+        <WalletsEmptyState t={t} onAddWallet={openAdd} />
       )}
 
       {/* Wallet cards */}
@@ -461,7 +500,7 @@ export default function Accounts() {
       )}
 
       {/* Legacy unmatched sources */}
-      {!loading && wallets.length > 0 && legacySources.length > 0 && (
+      {!loading && !loadError && wallets.length > 0 && legacySources.length > 0 && (
         <div className="hf-card" style={{ marginBottom: 16, background: 'var(--bg-2)' }}>
           <div style={{ fontSize: 11, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 800, marginBottom: 10 }}>{t('accounts.legacyTitle')}</div>
           <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-3)', marginBottom: 12, lineHeight: 1.5 }}>

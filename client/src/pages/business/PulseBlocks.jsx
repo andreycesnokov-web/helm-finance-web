@@ -18,26 +18,13 @@
 // defaulted. Zeros stay honest (Rp 0 is the true balance) but recede, and the page leads
 // with what to do next instead of a grid of dashes.
 import { Card, StatusBadge, Btn, Icon, DataList, FlagshipMark } from '../../shell/ui'
+import { compactIdr } from '../../lib/money'
 import './Pulse.css'
 
-/**
- * Display-only compaction so a large figure can never wrap the hero onto two lines.
- *
- * The API value is NOT changed: the exact amount stays in the title attribute and is
- * repeated in full in the caption beneath, so precision is one hover (or one glance) away.
- * Returns null when the number is already short enough to render in full.
- */
-function compactIdr(value) {
-  const n = Number(value || 0)
-  if (!Number.isFinite(n)) return null
-  const abs = Math.abs(n)
-  const sign = n < 0 ? '-' : ''
-  const at = (div, suffix) => `Rp ${sign}${(abs / div).toFixed(1)}${suffix}`
-  if (abs >= 1e12) return at(1e12, 'T')
-  if (abs >= 1e9) return at(1e9, 'B')
-  if (abs >= 1e6) return at(1e6, 'M')
-  return null
-}
+// compactIdr now lives in lib/money.js: Wallets shows the same headline figure,
+// and two copies of a money formatter is how two pages start disagreeing about
+// what "Rp 152.5M" means. The exact amount stays in the title attribute and in
+// the caption beneath, so precision is one glance away.
 
 /* ── executive hero ───────────────────────────────────────────────────────── */
 

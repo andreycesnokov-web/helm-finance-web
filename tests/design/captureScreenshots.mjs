@@ -324,6 +324,23 @@ const SHOTS = [
   // Retained evidence for reviewers: the focus ring and the semantic-colour states.
   ['15-focus-visible-state.png', `${P}?only=focus`, 1440, 560, { focus: '.dsp-focus-target' }],
   ['16-semantic-colour-states.png', `${P}?only=semantic`, 1440, 900, {}],
+  // Wallets in its OTHER state: the collection resolved and empty. Shot from the
+  // same route and the same components as the populated pair above (02/04/10), so
+  // the two are directly comparable — the card stays, the figure becomes Rp 0, and
+  // the supporting line says so instead of claiming wallets that do not exist.
+  ['17-wallets-empty-desktop-1440x900.png', `${P}?shell=accounts-empty`, 1440, 900, {}],
+  ['18-wallets-empty-mobile-390x844.png', `${P}?shell=accounts-empty`, 390, 844, PHONE],
+  ['19-wallets-empty-summary-card-closeup.png', `${P}?only=accounts-empty`, 1440, 900,
+    { region: { sel: '.cfo-summary.cfo-flagship', pad: 6 } }],
+  // The zero state's call to action under a real keyboard focus.
+  ['20-wallets-empty-cta-keyboard-focus.png', `${P}?shell=accounts-empty`, 1440, 900,
+    { focus: '.cfo-state-actions .cfo-btn', region: { sel: '.cfo-state', pad: 10 } }],
+  // 320px — the narrowest width the product is expected to survive. The compact
+  // headline must hold one line here, which is the whole reason it is compact.
+  ['21-wallets-populated-card-320.png', `${P}?shell=accounts`, 320, 720,
+    { crop: true, window: [512, 720], region: { sel: '.cfo-summary.cfo-flagship', pad: 6 } }],
+  ['22-wallets-empty-320.png', `${P}?shell=accounts-empty`, 320, 720,
+    { crop: true, window: [512, 720] }],
 ];
 
 const produced = new Set(SHOTS.map(([f]) => f));

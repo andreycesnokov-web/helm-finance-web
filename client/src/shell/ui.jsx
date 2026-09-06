@@ -151,13 +151,20 @@ export const Card = ({ title, action, children, className = '', style }) => (
  * The prop is named for that role and not for what it draws, so the branding
  * treatment can change without every call site having to be re-read.
  *
+ * `compact` says the headline figure is an ABBREVIATED amount — "Rp 152.5M" —
+ * with the exact figure carried in `meta` beneath it. That is the hierarchy Pulse
+ * uses, and it changes one thing here: an abbreviated amount must never wrap,
+ * because half of "152.5M" on a second line is not a number. A card passing the
+ * full figure as its headline keeps the existing wrapping behaviour, which is
+ * what a long exact amount needs.
+ *
  * `metrics` = [{k, v, tone}]
  */
-export const SummaryCard = ({ label, value, meta, metrics, flagship = false }) => (
+export const SummaryCard = ({ label, value, meta, metrics, flagship = false, compact = false }) => (
   <section className={`cfo-summary${flagship ? ' cfo-flagship' : ''}`}>
     {flagship && <FlagshipMark />}
     <div className="cfo-summary-label">{label}</div>
-    <div className="cfo-summary-value">{value}</div>
+    <div className={`cfo-summary-value${compact ? ' is-compact' : ''}`}>{value}</div>
     {meta && <div className="cfo-summary-meta">{meta}</div>}
     {metrics && (
       <div className="cfo-summary-row">
@@ -205,7 +212,7 @@ export const LoadingSkeleton = ({ rows = 3, height = 16, gap = 12, width = '100%
 
 export const EmptyState = ({ symbol, title, description, actions }) => (
   <div className="cfo-state">
-    {symbol && <img src={symbol} alt="" className="cfo-state-sym" aria-hidden />}
+    {symbol && <img src={symbol} alt="" className="cfo-state-sym" aria-hidden="true" />}
     <h2 className="cfo-state-h">{title}</h2>
     {description && <p className="cfo-state-p">{description}</p>}
     {actions && <div className="cfo-state-actions">{actions}</div>}

@@ -354,6 +354,47 @@ const PROBE_FN = `function facts(win, doc) {
       return { w: +r.width.toFixed(1), h: +r.height.toFixed(1), label: b.getAttribute('aria-label') }; })(),
   };
 
+  // Wallets is the one page in this PR with two states, and the failure mode is
+  // that they blend: a zero state under a card still claiming four wallets and a
+  // balance. So the probe reports what the card SAYS, not just that it exists.
+  const walletsState = (() => {
+    const card = doc.querySelector('.cfo-summary.cfo-flagship');
+    const state = doc.querySelector('.cfo-state');
+    const ctas = state ? state.querySelectorAll('.cfo-state-actions .cfo-btn') : [];
+    const cta = ctas[0] || null;
+    const val = card ? card.querySelector('.cfo-summary-value') : null;
+    const meta = card ? card.querySelector('.cfo-summary-meta') : null;
+    const sym = state ? state.querySelector('img') : null;
+    const head = state ? state.querySelector('h1,h2,h3,h4') : null;
+    const desc = state ? state.querySelector('.cfo-state-p') : null;
+    const box = (el) => { if (!el) return null; const q = el.getBoundingClientRect();
+      return { x: Math.round(q.x), y: Math.round(q.y),
+               w: Math.round(q.width), h: Math.round(q.height) }; };
+    const txt = (el) => (el ? el.textContent.replace(/\\s+/g, ' ').trim() : null);
+    const main = doc.querySelector('.cfo-main-inner') || doc.body;
+    return {
+      hasCard: !!card,
+      value: txt(val),
+      valueBox: box(val),
+      valueLines: val
+        ? Math.round(val.getBoundingClientRect().height / parseFloat(cs(val).lineHeight)) : null,
+      valueWhiteSpace: val ? cs(val).whiteSpace : null,
+      meta: txt(meta),
+      metaBox: box(meta),
+      hasEmptyState: !!state,
+      stateBox: box(state),
+      headingTag: head ? head.tagName.toLowerCase() : null,
+      heading: txt(head),
+      desc: txt(desc),
+      ctaCount: ctas.length,
+      cta: txt(cta),
+      ctaBox: box(cta),
+      symAlt: sym ? sym.getAttribute('alt') : null,
+      symAriaHidden: sym ? sym.getAttribute('aria-hidden') : null,
+      pageText: txt(main).slice(0, 1500),
+    };
+  })();
+
   // Any technical identifier that leaked into the rendered page.
   const idLeaks = [...doc.querySelectorAll('.cfo-pagehead, .cfo-summary, .pulse-cash')]
     .flatMap((el) => (el.textContent || '').match(/\\b[A-Z]{3,}-[A-Z0-9]{3,}-?[0-9]{3,}\\b/g) || []);
@@ -445,7 +486,7 @@ const PROBE_FN = `function facts(win, doc) {
     h1Total: doc.querySelectorAll('h1').length,
     sections, overflow: overflow.slice(0, 10), overflowCount: overflow.length,
     overlaps: overlaps.slice(0, 12), overlapCount: overlaps.length,
-    headActions, heads, focusRing, shell, figures, brand, idLeaks, navItems,
+    headActions, heads, focusRing, shell, figures, brand, idLeaks, navItems, walletsState,
     settings, drawerSettings, topbarSettings, headMarks,
     fonts: { status: doc.fonts.status, size: doc.fonts.size,
       archivo: doc.fonts.check('400 40px "Archivo Black"'),
@@ -501,6 +542,12 @@ const M = await collect(mobileProbe);
 const SD = await collect(shellDesktopProbe);
 const SM = await collect(shellMobileProbe);
 const DRAWER = await collect(drawerProbe);
+// Wallets in both states, at the widths where each one breaks differently.
+const WP = await collect(probeFor('/design-preview?shell=accounts', 1440, 900));
+const WE = await collect(probeFor('/design-preview?shell=accounts-empty', 1440, 900));
+const WEM = await collect(probeFor('/design-preview?shell=accounts-empty', 390, 844));
+const WP320 = await collect(probeFor('/design-preview?shell=accounts', 320, 720));
+const WE320 = await collect(probeFor('/design-preview?shell=accounts-empty', 320, 720));
 console.log(`  .. desktop viewport ${D.innerWidth}px, mobile viewport ${M.innerWidth}px, `
   + `in-shell ${SD.innerWidth}px / ${SM.innerWidth}px`);
 
@@ -1052,6 +1099,117 @@ t('the preview renders inside the real WorkspaceShell, not a drawing of it', () 
 t('the in-shell page keeps exactly one <h1>', () => {
   assert.strictEqual(SD.h1Total, 1, `in-shell desktop has ${SD.h1Total} h1`);
   assert.strictEqual(SM.h1Total, 1, `in-shell mobile has ${SM.h1Total} h1`);
+});
+
+/* ── Wallets: two states, and they must never blend ──────────────────────────
+   The rejected concept put "Add your first wallet" underneath a card reading
+   Rp 152 450 000 and "4 wallets" — a state the product cannot be in. These check
+   the rendered page rather than the source, because that is where the two states
+   met. */
+
+t('the populated page never invites a first wallet', () => {
+  for (const [name, f] of [['desktop', WP], ['mobile', SM], ['320px', WP320]]) {
+    const w = f.walletsState;
+    assert.strictEqual(w.hasEmptyState, false, name + ': the zero state is rendered with wallets present');
+    assert.ok(!/Add your first wallet/i.test(w.pageText || ''),
+      name + ': the populated page still offers "Add your first wallet"');
+    assert.ok(!/will live here/i.test(w.pageText || ''),
+      name + ': the populated page still carries the zero-state title');
+  }
+});
+
+t('the empty page never claims wallets or a balance', () => {
+  for (const [name, f] of [['desktop', WE], ['mobile', WEM], ['320px', WE320]]) {
+    const w = f.walletsState;
+    assert.strictEqual(w.hasCard, true, name + ': the summary card vanished on an empty workspace');
+    assert.strictEqual(w.value, 'Rp 0', name + ': the empty card headline reads ' + w.value);
+    assert.strictEqual(w.meta, 'No wallets added yet',
+      name + ': the empty card supporting line reads ' + w.meta);
+    assert.ok(!/\b4 wallets\b/.test(w.pageText || ''), name + ': the empty page claims 4 wallets');
+    assert.ok(!/152/.test(w.pageText || ''), name + ': the empty page shows a populated balance');
+    assert.ok(!/\d wallets\b/.test(w.meta || ''),
+      name + ': the empty card counts wallets instead of saying there are none');
+  }
+});
+
+t('the zero state says what the page will hold, and offers one way to start', () => {
+  for (const [name, f] of [['desktop', WE], ['mobile', WEM]]) {
+    const w = f.walletsState;
+    assert.strictEqual(w.hasEmptyState, true, name + ': no zero state on an empty workspace');
+    // Under the page's single h1, so the document outline stays intact.
+    assert.strictEqual(w.headingTag, 'h2', name + ': the zero-state heading is a ' + w.headingTag);
+    assert.strictEqual(w.heading, 'Your wallets will live here', name + ': heading is ' + w.heading);
+    assert.match(w.desc || '', /^Add a bank account, cash balance or payment wallet/,
+      name + ': description is ' + w.desc);
+    assert.strictEqual(w.ctaCount, 1, name + ': ' + w.ctaCount + ' calls to action, not one');
+    assert.strictEqual(w.cta, 'Add your first wallet', name + ': the CTA reads ' + w.cta);
+    // No preview-only labelling survives into the product.
+    assert.ok(!/UX concept|not production/i.test(w.pageText || ''),
+      name + ': the preview-only concept label is still on screen');
+  }
+});
+
+t('the zero state CTA is a real, reachable control on a phone', () => {
+  const w = WEM.walletsState;
+  assert.ok(w.ctaBox && w.ctaBox.h >= 44,
+    'the zero-state CTA is ' + (w.ctaBox && w.ctaBox.h) + 'px tall; a thumb needs 44');
+  // And the panel does not turn into a landing page.
+  assert.ok(w.stateBox.h < 420,
+    'the zero-state panel is ' + w.stateBox.h + 'px tall on a phone — that is a marketing page');
+});
+
+t('the zero state symbol is decorative', () => {
+  for (const [name, f] of [['desktop', WE], ['mobile', WEM]]) {
+    const w = f.walletsState;
+    assert.strictEqual(w.symAlt, '', name + ': the zero-state symbol has alt="' + w.symAlt + '"');
+    assert.strictEqual(w.symAriaHidden, 'true', name + ': the zero-state symbol is not aria-hidden');
+  }
+});
+
+t('the headline is the abbreviated figure, with the exact one beneath it', () => {
+  const w = WP.walletsState;
+  assert.match(w.value, /^Rp 152\.5M$/, 'the headline reads ' + w.value);
+  // The exact figure and the count, in the supporting line — grouped by the
+  // production formatter, so the separator is whatever it produces.
+  assert.match(w.meta, /^Rp 152.450.000 · 4 wallets$/,
+    'the supporting line reads ' + w.meta);
+  // Same hierarchy Pulse uses: the abbreviated figure is the bigger of the two.
+  assert.ok(w.valueBox.h > w.metaBox.h,
+    'the abbreviated figure is not the dominant one');
+});
+
+t('the abbreviated headline holds one line, down to 320px', () => {
+  for (const [name, f] of [['1440', WP], ['390', SM], ['320', WP320]]) {
+    const w = f.walletsState;
+    assert.strictEqual(w.valueWhiteSpace, 'nowrap',
+      name + 'px: the abbreviated headline may wrap (white-space: ' + w.valueWhiteSpace + ')');
+    assert.strictEqual(w.valueLines, 1,
+      name + 'px: the headline is on ' + w.valueLines + ' lines');
+  }
+  // Rp 0 is short by construction, but it is still the same card.
+  assert.strictEqual(WE320.walletsState.valueLines, 1, '320px: "Rp 0" wrapped');
+});
+
+t('neither state overflows, at any width down to 320px', () => {
+  for (const [name, f] of [['populated 1440', WP], ['empty 1440', WE], ['empty 390', WEM],
+                           ['populated 320', WP320], ['empty 320', WE320]]) {
+    assert.ok(f.scrollWidth <= f.clientWidth,
+      name + ': scrollWidth ' + f.scrollWidth + ' > clientWidth ' + f.clientWidth);
+    assert.strictEqual(f.overflowCount, 0,
+      name + ': ' + f.overflowCount + ' overflowing element(s): ' + JSON.stringify(f.overflow));
+  }
+});
+
+t('the watermark clears both amount lines in both states', () => {
+  for (const [name, f] of [['populated 1440', WP], ['empty 1440', WE], ['empty 390', WEM],
+                           ['populated 320', WP320], ['empty 320', WE320]]) {
+    for (const c of f.brand.flagships) {
+      assert.ok(c.safeGap > 0,
+        name + ': only ' + c.safeGap + 'px between the amounts and the mark');
+      assert.strictEqual(c.marks, 1, name + ': ' + c.marks + ' marks on the flagship card');
+      assert.strictEqual(c.ariaHidden, 'true', name + ': the card mark is not aria-hidden');
+    }
+  }
 });
 
 t('the in-shell mobile view is a true 390px viewport with no overflow', () => {
