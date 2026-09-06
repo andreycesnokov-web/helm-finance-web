@@ -62,6 +62,17 @@
   border-radius: var(--radius-lg);
   padding: var(--space-5);
 }
+/* The Add-wallet currency control, shown on the card surface it lives on. */
+.dsp-form{
+  background:var(--surface-card);border:1px solid var(--border-default);
+  border-radius:var(--radius-lg);padding:18px 20px;max-width:560px;
+  display:flex;flex-direction:column;gap:18px;
+}
+.dsp-form .modal-label{
+  display:block;font-family:var(--font-ui);font-size:12px;font-weight:800;
+  letter-spacing:.04em;color:var(--text-secondary);margin-bottom:8px;
+}
+
 .dsp-stage-wide { padding: var(--space-5); }
 
 .dsp-row { display: flex; gap: var(--space-3); align-items: center; flex-wrap: wrap; }

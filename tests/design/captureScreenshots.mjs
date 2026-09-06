@@ -284,6 +284,7 @@ function cropPng(inp, outp, cw, ch, ox = 0, oy = 0) {
 /* ── the set ───────────────────────────────────────────────────────────────── */
 const P = '/design-preview';
 const PHONE = { crop: true, window: [512, 844] };
+const PHONE_TALL = { crop: true, window: [512, 1400] };
 
 // Review order: the real application shell first, because that is what ships, then
 // the specific evidence for this pass's two corrections and the mobile lockup.
@@ -355,6 +356,19 @@ const SHOTS = [
   // A wallet whose currency was never set: counted, asked about, never totalled.
   ['28-wallets-needs-currency-card-closeup.png', `${P}?shell=accounts-nocur`, 1440, 900,
     { region: { sel: '.cfo-summary.cfo-flagship', pad: 6 } }],
+  // Four currencies, as THIS release reports them: the IDR total, and a plain
+  // statement of how many wallets were left out of it.
+  ['29-wallets-four-currencies-card-closeup.png', `${P}?shell=accounts-four`, 1440, 900,
+    { region: { sel: '.cfo-summary.cfo-flagship', pad: 6 } }],
+  ['30-wallets-four-currencies-mobile-390x844.png', `${P}?shell=accounts-four`, 390, 844, PHONE],
+  // The real Add-wallet currency control: required, ISO-only, name beside code,
+  // unproven currencies disabled, and locked on an existing wallet.
+  ['31-add-wallet-currency-field.png', `${P}?only=currency-field`, 1440, 760,
+    { region: { sel: '.dsp-form', pad: 16 } }],
+  // NOT SHIPPED — the two alternatives for the future multi-currency model,
+  // for review before the backend work that would make them honest.
+  ['32-concept-balances-by-currency-alternatives.png', `${P}?only=currency-concepts`, 1440, 1500, {}],
+  ['33-concept-balances-by-currency-mobile-390.png', `${P}?only=currency-concepts`, 390, 1400, PHONE_TALL],
 ];
 
 const produced = new Set(SHOTS.map(([f]) => f));

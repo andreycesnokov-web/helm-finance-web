@@ -16,6 +16,9 @@ import { formatAmount } from '../lib/money'
 import en from '../i18n/en'
 import { WalletsEmptyState } from './WalletsEmptyState'
 import { walletsSummary } from './walletsSummary'
+import { walletsSummaryByCurrency } from './walletsSummaryConcepts'
+import { WalletCurrencyField } from './WalletCurrencyField'
+import { CURRENCY_NAMES, formatCurrency, compactAmount } from '../lib/money'
 import { PageHeader, SummaryCard, Card, Btn, StatusBadge, Icon } from '../shell/ui'
 import { ExecutiveHero } from './business/PulseBlocks'
 import WorkspaceShell, { BUSINESS_NAV } from '../shell/WorkspaceShell'
@@ -161,12 +164,63 @@ const WALLETS_NEEDS_CURRENCY = [
   ...WALLETS_FIXTURE.slice(0, 2),
   { id: 'x1', name: 'Imported · unknown currency', currency: null, balance: 5000000 },
 ]
+// Four currencies, for the layout stress test, plus a deliberately long figure.
+const WALLETS_SGD = [{ id: 's1', name: 'DBS · SGD', currency: 'SGD', balance: 8200 }]
+const WALLETS_EUR = [{ id: 'e1', name: 'Revolut · EUR', currency: 'EUR', balance: 12400 }]
+const WALLETS_FOUR = [...WALLETS_FIXTURE, ...WALLETS_USD, ...WALLETS_SGD, ...WALLETS_EUR]
+const WALLETS_LONG = [
+  { id: 'L1', name: 'Consolidated treasury', currency: 'IDR', balance: 999999999 },
+  { id: 'L2', name: 'USD treasury', currency: 'USD', balance: 98765432 },
+]
 const WALLET_SETS = {
   'accounts': WALLETS_FIXTURE,
   'accounts-empty': WALLETS_EMPTY,
   'accounts-usd': WALLETS_USD,
   'accounts-mixed': WALLETS_MIXED,
   'accounts-nocur': WALLETS_NEEDS_CURRENCY,
+  'accounts-four': WALLETS_FOUR,
+}
+
+/* ── the approved FUTURE model, for review only ────────────────────────────
+   Balances by currency, once the backend derives native balances. NEITHER of
+   these is wired into a production page: today Accounts totals IDR and says
+   plainly that other currencies are not totalled yet, because its balances come
+   from amount_idr. These exist so the shape can be agreed before that work.
+
+   Alternative 1 — every currency a peer inside one navy section.
+   Alternative 2 — base currency keeps the navy flagship, the rest sit beneath it
+                   as quiet cards. (The provisional preference.)
+
+   Deliberately not offered: a navy hero per currency. Three competing heroes
+   make a page with no subject, and the one thing this layout must never suggest
+   is that any figure is the sum of the others. */
+const CurrencyConcept = ({ wallets, variant }) => {
+  const sum = walletsSummaryByCurrency({
+    wallets, t: tEn, scopeLabel: tEn('accounts.totalBalance'), variant,
+  })
+  return (
+    <>
+      <SummaryCard flagship compact={sum.compact}
+        label={sum.label} value={sum.value} meta={sum.meta} />
+      {sum.secondary && (
+        <div className="cfo-cur-aside">
+          {sum.secondary.map((g) => (
+            <div key={g.currency} className="cfo-cur-aside-item">
+              <span className="cfo-cur-aside-code">{g.currency} — {CURRENCY_NAMES[g.currency] || g.currency}</span>
+              <span className="cfo-cur-aside-amt">
+                {compactAmount(g.total, g.currency) || formatCurrency(g.total, g.currency)}
+              </span>
+              <span className="cfo-cur-aside-sub">
+                {formatCurrency(g.total, g.currency)} · {g.wallets.length === 1
+                  ? tEn('accounts.walletsCountOne')
+                  : tEn('accounts.walletsCountMany').replace('{n}', g.wallets.length)}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+    </>
+  )
 }
 
 const AccountsBody = ({ wallets = WALLETS_FIXTURE }) => {
@@ -241,11 +295,40 @@ export default function DesignPreview() {
           <PulseBody />
         </Section>
 
+        {/* ── the Add Wallet currency contract ─────────────────────────── */}
+        <Section id="currency-field" title="Add wallet — currency"
+          note="The real control from the Add / Edit wallet form. Required, chosen from a fixed ISO 4217 list and never typed, code shown with its readable name. Currencies whose native balance the backend cannot yet prove are visible but disabled with the reason; an existing wallet's currency cannot be changed at all, because the API would rewrite it and silently relabel every transaction the wallet already holds.">
+          <div className="dsp-form">
+            <WalletCurrencyField
+              currencies={['IDR', 'USD', 'EUR', 'SGD', 'MYR', 'THB', 'CNY']}
+              value="IDR" onChange={noop} locked={false}
+              styleFor={() => ({ bg: '#E8F0FE', color: '#003366' })} t={tEn} />
+            <WalletCurrencyField
+              currencies={['IDR', 'USD', 'EUR', 'SGD']}
+              value="IDR" onChange={noop} locked
+              styleFor={() => ({ bg: '#E8F0FE', color: '#003366' })} t={tEn} />
+          </div>
+        </Section>
+
+        {/* ── FUTURE: balances by currency, two alternatives ───────────── */}
+        <Section id="currency-concepts" title="Balances by currency — two alternatives, not yet shipped" wide
+          note="For review before the backend work. Neither is wired into a production page. Alternative 1 puts every currency inside one navy section as peers. Alternative 2 keeps the base currency in the navy flagship and sets the others beneath it as quiet cards. Neither shows a combined total, and neither implies conversion.">
+          <p className="dsp-note"><strong>Alternative 1 — one navy section, currencies as peers</strong></p>
+          <CurrencyConcept wallets={WALLETS_MIXED} variant="grouped" />
+          <CurrencyConcept wallets={WALLETS_FOUR} variant="grouped" />
+          <p className="dsp-note"><strong>Alternative 2 — base currency in the flagship, the rest beside it</strong></p>
+          <CurrencyConcept wallets={WALLETS_MIXED} variant="primary" />
+          <CurrencyConcept wallets={WALLETS_FOUR} variant="primary" />
+          <p className="dsp-note"><strong>Long values</strong></p>
+          <CurrencyConcept wallets={WALLETS_LONG} variant="primary" />
+        </Section>
+
         {/* ── Accounts, other currencies ───────────────────────────────── */}
-        <Section id="accounts-currencies" title="Wallets — currency safety" wide
-          note="A balance belongs to one currency, so a total may only cover wallets that share one. A dollar workspace is headed in dollars; a workspace holding both gets one labelled amount per currency and deliberately no combined figure, because this product has no rate that could produce one; a wallet with no currency set is counted and asked about, never folded into someone else's total.">
+        <Section id="accounts-currencies" title="Wallets — what this release actually says" wide
+          note="A balance belongs to one currency, and a currency is only totalled once its native balance is provable. Accounts reads the business endpoint, whose balance is a sum of amount_idr — so IDR is provable and nothing else is. A dollar-only workspace therefore reports no figure at all rather than printing rupiah behind a dollar sign; a mixed workspace totals its IDR and says how many wallets it left out; a wallet with no currency is counted and asked about. None of these invent a number.">
           <AccountsBody wallets={WALLETS_USD} />
           <AccountsBody wallets={WALLETS_MIXED} />
+          <AccountsBody wallets={WALLETS_FOUR} />
           <AccountsBody wallets={WALLETS_NEEDS_CURRENCY} />
         </Section>
 

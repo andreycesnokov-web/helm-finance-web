@@ -5,8 +5,10 @@ import { useAuth } from '../hooks/useAuth'
 import { useAccess } from '../hooks/useAccess'
 import { useTranslation } from '../hooks/useTranslation'
 import { apiFetch, fmt, fmtFull } from '../lib/api'
-import { formatCurrency, walletsByCurrency } from '../lib/money'
+import { formatCurrency } from '../lib/money'
 import { walletsSummary } from './walletsSummary'
+import { partitionWallets } from '../lib/walletBalanceContract'
+import { WalletCurrencyField } from './WalletCurrencyField'
 import { PageHeader, SummaryCard, ErrorState } from '../shell/ui'
 import { WalletsEmptyState } from './WalletsEmptyState'
 import { WORKSPACE_DEFAULT_CURRENCY } from './walletsSummary'
@@ -185,9 +187,17 @@ export default function Accounts() {
   //
   // Nothing is converted. There is no rate in this product that could value one
   // currency in another, so the page reports what it knows: a total per currency.
-  // Grouping is needed twice: the card totals per currency, and each wallet row
-  // shows its share of its OWN currency's total.
-  const { groups: currencyGroups } = walletsByCurrency(filteredWallets)
+  // Grouping is needed twice: the card totals the one currency whose balances are
+  // provable, and each wallet row shows its share of its OWN currency's total.
+  //
+  // `unproven` is not a display bug being hidden — it is a backend gap being told
+  // the truth about. The business endpoint derives balance from amount_idr, so a
+  // non-IDR wallet's number is an IDR-reporting figure wearing a foreign
+  // currency's label. The row lists the wallet and says the balance is not
+  // available yet rather than printing "$" in front of rupiah.
+  const { proven: provenGroups, unproven: unprovenGroups } = partitionWallets(filteredWallets)
+  const groupOf = (w) => provenGroups.find((g) => g.wallets.includes(w))
+  const isUnproven = (w) => unprovenGroups.some((g) => g.wallets.includes(w))
   const scopeLabel = scopeTab === 'business' ? t('accounts.totalBusiness')
     : scopeTab === 'personal' ? t('accounts.totalPersonal')
     : t('accounts.totalBalance')
@@ -430,7 +440,7 @@ export default function Accounts() {
             const isNeg = (w.balance || 0) < 0
             // Share of its OWN currency's total. Measured against a mixed total it
             // was arithmetic between unlike units dressed up as a percentage.
-            const grp   = currencyGroups.find((g) => g.wallets.includes(w))
+            const grp   = groupOf(w)
             const pct   = grp && grp.total > 0 ? Math.round(((w.balance || 0) / grp.total) * 100) : 0
             const typeLabel = WALLET_TYPES.find(t => t.value === w.type && t.value !== '__custom__')?.label || (w.type ? w.type : null)
             const walletScope = w.scope || 'business'
@@ -450,7 +460,9 @@ export default function Accounts() {
                       <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 20, fontWeight: 700,
                         background: grp ? cs.bg : 'var(--warning-soft, #FEF3C7)',
                         color:      grp ? cs.color : 'var(--warning-dark, #92400E)' }}>
-                        {grp ? grp.currency : t('accounts.needsCurrency')}
+                        {grp ? grp.currency
+                          : isUnproven(w) ? (w.currency || '').toUpperCase()
+                          : t('accounts.needsCurrency')}
                       </span>
                       {typeLabel && <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 20, background: 'var(--bg-2)', color: 'var(--text-3)', fontWeight: 600 }}>{typeLabel}</span>}
                       <span style={{
@@ -468,13 +480,17 @@ export default function Accounts() {
                     {/* The amount carries its own currency. Rendering every wallet
                         with the same bare number is what made a dollar account
                         indistinguishable from a rupiah one at a glance. */}
+                    {/* An amount is only printed where its unit is provable. For a
+                        wallet in another currency the number exists but its unit
+                        does not — the balance is a sum of amount_idr — so the row
+                        says so instead of dressing rupiah up as dollars. */}
                     <div style={{ fontSize: 'var(--text-base)', fontWeight: 800, color: isNeg ? 'var(--red-dark)' : 'var(--text)', letterSpacing: -0.3, lineHeight: 1, whiteSpace: 'nowrap' }}>
-                      {grp
-                        ? formatCurrency(w.balance || 0, grp.currency)
-                        : <>{isNeg ? '−' : ''}{fmt(Math.abs(w.balance || 0))}</>}
+                      {grp ? formatCurrency(w.balance || 0, grp.currency) : '—'}
                     </div>
                     <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 3, whiteSpace: 'nowrap' }}>
-                      {grp ? `${Math.abs(pct)}${t('accounts.share')}` : t('accounts.needsCurrency')}
+                      {grp ? `${Math.abs(pct)}${t('accounts.share')}`
+                        : isUnproven(w) ? t('accounts.balanceUnavailable')
+                        : t('accounts.needsCurrency')}
                     </div>
                   </div>
 
@@ -672,23 +688,19 @@ export default function Accounts() {
             />
 
             {/* Currency */}
-            <label className="modal-label">{t('accounts.currency')}</label>
-            <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
-              {CURRENCIES.map(c => {
-                const cs = getCurrencyStyle(c)
-                return (
-                  <button key={c} onClick={() => setForm(p => ({ ...p, currency: c }))} style={{
-                    padding: '8px 14px', borderRadius: 10, fontSize: 'var(--text-sm)',
-                    border: '0.5px solid var(--border-2)', fontFamily: 'inherit', fontWeight: 700,
-                    background: form.currency === c ? cs.bg : 'none',
-                    color:      form.currency === c ? cs.color : 'var(--text-3)',
-                    cursor: 'pointer', transition: 'all .1s',
-                  }}>{c}</button>
-                )
-              })}
-            </div>
+            {/* The real control, in its own module so the design preview can
+                photograph it rather than draw a copy. It owns the currency
+                contract: required, ISO-only, name beside the code, unproven
+                currencies disabled, and immutable once the wallet exists. */}
+            <WalletCurrencyField
+              currencies={CURRENCIES}
+              value={form.currency}
+              onChange={(c) => setForm(p => ({ ...p, currency: c }))}
+              locked={!!editWallet}
+              styleFor={getCurrencyStyle}
+              t={t}
+            />
 
-            {/* Type */}
             <label className="modal-label">{t('accounts.type')} <span style={{ fontWeight: 400, color: 'var(--text-3)' }}>(optional)</span></label>
             <select
               className="modal-input"

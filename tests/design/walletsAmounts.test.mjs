@@ -87,6 +87,13 @@ console.log('\nwallets — the count in the supporting line');
 // The page builds this from the translation layer; the grammar rule is what
 // matters, and "1 wallets" is the classic way it goes wrong.
 import enDict from '../../client/src/i18n/en.js';
+import { partitionWallets, PROVEN_NATIVE_CURRENCIES }
+  from '../../client/src/lib/walletBalanceContract.js';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+const REPO = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
+const readSrc = (rel) => fs.readFileSync(path.join(REPO, rel), 'utf8');
 const countLabel = (n) => (n === 1
   ? enDict.accounts.walletsCountOne
   : enDict.accounts.walletsCountMany.replace('{n}', n));
@@ -215,6 +222,76 @@ t('the abbreviated and exact figures describe the same amount, per currency', ()
 t('the groups are ordered largest first, so the card has a reading order', () => {
   const { groups } = walletsByCurrency([w('USD', 5), w('IDR', 900), w('EUR', 100)]);
   assert.deepStrictEqual(groups.map((g) => g.currency), ['IDR', 'EUR', 'USD']);
+});
+
+console.log('\nprovable balances — what this release may state');
+
+/* The second, harder question behind the currency rule: what unit is
+   wallet.balance actually in?
+
+     business  GET /api/wallets          balance = SUM(transactions.amount_idr)
+     personal  GET /api/personal/wallets balance = SUM(transactions.amount_original)
+
+   Accounts reads the business endpoint. amount_idr is the IDR-REPORTING column —
+   migration 037 says so in as many words — so the balance is the wallet's native
+   balance when the wallet is IDR, and is not when it is anything else. Printing
+   "$" in front of a sum of amount_idr relabels rupiah as dollars. */
+
+t('only IDR balances are treated as provably native', () => {
+  assert.deepStrictEqual(PROVEN_NATIVE_CURRENCIES, ['IDR'],
+    'the provable set has changed — has the backend started deriving native balances?');
+});
+
+t('a mixed workspace proves IDR and sets the rest aside', () => {
+  const { proven, unproven, unknown } = partitionWallets([
+    w('IDR', 94200000), w('USD', 842500), w('IDR', 58250000), w('SGD', 8200), w(null, 5)]);
+  assert.strictEqual(proven.length, 1, 'more than one currency was treated as provable');
+  assert.strictEqual(proven[0].currency, 'IDR');
+  assert.strictEqual(proven[0].total, 152450000);
+  assert.deepStrictEqual(unproven.map((g) => g.currency), ['USD', 'SGD']);
+  assert.strictEqual(unknown.length, 1);
+  // The unprovable balances are counted, never added to anything.
+  const totalled = proven.reduce((n, g) => n + g.total, 0);
+  assert.strictEqual(totalled, 152450000,
+    'an unprovable balance leaked into the total');
+});
+
+t('a workspace with no IDR wallet proves nothing', () => {
+  const { proven, unproven } = partitionWallets([w('USD', 842500), w('USD', 410000)]);
+  assert.strictEqual(proven.length, 0, 'a non-IDR currency was treated as provable');
+  assert.strictEqual(unproven.length, 1);
+  assert.strictEqual(unproven[0].wallets.length, 2,
+    'the wallets are hidden rather than counted');
+});
+
+t('the empty workspace transitions to whatever the first wallet is', () => {
+  // Empty: nothing proven, nothing unproven, nothing unknown.
+  const empty = partitionWallets([]);
+  assert.deepStrictEqual([empty.proven.length, empty.unproven.length, empty.unknown.length], [0, 0, 0]);
+  // First wallet is IDR -> a proven total appears immediately.
+  const first = partitionWallets([w('IDR', 250000)]);
+  assert.strictEqual(first.proven.length, 1);
+  assert.strictEqual(first.proven[0].total, 250000);
+  assert.strictEqual(formatCurrency(first.proven[0].total, 'IDR'), 'Rp 250 000');
+  // First wallet is USD -> NOT an IDR zero beside a USD wallet. Nothing is
+  // totalled, and the card says so rather than showing Rp 0.
+  const usdFirst = partitionWallets([w('USD', 5000)]);
+  assert.strictEqual(usdFirst.proven.length, 0,
+    'a USD-first workspace would still show an IDR total');
+  assert.strictEqual(usdFirst.unproven[0].wallets.length, 1);
+});
+
+t('native and reporting amounts are never read from the same field', () => {
+  // A guard on the contract itself: the two server derivations must stay
+  // distinguishable, because the whole IDR-only decision rests on knowing which
+  // column a balance came from.
+  const bizEndpoint = readSrc('server/index.js');
+  assert.ok(/\.select\('wallet_id, source, type, amount_idr'\)/.test(bizEndpoint),
+    'the business wallet endpoint no longer selects amount_idr — has it moved to '
+    + 'amount_original? If so, PROVEN_NATIVE_CURRENCIES can grow.');
+  const personal = readSrc('server/lib/personalWorkspace.js');
+  assert.ok(/Number\(t\.amount_original \|\| 0\)/.test(personal),
+    'the personal balance helper no longer reads amount_original');
 });
 
 console.log(fail ? `\n${pass} passed, ${fail} failed` : `\nALL PASS — ${pass} passed, 0 failed`);

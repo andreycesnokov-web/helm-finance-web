@@ -606,9 +606,11 @@ const CURRENCIES = await collectGroup([
   { key: 'WMIX', route: `${P}?shell=accounts-mixed`, w: 1440, h: 900 },
   { key: 'WMIXM', route: `${P}?shell=accounts-mixed`, w: 390, h: 844 },
   { key: 'WNOC', route: `${P}?shell=accounts-nocur`, w: 1440, h: 900 },
+  { key: 'W4', route: `${P}?shell=accounts-four`, w: 1440, h: 900 },
+  { key: 'W4M', route: `${P}?shell=accounts-four`, w: 390, h: 844 },
 ]);
 const { SD, SM, WP, WE, WEM, WP320, WE320 } = SHELLS;
-const { WUSD, WMIX, WMIXM, WNOC } = CURRENCIES;
+const { WUSD, WMIX, WMIXM, WNOC, W4, W4M } = CURRENCIES;
 console.log(`  .. desktop viewport ${D.innerWidth}px, mobile viewport ${M.innerWidth}px, `
   + `in-shell ${SD.innerWidth}px / ${SM.innerWidth}px`);
 
@@ -1255,7 +1257,7 @@ t('neither state overflows, at any width down to 320px', () => {
   for (const [name, f] of [['populated 1440', WP], ['empty 1440', WE], ['empty 390', WEM],
                            ['populated 320', WP320], ['empty 320', WE320],
                            ['usd 1440', WUSD], ['mixed 1440', WMIX], ['mixed 390', WMIXM],
-                           ['no-currency 1440', WNOC]]) {
+                           ['no-currency 1440', WNOC], ['four 1440', W4], ['four 390', W4M]]) {
     assert.ok(f.scrollWidth <= f.clientWidth,
       name + ': scrollWidth ' + f.scrollWidth + ' > clientWidth ' + f.clientWidth);
     assert.strictEqual(f.overflowCount, 0,
@@ -1280,36 +1282,49 @@ t('the watermark clears both amount lines in both states', () => {
    A balance belongs to one currency, so a total may only cover wallets that share
    one. The page used to add them all and label the result IDR. */
 
-t('a dollar workspace is headed in dollars, never in rupiah', () => {
+t('a dollar-only workspace reports no figure rather than relabelling rupiah', () => {
+  // The balance behind a USD wallet is a sum of transactions.amount_idr — the
+  // IDR-reporting column. Printing "$" in front of it would relabel rupiah as
+  // dollars, which is worse than the cross-currency addition this replaced. Until
+  // the backend derives native balances, the card states nothing.
   const w = WUSD.walletsState;
-  assert.match(w.value, /^\$/, `the USD headline reads ${w.value}`);
-  assert.ok(!/Rp/.test(w.value), `the USD headline contains Rp: ${w.value}`);
-  assert.ok(!/Rp/.test(w.meta), `the USD supporting line contains Rp: ${w.meta}`);
-  // Still the approved hierarchy: abbreviated headline, exact figure beneath.
-  assert.match(w.value, /^\$1\.3M$/, `expected $1.3M, got ${w.value}`);
-  assert.match(w.meta, /^\$1 252 500\.00 · 2 wallets$/, `supporting line reads ${w.meta}`);
-  assert.match(w.label || '', /USD/, 'the card does not name the currency it is totalling');
+  assert.strictEqual(w.value, 'Balance unavailable',
+    `the USD-only headline reads "${w.value}"`);
+  assert.ok(!/\$/.test(w.value), `a dollar figure was printed: ${w.value}`);
+  assert.ok(!/Rp/.test(w.value), `a rupiah figure was printed: ${w.value}`);
+  // And it says why, with the wallets counted rather than hidden.
+  assert.match(w.meta, /2 in other currencies \(not totalled yet\)/,
+    `the USD-only supporting line reads "${w.meta}"`);
 });
 
-t('two currencies produce two labelled amounts and no combined total', () => {
+t('a mixed workspace totals only what it can prove, and says what it left out', () => {
   for (const [name, f] of [['desktop', WMIX], ['mobile', WMIXM]]) {
     const w = f.walletsState;
-    assert.strictEqual(w.currencies.length, 2,
-      `${name}: ${w.currencies.length} currency amounts, expected 2`);
-    const codes = w.currencies.map((c) => c.code);
-    assert.deepStrictEqual(codes, ['IDR', 'USD'], `${name}: currencies are ${codes}`);
-    const idrAmt = w.currencies[0].amount, usdAmt = w.currencies[1].amount;
-    assert.match(idrAmt, /^Rp /, `${name}: the IDR amount reads ${idrAmt}`);
-    assert.match(usdAmt, /^\$/, `${name}: the USD amount reads ${usdAmt}`);
+    // The IDR total, in the approved hierarchy, labelled IDR.
+    assert.strictEqual(w.value, 'Rp 152.5M', `${name}: the headline reads ${w.value}`);
+    assert.match(w.label || '', /IDR/, `${name}: the card label is "${w.label}"`);
+    assert.match(w.meta, /^Rp 152 450 000 · 4 wallets · 2 in other currencies \(not totalled yet\)$/,
+      `${name}: the supporting line reads "${w.meta}"`);
     // The number that must never appear: the two added together. IDR 152 450 000
     // plus USD 1 252 500 would compact to Rp 153.7M.
     assert.ok(!/153\.7M/.test(w.pageText || ''),
       `${name}: a combined cross-currency total is on screen`);
-    // And the card must not present ONE dominant figure at all here.
-    assert.match(w.label || '', /by currency/i,
-      `${name}: the card label is "${w.label}" rather than saying it is by currency`);
-    assert.match(w.meta, /2 currencies/, `${name}: the supporting line reads ${w.meta}`);
+    // And no dollar figure anywhere, because none can be vouched for.
+    assert.ok(!/\$/.test(w.pageText || ''),
+      `${name}: a dollar amount appeared despite the balance being unprovable`);
+    // The by-currency list belongs to the unshipped concept, not to this card.
+    assert.strictEqual(w.currencies.length, 0,
+      `${name}: the production card rendered the future by-currency list`);
   }
+});
+
+t('four currencies do not change the rule or the layout', () => {
+  const w = W4.walletsState;
+  assert.strictEqual(w.value, 'Rp 152.5M', `the headline reads ${w.value}`);
+  assert.match(w.meta, /4 in other currencies \(not totalled yet\)/,
+    `the supporting line reads "${w.meta}"`);
+  assert.ok(!/\$|€|S\$/.test(w.pageText || ''), 'a foreign-currency figure was printed');
+  assert.strictEqual(w.valueLines, 1, 'the headline wrapped with four currencies present');
 });
 
 t('a wallet with no currency is counted and asked about, never totalled', () => {
@@ -1330,13 +1345,14 @@ t('a wallet with no currency is counted and asked about, never totalled', () => 
 
 t('every currency on screen is written in its own notation', () => {
   // Nowhere may a currency symbol appear in front of another currency's amount.
-  for (const [name, f] of [['USD', WUSD], ['mixed', WMIX], ['no-currency', WNOC]]) {
+  for (const [name, f] of [['USD', WUSD], ['mixed', WMIX], ['no-currency', WNOC],
+                           ['four', W4]]) {
     const text = f.walletsState.pageText || '';
     assert.ok(!/Rp\s*\$|\$\s*Rp/.test(text), `${name}: two currency marks collided`);
   }
-  // A dollar amount never carries Rp anywhere on the dollar page.
-  assert.ok(!/Rp/.test(WUSD.walletsState.pageText || ''),
-    'the dollar workspace mentions Rp somewhere');
+  // Nothing on the dollar-only page claims a figure in any currency.
+  assert.ok(!/Rp|\$/.test(WUSD.walletsState.value || ''),
+    'the dollar-only workspace printed a currency figure');
 });
 
 t('the in-shell mobile view is a true 390px viewport with no overflow', () => {

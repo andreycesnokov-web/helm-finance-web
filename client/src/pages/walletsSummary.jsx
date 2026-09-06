@@ -1,42 +1,64 @@
 // What the Wallets total-balance card says, for any collection of wallets.
 //
-// This is the currency-safety rule made into one function, in one place, because
-// the page and the design preview both have to obey it and a copy of the rule is
-// a copy that can drift. The rule:
+// ── the invariant ──────────────────────────────────────────────────────────
+// One wallet has exactly one native currency, and a balance must be shown in
+// THAT currency. Unlike currencies are never added together as raw numbers, and
+// nothing here converts anything: this product has no rate that can value one
+// currency in another for a balance.
 //
-//   A balance belongs to exactly one currency, so a total may only ever cover
-//   wallets that share one. Nothing here converts anything — this product has no
-//   rate that could value one currency in another, and inventing one would be a
-//   worse bug than showing two numbers.
+// ── why the release is IDR-only ────────────────────────────────────────────
+// The rule above is about presentation. There is a second, harder question —
+// what unit is `wallet.balance` actually in? — and the answer today is only
+// trustworthy for IDR:
 //
-// The page used to add every wallet's balance together and label the result IDR,
-// so a single dollar account silently turned $1 000 into Rp 1 000 in the headline.
-// The rest of the codebase already states the rule (personal Pulse in
-// server/index.js, and BusinessAccounts) — this brings Wallets in line.
+//   business  GET /api/wallets   balance = SUM(transactions.amount_idr)
+//   personal  GET /api/personal/wallets  balance = SUM(transactions.amount_original)
 //
-// Returns the three slots SummaryCard renders, so the caller stays declarative.
-import { formatCurrency, compactAmount, walletsByCurrency } from '../lib/money'
+// Accounts reads the BUSINESS endpoint, so its balances are sums of amount_idr —
+// the IDR-reporting column, which migration 037 explicitly demotes: "amount_idr
+// is KEPT for back-compat but is no longer the universal source of truth."
+//
+// For an IDR wallet, reporting and native are the same number, so the balance is
+// provably native. For a USD wallet it is not: printing "$" in front of a sum of
+// amount_idr would relabel an IDR-reporting figure as dollars, which is a worse
+// bug than the cross-currency addition it replaced. So a currency is only
+// totalled once its native balance is provable, and today that is IDR alone.
+//
+// Wallets in other currencies are still listed and counted — they are not hidden
+// — but no amount is claimed for them until the backend contract is repaired.
+// See walletsSummaryByCurrency below for the approved future model, which is
+// rendered in the gated design preview and nowhere else.
+import { formatCurrency, compactAmount } from '../lib/money'
+// The policy this file renders lives in its own plain module — it is a rule about
+// what may be stated, not a rendering concern, and it needs to be unit-testable
+// without a JSX transform. Re-exported so importers need not care where it lives.
+import {
+  WORKSPACE_DEFAULT_CURRENCY, PROVEN_NATIVE_CURRENCIES, partitionWallets,
+} from '../lib/walletBalanceContract'
 
-// The currency this workspace creates wallets in. It is used for ONE thing: the
-// zero shown when there are no wallets at all, where the amount is zero in every
-// currency and so naming one claims nothing about money that exists. It is never
-// applied to a wallet that already has a balance.
-export const WORKSPACE_DEFAULT_CURRENCY = 'IDR'
+export { WORKSPACE_DEFAULT_CURRENCY, PROVEN_NATIVE_CURRENCIES, partitionWallets }
+
+const countOf = (t, n) => (n === 1
+  ? t('accounts.walletsCountOne')
+  : t('accounts.walletsCountMany').replace('{n}', n))
 
 /**
+ * The production card. IDR-only by construction.
+ *
  * @param wallets    the wallets this card is totalling (already scope-filtered)
  * @param t          the page's translation function
  * @param scopeLabel the card's label for the current scope tab
- * @returns { label, value, meta, compact } for SummaryCard
  */
 export function walletsSummary({ wallets, t, scopeLabel }) {
-  const { groups, unknown } = walletsByCurrency(wallets || [])
-  const countOf = (n) => (n === 1
-    ? t('accounts.walletsCountOne')
-    : t('accounts.walletsCountMany').replace('{n}', n))
-  const unknownNote = unknown.length
-    ? ' · ' + t('accounts.needsCurrencyCount').replace('{n}', unknown.length)
-    : ''
+  const { proven, unproven, unknown } = partitionWallets(wallets)
+
+  // Notes for what is deliberately NOT in the total, so the figure is never
+  // silently narrower than the page it sits on.
+  const asideCount = unproven.reduce((n, g) => n + g.wallets.length, 0)
+  const notes = []
+  if (asideCount) notes.push(t('accounts.otherCurrenciesAside').replace('{n}', asideCount))
+  if (unknown.length) notes.push(t('accounts.needsCurrencyCount').replace('{n}', unknown.length))
+  const noteSuffix = notes.length ? ' · ' + notes.join(' · ') : ''
 
   // No wallets at all.
   if (!wallets || wallets.length === 0) {
@@ -48,50 +70,26 @@ export function walletsSummary({ wallets, t, scopeLabel }) {
     }
   }
 
-  // Wallets exist, but not one of them says which currency it is in. There is no
-  // honest total to print, so the card does not print one.
-  if (groups.length === 0) {
+  // Wallets exist, but none of them is in a currency whose balance we can prove.
+  // There is no honest figure to print, so none is printed.
+  if (proven.length === 0) {
     return {
       label: scopeLabel,
-      value: <span className="cfo-summary-nototal">{t('accounts.noCurrencyTotal')}</span>,
-      meta: t('accounts.needsCurrencyCount').replace('{n}', unknown.length),
+      value: <span className="cfo-summary-nototal">{t('accounts.noProvenBalance')}</span>,
+      meta: (notes.join(' · ') || t('accounts.noWalletsYet')),
       compact: false,
     }
   }
 
-  // One currency: the approved hierarchy — abbreviated figure as the headline,
-  // exact figure beneath it, both in that wallet's own currency.
-  if (groups.length === 1) {
-    const g = groups[0]
-    const exact = formatCurrency(g.total, g.currency)
-    return {
-      label: `${scopeLabel} · ${g.currency}`,
-      value: <span className="fin">{compactAmount(g.total, g.currency) || exact}</span>,
-      meta: `${exact} · ${countOf(g.wallets.length)}${unknownNote}`,
-      compact: true,
-    }
-  }
-
-  // More than one: one clearly labelled amount each, and deliberately no combined
-  // figure. Largest first, so the card still has a reading order.
+  // The release case: one proven currency, in the approved hierarchy —
+  // abbreviated figure as the headline, exact figure beneath.
+  const g = proven[0]
+  const exact = formatCurrency(g.total, g.currency)
   return {
-    label: t('accounts.totalByCurrency'),
-    value: (
-      <span className="cfo-summary-currencies">
-        {groups.map((g) => (
-          <span key={g.currency} className="cfo-summary-cur">
-            <span className="cfo-summary-cur-code">{g.currency}</span>
-            <span className="fin cfo-summary-cur-amt">
-              {compactAmount(g.total, g.currency) || formatCurrency(g.total, g.currency)}
-            </span>
-          </span>
-        ))}
-      </span>
-    ),
-    meta: t('accounts.walletsAcrossCurrencies')
-      .replace('{n}', wallets.length - unknown.length)
-      .replace('{m}', groups.length) + unknownNote,
-    compact: false,
+    label: `${scopeLabel} · ${g.currency}`,
+    value: <span className="fin">{compactAmount(g.total, g.currency) || exact}</span>,
+    meta: `${exact} · ${countOf(t, g.wallets.length)}${noteSuffix}`,
+    compact: true,
   }
 }
 

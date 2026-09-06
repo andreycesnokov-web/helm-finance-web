@@ -277,7 +277,7 @@ t('the zero state calls the page own add-wallet action', () => {
 
 t('both amount formatters come from the shared money module', () => {
   const ws = code('client/src/pages/walletsSummary.jsx');
-  assert.match(ws, /import \{ formatCurrency, compactAmount, walletsByCurrency \} from '\.\.\/lib\/money'/,
+  assert.match(ws, /import \{ formatCurrency, compactAmount \} from '\.\.\/lib\/money'/,
     'the summary does not import the shared formatters');
   assert.match(ws, /compactAmount\(g\.total, g\.currency\) \|\| exact/,
     'the headline is not the compact figure falling back to the exact one');
@@ -313,11 +313,78 @@ t('a total may only ever cover one currency', () => {
   assert.match(money, /\/\^\[A-Z\]\{3\}\$\//,
     'walletsByCurrency accepts something other than a currency code');
   const ws = code('client/src/pages/walletsSummary.jsx');
-  assert.match(ws, /if \(groups\.length === 1\)/, 'no single-currency branch');
-  // More than one currency must not produce a combined figure anywhere.
+  // No total may ever span groups, in either the shipped card or the concepts.
   assert.ok(!/groups\.reduce/.test(ws), 'the summary adds group totals together');
-  assert.match(ws, /accounts\.totalByCurrency/,
-    'a multi-currency card does not say it is broken down by currency');
+});
+
+t('only currencies with a provable native balance are totalled', () => {
+  // Accounts reads the BUSINESS endpoint, whose balance is a sum of amount_idr —
+  // the IDR-reporting column. That is the wallet's native balance for an IDR
+  // wallet and is not for any other, so a USD wallet must not be given a "$"
+  // figure derived from it. Today IDR is the only provable currency.
+  const contract = code('client/src/lib/walletBalanceContract.js');
+  assert.match(contract, /export const PROVEN_NATIVE_CURRENCIES = \['IDR'\]/,
+    'the set of currencies with provable native balances is not declared, or is not IDR-only');
+  const ws = code('client/src/pages/walletsSummary.jsx');
+  assert.match(ws, /const \{ proven, unproven, unknown \} = partitionWallets\(wallets\)/,
+    'the card does not split wallets by whether their balance is provable');
+  // Nothing but `proven` may reach a printed figure.
+  assert.match(ws, /const g = proven\[0\]/, 'the headline is not taken from a proven currency');
+  assert.ok(!/unproven\[0\]|unproven\.map\(\(g\) => formatCurrency/.test(ws),
+    'an unproven currency is given a printed amount');
+  // And when nothing is provable the card prints no number at all.
+  assert.match(ws, /if \(proven\.length === 0\)[\s\S]{0,300}noProvenBalance/,
+    'a workspace with no provable currency still prints a figure');
+});
+
+t('a wallet whose balance cannot be vouched for shows no amount', () => {
+  const acc = code('client/src/pages/Accounts.jsx');
+  assert.match(acc, /\{grp \? formatCurrency\(w\.balance \|\| 0, grp\.currency\) : '—'\}/,
+    'a row prints an amount for a wallet whose unit is not provable');
+  assert.match(acc, /accounts\.balanceUnavailable/,
+    'a row does not say why the balance is missing');
+});
+
+t('the future multi-currency model is preview-only', () => {
+  // walletsSummaryByCurrency renders the approved future model. It must not be
+  // reachable from a production page until native balances exist — and better
+  // than "no page calls it", it must not be in the production bundle at all.
+  const prod = ['client/src/pages/Accounts.jsx', 'client/src/pages/business/index.jsx',
+                'client/src/pages/personal/index.jsx', 'client/src/pages/PersonalDashboard.jsx',
+                'client/src/pages/walletsSummary.jsx'];
+  for (const f of prod) {
+    assert.ok(!/walletsSummaryByCurrency/.test(code(f)),
+      `${f} references the future multi-currency model before the backend supports it`);
+  }
+  // Only the gated preview imports it, so it can still be reviewed.
+  assert.match(code('client/src/pages/DesignPreview.jsx'),
+    /import \{ walletsSummaryByCurrency \} from '\.\/walletsSummaryConcepts'/,
+    'the preview does not import the concepts module');
+  // And it lives in a module nothing shipped imports.
+  const importers = ['client/src/pages/Accounts.jsx', 'client/src/pages/walletsSummary.jsx',
+                     'client/src/pages/WalletCurrencyField.jsx'];
+  for (const f of importers) {
+    assert.ok(!/walletsSummaryConcepts/.test(code(f)),
+      `${f} imports the preview-only concepts module`);
+  }
+});
+
+t('wallet currency is required, ISO-only and immutable once created', () => {
+  const f = code('client/src/pages/WalletCurrencyField.jsx');
+  // Chosen from a fixed list, never typed: no free-text input in this control.
+  assert.ok(!/<input/.test(f), 'the currency control accepts typed input');
+  assert.match(f, /currencies\.map/, 'the currency control is not driven by a fixed list');
+  // Code AND readable name.
+  assert.match(f, /CURRENCY_NAMES\[c\] \|\| c/, 'the readable currency name is not offered');
+  assert.match(f, /aria-label=\{`\$\{c\} — \$\{CURRENCY_NAMES\[c\] \|\| c\}`\}/,
+    'the control has no accessible name carrying code and currency name');
+  // Unproven currencies visible but not selectable; an existing wallet locked.
+  assert.match(f, /PROVEN_NATIVE_CURRENCIES\.includes\(c\) && !locked/,
+    'the control lets an unproven or existing-wallet currency be chosen');
+  assert.match(f, /disabled=\{!selectable\}/, 'unavailable currencies are not disabled');
+  const acc = code('client/src/pages/Accounts.jsx');
+  assert.match(acc, /locked=\{!!editWallet\}/,
+    'editing a wallet does not lock its currency');
 });
 
 t('no currency symbol is hardcoded outside the money module', () => {
@@ -328,10 +395,19 @@ t('no currency symbol is hardcoded outside the money module', () => {
   // The one place a currency is named without a wallet to read it from, and it is
   // only ever used for a zero.
   const ws = code('client/src/pages/walletsSummary.jsx');
-  assert.match(ws, /export const WORKSPACE_DEFAULT_CURRENCY = 'IDR'/,
-    'the workspace default currency is not declared in one named place');
+  // Declaration, the empty-state zero, and the future model's base-currency
+  // default. Nowhere else may name a currency without a wallet to read it from.
+  // Declared once in the contract module; used in the summary only for the
+  // empty-state zero and the future model's base default.
+  const contract = code('client/src/lib/walletBalanceContract.js');
+  assert.match(contract, /export const WORKSPACE_DEFAULT_CURRENCY = 'IDR'/,
+    'the workspace default currency is not declared in the contract module');
+  // Import, re-export, and the empty-state zero. Nothing else in the shipped
+  // summary may name a currency without a wallet to read it from.
   const uses = (ws.match(/WORKSPACE_DEFAULT_CURRENCY/g) || []).length;
-  assert.strictEqual(uses, 2, `WORKSPACE_DEFAULT_CURRENCY is used ${uses - 1} times, not once`);
+  assert.strictEqual(uses, 3, `WORKSPACE_DEFAULT_CURRENCY appears ${uses} times in the summary, expected 3`);
+  assert.match(ws, /value: <span className="fin">\{formatCurrency\(0, WORKSPACE_DEFAULT_CURRENCY\)\}/,
+    'the workspace default currency is used for something other than the empty-state zero');
 });
 
 t('a wallet row shows its own currency and its own share', () => {

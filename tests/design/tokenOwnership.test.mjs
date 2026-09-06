@@ -203,8 +203,10 @@ t('the hero figure uses the financial numeral treatment', () => {
   // moved there so the page and the design preview derive it from one place.
   const summary = read('client/src/pages/walletsSummary.jsx');
   assert.ok(/className="fin"/.test(summary), 'the Wallets balance must carry .fin');
-  // Every per-currency amount too, not just the single-currency headline.
-  assert.ok(/className="fin cfo-summary-cur-amt"/.test(summary),
+  // The not-yet-shipped balances-by-currency model has to obey the same rule, so
+  // that when it does ship its figures are already set in the numeral face.
+  const concepts = read('client/src/pages/walletsSummaryConcepts.jsx');
+  assert.ok(/className="fin cfo-cur-amt"/.test(concepts),
     'the per-currency amounts must carry .fin');
   const shell = read('client/src/shell/shell.css');
   const fin = shell.match(/\.fin\{[^}]*\}/);

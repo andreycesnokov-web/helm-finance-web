@@ -63,6 +63,14 @@ export const formatMoney = (value, asset) => `${formatAmount(value, asset)} ${as
 export const CURRENCY_PREFIX = {
   IDR: 'Rp ', USD: '$', EUR: '\u20AC', SGD: 'S$', MYR: 'RM ', THB: '\u0E3F', CNY: 'CN\u00A5',
 };
+// ISO 4217 code -> the name a person reads. Shown beside the code wherever a
+// currency is chosen, because "SGD" and "S$" are not obvious to everyone who has
+// to pick the right one for a bank account.
+export const CURRENCY_NAMES = {
+  IDR: 'Indonesian Rupiah', USD: 'US Dollar', EUR: 'Euro', SGD: 'Singapore Dollar',
+  MYR: 'Malaysian Ringgit', THB: 'Thai Baht', CNY: 'Chinese Yuan',
+};
+
 export const currencyPrefix = (currency) => {
   const c = String(currency || '').trim().toUpperCase();
   return CURRENCY_PREFIX[c] || (c ? c + ' ' : '');
@@ -164,5 +172,5 @@ export function reportingTotal(items, { amountKey = 'amount_reporting' } = {}) {
 }
 
 export default { toScaled, fromScaled, add, sub, cmp, sum, formatAmount, formatMoney,
-  formatCurrency, currencyPrefix, compactAmount, compactIdr, walletsByCurrency,
+  formatCurrency, currencyPrefix, compactAmount, compactIdr, walletsByCurrency, CURRENCY_NAMES,
   nativeTotalsByAsset, reportingTotal, ASSET_PRECISION, CURRENCY_PREFIX };
