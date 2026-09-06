@@ -31,7 +31,19 @@
 .cfo-nav{display:flex;flex-direction:column;gap:2px;margin-top:2px;
   flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;
   /* room for the scrollbar so it never sits on top of the labels */
-  padding-right:4px;margin-right:-4px}
+  padding-right:4px;margin-right:-4px;
+  /* The business nav (21 items) is taller than any laptop viewport, so it scrolls.
+     Two things keep a scrolled list from looking broken. A full row of bottom
+     clearance so the last item (Payment Connections lands on the fold at 900px) is
+     never jammed mid-glyph against the footer divider, and a soft bottom fade one
+     row tall so whatever sits on the fold reads as "there is more below" rather
+     than a label sliced in half. The clearance (40px) is taller than the fade
+     (36px), so when you scroll to the end the final item clears the fade and is
+     fully crisp — the fade is the affordance, the clearance is the actual fix. */
+  padding-bottom:40px;
+  scroll-padding-block-end:40px;
+  -webkit-mask-image:linear-gradient(to bottom,#000 calc(100% - 36px),transparent);
+          mask-image:linear-gradient(to bottom,#000 calc(100% - 36px),transparent)}
 .cfo-navgroup-title{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--text-muted);font-weight:700;padding:14px 12px 6px}
 .cfo-navitem{display:flex;align-items:center;gap:11px;padding:9px 12px;border-radius:var(--radius-sm);
   color:var(--text-secondary);text-decoration:none;font-weight:600;font-size:14px;border:0;background:none;cursor:pointer;width:100%;text-align:left}
@@ -132,12 +144,14 @@
 /* ── Page header ─────────────────────────────────────────────────────────── */
 /* ── Page hero ──────────────────────────────────────────────────────────────
    A defined band, not a bare stack: a left content zone, a right control zone,
-   a hairline rule that gives the page a top edge, and one cropped brand symbol
-   in a reserved column at the far right.
+   a hairline rule that gives the page a top edge, and — on a header with no
+   controls — one brand symbol set inside a reserved column at the far right.
 
-   --head-safe is the width that column claims. Both zones are kept out of it,
-   which is what stops the mark ever sitting behind something readable. Change
-   the mark's size and this follows; there is no second number to remember. */
+   --head-safe is the width that column claims, applied to the header only when it
+   has no control zone (see the media query below). A header that carries badges,
+   context or actions holds its natural right edge instead and drops the mark, so a
+   decorative symbol can never displace a control or sit behind one. Change the
+   mark's size and the column follows; there is no second number to remember. */
 .cfo-pagehead{
   /* index.css sets body to a system stack, so --font-ui (Manrope) never reaches
      ordinary text and the brand's UI face is effectively inert product-wide.
@@ -169,11 +183,18 @@
   margin-bottom:26px;
   border-bottom:1px solid var(--border-subtle);
 }
-/* The mark only appears where there is room to reserve a column for it. */
+/* The mark only appears where there is room for it — and never where it would sit
+   behind a control. A header that carries a control zone (.cfo-pagehead-right:
+   badges, context, actions) keeps its natural right edge so the primary action is
+   never pushed inward, and drops the decorative mark rather than weakening the
+   layout. A header with no controls reserves the mark's clear-space column and
+   shows it. The mark is absolutely positioned in both cases, so it never
+   contributes to layout sizing; the reserved column is a padding on the header
+   itself, applied only when the mark is actually painted. */
 .cfo-pagehead-mark{display:none}
 @media (min-width:900px){
-  .cfo-pagehead{padding-right:var(--head-safe)}
-  .cfo-pagehead-mark{
+  .cfo-pagehead:not(:has(.cfo-pagehead-right)){padding-right:var(--head-safe)}
+  .cfo-pagehead:not(:has(.cfo-pagehead-right)) .cfo-pagehead-mark{
     display:block;
     position:absolute;
     right:var(--head-inset);

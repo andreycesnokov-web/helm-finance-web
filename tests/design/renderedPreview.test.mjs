@@ -559,14 +559,30 @@ t('context badges hug their content instead of stretching', () => {
 /* ── the brand rule ────────────────────────────────────────────────────────── */
 console.log('\nbrand — one mark per content area');
 
-t('each page hero carries exactly one decorative mark on desktop', () => {
-  assert.ok(D.headMarks.length > 0, 'no page hero rendered');
-  for (const n of D.headMarks) {
-    assert.strictEqual(n, 1, `a page hero painted ${n} marks; the rule is one per hero`);
-  }
-  // And in the product, one page is one hero, so one mark on screen.
+t('a page hero shows one mark when it has room, and yields it to the controls otherwise', () => {
+  // The decorative page-hero mark is exactly that — decorative. A header with no
+  // control zone reserves its column and shows one mark; a header carrying badges,
+  // context or actions holds its natural right edge and drops the mark rather than
+  // sit a symbol behind a button. So the count is one per bare hero, zero per
+  // action hero — never two, and never one competing with a control.
+  assert.ok(D.heads.length > 0, 'no page hero rendered');
+  assert.strictEqual(D.heads.length, D.headMarks.length, 'heads/headMarks out of step');
+  D.heads.forEach((h, i) => {
+    const n = D.headMarks[i];
+    if (h.right) {
+      assert.strictEqual(n, 0,
+        `an action header painted ${n} hero mark(s); a header with controls must drop the mark`);
+    } else {
+      assert.strictEqual(n, 1,
+        `a bare header painted ${n} hero marks; a header with room gets exactly one`);
+    }
+  });
+  // At least one of each kind is on the catalogue, or the rule is only half-tested.
+  assert.ok(D.heads.some((h) => h.right), 'no action header in the catalogue to test the yield');
+  assert.ok(D.heads.some((h) => !h.right), 'no bare header in the catalogue to test the mark');
+  // The product's main page (Pulse) is a bare hero, so exactly one mark on screen.
   assert.strictEqual(SD.brand.heroMarks, 1,
-    `${SD.brand.heroMarks} marks painted in the app shell; the rule is one`);
+    `${SD.brand.heroMarks} marks painted in the app shell; a bare hero shows exactly one`);
 });
 
 /* ── the flagship watermark ─────────────────────────────────────────────────

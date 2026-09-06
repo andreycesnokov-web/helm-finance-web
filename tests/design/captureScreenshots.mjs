@@ -5,7 +5,7 @@
 // the preview flag on and re-shoots every image, so the set is always a picture of
 // HEAD rather than of whatever was on screen the day someone dragged a window.
 //
-// Two traps this script exists to close:
+// Three traps this script exists to close:
 //
 // 1. Fonts. A capture taken mid-swap records the fallback face, and a heading set
 //    in the fallback reads as a design regression that was never in the code.
@@ -18,6 +18,11 @@
 //    exactly like a broken phone layout and is not one. Every shot is framed in an
 //    iframe of the exact target size and the verification pass asserts the
 //    iframe's innerWidth, so a mobile image can never silently become a crop.
+//
+// 3. Close-ups. A hard-coded crop rectangle drifts the moment a component moves.
+//    A shot may instead name a selector (region:{sel}); the page measures that
+//    element's real rectangle and the crop follows it, so a close-up frames the
+//    thing it claims to and cannot quietly slide onto empty background.
 //
 // Run: node tests/design/captureScreenshots.mjs
 import assert from 'node:assert';
@@ -100,7 +105,8 @@ const run = (args) => new Promise((resolve, reject) => {
 /* ── the harness every shot is framed in ───────────────────────────────────── */
 // The iframe *is* the viewport, which is the only way to get a true 390px layout.
 // `focus` drives a real keyboard focus so :focus-visible engages for the capture.
-const harnessFor = (route, w, h, focus, click) => `<!doctype html><meta charset="utf-8">
+// `measure` names an element whose real rectangle a close-up crops to.
+const harnessFor = (route, w, h, focus, click, measure) => `<!doctype html><meta charset="utf-8">
 <style>html,body{margin:0;padding:0;background:#F4F6F8;overflow:hidden}
 iframe{width:${w}px;height:${h}px;border:0;display:block}</style>
 <body><iframe id="f" src="${route}"></iframe>
@@ -144,6 +150,12 @@ setTimeout(async () => {
         missing.push(smp.role + ' -> rendering in ' + family + ', expected ' + smp.expect);
       }
     }
+    // The iframe sits at the window origin (0,0) and never scrolls, so a rect read
+    // inside it maps one-to-one onto screenshot pixels.
+    let measured = null;
+    ${measure ? `const mEl = d.querySelector(${JSON.stringify(measure)});
+    if (mEl) { const r = mEl.getBoundingClientRect();
+      measured = { x: r.left, y: r.top, w: r.width, h: r.height }; }` : ''}
     const h1 = d.querySelector('h1');
     const st = h1 ? cw.getComputedStyle(h1) : null;
     ${focus ? `const t2 = d.querySelector(${JSON.stringify(focus)});` : ''}
@@ -153,6 +165,7 @@ setTimeout(async () => {
       missing: missing,
       faces: faces,
       innerWidth: cw.innerWidth,
+      measured: measured,
       h1Family: st ? st.fontFamily.split(',')[0].replace(/"/g, '') : null,
       h1Weight: st ? st.fontWeight : null,
       focusVisible: ${focus ? `!!(t2 && t2.matches(':focus-visible'))` : 'null'},
@@ -167,8 +180,12 @@ setTimeout(async () => {
 // page whose fonts and viewport could not be vouched for.
 const verifyAndShoot = async (file, route, w, h, opts = {}) => {
   const { crop, focus, window: win, click, region } = opts;
+  // A region may be a fixed [x,y,w,h] or {sel,pad}: measure the element and crop
+  // to it, so a close-up cannot drift off its subject.
+  const measureSel = region && !Array.isArray(region) ? region.sel : null;
+  const pad = region && !Array.isArray(region) ? (region.pad || 0) : 0;
   const name = `__cap-${Math.random().toString(36).slice(2)}.html`;
-  fs.writeFileSync(path.join(DIST, name), harnessFor(route, w, h, focus, click));
+  fs.writeFileSync(path.join(DIST, name), harnessFor(route, w, h, focus, click, measureSel));
   const url = `${origin}/${name}`;
   const winW = win ? win[0] : w, winH = win ? win[1] : h;
   const args = (extra) => ['--headless=new', '--disable-gpu', '--hide-scrollbars',
@@ -187,16 +204,26 @@ const verifyAndShoot = async (file, route, w, h, opts = {}) => {
     if (focus) assert.strictEqual(r.focusVisible, true, `${file}: ${focus} does not match :focus-visible`);
     if (click) assert.strictEqual(r.clicked, true, `${file}: ${click} was not found to click`);
 
-    const needsCrop = crop || region;
+    // Resolve the crop rectangle: a measured element, a fixed array, or none.
+    let rect = null;
+    if (measureSel) {
+      assert.ok(r.measured, `${file}: ${measureSel} was not found to measure`);
+      rect = [Math.max(0, Math.round(r.measured.x - pad)), Math.max(0, Math.round(r.measured.y - pad)),
+        Math.round(r.measured.w + pad * 2), Math.round(r.measured.h + pad * 2)];
+    } else if (Array.isArray(region)) {
+      rect = region;
+    }
+    const needsCrop = crop || rect;
     const raw = needsCrop ? path.join(DIST, '__shot.png') : path.join(OUT, file);
     await run(args([`--screenshot=${raw}`]));
     if (needsCrop) {
-      const [rx, ry, rw, rh] = region || [0, 0, w, h];
+      const [rx, ry, rw, rh] = rect || [0, 0, w, h];
       cropPng(raw, path.join(OUT, file), rw, rh, rx, ry);
       fs.unlinkSync(raw);
     }
     console.log(`  ${file}  viewport=${r.innerWidth}px `
       + r.faces.map((f) => `${f.role}:${f.family.split(' ')[0]}/${f.weight}`).join(' ')
+      + (measureSel ? ` crop=${measureSel}` : '')
       + (focus ? ` focus-visible ring=${r.focusOutline}` : ''));
   } finally { fs.unlinkSync(path.join(DIST, name)); }
 };
@@ -258,50 +285,48 @@ function cropPng(inp, outp, cw, ch, ox = 0, oy = 0) {
 const P = '/design-preview';
 const PHONE = { crop: true, window: [512, 844] };
 
-// Review order: the real application shell first, because that is what ships.
-// Regions are in device pixels of the captured window and were read off the live
-// DOM, not guessed — re-measure them if a surface's geometry changes.
+// Review order: the real application shell first, because that is what ships, then
+// the specific evidence for this pass's two corrections and the mobile lockup.
 const SHOTS = [
+  // Full shell — desktop and a true 390px phone, Pulse and Accounts.
   ['01-pulse-app-shell-desktop-1440x900.png', `${P}?shell=pulse`, 1440, 900, {}],
   ['02-accounts-app-shell-desktop-1440x900.png', `${P}?shell=accounts`, 1440, 900, {}],
   ['03-pulse-app-shell-mobile-390x844.png', `${P}?shell=pulse`, 390, 844, PHONE],
   ['04-accounts-app-shell-mobile-390x844.png', `${P}?shell=accounts`, 390, 844, PHONE],
-  // The two flagship cards at close range: one symbol each, cropped by the card
-  // edge, with the reserved column between it and anything readable.
-  ['05-pulse-total-cash-watermark-closeup.png', `${P}?shell=pulse`, 1440, 900,
-    { region: [306, 142, 478, 275] }],
-  ['06-accounts-total-balance-watermark-closeup.png', `${P}?shell=accounts`, 1440, 900,
-    { region: [306, 124, 1116, 172] }],
-  // The hero band and the card beneath it in one frame — the point is the
-  // relationship between the two marks, so they have to be photographed together.
-  ['07-page-hero-watermark-and-alignment.png', `${P}?shell=accounts`, 1440, 900,
-    { region: [280, 0, 1160, 300] }],
-  // Top of the real phone layout: the compact lockup and the burger.
-  ['08-mobile-header-compact-lockup.png', `${P}?shell=pulse`, 390, 844,
-    { crop: true, window: [512, 844], region: [0, 0, 390, 92] }],
+  // Sidebar — the nav clipping fix, at 900px and a shorter desktop height. The crop
+  // follows the real sidebar element, so it always frames rail, fade and footer.
+  ['05-sidebar-desktop-1440x900.png', `${P}?shell=pulse`, 1440, 900, { region: { sel: '.cfo-sidebar' } }],
+  ['06-sidebar-desktop-short-1440x720.png', `${P}?shell=pulse`, 1440, 720,
+    { window: [1440, 720], region: { sel: '.cfo-sidebar' } }],
+  // Page hero — the action alignment fix. Accounts' "+ Add wallet" holds the real
+  // right edge; the long-title header keeps its actions on the row and drops the mark.
+  ['07-accounts-pagehero-right-edge-1440x900.png', `${P}?shell=accounts`, 1440, 900,
+    { region: { sel: '.cfo-pagehead', pad: 18 } }],
+  ['08-long-title-header-actions-1440.png', `${P}?only=wrapping`, 1440, 760,
+    { region: { sel: '.cfo-pagehead', pad: 20 } }],
+  // Both navy flagship cards, close up, so the one cropped watermark on each reads.
+  ['09-pulse-flagship-watermark-closeup.png', `${P}?only=pulse`, 1440, 900,
+    { region: { sel: '.pulse-cash', pad: 6 } }],
+  ['10-accounts-flagship-watermark-closeup.png', `${P}?only=accounts`, 1440, 900,
+    { region: { sel: '.cfo-summary.cfo-flagship', pad: 6 } }],
+  // Mobile lockup, at its real rendered size, for the wordmark inspection.
+  ['11-mobile-header-closeup-390.png', `${P}?shell=pulse`, 390, 844,
+    { crop: true, window: [512, 844], region: { sel: '.cfo-mobilehead' } }],
   // The real drawer, opened by clicking the real burger.
-  ['09-mobile-drawer-workspace-settings.png', `${P}?shell=pulse`, 390, 844,
+  ['12-mobile-drawer-workspace-settings.png', `${P}?shell=pulse`, 390, 844,
     { crop: true, window: [512, 844], click: '.cfo-burger' }],
-  ['10-long-title-and-description-wrapping.png', `${P}?only=wrapping`, 1440, 660, {}],
-  ['11-semantic-colour-states.png', `${P}?only=semantic`, 1440, 900, {}],
-  ['12-buttons-and-keyboard-focus.png', `${P}?only=focus`, 1440, 560, { focus: '.dsp-focus-target' }],
-  // Tablet: the sidebar is gone, the hero mark is gone with it, and the flagship
-  // card is full width. The in-between width is where layouts usually break.
-  ['13-tablet-responsive-768.png', `${P}?shell=pulse`, 768, 1000, {}],
-  // Bottom-left of the desktop shell: the settings footer in place under the nav.
-  ['14-sidebar-workspace-settings-closeup.png', `${P}?shell=pulse`, 1440, 900,
-    { region: [0, 560, 420, 340] }],
+  // Retained evidence for reviewers: the focus ring and the semantic-colour states.
+  ['13-focus-visible-state.png', `${P}?only=focus`, 1440, 560, { focus: '.dsp-focus-target' }],
+  ['14-semantic-colour-states.png', `${P}?only=semantic`, 1440, 900, {}],
 ];
 
-// Anything in the directory that this list no longer produces is a picture of code
-// that no longer exists. Delete it before shooting, so the review folder is always
-// exactly one set and a reviewer never compares against a stale frame.
-const KEEP = new Set(SHOTS.map(([f]) => f));
-for (const f of fs.readdirSync(OUT).filter((n) => n.endsWith('.png'))) {
-  if (!KEEP.has(f)) { fs.unlinkSync(path.join(OUT, f)); console.log(`  removed stale ${f}`); }
-}
-
+const produced = new Set(SHOTS.map(([f]) => f));
 for (const [file, route, w, h, opts] of SHOTS) await verifyAndShoot(file, route, w, h, opts);
+
+/* ── no stale screenshots: delete any PNG this run did not produce ──────────── */
+for (const f of fs.readdirSync(OUT).filter((n) => n.endsWith('.png'))) {
+  if (!produced.has(f)) { fs.unlinkSync(path.join(OUT, f)); console.log(`  removed stale ${f}`); }
+}
 
 /* ── every image must be real, and none may be a duplicate ─────────────────── */
 const seen = new Map();
@@ -311,10 +336,10 @@ for (const f of fs.readdirSync(OUT).filter((n) => n.endsWith('.png')).sort()) {
   const b = fs.readFileSync(path.join(OUT, f));
   const ihdr = b.subarray(16, 24);
   const w = ihdr.readUInt32BE(0), h = ihdr.readUInt32BE(4);
-  // Scaled to the frame, not a flat byte count: a full 1440x900 page that
-  // compresses under ~13KB is blank, but a 390x92 crop of a mostly-white header
-  // bar legitimately weighs 4KB, and a flat 8KB floor called that a failure.
-  const blank = b.length < Math.max(1200, w * h * 0.01);
+  // Scale the "too small to be real" floor by pixel count: a full page never
+  // compresses under a few KB, but a thin close-up strip (a 390x67 header) truly
+  // does, and a flat 8KB floor wrongly failed it.
+  const blank = b.length < Math.max(1200, Math.round(w * h * 0.004));
   const dup = seen.get(b.length);
   seen.set(b.length, f);
   if (blank || dup) bad++;

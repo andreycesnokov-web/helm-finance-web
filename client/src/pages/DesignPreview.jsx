@@ -223,12 +223,11 @@ export default function DesignPreview() {
 
         {/* ── the two branding layers ──────────────────────────────────── */}
         <Section id="watermark" title="Branding layers" wide
-          note="Two marks, deliberately unequal. The page hero carries an ambient one at 4.5% set well inside the band; the flagship navy card carries the brand moment at 7%, cropped by the card edge. Both reserve a column no text may enter, and both are absent from the accessibility tree.">
+          note="Two marks, deliberately unequal. This header has no controls, so it carries the ambient page-hero mark at 3.5% set well inside a reserved column no text may enter; the flagship navy card carries the brand moment at 7%, cropped by the card edge. An action header (Accounts, and the long-title example above) drops the hero mark rather than sit it behind a control. Both marks are absent from the accessibility tree.">
           <PageHeader
             eyebrow="Business Workspace"
             title="Nusantara Facilities"
-            description="The hero symbol sits inside the band with clear space around it, so it reads as a background watermark rather than an icon clipped by the layout."
-            primaryAction={<Btn variant="primary">Primary action</Btn>}
+            description="With no action on this header, the hero symbol sits inside the band with clear space around it, so it reads as a background watermark rather than an icon clipped by the layout."
           />
           <SummaryCard
             flagship
