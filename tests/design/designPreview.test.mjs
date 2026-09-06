@@ -144,19 +144,82 @@ t('the one decorative mark is inert to assistive technology', () => {
   assert.match(imgs[0], /alt=""/, 'the page-hero mark has no empty alt');
 });
 
-t('the financial cards draw no mark of their own', () => {
-  // Total Cash / Total Balance used to carry a second large mark directly below
-  // the page hero's. One content area, one mark.
-  for (const f of ['client/src/shell/ui.jsx', 'client/src/pages/business/PulseBlocks.jsx']) {
-    const src2 = code(f);
-    assert.ok(!/cfo-summary-sym|pulse-cash-mark/.test(src2),
-      `${f} still renders a watermark inside a financial card`);
-  }
-  for (const f of ['client/src/shell/shell.css', 'client/src/pages/business/Pulse.css']) {
-    const css = read(f).replace(/\/\*[\s\S]*?\*\//g, ' ');
+t('the flagship watermark is opt-in, and off by default', () => {
+  // The previous implementation defaulted the symbol ON for every SummaryCard, so
+  // a page got branding by forgetting to opt out rather than by choosing to opt
+  // in. The default must stay false: most summary cards are not flagships.
+  const ui = code('client/src/shell/ui.jsx');
+  const sig = (ui.match(/export const SummaryCard = \(\{([^}]*)\}/) || [])[1] || '';
+  assert.ok(sig.includes('flagship'), 'SummaryCard has no flagship prop');
+  assert.match(sig, /flagship\s*=\s*false/,
+    `SummaryCard's flagship prop does not default to false: "${sig.trim()}"`);
+  assert.match(ui, /\{flagship && <FlagshipMark \/>\}/,
+    'SummaryCard renders the mark unconditionally rather than on the opt-in');
+  // The prop names the card's role, not what it draws, so the treatment can change
+  // without every call site having to be re-read.
+  assert.ok(!/watermark|logo|symbol\s*=/.test(sig),
+    `the prop is named for its presentation, not its meaning: "${sig.trim()}"`);
+});
+
+t('Pulse and the shared card draw the same mark from the same component', () => {
+  const ui = code('client/src/shell/ui.jsx');
+  // One component owns the mark, and it uses the canonical white symbol — the
+  // navy symbol would be invisible on a navy card.
+  const mark = (ui.match(/export const FlagshipMark = \(\) => \(([\s\S]*?)\)\n/) || [])[1] || '';
+  assert.ok(mark, 'no FlagshipMark component in shell/ui.jsx');
+  assert.match(ui, /FLAGSHIP_MARK = '\/brand\/symbol_white_transparent\.svg'/,
+    'FlagshipMark does not use the canonical transparent white symbol');
+  assert.match(mark, /alt=""/, 'the flagship mark has no empty alt');
+  assert.match(mark, /aria-hidden="true"/, 'the flagship mark is not aria-hidden');
+
+  // Pulse's total cash is hand-built rather than a SummaryCard, so the only way
+  // the two navy heroes stay identical is by both importing this component and
+  // wearing the shared class. They diverged once already: one drew the symbol,
+  // the other drew a graph-paper grid.
+  const pulse = code('client/src/pages/business/PulseBlocks.jsx');
+  assert.match(pulse, /import \{[^}]*FlagshipMark[^}]*\} from '\.\.\/\.\.\/shell\/ui'/,
+    'PulseBlocks does not import the shared FlagshipMark');
+  assert.match(pulse, /className="pulse-cash cfo-flagship"/,
+    'the Pulse cash card does not wear the shared .cfo-flagship class');
+  assert.ok(!/symbol_\w+\.svg/.test(pulse),
+    'PulseBlocks names a brand asset directly instead of using the shared component');
+});
+
+t('no page styles a watermark of its own', () => {
+  // Size, opacity, crop, safe area and phone behaviour belong to .cfo-flagship in
+  // the shell. A page that redeclares any of them is how the two navy heroes
+  // drifted apart the first time.
+  const strip = (f) => read(f).replace(/\/\*[\s\S]*?\*\//g, ' ');
+  const shell = strip('client/src/shell/shell.css');
+  assert.ok(/\.cfo-flagship-mark\s*\{/.test(shell),
+    'the shared watermark rule has gone from shell.css');
+  for (const f of ['client/src/pages/business/Pulse.css',
+                   'client/src/pages/business/Onboarding.css',
+                   'client/src/pages/DesignPreview.css']) {
+    const css = strip(f);
+    assert.ok(!/\.cfo-flagship-mark\s*\{/.test(css),
+      `${f} restyles the shared watermark`);
     assert.ok(!/\.cfo-summary-sym\s*\{|\.pulse-cash-mark\s*\{/.test(css),
-      `${f} still styles a financial-card watermark`);
+      `${f} still styles a page-specific financial-card watermark`);
   }
+  // The obsolete per-page classes are gone from the markup too.
+  for (const f of ['client/src/shell/ui.jsx', 'client/src/pages/business/PulseBlocks.jsx']) {
+    assert.ok(!/cfo-summary-sym|pulse-cash-mark/.test(code(f)),
+      `${f} still renders an obsolete watermark class`);
+  }
+});
+
+t('Radar is deferred, not half-migrated', () => {
+  // Radar's hero is an inline-styled gradient card with a graph-paper grid, on the
+  // legacy hf- classes rather than the shared design system. Giving it the
+  // flagship mark means migrating the page, which is a redesign this PR is not.
+  // The guard is that it stays untouched: no half-applied watermark, and no
+  // shared class on a card that does not have the shared structure.
+  const radar = code('client/src/pages/Radar.jsx');
+  assert.ok(!/cfo-flagship|FlagshipMark/.test(radar),
+    'Radar has been given the flagship watermark without being migrated to the shared card');
+  assert.ok(!/SummaryCard|PageHeader/.test(radar),
+    'Radar now imports the shared components — that is the migration, and it belongs to its own PR');
 });
 
 t('the page-hero mark sits inside the band rather than off its edge', () => {

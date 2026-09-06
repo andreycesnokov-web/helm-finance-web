@@ -740,7 +740,7 @@ export function BusinessAccounts() {
     const total = idrWallets.reduce((s, x) => s + Number(x.balance || 0), 0)
     return <>{head}
       <div style={{ marginBottom: 22 }}>
-        <SummaryCard label={otherWallets.length ? 'Total balance · IDR wallets' : 'Total balance · all wallets'}
+        <SummaryCard flagship label={otherWallets.length ? 'Total balance · IDR wallets' : 'Total balance · all wallets'}
           value={idr(total)}
           meta={<>{idrWallets.length} active wallet{idrWallets.length === 1 ? '' : 's'}{otherWallets.length ? ` · ${otherWallets.length} in other currencies (kept separate)` : ''}</>} />
       </div>

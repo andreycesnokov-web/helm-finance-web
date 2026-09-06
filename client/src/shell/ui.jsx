@@ -57,6 +57,31 @@ export const StatusBadge = ({ tone = 'neutral', icon, children }) => (
 // The same official symbol in navy, for the light page-hero band.
 export const HEAD_SYMBOL = '/brand/symbol_navy_transparent.svg'
 
+// The same official symbol in white, for the navy financial surfaces. Both files
+// are the identical geometry shipped in client/public/brand and differ only in
+// fill, so the product never draws two different marks.
+export const FLAGSHIP_MARK = '/brand/symbol_white_transparent.svg'
+
+/**
+ * The brand watermark a flagship financial card wears.
+ *
+ * There are exactly two branding layers in the product and they are deliberately
+ * unequal: the page hero carries a very faint contextual mark, and the one navy
+ * card carrying the page's headline figure carries a stronger cropped one. This
+ * is that second layer, and it is one component so Pulse's hand-built cash card
+ * and the shared SummaryCard cannot drift into two different treatments again.
+ *
+ * Size, opacity, crop, safe area and mobile behaviour all live in `.cfo-flagship`
+ * in shell.css. A surface opts in by wearing that class; it does not get to
+ * restyle the mark.
+ *
+ * Decorative: empty alt and aria-hidden, so it is absent from the accessibility
+ * tree entirely.
+ */
+export const FlagshipMark = () => (
+  <img className="cfo-flagship-mark" src={FLAGSHIP_MARK} alt="" aria-hidden="true" />
+)
+
 /**
  * The header every business-workspace page wears.
  *
@@ -117,15 +142,20 @@ export const Card = ({ title, action, children, className = '', style }) => (
 /**
  * Summary / hero card — the page's dominant financial figure.
  *
- * It carries no brand mark. The product showed one here AND one in the page hero
- * directly above, which is two large marks in a single content area; the hero
- * keeps its symbol and this card keeps the number. Dropping it also returns the
- * full card width to the figure, which is what the card is for.
+ * `flagship` marks this as the ONE card that carries the page's headline money
+ * figure: Pulse's total cash, Accounts' total balance. It is opt-in and off by
+ * default, because the meaning is editorial rather than visual — a page decides
+ * which of its cards is the flagship, and only that one earns the brand mark.
+ * Ordinary summary cards, KPI tiles, panels and tables stay unbranded.
+ *
+ * The prop is named for that role and not for what it draws, so the branding
+ * treatment can change without every call site having to be re-read.
  *
  * `metrics` = [{k, v, tone}]
  */
-export const SummaryCard = ({ label, value, meta, metrics }) => (
-  <section className="cfo-summary">
+export const SummaryCard = ({ label, value, meta, metrics, flagship = false }) => (
+  <section className={`cfo-summary${flagship ? ' cfo-flagship' : ''}`}>
+    {flagship && <FlagshipMark />}
     <div className="cfo-summary-label">{label}</div>
     <div className="cfo-summary-value">{value}</div>
     {meta && <div className="cfo-summary-meta">{meta}</div>}

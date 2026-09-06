@@ -17,11 +17,8 @@
 // EMPTY WORKSPACE: an account with no data is the FIRST impression, so it is designed, not
 // defaulted. Zeros stay honest (Rp 0 is the true balance) but recede, and the page leads
 // with what to do next instead of a grid of dashes.
-import { Card, StatusBadge, Btn, Icon, DataList } from '../../shell/ui'
+import { Card, StatusBadge, Btn, Icon, DataList, FlagshipMark } from '../../shell/ui'
 import './Pulse.css'
-
-// Official brand mark, already shipped in the repo (client/public/brand). Used as a
-// low-opacity watermark on the navy hero — never recoloured, never distorted.
 
 /**
  * Display-only compaction so a large figure can never wrap the hero onto two lines.
@@ -85,8 +82,11 @@ export function ExecutiveHero({ d, idr, readiness, empty }) {
 
   return (
     <section className={`pulse-exec${empty ? ' is-empty' : ''}`}>
-      {/* Navy corporate surface — the one place the brand background is used at scale. */}
-      <div className="pulse-cash">
+      {/* Navy corporate surface — the one place the brand background is used at scale,
+          and the one card on this page that carries the brand mark. Same component
+          as the mark on Accounts' total balance, so the two cannot diverge. */}
+      <div className="pulse-cash cfo-flagship">
+        <FlagshipMark />
         <div className="pulse-cash-top">
           <span className="pulse-cash-label">Total cash · IDR</span>
           {readiness}

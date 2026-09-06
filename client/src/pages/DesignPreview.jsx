@@ -4,7 +4,7 @@
 // following the same gating idiom as PreviewApp.jsx. Vite only exposes VITE_-prefixed
 // env to the bundle, so a production build without the flag ships the 404 branch.
 //
-// Why it exists: PR #80 changed the shared PageHeader, the SummaryCard watermark, the
+// Why it exists: PR #80 changed the shared PageHeader, the flagship card watermark, the
 // token layer and the semantic colour of the Pulse KPIs. Those are visual claims, and a
 // visual claim needs a picture. This page renders the ACTUAL production components —
 // PageHeader, SummaryCard and Pulse's own ExecutiveHero — against fixed data, so a
@@ -127,6 +127,7 @@ const AccountsBody = () => (
       primaryAction={<Btn variant="primary">+ Add wallet</Btn>}
     />
     <SummaryCard
+      flagship
       label="Total balance · all wallets"
       value={<span className="fin">{idr(152450000)}</span>}
       meta="IDR · 4 wallets"
@@ -169,20 +170,20 @@ export default function DesignPreview() {
             is cataloguing. */}
         <p className="dsp-title">PR #80 — design foundation</p>
         <p className="dsp-lede">
-          The real components, not a mock: <code>PageHeader</code> and <code>SummaryCard</code>
-          {' '}from <code>shell/ui.jsx</code>, and Pulse&rsquo;s own <code>ExecutiveHero</code>.
-          Every figure is invented.
+          The real components, not a mock: <code>PageHeader</code>, <code>SummaryCard</code> and
+          {' '}<code>FlagshipMark</code> from <code>shell/ui.jsx</code>, and Pulse&rsquo;s own
+          {' '}<code>ExecutiveHero</code>. Every figure is invented.
         </p>
 
         {/* ── Pulse ────────────────────────────────────────────────────── */}
         <Section id="pulse" title="Pulse" wide
-          note="Shared header with a description, the navy hero with its watermark, and the KPI row.">
+          note="Shared header with a description, the navy flagship card wearing the shared mark, and the KPI row — which stays unbranded.">
           <PulseBody />
         </Section>
 
         {/* ── Accounts ─────────────────────────────────────────────────── */}
         <Section id="accounts" title="Accounts" wide
-          note="The same header and the same navy hero, from the same components — this page used to draw its own gradient with a graph-paper grid.">
+          note="The same header and the same navy flagship card, from the same components and the same watermark — this page used to draw its own gradient with a graph-paper grid.">
           <AccountsBody />
         </Section>
 
@@ -220,19 +221,27 @@ export default function DesignPreview() {
           />
         </Section>
 
-        {/* ── page-hero branding ───────────────────────────────────────── */}
-        <Section id="watermark" title="Page hero branding" wide
-          note="The one decorative mark in the content area: the official symbol, set well inside the band at low opacity, clear of the text and control zones. The navy cards below carry no mark — two large marks in one area is one too many.">
+        {/* ── the two branding layers ──────────────────────────────────── */}
+        <Section id="watermark" title="Branding layers" wide
+          note="Two marks, deliberately unequal. The page hero carries an ambient one at 4.5% set well inside the band; the flagship navy card carries the brand moment at 7%, cropped by the card edge. Both reserve a column no text may enter, and both are absent from the accessibility tree.">
           <PageHeader
             eyebrow="Business Workspace"
             title="Nusantara Facilities"
-            description="The symbol sits inside the band with clear space around it, so it reads as a background watermark rather than an icon clipped by the layout."
+            description="The hero symbol sits inside the band with clear space around it, so it reads as a background watermark rather than an icon clipped by the layout."
             primaryAction={<Btn variant="primary">Primary action</Btn>}
           />
           <SummaryCard
+            flagship
             label="Total cash · IDR"
             value={<span className="fin">{idr(122850000)}</span>}
-            meta="No mark on the financial card — the full width belongs to the figure."
+            meta="Cropped by the card edge, and behind nothing anyone has to read."
+          />
+          {/* The same component with the prop left off — the difference between a
+              flagship card and an ordinary one is one word at the call site. */}
+          <SummaryCard
+            label="An ordinary summary card · no mark"
+            value={<span className="fin">{idr(4820000)}</span>}
+            meta="The watermark is opt-in, so every other card on every page stays plain."
           />
         </Section>
 

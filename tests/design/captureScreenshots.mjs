@@ -259,24 +259,47 @@ const P = '/design-preview';
 const PHONE = { crop: true, window: [512, 844] };
 
 // Review order: the real application shell first, because that is what ships.
+// Regions are in device pixels of the captured window and were read off the live
+// DOM, not guessed — re-measure them if a surface's geometry changes.
 const SHOTS = [
   ['01-pulse-app-shell-desktop-1440x900.png', `${P}?shell=pulse`, 1440, 900, {}],
   ['02-accounts-app-shell-desktop-1440x900.png', `${P}?shell=accounts`, 1440, 900, {}],
   ['03-pulse-app-shell-mobile-390x844.png', `${P}?shell=pulse`, 390, 844, PHONE],
   ['04-accounts-app-shell-mobile-390x844.png', `${P}?shell=accounts`, 390, 844, PHONE],
-  // Bottom-left of the desktop shell: the settings footer in place under the nav.
-  ['05-sidebar-footer-closeup.png', `${P}?shell=pulse`, 1440, 900, { region: [0, 560, 420, 340] }],
+  // The two flagship cards at close range: one symbol each, cropped by the card
+  // edge, with the reserved column between it and anything readable.
+  ['05-pulse-total-cash-watermark-closeup.png', `${P}?shell=pulse`, 1440, 900,
+    { region: [306, 142, 478, 275] }],
+  ['06-accounts-total-balance-watermark-closeup.png', `${P}?shell=accounts`, 1440, 900,
+    { region: [306, 124, 1116, 172] }],
+  // The hero band and the card beneath it in one frame — the point is the
+  // relationship between the two marks, so they have to be photographed together.
+  ['07-page-hero-watermark-and-alignment.png', `${P}?shell=accounts`, 1440, 900,
+    { region: [280, 0, 1160, 300] }],
+  // Top of the real phone layout: the compact lockup and the burger.
+  ['08-mobile-header-compact-lockup.png', `${P}?shell=pulse`, 390, 844,
+    { crop: true, window: [512, 844], region: [0, 0, 390, 92] }],
   // The real drawer, opened by clicking the real burger.
-  ['06-mobile-drawer-workspace-settings.png', `${P}?shell=pulse`, 390, 844,
+  ['09-mobile-drawer-workspace-settings.png', `${P}?shell=pulse`, 390, 844,
     { crop: true, window: [512, 844], click: '.cfo-burger' }],
-  ['07-page-hero-branding-closeup.png', `${P}?only=watermark`, 1440, 680, { region: [150, 268, 1160, 230] }],
-  ['08-focus-visible-state.png', `${P}?only=focus`, 1440, 560, { focus: '.dsp-focus-target' }],
-  // Component-level evidence, kept for reviewers who want the isolated view.
-  ['09-pulse-isolated-desktop-1440x900.png', `${P}?only=pulse`, 1440, 900, {}],
-  ['10-accounts-isolated-desktop-1440x900.png', `${P}?only=accounts`, 1440, 900, {}],
+  ['10-long-title-and-description-wrapping.png', `${P}?only=wrapping`, 1440, 660, {}],
   ['11-semantic-colour-states.png', `${P}?only=semantic`, 1440, 900, {}],
-  ['12-long-content-wrapping.png', `${P}?only=wrapping`, 1440, 660, {}],
+  ['12-buttons-and-keyboard-focus.png', `${P}?only=focus`, 1440, 560, { focus: '.dsp-focus-target' }],
+  // Tablet: the sidebar is gone, the hero mark is gone with it, and the flagship
+  // card is full width. The in-between width is where layouts usually break.
+  ['13-tablet-responsive-768.png', `${P}?shell=pulse`, 768, 1000, {}],
+  // Bottom-left of the desktop shell: the settings footer in place under the nav.
+  ['14-sidebar-workspace-settings-closeup.png', `${P}?shell=pulse`, 1440, 900,
+    { region: [0, 560, 420, 340] }],
 ];
+
+// Anything in the directory that this list no longer produces is a picture of code
+// that no longer exists. Delete it before shooting, so the review folder is always
+// exactly one set and a reviewer never compares against a stale frame.
+const KEEP = new Set(SHOTS.map(([f]) => f));
+for (const f of fs.readdirSync(OUT).filter((n) => n.endsWith('.png'))) {
+  if (!KEEP.has(f)) { fs.unlinkSync(path.join(OUT, f)); console.log(`  removed stale ${f}`); }
+}
 
 for (const [file, route, w, h, opts] of SHOTS) await verifyAndShoot(file, route, w, h, opts);
 
@@ -288,7 +311,10 @@ for (const f of fs.readdirSync(OUT).filter((n) => n.endsWith('.png')).sort()) {
   const b = fs.readFileSync(path.join(OUT, f));
   const ihdr = b.subarray(16, 24);
   const w = ihdr.readUInt32BE(0), h = ihdr.readUInt32BE(4);
-  const blank = b.length < 8000;   // a real page never compresses this small
+  // Scaled to the frame, not a flat byte count: a full 1440x900 page that
+  // compresses under ~13KB is blank, but a 390x92 crop of a mostly-white header
+  // bar legitimately weighs 4KB, and a flat 8KB floor called that a failure.
+  const blank = b.length < Math.max(1200, w * h * 0.01);
   const dup = seen.get(b.length);
   seen.set(b.length, f);
   if (blank || dup) bad++;

@@ -284,7 +284,7 @@ function Overview({ baseCur, hasWallet, wallets, t, insight, savingsRate, summar
       {needsOnboarding && <OnboardingChoices onPersonal={() => setModal('wallet')} onBusiness={() => setModal('business')} onInvite={(code) => navigate(`/invite/${code}`)} />}
 
       {/* A. Personal Balance */}
-      <SummaryCard label={hasMixedWallets ? `Total balance · ${baseCur}` : 'Total balance'} value={primaryBalance}
+      <SummaryCard flagship label={hasMixedWallets ? `Total balance · ${baseCur}` : 'Total balance'} value={primaryBalance}
         meta={<><Icon.dot className="dot" width="12" height="12" /> Safe to spend this month: <b style={{ fontWeight: 700 }}>{money(insight.safe_to_spend, baseCur)}</b></>}
         metrics={[
           { k: 'Income', v: money(t.income_mtd, baseCur), tone: 'pos' },

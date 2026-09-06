@@ -121,32 +121,38 @@ const PROBE_FN = `function facts(win, doc) {
   const ratio = (a, b) => { const l1 = lum(a), l2 = lum(b);
     return +(((Math.max(l1,l2)+0.05)/(Math.min(l1,l2)+0.05)).toFixed(2)); };
 
+  // Only h1/heroes are read from here. The mark description that used to live in
+  // this block queried .cfo-summary-sym/.pulse-cash-mark — classes the product no
+  // longer has — and nothing asserted on it; brand.flagships below measures the
+  // real thing instead.
   const sections = {};
   doc.querySelectorAll('.dsp-section').forEach((s) => {
-    const marks = s.querySelectorAll('.cfo-summary-sym, .pulse-cash-mark');
     sections[s.id] = {
       h1: s.querySelectorAll('h1').length,
       heroes: s.querySelectorAll('.cfo-summary, .pulse-cash').length,
-      marks: marks.length,
-      markAttrs: [...marks].map((m) => ({
-        ariaHidden: m.getAttribute('aria-hidden'), alt: m.getAttribute('alt'),
-        w: Math.round(m.getBoundingClientRect().width),
-        opacity: cs(m).opacity, inHero: !!m.closest('.cfo-summary, .pulse-cash'),
-        visible: cs(m).display !== 'none' && m.getBoundingClientRect().width > 0,
-        heroW: (() => { const h = m.closest('.cfo-summary, .pulse-cash');
-          return h ? Math.round(h.getBoundingClientRect().width) : 0; })(),
-        // A mark that stops inside the card is a sticker; one that runs off the
-        // edge is a crop. The approved treatment is the crop.
-        cropped: (() => { const h = m.closest('.cfo-summary, .pulse-cash');
-          return h ? m.getBoundingClientRect().right > h.getBoundingClientRect().right - 1 : false; })(),
-      })),
     };
   });
 
+  // An element only overflows if it is actually painted past the edge. The
+  // flagship watermark's whole treatment is to run off the card's right edge and
+  // be clipped there, so its layout box legitimately extends beyond the viewport
+  // while nothing of it is ever drawn outside the card. Reporting that as overflow
+  // made the test fail on the design it exists to protect. The scrollWidth
+  // assertion beside every use of this list is what proves there is no real
+  // horizontal scroll.
+  const clipBoundary = (el) => {
+    for (let a = el.parentElement; a; a = a.parentElement) {
+      const o = cs(a);
+      const hides = (v) => v === 'hidden' || v === 'clip';
+      if (hides(o.overflowX) || hides(o.overflowY)) return a.getBoundingClientRect().right;
+    }
+    return Infinity;
+  };
   const overflow = [];
   doc.querySelectorAll('*').forEach((el) => {
     const r = el.getBoundingClientRect();
-    if (r.width > 0 && r.right > de.clientWidth + 1) overflow.push({
+    if (r.width > 0 && r.right > de.clientWidth + 1
+        && clipBoundary(el) > de.clientWidth + 1) overflow.push({
       tag: el.tagName.toLowerCase(),
       cls: (typeof el.className === 'string' ? el.className : '').slice(0, 48),
       right: Math.round(r.right),
@@ -264,7 +270,64 @@ const PROBE_FN = `function facts(win, doc) {
     && el.getBoundingClientRect().width > 0 && Number(cs(el).opacity) > 0;
   const brand = {
     heroMarks: [...doc.querySelectorAll('.cfo-pagehead-mark')].filter(painted).length,
-    cardMarks: [...doc.querySelectorAll('.cfo-summary-sym, .pulse-cash-mark')].filter(painted).length,
+    // NB: this used to query .cfo-summary-sym/.pulse-cash-mark, classes that no
+    // longer exist anywhere in the product, so it counted 0 whatever was on screen
+    // and the assertion beside it was passing vacuously.
+    cardMarks: [...doc.querySelectorAll('.cfo-flagship-mark')].filter(painted).length,
+    // Every surface that opted in, described in full, so a reviewer does not have
+    // to take one mark per card, its faintness, its crop or its clear space on
+    // trust. cropped > 0 means the card's right edge eats into it, which is the
+    // intended treatment; safeGap is the distance from the nearest thing anyone
+    // has to read to the near edge of the mark. (No backticks in here: this whole
+    // probe is a template literal, and one would end it.)
+    flagships: [...doc.querySelectorAll('.cfo-flagship')].map((c) => {
+      const r = c.getBoundingClientRect();
+      const m = c.querySelector('.cfo-flagship-mark');
+      const mr = m ? m.getBoundingClientRect() : null;
+      const ms = m ? cs(m) : null;
+      const kids = [...c.children].filter((k) => k !== m);
+      const contentRight = kids.length
+        ? Math.max.apply(null, kids.map((k) => k.getBoundingClientRect().right)) : 0;
+      return {
+        cls: (typeof c.className === 'string' ? c.className : ''),
+        w: Math.round(r.width), h: Math.round(r.height),
+        marks: c.querySelectorAll('.cfo-flagship-mark').length,
+        painted: painted(m),
+        src: m ? (m.getAttribute('src') || '') : null,
+        alt: m ? m.getAttribute('alt') : null,
+        ariaHidden: m ? m.getAttribute('aria-hidden') : null,
+        role: m ? m.getAttribute('role') : null,
+        opacity: ms ? Number(ms.opacity) : null,
+        zIndex: ms ? ms.zIndex : null,
+        repeat: ms ? ms.backgroundRepeat : null,
+        bgImage: ms ? ms.backgroundImage : null,
+        markW: mr ? Math.round(mr.width) : null,
+        markH: mr ? Math.round(mr.height) : null,
+        cropped: mr ? Math.round(mr.right - r.right) : null,
+        safeGap: mr ? Math.round(mr.left - contentRight) : null,
+        sizeToken: cs(c).getPropertyValue('--mark-size').trim(),
+        safeToken: cs(c).getPropertyValue('--mark-safe').trim(),
+      };
+    }),
+    // Summary cards that did NOT opt in. These must be completely plain.
+    plainSummaries: [...doc.querySelectorAll('.cfo-summary:not(.cfo-flagship)')]
+      .filter((c) => painted(c))
+      .map((c) => ({ imgs: c.querySelectorAll('img').length,
+                     marks: c.querySelectorAll('.cfo-flagship-mark').length })),
+    // The other branding layer, measured so the two can be compared directly.
+    heroMark: (() => {
+      const m = [...doc.querySelectorAll('.cfo-pagehead-mark')].filter(painted)[0];
+      if (!m) return null;
+      const st = cs(m); const r = m.getBoundingClientRect();
+      const band = m.parentElement.getBoundingClientRect();
+      return { src: m.getAttribute('src') || '', opacity: Number(st.opacity),
+        alt: m.getAttribute('alt'), ariaHidden: m.getAttribute('aria-hidden'),
+        repeat: st.backgroundRepeat,
+        w: Math.round(r.width), h: Math.round(r.height),
+        clearTop: Math.round(r.top - band.top),
+        clearBottom: Math.round(band.bottom - r.bottom),
+        clearRight: Math.round(band.right - r.right) };
+    })(),
     sidebarWordmarks: [...doc.querySelectorAll('.cfo-sidebar .cfo-brand img')].filter(painted).length,
     mobileBrand: (() => {
       const b = doc.querySelector('.cfo-mobilehead .cfo-mobilebrand');
@@ -495,13 +558,157 @@ t('each page hero carries exactly one decorative mark on desktop', () => {
     `${SD.brand.heroMarks} marks painted in the app shell; the rule is one`);
 });
 
-t('the dark financial cards carry no mark at all', () => {
-  // Total Cash / Total Balance used to draw a second large mark directly under the
-  // page hero's. Two in one content area is one too many, and the card's width
-  // belongs to the figure.
+/* ── the flagship watermark ─────────────────────────────────────────────────
+   The product carries two branding layers on purpose, and they are deliberately
+   unequal: an ambient mark in the page hero, and a stronger cropped one on the
+   single navy card that carries the page's headline money figure. Everything
+   below pins that down, because "one faint logo" is the kind of claim that
+   quietly becomes two logos, or a tiled background, or a symbol under the number.
+
+   The assertion that stood here queried .cfo-summary-sym and .pulse-cash-mark,
+   classes that no longer exist anywhere in the product, so it counted zero
+   whatever was on screen and passed vacuously. */
+
+t('each flagship financial card carries exactly one brand mark', () => {
   for (const [name, f] of [['isolated', D], ['mobile', M], ['shell', SD], ['shell mobile', SM]]) {
-    assert.strictEqual(f.brand.cardMarks, 0,
-      `${f.brand.cardMarks} watermark(s) still painted in a financial card (${name})`);
+    assert.ok(f.brand.flagships.length > 0, `${name}: no flagship card on the page at all`);
+    for (const c of f.brand.flagships) {
+      assert.strictEqual(c.marks, 1,
+        `${name}: ${c.cls} paints ${c.marks} marks; a flagship card gets exactly one`);
+      assert.strictEqual(c.painted, true, `${name}: ${c.cls} has a mark that never renders`);
+    }
+    assert.strictEqual(f.brand.cardMarks, f.brand.flagships.length,
+      `${name}: ${f.brand.cardMarks} marks across ${f.brand.flagships.length} flagship cards`);
+  }
+});
+
+t('the watermark is opt-in: an ordinary summary card has none', () => {
+  // The previous implementation defaulted the symbol ON for every SummaryCard, so
+  // every page using one got branding it never asked for. The design preview
+  // renders a plain card beside a flagship one precisely so this is checkable
+  // rather than asserted in a comment.
+  for (const [name, f] of [['isolated', D], ['mobile', M]]) {
+    assert.ok(f.brand.plainSummaries.length > 0,
+      `${name}: no un-opted-in SummaryCard on the page, so opt-in is untested`);
+    for (const c of f.brand.plainSummaries) {
+      assert.strictEqual(c.marks, 0, `${name}: a plain SummaryCard is painting a brand mark`);
+      assert.strictEqual(c.imgs, 0, `${name}: a plain SummaryCard is painting an image`);
+    }
+  }
+});
+
+t('Pulse and Accounts get the watermark from the same shared implementation', () => {
+  // Pulse's total cash is a hand-built .pulse-cash card and Accounts' total
+  // balance is the shared SummaryCard, so "the same" cannot mean the same element
+  // — it means both wear .cfo-flagship and take every number from it. These two
+  // navy heroes have diverged once already: one drew the symbol, the other drew a
+  // graph-paper grid.
+  const pulse = D.brand.flagships.find((c) => c.cls.includes('pulse-cash'));
+  const acct = D.brand.flagships.find((c) => c.cls.includes('cfo-summary'));
+  assert.ok(pulse, 'no .pulse-cash flagship card rendered');
+  assert.ok(acct, 'no .cfo-summary flagship card rendered');
+  for (const c of [pulse, acct]) {
+    assert.match(c.cls, /cfo-flagship/, `${c.cls} does not wear the shared class`);
+  }
+  assert.strictEqual(pulse.src, acct.src,
+    `Pulse draws ${pulse.src} and Accounts draws ${acct.src}`);
+  assert.strictEqual(pulse.opacity, acct.opacity,
+    `Pulse is at ${pulse.opacity} and Accounts at ${acct.opacity}`);
+  assert.strictEqual(pulse.sizeToken, acct.sizeToken,
+    `--mark-size is ${pulse.sizeToken} on Pulse and ${acct.sizeToken} on Accounts`);
+  assert.strictEqual(pulse.safeToken, acct.safeToken,
+    `--mark-safe is ${pulse.safeToken} on Pulse and ${acct.safeToken} on Accounts`);
+});
+
+t('the flagship mark is decorative and absent from the accessibility tree', () => {
+  for (const [name, f] of [['isolated', D], ['mobile', M], ['shell', SD], ['shell mobile', SM]]) {
+    for (const c of f.brand.flagships) {
+      assert.strictEqual(c.alt, '', `${name}: ${c.cls} mark has alt="${c.alt}", not an empty alt`);
+      assert.strictEqual(c.ariaHidden, 'true', `${name}: ${c.cls} mark is not aria-hidden`);
+    }
+  }
+});
+
+t('the flagship mark is one symbol, never a repeating pattern', () => {
+  for (const [name, f] of [['isolated', D], ['mobile', M], ['shell', SD], ['shell mobile', SM]]) {
+    for (const c of f.brand.flagships) {
+      assert.strictEqual(c.bgImage, 'none',
+        `${name}: ${c.cls} mark is painted as a background image (${c.bgImage}) — that is how tiling gets in`);
+      assert.match(c.src, /^\/brand\//,
+        `${name}: ${c.cls} mark is ${c.src}, not an official asset from /brand`);
+      assert.match(c.src, /symbol_/,
+        `${name}: the card mark should be the standalone symbol, not ${c.src}`);
+    }
+  }
+});
+
+t('the flagship mark is cropped by the card edge and clear of every figure', () => {
+  for (const [name, f] of [['isolated', D], ['shell', SD]]) {
+    for (const c of f.brand.flagships) {
+      assert.ok(c.cropped > 0,
+        `${name}: ${c.cls} mark stops ${-c.cropped}px inside the card — a sticker, not a watermark`);
+      assert.ok(c.safeGap > 0,
+        `${name}: ${c.cls} leaves ${c.safeGap}px between the content and the mark; text would sit on it`);
+      // Cropped on the right only. A card shorter than the mark used to clip it
+      // top and bottom as well, which stopped it reading as a symbol at all.
+      assert.ok(c.markH <= c.h,
+        `${name}: ${c.cls} mark is ${c.markH}px tall in a ${c.h}px card — it is clipped vertically`);
+      assert.strictEqual(c.zIndex, '-1',
+        `${name}: ${c.cls} mark is at z-index ${c.zIndex}; only a negative index puts it structurally behind the text`);
+    }
+  }
+});
+
+t('on a phone the mark is smaller, fainter, and still clear of the figure', () => {
+  for (const [name, f] of [['mobile', M], ['shell mobile', SM]]) {
+    for (const c of f.brand.flagships) {
+      assert.ok(c.markW >= 60 && c.markW <= 110,
+        `${name}: ${c.cls} mark is ${c.markW}px on a phone; the intended range is 70-100`);
+      assert.ok(c.opacity <= 0.06,
+        `${name}: ${c.cls} mark is at ${c.opacity} on a phone, louder than the 4-6% intended`);
+      assert.ok(c.safeGap > 0,
+        `${name}: ${c.cls} leaves ${c.safeGap}px of text-safe area on a phone`);
+    }
+  }
+  const deskOp = D.brand.flagships[0].opacity, mobOp = M.brand.flagships[0].opacity;
+  assert.ok(mobOp < deskOp, `the phone mark (${mobOp}) is not quieter than the desktop one (${deskOp})`);
+  assert.ok(M.brand.flagships[0].markW < D.brand.flagships[0].markW,
+    'the phone mark is not smaller than the desktop one');
+});
+
+t('the two branding layers are independent, and the hero is the weaker one', () => {
+  const hero = D.brand.heroMark, card = D.brand.flagships[0];
+  assert.ok(hero, 'no page-hero mark on the desktop page');
+  assert.ok(card, 'no flagship card mark on the desktop page');
+  // Different assets: navy on the pale band, white on the navy card.
+  assert.notStrictEqual(hero.src, card.src,
+    `both layers draw ${hero.src}; the navy card needs the white symbol`);
+  assert.match(hero.src, /symbol_navy/, `the hero mark is ${hero.src}`);
+  assert.match(card.src, /symbol_white/, `the card mark is ${card.src}`);
+  // The hero is ambient; the card is the brand moment. Navy on a pale ground
+  // carries further than white on navy, so equal opacity is not equal presence.
+  assert.ok(hero.opacity < card.opacity,
+    `the hero mark (${hero.opacity}) is not fainter than the card mark (${card.opacity})`);
+  assert.ok(hero.opacity <= 0.04,
+    `the hero mark is at ${hero.opacity}; the page-level mark is meant to sit at 3-4%`);
+  // Independent: the phone drops the hero mark and keeps the card's.
+  assert.strictEqual(M.brand.heroMark, null, 'the page-hero mark is still painted on a phone');
+  assert.ok(M.brand.cardMarks > 0, 'the phone dropped the flagship card mark as well');
+});
+
+t('the page-hero mark is never cropped by its own band', () => {
+  // The opposite treatment to the card's, and the difference is the point: the
+  // hero mark is whole with clear space, the card mark runs off the edge. A
+  // header with no eyebrow is only ~133px tall, and a fixed 132px mark filled it
+  // edge to edge and read as clipped.
+  for (const [name, f] of [['isolated', D], ['shell', SD]]) {
+    const h = f.brand.heroMark;
+    assert.ok(h, `${name}: no page-hero mark`);
+    assert.ok(h.clearTop >= 8, `${name}: only ${h.clearTop}px of clear space above the hero mark`);
+    assert.ok(h.clearBottom >= 8, `${name}: only ${h.clearBottom}px of clear space below the hero mark`);
+    assert.ok(h.clearRight >= 8, `${name}: only ${h.clearRight}px between the hero mark and the band edge`);
+    assert.strictEqual(h.alt, '', `${name}: the hero mark has alt="${h.alt}"`);
+    assert.strictEqual(h.ariaHidden, 'true', `${name}: the hero mark is not aria-hidden`);
   }
 });
 

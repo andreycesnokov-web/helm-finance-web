@@ -100,7 +100,7 @@ export function PersonalOverview() {
   return (
     <>{head}
       <div style={{ marginBottom: 26 }}>
-        <SummaryCard label="Total Cash · reporting currency IDR" value={idr(total)}
+        <SummaryCard flagship label="Total Cash · reporting currency IDR" value={idr(total)}
           meta={<><span className="dot"><Icon.dot width="9" height="9" /></span> {wallets.length} account{wallets.length > 1 ? 's' : ''}</>}
           metrics={[
             { k: 'Income this month', v: '+ ' + idr(income), tone: 'pos' },

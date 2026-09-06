@@ -23,9 +23,10 @@
 
 /* ── total cash (navy) ──────────────────────────────────────────────────── */
 .pulse-cash {
-  /* Kept in step with .cfo-summary in shell/shell.css — same surface, same role.
-     Neither carries a brand mark any more: the page hero above already has one,
-     and the figure gets the whole card width back. */
+  /* The flagship financial surface. It wears .cfo-flagship (shell/shell.css) for
+     the brand mark rather than drawing its own, which is the whole reason the
+     watermark lives in one place: this card and Accounts' SummaryCard are the
+     same brand moment on two pages, and they used to be styled independently. */
   position: relative;
   overflow: hidden;
   display: flex;
@@ -45,9 +46,16 @@
   position: absolute;
   inset: 0;
   pointer-events: none;
+  /* Deepest layer of the three: glow, then the brand mark, then the text. The
+     glow is brightest at the top-right, which is exactly where the mark is, so
+     painting it over the mark tinted the symbol blue instead of leaving it as
+     white texture. */
+  z-index: -2;
   background: radial-gradient(120% 90% at 100% 0%, rgba(51, 153, 255, .22), rgba(51, 153, 255, 0) 62%);
 }
-/* Official mark, unmodified, as a subtle watermark. */
+/* The card reserves the mark's column in its own padding — see .cfo-flagship. */
+.pulse-cash.cfo-flagship { padding-right: var(--mark-safe); }
+
 .pulse-cash-top,
 .pulse-cash-value,
 .pulse-cash-flag,
@@ -513,13 +521,25 @@
 }
 .pulse-other-list {
   list-style: none; margin: 8px 0 0; padding: 0;
-  display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 4px 20px;
+  /* auto-FILL, not auto-fit: auto-fit collapses the empty tracks, so a month with
+     two excluded movements stretched each label/amount pair across half the card
+     — the amount sat ~330px from its own label and ~14px from the next pair's,
+     reading as one run of text rather than two pairs. auto-fill keeps the tracks,
+     so a pair stays a pair however few there are.
+     260px, not the old 190px: a track has to hold "Opening balances" and
+     "Rp 12 000 000" side by side. At 190px it could not, and the fix for the
+     stretching turned into a label wrapping onto two lines and an amount broken
+     mid-number. */
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 4px 20px;
   font-size: 12.5px; color: var(--text-secondary, #4a5563);
 }
 .pulse-other-list li { display: flex; justify-content: space-between; gap: 12px; }
 .pulse-other-amt {
   font-family: var(--font-mono, ui-monospace, monospace); font-variant-numeric: tabular-nums;
   color: var(--text-primary, #16202b); font-weight: 600;
+  /* A money figure never breaks across lines. If a track is ever too tight the
+     label wraps instead — "Rp 12 000" over "000" is not a number anyone can read. */
+  white-space: nowrap;
 }
 .pulse-other-note {
   margin: 8px 0 0; font-size: 11.5px; line-height: 1.5;

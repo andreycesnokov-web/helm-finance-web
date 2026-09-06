@@ -329,9 +329,11 @@ export default function Accounts() {
       {wallets.length > 0 && (
         /* The same navy surface Pulse uses, from the same component. It was a
            one-off inline gradient with a graph-paper grid and hardcoded #0F172A,
-           which is why the product's two dark heroes did not look related. The
-           watermark now comes from SummaryCard's default. */
+           which is why the product's two dark heroes did not look related.
+           `flagship` is what earns the brand mark: this is the page's headline
+           money figure, and the only card here that gets one. */
         <SummaryCard
+          flagship
           label={scopeTab === 'business' ? t('accounts.totalBusiness') : scopeTab === 'personal' ? t('accounts.totalPersonal') : t('accounts.totalBalance')}
           value={<span className="fin">{fmtFull(filteredBalance)}</span>}
           meta={`IDR · ${filteredWallets.length} wallet${filteredWallets.length !== 1 ? 's' : ''}`}

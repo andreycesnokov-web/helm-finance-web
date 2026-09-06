@@ -83,7 +83,16 @@
 .cfo-mobilehead{display:none;align-items:center;gap:10px;background:var(--surface-card);
   border-bottom:1px solid var(--border-default);padding:11px 16px;position:sticky;top:0;z-index:20}
 /* The compact lockup. Height-bound so the asset stays crisp and uncropped, and
-   vertically centred by the header's own align-items. */
+   vertically centred by the header's own align-items.
+
+   NOTE: the lockup PNG carries ~47% transparent canvas to the right (opaque
+   artwork ends at x1271 of 2400, measured off the file), so this <img> reserves
+   ~58px it never paints. Cropping it the way the desktop wordmark does needs a
+   wrapper element with an overflow window — doing it here with object-fit means
+   the element's box no longer matches the asset's aspect ratio, which is exactly
+   what the distortion guard in renderedPreview.test.mjs exists to catch. Left
+   as-is deliberately: the dead box changes nothing on screen, because the burger
+   is pinned right with margin-left:auto. */
 .cfo-mobilebrand{height:30px;width:auto;max-width:60vw;display:block;flex:0 0 auto}
 /* A thumb target, not a pointer target: 44px of tappable area around a 20px glyph. */
 .cfo-burger{margin-left:auto;background:none;border:0;display:inline-flex;flex-direction:column;
@@ -138,10 +147,18 @@
   font-family:var(--font-ui);
   /* Sits fully inside the band with clear space around it. It used to hang 26px
      off the right edge, which read as an icon accidentally clipped by the layout
-     rather than as a watermark someone placed. */
-  --head-mark:132px;
-  --head-inset:8px;
-  --head-safe:calc(var(--head-mark) + var(--head-inset) + 20px);
+     rather than as a watermark someone placed — so this one is never cropped.
+     That is the visible difference between the two branding layers: the hero mark
+     is whole and barely there, the flagship card's mark is bigger and cropped.
+
+     132px was too large for the job. On a header with no eyebrow the band is only
+     ~133px tall, so a 132px mark filled it edge to edge with no clear space and
+     read as clipped anyway; and reserving its column pushed a right-aligned
+     primary action ~160px in from the content's right edge. Smaller mark, smaller
+     column, and the height is capped below so a short band can never clip it. */
+  --head-mark:88px;
+  --head-inset:14px;
+  --head-safe:calc(var(--head-mark) + var(--head-inset) + 18px);
   position:relative;
   overflow:hidden;
   display:flex;
@@ -162,9 +179,16 @@
     right:var(--head-inset);
     top:50%;
     transform:translateY(-50%);
-    width:var(--head-mark);
-    height:var(--head-mark);
-    opacity:.045;                     /* background, not foreground */
+    /* Never taller than the band it sits in, so it keeps its clear space instead
+       of being cropped by a short header. width:auto + aspect-ratio holds the
+       official proportions — the mark is never distorted to fit. */
+    height:min(var(--head-mark), calc(100% - 28px));
+    width:auto;
+    aspect-ratio:1;
+    /* Navy on the pale page ground carries further than white on navy does, so at
+       equal opacity this mark read as strongly as the flagship card's. Measured by
+       eye against a real screenshot of both: 3.5% here to the card's 7%. */
+    opacity:.035;
     pointer-events:none;
     user-select:none;
   }
@@ -224,10 +248,6 @@
 .cfo-grid-4{grid-template-columns:repeat(4,1fr)}
 
 /* Summary / hero card (navy) */
-/* No watermark here any more: the page hero above already carries one, and two
-   large marks in one content area is the thing the brand rule forbids. Removing it
-   also gives the whole card width back to the figure, which is the point of the
-   card — the reserved column had been squeezing the number. */
 .cfo-summary{
   font-family:var(--font-ui);            /* see .cfo-pagehead — body is a system stack */
   position:relative;
@@ -237,6 +257,76 @@
   border-radius:var(--radius-lg);
   padding:24px 26px;
   box-shadow:var(--shadow-md);
+}
+/* The card reserves the mark's column in its own padding. Only when it is the
+   flagship — an ordinary summary card keeps its full width. */
+.cfo-summary.cfo-flagship{padding-right:var(--mark-safe)}
+
+/* ── the flagship brand watermark ───────────────────────────────────────────
+   ONE implementation, worn by every surface carrying a page's headline money
+   figure: the shared SummaryCard when a page passes `flagship`, and Pulse's
+   hand-built .pulse-cash. Both wear .cfo-flagship and neither restyles the mark,
+   so the product's two navy heroes cannot drift apart again — they already did
+   once, when one drew the symbol and the other drew a graph-paper grid.
+
+   Two branding layers, deliberately unequal:
+     page hero   .cfo-pagehead-mark   132px @ 4.5%  — ambient, contextual
+     flagship    .cfo-flagship-mark   168px @ 7%    — the brand moment
+   The hero is the weaker of the two on purpose. Change one, look at both.
+
+   The card edge crops the mark on purpose: a symbol sitting wholly inside the
+   card reads as an icon someone parked there, while one running off the edge
+   reads as the surface itself being branded.
+
+   --mark-safe is the column the mark claims, and each flagship surface adds it
+   to its own padding-right. That is what guarantees the label, the figure and
+   the supporting line are never set over the mark. Change --mark-size or
+   --mark-crop and the safe area follows; there is no second number to keep in
+   step. */
+.cfo-flagship{
+  --mark-size:168px;
+  --mark-crop:46px;                      /* how much of it the card edge eats */
+  --mark-gap:20px;                       /* clear space between text and mark */
+  --mark-safe:calc(var(--mark-size) - var(--mark-crop) + var(--mark-gap));
+  position:relative;
+  overflow:hidden;
+  /* Establishes a stacking context, which is what lets the mark sit at z-index
+     -1: behind every child, still in front of the card's own navy background.
+     Without it, -1 would drop the mark behind that background and it would
+     simply never be seen. */
+  isolation:isolate;
+}
+.cfo-flagship-mark{
+  position:absolute;
+  /* Structurally behind the text, not merely faint enough to get away with it.
+     Nothing readable can ever paint under it, whatever a page puts in the card. */
+  z-index:-1;
+  right:calc(var(--mark-crop) * -1);
+  top:50%;
+  transform:translateY(-50%);
+  /* Cropped by the right edge on purpose — never by the top and bottom as well.
+     A summary card is only as tall as its contents, and Accounts' is 148px, so a
+     flat 168px mark came out clipped on three sides and stopped reading as a
+     symbol. Capping the height to the card keeps the crop deliberate: one edge,
+     always the right one, whatever the card's height. */
+  height:min(var(--mark-size), calc(100% - 28px));
+  width:auto;
+  aspect-ratio:1;
+  opacity:.07;
+  pointer-events:none;
+  user-select:none;
+}
+/* Phone: a smaller, quieter mark and a much narrower reserved column, because
+   the figure needs the width more than the brand does. It is kept rather than
+   dropped — this is the one surface where the product's brand moment lives, and
+   the app header above it shows the compact lockup, not this symbol. */
+@media (max-width:640px){
+  .cfo-flagship{
+    --mark-size:92px;
+    --mark-crop:30px;
+    --mark-gap:14px;
+  }
+  .cfo-flagship-mark{opacity:.05}
 }
 /* ── page header ───────────────────────────────────────────────────────────
    Title and description sit together on the left; context chips and actions
@@ -509,6 +599,11 @@ html, body, #root { max-width: 100%; overflow-x: hidden; }
   .cfo-grid-2{grid-template-columns:1fr}
   .cfo-table-wrap{overflow-x:auto}
   .cfo-drawer{width:min(86vw,340px)}
+  /* A drawer row is a thumb target, not a pointer target. 36px is the right
+     density for the desktop sidebar and too mean for a phone, so the 44px
+     minimum is scoped here rather than applied to .cfo-navitem globally — the
+     same call already made for the page-header actions. */
+  .cfo-drawer .cfo-navitem{min-height:44px}
 }
 @media (max-width:640px){
   .cfo-main{padding:14px 20px 44px}
@@ -609,6 +704,9 @@ html, body, #root { max-width: 100%; overflow-x: hidden; }
   .personal-overview-subtitle{font-size:14px;line-height:1.35;margin:7px 0 14px;color:#52657C}
   .personal-mobile-meta{display:none}
   .personal-overview .cfo-summary{border-radius:12px;padding:18px 18px;margin-top:4px;box-shadow:0 10px 24px rgba(0,32,63,.15);background:#0A1730}
+  /* The shorthand above resets padding-right, so the flagship reclaims its
+     reserved column here rather than losing it to a more specific rule. */
+  .personal-overview .cfo-summary.cfo-flagship{padding-right:var(--mark-safe)}
   .personal-overview .cfo-summary-label{font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:#AFC1D4}
   .personal-overview .cfo-summary-value{font-size:29px;line-height:1.05;margin-top:8px;letter-spacing:-.01em;overflow-wrap:anywhere}
   .personal-overview .cfo-summary-meta{font-size:12px;margin-top:12px;line-height:1.35;color:#CAD7E5}
