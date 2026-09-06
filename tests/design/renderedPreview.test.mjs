@@ -132,6 +132,13 @@ const PROBE_FN = `function facts(win, doc) {
         ariaHidden: m.getAttribute('aria-hidden'), alt: m.getAttribute('alt'),
         w: Math.round(m.getBoundingClientRect().width),
         opacity: cs(m).opacity, inHero: !!m.closest('.cfo-summary, .pulse-cash'),
+        visible: cs(m).display !== 'none' && m.getBoundingClientRect().width > 0,
+        heroW: (() => { const h = m.closest('.cfo-summary, .pulse-cash');
+          return h ? Math.round(h.getBoundingClientRect().width) : 0; })(),
+        // A mark that stops inside the card is a sticker; one that runs off the
+        // edge is a crop. The approved treatment is the crop.
+        cropped: (() => { const h = m.closest('.cfo-summary, .pulse-cash');
+          return h ? m.getBoundingClientRect().right > h.getBoundingClientRect().right - 1 : false; })(),
       })),
     };
   });
@@ -145,6 +152,16 @@ const PROBE_FN = `function facts(win, doc) {
       right: Math.round(r.right),
     });
   });
+
+  // Figures must never be the thing that gives way. .pulse-cash-value is
+   // nowrap + ellipsis, so a too-greedy watermark column truncates it in silence.
+  const figures = [...doc.querySelectorAll('.pulse-cash-value, .cfo-summary-value, .pulse-kpi-value')]
+    .map((el) => ({
+      cls: (typeof el.className === 'string' ? el.className : '').slice(0, 24),
+      text: (el.textContent || '').trim().slice(0, 24),
+      truncated: el.scrollWidth > el.clientWidth + 1,
+      scrollW: el.scrollWidth, clientW: el.clientWidth,
+    }));
 
   const btn = doc.querySelector('.cfo-btn-primary');
   const primary = btn ? { bg: cs(btn).backgroundColor, fg: cs(btn).color,
@@ -163,6 +180,89 @@ const PROBE_FN = `function facts(win, doc) {
     });
     return out;
   };
+
+  // Watermark vs text: the mark is decoration and must never sit under anything a
+  // reader needs. Compare painted rectangles, not intentions.
+  const overlaps = [];
+  [...doc.querySelectorAll('.cfo-summary-sym, .pulse-cash-mark')].forEach((mk) => {
+    const mr = mk.getBoundingClientRect();
+    const hero = mk.closest('.cfo-summary, .pulse-cash, .cfo-pagehead');
+    if (!hero) return;
+    [...hero.querySelectorAll('*')].forEach((el) => {
+      if (el === mk || el.children.length) return;
+      const txt = (el.textContent || '').trim();
+      if (!txt) return;
+      const st = cs(el);
+      if (st.visibility === 'hidden' || st.display === 'none' || Number(st.opacity) === 0) return;
+      const tr = el.getBoundingClientRect();
+      const ox = Math.min(mr.right, tr.right) - Math.max(mr.left, tr.left);
+      const oy = Math.min(mr.bottom, tr.bottom) - Math.max(mr.top, tr.top);
+      if (ox > 0 && oy > 0) overlaps.push({
+        hero: hero.className.split(' ')[0],
+        text: txt.slice(0, 30),
+        cls: (typeof el.className === 'string' ? el.className : '').slice(0, 24),
+        by: Math.round(ox) + 'x' + Math.round(oy),
+      });
+    });
+  });
+
+  // Page-level actions are thumb targets on a phone.
+  const headActions = [...doc.querySelectorAll('.cfo-pagehead-actions :is(.cfo-btn,.btn,button,a[role="button"])')]
+    .map((b) => ({ txt: (b.textContent || '').trim().slice(0, 20),
+      h: +b.getBoundingClientRect().height.toFixed(1),
+      w: +b.getBoundingClientRect().width.toFixed(1) }));
+
+  // Header composition: is there a real left zone and a real right zone?
+  const heads = [...doc.querySelectorAll('.cfo-pagehead')].map((hd) => {
+    const r = hd.getBoundingClientRect();
+    const txt = hd.querySelector('.cfo-pagehead-text');
+    const right = hd.querySelector('.cfo-pagehead-right');
+    const mark = hd.querySelector('.cfo-pagehead-mark');
+    const box = (el) => el ? (rr => ({ l: Math.round(rr.left - r.left), r: Math.round(rr.right - r.left),
+      t: Math.round(rr.top - r.top), b: Math.round(rr.bottom - r.top) }))(el.getBoundingClientRect()) : null;
+    return {
+      width: Math.round(r.width),
+      text: box(txt), right: box(right), mark: box(mark),
+      markVisible: mark ? cs(mark).display !== 'none' && mark.getBoundingClientRect().width > 0 : false,
+      markReserve: Math.round(parseFloat(cs(hd).paddingRight) || 0),
+      sameRow: txt && right ? Math.abs(txt.getBoundingClientRect().top - right.getBoundingClientRect().top) < 40 : null,
+      rule: cs(hd).borderBottomWidth,
+    };
+  });
+
+  // Focus ring, from a real keyboard-style focus rather than a class that mimics
+  // one: :focus-visible is what a keyboard user actually gets.
+  let focusRing = null;
+  const ft = doc.querySelector('.dsp-focus-target') || doc.querySelector('.cfo-btn-primary');
+  if (ft) {
+    ft.dispatchEvent(new win.KeyboardEvent('keydown', { key: 'Tab', bubbles: true }));
+    ft.focus();
+    const fs2 = cs(ft);
+    focusRing = {
+      matches: ft.matches(':focus-visible'),
+      color: fs2.outlineColor,
+      width: fs2.outlineWidth,
+      style: fs2.outlineStyle,
+      offset: fs2.outlineOffset,
+    };
+    ft.blur();
+  }
+
+  // The real application frame, when the preview is rendering in-shell.
+  const shell = doc.querySelector('.cfo-shell') ? {
+    sidebars: doc.querySelectorAll('.cfo-sidebar').length,
+    navItems: doc.querySelectorAll('.cfo-sidebar a, .cfo-sidebar button').length,
+    brandImgs: doc.querySelectorAll('.cfo-brand img').length,
+    brandBoxH: (() => { const b = doc.querySelector('.cfo-brand');
+      return b ? Math.round(b.getBoundingClientRect().height) : 0; })(),
+    mobileHead: doc.querySelectorAll('.cfo-mobilehead').length,
+    mobileHeadH: (() => { const h = doc.querySelector('.cfo-mobilehead');
+      return h ? Math.round(h.getBoundingClientRect().height) : 0; })(),
+    sidebarVisible: (() => { const a = doc.querySelector('.cfo-sidebar');
+      return !!a && cs(a).display !== 'none' && a.getBoundingClientRect().width > 0; })(),
+    contentWidth: (() => { const m = doc.querySelector('.cfo-main, .cfo-content, .cfo-shell > *:not(.cfo-sidebar):not(.cfo-mobilehead)');
+      return m ? Math.round(m.getBoundingClientRect().width) : null; })(),
+  } : null;
 
   const ctx = doc.querySelector('.cfo-pagehead-context');
   const badges = ctx ? [...ctx.querySelectorAll('.cfo-badge')].map((b) =>
@@ -193,6 +293,11 @@ const PROBE_FN = `function facts(win, doc) {
     innerWidth: win.innerWidth, clientWidth: de.clientWidth, scrollWidth: de.scrollWidth,
     h1Total: doc.querySelectorAll('h1').length,
     sections, overflow: overflow.slice(0, 10), overflowCount: overflow.length,
+    overlaps: overlaps.slice(0, 12), overlapCount: overlaps.length,
+    headActions, heads, focusRing, shell, figures,
+    fonts: { status: doc.fonts.status, size: doc.fonts.size,
+      archivo: doc.fonts.check('400 40px "Archivo Black"'),
+      mono: doc.fonts.check('700 20px "JetBrains Mono Variable"') },
     primary, kpiPositive: kpiOf('pulse'), kpiNegative: kpiOf('semantic'),
     badgeWidths: badges, contextWidth: ctx ? Math.round(ctx.getBoundingClientRect().width) : null,
     pageWidth: Math.round(de.clientWidth), clipped,
@@ -210,24 +315,29 @@ const guard = (body) => `try { ${body} } catch (e) {
 }`;
 
 // Desktop: load the preview directly, then report from its own document.
-const directProbe = `<!doctype html><meta charset="utf-8"><body style="margin:0">
-<iframe id="f" src="/design-preview" style="width:1440px;height:900px;border:0"></iframe>
+// Every probe waits for document.fonts.ready before measuring. Geometry taken
+// mid-swap is geometry of the fallback face, and a text rectangle measured in the
+// wrong font is the wrong rectangle.
+const probeFor = (route, w, h) => `<!doctype html><meta charset="utf-8"><body style="margin:0">
+<iframe id="f" src="${route}" style="width:${w}px;height:${h}px;border:0"></iframe>
 <script>${PROBE_FN}
-setTimeout(() => { ${guard(`const w = document.getElementById('f').contentWindow;
-  const F = facts(w, w.document); ${emit}`)} }, 3500);
+setTimeout(async () => { ${guard(`const win = document.getElementById('f').contentWindow;
+  await win.document.fonts.ready;
+  const F = facts(win, win.document); ${emit}`)} }, 3000);
 </script></body>`;
 
-const mobileProbe = `<!doctype html><meta charset="utf-8"><body style="margin:0">
-<iframe id="f" src="/design-preview" style="width:390px;height:844px;border:0"></iframe>
-<script>${PROBE_FN}
-setTimeout(() => { ${guard(`const w = document.getElementById('f').contentWindow;
-  const F = facts(w, w.document); ${emit}`)} }, 3500);
-</script></body>`;
+const directProbe = probeFor('/design-preview', 1440, 900);
+const mobileProbe = probeFor('/design-preview', 390, 844);
+const shellDesktopProbe = probeFor('/design-preview?shell=pulse', 1440, 900);
+const shellMobileProbe = probeFor('/design-preview?shell=accounts', 390, 844);
 
 console.log('\nrendered preview — collecting facts from a real browser');
 const D = await collect(directProbe);
 const M = await collect(mobileProbe);
-console.log(`  .. desktop viewport ${D.innerWidth}px, mobile viewport ${M.innerWidth}px`);
+const SD = await collect(shellDesktopProbe);
+const SM = await collect(shellMobileProbe);
+console.log(`  .. desktop viewport ${D.innerWidth}px, mobile viewport ${M.innerWidth}px, `
+  + `in-shell ${SD.innerWidth}px / ${SM.innerWidth}px`);
 
 /* ── headings ──────────────────────────────────────────────────────────────── */
 console.log('\nheadings');
@@ -301,16 +411,136 @@ t('the mark is decorative: empty alt, hidden from assistive technology', () => {
   }
 });
 
+// Decoration must not share pixels with a figure, a label, a caption or a badge.
+const overlapReport = (f) => f.overlaps
+  .map((o) => `${o.hero} "${o.text}" (.${o.cls}) overlapping ${o.by}px`)
+  .join('; ');
+
+t('the watermark never sits under text — desktop', () => {
+  assert.strictEqual(D.overlapCount, 0,
+    `${D.overlapCount} text/watermark intersection(s): ${overlapReport(D)}`);
+});
+
+t('the watermark never sits under text — 390px', () => {
+  assert.strictEqual(M.overlapCount, 0,
+    `${M.overlapCount} text/watermark intersection(s): ${overlapReport(M)}`);
+});
+
+t('the hero mark is deliberately absent on a phone, not merely broken', () => {
+  // A reserved column for decoration costs a 390px card either its figure size or
+  // its readability. The mark is dropped on purpose; this pins that choice so a
+  // future change cannot quietly reintroduce it half-working.
+  const mobile = Object.values(M.sections).flatMap((s) => s.markAttrs);
+  assert.ok(mobile.length > 0, 'the mark should still be in the DOM, just not painted');
+  for (const m of mobile) {
+    assert.strictEqual(m.visible, false, `a mark is still painted at 390px (${m.w}px wide)`);
+  }
+});
+
 t('the mark is one oversized cropped symbol, not a tiled wallpaper', () => {
+  // Absolute size is deliberately NOT fixed across surfaces: the summary card is
+  // full width and the Pulse cash card is a ~440px column, and forcing the same
+  // 180px mark on both is what truncated "Rp 122.8M" to "Rp 122…". What must hold
+  // is the treatment — oversized for its own card, cropped by its edge, and the
+  // same weight everywhere.
   const all = Object.values(D.sections).flatMap((s) => s.markAttrs);
+  assert.ok(all.length > 0, 'no marks to check');
   for (const m of all) {
+    assert.strictEqual(m.visible, true, 'a desktop hero is missing its mark');
     assert.ok(m.w >= 120, `mark is only ${m.w}px — too small to read as the approved treatment`);
+    assert.ok(m.w <= m.heroW * 0.55,
+      `mark is ${m.w}px on a ${m.heroW}px card — that is wallpaper, not an accent`);
+    assert.strictEqual(m.cropped, true, 'the mark sits inside the card instead of being cropped by it');
     assert.ok(Number(m.opacity) <= 0.16, `mark opacity ${m.opacity} is too assertive`);
     assert.ok(Number(m.opacity) >= 0.05, `mark opacity ${m.opacity} would be invisible`);
   }
-  const widths = new Set(all.map((m) => m.w));
-  assert.strictEqual(widths.size, 1,
-    `the two hero implementations draw different marks: ${[...widths].join('px, ')}px`);
+  const opacities = new Set(all.map((m) => m.opacity));
+  assert.strictEqual(opacities.size, 1,
+    `the marks are drawn at different weights: ${[...opacities].join(', ')}`);
+});
+
+t('no financial figure is truncated by the watermark column', () => {
+  // The reserved column must come out of whitespace, never out of the number.
+  for (const f of [...D.figures, ...M.figures]) {
+    assert.strictEqual(f.truncated, false,
+      `"${f.text}" (.${f.cls}) is clipped: needs ${f.scrollW}px, has ${f.clientW}px`);
+  }
+});
+
+/* ── page-hero composition ─────────────────────────────────────────────────── */
+console.log('\npage hero — composition');
+
+t('desktop lays the header out as a left content zone and a right control zone', () => {
+  // The control zone used to drop to the left under a long title, leaving the whole
+  // right side of the header empty. It holds the right edge now.
+  const withControls = D.heads.filter((h) => h.right);
+  assert.ok(withControls.length > 0, 'no header with controls to check');
+  for (const h of withControls) {
+    assert.ok(h.text.l < h.right.l,
+      `the text zone starts at ${h.text.l} but controls start at ${h.right.l}`);
+    assert.ok(h.right.r >= h.width - h.markReserve - 4,
+      `controls end at ${h.right.r} in a ${h.width}px header — they are not holding the right edge`);
+  }
+});
+
+t('a description is given a readable measure, not the full window', () => {
+  for (const h of D.heads) {
+    assert.ok(h.text.r - h.text.l <= 900,
+      `the text zone is ${h.text.r - h.text.l}px wide; a line that long is hard to read`);
+  }
+});
+
+t('the header band carries a hairline rule', () => {
+  for (const h of D.heads) {
+    assert.notStrictEqual(h.rule, '0px', 'the page hero has no bottom rule');
+  }
+});
+
+t('the page-hero brand mark is decorative and reserved out of the content', () => {
+  const marked = D.heads.filter((h) => h.markVisible);
+  assert.ok(marked.length > 0, 'no page-hero brand mark is painted on desktop');
+  for (const h of marked) {
+    assert.ok(h.text.r <= h.mark.l + 1,
+      `the text zone reaches ${h.text.r} but the mark starts at ${h.mark.l}`);
+    if (h.right) assert.ok(h.right.r <= h.mark.l + 1,
+      `the control zone reaches ${h.right.r} but the mark starts at ${h.mark.l}`);
+  }
+});
+
+t('mobile stacks the header and drops the brand mark', () => {
+  for (const h of M.heads) {
+    assert.strictEqual(h.markVisible, false, 'the page-hero mark is still painted at 390px');
+    if (h.right) assert.strictEqual(h.sameRow, false,
+      'the control zone is still beside the text at 390px instead of stacked');
+  }
+});
+
+/* ── mobile control sizing ─────────────────────────────────────────────────── */
+console.log('\nmobile — control sizing');
+
+t('page-level actions are at least 44px tall at 390px', () => {
+  assert.ok(M.headActions.length > 0, 'no page-level action rendered at 390px');
+  for (const b of M.headActions) {
+    assert.ok(b.h >= 44, `"${b.txt}" is ${b.h}px tall; a thumb target needs 44px`);
+  }
+});
+
+t('desktop control sizing is left alone', () => {
+  // The comfort rule is scoped to the phone; a pointer does not need 44px, and
+  // growing every desktop button would be a redesign nobody asked for.
+  assert.ok(D.headActions.length > 0, 'no page-level action rendered at 1440px');
+  for (const b of D.headActions) {
+    assert.ok(b.h < 44, `"${b.txt}" is ${b.h}px tall on desktop; the mobile rule has leaked`);
+  }
+});
+
+/* ── fonts ─────────────────────────────────────────────────────────────────── */
+console.log('\nfonts');
+
+t('the page renders in the real faces, not fallbacks', () => {
+  assert.strictEqual(D.fonts.status, 'loaded', `document.fonts.status is ${D.fonts.status}`);
+  assert.ok(D.fonts.archivo, 'the display face (Archivo Black) is not loaded');
+  assert.ok(D.fonts.mono, 'the figure face (JetBrains Mono) is not loaded');
 });
 
 /* ── action colour ─────────────────────────────────────────────────────────── */
@@ -329,6 +559,25 @@ t('the primary button resolves to --action-primary, not the raw brand accent', (
 t('primary button text clears WCAG AA', () => {
   assert.ok(D.primary.ratio >= 4.5,
     `contrast is ${D.primary.ratio}:1 (${D.primary.bg} on ${D.primary.fg}), AA needs 4.5:1`);
+});
+
+/* ── focus ─────────────────────────────────────────────────────────────────── */
+console.log('\nfocus');
+
+t('a keyboard focus produces a real :focus-visible ring', () => {
+  assert.ok(D.focusRing, 'no focusable control found');
+  assert.strictEqual(D.focusRing.matches, true,
+    'the control does not match :focus-visible after a keyboard-style focus');
+  assert.notStrictEqual(D.focusRing.style, 'none', 'the focus ring has no outline style');
+  assert.ok(parseFloat(D.focusRing.width) >= 2,
+    `the focus ring is ${D.focusRing.width}; it needs at least 2px to be seen`);
+});
+
+t('the focus ring is the brand accent, offset clear of the control', () => {
+  assert.strictEqual(D.focusRing.color, 'rgb(51, 153, 255)',
+    `the ring is ${D.focusRing.color}, expected --focus-ring (#3399FF)`);
+  assert.ok(parseFloat(D.focusRing.offset) >= 2,
+    `the ring offset is ${D.focusRing.offset}; it needs space or it reads as a border`);
 });
 
 /* ── semantic colour ───────────────────────────────────────────────────────── */
@@ -385,6 +634,66 @@ t('a long title and description wrap without clipping', () => {
 t('nothing overflows horizontally at 1440px either', () => {
   assert.strictEqual(D.overflowCount, 0,
     `${D.overflowCount} overflowing element(s): ` + JSON.stringify(D.overflow));
+});
+
+/* ── the real application shell ────────────────────────────────────────────── */
+console.log('\napplication shell');
+
+t('the preview renders inside the real WorkspaceShell, not a drawing of it', () => {
+  // WorkspaceShell is presentational — useState and nothing else — so it can be
+  // driven by synthetic props. If this ever stops finding the real frame, the
+  // shell screenshots stop being evidence.
+  assert.ok(SD.shell, 'no .cfo-shell found — the in-shell view is not rendering the frame');
+  assert.strictEqual(SD.shell.sidebars, 1, `expected 1 sidebar, found ${SD.shell.sidebars}`);
+  assert.ok(SD.shell.sidebarVisible, 'the desktop sidebar is not painted');
+  assert.ok(SD.shell.brandImgs > 0, 'the shell is not rendering the official logo');
+  // The sidebar is a column flex box at height:100vh, so once the nav is longer
+  // than the viewport its children shrink. This one is a fixed clipping window
+  // and collapsed to 0, letting the workspace switcher draw over the wordmark.
+  assert.ok(SD.shell.brandBoxH >= 40,
+    `the sidebar wordmark box is ${SD.shell.brandBoxH}px tall — it has collapsed`);
+  assert.ok(SD.shell.navItems >= 15,
+    `the sidebar has ${SD.shell.navItems} nav items; the real BUSINESS_NAV has far more`);
+});
+
+t('the in-shell page keeps exactly one <h1>', () => {
+  assert.strictEqual(SD.h1Total, 1, `in-shell desktop has ${SD.h1Total} h1`);
+  assert.strictEqual(SM.h1Total, 1, `in-shell mobile has ${SM.h1Total} h1`);
+});
+
+t('the in-shell mobile view is a true 390px viewport with no overflow', () => {
+  assert.strictEqual(SM.innerWidth, 390, `in-shell mobile viewport is ${SM.innerWidth}px`);
+  assert.ok(SM.scrollWidth <= SM.clientWidth,
+    `in-shell mobile scrollWidth ${SM.scrollWidth} > clientWidth ${SM.clientWidth}`);
+  assert.strictEqual(SM.overflowCount, 0,
+    `${SM.overflowCount} element(s) overflow in the mobile shell: ` + JSON.stringify(SM.overflow));
+});
+
+t('the mobile shell shows its own header rather than the desktop sidebar', () => {
+  assert.ok(SM.shell, 'no shell in the mobile view');
+  assert.strictEqual(SM.shell.mobileHead, 1, 'the mobile shell header is missing');
+  // The shell grid's rows were implicit `auto`, and a grid taller than its content
+  // stretches them: on a short page the header absorbed the slack and grew to 274px
+  // of empty white before the content started.
+  assert.ok(SM.shell.mobileHeadH > 0 && SM.shell.mobileHeadH < 100,
+    `the mobile header is ${SM.shell.mobileHeadH}px tall — it is being stretched`);
+  assert.strictEqual(SM.shell.sidebarVisible, false,
+    'the desktop sidebar is still painted at 390px');
+});
+
+t('nothing in the shell views touches the network', () => {
+  for (const [name, f] of [['desktop', SD], ['mobile', SM]]) {
+    assert.deepStrictEqual(f.xhr, [], `${name} shell issued requests: ` + JSON.stringify(f.xhr));
+    assert.deepStrictEqual(f.suspiciousResources, [],
+      `${name} shell loaded backend resources: ` + JSON.stringify(f.suspiciousResources));
+  }
+});
+
+t('the watermark does not sit under text in the shell views either', () => {
+  assert.strictEqual(SD.overlapCount, 0,
+    `in-shell desktop: ${overlapReport(SD)}`);
+  assert.strictEqual(SM.overlapCount, 0,
+    `in-shell mobile: ${overlapReport(SM)}`);
 });
 
 /* ── isolation ─────────────────────────────────────────────────────────────── */

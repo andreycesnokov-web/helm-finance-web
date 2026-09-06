@@ -8,6 +8,7 @@
 /* #root is display:flex, so the preview must claim the row or it shrinks to its
    content width and leaves a dead gutter. */
 .dsp-root {
+  font-family: var(--font-ui);
   background: var(--surface-page);
   min-height: 100vh;
   flex: 1 1 auto;
@@ -102,3 +103,17 @@
   .dsp-stage { padding: var(--space-4); }
   .dsp-values { gap: var(--space-3); font-size: var(--text-md); }
 }
+
+/* ── in-shell views (?shell=pulse | ?shell=accounts) ───────────────────────
+   The real WorkspaceShell, driven by synthetic props. Only the banner is ours;
+   everything below it is the shipped frame, so these screenshots speak to the
+   sidebar, the gutters and the real content width. */
+.dsp-shell {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 100vh;
+  background: var(--surface-page);
+}
+.dsp-shell .cfo-shell { flex: 1 1 auto; min-height: 0; }

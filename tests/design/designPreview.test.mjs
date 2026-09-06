@@ -54,12 +54,18 @@ t('a disabled flag renders the not-found branch before anything else', () => {
 
 t('the flag is compile-time, so a production bundle drops the page entirely', () => {
   // Vite inlines import.meta.env.VITE_* at build time, which is what lets the
-  // minifier delete the branch. A runtime source (localStorage, a query param,
-  // an API response) would ship the whole page to every customer.
-  assert.ok(!/localStorage|sessionStorage|location\.search|document\.cookie/.test(
-    src.slice(0, src.indexOf('export default function DesignPreview'))
-      .replace(/const ONLY[\s\S]*?: null\n/, '')),
-    'gating must not depend on anything readable at runtime');
+  // minifier delete the branch and Rollup drop the lazy chunk. Anything the
+  // browser could decide at runtime would ship the page to every customer.
+  const gate = src.match(/const PREVIEW_ON\s*=\s*([^\n]+)/);
+  assert.ok(gate, 'PREVIEW_ON is not defined');
+  assert.match(gate[1], /import\.meta\.env\.VITE_DESIGN_PREVIEW_ENABLED/,
+    `the gate reads ${gate[1].trim()}, which is not a build-time constant`);
+  assert.strictEqual((src.match(/PREVIEW_ON\s*=[^=]/g) || []).length, 1,
+    'PREVIEW_ON is assigned more than once');
+  // Query params choose which example to render; they never decide whether the
+  // page exists. Storage and cookies have no business here at all.
+  assert.ok(!/localStorage|sessionStorage|document\.cookie/.test(src),
+    'the preview must not read browser storage');
 });
 
 t('the route is registered exactly once', () => {

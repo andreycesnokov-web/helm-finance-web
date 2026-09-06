@@ -5,10 +5,19 @@
 // the preview flag on and re-shoots every image, so the set is always a picture of
 // HEAD rather than of whatever was on screen the day someone dragged a window.
 //
-// Mobile needs care. Chrome clamps a top-level window to 512 CSS px, so
-// `--window-size=390` produces a 512px layout cropped to 390px — which looks like
-// a broken phone layout and is not one. Real 390px rendering comes from an iframe,
-// which gets its own viewport; the image is then cropped back to 390 wide.
+// Two traps this script exists to close:
+//
+// 1. Fonts. A capture taken mid-swap records the fallback face, and a heading set
+//    in the fallback reads as a design regression that was never in the code.
+//    Every shot is font-verified first — document.fonts.ready has resolved, the
+//    status is "loaded", and each required family answers document.fonts.check —
+//    and the script STOPS rather than writing an image it cannot vouch for.
+//
+// 2. Viewport. Chrome clamps a top-level window to 512 CSS px, so
+//    `--window-size=390` produces a 512px layout cropped to 390 — which looks
+//    exactly like a broken phone layout and is not one. Every shot is framed in an
+//    iframe of the exact target size and the verification pass asserts the
+//    iframe's innerWidth, so a mobile image can never silently become a crop.
 //
 // Run: node tests/design/captureScreenshots.mjs
 import assert from 'node:assert';
@@ -22,6 +31,21 @@ import { fileURLToPath } from 'node:url';
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const DIST = path.join(ROOT, 'client', 'dist');
 const OUT = path.join(ROOT, 'artifacts', 'design-pr80');
+
+// Which face each kind of content is supposed to render in. The check is done
+// against what the page ACTUALLY renders — sample an element, read its computed
+// family/weight/size, and ask document.fonts whether that exact face is loaded.
+// A fixed global list would fail honestly-font-free sections and, worse, would
+// still pass a page whose heading had quietly fallen back to a system face.
+// `expect` is a pattern string, not a RegExp: these travel into the page as JSON,
+// and JSON.stringify flattens a RegExp to {}.
+const FONT_SAMPLES = [
+  { sel: 'h1, .dsp-title', expect: 'Archivo Black', role: 'display' },
+  // .cfo-summary-value is only the container — the figure inside it carries .fin,
+  // so sampling the container reads the display face and reports a false miss.
+  { sel: '.fin, .pulse-cash-value, .pulse-kpi-value', expect: 'JetBrains Mono', role: 'figures' },
+  { sel: '.cfo-pagehead-desc, .cfo-summary-label, .pulse-kpi-label', expect: 'Manrope', role: 'text' },
+];
 
 const CHROME = [
   process.env.CHROME_PATH,
@@ -48,7 +72,8 @@ assert.strictEqual(build.status, 0, 'build failed:\n' + (build.stderr || '').sli
 fs.mkdirSync(OUT, { recursive: true });
 
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css',
-  '.svg': 'image/svg+xml', '.png': 'image/png', '.woff2': 'font/woff2', '.json': 'application/json' };
+  '.svg': 'image/svg+xml', '.png': 'image/png', '.woff2': 'font/woff2', '.woff': 'font/woff',
+  '.json': 'application/json' };
 const server = http.createServer((req, res) => {
   const url = decodeURIComponent((req.url || '/').split('?')[0]);
   let file = path.resolve(path.join(DIST, url));
@@ -64,21 +89,108 @@ const origin = `http://127.0.0.1:${server.address().port}`;
 // Chrome waiting for a page this process is too busy to serve.
 const run = (args) => new Promise((resolve, reject) => {
   const c = spawn(CHROME, args);
-  let err = '';
+  let out = '', err = '';
+  c.stdout.on('data', (d) => { out += d; });
   c.stderr.on('data', (d) => { err += d; });
   const kill = setTimeout(() => { c.kill(); reject(new Error('chrome timed out')); }, 90000);
   c.on('error', reject);
-  c.on('close', () => { clearTimeout(kill); resolve(err); });
+  c.on('close', () => { clearTimeout(kill); resolve({ out, err }); });
 });
 
-const shoot = (file, url, w, h) => run([
-  '--headless=new', '--disable-gpu', '--hide-scrollbars', '--no-first-run',
-  `--window-size=${w},${h}`, '--virtual-time-budget=15000',
-  `--screenshot=${file}`, url,
-]);
+/* ── the harness every shot is framed in ───────────────────────────────────── */
+// The iframe *is* the viewport, which is the only way to get a true 390px layout.
+// `focus` drives a real keyboard focus so :focus-visible engages for the capture.
+const harnessFor = (route, w, h, focus) => `<!doctype html><meta charset="utf-8">
+<style>html,body{margin:0;padding:0;background:#F4F6F8;overflow:hidden}
+iframe{width:${w}px;height:${h}px;border:0;display:block}</style>
+<body><iframe id="f" src="${route}"></iframe>
+<script>
+const SAMPLES = ${JSON.stringify(FONT_SAMPLES)};
+const fr = document.getElementById('f');
+setTimeout(async () => {
+  const report = (o) => document.body.insertAdjacentHTML('beforeend',
+    '<div>__FONTS__' + btoa(unescape(encodeURIComponent(JSON.stringify(o)))) + '__END__</div>');
+  try {
+    const cw = fr.contentWindow, d = cw.document;
+    await d.fonts.ready;
+    ${focus ? `
+    // A real keyboard focus, not a class that imitates one: :focus-visible only
+    // engages for keyboard-ish interaction, so the ring in the image is the ring
+    // a keyboard user actually sees.
+    const target = d.querySelector(${JSON.stringify(focus)});
+    if (target) {
+      target.dispatchEvent(new cw.KeyboardEvent('keydown', { key: 'Tab', bubbles: true }));
+      target.focus();
+    }` : ''}
+    // For every kind of content this page actually renders, prove the face it is
+    // painted with is loaded — not merely requested, and not a fallback.
+    const faces = [];
+    const missing = [];
+    for (const smp of SAMPLES) {
+      const el = d.querySelector(smp.sel);
+      if (!el) continue;
+      const cst = cw.getComputedStyle(el);
+      const family = cst.fontFamily.split(',')[0].replace(/["']/g, '').trim();
+      const spec = cst.fontWeight + ' ' + cst.fontSize + ' "' + family + '"';
+      const ok = d.fonts.check(spec);
+      faces.push({ role: smp.role, family: family, weight: cst.fontWeight, loaded: ok });
+      if (!ok) missing.push(smp.role + ' -> ' + spec + ' not loaded');
+      if (!new RegExp(smp.expect).test(family)) {
+        missing.push(smp.role + ' -> rendering in ' + family + ', expected ' + smp.expect);
+      }
+    }
+    const h1 = d.querySelector('h1');
+    const st = h1 ? cw.getComputedStyle(h1) : null;
+    ${focus ? `const t2 = d.querySelector(${JSON.stringify(focus)});` : ''}
+    report({
+      status: d.fonts.status,
+      loaded: d.fonts.size,
+      missing: missing,
+      faces: faces,
+      innerWidth: cw.innerWidth,
+      h1Family: st ? st.fontFamily.split(',')[0].replace(/"/g, '') : null,
+      h1Weight: st ? st.fontWeight : null,
+      focusVisible: ${focus ? `!!(t2 && t2.matches(':focus-visible'))` : 'null'},
+      focusOutline: ${focus ? `t2 ? cw.getComputedStyle(t2).outlineColor + ' ' + cw.getComputedStyle(t2).outlineWidth : null` : 'null'},
+    });
+  } catch (e) { report({ error: e.message }); }
+}, 2500);
+</script></body>`;
+
+// Verify first, then photograph the identical page. No image is written for a
+// page whose fonts and viewport could not be vouched for.
+const verifyAndShoot = async (file, route, w, h, opts = {}) => {
+  const { crop, focus, window: win } = opts;
+  const name = `__cap-${Math.random().toString(36).slice(2)}.html`;
+  fs.writeFileSync(path.join(DIST, name), harnessFor(route, w, h, focus));
+  const url = `${origin}/${name}`;
+  const winW = win ? win[0] : w, winH = win ? win[1] : h;
+  const args = (extra) => ['--headless=new', '--disable-gpu', '--hide-scrollbars',
+    '--no-first-run', `--window-size=${winW},${winH}`, '--virtual-time-budget=20000', ...extra, url];
+  try {
+    const { out } = await run(args(['--dump-dom']));
+    const m = out.match(/__FONTS__([A-Za-z0-9+/=]+)__END__/);
+    assert.ok(m, `${file}: the page never reported font state`);
+    const r = JSON.parse(Buffer.from(m[1], 'base64').toString('utf8'));
+    assert.ok(!r.error, `${file}: probe failed — ${r.error}`);
+    assert.strictEqual(r.status, 'loaded', `${file}: document.fonts.status is "${r.status}", not "loaded"`);
+    assert.deepStrictEqual(r.missing, [], `${file}: ${(r.missing || []).join(' | ')}`);
+    assert.ok(r.faces.length > 0, `${file}: no sampled element to verify a font against`);
+    assert.strictEqual(r.innerWidth, w, `${file}: viewport is ${r.innerWidth}px, expected ${w}px`);
+    if (r.h1Family) assert.match(r.h1Family, /Archivo Black/, `${file}: h1 renders in ${r.h1Family}`);
+    if (focus) assert.strictEqual(r.focusVisible, true, `${file}: ${focus} does not match :focus-visible`);
+
+    const raw = crop ? path.join(DIST, '__shot.png') : path.join(OUT, file);
+    await run(args([`--screenshot=${raw}`]));
+    if (crop) { cropPng(raw, path.join(OUT, file), w, h); fs.unlinkSync(raw); }
+    console.log(`  ${file}  viewport=${r.innerWidth}px `
+      + r.faces.map((f) => `${f.role}:${f.family.split(' ')[0]}/${f.weight}`).join(' ')
+      + (focus ? ` focus-visible ring=${r.focusOutline}` : ''));
+  } finally { fs.unlinkSync(path.join(DIST, name)); }
+};
 
 /* ── PNG crop, so a mobile image is really 390 wide ────────────────────────── */
-const crop = (inp, outp, cw, ch) => {
+function cropPng(inp, outp, cw, ch) {
   const buf = fs.readFileSync(inp);
   let pos = 8; const chunks = [];
   while (pos < buf.length) {
@@ -124,58 +236,43 @@ const crop = (inp, outp, cw, ch) => {
     Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
     chunk('IHDR', nih), chunk('IDAT', zlib.deflateSync(out, { level: 9 })), chunk('IEND', Buffer.alloc(0)),
   ]));
-};
-
-const DESKTOP = [
-  ['01-pulse-desktop-1440x900.png', 'pulse', 1440, 900],
-  ['02-accounts-desktop-1440x900.png', 'accounts', 1440, 900],
-  ['05-page-hero-watermark-closeup.png', 'watermark', 1440, 620],
-  ['06-semantic-colour-states.png', 'semantic', 1440, 900],
-  ['07-long-content-wrapping.png', 'wrapping', 1440, 620],
-  ['08-buttons-and-focus.png', 'focus', 1440, 520],
-];
-const MOBILE = [
-  ['03-pulse-mobile-390x844.png', 'pulse'],
-  ['04-accounts-mobile-390x844.png', 'accounts'],
-];
-
-for (const [file, only, w, h] of DESKTOP) {
-  await shoot(path.join(OUT, file), `${origin}/design-preview?only=${only}`, w, h);
-  console.log('  ' + file);
 }
 
-const tmpShot = path.join(DIST, '__shot.png');
-for (const [file, only] of MOBILE) {
-  // The iframe is the viewport; 512 is the narrowest window Chrome will honour.
-  const harness = path.join(DIST, `__m-${only}.html`);
-  fs.writeFileSync(harness, `<!doctype html><meta charset="utf-8">
-<style>html,body{margin:0;padding:0;background:#F4F6F8;overflow:hidden}
-iframe{width:390px;height:844px;border:0;display:block}</style>
-<body><iframe src="/design-preview?only=${only}"></iframe></body>`);
-  await shoot(tmpShot, `${origin}/__m-${only}.html`, 512, 844);
-  crop(tmpShot, path.join(OUT, file), 390, 844);
-  fs.unlinkSync(harness);
-  console.log('  ' + file);
-}
-fs.existsSync(tmpShot) && fs.unlinkSync(tmpShot);
+/* ── the set ───────────────────────────────────────────────────────────────── */
+const P = '/design-preview';
+const PHONE = { crop: true, window: [512, 844] };
+const SHOTS = [
+  ['01-pulse-desktop-1440x900.png', `${P}?only=pulse`, 1440, 900, {}],
+  ['02-accounts-desktop-1440x900.png', `${P}?only=accounts`, 1440, 900, {}],
+  ['03-pulse-mobile-390x844.png', `${P}?only=pulse`, 390, 844, PHONE],
+  ['04-accounts-mobile-390x844.png', `${P}?only=accounts`, 390, 844, PHONE],
+  ['05-page-hero-watermark-closeup.png', `${P}?only=watermark`, 1440, 660, {}],
+  ['06-semantic-colour-states.png', `${P}?only=semantic`, 1440, 900, {}],
+  ['07-long-content-wrapping.png', `${P}?only=wrapping`, 1440, 660, {}],
+  ['08-buttons-and-focus.png', `${P}?only=focus`, 1440, 560, { focus: '.dsp-focus-target' }],
+  ['09-pulse-app-shell-desktop-1440x900.png', `${P}?shell=pulse`, 1440, 900, {}],
+  ['10-accounts-app-shell-desktop-1440x900.png', `${P}?shell=accounts`, 1440, 900, {}],
+  ['11-pulse-app-shell-mobile-390x844.png', `${P}?shell=pulse`, 390, 844, PHONE],
+  ['12-accounts-app-shell-mobile-390x844.png', `${P}?shell=accounts`, 390, 844, PHONE],
+];
+
+for (const [file, route, w, h, opts] of SHOTS) await verifyAndShoot(file, route, w, h, opts);
 
 /* ── every image must be real, and none may be a duplicate ─────────────────── */
 const seen = new Map();
 let bad = 0;
-for (const f of fs.readdirSync(OUT).filter((f) => f.endsWith('.png')).sort()) {
-  const p = path.join(OUT, f);
-  const b = fs.readFileSync(p);
+console.log('');
+for (const f of fs.readdirSync(OUT).filter((n) => n.endsWith('.png')).sort()) {
+  const b = fs.readFileSync(path.join(OUT, f));
   const ihdr = b.subarray(16, 24);
   const w = ihdr.readUInt32BE(0), h = ihdr.readUInt32BE(4);
-  // A blank capture compresses to almost nothing; a real page never does.
-  const blank = b.length < 8000;
+  const blank = b.length < 8000;   // a real page never compresses this small
   const dup = seen.get(b.length);
   seen.set(b.length, f);
-  const note = blank ? 'BLANK?' : dup ? `DUPLICATE of ${dup}` : 'ok';
   if (blank || dup) bad++;
-  console.log(`  ${f}  ${w}x${h}  ${(b.length / 1024).toFixed(0)}KB  ${note}`);
+  console.log(`  ${f}  ${w}x${h}  ${(b.length / 1024).toFixed(0)}KB  ${blank ? 'BLANK?' : dup ? `DUPLICATE of ${dup}` : 'ok'}`);
 }
 
 server.close();
-console.log(bad ? `\n${bad} suspect image(s)` : '\nall screenshots look real and distinct');
+console.log(bad ? `\n${bad} suspect image(s)` : '\nall screenshots font-verified, real and distinct');
 process.exit(bad ? 1 : 0);

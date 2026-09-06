@@ -18,7 +18,11 @@
    padding with an overflow window — the asset itself is unmodified (no rescale of a
    single axis, no recolor, no rebuild). Result: prominent, readable CFO AI / FINANCIAL
    OS at ~48px tall (≈1.7× the previous rendered size), with clear space preserved. */
-.cfo-brand{height:48px;width:138px;overflow:hidden;margin:0 4px 6px}
+/* flex:0 0 auto because the sidebar is a column flex box with height:100vh: once
+   the nav is longer than the viewport every child shrinks, and this one — whose
+   whole job is to be a fixed 48px clipping window — collapsed to 0 and let the
+   workspace switcher draw straight over the wordmark. */
+.cfo-brand{flex:0 0 auto;height:48px;width:138px;overflow:hidden;margin:0 4px 6px}
 .cfo-brand img{height:48px;width:auto;max-width:none;display:block}
 .cfo-nav{display:flex;flex-direction:column;gap:2px;margin-top:2px}
 .cfo-navgroup-title{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--text-muted);font-weight:700;padding:14px 12px 6px}
@@ -66,12 +70,67 @@
 .cfo-switch-opt .cfo-switch-ava{width:30px;height:30px;border-radius:8px;font-size:13px}
 
 /* ── Page header ─────────────────────────────────────────────────────────── */
-.cfo-pagehead{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;margin-bottom:22px}
+/* ── Page hero ──────────────────────────────────────────────────────────────
+   A defined band, not a bare stack: a left content zone, a right control zone,
+   a hairline rule that gives the page a top edge, and one cropped brand symbol
+   in a reserved column at the far right.
+
+   --head-safe is the width that column claims. Both zones are kept out of it,
+   which is what stops the mark ever sitting behind something readable. Change
+   the mark's size and this follows; there is no second number to remember. */
+.cfo-pagehead{
+  /* index.css sets body to a system stack, so --font-ui (Manrope) never reaches
+     ordinary text and the brand's UI face is effectively inert product-wide.
+     Fixing body is a 21-page change and belongs to its own PR; the shared
+     surfaces this one owns opt in explicitly so the pilot is typographically
+     what the Brand Book says it is. */
+  font-family:var(--font-ui);
+  --head-mark:120px;
+  --head-bleed:26px;                                    /* hangs off the edge */
+  --head-safe:calc(var(--head-mark) - var(--head-bleed) + 20px);
+  position:relative;
+  overflow:hidden;
+  display:flex;
+  align-items:flex-start;
+  gap:20px 28px;
+  flex-wrap:wrap;
+  padding:0 0 18px;
+  margin-bottom:26px;
+  border-bottom:1px solid var(--border-subtle);
+}
+/* The mark only appears where there is room to reserve a column for it. */
+.cfo-pagehead-mark{display:none}
+@media (min-width:900px){
+  .cfo-pagehead{padding-right:var(--head-safe)}
+  .cfo-pagehead-mark{
+    display:block;
+    position:absolute;
+    right:calc(var(--head-bleed) * -1);
+    top:50%;
+    transform:translateY(-50%);
+    width:var(--head-mark);
+    height:var(--head-mark);
+    opacity:.055;
+    pointer-events:none;
+    user-select:none;
+  }
+}
 .cfo-eyebrow{font-size:12px;letter-spacing:.13em;text-transform:uppercase;color:var(--text-muted);font-weight:700}
 .cfo-h1{font-family:var(--font-display);font-size:30px;line-height:var(--line-tight);margin:4px 0 0;color:var(--brand-navy)}
-.cfo-pagehead-right{display:flex;align-items:center;justify-content:flex-end;gap:10px;flex-wrap:wrap}
-.cfo-pagehead-context{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-.cfo-pagehead-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+/* The control zone hugs its contents and holds the right edge. margin-left:auto
+   (rather than justify-content on the parent) keeps it right-aligned even when a
+   long title pushes it onto its own line — it used to drop to the left there,
+   leaving the whole right side of the header empty. */
+.cfo-pagehead-right{
+  display:flex;
+  flex:0 0 auto;
+  margin-left:auto;
+  flex-direction:column;
+  align-items:flex-end;
+  gap:10px;
+}
+.cfo-pagehead-context{display:flex;align-items:center;justify-content:flex-end;gap:8px;flex-wrap:wrap}
+.cfo-pagehead-actions{display:flex;align-items:center;justify-content:flex-end;gap:10px;flex-wrap:wrap}
 
 /* ── Badges ──────────────────────────────────────────────────────────────── */
 .cfo-badge{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;padding:6px 11px;border-radius:999px;white-space:nowrap}
@@ -111,12 +170,30 @@
 .cfo-grid-4{grid-template-columns:repeat(4,1fr)}
 
 /* Summary / hero card (navy) */
-.cfo-summary{position:relative;overflow:hidden;background:var(--brand-navy);color:#fff;border-radius:var(--radius-lg);padding:24px 26px;box-shadow:var(--shadow-md)}
+/* --mark-safe is the column the watermark owns. The card's right padding
+   reserves it, so every child — label, figure, meta, metrics — stops short of
+   the mark instead of running underneath it. */
+.cfo-summary{
+  font-family:var(--font-ui);            /* see .cfo-pagehead — body is a system stack */
+  --mark-size:180px;
+  --mark-bleed:18px;
+  --mark-safe:calc(var(--mark-size) - var(--mark-bleed) + 16px);
+  position:relative;
+  overflow:hidden;
+  background:var(--brand-navy);
+  color:#fff;
+  border-radius:var(--radius-lg);
+  padding:24px 26px;
+  padding-right:calc(26px + var(--mark-safe));
+  box-shadow:var(--shadow-md);
+}
 /* ── page header ───────────────────────────────────────────────────────────
    Title and description sit together on the left; context chips and actions
    collect on the right and wrap underneath on narrow screens rather than
    squeezing the title. */
-.cfo-pagehead-text{min-width:0}
+/* Grows to fill the row, but never past a comfortable measure — a description
+   should not run 120 characters wide just because the window is. */
+.cfo-pagehead-text{min-width:0;flex:1 1 min(420px,100%);max-width:74ch}
 .cfo-pagehead-desc{
   margin:6px 0 0;
   max-width:64ch;
@@ -125,20 +202,43 @@
   line-height:var(--line-normal);
 }
 @media (max-width:640px){
-  .cfo-pagehead{flex-direction:column;align-items:stretch;gap:12px}
+  .cfo-pagehead{flex-direction:column;align-items:stretch;gap:14px;padding-bottom:16px;margin-bottom:20px}
   /* Badges hug their text; only the actions box goes full width (see :357). */
-  .cfo-pagehead-right{justify-content:flex-start;align-items:flex-start;flex-direction:column;gap:12px;width:100%}
-  .cfo-pagehead-context{width:auto}
-  .cfo-pagehead-actions{flex-wrap:wrap}
+  .cfo-pagehead-right{justify-content:flex-start;align-items:flex-start;flex-direction:column;gap:12px;width:100%;margin-left:0}
+  .cfo-pagehead-context{width:auto;justify-content:flex-start}
+  .cfo-pagehead-actions{flex-wrap:wrap;justify-content:flex-start;gap:12px}
+  .cfo-pagehead-text{max-width:100%}
   .cfo-pagehead-desc{font-size:var(--text-sm)}
+  /* A page-level action is a thumb target, not a pointer target. 36px was usable
+     and mean; 44px is the size a finger actually expects. Scoped to the page
+     header so dense in-page controls elsewhere keep their own sizing. */
+  .cfo-pagehead-actions :is(.cfo-btn,.btn,button,a[role="button"]){
+    min-height:44px;
+    padding-top:0;
+    padding-bottom:0;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+  }
 }
 
 /* Focus is visible everywhere, in the brand accent rather than the UA default. */
+/* Focus belongs to the control, not to the container it happens to sit in. These
+   rules were scoped to the page header and the summary card, so the same button
+   showed a brand ring in one place and the browser's 1px default in another. */
+.cfo-btn:focus-visible,
+.cfo-input:focus-visible,
 .cfo-pagehead-actions :is(button,a):focus-visible,
 .cfo-summary :is(button,a):focus-visible{
   outline:var(--focus-ring-width) solid var(--focus-ring);
   outline-offset:var(--focus-ring-offset);
   border-radius:var(--radius-sm);
+}
+/* On the navy surfaces the accent sits too close to the ground to read as a ring
+   (#3399FF on #003366 is 1.55:1). White is the only ring that survives there. */
+.cfo-summary :is(button,a):focus-visible,
+.pulse-cash :is(button,a):focus-visible{
+  outline-color:var(--brand-white);
 }
 
 /* ── financial numerals ────────────────────────────────────────────────────
@@ -153,8 +253,24 @@
 /* The hero watermark. One oversized mark, cropped by the card, decorative only.
    Kept in step with .pulse-cash-mark in pages/business/Pulse.css — same surface,
    same brand moment, so they must not drift apart again. */
-.cfo-summary-sym{position:absolute;right:-18px;top:-18px;width:180px;height:180px;opacity:.10;pointer-events:none;user-select:none}
-@media (max-width:640px){.cfo-summary-sym{width:132px;height:132px;right:-20px;top:-14px}}
+.cfo-summary-sym{
+  position:absolute;
+  right:calc(var(--mark-bleed) * -1);
+  top:-18px;
+  width:var(--mark-size);
+  height:var(--mark-size);
+  opacity:.10;
+  pointer-events:none;
+  user-select:none;
+}
+/* On a phone the figure owns every pixel of width. Reserving a column for
+   decoration there would either shrink the number or push it under the mark, and
+   both are worse than simply not drawing it — the brand is already on screen in
+   the app header. One mark on desktop, none on mobile, never a compromise. */
+@media (max-width:640px){
+  .cfo-summary{padding-right:20px;padding-left:20px}
+  .cfo-summary-sym{display:none}
+}
 .cfo-summary-label{font-size:13px;color:#AFC6DE;font-weight:600}
 .cfo-summary-value{font-family:var(--font-display);font-size:40px;line-height:1.1;margin-top:6px}
 .cfo-summary-meta{display:flex;align-items:center;gap:8px;margin-top:12px;color:#C5D6E7;font-size:13px;flex-wrap:wrap}
@@ -344,7 +460,11 @@ html, body, #root { max-width: 100%; overflow-x: hidden; }
 
 /* ── Responsive ──────────────────────────────────────────────────────────── */
 @media (max-width:1024px){
-  .cfo-shell{grid-template-columns:1fr}
+  /* One column on a phone. The rows must be pinned too: they are implicit `auto`
+     otherwise, and a grid taller than its content stretches them by default — so on
+     a short page the mobile header absorbed the slack and grew to 274px of mostly
+     empty white before the content began. */
+  .cfo-shell{grid-template-columns:1fr;grid-template-rows:auto 1fr}
   .cfo-sidebar{display:none}
   .cfo-mobilehead{display:flex}
   .cfo-main{padding:18px 18px 48px}

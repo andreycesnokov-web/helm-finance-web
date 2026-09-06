@@ -40,13 +40,22 @@ export const Icon = {
 }
 
 /* ── primitives ─────────────────────────────────────────────────────────────*/
-export const Btn = ({ variant = 'primary', sm, icon, children, ...p }) => (
-  <button className={`cfo-btn cfo-btn-${variant}${sm ? ' cfo-btn-sm' : ''}`} {...p}>{icon}{children}</button>
+// className merges rather than replaces. The spread used to sit after the
+// computed class, so any caller passing className silently deleted
+// `cfo-btn cfo-btn-primary` and got an unstyled button.
+export const Btn = ({ variant = 'primary', sm, icon, className = '', children, ...p }) => (
+  <button
+    className={`cfo-btn cfo-btn-${variant}${sm ? ' cfo-btn-sm' : ''}${className ? ' ' + className : ''}`}
+    {...p}
+  >{icon}{children}</button>
 )
 
 export const StatusBadge = ({ tone = 'neutral', icon, children }) => (
   <span className={`cfo-badge cfo-badge-${tone}`}>{icon}{children}</span>
 )
+
+// The same official symbol in navy, for the light page-hero band.
+export const HEAD_SYMBOL = '/brand/symbol_navy_transparent.svg'
 
 /**
  * The header every business-workspace page wears.
@@ -69,6 +78,11 @@ export const PageHeader = ({
   eyebrow, title, description, primaryAction, secondaryActions, context, actions,
 }) => (
   <div className="cfo-pagehead">
+    {/* The band's branded corner: one official symbol, cropped by the band edge,
+        at low opacity. It lives in a reserved column that neither the text zone
+        nor the control zone can enter (see --head-safe), so it is never behind
+        anything anyone has to read. Decorative, so it is inert to a reader. */}
+    <img className="cfo-pagehead-mark" src={HEAD_SYMBOL} alt="" aria-hidden="true" />
     <div className="cfo-pagehead-text">
       {eyebrow && <div className="cfo-eyebrow">{eyebrow}</div>}
       <h1 className="cfo-h1">{title}</h1>

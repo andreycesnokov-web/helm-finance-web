@@ -15,6 +15,7 @@
 import { formatAmount } from '../lib/money'
 import { PageHeader, SummaryCard, Card, Btn, StatusBadge, Icon } from '../shell/ui'
 import { ExecutiveHero } from './business/PulseBlocks'
+import WorkspaceShell, { BUSINESS_NAV } from '../shell/WorkspaceShell'
 import './DesignPreview.css'
 
 const PREVIEW_ON = import.meta.env.VITE_DESIGN_PREVIEW_ENABLED === 'true'
@@ -62,6 +63,19 @@ const PULSE_NEGATIVE = {
   runway: 12,
 }
 
+/* The real app frame, driven by synthetic props.
+   WorkspaceShell is presentational — its only hook is useState, and it reads
+   nothing but the props below — so the shell in these screenshots is the shell
+   the product ships, not a drawing of it. No auth, no router, no network. */
+const SHELL_WORKSPACES = {
+  personal: [{ id: 'demo-personal', name: 'Personal', type: 'personal', role: 'owner' }],
+  business: [{
+    id: 'demo-business', name: 'Nusantara Facilities', type: 'business',
+    role: 'owner', location: 'Bali, Indonesia', business_code: 'DEMO-BIZ-000001',
+  }],
+}
+const noop = () => {}
+
 const LONG_TITLE = 'Nusantara Integrated Facilities Management & Industrial Services'
 const LONG_DESC = 'Cash position, this month’s operating figures and anything waiting on you — '
   + 'including unclassified transactions, documents awaiting confirmation and any tax deadline '
@@ -69,9 +83,14 @@ const LONG_DESC = 'Cash position, this month’s operating figures and anything 
 
 // ?only=<id> renders a single example. Screenshot tooling captures the top of the
 // viewport, so a hash anchor is not enough to frame one component — this is.
-const ONLY = typeof location !== 'undefined'
-  ? new URLSearchParams(location.search).get('only')
-  : null
+const params = typeof location !== 'undefined'
+  ? new URLSearchParams(location.search)
+  : new URLSearchParams()
+const ONLY = params.get('only')
+// ?shell=pulse | ?shell=accounts renders the page inside the real application
+// frame, which is the only way a screenshot can speak to sidebar, gutters and
+// content width rather than to a component floating on a blank page.
+const SHELL = params.get('shell')
 
 const Section = ({ id, title, note, children, wide }) => (
   ONLY && ONLY !== id ? null : (
@@ -85,8 +104,62 @@ const Section = ({ id, title, note, children, wide }) => (
   )
 )
 
+// Page bodies, shared by the isolated catalogue and the in-shell views, so the
+// two can never drift into showing different things.
+const PulseBody = () => (
+  <>
+    <PageHeader
+      eyebrow="Business Workspace"
+      title="Nusantara Facilities"
+      description="Cash position, this month's operating figures and anything waiting on you."
+      context={<>
+        <StatusBadge tone="shared" icon={<Icon.users />}>Shared business workspace</StatusBadge>
+        <StatusBadge tone="neutral">Role: owner</StatusBadge>
+        <StatusBadge tone="info">DEMO-BIZ-000001</StatusBadge>
+      </>}
+    />
+    <ExecutiveHero d={PULSE_FIXTURE} idr={idr} readiness={null} empty={false} />
+  </>
+)
+
+const AccountsBody = () => (
+  <>
+    <PageHeader
+      title="Wallets &amp; Accounts"
+      description="Manage your bank accounts, cash, and payment wallets"
+      primaryAction={<Btn variant="primary">+ Add wallet</Btn>}
+    />
+    <SummaryCard
+      label="Total balance · all wallets"
+      value={<span className="fin">{idr(152450000)}</span>}
+      meta="IDR · 4 wallets"
+    />
+  </>
+)
+
+function ShellPreview({ page }) {
+  return (
+    <div className="dsp-shell">
+      <div className="dsp-banner" role="note">
+        DESIGN PREVIEW · SYNTHETIC DATA · NOT A CUSTOMER PAGE
+      </div>
+      <WorkspaceShell
+        workspaces={SHELL_WORKSPACES}
+        activeId="demo-business"
+        onSelectWorkspace={noop}
+        nav={BUSINESS_NAV}
+        activeKey={page === 'accounts' ? 'accounts' : 'pulse'}
+        onNavigate={noop}
+      >
+        {page === 'accounts' ? <AccountsBody /> : <PulseBody />}
+      </WorkspaceShell>
+    </div>
+  )
+}
+
 export default function DesignPreview() {
   if (!PREVIEW_ON) return <NotFound />
+  if (SHELL) return <ShellPreview page={SHELL} />
 
   return (
     <div className="dsp-root">
@@ -108,32 +181,13 @@ export default function DesignPreview() {
         {/* ── Pulse ────────────────────────────────────────────────────── */}
         <Section id="pulse" title="Pulse" wide
           note="Shared header with a description, the navy hero with its watermark, and the KPI row.">
-          <PageHeader
-            eyebrow="Business Workspace"
-            title="Nusantara Facilities"
-            description="Cash position, this month's operating figures and anything waiting on you."
-            context={<>
-              <StatusBadge tone="shared" icon={<Icon.users />}>Shared business workspace</StatusBadge>
-              <StatusBadge tone="neutral">Role: owner</StatusBadge>
-              <StatusBadge tone="info">DEMO-BIZ-000001</StatusBadge>
-            </>}
-          />
-          <ExecutiveHero d={PULSE_FIXTURE} idr={idr} readiness={null} empty={false} />
+          <PulseBody />
         </Section>
 
         {/* ── Accounts ─────────────────────────────────────────────────── */}
         <Section id="accounts" title="Accounts" wide
           note="The same header and the same navy hero, from the same components — this page used to draw its own gradient with a graph-paper grid.">
-          <PageHeader
-            title="Wallets &amp; Accounts"
-            description="Manage your bank accounts, cash, and payment wallets"
-            primaryAction={<Btn variant="primary">+ Add wallet</Btn>}
-          />
-          <SummaryCard
-            label="Total balance · all wallets"
-            value={<span className="fin">{idr(152450000)}</span>}
-            meta="IDR · 4 wallets"
-          />
+          <AccountsBody />
         </Section>
 
         {/* ── semantic colour ──────────────────────────────────────────── */}
@@ -182,7 +236,7 @@ export default function DesignPreview() {
           note="Tab through these: the focus ring is the brand accent at 2px with an offset.">
           <Card title="Interactive">
             <div className="dsp-row">
-              <Btn variant="primary">Primary</Btn>
+              <Btn variant="primary" className="dsp-focus-target">Primary</Btn>
               <Btn variant="ghost">Secondary</Btn>
               <Btn variant="secondary">Emphasis</Btn>
               <a href="#pulse" className="dsp-link">A link</a>
