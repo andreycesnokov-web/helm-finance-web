@@ -133,15 +133,26 @@ const PROBE_FN = `function facts(win, doc) {
     };
   });
 
-  // An element only overflows if it is actually painted past the edge. The
-  // flagship watermark's whole treatment is to run off the card's right edge and
-  // be clipped there, so its layout box legitimately extends beyond the viewport
-  // while nothing of it is ever drawn outside the card. Reporting that as overflow
-  // made the test fail on the design it exists to protect. The scrollWidth
-  // assertion beside every use of this list is what proves there is no real
-  // horizontal scroll.
+  // Overflow means CONTENT that runs off the page. The flagship watermark's whole
+  // treatment is to run off its card's right edge and be clipped there, so its
+  // layout box legitimately extends past the viewport while nothing of it is ever
+  // drawn outside the card; the strict version of this scan failed on the design
+  // it exists to protect.
+  //
+  // The distinction that matters is WHAT clips it. A component clipping its own
+  // decoration is a design decision. The page's global guard clipping a too-wide
+  // layout is a bug — and a silent one here, because index.css sets overflow-x:
+  // hidden on html, body and #root, so a broken layout never produces a scrollbar
+  // to notice, it just amputates content. That also makes the scrollWidth
+  // assertion beside every use of this list unfalsifiable on this app, which is
+  // exactly why the element scan has to stay strict.
+  //
+  // So: walk up for a clipping ancestor, but STOP at the root containers. A
+  // non-root clipper means a deliberate local crop; reaching the root means only
+  // the global guard is hiding it, which is the case worth failing on.
+  const isRootish = (el) => el === de || el === doc.body || el.id === 'root';
   const clipBoundary = (el) => {
-    for (let a = el.parentElement; a; a = a.parentElement) {
+    for (let a = el.parentElement; a && !isRootish(a); a = a.parentElement) {
       const o = cs(a);
       const hides = (v) => v === 'hidden' || v === 'clip';
       if (hides(o.overflowX) || hides(o.overflowY)) return a.getBoundingClientRect().right;
