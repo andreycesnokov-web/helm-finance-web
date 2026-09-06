@@ -1,0 +1,99 @@
+/* ============================================================================
+   Radar — 30-day cash forecast.
+   Page-specific layout only. Every surface, colour, radius and shadow comes from
+   the shared system (shell/shell.css + brand/tokens.css); nothing here declares
+   a token or re-styles a shared component.
+   Class prefix: radar-
+   ========================================================================== */
+
+/* Plan gate. One quiet row, not a banner competing with the forecast. */
+.radar-upsell {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+.radar-upsell-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.radar-upsell-title { font-size: 13px; font-weight: 700; color: var(--text-primary); }
+.radar-upsell-sub { font-size: 12px; color: var(--text-muted); line-height: 1.45; }
+
+/* ── the two remaining scenarios ────────────────────────────────────────────
+   Best and worst case used to be solid green and red panels, which made a
+   forecast read as a verdict and put two colour fields either side of the real
+   figure. They are ordinary cards now; the colour is on the number, where it
+   carries meaning, and the neutral card keeps the flagship above them dominant. */
+.radar-scenarios { margin: 16px 0; }
+.radar-scenario-label {
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.radar-scenario-value {
+  font-size: clamp(22px, 2.4vw, 28px);
+  font-weight: 700;
+  line-height: 1.1;
+  margin-top: 6px;
+  /* A forecast can be long and negative. It wraps rather than overflowing, and
+     the figures stay on the tabular numerals .fin provides. */
+  overflow-wrap: anywhere;
+}
+.radar-scenario-sub {
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  line-height: 1.45;
+  margin-top: 6px;
+}
+
+/* ── burn breakdown ─────────────────────────────────────────────────────── */
+.radar-burn { margin-top: 4px; }
+.radar-burn-sub {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-subtle);
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* ── 30-day net flow ────────────────────────────────────────────────────── */
+.radar-flow { list-style: none; margin: 0; padding: 0; }
+.radar-flow li {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.radar-flow li:last-child { border-bottom: 0; }
+.radar-flow-k { font-size: 13.5px; color: var(--text-secondary); min-width: 0; }
+.radar-flow-v { font-size: 13.5px; font-weight: 700; white-space: nowrap; }
+.radar-flow-total {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 6px;
+  padding-top: 14px;
+  border-top: 2px solid var(--border-default);
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+.radar-flow-total .fin { white-space: nowrap; }
+
+@media (max-width: 640px) {
+  /* One column on a phone: two forecasts side by side at 390px leaves neither
+     of them readable. */
+  .radar-scenarios.cfo-grid-2 { grid-template-columns: 1fr; }
+  .radar-burn.cfo-grid-3 { grid-template-columns: 1fr 1fr; }
+  .radar-scenario-value { font-size: 24px; }
+  .radar-flow-total { font-size: 14px; }
+}
+@media (max-width: 380px) {
+  .radar-burn.cfo-grid-3 { grid-template-columns: 1fr; }
+}

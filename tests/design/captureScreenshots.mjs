@@ -372,6 +372,16 @@ const SHOTS = [
   // screenshot outlives the conversation that explained it.
   ['32-PREVIEW-ONLY-approved-future-balances-by-currency.png',
     `${P}?only=currency-concepts`, 1440, 1150, {}],
+  // Radar, migrated onto the shared system: the same PageHeader and the same
+  // flagship card as Pulse and Accounts, so it carries the one official
+  // watermark rather than an inline gradient and a graph-paper grid.
+  ['33-radar-app-shell-desktop-1440x900.png', `${P}?shell=radar`, 1440, 900, {}],
+  ['34-radar-app-shell-mobile-390x844.png', `${P}?shell=radar`, 390, 844, PHONE],
+  ['35-radar-flagship-card-closeup.png', `${P}?shell=radar`, 1440, 900,
+    { region: { sel: '.cfo-summary.cfo-flagship', pad: 6 } }],
+  // Zero-data: a forecast still holds, but nothing is planned — so the key-dates
+  // panel becomes a real empty state, not a page-sized logo.
+  ['36-radar-zero-data-desktop-1440x900.png', `${P}?shell=radar-empty`, 1440, 900, {}],
 ];
 
 const produced = new Set(SHOTS.map(([f]) => f));
