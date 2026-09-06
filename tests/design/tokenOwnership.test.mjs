@@ -149,31 +149,28 @@ t('the legacy actions slot still works, so unmigrated pages do not break', () =>
   assert.ok(ui.includes('{actions}'), 'actions must still render');
 });
 
-t('the watermark is decorative and hidden from assistive technology', () => {
-  const m = ui.match(/<img className="cfo-summary-sym"[^>]*>/);
-  assert.ok(m, 'the hero watermark img must exist');
-  assert.ok(/alt=""/.test(m[0]), 'watermark must have an empty alt');
-  assert.ok(/aria-hidden="true"/.test(m[0]), 'watermark must be aria-hidden');
+t('the one decorative mark is decorative and hidden from assistive technology', () => {
+  const ui = code('client/src/shell/ui.jsx');
+  const img = (ui.match(/<img[^>]*cfo-pagehead-mark[^>]*>/) || [])[0];
+  assert.ok(img, 'the page-hero mark img must exist');
+  assert.match(img, /aria-hidden="true"/, 'the mark must be hidden from assistive technology');
+  assert.match(img, /alt=""/, 'the mark must carry an empty alt');
 });
 
-t('the watermark uses an official brand asset and defaults on', () => {
-  assert.ok(/HERO_SYMBOL\s*=\s*'\/brand\/symbol_white_transparent\.svg'/.test(ui),
-    'must use the official white symbol from the existing /brand pipeline');
-  assert.ok(/symbol = HERO_SYMBOL/.test(ui),
-    'the hero watermark must be the default, not a per-page choice');
-  const asset = 'client/public/brand/symbol_white_transparent.svg';
-  assert.ok(fs.existsSync(path.join(ROOT, asset)), `${asset} must exist`);
+t('the mark uses an official brand asset', () => {
+  const ui = code('client/src/shell/ui.jsx');
+  assert.match(ui, /HEAD_SYMBOL = '\/brand\/symbol_[a-z_]*\.svg'/,
+    'the mark must come from the existing /brand pipeline, not a new or redrawn file');
 });
 
-t('the watermark is one cropped mark, not a repeating pattern', () => {
+t('the one mark is a single subtle symbol, never a repeating pattern', () => {
   const shell = read('client/src/shell/shell.css');
-  const rule = shell.match(/\.cfo-summary-sym\{[^}]*\}/);
-  assert.ok(rule, '.cfo-summary-sym must be styled');
-  assert.ok(!/repeat/.test(rule[0]), 'the watermark must never repeat');
-  const op = rule[0].match(/opacity:\s*\.?([0-9.]+)/);
-  assert.ok(op && parseFloat('0' + (op[1].startsWith('.') ? op[1] : '.' + op[1])) <= 0.15
-    || (op && parseFloat(op[0].split(':')[1]) <= 0.15),
-    `watermark opacity must stay subtle, found ${op && op[0]}`);
+  const rules = (shell.match(/\.cfo-pagehead-mark\s*\{[^}]*\}/g) || []);
+  const rule = rules.find((r) => /opacity:/.test(r));
+  assert.ok(rule, '.cfo-pagehead-mark must be styled');
+  assert.ok(!/repeat/.test(rule), 'the mark must never repeat');
+  const op = parseFloat((rule.match(/opacity:\s*([0-9.]*\.?[0-9]+)/) || [])[1]);
+  assert.ok(op > 0 && op <= 0.15, `mark opacity must stay subtle, found ${op}`);
 });
 
 t('no page draws its own graph-paper hero any more', () => {

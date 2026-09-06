@@ -100,7 +100,7 @@ const run = (args) => new Promise((resolve, reject) => {
 /* ── the harness every shot is framed in ───────────────────────────────────── */
 // The iframe *is* the viewport, which is the only way to get a true 390px layout.
 // `focus` drives a real keyboard focus so :focus-visible engages for the capture.
-const harnessFor = (route, w, h, focus) => `<!doctype html><meta charset="utf-8">
+const harnessFor = (route, w, h, focus, click) => `<!doctype html><meta charset="utf-8">
 <style>html,body{margin:0;padding:0;background:#F4F6F8;overflow:hidden}
 iframe{width:${w}px;height:${h}px;border:0;display:block}</style>
 <body><iframe id="f" src="${route}"></iframe>
@@ -113,6 +113,11 @@ setTimeout(async () => {
   try {
     const cw = fr.contentWindow, d = cw.document;
     await d.fonts.ready;
+    ${click ? `
+    // Drive the real control rather than forcing state: the drawer in the picture
+    // is the drawer a thumb opens.
+    const opener = d.querySelector(${JSON.stringify(click)});
+    if (opener) { opener.click(); await new Promise((r) => setTimeout(r, 400)); }` : ''}
     ${focus ? `
     // A real keyboard focus, not a class that imitates one: :focus-visible only
     // engages for keyboard-ish interaction, so the ring in the image is the ring
@@ -151,6 +156,7 @@ setTimeout(async () => {
       h1Family: st ? st.fontFamily.split(',')[0].replace(/"/g, '') : null,
       h1Weight: st ? st.fontWeight : null,
       focusVisible: ${focus ? `!!(t2 && t2.matches(':focus-visible'))` : 'null'},
+      clicked: ${click ? `!!d.querySelector(${JSON.stringify(click)})` : 'null'},
       focusOutline: ${focus ? `t2 ? cw.getComputedStyle(t2).outlineColor + ' ' + cw.getComputedStyle(t2).outlineWidth : null` : 'null'},
     });
   } catch (e) { report({ error: e.message }); }
@@ -160,9 +166,9 @@ setTimeout(async () => {
 // Verify first, then photograph the identical page. No image is written for a
 // page whose fonts and viewport could not be vouched for.
 const verifyAndShoot = async (file, route, w, h, opts = {}) => {
-  const { crop, focus, window: win } = opts;
+  const { crop, focus, window: win, click, region } = opts;
   const name = `__cap-${Math.random().toString(36).slice(2)}.html`;
-  fs.writeFileSync(path.join(DIST, name), harnessFor(route, w, h, focus));
+  fs.writeFileSync(path.join(DIST, name), harnessFor(route, w, h, focus, click));
   const url = `${origin}/${name}`;
   const winW = win ? win[0] : w, winH = win ? win[1] : h;
   const args = (extra) => ['--headless=new', '--disable-gpu', '--hide-scrollbars',
@@ -179,10 +185,16 @@ const verifyAndShoot = async (file, route, w, h, opts = {}) => {
     assert.strictEqual(r.innerWidth, w, `${file}: viewport is ${r.innerWidth}px, expected ${w}px`);
     if (r.h1Family) assert.match(r.h1Family, /Archivo Black/, `${file}: h1 renders in ${r.h1Family}`);
     if (focus) assert.strictEqual(r.focusVisible, true, `${file}: ${focus} does not match :focus-visible`);
+    if (click) assert.strictEqual(r.clicked, true, `${file}: ${click} was not found to click`);
 
-    const raw = crop ? path.join(DIST, '__shot.png') : path.join(OUT, file);
+    const needsCrop = crop || region;
+    const raw = needsCrop ? path.join(DIST, '__shot.png') : path.join(OUT, file);
     await run(args([`--screenshot=${raw}`]));
-    if (crop) { cropPng(raw, path.join(OUT, file), w, h); fs.unlinkSync(raw); }
+    if (needsCrop) {
+      const [rx, ry, rw, rh] = region || [0, 0, w, h];
+      cropPng(raw, path.join(OUT, file), rw, rh, rx, ry);
+      fs.unlinkSync(raw);
+    }
     console.log(`  ${file}  viewport=${r.innerWidth}px `
       + r.faces.map((f) => `${f.role}:${f.family.split(' ')[0]}/${f.weight}`).join(' ')
       + (focus ? ` focus-visible ring=${r.focusOutline}` : ''));
@@ -190,7 +202,7 @@ const verifyAndShoot = async (file, route, w, h, opts = {}) => {
 };
 
 /* ── PNG crop, so a mobile image is really 390 wide ────────────────────────── */
-function cropPng(inp, outp, cw, ch) {
+function cropPng(inp, outp, cw, ch, ox = 0, oy = 0) {
   const buf = fs.readFileSync(inp);
   let pos = 8; const chunks = [];
   while (pos < buf.length) {
@@ -219,9 +231,13 @@ function cropPng(inp, outp, cw, ch) {
       cur[i] = v & 0xff;
     }
   }
-  const nw = Math.min(cw, w), nh = Math.min(ch, h), ns = nw * bpp;
+  const x0 = Math.max(0, Math.min(ox, w - 1)), y0 = Math.max(0, Math.min(oy, h - 1));
+  const nw = Math.min(cw, w - x0), nh = Math.min(ch, h - y0), ns = nw * bpp;
   const out = Buffer.alloc(nh * (ns + 1));
-  for (let y = 0; y < nh; y++) px.copy(out, y * (ns + 1) + 1, y * stride, y * stride + ns);
+  for (let y = 0; y < nh; y++) {
+    const src = (y + y0) * stride + x0 * bpp;
+    px.copy(out, y * (ns + 1) + 1, src, src + ns);
+  }
   const crc32 = (b) => { let c = ~0;
     for (let i = 0; i < b.length; i++) { c ^= b[i]; for (let k = 0; k < 8; k++) c = (c >>> 1) ^ (0xedb88320 & -(c & 1)); }
     return ~c >>> 0; };
@@ -241,19 +257,25 @@ function cropPng(inp, outp, cw, ch) {
 /* ── the set ───────────────────────────────────────────────────────────────── */
 const P = '/design-preview';
 const PHONE = { crop: true, window: [512, 844] };
+
+// Review order: the real application shell first, because that is what ships.
 const SHOTS = [
-  ['01-pulse-desktop-1440x900.png', `${P}?only=pulse`, 1440, 900, {}],
-  ['02-accounts-desktop-1440x900.png', `${P}?only=accounts`, 1440, 900, {}],
-  ['03-pulse-mobile-390x844.png', `${P}?only=pulse`, 390, 844, PHONE],
-  ['04-accounts-mobile-390x844.png', `${P}?only=accounts`, 390, 844, PHONE],
-  ['05-page-hero-watermark-closeup.png', `${P}?only=watermark`, 1440, 660, {}],
-  ['06-semantic-colour-states.png', `${P}?only=semantic`, 1440, 900, {}],
-  ['07-long-content-wrapping.png', `${P}?only=wrapping`, 1440, 660, {}],
-  ['08-buttons-and-focus.png', `${P}?only=focus`, 1440, 560, { focus: '.dsp-focus-target' }],
-  ['09-pulse-app-shell-desktop-1440x900.png', `${P}?shell=pulse`, 1440, 900, {}],
-  ['10-accounts-app-shell-desktop-1440x900.png', `${P}?shell=accounts`, 1440, 900, {}],
-  ['11-pulse-app-shell-mobile-390x844.png', `${P}?shell=pulse`, 390, 844, PHONE],
-  ['12-accounts-app-shell-mobile-390x844.png', `${P}?shell=accounts`, 390, 844, PHONE],
+  ['01-pulse-app-shell-desktop-1440x900.png', `${P}?shell=pulse`, 1440, 900, {}],
+  ['02-accounts-app-shell-desktop-1440x900.png', `${P}?shell=accounts`, 1440, 900, {}],
+  ['03-pulse-app-shell-mobile-390x844.png', `${P}?shell=pulse`, 390, 844, PHONE],
+  ['04-accounts-app-shell-mobile-390x844.png', `${P}?shell=accounts`, 390, 844, PHONE],
+  // Bottom-left of the desktop shell: the settings footer in place under the nav.
+  ['05-sidebar-footer-closeup.png', `${P}?shell=pulse`, 1440, 900, { region: [0, 560, 420, 340] }],
+  // The real drawer, opened by clicking the real burger.
+  ['06-mobile-drawer-workspace-settings.png', `${P}?shell=pulse`, 390, 844,
+    { crop: true, window: [512, 844], click: '.cfo-burger' }],
+  ['07-page-hero-branding-closeup.png', `${P}?only=watermark`, 1440, 680, { region: [150, 268, 1160, 230] }],
+  ['08-focus-visible-state.png', `${P}?only=focus`, 1440, 560, { focus: '.dsp-focus-target' }],
+  // Component-level evidence, kept for reviewers who want the isolated view.
+  ['09-pulse-isolated-desktop-1440x900.png', `${P}?only=pulse`, 1440, 900, {}],
+  ['10-accounts-isolated-desktop-1440x900.png', `${P}?only=accounts`, 1440, 900, {}],
+  ['11-semantic-colour-states.png', `${P}?only=semantic`, 1440, 900, {}],
+  ['12-long-content-wrapping.png', `${P}?only=wrapping`, 1440, 660, {}],
 ];
 
 for (const [file, route, w, h, opts] of SHOTS) await verifyAndShoot(file, route, w, h, opts);

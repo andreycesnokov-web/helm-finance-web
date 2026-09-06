@@ -15,7 +15,6 @@ import {
 } from '../../shell/ui'
 
 const SYMBOL = '/brand/symbol_navy_blue_dot_transparent.svg'
-const SYMBOL_WHITE = '/brand/symbol_white_transparent.svg'
 const idr = (v) => 'Rp ' + formatAmount(String(v ?? 0), 'IDR')
 const ASSET_OF = (w) => w.asset_code || w.currency || 'IDR'
 
@@ -101,7 +100,7 @@ export function PersonalOverview() {
   return (
     <>{head}
       <div style={{ marginBottom: 26 }}>
-        <SummaryCard symbol={SYMBOL_WHITE} label="Total Cash · reporting currency IDR" value={idr(total)}
+        <SummaryCard label="Total Cash · reporting currency IDR" value={idr(total)}
           meta={<><span className="dot"><Icon.dot width="9" height="9" /></span> {wallets.length} account{wallets.length > 1 ? 's' : ''}</>}
           metrics={[
             { k: 'Income this month', v: '+ ' + idr(income), tone: 'pos' },

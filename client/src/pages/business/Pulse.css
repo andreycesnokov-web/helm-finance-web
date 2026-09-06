@@ -23,17 +23,9 @@
 
 /* ── total cash (navy) ──────────────────────────────────────────────────── */
 .pulse-cash {
-  /* Kept in step with .cfo-summary in shell/shell.css — same surface, same
-     brand moment. --mark-safe is the column the watermark owns; the right
-     padding reserves it so the figure never runs under the mark. */
-  /* Smaller and cropped harder than the summary card's mark, because this card is
-     a ~440px column rather than a full-width surface. Reserving the summary
-     card's 178px here left too little for the figure and .pulse-cash-value —
-     which is nowrap + ellipsis — silently truncated "Rp 122.8M" to "Rp 122…".
-     The mark is sized to its surface; the number is never the thing that gives. */
-  --mark-size: 132px;
-  --mark-bleed: 46px;
-  --mark-safe: calc(var(--mark-size) - var(--mark-bleed) + 14px);
+  /* Kept in step with .cfo-summary in shell/shell.css — same surface, same role.
+     Neither carries a brand mark any more: the page hero above already has one,
+     and the figure gets the whole card width back. */
   position: relative;
   overflow: hidden;
   display: flex;
@@ -42,7 +34,6 @@
   justify-content: center;
   min-width: 0;
   padding: 26px 28px;
-  padding-right: calc(28px + var(--mark-safe));
   border-radius: 20px;
   background: var(--brand-navy);
   color: var(--brand-white);
@@ -57,21 +48,6 @@
   background: radial-gradient(120% 90% at 100% 0%, rgba(51, 153, 255, .22), rgba(51, 153, 255, 0) 62%);
 }
 /* Official mark, unmodified, as a subtle watermark. */
-/* The hero watermark. Geometry and opacity are deliberately identical to
-   .cfo-summary-sym in shell/shell.css: these are the same brand moment on the same
-   navy surface, and they used to differ (210px at .07 anchored bottom-right here,
-   180px at .10 anchored top-right there) — so Pulse and Accounts wore visibly
-   different marks. If one changes, change both. */
-.pulse-cash-mark {
-  position: absolute;
-  right: calc(var(--mark-bleed) * -1);
-  top: -18px;
-  width: var(--mark-size);
-  height: var(--mark-size);
-  opacity: .10;
-  pointer-events: none;
-  user-select: none;
-}
 .pulse-cash-top,
 .pulse-cash-value,
 .pulse-cash-flag,
@@ -471,13 +447,8 @@
   .pulse-cash { padding: 24px; }
 }
 @media (max-width: 640px) {
-  /* The padding shorthand also releases the desktop mark column, which is
-     correct here: no mark on a phone, so nothing to reserve. Same call as
-     .cfo-summary in shell/shell.css, and for the same reason — the figure owns
-     the width, and decoration that costs it readability is not worth drawing. */
   .pulse-cash { padding: 20px; border-radius: 18px; }
   .pulse-cash-value { font-size: clamp(28px, 8.5vw, 38px); }
-  .pulse-cash-mark { display: none; }
   .pulse-kpi { padding: 15px 16px; border-radius: 16px; }
   .pulse-note, .pulse-cfo-p, .pulse-cfo-list li { font-size: 14px; }
   .pulse-start { padding: 20px; }

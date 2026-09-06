@@ -107,7 +107,7 @@ const collect = async (harnessHtml, ms = 12000) => {
     const facts = JSON.parse(Buffer.from(m[1], 'base64').toString('utf8'));
     assert.ok(!facts.probeError, 'the probe threw inside the page: ' + facts.probeError);
     return facts;
-  } finally { fs.unlinkSync(path.join(DIST, name)); }
+  } finally { if (!process.env.KEEP_HARNESS) fs.unlinkSync(path.join(DIST, name)); }
 };
 
 // Shared probe body. `doc`/`win` are the document under test, so the same code
@@ -238,15 +238,92 @@ const PROBE_FN = `function facts(win, doc) {
     ft.dispatchEvent(new win.KeyboardEvent('keydown', { key: 'Tab', bubbles: true }));
     ft.focus();
     const fs2 = cs(ft);
+    // The ring is seen against the page ground on both sides of its offset gap,
+    // so that is what it has to clear.
+    const ground = (() => {
+      let el = ft.parentElement;
+      while (el) { const bg = cs(el).backgroundColor;
+        if (bg && bg !== 'rgba(0, 0, 0, 0)' && bg !== 'transparent') return bg;
+        el = el.parentElement; }
+      return 'rgb(255, 255, 255)';
+    })();
     focusRing = {
       matches: ft.matches(':focus-visible'),
       color: fs2.outlineColor,
       width: fs2.outlineWidth,
       style: fs2.outlineStyle,
       offset: fs2.outlineOffset,
+      ground,
+      contrastVsGround: ratio(fs2.outlineColor, ground),
     };
     ft.blur();
   }
+
+  // How many large brand marks are painted in one content area, and where.
+  const painted = (el) => !!el && cs(el).display !== 'none'
+    && el.getBoundingClientRect().width > 0 && Number(cs(el).opacity) > 0;
+  const brand = {
+    heroMarks: [...doc.querySelectorAll('.cfo-pagehead-mark')].filter(painted).length,
+    cardMarks: [...doc.querySelectorAll('.cfo-summary-sym, .pulse-cash-mark')].filter(painted).length,
+    sidebarWordmarks: [...doc.querySelectorAll('.cfo-sidebar .cfo-brand img')].filter(painted).length,
+    mobileBrand: (() => {
+      const b = doc.querySelector('.cfo-mobilehead .cfo-mobilebrand');
+      if (!painted(b)) return null;
+      const r = b.getBoundingClientRect();
+      return { src: b.getAttribute('src'), alt: b.getAttribute('alt'),
+        w: Math.round(r.width), h: Math.round(r.height),
+        natural: b.naturalWidth + 'x' + b.naturalHeight };
+    })(),
+    mobileBadges: [...doc.querySelectorAll('.cfo-mobilehead .cfo-badge')].filter(painted).length,
+    burger: (() => { const b = doc.querySelector('.cfo-burger');
+      if (!b) return null; const r = b.getBoundingClientRect();
+      return { w: +r.width.toFixed(1), h: +r.height.toFixed(1), label: b.getAttribute('aria-label') }; })(),
+  };
+
+  // Any technical identifier that leaked into the rendered page.
+  const idLeaks = [...doc.querySelectorAll('.cfo-pagehead, .cfo-summary, .pulse-cash')]
+    .flatMap((el) => (el.textContent || '').match(/\\b[A-Z]{3,}-[A-Z0-9]{3,}-?[0-9]{3,}\\b/g) || []);
+
+  // The settings footer utility. Scoped by region: the sidebar copy still exists in
+  // the DOM on a phone (display:none), so an unscoped query measures the wrong one
+  // and reports a 0px row in the drawer.
+  const describeSettings = (root) => {
+    if (!root) return null;
+    const setBtn = root.querySelector('.cfo-side-settings');
+    if (!painted(setBtn)) return null;
+    const nav = root.querySelector('.cfo-nav');
+    const foot = root.querySelector('.cfo-side-foot');
+    return {
+      tag: setBtn.tagName.toLowerCase(),
+      label: setBtn.getAttribute('aria-label'),
+      title: (setBtn.querySelector('.cfo-side-settings-title') || {}).textContent,
+      sub: (setBtn.querySelector('.cfo-side-settings-sub') || {}).textContent,
+      h: +setBtn.getBoundingClientRect().height.toFixed(1),
+      nested: setBtn.querySelectorAll('button, a, [role="button"], [tabindex]').length,
+      hasIcon: !!setBtn.querySelector('.cfo-side-settings-icon svg'),
+      hasChev: !!setBtn.querySelector('.cfo-side-settings-chev svg'),
+      // The footer must sit outside the scrollport, not inside it.
+      insideNav: !!nav && nav.contains(setBtn),
+      navScrolls: !!nav && ['auto', 'scroll'].includes(cs(nav).overflowY),
+      // and must not be drawn over the last nav item
+      overlapsNav: (() => {
+        if (!nav || !foot) return null;
+        const n = nav.getBoundingClientRect(), f = foot.getBoundingClientRect();
+        return Math.min(n.bottom, f.bottom) - Math.max(n.top, f.top) > 1;
+      })(),
+    };
+  };
+  const settings = describeSettings(doc.querySelector('.cfo-sidebar'));
+  const drawerSettings = describeSettings(doc.querySelector('.cfo-drawer'));
+  const topbarSettings = describeSettings(doc.querySelector('.cfo-mobilehead'));
+
+  const navItems = [...doc.querySelectorAll('.cfo-nav .cfo-navitem')]
+    .map((b) => (b.textContent || '').trim());
+
+  // Marks per hero, not per document: the catalogue page renders several headers,
+  // and "one mark" is a rule about one content area.
+  const headMarks = [...doc.querySelectorAll('.cfo-pagehead')]
+    .map((hd) => [...hd.querySelectorAll('.cfo-pagehead-mark')].filter(painted).length);
 
   // The real application frame, when the preview is rendering in-shell.
   const shell = doc.querySelector('.cfo-shell') ? {
@@ -294,7 +371,8 @@ const PROBE_FN = `function facts(win, doc) {
     h1Total: doc.querySelectorAll('h1').length,
     sections, overflow: overflow.slice(0, 10), overflowCount: overflow.length,
     overlaps: overlaps.slice(0, 12), overlapCount: overlaps.length,
-    headActions, heads, focusRing, shell, figures,
+    headActions, heads, focusRing, shell, figures, brand, idLeaks, navItems,
+    settings, drawerSettings, topbarSettings, headMarks,
     fonts: { status: doc.fonts.status, size: doc.fonts.size,
       archivo: doc.fonts.check('400 40px "Archivo Black"'),
       mono: doc.fonts.check('700 20px "JetBrains Mono Variable"') },
@@ -330,12 +408,25 @@ const directProbe = probeFor('/design-preview', 1440, 900);
 const mobileProbe = probeFor('/design-preview', 390, 844);
 const shellDesktopProbe = probeFor('/design-preview?shell=pulse', 1440, 900);
 const shellMobileProbe = probeFor('/design-preview?shell=accounts', 390, 844);
+// The drawer, opened by clicking the real burger rather than forcing state.
+const drawerProbe = `<!doctype html><meta charset="utf-8"><body style="margin:0">
+<iframe id="f" src="/design-preview?shell=pulse" style="width:390px;height:844px;border:0"></iframe>
+<script>${PROBE_FN}
+setTimeout(async () => { ${guard(`const win = document.getElementById('f').contentWindow;
+  await win.document.fonts.ready;
+  // NB: the name is not b — the emit snippet below declares one, and two consts of
+  // the same name in one block is a parse error that surfaces only as "no facts".
+  const burger = win.document.querySelector('.cfo-burger');
+  if (burger) { burger.click(); await new Promise((r) => setTimeout(r, 400)); }
+  const F = facts(win, win.document); ${emit}`)} }, 3000);
+</script></body>`;
 
 console.log('\nrendered preview — collecting facts from a real browser');
 const D = await collect(directProbe);
 const M = await collect(mobileProbe);
 const SD = await collect(shellDesktopProbe);
 const SM = await collect(shellMobileProbe);
+const DRAWER = await collect(drawerProbe);
 console.log(`  .. desktop viewport ${D.innerWidth}px, mobile viewport ${M.innerWidth}px, `
   + `in-shell ${SD.innerWidth}px / ${SM.innerWidth}px`);
 
@@ -380,34 +471,92 @@ t('no element overflows the viewport at 390px', () => {
 
 t('context badges hug their content instead of stretching', () => {
   // They shared the actions box, which becomes a full-width grid on mobile, so
-  // every badge stretched edge to edge.
-  assert.ok(M.badgeWidths.length > 0, 'no context badges found');
+  // every badge stretched edge to edge. Widths must differ with their text.
+  assert.ok(M.badgeWidths.length > 1,
+    `expected the catalogue to render context badges to test, found ${M.badgeWidths.length}`);
   for (const w of M.badgeWidths) {
     assert.ok(w < M.clientWidth - 24,
       `a badge is ${w}px wide in a ${M.clientWidth}px viewport — it is stretching`);
   }
   assert.ok(new Set(M.badgeWidths).size > 1,
-    'every badge is the same width, which means they are being stretched to fit');
+    'every badge is exactly the same width, which means they are being stretched to fit');
 });
 
-/* ── the watermark ─────────────────────────────────────────────────────────── */
-console.log('\nwatermark');
+/* ── the brand rule ────────────────────────────────────────────────────────── */
+console.log('\nbrand — one mark per content area');
 
-t('each hero carries exactly one mark', () => {
-  for (const [id, s] of Object.entries(D.sections)) {
-    if (!s.heroes) continue;
-    assert.strictEqual(s.marks, s.heroes,
-      `section "${id}" has ${s.heroes} hero(es) but ${s.marks} mark(s)`);
+t('each page hero carries exactly one decorative mark on desktop', () => {
+  assert.ok(D.headMarks.length > 0, 'no page hero rendered');
+  for (const n of D.headMarks) {
+    assert.strictEqual(n, 1, `a page hero painted ${n} marks; the rule is one per hero`);
+  }
+  // And in the product, one page is one hero, so one mark on screen.
+  assert.strictEqual(SD.brand.heroMarks, 1,
+    `${SD.brand.heroMarks} marks painted in the app shell; the rule is one`);
+});
+
+t('the dark financial cards carry no mark at all', () => {
+  // Total Cash / Total Balance used to draw a second large mark directly under the
+  // page hero's. Two in one content area is one too many, and the card's width
+  // belongs to the figure.
+  for (const [name, f] of [['isolated', D], ['mobile', M], ['shell', SD], ['shell mobile', SM]]) {
+    assert.strictEqual(f.brand.cardMarks, 0,
+      `${f.brand.cardMarks} watermark(s) still painted in a financial card (${name})`);
   }
 });
 
-t('the mark is decorative: empty alt, hidden from assistive technology', () => {
-  const all = Object.values(D.sections).flatMap((s) => s.markAttrs);
-  assert.ok(all.length > 0, 'no watermark rendered');
-  for (const m of all) {
-    assert.strictEqual(m.ariaHidden, 'true', 'watermark is not aria-hidden');
-    assert.strictEqual(m.alt, '', 'watermark has a non-empty alt');
-    assert.ok(m.inHero, 'watermark is not anchored inside a hero');
+t('the desktop sidebar shows the complete wordmark', () => {
+  assert.strictEqual(SD.brand.sidebarWordmarks, 1,
+    `${SD.brand.sidebarWordmarks} sidebar wordmarks painted`);
+  assert.ok(SD.shell.brandBoxH >= 40,
+    `the wordmark box is ${SD.shell.brandBoxH}px tall — it has collapsed`);
+});
+
+t('the mobile bar shows a recognisable CFO AI lockup, not a bare symbol', () => {
+  const b = SM.brand.mobileBrand;
+  assert.ok(b, 'no brand lockup painted in the mobile header');
+  assert.match(b.src, /logo_/, `mobile header uses ${b.src}; a bare symbol is not identifiable`);
+  assert.match(b.alt || '', /CFO AI/i, `mobile brand alt is "${b.alt}"`);
+  // Crisp and uncropped: rendered inside the asset's natural box, not stretched.
+  const [nw, nh] = b.natural.split('x').map(Number);
+  assert.ok(nw > 0 && nh > 0, 'the mobile brand asset did not load');
+  const ratioNatural = nw / nh, ratioDrawn = b.w / b.h;
+  assert.ok(Math.abs(ratioNatural - ratioDrawn) / ratioNatural < 0.02,
+    `the lockup is distorted: drawn ${b.w}x${b.h}, natural ${b.natural}`);
+});
+
+t('the mobile bar has no role badge and one 44px control', () => {
+  assert.strictEqual(SM.brand.mobileBadges, 0,
+    `${SM.brand.mobileBadges} badge(s) still in the mobile top bar`);
+  assert.ok(SM.brand.burger, 'no menu button in the mobile bar');
+  assert.ok(SM.brand.burger.h >= 44 && SM.brand.burger.w >= 44,
+    `the menu button is ${SM.brand.burger.w}x${SM.brand.burger.h}; a thumb needs 44x44`);
+  assert.ok((SM.brand.burger.label || '').length > 0, 'the menu button has no accessible name');
+});
+
+t('no technical identifier is rendered in the page hero or the cards', () => {
+  for (const [name, f] of [['isolated', D], ['mobile', M], ['shell', SD], ['shell mobile', SM]]) {
+    assert.deepStrictEqual(f.idLeaks, [],
+      `${name}: technical identifier(s) visible: ${f.idLeaks.join(', ')}`);
+  }
+});
+
+t('the page-hero mark sits inside the band, clear of every zone', () => {
+  const marked = D.heads.filter((h) => h.markVisible);
+  assert.ok(marked.length > 0, 'no page-hero mark painted on desktop');
+  for (const h of marked) {
+    assert.ok(h.mark.r <= h.width,
+      `the mark runs to ${h.mark.r} in a ${h.width}px band — it is clipped by the edge`);
+    assert.ok(h.text.r <= h.mark.l + 1,
+      `the text zone reaches ${h.text.r} but the mark starts at ${h.mark.l}`);
+    if (h.right) assert.ok(h.right.r <= h.mark.l + 1,
+      `the control zone reaches ${h.right.r} but the mark starts at ${h.mark.l}`);
+  }
+});
+
+t('mobile drops the page-hero mark', () => {
+  for (const h of M.heads) {
+    assert.strictEqual(h.markVisible, false, 'the page-hero mark is still painted at 390px');
   }
 });
 
@@ -416,55 +565,75 @@ const overlapReport = (f) => f.overlaps
   .map((o) => `${o.hero} "${o.text}" (.${o.cls}) overlapping ${o.by}px`)
   .join('; ');
 
-t('the watermark never sits under text — desktop', () => {
-  assert.strictEqual(D.overlapCount, 0,
-    `${D.overlapCount} text/watermark intersection(s): ${overlapReport(D)}`);
-});
-
-t('the watermark never sits under text — 390px', () => {
-  assert.strictEqual(M.overlapCount, 0,
-    `${M.overlapCount} text/watermark intersection(s): ${overlapReport(M)}`);
-});
-
-t('the hero mark is deliberately absent on a phone, not merely broken', () => {
-  // A reserved column for decoration costs a 390px card either its figure size or
-  // its readability. The mark is dropped on purpose; this pins that choice so a
-  // future change cannot quietly reintroduce it half-working.
-  const mobile = Object.values(M.sections).flatMap((s) => s.markAttrs);
-  assert.ok(mobile.length > 0, 'the mark should still be in the DOM, just not painted');
-  for (const m of mobile) {
-    assert.strictEqual(m.visible, false, `a mark is still painted at 390px (${m.w}px wide)`);
+t('nothing decorative sits under text, anywhere', () => {
+  for (const [name, f] of [['desktop', D], ['390px', M], ['shell', SD], ['shell mobile', SM]]) {
+    assert.strictEqual(f.overlapCount, 0, `${name}: ${overlapReport(f)}`);
   }
 });
 
-t('the mark is one oversized cropped symbol, not a tiled wallpaper', () => {
-  // Absolute size is deliberately NOT fixed across surfaces: the summary card is
-  // full width and the Pulse cash card is a ~440px column, and forcing the same
-  // 180px mark on both is what truncated "Rp 122.8M" to "Rp 122…". What must hold
-  // is the treatment — oversized for its own card, cropped by its edge, and the
-  // same weight everywhere.
-  const all = Object.values(D.sections).flatMap((s) => s.markAttrs);
-  assert.ok(all.length > 0, 'no marks to check');
-  for (const m of all) {
-    assert.strictEqual(m.visible, true, 'a desktop hero is missing its mark');
-    assert.ok(m.w >= 120, `mark is only ${m.w}px — too small to read as the approved treatment`);
-    assert.ok(m.w <= m.heroW * 0.55,
-      `mark is ${m.w}px on a ${m.heroW}px card — that is wallpaper, not an accent`);
-    assert.strictEqual(m.cropped, true, 'the mark sits inside the card instead of being cropped by it');
-    assert.ok(Number(m.opacity) <= 0.16, `mark opacity ${m.opacity} is too assertive`);
-    assert.ok(Number(m.opacity) >= 0.05, `mark opacity ${m.opacity} would be invisible`);
-  }
-  const opacities = new Set(all.map((m) => m.opacity));
-  assert.strictEqual(opacities.size, 1,
-    `the marks are drawn at different weights: ${[...opacities].join(', ')}`);
-});
-
-t('no financial figure is truncated by the watermark column', () => {
-  // The reserved column must come out of whitespace, never out of the number.
-  for (const f of [...D.figures, ...M.figures]) {
+t('no financial figure is truncated', () => {
+  for (const f of [...D.figures, ...M.figures, ...SD.figures, ...SM.figures]) {
     assert.strictEqual(f.truncated, false,
       `"${f.text}" (.${f.cls}) is clipped: needs ${f.scrollW}px, has ${f.clientW}px`);
   }
+});
+
+/* ── workspace settings ────────────────────────────────────────────────────── */
+console.log('\nsidebar — workspace settings utility');
+
+t('Settings is no longer a plain navigation item', () => {
+  const stray = SD.navItems.filter((l) => /^settings$/i.test(l.trim()));
+  assert.deepStrictEqual(stray, [],
+    `"Settings" is still in the nav list: ${JSON.stringify(SD.navItems)}`);
+});
+
+t('Team stays in the navigation — it manages people, not configuration', () => {
+  assert.ok(SD.navItems.some((l) => /team/i.test(l)),
+    `Team is missing from the nav: ${JSON.stringify(SD.navItems)}`);
+});
+
+t('the footer utility is one control with a clear accessible name', () => {
+  const u = SD.settings;
+  assert.ok(u, 'no workspace settings utility in the sidebar');
+  assert.match(u.title.trim(), /^Workspace settings$/, `primary label is "${u.title}"`);
+  assert.ok(u.sub.trim().length > 0, 'the utility has no supporting label');
+  assert.match(u.label || '', /Workspace settings/, `accessible name is "${u.label}"`);
+  assert.strictEqual(u.nested, 0,
+    `${u.nested} nested interactive element(s) — the row must be a single control`);
+  assert.ok(u.hasIcon, 'the utility has no leading icon');
+  assert.ok(u.hasChev, 'the utility has no trailing chevron');
+  assert.ok(u.h >= 44, `the row is ${u.h}px tall; the target must be at least 44px`);
+});
+
+t('the supporting label describes the workspace, not a guess', () => {
+  // A personal workspace is not a shared team workspace; the subtitle is derived.
+  assert.match(SD.settings.sub.trim(), /workspace$/i,
+    `supporting label is "${SD.settings.sub}"`);
+});
+
+t('the footer sits outside the scrolling navigation and never covers it', () => {
+  const u = SD.settings;
+  assert.strictEqual(u.insideNav, false,
+    'the footer is inside the scrollport, so long navigation scrolls it away');
+  assert.strictEqual(u.navScrolls, true,
+    'the navigation is not independently scrollable');
+  assert.strictEqual(u.overlapsNav, false,
+    'the footer overlaps the navigation region');
+});
+
+t('the same utility is reachable in the mobile drawer', () => {
+  assert.ok(DRAWER.drawerSettings, 'the opened drawer has no workspace settings utility');
+  assert.match(DRAWER.drawerSettings.title.trim(), /^Workspace settings$/,
+    `drawer utility label is "${DRAWER.drawerSettings.title}"`);
+  assert.ok(DRAWER.drawerSettings.h >= 44,
+    `the drawer row is ${DRAWER.drawerSettings.h}px tall`);
+});
+
+t('the utility is not pinned into the compact mobile top bar', () => {
+  assert.strictEqual(SM.topbarSettings, null,
+    'workspace settings is showing in the mobile top bar; it belongs in the drawer');
+  assert.strictEqual(SM.settings, null,
+    'the desktop sidebar utility is still painted at 390px');
 });
 
 /* ── page-hero composition ─────────────────────────────────────────────────── */
@@ -496,20 +665,8 @@ t('the header band carries a hairline rule', () => {
   }
 });
 
-t('the page-hero brand mark is decorative and reserved out of the content', () => {
-  const marked = D.heads.filter((h) => h.markVisible);
-  assert.ok(marked.length > 0, 'no page-hero brand mark is painted on desktop');
-  for (const h of marked) {
-    assert.ok(h.text.r <= h.mark.l + 1,
-      `the text zone reaches ${h.text.r} but the mark starts at ${h.mark.l}`);
-    if (h.right) assert.ok(h.right.r <= h.mark.l + 1,
-      `the control zone reaches ${h.right.r} but the mark starts at ${h.mark.l}`);
-  }
-});
-
-t('mobile stacks the header and drops the brand mark', () => {
+t('mobile stacks the header', () => {
   for (const h of M.heads) {
-    assert.strictEqual(h.markVisible, false, 'the page-hero mark is still painted at 390px');
     if (h.right) assert.strictEqual(h.sameRow, false,
       'the control zone is still beside the text at 390px instead of stacked');
   }
@@ -573,9 +730,11 @@ t('a keyboard focus produces a real :focus-visible ring', () => {
     `the focus ring is ${D.focusRing.width}; it needs at least 2px to be seen`);
 });
 
-t('the focus ring is the brand accent, offset clear of the control', () => {
-  assert.strictEqual(D.focusRing.color, 'rgb(51, 153, 255)',
-    `the ring is ${D.focusRing.color}, expected --focus-ring (#3399FF)`);
+t('the focus ring clears 3:1 against the surface it is seen on', () => {
+  // WCAG 1.4.11: a non-text indicator needs 3:1. The raw brand accent measured
+  // 2.76:1 on the page ground, so the ring uses that blue's accessible ink.
+  assert.ok(D.focusRing.contrastVsGround >= 3,
+    `the ring is ${D.focusRing.contrastVsGround}:1 against ${D.focusRing.ground} — below 3:1`);
   assert.ok(parseFloat(D.focusRing.offset) >= 2,
     `the ring offset is ${D.focusRing.offset}; it needs space or it reads as a border`);
 });

@@ -22,7 +22,6 @@ import './Pulse.css'
 
 // Official brand mark, already shipped in the repo (client/public/brand). Used as a
 // low-opacity watermark on the navy hero — never recoloured, never distorted.
-const BRAND_MARK_WHITE = '/brand/symbol_white_transparent.svg'
 
 /**
  * Display-only compaction so a large figure can never wrap the hero onto two lines.
@@ -88,7 +87,6 @@ export function ExecutiveHero({ d, idr, readiness, empty }) {
     <section className={`pulse-exec${empty ? ' is-empty' : ''}`}>
       {/* Navy corporate surface — the one place the brand background is used at scale. */}
       <div className="pulse-cash">
-        <img className="pulse-cash-mark" src={BRAND_MARK_WHITE} alt="" aria-hidden="true" />
         <div className="pulse-cash-top">
           <span className="pulse-cash-label">Total cash · IDR</span>
           {readiness}

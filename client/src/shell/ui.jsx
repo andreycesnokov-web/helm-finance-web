@@ -114,25 +114,18 @@ export const Card = ({ title, action, children, className = '', style }) => (
   </section>
 )
 
-/** The official symbol, white, for use on the navy hero. Served from the
- *  existing /brand asset pipeline — no new file, no per-render request beyond
- *  the one cached copy the browser already holds. */
-export const HERO_SYMBOL = '/brand/symbol_white_transparent.svg'
-
 /**
- * Summary / hero card — the one branded surface a page is allowed.
+ * Summary / hero card — the page's dominant financial figure.
  *
- * The watermark is no longer a per-page choice. Pulse passed a symbol and
- * Accounts drew a graph-paper grid instead, so the two navy heroes in the
- * product did not look related. It now defaults to the official mark: one
- * instance, oversized, cropped at the corner, ~10% opacity, decorative and
- * hidden from assistive technology. Pass `symbol={null}` to opt out.
+ * It carries no brand mark. The product showed one here AND one in the page hero
+ * directly above, which is two large marks in a single content area; the hero
+ * keeps its symbol and this card keeps the number. Dropping it also returns the
+ * full card width to the figure, which is what the card is for.
  *
  * `metrics` = [{k, v, tone}]
  */
-export const SummaryCard = ({ label, value, meta, metrics, symbol = HERO_SYMBOL }) => (
+export const SummaryCard = ({ label, value, meta, metrics }) => (
   <section className="cfo-summary">
-    {symbol && <img className="cfo-summary-sym" src={symbol} alt="" aria-hidden="true" />}
     <div className="cfo-summary-label">{label}</div>
     <div className="cfo-summary-value">{value}</div>
     {meta && <div className="cfo-summary-meta">{meta}</div>}

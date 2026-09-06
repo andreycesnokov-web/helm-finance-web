@@ -71,7 +71,9 @@ const SHELL_WORKSPACES = {
   personal: [{ id: 'demo-personal', name: 'Personal', type: 'personal', role: 'owner' }],
   business: [{
     id: 'demo-business', name: 'Nusantara Facilities', type: 'business',
-    role: 'owner', location: 'Bali, Indonesia', business_code: 'DEMO-BIZ-000001',
+    // No business_code: the switcher renders one when present, and a technical
+    // identifier is not something a business user needs to read on every screen.
+    role: 'owner', location: 'Bali, Indonesia',
   }],
 }
 const noop = () => {}
@@ -112,11 +114,6 @@ const PulseBody = () => (
       eyebrow="Business Workspace"
       title="Nusantara Facilities"
       description="Cash position, this month's operating figures and anything waiting on you."
-      context={<>
-        <StatusBadge tone="shared" icon={<Icon.users />}>Shared business workspace</StatusBadge>
-        <StatusBadge tone="neutral">Role: owner</StatusBadge>
-        <StatusBadge tone="info">DEMO-BIZ-000001</StatusBadge>
-      </>}
     />
     <ExecutiveHero d={PULSE_FIXTURE} idr={idr} readiness={null} empty={false} />
   </>
@@ -139,10 +136,9 @@ const AccountsBody = () => (
 
 function ShellPreview({ page }) {
   return (
+    // No preview banner here on purpose: these are pictures of the product frame,
+    // and a strip of our own chrome above it would misrepresent what ships.
     <div className="dsp-shell">
-      <div className="dsp-banner" role="note">
-        DESIGN PREVIEW · SYNTHETIC DATA · NOT A CUSTOMER PAGE
-      </div>
       <WorkspaceShell
         workspaces={SHELL_WORKSPACES}
         activeId="demo-business"
@@ -217,23 +213,32 @@ export default function DesignPreview() {
             description={LONG_DESC}
             primaryAction={<Btn variant="primary">Primary action</Btn>}
             secondaryActions={<Btn variant="ghost">Secondary</Btn>}
-            context={<StatusBadge tone="neutral">Role: owner</StatusBadge>}
+            context={<>
+              <StatusBadge tone="shared" icon={<Icon.users />}>Shared workspace</StatusBadge>
+              <StatusBadge tone="neutral">Owner</StatusBadge>
+            </>}
           />
         </Section>
 
-        {/* ── watermark ────────────────────────────────────────────────── */}
-        <Section id="watermark" title="Hero watermark" wide
-          note="One oversized mark, cropped by the card, decorative and hidden from assistive technology. Never tiled, never over text.">
+        {/* ── page-hero branding ───────────────────────────────────────── */}
+        <Section id="watermark" title="Page hero branding" wide
+          note="The one decorative mark in the content area: the official symbol, set well inside the band at low opacity, clear of the text and control zones. The navy cards below carry no mark — two large marks in one area is one too many.">
+          <PageHeader
+            eyebrow="Business Workspace"
+            title="Nusantara Facilities"
+            description="The symbol sits inside the band with clear space around it, so it reads as a background watermark rather than an icon clipped by the layout."
+            primaryAction={<Btn variant="primary">Primary action</Btn>}
+          />
           <SummaryCard
             label="Total cash · IDR"
             value={<span className="fin">{idr(122850000)}</span>}
-            meta="The mark is cropped by the card edge; text sits on flat navy, never on the mark."
+            meta="No mark on the financial card — the full width belongs to the figure."
           />
         </Section>
 
         {/* ── focus ────────────────────────────────────────────────────── */}
         <Section id="focus" title="Focus and controls"
-          note="Tab through these: the focus ring is the brand accent at 2px with an offset.">
+          note="Tab through these. The ring is the brand blue's accessible ink (#1565C0) at 2px with a 2px offset — 3.65:1 against the page and 5.75:1 on white, where the raw accent measured 2.76:1. On navy surfaces it switches to white.">
           <Card title="Interactive">
             <div className="dsp-row">
               <Btn variant="primary" className="dsp-focus-target">Primary</Btn>

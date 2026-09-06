@@ -13,7 +13,6 @@ import {
 
 const PREVIEW_ON = import.meta.env.VITE_PREMIUM_UI_PREVIEW === 'true'
 const SYMBOL = '/brand/symbol_navy_blue_dot_transparent.svg'
-const SYMBOL_WHITE = '/brand/symbol_white_transparent.svg'
 const RATE_TS = '20 Jun 2026, 15:42', STALE_TS = '18 Jun 2026, 09:10'
 const fmtIDR = (v) => 'Rp ' + formatAmount(v, 'IDR')
 
@@ -68,7 +67,7 @@ function PersonalOverview({ state }) {
         actions={<><SoonBtn icon={<Icon.plus />}>Add an account</SoonBtn></>} />}
       {state === 'normal' && <>
         <div style={{ marginBottom: 26 }}>
-          <SummaryCard symbol={SYMBOL_WHITE} label="Total Cash · reporting currency IDR" value={fmtIDR(P_TOTAL)}
+          <SummaryCard label="Total Cash · reporting currency IDR" value={fmtIDR(P_TOTAL)}
             meta={<><span className="dot"><Icon.dot width="9" height="9" /></span> Valued {RATE_TS} <span style={{ opacity: .5 }}>·</span> 4 accounts · 2 currencies · 2 crypto</>}
             metrics={[
               { k: 'Income this month', v: '+ ' + fmtIDR('37500000'), tone: 'pos' },
@@ -130,7 +129,7 @@ function BusinessOverview({ state }) {
       {state === 'normal' && <>
         <div style={{ marginBottom: 14, fontSize: 12, color: 'var(--text-muted)' }} className="cfo-mono">Business code: HF-BIZ-000001 · base currency IDR</div>
         <div style={{ marginBottom: 26 }}>
-          <SummaryCard symbol={SYMBOL_WHITE} label="Total Cash · IDR" value={fmtIDR('1284500000')}
+          <SummaryCard label="Total Cash · IDR" value={fmtIDR('1284500000')}
             meta={<><span className="dot"><Icon.dot width="9" height="9" /></span> Updated {RATE_TS} <span style={{ opacity: .5 }}>·</span> 3 wallets · operating + financing</>}
             metrics={[
               { k: 'Revenue (MTD)', v: '+ ' + fmtIDR('512000000'), tone: 'pos' },
