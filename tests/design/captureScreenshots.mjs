@@ -123,7 +123,10 @@ setTimeout(async () => {
     // Drive the real control rather than forcing state: the drawer in the picture
     // is the drawer a thumb opens.
     const opener = d.querySelector(${JSON.stringify(click)});
-    if (opener) { opener.click(); await new Promise((r) => setTimeout(r, 400)); }` : ''}
+    // Long enough for the drawer's slide to finish and settle. At 400ms the frame
+    // sometimes landed mid-transition, so the same source produced a slightly
+    // different image run to run — which makes a screenshot diff meaningless.
+    if (opener) { opener.click(); await new Promise((r) => setTimeout(r, 1200)); }` : ''}
     ${focus ? `
     // A real keyboard focus, not a class that imitates one: :focus-visible only
     // engages for keyboard-ish interaction, so the ring in the image is the ring
@@ -284,7 +287,6 @@ function cropPng(inp, outp, cw, ch, ox = 0, oy = 0) {
 /* ── the set ───────────────────────────────────────────────────────────────── */
 const P = '/design-preview';
 const PHONE = { crop: true, window: [512, 844] };
-const PHONE_TALL = { crop: true, window: [512, 1400] };
 
 // Review order: the real application shell first, because that is what ships, then
 // the specific evidence for this pass's two corrections and the mobile lockup.
@@ -365,10 +367,11 @@ const SHOTS = [
   // unproven currencies disabled, and locked on an existing wallet.
   ['31-add-wallet-currency-field.png', `${P}?only=currency-field`, 1440, 760,
     { region: { sel: '.dsp-form', pad: 16 } }],
-  // NOT SHIPPED — the two alternatives for the future multi-currency model,
-  // for review before the backend work that would make them honest.
-  ['32-concept-balances-by-currency-alternatives.png', `${P}?only=currency-concepts`, 1440, 1500, {}],
-  ['33-concept-balances-by-currency-mobile-390.png', `${P}?only=currency-concepts`, 390, 1400, PHONE_TALL],
+  // NOT ACTIVE — the approved future multi-currency model, kept as a single
+  // reference frame for the follow-up PR. The filename says so, because a
+  // screenshot outlives the conversation that explained it.
+  ['32-PREVIEW-ONLY-approved-future-balances-by-currency.png',
+    `${P}?only=currency-concepts`, 1440, 1150, {}],
 ];
 
 const produced = new Set(SHOTS.map(([f]) => f));

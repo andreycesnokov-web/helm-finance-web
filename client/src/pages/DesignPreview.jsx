@@ -181,36 +181,40 @@ const WALLET_SETS = {
   'accounts-four': WALLETS_FOUR,
 }
 
-/* ── the approved FUTURE model, for review only ────────────────────────────
-   Balances by currency, once the backend derives native balances. NEITHER of
-   these is wired into a production page: today Accounts totals IDR and says
-   plainly that other currencies are not totalled yet, because its balances come
-   from amount_idr. These exist so the shape can be agreed before that work.
+/* ── the APPROVED future model, for reference only ─────────────────────────
+   Balances by currency, once the backend derives native balances. It is not
+   wired into any production page: today Accounts totals IDR and says plainly
+   that other currencies are not totalled yet, because its balances come from
+   amount_idr.
 
-   Alternative 1 — every currency a peer inside one navy section.
-   Alternative 2 — base currency keeps the navy flagship, the rest sit beneath it
-                   as quiet cards. (The provisional preference.)
+   The approved shape: the base currency stays visually primary in the navy
+   flagship; every other currency is shown separately beside it; there is no
+   combined grand total and no implied conversion. Deliberately not a navy hero
+   per currency — competing heroes make a page with no subject, and this layout
+   must never suggest one figure is the sum of the others.
 
-   Deliberately not offered: a navy hero per currency. Three competing heroes
-   make a page with no subject, and the one thing this layout must never suggest
-   is that any figure is the sum of the others. */
-const CurrencyConcept = ({ wallets, variant }) => {
+   See walletsSummaryConcepts.jsx for what activating it requires. */
+const CurrencyConcept = ({ wallets }) => {
   const sum = walletsSummaryByCurrency({
-    wallets, t: tEn, scopeLabel: tEn('accounts.totalBalance'), variant,
+    wallets, t: tEn, scopeLabel: tEn('accounts.totalBalance'),
   })
   return (
     <>
+      {/* A literal, not a translation key: this heading belongs to the preview
+          until the model activates, and a production string for an inactive
+          feature is a string that ships for nothing. */}
+      <p className="dsp-cur-heading">Balances by currency</p>
       <SummaryCard flagship compact={sum.compact}
         label={sum.label} value={sum.value} meta={sum.meta} />
       {sum.secondary && (
-        <div className="cfo-cur-aside">
+        <div className="dsp-cur-aside">
           {sum.secondary.map((g) => (
-            <div key={g.currency} className="cfo-cur-aside-item">
-              <span className="cfo-cur-aside-code">{g.currency} — {CURRENCY_NAMES[g.currency] || g.currency}</span>
-              <span className="cfo-cur-aside-amt">
+            <div key={g.currency} className="dsp-cur-aside-item">
+              <span className="dsp-cur-aside-code">{g.currency} — {CURRENCY_NAMES[g.currency] || g.currency}</span>
+              <span className="fin dsp-cur-aside-amt">
                 {compactAmount(g.total, g.currency) || formatCurrency(g.total, g.currency)}
               </span>
-              <span className="cfo-cur-aside-sub">
+              <span className="dsp-cur-aside-sub">
                 {formatCurrency(g.total, g.currency)} · {g.wallets.length === 1
                   ? tEn('accounts.walletsCountOne')
                   : tEn('accounts.walletsCountMany').replace('{n}', g.wallets.length)}
@@ -310,17 +314,13 @@ export default function DesignPreview() {
           </div>
         </Section>
 
-        {/* ── FUTURE: balances by currency, two alternatives ───────────── */}
-        <Section id="currency-concepts" title="Balances by currency — two alternatives, not yet shipped" wide
-          note="For review before the backend work. Neither is wired into a production page. Alternative 1 puts every currency inside one navy section as peers. Alternative 2 keeps the base currency in the navy flagship and sets the others beneath it as quiet cards. Neither shows a combined total, and neither implies conversion.">
-          <p className="dsp-note"><strong>Alternative 1 — one navy section, currencies as peers</strong></p>
-          <CurrencyConcept wallets={WALLETS_MIXED} variant="grouped" />
-          <CurrencyConcept wallets={WALLETS_FOUR} variant="grouped" />
-          <p className="dsp-note"><strong>Alternative 2 — base currency in the flagship, the rest beside it</strong></p>
-          <CurrencyConcept wallets={WALLETS_MIXED} variant="primary" />
-          <CurrencyConcept wallets={WALLETS_FOUR} variant="primary" />
+        {/* ── APPROVED FUTURE MODEL — not active in production ──────────── */}
+        <Section id="currency-concepts" title="Balances by currency — approved, NOT YET ACTIVE" wide
+          note="The approved future model, for reference only. It is not wired into any production page and is absent from the flag-off bundle. The base currency stays visually primary in the navy flagship; every other currency is shown separately beside it; there is no combined grand total and no implied conversion. Activating it requires a backend that derives native wallet balances — today Accounts totals IDR only, because balances come from amount_idr.">
+          <CurrencyConcept wallets={WALLETS_MIXED} />
+          <CurrencyConcept wallets={WALLETS_FOUR} />
           <p className="dsp-note"><strong>Long values</strong></p>
-          <CurrencyConcept wallets={WALLETS_LONG} variant="primary" />
+          <CurrencyConcept wallets={WALLETS_LONG} />
         </Section>
 
         {/* ── Accounts, other currencies ───────────────────────────────── */}

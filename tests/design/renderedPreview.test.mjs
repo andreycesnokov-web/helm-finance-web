@@ -598,6 +598,10 @@ const SHELLS = await collectGroup([
   { key: 'WEM', route: `${P}?shell=accounts-empty`, w: 390, h: 844 },
   { key: 'WP320', route: `${P}?shell=accounts`, w: 320, h: 720 },
   { key: 'WE320', route: `${P}?shell=accounts-empty`, w: 320, h: 720 },
+  // Tablet. The sidebar is gone here and the flagship card is full width, so it
+  // breaks differently from both the desktop and the phone.
+  { key: 'WP768', route: `${P}?shell=accounts`, w: 768, h: 1000 },
+  { key: 'PULSE768', route: `${P}?shell=pulse`, w: 768, h: 1000 },
 ]);
 // The currency cases: a dollar workspace, a workspace holding both, and a wallet
 // whose currency was never set.
@@ -609,7 +613,7 @@ const CURRENCIES = await collectGroup([
   { key: 'W4', route: `${P}?shell=accounts-four`, w: 1440, h: 900 },
   { key: 'W4M', route: `${P}?shell=accounts-four`, w: 390, h: 844 },
 ]);
-const { SD, SM, WP, WE, WEM, WP320, WE320 } = SHELLS;
+const { SD, SM, WP, WE, WEM, WP320, WE320, WP768, PULSE768 } = SHELLS;
 const { WUSD, WMIX, WMIXM, WNOC, W4, W4M } = CURRENCIES;
 console.log(`  .. desktop viewport ${D.innerWidth}px, mobile viewport ${M.innerWidth}px, `
   + `in-shell ${SD.innerWidth}px / ${SM.innerWidth}px`);
@@ -1159,6 +1163,15 @@ t('the preview renders inside the real WorkspaceShell, not a drawing of it', () 
     `the sidebar has ${SD.shell.navItems} nav items; the real BUSINESS_NAV has far more`);
 });
 
+t('every width keeps exactly one <h1>', () => {
+  for (const [name, f] of [['pulse 1440', SD], ['wallets 1440', WP], ['wallets 768', WP768],
+                           ['pulse 768', PULSE768], ['wallets 390', SM], ['wallets 320', WP320],
+                           ['empty 1440', WE], ['empty 390', WEM], ['empty 320', WE320],
+                           ['mixed 1440', WMIX], ['four 1440', W4]]) {
+    assert.strictEqual(f.h1Total, 1, `${name}: ${f.h1Total} h1 elements`);
+  }
+});
+
 t('the in-shell page keeps exactly one <h1>', () => {
   assert.strictEqual(SD.h1Total, 1, `in-shell desktop has ${SD.h1Total} h1`);
   assert.strictEqual(SM.h1Total, 1, `in-shell mobile has ${SM.h1Total} h1`);
@@ -1257,7 +1270,8 @@ t('neither state overflows, at any width down to 320px', () => {
   for (const [name, f] of [['populated 1440', WP], ['empty 1440', WE], ['empty 390', WEM],
                            ['populated 320', WP320], ['empty 320', WE320],
                            ['usd 1440', WUSD], ['mixed 1440', WMIX], ['mixed 390', WMIXM],
-                           ['no-currency 1440', WNOC], ['four 1440', W4], ['four 390', W4M]]) {
+                           ['no-currency 1440', WNOC], ['four 1440', W4], ['four 390', W4M],
+                           ['wallets 768', WP768], ['pulse 768', PULSE768]]) {
     assert.ok(f.scrollWidth <= f.clientWidth,
       name + ': scrollWidth ' + f.scrollWidth + ' > clientWidth ' + f.clientWidth);
     assert.strictEqual(f.overflowCount, 0,

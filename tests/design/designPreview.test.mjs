@@ -367,6 +367,34 @@ t('the future multi-currency model is preview-only', () => {
     assert.ok(!/walletsSummaryConcepts/.test(code(f)),
       `${f} imports the preview-only concepts module`);
   }
+  // Its STYLES are preview-only too. shell.css is in every production bundle, so
+  // a rule left there for an inactive feature ships for nothing — and dead rules
+  // for an inactive feature are how one quietly becomes active.
+  const shell = read('client/src/shell/shell.css');
+  assert.ok(!/cur-aside|cfo-cur-list|cfo-cur-row/.test(shell),
+    'shell.css still carries the future multi-currency styles');
+  assert.match(read('client/src/pages/DesignPreview.css'), /\.dsp-cur-aside\{/,
+    'the future model has no styles in the preview stylesheet');
+});
+
+t('only Alternative 2 survives as the approved future model', () => {
+  const concepts = code('client/src/pages/walletsSummaryConcepts.jsx');
+  // The rejected shape put every currency inside one navy section as peers, on a
+  // `variant` switch. Both are gone: there is one approved model, not a menu.
+  assert.ok(!/variant/.test(concepts), 'the concepts module still switches between shapes');
+  assert.ok(!/grouped/.test(concepts), 'the rejected grouped alternative is still here');
+  // What survives: base currency primary in the flagship, the rest returned
+  // separately for the caller to render beside it, and no combined figure.
+  assert.match(concepts, /const head = ordered\[0\]/, 'no primary/base currency branch');
+  assert.match(concepts, /secondary: rest\.length \? rest : null/,
+    'the other currencies are not returned separately');
+  assert.ok(!/reduce/.test(concepts), 'the concepts module totals across currencies');
+  // And the reasoning is written down where the next person will read it.
+  const doc = read('client/src/pages/walletsSummaryConcepts.jsx');
+  for (const claim of [/visually primary/, /separately/i, /no combined grand total/i,
+                       /native-balance backend|derives native/i]) {
+    assert.match(doc, claim, `the approved model's rationale does not state: ${claim}`);
+  }
 });
 
 t('wallet currency is required, ISO-only and immutable once created', () => {

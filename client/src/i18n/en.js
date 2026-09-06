@@ -206,9 +206,6 @@ const en = {
     addFirstWallet: 'Add your first wallet',
     // Shown as the summary card's supporting line while the workspace has none.
     noWalletsYet: 'No wallets added yet',
-    // Multi-currency: there is no single total, so the card says so.
-    totalByCurrency: 'Total balance · by currency',
-    walletsAcrossCurrencies: '{n} wallets across {m} currencies',
     noCurrencyTotal: 'No currency set',
     needsCurrency: 'Needs currency',
     needsCurrencyCount: '{n} needs currency',
@@ -216,7 +213,6 @@ const en = {
     balanceUnavailable: 'Balance unavailable',
     otherCurrenciesAside: '{n} in other currencies (not totalled yet)',
     noProvenBalance: 'Balance unavailable',
-    balancesByCurrency: 'Balances by currency',
     currencyNotYetSupported: 'Not available yet — balances in this currency are not ready',
     currencyLockedNote: 'Required. Only IDR wallets are available while balances in other currencies are being made native.',
     currencyImmutable: 'A wallet keeps the currency it was created with.',

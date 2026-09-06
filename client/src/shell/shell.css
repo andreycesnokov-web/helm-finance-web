@@ -466,36 +466,12 @@
    thing this layout must never suggest is that any figure is the sum of the
    others. A currency is a row — code, amount, and its exact figure and count —
    and the rows sit as peers. */
-.cfo-cur-list{display:flex;flex-direction:column;gap:14px}
-.cfo-cur-row{display:grid;grid-template-columns:auto minmax(0,1fr);gap:2px 14px;align-items:baseline}
-.cfo-cur-code{
-  grid-row:1 / span 2;align-self:center;
-  font-family:var(--font-ui);font-size:11px;font-weight:800;letter-spacing:.1em;
-  color:#AFC6DE;min-width:38px;
-}
-.cfo-cur-amt{font-size:28px;line-height:1.05;white-space:nowrap}
-.cfo-cur-exact{font-size:12.5px;color:#C5D6E7;font-family:var(--font-ui)}
-/* Alternative 2's secondary currencies: outside the navy card, quiet, and never
-   dressed up to look like a second headline. */
-.cfo-cur-aside{
-  display:flex;flex-wrap:wrap;gap:10px;margin-top:12px;
-}
-.cfo-cur-aside-item{
-  flex:1 1 190px;min-width:0;
-  display:flex;flex-direction:column;gap:2px;
-  background:var(--surface-card);border:1px solid var(--border-default);
-  border-radius:var(--radius-md);padding:12px 14px;
-}
-.cfo-cur-aside-code{
-  font-family:var(--font-ui);font-size:11px;font-weight:800;letter-spacing:.1em;
-  color:var(--text-muted);
-}
-.cfo-cur-aside-amt{font-family:var(--font-num);font-size:19px;font-weight:700;color:var(--text-primary)}
-.cfo-cur-aside-sub{font-size:11.5px;color:var(--text-muted)}
-@media (max-width:640px){
-  .cfo-cur-amt{font-size:23px}
-  .cfo-cur-aside-item{flex:1 1 100%}
-}
+/* The approved future multi-currency model's styles are NOT here. They live in
+   pages/DesignPreview.css under the dsp- prefix, so that shipping them is
+   impossible while the model is preview-only: this stylesheet is in every
+   production bundle, and dead rules for an inactive feature are exactly the kind
+   of thing that quietly becomes active. They move here in the PR that activates
+   Alternative 2 — see pages/walletsSummaryConcepts.jsx. */
 .cfo-summary-meta{display:flex;align-items:center;gap:8px;margin-top:12px;color:#C5D6E7;font-size:13px;flex-wrap:wrap}
 .cfo-summary-meta .dot{color:var(--brand-electric-blue);display:inline-flex}
 .cfo-summary-row{display:flex;gap:32px;margin-top:18px;padding-top:16px;border-top:1px solid rgba(255,255,255,.14);flex-wrap:wrap}
