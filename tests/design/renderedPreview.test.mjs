@@ -98,7 +98,12 @@ const collect = async (harnessHtml, ms = 12000) => {
       let out = '', err = '';
       child.stdout.on('data', (d) => { out += d; });
       child.stderr.on('data', (d) => { err += d; });
-      const kill = setTimeout(() => { child.kill(); reject(new Error('chrome timed out')); }, 60000);
+      // Headroom, because `node --test` runs test FILES in parallel and these
+      // launches compete with the rest of the suite for CPU. The real fix for the
+      // flake was fewer launches — see probeGroup below, which puts many
+      // viewports in one browser and took this file from ~75s to ~4s — but a
+      // timeout that only just fits is a flake waiting to come back.
+      const kill = setTimeout(() => { child.kill(); reject(new Error('chrome timed out')); }, 120000);
       child.on('error', reject);
       child.on('close', () => { clearTimeout(kill); resolve({ stdout: out, stderr: err }); });
     });
@@ -374,6 +379,7 @@ const PROBE_FN = `function facts(win, doc) {
     const main = doc.querySelector('.cfo-main-inner') || doc.body;
     return {
       hasCard: !!card,
+      label: txt(card ? card.querySelector('.cfo-summary-label') : null),
       value: txt(val),
       valueBox: box(val),
       valueLines: val
@@ -391,6 +397,15 @@ const PROBE_FN = `function facts(win, doc) {
       ctaBox: box(cta),
       symAlt: sym ? sym.getAttribute('alt') : null,
       symAriaHidden: sym ? sym.getAttribute('aria-hidden') : null,
+      // A multi-currency card prints one labelled amount per currency and no
+      // combined figure. Report the pairs so a test can check exactly that.
+      currencies: card
+        ? [...card.querySelectorAll('.cfo-summary-cur')].map((el) => ({
+            code: txt(el.querySelector('.cfo-summary-cur-code')),
+            amount: txt(el.querySelector('.cfo-summary-cur-amt')),
+          }))
+        : [],
+      noTotal: txt(card ? card.querySelector('.cfo-summary-nototal') : null),
       pageText: txt(main).slice(0, 1500),
     };
   })();
@@ -519,10 +534,40 @@ setTimeout(async () => { ${guard(`const win = document.getElementById('f').conte
   const F = facts(win, win.document); ${emit}`)} }, 3000);
 </script></body>`;
 
+/**
+ * Several viewports in ONE browser launch.
+ *
+ * Each viewport still gets its own iframe, so each still has a real, independent
+ * layout viewport — that is what makes 390px and 320px genuine rather than a
+ * cropped desktop. What is shared is the Chrome process. Fourteen separate
+ * launches made this file take four minutes and, under `node --test` running test
+ * files in parallel, made one unlucky probe time out and fail the suite at random.
+ * A flaky test is worse than a slow one: it teaches people to re-run and shrug.
+ */
+const probeGroup = (specs) => `<!doctype html><meta charset="utf-8"><body style="margin:0">
+${specs.map((sp, i) => `<iframe id="f${i}" src="${sp.route}" `
+  + `style="width:${sp.w}px;height:${sp.h}px;border:0"></iframe>`).join('\n')}
+<script>${PROBE_FN}
+const SPECS = ${JSON.stringify(specs.map((sp) => sp.key))};
+setTimeout(async () => { ${guard(`const F = {};
+  for (let i = 0; i < SPECS.length; i++) {
+    const win = document.getElementById('f' + i).contentWindow;
+    await win.document.fonts.ready;
+    F[SPECS[i]] = facts(win, win.document);
+  } ${emit}`)} }, 3500);
+</script></body>`;
+
+const collectGroup = async (specs, ms = 30000) => {
+  const all = await collect(probeGroup(specs), ms);
+  for (const sp of specs) {
+    assert.ok(all[sp.key], `probe "${sp.key}" produced no facts`);
+    assert.ok(!all[sp.key].probeError, `probe "${sp.key}" threw: ${all[sp.key].probeError}`);
+  }
+  return all;
+};
+
 const directProbe = probeFor('/design-preview', 1440, 900);
 const mobileProbe = probeFor('/design-preview', 390, 844);
-const shellDesktopProbe = probeFor('/design-preview?shell=pulse', 1440, 900);
-const shellMobileProbe = probeFor('/design-preview?shell=accounts', 390, 844);
 // The drawer, opened by clicking the real burger rather than forcing state.
 const drawerProbe = `<!doctype html><meta charset="utf-8"><body style="margin:0">
 <iframe id="f" src="/design-preview?shell=pulse" style="width:390px;height:844px;border:0"></iframe>
@@ -537,17 +582,33 @@ setTimeout(async () => { ${guard(`const win = document.getElementById('f').conte
 </script></body>`;
 
 console.log('\nrendered preview — collecting facts from a real browser');
+// The catalogue and the drawer keep their own launches: the drawer one clicks a
+// real control before measuring, and the catalogue pages are the heaviest.
 const D = await collect(directProbe);
 const M = await collect(mobileProbe);
-const SD = await collect(shellDesktopProbe);
-const SM = await collect(shellMobileProbe);
 const DRAWER = await collect(drawerProbe);
-// Wallets in both states, at the widths where each one breaks differently.
-const WP = await collect(probeFor('/design-preview?shell=accounts', 1440, 900));
-const WE = await collect(probeFor('/design-preview?shell=accounts-empty', 1440, 900));
-const WEM = await collect(probeFor('/design-preview?shell=accounts-empty', 390, 844));
-const WP320 = await collect(probeFor('/design-preview?shell=accounts', 320, 720));
-const WE320 = await collect(probeFor('/design-preview?shell=accounts-empty', 320, 720));
+
+// Everything else is a shell view at some width, so it all shares two browsers.
+const P = '/design-preview';
+const SHELLS = await collectGroup([
+  { key: 'SD', route: `${P}?shell=pulse`, w: 1440, h: 900 },
+  { key: 'SM', route: `${P}?shell=accounts`, w: 390, h: 844 },
+  { key: 'WP', route: `${P}?shell=accounts`, w: 1440, h: 900 },
+  { key: 'WE', route: `${P}?shell=accounts-empty`, w: 1440, h: 900 },
+  { key: 'WEM', route: `${P}?shell=accounts-empty`, w: 390, h: 844 },
+  { key: 'WP320', route: `${P}?shell=accounts`, w: 320, h: 720 },
+  { key: 'WE320', route: `${P}?shell=accounts-empty`, w: 320, h: 720 },
+]);
+// The currency cases: a dollar workspace, a workspace holding both, and a wallet
+// whose currency was never set.
+const CURRENCIES = await collectGroup([
+  { key: 'WUSD', route: `${P}?shell=accounts-usd`, w: 1440, h: 900 },
+  { key: 'WMIX', route: `${P}?shell=accounts-mixed`, w: 1440, h: 900 },
+  { key: 'WMIXM', route: `${P}?shell=accounts-mixed`, w: 390, h: 844 },
+  { key: 'WNOC', route: `${P}?shell=accounts-nocur`, w: 1440, h: 900 },
+]);
+const { SD, SM, WP, WE, WEM, WP320, WE320 } = SHELLS;
+const { WUSD, WMIX, WMIXM, WNOC } = CURRENCIES;
 console.log(`  .. desktop viewport ${D.innerWidth}px, mobile viewport ${M.innerWidth}px, `
   + `in-shell ${SD.innerWidth}px / ${SM.innerWidth}px`);
 
@@ -1192,7 +1253,9 @@ t('the abbreviated headline holds one line, down to 320px', () => {
 
 t('neither state overflows, at any width down to 320px', () => {
   for (const [name, f] of [['populated 1440', WP], ['empty 1440', WE], ['empty 390', WEM],
-                           ['populated 320', WP320], ['empty 320', WE320]]) {
+                           ['populated 320', WP320], ['empty 320', WE320],
+                           ['usd 1440', WUSD], ['mixed 1440', WMIX], ['mixed 390', WMIXM],
+                           ['no-currency 1440', WNOC]]) {
     assert.ok(f.scrollWidth <= f.clientWidth,
       name + ': scrollWidth ' + f.scrollWidth + ' > clientWidth ' + f.clientWidth);
     assert.strictEqual(f.overflowCount, 0,
@@ -1202,7 +1265,8 @@ t('neither state overflows, at any width down to 320px', () => {
 
 t('the watermark clears both amount lines in both states', () => {
   for (const [name, f] of [['populated 1440', WP], ['empty 1440', WE], ['empty 390', WEM],
-                           ['populated 320', WP320], ['empty 320', WE320]]) {
+                           ['populated 320', WP320], ['empty 320', WE320],
+                           ['usd 1440', WUSD], ['mixed 1440', WMIX], ['mixed 390', WMIXM]]) {
     for (const c of f.brand.flagships) {
       assert.ok(c.safeGap > 0,
         name + ': only ' + c.safeGap + 'px between the amounts and the mark');
@@ -1210,6 +1274,69 @@ t('the watermark clears both amount lines in both states', () => {
       assert.strictEqual(c.ariaHidden, 'true', name + ': the card mark is not aria-hidden');
     }
   }
+});
+
+/* ── currency safety, on the rendered page ───────────────────────────────────
+   A balance belongs to one currency, so a total may only cover wallets that share
+   one. The page used to add them all and label the result IDR. */
+
+t('a dollar workspace is headed in dollars, never in rupiah', () => {
+  const w = WUSD.walletsState;
+  assert.match(w.value, /^\$/, `the USD headline reads ${w.value}`);
+  assert.ok(!/Rp/.test(w.value), `the USD headline contains Rp: ${w.value}`);
+  assert.ok(!/Rp/.test(w.meta), `the USD supporting line contains Rp: ${w.meta}`);
+  // Still the approved hierarchy: abbreviated headline, exact figure beneath.
+  assert.match(w.value, /^\$1\.3M$/, `expected $1.3M, got ${w.value}`);
+  assert.match(w.meta, /^\$1 252 500\.00 · 2 wallets$/, `supporting line reads ${w.meta}`);
+  assert.match(w.label || '', /USD/, 'the card does not name the currency it is totalling');
+});
+
+t('two currencies produce two labelled amounts and no combined total', () => {
+  for (const [name, f] of [['desktop', WMIX], ['mobile', WMIXM]]) {
+    const w = f.walletsState;
+    assert.strictEqual(w.currencies.length, 2,
+      `${name}: ${w.currencies.length} currency amounts, expected 2`);
+    const codes = w.currencies.map((c) => c.code);
+    assert.deepStrictEqual(codes, ['IDR', 'USD'], `${name}: currencies are ${codes}`);
+    const idrAmt = w.currencies[0].amount, usdAmt = w.currencies[1].amount;
+    assert.match(idrAmt, /^Rp /, `${name}: the IDR amount reads ${idrAmt}`);
+    assert.match(usdAmt, /^\$/, `${name}: the USD amount reads ${usdAmt}`);
+    // The number that must never appear: the two added together. IDR 152 450 000
+    // plus USD 1 252 500 would compact to Rp 153.7M.
+    assert.ok(!/153\.7M/.test(w.pageText || ''),
+      `${name}: a combined cross-currency total is on screen`);
+    // And the card must not present ONE dominant figure at all here.
+    assert.match(w.label || '', /by currency/i,
+      `${name}: the card label is "${w.label}" rather than saying it is by currency`);
+    assert.match(w.meta, /2 currencies/, `${name}: the supporting line reads ${w.meta}`);
+  }
+});
+
+t('a wallet with no currency is counted and asked about, never totalled', () => {
+  const w = WNOC.walletsState;
+  // The two IDR wallets total Rp 132.7M; the 5 000 000 with no currency is out.
+  assert.match(w.value, /^Rp /, `the headline reads ${w.value}`);
+  assert.match(w.meta, /needs currency/i,
+    `the supporting line does not mention the wallet needing a currency: ${w.meta}`);
+  assert.ok(!/137\.7M|Rp 137/.test(w.pageText || ''),
+    'the unknown-currency balance was folded into the total anyway');
+  // The per-wallet "Needs currency" badge lives on the wallet rows, which only
+  // the real page renders — the preview shows header, card and zero state. The
+  // row badge is covered by the source assertions in designPreview.test.mjs; what
+  // the card must do, and does here, is exclude the balance and say why.
+  assert.strictEqual(w.currencies.length, 0,
+    'a single remaining currency should not render the by-currency list');
+});
+
+t('every currency on screen is written in its own notation', () => {
+  // Nowhere may a currency symbol appear in front of another currency's amount.
+  for (const [name, f] of [['USD', WUSD], ['mixed', WMIX], ['no-currency', WNOC]]) {
+    const text = f.walletsState.pageText || '';
+    assert.ok(!/Rp\s*\$|\$\s*Rp/.test(text), `${name}: two currency marks collided`);
+  }
+  // A dollar amount never carries Rp anywhere on the dollar page.
+  assert.ok(!/Rp/.test(WUSD.walletsState.pageText || ''),
+    'the dollar workspace mentions Rp somewhere');
 });
 
 t('the in-shell mobile view is a true 390px viewport with no overflow', () => {

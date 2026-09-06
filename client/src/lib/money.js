@@ -55,8 +55,25 @@ export function formatAmount(value, asset) {
 // "1 234.56 USD"
 export const formatMoney = (value, asset) => `${formatAmount(value, asset)} ${asset}`;
 
+// ── currency presentation ───────────────────────────────────────────────────
+// How each currency is written in front of its amount. A currency the product
+// has not been taught is written as a code and a space ("CHF 1 200") rather than
+// borrowed from another currency's symbol — showing "Rp" in front of dollars is
+// exactly the failure this module exists to prevent.
+export const CURRENCY_PREFIX = {
+  IDR: 'Rp ', USD: '$', EUR: '\u20AC', SGD: 'S$', MYR: 'RM ', THB: '\u0E3F', CNY: 'CN\u00A5',
+};
+export const currencyPrefix = (currency) => {
+  const c = String(currency || '').trim().toUpperCase();
+  return CURRENCY_PREFIX[c] || (c ? c + ' ' : '');
+};
+
+/** "Rp 152 450 000" / "$1 200.50" — the exact amount, in its own currency. */
+export const formatCurrency = (value, currency) =>
+  currencyPrefix(currency) + formatAmount(String(value ?? 0), String(currency || '').toUpperCase());
+
 /**
- * Display-only compaction for a headline IDR figure: "Rp 152.5M".
+ * Display-only compaction for a headline figure: "Rp 152.5M", "$1.2M".
  *
  * Returns null below a million, so a caller renders the exact amount instead —
  * that is what keeps "Rp 0" from becoming "Rp 0.0M". The exact figure is always
@@ -69,12 +86,13 @@ export const formatMoney = (value, asset) => `${formatAmount(value, asset)} ${as
  * Lived in PulseBlocks.jsx until Wallets needed the same headline treatment.
  * Copying it would have let the product's two money headlines drift apart.
  */
-export function compactIdr(value) {
+export function compactAmount(value, currency) {
   const n = Number(value || 0);
   if (!Number.isFinite(n)) return null;
   const abs = Math.abs(n);
   if (abs < 1e6) return null;             // "Rp 0", never "Rp 0.0M"
   const sign = n < 0 ? '-' : '';
+  const pre = currencyPrefix(currency);
   const UNITS = [[1e6, 'M'], [1e9, 'B'], [1e12, 'T']];
   let i = 0;
   while (i + 1 < UNITS.length && abs >= UNITS[i + 1][0]) i++;
@@ -92,7 +110,40 @@ export function compactIdr(value) {
     [div, suffix] = UNITS[i];
     tenths = Math.round(abs / (div / 10));
   }
-  return `Rp ${sign}${Math.floor(tenths / 10)}.${tenths % 10}${suffix}`;
+  return `${pre}${sign}${Math.floor(tenths / 10)}.${tenths % 10}${suffix}`;
+}
+
+/** The IDR-only shorthand Pulse has always used. */
+export const compactIdr = (value) => compactAmount(value, 'IDR');
+
+/**
+ * Group wallet-shaped rows by their own currency, and say plainly which rows
+ * could not be grouped.
+ *
+ * This is the whole safety rule in one function: a balance belongs to exactly one
+ * currency, so a total may only ever cover rows that share one. Rows whose
+ * currency is missing or is not a currency code are NOT guessed into a default —
+ * they are returned separately so the page can ask for the currency instead of
+ * inventing one. Nothing here converts anything.
+ *
+ * Returns { groups: [{ currency, total, wallets }] sorted by size, unknown: [...] }.
+ */
+export function walletsByCurrency(wallets, { balanceKey = 'balance', currencyKey = 'currency' } = {}) {
+  const byCur = new Map();
+  const unknown = [];
+  for (const w of wallets || []) {
+    const raw = w?.[currencyKey];
+    const code = typeof raw === 'string' ? raw.trim().toUpperCase() : '';
+    // A currency code, not a guess: three letters or it does not count.
+    if (!/^[A-Z]{3}$/.test(code)) { unknown.push(w); continue; }
+    if (!byCur.has(code)) byCur.set(code, { currency: code, total: 0, wallets: [] });
+    const g = byCur.get(code);
+    g.total += Number(w?.[balanceKey] || 0);
+    g.wallets.push(w);
+  }
+  const groups = [...byCur.values()].sort(
+    (a, b) => Math.abs(b.total) - Math.abs(a.total) || a.currency.localeCompare(b.currency));
+  return { groups, unknown };
 }
 
 // ── native vs reporting totals ──────────────────────────────────────────────
@@ -112,4 +163,6 @@ export function reportingTotal(items, { amountKey = 'amount_reporting' } = {}) {
   return sum((items || []).map((it) => it[amountKey] ?? it.amount_idr ?? '0'));
 }
 
-export default { toScaled, fromScaled, add, sub, cmp, sum, formatAmount, formatMoney, nativeTotalsByAsset, reportingTotal, ASSET_PRECISION };
+export default { toScaled, fromScaled, add, sub, cmp, sum, formatAmount, formatMoney,
+  formatCurrency, currencyPrefix, compactAmount, compactIdr, walletsByCurrency,
+  nativeTotalsByAsset, reportingTotal, ASSET_PRECISION, CURRENCY_PREFIX };

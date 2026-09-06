@@ -341,6 +341,20 @@ const SHOTS = [
     { crop: true, window: [512, 720], region: { sel: '.cfo-summary.cfo-flagship', pad: 6 } }],
   ['22-wallets-empty-320.png', `${P}?shell=accounts-empty`, 320, 720,
     { crop: true, window: [512, 720] }],
+  // Currency safety. A balance belongs to one currency, so a total may only cover
+  // wallets that share one — these are the states that proves it in.
+  ['23-wallets-usd-only-desktop-1440x900.png', `${P}?shell=accounts-usd`, 1440, 900, {}],
+  ['24-wallets-usd-only-card-closeup.png', `${P}?shell=accounts-usd`, 1440, 900,
+    { region: { sel: '.cfo-summary.cfo-flagship', pad: 6 } }],
+  // The case that blocked the release: unlike currencies in one workspace. One
+  // labelled amount each, and deliberately no combined figure.
+  ['25-wallets-mixed-currencies-desktop-1440x900.png', `${P}?shell=accounts-mixed`, 1440, 900, {}],
+  ['26-wallets-mixed-currencies-card-closeup.png', `${P}?shell=accounts-mixed`, 1440, 900,
+    { region: { sel: '.cfo-summary.cfo-flagship', pad: 6 } }],
+  ['27-wallets-mixed-currencies-mobile-390x844.png', `${P}?shell=accounts-mixed`, 390, 844, PHONE],
+  // A wallet whose currency was never set: counted, asked about, never totalled.
+  ['28-wallets-needs-currency-card-closeup.png', `${P}?shell=accounts-nocur`, 1440, 900,
+    { region: { sel: '.cfo-summary.cfo-flagship', pad: 6 } }],
 ];
 
 const produced = new Set(SHOTS.map(([f]) => f));

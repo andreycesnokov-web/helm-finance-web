@@ -9,7 +9,8 @@
 //
 // Pure functions, no browser, no build. Run: node tests/design/walletsAmounts.test.mjs
 import assert from 'node:assert';
-import { compactIdr, formatAmount } from '../../client/src/lib/money.js';
+import { compactIdr, compactAmount, formatAmount, formatCurrency,
+         currencyPrefix, walletsByCurrency } from '../../client/src/lib/money.js';
 
 let pass = 0, fail = 0;
 const t = (name, fn) => {
@@ -110,6 +111,110 @@ t('the approved zero-state copy is what ships', () => {
     'Add a bank account, cash balance or payment wallet to start tracking balances '
     + 'across every currency in one place.');
   assert.strictEqual(enDict.accounts.addFirstWallet, 'Add your first wallet');
+});
+
+console.log('\ncurrency safety — a total may only ever cover one currency');
+
+/* The release blocker: Accounts added every wallet's balance together and labelled
+   the result IDR, so a single dollar account turned $1 000 into Rp 1 000 inside
+   the headline. There is no exchange rate anywhere in this product that could
+   value one currency in another, so the fix is not conversion — it is refusing to
+   add unlike things. */
+
+const w = (currency, balance, id) => ({ id: id || currency + balance, currency, balance });
+
+t('IDR and USD balances are never added together', () => {
+  const { groups } = walletsByCurrency([w('IDR', 152450000), w('USD', 1000), w('IDR', 50000)]);
+  assert.strictEqual(groups.length, 2, 'two currencies did not produce two groups');
+  const idrG = groups.find((g) => g.currency === 'IDR');
+  const usdG = groups.find((g) => g.currency === 'USD');
+  assert.strictEqual(idrG.total, 152500000);
+  assert.strictEqual(usdG.total, 1000);
+  // The thing that must never exist: one number covering both.
+  assert.ok(!groups.some((g) => g.total === 152451000),
+    'a combined cross-currency total was produced');
+});
+
+t('a currency total includes only the wallets of that currency', () => {
+  const { groups } = walletsByCurrency([
+    w('IDR', 100, 'a'), w('USD', 7, 'b'), w('IDR', 200, 'c'), w('EUR', 3, 'd')]);
+  const idrG = groups.find((g) => g.currency === 'IDR');
+  assert.deepStrictEqual(idrG.wallets.map((x) => x.id), ['a', 'c']);
+  assert.strictEqual(idrG.total, 300);
+  // And the count shown beside a total is the count of THOSE wallets.
+  assert.strictEqual(countLabel(idrG.wallets.length), '2 wallets');
+  assert.strictEqual(countLabel(groups.find((g) => g.currency === 'USD').wallets.length), '1 wallet');
+});
+
+t('a single-currency workspace still gets one plain total', () => {
+  const { groups, unknown } = walletsByCurrency([
+    w('IDR', 94200000), w('IDR', 38500000), w('IDR', 12750000), w('IDR', 7000000)]);
+  assert.strictEqual(groups.length, 1);
+  assert.strictEqual(unknown.length, 0);
+  assert.strictEqual(groups[0].total, 152450000);
+  assert.strictEqual(compactAmount(groups[0].total, groups[0].currency), 'Rp 152.5M');
+  assert.strictEqual(formatCurrency(groups[0].total, groups[0].currency), 'Rp 152 450 000');
+});
+
+t('a missing or malformed currency is set aside, never guessed', () => {
+  const { groups, unknown } = walletsByCurrency([
+    w('IDR', 100), w(null, 500), w('', 600), w('rupiah', 700), w(undefined, 800), w(12, 900)]);
+  assert.strictEqual(groups.length, 1, 'something without a currency code was grouped anyway');
+  assert.strictEqual(groups[0].total, 100, 'an unknown-currency balance leaked into a total');
+  assert.strictEqual(unknown.length, 5, `${unknown.length} rows set aside, expected 5`);
+  // Specifically: it must not fall back to the workspace default.
+  assert.ok(!groups.some((g) => g.wallets.some((x) => !x.currency)),
+    'a wallet with no currency was folded into a currency group');
+});
+
+t('currency case and padding do not create phantom currencies', () => {
+  const { groups } = walletsByCurrency([w('idr', 1), w(' IDR ', 2), w('Idr', 3)]);
+  assert.strictEqual(groups.length, 1, 'the same currency was split across groups');
+  assert.strictEqual(groups[0].currency, 'IDR');
+  assert.strictEqual(groups[0].total, 6);
+});
+
+t('each currency is written in its own notation, never another one', () => {
+  assert.strictEqual(formatCurrency(1250000, 'USD'), '$1 250 000.00');
+  assert.strictEqual(compactAmount(1250000, 'USD'), '$1.3M');
+  assert.strictEqual(formatCurrency(152450000, 'IDR'), 'Rp 152 450 000');
+  // The specific bug this guards: Rp in front of dollars.
+  assert.ok(!formatCurrency(1000, 'USD').includes('Rp'), 'USD was written with Rp');
+  assert.ok(!compactAmount(5000000, 'USD').includes('Rp'), 'USD was abbreviated with Rp');
+  assert.ok(!formatCurrency(1000, 'IDR').includes('$'), 'IDR was written with a dollar sign');
+  // A currency the product has not been taught is written as its code, not
+  // borrowed from another currency's symbol.
+  assert.strictEqual(formatCurrency(1200, 'CHF'), 'CHF 1 200.00');
+});
+
+t('zero and negatives are correct in every currency', () => {
+  assert.strictEqual(formatCurrency(0, 'IDR'), 'Rp 0');
+  assert.strictEqual(formatCurrency(0, 'USD'), '$0.00');   // USD keeps its 2 decimals
+  assert.strictEqual(compactAmount(0, 'USD'), null, 'zero must not abbreviate');
+  assert.strictEqual(compactAmount(-152450000, 'IDR'), 'Rp -152.5M');
+  assert.strictEqual(compactAmount(-1250000, 'USD'), '$-1.3M');
+  assert.ok(formatCurrency(-5000, 'IDR').includes('-'), 'a negative exact amount lost its sign');
+  const { groups } = walletsByCurrency([w('IDR', -100), w('IDR', 40)]);
+  assert.strictEqual(groups[0].total, -60, 'negative balances do not net correctly');
+});
+
+t('the abbreviated and exact figures describe the same amount, per currency', () => {
+  for (const [cur, v] of [['IDR', 152450000], ['USD', 1250000], ['IDR', -9800000],
+                          ['EUR', 3400000], ['USD', 999999999]]) {
+    const head = compactAmount(v, cur);
+    if (!head) continue;
+    const unit = { M: 1e6, B: 1e9, T: 1e12 }[head.slice(-1)];
+    const shown = Number(head.replace(currencyPrefix(cur), '').slice(0, -1));
+    assert.ok(Math.abs(Math.abs(shown) * unit - Math.abs(v)) <= unit / 20 + 1e-6,
+      `${head} is not a correct rounding of ${v} ${cur}`);
+    assert.ok(head.startsWith(currencyPrefix(cur)),
+      `${head} is not written in ${cur}`);
+  }
+});
+
+t('the groups are ordered largest first, so the card has a reading order', () => {
+  const { groups } = walletsByCurrency([w('USD', 5), w('IDR', 900), w('EUR', 100)]);
+  assert.deepStrictEqual(groups.map((g) => g.currency), ['IDR', 'EUR', 'USD']);
 });
 
 console.log(fail ? `\n${pass} passed, ${fail} failed` : `\nALL PASS — ${pass} passed, 0 failed`);

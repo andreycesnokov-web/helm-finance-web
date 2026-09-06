@@ -206,6 +206,12 @@ const en = {
     addFirstWallet: 'Add your first wallet',
     // Shown as the summary card's supporting line while the workspace has none.
     noWalletsYet: 'No wallets added yet',
+    // Multi-currency: there is no single total, so the card says so.
+    totalByCurrency: 'Total balance · by currency',
+    walletsAcrossCurrencies: '{n} wallets across {m} currencies',
+    noCurrencyTotal: 'No currency set',
+    needsCurrency: 'Needs currency',
+    needsCurrencyCount: '{n} needs currency',
     walletsCountOne: '1 wallet',
     walletsCountMany: '{n} wallets',
     loadFailed: 'Could not load your wallets',

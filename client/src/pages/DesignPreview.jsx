@@ -12,9 +12,10 @@
 //
 // Safety: no auth, no API, no Supabase, no customer data. Every figure below is invented
 // and every company name is fictional. Nothing here writes anything.
-import { formatAmount, compactIdr } from '../lib/money'
+import { formatAmount } from '../lib/money'
 import en from '../i18n/en'
 import { WalletsEmptyState } from './WalletsEmptyState'
+import { walletsSummary } from './walletsSummary'
 import { PageHeader, SummaryCard, Card, Btn, StatusBadge, Icon } from '../shell/ui'
 import { ExecutiveHero } from './business/PulseBlocks'
 import WorkspaceShell, { BUSINESS_NAV } from '../shell/WorkspaceShell'
@@ -145,16 +146,36 @@ const WALLETS_FIXTURE = [
   { id: 'w4', name: 'Xendit settlement', currency: 'IDR', balance: 7000000 },
 ]
 const WALLETS_EMPTY = []
+// A workspace that banks in dollars. The headline must be written in ITS currency
+// — "$1.2M", never "Rp" in front of dollars.
+const WALLETS_USD = [
+  { id: 'u1', name: 'Wise · USD operating', currency: 'USD', balance: 842500 },
+  { id: 'u2', name: 'Mercury · reserves', currency: 'USD', balance: 410000 },
+]
+// The case that started this: unlike currencies in one workspace. There is no
+// rate in this product, so there is no combined total — one labelled amount each.
+const WALLETS_MIXED = [...WALLETS_FIXTURE, ...WALLETS_USD]
+// A wallet whose currency was never set. It is counted, never totalled, and the
+// row asks for the currency instead of being folded into someone else's total.
+const WALLETS_NEEDS_CURRENCY = [
+  ...WALLETS_FIXTURE.slice(0, 2),
+  { id: 'x1', name: 'Imported · unknown currency', currency: null, balance: 5000000 },
+]
+const WALLET_SETS = {
+  'accounts': WALLETS_FIXTURE,
+  'accounts-empty': WALLETS_EMPTY,
+  'accounts-usd': WALLETS_USD,
+  'accounts-mixed': WALLETS_MIXED,
+  'accounts-nocur': WALLETS_NEEDS_CURRENCY,
+}
 
 const AccountsBody = ({ wallets = WALLETS_FIXTURE }) => {
-  // Mirrors Accounts.jsx exactly — same formatters, same branch.
-  const total = wallets.reduce((sum, w) => sum + (w.balance || 0), 0)
-  const empty = wallets.length === 0
-  const exact = idr(total)
-  const headline = compactIdr(total) || exact
-  const count = wallets.length === 1
-    ? tEn('accounts.walletsCountOne')
-    : tEn('accounts.walletsCountMany').replace('{n}', wallets.length)
+  // The production derivation, called with the production translations. Not a
+  // mirror of Accounts.jsx — literally the function Accounts.jsx calls, so the
+  // currency rule cannot hold in one and not the other.
+  const summary = walletsSummary({
+    wallets, t: tEn, scopeLabel: tEn('accounts.totalBalance'),
+  })
   return (
     <>
       <PageHeader
@@ -162,23 +183,19 @@ const AccountsBody = ({ wallets = WALLETS_FIXTURE }) => {
         description={tEn('accounts.walletsSubtitle')}
         primaryAction={<Btn variant="primary">{tEn('accounts.addWallet')}</Btn>}
       />
-      <SummaryCard
-        flagship
-        compact={!empty}
-        label={tEn('accounts.totalBalance')}
-        value={<span className="fin">{empty ? idr(0) : headline}</span>}
-        meta={empty ? tEn('accounts.noWalletsYet') : `${exact} · ${count}`}
-      />
+      <SummaryCard flagship compact={summary.compact}
+        label={summary.label} value={summary.value} meta={summary.meta} />
       {/* The real zero-state component, not a drawing of it. */}
-      {empty && <WalletsEmptyState t={tEn} onAddWallet={noop} />}
+      {wallets.length === 0 && <WalletsEmptyState t={tEn} onAddWallet={noop} />}
     </>
   )
 }
 
-// ?shell=accounts renders the populated page; ?shell=accounts-empty renders the
-// same page with the wallet collection resolved and empty.
+// ?shell=accounts[-empty|-usd|-mixed|-nocur] renders the same page against
+// different resolved wallet collections. Every one is the same branch of the same
+// component; only the data differs.
 function ShellPreview({ page }) {
-  const isAccounts = page === 'accounts' || page === 'accounts-empty'
+  const isAccounts = Object.prototype.hasOwnProperty.call(WALLET_SETS, page)
   return (
     // No preview banner here on purpose: these are pictures of the product frame,
     // and a strip of our own chrome above it would misrepresent what ships.
@@ -191,9 +208,7 @@ function ShellPreview({ page }) {
         activeKey={isAccounts ? 'accounts' : 'pulse'}
         onNavigate={noop}
       >
-        {isAccounts
-          ? <AccountsBody wallets={page === 'accounts-empty' ? WALLETS_EMPTY : WALLETS_FIXTURE} />
-          : <PulseBody />}
+        {isAccounts ? <AccountsBody wallets={WALLET_SETS[page]} /> : <PulseBody />}
       </WorkspaceShell>
     </div>
   )
@@ -224,6 +239,14 @@ export default function DesignPreview() {
         <Section id="pulse" title="Pulse" wide
           note="Shared header with a description, the navy flagship card wearing the shared mark, and the KPI row — which stays unbranded.">
           <PulseBody />
+        </Section>
+
+        {/* ── Accounts, other currencies ───────────────────────────────── */}
+        <Section id="accounts-currencies" title="Wallets — currency safety" wide
+          note="A balance belongs to one currency, so a total may only cover wallets that share one. A dollar workspace is headed in dollars; a workspace holding both gets one labelled amount per currency and deliberately no combined figure, because this product has no rate that could produce one; a wallet with no currency set is counted and asked about, never folded into someone else's total.">
+          <AccountsBody wallets={WALLETS_USD} />
+          <AccountsBody wallets={WALLETS_MIXED} />
+          <AccountsBody wallets={WALLETS_NEEDS_CURRENCY} />
         </Section>
 
         {/* ── Accounts, empty ──────────────────────────────────────────── */}

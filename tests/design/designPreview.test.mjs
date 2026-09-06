@@ -93,15 +93,19 @@ t('the preview defines no look-alike of a component it is meant to prove', () =>
 });
 
 t('money is formatted by the production formatters', () => {
-  // Both of them: the preview shows the same abbreviated-over-exact pair the
-  // Wallets card does, so it needs compactIdr as well as formatAmount. Siblings
-  // in the import are fine; hand-rolled currency is not.
+  // The preview must never format currency itself. Pulse's fixtures go through
+  // formatAmount; the Wallets card goes through walletsSummary, which owns the
+  // abbreviation AND the currency rule — so importing that is the stronger
+  // guarantee, not a weaker one.
   const fromMoney = /import\s*\{([^}]*)\}\s*from\s*'\.\.\/lib\/money'/.exec(src);
   assert.ok(fromMoney, 'the preview does not import from lib/money at all');
   const named = fromMoney[1].split(',').map((x) => x.trim());
   assert.ok(named.includes('formatAmount'), 'the preview must not hand-format currency');
-  assert.ok(named.includes('compactIdr'),
-    'the preview must abbreviate with the production formatter, not its own');
+  assert.match(src, /import\s*\{[^}]*walletsSummary[^}]*\}\s*from\s*'\.\/walletsSummary'/,
+    'the preview must derive the Wallets card from the production summary');
+  // No currency symbol typed straight into the preview's own markup.
+  assert.ok(!/'Rp '|"Rp "|\$\{'\$'\}/.test(src.replace(/const idr =.*\n/, '')),
+    'the preview writes a currency symbol by hand somewhere');
 });
 
 console.log('\ndesign preview — it must not reach anything real');
@@ -249,10 +253,14 @@ t('the summary card never states a balance it does not know', () => {
   // nothing - but never while loading and never after a failure.
   assert.match(acc, /\{!loading && !loadError && \(\s*<SummaryCard/,
     'the summary card is not gated on a resolved, successful load');
-  assert.match(acc, /meta=\{resolvedEmpty \? t\('accounts\.noWalletsYet'\)/,
-    'an empty workspace does not get the zero-state supporting line');
-  assert.match(acc, /value=\{<span className="fin">\{resolvedEmpty \? idr\(0\)/,
-    'an empty workspace does not show Rp 0 as its headline');
+  // What it then SAYS is decided in one place, for the page and the preview both.
+  assert.match(acc, /const summary = walletsSummary\(\{ wallets: filteredWallets, t, scopeLabel \}\)/,
+    'the card content is not derived from the shared summary');
+  const ws = code('client/src/pages/walletsSummary.jsx');
+  assert.match(ws, /if \(!wallets \|\| wallets\.length === 0\)[\s\S]{0,400}accounts\.noWalletsYet/,
+    'an empty collection does not get the zero-state supporting line');
+  assert.match(ws, /formatCurrency\(0, WORKSPACE_DEFAULT_CURRENCY\)/,
+    'an empty collection does not show a zero in the workspace currency');
 });
 
 t('the zero state calls the page own add-wallet action', () => {
@@ -268,12 +276,12 @@ t('the zero state calls the page own add-wallet action', () => {
 });
 
 t('both amount formatters come from the shared money module', () => {
-  const acc = code('client/src/pages/Accounts.jsx');
-  assert.match(acc, /import \{ formatAmount, compactIdr \} from '\.\.\/lib\/money'/,
-    'Accounts does not import the shared formatters');
-  assert.match(acc, /const headlineAmount = compactIdr\(filteredBalance\) \|\| exactAmount/,
+  const ws = code('client/src/pages/walletsSummary.jsx');
+  assert.match(ws, /import \{ formatCurrency, compactAmount, walletsByCurrency \} from '\.\.\/lib\/money'/,
+    'the summary does not import the shared formatters');
+  assert.match(ws, /compactAmount\(g\.total, g\.currency\) \|\| exact/,
     'the headline is not the compact figure falling back to the exact one');
-  assert.match(acc, /const exactAmount = idr\(filteredBalance\)/,
+  assert.match(ws, /const exact = formatCurrency\(g\.total, g\.currency\)/,
     'the exact figure is not derived from the shared formatter');
   // One implementation: Pulse must not keep a private copy of the compaction.
   const pulse = code('client/src/pages/business/PulseBlocks.jsx');
@@ -281,6 +289,59 @@ t('both amount formatters come from the shared money module', () => {
     'PulseBlocks does not use the shared compactIdr');
   assert.ok(!/function compactIdr/.test(pulse),
     'PulseBlocks still defines its own compactIdr');
+});
+
+/* -- currency safety -------------------------------------------------------
+   The release blocker: the page added balances of unlike currencies and labelled
+   the result IDR, so one dollar account turned $1 000 into Rp 1 000. */
+
+t('the cross-currency sums are gone, not merely unused', () => {
+  const acc = code('client/src/pages/Accounts.jsx');
+  for (const gone of ['const totalBalance', 'const businessBalance',
+                      'const personalBalance', 'const filteredBalance']) {
+    assert.ok(!acc.includes(gone), `${gone} still exists and sums across currencies`);
+  }
+  assert.ok(!/wallets\.reduce\(\(s, w\) => s \+ \(w\.balance/.test(acc),
+    'Accounts still adds every wallet balance together');
+});
+
+t('a total may only ever cover one currency', () => {
+  const money = code('client/src/lib/money.js');
+  // Grouping refuses anything that is not a currency code rather than defaulting.
+  assert.match(money, /unknown\.push\(w\); continue;/,
+    'walletsByCurrency does not set aside rows without a currency');
+  assert.match(money, /\/\^\[A-Z\]\{3\}\$\//,
+    'walletsByCurrency accepts something other than a currency code');
+  const ws = code('client/src/pages/walletsSummary.jsx');
+  assert.match(ws, /if \(groups\.length === 1\)/, 'no single-currency branch');
+  // More than one currency must not produce a combined figure anywhere.
+  assert.ok(!/groups\.reduce/.test(ws), 'the summary adds group totals together');
+  assert.match(ws, /accounts\.totalByCurrency/,
+    'a multi-currency card does not say it is broken down by currency');
+});
+
+t('no currency symbol is hardcoded outside the money module', () => {
+  for (const f of ['client/src/pages/Accounts.jsx', 'client/src/pages/walletsSummary.jsx']) {
+    const src2 = code(f);
+    assert.ok(!/'Rp '|"Rp "/.test(src2), `${f} writes "Rp" by hand`);
+  }
+  // The one place a currency is named without a wallet to read it from, and it is
+  // only ever used for a zero.
+  const ws = code('client/src/pages/walletsSummary.jsx');
+  assert.match(ws, /export const WORKSPACE_DEFAULT_CURRENCY = 'IDR'/,
+    'the workspace default currency is not declared in one named place');
+  const uses = (ws.match(/WORKSPACE_DEFAULT_CURRENCY/g) || []).length;
+  assert.strictEqual(uses, 2, `WORKSPACE_DEFAULT_CURRENCY is used ${uses - 1} times, not once`);
+});
+
+t('a wallet row shows its own currency and its own share', () => {
+  const acc = code('client/src/pages/Accounts.jsx');
+  assert.match(acc, /formatCurrency\(w\.balance \|\| 0, grp\.currency\)/,
+    'a wallet row does not render its balance in its own currency');
+  assert.match(acc, /grp && grp\.total > 0/,
+    'a wallet share is still measured against a mixed total');
+  assert.match(acc, /accounts\.needsCurrency/,
+    'a wallet with no currency is not flagged for review');
 });
 
 t('an abbreviated headline is marked as one so it cannot wrap', () => {
@@ -332,15 +393,17 @@ t('the preview renders the real zero state, not a copy of it', () => {
 t('the preview fixture cannot show a balance and an empty state at once', () => {
   const dp = code('client/src/pages/DesignPreview.jsx');
   // The rejected concept rendered the zero state underneath a card claiming four
-  // wallets and Rp 152 450 000. Both now derive from the same array.
-  assert.match(dp, /const empty = wallets\.length === 0/,
-    'emptiness is not derived from the collection');
-  assert.match(dp, /\{empty && <WalletsEmptyState/,
+  // wallets and Rp 152 450 000. Card and zero state now both follow the array.
+  assert.match(dp, /const summary = walletsSummary\(\{/,
+    'the card is not derived from the production summary');
+  assert.match(dp, /\{wallets\.length === 0 && <WalletsEmptyState/,
     'the zero state is not gated on the collection being empty');
-  assert.match(dp, /const total = wallets\.reduce/,
-    'the total is not derived from the collection');
   assert.ok(!/idr\(152450000\)|meta="IDR · 4 wallets"/.test(dp),
     'the preview still hardcodes a populated total or wallet count');
+  // And it can demonstrate every currency case, from the same component.
+  for (const set of ['WALLETS_USD', 'WALLETS_MIXED', 'WALLETS_NEEDS_CURRENCY']) {
+    assert.ok(dp.includes(set), `the preview cannot demonstrate ${set}`);
+  }
 });
 
 t('Radar is deferred, not half-migrated', () => {

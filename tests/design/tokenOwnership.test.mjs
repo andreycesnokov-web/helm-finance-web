@@ -199,8 +199,13 @@ t('Accounts no longer uses the hand-rolled header div', () => {
 });
 
 t('the hero figure uses the financial numeral treatment', () => {
-  const accounts = read('client/src/pages/Accounts.jsx');
-  assert.ok(/className="fin"/.test(accounts), 'the Accounts balance must carry .fin');
+  // The Wallets hero figure is built in walletsSummary.jsx now — the card content
+  // moved there so the page and the design preview derive it from one place.
+  const summary = read('client/src/pages/walletsSummary.jsx');
+  assert.ok(/className="fin"/.test(summary), 'the Wallets balance must carry .fin');
+  // Every per-currency amount too, not just the single-currency headline.
+  assert.ok(/className="fin cfo-summary-cur-amt"/.test(summary),
+    'the per-currency amounts must carry .fin');
   const shell = read('client/src/shell/shell.css');
   const fin = shell.match(/\.fin\{[^}]*\}/);
   assert.ok(fin, '.fin must be defined');

@@ -5,9 +5,11 @@ import { useAuth } from '../hooks/useAuth'
 import { useAccess } from '../hooks/useAccess'
 import { useTranslation } from '../hooks/useTranslation'
 import { apiFetch, fmt, fmtFull } from '../lib/api'
-import { formatAmount, compactIdr } from '../lib/money'
+import { formatCurrency, walletsByCurrency } from '../lib/money'
+import { walletsSummary } from './walletsSummary'
 import { PageHeader, SummaryCard, ErrorState } from '../shell/ui'
 import { WalletsEmptyState } from './WalletsEmptyState'
+import { WORKSPACE_DEFAULT_CURRENCY } from './walletsSummary'
 
 // ── Wallet type config ────────────────────────────────────────────────────────
 const WALLET_TYPES = [
@@ -93,7 +95,7 @@ const getCurrencyStyle = (currency) => CURRENCY_STYLE[currency] || { bg: '#F1F5F
 const getTypeIcon      = (type, color) => (TYPE_ICON[type] || TYPE_ICON.other)(color)
 
 // ── Default form state ────────────────────────────────────────────────────────
-const EMPTY_FORM = { name: '', currency: 'IDR', type: '', entity_name: '', opening_balance: '', sort_order: 0, custom_type: '', scope: 'business' }
+const EMPTY_FORM = { name: '', currency: WORKSPACE_DEFAULT_CURRENCY, type: '', entity_name: '', opening_balance: '', sort_order: 0, custom_type: '', scope: 'business' }
 
 export default function Accounts() {
   const { token } = useAuth()
@@ -161,32 +163,35 @@ export default function Accounts() {
   }, [])
 
   // ── Computed totals ───────────────────────────────────────────────────────
-  const totalBalance    = wallets.reduce((s, w) => s + (w.balance || 0), 0)
-  const businessBalance = wallets.filter(w => (w.scope || 'business') === 'business').reduce((s, w) => s + (w.balance || 0), 0)
-  const personalBalance = wallets.filter(w => w.scope === 'personal').reduce((s, w) => s + (w.balance || 0), 0)
+  // The three cross-currency sums that used to live here are gone rather than
+  // merely unused. Each added every wallet's balance regardless of denomination
+  // and the result was labelled IDR, so one dollar account made the headline
+  // wrong; leaving them in place would be leaving the next caller a loaded gun.
+  // Totals are now derived per currency, below.
 
   // Filtered wallets per tab
   const filteredWallets = scopeTab === 'all'
     ? wallets
     : wallets.filter(w => (w.scope || 'business') === scopeTab)
 
-  const filteredBalance = scopeTab === 'all' ? totalBalance
-    : scopeTab === 'business' ? businessBalance
-    : personalBalance
-
-  // ── the summary card's two amounts ────────────────────────────────────────
-  // Pulse's hierarchy, adopted here: the abbreviated figure is the headline and
-  // the exact one sits underneath, so the card reads at a glance without rounding
-  // anything away. Both come from the shared formatters — compactIdr returns null
-  // below a million, which is what keeps an empty workspace at "Rp 0" rather than
-  // "Rp 0.0M", and what keeps small balances exact.
-  const idr = (v) => 'Rp ' + formatAmount(String(v ?? 0), 'IDR')
-  const walletCount = filteredWallets.length
-  const exactAmount = idr(filteredBalance)
-  const headlineAmount = compactIdr(filteredBalance) || exactAmount
-  const countLabel = walletCount === 1
-    ? t('accounts.walletsCountOne')
-    : t('accounts.walletsCountMany').replace('{n}', walletCount)
+  // ── the summary card's amounts, one currency at a time ────────────────────
+  //
+  // A balance belongs to exactly one currency, so a total may only ever cover
+  // wallets that share one. This page used to add every wallet's balance together
+  // and label the result IDR, which silently turned $1 000 into Rp 1 000 the
+  // moment a dollar account existed. The rule the rest of the codebase already
+  // states — personal Pulse in server/index.js and BusinessAccounts both say
+  // "NEVER sum across currencies" — now holds here too.
+  //
+  // Nothing is converted. There is no rate in this product that could value one
+  // currency in another, so the page reports what it knows: a total per currency.
+  // Grouping is needed twice: the card totals per currency, and each wallet row
+  // shows its share of its OWN currency's total.
+  const { groups: currencyGroups } = walletsByCurrency(filteredWallets)
+  const scopeLabel = scopeTab === 'business' ? t('accounts.totalBusiness')
+    : scopeTab === 'personal' ? t('accounts.totalPersonal')
+    : t('accounts.totalBalance')
+  const summary = walletsSummary({ wallets: filteredWallets, t, scopeLabel })
   // The collection has resolved and holds nothing. Distinct from "still loading"
   // and from "the request failed", and only this one invites a first wallet.
   const resolvedEmpty = !loading && !loadError && wallets.length === 0
@@ -367,10 +372,10 @@ export default function Accounts() {
       {!loading && !loadError && (
         <SummaryCard
           flagship
-          compact={!resolvedEmpty}
-          label={scopeTab === 'business' ? t('accounts.totalBusiness') : scopeTab === 'personal' ? t('accounts.totalPersonal') : t('accounts.totalBalance')}
-          value={<span className="fin">{resolvedEmpty ? idr(0) : headlineAmount}</span>}
-          meta={resolvedEmpty ? t('accounts.noWalletsYet') : `${exactAmount} · ${countLabel}`}
+          compact={summary.compact}
+          label={summary.label}
+          value={summary.value}
+          meta={summary.meta}
         />
       )}
 
@@ -423,7 +428,10 @@ export default function Accounts() {
           {filteredWallets.map((w) => {
             const cs    = getCurrencyStyle(w.currency)
             const isNeg = (w.balance || 0) < 0
-            const pct   = filteredBalance > 0 ? Math.round(((w.balance || 0) / filteredBalance) * 100) : 0
+            // Share of its OWN currency's total. Measured against a mixed total it
+            // was arithmetic between unlike units dressed up as a percentage.
+            const grp   = currencyGroups.find((g) => g.wallets.includes(w))
+            const pct   = grp && grp.total > 0 ? Math.round(((w.balance || 0) / grp.total) * 100) : 0
             const typeLabel = WALLET_TYPES.find(t => t.value === w.type && t.value !== '__custom__')?.label || (w.type ? w.type : null)
             const walletScope = w.scope || 'business'
 
@@ -439,7 +447,11 @@ export default function Accounts() {
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: 3 }}>{w.name}</div>
                     <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                      <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 20, background: cs.bg, color: cs.color, fontWeight: 700 }}>{w.currency}</span>
+                      <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 20, fontWeight: 700,
+                        background: grp ? cs.bg : 'var(--warning-soft, #FEF3C7)',
+                        color:      grp ? cs.color : 'var(--warning-dark, #92400E)' }}>
+                        {grp ? grp.currency : t('accounts.needsCurrency')}
+                      </span>
                       {typeLabel && <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 20, background: 'var(--bg-2)', color: 'var(--text-3)', fontWeight: 600 }}>{typeLabel}</span>}
                       <span style={{
                         fontSize: 10, padding: '1px 6px', borderRadius: 20, fontWeight: 700,
@@ -453,10 +465,17 @@ export default function Accounts() {
 
                   {/* Balance */}
                   <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                    {/* The amount carries its own currency. Rendering every wallet
+                        with the same bare number is what made a dollar account
+                        indistinguishable from a rupiah one at a glance. */}
                     <div style={{ fontSize: 'var(--text-base)', fontWeight: 800, color: isNeg ? 'var(--red-dark)' : 'var(--text)', letterSpacing: -0.3, lineHeight: 1, whiteSpace: 'nowrap' }}>
-                      {isNeg ? '−' : ''}{fmt(Math.abs(w.balance || 0))}
+                      {grp
+                        ? formatCurrency(w.balance || 0, grp.currency)
+                        : <>{isNeg ? '−' : ''}{fmt(Math.abs(w.balance || 0))}</>}
                     </div>
-                    <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 3, whiteSpace: 'nowrap' }}>{Math.abs(pct)}{t('accounts.share')}</div>
+                    <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 3, whiteSpace: 'nowrap' }}>
+                      {grp ? `${Math.abs(pct)}${t('accounts.share')}` : t('accounts.needsCurrency')}
+                    </div>
                   </div>
 
                   {/* Actions */}
