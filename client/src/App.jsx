@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './hooks/useAuth'
 import { useAccess } from './hooks/useAccess'
@@ -545,6 +545,13 @@ function SwipeBackIndicator() {
   )
 }
 
+// Design preview — visual QA for the shared page hero and token layer.
+// The flag is read at module scope so the whole page, including its stylesheet,
+// stays out of a production bundle: a static import would ship DesignPreview.css
+// to every customer even though the component never renders.
+const DESIGN_PREVIEW_ON = import.meta.env.VITE_DESIGN_PREVIEW_ENABLED === 'true'
+const DesignPreview = DESIGN_PREVIEW_ON ? lazy(() => import('./pages/DesignPreview')) : null
+
 export default function App() {
   return (
     <BrowserRouter>
@@ -586,6 +593,14 @@ export default function App() {
           {/* Premium UI preview — standalone, synthetic only, gated by VITE_PREMIUM_UI_PREVIEW.
               404s in any build without the flag (e.g. production). */}
           <Route path="/demo/personal-overview" element={<PreviewApp />} />
+          {/* Gated by VITE_DESIGN_PREVIEW_ENABLED. Without the flag the route is never
+              registered, so /design-preview falls through to the normal 404. Never
+              linked from navigation. */}
+          {DESIGN_PREVIEW_ON && (
+            <Route path="/design-preview" element={
+              <Suspense fallback={null}><DesignPreview /></Suspense>
+            } />
+          )}
           {/* Local design review only. Hidden from navigation and omitted from production routes. */}
           {import.meta.env.DEV && <Route path="/_preview/onboarding" element={<OnboardingPreview />} />}
           {/* Live Personal Workspace (Phase 2) — premium shell, real endpoints, no synthetic data. */}

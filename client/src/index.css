@@ -1,21 +1,28 @@
 @import './hf-system.css';
 
 :root {
+  /* ══════════════════════════════════════════════════════════════════════════
+     Brand colour, status colour, text colour, borders, elevation, radius,
+     spacing, focus and numerals are owned by brand/tokens.css. Do not declare
+     those names here: this file loads later, so a duplicate silently wins and
+     the brand layer stops applying. That is exactly what happened to
+     --brand-navy, --success, --warning, --danger, --text-muted and the shadows.
+     tests/design/tokenOwnership.test.mjs fails the build if it recurs.
+     ══════════════════════════════════════════════════════════════════════════ */
+
   /* ── Layout ─────────────────────────────────────────── */
   --sidebar-width: 296px;
   --right-panel:   300px;
 
   /* ── Border radius ───────────────────────────────────── */
-  --radius-sm: 8px;
-  --radius:    12px;
-  --radius-lg: 16px;
-  --radius-xl: 24px;
+  /* --radius-sm / -lg / -xl are owned by brand/tokens.css. Only the unprefixed
+     legacy alias lives here, pointing at the canonical mid step. */
+  --radius:    var(--radius-md);
 
-  /* ── Shadows (professional fintech, never heavy) ─────── */
-  --shadow-xs: 0 1px 2px rgba(16, 24, 40, 0.05);
-  --shadow-sm: 0 1px 3px rgba(16, 24, 40, 0.08), 0 1px 2px rgba(16, 24, 40, 0.04);
-  --shadow-md: 0 4px 12px rgba(16, 24, 40, 0.10);
-  --shadow-lg: 0 12px 32px rgba(16, 24, 40, 0.14);
+  /* ── Shadows ─────────────────────────────────────────── */
+  /* sm / md / lg are owned by brand/tokens.css, where they are navy-tinted to
+     match the brand rather than the slate these were mixed from. */
+  --shadow-xs: 0 1px 2px rgba(0, 51, 102, 0.05);
 
   /* ── Typography scale ────────────────────────────────── */
   --text-xs:   13px;
@@ -35,14 +42,8 @@
   --weight-bold:     700;
 
   /* ── Spacing scale ───────────────────────────────────── */
-  --space-1:  4px;
-  --space-2:  8px;
-  --space-3:  12px;
-  --space-4:  16px;
-  --space-5:  20px;
-  --space-6:  24px;
-  --space-8:  32px;
-  --space-10: 40px;
+  /* --space-1 … --space-10 are owned by brand/tokens.css (identical values).
+     Only the extra step lives here. */
   --space-12: 48px;
 
   /* ── Brand ───────────────────────────────────────────── */
@@ -51,7 +52,8 @@
   --brand-light: #EFF6FF;
 
   /* ── CFO AI corporate palette ───────────────────────── */
-  --brand-navy:       #0F172A;
+  /* --brand-navy is owned by brand/tokens.css and is #003366. It used to be
+     redeclared here as #0F172A, which is what actually shipped. */
   --brand-graphite:   #18181B;
   --brand-blue:       #2563EB;
   --brand-blue-dark:  #1D4ED8;
@@ -64,16 +66,15 @@
   --hf-blue-dark:#1D4ED8;
 
   /* Semantic status tokens */
-  --success:       #065F46;
-  --success-light: #ECFDF3;
-  --warning:       #D97706;
-  --warning-light: #FFFAEB;
-  --danger:        #DC2626;
-  --danger-light:  #FEF2F2;
+  /* --success / --warning / --danger are owned by brand/tokens.css. The -light
+     variants below are the legacy names for the canonical -soft pair; they are
+     aliased so existing call sites keep working while they migrate. */
+  --success-light: var(--success-soft);
+  --warning-light: var(--warning-soft);
+  --danger-light:  var(--danger-soft);
 
   /* Readable text tokens */
-  --text-main:  #0F172A;
-  --text-muted: #64748B;
+  --text-main:  var(--text-primary);
 
   /* ── Surface system ─────────────────────────────────── */
   --surface-main:   #F8FAFC;
@@ -97,8 +98,8 @@
   --bg-4: #E5EAF1;
 
   /* ── Surface tokens (semantic) ───────────────────────── */
+  /* --surface-card is owned by brand/tokens.css (same value). */
   --surface:              #FFFFFF;
-  --surface-card:         #FFFFFF;
   --surface-card-hover:   #F8FAFC;
   --surface-sidebar:      #FFFFFF;
   --surface-sidebar-active: #EFF6FF;

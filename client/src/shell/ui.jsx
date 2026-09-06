@@ -40,18 +40,95 @@ export const Icon = {
 }
 
 /* ── primitives ─────────────────────────────────────────────────────────────*/
-export const Btn = ({ variant = 'primary', sm, icon, children, ...p }) => (
-  <button className={`cfo-btn cfo-btn-${variant}${sm ? ' cfo-btn-sm' : ''}`} {...p}>{icon}{children}</button>
+// className merges rather than replaces. The spread used to sit after the
+// computed class, so any caller passing className silently deleted
+// `cfo-btn cfo-btn-primary` and got an unstyled button.
+export const Btn = ({ variant = 'primary', sm, icon, className = '', children, ...p }) => (
+  <button
+    className={`cfo-btn cfo-btn-${variant}${sm ? ' cfo-btn-sm' : ''}${className ? ' ' + className : ''}`}
+    {...p}
+  >{icon}{children}</button>
 )
 
 export const StatusBadge = ({ tone = 'neutral', icon, children }) => (
   <span className={`cfo-badge cfo-badge-${tone}`}>{icon}{children}</span>
 )
 
-export const PageHeader = ({ eyebrow, title, actions }) => (
+// The same official symbol in navy, for the light page-hero band.
+export const HEAD_SYMBOL = '/brand/symbol_navy_transparent.svg'
+
+// The same official symbol in white, for the navy financial surfaces. Both files
+// are the identical geometry shipped in client/public/brand and differ only in
+// fill, so the product never draws two different marks.
+export const FLAGSHIP_MARK = '/brand/symbol_white_transparent.svg'
+
+/**
+ * The brand watermark a flagship financial card wears.
+ *
+ * There are exactly two branding layers in the product and they are deliberately
+ * unequal: the page hero carries a very faint contextual mark, and the one navy
+ * card carrying the page's headline figure carries a stronger cropped one. This
+ * is that second layer, and it is one component so Pulse's hand-built cash card
+ * and the shared SummaryCard cannot drift into two different treatments again.
+ *
+ * Size, opacity, crop, safe area and mobile behaviour all live in `.cfo-flagship`
+ * in shell.css. A surface opts in by wearing that class; it does not get to
+ * restyle the mark.
+ *
+ * Decorative: empty alt and aria-hidden, so it is absent from the accessibility
+ * tree entirely.
+ */
+export const FlagshipMark = () => (
+  <img className="cfo-flagship-mark" src={FLAGSHIP_MARK} alt="" aria-hidden="true" />
+)
+
+/**
+ * The header every business-workspace page wears.
+ *
+ * There were two of these: this component, and a hand-rolled `.hf-page-header`
+ * div copied across Accounts, AI CFO, Approvals and Invoices. They disagreed on
+ * whether a page gets a description, where the action sits, and whether the
+ * title is an <h1> at all — five pages shipped no <h1> whatsoever. One contract
+ * now, so a page can leave a slot empty but cannot reinvent it.
+ *
+ * @param eyebrow    small label above the title (optional)
+ * @param title      the page name — always rendered as the page's single <h1>
+ * @param description one sentence on what the page is for (optional but expected)
+ * @param primaryAction the one thing this page is for (optional)
+ * @param secondaryActions supporting actions, shown before the primary (optional)
+ * @param context    status chips / metadata, wrapped below on narrow screens
+ * @param actions    legacy slot, kept so unmigrated pages keep working
+ */
+export const PageHeader = ({
+  eyebrow, title, description, primaryAction, secondaryActions, context, actions,
+}) => (
   <div className="cfo-pagehead">
-    <div>{eyebrow && <div className="cfo-eyebrow">{eyebrow}</div>}<h1 className="cfo-h1">{title}</h1></div>
-    {actions && <div className="cfo-pagehead-actions">{actions}</div>}
+    {/* The band's branded corner: one official symbol, cropped by the band edge,
+        at low opacity. It lives in a reserved column that neither the text zone
+        nor the control zone can enter (see --head-safe), so it is never behind
+        anything anyone has to read. Decorative, so it is inert to a reader. */}
+    <img className="cfo-pagehead-mark" src={HEAD_SYMBOL} alt="" aria-hidden="true" />
+    <div className="cfo-pagehead-text">
+      {eyebrow && <div className="cfo-eyebrow">{eyebrow}</div>}
+      <h1 className="cfo-h1">{title}</h1>
+      {description && <p className="cfo-pagehead-desc">{description}</p>}
+    </div>
+    {(primaryAction || secondaryActions || context || actions) && (
+      <div className="cfo-pagehead-right">
+        {/* Context (metadata badges) and actions (controls) are separate boxes on
+            purpose. On mobile the actions box becomes a full-width grid so a
+            primary button spans the screen — right for buttons, wrong for badges,
+            which stretched edge to edge while they shared that box. */}
+        {context && <div className="cfo-pagehead-context">{context}</div>}
+        {(actions || secondaryActions || primaryAction) && (
+          <div className="cfo-pagehead-actions">
+            {actions}
+            {secondaryActions}
+            {primaryAction}
+          </div>
+        )}
+      </div>
+    )}
   </div>
 )
 
@@ -62,12 +139,32 @@ export const Card = ({ title, action, children, className = '', style }) => (
   </section>
 )
 
-// Summary / hero card. `metrics` = [{k, v, tone}]
-export const SummaryCard = ({ label, value, meta, metrics, symbol }) => (
-  <section className="cfo-summary">
-    {symbol && <img className="cfo-summary-sym" src={symbol} alt="" aria-hidden />}
+/**
+ * Summary / hero card — the page's dominant financial figure.
+ *
+ * `flagship` marks this as the ONE card that carries the page's headline money
+ * figure: Pulse's total cash, Accounts' total balance. It is opt-in and off by
+ * default, because the meaning is editorial rather than visual — a page decides
+ * which of its cards is the flagship, and only that one earns the brand mark.
+ * Ordinary summary cards, KPI tiles, panels and tables stay unbranded.
+ *
+ * The prop is named for that role and not for what it draws, so the branding
+ * treatment can change without every call site having to be re-read.
+ *
+ * `compact` says the headline figure is an ABBREVIATED amount — "Rp 152.5M" —
+ * with the exact figure carried in `meta` beneath it. That is the hierarchy Pulse
+ * uses, and it changes one thing here: an abbreviated amount must never wrap,
+ * because half of "152.5M" on a second line is not a number. A card passing the
+ * full figure as its headline keeps the existing wrapping behaviour, which is
+ * what a long exact amount needs.
+ *
+ * `metrics` = [{k, v, tone}]
+ */
+export const SummaryCard = ({ label, value, meta, metrics, flagship = false, compact = false }) => (
+  <section className={`cfo-summary${flagship ? ' cfo-flagship' : ''}`}>
+    {flagship && <FlagshipMark />}
     <div className="cfo-summary-label">{label}</div>
-    <div className="cfo-summary-value">{value}</div>
+    <div className={`cfo-summary-value${compact ? ' is-compact' : ''}`}>{value}</div>
     {meta && <div className="cfo-summary-meta">{meta}</div>}
     {metrics && (
       <div className="cfo-summary-row">
@@ -115,7 +212,7 @@ export const LoadingSkeleton = ({ rows = 3, height = 16, gap = 12, width = '100%
 
 export const EmptyState = ({ symbol, title, description, actions }) => (
   <div className="cfo-state">
-    {symbol && <img src={symbol} alt="" className="cfo-state-sym" aria-hidden />}
+    {symbol && <img src={symbol} alt="" className="cfo-state-sym" aria-hidden="true" />}
     <h2 className="cfo-state-h">{title}</h2>
     {description && <p className="cfo-state-p">{description}</p>}
     {actions && <div className="cfo-state-actions">{actions}</div>}

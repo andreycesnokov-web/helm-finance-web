@@ -9,8 +9,16 @@ import WorkspaceSwitcher from './WorkspaceSwitcher'
 import { Icon } from './ui'
 
 const LOGO_WORDMARK = '/brand/logo_main_navy_transparent_2400.png'
-const SYMBOL = '/brand/symbol_navy_blue_dot_transparent.svg'
 const FUNDING_UI_ENABLED = import.meta.env.VITE_PERSONAL_FUNDING_UI_ENABLED === 'true'
+
+// Workspace settings is deliberately NOT a nav item. It configures the workspace
+// rather than navigating within it, so it sits in the sidebar footer as a utility
+// row. `Team` stays in the nav: Team manages people, settings manages configuration.
+// The destinations are unchanged — only the entry point moved.
+export const SETTINGS_DESTINATION = {
+  personal: { key: 'settings', label: 'Workspace settings', to: '/personal/settings' },
+  business: { key: 'settings', label: 'Workspace settings', to: '/business/settings' },
+}
 
 // Nav configs — labels are i18n keys at call sites; here plain for V1.
 export const PERSONAL_NAV = [
@@ -26,7 +34,6 @@ export const PERSONAL_NAV = [
   { title: 'More', items: [
     { key: 'documents', label: 'Documents', to: '/personal/documents', icon: <Icon.doc /> },
     { key: 'cfo', label: 'Personal AI CFO', to: '/personal/cfo', icon: <Icon.cfo /> },
-    { key: 'settings', label: 'Settings', to: '/personal/settings', icon: <Icon.cog /> },
   ] },
 ]
 
@@ -69,9 +76,41 @@ export const BUSINESS_NAV = [
     { key: 'approvals', label: 'Approvals', to: '/business/approvals', icon: <Icon.check /> },
     { key: 'team', label: 'Team', to: '/business/team', icon: <Icon.users /> },
     { key: 'documents', label: 'Documents', to: '/business/documents', icon: <Icon.doc /> },
-    { key: 'settings', label: 'Settings', to: '/business/settings', icon: <Icon.cog /> },
   ] },
 ]
+
+/**
+ * Sidebar footer utility.
+ *
+ * What was here before was a badge reading "Shared team workspace" — a label that
+ * looked clickable, was not, and explained nothing. It now carries the workspace
+ * settings entry point: one button, one accessible name, gear on the left, the
+ * workspace's own state as the supporting line, chevron on the right.
+ *
+ * Deliberately ONE interactive element. A row with a nested link inside a button
+ * gives a screen reader two overlapping controls for one action.
+ */
+function WorkspaceSettings({ workspace, onNavigate }) {
+  const isPersonal = workspace?.type === 'personal'
+  const dest = isPersonal ? SETTINGS_DESTINATION.personal : SETTINGS_DESTINATION.business
+  // Derived from the workspace, not assumed: a personal workspace is not shared.
+  const subtitle = isPersonal ? 'Personal workspace' : 'Shared team workspace'
+  return (
+    <button
+      type="button"
+      className="cfo-side-settings"
+      onClick={() => onNavigate?.(dest)}
+      aria-label={`Workspace settings — ${subtitle}`}
+    >
+      <span className="cfo-side-settings-icon" aria-hidden="true"><Icon.cog /></span>
+      <span className="cfo-side-settings-text">
+        <span className="cfo-side-settings-title">Workspace settings</span>
+        <span className="cfo-side-settings-sub">{subtitle}</span>
+      </span>
+      <span className="cfo-side-settings-chev" aria-hidden="true"><Icon.chev /></span>
+    </button>
+  )
+}
 
 function Nav({ groups, activeKey, onNavigate }) {
   return (
@@ -96,9 +135,6 @@ export default function WorkspaceShell({ workspaces, activeId, onSelectWorkspace
   const all = [...(workspaces?.personal || []), ...(workspaces?.business || [])]
   const active = all.find(w => String(w.id) === String(activeId)) || all[0]
   const isPersonal = active?.type === 'personal'
-  const footer = isPersonal
-    ? <span className="cfo-badge cfo-badge-private"><Icon.lock /> Personal workspace</span>
-    : <span className="cfo-badge cfo-badge-shared"><Icon.users /> Shared team workspace</span>
 
   const SwitcherEl = <WorkspaceSwitcher workspaces={workspaces} activeId={activeId} onSelect={onSelectWorkspace} />
   const go = (it) => { setDrawer(false); onNavigate?.(it) }
@@ -110,16 +146,22 @@ export default function WorkspaceShell({ workspaces, activeId, onSelectWorkspace
         <div className="cfo-brand"><img src={LOGO_WORDMARK} alt="CFO AI — Financial OS" /></div>
         {SwitcherEl}
         <Nav groups={nav} activeKey={activeKey} onNavigate={onNavigate} />
-        <div className="cfo-side-foot">{footer}</div>
+        <div className="cfo-side-foot">
+          <WorkspaceSettings workspace={active} onNavigate={onNavigate} />
+        </div>
       </aside>
 
       {/* mobile header */}
       <header className="cfo-mobilehead">
-        <img className="cfo-mobilesym" src={SYMBOL} alt="CFO AI" />
-        {isPersonal
-          ? <span className="cfo-badge cfo-badge-private"><Icon.lock /> Personal</span>
-          : <span className="cfo-badge cfo-badge-shared"><Icon.users /> {active?.role || 'Team'}</span>}
-        <button className="cfo-burger" aria-label="Menu" onClick={() => setDrawer(true)}><span /><span /><span /></button>
+        {/* The full lockup, small — a bare symbol is not identifiable as CFO AI to
+            anyone who has not already learned it. */}
+        <img className="cfo-mobilebrand" src={LOGO_WORDMARK} alt="CFO AI — Financial OS" />
+        <button
+          className="cfo-burger"
+          aria-label="Open navigation menu"
+          aria-expanded={drawer}
+          onClick={() => setDrawer(true)}
+        ><span /><span /><span /></button>
       </header>
 
       {/* mobile drawer */}
@@ -128,7 +170,9 @@ export default function WorkspaceShell({ workspaces, activeId, onSelectWorkspace
         <div className="cfo-brand"><img src={LOGO_WORDMARK} alt="CFO AI" /></div>
         {SwitcherEl}
         <Nav groups={mobileNav || nav} activeKey={activeKey} onNavigate={go} />
-        <div className="cfo-side-foot">{footer}</div>
+        <div className="cfo-side-foot">
+          <WorkspaceSettings workspace={active} onNavigate={go} />
+        </div>
       </div>
 
       <main className="cfo-main"><div className="cfo-main-inner">{children}</div></main>

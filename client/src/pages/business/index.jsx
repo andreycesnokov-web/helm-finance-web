@@ -53,7 +53,6 @@ import { partitionDocuments, VAULT_TYPES } from './companyVault'
 import DocumentIntakeModal from '../../components/DocumentIntakeModal'
 
 const SYMBOL = '/brand/symbol_navy_blue_dot_transparent.svg'
-const SYMBOL_WHITE = '/brand/symbol_white_transparent.svg'
 const idr = (v) => 'Rp ' + formatAmount(String(v ?? 0), 'IDR')
 
 // Premium P1 additions (Radar strip, Decision Engine, Compliance snapshot, Accounts
@@ -106,7 +105,8 @@ export function BusinessPulse() {
 
   const head = (
     <PageHeader eyebrow="Business Workspace" title={active?.name || 'Business'}
-      actions={<>
+      description="Cash position, this month's operating figures and anything waiting on you."
+      context={<>
         <StatusBadge tone="shared" icon={<Icon.users />}>Shared business workspace</StatusBadge>
         {active?.role && <StatusBadge tone="neutral">Role: {active.role}</StatusBadge>}
         {active?.business_code && <StatusBadge tone="info">{active.business_code}</StatusBadge>}
@@ -740,7 +740,7 @@ export function BusinessAccounts() {
     const total = idrWallets.reduce((s, x) => s + Number(x.balance || 0), 0)
     return <>{head}
       <div style={{ marginBottom: 22 }}>
-        <SummaryCard symbol={SYMBOL_WHITE} label={otherWallets.length ? 'Total balance · IDR wallets' : 'Total balance · all wallets'}
+        <SummaryCard flagship label={otherWallets.length ? 'Total balance · IDR wallets' : 'Total balance · all wallets'}
           value={idr(total)}
           meta={<>{idrWallets.length} active wallet{idrWallets.length === 1 ? '' : 's'}{otherWallets.length ? ` · ${otherWallets.length} in other currencies (kept separate)` : ''}</>} />
       </div>

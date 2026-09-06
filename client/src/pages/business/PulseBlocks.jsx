@@ -17,31 +17,14 @@
 // EMPTY WORKSPACE: an account with no data is the FIRST impression, so it is designed, not
 // defaulted. Zeros stay honest (Rp 0 is the true balance) but recede, and the page leads
 // with what to do next instead of a grid of dashes.
-import { Card, StatusBadge, Btn, Icon, DataList } from '../../shell/ui'
+import { Card, StatusBadge, Btn, Icon, DataList, FlagshipMark } from '../../shell/ui'
+import { compactIdr } from '../../lib/money'
 import './Pulse.css'
 
-// Official brand mark, already shipped in the repo (client/public/brand). Used as a
-// low-opacity watermark on the navy hero — never recoloured, never distorted.
-const BRAND_MARK_WHITE = '/brand/symbol_white_transparent.svg'
-
-/**
- * Display-only compaction so a large figure can never wrap the hero onto two lines.
- *
- * The API value is NOT changed: the exact amount stays in the title attribute and is
- * repeated in full in the caption beneath, so precision is one hover (or one glance) away.
- * Returns null when the number is already short enough to render in full.
- */
-function compactIdr(value) {
-  const n = Number(value || 0)
-  if (!Number.isFinite(n)) return null
-  const abs = Math.abs(n)
-  const sign = n < 0 ? '-' : ''
-  const at = (div, suffix) => `Rp ${sign}${(abs / div).toFixed(1)}${suffix}`
-  if (abs >= 1e12) return at(1e12, 'T')
-  if (abs >= 1e9) return at(1e9, 'B')
-  if (abs >= 1e6) return at(1e6, 'M')
-  return null
-}
+// compactIdr now lives in lib/money.js: Wallets shows the same headline figure,
+// and two copies of a money formatter is how two pages start disagreeing about
+// what "Rp 152.5M" means. The exact amount stays in the title attribute and in
+// the caption beneath, so precision is one glance away.
 
 /* ── executive hero ───────────────────────────────────────────────────────── */
 
@@ -59,25 +42,38 @@ export function ExecutiveHero({ d, idr, readiness, empty }) {
   const other = d.other_cash_movement || {}
   const otherTotal = Number(other.total || 0)
 
+  // Colour carries meaning here, so it is spent carefully.
+  //
+  // Red used to mark "operating cash out", which made every ordinary month look
+  // like something had gone wrong — and left nothing louder for the cases that
+  // genuinely are wrong. Red is now reserved for a real negative position; a
+  // short runway is a warning, not a loss; and green only appears when there is
+  // actually something positive to report, so "+ Rp 0" no longer reads as good
+  // news. Cash out is simply ink: large, important, not a failure.
+  const income = Number(d.income || 0)
+  const net = Number(d.netPosition || 0)
   const kpis = [
-    { key: 'revenue', label: 'Operating revenue this month', value: '+ ' + idr(d.income), tone: 'pos',
+    { key: 'revenue', label: 'Operating revenue this month', value: '+ ' + idr(d.income),
+      tone: income > 0 ? 'pos' : undefined,
       hint: 'Earned revenue only · excludes opening balances, funding and transfers' },
-    { key: 'outflow', label: 'Operating cash out this month', value: '− ' + idr(d.expenses), tone: 'neg',
+    { key: 'outflow', label: 'Operating cash out this month', value: '− ' + idr(d.expenses),
       hint: 'Direct costs and operating expenses · excludes CAPEX, tax and financing' },
     { key: 'net', label: 'Net position', value: idr(d.netPosition),
-      tone: Number(d.netPosition) >= 0 ? 'pos' : 'neg',
+      tone: net < 0 ? 'neg' : net > 0 ? 'pos' : undefined,
       hint: 'Balance sheet view: cash + receivables − payables. Not operating performance.' },
     { key: 'runway', label: 'Runway', value: runway === null ? '—' : `${runway} days`,
-      tone: lowRunway ? 'neg' : undefined,
+      tone: lowRunway ? 'warn' : undefined,
       chip: lowRunway ? 'Below 30 days' : null,
       hint: runway === null ? 'Needs expense history' : `At ${idr(d.burnRate)}/day · ${d.burnWindowDays || 30}d window` },
   ]
 
   return (
     <section className={`pulse-exec${empty ? ' is-empty' : ''}`}>
-      {/* Navy corporate surface — the one place the brand background is used at scale. */}
-      <div className="pulse-cash">
-        <img className="pulse-cash-mark" src={BRAND_MARK_WHITE} alt="" aria-hidden="true" />
+      {/* Navy corporate surface — the one place the brand background is used at scale,
+          and the one card on this page that carries the brand mark. Same component
+          as the mark on Accounts' total balance, so the two cannot diverge. */}
+      <div className="pulse-cash cfo-flagship">
+        <FlagshipMark />
         <div className="pulse-cash-top">
           <span className="pulse-cash-label">Total cash · IDR</span>
           {readiness}

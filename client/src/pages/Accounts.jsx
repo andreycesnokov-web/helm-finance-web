@@ -5,6 +5,13 @@ import { useAuth } from '../hooks/useAuth'
 import { useAccess } from '../hooks/useAccess'
 import { useTranslation } from '../hooks/useTranslation'
 import { apiFetch, fmt, fmtFull } from '../lib/api'
+import { formatCurrency } from '../lib/money'
+import { walletsSummary } from './walletsSummary'
+import { partitionWallets } from '../lib/walletBalanceContract'
+import { WalletCurrencyField } from './WalletCurrencyField'
+import { PageHeader, SummaryCard, ErrorState } from '../shell/ui'
+import { WalletsEmptyState } from './WalletsEmptyState'
+import { WORKSPACE_DEFAULT_CURRENCY } from './walletsSummary'
 
 // ── Wallet type config ────────────────────────────────────────────────────────
 const WALLET_TYPES = [
@@ -90,7 +97,7 @@ const getCurrencyStyle = (currency) => CURRENCY_STYLE[currency] || { bg: '#F1F5F
 const getTypeIcon      = (type, color) => (TYPE_ICON[type] || TYPE_ICON.other)(color)
 
 // ── Default form state ────────────────────────────────────────────────────────
-const EMPTY_FORM = { name: '', currency: 'IDR', type: '', entity_name: '', opening_balance: '', sort_order: 0, custom_type: '', scope: 'business' }
+const EMPTY_FORM = { name: '', currency: WORKSPACE_DEFAULT_CURRENCY, type: '', entity_name: '', opening_balance: '', sort_order: 0, custom_type: '', scope: 'business' }
 
 export default function Accounts() {
   const { token } = useAuth()
@@ -104,6 +111,11 @@ export default function Accounts() {
   const [wallets,      setWallets]      = useState([])
   const [legacySources,setLegacySources]= useState([]) // source-based accounts not yet in wallets
   const [loading,      setLoading]      = useState(true)
+  // A failed load used to be swallowed into console.error, leaving wallets as []
+  // with loading false — which is indistinguishable from "this workspace has no
+  // wallets". The page then told a user with accounts that they had none and
+  // invited them to add their first. An unknown balance is not zero.
+  const [loadError,    setLoadError]    = useState(false)
   const [showForm,     setShowForm]     = useState(false)
   const [editWallet,   setEditWallet]   = useState(null)
   const [form,         setForm]         = useState(EMPTY_FORM)
@@ -122,6 +134,7 @@ export default function Accounts() {
   // ── Load wallets + legacy sources ─────────────────────────────────────────
   const load = async () => {
     setLoading(true)
+    setLoadError(false)
     try {
       const [wData, pData] = await Promise.all([
         apiFetch('/wallets', token),
@@ -137,6 +150,7 @@ export default function Accounts() {
       setLegacySources(legacy)
     } catch (e) {
       console.error(e)
+      setLoadError(true)
     } finally {
       setLoading(false)
     }
@@ -151,18 +165,46 @@ export default function Accounts() {
   }, [])
 
   // ── Computed totals ───────────────────────────────────────────────────────
-  const totalBalance    = wallets.reduce((s, w) => s + (w.balance || 0), 0)
-  const businessBalance = wallets.filter(w => (w.scope || 'business') === 'business').reduce((s, w) => s + (w.balance || 0), 0)
-  const personalBalance = wallets.filter(w => w.scope === 'personal').reduce((s, w) => s + (w.balance || 0), 0)
+  // The three cross-currency sums that used to live here are gone rather than
+  // merely unused. Each added every wallet's balance regardless of denomination
+  // and the result was labelled IDR, so one dollar account made the headline
+  // wrong; leaving them in place would be leaving the next caller a loaded gun.
+  // Totals are now derived per currency, below.
 
   // Filtered wallets per tab
   const filteredWallets = scopeTab === 'all'
     ? wallets
     : wallets.filter(w => (w.scope || 'business') === scopeTab)
 
-  const filteredBalance = scopeTab === 'all' ? totalBalance
-    : scopeTab === 'business' ? businessBalance
-    : personalBalance
+  // ── the summary card's amounts, one currency at a time ────────────────────
+  //
+  // A balance belongs to exactly one currency, so a total may only ever cover
+  // wallets that share one. This page used to add every wallet's balance together
+  // and label the result IDR, which silently turned $1 000 into Rp 1 000 the
+  // moment a dollar account existed. The rule the rest of the codebase already
+  // states — personal Pulse in server/index.js and BusinessAccounts both say
+  // "NEVER sum across currencies" — now holds here too.
+  //
+  // Nothing is converted. There is no rate in this product that could value one
+  // currency in another, so the page reports what it knows: a total per currency.
+  // Grouping is needed twice: the card totals the one currency whose balances are
+  // provable, and each wallet row shows its share of its OWN currency's total.
+  //
+  // `unproven` is not a display bug being hidden — it is a backend gap being told
+  // the truth about. The business endpoint derives balance from amount_idr, so a
+  // non-IDR wallet's number is an IDR-reporting figure wearing a foreign
+  // currency's label. The row lists the wallet and says the balance is not
+  // available yet rather than printing "$" in front of rupiah.
+  const { proven: provenGroups, unproven: unprovenGroups } = partitionWallets(filteredWallets)
+  const groupOf = (w) => provenGroups.find((g) => g.wallets.includes(w))
+  const isUnproven = (w) => unprovenGroups.some((g) => g.wallets.includes(w))
+  const scopeLabel = scopeTab === 'business' ? t('accounts.totalBusiness')
+    : scopeTab === 'personal' ? t('accounts.totalPersonal')
+    : t('accounts.totalBalance')
+  const summary = walletsSummary({ wallets: filteredWallets, t, scopeLabel })
+  // The collection has resolved and holds nothing. Distinct from "still loading"
+  // and from "the request failed", and only this one invites a first wallet.
+  const resolvedEmpty = !loading && !loadError && wallets.length === 0
 
   // ── Backfill handler ──────────────────────────────────────────────────────
   const handleBackfill = async () => {
@@ -292,16 +334,16 @@ export default function Accounts() {
   return (
     <div className="hf-page">
 
-      {/* Page header */}
-      <div className="hf-page-header">
-        <div>
-          <div className="hf-page-title">{t('accounts.walletsAccounts')}</div>
-          <div className="hf-page-subtitle">{t('accounts.walletsSubtitle')}</div>
-        </div>
-        <div className="hf-page-actions">
+      {/* The shared header. This page previously rendered its title as a plain
+          <div>, so Accounts shipped no <h1> at all — a real accessibility gap and
+          the reason it never looked related to Pulse. */}
+      <PageHeader
+        title={t('accounts.walletsAccounts')}
+        description={t('accounts.walletsSubtitle')}
+        primaryAction={
           <button onClick={openAdd} className="btn btn-primary btn-md">{t('accounts.addWallet')}</button>
-        </div>
-      </div>
+        }
+      />
 
       {/* Scope tabs */}
       {wallets.length > 0 && (
@@ -324,28 +366,45 @@ export default function Accounts() {
         </div>
       )}
 
-      {/* Total balance hero */}
-      {wallets.length > 0 && (
-        <div style={{ background: 'linear-gradient(135deg, #0F172A 0%, #1e293b 100%)', borderRadius: 20, padding: '24px 26px 20px', boxShadow: '0 8px 32px rgba(15,23,42,.22)', marginBottom: 20, position: 'relative', overflow: 'hidden' }}>
-          <div style={{ position: 'absolute', inset: 0, opacity: 0.03, backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 28px, #fff 28px, #fff 29px), repeating-linear-gradient(90deg, transparent, transparent 28px, #fff 28px, #fff 29px)', pointerEvents: 'none' }} />
-          <div style={{ position: 'relative' }}>
-            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 10, fontWeight: 700 }}>
-              {scopeTab === 'business' ? t('accounts.totalBusiness') : scopeTab === 'personal' ? t('accounts.totalPersonal') : t('accounts.totalBalance')}
-            </div>
-            <div style={{ fontSize: 'clamp(28px, 9vw, 38px)', fontWeight: 800, color: '#fff', letterSpacing: -1, lineHeight: 1, wordBreak: 'break-word' }}>
-              {fmtFull(filteredBalance)}
-            </div>
-            <div style={{ fontSize: 'var(--text-xs)', color: 'rgba(255,255,255,0.4)', marginTop: 8 }}>IDR · {filteredWallets.length} wallet{filteredWallets.length !== 1 ? 's' : ''}</div>
-          </div>
-        </div>
+      {/* Total balance hero.
+          The same navy surface Pulse uses, from the same component. It was a
+          one-off inline gradient with a graph-paper grid and hardcoded #0F172A,
+          which is why the product's two dark heroes did not look related.
+          `flagship` is what earns the brand mark: this is the page's headline
+          money figure, and the only card here that gets one.
+
+          It stays on an empty workspace, showing Rp 0 and saying so. That keeps
+          the page's shape steady — the first wallet fills the card in rather than
+          rebuilding the page around it — and it is honest, because zero is the
+          true balance of a workspace with no accounts. What it must NOT do is
+          appear before we know: while loading, or after a failed load, there is
+          no figure to state and the card is not rendered. */}
+      {!loading && !loadError && (
+        <SummaryCard
+          flagship
+          compact={summary.compact}
+          label={summary.label}
+          value={summary.value}
+          meta={summary.meta}
+        />
       )}
 
       {loading && (
         <div style={{ padding: 32, textAlign: 'center', color: 'var(--text-3)', fontSize: 'var(--text-sm)' }}>{t('accounts.loadingWallets')}</div>
       )}
 
+      {/* A failed load gets the shared error treatment and a retry — never the
+          empty state, which would be a false claim about the account. */}
+      {loadError && (
+        <ErrorState
+          title={t('accounts.loadFailed')}
+          description={t('accounts.loadFailedSub')}
+          onRetry={load}
+        />
+      )}
+
       {/* Backfill banner — only when legacy accounts exist and no wallets yet */}
-      {!loading && wallets.length === 0 && legacySources.length > 0 && !backfillDone && (
+      {resolvedEmpty && legacySources.length > 0 && !backfillDone && (
         <div style={{ background: '#EEF2FF', border: '1px solid #C7D2FE', borderRadius: 14, padding: '16px 18px', marginBottom: 16, display: 'flex', alignItems: 'flex-start', gap: 14 }}>
           <div style={{ fontSize: 22, lineHeight: 1 }}>💡</div>
           <div style={{ flex: 1 }}>
@@ -366,16 +425,11 @@ export default function Accounts() {
         </div>
       )}
 
-      {/* Empty state — no wallets and no legacy */}
-      {!loading && wallets.length === 0 && legacySources.length === 0 && (
-        <div className="empty-state">
-          <div className="empty-state-icon">🏦</div>
-          <div className="empty-state-title">{t('accounts.noWallets')}</div>
-          <div className="empty-state-sub">
-            {t('accounts.noWalletsSub')}
-          </div>
-          <button className="empty-state-cta" onClick={openAdd}>{t('accounts.addFirstWallet')}</button>
-        </div>
+      {/* Empty state — the collection resolved, and it is empty. Not during a
+          load, not after a failure, and not once a single wallet exists. It calls
+          the page's own openAdd, so there is exactly one wallet-creation flow. */}
+      {resolvedEmpty && legacySources.length === 0 && (
+        <WalletsEmptyState t={t} onAddWallet={openAdd} />
       )}
 
       {/* Wallet cards */}
@@ -384,7 +438,10 @@ export default function Accounts() {
           {filteredWallets.map((w) => {
             const cs    = getCurrencyStyle(w.currency)
             const isNeg = (w.balance || 0) < 0
-            const pct   = filteredBalance > 0 ? Math.round(((w.balance || 0) / filteredBalance) * 100) : 0
+            // Share of its OWN currency's total. Measured against a mixed total it
+            // was arithmetic between unlike units dressed up as a percentage.
+            const grp   = groupOf(w)
+            const pct   = grp && grp.total > 0 ? Math.round(((w.balance || 0) / grp.total) * 100) : 0
             const typeLabel = WALLET_TYPES.find(t => t.value === w.type && t.value !== '__custom__')?.label || (w.type ? w.type : null)
             const walletScope = w.scope || 'business'
 
@@ -400,7 +457,13 @@ export default function Accounts() {
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: 3 }}>{w.name}</div>
                     <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                      <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 20, background: cs.bg, color: cs.color, fontWeight: 700 }}>{w.currency}</span>
+                      <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 20, fontWeight: 700,
+                        background: grp ? cs.bg : 'var(--warning-soft, #FEF3C7)',
+                        color:      grp ? cs.color : 'var(--warning-dark, #92400E)' }}>
+                        {grp ? grp.currency
+                          : isUnproven(w) ? (w.currency || '').toUpperCase()
+                          : t('accounts.needsCurrency')}
+                      </span>
                       {typeLabel && <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 20, background: 'var(--bg-2)', color: 'var(--text-3)', fontWeight: 600 }}>{typeLabel}</span>}
                       <span style={{
                         fontSize: 10, padding: '1px 6px', borderRadius: 20, fontWeight: 700,
@@ -414,10 +477,21 @@ export default function Accounts() {
 
                   {/* Balance */}
                   <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                    {/* The amount carries its own currency. Rendering every wallet
+                        with the same bare number is what made a dollar account
+                        indistinguishable from a rupiah one at a glance. */}
+                    {/* An amount is only printed where its unit is provable. For a
+                        wallet in another currency the number exists but its unit
+                        does not — the balance is a sum of amount_idr — so the row
+                        says so instead of dressing rupiah up as dollars. */}
                     <div style={{ fontSize: 'var(--text-base)', fontWeight: 800, color: isNeg ? 'var(--red-dark)' : 'var(--text)', letterSpacing: -0.3, lineHeight: 1, whiteSpace: 'nowrap' }}>
-                      {isNeg ? '−' : ''}{fmt(Math.abs(w.balance || 0))}
+                      {grp ? formatCurrency(w.balance || 0, grp.currency) : '—'}
                     </div>
-                    <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 3, whiteSpace: 'nowrap' }}>{Math.abs(pct)}{t('accounts.share')}</div>
+                    <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 3, whiteSpace: 'nowrap' }}>
+                      {grp ? `${Math.abs(pct)}${t('accounts.share')}`
+                        : isUnproven(w) ? t('accounts.balanceUnavailable')
+                        : t('accounts.needsCurrency')}
+                    </div>
                   </div>
 
                   {/* Actions */}
@@ -461,7 +535,7 @@ export default function Accounts() {
       )}
 
       {/* Legacy unmatched sources */}
-      {!loading && wallets.length > 0 && legacySources.length > 0 && (
+      {!loading && !loadError && wallets.length > 0 && legacySources.length > 0 && (
         <div className="hf-card" style={{ marginBottom: 16, background: 'var(--bg-2)' }}>
           <div style={{ fontSize: 11, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 800, marginBottom: 10 }}>{t('accounts.legacyTitle')}</div>
           <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-3)', marginBottom: 12, lineHeight: 1.5 }}>
@@ -614,23 +688,19 @@ export default function Accounts() {
             />
 
             {/* Currency */}
-            <label className="modal-label">{t('accounts.currency')}</label>
-            <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
-              {CURRENCIES.map(c => {
-                const cs = getCurrencyStyle(c)
-                return (
-                  <button key={c} onClick={() => setForm(p => ({ ...p, currency: c }))} style={{
-                    padding: '8px 14px', borderRadius: 10, fontSize: 'var(--text-sm)',
-                    border: '0.5px solid var(--border-2)', fontFamily: 'inherit', fontWeight: 700,
-                    background: form.currency === c ? cs.bg : 'none',
-                    color:      form.currency === c ? cs.color : 'var(--text-3)',
-                    cursor: 'pointer', transition: 'all .1s',
-                  }}>{c}</button>
-                )
-              })}
-            </div>
+            {/* The real control, in its own module so the design preview can
+                photograph it rather than draw a copy. It owns the currency
+                contract: required, ISO-only, name beside the code, unproven
+                currencies disabled, and immutable once the wallet exists. */}
+            <WalletCurrencyField
+              currencies={CURRENCIES}
+              value={form.currency}
+              onChange={(c) => setForm(p => ({ ...p, currency: c }))}
+              locked={!!editWallet}
+              styleFor={getCurrencyStyle}
+              t={t}
+            />
 
-            {/* Type */}
             <label className="modal-label">{t('accounts.type')} <span style={{ fontWeight: 400, color: 'var(--text-3)' }}>(optional)</span></label>
             <select
               className="modal-input"

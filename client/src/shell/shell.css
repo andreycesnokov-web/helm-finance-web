@@ -11,16 +11,39 @@
 .cfo-shell *{box-sizing:border-box}
 .cfo-mono{font-family:var(--font-mono);font-variant-numeric:tabular-nums}
 
+/* The sidebar itself no longer scrolls: the NAV scrolls, so the wordmark, the
+   switcher and the settings footer stay put and long navigation cannot push the
+   footer out of view or slide under it. */
 .cfo-sidebar{background:var(--surface-card);border-right:1px solid var(--border-default);
-  padding:20px 16px;display:flex;flex-direction:column;gap:16px;position:sticky;top:0;height:100vh;overflow-y:auto}
+  padding:20px 16px;display:flex;flex-direction:column;gap:16px;position:sticky;top:0;height:100vh;
+  overflow:hidden;min-height:0}
 /* Desktop wordmark: the official lockup PNG has ~45% empty transparent canvas on
    the right (viewBox 0 0 900 220, artwork ends ~x480). We clip ONLY that transparent
    padding with an overflow window — the asset itself is unmodified (no rescale of a
    single axis, no recolor, no rebuild). Result: prominent, readable CFO AI / FINANCIAL
    OS at ~48px tall (≈1.7× the previous rendered size), with clear space preserved. */
-.cfo-brand{height:48px;width:138px;overflow:hidden;margin:0 4px 6px}
+/* flex:0 0 auto because the sidebar is a column flex box with height:100vh: once
+   the nav is longer than the viewport every child shrinks, and this one — whose
+   whole job is to be a fixed 48px clipping window — collapsed to 0 and let the
+   workspace switcher draw straight over the wordmark. */
+.cfo-brand{flex:0 0 auto;height:48px;width:138px;overflow:hidden;margin:0 4px 6px}
 .cfo-brand img{height:48px;width:auto;max-width:none;display:block}
-.cfo-nav{display:flex;flex-direction:column;gap:2px;margin-top:2px}
+.cfo-nav{display:flex;flex-direction:column;gap:2px;margin-top:2px;
+  flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;
+  /* room for the scrollbar so it never sits on top of the labels */
+  padding-right:4px;margin-right:-4px;
+  /* The business nav (21 items) is taller than any laptop viewport, so it scrolls.
+     Two things keep a scrolled list from looking broken. A full row of bottom
+     clearance so the last item (Payment Connections lands on the fold at 900px) is
+     never jammed mid-glyph against the footer divider, and a soft bottom fade one
+     row tall so whatever sits on the fold reads as "there is more below" rather
+     than a label sliced in half. The clearance (40px) is taller than the fade
+     (36px), so when you scroll to the end the final item clears the fade and is
+     fully crisp — the fade is the affordance, the clearance is the actual fix. */
+  padding-bottom:40px;
+  scroll-padding-block-end:40px;
+  -webkit-mask-image:linear-gradient(to bottom,#000 calc(100% - 36px),transparent);
+          mask-image:linear-gradient(to bottom,#000 calc(100% - 36px),transparent)}
 .cfo-navgroup-title{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--text-muted);font-weight:700;padding:14px 12px 6px}
 .cfo-navitem{display:flex;align-items:center;gap:11px;padding:9px 12px;border-radius:var(--radius-sm);
   color:var(--text-secondary);text-decoration:none;font-weight:600;font-size:14px;border:0;background:none;cursor:pointer;width:100%;text-align:left}
@@ -29,12 +52,65 @@
 .cfo-navitem svg{width:18px;height:18px;flex-shrink:0;opacity:.85}
 .cfo-navitem.is-active svg{color:var(--brand-electric-blue);opacity:1}
 .cfo-navitem:disabled{opacity:.45;cursor:default}
-.cfo-side-foot{margin-top:auto;display:flex;flex-direction:column;gap:8px;padding-top:8px}
+.cfo-side-foot{flex:0 0 auto;display:flex;flex-direction:column;gap:8px;
+  padding-top:12px;margin-top:4px;border-top:1px solid var(--border-subtle)}
+
+/* Workspace settings — quieter than navigation, unmistakably interactive.
+   One button, one accessible name, a full-row target at least 44px tall. */
+.cfo-side-settings{
+  display:grid;
+  grid-template-columns:auto minmax(0,1fr) auto;
+  align-items:center;
+  gap:10px;
+  width:100%;
+  min-height:44px;
+  padding:8px 10px;
+  border:1px solid transparent;
+  border-radius:var(--radius-md);
+  background:none;
+  text-align:left;
+  cursor:pointer;
+  color:var(--text-secondary);
+  font-family:inherit;
+}
+.cfo-side-settings:hover{background:var(--surface-card-muted);color:var(--text-primary)}
+.cfo-side-settings:active{background:var(--border-subtle)}
+.cfo-side-settings[aria-current="page"],
+.cfo-side-settings.is-active{background:var(--info-soft);color:var(--brand-navy)}
+.cfo-side-settings-icon{display:inline-flex;color:var(--text-muted)}
+.cfo-side-settings:hover .cfo-side-settings-icon{color:var(--brand-navy)}
+.cfo-side-settings-icon svg{width:17px;height:17px}
+.cfo-side-settings-text{display:flex;flex-direction:column;gap:1px;min-width:0}
+.cfo-side-settings-title{
+  font-size:13.5px;font-weight:700;color:var(--text-primary);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.cfo-side-settings-sub{
+  font-size:11.5px;color:var(--text-muted);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.cfo-side-settings-chev{display:inline-flex;color:var(--text-muted);transform:rotate(-90deg)}
+.cfo-side-settings-chev svg{width:15px;height:15px}
 
 .cfo-mobilehead{display:none;align-items:center;gap:10px;background:var(--surface-card);
   border-bottom:1px solid var(--border-default);padding:11px 16px;position:sticky;top:0;z-index:20}
-.cfo-mobilesym{height:36px;width:36px}
-.cfo-burger{margin-left:auto;background:none;border:0;display:flex;flex-direction:column;gap:4px;cursor:pointer;padding:6px}
+/* The compact lockup. Height-bound so the asset stays crisp and uncropped, and
+   vertically centred by the header's own align-items.
+
+   NOTE: the lockup PNG carries ~47% transparent canvas to the right (opaque
+   artwork ends at x1271 of 2400, measured off the file), so this <img> reserves
+   ~58px it never paints. Cropping it the way the desktop wordmark does needs a
+   wrapper element with an overflow window — doing it here with object-fit means
+   the element's box no longer matches the asset's aspect ratio, which is exactly
+   what the distortion guard in renderedPreview.test.mjs exists to catch. Left
+   as-is deliberately: the dead box changes nothing on screen, because the burger
+   is pinned right with margin-left:auto. */
+.cfo-mobilebrand{height:30px;width:auto;max-width:60vw;display:block;flex:0 0 auto}
+/* A thumb target, not a pointer target: 44px of tappable area around a 20px glyph. */
+.cfo-burger{margin-left:auto;background:none;border:0;display:inline-flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:4px;cursor:pointer;padding:0;
+  min-width:44px;min-height:44px;border-radius:var(--radius-md)}
+.cfo-burger:hover{background:var(--surface-card-muted)}
 .cfo-burger span{width:20px;height:2px;background:var(--text-primary);border-radius:2px}
 .cfo-main{min-width:0;padding:26px 30px 56px}
 .cfo-main-inner{max-width:1180px;margin:0 auto}
@@ -66,10 +142,94 @@
 .cfo-switch-opt .cfo-switch-ava{width:30px;height:30px;border-radius:8px;font-size:13px}
 
 /* ── Page header ─────────────────────────────────────────────────────────── */
-.cfo-pagehead{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;margin-bottom:22px}
+/* ── Page hero ──────────────────────────────────────────────────────────────
+   A defined band, not a bare stack: a left content zone, a right control zone,
+   a hairline rule that gives the page a top edge, and — on a header with no
+   controls — one brand symbol set inside a reserved column at the far right.
+
+   --head-safe is the width that column claims, applied to the header only when it
+   has no control zone (see the media query below). A header that carries badges,
+   context or actions holds its natural right edge instead and drops the mark, so a
+   decorative symbol can never displace a control or sit behind one. Change the
+   mark's size and the column follows; there is no second number to remember. */
+.cfo-pagehead{
+  /* index.css sets body to a system stack, so --font-ui (Manrope) never reaches
+     ordinary text and the brand's UI face is effectively inert product-wide.
+     Fixing body is a 21-page change and belongs to its own PR; the shared
+     surfaces this one owns opt in explicitly so the pilot is typographically
+     what the Brand Book says it is. */
+  font-family:var(--font-ui);
+  /* Sits fully inside the band with clear space around it. It used to hang 26px
+     off the right edge, which read as an icon accidentally clipped by the layout
+     rather than as a watermark someone placed — so this one is never cropped.
+     That is the visible difference between the two branding layers: the hero mark
+     is whole and barely there, the flagship card's mark is bigger and cropped.
+
+     132px was too large for the job. On a header with no eyebrow the band is only
+     ~133px tall, so a 132px mark filled it edge to edge with no clear space and
+     read as clipped anyway; and reserving its column pushed a right-aligned
+     primary action ~160px in from the content's right edge. Smaller mark, smaller
+     column, and the height is capped below so a short band can never clip it. */
+  --head-mark:88px;
+  --head-inset:14px;
+  --head-safe:calc(var(--head-mark) + var(--head-inset) + 18px);
+  position:relative;
+  overflow:hidden;
+  display:flex;
+  align-items:flex-start;
+  gap:20px 28px;
+  flex-wrap:wrap;
+  padding:0 0 18px;
+  margin-bottom:26px;
+  border-bottom:1px solid var(--border-subtle);
+}
+/* The mark only appears where there is room for it — and never where it would sit
+   behind a control. A header that carries a control zone (.cfo-pagehead-right:
+   badges, context, actions) keeps its natural right edge so the primary action is
+   never pushed inward, and drops the decorative mark rather than weakening the
+   layout. A header with no controls reserves the mark's clear-space column and
+   shows it. The mark is absolutely positioned in both cases, so it never
+   contributes to layout sizing; the reserved column is a padding on the header
+   itself, applied only when the mark is actually painted. */
+.cfo-pagehead-mark{display:none}
+@media (min-width:900px){
+  .cfo-pagehead:not(:has(.cfo-pagehead-right)){padding-right:var(--head-safe)}
+  .cfo-pagehead:not(:has(.cfo-pagehead-right)) .cfo-pagehead-mark{
+    display:block;
+    position:absolute;
+    right:var(--head-inset);
+    top:50%;
+    transform:translateY(-50%);
+    /* Never taller than the band it sits in, so it keeps its clear space instead
+       of being cropped by a short header. width:auto + aspect-ratio holds the
+       official proportions — the mark is never distorted to fit. */
+    height:min(var(--head-mark), calc(100% - 28px));
+    width:auto;
+    aspect-ratio:1;
+    /* Navy on the pale page ground carries further than white on navy does, so at
+       equal opacity this mark read as strongly as the flagship card's. Measured by
+       eye against a real screenshot of both: 3.5% here to the card's 7%. */
+    opacity:.035;
+    pointer-events:none;
+    user-select:none;
+  }
+}
 .cfo-eyebrow{font-size:12px;letter-spacing:.13em;text-transform:uppercase;color:var(--text-muted);font-weight:700}
 .cfo-h1{font-family:var(--font-display);font-size:30px;line-height:var(--line-tight);margin:4px 0 0;color:var(--brand-navy)}
-.cfo-pagehead-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+/* The control zone hugs its contents and holds the right edge. margin-left:auto
+   (rather than justify-content on the parent) keeps it right-aligned even when a
+   long title pushes it onto its own line — it used to drop to the left there,
+   leaving the whole right side of the header empty. */
+.cfo-pagehead-right{
+  display:flex;
+  flex:0 0 auto;
+  margin-left:auto;
+  flex-direction:column;
+  align-items:flex-end;
+  gap:10px;
+}
+.cfo-pagehead-context{display:flex;align-items:center;justify-content:flex-end;gap:8px;flex-wrap:wrap}
+.cfo-pagehead-actions{display:flex;align-items:center;justify-content:flex-end;gap:10px;flex-wrap:wrap}
 
 /* ── Badges ──────────────────────────────────────────────────────────────── */
 .cfo-badge{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;padding:6px 11px;border-radius:999px;white-space:nowrap}
@@ -86,8 +246,11 @@
 .cfo-btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;font-family:var(--font-ui);font-weight:700;
   font-size:14px;border-radius:var(--radius-md);padding:10px 16px;cursor:pointer;border:1px solid transparent;line-height:1}
 .cfo-btn svg{width:16px;height:16px}
-.cfo-btn-primary{background:var(--brand-electric-blue);color:#fff;box-shadow:var(--shadow-sm)}
-.cfo-btn-primary:hover{background:#2486e6}
+/* The token layer owns this pair. --brand-electric-blue is the brand accent, not an
+   action surface: white on #3399FF is 2.94:1, which fails WCAG AA for button text.
+   --action-primary is the accessible ink of that same blue (#1565C0, 5.68:1). */
+.cfo-btn-primary{background:var(--action-primary);color:var(--action-primary-text);box-shadow:var(--shadow-sm)}
+.cfo-btn-primary:hover{background:var(--action-primary-hover)}
 .cfo-btn-secondary{background:var(--brand-navy);color:#fff}
 .cfo-btn-secondary:hover{background:#00284f}
 .cfo-btn-ghost{background:var(--surface-card);border-color:var(--border-default);color:var(--text-primary)}
@@ -106,10 +269,209 @@
 .cfo-grid-4{grid-template-columns:repeat(4,1fr)}
 
 /* Summary / hero card (navy) */
-.cfo-summary{position:relative;overflow:hidden;background:var(--brand-navy);color:#fff;border-radius:var(--radius-lg);padding:24px 26px;box-shadow:var(--shadow-md)}
-.cfo-summary-sym{position:absolute;right:-18px;top:-18px;width:180px;opacity:.10}
+.cfo-summary{
+  font-family:var(--font-ui);            /* see .cfo-pagehead — body is a system stack */
+  position:relative;
+  overflow:hidden;
+  background:var(--brand-navy);
+  color:#fff;
+  border-radius:var(--radius-lg);
+  padding:24px 26px;
+  box-shadow:var(--shadow-md);
+}
+/* The card reserves the mark's column in its own padding. Only when it is the
+   flagship — an ordinary summary card keeps its full width. */
+.cfo-summary.cfo-flagship{padding-right:var(--mark-safe)}
+
+/* ── the flagship brand watermark ───────────────────────────────────────────
+   ONE implementation, worn by every surface carrying a page's headline money
+   figure: the shared SummaryCard when a page passes `flagship`, and Pulse's
+   hand-built .pulse-cash. Both wear .cfo-flagship and neither restyles the mark,
+   so the product's two navy heroes cannot drift apart again — they already did
+   once, when one drew the symbol and the other drew a graph-paper grid.
+
+   Two branding layers, deliberately unequal:
+     page hero   .cfo-pagehead-mark   132px @ 4.5%  — ambient, contextual
+     flagship    .cfo-flagship-mark   168px @ 7%    — the brand moment
+   The hero is the weaker of the two on purpose. Change one, look at both.
+
+   The card edge crops the mark on purpose: a symbol sitting wholly inside the
+   card reads as an icon someone parked there, while one running off the edge
+   reads as the surface itself being branded.
+
+   The crop is a FRACTION of the mark, not a fixed number of pixels. The mark's
+   height is capped to the card, so a shallow card (Wallets, ~146px) renders a
+   smaller mark than a tall one (Pulse, ~249px); a fixed pixel crop then ate a
+   bigger share of the small one — 46px left Pulse at 73% but Wallets at 61%,
+   only a fragment. --mark-inside is the share kept inside the card, and the mark
+   is pushed off by the rest of ITS OWN width via translateX(%), which is relative
+   to the element. So one shared primitive keeps the same visible share on a tall
+   card, a wide shallow card and a phone, with a different absolute crop on each —
+   no page-specific positioning, no per-card token.
+
+   --mark-safe is the column the mark claims, and each flagship surface adds it to
+   its own padding-right. That is what guarantees the label, the figure and the
+   supporting line are never set over the mark. Change --mark-size or --mark-inside
+   and the safe area follows; there is no second number to keep in step. */
+.cfo-flagship{
+  --mark-size:168px;
+  --mark-inside:.74;                     /* share of the mark kept inside the card */
+  --mark-gap:20px;                       /* clear space between text and mark */
+  --mark-safe:calc(var(--mark-size) * var(--mark-inside) + var(--mark-gap));
+  position:relative;
+  overflow:hidden;
+  /* Establishes a stacking context, which is what lets the mark sit at z-index
+     -1: behind every child, still in front of the card's own navy background.
+     Without it, -1 would drop the mark behind that background and it would
+     simply never be seen. */
+  isolation:isolate;
+}
+.cfo-flagship-mark{
+  position:absolute;
+  /* Structurally behind the text, not merely faint enough to get away with it.
+     Nothing readable can ever paint under it, whatever a page puts in the card. */
+  z-index:-1;
+  /* Anchor the right edge to the card edge, then push the mark off by the share
+     of its OWN width that is meant to hang over — translateX(%) is relative to the
+     element, so the visible fraction is constant while the absolute crop follows
+     the mark's rendered size on each card. */
+  right:0;
+  top:50%;
+  transform:translateY(-50%) translateX(calc((1 - var(--mark-inside)) * 100%));
+  /* Cropped by the right edge on purpose — never by the top and bottom as well.
+     A summary card is only as tall as its contents, and Accounts' is 146px, so a
+     flat 168px mark came out clipped on three sides and stopped reading as a
+     symbol. Capping the height to the card keeps the crop deliberate: one edge,
+     always the right one, whatever the card's height. */
+  height:min(var(--mark-size), calc(100% - 28px));
+  width:auto;
+  aspect-ratio:1;
+  opacity:.07;
+  pointer-events:none;
+  user-select:none;
+}
+/* Phone: a smaller, quieter mark and a much narrower reserved column, because
+   the figure needs the width more than the brand does. It is kept rather than
+   dropped — this is the one surface where the product's brand moment lives, and
+   the app header above it shows the compact lockup, not this symbol. */
+@media (max-width:640px){
+  /* A smaller, quieter mark; the same --mark-inside keeps the visible share, and a
+     tighter gap keeps the reserved column off the figure on a narrow card. */
+  .cfo-flagship{
+    --mark-size:92px;
+    --mark-gap:12px;
+  }
+  .cfo-flagship-mark{opacity:.05}
+}
+/* ── page header ───────────────────────────────────────────────────────────
+   Title and description sit together on the left; context chips and actions
+   collect on the right and wrap underneath on narrow screens rather than
+   squeezing the title. */
+/* Grows to fill the row, but never past a comfortable measure — a description
+   should not run 120 characters wide just because the window is. */
+.cfo-pagehead-text{min-width:0;flex:1 1 min(420px,100%);max-width:74ch}
+.cfo-pagehead-desc{
+  margin:6px 0 0;
+  max-width:64ch;
+  color:var(--text-secondary);
+  font-size:var(--text-sm);
+  line-height:var(--line-normal);
+}
+@media (max-width:640px){
+  .cfo-pagehead{flex-direction:column;align-items:stretch;gap:14px;padding-bottom:16px;margin-bottom:20px}
+  /* Badges hug their text; only the actions box goes full width (see :357). */
+  .cfo-pagehead-right{justify-content:flex-start;align-items:flex-start;flex-direction:column;gap:12px;width:100%;margin-left:0}
+  .cfo-pagehead-context{width:auto;justify-content:flex-start}
+  .cfo-pagehead-actions{flex-wrap:wrap;justify-content:flex-start;gap:12px}
+  .cfo-pagehead-text{max-width:100%}
+  .cfo-pagehead-desc{font-size:var(--text-sm)}
+  /* A page-level action is a thumb target, not a pointer target. 36px was usable
+     and mean; 44px is the size a finger actually expects. Scoped to the page
+     header so dense in-page controls elsewhere keep their own sizing. */
+  .cfo-pagehead-actions :is(.cfo-btn,.btn,button,a[role="button"]),
+  .cfo-state-actions :is(.cfo-btn,.btn,button,a[role="button"]){
+    min-height:44px;
+    padding-top:0;
+    padding-bottom:0;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+  }
+}
+
+/* Focus is visible everywhere, in the brand accent rather than the UA default. */
+/* Focus belongs to the control, not to the container it happens to sit in. These
+   rules were scoped to the page header and the summary card, so the same button
+   showed a brand ring in one place and the browser's 1px default in another. */
+.cfo-btn:focus-visible,
+.cfo-input:focus-visible,
+.cfo-side-settings:focus-visible,
+.cfo-navitem:focus-visible,
+.cfo-burger:focus-visible,
+.cfo-pagehead-actions :is(button,a):focus-visible,
+.cfo-summary :is(button,a):focus-visible{
+  outline:var(--focus-ring-width) solid var(--focus-ring);
+  outline-offset:var(--focus-ring-offset);
+  border-radius:var(--radius-sm);
+}
+/* On the navy surfaces no blue reads as a ring — #3399FF on #003366 is 1.55:1 and
+   the accessible ink is 1.20:1. White is the only ring that survives there. */
+.cfo-summary :is(button,a):focus-visible,
+.pulse-cash :is(button,a):focus-visible{
+  outline-color:var(--brand-white);
+}
+
+/* ── financial numerals ────────────────────────────────────────────────────
+   Applied to figures a person may compare against another figure. Deliberately
+   NOT applied to body copy or controls. */
+.fin{
+  font-family:var(--font-num);
+  font-variant-numeric:var(--num-features);
+  font-feature-settings:'tnum' 1,'lnum' 1;
+}
+
+@media (max-width:640px){
+  .cfo-summary{padding:20px}
+}
 .cfo-summary-label{font-size:13px;color:#AFC6DE;font-weight:600}
 .cfo-summary-value{font-family:var(--font-display);font-size:40px;line-height:1.1;margin-top:6px}
+/* An abbreviated headline amount is short by construction, so it never needs to
+   wrap — and must not be allowed to, because "Rp 152." above "5M" is not a
+   figure anyone can read. The exact amount underneath may wrap freely. */
+.cfo-summary-value.is-compact{white-space:nowrap;overflow-wrap:normal}
+
+/* More than one currency in the card: one labelled amount each, and no combined
+   figure, because there is no rate in this product that could produce one. They
+   are set smaller than a single headline would be — three totals competing at
+   40px is a wall, and none of them is THE number the way a lone total is. */
+.cfo-summary-currencies{display:flex;flex-wrap:wrap;gap:6px 26px;align-items:baseline}
+.cfo-summary-cur{display:flex;flex-direction:column;gap:2px;min-width:0}
+.cfo-summary-cur-code{
+  font-family:var(--font-ui);font-size:11px;font-weight:800;letter-spacing:.1em;
+  text-transform:uppercase;color:#AFC6DE;
+}
+.cfo-summary-cur-amt{font-size:26px;line-height:1.05;white-space:nowrap}
+@media (max-width:640px){
+  .cfo-summary-currencies{gap:10px 18px}
+  .cfo-summary-cur-amt{font-size:21px}
+}
+/* Wallets exist but no balance can be stated for them — either no currency is
+   set, or the currency's native balance is not yet provable. The card says so
+   rather than printing a number it cannot stand behind. */
+.cfo-summary-nototal{font-size:22px;color:#C5D6E7;font-family:var(--font-ui);font-weight:700}
+
+/* ── balances by currency (design preview only) ─────────────────────────────
+   The approved future model, in two alternatives. Deliberately NOT a navy hero
+   per currency: three competing heroes make a page with no subject, and the one
+   thing this layout must never suggest is that any figure is the sum of the
+   others. A currency is a row — code, amount, and its exact figure and count —
+   and the rows sit as peers. */
+/* The approved future multi-currency model's styles are NOT here. They live in
+   pages/DesignPreview.css under the dsp- prefix, so that shipping them is
+   impossible while the model is preview-only: this stylesheet is in every
+   production bundle, and dead rules for an inactive feature are exactly the kind
+   of thing that quietly becomes active. They move here in the PR that activates
+   Alternative 2 — see pages/walletsSummaryConcepts.jsx. */
 .cfo-summary-meta{display:flex;align-items:center;gap:8px;margin-top:12px;color:#C5D6E7;font-size:13px;flex-wrap:wrap}
 .cfo-summary-meta .dot{color:var(--brand-electric-blue);display:inline-flex}
 .cfo-summary-row{display:flex;gap:32px;margin-top:18px;padding-top:16px;border-top:1px solid rgba(255,255,255,.14);flex-wrap:wrap}
@@ -297,7 +659,11 @@ html, body, #root { max-width: 100%; overflow-x: hidden; }
 
 /* ── Responsive ──────────────────────────────────────────────────────────── */
 @media (max-width:1024px){
-  .cfo-shell{grid-template-columns:1fr}
+  /* One column on a phone. The rows must be pinned too: they are implicit `auto`
+     otherwise, and a grid taller than its content stretches them by default — so on
+     a short page the mobile header absorbed the slack and grew to 274px of mostly
+     empty white before the content began. */
+  .cfo-shell{grid-template-columns:1fr;grid-template-rows:auto 1fr}
   .cfo-sidebar{display:none}
   .cfo-mobilehead{display:flex}
   .cfo-main{padding:18px 18px 48px}
@@ -306,6 +672,11 @@ html, body, #root { max-width: 100%; overflow-x: hidden; }
   .cfo-grid-2{grid-template-columns:1fr}
   .cfo-table-wrap{overflow-x:auto}
   .cfo-drawer{width:min(86vw,340px)}
+  /* A drawer row is a thumb target, not a pointer target. 36px is the right
+     density for the desktop sidebar and too mean for a phone, so the 44px
+     minimum is scoped here rather than applied to .cfo-navitem globally — the
+     same call already made for the page-header actions. */
+  .cfo-drawer .cfo-navitem{min-height:44px}
 }
 @media (max-width:640px){
   .cfo-main{padding:14px 20px 44px}
@@ -406,7 +777,9 @@ html, body, #root { max-width: 100%; overflow-x: hidden; }
   .personal-overview-subtitle{font-size:14px;line-height:1.35;margin:7px 0 14px;color:#52657C}
   .personal-mobile-meta{display:none}
   .personal-overview .cfo-summary{border-radius:12px;padding:18px 18px;margin-top:4px;box-shadow:0 10px 24px rgba(0,32,63,.15);background:#0A1730}
-  .personal-overview .cfo-summary-sym{width:150px;right:-44px;top:8px;opacity:.10}
+  /* The shorthand above resets padding-right, so the flagship reclaims its
+     reserved column here rather than losing it to a more specific rule. */
+  .personal-overview .cfo-summary.cfo-flagship{padding-right:var(--mark-safe)}
   .personal-overview .cfo-summary-label{font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:#AFC1D4}
   .personal-overview .cfo-summary-value{font-size:29px;line-height:1.05;margin-top:8px;letter-spacing:-.01em;overflow-wrap:anywhere}
   .personal-overview .cfo-summary-meta{font-size:12px;margin-top:12px;line-height:1.35;color:#CAD7E5}
