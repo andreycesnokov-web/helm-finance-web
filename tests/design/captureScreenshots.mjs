@@ -304,20 +304,26 @@ const SHOTS = [
     { region: { sel: '.cfo-pagehead', pad: 18 } }],
   ['08-long-title-header-actions-1440.png', `${P}?only=wrapping`, 1440, 760,
     { region: { sel: '.cfo-pagehead', pad: 20 } }],
-  // Both navy flagship cards, close up, so the one cropped watermark on each reads.
-  ['09-pulse-flagship-watermark-closeup.png', `${P}?only=pulse`, 1440, 900,
+  // The four navy flagship cards, close up: the one cropped watermark on each now
+  // reads at ~74% visible from the same shared primitive — a tall Pulse card, a
+  // wide shallow Wallets card and both on a phone, each with its own crop distance.
+  ['09-pulse-flagship-desktop-closeup.png', `${P}?only=pulse`, 1440, 900,
     { region: { sel: '.pulse-cash', pad: 6 } }],
-  ['10-accounts-flagship-watermark-closeup.png', `${P}?only=accounts`, 1440, 900,
+  ['10-wallets-flagship-desktop-closeup.png', `${P}?only=accounts`, 1440, 900,
     { region: { sel: '.cfo-summary.cfo-flagship', pad: 6 } }],
+  ['11-pulse-flagship-mobile-closeup.png', `${P}?only=pulse`, 390, 844,
+    { crop: true, window: [512, 844], region: { sel: '.pulse-cash', pad: 6 } }],
+  ['12-wallets-flagship-mobile-closeup.png', `${P}?only=accounts`, 390, 844,
+    { crop: true, window: [512, 844], region: { sel: '.cfo-summary.cfo-flagship', pad: 6 } }],
   // Mobile lockup, at its real rendered size, for the wordmark inspection.
-  ['11-mobile-header-closeup-390.png', `${P}?shell=pulse`, 390, 844,
+  ['13-mobile-header-closeup-390.png', `${P}?shell=pulse`, 390, 844,
     { crop: true, window: [512, 844], region: { sel: '.cfo-mobilehead' } }],
   // The real drawer, opened by clicking the real burger.
-  ['12-mobile-drawer-workspace-settings.png', `${P}?shell=pulse`, 390, 844,
+  ['14-mobile-drawer-workspace-settings.png', `${P}?shell=pulse`, 390, 844,
     { crop: true, window: [512, 844], click: '.cfo-burger' }],
   // Retained evidence for reviewers: the focus ring and the semantic-colour states.
-  ['13-focus-visible-state.png', `${P}?only=focus`, 1440, 560, { focus: '.dsp-focus-target' }],
-  ['14-semantic-colour-states.png', `${P}?only=semantic`, 1440, 900, {}],
+  ['15-focus-visible-state.png', `${P}?only=focus`, 1440, 560, { focus: '.dsp-focus-target' }],
+  ['16-semantic-colour-states.png', `${P}?only=semantic`, 1440, 900, {}],
 ];
 
 const produced = new Set(SHOTS.map(([f]) => f));

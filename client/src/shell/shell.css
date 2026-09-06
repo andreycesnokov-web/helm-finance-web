@@ -299,16 +299,25 @@
    card reads as an icon someone parked there, while one running off the edge
    reads as the surface itself being branded.
 
-   --mark-safe is the column the mark claims, and each flagship surface adds it
-   to its own padding-right. That is what guarantees the label, the figure and
-   the supporting line are never set over the mark. Change --mark-size or
-   --mark-crop and the safe area follows; there is no second number to keep in
-   step. */
+   The crop is a FRACTION of the mark, not a fixed number of pixels. The mark's
+   height is capped to the card, so a shallow card (Wallets, ~146px) renders a
+   smaller mark than a tall one (Pulse, ~249px); a fixed pixel crop then ate a
+   bigger share of the small one — 46px left Pulse at 73% but Wallets at 61%,
+   only a fragment. --mark-inside is the share kept inside the card, and the mark
+   is pushed off by the rest of ITS OWN width via translateX(%), which is relative
+   to the element. So one shared primitive keeps the same visible share on a tall
+   card, a wide shallow card and a phone, with a different absolute crop on each —
+   no page-specific positioning, no per-card token.
+
+   --mark-safe is the column the mark claims, and each flagship surface adds it to
+   its own padding-right. That is what guarantees the label, the figure and the
+   supporting line are never set over the mark. Change --mark-size or --mark-inside
+   and the safe area follows; there is no second number to keep in step. */
 .cfo-flagship{
   --mark-size:168px;
-  --mark-crop:46px;                      /* how much of it the card edge eats */
+  --mark-inside:.74;                     /* share of the mark kept inside the card */
   --mark-gap:20px;                       /* clear space between text and mark */
-  --mark-safe:calc(var(--mark-size) - var(--mark-crop) + var(--mark-gap));
+  --mark-safe:calc(var(--mark-size) * var(--mark-inside) + var(--mark-gap));
   position:relative;
   overflow:hidden;
   /* Establishes a stacking context, which is what lets the mark sit at z-index
@@ -322,11 +331,15 @@
   /* Structurally behind the text, not merely faint enough to get away with it.
      Nothing readable can ever paint under it, whatever a page puts in the card. */
   z-index:-1;
-  right:calc(var(--mark-crop) * -1);
+  /* Anchor the right edge to the card edge, then push the mark off by the share
+     of its OWN width that is meant to hang over — translateX(%) is relative to the
+     element, so the visible fraction is constant while the absolute crop follows
+     the mark's rendered size on each card. */
+  right:0;
   top:50%;
-  transform:translateY(-50%);
+  transform:translateY(-50%) translateX(calc((1 - var(--mark-inside)) * 100%));
   /* Cropped by the right edge on purpose — never by the top and bottom as well.
-     A summary card is only as tall as its contents, and Accounts' is 148px, so a
+     A summary card is only as tall as its contents, and Accounts' is 146px, so a
      flat 168px mark came out clipped on three sides and stopped reading as a
      symbol. Capping the height to the card keeps the crop deliberate: one edge,
      always the right one, whatever the card's height. */
@@ -342,10 +355,11 @@
    dropped — this is the one surface where the product's brand moment lives, and
    the app header above it shows the compact lockup, not this symbol. */
 @media (max-width:640px){
+  /* A smaller, quieter mark; the same --mark-inside keeps the visible share, and a
+     tighter gap keeps the reserved column off the figure on a narrow card. */
   .cfo-flagship{
     --mark-size:92px;
-    --mark-crop:30px;
-    --mark-gap:14px;
+    --mark-gap:12px;
   }
   .cfo-flagship-mark{opacity:.05}
 }
