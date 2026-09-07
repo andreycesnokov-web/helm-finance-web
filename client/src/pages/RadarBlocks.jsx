@@ -14,6 +14,8 @@ import {
   PageHeader, SummaryCard, Card, Stat, DataList, EmptyState, StatusBadge,
 } from '../shell/ui'
 import { fmt, fmtFull, daysUntil } from '../lib/api'
+import { currencyPrefix } from '../lib/money'
+import { WORKSPACE_DEFAULT_CURRENCY } from '../lib/walletBalanceContract'
 // The arithmetic lives in a plain module so a unit test can pin every figure
 // without a JSX transform — which is how this migration proves it moved none.
 import { radarFigures } from '../lib/radarFigures'
@@ -36,6 +38,20 @@ const signed = (v) => (v >= 0 ? '+' : '') + fmt(Math.round(v))
    green only when there is genuinely something positive, red only for a real
    negative, and neither at zero. */
 const toneOf = (v) => (v < 0 ? 'cfo-neg' : v > 0 ? 'cfo-pos' : '')
+
+/* A money figure says which currency it is in.
+   The mini-metrics dropped the currency when the page moved onto the shared card,
+   which is fine while everything is rupiah and wrong the moment it is not — so the
+   symbol comes from currencyPrefix() against the workspace currency context,
+   never a literal "Rp". When Radar learns a real base currency, this is the one
+   line that changes.
+
+   Deliberately NOT money.js's compactAmount(): it rounds half-up, while the fmt()
+   this page has always used does not. Swapping it would print "Rp 122.9M" here
+   beside a best case still reading "+122.8M" for the same number. Prefix plus the
+   existing formatter names the currency and moves no digit. */
+const CURRENCY = WORKSPACE_DEFAULT_CURRENCY
+const money = (v) => currencyPrefix(CURRENCY) + fmt(v)
 
 /** The shared page hero. `badge` is withheld until the figures are known. */
 export function RadarHeader({ t, isHealthy, badge = true }) {
@@ -105,8 +121,8 @@ export function RadarForecast({ figures: f, t, hasAdvanced = true }) {
         value={<span className="fin">{signed(f.proj30)}</span>}
         meta={`${fmtFull(Math.round(f.proj30))} ${t('radar.ifAllPlanned')}`}
         metrics={[
-          { k: t('radar.balance'), v: fmt(f.balance) },
-          { k: t('radar.monthlyBurn'), v: fmt(f.monthlyBurn) },
+          { k: t('radar.balance'), v: money(f.balance) },
+          { k: t('radar.monthlyBurn'), v: money(f.monthlyBurn) },
           /* radar.runway does not exist in any locale — the previous page asked
              for it too and rendered the raw key. radar.runwayLeft is the real
              string and is translated in all three. */
@@ -134,8 +150,8 @@ export function RadarForecast({ figures: f, t, hasAdvanced = true }) {
 
       <Card title={t('radar.monthlyBurnBreakdown')}>
         <div className="cfo-grid cfo-grid-3 radar-burn">
-          <Stat k={t('radar.monthlyBurn')} v={fmt(f.monthlyBurn)} tone="neg" />
-          <Stat k={t('radar.dailyAverage')} v={fmt(f.burnRate)} />
+          <Stat k={t('radar.monthlyBurn')} v={money(f.monthlyBurn)} tone="neg" />
+          <Stat k={t('radar.dailyAverage')} v={money(f.burnRate)} />
           <Stat k={t('radar.runwayLeft')} v={f.runway != null ? `${f.runway}d` : '∞'}
             tone={f.runway != null && f.runway < 30 ? 'warn' : ''} />
         </div>

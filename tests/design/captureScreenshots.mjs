@@ -35,7 +35,10 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const DIST = path.join(ROOT, 'client', 'dist');
+// One directory per PR, so a review folder always answers "which change is this
+// evidence for". A shot names its own directory; OUT is the default.
 const OUT = path.join(ROOT, 'artifacts', 'design-pr80');
+const OUT_RADAR = path.join(ROOT, 'artifacts', 'design-pr81-radar');
 
 // Which face each kind of content is supposed to render in. The check is done
 // against what the page ACTUALLY renders — sample an element, read its computed
@@ -74,7 +77,7 @@ const build = spawnSync(process.platform === 'win32' ? 'npm.cmd' : 'npm', ['run'
 });
 assert.strictEqual(build.status, 0, 'build failed:\n' + (build.stderr || '').slice(-2000));
 
-fs.mkdirSync(OUT, { recursive: true });
+for (const dir of [OUT, OUT_RADAR]) fs.mkdirSync(dir, { recursive: true });
 
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css',
   '.svg': 'image/svg+xml', '.png': 'image/png', '.woff2': 'font/woff2', '.woff': 'font/woff',
@@ -182,7 +185,7 @@ setTimeout(async () => {
 // Verify first, then photograph the identical page. No image is written for a
 // page whose fonts and viewport could not be vouched for.
 const verifyAndShoot = async (file, route, w, h, opts = {}) => {
-  const { crop, focus, window: win, click, region } = opts;
+  const { crop, focus, window: win, click, region, dir = OUT } = opts;
   // A region may be a fixed [x,y,w,h] or {sel,pad}: measure the element and crop
   // to it, so a close-up cannot drift off its subject.
   const measureSel = region && !Array.isArray(region) ? region.sel : null;
@@ -217,11 +220,11 @@ const verifyAndShoot = async (file, route, w, h, opts = {}) => {
       rect = region;
     }
     const needsCrop = crop || rect;
-    const raw = needsCrop ? path.join(DIST, '__shot.png') : path.join(OUT, file);
+    const raw = needsCrop ? path.join(DIST, '__shot.png') : path.join(dir, file);
     await run(args([`--screenshot=${raw}`]));
     if (needsCrop) {
       const [rx, ry, rw, rh] = rect || [0, 0, w, h];
-      cropPng(raw, path.join(OUT, file), rw, rh, rx, ry);
+      cropPng(raw, path.join(dir, file), rw, rh, rx, ry);
       fs.unlinkSync(raw);
     }
     console.log(`  ${file}  viewport=${r.innerWidth}px `
@@ -375,29 +378,48 @@ const SHOTS = [
   // Radar, migrated onto the shared system: the same PageHeader and the same
   // flagship card as Pulse and Accounts, so it carries the one official
   // watermark rather than an inline gradient and a graph-paper grid.
-  ['33-radar-app-shell-desktop-1440x900.png', `${P}?shell=radar`, 1440, 900, {}],
-  ['34-radar-app-shell-mobile-390x844.png', `${P}?shell=radar`, 390, 844, PHONE],
-  ['35-radar-flagship-card-closeup.png', `${P}?shell=radar`, 1440, 900,
-    { region: { sel: '.cfo-summary.cfo-flagship', pad: 6 } }],
+  ['01-radar-app-shell-desktop-1440x900.png', `${P}?shell=radar`, 1440, 900, { dir: OUT_RADAR }],
+  ['02-radar-app-shell-mobile-390x844.png', `${P}?shell=radar`, 390, 844,
+    { ...PHONE, dir: OUT_RADAR }],
+  ['03-radar-flagship-card-closeup.png', `${P}?shell=radar`, 1440, 900,
+    { region: { sel: '.cfo-summary.cfo-flagship', pad: 6 }, dir: OUT_RADAR }],
   // Zero-data: a forecast still holds, but nothing is planned — so the key-dates
   // panel becomes a real empty state, not a page-sized logo.
-  ['36-radar-zero-data-desktop-1440x900.png', `${P}?shell=radar-empty`, 1440, 900, {}],
+  ['04-radar-zero-data-desktop-1440x900.png', `${P}?shell=radar-empty`, 1440, 900,
+    { dir: OUT_RADAR }],
 ];
 
-const produced = new Set(SHOTS.map(([f]) => f));
+// Produced filenames, per directory — a run only prunes what it owns, so the
+// Radar folder cannot delete PR #80's evidence or the other way round.
+const produced = new Map();
+for (const [f, , , , o = {}] of SHOTS) {
+  const dir = o.dir || OUT;
+  if (!produced.has(dir)) produced.set(dir, new Set());
+  produced.get(dir).add(f);
+}
 for (const [file, route, w, h, opts] of SHOTS) await verifyAndShoot(file, route, w, h, opts);
 
 /* ── no stale screenshots: delete any PNG this run did not produce ──────────── */
-for (const f of fs.readdirSync(OUT).filter((n) => n.endsWith('.png'))) {
-  if (!produced.has(f)) { fs.unlinkSync(path.join(OUT, f)); console.log(`  removed stale ${f}`); }
+for (const [dir, keep] of produced) {
+  for (const f of fs.readdirSync(dir).filter((n) => n.endsWith('.png'))) {
+    if (!keep.has(f)) {
+      fs.unlinkSync(path.join(dir, f));
+      console.log(`  removed stale ${path.basename(dir)}/${f}`);
+    }
+  }
 }
 
 /* ── every image must be real, and none may be a duplicate ─────────────────── */
 const seen = new Map();
 let bad = 0;
 console.log('');
-for (const f of fs.readdirSync(OUT).filter((n) => n.endsWith('.png')).sort()) {
-  const b = fs.readFileSync(path.join(OUT, f));
+// Duplicate detection spans every directory: the same frame filed under two PRs
+// is exactly the kind of thing a reviewer should be told about.
+const allShots = [...produced.keys()].flatMap((dir) =>
+  fs.readdirSync(dir).filter((n) => n.endsWith('.png')).sort()
+    .map((f) => [dir, f])).sort((a, b) => (a[1] < b[1] ? -1 : 1));
+for (const [dir, f] of allShots) {
+  const b = fs.readFileSync(path.join(dir, f));
   const ihdr = b.subarray(16, 24);
   const w = ihdr.readUInt32BE(0), h = ihdr.readUInt32BE(4);
   // Scale the "too small to be real" floor by pixel count: a full page never
