@@ -18,7 +18,11 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
-const read = (p) => fs.readFileSync(path.join(ROOT, p), 'utf8');
+// Normalised to LF. Git checks these files out with CRLF on Windows, so a
+// pattern anchored on a newline silently stops matching there — an assertion
+// that fails on one machine and passes on CI, or worse passes everywhere while
+// matching nothing at all.
+const read = (p) => fs.readFileSync(path.join(ROOT, p), 'utf8').replace(/\r\n/g, '\n');
 
 /** Source with comments stripped, so assertions about behaviour are not
  *  satisfied — or broken — by prose that merely describes it. */
@@ -510,17 +514,81 @@ t('the preview fixture cannot show a balance and an empty state at once', () => 
   }
 });
 
-t('Radar is deferred, not half-migrated', () => {
-  // Radar's hero is an inline-styled gradient card with a graph-paper grid, on the
-  // legacy hf- classes rather than the shared design system. Giving it the
-  // flagship mark means migrating the page, which is a redesign this PR is not.
-  // The guard is that it stays untouched: no half-applied watermark, and no
-  // shared class on a card that does not have the shared structure.
+/* -- Radar, migrated --------------------------------------------------------
+   Radar was the last page outside the shared system: its own header, an inline
+   linear-gradient hero with a graph-paper grid built from repeating-linear-
+   gradient, and hf-card panels. PR #80 deferred it because migrating it is a
+   rewrite, not a prop. These assert the rewrite landed and stayed inside the
+   existing foundation rather than starting a second one. */
+
+t('Radar uses the shared page hero and the shared flagship card', () => {
+  const blocks = code('client/src/pages/RadarBlocks.jsx');
+  assert.match(blocks, /from '\.\.\/shell\/ui'/, 'Radar does not import the shared components');
+  assert.match(blocks, /<PageHeader/, 'Radar does not use the shared PageHeader');
+  assert.match(blocks, /<SummaryCard\s+flagship/,
+    'Radar headline is not the shared flagship SummaryCard');
+  // Exactly one flagship on the page: the watermark is the brand moment, and two
+  // of them in one content area is the rule PR #80 exists to enforce.
+  assert.strictEqual((blocks.match(/flagship/g) || []).length, 1,
+    'Radar renders more than one flagship card');
+});
+
+t('Radar no longer paints its own navy, gradient or graph paper', () => {
+  for (const f of ['client/src/pages/Radar.jsx', 'client/src/pages/RadarBlocks.jsx']) {
+    const src2 = code(f);
+    assert.ok(!/linear-gradient|repeating-linear-gradient/.test(src2),
+      `${f} still paints a gradient or a graph-paper grid`);
+    assert.ok(!/hf-page-header|hf-card|hf-badge/.test(src2),
+      `${f} still uses the legacy hf- surfaces`);
+    assert.ok(!/#1e2d4a|#0F172A/i.test(src2), `${f} still hardcodes a navy`);
+  }
+  // And it did not start a private design system either: Radar.css may lay the
+  // page out, but it must not declare tokens or restyle shared components.
+  const css = read('client/src/pages/Radar.css');
+  assert.ok(!/--(brand|surface|text|border|shadow|radius|success|warning|danger)-/.test(
+    css.replace(/var\(--[a-z-]+\)/g, '')), 'Radar.css declares design tokens of its own');
+  assert.ok(!/\.cfo-[a-z-]+\s*\{/.test(css), 'Radar.css restyles a shared component');
+});
+
+t('Radar keeps the brand asset, at the size an empty state uses', () => {
+  const blocks = code('client/src/pages/RadarBlocks.jsx');
+  // The one symbol on the page comes from the shipped /brand pipeline. Nothing
+  // is drawn in CSS, and there is no page-sized background logo.
+  assert.match(blocks, /RADAR_SYMBOL = '\/brand\/symbol_[a-z_]+\.svg'/,
+    'Radar does not use an official brand asset');
+  assert.ok(!/backgroundImage|background-image/.test(blocks),
+    'Radar paints a background image — the rejected giant-logo pattern');
+  // The flagship watermark comes from the shared card, never hand-placed.
+  assert.ok(!/FlagshipMark/.test(blocks),
+    'Radar hand-places the watermark instead of letting SummaryCard own it');
+});
+
+t('Radar keeps all three scenarios, and its arithmetic left the component', () => {
+  const blocks = code('client/src/pages/RadarBlocks.jsx');
+  for (const key of ['radar.bestCaseFull', 'radar.worstCaseFull', 'radar.projectedBalance30']) {
+    assert.ok(blocks.includes(key), `Radar no longer shows ${key}`);
+  }
+  // The figures moved to a plain module so they can be pinned by a unit test —
+  // see radarFigures.test.mjs. The component must not recompute them.
+  const fig = code('client/src/lib/radarFigures.js');
+  assert.match(fig, /proj30\s*=\s*balance \+ totalIn - totalOut - burnRate \* 30/,
+    'the expected-case formula changed');
+  assert.match(fig, /projBest\s*=\s*balance \+ totalIn - totalOut \* 0\.5/,
+    'the best-case formula changed');
+  assert.match(fig, /projWorst\s*=\s*balance - totalOut - burnRate \* 30/,
+    'the worst-case formula changed');
+  assert.ok(!/proj30\s*=|projBest\s*=|projWorst\s*=/.test(blocks),
+    'RadarBlocks recomputes the forecast instead of taking it from radarFigures');
+});
+
+t('Radar changed no data source and no backend call', () => {
   const radar = code('client/src/pages/Radar.jsx');
-  assert.ok(!/cfo-flagship|FlagshipMark/.test(radar),
-    'Radar has been given the flagship watermark without being migrated to the shared card');
-  assert.ok(!/SummaryCard|PageHeader/.test(radar),
-    'Radar now imports the shared components — that is the migration, and it belongs to its own PR');
+  // One endpoint, unchanged, and no write of any kind from this page.
+  const calls = radar.match(/apiFetch\([^)]*\)/g) || [];
+  assert.strictEqual(calls.length, 1, `Radar makes ${calls.length} API calls, expected 1`);
+  assert.match(calls[0], /'\/pulse\?scope=business'/, `Radar now calls ${calls[0]}`);
+  assert.ok(!/method:\s*'(POST|PUT|PATCH|DELETE)'/.test(radar),
+    'Radar performs a write — it is a read-only forecast');
 });
 
 t('the page-hero mark sits inside the band rather than off its edge', () => {

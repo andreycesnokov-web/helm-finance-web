@@ -13,7 +13,11 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
-const read = (p) => fs.readFileSync(path.join(ROOT, p), 'utf8');
+// Normalised to LF. Git checks these files out with CRLF on Windows, so a
+// pattern anchored on a newline silently stops matching there — an assertion
+// that fails on one machine and passes on CI, or worse passes everywhere while
+// matching nothing at all.
+const read = (p) => fs.readFileSync(path.join(ROOT, p), 'utf8').replace(/\r\n/g, '\n');
 
 /** Source with comments removed. Assertions about what the CODE does must not
  *  trip over prose that explains it — an earlier version of this file failed

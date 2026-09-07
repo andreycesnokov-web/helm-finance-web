@@ -21,6 +21,7 @@ import { WalletCurrencyField } from './WalletCurrencyField'
 import { CURRENCY_NAMES, formatCurrency, compactAmount } from '../lib/money'
 import { PageHeader, SummaryCard, Card, Btn, StatusBadge, Icon } from '../shell/ui'
 import { ExecutiveHero } from './business/PulseBlocks'
+import { RadarHeader, RadarForecast, radarFigures } from './RadarBlocks'
 import WorkspaceShell, { BUSINESS_NAV } from '../shell/WorkspaceShell'
 import './DesignPreview.css'
 
@@ -90,6 +91,27 @@ const SHELL_WORKSPACES = {
   }],
 }
 const noop = () => {}
+
+/* Radar — the same shape GET /api/pulse?scope=business returns.
+
+   The due dates are offsets from today rather than fixed strings: Radar renders
+   "in 12d" from daysUntil(), so a hardcoded date would make the label drift a day
+   at a time and every screenshot diff would be noise. The offsets are fixed, so
+   the rendered labels are stable. */
+const inDays = (n) => new Date(Date.now() + n * 86400000).toISOString().slice(0, 10)
+const RADAR_FIXTURE = {
+  totalBalance: 122850000,
+  burnRate: 3282833,
+  burnWindowDays: 30,
+  debts: [
+    { id: 'r1', type: 'receivable', counterparty: 'PT Sinar Abadi', amount: 48200000, due_date: inDays(9) },
+    { id: 'r2', type: 'receivable', counterparty: 'Bali Retail Group', amount: 17650000, due_date: inDays(23) },
+    { id: 'p1', type: 'payable', counterparty: 'Kantor Pajak', amount: 21400000, due_date: inDays(4) },
+    { id: 'p2', type: 'payable', counterparty: 'Supplier Nusantara', amount: 9800000, due_date: inDays(-3) },
+  ],
+}
+// The zero-data case: a workspace with a balance but nothing planned.
+const RADAR_EMPTY = { totalBalance: 122850000, burnRate: 3282833, burnWindowDays: 30, debts: [] }
 
 const LONG_TITLE = 'Nusantara Integrated Facilities Management & Industrial Services'
 const LONG_DESC = 'Cash position, this month’s operating figures and anything waiting on you — '
@@ -180,6 +202,9 @@ const WALLET_SETS = {
   'accounts-nocur': WALLETS_NEEDS_CURRENCY,
   'accounts-four': WALLETS_FOUR,
 }
+// Radar is a different page shape, so it gets its own shell routes rather than a
+// wallet collection.
+const RADAR_SHELLS = { radar: RADAR_FIXTURE, 'radar-empty': RADAR_EMPTY }
 
 /* ── the APPROVED future model, for reference only ─────────────────────────
    Balances by currency, once the backend derives native balances. It is not
@@ -227,6 +252,16 @@ const CurrencyConcept = ({ wallets }) => {
   )
 }
 
+const RadarBody = ({ data = RADAR_FIXTURE, hasAdvanced = false }) => {
+  const figures = radarFigures(data)
+  return (
+    <>
+      <RadarHeader t={tEn} isHealthy={figures.isHealthy} />
+      <RadarForecast figures={figures} t={tEn} hasAdvanced={hasAdvanced} />
+    </>
+  )
+}
+
 const AccountsBody = ({ wallets = WALLETS_FIXTURE }) => {
   // The production derivation, called with the production translations. Not a
   // mirror of Accounts.jsx — literally the function Accounts.jsx calls, so the
@@ -254,6 +289,7 @@ const AccountsBody = ({ wallets = WALLETS_FIXTURE }) => {
 // component; only the data differs.
 function ShellPreview({ page }) {
   const isAccounts = Object.prototype.hasOwnProperty.call(WALLET_SETS, page)
+  const isRadar = Object.prototype.hasOwnProperty.call(RADAR_SHELLS, page)
   return (
     // No preview banner here on purpose: these are pictures of the product frame,
     // and a strip of our own chrome above it would misrepresent what ships.
@@ -263,10 +299,12 @@ function ShellPreview({ page }) {
         activeId="demo-business"
         onSelectWorkspace={noop}
         nav={BUSINESS_NAV}
-        activeKey={isAccounts ? 'accounts' : 'pulse'}
+        activeKey={isRadar ? 'radar' : isAccounts ? 'accounts' : 'pulse'}
         onNavigate={noop}
       >
-        {isAccounts ? <AccountsBody wallets={WALLET_SETS[page]} /> : <PulseBody />}
+        {isRadar
+          ? <RadarBody data={RADAR_SHELLS[page]} />
+          : isAccounts ? <AccountsBody wallets={WALLET_SETS[page]} /> : <PulseBody />}
       </WorkspaceShell>
     </div>
   )
@@ -321,6 +359,17 @@ export default function DesignPreview() {
           <CurrencyConcept wallets={WALLETS_FOUR} />
           <p className="dsp-note"><strong>Long values</strong></p>
           <CurrencyConcept wallets={WALLETS_LONG} />
+        </Section>
+
+        {/* ── Radar ─────────────────────────────────────────────────────── */}
+        <Section id="radar" title="Radar" wide
+          note="The last page outside the shared system. It drew its own header, an inline navy gradient with a graph-paper grid, and hf-card panels. It now uses the same PageHeader and the same flagship SummaryCard as Pulse and Accounts — so it carries the one official watermark, the compact-over-exact amount hierarchy and the canonical navy. Every figure is unchanged: same expressions, same endpoint, same formatters. Best and worst case stopped being solid colour panels; the colour is on the figure now.">
+          <RadarBody />
+        </Section>
+
+        <Section id="radar-empty" title="Radar — nothing planned" wide
+          note="Zero-data. The forecast still holds, because a balance and a burn rate are enough for one; what is missing is planned movement, so the key-dates panel becomes a real empty state at the symbol's normal size rather than a page-sized logo.">
+          <RadarBody data={RADAR_EMPTY} hasAdvanced />
         </Section>
 
         {/* ── Accounts, other currencies ───────────────────────────────── */}

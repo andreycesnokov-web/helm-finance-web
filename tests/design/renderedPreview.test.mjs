@@ -471,7 +471,12 @@ const PROBE_FN = `function facts(win, doc) {
       return m ? Math.round(m.getBoundingClientRect().width) : null; })(),
   } : null;
 
-  const ctx = doc.querySelector('.cfo-pagehead-context');
+  // Measured inside the wrapping example, which exists precisely to carry several
+  // badges of different lengths. Taking the FIRST context box on the page instead
+  // made this depend on the order of the catalogue: adding a section above it
+  // whose header carries a single badge silently changed what was being tested.
+  const ctxHost = doc.getElementById('wrapping') || doc;
+  const ctx = ctxHost.querySelector('.cfo-pagehead-context');
   const badges = ctx ? [...ctx.querySelectorAll('.cfo-badge')].map((b) =>
     Math.round(b.getBoundingClientRect().width)) : [];
 

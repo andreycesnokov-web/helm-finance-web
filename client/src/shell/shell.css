@@ -478,6 +478,9 @@
 .cfo-summary-k{display:block;font-size:12px;color:#AFC6DE}
 .cfo-summary-v{display:block;font-weight:800;font-size:18px;margin-top:3px;font-family:var(--font-mono)}
 .cfo-summary-v.pos{color:#7FE3B6}.cfo-summary-v.neg{color:#FFB4A8}
+/* On navy, the ink warning (#B5740B) is unreadable; this is the same amber lifted
+   for a dark surface, matching how .pos and .neg are lifted above. */
+.cfo-summary-v.warn{color:#FFD08A}
 
 /* Money / asset card */
 .cfo-money{background:var(--surface-card);border:1px solid var(--border-default);border-radius:var(--radius-lg);padding:16px;box-shadow:var(--shadow-sm)}
@@ -498,6 +501,8 @@
 .cfo-stat-k{font-size:12px;color:var(--text-muted)}
 .cfo-stat-v{font-size:17px;font-weight:700;color:var(--text-primary);font-family:var(--font-mono)}
 .cfo-stat-v.pos{color:var(--success)}.cfo-stat-v.neg{color:var(--danger)}
+/* A short runway warns rather than alarms — the same rule Pulse's KPIs follow. */
+.cfo-stat-v.warn{color:var(--warning)}
 
 /* ── Tabs ────────────────────────────────────────────────────────────────── */
 .cfo-tabs{display:flex;gap:4px;border-bottom:1px solid var(--border-default);margin-bottom:18px;overflow-x:auto}
