@@ -12587,6 +12587,7 @@ const docContent = require('./lib/documentContent');
 const { extractPdfText } = require('./lib/pdfText');
 const docExtract = require('./lib/documentExtraction');
 const docOcr = require('./lib/documentOcr');
+const documentTelemetry = require('./lib/documentTelemetry');
 const docDates = require('./lib/documentDates');
 const docParties = require('./lib/documentParties');
 const uploadIntentLib = require('./lib/uploadIntent');
@@ -13351,58 +13352,64 @@ const intakeOrchestrator = require('./lib/documentIntakeOrchestrator');
  * Returns { file, buf, extraction, readSource, ocr } or { error, status }.
  */
 async function readDocumentForIntake(biz, doc) {
-  const { data: fileRows } = await supabase.from('document_files')
-    .select('id, storage_path, file_name, mime_type')
-    .eq('id', doc.file_id).eq('business_id', biz.business.id).limit(1);
-  const file = fileRows?.[0];
-  if (!file) return { error: 'file_not_found', status: 404 };
+  const run = documentTelemetry.createRun(biz.business.id, doc.id);
+  return run.execute(async () => {
+    const { data: fileRows } = await run.stage('file_lookup', () => supabase.from('document_files')
+      .select('id, storage_path, file_name, mime_type')
+      .eq('id', doc.file_id).eq('business_id', biz.business.id).limit(1));
+    const file = fileRows?.[0];
+    if (!file) return { error: 'file_not_found', status: 404 };
 
-  const { data: blob, error: dlErr } = await supabase.storage.from(DOC_BUCKET).download(file.storage_path);
-  if (dlErr || !blob) return { error: 'document_unavailable', status: 503 };
-  const buf = Buffer.from(await blob.arrayBuffer());
+    const { data: blob, error: dlErr } = await run.stage('download',
+      () => supabase.storage.from(DOC_BUCKET).download(file.storage_path));
+    if (dlErr || !blob) return { error: 'document_unavailable', status: 503 };
+    const buf = Buffer.from(await blob.arrayBuffer());
 
-  const isPdf = /pdf/i.test(file.mime_type || '') || /\.pdf$/i.test(file.file_name || '');
-  const ex = isPdf ? extractPdfText(buf)
-    : { text: '', text_available: false, method: 'not_a_pdf', reason: 'not_a_pdf' };
-  let extraction = docExtract.extractFromText(ex.text, {
-    text_available: ex.text_available, document_type: doc.document_type,
-    file_name: file.file_name, extraction_reason: ex.reason,
-  });
+    const isPdf = /pdf/i.test(file.mime_type || '') || /\.pdf$/i.test(file.file_name || '');
+    const ex = await run.stage('pdf_text', () => isPdf ? extractPdfText(buf)
+      : { text: '', text_available: false, method: 'not_a_pdf', reason: 'not_a_pdf' });
+    let extraction = await run.stage('field_parse', () => docExtract.extractFromText(ex.text, {
+      text_available: ex.text_available, document_type: doc.document_type,
+      file_name: file.file_name, extraction_reason: ex.reason,
+    }));
 
-  // ── OCR / Vision fallback ────────────────────────────────────────────────
-  // Embedded text first, always: it is free, deterministic and exact. Vision runs ONLY
-  // when there was no text to read, so a readable PDF never costs a vision call and its
-  // result can never be overridden by a model's reading of the same page.
-  //
-  // Gated by DOCUMENT_OCR_VISION_ENABLED. Fail-open throughout: readDocumentWithVision
-  // never throws, and a result that is not `ok` leaves `extraction` exactly as the
-  // no-text path produced it — the same "unsupported" answer as before OCR existed.
-  let readSource = ex.text_available ? 'embedded_text' : 'filename_only';
-  let ocr = null;
-  if (!ex.text_available && docOcr.ocrEnabled()) {
-    ocr = await docOcr.readDocumentWithVision(buf, {
-      mime_type: file.mime_type, file_name: file.file_name, client: anthropic,
-    });
-    if (ocr.ok && (ocr.text || ocr.document_type !== 'unknown')) {
-      // Re-run the SAME parser over the transcript, then let the reader's own structured
-      // fields fill what the parser could not find. One extraction shape downstream, so
-      // the orchestrator, the UI and the tests do not care which reader produced it.
-      const fromText = docExtract.extractFromText(ocr.text, {
-        text_available: !!ocr.text, document_type: doc.document_type, file_name: file.file_name,
-      });
-      extraction = docOcr.mergeIntoExtraction(fromText, ocr);
-      readSource = 'ocr_vision';
+    // ── OCR / Vision fallback ────────────────────────────────────────────────
+    // Embedded text first, always: it is free, deterministic and exact. Vision runs ONLY
+    // when there was no text to read, so a readable PDF never costs a vision call and its
+    // result can never be overridden by a model's reading of the same page.
+    //
+    // Gated by DOCUMENT_OCR_VISION_ENABLED. Fail-open throughout: readDocumentWithVision
+    // never throws, and a result that is not `ok` leaves `extraction` exactly as the
+    // no-text path produced it — the same "unsupported" answer as before OCR existed.
+    let readSource = ex.text_available ? 'embedded_text' : 'filename_only';
+    let ocr = null;
+    if (!ex.text_available && docOcr.ocrEnabled()) {
+      ocr = await run.stage('vision', () => docOcr.readDocumentWithVision(buf, {
+        mime_type: file.mime_type, file_name: file.file_name, client: anthropic,
+      }));
+      if (ocr.ok && (ocr.text || ocr.document_type !== 'unknown')) {
+        // Re-run the SAME parser over the transcript, then let the reader's own structured
+        // fields fill what the parser could not find. One extraction shape downstream, so
+        // the orchestrator, the UI and the tests do not care which reader produced it.
+        const fromText = docExtract.extractFromText(ocr.text, {
+          text_available: !!ocr.text, document_type: doc.document_type, file_name: file.file_name,
+        });
+        extraction = docOcr.mergeIntoExtraction(fromText, ocr);
+        readSource = 'ocr_vision';
+      }
     }
-  }
-  // Dates and parties are read from the SAME text the fields came from, so every
-  // caller of this helper gets the same structured answer. The FULL text, not the
-  // 600-character excerpt stored on the row — a due date or a second party block
-  // routinely sits past that cut.
-  const readText = (readSource === 'ocr_vision' ? (ocr && ocr.text) : ex.text) || '';
-  const dates = docDates.extractDates(readText, { document_type: extraction.document_type });
-  const parties = docParties.extractParties(readText);
+    // Dates and parties are read from the SAME text the fields came from, so every
+    // caller of this helper gets the same structured answer. The FULL text, not the
+    // 600-character excerpt stored on the row — a due date or a second party block
+    // routinely sits past that cut.
+    const readText = (readSource === 'ocr_vision' ? (ocr && ocr.text) : ex.text) || '';
+    const { dates, parties } = await run.stage('dates_parties', () => ({
+      dates: docDates.extractDates(readText, { document_type: extraction.document_type }),
+      parties: docParties.extractParties(readText),
+    }));
 
-  return { file, buf, extraction, readSource, ocr, dates, parties };
+    return { file, buf, extraction, readSource, ocr, dates, parties };
+  });
 }
 
 async function runDocumentIntake(biz, doc, opts = {}) {
