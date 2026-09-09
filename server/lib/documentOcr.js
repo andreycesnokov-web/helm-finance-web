@@ -19,6 +19,7 @@
 // { ok: false, reason } and the caller carries on exactly as it did before OCR existed.
 // An upload must never fail because a document could not be read.
 'use strict';
+const telemetry = require('./documentTelemetry');
 
 /** Vision is opt-in per environment. Read at call time so tests can flip it. */
 const ocrEnabled = () => process.env.DOCUMENT_OCR_VISION_ENABLED === 'true';
@@ -166,30 +167,55 @@ async function readDocumentWithVision(buffer, opts = {}) {
     ? { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: buffer.toString('base64') } }
     : { type: 'image', source: { type: 'base64', media_type: imageMime, data: buffer.toString('base64') } };
 
-  let resp;
-  try {
-    // A vision call runs inside an HTTP request that already holds a stored file, so it
-    // gets a hard ceiling rather than the SDK's default patience.
-    resp = await Promise.race([
-      client.messages.create({
-        model: MODEL, max_tokens: 1500,
-        messages: [{ role: 'user', content: [block, { type: 'text', text: PROMPT }] }],
-      }),
-      new Promise((_, reject) => setTimeout(() => reject(new Error('ocr_timeout')), OCR_TIMEOUT_MS)),
-    ]);
-  } catch (e) {
-    const timedOut = /ocr_timeout/.test(e.message || '');
-    return failure(timedOut ? 'ocr_timeout' : 'ocr_request_failed',
-      'Automatic reading did not finish. Enter the values manually or try again.');
-  }
+  return telemetry.modelCall(client, MODEL, async (observation) => {
+    const controller = new AbortController();
+    // Test injection is internal only; no request/env setting changes the 45s ceiling.
+    const timeoutMs = Number.isFinite(opts.timeoutMs) && opts.timeoutMs > 0
+      ? Math.min(opts.timeoutMs, OCR_TIMEOUT_MS) : OCR_TIMEOUT_MS;
+    let timer;
+    let timedOut = false;
+    let resp;
+    try {
+      const deadline = new Promise((_, reject) => {
+        timer = setTimeout(() => {
+          timedOut = true;
+          controller.abort();
+          reject(new Error('ocr_timeout'));
+        }, timeoutMs);
+      });
+      // The signal cancels the SDK transport. The race bounds waiting even if a mock
+      // or transport ignores abort. Cancellation does not guarantee zero billing.
+      resp = await Promise.race([
+        client.messages.create({
+          model: MODEL, max_tokens: 1500,
+          messages: [{ role: 'user', content: [block, { type: 'text', text: PROMPT }] }],
+        }, { signal: controller.signal }),
+        deadline,
+      ]);
+      observation.response(resp);
+    } catch (e) {
+      observation.failure(e, timedOut);
+      return failure(timedOut ? 'ocr_timeout' : 'ocr_request_failed',
+        'Automatic reading did not finish. Enter the values manually or try again.');
+    } finally {
+      clearTimeout(timer);
+    }
 
-  const raw = (resp?.content?.[0]?.text || '').trim()
-    .replace(/^```(?:json)?/i, '').replace(/```$/, '').trim();
-  if (!raw) return failure('ocr_empty_response');
-  let parsed;
-  try { parsed = JSON.parse(raw); } catch { return failure('ocr_unparseable_response'); }
-
-  return normalizeResult(parsed);
+    const text = resp?.content?.[0]?.text;
+    const raw = typeof text === 'string'
+      ? text.trim().replace(/^```(?:json)?/i, '').replace(/```$/, '').trim() : '';
+    if (!raw) {
+      observation.result('empty_response');
+      return failure('ocr_empty_response');
+    }
+    let parsed;
+    try { parsed = JSON.parse(raw); } catch {
+      observation.result('unparseable_response');
+      return failure('ocr_unparseable_response');
+    }
+    observation.result('success');
+    return normalizeResult(parsed);
+  });
 }
 
 /* ── folding a vision reading into the normal extraction shape ─────────────── */
