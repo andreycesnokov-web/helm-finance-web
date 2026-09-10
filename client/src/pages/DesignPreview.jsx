@@ -441,6 +441,11 @@ const WALLET_SETS = {
      The four-wallet collection pushes the add block below the fold on a phone,
      which makes it unphotographable in one shot rather than badly designed. */
   'accounts-short': WALLETS_FIXTURE.slice(0, 2),
+  /* One wallet, so a 390x844 frame holds the list AND the block that closes it.
+     A phone row is two lines tall, so even two wallets push the block past the
+     fold — which makes the relationship between them unphotographable in one
+     honest phone-sized frame rather than badly designed. */
+  'accounts-one': WALLETS_FIXTURE.slice(0, 1),
   // Wallets exist; none is personal. The filter is empty, the workspace is not.
   'accounts-filter-empty': WALLETS_FIXTURE,
 }

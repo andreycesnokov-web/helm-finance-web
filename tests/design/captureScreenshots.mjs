@@ -30,6 +30,7 @@ import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
 import zlib from 'node:zlib';
+import { createHash } from 'node:crypto';
 import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
@@ -439,7 +440,7 @@ const SHOTS = [
   // A phone frame holding the list and the add block together. The four-wallet
   // collection pushes the block past 844px, so this uses the two-wallet one —
   // the point is the relationship between the list and its closing block.
-  ['05-accounts-list-and-add-block-mobile-390.png', `${P}?shell=accounts-short`, 390, 844,
+  ['05-accounts-list-and-add-block-mobile-390.png', `${P}?shell=accounts-one`, 390, 844,
     { ...PHONE, dir: OUT_ACCOUNTS }],
   // The zero state — the workspace has no wallets at all.
   ['06-accounts-zero-state-desktop-1440x900.png', `${P}?shell=accounts-empty`, 1440, 900,
@@ -483,14 +484,26 @@ for (const [dir, keep] of produced) {
 }
 
 /* ── every image must be real, and none may be a duplicate ─────────────────── */
-const seen = new Map();
 let bad = 0;
 console.log('');
-// Duplicate detection spans every directory: the same frame filed under two PRs
-// is exactly the kind of thing a reviewer should be told about.
+/* Duplicate detection is PER DIRECTORY, and compares content rather than byte
+   length.
+
+   Two shots in the SAME folder being identical is a bug — a crop that silently
+   framed the wrong element, or a route that did not change what it rendered.
+   Two shots in DIFFERENT folders being identical is not: each folder is evidence
+   for one PR, and once two PRs photograph the same page from the same source
+   they will agree exactly. That is the expected state, not a finding. Comparing
+   across folders made the tool exit 1 the moment a second PR touched a page an
+   earlier PR had also shot — which blocks the next author over nothing.
+
+   Content-hashed rather than length-matched, because two genuinely different
+   images can compress to the same number of bytes, and that false positive is
+   just as unhelpful. */
 const allShots = [...produced.keys()].flatMap((dir) =>
   fs.readdirSync(dir).filter((n) => n.endsWith('.png')).sort()
     .map((f) => [dir, f])).sort((a, b) => (a[1] < b[1] ? -1 : 1));
+const seenByDir = new Map();
 for (const [dir, f] of allShots) {
   const b = fs.readFileSync(path.join(dir, f));
   const ihdr = b.subarray(16, 24);
@@ -499,8 +512,11 @@ for (const [dir, f] of allShots) {
   // compresses under a few KB, but a thin close-up strip (a 390x67 header) truly
   // does, and a flat 8KB floor wrongly failed it.
   const blank = b.length < Math.max(1200, Math.round(w * h * 0.004));
-  const dup = seen.get(b.length);
-  seen.set(b.length, f);
+  if (!seenByDir.has(dir)) seenByDir.set(dir, new Map());
+  const seen = seenByDir.get(dir);
+  const digest = createHash('sha256').update(b).digest('hex');
+  const dup = seen.get(digest);
+  seen.set(digest, f);
   if (blank || dup) bad++;
   console.log(`  ${f}  ${w}x${h}  ${(b.length / 1024).toFixed(0)}KB  ${blank ? 'BLANK?' : dup ? `DUPLICATE of ${dup}` : 'ok'}`);
 }

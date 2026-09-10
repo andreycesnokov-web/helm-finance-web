@@ -99,11 +99,13 @@
   font-size: 14px;
   font-weight: 700;
   color: var(--text-primary);
-  /* A long wallet name wraps to a second line rather than being cut off with an
-     ellipsis. The name is how a person identifies the account; truncating it at
-     320px turned "Mandiri · Operating account PT Nusantara" into a row that
-     could not be told apart from its neighbour. */
-  overflow-wrap: anywhere;
+  /* A long wallet name wraps rather than being cut off with an ellipsis — the
+     name is how a person identifies the account, so it is the last thing that
+     may be truncated. break-word, NOT anywhere: `anywhere` breaks mid-word at
+     the first opportunity, which turned "BCA · Operating" into "BCA · Opera /
+     ting" the moment the column narrowed. Words break only when a single word
+     genuinely cannot fit. */
+  overflow-wrap: break-word;
   line-height: 1.3;
 }
 .acct-row-tags { display: flex; flex-wrap: wrap; gap: 5px; }
@@ -255,13 +257,23 @@
   .acct-iconbtn { width: 40px; height: 40px; }
 }
 
-/* 320px is the narrowest width the product is expected to survive, and it is
-   where a long wallet name and a negative balance collide. The row goes to two
-   lines: identity above, money below, each with the full width. */
-@media (max-width: 380px) {
+/* A phone cannot hold four columns — icon, identity, money, actions — without
+   crushing the identity column, and a crushed identity column is where a wallet
+   name starts breaking mid-word. The row goes to two lines well before 320px:
+   identity above, money below, each with the full width.
+
+   560px, not 380px. At 380 a 390px phone missed the breakpoint entirely and got
+   the crushed four-column row — which is exactly what the mobile screenshot
+   caught. */
+@media (max-width: 560px) {
   .acct-row-open { flex-wrap: wrap; padding-inline: 12px; }
-  .acct-row-main { flex: 1 1 100%; order: 2; }
+  /* The icon keeps the name company on the first line — left on its own above
+     the name it reads as an orphan. The money takes the second line in full. */
   .acct-row-ic { order: 1; }
+  /* flex-basis 0, not auto: `auto` sizes the column to its content, so the
+     name wrapped onto its own line and left the icon orphaned above it.
+     With 0 it shrinks to the space beside the icon instead. */
+  .acct-row-main { order: 2; flex: 1 1 0; }
   .acct-row-amount {
     order: 3;
     flex: 1 1 100%;
