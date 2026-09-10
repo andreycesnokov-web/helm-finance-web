@@ -416,6 +416,12 @@ const SHOTS = [
   // ever entered. Not the empty state, and the page has to show the difference.
   ['09-ai-cfo-partial-data-desktop-1440x900.png', `${P}?shell=ai-cfo-partial`, 1440, 900,
     { dir: OUT_AICFO }],
+  // A refresh that failed: the figures stay, and the page says they are the
+  // previous ones rather than letting a stale page pass for a current one.
+  ['10-ai-cfo-refresh-failed-stale-data.png', `${P}?shell=ai-cfo-stale`, 1440, 900,
+    { dir: OUT_AICFO }],
+  ['11-ai-cfo-refresh-failed-notice-closeup.png', `${P}?shell=ai-cfo-stale`, 1440, 900,
+    { region: { sel: '.aicfo-stale', pad: 12 }, dir: OUT_AICFO }],
 ];
 
 // Produced filenames, per directory — a run only prunes what it owns, so the

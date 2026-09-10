@@ -156,15 +156,30 @@ const EMPTY_CTX = {
   payables: { total_remaining: 0 },
 };
 
-t('a workspace with nothing in it is empty', () => {
+t('a workspace with nothing in it has nothing to assess', () => {
   assert.strictEqual(hasNoFinancialData(EMPTY_CTX), true);
+});
+
+t('THE CASE THAT MATTERS: transactions with a zero balance is NOT empty', () => {
+  // A real business can spend exactly what it earns, or bank at zero. It has
+  // given the engine plenty to work with, and its figures — including the zeros —
+  // are measurements. It must never be told there is nothing here.
+  const traded = {
+    cash: { total_balance: 0, wallets_count: 1 },
+    current_month: { transactions_count: 42, income: 18000000, expenses: 18000000, net_flow: 0 },
+    receivables: { total_remaining: 0 },
+    payables: { total_remaining: 0 },
+  };
+  assert.strictEqual(hasNoFinancialData(traded), false,
+    'a business that trades to a zero balance was shown the empty state');
+  // Even with no wallet row at all — transactions alone are enough.
+  assert.strictEqual(hasNoFinancialData({ ...traded, cash: { total_balance: 0, wallets_count: 0 } }), false);
 });
 
 t('any single signal of activity means it is NOT empty', () => {
   // One of these is enough. The page must show real figures the moment there is
   // one real thing behind them.
   const cases = [
-    ['a wallet', { cash: { total_balance: 0, wallets_count: 1 } }],
     ['a transaction', { current_month: { transactions_count: 1 } }],
     ['a balance', { cash: { total_balance: 25000, wallets_count: 0 } }],
     ['a receivable', { receivables: { total_remaining: 5000 } }],
@@ -177,14 +192,24 @@ t('any single signal of activity means it is NOT empty', () => {
   }
 });
 
+t('wallets alone are NOT something to assess', () => {
+  // Deliberate, and the one case that changed during review. Every factor the
+  // engine scores comes from transaction history, so three bank accounts with
+  // nothing imported give it exactly as much as an untouched workspace — and it
+  // still returned 72 out of 100 with "No payables" scored 90 and POSITIVE.
+  // The zeros stay on the cash card, which is true; the verdict is withheld.
+  assert.strictEqual(hasNoFinancialData({
+    ...EMPTY_CTX, cash: { total_balance: 0, wallets_count: 3 },
+  }), true, 'a workspace with wallets but no transactions was given a scored verdict');
+});
+
 t('a missing count is not read as a zero', () => {
   // Absence of a field means the payload was not the shape we expected, which is
   // not the same as proof that the workspace is empty. Claiming emptiness there
   // would hide real figures behind a "nothing here yet" screen.
   for (const patch of [
-    { cash: { total_balance: 0 } },                 // no wallets_count
     { current_month: {} },                          // no transactions_count
-    { cash: {} },
+    { current_month: { transactions_count: null } },
   ]) {
     assert.strictEqual(hasNoFinancialData({ ...EMPTY_CTX, ...patch }), false);
   }

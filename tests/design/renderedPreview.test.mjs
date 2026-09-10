@@ -103,7 +103,15 @@ const collect = async (harnessHtml, ms = 12000) => {
       // flake was fewer launches — see probeGroup below, which puts many
       // viewports in one browser and took this file from ~75s to ~4s — but a
       // timeout that only just fits is a flake waiting to come back.
-      const kill = setTimeout(() => { child.kill(); reject(new Error('chrome timed out')); }, 120000);
+      // 240s, not 120s. This is a WALL-CLOCK guard against a wedged browser, not
+      // a performance budget: the whole file runs in ~6s on an idle machine. The
+      // number has to cover the worst case under `node --test`, which runs test
+      // FILES in parallel — this file's five Chrome launches then compete with
+      // the rest of the suite for CPU, and a group carrying a dozen viewports
+      // took 126s that way while passing in 6s alone. 120s fitted the suite as
+      // it was and stopped fitting the moment a page was added, which is the
+      // flake the comment below already warned about.
+      const kill = setTimeout(() => { child.kill(); reject(new Error('chrome timed out')); }, 240000);
       child.on('error', reject);
       child.on('close', () => { clearTimeout(kill); resolve({ stdout: out, stderr: err }); });
     });
@@ -570,6 +578,21 @@ const PROBE_FN = `function facts(win, doc) {
           actions: st.querySelectorAll('.cfo-state-actions button, .cfo-state-actions a').length,
         };
       })(),
+      // The refresh-failure notice, present only in the stale state.
+      stale: (() => {
+        const n = page.querySelector('.aicfo-stale');
+        if (!n) return null;
+        const btn = n.querySelector('.cfo-btn');
+        return {
+          // Doubled backslash: this whole probe is a template literal, so a bare
+          // \\s would reach the page as a literal "s" and collapse every s in the
+          // notice into a space.
+          text: (n.textContent || '').replace(/\\s+/g, ' ').trim(),
+          role: n.getAttribute('role'),
+          stripe: cs(n).borderInlineStartColor || cs(n).borderLeftColor,
+          retry: btn ? { label: (btn.textContent || '').trim(), h: +btn.getBoundingClientRect().height.toFixed(1) } : null,
+        };
+      })(),
       hasScoreBlock: !!num,
       cardMarks: [...page.querySelectorAll('.cfo-flagship-mark')].filter(painted).length,
       flagships: page.querySelectorAll('.cfo-flagship').length,
@@ -718,10 +741,11 @@ const CURRENCIES = await collectGroup([
   { key: 'CR', route: `${P}?shell=ai-cfo-risk`, w: 1440, h: 900 },
   { key: 'CRM', route: `${P}?shell=ai-cfo-risk`, w: 390, h: 844 },
   { key: 'CE', route: `${P}?shell=ai-cfo-empty`, w: 1440, h: 900 },
+  { key: 'CS', route: `${P}?shell=ai-cfo-stale`, w: 1440, h: 900 },
 ], 45000);
 const { SD, SM, WP, WE, WEM, WP320, WE320, WP768, PULSE768 } = SHELLS;
 const { WUSD, WMIX, WMIXM, WNOC, W4, W4M } = CURRENCIES;
-const { CD, CM, CR, CRM, CE } = CURRENCIES;
+const { CD, CM, CR, CRM, CE, CS } = CURRENCIES;
 console.log(`  .. desktop viewport ${D.innerWidth}px, mobile viewport ${M.innerWidth}px, `
   + `in-shell ${SD.innerWidth}px / ${SM.innerWidth}px`);
 
@@ -1041,7 +1065,8 @@ t('no financial figure is truncated', () => {
    scroll. The structural half of these lives in designPreview.test.mjs. */
 console.log('\nAI CFO — the migrated page');
 
-const CFO_VIEWS = [['desktop', CD], ['390px', CM], ['risk', CR], ['risk 390px', CRM], ['no data', CE]];
+const CFO_VIEWS = [['desktop', CD], ['390px', CM], ['risk', CR], ['risk 390px', CRM],
+  ['no data', CE], ['stale', CS]];
 
 t('every AI CFO view rendered', () => {
   for (const [name, f] of CFO_VIEWS) {
@@ -1107,8 +1132,13 @@ t('money names its currency; days and the score do not', () => {
   // allowance rather than a remaining count that the product cannot measure.
   const q = m.metrics.find((x) => /question/i.test(x.k));
   assert.ok(q, `no AI question metric on the card: ${JSON.stringify(m.metrics)}`);
-  assert.match(q.k, /month/i, `the AI question metric is labelled "${q.k}"`);
-  assert.ok(!/remaining/i.test(q.k), `the AI question metric still says "${q.k}"`);
+  // The product does not measure usage — usage.ai_questions_this_month is
+  // hardcoded to 0 server-side — so this figure is the PLAN'S LIMIT and has to
+  // say so. Anything implying a remainder is a claim nothing can back.
+  assert.match(q.k, /limit|month/i,
+    `the AI question metric is labelled "${q.k}", which names neither a limit nor a period`);
+  assert.ok(!/remaining|\bleft\b/i.test(q.k),
+    `the AI question metric says "${q.k}", which claims a remainder`);
   assert.ok(!/Rp/.test(q.v), `the question allowance reads "${q.v}" — a count took a currency`);
   // The four operating figures each name their currency and carry a sign.
   for (const f of m.figures) {
@@ -1208,6 +1238,41 @@ t('the no-data state withholds the verdict instead of showing a score of 72', ()
   // Cash stays, because zero cash with zero wallets is true rather than absent.
   assert.match(CE.aicfo.summaryValue, /^Rp /,
     `the no-data view dropped the cash card: "${CE.aicfo.summaryValue}"`);
+});
+
+t('a failed refresh keeps the figures AND says they are the previous ones', () => {
+  // The three things that have to be simultaneously true, because any two
+  // without the third is a different bug:
+  //   1. the figures are still on screen (not blanked, not redrawn as zeros),
+  //   2. the page says they are from the last successful load, and
+  //   3. there is a way to try again.
+  const st = CS.aicfo.stale;
+  assert.ok(st, 'no stale-data notice in the refresh-failure state');
+  // 1 — the flagship figure survived the failed refresh untouched.
+  assert.strictEqual(CS.aicfo.summaryValue, CD.aicfo.summaryValue,
+    `the figures changed when a refresh failed: "${CD.aicfo.summaryValue}" became "${CS.aicfo.summaryValue}"`);
+  assert.ok(CS.aicfo.hasScoreBlock, 'a failed refresh threw away the CFO Score');
+  assert.strictEqual(CS.aicfo.factors.length, CD.aicfo.factors.length,
+    'a failed refresh dropped some of the factors');
+  // Emphatically not zeros.
+  assert.ok(!/Rp 0$/.test(CS.aicfo.summaryValue),
+    'a failed refresh redrew the cash figure as zero');
+  // 2 — and it says so, in words, not just by printing an error code.
+  assert.match(st.text, /last successful load/i,
+    `the notice reads "${st.text}" — it does not say the figures are the previous ones`);
+  assert.strictEqual(st.role, 'alert', 'the notice is not announced to assistive technology');
+  // 3 — with a retry the reader can actually hit.
+  assert.ok(st.retry, 'the stale notice offers no way to try again');
+  assert.ok(st.retry.h >= 36, `the retry is ${st.retry.h}px tall`);
+});
+
+t('the stale notice is a warning, not an error — nothing is wrong with the figures', () => {
+  // Red would say the numbers are bad. They are not; they are old.
+  const st = CS.aicfo.stale;
+  const critical = CR.aicfo.signals.find((x) => x.band === 'critical');
+  assert.ok(critical, 'no critical card measured to compare against');
+  assert.notStrictEqual(st.stripe, critical.stripe,
+    `the stale notice is painted the same colour as a critical alert (${st.stripe})`);
 });
 
 t('the empty state offers a next action, at the symbol\'s normal size', () => {

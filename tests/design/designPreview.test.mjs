@@ -687,12 +687,16 @@ t('every money figure names its currency; days and scores do not', () => {
   assert.match(blocks, /import \{ currencyPrefix \} from '\.\.\/lib\/money'/,
     'AI CFO does not use the shared currencyPrefix()');
   assert.ok(!/'Rp[ '"]/.test(blocks), 'AI CFO hardcodes a currency symbol');
-  assert.match(blocks, /const money = \(v, currency\) => currencyPrefix\(currency\) \+ fmt\(v\)/,
+  const fig2 = code('client/src/lib/aiCfoFigures.js');
+  assert.match(fig2, /export const money = \(v, currency\) => currencyPrefix\(currency\) \+ fmt\(v\)/,
     'the money helper no longer pairs currencyPrefix with the page own fmt()');
   // The formatter itself is untouched: fmt/fmtFull, not money.js compactAmount,
   // which rounds half-up where fmt does not and would move a printed digit.
-  assert.match(blocks, /import \{ fmt, fmtFull \} from '\.\.\/lib\/api'/,
+  // aiCfoValuePreservation.test.mjs renders both over one fixture and compares.
+  assert.match(fig2, /import \{ fmt, fmtFull \} from '\.\/api\.js'/,
     'AI CFO changed its formatter');
+  assert.ok(!/compactAmount|compactIdr/.test(fig2),
+    'the figures module switched to a formatter that rounds differently');
   assert.ok(!/compactAmount|compactIdr/.test(blocks),
     'AI CFO switched to a formatter that rounds differently');
   // Runway is days and the score is a score. Neither takes a currency.
@@ -771,6 +775,15 @@ t('AI CFO never presents a verdict with nothing behind it', () => {
   // verdict; the engine is not changed.
   assert.match(page, /hasNoFinancialData\(ctx\)/,
     'the page no longer checks whether there is anything to assess');
+  // Wallets are deliberately not part of the test: every factor the engine
+  // scores comes from transaction history, so wallets with nothing imported give
+  // it no more to work with than an untouched workspace. See aiCfoFigures.js.
+  const fig3 = code('client/src/lib/aiCfoFigures.js');
+  const start = fig3.indexOf('export function hasNoFinancialData');
+  assert.ok(start > -1, 'hasNoFinancialData is gone');
+  const body = fig3.slice(start, fig3.indexOf('export default', start));
+  assert.ok(!/wallets_count/.test(body),
+    'hasNoFinancialData counts wallets, so a workspace with wallets and no transactions is still scored');
   assert.match(page, /<AICFOEmpty/, 'the no-data empty state was removed');
   assert.match(blocks, /<EmptyState/, 'the empty state is not the shared component');
   // And the empty branch must not also render the score.
@@ -787,6 +800,26 @@ t('AI CFO has a real loading state and a real error state with a retry', () => {
     'a failed load has no retry — the page used to show a line of red text and no way out');
   // A refresh that fails must not blank the figures that are already on screen.
   assert.match(page, /ctxErr && !ctx/, 'an error replaces good data instead of sitting beside it');
+  // And it must SAY they are stale. Printing the raw error and nothing else
+  // leaves a stale page looking like a current one. The notice is a presentation
+  // block, so the container renders it and AICFOBlocks defines it — which is
+  // also what lets the preview photograph the state and renderedPreview measure
+  // it (see "a failed refresh keeps the figures AND says they are the previous
+  // ones" there).
+  assert.match(page, /<AICFOStaleNotice[^>]*error=\{ctxErr\}/,
+    'the container does not render the stale-data notice on a failed refresh');
+  assert.match(page, /onRetry=\{loadCtx\}/, 'the stale-data notice offers no retry');
+  const blocks2 = code('client/src/pages/AICFOBlocks.jsx');
+  assert.match(blocks2, /export function AICFOStaleNotice/, 'the stale-data notice is missing');
+  assert.match(blocks2, /aicfo\.refreshFailedStale/,
+    'a failed refresh does not tell the reader the figures below are the previous ones');
+  assert.match(blocks2, /className="aicfo-stale" role="alert"/,
+    'the stale-data notice is not announced to assistive technology');
+  // The figures must still be rendered beneath it — the notice sits BESIDE the
+  // data, it does not replace it.
+  const afterNotice = page.slice(page.indexOf('<AICFOStaleNotice'));
+  assert.match(afterNotice, /<AICFOScore/, 'the stale branch stops rendering the score');
+  assert.match(afterNotice, /<AICFOFigures/, 'the stale branch stops rendering the figures');
 });
 
 t('AI CFO navigates inside the business workspace', () => {
@@ -800,18 +833,20 @@ t('AI CFO navigates inside the business workspace', () => {
   ]) {
     assert.ok(blocks.includes(`${key}: '${route}'`), `${key} does not route to ${route}`);
   }
-  // Two bare routes may remain, and neither is a destination anyone is sent to
-  // by mistake:
-  //   '/add' — the only legacy route still navigated to, because there is no
-  //            /business/add and /business/transactions is a read view with no
-  //            add control, so pointing the tile there would mislabel it;
-  //   '/cfo' — never navigated to at all. The engine emits route:'/cfo' on a
-  //            hiring action to mean "you are already on that page", and the
-  //            page filters it out rather than linking to itself.
+  // Exactly one bare route may remain, and it is not a destination at all:
+  // the engine emits route:'/cfo' on a hiring action to mean "you are already on
+  // that page", and the page filters it out rather than linking to itself.
   const legacy = [...new Set(blocks.match(/'\/(?!business\/)[a-z-]+'/g) || [])].sort();
-  assert.deepStrictEqual(legacy, ["'/add'", "'/cfo'"],
+  assert.deepStrictEqual(legacy, ["'/cfo'"],
     `AI CFO still leaves the workspace for ${legacy.join(', ')}`);
   assert.match(blocks, /a\.route !== '\/cfo'/, "the self-link guard on '/cfo' was dropped");
+  // Add is the one that used to escape, and it was the empty state's only call
+  // to action — a brand-new business's first click dropped it into the legacy
+  // Layout, whose sidebar has no link back to /business/*.
+  assert.ok(blocks.includes("add: '/business/add'"), 'the add destination left the workspace again');
+  const app2 = code('client/src/App.jsx');
+  assert.match(app2, /path="\/business\/add" element=\{<BusinessShell><Add \/><\/BusinessShell>\}/,
+    '/business/add is not registered inside the business shell');
 });
 
 t('AI CFO uses the icon system rather than emoji', () => {

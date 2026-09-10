@@ -638,6 +638,12 @@ export default function App() {
             {/* Not-yet-migrated modules: existing components rendered INSIDE the premium
                 shell (real content + premium sidebar/header), so the user never sees the
                 legacy Layout. Legacy routes (/cfo,/payroll,…) remain by direct URL only. */}
+            {/* Add: the same legacy component inside the premium shell. It was the
+                one destination AI CFO could not reach without dropping the user into
+                the legacy Layout — which replaces the workspace switcher and business
+                nav with a sidebar whose every link is a legacy route, so there is no
+                way back to /business/* from it. */}
+            <Route path="/business/add" element={<BusinessShell><Add /></BusinessShell>} />
             <Route path="/business/ai-cfo" element={<BusinessShell><AICFO /></BusinessShell>} />
             <Route path="/business/radar" element={<BusinessShell><Radar /></BusinessShell>} />
             <Route path="/business/payroll" element={<BusinessShell><Payroll /></BusinessShell>} />

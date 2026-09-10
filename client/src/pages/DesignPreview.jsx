@@ -24,7 +24,8 @@ import { ExecutiveHero } from './business/PulseBlocks'
 import { RadarHeader, RadarForecast, radarFigures } from './RadarBlocks'
 import {
   AICFOHeader, AICFOSummary, AICFOScore, AICFOSignals, AICFOFigures,
-  AICFORisks, AICFOActions, AICFOAsk, AICFOQuickNav, AICFOEmpty, SUGGESTED_KEYS,
+  AICFORisks, AICFOActions, AICFOAsk, AICFOQuickNav, AICFOEmpty, AICFOStaleNotice,
+  SUGGESTED_KEYS,
 } from './AICFOBlocks'
 import { aiQuestionsLeft, hasNoFinancialData } from '../lib/aiCfoFigures'
 import WorkspaceShell, { BUSINESS_NAV } from '../shell/WorkspaceShell'
@@ -423,6 +424,13 @@ const AICFO_SHELLS = {
   'ai-cfo-risk': { data: AICFO_RISK, access: AICFO_ACCESS, planLabel: 'Founder', messages: AICFO_CHAT },
   'ai-cfo-empty': { data: AICFO_EMPTY, access: AICFO_ACCESS_FREE, planLabel: 'Free Plan', messages: [] },
   'ai-cfo-partial': { data: AICFO_PARTIAL, access: AICFO_ACCESS_FREE, planLabel: 'Trial · 6d left', messages: [] },
+  /* A refresh that failed. The figures are the populated fixture — the point
+     of the state is that they are STILL THERE and the page says they are old,
+     rather than blanking them or, worse, redrawing them as zeros. */
+  'ai-cfo-stale': {
+    data: AICFO_FIXTURE, access: AICFO_ACCESS, planLabel: 'Founder', messages: [],
+    staleError: 'Request failed: the server did not respond in time.',
+  },
 }
 
 /* ── the APPROVED future model, for reference only ─────────────────────────
@@ -491,7 +499,7 @@ const RadarBody = ({ data = RADAR_FIXTURE, hasAdvanced = false }) => {
    `lang="en"` for the same reason this file uses tEn: the engine strings pass
    through localizeInsight(), which otherwise follows whatever language the
    developer has stored, and a screenshot has to be deterministic. */
-const AICFOBody = ({ data = AICFO_FIXTURE, access = AICFO_ACCESS, planLabel = 'Founder', messages = [] }) => {
+const AICFOBody = ({ data = AICFO_FIXTURE, access = AICFO_ACCESS, planLabel = 'Founder', messages = [], staleError = null }) => {
   const aiQLeft = aiQuestionsLeft(access)
   const empty = hasNoFinancialData(data)
   const askPanel = (
@@ -508,6 +516,7 @@ const AICFOBody = ({ data = AICFO_FIXTURE, access = AICFO_ACCESS, planLabel = 'F
         </>
       ) : (
         <>
+          <AICFOStaleNotice t={tEn} error={staleError} onRetry={noop} />
           <AICFOScore score={data.cfo_score} t={tEn} lang="en" />
           <AICFOSignals ctx={data} t={tEn} onAsk={noop} lang="en" />
           <AICFOFigures ctx={data} t={tEn} onNavigate={noop} />
@@ -648,6 +657,11 @@ export default function DesignPreview() {
         <Section id="ai-cfo-empty" title="AI CFO — nothing recorded yet" wide
           note="The engine scores the ABSENCE of data as readily as data: an untouched workspace takes the not-enough-expense-history (70), runway-unknown (60), no-receivables (80), no-payables (90, impact positive) and no-monthly-data (60) branches, which weight to 72 — so a business that has entered nothing was being told its financial health was 72 out of 100 and its payables were in excellent shape. The fixture behind this screenshot carries that real 72. Not one threshold or weight changed; the page declines to present a verdict with nothing behind it and asks for the first transaction instead. Cash stays on screen at Rp 0, because zero cash with zero wallets is true.">
           <AICFOBody data={AICFO_EMPTY} access={AICFO_ACCESS_FREE} planLabel="Free Plan" />
+        </Section>
+
+        <Section id="ai-cfo-stale" title="AI CFO — a refresh that failed" wide
+          note="The figures stay. Replacing them with an error would throw away data the reader can still act on, and replacing them with zeros would be a lie — but a stale page that looks current is its own kind of lie, so the page says plainly that these numbers are from the last successful load and offers the retry. The old page printed the raw error text and nothing else. Amber, not red: nothing is broken and nothing is wrong with the figures.">
+          <AICFOBody staleError="Request failed: the server did not respond in time." />
         </Section>
 
         <Section id="ai-cfo-partial" title="AI CFO — partially populated" wide

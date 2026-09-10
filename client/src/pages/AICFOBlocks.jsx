@@ -22,10 +22,11 @@
 import {
   PageHeader, SummaryCard, Card, Stat, StatusBadge, EmptyState, Btn, Icon,
 } from '../shell/ui'
-import { fmt, fmtFull } from '../lib/api'
+import { fmt } from '../lib/api'
 import { currencyPrefix } from '../lib/money'
 import {
   FACTOR_ORDER, scoreBand, factorBand, runwayBand, signBand,
+  money, moneyFull, signedMoney,
 } from '../lib/aiCfoFigures'
 import './AICFO.css'
 
@@ -118,14 +119,11 @@ export function localizeInsight(text, lang) {
    business's base currency. In a single-currency workspace that is exact. In a
    mixed one the sum itself is unsound — a pre-existing backend issue this
    migration does not touch and does not create; naming the currency only makes
-   the existing claim visible. */
-const money = (v, currency) => currencyPrefix(currency) + fmt(v)
-const moneyFull = (v, currency) => currencyPrefix(currency) + fmtFull(v)
-/** "+Rp 61.5M" / "−Rp 61.5M" — sign first, then the currency, then the figure. */
-const signedMoney = (v, currency) => {
-  const n = Number(v || 0)
-  return (n < 0 ? '−' : '+') + currencyPrefix(currency) + fmt(Math.abs(n))
-}
+   the existing claim visible.
+
+   money(), moneyFull() and signedMoney() now live in lib/aiCfoFigures.js — a
+   plain module, so a Node test can render the old expression and the new one
+   over one fixture and compare them token by token. */
 
 /* Band → the class a figure wears. One mapping, so "green means genuinely
    healthy" holds identically in the score, the factors, the alert and the
@@ -192,15 +190,18 @@ const ACTION_PRIORITY_KEY = {
    /transactions — which are rendered by the old Layout. Clicking a figure threw
    the user out of the workspace they were standing in. Every other business
    page uses /business/*; these now do too.
-   /add is deliberately absent: there is no /business/add, and the business
-   transactions view is a read surface with no add control, so pointing the
-   "add" tile there would mislabel it. It keeps the legacy route until a business
-   add surface exists. */
+   /add was the last one left: it had no /business equivalent, and
+   /business/transactions is a read surface with no add control, so pointing the
+   tile there would have mislabelled it. Rather than ship a call to action that
+   ejects a brand-new business from its own workspace, App.jsx now registers
+   /business/add — the same Add component inside BusinessShell, exactly the
+   pattern the routes beside it already use. */
 export const BUSINESS_ROUTES = {
   receivables: '/business/receivables',
   payables: '/business/payables',
   radar: '/business/radar',
   transactions: '/business/transactions',
+  add: '/business/add',
 }
 
 /* Suggested questions — keys resolved via t() at render time. The decorative
@@ -248,6 +249,38 @@ export function AICFOHeader({ t, onRefresh, refreshing = false }) {
         </Btn>
       )}
     />
+  )
+}
+
+/**
+ * A refresh that failed.
+ *
+ * The figures below this notice are the last ones that loaded successfully, and
+ * saying so is the whole job. The previous page printed the raw error message
+ * and nothing else, which left a stale page looking like a current one — the
+ * reader had no way to know the numbers were not from now.
+ *
+ * Deliberately amber rather than red: nothing is broken and nothing is wrong
+ * with the figures, they are simply older than they look. The technical reason
+ * is kept but demoted — useful in a support conversation, never the headline.
+ *
+ * It lives here rather than in the container so the design preview can render
+ * it and a screenshot can prove it exists.
+ */
+export function AICFOStaleNotice({ t, error, onRetry, retrying = false }) {
+  if (!error) return null
+  return (
+    <div className="aicfo-stale" role="alert">
+      <span className="aicfo-stale-ic" aria-hidden="true"><Icon.warn /></span>
+      <span className="aicfo-stale-text">
+        <strong>{t('aicfo.refreshFailed')}</strong>
+        <span>{t('aicfo.refreshFailedStale')}</span>
+        <span className="aicfo-stale-reason">{error}</span>
+      </span>
+      {onRetry && (
+        <Btn sm variant="ghost" onClick={onRetry} disabled={retrying}>{t('aicfo.tryAgain')}</Btn>
+      )}
+    </div>
   )
 }
 
@@ -737,15 +770,12 @@ export function AICFOQuickNav({ ctx, t, onNavigate }) {
       icon: Icon.radar,
       to: BUSINESS_ROUTES.radar,
     },
-    /* The one destination with no business-workspace equivalent: there is no
-       /business/add, and /business/transactions is a read view with no add
-       control, so this keeps the legacy route rather than mislabel a tile. */
     {
       key: 'add',
       label: t('aicfo.addTransaction'),
       sub: t('aicfo.keepDataUpdated'),
       icon: Icon.plus,
-      to: '/add',
+      to: BUSINESS_ROUTES.add,
     },
   ]
 
@@ -787,7 +817,7 @@ export function AICFOEmpty({ t, onNavigate }) {
       title={t('aicfo.noDataTitle')}
       description={t('aicfo.noDataBody')}
       actions={onNavigate && (
-        <Btn variant="primary" onClick={() => onNavigate('/add')}>{t('aicfo.addTransaction')}</Btn>
+        <Btn variant="primary" onClick={() => onNavigate(BUSINESS_ROUTES.add)}>{t('aicfo.addTransaction')}</Btn>
       )}
     />
   )

@@ -28,7 +28,8 @@ import { Card, LoadingSkeleton, ErrorState } from '../shell/ui'
 import { aiQuestionsLeft, hasNoFinancialData } from '../lib/aiCfoFigures'
 import {
   AICFOHeader, AICFOSummary, AICFOScore, AICFOSignals, AICFOFigures,
-  AICFORisks, AICFOActions, AICFOAsk, AICFOQuickNav, AICFOEmpty, SUGGESTED_KEYS,
+  AICFORisks, AICFOActions, AICFOAsk, AICFOQuickNav, AICFOEmpty, AICFOStaleNotice,
+  SUGGESTED_KEYS,
 } from './AICFOBlocks'
 
 export default function AICFO() {
@@ -150,9 +151,13 @@ export default function AICFO() {
     <div className="hf-page aicfo-page">
       <AICFOHeader t={t} onRefresh={loadCtx} refreshing={ctxLoad} />
       <AICFOSummary ctx={ctx} t={t} planLabel={planLabel} aiQLeft={aiQLeft} lang={lang} />
-      {/* A refresh that fails leaves the last good figures on screen and says so,
-          rather than replacing them with an error or, worse, with zeros. */}
-      {ctxErr && <p className="aicfo-note aicfo-limit" role="alert">{ctxErr}</p>}
+      {/* A refresh that fails leaves the last good figures on screen — replacing
+          them with an error would throw away data the user can still act on, and
+          replacing them with zeros would be a lie. But the page must then say so
+          plainly: it printed only the raw error before, so a stale page looked
+          like a current one. The notice names the state, gives the reason, and
+          offers the retry. */}
+      <AICFOStaleNotice t={t} error={ctxErr} onRetry={loadCtx} retrying={ctxLoad} />
       <AICFOScore score={ctx?.cfo_score} t={t} lang={lang} />
       <AICFOSignals ctx={ctx} t={t} onAsk={ask} lang={lang} />
       <AICFOFigures ctx={ctx} t={t} onNavigate={navigate} />
