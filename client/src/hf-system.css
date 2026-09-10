@@ -200,28 +200,21 @@
   margin-bottom: 16px;
 }
 
-/* ── Dark hero card (AI CFO / Radar) ─────────────────────── */
-.cfo-dark-card,
-.hf-dark-card {
-  background: linear-gradient(135deg, #0F172A 0%, #1e293b 100%);
-  border-radius: 20px;
-  padding: 28px 28px 24px;
-  box-shadow: 0 8px 32px rgba(15, 23, 42, 0.22);
-  position: relative;
-  overflow: hidden;
-  margin-bottom: 20px;
-}
-.cfo-dark-card::before,
-.hf-dark-card::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  opacity: 0.03;
-  background-image:
-    repeating-linear-gradient(0deg, transparent, transparent 28px, #fff 28px, #fff 29px),
-    repeating-linear-gradient(90deg, transparent, transparent 28px, #fff 28px, #fff 29px);
-  pointer-events: none;
-}
+/* ── Dark hero card — REMOVED ─────────────────────────────
+   `.hf-dark-card` / `.cfo-dark-card` was the product's second navy hero: a
+   135deg gradient from #0F172A, with a graph-paper grid built from two
+   repeating-linear-gradients at 3% over the top. #0F172A is the legacy navy the
+   Brand Book never specified — PR #80 traced it to index.css re-declaring the
+   token and restored #003366 — so this card shipped the wrong navy AND a second
+   treatment of a surface the shared SummaryCard already owns.
+
+   Radar left it in PR #81 and AI CFO was the last consumer. The one navy
+   financial surface is now `.cfo-summary.cfo-flagship` in shell/shell.css,
+   which carries the canonical navy and the single cropped watermark, and Pulse's
+   `.pulse-cash` wears the same `.cfo-flagship` so the two cannot drift.
+
+   Deleted rather than deprecated: a class left in the stylesheet is a class the
+   next page will find and use. */
 
 /* ── Task card ────────────────────────────────────────────── */
 .task-card {

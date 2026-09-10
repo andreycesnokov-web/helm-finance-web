@@ -30,6 +30,11 @@ const code = (p) => read(p)
   .replace(/\/\*[\s\S]*?\*\//g, ' ')
   .replace(/(^|[^:])\/\/.*$/gm, '$1');
 
+/** A stylesheet with its comments removed. Same reason as code() above: a
+ *  comment recording what a migration DELETED names the deleted thing, and an
+ *  assertion that the thing is gone would match the note saying so. */
+const cssCode = (p) => read(p).replace(/\/\*[\s\S]*?\*\//g, ' ');
+
 let pass = 0, fail = 0;
 const t = (name, fn) => {
   try { fn(); pass++; console.log(`  ok  ${name}`); }
@@ -589,6 +594,323 @@ t('Radar changed no data source and no backend call', () => {
   assert.match(calls[0], /'\/pulse\?scope=business'/, `Radar now calls ${calls[0]}`);
   assert.ok(!/method:\s*'(POST|PUT|PATCH|DELETE)'/.test(radar),
     'Radar performs a write — it is a read-only forecast');
+});
+
+/* -- AI CFO, migrated -------------------------------------------------------
+   AI CFO was the last BUSINESS page outside the shared system, and the last
+   consumer of .hf-dark-card — the #0F172A gradient with a graph-paper grid built
+   from two repeating-linear-gradients. #0F172A is the legacy navy PR #80 traced
+   to index.css re-declaring the token, so this page shipped the wrong navy on
+   top of a second treatment of a surface SummaryCard already owns.
+
+   Unlike Radar, this page computes no financial figure at all: the CFO Score,
+   its five factors, the alert, the hiring verdict, the risks and the next
+   actions are server output. So what these assert is that the migration was
+   visual — that the page still shows every one of those, still calls the same
+   two endpoints, and did not acquire arithmetic of its own on the way. */
+
+t('AI CFO uses the shared page hero and the shared flagship card', () => {
+  const blocks = code('client/src/pages/AICFOBlocks.jsx');
+  assert.match(blocks, /from '\.\.\/shell\/ui'/, 'AI CFO does not import the shared components');
+  assert.match(blocks, /<PageHeader/, 'AI CFO does not use the shared PageHeader');
+  assert.match(blocks, /<SummaryCard\s+flagship/,
+    'AI CFO headline is not the shared flagship SummaryCard');
+  // Exactly one flagship on the page. Two brand moments in one content area is
+  // the rule PR #80 exists to enforce.
+  assert.strictEqual((blocks.match(/flagship/g) || []).length, 1,
+    'AI CFO renders more than one flagship card');
+  // The eyebrow, title and description the migration specified.
+  assert.match(blocks, /eyebrow="Business Workspace"/, 'AI CFO lost its eyebrow');
+  assert.match(blocks, /title=\{t\('aicfo\.title'\)\}/, 'AI CFO title is not the translated page title');
+  assert.match(blocks, /description=\{t\('aicfo\.subtitle'\)\}/, 'AI CFO lost its description');
+});
+
+t('the old graph-paper hero is gone from the page AND from the stylesheet', () => {
+  for (const f of ['client/src/pages/AICFO.jsx', 'client/src/pages/AICFOBlocks.jsx']) {
+    const src2 = code(f);
+    assert.ok(!/linear-gradient|repeating-linear-gradient/.test(src2),
+      `${f} still paints a gradient or a graph-paper grid`);
+    assert.ok(!/hf-dark-card|cfo-dark-card/.test(src2), `${f} still uses the dark hero card`);
+    assert.ok(!/hf-page-header|hf-card|hf-kpi|hf-section-title|hf-badge/.test(src2),
+      `${f} still uses the legacy hf- surfaces`);
+    assert.ok(!/#0F172A|#1e293b|#1D4ED8|#2563EB|#F87171|#34D399|#FBBF24/i.test(src2),
+      `${f} still hardcodes a colour instead of using a semantic token`);
+  }
+  // AI CFO was the LAST consumer, so the class itself is gone rather than left
+  // in the stylesheet for the next page to find and use.
+  // Comments stripped, for the same reason code() strips them from JS: the note
+  // explaining what was deleted names the thing it deleted.
+  const sys = cssCode('client/src/hf-system.css');
+  assert.ok(!/\.(hf|cfo)-dark-card[\s,{]/.test(sys),
+    '.hf-dark-card / .cfo-dark-card is still declared in hf-system.css');
+  assert.ok(!/repeating-linear-gradient\s*\(/.test(sys),
+    'hf-system.css still builds a graph-paper grid');
+  // No page anywhere may reach for it again.
+  for (const f of ['client/src/pages/AICFO.jsx', 'client/src/pages/AICFOBlocks.jsx',
+    'client/src/pages/Radar.jsx', 'client/src/pages/RadarBlocks.jsx']) {
+    assert.ok(!/dark-card/.test(code(f)), `${f} references the deleted dark card`);
+  }
+});
+
+t('AI CFO did not start a design system of its own', () => {
+  const css = cssCode('client/src/pages/AICFO.css');
+  assert.ok(!/--(brand|surface|text|border|shadow|radius|success|warning|danger|info)-[a-z]*\s*:/.test(
+    css.replace(/var\(--[a-z-]+\)/g, '')), 'AICFO.css declares design tokens of its own');
+  assert.ok(!/^\.cfo-[a-z-]+\s*\{/m.test(css), 'AICFO.css restyles a shared component');
+  // Semantic colour comes from the tokens, never from a literal. #fff is the one
+  // exception: white on the navy avatar and the navy chat bubble is not a theme
+  // decision, it is the only legible ink on that surface.
+  assert.ok(!/#[0-9a-f]{3,8}/i.test(css.replace(/#fff\b/gi, '')),
+    'AICFO.css hardcodes a colour instead of using a token');
+});
+
+t('AI CFO carries the official watermark, and only from the shared card', () => {
+  const blocks = code('client/src/pages/AICFOBlocks.jsx');
+  // The flagship watermark is SummaryCard's, never hand-placed and never restyled.
+  assert.ok(!/FlagshipMark/.test(blocks),
+    'AI CFO hand-places the watermark instead of letting SummaryCard own it');
+  assert.ok(!/cfo-flagship-mark/.test(blocks), 'AI CFO restyles the shared watermark');
+  // The empty state uses the shipped brand asset at the size an empty state uses
+  // it — not a page-sized decorative logo.
+  assert.match(blocks, /AICFO_SYMBOL = '\/brand\/symbol_[a-z_]+\.svg'/,
+    'AI CFO does not use an official brand asset');
+  assert.ok(!/backgroundImage|background-image/.test(blocks),
+    'AI CFO paints a background image — the rejected giant-logo pattern');
+  const css = read('client/src/pages/AICFO.css');
+  assert.ok(!/background-image/.test(css), 'AICFO.css paints a background image');
+});
+
+t('every money figure names its currency; days and scores do not', () => {
+  const blocks = code('client/src/pages/AICFOBlocks.jsx');
+  // The currency comes from the workspace context through the shared helper,
+  // never from a literal "Rp" — which is what would relabel dollars as rupiah.
+  // The page reaches it only through the figures module: neither the raw
+  // formatter nor the prefix is imported here any more, so a new figure cannot
+  // bypass the absence rule by building its own string.
+  assert.ok(!/from '\.\.\/lib\/money'/.test(blocks),
+    'AI CFO builds a currency prefix itself instead of going through the figures module');
+  assert.ok(!/from '\.\.\/lib\/api'/.test(blocks),
+    'AI CFO calls the raw formatter instead of going through the figures module');
+  assert.match(blocks, /money, moneyFull, signedMoney, directionalMoney, countOrMissing, MISSING/,
+    'AI CFO does not take its money formatting from the shared figures module');
+  assert.ok(!/'Rp[ '"]/.test(blocks), 'AI CFO hardcodes a currency symbol');
+  const fig2 = code('client/src/lib/aiCfoFigures.js');
+  assert.match(fig2, /import \{ currencyPrefix \} from '\.\/money\.js'/,
+    'the figures module does not use the shared currencyPrefix()');
+  assert.match(fig2, /currencyPrefix\(currency\) \+ fmt\(normalizeZero\(v\)\)/,
+    'the money helper no longer pairs currencyPrefix with the page own fmt()');
+  // The formatter itself is untouched: fmt/fmtFull, not money.js compactAmount,
+  // which rounds half-up where fmt does not and would move a printed digit.
+  // aiCfoValuePreservation.test.mjs renders both over one fixture and compares.
+  assert.match(fig2, /import \{ fmt, fmtFull \} from '\.\/api\.js'/,
+    'AI CFO changed its formatter');
+  assert.ok(!/compactAmount|compactIdr/.test(fig2),
+    'the figures module switched to a formatter that rounds differently');
+  assert.ok(!/compactAmount|compactIdr/.test(blocks),
+    'AI CFO switched to a formatter that rounds differently');
+  // Runway is days and the score is a score. Neither takes a currency.
+  assert.match(blocks, /\$\{runway\} \$\{t\('radar\.days'\)\}/,
+    'the runway is no longer rendered as a plain number of days');
+  assert.ok(!/money\([^)]*runway|currencyPrefix[^\n]*runway/.test(blocks),
+    'the runway was given a currency prefix');
+  assert.ok(!/money\([^)]*\bscore\b/.test(blocks), 'the CFO score was given a currency prefix');
+});
+
+t('no financial figure or threshold moved into the page', () => {
+  const blocks = code('client/src/pages/AICFOBlocks.jsx');
+  const page = code('client/src/pages/AICFO.jsx');
+  // Every figure is server output. The page must not recompute a score, a
+  // weight or a runway of its own.
+  for (const src2 of [blocks, page]) {
+    assert.ok(!/\*\s*0\.(25|20|15)|score\s*=\s*Math\.round/.test(src2),
+      'the CFO Score weighting appeared in the frontend');
+    assert.ok(!/burnRate\s*\*\s*30|balance\s*\/\s*burn/.test(src2),
+      'the page started deriving runway or burn itself');
+  }
+  // The display thresholds live in a plain module so they can be pinned — see
+  // aiCfoFigures.test.mjs — and the components must read them from there.
+  const fig = code('client/src/lib/aiCfoFigures.js');
+  assert.match(fig, /score >= 75/, 'the healthy score boundary changed');
+  assert.match(fig, /score >= 50/, 'the attention score boundary changed');
+  assert.match(fig, /days < 7/, 'the critical runway boundary changed');
+  assert.match(fig, /days < 14/, 'the attention runway boundary changed');
+  assert.match(fig,
+    /Math\.max\(0, access\.limits\.max_ai_questions_per_month - \(access\?\.usage\?\.ai_questions_this_month \?\? 0\)\)/,
+    'the AI question arithmetic changed');
+  assert.ok(!/>= 75|>= 50|< 7\b|< 14\b/.test(blocks),
+    'AICFOBlocks re-declares a threshold instead of taking it from aiCfoFigures');
+});
+
+t('AI CFO still shows every block the decision layer produces', () => {
+  const blocks = code('client/src/pages/AICFOBlocks.jsx');
+  for (const key of [
+    'aicfo.cfoScore', 'aicfo.aiAlert', 'aicfo.hiringReadiness', 'aicfo.safeSalary',
+    'aicfo.askCFO', 'aicfo.riskSummary', 'aicfo.nextBestActions', 'aicfo.askAICFO',
+    'aicfo.receivables', 'aicfo.payables', 'aicfo.income', 'aicfo.expenses',
+  ]) {
+    assert.ok(blocks.includes(key), `AI CFO no longer shows ${key}`);
+  }
+  // All five factors, in the engine's own order.
+  const fig = code('client/src/lib/aiCfoFigures.js');
+  for (const f of ['cash_health', 'runway', 'payables', 'receivables', 'expense_control']) {
+    assert.ok(fig.includes(f), `the ${f} factor was dropped`);
+  }
+  // Alert and hiring stay two independent cards, side by side and stacking.
+  assert.match(blocks, /cfo-grid cfo-grid-2 aicfo-signals/,
+    'the alert and hiring readiness are no longer two independent cards');
+});
+
+t('AI CFO changed no data source, no endpoint and no gate', () => {
+  const page = code('client/src/pages/AICFO.jsx');
+  const calls = page.match(/apiFetch\([^)]*\)/g) || [];
+  assert.strictEqual(calls.length, 2, `AI CFO makes ${calls.length} API calls, expected 2`);
+  assert.ok(calls.some((c) => /ai-cfo\/context/.test(c)), 'the context endpoint changed');
+  assert.ok(calls.some((c) => /'\/ai-cfo\/ask'/.test(c)), 'the ask endpoint changed');
+  // The ask is the page's only write, and it is the one it always made.
+  const writes = page.match(/method:\s*'(POST|PUT|PATCH|DELETE)'/g) || [];
+  assert.strictEqual(writes.length, 1, `AI CFO performs ${writes.length} writes, expected 1`);
+  // Plan gating is untouched: same limit source, same blocking condition.
+  assert.match(page, /e\.upgrade_required \|\| e\.message\?\.includes\('limit'\)/,
+    'the question-limit gate condition changed');
+  assert.match(page, /aiQuestionsLeft\(access\)/, 'the question allowance is no longer read from access');
+  assert.ok(!/hasFeature|isOverLimit/.test(page),
+    'AI CFO started gating on a feature flag it did not gate on before');
+});
+
+t('AI CFO never presents a verdict with nothing behind it', () => {
+  const page = code('client/src/pages/AICFO.jsx');
+  const blocks = code('client/src/pages/AICFOBlocks.jsx');
+  // The engine scores an untouched workspace at 72. The page withholds the
+  // verdict; the engine is not changed.
+  assert.match(page, /hasNoFinancialData\(ctx\)/,
+    'the page no longer checks whether there is anything to assess');
+  // Wallets are deliberately not part of the test: every factor the engine
+  // scores comes from transaction history, so wallets with nothing imported give
+  // it no more to work with than an untouched workspace. See aiCfoFigures.js.
+  const fig3 = code('client/src/lib/aiCfoFigures.js');
+  const start = fig3.indexOf('export function hasNoFinancialData');
+  assert.ok(start > -1, 'hasNoFinancialData is gone');
+  const body = fig3.slice(start, fig3.indexOf('export default', start));
+  assert.ok(!/wallets_count/.test(body),
+    'hasNoFinancialData counts wallets, so a workspace with wallets and no transactions is still scored');
+  assert.match(page, /<AICFOEmpty/, 'the no-data empty state was removed');
+  assert.match(blocks, /<EmptyState/, 'the empty state is not the shared component');
+  // And the empty branch must not also render the score.
+  const emptyBranch = page.slice(page.indexOf('hasNoFinancialData(ctx)'));
+  const branchEnd = emptyBranch.indexOf('  return (');
+  assert.ok(!/AICFOScore|AICFOSignals|AICFOFigures/.test(emptyBranch.slice(0, branchEnd)),
+    'the no-data branch still renders the score or the figures');
+});
+
+t('AI CFO has a real loading state and a real error state with a retry', () => {
+  const page = code('client/src/pages/AICFO.jsx');
+  assert.match(page, /<LoadingSkeleton/, 'the loading state is not the shared skeleton');
+  assert.match(page, /<ErrorState[^>]*onRetry=\{loadCtx\}/,
+    'a failed load has no retry — the page used to show a line of red text and no way out');
+  // A refresh that fails must not blank the figures that are already on screen.
+  assert.match(page, /ctxErr && !ctx/, 'an error replaces good data instead of sitting beside it');
+  // And it must SAY they are stale. Printing the raw error and nothing else
+  // leaves a stale page looking like a current one. The notice is a presentation
+  // block, so the container renders it and AICFOBlocks defines it — which is
+  // also what lets the preview photograph the state and renderedPreview measure
+  // it (see "a failed refresh keeps the figures AND says they are the previous
+  // ones" there).
+  assert.match(page, /<AICFOStaleNotice[^>]*error=\{ctxErr\}/,
+    'the container does not render the stale-data notice on a failed refresh');
+  assert.match(page, /onRetry=\{loadCtx\}/, 'the stale-data notice offers no retry');
+  const blocks2 = code('client/src/pages/AICFOBlocks.jsx');
+  assert.match(blocks2, /export function AICFOStaleNotice/, 'the stale-data notice is missing');
+  assert.match(blocks2, /aicfo\.refreshFailedStale/,
+    'a failed refresh does not tell the reader the figures below are the previous ones');
+  assert.match(blocks2, /className="aicfo-stale" role="alert"/,
+    'the stale-data notice is not announced to assistive technology');
+  // The figures must still be rendered beneath it — the notice sits BESIDE the
+  // data, it does not replace it.
+  const afterNotice = page.slice(page.indexOf('<AICFOStaleNotice'));
+  assert.match(afterNotice, /<AICFOScore/, 'the stale branch stops rendering the score');
+  assert.match(afterNotice, /<AICFOFigures/, 'the stale branch stops rendering the figures');
+});
+
+t('AI CFO navigates inside the business workspace', () => {
+  const blocks = code('client/src/pages/AICFOBlocks.jsx');
+  // The page is mounted at /business/ai-cfo inside BusinessShell, but every card
+  // used to navigate to the bare legacy routes, throwing the user out of the
+  // workspace they were standing in.
+  for (const [key, route] of [
+    ['receivables', '/business/receivables'], ['payables', '/business/payables'],
+    ['radar', '/business/radar'], ['transactions', '/business/transactions'],
+  ]) {
+    assert.ok(blocks.includes(`${key}: '${route}'`), `${key} does not route to ${route}`);
+  }
+  // Exactly one bare route may remain, and it is not a destination at all:
+  // the engine emits route:'/cfo' on a hiring action to mean "you are already on
+  // that page", and the page filters it out rather than linking to itself.
+  const legacy = [...new Set(blocks.match(/'\/(?!business\/)[a-z-]+'/g) || [])].sort();
+  assert.deepStrictEqual(legacy, ["'/cfo'"],
+    `AI CFO still leaves the workspace for ${legacy.join(', ')}`);
+  assert.match(blocks, /a\.route !== '\/cfo'/, "the self-link guard on '/cfo' was dropped");
+  // Both destinations that used to reach for /add now point at surfaces that
+  // ALREADY exist in the workspace. No /business/add was introduced to make the
+  // old wording fit: wrapping the legacy Add in BusinessShell holds the shell
+  // only until the first save, because Add's own post-save links are legacy
+  // routes. That migration is its own task — see
+  // _specs/business-add-surface-migration.md.
+  assert.ok(blocks.includes("accounts: '/business/accounts'"),
+    'the empty-state CTA has no in-workspace destination');
+  assert.match(blocks, /onNavigate\(BUSINESS_ROUTES\.accounts\)\}>\{t\('aicfo\.setUpWallets'\)/,
+    'the empty-state CTA is not "Set up wallets" into Accounts');
+  const app2 = code('client/src/App.jsx');
+  assert.ok(!/\/business\/add/.test(app2),
+    'a half-migrated /business/add route is registered — it holds the shell only until the first save');
+  assert.ok(!/BUSINESS_ROUTES\.add\b/.test(blocks), 'AI CFO still references an add route');
+  // Quick navigation offers an existing workspace surface, named for what it is.
+  assert.match(blocks, /key: 'transactions',[\s\S]{0,200}to: BUSINESS_ROUTES\.transactions/,
+    'quick navigation does not offer the workspace transactions surface');
+  assert.ok(!/aicfo\.addTransaction/.test(blocks),
+    'a tile is still labelled "Add transaction" with no add surface to reach');
+});
+
+t('AI CFO uses the icon system rather than emoji', () => {
+  const blocks = code('client/src/pages/AICFOBlocks.jsx');
+  const page = code('client/src/pages/AICFO.jsx');
+  // 16 emoji stood in for icons: severity dots, factor glyphs, action markers and
+  // the assistant avatar. The shared set draws the same meanings at currentColor.
+  const EMOJI = /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}\u{FE0F}]/u;
+  for (const [f, src2] of [['AICFOBlocks.jsx', blocks], ['AICFO.jsx', page]]) {
+    const hits = src2.split('\n').filter((l) => EMOJI.test(l));
+    assert.strictEqual(hits.length, 0, `${f} still renders emoji: ${hits[0]}`);
+  }
+  assert.match(blocks, /Icon\.wallet|Icon\.pulse|Icon\.up|Icon\.down|Icon\.list/,
+    'the factor rows do not use the shared icon set');
+});
+
+t('the AI question figure is labelled as an allowance, not a remaining count', () => {
+  const blocks = code('client/src/pages/AICFOBlocks.jsx');
+  // usage.ai_questions_this_month is hardcoded to 0 server-side, so the figure
+  // never decrements. Calling it "remaining" claims a measurement that does not
+  // exist anywhere in the product.
+  assert.match(blocks, /t\('aicfo\.aiQuestionsPerMonth'\)/,
+    'the AI question metric is not labelled as a monthly allowance');
+  assert.ok(!/aicfo\.remaining/.test(blocks),
+    'the page still calls the AI question figure a remaining count');
+});
+
+t('the preview renders the real AI CFO components against synthetic data', () => {
+  // The same rule the rest of this file enforces: a screenshot must photograph
+  // the product, not a drawing of it.
+  assert.match(src, /from '\.\/AICFOBlocks'/, 'the preview does not import the real AI CFO blocks');
+  assert.match(src, /<AICFOSummary/, 'the preview draws its own summary card');
+  assert.match(src, /<AICFOScore/, 'the preview draws its own score block');
+  // The empty-state decision is the production function, not a copy of the rule,
+  // so the preview cannot show a state the page would never reach.
+  assert.match(src, /hasNoFinancialData\(data\)/,
+    'the preview decides the empty state with its own rule');
+  assert.match(src, /aiQuestionsLeft\(access\)/, 'the preview computes the allowance itself');
+  // Deterministic language: the engine strings pass through localizeInsight(),
+  // which otherwise follows whatever language the developer has stored.
+  assert.match(src, /lang="en"/, 'the preview does not pin the language, so shots are not deterministic');
+  // Every fixture is invented, and none of them is a real business.
+  assert.ok(!/Helm Care|PT Helm/i.test(src), 'the preview names a real business');
 });
 
 t('the page-hero mark sits inside the band rather than off its edge', () => {

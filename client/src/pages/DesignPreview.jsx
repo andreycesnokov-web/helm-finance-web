@@ -22,6 +22,12 @@ import { CURRENCY_NAMES, formatCurrency, compactAmount } from '../lib/money'
 import { PageHeader, SummaryCard, Card, Btn, StatusBadge, Icon } from '../shell/ui'
 import { ExecutiveHero } from './business/PulseBlocks'
 import { RadarHeader, RadarForecast, radarFigures } from './RadarBlocks'
+import {
+  AICFOHeader, AICFOSummary, AICFOScore, AICFOSignals, AICFOFigures,
+  AICFORisks, AICFOActions, AICFOAsk, AICFOQuickNav, AICFOEmpty, AICFOStaleNotice,
+  SUGGESTED_KEYS,
+} from './AICFOBlocks'
+import { aiQuestionsLeft, hasNoFinancialData } from '../lib/aiCfoFigures'
 import WorkspaceShell, { BUSINESS_NAV } from '../shell/WorkspaceShell'
 import './DesignPreview.css'
 
@@ -112,6 +118,212 @@ const RADAR_FIXTURE = {
 }
 // The zero-data case: a workspace with a balance but nothing planned.
 const RADAR_EMPTY = { totalBalance: 122850000, burnRate: 3282833, burnWindowDays: 30, debts: [] }
+
+/* ── AI CFO ────────────────────────────────────────────────────────────────
+   The same shape GET /api/ai-cfo/context returns. The CFO Score, its factors,
+   the alert and the hiring verdict are all SERVER output, so they are fixtures
+   here rather than something the preview computes — which is the point: these
+   are the numbers the page is handed, and the screenshot shows what it does
+   with them. Invented company, invented figures, no real counterparty.
+
+   The scores below are the engine's own values for their labels
+   (server/index.js calculateCfoScore), so the picture is of a state the product
+   can actually be in rather than an arrangement of plausible numbers. */
+const AICFO_FIXTURE = {
+  business: { name: 'Nusantara Facilities', base_currency: 'IDR', plan: 'founder', effective_plan: 'founder' },
+  cash: { total_balance: 122850000, wallets_count: 4 },
+  current_month: {
+    income: 78745000, expenses: 42450000, net_flow: 36295000,
+    transactions_count: 62, burn_rate: 3282833, burn_window_days: 30,
+  },
+  receivables: { total_remaining: 65850000, overdue_count: 0, overdue_total: 0 },
+  payables: { total_remaining: 31200000, overdue_count: 0, overdue_total: 0 },
+  runway_days: 37,
+  cfo_score: {
+    score: 80,
+    status: 'healthy',
+    summary: 'Strong cash position. All key metrics are positive.',
+    factors: {
+      cash_health: { score: 90, label: 'Strong cash position', impact: 'positive' },
+      runway: { score: 70, label: 'Runway adequate (30+ days)', impact: 'neutral' },
+      receivables: { score: 85, label: 'All receivables on time', impact: 'positive' },
+      payables: { score: 80, label: 'Payables under control', impact: 'positive' },
+      expense_control: { score: 92, label: 'Net flow positive', impact: 'positive' },
+    },
+  },
+  ai_alert: {
+    status: 'healthy',
+    headline: 'Business is financially stable',
+    description: 'Cash is strong with no urgent payment risks detected. Keep monitoring monthly.',
+  },
+  hiring_readiness: {
+    status: 'ready',
+    safe_monthly_salary: 12400000,
+    recommendation: 'Income covers obligations.',
+  },
+  risks: [{ type: 'healthy', severity: 'low', title: 'No significant risks', description: 'Finances look stable', amount: 0 }],
+  next_actions: [
+    {
+      action_type: 'receivable_due_soon', priority: 'medium', route: '/receivables',
+      title: 'Rp 18.4M due within 7 days',
+      description: 'Two invoices fall due this week — confirm payment dates.',
+      amount: 18400000,
+    },
+    {
+      action_type: 'pulse', priority: 'low', route: '/transactions',
+      title: 'Keep the ledger current',
+      description: 'Add transactions daily so the forecast stays accurate.',
+      amount: 0,
+    },
+  ],
+}
+
+/* The state that has to be seen to be judged: a business under real pressure.
+   Every band the page can paint appears at once — a critical score, a negative
+   factor, a warning factor, a neutral one, a critical alert, "Not recommended"
+   hiring, and overdue counts on both sides of the ledger. This is the picture
+   that shows whether restrained red is still legible as red. */
+const AICFO_RISK = {
+  ...AICFO_FIXTURE,
+  cash: { total_balance: 9420000, wallets_count: 3 },
+  current_month: {
+    income: 12100000, expenses: 34800000, net_flow: -22700000,
+    transactions_count: 41, burn_rate: 1160000, burn_window_days: 30,
+  },
+  receivables: { total_remaining: 47300000, overdue_count: 4, overdue_total: 38900000 },
+  payables: { total_remaining: 58600000, overdue_count: 3, overdue_total: 24500000 },
+  runway_days: 8,
+  cfo_score: {
+    score: 41,
+    status: 'critical',
+    summary: 'Overdue payables exceed cash. Immediate action required.',
+    factors: {
+      cash_health: { score: 30, label: 'Cash critically low', impact: 'negative' },
+      runway: { score: 20, label: 'Runway critical (<15 days)', impact: 'negative' },
+      receivables: { score: 30, label: 'Most receivables overdue', impact: 'negative' },
+      payables: { score: 20, label: 'Overdue payables exceed cash', impact: 'negative' },
+      expense_control: { score: 62, label: 'Monthly expenses exceed income', impact: 'warning' },
+    },
+  },
+  ai_alert: {
+    status: 'critical',
+    headline: 'Immediate cash action required',
+    description: 'Overdue payables are larger than the cash on hand. Collect the overdue receivables and agree new dates with suppliers before committing to anything else.',
+  },
+  hiring_readiness: {
+    status: 'not_ready',
+    safe_monthly_salary: 0,
+    recommendation: 'Not recommended',
+  },
+  risks: [
+    { type: 'runway_critical', severity: 'critical', title: 'Only 8 days runway', description: 'Cash will run out very soon', amount: 9420000 },
+    { type: 'overdue_payables', severity: 'high', title: '3 overdue payables', description: 'Payments overdue — may affect relationships', amount: 24500000 },
+    { type: 'overdue_receivables', severity: 'high', title: '4 overdue receivables', description: 'Clients have not paid past due date', amount: 38900000 },
+    { type: 'payables_due_soon', severity: 'medium', title: '2 payments due within 7 days', description: 'Upcoming cash outflows', amount: 11300000 },
+  ],
+  next_actions: [
+    {
+      action_type: 'payable_overdue', priority: 'high', route: '/payables',
+      title: 'Kantor Pajak is 12 days overdue',
+      description: 'The largest overdue payable — agree a date today.',
+      amount: 14200000,
+    },
+    {
+      action_type: 'receivable_followup', priority: 'high', route: '/receivables',
+      title: 'Chase Rp 38.9M in overdue invoices',
+      description: 'Four clients are past their due date.',
+      amount: 38900000,
+    },
+    {
+      action_type: 'cash_protection', priority: 'high', route: '/transactions',
+      title: 'Hold discretionary spending',
+      description: 'Runway is under two weeks at the current burn.',
+      amount: 0,
+    },
+  ],
+}
+
+/* A workspace nobody has entered anything into.
+   The engine still scores it — "not enough expense history" (70), "runway
+   unknown" (60), "no receivables" (80), "no payables" (90, POSITIVE) and "no
+   monthly data" (60) weight to 72 — so this fixture carries that real score to
+   prove the page withholds the verdict rather than the engine withholding the
+   number. hasNoFinancialData() is what decides, and the preview calls the
+   production function rather than a copy of the rule. */
+const AICFO_EMPTY = {
+  business: { name: 'Nusantara Facilities', base_currency: 'IDR', plan: 'free', effective_plan: 'free' },
+  cash: { total_balance: 0, wallets_count: 0 },
+  current_month: { income: 0, expenses: 0, net_flow: 0, transactions_count: 0, burn_rate: 0, burn_window_days: 0 },
+  receivables: { total_remaining: 0, overdue_count: 0, overdue_total: 0 },
+  payables: { total_remaining: 0, overdue_count: 0, overdue_total: 0 },
+  runway_days: null,
+  cfo_score: {
+    score: 72,
+    status: 'warning',
+    summary: 'Not enough expense history. Monitor closely and take action.',
+    factors: {
+      cash_health: { score: 70, label: 'Not enough expense history', impact: 'neutral' },
+      runway: { score: 60, label: 'Runway unknown — add expenses', impact: 'neutral' },
+      receivables: { score: 80, label: 'No receivables', impact: 'neutral' },
+      payables: { score: 90, label: 'No payables', impact: 'positive' },
+      expense_control: { score: 60, label: 'No monthly data yet', impact: 'neutral' },
+    },
+  },
+  ai_alert: null,
+  hiring_readiness: null,
+  risks: [],
+  next_actions: [],
+}
+
+/* Partially populated: wallets and transactions exist, but no receivable or
+   payable has ever been entered, so two of the five factors are the engine's
+   "nothing here" branches. It is NOT the empty state — there is real cash and a
+   real burn behind the score — and the page has to show the difference. */
+const AICFO_PARTIAL = {
+  ...AICFO_FIXTURE,
+  cash: { total_balance: 41500000, wallets_count: 1 },
+  current_month: {
+    income: 0, expenses: 8400000, net_flow: -8400000,
+    transactions_count: 7, burn_rate: 280000, burn_window_days: 12,
+  },
+  receivables: { total_remaining: 0, overdue_count: 0, overdue_total: 0 },
+  payables: { total_remaining: 0, overdue_count: 0, overdue_total: 0 },
+  runway_days: 148,
+  cfo_score: {
+    score: 78,
+    status: 'healthy',
+    summary: 'Runway excellent (90+ days). Expenses significantly exceed income.',
+    factors: {
+      cash_health: { score: 78, label: 'Adequate cash reserves', impact: 'positive' },
+      runway: { score: 100, label: 'Runway excellent (90+ days)', impact: 'positive' },
+      receivables: { score: 80, label: 'No receivables', impact: 'neutral' },
+      payables: { score: 90, label: 'No payables', impact: 'positive' },
+      expense_control: { score: 48, label: 'Expenses significantly exceed income', impact: 'negative' },
+    },
+  },
+  ai_alert: null,
+  hiring_readiness: { status: 'insufficient_data', safe_monthly_salary: 0, recommendation: 'Add wallets, transactions and expenses to calculate safe hiring budget.' },
+  risks: [{ type: 'healthy', severity: 'low', title: 'No significant risks', description: 'Finances look stable', amount: 0 }],
+  next_actions: [],
+}
+
+// The plan shape useAccess() derives planLabel and the question cap from.
+const AICFO_ACCESS = { limits: { max_ai_questions_per_month: 200 }, usage: { ai_questions_this_month: 0 } }
+const AICFO_ACCESS_FREE = { limits: { max_ai_questions_per_month: 10 }, usage: { ai_questions_this_month: 0 } }
+
+/* A conversation, for the screenshot of the chat panel. Declared here with the
+   other fixtures rather than beside the component that uses it: AICFO_SHELLS
+   below refers to it, and a const referenced above its own declaration is a
+   temporal-dead-zone ReferenceError that takes the whole module down. */
+const AICFO_CHAT = [
+  { role: 'user', content: 'What is my biggest cash risk?' },
+  {
+    role: 'assistant',
+    content: 'Your biggest exposure is **Rp 38.9M in overdue receivables** across four '
+      + 'clients, against **Rp 9.4M** of cash on hand. Collecting even half of it would '
+      + 'cover the three overdue payables.',
+  },
+]
 
 const LONG_TITLE = 'Nusantara Integrated Facilities Management & Industrial Services'
 const LONG_DESC = 'Cash position, this month’s operating figures and anything waiting on you — '
@@ -205,6 +417,21 @@ const WALLET_SETS = {
 // Radar is a different page shape, so it gets its own shell routes rather than a
 // wallet collection.
 const RADAR_SHELLS = { radar: RADAR_FIXTURE, 'radar-empty': RADAR_EMPTY }
+// AI CFO likewise. Four states, because the page's whole job is a verdict and
+// each of these is a different verdict — including the one it declines to give.
+const AICFO_SHELLS = {
+  'ai-cfo': { data: AICFO_FIXTURE, access: AICFO_ACCESS, planLabel: 'Founder', messages: [] },
+  'ai-cfo-risk': { data: AICFO_RISK, access: AICFO_ACCESS, planLabel: 'Founder', messages: AICFO_CHAT },
+  'ai-cfo-empty': { data: AICFO_EMPTY, access: AICFO_ACCESS_FREE, planLabel: 'Free Plan', messages: [] },
+  'ai-cfo-partial': { data: AICFO_PARTIAL, access: AICFO_ACCESS_FREE, planLabel: 'Trial · 6d left', messages: [] },
+  /* A refresh that failed. The figures are the populated fixture — the point
+     of the state is that they are STILL THERE and the page says they are old,
+     rather than blanking them or, worse, redrawing them as zeros. */
+  'ai-cfo-stale': {
+    data: AICFO_FIXTURE, access: AICFO_ACCESS, planLabel: 'Founder', messages: [],
+    staleError: 'Request failed: the server did not respond in time.',
+  },
+}
 
 /* ── the APPROVED future model, for reference only ─────────────────────────
    Balances by currency, once the backend derives native balances. It is not
@@ -262,6 +489,47 @@ const RadarBody = ({ data = RADAR_FIXTURE, hasAdvanced = false }) => {
   )
 }
 
+/* AI CFO, as the product renders it.
+   Every block is the production component from AICFOBlocks.jsx, and the
+   empty-state decision is the production hasNoFinancialData() — not a copy of
+   the rule, so the preview cannot show a state the page would not. The chat is
+   given a fixed conversation rather than live state; the container owns the
+   state in the real page, which is exactly why the panel takes it as props.
+
+   `lang="en"` for the same reason this file uses tEn: the engine strings pass
+   through localizeInsight(), which otherwise follows whatever language the
+   developer has stored, and a screenshot has to be deterministic. */
+const AICFOBody = ({ data = AICFO_FIXTURE, access = AICFO_ACCESS, planLabel = 'Founder', messages = [], staleError = null }) => {
+  const aiQLeft = aiQuestionsLeft(access)
+  const empty = hasNoFinancialData(data)
+  const askPanel = (
+    <AICFOAsk t={tEn} messages={messages} suggestions={SUGGESTED_KEYS} aiQLeft={aiQLeft} />
+  )
+  return (
+    <div className="aicfo-page">
+      <AICFOHeader t={tEn} onRefresh={noop} />
+      <AICFOSummary ctx={data} t={tEn} planLabel={planLabel} aiQLeft={aiQLeft} />
+      {empty ? (
+        <>
+          <AICFOEmpty t={tEn} onNavigate={noop} />
+          {askPanel}
+        </>
+      ) : (
+        <>
+          <AICFOStaleNotice t={tEn} error={staleError} onRetry={noop} />
+          <AICFOScore score={data.cfo_score} t={tEn} lang="en" />
+          <AICFOSignals ctx={data} t={tEn} onAsk={noop} lang="en" />
+          <AICFOFigures ctx={data} t={tEn} onNavigate={noop} />
+          <AICFORisks ctx={data} t={tEn} />
+          <AICFOActions ctx={data} t={tEn} onNavigate={noop} />
+          {askPanel}
+          <AICFOQuickNav ctx={data} t={tEn} onNavigate={noop} />
+        </>
+      )}
+    </div>
+  )
+}
+
 const AccountsBody = ({ wallets = WALLETS_FIXTURE }) => {
   // The production derivation, called with the production translations. Not a
   // mirror of Accounts.jsx — literally the function Accounts.jsx calls, so the
@@ -290,6 +558,7 @@ const AccountsBody = ({ wallets = WALLETS_FIXTURE }) => {
 function ShellPreview({ page }) {
   const isAccounts = Object.prototype.hasOwnProperty.call(WALLET_SETS, page)
   const isRadar = Object.prototype.hasOwnProperty.call(RADAR_SHELLS, page)
+  const isAiCfo = Object.prototype.hasOwnProperty.call(AICFO_SHELLS, page)
   return (
     // No preview banner here on purpose: these are pictures of the product frame,
     // and a strip of our own chrome above it would misrepresent what ships.
@@ -299,12 +568,14 @@ function ShellPreview({ page }) {
         activeId="demo-business"
         onSelectWorkspace={noop}
         nav={BUSINESS_NAV}
-        activeKey={isRadar ? 'radar' : isAccounts ? 'accounts' : 'pulse'}
+        activeKey={isAiCfo ? 'cfo' : isRadar ? 'radar' : isAccounts ? 'accounts' : 'pulse'}
         onNavigate={noop}
       >
-        {isRadar
-          ? <RadarBody data={RADAR_SHELLS[page]} />
-          : isAccounts ? <AccountsBody wallets={WALLET_SETS[page]} /> : <PulseBody />}
+        {isAiCfo
+          ? <AICFOBody {...AICFO_SHELLS[page]} />
+          : isRadar
+            ? <RadarBody data={RADAR_SHELLS[page]} />
+            : isAccounts ? <AccountsBody wallets={WALLET_SETS[page]} /> : <PulseBody />}
       </WorkspaceShell>
     </div>
   )
@@ -370,6 +641,32 @@ export default function DesignPreview() {
         <Section id="radar-empty" title="Radar — nothing planned" wide
           note="Zero-data. The forecast still holds, because a balance and a burn rate are enough for one; what is missing is planned movement, so the key-dates panel becomes a real empty state at the symbol's normal size rather than a page-sized logo.">
           <RadarBody data={RADAR_EMPTY} hasAdvanced />
+        </Section>
+
+        {/* ── AI CFO ────────────────────────────────────────────────────── */}
+        <Section id="ai-cfo" title="AI CFO" wide
+          note="The last business page outside the shared system. It drew its own header with no h1 at all, a dark hero from .hf-dark-card — the legacy #0F172A navy with a graph-paper grid built from two repeating-linear-gradients — and hf-card panels, across 105 inline style blocks, 9 hex literals, 18 rgba() literals and 16 emoji standing in for icons. It now uses the same PageHeader and the same flagship SummaryCard as Pulse, Accounts and Radar, so it carries the one official watermark and the canonical navy. Every figure is unchanged: the CFO Score, its five factors and their thresholds, the alert and the hiring verdict are all server output and arrive ready to render. Money names its currency; days and scores do not.">
+          <AICFOBody />
+        </Section>
+
+        <Section id="ai-cfo-risk" title="AI CFO — a business under pressure" wide
+          note="Every band the page can paint, at once: a critical score, four negative or warning factors, a critical alert and a hiring verdict of Not recommended. The alert and the hiring card used to be solid tinted panels — a filled amber block for a warning, a filled red one for Not recommended — which made a considered opinion about a business read as a system error. They are ordinary cards with a restrained severity stripe now, and red still reads as red.">
+          <AICFOBody data={AICFO_RISK} messages={AICFO_CHAT} />
+        </Section>
+
+        <Section id="ai-cfo-empty" title="AI CFO — nothing recorded yet" wide
+          note="The engine scores the ABSENCE of data as readily as data: an untouched workspace takes the not-enough-expense-history (70), runway-unknown (60), no-receivables (80), no-payables (90, impact positive) and no-monthly-data (60) branches, which weight to 72 — so a business that has entered nothing was being told its financial health was 72 out of 100 and its payables were in excellent shape. The fixture behind this screenshot carries that real 72. Not one threshold or weight changed; the page declines to present a verdict with nothing behind it and asks for the first transaction instead. Cash stays on screen at Rp 0, because zero cash with zero wallets is true.">
+          <AICFOBody data={AICFO_EMPTY} access={AICFO_ACCESS_FREE} planLabel="Free Plan" />
+        </Section>
+
+        <Section id="ai-cfo-stale" title="AI CFO — a refresh that failed" wide
+          note="The figures stay. Replacing them with an error would throw away data the reader can still act on, and replacing them with zeros would be a lie — but a stale page that looks current is its own kind of lie, so the page says plainly that these numbers are from the last successful load and offers the retry. The old page printed the raw error text and nothing else. Amber, not red: nothing is broken and nothing is wrong with the figures.">
+          <AICFOBody staleError="Request failed: the server did not respond in time." />
+        </Section>
+
+        <Section id="ai-cfo-partial" title="AI CFO — partially populated" wide
+          note="Wallets and transactions exist; no receivable or payable ever has. Two of the five factors are the engine's nothing-here branches and one is a real negative, so the page shows the score — there is genuine cash and a genuine burn behind it — while the hiring card has too little to work with and says so. This is the state the empty case must not be confused with.">
+          <AICFOBody data={AICFO_PARTIAL} access={AICFO_ACCESS_FREE} planLabel="Trial · 6d left" />
         </Section>
 
         {/* ── Accounts, other currencies ───────────────────────────────── */}
