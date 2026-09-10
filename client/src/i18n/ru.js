@@ -449,7 +449,7 @@ const ru = {
     askFailed: 'Не удалось ответить на вопрос прямо сейчас.',
     tryAgain: 'Повторить',
     setUpWallets: 'Настроить кошельки',
-    refreshFailedStale: 'Ниже показаны данные последней успешной загрузки, а не текущие.',
+    refreshFailedStale: 'Показаны данные последней успешной загрузки.',
     refreshFailed: 'Не удалось обновить',
   },
   transactions: {

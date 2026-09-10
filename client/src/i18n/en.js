@@ -427,7 +427,7 @@ const en = {
     askFailed: "Sorry, I couldn't answer that right now.",
     tryAgain: 'Try again',
     setUpWallets: 'Set up wallets',
-    refreshFailedStale: 'The figures below are from the last successful load, not from now.',
+    refreshFailedStale: 'Displayed figures are from the last successful load.',
     refreshFailed: 'Could not refresh',
   },
   add: {

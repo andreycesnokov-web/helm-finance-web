@@ -469,7 +469,7 @@ const id = {
     askFailed: 'Maaf, saya belum bisa menjawabnya sekarang.',
     tryAgain: 'Coba lagi',
     setUpWallets: 'Siapkan dompet',
-    refreshFailedStale: 'Angka di bawah berasal dari pemuatan terakhir yang berhasil, bukan saat ini.',
+    refreshFailedStale: 'Angka yang ditampilkan berasal dari pemuatan terakhir yang berhasil.',
     refreshFailed: 'Gagal memuat ulang',
   },
   transactions: {
