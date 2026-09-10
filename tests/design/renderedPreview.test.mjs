@@ -86,6 +86,25 @@ const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'dsp-'));
 // Async on purpose: the static server lives in this process, so a blocking
 // spawnSync would stop the event loop and Chrome would wait forever for a reply
 // that this process is too busy to send.
+/* How long a browser may take before we call it wedged.
+ *
+ * This is a WALL-CLOCK guard, not a performance budget: the whole file runs in
+ * ~6s on an idle machine, and every number below is dead time that only elapses
+ * when something is already broken.
+ *
+ * It has to be two numbers because the same work takes wildly different wall
+ * time depending on how it is invoked. Run directly, this file gets the machine
+ * to itself. Run through `node --test`, which executes test FILES in parallel,
+ * its five Chrome launches compete with ~30 other files for CPU — the same run
+ * was measured at 129s and then 297s on the same machine minutes apart. A single
+ * fixed number is therefore either a flake (too low under the runner) or useless
+ * (too high when run directly, where a wedged browser should surface in seconds).
+ *
+ * `NODE_TEST_CONTEXT` is set by node's own test runner in the child process, so
+ * the file can tell which situation it is in without being told.
+ */
+const KILL_MS = process.env.NODE_TEST_CONTEXT ? 600000 : 120000;
+
 const collect = async (harnessHtml, ms = 12000) => {
   const name = `__probe-${Math.random().toString(36).slice(2)}.html`;
   fs.writeFileSync(path.join(DIST, name), harnessHtml);
@@ -103,15 +122,7 @@ const collect = async (harnessHtml, ms = 12000) => {
       // flake was fewer launches — see probeGroup below, which puts many
       // viewports in one browser and took this file from ~75s to ~4s — but a
       // timeout that only just fits is a flake waiting to come back.
-      // 240s, not 120s. This is a WALL-CLOCK guard against a wedged browser, not
-      // a performance budget: the whole file runs in ~6s on an idle machine. The
-      // number has to cover the worst case under `node --test`, which runs test
-      // FILES in parallel — this file's five Chrome launches then compete with
-      // the rest of the suite for CPU, and a group carrying a dozen viewports
-      // took 126s that way while passing in 6s alone. 120s fitted the suite as
-      // it was and stopped fitting the moment a page was added, which is the
-      // flake the comment below already warned about.
-      const kill = setTimeout(() => { child.kill(); reject(new Error('chrome timed out')); }, 240000);
+      const kill = setTimeout(() => { child.kill(); reject(new Error('chrome timed out')); }, KILL_MS);
       child.on('error', reject);
       child.on('close', () => { clearTimeout(kill); resolve({ stdout: out, stderr: err }); });
     });
@@ -592,6 +603,29 @@ const PROBE_FN = `function facts(win, doc) {
           stripe: cs(n).borderInlineStartColor || cs(n).borderLeftColor,
           retry: btn ? { label: (btn.textContent || '').trim(), h: +btn.getBoundingClientRect().height.toFixed(1) } : null,
         };
+      })(),
+      // The real gap between each pair of adjacent top-level sections, measured
+      // from painted rectangles rather than read off a stylesheet. .hf-page is a
+      // plain block and .cfo-card carries no margin, so these were 0 until the
+      // page got a single flex gap — and a box-shadow made that look like
+      // spacing in a screenshot. (No backticks in here: the whole probe is a
+      // template literal, and one would end it.)
+      gaps: (() => {
+        const kids = [...page.children].filter((el) => {
+          const r = el.getBoundingClientRect();
+          return r.height > 0 && cs(el).display !== 'none';
+        });
+        const out = [];
+        for (let i = 1; i < kids.length; i++) {
+          const a = kids[i - 1].getBoundingClientRect();
+          const b = kids[i].getBoundingClientRect();
+          out.push({
+            from: (typeof kids[i - 1].className === 'string' ? kids[i - 1].className : '').split(' ')[0] || kids[i - 1].tagName.toLowerCase(),
+            to: (typeof kids[i].className === 'string' ? kids[i].className : '').split(' ')[0] || kids[i].tagName.toLowerCase(),
+            px: Math.round(b.top - a.bottom),
+          });
+        }
+        return out;
       })(),
       hasScoreBlock: !!num,
       cardMarks: [...page.querySelectorAll('.cfo-flagship-mark')].filter(painted).length,
@@ -1238,6 +1272,64 @@ t('the no-data state withholds the verdict instead of showing a score of 72', ()
   // Cash stays, because zero cash with zero wallets is true rather than absent.
   assert.match(CE.aicfo.summaryValue, /^Rp /,
     `the no-data view dropped the cash card: "${CE.aicfo.summaryValue}"`);
+});
+
+t('every top-level section is separated by ONE gap, in every state', () => {
+  // The defect this pins: .hf-page is a plain block with padding and no gap, and
+  // .cfo-card carries no margin, so the flagship card and the CFO Score below it
+  // sat flush — the apparent gap in a screenshot was the card's own box-shadow.
+  // Everything else was spaced by whichever margin a block happened to bring, so
+  // the rhythm changed with which sections a state rendered.
+  const BAND = [16, 20];
+  // The shared PageHeader owns the space beneath itself (.cfo-pagehead carries
+  // its own padding-bottom + margin-bottom in shell.css, and Pulse, Accounts and
+  // Radar all sit on it). That rhythm belongs to the design system, not to this
+  // page, so it is asserted separately below rather than flattened to match.
+  const between = (f) => f.aicfo.gaps.filter((g) => !g.from.includes('pagehead'));
+  for (const [name, f] of CFO_VIEWS) {
+    const gaps = between(f);
+    assert.ok(gaps.length > 0, `${name}: no sections measured`);
+    for (const g of gaps) {
+      assert.ok(g.px >= BAND[0] && g.px <= BAND[1],
+        `${name}: ${g.from} → ${g.to} is ${g.px}px, outside ${BAND[0]}-${BAND[1]}px`);
+    }
+    // One gap, not a range of them.
+    const distinct = [...new Set(gaps.map((g) => g.px))];
+    assert.strictEqual(distinct.length, 1,
+      `${name}: sections are separated by ${distinct.join('px, ')}px — the rhythm is not uniform`);
+  }
+});
+
+t('the page header keeps the shared system spacing, and is not tighter than the sections', () => {
+  // A header closer to the page than its sections are to each other would read
+  // as part of the first section.
+  for (const [name, f] of CFO_VIEWS) {
+    const head = f.aicfo.gaps.find((g) => g.from.includes('pagehead'));
+    if (!head) continue;
+    const section = f.aicfo.gaps.find((g) => !g.from.includes('pagehead'));
+    assert.ok(head.px >= section.px,
+      `${name}: the header sits ${head.px}px above the page but sections are ${section.px}px apart`);
+  }
+});
+
+t('the two sequences with no card between them are spaced too', () => {
+  // flagship → score, and flagship → empty state → chat. These are the pairs a
+  // margin-based approach missed, because neither side owned a margin.
+  const pairOf = (f, from, to) => f.aicfo.gaps.find(
+    (g) => g.from.includes(from) && g.to.includes(to));
+
+  const scoreGap = pairOf(CD, 'cfo-summary', 'cfo-card');
+  assert.ok(scoreGap, `flagship → score not found among ${JSON.stringify(CD.aicfo.gaps)}`);
+  assert.ok(scoreGap.px >= 16 && scoreGap.px <= 20,
+    `flagship → score is ${scoreGap.px}px`);
+
+  // The no-data state: flagship → empty state → chat.
+  const emptyGap = pairOf(CE, 'cfo-summary', 'cfo-state');
+  assert.ok(emptyGap, `flagship → empty not found among ${JSON.stringify(CE.aicfo.gaps)}`);
+  assert.ok(emptyGap.px >= 16 && emptyGap.px <= 20, `flagship → empty is ${emptyGap.px}px`);
+  const chatGap = pairOf(CE, 'cfo-state', 'cfo-card');
+  assert.ok(chatGap, `empty → chat not found among ${JSON.stringify(CE.aicfo.gaps)}`);
+  assert.ok(chatGap.px >= 16 && chatGap.px <= 20, `empty → chat is ${chatGap.px}px`);
 });
 
 t('a failed refresh keeps the figures AND says they are the previous ones', () => {

@@ -13,8 +13,16 @@
 //
 // Run: node tests/design/aiCfoValuePreservation.test.mjs
 import assert from 'node:assert';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 import { fmt, fmtFull } from '../../client/src/lib/api.js';
-import { money, moneyFull, signedMoney, scoreBand, runwayBand } from '../../client/src/lib/aiCfoFigures.js';
+import {
+  money, moneyFull, signedMoney, directionalMoney, countOrMissing, MISSING,
+  scoreBand, runwayBand,
+} from '../../client/src/lib/aiCfoFigures.js';
 
 let pass = 0, fail = 0;
 const t = (name, fn) => {
@@ -176,7 +184,10 @@ t('the sign survives, and a negative reads as a typographic minus', () => {
 t('zero is still zero, and is not dressed up as a rounded million', () => {
   assert.strictEqual(fmt(0), '0');
   assert.strictEqual(money(0, CURRENCY), 'Rp 0');
-  assert.strictEqual(signedMoney(0, CURRENCY), '+Rp 0');
+  // No sign on zero. This asserted '+Rp 0' until review pointed out that
+  // `n < 0 ? '−' : '+'` signs zero as positive, which disagrees with signBand()
+  // refusing to colour it. See "zero takes NO sign" below.
+  assert.strictEqual(signedMoney(0, CURRENCY), 'Rp 0');
   // The whole reason fmt() is kept rather than money.js's compactAmount().
   assert.ok(!/0\.0M/.test(money(0, CURRENCY)));
 });
@@ -203,6 +214,107 @@ t('half-up rounding was NOT introduced — fmt() truncates where compactAmount r
   assert.strictEqual(money(152450000, CURRENCY), 'Rp 152.4M');
 });
 
+console.log('\nAI CFO — absence is not zero');
+
+/* The distinction every one of these turns on: a MEASURED zero and an ABSENT
+   value are different facts about a business. The first implementation collapsed
+   them — `Number(v || 0)` — so a field the server never sent rendered as a
+   confident "+Rp 0": a claim that the business broke exactly even this month. */
+
+const ABSENT = [['null', null], ['undefined', undefined], ['empty string', ''],
+  ['NaN', NaN], ['a non-number', 'abc'], ['Infinity', Infinity]];
+
+t('a missing figure renders as absence, in every formatter', () => {
+  for (const [what, v] of ABSENT) {
+    assert.strictEqual(money(v, CURRENCY), MISSING, `money(${what}) is "${money(v, CURRENCY)}"`);
+    assert.strictEqual(moneyFull(v, CURRENCY), MISSING, `moneyFull(${what}) is "${moneyFull(v, CURRENCY)}"`);
+    assert.strictEqual(signedMoney(v, CURRENCY), MISSING, `signedMoney(${what}) is "${signedMoney(v, CURRENCY)}"`);
+    assert.strictEqual(directionalMoney(v, CURRENCY, '+'), MISSING,
+      `directionalMoney(${what}) is "${directionalMoney(v, CURRENCY, '+')}"`);
+  }
+});
+
+t('a missing figure never wears a currency, a sign, or a digit', () => {
+  // "Rp —" reads as a rupiah amount that happens to be unprintable; "+Rp —"
+  // asserts a direction about a figure nobody measured. Both were real outputs
+  // of the first implementation.
+  for (const [what, v] of ABSENT) {
+    for (const rendered of [money(v, CURRENCY), moneyFull(v, CURRENCY),
+      signedMoney(v, CURRENCY), directionalMoney(v, CURRENCY, '−')]) {
+      assert.ok(!/Rp/.test(rendered), `${what} rendered "${rendered}" — it carries a currency`);
+      assert.ok(!/^[+−]/.test(rendered), `${what} rendered "${rendered}" — it carries a sign`);
+      assert.ok(!/\d/.test(rendered), `${what} rendered "${rendered}" — absence became a number`);
+    }
+  }
+});
+
+t('a CONFIRMED zero is a figure, and prints as one', () => {
+  // The other half of the rule. A business that really holds nothing must not be
+  // shown a dash, which would read as "we could not measure this".
+  for (const zero of [0, '0', -0]) {
+    assert.strictEqual(money(zero, CURRENCY), 'Rp 0', `money(${JSON.stringify(zero)})`);
+    assert.strictEqual(signedMoney(zero, CURRENCY), 'Rp 0', `signedMoney(${JSON.stringify(zero)})`);
+    assert.notStrictEqual(money(zero, CURRENCY), MISSING);
+  }
+});
+
+t('zero takes NO sign', () => {
+  // `n < 0 ? '−' : '+'` signs zero as positive. Zero is neither, and signBand()
+  // already refuses to COLOUR it — the glyph has to agree with the colour.
+  const z = signedMoney(0, CURRENCY);
+  assert.strictEqual(z, 'Rp 0', `zero rendered "${z}"`);
+  assert.ok(!z.startsWith('+'), `zero rendered "${z}" — it is signed positive`);
+  assert.ok(!z.startsWith('−'), `zero rendered "${z}" — it is signed negative`);
+});
+
+t('a signed figure either side of zero keeps its sign AND its old rounding', () => {
+  // The rounding half matters as much as the sign: this is the same fmt() the
+  // page has always used, so the digits are the digits it always printed.
+  assert.strictEqual(signedMoney(36295000, CURRENCY), '+Rp 36.3M');
+  assert.strictEqual(signedMoney(-22700000, CURRENCY), '−Rp 22.7M');
+  assert.strictEqual(signedMoney(1, CURRENCY), '+Rp 1');
+  assert.strictEqual(signedMoney(-1, CURRENCY), '−Rp 1');
+  for (const n of [1, 999, 1000, 1000000, 122850000, 152450000, 999999999]) {
+    assert.strictEqual(signedMoney(n, CURRENCY), '+Rp ' + fmt(n), `+${n}`);
+    assert.strictEqual(signedMoney(-n, CURRENCY), '−Rp ' + fmt(n), `-${n}`);
+  }
+});
+
+t('a count is absent or exact, never a defaulted zero', () => {
+  // month.transactions_count went through `?? 0`, so a missing count rendered
+  // "0 transactions" — a statement about a month nobody counted.
+  for (const [what, v] of ABSENT) {
+    assert.strictEqual(countOrMissing(v), MISSING, `countOrMissing(${what})`);
+  }
+  assert.strictEqual(countOrMissing(0), '0');
+  assert.strictEqual(countOrMissing(62), '62');
+});
+
+t('a direction goes on only when there is a figure to give it to', () => {
+  assert.strictEqual(directionalMoney(65850000, CURRENCY, '+'), '+Rp 65.8M');
+  assert.strictEqual(directionalMoney(31200000, CURRENCY, '−'), '−Rp 31.2M');
+  // A real zero still gets its direction: "nothing outstanding" is a
+  // measurement, and the tile reads +Rp 0 rather than a dash.
+  assert.strictEqual(directionalMoney(0, CURRENCY, '+'), '+Rp 0');
+  assert.strictEqual(directionalMoney(null, CURRENCY, '+'), MISSING);
+});
+
+t('no page-level default can smuggle a zero past the formatter', () => {
+  // The formatters are only half the guarantee. If a call site writes
+  // `value ?? 0` or `Number(x || 0)` before handing the figure over, absence has
+  // already become zero and no formatter can tell the difference.
+  const blocks = fs.readFileSync(
+    path.join(ROOT, 'client/src/pages/AICFOBlocks.jsx'), 'utf8').replace(/\r\n/g, '\n');
+  const code = blocks.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/(^|[^:])\/\/.*$/gm, '$1');
+  const smuggled = code.match(/\?\?\s*0|\|\|\s*0\s*\)/g) || [];
+  assert.deepStrictEqual(smuggled, [],
+    `a call site defaults absence to zero before formatting: ${smuggled.join(', ')}`);
+  // And the raw formatter is not reachable from the page any more, so a new
+  // figure cannot bypass the absence rule by calling fmt() directly.
+  assert.ok(!/\bfmt\s*\(/.test(code), 'AICFOBlocks calls fmt() directly, bypassing the absence rule');
+  assert.ok(!/currencyPrefix\s*\(/.test(code),
+    'AICFOBlocks builds a currency prefix itself, bypassing the absence rule');
+});
 console.log('\nAI CFO — the figures that are NOT money');
 
 t('the runway is a count of days and takes no currency', () => {

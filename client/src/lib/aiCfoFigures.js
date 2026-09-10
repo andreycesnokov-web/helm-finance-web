@@ -40,22 +40,81 @@ export const FACTOR_ORDER = ['cash_health', 'runway', 'payables', 'receivables',
    the new expression over one fixture and compares them token by token.
 
    Days and scores are NOT money and never pass through here. */
-export const money = (v, currency) => currencyPrefix(currency) + fmt(v)
-export const moneyFull = (v, currency) => currencyPrefix(currency) + fmtFull(v)
+
+/** What the page prints where a figure could not be measured. */
+export const MISSING = '—'
 
 /**
- * "+Rp 61.5M" / "−Rp 61.5M" — sign first, then the currency, then the figure.
+ * Is this a number the page is entitled to print?
  *
- * The one deliberate difference from the old page: a negative used to arrive as
- * whatever fmt() produced, which is an ASCII hyphen ("-22.7M"). It is now a
- * typographic minus (U+2212), which is what the rest of the design system uses
- * and what aligns in the tabular figures. The MAGNITUDE is identical — pinned
- * by test — only the glyph changed.
+ * The distinction the whole module turns on: a MEASURED zero and an ABSENT
+ * value are different facts, and only one of them may be rendered as "Rp 0".
+ * `Number(v || 0)` collapses them — it turns null, undefined, '' and NaN into a
+ * confident zero — which on this page means inventing a balance, a net flow or
+ * a total that the server never sent.
+ *
+ * `0` and `'0'` are values. `null`, `undefined`, `''` and anything that is not a
+ * finite number are not.
+ */
+const isMeasured = (v) =>
+  v !== null && v !== undefined && v !== '' && Number.isFinite(Number(v))
+
+/** Negative zero is zero. JSON can carry -0, and it formats as "-0" — a minus
+ *  sign in front of nothing, which reads as a tiny loss rather than as none. */
+const normalizeZero = (v) => (Number(v) === 0 ? 0 : v)
+
+/**
+ * "Rp 122.8M", or "—" when there is no figure to show.
+ *
+ * Note the currency prefix goes on ONLY when there is something to prefix.
+ * `currencyPrefix(c) + fmt(null)` renders "Rp —", which reads as a rupiah
+ * amount that happens to be unprintable rather than as a missing measurement.
+ */
+export const money = (v, currency) =>
+  (isMeasured(v) ? currencyPrefix(currency) + fmt(normalizeZero(v)) : MISSING)
+
+/** The exact figure, same rule. */
+export const moneyFull = (v, currency) =>
+  (isMeasured(v) ? currencyPrefix(currency) + fmtFull(normalizeZero(v)) : MISSING)
+
+/**
+ * A signed figure: "+Rp 61.5M", "−Rp 22.7M", "Rp 0", or "—".
+ *
+ * Three rules, and each exists because the obvious implementation gets it wrong:
+ *
+ *   1. ABSENCE IS NOT ZERO. `Number(v || 0)` turned a missing net flow into a
+ *      confident "+Rp 0" — a claim that the business broke exactly even this
+ *      month, made from a field the server did not send.
+ *
+ *   2. ZERO TAKES NO SIGN. `n < 0 ? '−' : '+'` signs zero as positive. Zero is
+ *      neither, and the page already refuses to COLOUR it (see signBand); the
+ *      glyph has to agree with the colour.
+ *
+ *   3. A negative reads as a typographic minus (U+2212) rather than fmt()'s
+ *      ASCII hyphen — the one deliberate change to a printed character in this
+ *      migration, and the magnitude either side of it is pinned by test.
  */
 export const signedMoney = (v, currency) => {
-  const n = Number(v || 0)
+  if (!isMeasured(v)) return MISSING
+  const n = Number(v)
+  if (n === 0) return currencyPrefix(currency) + fmt(0)   // -0 included
   return (n < 0 ? '−' : '+') + currencyPrefix(currency) + fmt(Math.abs(n))
 }
+
+/**
+ * Money carrying a DIRECTION rather than the sign of its own value.
+ *
+ * Receivables are money coming in and payables money going out, whatever the
+ * magnitude — so those cards prefix a fixed glyph rather than read the number's
+ * sign. Doing that at the call site produced "+Rp —" for an absent total: a
+ * direction asserted about a figure that was never measured. The direction now
+ * goes on only when there is a figure to give it to.
+ */
+export const directionalMoney = (v, currency, direction) =>
+  (isMeasured(v) ? direction + money(v, currency) : MISSING)
+
+/** A count, or "—". Same rule as money, without the currency. */
+export const countOrMissing = (v) => (isMeasured(v) ? String(Number(v)) : MISSING)
 
 /**
  * Remaining AI questions for the month, or null when the plan has no cap.
@@ -168,6 +227,6 @@ export function hasNoFinancialData(ctx) {
 }
 
 export default {
-  FACTOR_ORDER, money, moneyFull, signedMoney,
+  FACTOR_ORDER, MISSING, money, moneyFull, signedMoney, directionalMoney, countOrMissing,
   aiQuestionsLeft, scoreBand, factorBand, runwayBand, signBand, hasNoFinancialData,
 }

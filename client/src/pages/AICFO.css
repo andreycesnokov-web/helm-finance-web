@@ -6,6 +6,37 @@
    Class prefix: aicfo-
    ========================================================================== */
 
+/* ── the page's vertical rhythm ─────────────────────────────────────────────
+   ONE gap between top-level sections, set once here.
+
+   .hf-page is a plain block with padding and no gap, and .cfo-card carries no
+   margin, so consecutive sections sat flush against each other — the flagship
+   card and the CFO Score below it had NO space between them at all, and what
+   looked like a gap in a screenshot was the card's own box-shadow. Everything
+   else was spaced by whichever margin a block happened to bring with it
+   (.aicfo-signals had 16px, .aicfo-quicknav 16px, the stale notice 16px, the
+   Cards nothing), so the rhythm changed depending on which sections a given
+   state rendered.
+
+   A flex column with one `gap` fixes the whole page at once, including the two
+   sequences that have no Card between them — flagship → score, and
+   flagship → empty state → chat. It also means a section that renders `null`
+   (Risks and Next actions both can) collapses without leaving a double gap
+   behind, which stacked margins do not.
+
+   18px: inside the 16–20px band, and a size the 20px card padding sits well
+   against. Sections own no vertical margins of their own — see below. */
+.aicfo-page {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  /* A flex container's children do not collapse margins, so any stray vertical
+     margin on a section would ADD to the gap. There are none; this is the
+     guard that keeps it that way. */
+  align-items: stretch;
+  min-width: 0;
+}
+
 /* ── one semantic colour vocabulary for the whole page ──────────────────────
    The page had nine hex literals and eighteen rgba() literals deciding what
    "good" and "bad" looked like, none of them the system's. Three bands now,
@@ -52,7 +83,6 @@
   display: flex;
   align-items: flex-start;
   gap: 12px;
-  margin-bottom: 16px;
   padding: 12px 14px;
   border: 1px solid var(--border-subtle);
   border-inline-start: 3px solid var(--warning);
@@ -188,7 +218,7 @@
    "Not recommended" — which read as a system error rather than a considered
    opinion about a business. The severity is a stripe on the leading edge now:
    present, restrained, and gone entirely when there is nothing to flag. */
-.aicfo-signals { margin: 16px 0; align-items: start; }
+.aicfo-signals { align-items: start; }
 .aicfo-signal { position: relative; overflow: hidden; }
 /* The stripe carries the band and nothing else does — the card's own text keeps
    reading as text. Explicit colours rather than currentColor, so nothing inside
@@ -438,7 +468,7 @@
 .aicfo-limit { margin-top: 12px; text-align: center; }
 
 /* ── quick navigation ────────────────────────────────────────────────────── */
-.aicfo-quicknav { margin-top: 16px; gap: 12px; }
+.aicfo-quicknav { gap: 12px; }
 .aicfo-quick {
   display: flex;
   align-items: center;

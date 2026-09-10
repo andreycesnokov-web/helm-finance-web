@@ -684,11 +684,20 @@ t('every money figure names its currency; days and scores do not', () => {
   const blocks = code('client/src/pages/AICFOBlocks.jsx');
   // The currency comes from the workspace context through the shared helper,
   // never from a literal "Rp" — which is what would relabel dollars as rupiah.
-  assert.match(blocks, /import \{ currencyPrefix \} from '\.\.\/lib\/money'/,
-    'AI CFO does not use the shared currencyPrefix()');
+  // The page reaches it only through the figures module: neither the raw
+  // formatter nor the prefix is imported here any more, so a new figure cannot
+  // bypass the absence rule by building its own string.
+  assert.ok(!/from '\.\.\/lib\/money'/.test(blocks),
+    'AI CFO builds a currency prefix itself instead of going through the figures module');
+  assert.ok(!/from '\.\.\/lib\/api'/.test(blocks),
+    'AI CFO calls the raw formatter instead of going through the figures module');
+  assert.match(blocks, /money, moneyFull, signedMoney, directionalMoney, countOrMissing, MISSING/,
+    'AI CFO does not take its money formatting from the shared figures module');
   assert.ok(!/'Rp[ '"]/.test(blocks), 'AI CFO hardcodes a currency symbol');
   const fig2 = code('client/src/lib/aiCfoFigures.js');
-  assert.match(fig2, /export const money = \(v, currency\) => currencyPrefix\(currency\) \+ fmt\(v\)/,
+  assert.match(fig2, /import \{ currencyPrefix \} from '\.\/money\.js'/,
+    'the figures module does not use the shared currencyPrefix()');
+  assert.match(fig2, /currencyPrefix\(currency\) \+ fmt\(normalizeZero\(v\)\)/,
     'the money helper no longer pairs currencyPrefix with the page own fmt()');
   // The formatter itself is untouched: fmt/fmtFull, not money.js compactAmount,
   // which rounds half-up where fmt does not and would move a printed digit.
@@ -840,13 +849,25 @@ t('AI CFO navigates inside the business workspace', () => {
   assert.deepStrictEqual(legacy, ["'/cfo'"],
     `AI CFO still leaves the workspace for ${legacy.join(', ')}`);
   assert.match(blocks, /a\.route !== '\/cfo'/, "the self-link guard on '/cfo' was dropped");
-  // Add is the one that used to escape, and it was the empty state's only call
-  // to action — a brand-new business's first click dropped it into the legacy
-  // Layout, whose sidebar has no link back to /business/*.
-  assert.ok(blocks.includes("add: '/business/add'"), 'the add destination left the workspace again');
+  // Both destinations that used to reach for /add now point at surfaces that
+  // ALREADY exist in the workspace. No /business/add was introduced to make the
+  // old wording fit: wrapping the legacy Add in BusinessShell holds the shell
+  // only until the first save, because Add's own post-save links are legacy
+  // routes. That migration is its own task — see
+  // _specs/business-add-surface-migration.md.
+  assert.ok(blocks.includes("accounts: '/business/accounts'"),
+    'the empty-state CTA has no in-workspace destination');
+  assert.match(blocks, /onNavigate\(BUSINESS_ROUTES\.accounts\)\}>\{t\('aicfo\.setUpWallets'\)/,
+    'the empty-state CTA is not "Set up wallets" into Accounts');
   const app2 = code('client/src/App.jsx');
-  assert.match(app2, /path="\/business\/add" element=\{<BusinessShell><Add \/><\/BusinessShell>\}/,
-    '/business/add is not registered inside the business shell');
+  assert.ok(!/\/business\/add/.test(app2),
+    'a half-migrated /business/add route is registered — it holds the shell only until the first save');
+  assert.ok(!/BUSINESS_ROUTES\.add\b/.test(blocks), 'AI CFO still references an add route');
+  // Quick navigation offers an existing workspace surface, named for what it is.
+  assert.match(blocks, /key: 'transactions',[\s\S]{0,200}to: BUSINESS_ROUTES\.transactions/,
+    'quick navigation does not offer the workspace transactions surface');
+  assert.ok(!/aicfo\.addTransaction/.test(blocks),
+    'a tile is still labelled "Add transaction" with no add surface to reach');
 });
 
 t('AI CFO uses the icon system rather than emoji', () => {

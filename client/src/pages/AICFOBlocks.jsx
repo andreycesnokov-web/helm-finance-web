@@ -22,11 +22,9 @@
 import {
   PageHeader, SummaryCard, Card, Stat, StatusBadge, EmptyState, Btn, Icon,
 } from '../shell/ui'
-import { fmt } from '../lib/api'
-import { currencyPrefix } from '../lib/money'
 import {
   FACTOR_ORDER, scoreBand, factorBand, runwayBand, signBand,
-  money, moneyFull, signedMoney,
+  money, moneyFull, signedMoney, directionalMoney, countOrMissing, MISSING,
 } from '../lib/aiCfoFigures'
 import './AICFO.css'
 
@@ -190,18 +188,22 @@ const ACTION_PRIORITY_KEY = {
    /transactions — which are rendered by the old Layout. Clicking a figure threw
    the user out of the workspace they were standing in. Every other business
    page uses /business/*; these now do too.
-   /add was the last one left: it had no /business equivalent, and
-   /business/transactions is a read surface with no add control, so pointing the
-   tile there would have mislabelled it. Rather than ship a call to action that
-   ejects a brand-new business from its own workspace, App.jsx now registers
-   /business/add — the same Add component inside BusinessShell, exactly the
-   pattern the routes beside it already use. */
+   /add is not among them, and no /business/add is introduced to make it fit.
+   Wrapping the legacy Add component in BusinessShell would hold the workspace
+   only until the first save — Add's own post-save links go straight back to the
+   legacy routes — and a route that looks migrated but is not is worse than one
+   that plainly is not. Migrating Add properly, post-save links included, is its
+   own task: _specs/business-add-surface-migration.md.
+
+   So both destinations that used to reach for /add now point at surfaces that
+   already exist inside the workspace: Accounts, where wallets are set up, and
+   Transactions, where the ledger lives. */
 export const BUSINESS_ROUTES = {
+  accounts: '/business/accounts',
   receivables: '/business/receivables',
   payables: '/business/payables',
   radar: '/business/radar',
   transactions: '/business/transactions',
-  add: '/business/add',
 }
 
 /* Suggested questions — keys resolved via t() at render time. The decorative
@@ -303,7 +305,7 @@ export function AICFOSummary({ ctx, t, planLabel, aiQLeft }) {
   const runway = c.runway_days
   const rBand = runwayBand(runway)
 
-  const runwayValue = runway === null || runway === undefined ? '—'
+  const runwayValue = runway === null || runway === undefined ? MISSING
     : runway >= 999 ? '∞'
       : `${runway} ${t('radar.days')}`
 
@@ -497,13 +499,12 @@ export function AICFOFigures({ ctx, t, onNavigate }) {
   const pay = c.payables || {}
   const biz = c.business || {}
   const currency = biz.base_currency || 'IDR'
-  const pre = currencyPrefix(currency)
 
   const figures = [
     {
       key: 'receivables',
       k: t('aicfo.receivables'),
-      v: '+' + money(recv.total_remaining, currency),
+      v: directionalMoney(recv.total_remaining, currency, '+'),
       tone: STAT_TONE[signBand(recv.total_remaining)],
       sub: recv.overdue_count > 0
         ? `${recv.overdue_count} ${t('common.overdue')}`
@@ -513,8 +514,12 @@ export function AICFOFigures({ ctx, t, onNavigate }) {
     {
       key: 'payables',
       k: t('aicfo.payables'),
-      v: '−' + money(pay.total_remaining, currency),
-      tone: Number(pay.total_remaining || 0) > 0 ? 'neg' : '',
+      v: directionalMoney(pay.total_remaining, currency, '−'),
+      // Money owed is a real negative, so a payables balance above zero is the
+      // one figure here that earns red. Through the shared band rather than a
+      // local `|| 0`, so an unmeasured total is uncoloured rather than
+      // silently treated as an unproblematic zero.
+      tone: signBand(pay.total_remaining) === 'positive' ? 'neg' : '',
       sub: pay.overdue_count > 0
         ? `${pay.overdue_count} ${t('common.overdue')}`
         : `${currency}${t('aicfo.toPay')}`,
@@ -523,17 +528,17 @@ export function AICFOFigures({ ctx, t, onNavigate }) {
     {
       key: 'income',
       k: t('aicfo.income'),
-      v: '+' + money(month.income, currency),
+      v: directionalMoney(month.income, currency, '+'),
       tone: STAT_TONE[signBand(month.income)],
-      sub: `${month.transactions_count ?? 0} ${t('aicfo.transactions')}`,
+      sub: `${countOrMissing(month.transactions_count)} ${t('aicfo.transactions')}`,
       route: null,
     },
     {
       key: 'expenses',
       k: t('aicfo.expenses'),
-      v: '−' + money(month.expenses, currency),
+      v: directionalMoney(month.expenses, currency, '−'),
       tone: '',
-      sub: `${pre}${fmt(month.burn_rate)}${t('pulse.perDay')} · ${
+      sub: `${money(month.burn_rate, currency)}${t('pulse.perDay')} · ${
         month.burn_window_days >= 30 ? t('pulse.avg30')
           : month.burn_window_days > 0 ? `${month.burn_window_days}${t('pulse.dAvg')}`
             : t('pulse.avg30')}`,
@@ -771,11 +776,11 @@ export function AICFOQuickNav({ ctx, t, onNavigate }) {
       to: BUSINESS_ROUTES.radar,
     },
     {
-      key: 'add',
-      label: t('aicfo.addTransaction'),
+      key: 'transactions',
+      label: t('nav.transactions'),
       sub: t('aicfo.keepDataUpdated'),
-      icon: Icon.plus,
-      to: BUSINESS_ROUTES.add,
+      icon: Icon.list,
+      to: BUSINESS_ROUTES.transactions,
     },
   ]
 
@@ -817,7 +822,7 @@ export function AICFOEmpty({ t, onNavigate }) {
       title={t('aicfo.noDataTitle')}
       description={t('aicfo.noDataBody')}
       actions={onNavigate && (
-        <Btn variant="primary" onClick={() => onNavigate(BUSINESS_ROUTES.add)}>{t('aicfo.addTransaction')}</Btn>
+        <Btn variant="primary" onClick={() => onNavigate(BUSINESS_ROUTES.accounts)}>{t('aicfo.setUpWallets')}</Btn>
       )}
     />
   )
