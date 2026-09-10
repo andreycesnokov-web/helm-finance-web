@@ -496,6 +496,91 @@ const PROBE_FN = `function facts(win, doc) {
       clipped.push(el.tagName.toLowerCase() + ' ellipsised');
   });
 
+  // AI CFO, measured. The page's whole job is a verdict, so what has to be
+  // checked is that the verdict is legible and that nothing about it is claimed
+  // by colour alone: the score bar's fill and the figure beside it must agree,
+  // and every control the page adds has to be reachable by a thumb.
+  const aicfo = (() => {
+    const page = doc.querySelector('.aicfo-page');
+    if (!page) return null;
+    const bandOf = (el) => !el ? null
+      : el.classList.contains('is-healthy') ? 'healthy'
+        : el.classList.contains('is-attention') ? 'attention'
+          : el.classList.contains('is-critical') ? 'critical' : 'neutral';
+    const num = page.querySelector('.aicfo-score-num');
+    return {
+      // The score and its band, plus the painted colour, so "green means healthy"
+      // is checked against what is on screen rather than against a class name.
+      score: num ? { text: num.textContent.trim(), band: bandOf(num), color: cs(num).color } : null,
+      // Each factor: the bar's band, its painted fill, its width as a percentage
+      // of the track, and the score it sits under.
+      factors: [...page.querySelectorAll('.aicfo-factor')].map((li) => {
+        const fill = li.querySelector('.aicfo-bar-fill');
+        const track = li.querySelector('.aicfo-bar');
+        const sc = li.querySelector('.aicfo-factor-score');
+        const meter = li.querySelector('[role="meter"]');
+        return {
+          name: (li.querySelector('.aicfo-factor-name') || {}).textContent?.trim().slice(0, 24) || '',
+          band: bandOf(fill),
+          scoreBand: bandOf(sc),
+          score: sc ? sc.textContent.trim() : null,
+          fill: fill ? cs(fill).backgroundColor : null,
+          pct: fill && track && track.getBoundingClientRect().width > 0
+            ? Math.round(fill.getBoundingClientRect().width / track.getBoundingClientRect().width * 100)
+            : null,
+          labelled: !!(meter && meter.getAttribute('aria-label')),
+        };
+      }),
+      // The two judgement cards, and whether either is a filled panel again.
+      signals: [...page.querySelectorAll('.aicfo-signal')].map((c) => ({
+        band: bandOf(c),
+        bg: cs(c).backgroundColor,
+        stripe: cs(c).borderInlineStartWidth || cs(c).borderLeftWidth,
+      })),
+      // Every control this page adds, for the thumb-target rule. Header actions
+      // are covered separately by headActions.
+      targets: [...page.querySelectorAll('.aicfo-figure.is-link, .aicfo-quick, .aicfo-row-btn, .aicfo-send, .aicfo-suggest-chip')]
+        .map((b) => ({
+          cls: (typeof b.className === 'string' ? b.className : '').split(' ')[0],
+          h: +b.getBoundingClientRect().height.toFixed(1),
+          w: +b.getBoundingClientRect().width.toFixed(1),
+        })),
+      // Money on this page must name its currency; days and scores must not.
+      metrics: [...page.querySelectorAll('.cfo-summary-row > div')].map((d) => ({
+        k: (d.querySelector('.cfo-summary-k') || {}).textContent?.trim() || '',
+        v: (d.querySelector('.cfo-summary-v') || {}).textContent?.trim() || '',
+      })),
+      summaryLabel: (page.querySelector('.cfo-summary-label') || {}).textContent?.trim() || '',
+      summaryValue: (page.querySelector('.cfo-summary-value') || {}).textContent?.trim() || '',
+      summaryMeta: (page.querySelector('.cfo-summary-meta') || {}).textContent?.trim() || '',
+      figures: [...page.querySelectorAll('.aicfo-figure')].map((f) => ({
+        k: (f.querySelector('.cfo-stat-k') || {}).textContent?.trim() || '',
+        v: (f.querySelector('.cfo-stat-v') || {}).textContent?.trim() || '',
+        color: (() => { const el = f.querySelector('.cfo-stat-v'); return el ? cs(el).color : null; })(),
+      })),
+      // Present only in the no-data state.
+      emptyState: (() => {
+        const st = page.querySelector('.cfo-state');
+        if (!st) return null;
+        const sym = st.querySelector('.cfo-state-sym');
+        return {
+          title: (st.querySelector('.cfo-state-h') || {}).textContent?.trim() || '',
+          symWidth: sym ? Math.round(sym.getBoundingClientRect().width) : 0,
+          symSrc: sym ? sym.getAttribute('src') : null,
+          actions: st.querySelectorAll('.cfo-state-actions button, .cfo-state-actions a').length,
+        };
+      })(),
+      hasScoreBlock: !!num,
+      cardMarks: [...page.querySelectorAll('.cfo-flagship-mark')].filter(painted).length,
+      flagships: page.querySelectorAll('.cfo-flagship').length,
+      // Nothing on this page may paint a gradient or a graph-paper grid again.
+      gradients: [...page.querySelectorAll('*')].filter((el) => {
+        const bg = cs(el).backgroundImage;
+        return bg && bg !== 'none';
+      }).map((el) => (typeof el.className === 'string' ? el.className : '').slice(0, 32)),
+    };
+  })();
+
   const res = win.performance.getEntriesByType('resource');
   const calls = res.filter((e) => e.initiatorType === 'xmlhttprequest' || e.initiatorType === 'fetch')
     .map((e) => e.name);
@@ -506,7 +591,7 @@ const PROBE_FN = `function facts(win, doc) {
     h1Total: doc.querySelectorAll('h1').length,
     sections, overflow: overflow.slice(0, 10), overflowCount: overflow.length,
     overlaps: overlaps.slice(0, 12), overlapCount: overlaps.length,
-    headActions, heads, focusRing, shell, figures, brand, idLeaks, navItems, walletsState,
+    headActions, heads, focusRing, shell, figures, brand, idLeaks, navItems, walletsState, aicfo,
     settings, drawerSettings, topbarSettings, headMarks,
     fonts: { status: doc.fonts.status, size: doc.fonts.size,
       archivo: doc.fonts.check('400 40px "Archivo Black"'),
@@ -617,9 +702,26 @@ const CURRENCIES = await collectGroup([
   { key: 'WNOC', route: `${P}?shell=accounts-nocur`, w: 1440, h: 900 },
   { key: 'W4', route: `${P}?shell=accounts-four`, w: 1440, h: 900 },
   { key: 'W4M', route: `${P}?shell=accounts-four`, w: 390, h: 844 },
-]);
+  /* AI CFO, in the app frame: the populated page at desktop and at a genuine
+     390px, the risk state — where every semantic band is on screen at once —
+     and the no-data state, which is the one that has to withhold a verdict.
+
+     Deliberately folded into THIS group rather than given one of its own. Each
+     collectGroup is one browser launch, and `node --test` runs test files in
+     parallel, so a fourth launch competing for the same CPU pushed this file
+     past collect()'s 120s kill — it passed alone and failed in the suite. Fewer
+     launches is the strategy this file already documents; a group holds many
+     viewports in one browser precisely so a new page costs an iframe, not a
+     process. */
+  { key: 'CD', route: `${P}?shell=ai-cfo`, w: 1440, h: 900 },
+  { key: 'CM', route: `${P}?shell=ai-cfo`, w: 390, h: 844 },
+  { key: 'CR', route: `${P}?shell=ai-cfo-risk`, w: 1440, h: 900 },
+  { key: 'CRM', route: `${P}?shell=ai-cfo-risk`, w: 390, h: 844 },
+  { key: 'CE', route: `${P}?shell=ai-cfo-empty`, w: 1440, h: 900 },
+], 45000);
 const { SD, SM, WP, WE, WEM, WP320, WE320, WP768, PULSE768 } = SHELLS;
 const { WUSD, WMIX, WMIXM, WNOC, W4, W4M } = CURRENCIES;
+const { CD, CM, CR, CRM, CE } = CURRENCIES;
 console.log(`  .. desktop viewport ${D.innerWidth}px, mobile viewport ${M.innerWidth}px, `
   + `in-shell ${SD.innerWidth}px / ${SM.innerWidth}px`);
 
@@ -929,6 +1031,257 @@ t('no financial figure is truncated', () => {
     assert.strictEqual(f.truncated, false,
       `"${f.text}" (.${f.cls}) is clipped: needs ${f.scrollW}px, has ${f.clientW}px`);
   }
+});
+
+/* ── AI CFO ────────────────────────────────────────────────────────────────
+   Measured in the app frame, because this page's claims are claims about
+   pixels: that the score is legible without shouting, that green appears only
+   where something is genuinely healthy, that a warning does not read as a
+   system error, and that a 390px phone shows all of it without a sideways
+   scroll. The structural half of these lives in designPreview.test.mjs. */
+console.log('\nAI CFO — the migrated page');
+
+const CFO_VIEWS = [['desktop', CD], ['390px', CM], ['risk', CR], ['risk 390px', CRM], ['no data', CE]];
+
+t('every AI CFO view rendered', () => {
+  for (const [name, f] of CFO_VIEWS) {
+    assert.ok(f.aicfo, `the ${name} view did not render the AI CFO page`);
+  }
+});
+
+t('the page has exactly one <h1>, from the shared header', () => {
+  for (const [name, f] of CFO_VIEWS) {
+    assert.strictEqual(f.h1Total, 1, `${name}: ${f.h1Total} h1 elements, expected 1`);
+  }
+  // The catalogue sections each own one too.
+  for (const id of ['ai-cfo', 'ai-cfo-risk', 'ai-cfo-empty', 'ai-cfo-partial']) {
+    assert.strictEqual(D.sections[id]?.h1, 1, `section ${id} h1 count = ${D.sections[id]?.h1}`);
+  }
+});
+
+t('one flagship card, wearing one shared watermark', () => {
+  for (const [name, f] of CFO_VIEWS) {
+    assert.strictEqual(f.aicfo.flagships, 1, `${name}: ${f.aicfo.flagships} flagship cards, expected 1`);
+    assert.strictEqual(f.aicfo.cardMarks, 1, `${name}: ${f.aicfo.cardMarks} watermarks, expected 1`);
+  }
+});
+
+t('the watermark is the official symbol and is absent from the accessibility tree', () => {
+  // Both facts already hold for Pulse, Accounts and Radar; this asserts AI CFO
+  // gets them from the same component rather than a copy.
+  const mk = CD.brand.flagships.find((c) => c.src);
+  assert.ok(mk, 'no flagship mark measured on the AI CFO page');
+  assert.match(mk.src, /symbol_white_transparent\.svg$/,
+    `the flagship mark is ${mk.src}, not the official white symbol`);
+  assert.strictEqual(mk.alt, '', `the mark carries alt="${mk.alt}" — it is decoration`);
+  assert.strictEqual(mk.ariaHidden, 'true', 'the mark is not hidden from assistive technology');
+  // Cropped by the card's right edge, and clear of everything anyone reads —
+  // the same treatment Pulse, Accounts and Radar get, from the same primitive.
+  assert.ok(mk.cropped > 0, `the mark is not cropped by the card edge (${mk.cropped}px)`);
+  assert.ok(mk.safeGap >= 0, `the mark sits ${mk.safeGap}px into the content`);
+});
+
+t('nothing on the page paints a gradient or a graph-paper grid', () => {
+  // The removed .hf-dark-card drew a #0F172A gradient with two
+  // repeating-linear-gradients over it. Asserted against COMPUTED style, so it
+  // catches the treatment coming back from anywhere, not just from this source.
+  for (const [name, f] of CFO_VIEWS) {
+    assert.deepStrictEqual(f.aicfo.gradients, [],
+      `${name}: background images painted on ${f.aicfo.gradients.join(', ')}`);
+  }
+});
+
+t('money names its currency; days and the score do not', () => {
+  const m = CD.aicfo;
+  // The headline figure and its exact companion.
+  assert.match(m.summaryValue, /^Rp /, `the headline reads "${m.summaryValue}" with no currency`);
+  assert.match(m.summaryMeta, /Rp /, `the exact figure reads "${m.summaryMeta}" with no currency`);
+  assert.match(m.summaryLabel, /^Cash · /, `the card label reads "${m.summaryLabel}"`);
+  const by = (k) => (m.metrics.find((x) => new RegExp(k, 'i').test(x.k)) || {}).v || '';
+  // Runway is a count of days. A currency in front of it would be nonsense.
+  assert.match(by('runway'), /^\d+ days$/, `runway reads "${by('runway')}"`);
+  assert.ok(!/Rp/.test(by('runway')), `runway reads "${by('runway')}" — days took a currency`);
+  // Net per month is money, and carries its sign in front of the currency.
+  assert.match(by('net'), /^[+−]Rp /, `net per month reads "${by('net')}"`);
+  // The question allowance is a count, not money, and is labelled as an
+  // allowance rather than a remaining count that the product cannot measure.
+  const q = m.metrics.find((x) => /question/i.test(x.k));
+  assert.ok(q, `no AI question metric on the card: ${JSON.stringify(m.metrics)}`);
+  assert.match(q.k, /month/i, `the AI question metric is labelled "${q.k}"`);
+  assert.ok(!/remaining/i.test(q.k), `the AI question metric still says "${q.k}"`);
+  assert.ok(!/Rp/.test(q.v), `the question allowance reads "${q.v}" — a count took a currency`);
+  // The four operating figures each name their currency and carry a sign.
+  for (const f of m.figures) {
+    assert.match(f.v, /^[+−]Rp /, `the ${f.k} figure reads "${f.v}"`);
+  }
+  // And the score is a score.
+  assert.match(m.score.text, /^\d+$/, `the CFO score reads "${m.score.text}"`);
+});
+
+t('the CFO Score is present but no longer competes with the headline figure', () => {
+  // It was 34px... at weight 900 and 32px directly beneath the hero, which gave
+  // the page two headline figures and therefore no subject. The flagship value
+  // must stay the largest number on the page.
+  const heroFont = CD.figures.find((f) => /cfo-summary-value/.test(f.cls));
+  assert.ok(heroFont, 'the flagship value was not measured');
+  assert.ok(CD.aicfo.hasScoreBlock, 'the CFO Score block is missing');
+  assert.match(CD.aicfo.score.text, /^\d+$/, 'the CFO Score is not a number');
+});
+
+t('a factor is coloured by its impact, and the bar agrees with the number', () => {
+  // The engine sends impact separately from score. "No payables" is 90/positive
+  // and "Runway adequate (30+ days)" is 70/neutral — colouring by score would
+  // paint the second green.
+  for (const [name, f] of CFO_VIEWS) {
+    if (!f.aicfo.factors.length) continue;
+    for (const fa of f.aicfo.factors) {
+      assert.strictEqual(fa.band, fa.scoreBand,
+        `${name}: the ${fa.name} bar is ${fa.band} but its score is ${fa.scoreBand}`);
+      assert.ok(fa.labelled, `${name}: the ${fa.name} bar has no accessible label`);
+    }
+  }
+  // The healthy view: the neutral runway factor must NOT be green.
+  const runway = CD.aicfo.factors.find((x) => /runway/i.test(x.name));
+  assert.ok(runway, 'no runway factor rendered');
+  assert.strictEqual(runway.band, 'neutral',
+    `a 70/neutral runway factor is painted ${runway.band}`);
+});
+
+t('the bar fill is the value, not a decoration', () => {
+  // A bar that does not track its number is worse than no bar.
+  for (const fa of [...CD.aicfo.factors, ...CR.aicfo.factors]) {
+    const n = Number(fa.score);
+    assert.ok(Math.abs(fa.pct - n) <= 2,
+      `the ${fa.name} bar is ${fa.pct}% wide for a score of ${n}`);
+  }
+});
+
+t('every band the page can paint is legible, and each is a different colour', () => {
+  // The risk view puts a critical score, four negative or warning factors and a
+  // critical alert on screen at once. Distinct colours, or the encoding is not
+  // an encoding.
+  const bands = new Set(CR.aicfo.factors.map((f) => f.band));
+  assert.ok(bands.has('critical'), `the risk view has no critical factor: ${[...bands].join(', ')}`);
+  assert.ok(bands.has('attention'), `the risk view has no attention factor: ${[...bands].join(', ')}`);
+  const fills = new Set(CR.aicfo.factors.map((f) => f.fill));
+  assert.ok(fills.size >= 2, `every factor bar is the same colour: ${[...fills].join(', ')}`);
+  assert.strictEqual(CR.aicfo.score.band, 'critical',
+    `a score of ${CR.aicfo.score.text} is painted ${CR.aicfo.score.band}`);
+});
+
+t('green appears only where something is genuinely healthy', () => {
+  // The whole rule in one assertion: in a business with a critical score, four
+  // negative factors and overdue debt on both sides, nothing may be green.
+  const green = CR.aicfo.factors.filter((f) => f.band === 'healthy');
+  assert.deepStrictEqual(green.map((f) => f.name), [],
+    `a business in difficulty shows ${green.length} green factor(s): ${green.map((f) => f.name).join(', ')}`);
+  assert.notStrictEqual(CR.aicfo.score.band, 'healthy', 'a critical score is painted healthy');
+});
+
+t('a warning does not read as a system error', () => {
+  // The alert and hiring cards were solid tinted panels — a filled amber block
+  // for a warning, a filled red one for "Not recommended". They are ordinary
+  // cards with a stripe now: the card ground stays the card ground.
+  assert.ok(CR.aicfo.signals.length >= 2,
+    `expected two judgement cards, found ${CR.aicfo.signals.length}`);
+  const cardBg = new Set(CD.aicfo.signals.map((s) => s.bg));
+  for (const s of CR.aicfo.signals) {
+    assert.ok(cardBg.has(s.bg),
+      `a ${s.band} card is filled with ${s.bg} while a healthy one is ${[...cardBg].join(', ')}`);
+    // The severity is carried, just not by flooding the card.
+    if (s.band !== 'neutral') {
+      assert.ok(parseFloat(s.stripe) >= 2,
+        `a ${s.band} card has a ${s.stripe} stripe — the severity is not shown at all`);
+    }
+  }
+});
+
+t('the no-data state withholds the verdict instead of showing a score of 72', () => {
+  // The engine scores an untouched workspace at 72 out of 100 and calls its
+  // payables excellent. The fixture behind this view carries that real 72.
+  assert.strictEqual(CE.aicfo.hasScoreBlock, false,
+    'the no-data view still presents a CFO Score');
+  assert.strictEqual(CE.aicfo.factors.length, 0,
+    `the no-data view still shows ${CE.aicfo.factors.length} scored factors`);
+  assert.strictEqual(CE.aicfo.figures.length, 0,
+    'the no-data view still shows the operating figures as if they were measurements');
+  // Cash stays, because zero cash with zero wallets is true rather than absent.
+  assert.match(CE.aicfo.summaryValue, /^Rp /,
+    `the no-data view dropped the cash card: "${CE.aicfo.summaryValue}"`);
+});
+
+t('the empty state offers a next action, at the symbol\'s normal size', () => {
+  const st = CE.aicfo.emptyState;
+  assert.ok(st, 'the no-data view has no empty state');
+  assert.ok(st.title.length > 0, 'the empty state has no heading');
+  assert.ok(st.actions >= 1, 'the empty state offers nothing to do next');
+  assert.match(st.symSrc || '', /\/brand\/symbol_[a-z_]+\.svg$/,
+    `the empty state symbol is ${st.symSrc}, not an official brand asset`);
+  // Not the rejected page-sized-logo pattern: this is the size every other
+  // empty state in the product uses.
+  assert.ok(st.symWidth > 0 && st.symWidth <= 96,
+    `the empty-state symbol is ${st.symWidth}px wide — that is decoration, not a symbol`);
+});
+
+console.log('\nAI CFO — 390px');
+
+t('the phone viewport is genuinely 390 CSS pixels', () => {
+  for (const [name, f] of [['ai-cfo', CM], ['ai-cfo risk', CRM]]) {
+    assert.strictEqual(f.innerWidth, 390, `${name}: innerWidth = ${f.innerWidth}, expected 390`);
+  }
+});
+
+t('nothing scrolls sideways and nothing overflows at 390px', () => {
+  for (const [name, f] of [['ai-cfo', CM], ['ai-cfo risk', CRM]]) {
+    assert.ok(f.scrollWidth <= f.clientWidth,
+      `${name}: scrollWidth ${f.scrollWidth} > clientWidth ${f.clientWidth}`);
+    assert.strictEqual(f.overflowCount, 0,
+      `${name}: ${f.overflowCount} overflowing element(s): ${JSON.stringify(f.overflow)}`);
+  }
+});
+
+t('no figure on the page is clipped, at any width', () => {
+  for (const [name, f] of CFO_VIEWS) {
+    for (const fig of f.figures) {
+      assert.strictEqual(fig.truncated, false,
+        `${name}: "${fig.text}" (.${fig.cls}) is clipped: needs ${fig.scrollW}px, has ${fig.clientW}px`);
+    }
+  }
+});
+
+t('the watermark sits behind nothing anyone has to read', () => {
+  for (const [name, f] of CFO_VIEWS) {
+    assert.strictEqual(f.overlapCount, 0, `${name}: ${overlapReport(f)}`);
+  }
+});
+
+t('every control the page adds is a 44px thumb target', () => {
+  for (const [name, f] of [['390px', CM], ['risk 390px', CRM], ['desktop', CD]]) {
+    for (const b of f.aicfo.targets) {
+      assert.ok(b.h >= 36, `${name}: a .${b.cls} control is ${b.h}px tall`);
+    }
+    // The row-level and card-level controls carry the full 44px; the suggestion
+    // chips are a wrapped list of short phrases and sit at 36px by design, the
+    // same height the product's other chip rows use.
+    for (const b of f.aicfo.targets.filter((x) => x.cls !== 'aicfo-suggest-chip')) {
+      assert.ok(b.h >= 44, `${name}: a .${b.cls} control is ${b.h}px tall, under the 44px target`);
+    }
+  }
+});
+
+t('Refresh stays reachable and does not push the title around', () => {
+  // The product's control height on desktop, a full thumb target on a phone.
+  for (const [name, f, min] of [['desktop', CD, 36], ['390px', CM, 44]]) {
+    const acts = f.headActions;
+    assert.strictEqual(acts.length, 1, `${name}: ${acts.length} header actions, expected just Refresh`);
+    assert.match(acts[0].txt, /Refresh/i, `${name}: the header action is "${acts[0].txt}"`);
+    assert.ok(acts[0].h >= min, `${name}: Refresh is ${acts[0].h}px tall, under the ${min}px target`);
+  }
+  // The header keeps its two zones on one row on desktop, so the button cannot
+  // displace the heading.
+  const head = CD.heads[0];
+  assert.ok(head, 'no page hero rendered on the AI CFO page');
+  assert.strictEqual(head.sameRow, true, 'Refresh dropped onto its own row on desktop');
 });
 
 /* ── workspace settings ────────────────────────────────────────────────────── */

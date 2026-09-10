@@ -39,6 +39,7 @@ const DIST = path.join(ROOT, 'client', 'dist');
 // evidence for". A shot names its own directory; OUT is the default.
 const OUT = path.join(ROOT, 'artifacts', 'design-pr80');
 const OUT_RADAR = path.join(ROOT, 'artifacts', 'design-pr81-radar');
+const OUT_AICFO = path.join(ROOT, 'artifacts', 'design-pr83-ai-cfo');
 
 // Which face each kind of content is supposed to render in. The check is done
 // against what the page ACTUALLY renders — sample an element, read its computed
@@ -77,7 +78,7 @@ const build = spawnSync(process.platform === 'win32' ? 'npm.cmd' : 'npm', ['run'
 });
 assert.strictEqual(build.status, 0, 'build failed:\n' + (build.stderr || '').slice(-2000));
 
-for (const dir of [OUT, OUT_RADAR]) fs.mkdirSync(dir, { recursive: true });
+for (const dir of [OUT, OUT_RADAR, OUT_AICFO]) fs.mkdirSync(dir, { recursive: true });
 
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css',
   '.svg': 'image/svg+xml', '.png': 'image/png', '.woff2': 'font/woff2', '.woff': 'font/woff',
@@ -387,6 +388,34 @@ const SHOTS = [
   // panel becomes a real empty state, not a page-sized logo.
   ['04-radar-zero-data-desktop-1440x900.png', `${P}?shell=radar-empty`, 1440, 900,
     { dir: OUT_RADAR }],
+  // AI CFO, migrated onto the shared system: the same PageHeader and the same
+  // flagship card as Pulse, Accounts and Radar, in place of the .hf-dark-card
+  // graph-paper hero it was the last consumer of.
+  ['01-ai-cfo-app-shell-desktop-1440x900.png', `${P}?shell=ai-cfo`, 1440, 900, { dir: OUT_AICFO }],
+  ['02-ai-cfo-app-shell-mobile-390x844.png', `${P}?shell=ai-cfo`, 390, 844,
+    { ...PHONE, dir: OUT_AICFO }],
+  ['03-ai-cfo-flagship-card-closeup.png', `${P}?shell=ai-cfo`, 1440, 900,
+    { region: { sel: '.cfo-summary.cfo-flagship', pad: 6 }, dir: OUT_AICFO }],
+  // A business under real pressure: every semantic band on screen at once, which
+  // is the frame that shows whether restrained red still reads as red.
+  ['04-ai-cfo-attention-risk-desktop-1440x900.png', `${P}?shell=ai-cfo-risk`, 1440, 900,
+    { dir: OUT_AICFO }],
+  ['05-ai-cfo-attention-risk-mobile-390x844.png', `${P}?shell=ai-cfo-risk`, 390, 844,
+    { ...PHONE, dir: OUT_AICFO }],
+  // The CFO Score close up, in the state where four of its five factors are
+  // negative or warning — the bars, their colours and the verdict badge.
+  ['06-ai-cfo-score-attention-closeup.png', `${P}?shell=ai-cfo-risk`, 1440, 900,
+    { region: { sel: '.aicfo-factors', pad: 16 }, dir: OUT_AICFO }],
+  // Nothing recorded yet. The engine scores an untouched workspace at 72; the
+  // page declines to present that as a verdict.
+  ['07-ai-cfo-no-data-desktop-1440x900.png', `${P}?shell=ai-cfo-empty`, 1440, 900,
+    { dir: OUT_AICFO }],
+  ['08-ai-cfo-no-data-empty-state-closeup.png', `${P}?shell=ai-cfo-empty`, 1440, 900,
+    { region: { sel: '.cfo-state', pad: 12 }, dir: OUT_AICFO }],
+  // Partially populated: wallets and transactions, but no receivable or payable
+  // ever entered. Not the empty state, and the page has to show the difference.
+  ['09-ai-cfo-partial-data-desktop-1440x900.png', `${P}?shell=ai-cfo-partial`, 1440, 900,
+    { dir: OUT_AICFO }],
 ];
 
 // Produced filenames, per directory — a run only prunes what it owns, so the

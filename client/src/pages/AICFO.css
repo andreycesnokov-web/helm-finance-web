@@ -1,0 +1,466 @@
+/* ============================================================================
+   AI CFO — financial decision assistant.
+   Page-specific layout only. Every surface, colour, radius and shadow comes from
+   the shared system (shell/shell.css + brand/tokens.css); nothing here declares
+   a token or re-styles a shared component.
+   Class prefix: aicfo-
+   ========================================================================== */
+
+/* ── one semantic colour vocabulary for the whole page ──────────────────────
+   The page had nine hex literals and eighteen rgba() literals deciding what
+   "good" and "bad" looked like, none of them the system's. Three bands now,
+   taken from the semantic tokens, and a fourth state that is deliberately no
+   class at all: an uncoloured figure is the default, and colour is spent only
+   where it says something the label cannot.
+
+   Green means genuinely healthy. Amber means attention. Red means a real
+   negative or a real risk. Neutral and "adequate" get nothing.
+
+   Each band is applied to the exact elements that wear it rather than through
+   one loose `.is-healthy { color }` rule. A page-wide colour rule would beat
+   .cfo-card-title on specificity and repaint the shared card header, and would
+   cascade out of a banded card into every child inside it — the class of
+   collision that is invisible until a card somewhere turns the wrong colour. */
+.aicfo-score-num.is-healthy,
+.aicfo-factor-label.is-healthy,
+.aicfo-factor-score.is-healthy { color: var(--success); }
+.aicfo-score-num.is-attention,
+.aicfo-factor-label.is-attention,
+.aicfo-factor-score.is-attention { color: var(--warning); }
+.aicfo-score-num.is-critical,
+.aicfo-factor-label.is-critical,
+.aicfo-factor-score.is-critical { color: var(--danger); }
+
+.aicfo-note {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--text-secondary);
+}
+
+/* Refresh keeps a stable width across its two labels, so the header does not
+   twitch and the title does not move while a reload is in flight. The height is
+   the product's control height on desktop and a full thumb target on a phone. */
+.aicfo-refresh { min-width: 108px; min-height: 36px; justify-content: center; }
+
+/* ── CFO Score ───────────────────────────────────────────────────────────── */
+.aicfo-score-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 20px;
+  flex-wrap: wrap;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.aicfo-score-figure { display: flex; align-items: baseline; gap: 6px; flex-shrink: 0; }
+/* Noticeably the score, but no longer competing with the flagship above it:
+   this was 32px at weight 900 in full semantic colour directly beneath the
+   hero, which gave the page two headline figures and no subject. */
+.aicfo-score-num { font-size: 34px; font-weight: 700; line-height: 1; }
+.aicfo-score-outof { font-size: 13px; color: var(--text-muted); font-family: var(--font-mono); }
+.aicfo-score-verdict {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  min-width: 0;
+  flex: 1 1 260px;
+}
+.aicfo-score-summary {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--text-secondary);
+  /* A summary sentence is built from two engine labels and can run long. */
+  max-width: 62ch;
+}
+
+.aicfo-factors {
+  list-style: none;
+  margin: 18px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+.aicfo-factor-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 7px;
+}
+.aicfo-factor-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  min-width: 0;
+}
+/* The shared icon set draws at currentColor with no intrinsic size. Muted, so
+   the glyph identifies the row without competing with the verdict beside it. */
+.aicfo-factor-name svg {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+  color: var(--text-muted);
+  align-self: center;
+}
+.aicfo-factor-meta {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-shrink: 0;
+  min-width: 0;
+}
+.aicfo-factor-label {
+  font-size: 12px;
+  line-height: 1.4;
+  text-align: right;
+  /* An engine label is a whole clause — "Overdue payables exceed cash" — so it
+     wraps rather than truncating. Truncation would hide the reason. */
+  overflow-wrap: anywhere;
+}
+.aicfo-factor-score {
+  font-size: 13px;
+  font-weight: 700;
+  min-width: 26px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.aicfo-bar {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--surface-card-muted);
+  overflow: hidden;
+}
+.aicfo-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  /* Neutral is the default fill: a factor the engine marked `neutral` — "runway
+     unknown", "not enough expense history" — is grey, never green. */
+  background: var(--text-muted);
+  transition: width .45s ease;
+}
+.aicfo-bar-fill.is-healthy { background: var(--success); }
+.aicfo-bar-fill.is-attention { background: var(--warning); }
+.aicfo-bar-fill.is-critical { background: var(--danger); }
+@media (prefers-reduced-motion: reduce) {
+  .aicfo-bar-fill { transition: none; }
+}
+
+/* ── AI Alert / Hiring Readiness ─────────────────────────────────────────────
+   Two independent judgements, two ordinary cards. They used to be solid tinted
+   panels — a filled amber block for a warning, a filled red one for
+   "Not recommended" — which read as a system error rather than a considered
+   opinion about a business. The severity is a stripe on the leading edge now:
+   present, restrained, and gone entirely when there is nothing to flag. */
+.aicfo-signals { margin: 16px 0; align-items: start; }
+.aicfo-signal { position: relative; overflow: hidden; }
+/* The stripe carries the band and nothing else does — the card's own text keeps
+   reading as text. Explicit colours rather than currentColor, so nothing inside
+   the card can inherit the severity. */
+.aicfo-signal.is-healthy { border-inline-start: 3px solid var(--success); }
+.aicfo-signal.is-attention { border-inline-start: 3px solid var(--warning); }
+.aicfo-signal.is-critical { border-inline-start: 3px solid var(--danger); }
+
+.aicfo-signal-headline {
+  margin: 12px 0 0;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.45;
+  color: var(--text-primary);
+}
+.aicfo-signal-body {
+  margin: 8px 0 0;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--text-secondary);
+}
+.aicfo-signal-figure { display: flex; flex-direction: column; gap: 3px; margin-top: 14px; }
+.aicfo-signal-figure-k {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.aicfo-signal-figure-v {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
+}
+.aicfo-signal-figure-unit {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+  font-family: var(--font-ui);
+  margin-inline-start: 4px;
+}
+.aicfo-signal .cfo-btn { margin-top: 14px; }
+
+/* ── the four operating figures ─────────────────────────────────────────────
+   Clickable <div>s before, so a keyboard could not reach them at all. Buttons
+   now, at the product's 44px thumb target. */
+.aicfo-figures { gap: 14px; }
+.aicfo-figure {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  min-height: 44px;
+  padding: 12px 14px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: transparent;
+  font-family: inherit;
+  text-align: start;
+}
+.aicfo-figure.is-link { cursor: pointer; transition: border-color .15s, background-color .15s; }
+.aicfo-figure.is-link:hover {
+  border-color: var(--border-strong);
+  background: var(--surface-card-muted);
+}
+@media (prefers-reduced-motion: reduce) {
+  .aicfo-figure.is-link { transition: none; }
+}
+.aicfo-figure .cfo-stat-v { overflow-wrap: anywhere; }
+.aicfo-figure-sub {
+  font-size: 11.5px;
+  line-height: 1.4;
+  color: var(--text-muted);
+}
+
+/* ── risk rows and next best actions ─────────────────────────────────────── */
+.aicfo-rows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.aicfo-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border-subtle);
+  min-height: 44px;
+}
+.aicfo-row:last-child { border-bottom: 0; }
+.aicfo-row:first-child { padding-top: 0; }
+/* A row that navigates is one button spanning the row, so the whole row is the
+   target rather than a small area inside a clickable container. */
+.aicfo-row-btn {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font-family: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+.aicfo-row-ic {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  border-radius: 9px;
+  background: var(--surface-card-muted);
+  color: var(--text-secondary);
+}
+.aicfo-row-ic.is-critical { background: var(--danger-soft); color: var(--danger); }
+.aicfo-row-ic.is-attention { background: var(--warning-soft); color: var(--warning); }
+.aicfo-row-ic.is-healthy { background: var(--success-soft); color: var(--success); }
+.aicfo-row-ic svg { width: 16px; height: 16px; }
+.aicfo-row-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.aicfo-row-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
+}
+.aicfo-row-sub { font-size: 12px; line-height: 1.45; color: var(--text-muted); overflow-wrap: anywhere; }
+.aicfo-row-end { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+.aicfo-row-amt { font-size: 12px; color: var(--text-muted); white-space: nowrap; }
+
+/* ── the assistant ───────────────────────────────────────────────────────── */
+.aicfo-suggest { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+.aicfo-suggest-chip {
+  min-height: 36px;
+  padding: 8px 13px;
+  border: 1px solid var(--border-default);
+  border-radius: 999px;
+  background: var(--surface-card);
+  color: var(--text-secondary);
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color .15s, color .15s;
+}
+.aicfo-suggest-chip:hover:not(:disabled) { border-color: var(--border-strong); color: var(--text-primary); }
+.aicfo-suggest-chip:disabled { opacity: .5; cursor: not-allowed; }
+@media (prefers-reduced-motion: reduce) { .aicfo-suggest-chip { transition: none; } }
+
+.aicfo-chat {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-card-muted);
+  overflow: hidden;
+}
+.aicfo-chat-log { max-height: 420px; overflow-y: auto; padding: 16px 16px 8px; }
+.aicfo-chat-empty { padding: 26px 16px; text-align: center; color: var(--text-muted); }
+.aicfo-chat-empty p { margin: 10px auto 0; font-size: 13px; line-height: 1.55; max-width: 46ch; }
+.aicfo-chat-empty-ic { display: inline-flex; color: var(--border-strong); }
+.aicfo-chat-empty-ic svg { width: 26px; height: 26px; }
+
+.aicfo-msg { display: flex; align-items: flex-end; gap: 8px; margin-bottom: 12px; }
+.aicfo-msg.is-user { justify-content: flex-end; }
+.aicfo-msg-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--brand-navy);
+  color: #fff;
+}
+.aicfo-msg-avatar svg { width: 14px; height: 14px; }
+.aicfo-msg-body { max-width: 80%; min-width: 0; }
+.aicfo-bubble {
+  padding: 10px 14px;
+  border-radius: 16px 16px 16px 4px;
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-card);
+  color: var(--text-primary);
+  font-size: 13px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.aicfo-bubble.is-outofscope { color: var(--text-secondary); }
+/* The reader's own message: the brand navy, which is the one surface colour
+   this product uses for "you". It used to be a #1D4ED8 → #2563EB gradient that
+   appeared nowhere else in the design system. */
+.aicfo-msg.is-user .aicfo-bubble {
+  border-radius: 16px 16px 4px 16px;
+  border-color: transparent;
+  background: var(--brand-navy);
+  color: #fff;
+}
+.aicfo-md { white-space: pre-wrap; }
+.aicfo-msg-note {
+  display: block;
+  margin-top: 4px;
+  padding-inline-start: 4px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.aicfo-typing { display: inline-flex; align-items: center; gap: 4px; }
+.aicfo-typing i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  animation: aicfo-blink 1.1s ease-in-out infinite;
+}
+.aicfo-typing i:nth-child(2) { animation-delay: .18s; }
+.aicfo-typing i:nth-child(3) { animation-delay: .36s; }
+@keyframes aicfo-blink { 0%, 80%, 100% { opacity: .3; } 40% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .aicfo-typing i { animation: none; opacity: .55; }
+}
+
+.aicfo-composer {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 10px 12px;
+  border-top: 1px solid var(--border-subtle);
+  background: var(--surface-card);
+}
+.aicfo-composer textarea {
+  flex: 1;
+  min-width: 0;
+  min-height: 44px;
+  max-height: 110px;
+  padding: 11px 12px;
+  border: 1px solid var(--border-default);
+  border-radius: 10px;
+  background: var(--surface-page);
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.5;
+  resize: none;
+  overflow-y: auto;
+}
+.aicfo-composer textarea:disabled { opacity: .6; }
+.aicfo-send { width: 44px; min-height: 44px; padding: 0; justify-content: center; flex-shrink: 0; }
+.aicfo-send svg { width: 16px; height: 16px; }
+.aicfo-chat-err { margin: 0; padding: 8px 14px 10px; font-size: 12px; color: var(--danger); }
+.aicfo-limit { margin-top: 12px; text-align: center; }
+
+/* ── quick navigation ────────────────────────────────────────────────────── */
+.aicfo-quicknav { margin-top: 16px; gap: 12px; }
+.aicfo-quick {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  padding: 14px 16px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-card);
+  font-family: inherit;
+  text-align: start;
+  cursor: pointer;
+  transition: border-color .15s, box-shadow .15s;
+}
+.aicfo-quick:hover { border-color: var(--border-strong); box-shadow: var(--shadow-sm); }
+@media (prefers-reduced-motion: reduce) { .aicfo-quick { transition: none; } }
+.aicfo-quick-ic {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  border-radius: 10px;
+  background: var(--info-soft);
+  color: var(--brand-navy);
+}
+.aicfo-quick-ic svg { width: 16px; height: 16px; }
+.aicfo-quick-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.aicfo-quick-label { font-size: 13px; font-weight: 700; color: var(--text-primary); }
+.aicfo-quick-sub { font-size: 11.5px; color: var(--text-muted); overflow-wrap: anywhere; }
+
+/* ── narrow screens ─────────────────────────────────────────────────────────
+   .cfo-grid-4 already steps 4 → 2 → 1 in shell.css; these are the page's own
+   adjustments on top of it. */
+@media (max-width: 900px) {
+  /* Two independent judgements, stacked — side by side at this width leaves
+     neither of them readable. */
+  .aicfo-signals.cfo-grid-2 { grid-template-columns: 1fr; }
+}
+@media (max-width: 640px) {
+  /* A phone control is a thumb target. */
+  .aicfo-refresh { min-height: 44px; }
+  .aicfo-score-num { font-size: 29px; }
+  .aicfo-score-head { gap: 14px; }
+  /* The verdict and the factor label both wrap on a phone; keeping the label
+     right-aligned against a wrapped name produces a ragged column, so the whole
+     factor row goes vertical. */
+  .aicfo-factor-top { flex-direction: column; align-items: stretch; gap: 4px; }
+  .aicfo-factor-meta { justify-content: space-between; }
+  .aicfo-factor-label { text-align: start; }
+  .aicfo-msg-body { max-width: 88%; }
+  .aicfo-chat-log { max-height: 340px; }
+  .aicfo-row-end { flex-direction: column; align-items: flex-end; gap: 4px; }
+}
