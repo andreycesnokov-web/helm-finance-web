@@ -81,6 +81,31 @@ Not into a design PR. It changes routing and post-save destinations across a
 component shared by the legacy shell and the business shell, so it needs its own
 regression pass over both.
 
+## Also in the legacy shell: wallet detail
+
+Found during the Wallets & Accounts design completion, same defect class, not
+fixed there either.
+
+A wallet row on `/business/accounts` opens `/accounts/:id`
+(`client/src/pages/AccountsBlocks.jsx`, the `onOpen` prop, wired in
+`Accounts.jsx`). That route is registered as
+
+```jsx
+// client/src/App.jsx:576
+<Route path="/accounts/:id" element={<Layout><WalletDetail /></Layout>} />
+```
+
+— the legacy `Layout` again. There is no `/business/accounts/:id`. So clicking
+any wallet from inside the business workspace swaps the workspace switcher and
+business nav for the legacy sidebar, exactly as `/add` does, and with the same
+absence of a way back.
+
+The destination itself is correct and the data is right; it is the shell that is
+wrong. Migrating it belongs with this task rather than with a design pass,
+because `WalletDetail`'s own internal navigation needs the same audit `Add`'s
+does — wrapping it in `BusinessShell` alone would hold the workspace only until
+the first link.
+
 ## Related
 
 - `_specs/ai-cfo-cross-currency-cash-defect.md` — the other defect found during

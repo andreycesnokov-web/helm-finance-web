@@ -40,6 +40,7 @@ const DIST = path.join(ROOT, 'client', 'dist');
 const OUT = path.join(ROOT, 'artifacts', 'design-pr80');
 const OUT_RADAR = path.join(ROOT, 'artifacts', 'design-pr81-radar');
 const OUT_AICFO = path.join(ROOT, 'artifacts', 'design-pr83-ai-cfo');
+const OUT_ACCOUNTS = path.join(ROOT, 'artifacts', 'design-accounts');
 
 // Which face each kind of content is supposed to render in. The check is done
 // against what the page ACTUALLY renders — sample an element, read its computed
@@ -78,7 +79,7 @@ const build = spawnSync(process.platform === 'win32' ? 'npm.cmd' : 'npm', ['run'
 });
 assert.strictEqual(build.status, 0, 'build failed:\n' + (build.stderr || '').slice(-2000));
 
-for (const dir of [OUT, OUT_RADAR, OUT_AICFO]) fs.mkdirSync(dir, { recursive: true });
+for (const dir of [OUT, OUT_RADAR, OUT_AICFO, OUT_ACCOUNTS]) fs.mkdirSync(dir, { recursive: true });
 
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css',
   '.svg': 'image/svg+xml', '.png': 'image/png', '.woff2': 'font/woff2', '.woff': 'font/woff',
@@ -422,6 +423,43 @@ const SHOTS = [
     { dir: OUT_AICFO }],
   ['11-ai-cfo-refresh-failed-notice-closeup.png', `${P}?shell=ai-cfo-stale`, 1440, 900,
     { region: { sel: '.aicfo-stale', pad: 12 }, dir: OUT_AICFO }],
+
+  /* ── Wallets & Accounts ──────────────────────────────────────────────────
+     The whole page, list included. Every previous "Accounts" shot was a header
+     and one summary card, because the preview rendered nothing else. */
+  ['01-accounts-app-shell-desktop-1440x900.png', `${P}?shell=accounts`, 1440, 900,
+    { dir: OUT_ACCOUNTS }],
+  ['02-accounts-app-shell-mobile-390x844.png', `${P}?shell=accounts`, 390, 844,
+    { ...PHONE, dir: OUT_ACCOUNTS }],
+  // The list itself, and the block that closes it.
+  ['03-accounts-wallet-list-closeup.png', `${P}?shell=accounts`, 1440, 900,
+    { region: { sel: '.acct-list', pad: 8 }, dir: OUT_ACCOUNTS }],
+  ['04-accounts-add-another-block-closeup.png', `${P}?shell=accounts`, 1440, 900,
+    { region: { sel: '.acct-addmore', pad: 8 }, dir: OUT_ACCOUNTS }],
+  // A phone frame holding the list and the add block together. The four-wallet
+  // collection pushes the block past 844px, so this uses the two-wallet one —
+  // the point is the relationship between the list and its closing block.
+  ['05-accounts-list-and-add-block-mobile-390.png', `${P}?shell=accounts-short`, 390, 844,
+    { ...PHONE, dir: OUT_ACCOUNTS }],
+  // The zero state — the workspace has no wallets at all.
+  ['06-accounts-zero-state-desktop-1440x900.png', `${P}?shell=accounts-empty`, 1440, 900,
+    { dir: OUT_ACCOUNTS }],
+  ['07-accounts-zero-state-mobile-390x844.png', `${P}?shell=accounts-empty`, 390, 844,
+    { ...PHONE, dir: OUT_ACCOUNTS }],
+  // The Add-wallet form, which had never been photographed.
+  // A tall frame on purpose: the form is ~700px and the crop follows the sheet,
+  // so a short viewport clips the capture rather than the sheet.
+  ['08-accounts-add-wallet-form.png', `${P}?only=accounts-form`, 1440, 1240,
+    { window: [1440, 1240], region: { sel: '.modal-sheet', pad: 18 }, dir: OUT_ACCOUNTS }],
+  // Long name, negative balance, exact zero, an untotalled currency and a wallet
+  // with no currency — at 320px, where they collide.
+  ['09-accounts-long-name-negative-320.png', `${P}?shell=accounts-stress`, 320, 900,
+    { crop: true, window: [512, 900], dir: OUT_ACCOUNTS }],
+  ['10-accounts-stress-desktop-1440x900.png', `${P}?shell=accounts-stress`, 1440, 900,
+    { dir: OUT_ACCOUNTS }],
+  // A filter that matched nothing. NOT the zero state.
+  ['11-accounts-filter-empty-desktop.png', `${P}?shell=accounts-filter-empty`, 1440, 900,
+    { dir: OUT_ACCOUNTS }],
 ];
 
 // Produced filenames, per directory — a run only prunes what it owns, so the

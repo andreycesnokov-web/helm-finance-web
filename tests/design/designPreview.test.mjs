@@ -260,8 +260,12 @@ t('the summary card never states a balance it does not know', () => {
   const acc = code('client/src/pages/Accounts.jsx');
   // Rendered once the collection resolves - including when it resolved to
   // nothing - but never while loading and never after a failure.
-  assert.match(acc, /\{!loading && !loadError && \(\s*<SummaryCard/,
+  assert.match(acc, /\{!loading && !loadError && <AccountsSummary summary=\{summary\} \/>\}/,
     'the summary card is not gated on a resolved, successful load');
+  // The card itself is the shared flagship SummaryCard, in AccountsBlocks.
+  const blk = code('client/src/pages/AccountsBlocks.jsx');
+  assert.match(blk, /<SummaryCard\s+flagship/,
+    'the total-balance card is not the shared flagship SummaryCard');
   // What it then SAYS is decided in one place, for the page and the preview both.
   assert.match(acc, /const summary = walletsSummary\(\{ wallets: filteredWallets, t, scopeLabel \}\)/,
     'the card content is not derived from the shared summary');
@@ -347,11 +351,14 @@ t('only currencies with a provable native balance are totalled', () => {
 });
 
 t('a wallet whose balance cannot be vouched for shows no amount', () => {
-  const acc = code('client/src/pages/Accounts.jsx');
-  assert.match(acc, /\{grp \? formatCurrency\(w\.balance \|\| 0, grp\.currency\) : '—'\}/,
+  const blk = code('client/src/pages/AccountsBlocks.jsx');
+  assert.match(blk, /\{group \? formatCurrency\(balance \|\| 0, group\.currency\) : '—'\}/,
     'a row prints an amount for a wallet whose unit is not provable');
-  assert.match(acc, /accounts\.balanceUnavailable/,
+  assert.match(blk, /accounts\.balanceUnavailable/,
     'a row does not say why the balance is missing');
+  // And an unavailable balance is never quietly turned into a zero.
+  assert.ok(!/balance \|\| 0\s*,\s*WORKSPACE_DEFAULT_CURRENCY/.test(blk),
+    'a row falls back to the workspace currency for an unprovable balance');
 });
 
 t('the future multi-currency model is preview-only', () => {
@@ -419,8 +426,10 @@ t('wallet currency is required, ISO-only and immutable once created', () => {
   assert.match(f, /PROVEN_NATIVE_CURRENCIES\.includes\(c\) && !locked/,
     'the control lets an unproven or existing-wallet currency be chosen');
   assert.match(f, /disabled=\{!selectable\}/, 'unavailable currencies are not disabled');
-  const acc = code('client/src/pages/Accounts.jsx');
-  assert.match(acc, /locked=\{!!editWallet\}/,
+  // The field is wired by the form component, which the page and the preview
+  // both render — so the lock cannot hold in one and not the other.
+  const blk = code('client/src/pages/AccountsBlocks.jsx');
+  assert.match(blk, /locked=\{!!editWallet\}/,
     'editing a wallet does not lock its currency');
 });
 
@@ -448,13 +457,16 @@ t('no currency symbol is hardcoded outside the money module', () => {
 });
 
 t('a wallet row shows its own currency and its own share', () => {
-  const acc = code('client/src/pages/Accounts.jsx');
-  assert.match(acc, /formatCurrency\(w\.balance \|\| 0, grp\.currency\)/,
+  const blk = code('client/src/pages/AccountsBlocks.jsx');
+  assert.match(blk, /formatCurrency\(balance \|\| 0, group\.currency\)/,
     'a wallet row does not render its balance in its own currency');
-  assert.match(acc, /grp && grp\.total > 0/,
+  assert.match(blk, /group && group\.total > 0/,
     'a wallet share is still measured against a mixed total');
-  assert.match(acc, /accounts\.needsCurrency/,
+  assert.match(blk, /accounts\.needsCurrency/,
     'a wallet with no currency is not flagged for review');
+  // The partition is the caller's; the row classifies nothing itself.
+  assert.ok(!/partitionWallets|walletsByCurrency/.test(blk),
+    'the row decides currency provability itself instead of taking it from the page');
 });
 
 t('an abbreviated headline is marked as one so it cannot wrap', () => {
@@ -497,7 +509,7 @@ t('the preview renders the real zero state, not a copy of it', () => {
     'the preview has its own copy of the zero-state wording');
   // Both states come from one component taking a wallet collection, which is what
   // makes "populated" and "empty" the same branch the product takes.
-  assert.match(dp, /const AccountsBody = \(\{ wallets = WALLETS_FIXTURE \}\)/,
+  assert.match(dp, /const AccountsBody = \(\{ wallets = WALLETS_FIXTURE/,
     'the preview does not drive Wallets from a wallet collection');
   assert.match(dp, /shell=accounts-empty|'accounts-empty'/,
     'the preview has no empty-Wallets route');
@@ -594,6 +606,155 @@ t('Radar changed no data source and no backend call', () => {
   assert.match(calls[0], /'\/pulse\?scope=business'/, `Radar now calls ${calls[0]}`);
   assert.ok(!/method:\s*'(POST|PUT|PATCH|DELETE)'/.test(radar),
     'Radar performs a write — it is a read-only forecast');
+});
+
+/* -- Wallets & Accounts, design completion --------------------------------
+   The list was restyled onto the shared system and split into AccountsBlocks so
+   the preview can photograph it. These assert the two things a restyle must not
+   quietly do: drop a working control, or change what a balance is allowed to
+   say. The rendered-DOM half — gaps, keyboard targets, the dash for an
+   unprovable balance, the filter-empty wording — lives in renderedPreview. */
+
+t('every existing wallet action is still wired to the page', () => {
+  const acc = code('client/src/pages/Accounts.jsx');
+  // Create, edit, archive, adjust and the legacy backfill all still exist and
+  // still call the same endpoints with the same methods.
+  const calls = acc.match(/apiFetch\([^)]*\)/g) || [];
+  assert.ok(calls.some((c) => /'\/wallets'/.test(c)), 'the wallet list is no longer loaded');
+  assert.ok(calls.some((c) => /'\/pulse\?scope=all'/.test(c)), 'legacy sources are no longer loaded');
+  assert.match(acc, /apiFetch\('\/wallets', token, \{\s*method: 'POST'/, 'creating a wallet was dropped');
+  assert.match(acc, /method: 'PUT'/, 'editing a wallet was dropped');
+  assert.match(acc, /method: 'DELETE'/, 'archiving a wallet was dropped');
+  assert.match(acc, /adjust-balance/, 'the balance adjustment was dropped');
+  assert.match(acc, /\/wallets\/backfill/, 'the legacy backfill was dropped');
+  // And the handlers reach the list.
+  for (const wiring of ['onEdit={openEdit}', 'onAddWallet={openAdd}', 'onRetry={load}']) {
+    assert.ok(acc.includes(wiring), `${wiring} is not wired`);
+  }
+  // Adjust stays owner/admin only — a restyle must not widen who can use it.
+  assert.match(acc, /onAdjust=\{canAdjust \? openAdjust : null\}/,
+    'the balance adjustment is no longer gated on role');
+  assert.match(acc, /const canAdjust = \['owner', 'admin'\]\.includes/,
+    'the adjust role gate changed');
+});
+
+t('the scope filter still filters, and clearing it works', () => {
+  const acc = code('client/src/pages/Accounts.jsx');
+  assert.match(acc, /scopeTab === 'all'\s*\?\s*wallets\s*:\s*wallets\.filter\(w => \(w\.scope \|\| 'business'\) === scopeTab\)/,
+    'the scope filter expression changed');
+  assert.match(acc, /onClearFilter=\{\(\) => setScopeTab\('all'\)\}/,
+    'the filter-empty state cannot clear the filter');
+  const blk = code('client/src/pages/AccountsBlocks.jsx');
+  assert.match(blk, /<div className="cfo-tabs acct-tabs" role="tablist">/,
+    'the scope filter is no longer on the shared tab primitive');
+});
+
+t('the three empty-ish states stay distinct', () => {
+  const acc = code('client/src/pages/Accounts.jsx');
+  // Resolved-and-empty is the only one that invites a first wallet, and it is
+  // gated on a successful load — a failed request must never claim "no wallets".
+  assert.match(acc, /const resolvedEmpty = !loading && !loadError && wallets\.length === 0/,
+    'the zero state is no longer gated on a resolved, successful load');
+  assert.match(acc, /\{resolvedEmpty && legacySources\.length === 0 && \(\s*<WalletsEmptyState/,
+    'the zero state condition changed');
+  assert.match(acc, /<ErrorState/, 'a failed load no longer gets the error treatment');
+  // A filter that matched nothing is a different component with different words.
+  const blk = code('client/src/pages/AccountsBlocks.jsx');
+  assert.match(blk, /function WalletsFilterEmpty/, 'the filter-empty state is missing');
+  const fe = blk.slice(blk.indexOf('function WalletsFilterEmpty'));
+  assert.ok(!/noWallets\b|addFirstWallet/.test(fe.slice(0, 900)),
+    'the filter-empty state reuses the zero state wording');
+});
+
+t('the dashed add row is replaced by a branded block, and the top button stays', () => {
+  const blk = code('client/src/pages/AccountsBlocks.jsx');
+  assert.match(blk, /function AddAnotherWallet/, 'the add-another block is missing');
+  assert.match(blk, /accounts\.addAnother/, 'the block has no heading of its own');
+  assert.match(blk, /ACCOUNTS_SYMBOL = '\/brand\/symbol_[a-z_]+\.svg'/,
+    'the block does not use an official brand asset');
+  // The header keeps its own add control: two entry points, one flow.
+  assert.match(blk, /function AccountsHeader[\s\S]{0,400}primaryAction=\{onAddWallet/,
+    'the page header lost its add-wallet action');
+  // Both controls call the SAME action the page passes down — there is one
+  // wallet-creation flow, and neither of these opens a form of its own.
+  const addCalls = (blk.match(/onClick=\{onAddWallet\}/g) || []).length;
+  assert.strictEqual(addCalls, 2,
+    `${addCalls} controls call onAddWallet, expected the header button and the block button`);
+  assert.ok(!/setShowForm|useState/.test(blk),
+    'the presentation layer opens a wallet form of its own');
+  // No dashed placeholder anywhere.
+  const css = cssCode('client/src/pages/Accounts.css');
+  assert.ok(!/dashed/.test(css), 'a dashed placeholder survives in the stylesheet');
+});
+
+t('Accounts did not start a design system of its own', () => {
+  const css = cssCode('client/src/pages/Accounts.css');
+  assert.ok(!/--(brand|surface|text|border|shadow|radius|success|warning|danger|info)-[a-z]*\s*:/.test(
+    css.replace(/var\(--[a-z-]+\)/g, '')), 'Accounts.css declares design tokens of its own');
+  assert.ok(!/^\.cfo-[a-z-]+\s*\{/m.test(css), 'Accounts.css restyles a shared component');
+  // The private seven-colour currency palette is gone from the list. It survives
+  // only in the form, where it is a swatch to tell options apart rather than a
+  // semantic colour.
+  const blk = code('client/src/pages/AccountsBlocks.jsx');
+  assert.ok(!/#[0-9a-f]{3,8}/i.test(blk), 'AccountsBlocks hardcodes a colour');
+  const acc = code('client/src/pages/Accounts.jsx');
+  assert.ok(!/CURRENCY_STYLE\b/.test(acc), 'the old currency palette name survives');
+  assert.match(acc, /const CURRENCY_SWATCH = \{/, 'the form swatch palette is missing');
+  // And the token that never existed is no longer being reached for.
+  assert.ok(!/--warning-dark/.test(blk + acc + css),
+    'the non-existent --warning-dark token is still referenced');
+});
+
+t('the currency contract is unchanged by the restyle', () => {
+  const blk = code('client/src/pages/AccountsBlocks.jsx');
+  // Nothing in the presentation layer partitions, sums or converts.
+  assert.ok(!/partitionWallets|walletsByCurrency|compactAmount/.test(blk),
+    'the presentation layer decides currency provability itself');
+  assert.ok(!/reduce\(/.test(blk), 'the presentation layer sums balances');
+  assert.ok(!/WORKSPACE_DEFAULT_CURRENCY/.test(blk),
+    'the list falls back to a default currency somewhere');
+  // The page still derives the card from the shared summary.
+  const acc = code('client/src/pages/Accounts.jsx');
+  assert.match(acc, /walletsSummary\(\{ wallets: filteredWallets, t, scopeLabel \}\)/,
+    'the summary card is no longer derived from the shared summary');
+  assert.match(acc, /partitionWallets\(filteredWallets\)/,
+    'the page no longer partitions by proven currency');
+});
+
+t('the wallet form is the real one, and its validation is unchanged', () => {
+  const blk = code('client/src/pages/AccountsBlocks.jsx');
+  assert.match(blk, /function WalletFormModal/, 'the wallet form component is missing');
+  // Save stays disabled until a name exists, and while saving.
+  assert.match(blk, /disabled=\{!form\.name\.trim\(\) \|\| saving\}/,
+    'the save button validation changed');
+  // The currency control is the shared one, and it is locked on an existing wallet.
+  assert.match(blk, /<WalletCurrencyField/, 'the form no longer uses the shared currency control');
+  assert.match(blk, /locked=\{!!editWallet\}/, 'an existing wallet no longer locks its currency');
+  // Opening balance is offered for a new wallet only — editing never rewrites a
+  // balance, which is what the audited adjust flow is for.
+  assert.match(blk, /\{!editWallet && \(/, 'the opening-balance field is no longer new-wallet only');
+  // Cancel exists and is distinct from save.
+  assert.match(blk, /onClick=\{onCancel\}/, 'the form has no cancel');
+  // The page still owns the handlers.
+  const acc = code('client/src/pages/Accounts.jsx');
+  assert.match(acc, /onSave=\{handleSave\}/, 'the form is not wired to the page save handler');
+  assert.match(acc, /onCancel=\{\(\) => setShowForm\(false\)\}/, 'the form cancel is not wired');
+  assert.match(acc, /onDelete=\{handleDelete\}/, 'the form archive is not wired');
+});
+
+t('the preview renders the real Accounts page, list included', () => {
+  // The gap this PR closes: every previous Accounts screenshot was a header and
+  // a summary card, because the preview rendered nothing else.
+  assert.match(src, /from '\.\/AccountsBlocks'/, 'the preview does not import the real Accounts blocks');
+  assert.match(src, /<WalletList/, 'the preview still does not render the wallet list');
+  assert.match(src, /<WalletFormModal/, 'the preview does not render the real wallet form');
+  assert.match(src, /partitionWallets\(scoped\)/,
+    'the preview decides currency provability with its own rule');
+  // Fixtures that actually exercise the states.
+  assert.match(src, /WALLETS_STRESS/, 'there is no fixture for the awkward states');
+  for (const state of ['accounts-stress', 'accounts-filter-empty', 'accounts-empty']) {
+    assert.ok(src.includes(state), `the preview has no ${state} route`);
+  }
 });
 
 /* -- AI CFO, migrated -------------------------------------------------------

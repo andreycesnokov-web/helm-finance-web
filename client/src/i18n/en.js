@@ -204,6 +204,13 @@ const en = {
     noWallets: 'Your wallets will live here',
     noWalletsSub: 'Add a bank account, cash balance or payment wallet to start tracking balances across every currency in one place.',
     addFirstWallet: 'Add your first wallet',
+    addWalletAction: 'Add wallet',
+    addAnother: 'Add another wallet',
+    addAnotherSub: 'A bank account, a cash balance or a payment wallet — each one keeps its own currency.',
+    filterEmpty: 'No {scope} wallets',
+    filterEmptyOne: 'This workspace has 1 wallet, in another scope.',
+    filterEmptyMany: 'This workspace has {n} wallets, none of them in this scope.',
+    showAllWallets: 'Show all wallets',
     // Shown as the summary card's supporting line while the workspace has none.
     noWalletsYet: 'No wallets added yet',
     noCurrencyTotal: 'No currency set',

@@ -187,8 +187,10 @@ t('no page draws its own graph-paper hero any more', () => {
 console.log('\nPilot pages');
 
 t('Pulse and Accounts each render exactly one h1, through the shared header', () => {
+  // Accounts renders its header through AccountsBlocks now, the way Radar and
+  // AI CFO do — the h1 still comes from the one shared PageHeader.
   for (const [page, file] of [['Pulse', 'client/src/pages/business/index.jsx'],
-                              ['Accounts', 'client/src/pages/Accounts.jsx']]) {
+                              ['Accounts', 'client/src/pages/AccountsBlocks.jsx']]) {
     const src = code(file);
     assert.ok(/<PageHeader\b/.test(src), `${page} must use the shared PageHeader`);
     assert.ok(!/<h1\b/.test(src), `${page} must not render its own h1 beside the shared one`);
