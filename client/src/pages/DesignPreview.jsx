@@ -14,6 +14,8 @@
 // and every company name is fictional. Nothing here writes anything.
 import { formatAmount } from '../lib/money'
 import en from '../i18n/en'
+import ruDict from '../i18n/ru'
+import idDict from '../i18n/id'
 import { WalletsEmptyState } from './WalletsEmptyState'
 import {
   AccountsHeader, AccountsSummary, WalletList, AboutWallets, WalletFormModal,
@@ -32,6 +34,12 @@ import {
   SUGGESTED_KEYS,
 } from './AICFOBlocks'
 import { aiQuestionsLeft, hasNoFinancialData } from '../lib/aiCfoFigures'
+import {
+  AccountantHeader, AccountantTabs, ModuleChips, ReserveCard, CompletenessCard,
+  ObligationsCard, PendingActionsCard, CalendarPreviewCard, PlainLanguageCard,
+  CalendarGrid, DeadlinesCard, DraftCalculationCard, DraftExplanationCard,
+  DraftStatusCard, WithholdingCard, AccountantNotice, obligationView,
+} from './business/AccountantBlocks'
 import WorkspaceShell, { BUSINESS_NAV } from '../shell/WorkspaceShell'
 import './DesignPreview.css'
 
@@ -59,6 +67,12 @@ const idr = (v) => 'Rp ' + formatAmount(String(v ?? 0), 'IDR')
 // not a local copy of the words, because the last preview held its own copy of
 // the zero state and the two drifted within a day.
 const tEn = (key) => key.split('.').reduce((o, k) => (o == null ? o : o[k]), en) ?? key
+/* The product ships in three languages and the preview only ever photographed
+   one, so a locale could go missing — or a translated string could break a
+   layout — without any picture showing it. These are the same lookup against
+   the other two dictionaries. */
+const tRu = (key) => key.split('.').reduce((o, k) => (o == null ? o : o[k]), ruDict) ?? key
+const tId = (key) => key.split('.').reduce((o, k) => (o == null ? o : o[k]), idDict) ?? key
 
 /* ── fixtures ──────────────────────────────────────────────────────────────
    Invented companies, invented figures. No real balance, tax number, bank
@@ -450,6 +464,205 @@ const WALLET_SETS = {
      honest phone-sized frame rather than badly designed. */
   'accounts-one': WALLETS_FIXTURE.slice(0, 1),
 }
+/* ── AI Accountant — Tax & Compliance Workbench ────────────────────────────
+   Invented figures, a fictional company, no API. What each fixture exists to
+   photograph is stated on it, because the whole point of this page is that a
+   screenshot proves a state rather than a happy path.
+
+   The dates are pinned to a fixed month rather than taken from the clock, so a
+   screenshot captured today and one captured next March frame the same grid and
+   a visual diff means a change rather than a calendar turning over. */
+const ACCT_YEAR = 2026
+const ACCT_MONTH = 8            // September 2026, 0-based
+const ACCT_TODAY = 11
+
+/* The state production is actually in: nothing has a deterministic amount, so
+   the reserve is UNKNOWN — an em dash, not a zero — and the two obligations
+   that are merely short of data say so without implying nothing is owed. */
+const ACCT_OBLIGATIONS = {
+  period: '2026-08',
+  reserve: { amount: 0, currency: 'IDR', lines: [] },
+  obligations: [
+    { obligation_type: 'pph_21_26', title: 'PPH 21/26', status: 'insufficient_data', amount: null, source_label: 'from Payroll · no payments in period' },
+    { obligation_type: 'pph_23', title: 'PPH 23', status: 'insufficient_data', amount: null, source_label: 'No withholding rate / service classification defined' },
+    { obligation_type: 'ppn', title: 'PPN', status: 'unavailable', amount: null, source_label: 'PPN requires invoice data — invoicing not enabled' },
+  ],
+}
+
+/* One obligation has a real amount. This is the fixture that proves a figure
+   still reads as a figure beside two chips, and that the reserve switches from
+   an em dash to money the moment `lines` is non-empty. */
+const ACCT_OBLIGATIONS_CALC = {
+  period: '2026-08',
+  reserve: { amount: 24_850_000, currency: 'IDR', lines: [{ obligation_type: 'pph_21_26', amount: 24_850_000 }] },
+  obligations: [
+    { obligation_type: 'pph_21_26', title: 'PPH 21/26', status: 'calculated', amount: 24_850_000, period: '2026-08', due_date: '2026-09-10', source_label: 'from Payroll · 14 withholding lines' },
+    { obligation_type: 'pph_23', title: 'PPH 23', status: 'insufficient_data', amount: null, source_label: 'No withholding rate / service classification defined' },
+    { obligation_type: 'ppn', title: 'PPN', status: 'unavailable', amount: null, source_label: 'PPN requires invoice data — invoicing not enabled' },
+  ],
+}
+
+/* A CONFIRMED zero: the server summed one line and it came to nothing. This is
+   the case the em dash must NOT swallow — a measured zero is a zero. */
+const ACCT_OBLIGATIONS_ZERO = {
+  period: '2026-08',
+  reserve: { amount: 0, currency: 'IDR', lines: [{ obligation_type: 'pph_21_26', amount: 0 }] },
+  obligations: [
+    { obligation_type: 'pph_21_26', title: 'PPH 21/26', status: 'calculated', amount: 0, period: '2026-08', due_date: '2026-09-10', source_label: 'from Payroll · 3 withholding lines, all exempt' },
+  ],
+}
+
+const ACCT_DEADLINES = [
+  { day: 10, key: 'pph2126', title: 'PPH 21/26 payment', sub: 'Employee withholding · from Payroll', kind: 'withholding', date: new Date(ACCT_YEAR, ACCT_MONTH, 10) },
+  { day: 10, key: 'pph23', title: 'PPH 23 payment', sub: 'Service withholding · from Payables', kind: 'service', date: new Date(ACCT_YEAR, ACCT_MONTH, 10) },
+  { day: 15, key: 'pph25', title: 'PPH 25 installment', sub: 'Corporate income tax installment', kind: 'cit', date: new Date(ACCT_YEAR, ACCT_MONTH, 15) },
+  { day: 20, key: 'pph21file', title: 'PPH 21/26 filing', sub: 'Monthly withholding return', kind: 'withholding', date: new Date(ACCT_YEAR, ACCT_MONTH, 20) },
+  { day: 30, key: 'ppn', title: 'PPN filing & payment', sub: 'VAT for the previous period · from Invoices', kind: 'ppn', date: new Date(ACCT_YEAR, ACCT_MONTH, 30) },
+]
+
+const ACCT_MODULES_MIXED = [
+  { key: 'tx', labelKey: 'accountantHub.modTransactions', ok: true },
+  { key: 'recv', labelKey: 'accountantHub.modReceivables', ok: true },
+  { key: 'pay', labelKey: 'accountantHub.modPayables', ok: false },
+  { key: 'payroll', labelKey: 'accountantHub.modPayroll', ok: null },
+  { key: 'bank', labelKey: 'accountantHub.modBankImport', ok: null },
+]
+
+const ACCT_ACTIONS_PENDING = [
+  { id: 'profile', label: 'Complete your tax profile', sub: '2 fields missing — obligations depend on them', cta: 'Complete', go: noop },
+  { id: 'npwp', label: 'Upload NPWP certificate', sub: 'Tax registration · required before obligations can be resolved', cta: 'Upload', go: noop },
+  { id: 'bpjs', label: 'Confirm BPJS registration number', sub: 'Payroll · needed for PPH 21/26', cta: 'Confirm', go: noop },
+]
+
+const ACCT_ACTIONS_CLEAR = [
+  { id: 'docs-ok', label: 'Required documents are in place', sub: 'Preliminary — the checklist reflects your profile and the documents you uploaded, not an official validation', cta: 'Review', go: noop },
+]
+
+const ACCT_SOURCES = [
+  { title: 'UU No. 36 / 2008', sub: 'Income tax law' },
+  { title: 'PP No. 94 / 2010', sub: 'Implementation reg.' },
+]
+
+const acctShortDate = (d) => d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })
+
+const AccountantChrome = ({ active, t = tEn }) => (
+  <>
+    <AccountantHeader t={t} onTaxSplit={noop} onSettlement={noop} />
+    <AccountantTabs t={t} active={active} onChange={noop} tabs={[
+      { key: 'workbench', label: t('accountantHub.tabWorkbench') },
+      { key: 'calendar', label: t('accountantHub.tabCalendar') },
+      { key: 'taxdraft', label: t('accountantHub.tabDraft') },
+      { key: 'audit', label: t('accountantHub.tabAudit') },
+      { key: 'profile', label: t('accountantHub.tabProfile') },
+    ]} />
+  </>
+)
+
+/**
+ * The Workbench tab, built from the REAL blocks.
+ *
+ * Every component below is the one AccountantPremium.jsx renders. The container
+ * is what is stubbed — five fetches and a request guard — not the presentation,
+ * which is the whole reason the module was split.
+ */
+const AccountantWorkbenchBody = ({
+  obligations = ACCT_OBLIGATIONS,
+  modules = ACCT_MODULES_MIXED,
+  actions = ACCT_ACTIONS_PENDING,
+  filled = 7, total = 9, missing = 2,
+  t = tEn,
+}) => (
+  <div className="acct-wb">
+    <AccountantChrome active="workbench" t={t} />
+    <ModuleChips t={t} chips={modules} />
+    <div className="acct-wb-band">
+      <ReserveCard t={t} reserve={obligations.reserve} />
+      <CompletenessCard t={t} filled={filled} total={total} missing={missing} />
+    </div>
+    <ObligationsCard t={t} period={obligations.period} obligations={obligations.obligations} />
+    <div className="acct-wb-band">
+      <PendingActionsCard t={t} actions={actions} />
+      <CalendarPreviewCard t={t} deadlines={ACCT_DEADLINES.slice(0, 3)} onOpen={noop} formatDay={acctShortDate} />
+    </div>
+    <PlainLanguageCard t={t}
+      what={t('accountantHub.plainWhatDue').replace('{title}', 'PPH 25 installment').replace('{date}', '15 Sept')}
+      why={t('accountantHub.plainWhyBody')}
+      prepare={missing ? t('accountantHub.plainPrepareMissing') : t('accountantHub.plainPrepareOk')}
+      onAskCfo={noop} />
+  </div>
+)
+
+/** The Compliance Calendar tab, on a pinned month so the grid never shifts. */
+const AccountantCalendarBody = ({ obligations = ACCT_OBLIGATIONS }) => {
+  // Same shape the container builds: a day carries a LIST, because the 10th
+  // carries two obligations.
+  const byDay = new Map()
+  for (const x of ACCT_DEADLINES) byDay.set(x.day, [...(byDay.get(x.day) || []), x])
+  const first = new Date(ACCT_YEAR, ACCT_MONTH, 1)
+  const lead = (first.getDay() + 6) % 7
+  const daysInMonth = new Date(ACCT_YEAR, ACCT_MONTH + 1, 0).getDate()
+  const cells = [...Array(lead).fill(null), ...Array.from({ length: daysInMonth }, (_, i) => i + 1)]
+  const DEADLINE_OB = { pph2126: 'pph_21_26', pph21file: 'pph_21_26', pph23: 'pph_23', ppn: 'ppn' }
+  const rows = ACCT_DEADLINES.map((x) => {
+    const ob = (obligations.obligations || []).find((o) => o.obligation_type === DEADLINE_OB[x.key])
+    const v = ob ? obligationView(ob, tEn) : null
+    return {
+      id: x.key, label: x.title, sub: `${acctShortDate(x.date)} · ${x.sub}`,
+      amount: v && v.kind === 'calculated' ? v.amount : acctShortDate(x.date),
+      state: v && v.kind !== 'calculated' ? v : null,
+    }
+  })
+  return (
+    <div className="acct-wb">
+      <AccountantChrome active="calendar" />
+      <div className="acct-wb-band">
+        <CalendarGrid t={tEn} year={ACCT_YEAR} month={ACCT_MONTH} cells={cells}
+          title="September 2026" weekdays={['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']}
+          deadlineFor={(day) => byDay.get(day) || null}
+          isToday={(day) => day === ACCT_TODAY}
+          onPrev={noop} onNext={noop} />
+        <DeadlinesCard t={tEn} rows={rows} />
+      </div>
+    </div>
+  )
+}
+
+/** The Tax Draft tab — every figure an em dash, because the engine is not connected. */
+const AccountantDraftBody = ({ withholding = null }) => (
+  <div className="acct-wb">
+    <AccountantChrome active="taxdraft" />
+    {withholding && (
+      <WithholdingCard t={tEn} view={obligationView(withholding, tEn)}
+        sourceLabel={withholding.source_label}
+        note={tEn('accountantHub.withholdingNote').replace('{period}', withholding.period).replace('{date}', '10 Sept')} />
+    )}
+    <div className="acct-wb-band">
+      <DraftCalculationCard t={tEn} sources={ACCT_SOURCES} rows={[
+        tEn('accountantHub.draftGross'), tEn('accountantHub.draftNonObject'), tEn('accountantHub.draftOpex'),
+        tEn('accountantHub.draftDeductible'), tEn('accountantHub.draftNonDeductible'),
+      ]} />
+      <DraftExplanationCard t={tEn} />
+    </div>
+    <DraftStatusCard t={tEn} />
+  </div>
+)
+
+// Accountant shells: five tabs is too many to prove with one picture, so each
+// state that differs gets its own route.
+const ACCOUNTANT_SHELLS = {
+  accountant: <AccountantWorkbenchBody />,
+  'accountant-calc': <AccountantWorkbenchBody obligations={ACCT_OBLIGATIONS_CALC} actions={ACCT_ACTIONS_CLEAR} filled={9} missing={0} />,
+  'accountant-zero': <AccountantWorkbenchBody obligations={ACCT_OBLIGATIONS_ZERO} actions={ACCT_ACTIONS_CLEAR} filled={9} missing={0} />,
+  'accountant-calendar': <AccountantCalendarBody />,
+  'accountant-draft': <AccountantDraftBody />,
+  'accountant-draft-withholding': <AccountantDraftBody withholding={ACCT_OBLIGATIONS_CALC.obligations[0]} />,
+  /* The same page in the other two languages the product ships. Russian is the
+     longest of the three and Indonesian sets the widest chips, so these are
+     also the frames where a layout tuned only to English gives way. */
+  'accountant-ru': <AccountantWorkbenchBody t={tRu} />,
+  'accountant-id': <AccountantWorkbenchBody t={tId} />,
+}
+
 // Radar is a different page shape, so it gets its own shell routes rather than a
 // wallet collection.
 const RADAR_SHELLS = { radar: RADAR_FIXTURE, 'radar-empty': RADAR_EMPTY }
@@ -661,6 +874,7 @@ function ShellPreview({ page }) {
 const isAccounts = Object.prototype.hasOwnProperty.call(WALLET_SETS, page)
   const isRadar = Object.prototype.hasOwnProperty.call(RADAR_SHELLS, page)
   const isAiCfo = Object.prototype.hasOwnProperty.call(AICFO_SHELLS, page)
+  const isAccountant = Object.prototype.hasOwnProperty.call(ACCOUNTANT_SHELLS, page)
   return (
     // No preview banner here on purpose: these are pictures of the product frame,
     // and a strip of our own chrome above it would misrepresent what ships.
@@ -670,14 +884,16 @@ const isAccounts = Object.prototype.hasOwnProperty.call(WALLET_SETS, page)
         activeId="demo-business"
         onSelectWorkspace={noop}
         nav={BUSINESS_NAV}
-        activeKey={isAiCfo ? 'cfo' : isRadar ? 'radar' : isAccounts ? 'accounts' : 'pulse'}
+        activeKey={isAccountant ? 'accountant' : isAiCfo ? 'cfo' : isRadar ? 'radar' : isAccounts ? 'accounts' : 'pulse'}
         onNavigate={noop}
       >
-        {isAiCfo
-          ? <AICFOBody {...AICFO_SHELLS[page]} />
-          : isRadar
-            ? <RadarBody data={RADAR_SHELLS[page]} />
-            : isAccounts ? <ShellAccounts page={page} /> : <PulseBody />}
+        {isAccountant
+          ? ACCOUNTANT_SHELLS[page]
+          : isAiCfo
+            ? <AICFOBody {...AICFO_SHELLS[page]} />
+            : isRadar
+              ? <RadarBody data={RADAR_SHELLS[page]} />
+              : isAccounts ? <ShellAccounts page={page} /> : <PulseBody />}
       </WorkspaceShell>
     </div>
   )

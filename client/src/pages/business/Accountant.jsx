@@ -33,7 +33,7 @@ const VSTATES = {
   not_required: { label: 'Not required', tone: 'neutral' },
 }
 
-export function BusinessAccountant({ onProfileSaved, onDocumentsChanged } = {}) {
+export function BusinessAccountant({ onProfileSaved, onDocumentsChanged, embedded = false } = {}) {
   const { token } = useAuth()
   const { active, scopeKey } = useWorkspace()
   const [loading, setLoading] = useState(true)
@@ -207,10 +207,22 @@ export function BusinessAccountant({ onProfileSaved, onDocumentsChanged } = {}) 
   // its component identity is stable across renders — that is what keeps input focus.
   const fp = { form, set, vstatus }
 
-  const head = (
-    <PageHeader eyebrow="Business Workspace · AI Accountant" title="Company Tax & Compliance Profile"
-      actions={<><StatusBadge tone="info">Preliminary assessment</StatusBadge><Btn onClick={save} disabled={saving}>{saving ? 'Saving…' : 'Save profile'}</Btn></>} />
+  // Standalone (the premium flag off) this page is a page and wears the page
+  // header. Embedded as the Workbench's Tax Profile tab it is a TAB, and a tab
+  // may not rename the page it sits in — the module drew two PageHeaders with
+  // different eyebrows and different titles, so opening this tab retitled
+  // "Tax & Compliance Workbench" to "Company Tax & Compliance Profile".
+  //
+  // Embedded, the header collapses to its controls alone. Save is one of them,
+  // so it goes on travelling with the form it saves rather than being hoisted
+  // into a header that would then need to know about this page's state.
+  const actions = (
+    <><StatusBadge tone="info">Preliminary assessment</StatusBadge>
+      <Btn onClick={save} disabled={saving}>{saving ? 'Saving…' : 'Save profile'}</Btn></>
   )
+  const head = embedded
+    ? <div className="cfo-accountant-embedded-actions">{actions}</div>
+    : <PageHeader eyebrow="Business Workspace · AI Accountant" title="Company Tax & Compliance Profile" actions={actions} />
   if (loading) return <>{head}<Card><LoadingSkeleton rows={6} height={18} /></Card></>
   if (error && !form) return <>{head}<ErrorState description={error} onRetry={() => location.reload()} /></>
 

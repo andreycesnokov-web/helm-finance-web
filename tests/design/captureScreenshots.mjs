@@ -42,6 +42,7 @@ const OUT = path.join(ROOT, 'artifacts', 'design-pr80');
 const OUT_RADAR = path.join(ROOT, 'artifacts', 'design-pr81-radar');
 const OUT_AICFO = path.join(ROOT, 'artifacts', 'design-pr83-ai-cfo');
 const OUT_ACCOUNTS = path.join(ROOT, 'artifacts', 'design-accounts');
+const OUT_ACCOUNTANT = path.join(ROOT, 'artifacts', 'design-accountant');
 
 // Which face each kind of content is supposed to render in. The check is done
 // against what the page ACTUALLY renders — sample an element, read its computed
@@ -80,7 +81,7 @@ const build = spawnSync(process.platform === 'win32' ? 'npm.cmd' : 'npm', ['run'
 });
 assert.strictEqual(build.status, 0, 'build failed:\n' + (build.stderr || '').slice(-2000));
 
-for (const dir of [OUT, OUT_RADAR, OUT_AICFO, OUT_ACCOUNTS]) fs.mkdirSync(dir, { recursive: true });
+for (const dir of [OUT, OUT_RADAR, OUT_AICFO, OUT_ACCOUNTS, OUT_ACCOUNTANT]) fs.mkdirSync(dir, { recursive: true });
 
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css',
   '.svg': 'image/svg+xml', '.png': 'image/png', '.woff2': 'font/woff2', '.woff': 'font/woff',
@@ -458,6 +459,67 @@ const SHOTS = [
     { crop: true, window: [512, 900], dir: OUT_ACCOUNTS }],
   ['10-accounts-stress-desktop-1440x900.png', `${P}?shell=accounts-stress`, 1440, 900,
     { dir: OUT_ACCOUNTS }],
+
+  /* ── AI Accountant — Tax & Compliance Workbench ──────────────────────────
+     Five tabs and three obligation states. What each frame is for is on it,
+     because the states are the design: the same page looks very different
+     depending on whether the engine has a figure, and the point of the pass is
+     that it stays honest in all three. */
+  ['01-accountant-workbench-desktop-1440x900.png', `${P}?shell=accountant`, 1440, 900,
+    { dir: OUT_ACCOUNTANT }],
+  ['02-accountant-workbench-mobile-390x844.png', `${P}?shell=accountant`, 390, 844,
+    { ...PHONE, dir: OUT_ACCOUNTANT }],
+  // The Tax reserve flagship, close up: the branded navy card the page never had.
+  // The mark is cropped by the card edge and the text stops clear of it.
+  ['03-accountant-tax-reserve-flagship-closeup.png', `${P}?shell=accountant`, 1440, 900,
+    { region: { sel: '.acct-reserve .cfo-summary', pad: 6 }, dir: OUT_ACCOUNTANT }],
+  // Nothing measured: the reserve is an em dash and says why, rather than Rp 0.
+  ['04-accountant-reserve-absent-closeup.png', `${P}?shell=accountant`, 1440, 900,
+    { region: { sel: '.acct-wb-band', pad: 10 }, dir: OUT_ACCOUNTANT }],
+  // A real amount beside two state chips — the frame that shows a figure and a
+  // non-figure can no longer be mistaken for one another.
+  ['05-accountant-obligations-mixed-states.png', `${P}?shell=accountant-calc`, 1440, 900,
+    { region: { sel: '.acct-obligations', pad: 10 }, dir: OUT_ACCOUNTANT }],
+  ['06-accountant-workbench-calculated-desktop.png', `${P}?shell=accountant-calc`, 1440, 900,
+    { dir: OUT_ACCOUNTANT }],
+  // A CONFIRMED zero: one line, summing to nothing. Rp 0, not an em dash.
+  ['07-accountant-reserve-confirmed-zero.png', `${P}?shell=accountant-zero`, 1440, 900,
+    { region: { sel: '.acct-wb-band', pad: 10 }, dir: OUT_ACCOUNTANT }],
+  // Profile completeness at 100% — deliberately not green, and carrying the
+  // sentence that says completeness is about the form, not about liability.
+  ['08-accountant-completeness-caveat-closeup.png', `${P}?shell=accountant-calc`, 1440, 900,
+    { region: { sel: '.acct-reserve + .cfo-card', pad: 8 }, dir: OUT_ACCOUNTANT }],
+  // The Compliance Calendar, on a pinned month so this frame is stable.
+  ['09-accountant-calendar-desktop-1440x900.png', `${P}?shell=accountant-calendar`, 1440, 900,
+    { dir: OUT_ACCOUNTANT }],
+  ['10-accountant-calendar-mobile-390x844.png', `${P}?shell=accountant-calendar`, 390, 844,
+    { ...PHONE, dir: OUT_ACCOUNTANT }],
+  ['11-accountant-calendar-grid-closeup.png', `${P}?shell=accountant-calendar`, 1440, 900,
+    { region: { sel: '.cfo-card:has(.acct-cal-days)', pad: 10 }, dir: OUT_ACCOUNTANT }],
+  // The Tax Draft tab: every figure an em dash, because the CIT engine is not
+  // connected and no number here is allowed to be an estimate.
+  ['12-accountant-tax-draft-desktop-1440x900.png', `${P}?shell=accountant-draft`, 1440, 900,
+    { dir: OUT_ACCOUNTANT }],
+  ['13-accountant-tax-draft-withholding.png', `${P}?shell=accountant-draft-withholding`, 1440, 900,
+    { dir: OUT_ACCOUNTANT }],
+  // 320px: the narrowest screen the product designs for.
+  ['14-accountant-workbench-320.png', `${P}?shell=accountant`, 320, 900,
+    { crop: true, window: [512, 900], dir: OUT_ACCOUNTANT }],
+  // The tab strip on a phone, where three of five tabs sit past the edge and the
+  // fade is the only thing that says so.
+  ['15-accountant-tabs-scroll-affordance-390.png', `${P}?shell=accountant`, 390, 844,
+    { ...PHONE, region: { sel: '.acct-wb-tabs', pad: 6 }, dir: OUT_ACCOUNTANT }],
+  /* The other two languages the product ships. Russian runs longest and
+     Indonesian sets the widest chips, so these are the frames that show whether
+     the layout was tuned to English sentence lengths. */
+  ['16-accountant-workbench-ru-1440x900.png', `${P}?shell=accountant-ru`, 1440, 900,
+    { dir: OUT_ACCOUNTANT }],
+  ['17-accountant-workbench-ru-390x844.png', `${P}?shell=accountant-ru`, 390, 844,
+    { ...PHONE, dir: OUT_ACCOUNTANT }],
+  ['18-accountant-workbench-id-1440x900.png', `${P}?shell=accountant-id`, 1440, 900,
+    { dir: OUT_ACCOUNTANT }],
+  ['19-accountant-workbench-id-390x844.png', `${P}?shell=accountant-id`, 390, 844,
+    { ...PHONE, dir: OUT_ACCOUNTANT }],
 ];
 
 /* ── which directories this run is allowed to touch ────────────────────────
