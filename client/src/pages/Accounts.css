@@ -119,7 +119,15 @@
    fault in the user's data. Amber says "unfinished", which is true. */
 .acct-chip-cur.is-unproven { background: var(--warning-soft); color: var(--warning-ink); }
 .acct-chip-scope.is-business { background: var(--info-soft); color: var(--brand-navy); }
-.acct-chip-scope.is-personal { background: var(--surface-card-muted); color: var(--text-secondary); }
+/* A wallet carrying THIS COMPANY'S business_id but flagged personal is an
+   ambiguous record: business_id establishes that the row belongs to the company,
+   the flag claims the money does not, and migration 017's backfill assigned
+   wallets to businesses without ever looking at scope. So the chip is marked
+   rather than muted — the same amber the untotalled-currency chip wears, which
+   says "unfinished", not "wrong". Nothing about the row is the user's fault, and
+   nothing here reclassifies it.
+   See _specs/accounts-personal-scope-ambiguity.md. */
+.acct-chip-scope.is-personal { background: var(--warning-soft); color: var(--warning-ink); }
 
 .acct-row-amount {
   display: flex;

@@ -403,6 +403,10 @@ const WALLETS_STRESS = [
   { id: 's4', name: 'Wise · USD operating', currency: 'USD', balance: 842500, type: 'bank', scope: 'business' },
   // No currency at all. Counted, asked about, never guessed into a default.
   { id: 's5', name: 'Imported · unknown currency', currency: null, balance: 5000000, type: 'other', scope: 'business' },
+  // A company-owned wallet flagged personal — the ambiguous record migration 017
+  // could have produced. It belongs to this company by business_id and is listed
+  // and totalled as such; the chip marks the claim without resolving it.
+  { id: 's6', name: 'Director card · reimbursements', currency: 'IDR', balance: 3100000, type: 'ewallet', scope: 'personal' },
 ]
 const WALLETS_EMPTY = []
 // A workspace that banks in dollars. The headline must be written in ITS currency

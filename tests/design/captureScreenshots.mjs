@@ -460,15 +460,36 @@ const SHOTS = [
     { dir: OUT_ACCOUNTS }],
 ];
 
+/* ── which directories this run is allowed to touch ────────────────────────
+   `--only <substring>` (or ONLY_DIR) restricts the run to matching output
+   directories. Every other folder is left exactly as it is on disk.
+
+   This exists because the folders are per-PR evidence with different lifetimes.
+   Regenerating everything re-shoots merged PRs' screenshots from today's source,
+   so an old folder silently stops depicting what that PR shipped — and a
+   reviewer diffing it sees churn that belongs to neither PR. A run for one PR
+   should touch one PR's evidence. */
+const onlyArg = (() => {
+  const i = process.argv.indexOf('--only');
+  return (i > -1 ? process.argv[i + 1] : process.env.ONLY_DIR) || null;
+})();
+const wanted = (dir) => !onlyArg || path.basename(dir).includes(onlyArg);
+const SELECTED = SHOTS.filter(([, , , , o = {}]) => wanted(o.dir || OUT));
+if (onlyArg) {
+  const dirs = [...new Set(SELECTED.map(([, , , , o = {}]) => path.basename(o.dir || OUT)))];
+  console.log(`only "${onlyArg}" → ${SELECTED.length} shot(s) in ${dirs.join(', ') || '(nothing)'}`);
+  assert.ok(SELECTED.length, `--only ${onlyArg} matched no output directory`);
+}
+
 // Produced filenames, per directory — a run only prunes what it owns, so the
 // Radar folder cannot delete PR #80's evidence or the other way round.
 const produced = new Map();
-for (const [f, , , , o = {}] of SHOTS) {
+for (const [f, , , , o = {}] of SELECTED) {
   const dir = o.dir || OUT;
   if (!produced.has(dir)) produced.set(dir, new Set());
   produced.get(dir).add(f);
 }
-for (const [file, route, w, h, opts] of SHOTS) await verifyAndShoot(file, route, w, h, opts);
+for (const [file, route, w, h, opts] of SELECTED) await verifyAndShoot(file, route, w, h, opts);
 
 /* ── no stale screenshots: delete any PNG this run did not produce ──────────── */
 for (const [dir, keep] of produced) {

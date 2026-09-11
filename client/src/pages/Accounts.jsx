@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
@@ -9,6 +9,7 @@ import { apiFetch, fmt, fmtFull } from '../lib/api'
 import { formatCurrency } from '../lib/money'
 import { walletsSummary } from './walletsSummary'
 import { partitionWallets } from '../lib/walletBalanceContract'
+import { createRequestGuard } from '../lib/requestGuard'
 import { Card, Btn, ErrorState } from '../shell/ui'
 import { WalletsEmptyState } from './WalletsEmptyState'
 import {
@@ -96,14 +97,36 @@ export default function Accounts() {
   const [adjusting,    setAdjusting]    = useState(false)
 
   // ── Load wallets + legacy sources ─────────────────────────────────────────
+  //
+  // Guarded against out-of-order responses. Switching from company A to B while
+  // A's request is still in flight is not hypothetical: A's slower response
+  // lands last and paints A's wallets, balances and total under B's name. That
+  // is a data-isolation bug, not a cosmetic one — the same one requestGuard was
+  // written for on the AI Accountant intake.
+  const guard = useRef(createRequestGuard())
+  // Which workspace the rows currently on screen belong to.
+  const loadedScope = useRef(undefined)
+
   const load = async () => {
+    const req = guard.current.start()
+    const scopeId = active?.id ?? null
     setLoading(true)
     setLoadError(false)
+    // A WORKSPACE CHANGE clears the list first, so company A's wallets are never
+    // on screen underneath company B's name while B is still loading. A reload
+    // of the SAME workspace — after saving a wallet — keeps its rows until the
+    // new ones arrive, so an ordinary save does not blank the page.
+    if (loadedScope.current !== undefined && loadedScope.current !== scopeId) {
+      setWallets([])
+      setLegacySources([])
+    }
     try {
       const [wData, pData] = await Promise.all([
         apiFetch('/wallets', token),
         apiFetch('/pulse?scope=all', token),
       ])
+      // A response from a workspace the user has already left is discarded.
+      if (req.isStale()) return
 
       const loaded = wData.wallets || []
       setWallets(loaded)
@@ -112,11 +135,16 @@ export default function Accounts() {
       const walletNames = new Set(loaded.map(w => w.name))
       const legacy = (pData.accounts || []).filter(a => !walletNames.has(a.name))
       setLegacySources(legacy)
+      loadedScope.current = scopeId
     } catch (e) {
+      if (req.isStale()) return
       console.error(e)
       setLoadError(true)
+      loadedScope.current = scopeId
     } finally {
-      setLoading(false)
+      // Only the current request may clear the spinner: a stale one finishing
+      // would otherwise report the newer request as done.
+      if (!req.isStale()) setLoading(false)
     }
   }
 

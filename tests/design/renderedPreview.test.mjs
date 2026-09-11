@@ -1557,7 +1557,7 @@ t('the wallet list is on screen, not just the summary card', () => {
   // The regression this whole split exists to prevent: a screenshot of the
   // summary card being taken for a screenshot of the page.
   assert.strictEqual(AD.accounts.rows.length, 4, `desktop shows ${AD.accounts.rows.length} wallet rows`);
-  assert.strictEqual(AS.accounts.rows.length, 5, `the stress view shows ${AS.accounts.rows.length} rows`);
+  assert.strictEqual(AS.accounts.rows.length, 6, `the stress view shows ${AS.accounts.rows.length} rows`);
   for (const [name, f] of ACCT_VIEWS) {
     assert.ok(f.accounts.rows.length > 0, `${name}: the wallet list is missing`);
   }
@@ -1677,8 +1677,8 @@ t('the business page shows one unfiltered list, with no scope tabs', () => {
       `${name}: ${f.accounts.scopeTabs} scope tab row(s) still rendered`);
   }
   // Every wallet in the fixture is on screen — nothing is filtered out.
-  assert.strictEqual(AS.accounts.rows.length, 5,
-    `the stress view shows ${AS.accounts.rows.length} of 5 wallets`);
+  assert.strictEqual(AS.accounts.rows.length, 6,
+    `the stress view shows ${AS.accounts.rows.length} of 6 wallets`);
 });
 
 t('removing the filter did not hide the Business/Personal flag', () => {
@@ -1689,6 +1689,22 @@ t('removing the filter did not hide the Business/Personal flag', () => {
     assert.ok(/Business|Personal/.test(scopeChip),
       `"${row.name}" lost its scope chip: ${row.chips.join(', ')}`);
   }
+});
+
+t('a company wallet flagged personal is marked, not muted', () => {
+  // business_id says the row belongs to this company; the flag claims the money
+  // does not; migration 017 assigned wallets to businesses without ever looking
+  // at scope. The row is listed and totalled as the company's — that is what
+  // business_id establishes — and the chip marks the unresolved claim rather
+  // than blending into the other chips.
+  const personal = AS.accounts.rows.find((r) => /Director card/.test(r.name));
+  assert.ok(personal, 'the ambiguous-record fixture did not render');
+  assert.ok(personal.chips.some((c) => /Personal/.test(c)),
+    `the row is not labelled personal: ${personal.chips.join(', ')}`);
+  // It still carries a real balance: nothing is excluded, hidden or reclassified.
+  assert.match(personal.balance, /^Rp /,
+    `the row prints "${personal.balance}" instead of its balance`);
+  assert.ok(!personal.missing, 'the row was treated as an unmeasurable balance');
 });
 
 t('the dashed add row is gone, replaced by the branded block', () => {
