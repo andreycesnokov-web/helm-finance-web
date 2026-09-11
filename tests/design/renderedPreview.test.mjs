@@ -719,6 +719,9 @@ const PROBE_FN = `function facts(win, doc) {
       })(),
       summaryMeta: (doc.querySelector('.cfo-summary-meta') || {}).textContent?.trim() || '',
       dashedAddRow: doc.querySelectorAll('[style*="dashed"]').length,
+      // The Business/Personal scope filter, which /business/accounts no longer
+      // has: the API already restricts the list to the active company.
+      scopeTabs: doc.querySelectorAll('.acct-page [role="tablist"]').length,
       flagships: doc.querySelectorAll('.acct-page .cfo-flagship').length,
     };
   })();
@@ -873,9 +876,8 @@ const ACCOUNTS = await collectGroup([
   { key: 'AS', route: `${P}?shell=accounts-stress`, w: 1440, h: 900 },
   { key: 'A320', route: `${P}?shell=accounts-stress`, w: 320, h: 900 },
   { key: 'AE', route: `${P}?shell=accounts-empty`, w: 1440, h: 900 },
-  { key: 'AF', route: `${P}?shell=accounts-filter-empty`, w: 1440, h: 900 },
 ], 45000);
-const { AD, AM, AS, A320, AE, AF } = ACCOUNTS;
+const { AD, AM, AS, A320, AE } = ACCOUNTS;
 console.log(`  .. desktop viewport ${D.innerWidth}px, mobile viewport ${M.innerWidth}px, `
   + `in-shell ${SD.innerWidth}px / ${SM.innerWidth}px`);
 
@@ -1666,6 +1668,29 @@ t('a long wallet name wraps rather than being cut off', () => {
 
 console.log('\nWallets & Accounts — adding a wallet');
 
+t('the business page shows one unfiltered list, with no scope tabs', () => {
+  // /business/accounts shows the wallets of the SELECTED COMPANY. The tabs only
+  // re-filtered rows the API had already restricted to that company, by a scope
+  // column that does not establish ownership.
+  for (const [name, f] of [...ACCT_VIEWS, ['empty', AE]]) {
+    assert.strictEqual(f.accounts.scopeTabs, 0,
+      `${name}: ${f.accounts.scopeTabs} scope tab row(s) still rendered`);
+  }
+  // Every wallet in the fixture is on screen — nothing is filtered out.
+  assert.strictEqual(AS.accounts.rows.length, 5,
+    `the stress view shows ${AS.accounts.rows.length} of 5 wallets`);
+});
+
+t('removing the filter did not hide the Business/Personal flag', () => {
+  // The scope is still on every row. A company-owned wallet flagged personal
+  // stays visible and stays labelled — the filter went, the data did not.
+  for (const row of AD.accounts.rows) {
+    const scopeChip = row.chips[row.chips.length - 1];
+    assert.ok(/Business|Personal/.test(scopeChip),
+      `"${row.name}" lost its scope chip: ${row.chips.join(', ')}`);
+  }
+});
+
 t('the dashed add row is gone, replaced by the branded block', () => {
   // The list used to end with a dashed card pretending to be a wallet.
   for (const [name, f] of ACCT_VIEWS) {
@@ -1709,22 +1734,8 @@ t('the zero state still says what it always said', () => {
   assert.strictEqual(AE.accounts.rows.length, 0, 'the empty workspace rendered wallet rows');
 });
 
-t('an empty FILTER never claims the workspace has no wallets', () => {
-  // Four wallets exist; none is personal. Telling the reader to add their first
-  // would be false.
-  const fe = AF.accounts.filterEmpty;
-  assert.ok(fe, 'the filter-empty state did not render');
-  assert.ok(!/first wallet|will live here/i.test(fe.text),
-    `the filter-empty state uses zero-state wording: "${fe.text}"`);
-  // It says how many wallets exist elsewhere, and offers a way back.
-  assert.match(fe.sub, /4/, `the filter-empty state does not say how many wallets exist: "${fe.sub}"`);
-  assert.match(fe.text, /Show all wallets/i, 'the filter-empty state offers no way to clear the filter');
-  assert.strictEqual(AF.accounts.zeroState, null,
-    'the filter-empty state rendered the zero state as well');
-});
-
 t('exactly one card on the page carries the brand watermark', () => {
-  for (const [name, f] of [...ACCT_VIEWS, ['empty', AE], ['filter-empty', AF]]) {
+  for (const [name, f] of [...ACCT_VIEWS, ['empty', AE]]) {
     assert.strictEqual(f.accounts.flagships, 1,
       `${name}: ${f.accounts.flagships} flagship cards, expected 1`);
   }

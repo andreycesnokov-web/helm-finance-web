@@ -458,9 +458,6 @@ const SHOTS = [
     { crop: true, window: [512, 900], dir: OUT_ACCOUNTS }],
   ['10-accounts-stress-desktop-1440x900.png', `${P}?shell=accounts-stress`, 1440, 900,
     { dir: OUT_ACCOUNTS }],
-  // A filter that matched nothing. NOT the zero state.
-  ['11-accounts-filter-empty-desktop.png', `${P}?shell=accounts-filter-empty`, 1440, 900,
-    { dir: OUT_ACCOUNTS }],
 ];
 
 // Produced filenames, per directory — a run only prunes what it owns, so the

@@ -267,7 +267,7 @@ t('the summary card never states a balance it does not know', () => {
   assert.match(blk, /<SummaryCard\s+flagship/,
     'the total-balance card is not the shared flagship SummaryCard');
   // What it then SAYS is decided in one place, for the page and the preview both.
-  assert.match(acc, /const summary = walletsSummary\(\{ wallets: filteredWallets, t, scopeLabel \}\)/,
+  assert.match(acc, /const summary = walletsSummary\(\{ wallets, t, scopeLabel: t\('accounts\.totalBalance'\) \}\)/,
     'the card content is not derived from the shared summary');
   const ws = code('client/src/pages/walletsSummary.jsx');
   assert.match(ws, /if \(!wallets \|\| wallets\.length === 0\)[\s\S]{0,400}accounts\.noWalletsYet/,
@@ -638,18 +638,61 @@ t('every existing wallet action is still wired to the page', () => {
     'the adjust role gate changed');
 });
 
-t('the scope filter still filters, and clearing it works', () => {
+t('the business page has no Business/Personal scope filter', () => {
+  // /business/accounts shows the wallets of the SELECTED COMPANY. The API
+  // already restricts the selection to it — resolveActiveBusiness() rejects a
+  // personal workspace (`business_workspace_required`) and bizOrFilter() is a
+  // strict `business_id.eq.<active>` with the legacy NULL union removed — so the
+  // tabs only re-filtered rows that were already the company's, using a `scope`
+  // column that does not establish ownership.
+  // See _specs/accounts-personal-scope-ambiguity.md.
   const acc = code('client/src/pages/Accounts.jsx');
-  assert.match(acc, /scopeTab === 'all'\s*\?\s*wallets\s*:\s*wallets\.filter\(w => \(w\.scope \|\| 'business'\) === scopeTab\)/,
-    'the scope filter expression changed');
-  assert.match(acc, /onClearFilter=\{\(\) => setScopeTab\('all'\)\}/,
-    'the filter-empty state cannot clear the filter');
+  for (const gone of ['scopeTab', 'filteredWallets', 'ScopeTabs', 'totalBusiness', 'totalPersonal']) {
+    assert.ok(!acc.includes(gone), `the business page still references ${gone}`);
+  }
   const blk = code('client/src/pages/AccountsBlocks.jsx');
-  assert.match(blk, /<div className="cfo-tabs acct-tabs" role="tablist">/,
-    'the scope filter is no longer on the shared tab primitive');
+  assert.ok(!/ScopeTabs|WalletsFilterEmpty|onClearFilter/.test(blk),
+    'the removed filter components are still exported');
+  // The list gets every wallet the API returned, unfiltered.
+  assert.match(acc, /<WalletList\s+wallets=\{wallets\}/,
+    'the list is still fed a filtered collection');
+  // The row still SHOWS the scope. Removing the filter must not hide the data:
+  // a company-owned row flagged personal stays visible and labelled.
+  assert.match(blk, /acct-chip-scope/, 'the row no longer shows Business/Personal');
+  assert.match(blk, /accounts\.scopeBusiness/, 'the row lost its scope label');
 });
 
-t('the three empty-ish states stay distinct', () => {
+t('the business page never creates a personal-scoped wallet', () => {
+  // POST /api/wallets accepts scope='personal' when PERSONAL_WORKSPACE_ENABLED
+  // is on, so the guarantee has to be that this page never sends it. The
+  // Business/Personal selector was already removed from the form; this pins it.
+  const acc = code('client/src/pages/Accounts.jsx');
+  assert.match(acc, /scope: 'business'/, 'the form default scope is not business');
+  assert.ok(!/scope: 'personal'/.test(acc), 'the business page can send a personal scope');
+  const blk = code('client/src/pages/AccountsBlocks.jsx');
+  assert.ok(!/'personal'/.test(blk), 'the form offers a personal scope');
+  assert.ok(!/setForm\([^)]*scope:/.test(acc + blk), 'something still sets the wallet scope');
+});
+
+t('the wallet list follows the SELECTED company', () => {
+  // switchTo() bumps scopeKey and does not remount this page, so a fetch keyed
+  // on [] kept the previous company's wallets, balances and total on screen
+  // under the new company's name. Every other business page already keys off
+  // scopeKey + active.id; this one did not.
+  const acc = code('client/src/pages/Accounts.jsx');
+  assert.match(acc, /useWorkspace\(\) \|\| \{\}/,
+    'the page does not read the active workspace, or would crash outside the provider');
+  assert.match(acc, /\}, \[token, active\?\.id, scopeKey\]/,
+    'the wallet fetch is not keyed on the active workspace');
+  // The legacy /accounts route mounts this component OUTSIDE WorkspaceProvider,
+  // where useWorkspace() returns null — destructuring it directly would throw
+  // and the legacy page would go white.
+  const app2 = code('client/src/App.jsx');
+  assert.match(app2, /path="\/accounts"\s+element=\{<Layout><Accounts \/><\/Layout>\}/,
+    'the legacy /accounts route changed; re-check the useWorkspace guard');
+});
+
+t('loading, failed and empty stay distinct', () => {
   const acc = code('client/src/pages/Accounts.jsx');
   // Resolved-and-empty is the only one that invites a first wallet, and it is
   // gated on a successful load — a failed request must never claim "no wallets".
@@ -658,12 +701,11 @@ t('the three empty-ish states stay distinct', () => {
   assert.match(acc, /\{resolvedEmpty && legacySources\.length === 0 && \(\s*<WalletsEmptyState/,
     'the zero state condition changed');
   assert.match(acc, /<ErrorState/, 'a failed load no longer gets the error treatment');
-  // A filter that matched nothing is a different component with different words.
+  // With no filter there is no third state to confuse the zero state with: a
+  // company that has wallets always produces a non-empty list.
   const blk = code('client/src/pages/AccountsBlocks.jsx');
-  assert.match(blk, /function WalletsFilterEmpty/, 'the filter-empty state is missing');
-  const fe = blk.slice(blk.indexOf('function WalletsFilterEmpty'));
-  assert.ok(!/noWallets\b|addFirstWallet/.test(fe.slice(0, 900)),
-    'the filter-empty state reuses the zero state wording');
+  assert.ok(!/wallets\.length === 0/.test(blk),
+    'the list has an empty branch of its own, which can only disagree with the page');
 });
 
 t('the dashed add row is replaced by a branded block, and the top button stays', () => {
@@ -715,9 +757,9 @@ t('the currency contract is unchanged by the restyle', () => {
     'the list falls back to a default currency somewhere');
   // The page still derives the card from the shared summary.
   const acc = code('client/src/pages/Accounts.jsx');
-  assert.match(acc, /walletsSummary\(\{ wallets: filteredWallets, t, scopeLabel \}\)/,
+  assert.match(acc, /walletsSummary\(\{ wallets, t, scopeLabel: t\('accounts\.totalBalance'\) \}\)/,
     'the summary card is no longer derived from the shared summary');
-  assert.match(acc, /partitionWallets\(filteredWallets\)/,
+  assert.match(acc, /partitionWallets\(wallets\)/,
     'the page no longer partitions by proven currency');
 });
 
@@ -748,13 +790,16 @@ t('the preview renders the real Accounts page, list included', () => {
   assert.match(src, /from '\.\/AccountsBlocks'/, 'the preview does not import the real Accounts blocks');
   assert.match(src, /<WalletList/, 'the preview still does not render the wallet list');
   assert.match(src, /<WalletFormModal/, 'the preview does not render the real wallet form');
-  assert.match(src, /partitionWallets\(scoped\)/,
+  assert.match(src, /partitionWallets\(wallets\)/,
     'the preview decides currency provability with its own rule');
   // Fixtures that actually exercise the states.
   assert.match(src, /WALLETS_STRESS/, 'there is no fixture for the awkward states');
-  for (const state of ['accounts-stress', 'accounts-filter-empty', 'accounts-empty']) {
+  for (const state of ['accounts-stress', 'accounts-empty']) {
     assert.ok(src.includes(state), `the preview has no ${state} route`);
   }
+  // The filter-empty route went with the filter it existed to demonstrate.
+  assert.ok(!src.includes('accounts-filter-empty'),
+    'a route for the removed scope filter survives in the preview');
 });
 
 /* -- AI CFO, migrated -------------------------------------------------------

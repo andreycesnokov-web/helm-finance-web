@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
+import { useWorkspace } from '../shell/WorkspaceProvider'
 import { useAccess } from '../hooks/useAccess'
 import { useTranslation } from '../hooks/useTranslation'
 import { apiFetch, fmt, fmtFull } from '../lib/api'
@@ -11,8 +12,7 @@ import { partitionWallets } from '../lib/walletBalanceContract'
 import { Card, Btn, ErrorState } from '../shell/ui'
 import { WalletsEmptyState } from './WalletsEmptyState'
 import {
-  AccountsHeader, AccountsSummary, ScopeTabs, WalletList, AboutWallets,
-  WalletFormModal,
+  AccountsHeader, AccountsSummary, WalletList, AboutWallets, WalletFormModal,
 } from './AccountsBlocks'
 import { WORKSPACE_DEFAULT_CURRENCY } from './walletsSummary'
 
@@ -58,6 +58,15 @@ const EMPTY_FORM = { name: '', currency: WORKSPACE_DEFAULT_CURRENCY, type: '', e
 export default function Accounts() {
   const { token } = useAuth()
   const { access } = useAccess()
+  // switchTo() bumps scopeKey rather than remounting the page, so a page that
+  // does not read it keeps rendering the previous workspace's data.
+  //
+  // Defaulted, not destructured directly: this component is ALSO mounted on the
+  // legacy /accounts route, which sits in <Layout> outside WorkspaceProvider.
+  // useWorkspace() returns null there, and destructuring null throws — so the
+  // legacy page would have gone white. Outside the provider there is no switcher
+  // to follow, and the single fetch on mount is the correct behaviour.
+  const { active, scopeKey } = useWorkspace() || {}
   const navigate = useNavigate()
   const { t } = useTranslation()
 
@@ -75,7 +84,6 @@ export default function Accounts() {
   const [showForm,     setShowForm]     = useState(false)
   const [editWallet,   setEditWallet]   = useState(null)
   const [form,         setForm]         = useState(EMPTY_FORM)
-  const [scopeTab,     setScopeTab]     = useState('all')
   const [saving,       setSaving]       = useState(false)
   const [backfilling,  setBackfilling]  = useState(false)
   const [backfillDone, setBackfillDone] = useState(false)
@@ -112,13 +120,22 @@ export default function Accounts() {
     }
   }
 
+  // Re-fetched per active workspace. The deps were `[]`, and switching company
+  // does not remount this page — it bumps scopeKey — so the list, the balances
+  // and the total stayed on the PREVIOUS company's data until a manual reload.
+  // The API was never the problem: it is strictly business-scoped, and the page
+  // simply never asked again. Same contract the other business pages use.
   useEffect(() => {
     load()
-    // Load admin status silently — non-blocking, never errors visibly
+  }, [token, active?.id, scopeKey]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    // Admin status is a property of the USER, not of the workspace, so it is
+    // fetched once. Silent and non-blocking — it never errors visibly.
     apiFetch('/admin/status', token)
-      .then(d => { setIsAdmin(d.is_admin === true); console.log('[admin/status]', d) })
+      .then(d => { setIsAdmin(d.is_admin === true) })
       .catch(e => console.warn('[admin/status] failed:', e.message))
-  }, [])
+  }, [token])
 
   // ── Computed totals ───────────────────────────────────────────────────────
   // The three cross-currency sums that used to live here are gone rather than
@@ -127,10 +144,19 @@ export default function Accounts() {
   // wrong; leaving them in place would be leaving the next caller a loaded gun.
   // Totals are now derived per currency, below.
 
-  // Filtered wallets per tab
-  const filteredWallets = scopeTab === 'all'
-    ? wallets
-    : wallets.filter(w => (w.scope || 'business') === scopeTab)
+  // No client-side scope filter. GET /api/wallets is already restricted to the
+  // ACTIVE COMPANY — resolveActiveBusiness() rejects a personal workspace
+  // outright (`business_workspace_required`) and bizOrFilter() is a strict
+  // `business_id.eq.<active business>` with the legacy NULL union removed. So
+  // every row that arrives here belongs to the selected company by the only
+  // link that establishes ownership, and the page shows all of them.
+  //
+  // The `scope` column is NOT that link. A row may carry scope='personal' and
+  // this company's business_id — migration 017 backfilled every wallet of a user
+  // into their owned business without filtering on scope — so the flag is a
+  // label on a company-owned row, not proof the money is someone's own. It stays
+  // visible as a chip on the row; it no longer filters the list or the total.
+  // See _specs/accounts-personal-scope-ambiguity.md.
 
   // ── the summary card's amounts, one currency at a time ────────────────────
   //
@@ -151,13 +177,11 @@ export default function Accounts() {
   // non-IDR wallet's number is an IDR-reporting figure wearing a foreign
   // currency's label. The row lists the wallet and says the balance is not
   // available yet rather than printing "$" in front of rupiah.
-  const { proven: provenGroups, unproven: unprovenGroups } = partitionWallets(filteredWallets)
+  const { proven: provenGroups, unproven: unprovenGroups } = partitionWallets(wallets)
   const groupOf = (w) => provenGroups.find((g) => g.wallets.includes(w))
   const isUnproven = (w) => unprovenGroups.some((g) => g.wallets.includes(w))
-  const scopeLabel = scopeTab === 'business' ? t('accounts.totalBusiness')
-    : scopeTab === 'personal' ? t('accounts.totalPersonal')
-    : t('accounts.totalBalance')
-  const summary = walletsSummary({ wallets: filteredWallets, t, scopeLabel })
+  // One label, because there is one list: this company's wallets.
+  const summary = walletsSummary({ wallets, t, scopeLabel: t('accounts.totalBalance') })
   // The collection has resolved and holds nothing. Distinct from "still loading"
   // and from "the request failed", and only this one invites a first wallet.
   const resolvedEmpty = !loading && !loadError && wallets.length === 0
@@ -300,11 +324,6 @@ export default function Accounts() {
 
       <AccountsHeader t={t} onAddWallet={openAdd} />
 
-      {/* Scope filter. Only once there is something to filter. */}
-      {wallets.length > 0 && (
-        <ScopeTabs t={t} value={scopeTab} onChange={setScopeTab} />
-      )}
-
       {/* Total balance hero.
           The same navy surface Pulse uses, from the same component, and the only
           card on this page carrying the brand mark — it holds the page's
@@ -352,11 +371,12 @@ export default function Accounts() {
       )}
 
       {/* The wallet list, and the block that closes it.
-          `filteredWallets` is scope-filtered here; the partition comes from
-          walletBalanceContract. WalletList renders and classifies nothing. */}
+          Every wallet the API returned for the active company. The partition
+          comes from walletBalanceContract; WalletList renders and classifies
+          nothing. */}
       {wallets.length > 0 && (
         <WalletList
-          wallets={filteredWallets}
+          wallets={wallets}
           groupOf={groupOf}
           isUnproven={isUnproven}
           typeLabelFor={typeLabelFor}
@@ -365,9 +385,6 @@ export default function Accounts() {
           onEdit={openEdit}
           onAdjust={canAdjust ? openAdjust : null}
           onAddWallet={openAdd}
-          scope={scopeTab}
-          totalCount={wallets.length}
-          onClearFilter={() => setScopeTab('all')}
         />
       )}
 

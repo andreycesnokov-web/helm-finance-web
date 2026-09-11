@@ -16,8 +16,7 @@ import { formatAmount } from '../lib/money'
 import en from '../i18n/en'
 import { WalletsEmptyState } from './WalletsEmptyState'
 import {
-  AccountsHeader, AccountsSummary, ScopeTabs, WalletList, AboutWallets,
-  WalletFormModal,
+  AccountsHeader, AccountsSummary, WalletList, AboutWallets, WalletFormModal,
 } from './AccountsBlocks'
 import { partitionWallets } from '../lib/walletBalanceContract'
 import { walletsSummary } from './walletsSummary'
@@ -446,8 +445,6 @@ const WALLET_SETS = {
      fold — which makes the relationship between them unphotographable in one
      honest phone-sized frame rather than badly designed. */
   'accounts-one': WALLETS_FIXTURE.slice(0, 1),
-  // Wallets exist; none is personal. The filter is empty, the workspace is not.
-  'accounts-filter-empty': WALLETS_FIXTURE,
 }
 // Radar is a different page shape, so it gets its own shell routes rather than a
 // wallet collection.
@@ -616,29 +613,25 @@ const WALLET_TYPE_LABEL = {
   bank: 'Bank account', cash: 'Cash', ewallet: 'E-Wallet',
   crypto: 'Crypto wallet', payment_gateway: 'Payment gateway', other: 'Other',
 }
-const AccountsBody = ({ wallets = WALLETS_FIXTURE, scope = 'all', canAdjust = true }) => {
-  const scoped = scope === 'all'
-    ? wallets
-    : wallets.filter((w) => (w.scope || 'business') === scope)
+const AccountsBody = ({ wallets = WALLETS_FIXTURE, canAdjust = true }) => {
   // The production derivation, called with the production translations. Not a
   // mirror of Accounts.jsx — literally the function Accounts.jsx calls, so the
   // currency rule cannot hold in one and not the other.
   const summary = walletsSummary({
-    wallets: scoped, t: tEn, scopeLabel: tEn('accounts.totalBalance'),
+    wallets, t: tEn, scopeLabel: tEn('accounts.totalBalance'),
   })
-  const { proven, unproven } = partitionWallets(scoped)
+  const { proven, unproven } = partitionWallets(wallets)
   const groupOf = (w) => proven.find((g) => g.wallets.includes(w))
   const isUnproven = (w) => unproven.some((g) => g.wallets.includes(w))
   return (
     <div className="acct-page">
       <AccountsHeader t={tEn} onAddWallet={noop} />
-      {wallets.length > 0 && <ScopeTabs t={tEn} value={scope} onChange={noop} />}
       <AccountsSummary summary={summary} />
       {/* The real zero-state component, not a drawing of it. */}
       {wallets.length === 0 && <WalletsEmptyState t={tEn} onAddWallet={noop} />}
       {wallets.length > 0 && (
         <WalletList
-          wallets={scoped}
+          wallets={wallets}
           groupOf={groupOf}
           isUnproven={isUnproven}
           typeLabelFor={(w) => WALLET_TYPE_LABEL[w.type] || w.type || null}
@@ -647,9 +640,6 @@ const AccountsBody = ({ wallets = WALLETS_FIXTURE, scope = 'all', canAdjust = tr
           onEdit={noop}
           onAdjust={canAdjust ? noop : null}
           onAddWallet={noop}
-          scope={scope}
-          totalCount={wallets.length}
-          onClearFilter={noop}
         />
       )}
       <AboutWallets t={tEn} />
@@ -661,9 +651,8 @@ const AccountsBody = ({ wallets = WALLETS_FIXTURE, scope = 'all', canAdjust = tr
 // different resolved wallet collections. Every one is the same branch of the same
 // component; only the data differs.
 function ShellPreview({ page }) {
-  const ACCOUNTS_SCOPES = { 'accounts-filter-empty': 'personal' }
-function ShellAccounts({ page }) {
-  return <AccountsBody wallets={WALLET_SETS[page]} scope={ACCOUNTS_SCOPES[page] || 'all'} />
+  function ShellAccounts({ page }) {
+  return <AccountsBody wallets={WALLET_SETS[page]} />
 }
 const isAccounts = Object.prototype.hasOwnProperty.call(WALLET_SETS, page)
   const isRadar = Object.prototype.hasOwnProperty.call(RADAR_SHELLS, page)
@@ -791,11 +780,6 @@ export default function DesignPreview() {
         <Section id="accounts-stress" title="Wallets — long names, negative, zero and untotalled" wide
           note="The states a list of accounts actually reaches. A wallet name long enough to wrap rather than be truncated — the name is how a person identifies the account, so it is the last thing that may be cut. A negative balance in red and an exact zero in ink. A dollar wallet whose balance is a sum of amount_idr, so no amount is claimed for it and no share bar is drawn. And a wallet with no currency at all, counted and asked about rather than defaulted to IDR. None of these invents a number.">
           <AccountsBody wallets={WALLETS_STRESS} />
-        </Section>
-
-        <Section id="accounts-filter-empty" title="Wallets — the filter matched nothing" wide
-          note="Emphatically not the zero state. This workspace has four wallets; none of them is personal. Telling the reader to add their first wallet here would be false, so the block names the filter, says how many wallets exist elsewhere, and offers to clear it.">
-          <AccountsBody wallets={WALLETS_FIXTURE} scope="personal" />
         </Section>
 
         {/* ── the Add wallet form ──────────────────────────────────────── */}

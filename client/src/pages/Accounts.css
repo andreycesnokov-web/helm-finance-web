@@ -24,12 +24,6 @@
   align-items: stretch;
   min-width: 0;
 }
-/* The shared .cfo-tabs carries its own margin-bottom for pages that space by
-   margin. This page spaces by gap, so the margin is cleared and the one 18px
-   gap governs here too — otherwise the tab row sits to a different rhythm than
-   every other section on the page. */
-.acct-tabs { margin-bottom: 0; }
-
 /* ── the wallet list ────────────────────────────────────────────────────────
    A list, not a stack of cards. Each wallet was an .hf-card with its own border
    and shadow, so eight wallets read as eight unrelated objects; they are rows of
@@ -203,23 +197,6 @@
 .acct-addmore-title { margin: 0; font-size: 14px; font-weight: 700; color: var(--text-primary); }
 .acct-addmore-sub { margin: 0; font-size: 12.5px; line-height: 1.45; color: var(--text-secondary); }
 .acct-addmore .cfo-btn { flex-shrink: 0; min-height: 40px; }
-
-/* ── the filter matched nothing ─────────────────────────────────────────────
-   Not the zero state: this workspace HAS wallets. Quieter than an empty state
-   because nothing is wrong — a filter is doing its job. */
-.acct-filter-empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  padding: 30px 20px;
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-lg);
-  background: var(--surface-card);
-  text-align: center;
-}
-.acct-filter-empty-title { margin: 0; font-size: 15px; font-weight: 700; color: var(--text-primary); }
-.acct-filter-empty-sub { margin: 0 0 6px; font-size: 13px; color: var(--text-secondary); max-width: 44ch; }
 
 /* ── supporting panels ──────────────────────────────────────────────────── */
 .acct-about-text { margin: 0; font-size: 13.5px; line-height: 1.6; color: var(--text-secondary); }

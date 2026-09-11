@@ -120,32 +120,6 @@ export function AccountsSummary({ summary }) {
   )
 }
 
-/** Scope filter. On the shared tab primitive rather than three hand-styled
- *  pills, so it matches every other tab row in the product. */
-export function ScopeTabs({ t, value, onChange }) {
-  const TABS = [
-    { key: 'all', label: t('common.all') },
-    { key: 'business', label: t('common.business') },
-    { key: 'personal', label: t('common.personal') },
-  ]
-  return (
-    <div className="cfo-tabs acct-tabs" role="tablist">
-      {TABS.map((tab) => (
-        <button
-          key={tab.key}
-          role="tab"
-          type="button"
-          aria-selected={value === tab.key}
-          className={`cfo-tab${value === tab.key ? ' is-active' : ''}`}
-          onClick={() => onChange(tab.key)}
-        >
-          {tab.label}
-        </button>
-      ))}
-    </div>
-  )
-}
-
 /**
  * One wallet.
  *
@@ -289,49 +263,20 @@ export function AddAnotherWallet({ t, onAddWallet }) {
 }
 
 /**
- * The filter matched nothing.
- *
- * Emphatically NOT the zero state. This workspace has wallets — they are just
- * not in the scope the reader is looking at — so telling them to "add your first
- * wallet" would be false. It names the filter, says how many wallets exist
- * elsewhere, and offers to clear it.
- */
-export function WalletsFilterEmpty({ t, scope, totalCount, onClearFilter }) {
-  const scopeName = scope === 'business' ? t('accounts.scopeBusiness') : t('accounts.scopePersonal')
-  return (
-    <div className="acct-filter-empty">
-      <p className="acct-filter-empty-title">
-        {t('accounts.filterEmpty').replace('{scope}', scopeName)}
-      </p>
-      <p className="acct-filter-empty-sub">
-        {(totalCount === 1
-          ? t('accounts.filterEmptyOne')
-          : t('accounts.filterEmptyMany').replace('{n}', String(totalCount)))}
-      </p>
-      <Btn variant="ghost" onClick={onClearFilter}>{t('accounts.showAllWallets')}</Btn>
-    </div>
-  )
-}
-
-/**
  * The wallet list.
  *
- * `wallets` is already scope-filtered by the caller, and `groupOf` / `isUnproven`
- * are the caller's partition — this component classifies nothing itself.
+ * `wallets` is every wallet the API returned for the active company, and
+ * `groupOf` / `isUnproven` are the caller's partition — this component
+ * classifies nothing itself.
  */
 export function WalletList({
   wallets, groupOf, isUnproven, typeLabelFor, t,
   onOpen, onEdit, onAdjust, onAddWallet,
-  scope = 'all', totalCount = 0, onClearFilter,
 }) {
-  // The filter emptied the list, but the workspace has wallets.
-  if (wallets.length === 0) {
-    return (
-      <WalletsFilterEmpty
-        t={t} scope={scope} totalCount={totalCount} onClearFilter={onClearFilter}
-      />
-    )
-  }
+  // The caller renders this only when the company has wallets, and there is no
+  // filter that could empty it — so there is no empty branch here. The zero
+  // state belongs to the page, which knows the difference between "this company
+  // has no wallets", "the request failed" and "still loading".
   return (
     <>
       <ul className="acct-list">
