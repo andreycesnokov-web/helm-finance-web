@@ -1,9 +1,10 @@
 # Defect: the Workbench states "0 obligations" while listing three of them
 
 Raised: 2026-09-11, auditing `/business/accountant` before the design pass.
-Status: **OPEN — not fixed. This is a data/server question, not a design one.**
+Status: **wording fixed in the design PR (#85). The underlying cause — zero
+activated tax rules — is OPEN and belongs to the Tax Engine.**
 Workspace type: Business.
-Severity: **high — the page tells the user they have no tax obligations while
+Severity: **high as a communication defect — the page tells the user they have no tax obligations while
 simultaneously showing three.**
 
 ## What the user sees
@@ -57,26 +58,50 @@ obligations exist, two of them blocked only on missing payroll/service data — 
 amounts that will become real once data is recorded. Nothing on the page says the
 zero is a *rule-resolution* zero rather than a *liability* zero.
 
-## What this report does NOT claim
+## Resolved: the two endpoints are not measuring the same thing
 
-Which endpoint is right. `applicable_rules` may legitimately be empty (no rule set
-configured for this jurisdiction/entity) while `obligations` is a separate
-deterministic list; or the applicability rule set may simply not have been seeded
-for this business. Deciding that needs a look at the tax-rule tables and at
-`/accountant/applicability`'s resolution, neither of which belongs in a design PR.
+**Correction, established after this report was first written.** The original
+version left open which endpoint was wrong. Neither is.
+
+`applicable_rules` counts rows in `tax_rules` that have passed the activation
+gate in `server/lib/taxGate.js` — a verified official source plus an approved
+review by a licensed reviewer whose licence was verified by someone else. Read
+live from production through the app's own endpoints:
+
+```
+GET /api/accountant/rules    →  { jurisdiction: 'ID', rules: [] }      0 active rules
+GET /api/accountant/sources  →  3 rows, every last_verified_at = null
+GET /api/accountant/summary  →  applicable_rules: 0, active_unverified: 0
+```
+
+So `applicable_rules: []` is **correct and expected**: no tax rule has ever been
+activated, and `knowledge/indonesia_official_kb/README.md` says so in its own
+words — *"no verified official rule has ever been loaded"*.
+
+`/accountant/obligations` is a different, later deterministic path that does not
+read `tax_rules` at all. The three rows it returns are obligation *slots* with a
+status, not activated rules.
+
+The defect was therefore never a data inconsistency. It was **the sentence**: a
+count of activated rules, rendered as "deterministic obligations identified from
+your profile", sitting beside a list of obligations, under a 100% completeness
+bar. Three true facts composed into a false impression.
 
 ## What must happen
 
-1. Establish which endpoint is authoritative for "how many obligations apply to
-   this company", and whether an empty `applicable_rules` with a non-empty
-   `obligations` list is an expected state or a seeding gap.
-2. Until then the page must not state a count that contradicts the list beside
-   it. Handled in the design PR as **copy only**: the Profile completeness card
-   stops asserting an obligation count, and says what completeness actually
-   measures (profile fields filled) plus the explicit warning that a complete
-   profile is not a statement about tax risk. No figure, threshold, endpoint or
-   rule is changed.
-3. A check that the two sources agree, once step 1 settles which one leads.
+1. **Done in the design PR, as copy only.** The Profile completeness card stops
+   asserting an obligation count and says what completeness actually measures
+   (profile fields filled), plus the explicit warning that a complete profile is
+   not a statement about tax risk. No figure, threshold, endpoint or rule was
+   changed.
+2. **Still open, and larger than this page:** zero activated rules means the
+   product cannot yet state what tax applies, on what base, or when. Every
+   surface that reports a rule count — here, the Tax Profile readiness card, the
+   Workbench — is reporting zero against a gate nothing has passed. That is the
+   Tax Engine's activation backlog, not a UI question.
+3. Anything that answers a user's tax question must carry this state honestly:
+   it may cite a *collected* source as collected, and must never present one as
+   settled law. See `_specs/ai-accountant-assistant-audit.md`.
 
 ## Not changed here
 
