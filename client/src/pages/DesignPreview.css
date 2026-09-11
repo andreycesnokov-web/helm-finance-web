@@ -162,3 +162,34 @@
   background: var(--surface-page);
 }
 .dsp-shell .cfo-shell { flex: 1 1 auto; min-height: 0; }
+
+/* The wallet form is a bottom sheet in the product: fixed, full-viewport,
+   translucent scrim. A screenshot needs it framed in the flow of the catalogue
+   instead, so the stage neutralises the fixed positioning for this one example.
+   The SHEET itself is untouched — only where it is anchored changes. */
+.dsp-modal-stage { position: relative; min-height: 740px; }
+.dsp-modal-stage .modal-overlay {
+  position: absolute;
+  inset: 0;
+  /* Anchored to the top of the stage rather than centred: a centred sheet taller
+     than the frame hangs below the viewport, and the screenshot crop is clipped
+     by the viewport rather than by the sheet — which is how the form's buttons
+     went missing from the first capture. */
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 16px;
+  background: rgba(0, 32, 63, .10);
+}
+.dsp-modal-stage .modal-sheet {
+  position: relative;
+  max-width: 460px;
+  width: 100%;
+  border-radius: 16px;
+  /* index.css caps the sheet at 90dvh and scrolls it. In the product that is
+     right; for a screenshot it hides the form's buttons below a scroll, so the
+     stage lets this one example size to its content. The sheet's own styling is
+     otherwise untouched. */
+  max-height: none;
+  overflow: visible;
+  animation: none;
+}

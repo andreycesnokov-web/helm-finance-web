@@ -15,6 +15,10 @@
 import { formatAmount } from '../lib/money'
 import en from '../i18n/en'
 import { WalletsEmptyState } from './WalletsEmptyState'
+import {
+  AccountsHeader, AccountsSummary, WalletList, AboutWallets, WalletFormModal,
+} from './AccountsBlocks'
+import { partitionWallets } from '../lib/walletBalanceContract'
 import { walletsSummary } from './walletsSummary'
 import { walletsSummaryByCurrency } from './walletsSummaryConcepts'
 import { WalletCurrencyField } from './WalletCurrencyField'
@@ -377,17 +381,39 @@ const PulseBody = () => (
 
    Four IDR wallets, summing to exactly Rp 152 450 000. */
 const WALLETS_FIXTURE = [
-  { id: 'w1', name: 'BCA · Operating', currency: 'IDR', balance: 94200000 },
-  { id: 'w2', name: 'Mandiri · Payroll', currency: 'IDR', balance: 38500000 },
-  { id: 'w3', name: 'Cash box · Denpasar', currency: 'IDR', balance: 12750000 },
-  { id: 'w4', name: 'Xendit settlement', currency: 'IDR', balance: 7000000 },
+  { id: 'w1', name: 'BCA · Operating', currency: 'IDR', balance: 94200000, type: 'bank', scope: 'business' },
+  { id: 'w2', name: 'Mandiri · Payroll', currency: 'IDR', balance: 38500000, type: 'bank', scope: 'business' },
+  { id: 'w3', name: 'Cash box · Denpasar', currency: 'IDR', balance: 12750000, type: 'cash', scope: 'business' },
+  { id: 'w4', name: 'Xendit settlement', currency: 'IDR', balance: 7000000, type: 'payment_gateway', scope: 'business' },
+]
+
+/* The states a list has to survive, in one collection: a name long enough to
+   wrap at 320px, a negative balance, an exact zero, a wallet in a currency this
+   release cannot total, and one with no currency at all. Every one of these is a
+   state the production page can reach today. */
+const WALLETS_STRESS = [
+  {
+    id: 's1',
+    name: 'Mandiri · Operating account PT Nusantara Integrated Facilities Management',
+    currency: 'IDR', balance: 148900000, type: 'bank', scope: 'business',
+  },
+  { id: 's2', name: 'Petty cash · overdrawn', currency: 'IDR', balance: -4250000, type: 'cash', scope: 'business' },
+  { id: 's3', name: 'Escrow · unused', currency: 'IDR', balance: 0, type: 'other', scope: 'business' },
+  // Real currency, but the balance is a sum of amount_idr — no amount is claimed.
+  { id: 's4', name: 'Wise · USD operating', currency: 'USD', balance: 842500, type: 'bank', scope: 'business' },
+  // No currency at all. Counted, asked about, never guessed into a default.
+  { id: 's5', name: 'Imported · unknown currency', currency: null, balance: 5000000, type: 'other', scope: 'business' },
+  // A company-owned wallet flagged personal — the ambiguous record migration 017
+  // could have produced. It belongs to this company by business_id and is listed
+  // and totalled as such; the chip marks the claim without resolving it.
+  { id: 's6', name: 'Director card · reimbursements', currency: 'IDR', balance: 3100000, type: 'ewallet', scope: 'personal' },
 ]
 const WALLETS_EMPTY = []
 // A workspace that banks in dollars. The headline must be written in ITS currency
 // — "$1.2M", never "Rp" in front of dollars.
 const WALLETS_USD = [
-  { id: 'u1', name: 'Wise · USD operating', currency: 'USD', balance: 842500 },
-  { id: 'u2', name: 'Mercury · reserves', currency: 'USD', balance: 410000 },
+  { id: 'u1', name: 'Wise · USD operating', currency: 'USD', balance: 842500, type: 'bank', scope: 'business' },
+  { id: 'u2', name: 'Mercury · reserves', currency: 'USD', balance: 410000, type: 'bank', scope: 'business' },
 ]
 // The case that started this: unlike currencies in one workspace. There is no
 // rate in this product, so there is no combined total — one labelled amount each.
@@ -396,15 +422,15 @@ const WALLETS_MIXED = [...WALLETS_FIXTURE, ...WALLETS_USD]
 // row asks for the currency instead of being folded into someone else's total.
 const WALLETS_NEEDS_CURRENCY = [
   ...WALLETS_FIXTURE.slice(0, 2),
-  { id: 'x1', name: 'Imported · unknown currency', currency: null, balance: 5000000 },
+  { id: 'x1', name: 'Imported · unknown currency', currency: null, balance: 5000000, type: 'other', scope: 'business' },
 ]
 // Four currencies, for the layout stress test, plus a deliberately long figure.
-const WALLETS_SGD = [{ id: 's1', name: 'DBS · SGD', currency: 'SGD', balance: 8200 }]
-const WALLETS_EUR = [{ id: 'e1', name: 'Revolut · EUR', currency: 'EUR', balance: 12400 }]
+const WALLETS_SGD = [{ id: 'g1', name: 'DBS · SGD', currency: 'SGD', balance: 8200, type: 'bank', scope: 'business' }]
+const WALLETS_EUR = [{ id: 'e1', name: 'Revolut · EUR', currency: 'EUR', balance: 12400, type: 'bank', scope: 'business' }]
 const WALLETS_FOUR = [...WALLETS_FIXTURE, ...WALLETS_USD, ...WALLETS_SGD, ...WALLETS_EUR]
 const WALLETS_LONG = [
-  { id: 'L1', name: 'Consolidated treasury', currency: 'IDR', balance: 999999999 },
-  { id: 'L2', name: 'USD treasury', currency: 'USD', balance: 98765432 },
+  { id: 'L1', name: 'Consolidated treasury', currency: 'IDR', balance: 999999999, type: 'bank', scope: 'business' },
+  { id: 'L2', name: 'USD treasury', currency: 'USD', balance: 98765432, type: 'bank', scope: 'business' },
 ]
 const WALLET_SETS = {
   'accounts': WALLETS_FIXTURE,
@@ -413,6 +439,16 @@ const WALLET_SETS = {
   'accounts-mixed': WALLETS_MIXED,
   'accounts-nocur': WALLETS_NEEDS_CURRENCY,
   'accounts-four': WALLETS_FOUR,
+  'accounts-stress': WALLETS_STRESS,
+  /* Two wallets, so a 390x844 frame holds the list AND the block that closes it.
+     The four-wallet collection pushes the add block below the fold on a phone,
+     which makes it unphotographable in one shot rather than badly designed. */
+  'accounts-short': WALLETS_FIXTURE.slice(0, 2),
+  /* One wallet, so a 390x844 frame holds the list AND the block that closes it.
+     A phone row is two lines tall, so even two wallets push the block past the
+     fold — which makes the relationship between them unphotographable in one
+     honest phone-sized frame rather than badly designed. */
+  'accounts-one': WALLETS_FIXTURE.slice(0, 1),
 }
 // Radar is a different page shape, so it gets its own shell routes rather than a
 // wallet collection.
@@ -530,25 +566,88 @@ const AICFOBody = ({ data = AICFO_FIXTURE, access = AICFO_ACCESS, planLabel = 'F
   )
 }
 
-const AccountsBody = ({ wallets = WALLETS_FIXTURE }) => {
+/* The Add-wallet form, which had never been photographed.
+   The production component with a filled-in form object — the same one
+   Accounts.jsx passes down. Rendered inline rather than through a portal so the
+   screenshot frames it; the sheet's own markup is identical either way.
+
+   `setForm` is a no-op here: this is a picture of a form, not a working one. */
+const WALLET_TYPES_PREVIEW = [
+  { value: 'bank', label: 'Bank account' },
+  { value: 'cash', label: 'Cash' },
+  { value: 'ewallet', label: 'E-Wallet' },
+  { value: 'crypto', label: 'Crypto wallet' },
+  { value: 'payment_gateway', label: 'Payment gateway' },
+  { value: 'other', label: 'Other' },
+]
+const CURRENCY_SWATCH_PREVIEW = {
+  IDR: { bg: '#E1F5EE', color: '#085041' }, USD: { bg: '#EEF2FF', color: '#3730a3' },
+  EUR: { bg: '#FEF3C7', color: '#92400E' }, SGD: { bg: '#FDE8FF', color: '#7E22CE' },
+}
+const WalletFormBody = ({ editWallet = null, form: override = {} }) => (
+  <div className="dsp-modal-stage">
+    <WalletFormModal
+      t={tEn}
+      form={{
+        name: '', currency: 'IDR', type: '', entity_name: '',
+        opening_balance: '', custom_type: '', scope: 'business', ...override,
+      }}
+      setForm={noop}
+      editWallet={editWallet}
+      saving={false}
+      canAdjust
+      currencies={['IDR', 'USD', 'EUR', 'SGD', 'MYR', 'THB', 'CNY']}
+      walletTypes={WALLET_TYPES_PREVIEW}
+      styleFor={(c) => CURRENCY_SWATCH_PREVIEW[c] || { bg: '#F1F5F9', color: '#475569' }}
+      onSave={noop} onCancel={noop} onAdjust={noop} onDelete={noop}
+    />
+  </div>
+)
+
+/* Accounts, as the product renders it.
+
+   This used to be a page header, a summary card and nothing else — so every
+   "Accounts" screenshot PR #80 shipped showed one navy card, and the wallet
+   list, the scope tabs, the add block and the wallet form had never been
+   photographed at all. A picture of the summary card is not a picture of this
+   page. Every block below is the production component from AccountsBlocks.jsx,
+   and the partition is the production partitionWallets() rather than a copy of
+   the rule, so the preview cannot show a currency state the page would not. */
+const WALLET_TYPE_LABEL = {
+  bank: 'Bank account', cash: 'Cash', ewallet: 'E-Wallet',
+  crypto: 'Crypto wallet', payment_gateway: 'Payment gateway', other: 'Other',
+}
+const AccountsBody = ({ wallets = WALLETS_FIXTURE, canAdjust = true }) => {
   // The production derivation, called with the production translations. Not a
   // mirror of Accounts.jsx — literally the function Accounts.jsx calls, so the
   // currency rule cannot hold in one and not the other.
   const summary = walletsSummary({
     wallets, t: tEn, scopeLabel: tEn('accounts.totalBalance'),
   })
+  const { proven, unproven } = partitionWallets(wallets)
+  const groupOf = (w) => proven.find((g) => g.wallets.includes(w))
+  const isUnproven = (w) => unproven.some((g) => g.wallets.includes(w))
   return (
-    <>
-      <PageHeader
-        title={tEn('accounts.walletsAccounts')}
-        description={tEn('accounts.walletsSubtitle')}
-        primaryAction={<Btn variant="primary">{tEn('accounts.addWallet')}</Btn>}
-      />
-      <SummaryCard flagship compact={summary.compact}
-        label={summary.label} value={summary.value} meta={summary.meta} />
+    <div className="acct-page">
+      <AccountsHeader t={tEn} onAddWallet={noop} />
+      <AccountsSummary summary={summary} />
       {/* The real zero-state component, not a drawing of it. */}
       {wallets.length === 0 && <WalletsEmptyState t={tEn} onAddWallet={noop} />}
-    </>
+      {wallets.length > 0 && (
+        <WalletList
+          wallets={wallets}
+          groupOf={groupOf}
+          isUnproven={isUnproven}
+          typeLabelFor={(w) => WALLET_TYPE_LABEL[w.type] || w.type || null}
+          t={tEn}
+          onOpen={noop}
+          onEdit={noop}
+          onAdjust={canAdjust ? noop : null}
+          onAddWallet={noop}
+        />
+      )}
+      <AboutWallets t={tEn} />
+    </div>
   )
 }
 
@@ -556,7 +655,10 @@ const AccountsBody = ({ wallets = WALLETS_FIXTURE }) => {
 // different resolved wallet collections. Every one is the same branch of the same
 // component; only the data differs.
 function ShellPreview({ page }) {
-  const isAccounts = Object.prototype.hasOwnProperty.call(WALLET_SETS, page)
+  function ShellAccounts({ page }) {
+  return <AccountsBody wallets={WALLET_SETS[page]} />
+}
+const isAccounts = Object.prototype.hasOwnProperty.call(WALLET_SETS, page)
   const isRadar = Object.prototype.hasOwnProperty.call(RADAR_SHELLS, page)
   const isAiCfo = Object.prototype.hasOwnProperty.call(AICFO_SHELLS, page)
   return (
@@ -575,7 +677,7 @@ function ShellPreview({ page }) {
           ? <AICFOBody {...AICFO_SHELLS[page]} />
           : isRadar
             ? <RadarBody data={RADAR_SHELLS[page]} />
-            : isAccounts ? <AccountsBody wallets={WALLET_SETS[page]} /> : <PulseBody />}
+            : isAccounts ? <ShellAccounts page={page} /> : <PulseBody />}
       </WorkspaceShell>
     </div>
   )
@@ -676,6 +778,18 @@ export default function DesignPreview() {
           <AccountsBody wallets={WALLETS_MIXED} />
           <AccountsBody wallets={WALLETS_FOUR} />
           <AccountsBody wallets={WALLETS_NEEDS_CURRENCY} />
+        </Section>
+
+        {/* ── Accounts, the list itself ────────────────────────────────── */}
+        <Section id="accounts-stress" title="Wallets — long names, negative, zero and untotalled" wide
+          note="The states a list of accounts actually reaches. A wallet name long enough to wrap rather than be truncated — the name is how a person identifies the account, so it is the last thing that may be cut. A negative balance in red and an exact zero in ink. A dollar wallet whose balance is a sum of amount_idr, so no amount is claimed for it and no share bar is drawn. And a wallet with no currency at all, counted and asked about rather than defaulted to IDR. None of these invents a number.">
+          <AccountsBody wallets={WALLETS_STRESS} />
+        </Section>
+
+        {/* ── the Add wallet form ──────────────────────────────────────── */}
+        <Section id="accounts-form" title="Add wallet — the real form" wide
+          note="The form a user actually fills in, from the production component. It had never appeared in a screenshot: the preview rendered a header and a summary card, so the wallet list, the scope tabs and this form were all unphotographed. The currency control is required, ISO-only and shows each code beside its name; currencies whose native balance the backend cannot yet prove are visible but disabled with the reason given, and on an existing wallet the field is locked outright — changing it would relabel every transaction the wallet already holds.">
+          <WalletFormBody />
         </Section>
 
         {/* ── Accounts, empty ──────────────────────────────────────────── */}

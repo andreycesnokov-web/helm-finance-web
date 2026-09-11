@@ -638,6 +638,94 @@ const PROBE_FN = `function facts(win, doc) {
     };
   })();
 
+  // Wallets & Accounts, measured. The list is the part of this page that had
+  // never been photographed or asserted on at all — every previous check saw a
+  // header and one summary card.
+  const accounts = (() => {
+    const page = doc.querySelector('.acct-page');
+    if (!page) return null;
+    const kids = [...page.children].filter((el) => el.getBoundingClientRect().height > 0);
+    const gaps = [];
+    for (let i = 1; i < kids.length; i++) {
+      const a = kids[i - 1].getBoundingClientRect(), b = kids[i].getBoundingClientRect();
+      gaps.push({
+        from: (typeof kids[i - 1].className === 'string' ? kids[i - 1].className : '').split(' ')[0],
+        to: (typeof kids[i].className === 'string' ? kids[i].className : '').split(' ')[0],
+        px: Math.round(b.top - a.bottom),
+      });
+    }
+    return {
+      gaps,
+      rows: [...doc.querySelectorAll('.acct-row')].map((li) => {
+        const bal = li.querySelector('.acct-row-balance');
+        const sub = li.querySelector('.acct-row-sub');
+        const open = li.querySelector('.acct-row-open');
+        return {
+          name: (li.querySelector('.acct-row-name') || {}).textContent?.trim() || '',
+          balance: bal ? bal.textContent.trim() : null,
+          balanceColor: bal ? cs(bal).color : null,
+          missing: bal ? bal.classList.contains('is-missing') : false,
+          negative: bal ? bal.classList.contains('is-neg') : false,
+          sub: sub ? sub.textContent.trim() : null,
+          chips: [...li.querySelectorAll('.acct-chip')].map((c) => c.textContent.trim()),
+          meter: !!li.querySelector('.acct-row-meter'),
+          openIsButton: !!open && open.tagName === 'BUTTON',
+          openH: open ? +open.getBoundingClientRect().height.toFixed(1) : 0,
+          actions: [...li.querySelectorAll('.acct-iconbtn')].map((b) => ({
+            label: b.getAttribute('aria-label'),
+            h: +b.getBoundingClientRect().height.toFixed(1),
+          })),
+          nameTruncated: (() => {
+            const n = li.querySelector('.acct-row-name');
+            return n ? n.scrollWidth > n.clientWidth + 1 : false;
+          })(),
+        };
+      }),
+      addMore: (() => {
+        const b = doc.querySelector('.acct-addmore');
+        if (!b) return null;
+        const sym = b.querySelector('.acct-addmore-sym');
+        const btn = b.querySelector('.cfo-btn');
+        return {
+          title: (b.querySelector('.acct-addmore-title') || {}).textContent?.trim() || '',
+          sub: (b.querySelector('.acct-addmore-sub') || {}).textContent?.trim() || '',
+          symSrc: sym ? sym.getAttribute('src') : null,
+          symW: sym ? Math.round(sym.getBoundingClientRect().width) : 0,
+          btnLabel: btn ? btn.textContent.trim() : null,
+          btnH: btn ? +btn.getBoundingClientRect().height.toFixed(1) : 0,
+          h: Math.round(b.getBoundingClientRect().height),
+        };
+      })(),
+      zeroState: (() => {
+        const st = doc.querySelector('.cfo-state');
+        if (!st) return null;
+        const sym = st.querySelector('.cfo-state-sym');
+        return {
+          title: (st.querySelector('.cfo-state-h') || {}).textContent?.trim() || '',
+          symW: sym ? Math.round(sym.getBoundingClientRect().width) : 0,
+          h: Math.round(st.getBoundingClientRect().height),
+        };
+      })(),
+      filterEmpty: (() => {
+        const fe = doc.querySelector('.acct-filter-empty');
+        if (!fe) return null;
+        return {
+          title: (fe.querySelector('.acct-filter-empty-title') || {}).textContent?.trim() || '',
+          sub: (fe.querySelector('.acct-filter-empty-sub') || {}).textContent?.trim() || '',
+          // Doubled backslash: the probe is a template literal, so a bare \\s
+          // reaches the page as a literal "s".
+          text: (fe.textContent || '').replace(/\\s+/g, ' ').trim(),
+        };
+      })(),
+      summaryMeta: (doc.querySelector('.cfo-summary-meta') || {}).textContent?.trim() || '',
+      dashedAddRow: doc.querySelectorAll('[style*="dashed"]').length,
+      // The Business/Personal scope filter, which /business/accounts no longer
+      // has: the API already restricts the list to the active company.
+      scopeTabs: doc.querySelectorAll('.acct-page [role="tablist"]').length,
+      flagships: doc.querySelectorAll('.acct-page .cfo-flagship').length,
+    };
+  })();
+
   const res = win.performance.getEntriesByType('resource');
   const calls = res.filter((e) => e.initiatorType === 'xmlhttprequest' || e.initiatorType === 'fetch')
     .map((e) => e.name);
@@ -648,7 +736,7 @@ const PROBE_FN = `function facts(win, doc) {
     h1Total: doc.querySelectorAll('h1').length,
     sections, overflow: overflow.slice(0, 10), overflowCount: overflow.length,
     overlaps: overlaps.slice(0, 12), overlapCount: overlaps.length,
-    headActions, heads, focusRing, shell, figures, brand, idLeaks, navItems, walletsState, aicfo,
+    headActions, heads, focusRing, shell, figures, brand, idLeaks, navItems, walletsState, aicfo, accounts,
     settings, drawerSettings, topbarSettings, headMarks,
     fonts: { status: doc.fonts.status, size: doc.fonts.size,
       archivo: doc.fonts.check('400 40px "Archivo Black"'),
@@ -780,6 +868,16 @@ const CURRENCIES = await collectGroup([
 const { SD, SM, WP, WE, WEM, WP320, WE320, WP768, PULSE768 } = SHELLS;
 const { WUSD, WMIX, WMIXM, WNOC, W4, W4M } = CURRENCIES;
 const { CD, CM, CR, CRM, CE, CS } = CURRENCIES;
+/* Wallets & Accounts. Its own group, and the reason is coverage rather than
+   taste: this page's list had never been rendered in a test at all. */
+const ACCOUNTS = await collectGroup([
+  { key: 'AD', route: `${P}?shell=accounts`, w: 1440, h: 900 },
+  { key: 'AM', route: `${P}?shell=accounts`, w: 390, h: 844 },
+  { key: 'AS', route: `${P}?shell=accounts-stress`, w: 1440, h: 900 },
+  { key: 'A320', route: `${P}?shell=accounts-stress`, w: 320, h: 900 },
+  { key: 'AE', route: `${P}?shell=accounts-empty`, w: 1440, h: 900 },
+], 45000);
+const { AD, AM, AS, A320, AE } = ACCOUNTS;
 console.log(`  .. desktop viewport ${D.innerWidth}px, mobile viewport ${M.innerWidth}px, `
   + `in-shell ${SD.innerWidth}px / ${SM.innerWidth}px`);
 
@@ -1439,6 +1537,244 @@ t('Refresh stays reachable and does not push the title around', () => {
   const head = CD.heads[0];
   assert.ok(head, 'no page hero rendered on the AI CFO page');
   assert.strictEqual(head.sameRow, true, 'Refresh dropped onto its own row on desktop');
+});
+
+/* ── Wallets & Accounts ────────────────────────────────────────────────────
+   The list is what this page is, and it had never been measured — or
+   photographed — because the preview rendered a header and a summary card and
+   nothing else. These assert the list itself. */
+console.log('\nWallets & Accounts — the list');
+
+const ACCT_VIEWS = [['desktop', AD], ['390px', AM], ['stress', AS], ['320px', A320]];
+
+t('every Accounts view rendered a page', () => {
+  for (const [name, f] of ACCT_VIEWS) {
+    assert.ok(f.accounts, `the ${name} view did not render the Accounts page`);
+  }
+});
+
+t('the wallet list is on screen, not just the summary card', () => {
+  // The regression this whole split exists to prevent: a screenshot of the
+  // summary card being taken for a screenshot of the page.
+  assert.strictEqual(AD.accounts.rows.length, 4, `desktop shows ${AD.accounts.rows.length} wallet rows`);
+  assert.strictEqual(AS.accounts.rows.length, 6, `the stress view shows ${AS.accounts.rows.length} rows`);
+  for (const [name, f] of ACCT_VIEWS) {
+    assert.ok(f.accounts.rows.length > 0, `${name}: the wallet list is missing`);
+  }
+});
+
+t('one gap between sections, 16-20px, in every state', () => {
+  // .hf-page is a plain block and .cfo-card has no margin, so the page was
+  // spaced by whichever margin each block happened to carry.
+  const between = (f) => f.accounts.gaps.filter((g) => !g.from.includes('pagehead'));
+  for (const [name, f] of ACCT_VIEWS) {
+    const gaps = between(f);
+    assert.ok(gaps.length > 0, `${name}: no sections measured`);
+    for (const g of gaps) {
+      assert.ok(g.px >= 16 && g.px <= 20,
+        `${name}: ${g.from} → ${g.to} is ${g.px}px, outside 16-20px`);
+    }
+  }
+});
+
+t('a row keeps name, currency, type, scope, balance and both actions', () => {
+  const row = AD.accounts.rows[0];
+  assert.ok(row.name.length > 0, 'a row has no name');
+  assert.strictEqual(row.chips.length, 3,
+    `a row shows ${row.chips.length} chips, expected currency + type + scope: ${row.chips.join(', ')}`);
+  assert.ok(/^IDR$/.test(row.chips[0]), `the first chip is "${row.chips[0]}", not a currency`);
+  assert.ok(/Business|Personal/.test(row.chips[2]), `the scope chip reads "${row.chips[2]}"`);
+  assert.match(row.balance, /^Rp /, `the balance reads "${row.balance}" with no currency`);
+  assert.strictEqual(row.actions.length, 2, `a row has ${row.actions.length} actions, expected 2`);
+  for (const a of row.actions) {
+    assert.ok(a.label && a.label.length > 0, 'a row action has no accessible name');
+  }
+});
+
+t('a row is reachable from a keyboard, at a thumb-sized target', () => {
+  // It was a <div> with onClick and the two action buttons nested inside it —
+  // unreachable by keyboard, and invalid nesting besides.
+  for (const [name, f] of ACCT_VIEWS) {
+    for (const row of f.accounts.rows) {
+      assert.ok(row.openIsButton, `${name}: the row "${row.name}" is not a button`);
+      assert.ok(row.openH >= 44, `${name}: the row "${row.name}" is ${row.openH}px tall`);
+      for (const a of row.actions) {
+        assert.ok(a.h >= 36, `${name}: an action on "${row.name}" is ${a.h}px tall`);
+      }
+    }
+  }
+});
+
+console.log('\nWallets & Accounts — what a balance may say');
+
+t('an unavailable balance is a dash, never a zero and never red', () => {
+  // The rule the currency contract exists for. A wallet whose unit cannot be
+  // vouched for prints no amount at all; it must not fall back to Rp 0, which
+  // would be a claim about money, nor to red, which would read as a negative.
+  const unavailable = AS.accounts.rows.filter((r) => r.missing);
+  assert.strictEqual(unavailable.length, 2,
+    `expected 2 unprovable balances in the stress view, found ${unavailable.length}`);
+  for (const r of unavailable) {
+    assert.strictEqual(r.balance, '—', `"${r.name}" prints "${r.balance}"`);
+    assert.ok(!/0/.test(r.balance), `"${r.name}" rendered a zero for an unknown balance`);
+    assert.ok(!/Rp/.test(r.balance), `"${r.name}" wears a currency it cannot prove`);
+    assert.ok(!r.negative, `"${r.name}" is styled as a negative balance`);
+    // And it says WHY, rather than leaving a bare dash.
+    assert.ok(/unavailable|currency/i.test(r.sub || ''),
+      `"${r.name}" gives no reason: "${r.sub}"`);
+    // No share meter either: there is no total to take a share of.
+    assert.ok(!r.meter, `"${r.name}" draws a share meter for an unmeasurable balance`);
+  }
+});
+
+t('a real zero balance is shown as a figure, not as absence', () => {
+  const zero = AS.accounts.rows.find((r) => /Escrow/.test(r.name));
+  assert.ok(zero, 'the zero-balance fixture did not render');
+  assert.strictEqual(zero.balance, 'Rp 0', `a zero balance reads "${zero.balance}"`);
+  assert.ok(!zero.missing, 'a measured zero is being treated as an unavailable balance');
+  assert.ok(!zero.negative, 'a zero balance is coloured as a negative');
+});
+
+t('a negative balance is red, and only a negative one is', () => {
+  const neg = AS.accounts.rows.find((r) => r.negative);
+  assert.ok(neg, 'the negative-balance fixture did not render');
+  assert.match(neg.balance, /^Rp -/, `the negative balance reads "${neg.balance}"`);
+  const positives = AS.accounts.rows.filter((r) => !r.negative && !r.missing);
+  const colors = new Set(positives.map((r) => r.balanceColor));
+  assert.ok(!colors.has(neg.balanceColor),
+    `a positive balance is painted the same colour as the negative one (${neg.balanceColor})`);
+});
+
+t('the summary keeps saying what it left out of the total', () => {
+  // Wallets in other currencies are counted and named, never folded into the
+  // figure and never hidden.
+  assert.match(AS.accounts.summaryMeta, /not totalled yet/i,
+    `the stress summary reads "${AS.accounts.summaryMeta}"`);
+  assert.match(AS.accounts.summaryMeta, /needs currency/i,
+    `the stress summary does not mention the wallet with no currency`);
+});
+
+t('a long wallet name wraps rather than being cut off', () => {
+  // The name is how a person identifies the account, so it is the last thing
+  // that may be truncated — at 320px especially.
+  for (const [name, f] of [['stress', AS], ['320px', A320]]) {
+    for (const row of f.accounts.rows) {
+      assert.ok(!row.nameTruncated, `${name}: "${row.name}" is clipped`);
+    }
+  }
+  const long = A320.accounts.rows.find((r) => r.name.length > 50);
+  assert.ok(long, 'the long-name fixture did not render at 320px');
+});
+
+console.log('\nWallets & Accounts — adding a wallet');
+
+t('the business page shows one unfiltered list, with no scope tabs', () => {
+  // /business/accounts shows the wallets of the SELECTED COMPANY. The tabs only
+  // re-filtered rows the API had already restricted to that company, by a scope
+  // column that does not establish ownership.
+  for (const [name, f] of [...ACCT_VIEWS, ['empty', AE]]) {
+    assert.strictEqual(f.accounts.scopeTabs, 0,
+      `${name}: ${f.accounts.scopeTabs} scope tab row(s) still rendered`);
+  }
+  // Every wallet in the fixture is on screen — nothing is filtered out.
+  assert.strictEqual(AS.accounts.rows.length, 6,
+    `the stress view shows ${AS.accounts.rows.length} of 6 wallets`);
+});
+
+t('removing the filter did not hide the Business/Personal flag', () => {
+  // The scope is still on every row. A company-owned wallet flagged personal
+  // stays visible and stays labelled — the filter went, the data did not.
+  for (const row of AD.accounts.rows) {
+    const scopeChip = row.chips[row.chips.length - 1];
+    assert.ok(/Business|Personal/.test(scopeChip),
+      `"${row.name}" lost its scope chip: ${row.chips.join(', ')}`);
+  }
+});
+
+t('a company wallet flagged personal is marked, not muted', () => {
+  // business_id says the row belongs to this company; the flag claims the money
+  // does not; migration 017 assigned wallets to businesses without ever looking
+  // at scope. The row is listed and totalled as the company's — that is what
+  // business_id establishes — and the chip marks the unresolved claim rather
+  // than blending into the other chips.
+  const personal = AS.accounts.rows.find((r) => /Director card/.test(r.name));
+  assert.ok(personal, 'the ambiguous-record fixture did not render');
+  assert.ok(personal.chips.some((c) => /Personal/.test(c)),
+    `the row is not labelled personal: ${personal.chips.join(', ')}`);
+  // It still carries a real balance: nothing is excluded, hidden or reclassified.
+  assert.match(personal.balance, /^Rp /,
+    `the row prints "${personal.balance}" instead of its balance`);
+  assert.ok(!personal.missing, 'the row was treated as an unmeasurable balance');
+});
+
+t('the dashed add row is gone, replaced by the branded block', () => {
+  // The list used to end with a dashed card pretending to be a wallet.
+  for (const [name, f] of ACCT_VIEWS) {
+    assert.strictEqual(f.accounts.dashedAddRow, 0,
+      `${name}: ${f.accounts.dashedAddRow} dashed placeholder(s) still on the page`);
+  }
+  const b = AD.accounts.addMore;
+  assert.ok(b, 'the add-another block is missing');
+  assert.ok(b.title.length > 0, 'the add-another block has no heading');
+  assert.ok(b.sub.length > 20, `the explanation is "${b.sub}" — too short to explain anything`);
+  assert.ok(b.btnLabel && /add/i.test(b.btnLabel), `the button reads "${b.btnLabel}"`);
+});
+
+t('the add block carries the official mark, small', () => {
+  const b = AD.accounts.addMore;
+  assert.match(b.symSrc || '', /\/brand\/symbol_[a-z_]+\.svg$/,
+    `the block's mark is ${b.symSrc}, not an official brand asset`);
+  // Deliberately smaller than the zero state's, which is the whole page.
+  assert.ok(b.symW > 0 && b.symW <= 40, `the block's mark is ${b.symW}px wide`);
+});
+
+t('the add block is more compact than the full zero state', () => {
+  // Two different jobs: one closes a list that already has content, the other IS
+  // the page. If they were the same size the list would end in a second page.
+  const block = AD.accounts.addMore;
+  const zero = AE.accounts.zeroState;
+  assert.ok(zero, 'the zero state did not render');
+  assert.ok(block.h < zero.h,
+    `the add block is ${block.h}px and the zero state ${zero.h}px — the block is not more compact`);
+  assert.ok(block.symW < zero.symW,
+    `the block's mark (${block.symW}px) is not smaller than the zero state's (${zero.symW}px)`);
+});
+
+t('the zero state still says what it always said', () => {
+  const z = AE.accounts.zeroState;
+  assert.match(z.title, /Your wallets will live here/,
+    `the zero state heading reads "${z.title}"`);
+  // And on an empty workspace there is no add-another block competing with it.
+  assert.strictEqual(AE.accounts.addMore, null,
+    'the add-another block renders on an empty workspace, alongside the zero state');
+  assert.strictEqual(AE.accounts.rows.length, 0, 'the empty workspace rendered wallet rows');
+});
+
+t('exactly one card on the page carries the brand watermark', () => {
+  for (const [name, f] of [...ACCT_VIEWS, ['empty', AE]]) {
+    assert.strictEqual(f.accounts.flagships, 1,
+      `${name}: ${f.accounts.flagships} flagship cards, expected 1`);
+  }
+});
+
+console.log('\nWallets & Accounts — 390px and 320px');
+
+t('nothing overflows or scrolls sideways on a phone', () => {
+  for (const [name, f] of [['390px', AM], ['320px', A320]]) {
+    assert.ok(f.scrollWidth <= f.clientWidth,
+      `${name}: scrollWidth ${f.scrollWidth} > clientWidth ${f.clientWidth}`);
+    assert.strictEqual(f.overflowCount, 0,
+      `${name}: ${f.overflowCount} overflowing element(s): ${JSON.stringify(f.overflow)}`);
+  }
+});
+
+t('no balance is clipped, at any width', () => {
+  for (const [name, f] of ACCT_VIEWS) {
+    for (const fig of f.figures) {
+      assert.strictEqual(fig.truncated, false,
+        `${name}: "${fig.text}" (.${fig.cls}) is clipped`);
+    }
+  }
 });
 
 /* ── workspace settings ────────────────────────────────────────────────────── */

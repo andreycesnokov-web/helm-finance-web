@@ -1,16 +1,20 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
+import { useWorkspace } from '../shell/WorkspaceProvider'
 import { useAccess } from '../hooks/useAccess'
 import { useTranslation } from '../hooks/useTranslation'
 import { apiFetch, fmt, fmtFull } from '../lib/api'
 import { formatCurrency } from '../lib/money'
 import { walletsSummary } from './walletsSummary'
 import { partitionWallets } from '../lib/walletBalanceContract'
-import { WalletCurrencyField } from './WalletCurrencyField'
-import { PageHeader, SummaryCard, ErrorState } from '../shell/ui'
+import { createRequestGuard } from '../lib/requestGuard'
+import { Card, Btn, ErrorState } from '../shell/ui'
 import { WalletsEmptyState } from './WalletsEmptyState'
+import {
+  AccountsHeader, AccountsSummary, WalletList, AboutWallets, WalletFormModal,
+} from './AccountsBlocks'
 import { WORKSPACE_DEFAULT_CURRENCY } from './walletsSummary'
 
 // ── Wallet type config ────────────────────────────────────────────────────────
@@ -28,62 +32,17 @@ const WALLET_TYPES = [
 
 const CURRENCIES = ['IDR', 'USD', 'EUR', 'SGD', 'MYR', 'THB', 'CNY']
 
-const TYPE_ICON = {
-  bank: (color) => (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round">
-      <rect x="2" y="7" width="20" height="14" rx="2"/>
-      <path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/>
-      <line x1="12" y1="12" x2="12" y2="16"/><line x1="10" y1="14" x2="14" y2="14"/>
-    </svg>
-  ),
-  cash: (color) => (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round">
-      <rect x="2" y="6" width="20" height="12" rx="2"/>
-      <circle cx="12" cy="12" r="3"/>
-      <path d="M6 12h.01M18 12h.01"/>
-    </svg>
-  ),
-  ewallet: (color) => (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round">
-      <rect x="5" y="2" width="14" height="20" rx="2"/>
-      <line x1="12" y1="18" x2="12.01" y2="18"/>
-    </svg>
-  ),
-  alipay: (color) => (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round">
-      <circle cx="12" cy="12" r="10"/>
-      <path d="M9 9h6M9 12h6"/>
-      <path d="M7 15c2 1 8 2 10 0"/>
-    </svg>
-  ),
-  wechat_pay: (color) => (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round">
-      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-      <line x1="9" y1="10" x2="9.01" y2="10"/>
-      <line x1="15" y1="10" x2="15.01" y2="10"/>
-    </svg>
-  ),
-  crypto: (color) => (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round">
-      <circle cx="12" cy="12" r="10"/>
-      <path d="M9 8h4a2 2 0 0 1 0 4H9zm0 4h4.5a2 2 0 0 1 0 4H9z"/>
-      <line x1="12" y1="6" x2="12" y2="8"/><line x1="12" y1="16" x2="12" y2="18"/>
-    </svg>
-  ),
-  payment_gateway: (color) => (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round">
-      <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
-    </svg>
-  ),
-  other: (color) => (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round">
-      <rect x="1" y="4" width="22" height="16" rx="2"/>
-      <line x1="1" y1="10" x2="23" y2="10"/>
-    </svg>
-  ),
-}
+// TYPE_ICON and the private CURRENCY_STYLE palette that used to sit here are
+// gone. The icons moved verbatim into AccountsBlocks.jsx and now draw at
+// currentColor; the palette was seven hardcoded pairs (#E1F5EE / #085041 …) that
+// belonged to no token layer and coloured a row by its CURRENCY while the icon
+// depicts its TYPE. The form's currency swatches keep a styleFor() below, which
+// is the one place that mapping was actually about a currency.
 
-const CURRENCY_STYLE = {
+// The Add/Edit form still shows a colour behind each currency code. That is a
+// swatch to tell options apart in a list, not a semantic colour, so it stays
+// local to the form and out of the token layer.
+const CURRENCY_SWATCH = {
   IDR: { bg: '#E1F5EE', color: '#085041' },
   USD: { bg: '#EEF2FF', color: '#3730a3' },
   EUR: { bg: '#FEF3C7', color: '#92400E' },
@@ -92,9 +51,7 @@ const CURRENCY_STYLE = {
   THB: { bg: '#F0F9FF', color: '#0369A1' },
   CNY: { bg: '#FFF1F0', color: '#991B1B' },
 }
-
-const getCurrencyStyle = (currency) => CURRENCY_STYLE[currency] || { bg: '#F1F5F9', color: '#475569' }
-const getTypeIcon      = (type, color) => (TYPE_ICON[type] || TYPE_ICON.other)(color)
+const getCurrencyStyle = (currency) => CURRENCY_SWATCH[currency] || { bg: '#F1F5F9', color: '#475569' }
 
 // ── Default form state ────────────────────────────────────────────────────────
 const EMPTY_FORM = { name: '', currency: WORKSPACE_DEFAULT_CURRENCY, type: '', entity_name: '', opening_balance: '', sort_order: 0, custom_type: '', scope: 'business' }
@@ -102,6 +59,15 @@ const EMPTY_FORM = { name: '', currency: WORKSPACE_DEFAULT_CURRENCY, type: '', e
 export default function Accounts() {
   const { token } = useAuth()
   const { access } = useAccess()
+  // switchTo() bumps scopeKey rather than remounting the page, so a page that
+  // does not read it keeps rendering the previous workspace's data.
+  //
+  // Defaulted, not destructured directly: this component is ALSO mounted on the
+  // legacy /accounts route, which sits in <Layout> outside WorkspaceProvider.
+  // useWorkspace() returns null there, and destructuring null throws — so the
+  // legacy page would have gone white. Outside the provider there is no switcher
+  // to follow, and the single fetch on mount is the correct behaviour.
+  const { active, scopeKey } = useWorkspace() || {}
   const navigate = useNavigate()
   const { t } = useTranslation()
 
@@ -119,7 +85,6 @@ export default function Accounts() {
   const [showForm,     setShowForm]     = useState(false)
   const [editWallet,   setEditWallet]   = useState(null)
   const [form,         setForm]         = useState(EMPTY_FORM)
-  const [scopeTab,     setScopeTab]     = useState('all')
   const [saving,       setSaving]       = useState(false)
   const [backfilling,  setBackfilling]  = useState(false)
   const [backfillDone, setBackfillDone] = useState(false)
@@ -132,14 +97,36 @@ export default function Accounts() {
   const [adjusting,    setAdjusting]    = useState(false)
 
   // ── Load wallets + legacy sources ─────────────────────────────────────────
+  //
+  // Guarded against out-of-order responses. Switching from company A to B while
+  // A's request is still in flight is not hypothetical: A's slower response
+  // lands last and paints A's wallets, balances and total under B's name. That
+  // is a data-isolation bug, not a cosmetic one — the same one requestGuard was
+  // written for on the AI Accountant intake.
+  const guard = useRef(createRequestGuard())
+  // Which workspace the rows currently on screen belong to.
+  const loadedScope = useRef(undefined)
+
   const load = async () => {
+    const req = guard.current.start()
+    const scopeId = active?.id ?? null
     setLoading(true)
     setLoadError(false)
+    // A WORKSPACE CHANGE clears the list first, so company A's wallets are never
+    // on screen underneath company B's name while B is still loading. A reload
+    // of the SAME workspace — after saving a wallet — keeps its rows until the
+    // new ones arrive, so an ordinary save does not blank the page.
+    if (loadedScope.current !== undefined && loadedScope.current !== scopeId) {
+      setWallets([])
+      setLegacySources([])
+    }
     try {
       const [wData, pData] = await Promise.all([
         apiFetch('/wallets', token),
         apiFetch('/pulse?scope=all', token),
       ])
+      // A response from a workspace the user has already left is discarded.
+      if (req.isStale()) return
 
       const loaded = wData.wallets || []
       setWallets(loaded)
@@ -148,21 +135,35 @@ export default function Accounts() {
       const walletNames = new Set(loaded.map(w => w.name))
       const legacy = (pData.accounts || []).filter(a => !walletNames.has(a.name))
       setLegacySources(legacy)
+      loadedScope.current = scopeId
     } catch (e) {
+      if (req.isStale()) return
       console.error(e)
       setLoadError(true)
+      loadedScope.current = scopeId
     } finally {
-      setLoading(false)
+      // Only the current request may clear the spinner: a stale one finishing
+      // would otherwise report the newer request as done.
+      if (!req.isStale()) setLoading(false)
     }
   }
 
+  // Re-fetched per active workspace. The deps were `[]`, and switching company
+  // does not remount this page — it bumps scopeKey — so the list, the balances
+  // and the total stayed on the PREVIOUS company's data until a manual reload.
+  // The API was never the problem: it is strictly business-scoped, and the page
+  // simply never asked again. Same contract the other business pages use.
   useEffect(() => {
     load()
-    // Load admin status silently — non-blocking, never errors visibly
+  }, [token, active?.id, scopeKey]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    // Admin status is a property of the USER, not of the workspace, so it is
+    // fetched once. Silent and non-blocking — it never errors visibly.
     apiFetch('/admin/status', token)
-      .then(d => { setIsAdmin(d.is_admin === true); console.log('[admin/status]', d) })
+      .then(d => { setIsAdmin(d.is_admin === true) })
       .catch(e => console.warn('[admin/status] failed:', e.message))
-  }, [])
+  }, [token])
 
   // ── Computed totals ───────────────────────────────────────────────────────
   // The three cross-currency sums that used to live here are gone rather than
@@ -171,10 +172,19 @@ export default function Accounts() {
   // wrong; leaving them in place would be leaving the next caller a loaded gun.
   // Totals are now derived per currency, below.
 
-  // Filtered wallets per tab
-  const filteredWallets = scopeTab === 'all'
-    ? wallets
-    : wallets.filter(w => (w.scope || 'business') === scopeTab)
+  // No client-side scope filter. GET /api/wallets is already restricted to the
+  // ACTIVE COMPANY — resolveActiveBusiness() rejects a personal workspace
+  // outright (`business_workspace_required`) and bizOrFilter() is a strict
+  // `business_id.eq.<active business>` with the legacy NULL union removed. So
+  // every row that arrives here belongs to the selected company by the only
+  // link that establishes ownership, and the page shows all of them.
+  //
+  // The `scope` column is NOT that link. A row may carry scope='personal' and
+  // this company's business_id — migration 017 backfilled every wallet of a user
+  // into their owned business without filtering on scope — so the flag is a
+  // label on a company-owned row, not proof the money is someone's own. It stays
+  // visible as a chip on the row; it no longer filters the list or the total.
+  // See _specs/accounts-personal-scope-ambiguity.md.
 
   // ── the summary card's amounts, one currency at a time ────────────────────
   //
@@ -195,13 +205,11 @@ export default function Accounts() {
   // non-IDR wallet's number is an IDR-reporting figure wearing a foreign
   // currency's label. The row lists the wallet and says the balance is not
   // available yet rather than printing "$" in front of rupiah.
-  const { proven: provenGroups, unproven: unprovenGroups } = partitionWallets(filteredWallets)
+  const { proven: provenGroups, unproven: unprovenGroups } = partitionWallets(wallets)
   const groupOf = (w) => provenGroups.find((g) => g.wallets.includes(w))
   const isUnproven = (w) => unprovenGroups.some((g) => g.wallets.includes(w))
-  const scopeLabel = scopeTab === 'business' ? t('accounts.totalBusiness')
-    : scopeTab === 'personal' ? t('accounts.totalPersonal')
-    : t('accounts.totalBalance')
-  const summary = walletsSummary({ wallets: filteredWallets, t, scopeLabel })
+  // One label, because there is one list: this company's wallets.
+  const summary = walletsSummary({ wallets, t, scopeLabel: t('accounts.totalBalance') })
   // The collection has resolved and holds nothing. Distinct from "still loading"
   // and from "the request failed", and only this one invites a first wallet.
   const resolvedEmpty = !loading && !loadError && wallets.length === 0
@@ -331,67 +339,33 @@ export default function Accounts() {
   }
 
   // ── Render ────────────────────────────────────────────────────────────────
+  // The wallet's type label, resolved against the same list the form offers.
+  const typeLabelFor = (w) => WALLET_TYPES.find(
+    (x) => x.value === w.type && x.value !== '__custom__')?.label || (w.type || null)
+
+  // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <div className="hf-page">
+    /* acct-page adds ONE 18px gap between top-level sections. The page was
+       spaced by whichever margin each block happened to carry, so the rhythm
+       changed with which sections a given state rendered. */
+    <div className="hf-page acct-page">
 
-      {/* The shared header. This page previously rendered its title as a plain
-          <div>, so Accounts shipped no <h1> at all — a real accessibility gap and
-          the reason it never looked related to Pulse. */}
-      <PageHeader
-        title={t('accounts.walletsAccounts')}
-        description={t('accounts.walletsSubtitle')}
-        primaryAction={
-          <button onClick={openAdd} className="btn btn-primary btn-md">{t('accounts.addWallet')}</button>
-        }
-      />
-
-      {/* Scope tabs */}
-      {wallets.length > 0 && (
-        <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
-          {['all', 'business', 'personal'].map(s => (
-            <button
-              key={s}
-              onClick={() => setScopeTab(s)}
-              style={{
-                padding: '7px 16px', borderRadius: 20, fontSize: 12, fontWeight: 700,
-                border: '1px solid var(--border-2)', fontFamily: 'inherit', cursor: 'pointer',
-                background: scopeTab === s ? 'var(--text)' : 'var(--bg-2)',
-                color:      scopeTab === s ? 'var(--bg)'   : 'var(--text-2)',
-                transition: 'all .15s',
-              }}
-            >
-              {s === 'all' ? t('common.all') : s === 'business' ? t('common.business') : t('common.personal')}
-            </button>
-          ))}
-        </div>
-      )}
+      <AccountsHeader t={t} onAddWallet={openAdd} />
 
       {/* Total balance hero.
-          The same navy surface Pulse uses, from the same component. It was a
-          one-off inline gradient with a graph-paper grid and hardcoded #0F172A,
-          which is why the product's two dark heroes did not look related.
-          `flagship` is what earns the brand mark: this is the page's headline
-          money figure, and the only card here that gets one.
+          The same navy surface Pulse uses, from the same component, and the only
+          card on this page carrying the brand mark — it holds the page's
+          headline money figure.
 
-          It stays on an empty workspace, showing Rp 0 and saying so. That keeps
-          the page's shape steady — the first wallet fills the card in rather than
-          rebuilding the page around it — and it is honest, because zero is the
-          true balance of a workspace with no accounts. What it must NOT do is
-          appear before we know: while loading, or after a failed load, there is
-          no figure to state and the card is not rendered. */}
-      {!loading && !loadError && (
-        <SummaryCard
-          flagship
-          compact={summary.compact}
-          label={summary.label}
-          value={summary.value}
-          meta={summary.meta}
-        />
-      )}
+          It stays on an empty workspace, showing Rp 0 and saying so: zero is the
+          true balance of a workspace with no accounts, and keeping the card
+          steady means the first wallet fills it in rather than rebuilding the
+          page. What it must NOT do is appear before we know — while loading, or
+          after a failed load, there is no figure to state and it is not
+          rendered. */}
+      {!loading && !loadError && <AccountsSummary summary={summary} />}
 
-      {loading && (
-        <div style={{ padding: 32, textAlign: 'center', color: 'var(--text-3)', fontSize: 'var(--text-sm)' }}>{t('accounts.loadingWallets')}</div>
-      )}
+      {loading && <div className="acct-loading">{t('accounts.loadingWallets')}</div>}
 
       {/* A failed load gets the shared error treatment and a retry — never the
           empty state, which would be a false claim about the account. */}
@@ -403,166 +377,62 @@ export default function Accounts() {
         />
       )}
 
-      {/* Backfill banner — only when legacy accounts exist and no wallets yet */}
+      {/* Backfill banner — only when legacy accounts exist and no wallets yet. */}
       {resolvedEmpty && legacySources.length > 0 && !backfillDone && (
-        <div style={{ background: '#EEF2FF', border: '1px solid #C7D2FE', borderRadius: 14, padding: '16px 18px', marginBottom: 16, display: 'flex', alignItems: 'flex-start', gap: 14 }}>
-          <div style={{ fontSize: 22, lineHeight: 1 }}>💡</div>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 'var(--text-sm)', fontWeight: 700, color: '#3730a3', marginBottom: 4 }}>
-              {t('accounts.youHaveAccounts').replace('{n}', legacySources.length).replace('{s}', legacySources.length !== 1 ? 's' : '')}
-            </div>
-            <div style={{ fontSize: 'var(--text-xs)', color: '#4338ca', lineHeight: 1.5, marginBottom: 12 }}>
-              {t('accounts.importSub')}
-            </div>
-            <button
-              onClick={handleBackfill}
-              disabled={backfilling}
-              style={{ padding: '8px 16px', borderRadius: 8, background: '#4338ca', color: '#fff', border: 'none', fontSize: 'var(--text-sm)', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}
-            >
-              {backfilling ? t('accounts.importing') : t('accounts.importAccounts').replace('{n}', legacySources.length).replace('{s}', legacySources.length !== 1 ? 's' : '')}
-            </button>
-          </div>
-        </div>
+        <Card className="acct-backfill">
+          <p className="acct-addmore-title">
+            {t('accounts.youHaveAccounts').replace('{n}', legacySources.length).replace('{s}', legacySources.length !== 1 ? 's' : '')}
+          </p>
+          <p className="acct-legacy-sub">{t('accounts.importSub')}</p>
+          <Btn variant="primary" onClick={handleBackfill} disabled={backfilling}>
+            {backfilling ? t('accounts.importing')
+              : t('accounts.importAccounts').replace('{n}', legacySources.length).replace('{s}', legacySources.length !== 1 ? 's' : '')}
+          </Btn>
+        </Card>
       )}
 
-      {/* Empty state — the collection resolved, and it is empty. Not during a
-          load, not after a failure, and not once a single wallet exists. It calls
-          the page's own openAdd, so there is exactly one wallet-creation flow. */}
+      {/* Zero state — the collection resolved and it is empty. Not during a
+          load, not after a failure, and not once a single wallet exists. It
+          calls the page's own openAdd, so there is one wallet-creation flow. */}
       {resolvedEmpty && legacySources.length === 0 && (
         <WalletsEmptyState t={t} onAddWallet={openAdd} />
       )}
 
-      {/* Wallet cards */}
+      {/* The wallet list, and the block that closes it.
+          Every wallet the API returned for the active company. The partition
+          comes from walletBalanceContract; WalletList renders and classifies
+          nothing. */}
       {wallets.length > 0 && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
-          {filteredWallets.map((w) => {
-            const cs    = getCurrencyStyle(w.currency)
-            const isNeg = (w.balance || 0) < 0
-            // Share of its OWN currency's total. Measured against a mixed total it
-            // was arithmetic between unlike units dressed up as a percentage.
-            const grp   = groupOf(w)
-            const pct   = grp && grp.total > 0 ? Math.round(((w.balance || 0) / grp.total) * 100) : 0
-            const typeLabel = WALLET_TYPES.find(t => t.value === w.type && t.value !== '__custom__')?.label || (w.type ? w.type : null)
-            const walletScope = w.scope || 'business'
-
-            return (
-              <div key={w.id} className="hf-card" onClick={() => navigate(`/accounts/${w.id}`)} style={{ cursor: 'pointer', padding: '12px 14px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  {/* Icon */}
-                  <div style={{ width: 34, height: 34, borderRadius: 10, background: cs.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                    {getTypeIcon(w.type, cs.color)}
-                  </div>
-
-                  {/* Name + badges */}
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: 3 }}>{w.name}</div>
-                    <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                      <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 20, fontWeight: 700,
-                        background: grp ? cs.bg : 'var(--warning-soft, #FEF3C7)',
-                        color:      grp ? cs.color : 'var(--warning-dark, #92400E)' }}>
-                        {grp ? grp.currency
-                          : isUnproven(w) ? (w.currency || '').toUpperCase()
-                          : t('accounts.needsCurrency')}
-                      </span>
-                      {typeLabel && <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 20, background: 'var(--bg-2)', color: 'var(--text-3)', fontWeight: 600 }}>{typeLabel}</span>}
-                      <span style={{
-                        fontSize: 10, padding: '1px 6px', borderRadius: 20, fontWeight: 700,
-                        background: walletScope === 'business' ? '#EEF2FF' : '#FDF2FF',
-                        color:      walletScope === 'business' ? '#3730a3' : '#7E22CE',
-                      }}>
-                        {walletScope === 'business' ? t('accounts.scopeBusiness') : t('accounts.scopePersonal')}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Balance */}
-                  <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                    {/* The amount carries its own currency. Rendering every wallet
-                        with the same bare number is what made a dollar account
-                        indistinguishable from a rupiah one at a glance. */}
-                    {/* An amount is only printed where its unit is provable. For a
-                        wallet in another currency the number exists but its unit
-                        does not — the balance is a sum of amount_idr — so the row
-                        says so instead of dressing rupiah up as dollars. */}
-                    <div style={{ fontSize: 'var(--text-base)', fontWeight: 800, color: isNeg ? 'var(--red-dark)' : 'var(--text)', letterSpacing: -0.3, lineHeight: 1, whiteSpace: 'nowrap' }}>
-                      {grp ? formatCurrency(w.balance || 0, grp.currency) : '—'}
-                    </div>
-                    <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 3, whiteSpace: 'nowrap' }}>
-                      {grp ? `${Math.abs(pct)}${t('accounts.share')}`
-                        : isUnproven(w) ? t('accounts.balanceUnavailable')
-                        : t('accounts.needsCurrency')}
-                    </div>
-                  </div>
-
-                  {/* Actions */}
-                  <div style={{ display: 'flex', gap: 5, flexShrink: 0, marginLeft: 4 }}>
-                    {canAdjust && (
-                      <button onClick={(e) => { e.stopPropagation(); openAdjust(w) }} title="Adjust balance" style={{ width: 28, height: 28, borderRadius: 8, background: 'var(--bg-2)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3, cursor: 'pointer', fontSize: 10, fontWeight: 700, color: 'var(--text-2)', fontFamily: 'inherit' }}>
-                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                      </button>
-                    )}
-                    <button onClick={(e) => { e.stopPropagation(); openEdit(w) }} style={{ width: 28, height: 28, borderRadius: 8, background: 'var(--bg-2)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--text-2)" strokeWidth="2" strokeLinecap="round">
-                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                      </svg>
-                    </button>
-                  </div>
-                </div>
-
-                {/* Share bar */}
-                <div style={{ height: 3, background: 'var(--bg-3)', borderRadius: 3, overflow: 'hidden', marginTop: 10 }}>
-                  <div style={{ height: '100%', borderRadius: 3, background: isNeg ? 'var(--red)' : cs.color, width: `${Math.max(2, Math.min(100, Math.abs(pct)))}%`, transition: 'width .3s' }} />
-                </div>
-              </div>
-            )
-          })}
-
-          {/* Add wallet row */}
-          <div
-            className="hf-card"
-            onClick={openAdd}
-            style={{ border: '1.5px dashed var(--border-2)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '12px 14px' }}
-          >
-            <div style={{ width: 28, height: 28, borderRadius: 8, background: 'var(--bg-2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-3)" strokeWidth="2.5" strokeLinecap="round">
-                <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-              </svg>
-            </div>
-            <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-3)', fontWeight: 500 }}>{t('accounts.addWallet')}</div>
-          </div>
-        </div>
+        <WalletList
+          wallets={wallets}
+          groupOf={groupOf}
+          isUnproven={isUnproven}
+          typeLabelFor={typeLabelFor}
+          t={t}
+          onOpen={(w) => navigate(`/accounts/${w.id}`)}
+          onEdit={openEdit}
+          onAdjust={canAdjust ? openAdjust : null}
+          onAddWallet={openAdd}
+        />
       )}
 
-      {/* Legacy unmatched sources */}
+      {/* Legacy unmatched sources — source-based accounts not yet migrated to
+          wallets. Same content, on the shared Card. */}
       {!loading && !loadError && wallets.length > 0 && legacySources.length > 0 && (
-        <div className="hf-card" style={{ marginBottom: 16, background: 'var(--bg-2)' }}>
-          <div style={{ fontSize: 11, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 800, marginBottom: 10 }}>{t('accounts.legacyTitle')}</div>
-          <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-3)', marginBottom: 12, lineHeight: 1.5 }}>
-            {t('accounts.legacySub')}
-          </div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
-            {legacySources.map(a => (
-              <span key={a.id} style={{ fontSize: 12, padding: '4px 10px', borderRadius: 20, background: 'var(--bg-3)', color: 'var(--text-2)', fontWeight: 600 }}>{a.name}</span>
+        <Card title={t('accounts.legacyTitle')}>
+          <p className="acct-legacy-sub">{t('accounts.legacySub')}</p>
+          <div className="acct-legacy-chips">
+            {legacySources.map((a) => (
+              <span key={a.id} className="acct-chip">{a.name}</span>
             ))}
           </div>
-          <button
-            onClick={handleBackfill}
-            disabled={backfilling}
-            style={{ padding: '8px 14px', borderRadius: 8, background: 'var(--text)', color: 'var(--bg)', border: 'none', fontSize: 'var(--text-sm)', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}
-          >
+          <Btn variant="secondary" onClick={handleBackfill} disabled={backfilling}>
             {backfilling ? t('accounts.importing') : t('accounts.importAsWallets')}
-          </button>
-        </div>
+          </Btn>
+        </Card>
       )}
 
-      {/* Info card */}
-      <div className="hf-card" style={{ background: 'var(--bg-2)', border: '1px solid var(--border)' }}>
-        <div style={{ fontSize: 11, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 800, marginBottom: 8 }}>{t('accounts.aboutWallets')}</div>
-        <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-2)', lineHeight: 1.6 }}>
-          {t('accounts.aboutWalletsSub')}
-        </div>
-      </div>
+      <AboutWallets t={t} />
 
       {/* ── Adjust Balance modal (admin only) ──────────────────────────────── */}
       {adjustWallet && createPortal(
@@ -665,136 +535,26 @@ export default function Accounts() {
         document.body
       )}
 
-      {/* Add / Edit modal */}
+      {/* The Add / Edit form. Presentational component, so the design preview
+          renders the SAME form a user fills in rather than a drawing of it —
+          the form had never been photographed before. Every handler, field and
+          disabled condition below is this page's, passed down. */}
       {showForm && createPortal(
-        <div className="modal-overlay" onClick={() => setShowForm(false)}>
-          <div className="modal-sheet" onClick={e => e.stopPropagation()}>
-            <div className="modal-drag-handle" />
-            <button className="modal-close-btn" onClick={() => setShowForm(false)}>✕</button>
-
-            <div style={{ fontSize: 'var(--text-lg)', fontWeight: 600, color: 'var(--text)', marginBottom: 18 }}>
-              {editWallet ? `${t('accounts.editWallet')}${editWallet.name}` : t('accounts.addWallet')}
-            </div>
-
-            {/* Name */}
-            <label className="modal-label">{t('accounts.walletName')}</label>
-            <input
-              className="modal-input"
-              value={form.name}
-              onChange={e => setForm(p => ({ ...p, name: e.target.value }))}
-              placeholder="e.g. BCA IDR, Cash Office, Wise USD"
-              style={{ marginBottom: 14 }}
-              autoFocus
-            />
-
-            {/* Currency */}
-            {/* The real control, in its own module so the design preview can
-                photograph it rather than draw a copy. It owns the currency
-                contract: required, ISO-only, name beside the code, unproven
-                currencies disabled, and immutable once the wallet exists. */}
-            <WalletCurrencyField
-              currencies={CURRENCIES}
-              value={form.currency}
-              onChange={(c) => setForm(p => ({ ...p, currency: c }))}
-              locked={!!editWallet}
-              styleFor={getCurrencyStyle}
-              t={t}
-            />
-
-            <label className="modal-label">{t('accounts.type')} <span style={{ fontWeight: 400, color: 'var(--text-3)' }}>(optional)</span></label>
-            <select
-              className="modal-input"
-              value={form.type}
-              onChange={e => setForm(p => ({ ...p, type: e.target.value, custom_type: '' }))}
-              style={{ marginBottom: form.type === '__custom__' ? 8 : 14 }}
-            >
-              <option value="">{t('accounts.selectType')}</option>
-              {WALLET_TYPES
-                .filter(t => t.value !== '__custom__' || canAdjust)
-                .map(t => <option key={t.value} value={t.value}>{t.label}</option>)
-              }
-            </select>
-
-            {/* Custom type input — visible only when __custom__ selected (owner/admin only) */}
-            {form.type === '__custom__' && canAdjust && (
-              <>
-                <input
-                  className="modal-input"
-                  value={form.custom_type}
-                  onChange={e => setForm(p => ({ ...p, custom_type: e.target.value }))}
-                  placeholder="e.g. Stripe, Dana, PayPal, USDT wallet…"
-                  style={{ marginBottom: 6 }}
-                  autoFocus
-                />
-                <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 14 }}>
-                  {t('accounts.customType')}
-                </div>
-              </>
-            )}
-
-            {/* Entity name */}
-            <label className="modal-label">{t('accounts.company')} <span style={{ fontWeight: 400, color: 'var(--text-3)' }}>(optional)</span></label>
-            <input
-              className="modal-input"
-              value={form.entity_name}
-              onChange={e => setForm(p => ({ ...p, entity_name: e.target.value }))}
-              placeholder="e.g. PT Siberian BG, Personal"
-              style={{ marginBottom: 14 }}
-            />
-
-            {/* Wallets created in the Business Workspace are always business-scoped.
-                The Business/Personal selector was removed — Personal Workspace is gated
-                off, so business pages must not create personal wallets. form.scope stays
-                'business' (see EMPTY_FORM). */}
-
-            {/* Opening balance — only for new wallets */}
-            {!editWallet && (
-              <>
-                <label className="modal-label">{t('accounts.openingBalanceOpt')} <span style={{ fontWeight: 400, color: 'var(--text-3)' }}>(optional)</span></label>
-                <input
-                  type="number"
-                  className="modal-input"
-                  value={form.opening_balance}
-                  onChange={e => setForm(p => ({ ...p, opening_balance: e.target.value }))}
-                  placeholder="0"
-                  style={{ marginBottom: 18 }}
-                />
-              </>
-            )}
-
-            {editWallet && <div style={{ marginBottom: 18 }} />}
-
-            <button
-              disabled={!form.name.trim() || saving}
-              onClick={handleSave}
-              className="btn btn-primary btn-block btn-lg"
-              style={{ marginBottom: 8 }}
-            >
-              {saving ? t('accounts.saving') : editWallet ? t('accounts.saveChanges') : t('accounts.addWallet')}
-            </button>
-
-            <button onClick={() => setShowForm(false)} className="btn btn-ghost btn-block btn-lg" style={{ marginBottom: editWallet ? 8 : 0 }}>
-              {t('common.cancel')}
-            </button>
-
-            {editWallet && canAdjust && (
-              <button
-                onClick={() => { setShowForm(false); openAdjust(editWallet) }}
-                disabled={saving}
-                className="btn btn-block btn-lg"
-                style={{ marginBottom: 8, background: 'var(--bg-2)', border: '1px solid var(--border)', color: 'var(--text-2)', fontWeight: 600 }}
-              >
-                {t('accounts.adjustBalance')}
-              </button>
-            )}
-
-            {editWallet && (
-              <button onClick={handleDelete} disabled={saving} className="btn btn-danger btn-block btn-lg">
-                {t('accounts.archiveDelete')}
-              </button>
-            )}
-          </div>
-        </div>,
+        <WalletFormModal
+          t={t}
+          form={form}
+          setForm={setForm}
+          editWallet={editWallet}
+          saving={saving}
+          canAdjust={canAdjust}
+          currencies={CURRENCIES}
+          walletTypes={WALLET_TYPES}
+          styleFor={getCurrencyStyle}
+          onSave={handleSave}
+          onCancel={() => setShowForm(false)}
+          onAdjust={() => { setShowForm(false); openAdjust(editWallet) }}
+          onDelete={handleDelete}
+        />,
         document.body
       )}
     </div>

@@ -30,6 +30,7 @@ import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
 import zlib from 'node:zlib';
+import { createHash } from 'node:crypto';
 import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
@@ -40,6 +41,7 @@ const DIST = path.join(ROOT, 'client', 'dist');
 const OUT = path.join(ROOT, 'artifacts', 'design-pr80');
 const OUT_RADAR = path.join(ROOT, 'artifacts', 'design-pr81-radar');
 const OUT_AICFO = path.join(ROOT, 'artifacts', 'design-pr83-ai-cfo');
+const OUT_ACCOUNTS = path.join(ROOT, 'artifacts', 'design-accounts');
 
 // Which face each kind of content is supposed to render in. The check is done
 // against what the page ACTUALLY renders — sample an element, read its computed
@@ -78,7 +80,7 @@ const build = spawnSync(process.platform === 'win32' ? 'npm.cmd' : 'npm', ['run'
 });
 assert.strictEqual(build.status, 0, 'build failed:\n' + (build.stderr || '').slice(-2000));
 
-for (const dir of [OUT, OUT_RADAR, OUT_AICFO]) fs.mkdirSync(dir, { recursive: true });
+for (const dir of [OUT, OUT_RADAR, OUT_AICFO, OUT_ACCOUNTS]) fs.mkdirSync(dir, { recursive: true });
 
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css',
   '.svg': 'image/svg+xml', '.png': 'image/png', '.woff2': 'font/woff2', '.woff': 'font/woff',
@@ -422,17 +424,72 @@ const SHOTS = [
     { dir: OUT_AICFO }],
   ['11-ai-cfo-refresh-failed-notice-closeup.png', `${P}?shell=ai-cfo-stale`, 1440, 900,
     { region: { sel: '.aicfo-stale', pad: 12 }, dir: OUT_AICFO }],
+
+  /* ── Wallets & Accounts ──────────────────────────────────────────────────
+     The whole page, list included. Every previous "Accounts" shot was a header
+     and one summary card, because the preview rendered nothing else. */
+  ['01-accounts-app-shell-desktop-1440x900.png', `${P}?shell=accounts`, 1440, 900,
+    { dir: OUT_ACCOUNTS }],
+  ['02-accounts-app-shell-mobile-390x844.png', `${P}?shell=accounts`, 390, 844,
+    { ...PHONE, dir: OUT_ACCOUNTS }],
+  // The list itself, and the block that closes it.
+  ['03-accounts-wallet-list-closeup.png', `${P}?shell=accounts`, 1440, 900,
+    { region: { sel: '.acct-list', pad: 8 }, dir: OUT_ACCOUNTS }],
+  ['04-accounts-add-another-block-closeup.png', `${P}?shell=accounts`, 1440, 900,
+    { region: { sel: '.acct-addmore', pad: 8 }, dir: OUT_ACCOUNTS }],
+  // A phone frame holding the list and the add block together. The four-wallet
+  // collection pushes the block past 844px, so this uses the two-wallet one —
+  // the point is the relationship between the list and its closing block.
+  ['05-accounts-list-and-add-block-mobile-390.png', `${P}?shell=accounts-one`, 390, 844,
+    { ...PHONE, dir: OUT_ACCOUNTS }],
+  // The zero state — the workspace has no wallets at all.
+  ['06-accounts-zero-state-desktop-1440x900.png', `${P}?shell=accounts-empty`, 1440, 900,
+    { dir: OUT_ACCOUNTS }],
+  ['07-accounts-zero-state-mobile-390x844.png', `${P}?shell=accounts-empty`, 390, 844,
+    { ...PHONE, dir: OUT_ACCOUNTS }],
+  // The Add-wallet form, which had never been photographed.
+  // A tall frame on purpose: the form is ~700px and the crop follows the sheet,
+  // so a short viewport clips the capture rather than the sheet.
+  ['08-accounts-add-wallet-form.png', `${P}?only=accounts-form`, 1440, 1240,
+    { window: [1440, 1240], region: { sel: '.modal-sheet', pad: 18 }, dir: OUT_ACCOUNTS }],
+  // Long name, negative balance, exact zero, an untotalled currency and a wallet
+  // with no currency — at 320px, where they collide.
+  ['09-accounts-long-name-negative-320.png', `${P}?shell=accounts-stress`, 320, 900,
+    { crop: true, window: [512, 900], dir: OUT_ACCOUNTS }],
+  ['10-accounts-stress-desktop-1440x900.png', `${P}?shell=accounts-stress`, 1440, 900,
+    { dir: OUT_ACCOUNTS }],
 ];
+
+/* ── which directories this run is allowed to touch ────────────────────────
+   `--only <substring>` (or ONLY_DIR) restricts the run to matching output
+   directories. Every other folder is left exactly as it is on disk.
+
+   This exists because the folders are per-PR evidence with different lifetimes.
+   Regenerating everything re-shoots merged PRs' screenshots from today's source,
+   so an old folder silently stops depicting what that PR shipped — and a
+   reviewer diffing it sees churn that belongs to neither PR. A run for one PR
+   should touch one PR's evidence. */
+const onlyArg = (() => {
+  const i = process.argv.indexOf('--only');
+  return (i > -1 ? process.argv[i + 1] : process.env.ONLY_DIR) || null;
+})();
+const wanted = (dir) => !onlyArg || path.basename(dir).includes(onlyArg);
+const SELECTED = SHOTS.filter(([, , , , o = {}]) => wanted(o.dir || OUT));
+if (onlyArg) {
+  const dirs = [...new Set(SELECTED.map(([, , , , o = {}]) => path.basename(o.dir || OUT)))];
+  console.log(`only "${onlyArg}" → ${SELECTED.length} shot(s) in ${dirs.join(', ') || '(nothing)'}`);
+  assert.ok(SELECTED.length, `--only ${onlyArg} matched no output directory`);
+}
 
 // Produced filenames, per directory — a run only prunes what it owns, so the
 // Radar folder cannot delete PR #80's evidence or the other way round.
 const produced = new Map();
-for (const [f, , , , o = {}] of SHOTS) {
+for (const [f, , , , o = {}] of SELECTED) {
   const dir = o.dir || OUT;
   if (!produced.has(dir)) produced.set(dir, new Set());
   produced.get(dir).add(f);
 }
-for (const [file, route, w, h, opts] of SHOTS) await verifyAndShoot(file, route, w, h, opts);
+for (const [file, route, w, h, opts] of SELECTED) await verifyAndShoot(file, route, w, h, opts);
 
 /* ── no stale screenshots: delete any PNG this run did not produce ──────────── */
 for (const [dir, keep] of produced) {
@@ -445,14 +502,26 @@ for (const [dir, keep] of produced) {
 }
 
 /* ── every image must be real, and none may be a duplicate ─────────────────── */
-const seen = new Map();
 let bad = 0;
 console.log('');
-// Duplicate detection spans every directory: the same frame filed under two PRs
-// is exactly the kind of thing a reviewer should be told about.
+/* Duplicate detection is PER DIRECTORY, and compares content rather than byte
+   length.
+
+   Two shots in the SAME folder being identical is a bug — a crop that silently
+   framed the wrong element, or a route that did not change what it rendered.
+   Two shots in DIFFERENT folders being identical is not: each folder is evidence
+   for one PR, and once two PRs photograph the same page from the same source
+   they will agree exactly. That is the expected state, not a finding. Comparing
+   across folders made the tool exit 1 the moment a second PR touched a page an
+   earlier PR had also shot — which blocks the next author over nothing.
+
+   Content-hashed rather than length-matched, because two genuinely different
+   images can compress to the same number of bytes, and that false positive is
+   just as unhelpful. */
 const allShots = [...produced.keys()].flatMap((dir) =>
   fs.readdirSync(dir).filter((n) => n.endsWith('.png')).sort()
     .map((f) => [dir, f])).sort((a, b) => (a[1] < b[1] ? -1 : 1));
+const seenByDir = new Map();
 for (const [dir, f] of allShots) {
   const b = fs.readFileSync(path.join(dir, f));
   const ihdr = b.subarray(16, 24);
@@ -461,8 +530,11 @@ for (const [dir, f] of allShots) {
   // compresses under a few KB, but a thin close-up strip (a 390x67 header) truly
   // does, and a flat 8KB floor wrongly failed it.
   const blank = b.length < Math.max(1200, Math.round(w * h * 0.004));
-  const dup = seen.get(b.length);
-  seen.set(b.length, f);
+  if (!seenByDir.has(dir)) seenByDir.set(dir, new Map());
+  const seen = seenByDir.get(dir);
+  const digest = createHash('sha256').update(b).digest('hex');
+  const dup = seen.get(digest);
+  seen.set(digest, f);
   if (blank || dup) bad++;
   console.log(`  ${f}  ${w}x${h}  ${(b.length / 1024).toFixed(0)}KB  ${blank ? 'BLANK?' : dup ? `DUPLICATE of ${dup}` : 'ok'}`);
 }
