@@ -1,0 +1,428 @@
+/* AI Accountant — Tax & Compliance Workbench.
+ *
+ * Page-local CSS for /business/accountant, written for the same reason
+ * Accounts.css and AICFO.css exist: the module carried its whole visual
+ * identity in inline style objects — 24 on the Workbench tab, 55 on the
+ * Compliance Calendar, 18 on Tax Draft and 12 on Audit — so nothing could be
+ * shared, overridden, measured or kept consistent between tabs.
+ *
+ * Everything here draws on client/src/brand/tokens.css. There are no hex
+ * literals and no second palette: the module declares no colour of its own.
+ *
+ * ONE VERTICAL RHYTHM. Every gap between page sections is 18px, set once by
+ * .acct-wb's own `gap`, not by a margin on each block. Measured before this
+ * file existed, the same page ran 26 / 18 / 16 / 18 / 16 / 16 down its
+ * Workbench tab, because each block carried its own marginBottom.
+ */
+
+/* ── the page ─────────────────────────────────────────────────────────────── */
+.acct-wb {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+/* .cfo-pagehead carries its own margin-bottom: 26px, which is right for a page
+   whose sections are spaced by margins and wrong inside a flex column that sets
+   its own gap — the two ADD, and the rendered gap under the header measured 44px
+   against 18px everywhere else. The page owns its rhythm; the header contributes
+   its box and nothing more. */
+.acct-wb > .cfo-pagehead { margin-bottom: 0; }
+
+/* The tab strip sits in the page flow like any other section, so it takes the
+   same 18px above and below as everything else. It used to carry a hand-set
+   `margin: 0 0 18px` that differed from the header's 26px below it. */
+.acct-wb-tabs { min-width: 0; }
+
+/* On a phone the five tabs cannot fit, and .cfo-tabs scrolls them. Scrolling is
+   the right answer; discovering that you can is the problem — on a 373px screen
+   the strip showed "Workbench | Compliance Calendar" and gave no sign that Tax
+   Draft, Audit and Tax Profile existed past the edge. A fade on the right edge
+   is the affordance, drawn only while there is something to scroll to. */
+@media (max-width: 720px) {
+  .acct-wb-tabs {
+    position: relative;
+    /* The mask is the affordance itself: the strip visibly dissolves at the
+       edge instead of ending on a hard cut that reads as the last tab. */
+    -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent 100%);
+    mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent 100%);
+  }
+  /* Once the user has scrolled to the end there is nothing more to promise, so
+     the fade is removed rather than left lying about the content. */
+  .acct-wb-tabs.is-end {
+    -webkit-mask-image: none;
+    mask-image: none;
+  }
+}
+
+/* ── module sync chips ────────────────────────────────────────────────────── */
+.acct-wb-mods {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  align-items: center;
+}
+/* The explanatory sentence used to sit inside the chip row as a bare <span>
+   with `alignSelf: center`, so it wrapped into the middle of the chips. It is
+   its own line now and always reads as prose, never as another chip. */
+.acct-wb-mods-note {
+  flex-basis: 100%;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  margin: 0;
+}
+
+/* ── two-column band: the reserve flagship and profile completeness ───────── */
+/* Not .cfo-grid-2: these two are deliberately unequal — a navy flagship beside
+   a white card — and they must share a baseline and a height. */
+.acct-wb-band {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+  align-items: stretch;
+}
+.acct-wb-band > * { min-width: 0; }
+
+/* Three equal tiles (the Audit tab's counters). Same 18px gutter as everything
+   else, so a tab does not get its own rhythm. */
+.acct-wb-band-3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 18px;
+  align-items: stretch;
+}
+.acct-wb-band-3 > * { min-width: 0; }
+
+/* ── the tax reserve flagship ─────────────────────────────────────────────── */
+/* The card is the shared SummaryCard wearing `flagship`, so the watermark, its
+   size, crop, opacity and — crucially — the reserved safe column all come from
+   .cfo-flagship in shell.css. The page does not position the mark and does not
+   restyle it; that is the whole point of there being one implementation.
+   Before this, the Tax reserve card was a hand-built <div class="cfo-summary">
+   with no mark at all, which is why the page's one navy surface was the only
+   unbranded flagship in the product. */
+.acct-reserve { height: 100%; }
+
+/* The value is an em dash far more often than it is a figure — the engine only
+   fills it from recorded withholding. At the flagship's full display size a
+   lone dash read as a rule someone had drawn across the card, so the absent
+   marker is set at the supporting size. It is still the same em dash every
+   other page uses for absence; only its scale changes. */
+.acct-reserve .acct-reserve-absent {
+  display: inline-block;
+  font-size: var(--text-xl);
+  line-height: 1;
+  letter-spacing: 0;
+  opacity: .9;
+}
+
+/* ── profile completeness ─────────────────────────────────────────────────── */
+.acct-meter {
+  height: 8px;
+  border-radius: 5px;
+  background: var(--surface-page);
+  overflow: hidden;
+  margin: var(--space-2) 0 var(--space-3);
+}
+.acct-meter-fill {
+  height: 100%;
+  border-radius: 5px;
+  background: var(--action-primary);
+  transition: width .2s ease;
+}
+/* Completeness is a measure of the FORM, never of liability, so a full bar does
+   not turn green. Green here would say "you are compliant", which no part of
+   this page is in a position to say — see
+   _specs/accountant-applicability-obligations-contradiction.md. The bar is the
+   action colour at every value; only the caveat below it carries meaning. */
+.acct-meter-fill.is-full { background: var(--action-primary); }
+
+.acct-completeness-meta {
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  line-height: var(--line-normal);
+  margin: 0;
+}
+.acct-caveat {
+  margin: var(--space-2) 0 0;
+  font-size: 12px;
+  line-height: var(--line-normal);
+  color: var(--warning-ink);
+  background: var(--warning-soft);
+  border-radius: var(--radius-sm);
+  padding: var(--space-2) 10px;
+}
+
+/* ── obligation states ────────────────────────────────────────────────────── */
+/* "insufficient data" and "not enabled" used to render in the amount column, in
+   the mono figure face, right-aligned — typographically identical to a number.
+   They are not numbers, and a reader scanning the column should never have to
+   read the words to know that. They are chips now: UI face, not mono, on a
+   muted ground, so a real amount is the only thing in that column that ever
+   looks like money. */
+.acct-ob-state {
+  display: inline-block;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.3;
+  white-space: nowrap;
+  border-radius: 999px;
+  padding: 3px 10px;
+  background: var(--surface-page);
+  color: var(--text-muted);
+  border: 1px solid var(--border-default);
+}
+.acct-ob-state.is-insufficient {
+  background: var(--warning-soft);
+  color: var(--warning-ink);
+  border-color: transparent;
+}
+
+/* A hint under each non-calculated obligation, so "insufficient data" can never
+   be read as "nothing is owed". */
+.acct-ob-hint {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: var(--line-normal);
+}
+
+.acct-note {
+  margin: var(--space-2) 0 0;
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: var(--line-normal);
+}
+/* The same note used as a lead-in above a list, so it carries no top margin. */
+.acct-note.is-lead { margin: 0 0 var(--space-2); }
+
+/* ── compliance calendar ──────────────────────────────────────────────────── */
+.acct-cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 3px;
+}
+.acct-cal-head {
+  font-size: 10.5px;
+  color: var(--text-muted);
+  text-align: center;
+  font-weight: 600;
+  padding: 2px 0;
+}
+.acct-cal-day {
+  aspect-ratio: 1;
+  max-width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12.5px;
+  border-radius: 9px;
+  color: var(--text-secondary);
+}
+.acct-cal-day.is-today {
+  outline: 2px solid var(--border-focus);
+  outline-offset: -2px;
+}
+/* Deadline kinds. Each pairs a soft ground with its own ink token, so the text
+   carries the contrast the ground cannot — the calendar previously set
+   var(--warning) as a text colour on var(--warning-soft), and a bare #fff on
+   the PPN cell. */
+.acct-cal-day.k-ppn        { background: var(--info-soft);    color: var(--info);        font-weight: 700; }
+.acct-cal-day.k-withholding{ background: var(--danger-soft);  color: var(--danger);      font-weight: 700; }
+.acct-cal-day.k-cit        { background: var(--warning-soft); color: var(--warning-ink); font-weight: 700; }
+.acct-cal-day.k-service    { background: var(--surface-page);  color: var(--text-primary); font-weight: 700; }
+
+.acct-cal-legend {
+  display: flex;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+  flex-wrap: wrap;
+}
+.acct-legend {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11.5px;
+  color: var(--text-secondary);
+}
+.acct-legend-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex: none;
+}
+.acct-legend-dot.k-ppn         { background: var(--info); }
+.acct-legend-dot.k-withholding { background: var(--danger); }
+.acct-legend-dot.k-cit         { background: var(--warning); }
+.acct-legend-dot.k-service     { background: var(--text-primary); }
+
+.acct-cal-nav { display: flex; gap: 6px; }
+
+/* ── "this month, in plain language" ──────────────────────────────────────── */
+.acct-plain { border-left: 3px solid var(--action-primary); }
+.acct-plain-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-3);
+}
+.acct-plain-card {
+  background: var(--surface-page);
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+  min-width: 0;
+}
+.acct-plain-k {
+  font-size: 11px;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: var(--brand-electric-blue-ink);
+}
+.acct-plain-v {
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  margin-top: 5px;
+  line-height: var(--line-normal);
+}
+.acct-plain-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: var(--space-4);
+  flex-wrap: wrap;
+}
+
+/* ── tax draft ────────────────────────────────────────────────────────────── */
+.acct-draft-total,
+.acct-draft-liability {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--space-3);
+}
+.acct-draft-total {
+  background: var(--info-soft);
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+  margin: 10px 0;
+  font-weight: 700;
+  font-size: 13.5px;
+}
+.acct-draft-liability { font-weight: 800; font-size: var(--text-sm); }
+.acct-draft-sources-k {
+  margin-top: var(--space-4);
+  font-size: 12.5px;
+  font-weight: 700;
+}
+.acct-draft-sources {
+  display: flex;
+  gap: var(--space-2);
+  margin-top: 6px;
+  flex-wrap: wrap;
+}
+.acct-source {
+  flex: 1 1 140px;
+  background: var(--surface-page);
+  border-radius: var(--radius-md);
+  padding: 9px 11px;
+  min-width: 0;
+}
+.acct-source-t { font-size: 12.5px; font-weight: 700; }
+.acct-source-s { font-size: 11.5px; color: var(--text-muted); margin-top: 2px; }
+
+.acct-draft-body {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  line-height: var(--line-relaxed);
+  margin: 0;
+}
+.acct-draft-empty {
+  margin-top: var(--space-4);
+  padding: 12px 14px;
+  background: var(--surface-page);
+  border-radius: var(--radius-md);
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  line-height: var(--line-normal);
+}
+.acct-draft-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.acct-draft-status-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.acct-withholding { border-left: 3px solid var(--success); }
+
+/* ── audit ────────────────────────────────────────────────────────────────── */
+.acct-audit-v {
+  font-family: var(--font-num);
+  font-feature-settings: var(--num-features);
+  font-size: var(--text-xl);
+  font-weight: 700;
+  color: var(--text-primary);
+}
+.acct-audit-v.is-ts { font-size: var(--text-md); }
+.acct-audit-k {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+.acct-audit-filter { max-width: 200px; }
+
+/* ── narrow screens ───────────────────────────────────────────────────────── */
+/* One breakpoint for the whole module. 560px, not 380px: the grids break long
+   before a phone's own width, and Accounts shipped a 380px breakpoint that left
+   390px screens breaking names mid-word. */
+@media (max-width: 560px) {
+  .acct-wb-band,
+  .acct-wb-band-3 { grid-template-columns: 1fr; }
+
+  /* Three prose cards in a 3-column grid collapsed to two 135px columns at
+     373px, with the third orphaned on its own row. Prose does not fit in
+     135px. One column. */
+  .acct-plain-grid { grid-template-columns: 1fr; }
+
+  .acct-plain-actions > .cfo-btn,
+  .acct-draft-status-actions > .cfo-btn { flex: 1 1 100%; }
+
+  .acct-audit-filter { max-width: 100%; }
+
+  /* The calendar keeps its seven columns — a week has seven days and a stacked
+     calendar is not a calendar — but the cells shrink with the viewport and the
+     legend wraps to as many lines as it needs. */
+  .acct-cal-day { font-size: 11.5px; border-radius: 7px; }
+  .acct-cal-legend { gap: var(--space-2); }
+}
+
+/* ── the profile page, embedded as the Workbench's Tax Profile tab ─────────── */
+/* Standalone it wears a PageHeader; embedded it must not, because a tab may not
+   retitle the page it sits in. What remains is its control row, aligned right
+   the way the page header's control zone is, and full-width on a phone for the
+   same reason the header's actions are. */
+.cfo-accountant-embedded-actions {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+@media (max-width: 560px) {
+  .cfo-accountant-embedded-actions { justify-content: stretch; }
+  .cfo-accountant-embedded-actions > .cfo-btn { flex: 1 1 100%; }
+}
+
+/* A day carrying more than one statutory deadline. It wears the first one's
+   ground — a cell cannot be two colours — and this marks that there is more
+   than one, so the reader knows to look at the list beside it. The dot is
+   drawn in the cell's own text colour, so it works on all four grounds. */
+.acct-cal-day.is-multi { position: relative; }
+.acct-cal-day.is-multi::after {
+  content: '';
+  position: absolute;
+  bottom: 3px;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: currentColor;
+}

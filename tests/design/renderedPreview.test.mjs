@@ -178,7 +178,11 @@ const PROBE_FN = `function facts(win, doc) {
   const clipBoundary = (el) => {
     for (let a = el.parentElement; a && !isRootish(a); a = a.parentElement) {
       const o = cs(a);
-      const hides = (v) => v === 'hidden' || v === 'clip';
+      // 'auto' and 'scroll' clip exactly as 'hidden' does — the content past the
+      // edge is reachable by scrolling, not painted outside the box. Treating
+      // them as non-clipping reported a deliberately scrollable tab strip as a
+      // page that overflows, which is the opposite of what it is.
+      const hides = (v) => v === 'hidden' || v === 'clip' || v === 'auto' || v === 'scroll';
       if (hides(o.overflowX) || hides(o.overflowY)) return a.getBoundingClientRect().right;
     }
     return Infinity;
@@ -726,6 +730,81 @@ const PROBE_FN = `function facts(win, doc) {
     };
   })();
 
+  // AI Accountant. The claims worth a browser are all about what a reader sees
+  // in the amount column, whether the one navy card is branded, and whether the
+  // five tabs survive a phone. None of those are decidable from source text.
+  const accountant = (() => {
+    const page = doc.querySelector('.acct-wb');
+    if (!page) return null;
+    const txt = (el) => (el ? el.textContent.replace(/\\s+/g, ' ').trim() : null);
+    const kids = [...page.children].filter((el) => el.getBoundingClientRect().height > 0);
+    const gaps = [];
+    for (let i = 1; i < kids.length; i++) {
+      const a = kids[i - 1].getBoundingClientRect(), b = kids[i].getBoundingClientRect();
+      gaps.push(Math.round(b.top - a.bottom));
+    }
+    const card = page.querySelector('.acct-reserve .cfo-summary');
+    const mark = card ? card.querySelector('.cfo-flagship-mark') : null;
+    const meter = page.querySelector('.acct-meter-fill');
+    const rows = [...page.querySelectorAll('.acct-list, .cfo-list')]
+      .slice(0, 1)
+      .flatMap((ul) => [...ul.querySelectorAll('.cfo-list-item')])
+      .map((li) => {
+        const amt = li.querySelector('.cfo-list-amt');
+        const chip = li.querySelector('.acct-ob-state');
+        return {
+          label: txt(li.querySelector('.cfo-list-label')),
+          sub: txt(li.querySelector('.cfo-list-sub')),
+          amount: txt(amt),
+          isChip: !!chip,
+          chipFont: chip ? cs(chip).fontFamily.split(',')[0].replace(/"/g, '') : null,
+          amtFont: amt ? cs(amt).fontFamily.split(',')[0].replace(/"/g, '') : null,
+        };
+      });
+    const tabsWrap = page.querySelector('.acct-wb-tabs');
+    const strip = tabsWrap ? tabsWrap.querySelector('.cfo-tabs') : null;
+    const tabs = strip ? [...strip.querySelectorAll('.cfo-tab')] : [];
+    const caveat = page.querySelector('.acct-caveat');
+    return {
+      sectionGaps: gaps,
+      pageGap: cs(page).rowGap || cs(page).gap,
+      reserve: {
+        present: !!card,
+        flagship: card ? card.classList.contains('cfo-flagship') : null,
+        label: txt(card ? card.querySelector('.cfo-summary-label') : null),
+        value: txt(card ? card.querySelector('.cfo-summary-value') : null),
+        meta: txt(card ? card.querySelector('.cfo-summary-meta') : null),
+        markPainted: mark ? (cs(mark).display !== 'none' && mark.getBoundingClientRect().width > 0) : false,
+        markSrc: mark ? mark.getAttribute('src') : null,
+        markAlt: mark ? mark.getAttribute('alt') : null,
+        markAria: mark ? mark.getAttribute('aria-hidden') : null,
+        safeToken: card ? cs(card).getPropertyValue('--mark-safe').trim() : null,
+        safePad: card ? cs(card).paddingRight : null,
+      },
+      completeness: meter ? {
+        width: cs(meter).width,
+        bg: cs(meter).backgroundColor,
+        caveat: txt(caveat),
+        caveatColor: caveat ? cs(caveat).color : null,
+        caveatBg: caveat ? cs(caveat).backgroundColor : null,
+      } : null,
+      obligations: rows,
+      chipCount: page.querySelectorAll('.acct-ob-state').length,
+      tabs: tabs.map((b) => txt(b)),
+      tabsScrollable: strip ? strip.scrollWidth > strip.clientWidth + 1 : null,
+      tabsMask: tabsWrap ? cs(tabsWrap).maskImage || cs(tabsWrap).webkitMaskImage : null,
+      plainCols: (() => { const g = page.querySelector('.acct-plain-grid');
+        return g ? cs(g).gridTemplateColumns.split(' ').length : null; })(),
+      bandCols: (() => { const g = page.querySelector('.acct-wb-band');
+        return g ? cs(g).gridTemplateColumns.split(' ').length : null; })(),
+      calendarKinds: [...page.querySelectorAll('.acct-cal-day[class*="k-"]')].map((d) => ({
+        day: txt(d), color: cs(d).color, bg: cs(d).backgroundColor,
+        kind: (d.className.match(/k-([a-z]+)/) || [])[1] || null,
+      })),
+      hexInStyle: false,
+    };
+  })();
+
   const res = win.performance.getEntriesByType('resource');
   const calls = res.filter((e) => e.initiatorType === 'xmlhttprequest' || e.initiatorType === 'fetch')
     .map((e) => e.name);
@@ -736,7 +815,7 @@ const PROBE_FN = `function facts(win, doc) {
     h1Total: doc.querySelectorAll('h1').length,
     sections, overflow: overflow.slice(0, 10), overflowCount: overflow.length,
     overlaps: overlaps.slice(0, 12), overlapCount: overlaps.length,
-    headActions, heads, focusRing, shell, figures, brand, idLeaks, navItems, walletsState, aicfo, accounts,
+    headActions, heads, focusRing, shell, figures, brand, idLeaks, navItems, walletsState, aicfo, accounts, accountant,
     settings, drawerSettings, topbarSettings, headMarks,
     fonts: { status: doc.fonts.status, size: doc.fonts.size,
       archivo: doc.fonts.check('400 40px "Archivo Black"'),
@@ -878,6 +957,25 @@ const ACCOUNTS = await collectGroup([
   { key: 'AE', route: `${P}?shell=accounts-empty`, w: 1440, h: 900 },
 ], 45000);
 const { AD, AM, AS, A320, AE } = ACCOUNTS;
+/* AI Accountant. Folded into ONE further launch rather than several, for the
+   reason this file already documents: each collectGroup is a browser, node --test
+   runs files in parallel, and a launch too many pushes the suite past the kill
+   timeout. A viewport costs an iframe here, not a process.
+
+   The three obligation fixtures are the point: the state production is in (no
+   amount anywhere), one real amount, and a CONFIRMED zero. Those three are the
+   only way to prove the em dash is absence and the zero is a zero. */
+const ACCOUNTANT = await collectGroup([
+  { key: 'NAD', route: `${P}?shell=accountant`, w: 1440, h: 900 },
+  { key: 'NAM', route: `${P}?shell=accountant`, w: 390, h: 844 },
+  { key: 'NA320', route: `${P}?shell=accountant`, w: 320, h: 900 },
+  { key: 'NCALC', route: `${P}?shell=accountant-calc`, w: 1440, h: 900 },
+  { key: 'NZERO', route: `${P}?shell=accountant-zero`, w: 1440, h: 900 },
+  { key: 'NCAL', route: `${P}?shell=accountant-calendar`, w: 1440, h: 900 },
+  { key: 'NCALM', route: `${P}?shell=accountant-calendar`, w: 390, h: 844 },
+  { key: 'NDRAFT', route: `${P}?shell=accountant-draft`, w: 1440, h: 900 },
+], 45000);
+const { NAD, NAM, NA320, NCALC, NZERO, NCAL, NCALM, NDRAFT } = ACCOUNTANT;
 console.log(`  .. desktop viewport ${D.innerWidth}px, mobile viewport ${M.innerWidth}px, `
   + `in-shell ${SD.innerWidth}px / ${SM.innerWidth}px`);
 
@@ -2266,5 +2364,224 @@ t('the preview makes no API or Supabase requests', () => {
 
 server.close();
 fs.rmSync(tmp, { recursive: true, force: true });
+
+/* ── AI Accountant — Tax & Compliance Workbench ─────────────────────────────
+   What a browser can settle and a source read cannot: whether the one navy card
+   is branded, whether "insufficient data" still looks like money, and whether
+   five tabs and three prose cards survive a phone. */
+console.log('\nAI Accountant — the flagship and its mark');
+
+t('the Tax reserve card is a flagship and wears exactly one mark', () => {
+  const r = NAD.accountant.reserve;
+  assert.ok(r.present, 'no reserve card rendered');
+  assert.strictEqual(r.flagship, true, 'the page\u2019s one navy hero is not a flagship');
+  assert.strictEqual(r.markPainted, true, 'the flagship mark is not painted');
+  assert.strictEqual(NAD.brand.cardMarks, 1, `expected one card mark, saw ${NAD.brand.cardMarks}`);
+});
+
+t('the mark is the official white symbol, and inert to a reader', () => {
+  const r = NAD.accountant.reserve;
+  assert.match(r.markSrc || '', /symbol_white_transparent\.svg$/);
+  assert.strictEqual(r.markAlt, '', 'a decorative mark must carry an empty alt');
+  assert.strictEqual(r.markAria, 'true');
+});
+
+t('the mark claims a safe column the text may not enter', () => {
+  // --mark-safe guarantees the label, the figure and the supporting line are
+  // never set over the mark, and it belongs to shell.css rather than this page.
+  // The custom property reads back as its unresolved calc() text, so what the
+  // assertion measures is the USED value: the padding the card really reserves.
+  const pad = parseFloat(NAD.accountant.reserve.safePad);
+  assert.ok(pad > 100, `the card reserves only ${NAD.accountant.reserve.safePad} for the mark`);
+  // And the column actually works: the nearest thing a reader has to read stops
+  // clear of the mark's near edge. safeGap is that distance, measured on the
+  // painted rectangles rather than inferred from the padding.
+  const fs = (NAD.brand.flagships || []).filter((f) => f.painted);
+  assert.strictEqual(fs.length, 1, `expected one flagship, saw ${fs.length}`);
+  assert.ok(fs[0].safeGap >= 0,
+    `content runs ${-fs[0].safeGap}px into the mark's column`);
+  assert.ok(fs[0].cropped > 0,
+    'the mark must be cropped by the card edge — an uncropped one reads as a parked icon');
+});
+
+t('nothing readable is painted over the mark, at any width', () => {
+  for (const [name, V] of [['desktop', NAD], ['390', NAM], ['320', NA320]]) {
+    const bad = (V.overlaps || []).filter((o) => /cfo-summary|acct-/.test(o.hero + o.cls));
+    assert.strictEqual(bad.length, 0, `${name}: ${JSON.stringify(bad)}`);
+  }
+});
+
+console.log('\nAI Accountant — absence, zero and amount');
+
+t('with nothing measured the reserve is an em dash, not Rp 0', () => {
+  const r = NAD.accountant.reserve;
+  assert.strictEqual(r.value, '\u2014', `reserve read ${JSON.stringify(r.value)}`);
+  assert.ok(!/Rp\s*0/.test(r.value || ''), 'an unmeasured reserve must never render as money');
+  assert.ok((r.meta || '').length > 20, 'the absent reserve must say why it is absent');
+});
+
+t('a measured reserve renders as money', () => {
+  const r = NCALC.accountant.reserve;
+  assert.match(r.value || '', /^Rp\s/, `reserve read ${JSON.stringify(r.value)}`);
+  assert.ok(!/\u2014/.test(r.value || ''));
+});
+
+t('a CONFIRMED zero renders as a zero, not as an em dash', () => {
+  // One line, summing to nothing. This is the case the old `reserve > 0` test
+  // swallowed: it showed the same em dash as never-measured.
+  const r = NZERO.accountant.reserve;
+  assert.match(r.value || '', /^Rp\s*0$/, `confirmed zero read ${JSON.stringify(r.value)}`);
+});
+
+t('no figure on the page is truncated at any width', () => {
+  for (const [name, V] of [['desktop', NAD], ['390', NAM], ['320', NA320], ['calc', NCALC]]) {
+    const cut = (V.figures || []).filter((f) => f.truncated);
+    assert.strictEqual(cut.length, 0, `${name}: ${JSON.stringify(cut)}`);
+  }
+});
+
+console.log('\nAI Accountant — a non-amount never looks like an amount');
+
+t('insufficient data and not enabled render as chips, not as figures', () => {
+  const rows = NAD.accountant.obligations;
+  assert.ok(rows.length >= 3, `expected the obligation rows, saw ${rows.length}`);
+  const nonAmount = rows.filter((r) => /insufficient|not enabled/i.test(r.amount || ''));
+  assert.ok(nonAmount.length >= 2, `expected at least two non-amount rows, saw ${nonAmount.length}`);
+  for (const r of nonAmount) {
+    assert.strictEqual(r.isChip, true, `${r.label}: still rendered as a bare amount`);
+    assert.ok(!/JetBrains/i.test(r.chipFont || ''),
+      `${r.label}: a state is set in the figure face (${r.chipFont})`);
+  }
+});
+
+t('a real amount IS in the figure face, beside the chips', () => {
+  const rows = NCALC.accountant.obligations;
+  const real = rows.filter((r) => /^Rp\s/.test(r.amount || ''));
+  assert.ok(real.length >= 1, `expected one real amount, saw ${JSON.stringify(rows.map((r) => r.amount))}`);
+  assert.match(real[0].amtFont || '', /JetBrains/i, 'money must be set in the figure face');
+  assert.strictEqual(real[0].isChip, false);
+  // And the chips are still chips on the same screen — the contrast is the point.
+  assert.ok(NCALC.accountant.chipCount >= 1, 'the mixed state must show both treatments at once');
+});
+
+t('every non-amount row explains what it does not mean', () => {
+  for (const r of NAD.accountant.obligations.filter((x) => x.isChip)) {
+    assert.ok((r.sub || '').length > 30,
+      `${r.label}: no hint under a state that could be read as "nothing is owed"`);
+  }
+});
+
+console.log('\nAI Accountant — completeness is about the form');
+
+t('a full completeness bar does not turn green', () => {
+  const c = NCALC.accountant.completeness;
+  assert.ok(c, 'no completeness meter rendered');
+  // --success is #0F7A52. A bar at 100% in that colour reads as a compliance verdict.
+  assert.ok(!/15,\s*122,\s*82/.test(c.bg), `the full bar is drawn in the success colour: ${c.bg}`);
+});
+
+t('the completeness card states what it measures and what it does not', () => {
+  const c = NCALC.accountant.completeness;
+  assert.ok((c.caveat || '').length > 30, 'no caveat beside a 100% figure');
+  assert.ok(c.caveatBg && c.caveatBg !== 'rgba(0, 0, 0, 0)', 'the caveat must be a visible callout');
+});
+
+console.log('\nAI Accountant — one rhythm, one identity');
+
+t('every gap between page sections is 18px', () => {
+  assert.strictEqual(NAD.accountant.pageGap, '18px', `page gap is ${NAD.accountant.pageGap}`);
+  const odd = NAD.accountant.sectionGaps.filter((g) => g !== 18);
+  assert.deepStrictEqual(odd, [], `section gaps: ${NAD.accountant.sectionGaps.join(', ')}`);
+});
+
+t('the module renders exactly one page header on every view', () => {
+  for (const [name, V] of [['workbench', NAD], ['calendar', NCAL], ['draft', NDRAFT]]) {
+    assert.strictEqual(V.h1Total, 1, `${name}: ${V.h1Total} h1 on one page`);
+    assert.strictEqual(V.heads.length, 1, `${name}: ${V.heads.length} page headers`);
+  }
+});
+
+t('the page header keeps its badge out of the button box', () => {
+  // context and actions are separate zones: a badge sharing the actions box
+  // stretched edge to edge on a phone, which is right for a button and wrong
+  // for a label.
+  for (const b of NAM.headActions) {
+    assert.ok(!/Preview/i.test(b.txt), `a status badge is sitting in the actions box: ${b.txt}`);
+  }
+});
+
+t('page-level actions stay thumb-sized on a phone', () => {
+  for (const b of NAM.headActions) {
+    assert.ok(b.h >= 32, `${b.txt}: ${b.h}px tall`);
+  }
+});
+
+console.log('\nAI Accountant — narrow screens');
+
+t('nothing overflows the viewport at 390 or 320', () => {
+  for (const [name, V] of [['390', NAM], ['320', NA320], ['calendar 390', NCALM]]) {
+    assert.strictEqual(V.overflowCount, 0,
+      `${name}: ${JSON.stringify(V.overflow)}`);
+  }
+});
+
+t('the five tabs scroll, and say so', () => {
+  const a = NAM.accountant;
+  assert.strictEqual(a.tabs.length, 5, `saw ${a.tabs.length} tabs`);
+  assert.strictEqual(a.tabsScrollable, true, 'five tabs fitting a phone would mean they are unreadably small');
+  assert.match(a.tabsMask || '', /gradient/,
+    'a strip that scrolls with no edge affordance hides three of its five tabs');
+});
+
+t('the tab strip does NOT scroll on desktop, and carries no fade there', () => {
+  assert.strictEqual(NAD.accountant.tabsScrollable, false);
+  assert.ok(!/gradient/.test(NAD.accountant.tabsMask || ''),
+    'a fade on a strip with nothing past the edge is a lie');
+});
+
+t('the plain-language row is one column on a phone, three on desktop', () => {
+  assert.strictEqual(NAD.accountant.plainCols, 3, `desktop: ${NAD.accountant.plainCols} columns`);
+  assert.strictEqual(NAM.accountant.plainCols, 1,
+    `390: ${NAM.accountant.plainCols} columns \u2014 prose does not fit in a 135px track`);
+  assert.strictEqual(NA320.accountant.plainCols, 1, `320: ${NA320.accountant.plainCols} columns`);
+});
+
+t('the two-column bands stack on a phone', () => {
+  assert.strictEqual(NAD.accountant.bandCols, 2);
+  assert.strictEqual(NAM.accountant.bandCols, 1);
+});
+
+console.log('\nAI Accountant — calendar colour');
+
+t('every marked calendar day clears 4.5:1 against its own ground', () => {
+  // The old cellStyle set var(--warning) as text on var(--warning-soft) and a
+  // bare #fff on the PPN cell. Contrast is measured here, not asserted in prose.
+  const days = NCAL.accountant.calendarKinds;
+  assert.ok(days.length >= 4, `expected the marked days, saw ${days.length}`);
+  const lum = (c) => { const p = c.match(/[\d.]+/g).slice(0, 3).map(Number).map((v) => {
+    v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); });
+    return 0.2126 * p[0] + 0.7152 * p[1] + 0.0722 * p[2]; };
+  for (const d of days) {
+    const l1 = lum(d.color), l2 = lum(d.bg);
+    const ratio = (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05);
+    assert.ok(ratio >= 4.5, `${d.kind} day ${d.day}: ${ratio.toFixed(2)}:1 (${d.color} on ${d.bg})`);
+  }
+});
+
+t('the calendar keeps seven columns on a phone', () => {
+  // A week has seven days; a stacked calendar is not a calendar. It may shrink,
+  // it may not restructure.
+  assert.ok(NCALM.accountant.calendarKinds.length >= 4, 'the marked days vanished at 390px');
+  assert.strictEqual(NCALM.overflowCount, 0);
+});
+
+console.log('\nAI Accountant — the preview is still a preview');
+
+t('no accountant view makes a network call', () => {
+  for (const [name, V] of [['workbench', NAD], ['calendar', NCAL], ['draft', NDRAFT], ['calc', NCALC]]) {
+    assert.deepStrictEqual(V.suspicious || [], [], `${name} reached the network: ${JSON.stringify(V.suspicious)}`);
+  }
+});
+
 console.log(`\n${pass} passed, ${fail} failed\n`);
 process.exit(fail ? 1 : 0);
