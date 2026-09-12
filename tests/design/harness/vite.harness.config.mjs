@@ -1,4 +1,4 @@
-// Build config for the Accounts test harness.
+// Build config for the page test harnesses (Accounts, AI Accountant).
 //
 // .mjs, not .js: Vite loads a .js config through esbuild's CJS output, where the
 // top-level await below is a syntax error.
@@ -48,12 +48,22 @@ export default {
   // LIB build does not, so the bundle shipped 40 bare `process` references and
   // threw ReferenceError the moment the module evaluated — the harness globals
   // never attached and every scenario reported "__boot is not a function".
-  define: { 'process.env.NODE_ENV': JSON.stringify('production') },
+  define: {
+    'process.env.NODE_ENV': JSON.stringify('production'),
+    // The AI Accountant hub renders the legacy profile page unless this
+    // build-time flag is on, and it IS on in production. Vite only reads VITE_*
+    // from .env files, so a harness build would otherwise silently exercise the
+    // wrong component — the page with no chat on it.
+    'import.meta.env.VITE_AI_ACCOUNTANT_PREMIUM': JSON.stringify(
+      process.env.VITE_AI_ACCOUNTANT_PREMIUM || 'false'),
+  },
   build: {
     // A library-style build with one predictable filename, because the scenario
     // pages load it by name rather than through a generated HTML template.
     lib: {
-      entry: path.join(HERE, 'accountsHarness.jsx'),
+      // Which harness to build. Defaults to Accounts so existing callers are
+      // unchanged; the AI Accountant suite passes its own.
+      entry: path.join(HERE, process.env.HARNESS_ENTRY || 'accountsHarness.jsx'),
       formats: ['es'],
       fileName: () => 'harness.js',
     },

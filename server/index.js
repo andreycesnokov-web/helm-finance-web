@@ -2537,55 +2537,76 @@ app.get('/api/audit/events', auth, async (req, res) => {
 //               classification exists in the product yet. Never a guessed %.
 //   PPN       : unavailable — needs invoice data (041 not applied / invoicing off).
 //   reserve   : sum of CALCULATED obligations only.
+// The deterministic obligations file, as a function.
+//
+// Extracted from its route handler so the AI Accountant reads obligations
+// through the SAME code the page does. A second copy of this arithmetic living
+// beside the assistant is how an explanation starts disagreeing with the figure
+// it is explaining.
+//
+// Unchanged from what shipped: the period, the due dates, the withholding
+// filter and every status string are exactly as they were.
+async function computeAccountantObligations(biz, now = new Date()) {
+  // Obligations file for the LAST completed month (paid in the current month).
+  const period = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const periodStr = `${period.getFullYear()}-${String(period.getMonth() + 1).padStart(2, '0')}`;
+  const due10 = new Date(now.getFullYear(), now.getMonth(), 10).toISOString().slice(0, 10);
+  const dueEndNext = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().slice(0, 10);
+
+  // ── PPH 21/26 — recorded withholding lines only ──────────────────────────
+  const { data: pays } = await supabase.from('payroll_payments')
+    .select('id, currency, period_month, payment_date, status').or(bizOrFilter(biz));
+  const inPeriod = (pays || []).filter(p =>
+    (p.status === 'paid' || !p.status) &&
+    (p.period_month === periodStr || String(p.payment_date || '').slice(0, 7) === periodStr));
+  let pph21 = { amount: null, source_count: inPeriod.length, status: 'insufficient_data',
+    source_label: inPeriod.length ? `from Payroll · ${inPeriod.length} payment${inPeriod.length === 1 ? '' : 's'} (no tax lines recorded)` : 'from Payroll · no payments in period' };
+  let withholdingTotal = null;
+  if (inPeriod.length) {
+    const ids = inPeriod.map(p => p.id);
+    const { data: items } = await supabase.from('payroll_payment_items')
+      .select('amount, direction, item_type, label, payroll_payment_id').in('payroll_payment_id', ids);
+    const taxLines = (items || []).filter(i => i.direction === 'deduction'
+      && /pph|pajak|\btax\b|withhold/i.test(`${i.label || ''} ${i.item_type || ''}`));
+    const amount = taxLines.reduce((s, i) => s + Number(i.amount || 0), 0);
+    // Recorded lines exist, so the total is MEASURED even when it sums to zero.
+    // That is the absence-vs-zero distinction the assistant depends on, and it
+    // is why this is tracked separately from the obligation's own status.
+    if (taxLines.length) withholdingTotal = amount;
+    if (taxLines.length && amount > 0) {
+      pph21 = { amount, source_count: inPeriod.length, status: 'calculated',
+        source_label: `from Payroll · ${inPeriod.length} payment${inPeriod.length === 1 ? '' : 's'} · ${taxLines.length} withholding line${taxLines.length === 1 ? '' : 's'}` };
+    }
+  }
+
+  const obligations = [
+    { obligation_type: 'pph_21_26', title: 'PPH 21/26', currency: 'IDR', period: periodStr, due_date: due10, ...pph21 },
+    { obligation_type: 'pph_23', title: 'PPH 23', amount: null, currency: 'IDR', period: periodStr, due_date: due10,
+      source_count: 0, status: 'insufficient_data', source_label: 'No withholding rate / service classification defined' },
+    { obligation_type: 'ppn', title: 'PPN', amount: null, currency: 'IDR', period: periodStr, due_date: dueEndNext,
+      source_count: 0, status: 'unavailable', source_label: 'PPN requires invoice data — invoicing not enabled' },
+  ];
+  const calc = obligations.filter(o => o.status === 'calculated');
+  return {
+    period: periodStr,
+    obligations,
+    reserve: { currency: 'IDR', amount: calc.reduce((s, o) => s + Number(o.amount || 0), 0),
+      lines: calc.map(o => ({ obligation_type: o.obligation_type, title: o.title, amount: o.amount, source_label: o.source_label })) },
+    // Not part of the endpoint payload: the assistant needs to tell "no payroll
+    // records at all" from "records exist and withholding is zero".
+    payroll_runs_count: inPeriod.length,
+    payroll_withholding_total: withholdingTotal,
+  };
+}
+
 app.get('/api/accountant/obligations', auth, async (req, res) => {
   try {
     const biz = await requireBusiness(req, res);
     if (!biz) return;
     if (!['owner', 'ceo', 'admin', 'cfo', 'accountant', 'auditor'].includes(biz.role))
       return res.status(403).json({ error: 'forbidden' });
-
-    const now = new Date();
-    // Obligations file for the LAST completed month (paid in the current month).
-    const period = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    const periodStr = `${period.getFullYear()}-${String(period.getMonth() + 1).padStart(2, '0')}`;
-    const due10 = new Date(now.getFullYear(), now.getMonth(), 10).toISOString().slice(0, 10);
-    const dueEndNext = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().slice(0, 10);
-
-    // ── PPH 21/26 — recorded withholding lines only ──────────────────────────
-    const { data: pays } = await supabase.from('payroll_payments')
-      .select('id, currency, period_month, payment_date, status').or(bizOrFilter(biz));
-    const inPeriod = (pays || []).filter(p =>
-      (p.status === 'paid' || !p.status) &&
-      (p.period_month === periodStr || String(p.payment_date || '').slice(0, 7) === periodStr));
-    let pph21 = { amount: null, source_count: inPeriod.length, status: 'insufficient_data',
-      source_label: inPeriod.length ? `from Payroll · ${inPeriod.length} payment${inPeriod.length === 1 ? '' : 's'} (no tax lines recorded)` : 'from Payroll · no payments in period' };
-    if (inPeriod.length) {
-      const ids = inPeriod.map(p => p.id);
-      const { data: items } = await supabase.from('payroll_payment_items')
-        .select('amount, direction, item_type, label, payroll_payment_id').in('payroll_payment_id', ids);
-      const taxLines = (items || []).filter(i => i.direction === 'deduction'
-        && /pph|pajak|\btax\b|withhold/i.test(`${i.label || ''} ${i.item_type || ''}`));
-      const amount = taxLines.reduce((s, i) => s + Number(i.amount || 0), 0);
-      if (taxLines.length && amount > 0) {
-        pph21 = { amount, source_count: inPeriod.length, status: 'calculated',
-          source_label: `from Payroll · ${inPeriod.length} payment${inPeriod.length === 1 ? '' : 's'} · ${taxLines.length} withholding line${taxLines.length === 1 ? '' : 's'}` };
-      }
-    }
-
-    const obligations = [
-      { obligation_type: 'pph_21_26', title: 'PPH 21/26', currency: 'IDR', period: periodStr, due_date: due10, ...pph21 },
-      { obligation_type: 'pph_23', title: 'PPH 23', amount: null, currency: 'IDR', period: periodStr, due_date: due10,
-        source_count: 0, status: 'insufficient_data', source_label: 'No withholding rate / service classification defined' },
-      { obligation_type: 'ppn', title: 'PPN', amount: null, currency: 'IDR', period: periodStr, due_date: dueEndNext,
-        source_count: 0, status: 'unavailable', source_label: 'PPN requires invoice data — invoicing not enabled' },
-    ];
-    const calc = obligations.filter(o => o.status === 'calculated');
-    res.json({
-      period: periodStr,
-      obligations,
-      reserve: { currency: 'IDR', amount: calc.reduce((s, o) => s + Number(o.amount || 0), 0),
-        lines: calc.map(o => ({ obligation_type: o.obligation_type, title: o.title, amount: o.amount, source_label: o.source_label })) },
-    });
+    const { period, obligations, reserve } = await computeAccountantObligations(biz);
+    res.json({ period, obligations, reserve });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -2642,55 +2663,250 @@ app.get('/api/accountant/summary', auth, async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// POST /api/accountant/ask — AI explains compliance using ONLY deterministic
-// data. It never invents a rate/deadline/requirement and always cites sources.
+// POST /api/accountant/ask — the AI Accountant assistant.
+//
+// Answers questions about THIS company's bookkeeping: ledger and accounts,
+// transactions, receivables, payables, payroll, documents, closing a period and
+// tax. The user stays on the AI Accountant page; nothing here routes to AI CFO.
+//
+// The guarantees, and where each one is actually enforced — none of them rest on
+// the model doing as it is told:
+//
+//   ISOLATION      requireBusiness() resolves the company from the session, not
+//                  from the request body. A client-supplied business_id cannot
+//                  widen scope, and a personal workspace is refused outright.
+//                  The role gate is checked here, server-side, as well.
+//   FIGURES        come from buildAiCfoContext() and computeAccountantObligations()
+//                  — the product's existing computations. The model is given
+//                  them already labelled measured / zero / absent / unknown.
+//   CITATIONS      the model emits ids only. URLs are attached afterwards from
+//                  the server's own registry, and any id it did not receive is
+//                  dropped and reported. Link-shaped text is stripped from prose.
+//   SOURCE TIERS   an activated rule with a verified source can support a legal
+//                  statement; a collected document cannot, and is returned in a
+//                  separate field so a UI cannot render the two as one list.
+//   UNTRUSTED TEXT knowledge text is fenced and labelled as quoted third-party
+//                  material. An instruction inside a document is reported, not
+//                  followed.
+//   LIMITS         one atomic reservation per question against the plan's
+//                  existing max_ai_questions_per_month. Parallel requests cannot
+//                  all pass the same check, because there is no check to pass —
+//                  each caller gets its own increment back.
+//
+// Stage one: answers and recommendations only. This endpoint writes nothing to
+// any financial table, and no financial change happens without the user's own
+// separate, manual confirmation elsewhere in the product.
 app.post('/api/accountant/ask', auth, async (req, res) => {
+  const KB = require('./lib/accountantKnowledge');
+  const ACTX = require('./lib/accountantContext');
+  const ASSIST = require('./lib/accountantAssistant');
+  const USAGE = require('./lib/aiUsageLimit');
+  const FEATURE = 'ai_accountant_ask';
+
+  let reservation = null;
+  let bizIdForRelease = null;
+  try {
+    // ── access: session → company → role. In that order, and all server-side.
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canViewBusinessFinance(biz.role)) {
+      return res.status(403).json({ error: 'Your role cannot use the AI Accountant', code: 'forbidden_role' });
+    }
+    bizIdForRelease = biz.business.id;
+
+    const question = String(req.body?.question || '').trim().slice(0, ASSIST.MAX_QUESTION);
+    if (!question) return res.status(400).json({ error: 'question required', code: 'question_required' });
+
+    const language = normalizeLanguage(req.body?.language || await getUserLanguage(req.user.userId));
+    const disclaimer = AI_ACCOUNTANT_DISCLAIMER[language] || AI_ACCOUNTANT_DISCLAIMER.en;
+
+    // The client may send the thread it is displaying. It is used for continuity
+    // only — never as a source of facts — and it is re-scoped here: history is
+    // accepted as text, and every figure in the answer is recomputed from the
+    // company's own records on this request.
+    const history = Array.isArray(req.body?.history)
+      ? req.body.history
+        .filter((m) => m && typeof m.text === 'string' && ['user', 'assistant'].includes(m.role))
+        .slice(-ASSIST.MAX_HISTORY_TURNS)
+        .map((m) => ({ role: m.role, text: String(m.text).slice(0, 1200) }))
+      : [];
+
+    // ── scope guard ────────────────────────────────────────────────────────
+    if (!ASSIST.isAccountingQuestion(question)) {
+      return res.json({
+        answer: ASSIST.OUT_OF_SCOPE[language] || ASSIST.OUT_OF_SCOPE.en,
+        out_of_scope: true, statement_types: [], grounded_sources: [], sources_for_review: [],
+        rejected_source_ids: [], missing: [], next_step: null, data_gaps: [],
+        injection_detected: false, unfounded_legal_claim: false,
+        grounded_rules_available: false, disclaimer,
+        business_id: biz.business.id,
+      });
+    }
+
+    // ── the plan's monthly allowance ───────────────────────────────────────
+    // Reserved BEFORE the provider call, atomically, and released below if the
+    // answer never happened. A limit checked after the fact is not a limit.
+    let access = null;
+    try { access = await getCurrentAccess(biz.ownerUserId || req.user.userId, biz.business.id); } catch { /* fail open on lookup */ }
+    const maxQ = access?.limits?.max_ai_questions_per_month;
+    reservation = await USAGE.reserve(supabase, {
+      businessId: biz.business.id, feature: FEATURE, limit: maxQ, userId: req.user.userId,
+    });
+    if (!reservation.allowed) {
+      return res.status(429).json({
+        error: 'Monthly AI question limit reached for this plan',
+        code: 'ai_limit_reached',
+        usage: { used: reservation.used, limit: reservation.limit, remaining: 0, period: reservation.period },
+        disclaimer, business_id: biz.business.id,
+      });
+    }
+
+    // ── the company's own records ──────────────────────────────────────────
+    const [cfoCtx, accountantData, obligationsFile] = await Promise.all([
+      buildAiCfoContext(req.user.userId, language, biz).catch(() => null),
+      buildAccountantData(biz).catch(() => null),
+      computeAccountantObligations(biz).catch(() => null),
+    ]);
+
+    // Counts are what separate absence from zero, so they are read explicitly
+    // rather than inferred from a sum being 0.
+    const [{ count: txCount }, { count: walletCount }, { count: docCount }] = await Promise.all([
+      supabase.from('transactions').select('id', { count: 'exact', head: true }).or(bizOrFilter(biz)),
+      supabase.from('wallets').select('id', { count: 'exact', head: true }).or(bizOrFilter(biz)).eq('is_active', true),
+      supabase.from('documents').select('id', { count: 'exact', head: true }).or(bizOrFilter(biz)),
+    ].map((q) => q.then((r) => ({ count: r?.count ?? 0 })).catch(() => ({ count: 0 }))));
+
+    // Open receivable / payable COUNTS. buildAiCfoContext returns totals and a
+    // top-5 list only, so counting its list would report 5 for any company with
+    // more than five. Same open-debt definition it uses: not paid, not
+    // cancelled, and approved (or from before approvals existed).
+    let recvCount = 0, payCount = 0;
+    try {
+      const { data: openDebts } = await supabase.from('debts')
+        .select('type, status, approval_status').or(bizOrFilter(biz))
+        .or('is_training.is.null,is_training.eq.false');
+      for (const d of openDebts || []) {
+        if (['paid', 'cancelled'].includes(d.status)) continue;
+        if (d.approval_status && d.approval_status !== 'approved') continue;
+        if (d.type === 'receivable') recvCount++;
+        else if (d.type === 'payable') payCount++;
+      }
+    } catch { /* counts stay 0 → the measures read as absent, which is honest */ }
+
+    const recv = cfoCtx?.receivables || {};
+    const pay = cfoCtx?.payables || {};
+    const context = ACTX.buildAccountingContext({
+      business: { id: biz.business.id, name: biz.business.name, base_currency: biz.business.base_currency },
+      cfo: cfoCtx,
+      accountant: accountantData,
+      extras: {
+        transactions_count: txCount,
+        wallets_count: walletCount,
+        documents_count: docCount,
+        receivables_count: recvCount,
+        payables_count: payCount,
+        receivables_overdue_count: recv.overdue_count ?? 0,
+        receivables_overdue_total: recv.overdue_total ?? null,
+        payables_overdue_count: pay.overdue_count ?? 0,
+        payables_overdue_total: pay.overdue_total ?? null,
+        payroll_runs_count: obligationsFile?.payroll_runs_count ?? 0,
+        payroll_withholding_total: obligationsFile?.payroll_withholding_total ?? null,
+        obligations: obligationsFile?.obligations || [],
+      },
+    });
+
+    // ── the two source tiers ───────────────────────────────────────────────
+    const grounded = KB.groundedFromRules(accountantData?.applicable_rules || []);
+    const forReview = KB.searchForReview(question, {
+      jurisdiction: context.company.jurisdiction || 'ID', limit: 4,
+    });
+    const knowledge = { grounded, forReview };
+
+    // ── ask the model ──────────────────────────────────────────────────────
+    const system = ASSIST.buildSystemPrompt({
+      language, companyName: biz.business.name || 'this company', hasGrounded: grounded.length > 0,
+    });
+    const userPrompt = ASSIST.buildUserPrompt({ question, context, knowledge, history });
+
+    let payload = null;
+    let providerError = null;
+    if (process.env.ANTHROPIC_API_KEY) {
+      try {
+        const resp = await anthropic.messages.create({
+          // The model and provider the product already uses. Nothing new is
+          // introduced here, and no comparison test is implied.
+          model: 'claude-sonnet-4-5',
+          max_tokens: 1100,
+          system,
+          messages: [{ role: 'user', content: userPrompt }],
+        });
+        const raw = (resp.content?.[0]?.text || '').trim();
+        payload = ASSIST.composeAnswer({
+          parsed: ASSIST.parseModelJson(raw), raw, knowledge, context, language,
+        });
+      } catch (e) {
+        providerError = e;
+        console.warn('[accountant/ask] provider failed:', e.message);
+      }
+    } else {
+      providerError = new Error('no_api_key');
+    }
+
+    if (!payload) {
+      // The answer never happened, so the question is not spent.
+      if (reservation?.enforced) {
+        await USAGE.release(supabase, { businessId: bizIdForRelease, feature: FEATURE }).catch(() => {});
+        reservation = { ...reservation, used: Math.max(0, (reservation.used || 1) - 1), released: true };
+      }
+      payload = ASSIST.localFallback({ context, knowledge, language });
+    }
+
+    return res.json({
+      ...payload,
+      disclaimer,
+      // Echoed so the client can drop an answer that arrived after the user
+      // switched company. The client guards too; this is the server half, and
+      // it is the half that cannot be skipped by a stale closure.
+      business_id: biz.business.id,
+      provider_error: providerError ? true : false,
+      usage: {
+        used: reservation?.used ?? null,
+        limit: reservation?.limit ?? null,
+        remaining: reservation?.remaining ?? null,
+        period: reservation?.period ?? null,
+        enforced: reservation?.enforced === true,
+      },
+      knowledge_base: KB.knowledgeStats(),
+    });
+  } catch (e) {
+    // A crash after reserving must not bill the user for a question.
+    if (reservation?.enforced && bizIdForRelease) {
+      await USAGE.release(supabase, { businessId: bizIdForRelease, feature: FEATURE }).catch(() => {});
+    }
+    console.error('[accountant/ask]', e);
+    return res.status(500).json({ error: e.message, code: 'assistant_failed' });
+  }
+});
+
+// GET /api/accountant/knowledge — what the assistant is working from.
+// Read-only, and deliberately blunt about the state of the corpus so a UI can
+// tell the user what is and is not behind an answer.
+app.get('/api/accountant/knowledge', auth, async (req, res) => {
   try {
     const biz = await requireBusiness(req, res);
     if (!biz) return;
     if (!canViewBusinessFinance(biz.role)) return res.status(403).json({ error: 'Forbidden' });
-    const question = String(req.body?.question || '').slice(0, 500);
-    if (!question) return res.status(400).json({ error: 'question required' });
-    const language = normalizeLanguage(await getUserLanguage(req.user.userId));
-    const disclaimer = AI_ACCOUNTANT_DISCLAIMER[language] || AI_ACCOUNTANT_DISCLAIMER.en;
-    const data = await buildAccountantData(biz);
-
-    // Only safe deterministic facts go to the model.
-    const facts = {
-      jurisdiction: data.jurisdiction,
-      profile: data.profile ? { legal_entity_type: data.profile.legal_entity_type, tax_regime: data.profile.tax_regime, vat_status: data.profile.vat_status, employee_status: data.profile.employee_status, financial_year_start: data.profile.financial_year_start, financial_year_end: data.profile.financial_year_end } : null,
-      profile_completeness_percent: data.completeness.percent,
-      missing_profile_fields: data.missing_profile_fields,
-      applicable_rules: data.applicable_rules.map(r => ({ rule_code: r.rule_code, version: r.version, title: r.title, reason: r.reason, official_source: r.official_source ? { title: r.official_source.title, url: r.official_source.url, last_verified_at: r.official_source.last_verified_at } : null })),
-      upcoming_obligations: data.upcoming.map(e => ({ title: e.title, rule_code: e.rule_code, version: e.rule_version, period: e.period, due_date: e.due_date, status: e.status })),
-      overdue_obligations: data.overdue.map(e => ({ title: e.title, due_date: e.due_date })),
-      active_unverified_rules: data.active_unverified,
-    };
-    const prompt = `You are the Helm Finance AI Accountant for ONE business. Answer in ${language === 'ru' ? 'Russian' : language === 'id' ? 'Indonesian' : 'English'}.
-
-STRICT RULES:
-- Use ONLY the deterministic facts below. NEVER invent a tax rate, deadline, filing frequency, threshold or legal interpretation.
-- If the facts do not contain an active rule needed to answer, say the determination is not possible yet and what is missing (e.g. missing profile fields, unverified rules).
-- When you state an obligation, cite its rule_code, version and official source title.
-- You explain and summarise; you do not calculate tax amounts (the deterministic engine does that later).
-- Do not present this as official advice.
-
-FACTS:
-${JSON.stringify(facts)}
-
-QUESTION: ${question}`;
-
-    let answer;
-    try {
-      const resp = await anthropic.messages.create({ model: 'claude-sonnet-4-5', max_tokens: 700, messages: [{ role: 'user', content: prompt }] });
-      answer = (resp.content?.[0]?.text || '').trim();
-    } catch {
-      // Local fallback keeps the feature usable if the model is unavailable.
-      answer = data.applicable_rules.length
-        ? `Applicable obligations: ${data.applicable_rules.map(r => `${r.title} (${r.rule_code} v${r.version})`).join('; ')}. ${data.overdue.length ? `${data.overdue.length} overdue. ` : ''}Confirm with a licensed professional.`
-        : `No active verified tax rules apply yet${data.missing_profile_fields.length ? ` — missing profile fields: ${data.missing_profile_fields.join(', ')}` : ''}. Determination not possible.`;
-    }
-    res.json({ answer, disclaimer, used_rules: data.applicable_rules.map(r => ({ rule_code: r.rule_code, version: r.version })) });
+    const KB = require('./lib/accountantKnowledge');
+    const data = await buildAccountantData(biz).catch(() => null);
+    const grounded = KB.groundedFromRules(data?.applicable_rules || []);
+    res.json({
+      ...KB.knowledgeStats(),
+      grounded_available: grounded.length > 0,
+      grounded_rules: grounded.map((g) => ({
+        rule_code: g.rule_code, version: g.rule_version, title: g.title,
+        source_title: g.source_title, verified_at: g.source_verified_at,
+      })),
+    });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 

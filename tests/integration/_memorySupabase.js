@@ -54,10 +54,24 @@ class Q {
   }
   ilike(c, pat) { return this.like(c, pat); }
   or(expr) {
-    // Only the single-term form the code emits: `business_id.eq.<uuid>`
+    // The forms the product actually emits: `business_id.eq.<uuid>` and the
+    // `is_training.is.null,is_training.eq.false` pair every financial read uses
+    // to exclude training rows. `.is.null` was previously unsupported and
+    // compiled to a predicate that matched nothing, so any query carrying it
+    // silently returned an empty set — a passing test over no rows.
     const parts = String(expr).split(',').map((p) => {
-      const m = p.match(/^(\w+)\.eq\.(.*)$/); return m ? (r) => String(r[m[1]]) === m[2] : () => false;
+      const eq = p.match(/^(\w+)\.eq\.(.*)$/);
+      if (eq) return (r) => String(r[eq[1]]) === eq[2];
+      const is = p.match(/^(\w+)\.is\.(null|true|false)$/);
+      if (is) {
+        const [, col, want] = is;
+        if (want === 'null') return (r) => r[col] === null || r[col] === undefined;
+        return (r) => r[col] === (want === 'true');
+      }
+      return () => false;
     });
+    // Multiple .or() calls AND their groups together, which is what PostgREST
+    // does and what the business-scope + is_training pairing relies on.
     this.filters.push((r) => parts.some((f) => f(r)));
     return this;
   }

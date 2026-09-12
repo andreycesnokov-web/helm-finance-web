@@ -520,6 +520,27 @@ const SHOTS = [
     { dir: OUT_ACCOUNTANT }],
   ['19-accountant-workbench-id-390x844.png', `${P}?shell=accountant-id`, 390, 844,
     { ...PHONE, dir: OUT_ACCOUNTANT }],
+
+  /* ── Ask AI Accountant ───────────────────────────────────────────────────
+     The chat that replaced the hand-off to AI CFO. The answer shown is the
+     awkward case on purpose: no verified rule exists, so it explains what the
+     records DO show, separates general bookkeeping from company facts, puts the
+     unverified document under its own warned heading, and says what is missing. */
+  ['20-accountant-ask-conversation.png', `${P}?shell=accountant-ask`, 1440, 1100,
+    { window: [1440, 1100], region: { sel: '.acct-ask', pad: 12 }, dir: OUT_ACCOUNTANT }],
+  ['21-accountant-ask-desktop-1440x900.png', `${P}?shell=accountant-ask`, 1440, 900,
+    { dir: OUT_ACCOUNTANT }],
+  ['22-accountant-ask-mobile-390x844.png', `${P}?shell=accountant-ask`, 390, 844,
+    { ...PHONE, dir: OUT_ACCOUNTANT }],
+  // The two source lists side by side, which is the distinction the whole
+  // feature turns on.
+  ['23-accountant-ask-sources-closeup.png', `${P}?shell=accountant-ask`, 1440, 1100,
+    { window: [1440, 1100], region: { sel: '.acct-src-review', pad: 10 }, dir: OUT_ACCOUNTANT }],
+  // Before the first question: the starting questions and the disclaimer.
+  ['24-accountant-ask-empty-state.png', `${P}?shell=accountant-ask-empty`, 1440, 900,
+    { region: { sel: '.acct-ask', pad: 12 }, dir: OUT_ACCOUNTANT }],
+  ['25-accountant-ask-empty-ru.png', `${P}?shell=accountant-ask-ru`, 1440, 900,
+    { region: { sel: '.acct-ask', pad: 12 }, dir: OUT_ACCOUNTANT }],
 ];
 
 /* ── which directories this run is allowed to touch ────────────────────────

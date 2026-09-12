@@ -426,3 +426,257 @@
   border-radius: 50%;
   background: currentColor;
 }
+
+/* ── Ask AI Accountant ────────────────────────────────────────────────────── */
+/* The chat that replaced a link out to AI CFO. Same tokens, same rhythm and the
+   same 18px the rest of the page uses; it is a section of this page, not a
+   widget parked on it. */
+.acct-ask-lede {
+  margin: 0 0 var(--space-3);
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  line-height: var(--line-normal);
+}
+
+.acct-ask-thread {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  max-height: 460px;
+  overflow-y: auto;
+  padding-right: var(--space-1);
+}
+
+.acct-ask-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-6) var(--space-4);
+  text-align: center;
+}
+.acct-ask-empty-sym { width: 34px; height: 34px; opacity: .5; }
+.acct-ask-empty-t {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  max-width: 42ch;
+  line-height: var(--line-normal);
+}
+
+/* A question and an answer are different kinds of thing and are not mirrored
+   bubbles: the question is short and indented, the answer is a block of
+   structured material. */
+.acct-msg { min-width: 0; }
+.acct-msg.is-user {
+  align-self: flex-end;
+  max-width: 82%;
+  background: var(--info-soft);
+  border-radius: var(--radius-md) var(--radius-md) var(--radius-sm) var(--radius-md);
+  padding: 10px 12px;
+}
+.acct-msg.is-assistant {
+  align-self: stretch;
+  border-left: 3px solid var(--action-primary);
+  padding: 2px 0 2px var(--space-3);
+}
+.acct-msg.is-pending { border-left-color: var(--border-default); }
+.acct-msg-text {
+  margin: 0;
+  font-size: var(--text-sm);
+  line-height: var(--line-relaxed);
+  color: var(--text-primary);
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+}
+.acct-msg.is-user .acct-msg-text { color: var(--text-primary); }
+
+.acct-ask-pending {
+  margin: var(--space-2) 0 0;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* Which kind of statement the answer is making. Three tones because the three
+   carry different authority — a legal requirement is not a general explanation
+   and must not look like one. */
+.acct-msg-kinds {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: var(--space-2);
+}
+.acct-kind {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .02em;
+  border-radius: 999px;
+  padding: 2px 9px;
+  background: var(--surface-page);
+  color: var(--text-muted);
+  border: 1px solid var(--border-default);
+}
+.acct-kind.is-company_facts { background: var(--info-soft); color: var(--info); border-color: transparent; }
+.acct-kind.is-legal_requirement { background: var(--success-soft); color: var(--success); border-color: transparent; }
+
+/* ── the two source lists, which must never read as one ───────────────────── */
+.acct-src { margin-top: var(--space-3); }
+.acct-src-h {
+  font-size: 11px;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: var(--text-muted);
+  margin-bottom: 5px;
+}
+.acct-src-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.acct-src-item { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.acct-src-t { font-size: 12.5px; font-weight: 600; color: var(--text-primary); overflow-wrap: break-word; }
+.acct-src-m { font-size: 11.5px; color: var(--text-muted); }
+.acct-src-link { font-size: 11.5px; color: var(--text-link); overflow-wrap: anywhere; }
+
+/* Verified basis: a green rule, because this one can actually carry a legal
+   statement. */
+.acct-src-grounded {
+  border-left: 3px solid var(--success);
+  padding-left: 10px;
+}
+.acct-src-grounded .acct-src-h { color: var(--success); }
+
+/* For review: warning-toned, and carrying its warning in the markup rather than
+   relying on the reader to know what "collected" means. */
+.acct-src-review {
+  border-left: 3px solid var(--warning);
+  padding-left: 10px;
+  background: var(--warning-soft);
+  /* On the block itself, not only on its children: any text added here later
+     inherits the right ink instead of the page default on a warning ground.
+     --warning is the ground's own hue and fails contrast as text on it. */
+  color: var(--warning-ink);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  padding-block: var(--space-2);
+  padding-right: var(--space-2);
+}
+.acct-src-review .acct-src-h { color: var(--warning-ink); }
+.acct-src-review .acct-src-t,
+.acct-src-review .acct-src-m { color: var(--warning-ink); }
+.acct-src-warn {
+  margin: 0 0 6px;
+  font-size: 11.5px;
+  line-height: var(--line-normal);
+  color: var(--warning-ink);
+}
+.acct-src-review .acct-src-link { color: var(--warning-ink); text-decoration: underline; }
+
+.acct-ask-nogrounded {
+  margin: var(--space-2) 0 0;
+  font-size: 12px;
+  line-height: var(--line-normal);
+  color: var(--warning-ink);
+}
+
+.acct-ask-missing { margin-top: var(--space-3); }
+.acct-ask-missing-list {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  line-height: var(--line-normal);
+}
+.acct-ask-next {
+  margin-top: var(--space-3);
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  align-items: baseline;
+  background: var(--surface-page);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+}
+.acct-ask-next-k {
+  font-size: 11px;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: var(--brand-electric-blue-ink);
+}
+.acct-ask-next-v { font-size: 12.5px; color: var(--text-secondary); line-height: var(--line-normal); }
+
+.acct-ask-degraded,
+.acct-ask-injection {
+  margin: 0 0 var(--space-2);
+  font-size: 12px;
+  line-height: var(--line-normal);
+  border-radius: var(--radius-sm);
+  padding: 6px 9px;
+}
+.acct-ask-degraded { background: var(--surface-page); color: var(--text-muted); }
+.acct-ask-injection { background: var(--danger-soft); color: var(--danger); font-weight: 600; }
+
+/* ── composing ────────────────────────────────────────────────────────────── */
+.acct-ask-suggestions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: var(--space-3);
+}
+.acct-ask-suggestion {
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+  border: 1px solid var(--border-default);
+  background: var(--surface-card);
+  color: var(--text-secondary);
+  border-radius: 999px;
+  padding: 6px 12px;
+  min-height: 32px;
+}
+.acct-ask-suggestion:hover:not(:disabled) { border-color: var(--border-strong); color: var(--text-primary); }
+.acct-ask-suggestion:disabled { opacity: .55; cursor: default; }
+
+.acct-ask-form {
+  display: flex;
+  gap: var(--space-2);
+  align-items: flex-end;
+  margin-top: var(--space-3);
+}
+.acct-ask-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  resize: vertical;
+  min-height: 56px;
+  line-height: var(--line-normal);
+}
+.acct-ask-form > .cfo-btn { flex: none; }
+
+.acct-ask-error {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  flex-wrap: wrap;
+  margin-top: var(--space-3);
+  background: var(--danger-soft);
+  color: var(--danger);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  font-size: 12.5px;
+}
+.acct-ask-error-t { flex: 1 1 auto; min-width: 0; }
+
+.acct-ask-limit {
+  margin: var(--space-2) 0 0;
+  font-size: 12px;
+  color: var(--warning-ink);
+  background: var(--warning-soft);
+  border-radius: var(--radius-sm);
+  padding: 6px 9px;
+  line-height: var(--line-normal);
+}
+
+@media (max-width: 560px) {
+  .acct-ask-form { flex-direction: column; align-items: stretch; }
+  .acct-ask-form > .cfo-btn { width: 100%; }
+  .acct-msg.is-user { max-width: 100%; }
+  .acct-ask-thread { max-height: 380px; }
+}

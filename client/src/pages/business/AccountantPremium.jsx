@@ -33,6 +33,7 @@ import {
   CalendarGrid, DeadlinesCard, WithholdingCard, DraftCalculationCard,
   DraftExplanationCard, DraftStatusCard, AuditStat, AuditTrailCard,
   AccountantLoading, AccountantError, AccountantNotice, obligationView, RESERVE_CURRENCY,
+  AccountantAsk, ASK_SUGGESTIONS,
 } from './AccountantBlocks'
 import './Accountant.css'
 
@@ -81,7 +82,7 @@ export function BusinessAccountantHub() {
 
 function PremiumAccountant() {
   const { token } = useAuth()
-  const { t } = useTranslation()
+  const { t, lang } = useTranslation()
   const { active, scopeKey } = useWorkspace()
   const navigate = useNavigate()
   const [tab, setTab] = useState('workbench')
@@ -93,6 +94,9 @@ function PremiumAccountant() {
   const [state, setState] = useState(EMPTY)
   // Ignores a response from a workspace the user has already switched away from.
   const guard = useRef(createRequestGuard())
+  // The assistant thread. Keyed on the same company signal the page's own
+  // fetches use, so a switch clears the conversation and the figures together.
+  const ask = useAccountantAsk({ token, activeId: active?.id ?? null, scopeKey, language: lang, t })
 
   useEffect(() => {
     // Clear FIRST so business A's pending actions can never render under business B.
@@ -131,7 +135,8 @@ function PremiumAccountant() {
         onTaxSplit={() => navigate('/business/accountant/tax-split')}
         onSettlement={() => navigate('/business/accountant/settlement')} />
       <AccountantTabs t={t} tabs={tabs} active={tab} onChange={setTab} />
-      {tab === 'workbench' && <Workbench t={t} state={state} setTab={setTab} navigate={navigate} onRetry={() => setReloadKey(k => k + 1)} />}
+      {tab === 'workbench' && <Workbench t={t} state={state} setTab={setTab} navigate={navigate}
+        onRetry={() => setReloadKey(k => k + 1)} ask={ask} />}
       {tab === 'calendar' && <CalendarTab t={t} obligations={state.obligations} />}
       {tab === 'taxdraft' && <TaxDraftTab t={t} obligations={state.obligations} />}
       {tab === 'audit' && <AuditTab t={t} />}
@@ -143,8 +148,143 @@ function PremiumAccountant() {
   )
 }
 
+/**
+ * The Ask AI Accountant thread.
+ *
+ * Owns the conversation, the in-flight request and — the part that matters —
+ * the company it belongs to.
+ *
+ * COMPANY ISOLATION, on three independent levels, because any one of them alone
+ * has a hole:
+ *
+ *  1. Switching company CLEARS the thread. Not filtered, not hidden — cleared,
+ *     synchronously, before any new request can start.
+ *  2. A request carries the company id it was issued under. When the response
+ *     arrives, the id is compared against the company that is active NOW, and a
+ *     mismatch is dropped. This is what catches the slow answer to a question
+ *     asked about the company the user has already left.
+ *  3. The server echoes `business_id` on every answer and it is checked too. A
+ *     client-side guard lives in a closure that a remount can orphan; the
+ *     server's own statement of which company it answered for cannot be.
+ *
+ * Stage one keeps the thread in memory. Nothing is persisted, so there is no
+ * stored history to leak across a switch either.
+ */
+function useAccountantAsk({ token, activeId, scopeKey, language, t }) {
+  const [messages, setMessages] = useState([])
+  const [input, setInput] = useState('')
+  const [asking, setAsking] = useState(false)
+  const [error, setError] = useState('')
+  const [usage, setUsage] = useState(null)
+  const [limitHit, setLimitHit] = useState(false)
+  const lastQuestion = useRef(null)
+  const guard = useRef(createRequestGuard())
+  // The company this thread belongs to. Read inside the async continuation so
+  // the comparison is against the company active at RESPONSE time, not the one
+  // captured when the request was sent.
+  const threadScope = useRef(activeId)
+  const endRef = useRef(null)
+  const inputRef = useRef(null)
+
+  // A different company is a different set of books, so it is a different
+  // conversation. Clearing runs on the same signal the page's own fetches key
+  // on, so the thread can never outlive the data it was talking about.
+  useEffect(() => {
+    guard.current.abort()
+    threadScope.current = activeId
+    setMessages([])
+    setInput('')
+    setError('')
+    setAsking(false)
+    setLimitHit(false)
+    setUsage(null)
+    lastQuestion.current = null
+  }, [activeId, scopeKey])
+
+  useEffect(() => {
+    if (endRef.current) endRef.current.scrollIntoView({ block: 'nearest' })
+  }, [messages, asking])
+
+  const ask = async (rawQuestion) => {
+    const question = String(rawQuestion || '').trim()
+    if (!question || asking || limitHit) return
+    lastQuestion.current = question
+
+    const askedUnder = activeId
+    const req = guard.current.start()
+    const id = `q${Date.now()}`
+    // The history the server sees is this thread only, and this thread is
+    // already company-scoped by the effect above.
+    const history = messages.map((m) => ({ role: m.role, text: m.text }))
+
+    setMessages((prev) => [...prev, { id, role: 'user', text: question }])
+    setInput('')
+    setError('')
+    setAsking(true)
+
+    try {
+      const data = await apiFetch('/accountant/ask', token, {
+        method: 'POST',
+        signal: req.signal,
+        body: JSON.stringify({ question, language, history }),
+      })
+      if (req.isStale()) return
+      // Level 2 and 3: the company the request was issued under, the company
+      // active now, and the company the server says it answered for must all
+      // agree. Any disagreement means this answer belongs to a thread that no
+      // longer exists on screen.
+      if (askedUnder !== threadScope.current) return
+      if (data?.business_id && data.business_id !== threadScope.current) return
+
+      setUsage(data.usage || null)
+      setMessages((prev) => [...prev, {
+        id: `a${Date.now()}`,
+        role: 'assistant',
+        text: data.answer || '',
+        statement_types: data.statement_types || [],
+        grounded_sources: data.grounded_sources || [],
+        sources_for_review: data.sources_for_review || [],
+        missing: data.missing || [],
+        next_step: data.next_step || null,
+        injection_detected: data.injection_detected === true,
+        grounded_rules_available: data.grounded_rules_available === true,
+        degraded: data.degraded === true || data.provider_error === true,
+      }])
+    } catch (e) {
+      if (req.isStale()) return
+      if (askedUnder !== threadScope.current) return
+      const code = e?.data?.code || e?.code
+      if (code === 'ai_limit_reached' || e?.status === 429) {
+        setLimitHit(true)
+        setUsage(e?.data?.usage || null)
+        setError('')
+      } else if (code === 'forbidden_role' || e?.status === 403) {
+        setError(t('accountantHub.askForbidden'))
+      } else {
+        setError(e?.message || t('accountantHub.askFailed'))
+      }
+      // The question stays in the thread, and retry re-sends it. Dropping it
+      // would make a failed request look like one the user never made.
+    } finally {
+      if (!req.isStale() && askedUnder === threadScope.current) setAsking(false)
+    }
+  }
+
+  return {
+    messages, input, asking, error, usage, limitHit,
+    setInput, ask,
+    retry: () => { if (lastQuestion.current) ask(lastQuestion.current) },
+    onKeyDown: (e) => {
+      // Enter sends, Shift+Enter is a newline — the convention for a chat box
+      // that is a textarea rather than an input.
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); ask(input) }
+    },
+    endRef, inputRef,
+  }
+}
+
 // ── Workbench (dashboard) ─────────────────────────────────────────────────────
-function Workbench({ t, state, setTab, navigate, onRetry }) {
+function Workbench({ t, state, setTab, navigate, onRetry, ask }) {
   if (state.loading) return <AccountantLoading rows={5} />
   if (state.failed) return <AccountantError t={t} onRetry={onRetry} />
 
@@ -240,8 +380,27 @@ function Workbench({ t, state, setTab, navigate, onRetry }) {
         why={t('accountantHub.plainWhyBody')}
         // `missing` is the FILTERED list — a field that does not apply (vat_status on a
         // Non-PKP company) must not read as an unfinished profile here either.
-        prepare={missing.length ? t('accountantHub.plainPrepareMissing') : t('accountantHub.plainPrepareOk')}
-        onAskCfo={() => navigate('/business/ai-cfo')} />
+        prepare={missing.length ? t('accountantHub.plainPrepareMissing') : t('accountantHub.plainPrepareOk')} />
+      {/* The accounting question is answered HERE. This used to be a button that
+          navigated to AI CFO — which left the section the question was about and
+          arrived somewhere that reads cash rather than books. AI CFO itself is
+          unchanged and still reachable from the sidebar. */}
+      <AccountantAsk
+        t={t}
+        messages={ask.messages}
+        input={ask.input}
+        asking={ask.asking}
+        error={ask.error}
+        usage={ask.usage}
+        limitHit={ask.limitHit}
+        suggestions={ASK_SUGGESTIONS}
+        onInput={ask.setInput}
+        onAsk={ask.ask}
+        onRetry={ask.retry}
+        onKeyDown={ask.onKeyDown}
+        inputRef={ask.inputRef}
+        endRef={ask.endRef}
+      />
     </>
   )
 }
