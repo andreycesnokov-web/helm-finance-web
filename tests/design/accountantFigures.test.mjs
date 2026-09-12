@@ -286,9 +286,16 @@ t('the premium gate is unchanged', () => {
 t('the applicability filter is still the one source of truth for gaps', () => {
   assert.match(premium, /applicableMissingFields\(/);
 });
-t('no tax rate, threshold or percentage was introduced', () => {
-  const suspicious = blocks.match(/\b\d+(\.\d+)?\s*%/g) || [];
-  assert.deepStrictEqual(suspicious, [], `a percentage literal appeared: ${suspicious.join(', ')}`);
+t('no tax rate or threshold literal was introduced', () => {
+  // The rule is that no RATE lives in the presentation layer — a tax figure must
+  // come from an activated rule, never from a component. A CSS percentage is a
+  // length, not a rate, so lines that are plainly layout are excluded rather
+  // than the check being dropped altogether.
+  const LAYOUT = /width|height|flex|basis|translate|margin|padding|top|left|right|bottom|size|gap/i;
+  const suspicious = blocks.split('\n')
+    .filter((l) => !LAYOUT.test(l))
+    .flatMap((l) => l.match(/\b\d+(\.\d+)?\s*%/g) || []);
+  assert.deepStrictEqual(suspicious, [], `a rate-shaped literal appeared: ${suspicious.join(', ')}`);
 });
 t('the document-recognition engine is untouched by this module', () => {
   for (const src of [blocks, premium])

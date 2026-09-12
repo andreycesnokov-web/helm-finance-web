@@ -39,6 +39,7 @@ import {
   ObligationsCard, PendingActionsCard, CalendarPreviewCard, PlainLanguageCard,
   CalendarGrid, DeadlinesCard, DraftCalculationCard, DraftExplanationCard,
   DraftStatusCard, WithholdingCard, AccountantNotice, obligationView,
+  AccountantAsk, ASK_SUGGESTIONS,
 } from './business/AccountantBlocks'
 import WorkspaceShell, { BUSINESS_NAV } from '../shell/WorkspaceShell'
 import './DesignPreview.css'
@@ -647,6 +648,54 @@ const AccountantDraftBody = ({ withholding = null }) => (
   </div>
 )
 
+/* The assistant, mid-conversation. Invented company, invented figures, and a
+   deliberately awkward answer: no verified rule exists, so it explains what the
+   records DO show, names the document to check under its own heading, and says
+   what is missing. That combination is the design, so it is what gets
+   photographed. */
+const ASK_THREAD = [
+  { id: 'u1', role: 'user', text: 'How do I record an expense the director paid personally?' },
+  {
+    id: 'a1', role: 'assistant',
+    text: 'Treat it as a reimbursement rather than a direct expense. The company owes the director the amount they paid, so it is recorded as the expense against the correct category and a payable to the director, and it clears when the company repays them.  In your records I can see 2 wallets and 148 transactions this period, and no payable to a director yet. Your books do not show the original receipt attached to any transaction, which is what a reviewer would look for first.',
+    statement_types: ['general_accounting', 'company_facts'],
+    grounded_sources: [],
+    sources_for_review: [{
+      source_id: 'DJP_EVIDENCE_004',
+      title: 'DJP — Bukti pembayaran dan kwitansi sebagai dokumen pendukung',
+      authority: 'DJP', document_number: null, url: 'https://www.pajak.go.id/',
+      verification: 'search-listed',
+    }],
+    missing: [
+      'The receipt the director was given, attached to the transaction',
+      'A counterparty record for the director, so the payable has somewhere to sit',
+    ],
+    next_step: 'Add the expense with the director as counterparty, then attach the receipt in Documents.',
+    grounded_rules_available: false,
+    injection_detected: false,
+  },
+]
+
+const AccountantAskBody = ({ t = tEn, messages = ASK_THREAD, usage = null }) => (
+  <div className="acct-wb">
+    <AccountantChrome active="workbench" t={t} />
+    <AccountantAsk
+      t={t}
+      messages={messages}
+      input=""
+      asking={false}
+      error=""
+      limitHit={false}
+      usage={usage}
+      suggestions={ASK_SUGGESTIONS}
+      onInput={noop}
+      onAsk={noop}
+      onRetry={noop}
+      onKeyDown={noop}
+    />
+  </div>
+)
+
 // Accountant shells: five tabs is too many to prove with one picture, so each
 // state that differs gets its own route.
 const ACCOUNTANT_SHELLS = {
@@ -659,6 +708,9 @@ const ACCOUNTANT_SHELLS = {
   /* The same page in the other two languages the product ships. Russian is the
      longest of the three and Indonesian sets the widest chips, so these are
      also the frames where a layout tuned only to English gives way. */
+  'accountant-ask': <AccountantAskBody />,
+  'accountant-ask-empty': <AccountantAskBody messages={[]} />,
+  'accountant-ask-ru': <AccountantAskBody t={tRu} messages={[]} />,
   'accountant-ru': <AccountantWorkbenchBody t={tRu} />,
   'accountant-id': <AccountantWorkbenchBody t={tId} />,
 }

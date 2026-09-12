@@ -37,7 +37,9 @@ export const RESERVE_CURRENCY = 'IDR'
 const plural = (t, n, oneKey, manyKey) =>
   (n === 1 ? t(oneKey) : t(manyKey).replace('{n}', String(n)))
 
-const fill = (s, vars) =>
+// Exported because the Ask block formats its usage badge with it and a second
+// interpolator would be a second set of placeholder bugs.
+export const fill = (s, vars) =>
   Object.keys(vars).reduce((acc, k) => acc.split('{' + k + '}').join(String(vars[k])), s)
 
 /**
@@ -293,7 +295,7 @@ export function CalendarPreviewCard({ t, deadlines, onOpen, formatDay }) {
   )
 }
 
-export function PlainLanguageCard({ t, what, why, prepare, onFilingPack, onAskCfo }) {
+export function PlainLanguageCard({ t, what, why, prepare, onFilingPack }) {
   return (
     <Card title={t('accountantHub.plainTitle')} className="acct-plain">
       <div className="acct-plain-grid">
@@ -301,11 +303,13 @@ export function PlainLanguageCard({ t, what, why, prepare, onFilingPack, onAskCf
         <PlainCard k={t('accountantHub.plainWhy')} v={why} />
         <PlainCard k={t('accountantHub.plainPrepare')} v={prepare} />
       </div>
+      {/* "Ask AI CFO" used to sit here and navigate out of the accounting
+          section. The question is answered on this page now, by AccountantAsk
+          below. */}
       <div className="acct-plain-actions">
         <Btn disabled title={t('accountantHub.engineTitle')} onClick={onFilingPack}>
           {t('accountantHub.filingPack')} ({t('accountantHub.soon')})
         </Btn>
-        <Btn variant="ghost" onClick={onAskCfo}>{t('accountantHub.askCfo')}</Btn>
       </div>
     </Card>
   )
@@ -319,6 +323,207 @@ function PlainCard({ k, v }) {
     </div>
   )
 }
+
+/* ── Ask AI Accountant ─────────────────────────────────────────────────────
+   The chat lives HERE, on the accounting page. It replaced a button that sent
+   the user to AI CFO, which meant leaving the section their question was about
+   and arriving somewhere that reads cash, not books.
+
+   Presentation only, like everything else in this file. The container owns the
+   thread, the request guard and the company scope; this renders what it is
+   given.
+
+   THE TWO SOURCE LISTS ARE NEVER ONE LIST. An answer may carry
+   `grounded_sources` — an activated rule with a verified source behind it — and
+   `sources_for_review` — a document someone collected and nobody has read. They
+   are rendered under different headings, with different weight, and the second
+   says what it is on every row. A single "Sources" list would turn a lead into
+   a citation, which is the exact failure this whole feature was built to avoid. */
+
+export function AccountantAsk({
+  t, messages = [], input = '', asking = false, error = '', limitHit = false,
+  usage = null, suggestions = [], onInput, onAsk, onRetry, onKeyDown, inputRef, endRef,
+}) {
+  const canSend = input.trim().length > 0 && !asking && !limitHit
+  return (
+    <Card className="acct-ask" title={t('accountantHub.askTitle')}
+      action={usage && usage.enforced && usage.limit != null
+        ? <StatusBadge tone={usage.remaining === 0 ? 'warning' : 'neutral'}>
+            {fill(t('accountantHub.askUsage'), { used: usage.used ?? 0, limit: usage.limit })}
+          </StatusBadge>
+        : null}>
+      <p className="acct-ask-lede">{t('accountantHub.askLede')}</p>
+
+      <div className="acct-ask-thread" role="log" aria-live="polite">
+        {messages.length === 0 && !asking && (
+          <div className="acct-ask-empty">
+            <img src={ACCOUNTANT_SYMBOL} alt="" aria-hidden="true" className="acct-ask-empty-sym" />
+            <p className="acct-ask-empty-t">{t('accountantHub.askEmpty')}</p>
+          </div>
+        )}
+        {messages.map((m) => (
+          m.role === 'user'
+            ? <div key={m.id} className="acct-msg is-user"><p className="acct-msg-text">{m.text}</p></div>
+            : <AnswerBubble key={m.id} t={t} m={m} />
+        ))}
+        {asking && (
+          <div className="acct-msg is-assistant is-pending" aria-busy="true">
+            <LoadingSkeleton rows={3} height={13} width={(i) => (i === 2 ? '62%' : '100%')} />
+            <p className="acct-ask-pending">{t('accountantHub.askThinking')}</p>
+          </div>
+        )}
+        <div ref={endRef} />
+      </div>
+
+      {error && (
+        <div className="acct-ask-error" role="alert">
+          <span className="acct-ask-error-t">{error}</span>
+          {onRetry && (
+            <Btn sm variant="ghost" onClick={onRetry} disabled={asking}>
+              {t('accountantHub.retry')}
+            </Btn>
+          )}
+        </div>
+      )}
+
+      {messages.length === 0 && suggestions.length > 0 && (
+        <div className="acct-ask-suggestions">
+          {suggestions.map((key) => (
+            <button key={key} type="button" className="acct-ask-suggestion"
+              onClick={() => onAsk(t(key))} disabled={asking || limitHit}>
+              {t(key)}
+            </button>
+          ))}
+        </div>
+      )}
+
+      <div className="acct-ask-form">
+        <textarea
+          id="acct-ask-input"
+          ref={inputRef}
+          className="cfo-input acct-ask-input"
+          rows={2}
+          value={input}
+          placeholder={t('accountantHub.askPlaceholder')}
+          aria-label={t('accountantHub.askTitle')}
+          disabled={limitHit}
+          onChange={(e) => onInput(e.target.value)}
+          onKeyDown={onKeyDown}
+        />
+        <Btn onClick={() => onAsk(input)} disabled={!canSend}>
+          {asking ? t('accountantHub.askSending') : t('accountantHub.askSend')}
+        </Btn>
+      </div>
+
+      {limitHit && <p className="acct-ask-limit" role="status">{t('accountantHub.askLimitReached')}</p>}
+      <p className="acct-note">{t('accountantHub.askDisclaimer')}</p>
+    </Card>
+  )
+}
+
+/**
+ * One answer.
+ *
+ * Everything below the prose is structure the server returned, not something
+ * parsed out of the text: which kinds of statement the answer contains, what is
+ * missing, the next step, and the two source lists.
+ */
+function AnswerBubble({ t, m }) {
+  const grounded = m.grounded_sources || []
+  const forReview = m.sources_for_review || []
+  return (
+    <div className="acct-msg is-assistant">
+      {m.degraded && (
+        <p className="acct-ask-degraded">{t('accountantHub.askDegraded')}</p>
+      )}
+      {m.injection_detected && (
+        <p className="acct-ask-injection" role="alert">{t('accountantHub.askInjection')}</p>
+      )}
+
+      <p className="acct-msg-text">{m.text}</p>
+
+      {(m.statement_types || []).length > 0 && (
+        <div className="acct-msg-kinds">
+          {m.statement_types.map((k) => (
+            <span key={k} className={`acct-kind is-${k}`}>{t(`accountantHub.kind_${k}`)}</span>
+          ))}
+        </div>
+      )}
+
+      {/* No grounded rule exists for this company, and the answer touched the
+          law. Said once, plainly, rather than left for the reader to infer from
+          an empty source list. */}
+      {!m.grounded_rules_available && (
+        <p className="acct-ask-nogrounded">{t('accountantHub.askNoGroundedRules')}</p>
+      )}
+
+      {grounded.length > 0 && (
+        <div className="acct-src acct-src-grounded">
+          <div className="acct-src-h">{t('accountantHub.srcGrounded')}</div>
+          <ul className="acct-src-list">
+            {grounded.map((g) => (
+              <li key={`${g.rule_code}@${g.rule_version}`} className="acct-src-item">
+                <span className="acct-src-t">{g.title}</span>
+                <span className="acct-src-m">
+                  {g.rule_code} v{g.rule_version}
+                  {g.effective_from ? ` · ${t('accountantHub.srcEffective')} ${g.effective_from}` : ''}
+                </span>
+                <a className="acct-src-link" href={g.url} target="_blank" rel="noopener noreferrer">
+                  {g.source_title} — {g.authority}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {forReview.length > 0 && (
+        <div className="acct-src acct-src-review">
+          <div className="acct-src-h">{t('accountantHub.srcForReview')}</div>
+          <p className="acct-src-warn">{t('accountantHub.srcForReviewWarn')}</p>
+          <ul className="acct-src-list">
+            {forReview.map((s) => (
+              <li key={s.source_id} className="acct-src-item">
+                <span className="acct-src-t">{s.title}</span>
+                <span className="acct-src-m">
+                  {[s.authority, s.document_number, t(`accountantHub.verif_${s.verification.replace('-', '_')}`)]
+                    .filter(Boolean).join(' · ')}
+                </span>
+                <a className="acct-src-link" href={s.url} target="_blank" rel="noopener noreferrer">
+                  {t('accountantHub.srcOpen')}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {(m.missing || []).length > 0 && (
+        <div className="acct-ask-missing">
+          <div className="acct-src-h">{t('accountantHub.askMissing')}</div>
+          <ul className="acct-ask-missing-list">
+            {m.missing.map((x, i) => <li key={i}>{x}</li>)}
+          </ul>
+        </div>
+      )}
+
+      {m.next_step && (
+        <div className="acct-ask-next">
+          <span className="acct-ask-next-k">{t('accountantHub.askNextStep')}</span>
+          <span className="acct-ask-next-v">{m.next_step}</span>
+        </div>
+      )}
+    </div>
+  )
+}
+
+/** The starting questions, as translation keys so they read in all three languages. */
+export const ASK_SUGGESTIONS = [
+  'accountantHub.q1',
+  'accountantHub.q2',
+  'accountantHub.q3',
+  'accountantHub.q4',
+]
 
 /* ── compliance calendar ──────────────────────────────────────────────────── */
 

@@ -1,0 +1,490 @@
+{
+  "benchmark_version": "1.0.0",
+  "description": "Synthetic CFO AI document routing and extraction benchmark. No real customer data.",
+  "cases": [
+    {
+      "id": "id_faktur_pajak_clean",
+      "language": "id",
+      "format": "pdf_text",
+      "pages": 1,
+      "file_name": "faktur-pajak-001.pdf",
+      "source_text": "Faktur Pajak Kode dan Nomor Seri Faktur Pajak: 040.026-00.313616020 Pengusaha Kena Pajak Nama : PT Nusantara Vendor NPWP : 01.234.567.8-091.000 Pembeli Barang Kena Pajak Nama : PT Aruna Commerce NPWP : 09.876.543.2-101.000 Dasar Pengenaan Pajak 129.600.000 Jumlah PPN 14.256.000 Netto 143.856.000 No. Invoice INV-ID-001",
+      "expected": {
+        "route": "deterministic_text",
+        "document_type": "faktur_pajak",
+        "review_required": false,
+        "fields": {
+          "document_number": "INV-ID-001",
+          "tax_invoice_serial": "04002600313616020",
+          "issuer_name": "PT Nusantara Vendor",
+          "buyer_name": "PT Aruna Commerce",
+          "currency": "IDR",
+          "commercial_base_amount": 129600000,
+          "commercial_tax_amount": 14256000,
+          "gross_amount": 143856000
+        },
+        "critical_fields": [
+          "document_number",
+          "commercial_base_amount",
+          "commercial_tax_amount",
+          "gross_amount"
+        ],
+        "line_items": [],
+        "duplicate_of": null,
+        "evidence": {
+          "document_number": {
+            "page": 1,
+            "quote": "No. Invoice INV-ID-001"
+          },
+          "commercial_base_amount": {
+            "page": 1,
+            "quote": "Dasar Pengenaan Pajak 129.600.000"
+          },
+          "commercial_tax_amount": {
+            "page": 1,
+            "quote": "Jumlah PPN 14.256.000"
+          },
+          "gross_amount": {
+            "page": 1,
+            "quote": "Netto 143.856.000"
+          }
+        }
+      }
+    },
+    {
+      "id": "id_kwitansi_clean",
+      "language": "id",
+      "format": "image_clean",
+      "pages": 1,
+      "file_name": "kwitansi-jasakonsultan.jpg",
+      "expected": {
+        "route": "vision_cheap",
+        "document_type": "receipt",
+        "review_required": true,
+        "fields": {
+          "issuer_name": "PT Sinar Konsultan",
+          "buyer_name": "PT Aruna Commerce",
+          "currency": "IDR",
+          "gross_amount": 12500000
+        },
+        "critical_fields": [
+          "issuer_name",
+          "buyer_name",
+          "gross_amount"
+        ],
+        "line_items": [],
+        "duplicate_of": null,
+        "evidence": {
+          "issuer_name": {
+            "page": 1,
+            "quote": "PT Sinar Konsultan"
+          },
+          "buyer_name": {
+            "page": 1,
+            "quote": "Sudah terima dari PT Aruna Commerce"
+          },
+          "gross_amount": {
+            "page": 1,
+            "quote": "Jumlah Rp 12.500.000"
+          }
+        }
+      }
+    },
+    {
+      "id": "id_bank_transfer_duplicate_source",
+      "language": "id",
+      "format": "pdf_text",
+      "pages": 1,
+      "file_name": "bca-transfer-20260904.pdf",
+      "source_text": "BCA Transfer ke Rekening BCA 04/09/2026 09:35:02 Dari 772-1538064 / PT ARUNA COMMERCE Ke 075-3020192 / PT NUSANTARA VENDOR Amount Rp 29.600.000 Fee Rp 0 Status Successful Reference No. 26090400308936",
+      "expected": {
+        "route": "deterministic_text",
+        "document_type": "payment_proof",
+        "review_required": false,
+        "fields": {
+          "currency": "IDR",
+          "amount": 29600000,
+          "fee": 0,
+          "payment_status": "Successful",
+          "payment_reference_number": "26090400308936",
+          "from_account_number": "772-1538064",
+          "to_account_number": "075-3020192"
+        },
+        "critical_fields": [
+          "amount",
+          "payment_status",
+          "payment_reference_number"
+        ],
+        "line_items": [],
+        "duplicate_of": null,
+        "evidence": {
+          "amount": {
+            "page": 1,
+            "quote": "Amount Rp 29.600.000"
+          },
+          "payment_reference_number": {
+            "page": 1,
+            "quote": "Reference No. 26090400308936"
+          }
+        }
+      }
+    },
+    {
+      "id": "id_bank_transfer_duplicate_copy",
+      "language": "id",
+      "format": "image_clean",
+      "pages": 1,
+      "file_name": "transfer-copy.png",
+      "expected": {
+        "route": "vision_cheap",
+        "document_type": "payment_proof",
+        "review_required": true,
+        "fields": {
+          "currency": "IDR",
+          "amount": 29600000,
+          "payment_status": "Successful",
+          "payment_reference_number": "26090400308936"
+        },
+        "critical_fields": [
+          "amount",
+          "payment_reference_number",
+          "duplicate_of"
+        ],
+        "line_items": [],
+        "duplicate_of": "id_bank_transfer_duplicate_source",
+        "evidence": {
+          "amount": {
+            "page": 1,
+            "quote": "Amount Rp 29.600.000"
+          },
+          "payment_reference_number": {
+            "page": 1,
+            "quote": "Reference No. 26090400308936"
+          }
+        }
+      }
+    },
+    {
+      "id": "en_invoice_usd_lines",
+      "language": "en",
+      "format": "pdf_text",
+      "pages": 2,
+      "file_name": "invoice-acme-8841.pdf",
+      "source_text": "INVOICE Invoice No. ACME-8841 From: Acme Cloud Ltd Bill To: PT Aruna Commerce Currency USD Subtotal 1,000.00 VAT 110.00 Total 1,110.00 Due date 2026-10-15 Page 2 Service A 2 x 300.00 600.00 Service B 1 x 400.00 400.00",
+      "expected": {
+        "route": "deterministic_text",
+        "document_type": "invoice",
+        "review_required": true,
+        "fields": {
+          "document_number": "ACME-8841",
+          "issuer_name": "Acme Cloud Ltd",
+          "buyer_name": "PT Aruna Commerce",
+          "currency": "USD",
+          "commercial_base_amount": 1000,
+          "commercial_tax_amount": 110,
+          "gross_amount": 1110
+        },
+        "critical_fields": [
+          "document_number",
+          "currency",
+          "gross_amount",
+          "line_items"
+        ],
+        "line_items": [
+          {
+            "description": "Service A",
+            "quantity": 2,
+            "unit_price": 300,
+            "amount": 600
+          },
+          {
+            "description": "Service B",
+            "quantity": 1,
+            "unit_price": 400,
+            "amount": 400
+          }
+        ],
+        "duplicate_of": null,
+        "evidence": {
+          "document_number": {
+            "page": 1,
+            "quote": "Invoice No. ACME-8841"
+          },
+          "gross_amount": {
+            "page": 1,
+            "quote": "Total 1,110.00"
+          },
+          "line_items": {
+            "page": 2,
+            "quote": "Service A 2 x 300.00 600.00"
+          }
+        }
+      }
+    },
+    {
+      "id": "en_credit_note_ambiguous",
+      "language": "en",
+      "format": "pdf_text",
+      "pages": 1,
+      "file_name": "credit-note-cn-91.pdf",
+      "source_text": "CREDIT NOTE CN-91 Related invoice ACME-8841 Amount USD 220.00 Reason service adjustment",
+      "expected": {
+        "route": "manual_review",
+        "document_type": "unknown",
+        "review_required": true,
+        "fields": {
+          "document_number": "CN-91",
+          "currency": "USD",
+          "gross_amount": 220
+        },
+        "critical_fields": [
+          "document_type",
+          "review_required"
+        ],
+        "line_items": [],
+        "duplicate_of": null,
+        "evidence": {
+          "document_number": {
+            "page": 1,
+            "quote": "CREDIT NOTE CN-91"
+          },
+          "gross_amount": {
+            "page": 1,
+            "quote": "Amount USD 220.00"
+          }
+        },
+        "forbidden_fields": [
+          "commercial_tax_amount",
+          "tax_invoice_serial"
+        ]
+      }
+    },
+    {
+      "id": "id_bad_photo_rotated_cropped",
+      "language": "id",
+      "format": "image_degraded",
+      "pages": 1,
+      "file_name": "IMG_9031.jpg",
+      "expected": {
+        "route": "manual_review",
+        "document_type": "unknown",
+        "review_required": true,
+        "fields": {},
+        "critical_fields": [
+          "document_type",
+          "review_required"
+        ],
+        "line_items": [],
+        "duplicate_of": null,
+        "evidence": {},
+        "forbidden_fields": [
+          "document_number",
+          "amount",
+          "gross_amount",
+          "commercial_tax_amount"
+        ]
+      }
+    },
+    {
+      "id": "id_multipage_bank_table",
+      "language": "id",
+      "format": "pdf_table",
+      "pages": 8,
+      "file_name": "rekening-koran-aug-2026.pdf",
+      "source_text": "Rekening Koran PT Aruna Commerce Periode Agustus 2026 Saldo Awal 150.000.000 Halaman 1 dari 8 Tanggal Keterangan Debit Kredit Saldo Halaman 8 dari 8 Saldo Akhir 183.500.000",
+      "expected": {
+        "route": "vision_strong",
+        "document_type": "bank_statement",
+        "review_required": true,
+        "fields": {
+          "currency": "IDR",
+          "period_start": "2026-08-01",
+          "period_end": "2026-08-31",
+          "opening_balance": 150000000,
+          "closing_balance": 183500000
+        },
+        "critical_fields": [
+          "document_type",
+          "opening_balance",
+          "closing_balance",
+          "line_items"
+        ],
+        "line_items": [
+          {
+            "description": "TRANSFER MASUK REF 0091",
+            "amount": 50000000
+          },
+          {
+            "description": "BIAYA ADMIN",
+            "amount": -6500
+          }
+        ],
+        "duplicate_of": null,
+        "evidence": {
+          "opening_balance": {
+            "page": 1,
+            "quote": "Saldo Awal 150.000.000"
+          },
+          "closing_balance": {
+            "page": 8,
+            "quote": "Saldo Akhir 183.500.000"
+          },
+          "line_items": {
+            "page": 4,
+            "quote": "TRANSFER MASUK REF 0091"
+          }
+        }
+      }
+    },
+    {
+      "id": "id_bundle_invoice_and_transfer",
+      "language": "id",
+      "format": "pdf_bundle",
+      "pages": 3,
+      "file_name": "supporting-documents.pdf",
+      "expected": {
+        "route": "bundle_split",
+        "document_type": "bundle",
+        "review_required": true,
+        "fields": {},
+        "critical_fields": [
+          "document_type",
+          "review_required"
+        ],
+        "line_items": [],
+        "duplicate_of": null,
+        "evidence": {
+          "bundle_parts": {
+            "page": 1,
+            "quote": "Invoice INV-BUNDLE-7; transfer evidence starts on page 3"
+          }
+        },
+        "forbidden_fields": [
+          "document_number",
+          "amount",
+          "gross_amount"
+        ]
+      }
+    },
+    {
+      "id": "id_filename_contradicts_content",
+      "language": "id",
+      "format": "pdf_text",
+      "pages": 1,
+      "file_name": "NPWP_PT_ARUNA.pdf",
+      "source_text": "INVOICE No. Invoice INV-CONTRA-9 Dari : PT Vendor Merdeka Kepada : PT Aruna Commerce Total Rp 8.500.000 Jatuh Tempo 30 September 2026",
+      "expected": {
+        "route": "deterministic_text",
+        "document_type": "invoice",
+        "review_required": true,
+        "fields": {
+          "document_number": "INV-CONTRA-9",
+          "issuer_name": "PT Vendor Merdeka",
+          "buyer_name": "PT Aruna Commerce",
+          "currency": "IDR",
+          "gross_amount": 8500000
+        },
+        "critical_fields": [
+          "document_type",
+          "document_number",
+          "gross_amount"
+        ],
+        "line_items": [],
+        "duplicate_of": null,
+        "evidence": {
+          "document_number": {
+            "page": 1,
+            "quote": "No. Invoice INV-CONTRA-9"
+          },
+          "gross_amount": {
+            "page": 1,
+            "quote": "Total Rp 8.500.000"
+          }
+        }
+      }
+    },
+    {
+      "id": "id_xlsx_bank_with_formula",
+      "language": "id",
+      "format": "xlsx",
+      "pages": 1,
+      "file_name": "mutasi-bank.xlsx",
+      "expected": {
+        "route": "spreadsheet_parser",
+        "document_type": "bank_statement",
+        "review_required": true,
+        "fields": {
+          "currency": "IDR",
+          "opening_balance": 10000000,
+          "closing_balance": 12493500
+        },
+        "critical_fields": [
+          "document_type",
+          "closing_balance",
+          "line_items"
+        ],
+        "line_items": [
+          {
+            "description": "Payment INV-77",
+            "amount": 2500000
+          },
+          {
+            "description": "Admin fee",
+            "amount": -6500
+          }
+        ],
+        "duplicate_of": null,
+        "evidence": {
+          "opening_balance": {
+            "cell": "Summary!B2",
+            "quote": "10000000"
+          },
+          "closing_balance": {
+            "cell": "Summary!B3",
+            "quote": "=B2+Transactions!D2+Transactions!D3"
+          },
+          "line_items": {
+            "cell": "Transactions!A2:D3",
+            "quote": "Payment INV-77; Admin fee"
+          }
+        }
+      }
+    },
+    {
+      "id": "en_csv_mixed_dates_currency",
+      "language": "en",
+      "format": "csv",
+      "pages": 1,
+      "file_name": "statement-september.csv",
+      "expected": {
+        "route": "spreadsheet_parser",
+        "document_type": "bank_statement",
+        "review_required": true,
+        "fields": {
+          "currency": "USD"
+        },
+        "critical_fields": [
+          "document_type",
+          "line_items"
+        ],
+        "line_items": [
+          {
+            "description": "Customer payment",
+            "amount": 1200.5
+          },
+          {
+            "description": "Card fee",
+            "amount": -12.25
+          }
+        ],
+        "duplicate_of": null,
+        "evidence": {
+          "line_items": {
+            "cell": "CSV row 2-3",
+            "quote": "09/10/2026; 10/09/2026"
+          }
+        }
+      }
+    }
+  ]
+}
