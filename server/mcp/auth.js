@@ -28,8 +28,10 @@ function resolveMcpUser(req, JWT_SECRET) {
 
   // Dev token path (shared/staging testing only). Constant-time comparison.
   if (process.env.MCP_DEV_TOKEN && safeEqual(token, process.env.MCP_DEV_TOKEN)) {
-    const uid = Number(process.env.MCP_DEV_USER_ID);
-    return Number.isFinite(uid) ? { userId: uid, via: 'dev_token' } : null;
+    // Fail closed on a missing/blank/non-integer id (Number('') is 0, which must not pass).
+    const raw = String(process.env.MCP_DEV_USER_ID || '').trim();
+    const uid = /^-?\d+$/.test(raw) ? Number(raw) : NaN;
+    return Number.isSafeInteger(uid) && uid !== 0 ? { userId: uid, via: 'dev_token' } : null;
   }
 
   // Existing CFO custom JWT path.
