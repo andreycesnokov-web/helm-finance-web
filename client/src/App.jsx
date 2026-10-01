@@ -67,6 +67,7 @@ import PreviewApp from './pages/PreviewApp'
 import OnboardingPreview from './pages/OnboardingPreview'
 import EmailLogin from './pages/EmailLogin'
 import EmailCallback from './pages/EmailCallback'
+import OAuthConsent from './pages/OAuthConsent'
 import TelegramLogin from './pages/TelegramLogin'
 import PersonalProfile from './pages/PersonalProfile'
 import { PersonalLayout, PersonalShell, PersonalOverview, PersonalAccounts, PersonalTransactions, PersonalOnboarding } from './pages/personal'
@@ -559,6 +560,8 @@ export default function App() {
         <SwipeBackIndicator />
         <Routes>
           <Route path="/login" element={<Login />} />
+          {/* "Sign in with CFO Finance" consent for AI clients (MCP OAuth). Handles sign-in itself. */}
+          <Route path="/oauth/consent" element={<OAuthConsent />} />
           {/* Email-primary identity UI — only when VITE_EMAIL_AUTH_ENABLED=true.
               Telegram login (/login) stays the default and is unchanged. */}
           {EMAIL_AUTH_UI && <Route path="/login/email" element={<EmailLogin />} />}

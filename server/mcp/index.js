@@ -4,33 +4,63 @@
 // extracted into its own service WITHOUT touching accounting/business logic. The adapter
 // only ever calls existing services; it never duplicates accounting logic.
 //
-// Phase 1 is READ-ONLY and gated by MCP_SERVER_ENABLED (default OFF → 404). Identity is
-// resolved by the dev-only resolver (see auth.js / mcp-identity-mapping-findings.md); OAuth
-// 2.1 via Supabase Auth replaces it in PR2.
+// Read-only tools, gated by MCP_SERVER_ENABLED (default OFF → 404). Identity: OAuth 2.1
+// "Sign in with CFO Finance" (gated by MCP_OAUTH_ENABLED, see oauth/), plus the development
+// dev-token / CFO-JWT paths (see auth.js).
 
-const { resolveMcpUser } = require('./auth');
+const { resolveMcpUser, bearerToken } = require('./auth');
 const { handleMcpRequest } = require('./server');
+const { createOAuthIntegration } = require('./oauth');
 
 function attachMcp(app, deps = {}) {
   const JWT_SECRET = deps.JWT_SECRET;
   // Existing CFO services injected by server/index.js (the same functions the web routes
-  // call). The MCP layer never reaches the database on its own.
+  // call). The MCP layer never reaches the business database on its own.
   const services = deps.services || {};
 
+  const oauth = createOAuthIntegration({
+    supabase: deps.supabase, store: deps.oauthStore, auth: deps.auth,
+    now: deps.now, onEvent: deps.onOAuthEvent,
+  });
+
+  // ── OAuth (only when MCP_OAUTH_ENABLED) ────────────────────────────────────
+  // Consent API for the web app's /oauth/consent page — CFO login required.
+  app.use('/api/mcp-oauth', oauth.consentApi);
+  // The consent page must never render inside someone else's frame (clickjacking).
+  app.get('/oauth/consent', (req, res, next) => {
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('Content-Security-Policy', "frame-ancestors 'none'");
+    res.setHeader('Cache-Control', 'no-store');
+    next();
+  });
+  // SDK endpoints at the application root (/.well-known/oauth-*, /authorize, /token, ...).
+  app.use(oauth.sdkEndpoints);
+
+  // ── MCP endpoint ───────────────────────────────────────────────────────────
   app.all('/mcp', async (req, res) => {
     // Feature flag, read per request (consistent with the rest of the app).
     if (process.env.MCP_SERVER_ENABLED !== 'true') {
       return res.status(404).json({ error: 'not_found' });
     }
 
-    const mcpUser = resolveMcpUser(req, JWT_SECRET);
+    const oauthOn = oauth.enabled();
+    const mcpUser = await resolveMcpUser(req, {
+      JWT_SECRET,
+      verifyOAuth: oauthOn ? oauth.verifyAccessToken : null,
+      resourceUrl: oauthOn ? oauth.resourceUrl() : null,
+    });
 
     // Transport-layer auth — SECURE BY DEFAULT. When the server is enabled it requires an
-    // authenticated identity (dev token or CFO JWT in Phase 1; OAuth in PR2). The ONLY way to
-    // run it open is an explicit local opt-in (MCP_ALLOW_UNAUTHENTICATED=true) for MCP Inspector
-    // bring-up — so enabling the flag in a deployed env never silently exposes an open endpoint.
+    // authenticated identity. The ONLY way to run it open is an explicit local opt-in
+    // (MCP_ALLOW_UNAUTHENTICATED=true) for MCP Inspector bring-up.
     const allowUnauthenticated = process.env.MCP_ALLOW_UNAUTHENTICATED === 'true';
     if (!allowUnauthenticated && !mcpUser) {
+      // Tell OAuth clients where to sign in (RFC 9728 / MCP authorization spec).
+      const metadataUrl = oauthOn ? oauth.resourceMetadataUrl() : null;
+      if (metadataUrl) {
+        const invalid = bearerToken(req) ? ', error="invalid_token"' : '';
+        res.setHeader('WWW-Authenticate', `Bearer resource_metadata="${metadataUrl}"${invalid}`);
+      }
       return res.status(401).json({ error: 'unauthorized' });
     }
 
