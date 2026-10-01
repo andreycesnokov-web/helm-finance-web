@@ -27,9 +27,10 @@ async function loadSdk() {
   return _sdk;
 }
 
-async function handleMcpRequest(req, res, ctx) {
-  const { McpServer, StreamableHTTPServerTransport } = await loadSdk();
-
+// Build a configured McpServer for the given identity context. Transport-agnostic, so it
+// can be driven by the HTTP transport (production) or an in-memory client (tests).
+async function buildServer(ctx) {
+  const { McpServer } = await loadSdk();
   const server = new McpServer(
     { name: 'cfo-finance-mcp', version: '0.1.0' },
     { instructions: SERVER_INSTRUCTIONS },
@@ -37,6 +38,12 @@ async function handleMcpRequest(req, res, ctx) {
   for (const t of phase1Tools(ctx)) {
     server.registerTool(t.name, t.config, t.handler);
   }
+  return server;
+}
+
+async function handleMcpRequest(req, res, ctx) {
+  const { StreamableHTTPServerTransport } = await loadSdk();
+  const server = await buildServer(ctx);
 
   // Stateless: no session id generator. New transport per request.
   const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
@@ -49,4 +56,4 @@ async function handleMcpRequest(req, res, ctx) {
   await transport.handleRequest(req, res, req.body);
 }
 
-module.exports = { handleMcpRequest, SERVER_INSTRUCTIONS };
+module.exports = { handleMcpRequest, buildServer, SERVER_INSTRUCTIONS };
