@@ -9,15 +9,25 @@
 // (resolveActiveBusiness / requireBusiness) apply unchanged. OAuth replaces this
 // resolver in PR2 without changing anything downstream.
 
+const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
+
+// Constant-time string compare (avoids leaking the dev token via response timing).
+function safeEqual(a, b) {
+  if (typeof a !== 'string' || typeof b !== 'string' || a.length === 0 || b.length === 0) return false;
+  const ab = Buffer.from(a);
+  const bb = Buffer.from(b);
+  if (ab.length !== bb.length) return false;
+  return crypto.timingSafeEqual(ab, bb);
+}
 
 function resolveMcpUser(req, JWT_SECRET) {
   const raw = (req.headers && req.headers.authorization) || '';
   const token = raw.startsWith('Bearer ') ? raw.slice(7).trim() : '';
   if (!token) return null;
 
-  // Dev token path (shared/staging testing only).
-  if (process.env.MCP_DEV_TOKEN && token === process.env.MCP_DEV_TOKEN) {
+  // Dev token path (shared/staging testing only). Constant-time comparison.
+  if (process.env.MCP_DEV_TOKEN && safeEqual(token, process.env.MCP_DEV_TOKEN)) {
     const uid = Number(process.env.MCP_DEV_USER_ID);
     return Number.isFinite(uid) ? { userId: uid, via: 'dev_token' } : null;
   }

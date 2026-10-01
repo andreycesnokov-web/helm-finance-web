@@ -22,17 +22,21 @@ function attachMcp(app, deps = {}) {
 
     const mcpUser = resolveMcpUser(req, JWT_SECRET);
 
-    // Transport-layer auth. Enforced whenever a dev token is configured (i.e. any shared or
-    // deployed environment). A pure-local MCP Inspector run leaves MCP_DEV_TOKEN unset so the
-    // protocol can be exercised without auth during local bring-up.
-    if (process.env.MCP_DEV_TOKEN && !mcpUser) {
+    // Transport-layer auth — SECURE BY DEFAULT. When the server is enabled it requires an
+    // authenticated identity (dev token or CFO JWT in Phase 1; OAuth in PR2). The ONLY way to
+    // run it open is an explicit local opt-in (MCP_ALLOW_UNAUTHENTICATED=true) for MCP Inspector
+    // bring-up — so enabling the flag in a deployed env never silently exposes an open endpoint.
+    const allowUnauthenticated = process.env.MCP_ALLOW_UNAUTHENTICATED === 'true';
+    if (!allowUnauthenticated && !mcpUser) {
       return res.status(401).json({ error: 'unauthorized' });
     }
 
     try {
       await handleMcpRequest(req, res, { mcpUser });
     } catch (e) {
-      if (!res.headersSent) res.status(500).json({ error: 'mcp_error', message: e.message });
+      // Do not leak internal error detail to the client; log it server-side.
+      console.error('[mcp] request error:', e && e.message);
+      if (!res.headersSent) res.status(500).json({ error: 'mcp_error' });
     }
   });
 }
