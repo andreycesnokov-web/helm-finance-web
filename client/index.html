@@ -13,9 +13,18 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="CFO AI" />
 
-    <!-- Official CFO AI brand icons -->
+    <!-- Official CFO AI brand icons. The .ico / PNG versions are for services that do not
+         read SVG (favicon fetchers, AI-client connector tiles, link previews). -->
+    <link rel="icon" href="/favicon.ico" sizes="any" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
     <link rel="icon" type="image/svg+xml" href="/brand/symbol_navy_blue_dot_transparent.svg" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+
+    <!-- Link previews (messengers, social) -->
+    <meta property="og:site_name" content="CFO AI" />
+    <meta property="og:title" content="CFO AI — Financial OS" />
+    <meta property="og:image" content="https://app.cfo-ai.site/brand/app_icon_navy_rounded_1024.png" />
+    <meta name="twitter:card" content="summary" />
 
     <style>
       * { box-sizing: border-box; margin: 0; padding: 0; }

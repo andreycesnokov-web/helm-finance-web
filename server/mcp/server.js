@@ -9,7 +9,7 @@
 const { phase1Tools } = require('./tools');
 
 const SERVER_INSTRUCTIONS = [
-  'CFO Finance MCP server. CFO Finance OS is the system of record for accounting and documents;',
+  'CFO AI (CFO Finance) MCP server. CFO AI is the system of record for accounting and documents;',
   'these tools are a read-only interface to it (Phase 1) — nothing you call here saves or changes',
   'data. Always call get_company_context first to learn which company the user can act in — never',
   'guess a company_id. Tools return structured data computed by CFO Finance; present it to the user',
@@ -29,12 +29,35 @@ async function loadSdk() {
   return _sdk;
 }
 
+// How the server introduces itself to AI clients (MCP `serverInfo`): brand name, a short
+// description, the website and the official CFO AI app icon — navy for light UIs, white for
+// dark ones. Icons need absolute URLs, so they are only advertised when the public base URL
+// is known (MCP_PUBLIC_BASE_URL / APP_BASE_URL).
+function serverInfo(baseUrl) {
+  const info = {
+    name: 'cfo-finance-mcp',
+    title: 'CFO AI',
+    version: '0.3.0',
+    description: 'CFO AI — Financial OS: your companies, financial position, missing documents and invoice analysis (read-only).',
+  };
+  if (baseUrl) {
+    info.websiteUrl = baseUrl;
+    info.icons = [
+      { src: `${baseUrl}/brand/app_icon_navy_rounded_1024.png`, mimeType: 'image/png', sizes: ['1024x1024'], theme: 'light' },
+      { src: `${baseUrl}/brand/app_icon_navy_rounded.svg`, mimeType: 'image/svg+xml', sizes: ['any'], theme: 'light' },
+      { src: `${baseUrl}/brand/app_icon_white_rounded_1024.png`, mimeType: 'image/png', sizes: ['1024x1024'], theme: 'dark' },
+      { src: `${baseUrl}/brand/app_icon_white_rounded.svg`, mimeType: 'image/svg+xml', sizes: ['any'], theme: 'dark' },
+    ];
+  }
+  return info;
+}
+
 // Build a configured McpServer for the given identity context. Transport-agnostic, so it
 // can be driven by the HTTP transport (production) or an in-memory client (tests).
 async function buildServer(ctx) {
   const { McpServer } = await loadSdk();
   const server = new McpServer(
-    { name: 'cfo-finance-mcp', version: '0.2.0' },
+    serverInfo(ctx && ctx.baseUrl),
     { instructions: SERVER_INSTRUCTIONS },
   );
   for (const t of phase1Tools(ctx)) {
@@ -58,4 +81,4 @@ async function handleMcpRequest(req, res, ctx) {
   await transport.handleRequest(req, res, req.body);
 }
 
-module.exports = { handleMcpRequest, buildServer, SERVER_INSTRUCTIONS };
+module.exports = { handleMcpRequest, buildServer, serverInfo, SERVER_INSTRUCTIONS };

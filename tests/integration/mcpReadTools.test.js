@@ -153,6 +153,27 @@ test('exactly four read-only tools are exposed — no period-readiness tool with
   } finally { await close(); }
 });
 
+test('the server introduces itself as CFO AI with the brand icons (light + dark) when the base URL is known', async () => {
+  const base = 'https://app.cfo-ai.site';
+  const { client, close } = await connect({ mcpUser: { userId: OWNER }, services: fakeServices(), baseUrl: base });
+  try {
+    const info = client.getServerVersion();
+    assert.strictEqual(info.title, 'CFO AI');
+    assert.strictEqual(info.websiteUrl, base);
+    assert.ok(info.icons.length >= 2);
+    for (const i of info.icons) assert.ok(i.src.startsWith(`${base}/brand/app_icon_`), i.src);
+    assert.deepStrictEqual([...new Set(info.icons.map((i) => i.theme))].sort(), ['dark', 'light']);
+  } finally { await close(); }
+
+  // No base URL → no icons (they must be absolute), but the brand name stays.
+  const bare = await connect({ mcpUser: { userId: OWNER }, services: fakeServices() });
+  try {
+    const info = bare.client.getServerVersion();
+    assert.strictEqual(info.title, 'CFO AI');
+    assert.strictEqual(info.icons, undefined);
+  } finally { await bare.close(); }
+});
+
 /* ── identity ─────────────────────────────────────────────────────────────── */
 
 test('without an authenticated user every data tool refuses and no service is touched', async () => {
