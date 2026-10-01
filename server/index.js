@@ -2772,17 +2772,14 @@ app.get('/api/pulse/advanced-insights', auth, async (req, res) => {
 //     balance and writes the transaction. This records the AUDIT TRAIL that route
 //     never wrote: which transaction and which payment proof settled which invoice.
 
-// GET /api/invoices/:debtId/settlement — read-only.
-app.get('/api/invoices/:debtId/settlement', auth, async (req, res) => {
-  try {
-    const biz = await requireBusiness(req, res); if (!biz) return;
-    if (!canViewBusinessFinance(biz.role))
-      return res.status(403).json({ error: 'Your role cannot view business finance' });
-
+// Settlement + closeout for ONE invoice (debt) in ONE business. Read-only. Returns null
+// when the invoice is not in this business. Shared by the route below and the MCP adapter;
+// the caller is responsible for the role gate.
+async function buildInvoiceSettlement(biz, debtId) {
     const { data: debtRows } = await supabase.from('debts')
-      .select('*').eq('id', req.params.debtId).or(bizOrFilter(biz)).limit(1);
+      .select('*').eq('id', debtId).or(bizOrFilter(biz)).limit(1);
     const debt = debtRows?.[0];
-    if (!debt) return res.status(404).json({ error: 'invoice_not_found_in_this_business' });
+    if (!debt) return null;
 
     const [{ data: allocs }, { data: links }] = await Promise.all([
       supabase.from('debt_settlement_allocations').select('*')
@@ -2850,7 +2847,7 @@ app.get('/api/invoices/:debtId/settlement', auth, async (req, res) => {
       has_tax: Number(taxAmount || 0) > 0 || taxDocs.length > 0,
     });
 
-    res.json({
+    return {
       ok: true, business_id: biz.business.id,
       invoice: {
         debt_id: debt.id, type: debt.type, counterparty: debt.counterparty,
@@ -2870,12 +2867,49 @@ app.get('/api/invoices/:debtId/settlement', auth, async (req, res) => {
         commercial_tax_amount: d.commercial_tax_amount,
         gross_amount: d.gross_amount,
       })),
-    });
+    };
+}
+
+// GET /api/invoices/:debtId/settlement — read-only.
+app.get('/api/invoices/:debtId/settlement', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res); if (!biz) return;
+    if (!canViewBusinessFinance(biz.role))
+      return res.status(403).json({ error: 'Your role cannot view business finance' });
+    const out = await buildInvoiceSettlement(biz, req.params.debtId);
+    if (!out) return res.status(404).json({ error: 'invoice_not_found_in_this_business' });
+    res.json(out);
   } catch (e) {
     console.error(`[settlement] read failed: ${e.message}`);
     res.status(500).json({ ok: false, error: 'settlement_read_failed' });
   }
 });
+
+// If a stored document is already attached to an invoice record, that invoice's REAL
+// settlement + closeout (first linked invoice). Null when it is not linked. Read-only.
+async function linkedInvoiceSettlement(biz, docId) {
+  if (!docId) return null;
+  const { data } = await supabase.from('document_debt_links').select('debt_id')
+    .eq('document_id', docId).eq('business_id', biz.business.id).limit(1);
+  const debtId = data?.[0]?.debt_id;
+  return debtId ? buildInvoiceSettlement(biz, debtId) : null;
+}
+
+// Readiness of a document AS IF it were entered now as a new invoice with nothing paid:
+// the SAME settlement + closeout engine as a stored invoice, fed the only facts known —
+// this document is the invoice, no payment is allocated, tax as the intake assessed it.
+// A preview for a caller deciding whether to enter it; never a stored state.
+function invoiceReadinessPreview(fields = {}, tax = {}) {
+  const settlement = SETTLE.settlementOf({
+    invoice_total: fields.gross_amount,
+    base_amount: fields.commercial_base_amount,
+    tax_amount: tax.ppn_detected ? tax.ppn_amount : null,
+    allocations: [],
+  });
+  const documents = { invoice: true };
+  const closeout = SETTLE.closeoutState({ settlement, documents, has_tax: !!tax.ppn_detected });
+  return { basis: 'preview_as_new_invoice', settlement, documents, closeout };
+}
 
 // POST /api/invoices/:debtId/allocate — record that a transaction settled this invoice.
 // Audit trail only: no money moves here, and no invoice is closed.
@@ -8422,7 +8456,10 @@ app.delete('/api/activity-types/:id', auth, async (req, res) => {
  * Ensure every authenticated user has a default business + owner membership.
  * Idempotent: safe to call on every request that needs access context.
  */
-async function ensureDefaultBusiness(userId, firstName) {
+// Read-only half of ensureDefaultBusiness: the user's existing default business, or
+// { business: null, membership: null }. NEVER creates anything — read-only callers
+// (e.g. the MCP adapter) use this so a lookup can never bootstrap a workspace.
+async function findDefaultBusiness(userId) {
   // Look for an existing active membership. Deterministic: the EARLIEST-created
   // business-type workspace (never a personal workspace), so the "default" business
   // is stable across requests rather than whatever Postgres returns first.
@@ -8438,6 +8475,12 @@ async function ensureDefaultBusiness(userId, firstName) {
   if (ownedBusiness) {
     return { business: ownedBusiness.businesses, membership: { role: ownedBusiness.role, status: ownedBusiness.status } };
   }
+  return { business: null, membership: null };
+}
+
+async function ensureDefaultBusiness(userId, firstName) {
+  const existing = await findDefaultBusiness(userId);
+  if (existing.business) return existing;
 
   // Email-first Personal Account users (negative app_user_id_seq ids) must NOT get an
   // auto-created business. They explicitly click "Create business" from /account. Return
@@ -12892,38 +12935,44 @@ app.post('/api/ai-accountant/documents/:id/reclassify', auth, async (req, res) =
 });
 
 // GET /api/ai-accountant/required-documents — PRELIMINARY checklist for the active business.
+// The company's required-documents checklist (which documents apply to this profile and
+// which are missing). Read-only; shared by the route below and the MCP adapter. The caller
+// is responsible for the role and Document Center gates.
+async function buildRequiredDocuments(biz, userId) {
+  // Profile drives which documents apply. A missing profile is reported, never guessed.
+  const { data: profRows, error: pErr } = await supabase.from('tax_profiles')
+    .select('*').eq('business_id', biz.business.id).limit(1);
+  const warnings = [];
+  if (pErr) { console.error(`[doc-intake] profile read failed: ${pErr.message}`); warnings.push('tax profile: unavailable (database error)'); }
+  const profile = profRows?.[0] || {};
+  if (!pErr && !profRows?.length) warnings.push('No tax profile saved yet — the checklist assumes defaults until you complete it.');
+
+  // Same visibility filtering as the intake list: a restricted role must not learn about
+  // documents through the checklist either. `truncated` stops a partial set producing a
+  // confident "missing".
+  const { documents, truncated } = await loadIntakeDocuments(biz, userId);
+  const checklist = docIntake.buildChecklist(profile, documents, { truncated });
+  return {
+    business: { id: biz.business.id, name: biz.business.name },
+    profile_used: {
+      legal_entity_type: profile.legal_entity_type ?? null,
+      pkp_status: profile.pkp_status ?? null,
+      employee_status: profile.employee_status ?? null,
+      country: profile.country ?? null,
+    },
+    ...checklist,
+    truncated,
+    warnings: [...warnings, ...checklist.warnings],
+  };
+}
+
 app.get('/api/ai-accountant/required-documents', auth, async (req, res) => {
   try {
     const biz = await requireBusiness(req, res); if (!biz) return;
     if (!canViewBusinessFinance(biz.role) && !canUploadDocument(biz.role))
       return res.status(403).json({ error: 'Your role cannot view documents' });
     if (!await hasDocumentsAccess(biz)) return res.status(403).json({ error: 'Document Center is not enabled', upgrade_required: true });
-
-    // Profile drives which documents apply. A missing profile is reported, never guessed.
-    const { data: profRows, error: pErr } = await supabase.from('tax_profiles')
-      .select('*').eq('business_id', biz.business.id).limit(1);
-    const warnings = [];
-    if (pErr) { console.error(`[doc-intake] profile read failed: ${pErr.message}`); warnings.push('tax profile: unavailable (database error)'); }
-    const profile = profRows?.[0] || {};
-    if (!pErr && !profRows?.length) warnings.push('No tax profile saved yet — the checklist assumes defaults until you complete it.');
-
-    // Same visibility filtering as the intake list: a restricted role must not learn about
-    // documents through the checklist either. `truncated` stops a partial set producing a
-    // confident "missing".
-    const { documents, truncated } = await loadIntakeDocuments(biz, req.user.userId);
-    const checklist = docIntake.buildChecklist(profile, documents, { truncated });
-    res.json({
-      business: { id: biz.business.id, name: biz.business.name },
-      profile_used: {
-        legal_entity_type: profile.legal_entity_type ?? null,
-        pkp_status: profile.pkp_status ?? null,
-        employee_status: profile.employee_status ?? null,
-        country: profile.country ?? null,
-      },
-      ...checklist,
-      truncated,
-      warnings: [...warnings, ...checklist.warnings],
-    });
+    res.json(await buildRequiredDocuments(biz, req.user.userId));
   } catch (e) {
     console.error(`[doc-intake] required-documents failed: ${e.message}`);
     res.status(500).json({ error: 'required_documents_unavailable' });
@@ -13405,11 +13454,23 @@ async function readDocumentForIntake(biz, doc) {
   return { file, buf, extraction, readSource, ocr, dates, parties };
 }
 
-async function runDocumentIntake(biz, doc, opts = {}) {
-  const read = await readDocumentForIntake(biz, doc);
-  if (read.error) return { error: read.error, status: read.status };
+// The same reading shape as readDocumentForIntake, for text the caller already holds —
+// e.g. an MCP client (Claude / ChatGPT) that read the invoice itself. No file, no storage,
+// no OCR call. readSource 'client_model_text' tells the orchestrator the text came from a
+// model, so tax figures get the same caution as an OCR/Vision reading (see assessTax).
+function readTextForIntake(text) {
+  const body = String(text || '');
+  const extraction = docExtract.extractFromText(body, { text_available: body.trim().length > 0 });
+  const dates = docDates.extractDates(body, { document_type: extraction.document_type });
+  const parties = docParties.extractParties(body);
+  return { file: null, buf: null, extraction, readSource: 'client_model_text', ocr: null, dates, parties };
+}
+
+// The post-read half of runDocumentIntake: counterparties, existing links and tax rules
+// for THIS business, then the orchestrator. Pure read — writes nothing. Shared by the web
+// intake and the MCP adapter so one document gets one answer whoever asks.
+async function analyzeDocumentReading(biz, doc, read) {
   const { extraction, readSource, ocr } = read;
-  const ex = extraction;
 
   // Counterparty directory + anything this document is already attached to. Both are
   // business-scoped reads; a failure degrades to "unknown" rather than a 500.
@@ -13417,16 +13478,19 @@ async function runDocumentIntake(biz, doc, opts = {}) {
   try { counterparties = await cpDirectoryForMatching(biz); } catch { counterparties = []; }
 
   const existingLinks = { debt_ids: [], transaction_ids: [] };
-  try {
-    const [{ data: dl }, { data: tl }] = await Promise.all([
-      supabase.from('document_debt_links').select('debt_id')
-        .eq('document_id', doc.id).eq('business_id', biz.business.id),
-      supabase.from('document_transaction_links').select('transaction_id')
-        .eq('document_id', doc.id).eq('business_id', biz.business.id),
-    ]);
-    existingLinks.debt_ids = (dl || []).map((x) => x.debt_id);
-    existingLinks.transaction_ids = (tl || []).map((x) => x.transaction_id);
-  } catch { /* links unknown; the pipeline still runs */ }
+  // A document that is not stored yet (caller-supplied text) has no links to look up.
+  if (doc.id) {
+    try {
+      const [{ data: dl }, { data: tl }] = await Promise.all([
+        supabase.from('document_debt_links').select('debt_id')
+          .eq('document_id', doc.id).eq('business_id', biz.business.id),
+        supabase.from('document_transaction_links').select('transaction_id')
+          .eq('document_id', doc.id).eq('business_id', biz.business.id),
+      ]);
+      existingLinks.debt_ids = (dl || []).map((x) => x.debt_id);
+      existingLinks.transaction_ids = (tl || []).map((x) => x.transaction_id);
+    } catch { /* links unknown; the pipeline still runs */ }
+  }
 
   // Tax rules the caller may safely act on. effectiveRuleActive is the existing gate:
   // active status, verified rule, cited source, and the source itself still good.
@@ -13443,7 +13507,7 @@ async function runDocumentIntake(biz, doc, opts = {}) {
     }));
   } catch { taxRules = []; }
 
-  const intake = intakeOrchestrator.processDocument({
+  return intakeOrchestrator.processDocument({
     document: doc, extraction, businessName: biz.business?.name,
     counterparties, existingLinks, taxRules,
     // What the user said they were uploading, kept from upload-complete. It is a hint
@@ -13451,6 +13515,12 @@ async function runDocumentIntake(biz, doc, opts = {}) {
     uploadIntent: (doc.extracted_json || {}).upload_intent || null,
     readSource, ocr,
   });
+}
+
+async function runDocumentIntake(biz, doc, opts = {}) {
+  const read = await readDocumentForIntake(biz, doc);
+  if (read.error) return { error: read.error, status: read.status };
+  const intake = await analyzeDocumentReading(biz, doc, read);
 
   let stored = false;
   if (opts.persist) {
@@ -13472,6 +13542,27 @@ async function runDocumentIntake(biz, doc, opts = {}) {
     }
   }
   return { intake, stored };
+}
+
+// Duplicate check across ONE business, using references already recorded on its
+// documents. `excludeDocId` keeps a stored document from matching itself; it is null for
+// text that is not stored yet. Read-only; shared by /extract and the MCP adapter.
+async function findDocumentDuplicate(biz, excludeDocId, fields = {}) {
+  const candidateRef = fields.payment_reference_number || fields.document_number;
+  if (!candidateRef) return { duplicate: false };
+  let q = supabase.from('financial_documents')
+    .select('id, document_number, gross_amount, extracted_json')
+    .eq('business_id', biz.business.id);
+  if (excludeDocId) q = q.neq('id', excludeDocId);
+  const { data: others } = await q.limit(200);
+  const existing = (others || []).map((d) => ({
+    id: d.id,
+    document_number: d.document_number,
+    payment_reference_number: d.extracted_json && d.extracted_json.payment_reference_number,
+    amount: d.gross_amount == null ? null : Number(d.gross_amount),
+  }));
+  return docExtract.findDuplicateDocument(
+    { ...fields, amount: fields.amount ?? fields.gross_amount }, existing);
 }
 
 // POST /api/documents/:id/extract — suggest structured fields from the document's text.
@@ -13508,21 +13599,7 @@ app.post('/api/documents/:id/extract', auth, async (req, res) => {
     const result = read.extraction;
 
     // Duplicate check across this business, using references already recorded.
-    let duplicate = { duplicate: false };
-    const candidateRef = result.fields.payment_reference_number || result.fields.document_number;
-    if (candidateRef) {
-      const { data: others } = await supabase.from('financial_documents')
-        .select('id, document_number, gross_amount, extracted_json')
-        .eq('business_id', biz.business.id).neq('id', doc.id).limit(200);
-      const existing = (others || []).map((d) => ({
-        id: d.id,
-        document_number: d.document_number,
-        payment_reference_number: d.extracted_json && d.extracted_json.payment_reference_number,
-        amount: d.gross_amount == null ? null : Number(d.gross_amount),
-      }));
-      duplicate = docExtract.findDuplicateDocument(
-        { ...result.fields, amount: result.fields.amount ?? result.fields.gross_amount }, existing);
-    }
+    const duplicate = await findDocumentDuplicate(biz, doc.id, result.fields);
 
     res.json({
       ok: true, business_id: biz.business.id, document_id: doc.id,
@@ -13756,8 +13833,26 @@ app.use('/api', (req, res) => {
 // MCP adapter — read-only Phase 1, gated by MCP_SERVER_ENABLED (default OFF → 404).
 // Thin interface over existing services; must be mounted BEFORE the SPA catch-all so
 // `/mcp` is not shadowed. See _specs/mcp-server-audit-and-plan.md.
+//
+// The adapter receives the SAME functions the web routes use (dependency injection), so
+// there is one implementation of every rule. Everything passed here is read-only.
 // ─────────────────────────────────────────────────────────────────────────────
-require('./mcp').attachMcp(app, { JWT_SECRET });
+require('./mcp').attachMcp(app, {
+  JWT_SECRET,
+  services: {
+    // identity → company. Read-only: a lookup can never bootstrap a workspace
+    // (ensureDefaultBusiness would; findDefaultBusiness never does).
+    listAccessibleWorkspaces: (userId) => require('./lib/workspaceAccess').listAccessibleWorkspaces(supabase, userId),
+    findDefaultBusiness,
+    resolveBusinessReadOnly: (req) => _resolveActiveBusiness(supabase, (uid) => findDefaultBusiness(uid), req),
+    // role / plan gates — identical to the web routes
+    canViewBusinessFinance, canUploadDocument, hasDocumentsAccess,
+    // read capabilities
+    buildAiCfoContext, buildRequiredDocuments,
+    loadDocumentScoped, readDocumentForIntake, readTextForIntake, analyzeDocumentReading,
+    findDocumentDuplicate, linkedInvoiceSettlement, invoiceReadinessPreview,
+  },
+});
 
 // SPA catch-all — MUST be the last route so it never shadows API endpoints.
 app.get('*', (req, res) => {

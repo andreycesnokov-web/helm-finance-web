@@ -3,16 +3,18 @@
 // CommonJS module that lazy-loads the ESM MCP SDK on first request (the SDK is ESM-only;
 // the rest of the backend is CommonJS). Stateless transport: a fresh McpServer + transport
 // is built per request, as the SDK's stateless pattern recommends. This file is a thin
-// boundary — it contains NO accounting logic; tool handlers live in tools.js and (from
-// PR3) call the existing server/lib/* services.
+// boundary — it contains NO accounting logic; tool handlers live in tools.js and call the
+// existing CFO services injected from server/index.js.
 
 const { phase1Tools } = require('./tools');
 
 const SERVER_INSTRUCTIONS = [
   'CFO Finance MCP server. CFO Finance OS is the system of record for accounting and documents;',
-  'these tools are a read-only interface to it (Phase 1). Always call get_company_context first to',
-  'learn which company the user can act in — never guess a company_id. Tools return structured data',
-  'computed by CFO Finance; present it to the user and do not recompute financial figures yourself.',
+  'these tools are a read-only interface to it (Phase 1) — nothing you call here saves or changes',
+  'data. Always call get_company_context first to learn which company the user can act in — never',
+  'guess a company_id. Tools return structured data computed by CFO Finance; present it to the user',
+  'and do not recompute financial figures yourself. To analyze an invoice the user gave you, pass its',
+  'full text to analyze_invoice; amounts you read are treated as a model reading and need confirmation.',
 ].join(' ');
 
 let _sdk = null;
@@ -32,7 +34,7 @@ async function loadSdk() {
 async function buildServer(ctx) {
   const { McpServer } = await loadSdk();
   const server = new McpServer(
-    { name: 'cfo-finance-mcp', version: '0.1.0' },
+    { name: 'cfo-finance-mcp', version: '0.2.0' },
     { instructions: SERVER_INSTRUCTIONS },
   );
   for (const t of phase1Tools(ctx)) {

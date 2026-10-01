@@ -13,6 +13,9 @@ const { handleMcpRequest } = require('./server');
 
 function attachMcp(app, deps = {}) {
   const JWT_SECRET = deps.JWT_SECRET;
+  // Existing CFO services injected by server/index.js (the same functions the web routes
+  // call). The MCP layer never reaches the database on its own.
+  const services = deps.services || {};
 
   app.all('/mcp', async (req, res) => {
     // Feature flag, read per request (consistent with the rest of the app).
@@ -32,7 +35,7 @@ function attachMcp(app, deps = {}) {
     }
 
     try {
-      await handleMcpRequest(req, res, { mcpUser });
+      await handleMcpRequest(req, res, { mcpUser, services });
     } catch (e) {
       // Do not leak internal error detail to the client; log it server-side.
       console.error('[mcp] request error:', e && e.message);

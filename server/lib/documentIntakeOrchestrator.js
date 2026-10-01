@@ -147,7 +147,11 @@ function assessTax(type, fields, opts = {}) {
   //
   // So a vision number is only treated as a reading when the transcript actually
   // mentions tax. Otherwise it is a possibility for an accountant, not a figure.
-  const fromVision = opts.readSource === 'ocr_vision';
+  //
+  // Text handed over by an AI client (MCP: Claude / ChatGPT read the file themselves) is
+  // the same kind of reading — a model's transcript, not the document's own text layer —
+  // so it gets exactly the same discipline.
+  const fromVision = opts.readSource === 'ocr_vision' || opts.readSource === 'client_model_text';
   const evidence = !fromVision || !!opts.taxEvidence;
   const detected = hasNumber && evidence;
 
@@ -165,7 +169,8 @@ function assessTax(type, fields, opts = {}) {
   };
 
   if (detected && fromVision) {
-    out.notes.push(`A PPN amount of ${ppn} was read by OCR/Vision. Verify it against the document before using it.`);
+    const reader = opts.readSource === 'client_model_text' ? 'the AI client' : 'OCR/Vision';
+    out.notes.push(`A PPN amount of ${ppn} was read by ${reader}. Verify it against the document before using it.`);
   } else if (detected) {
     out.notes.push(`PPN of ${ppn} is stated on the document.`);
   } else if (hasNumber) {
