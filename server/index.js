@@ -13752,6 +13752,13 @@ app.use('/api', (req, res) => {
   res.status(404).json({ error: 'not_found', path: req.originalUrl });
 });
 
+// ─────────────────────────────────────────────────────────────────────────────
+// MCP adapter — read-only Phase 1, gated by MCP_SERVER_ENABLED (default OFF → 404).
+// Thin interface over existing services; must be mounted BEFORE the SPA catch-all so
+// `/mcp` is not shadowed. See _specs/mcp-server-audit-and-plan.md.
+// ─────────────────────────────────────────────────────────────────────────────
+require('./mcp').attachMcp(app, { JWT_SECRET });
+
 // SPA catch-all — MUST be the last route so it never shadows API endpoints.
 app.get('*', (req, res) => {
   res.sendFile('index.html', { root: 'client/dist' });

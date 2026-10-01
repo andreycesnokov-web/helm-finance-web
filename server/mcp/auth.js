@@ -1,0 +1,46 @@
+// MCP identity resolution — PHASE 1 (dev-only).
+//
+// There is NO Supabase Auth mapping for existing CFO users yet
+// (see _specs/mcp-identity-mapping-findings.md). Until the OAuth 2.1 + explicit
+// account-linking work in PR2, the /mcp surface resolves identity from either:
+//   1. a configured shared dev token (MCP_DEV_TOKEN -> MCP_DEV_USER_ID), or
+//   2. the existing CFO custom JWT (same secret the web app uses).
+// Both resolve to a public.users id. From there the EXISTING tenant/role checks
+// (resolveActiveBusiness / requireBusiness) apply unchanged. OAuth replaces this
+// resolver in PR2 without changing anything downstream.
+
+const crypto = require('crypto');
+const jwt = require('jsonwebtoken');
+
+// Constant-time string compare (avoids leaking the dev token via response timing).
+function safeEqual(a, b) {
+  if (typeof a !== 'string' || typeof b !== 'string' || a.length === 0 || b.length === 0) return false;
+  const ab = Buffer.from(a);
+  const bb = Buffer.from(b);
+  if (ab.length !== bb.length) return false;
+  return crypto.timingSafeEqual(ab, bb);
+}
+
+function resolveMcpUser(req, JWT_SECRET) {
+  const raw = (req.headers && req.headers.authorization) || '';
+  const token = raw.startsWith('Bearer ') ? raw.slice(7).trim() : '';
+  if (!token) return null;
+
+  // Dev token path (shared/staging testing only). Constant-time comparison.
+  if (process.env.MCP_DEV_TOKEN && safeEqual(token, process.env.MCP_DEV_TOKEN)) {
+    // Fail closed on a missing/blank/non-integer id (Number('') is 0, which must not pass).
+    const raw = String(process.env.MCP_DEV_USER_ID || '').trim();
+    const uid = /^-?\d+$/.test(raw) ? Number(raw) : NaN;
+    return Number.isSafeInteger(uid) && uid !== 0 ? { userId: uid, via: 'dev_token' } : null;
+  }
+
+  // Existing CFO custom JWT path.
+  try {
+    const d = jwt.verify(token, JWT_SECRET);
+    if (d && d.userId != null) return { userId: d.userId, via: 'app_jwt' };
+  } catch { /* invalid/expired token → unauthenticated */ }
+
+  return null;
+}
+
+module.exports = { resolveMcpUser };
