@@ -105,14 +105,16 @@ async function getMissingDocuments(args, ctx) {
 }
 
 /* ── analyze_invoice ─────────────────────────────────────────────────────── */
-async function analyzeInvoice(args, ctx) {
+function invoiceSource(args) {
   const hasDoc = !!args.document_id;
   const hasText = typeof args.invoice_text === 'string' && args.invoice_text.trim().length > 0;
   if (hasDoc === hasText) {
     throw new ToolError('invalid_arguments', 'Provide exactly one of document_id or invoice_text.');
   }
-  const s = ctx.services;
-  const biz = await resolveCompany(ctx, args.company_id);
+  return { hasDoc, hasText };
+}
+
+async function requireInvoiceGates(biz, s) {
   // Same gates as the web app's zero-write extraction (/api/documents/:id/extract).
   if (!s.canViewBusinessFinance(biz.role)) {
     throw new ToolError('forbidden_role', 'Your role in this company cannot view business finance.');
@@ -121,7 +123,20 @@ async function analyzeInvoice(args, ctx) {
     throw new ToolError('document_center_not_enabled',
       'Document Center is not enabled for this company.', { upgrade_required: true });
   }
+}
 
+async function analyzeInvoice(args, ctx) {
+  invoiceSource(args);
+  const biz = await resolveCompany(ctx, args.company_id);
+  await requireInvoiceGates(biz, ctx.services);
+  return runInvoiceAnalysis(args, ctx, biz);
+}
+
+// The CFO reading of an invoice. Shared by analyze_invoice (read-only) and
+// submit_invoice_draft, so a draft is built from exactly the analysis the user saw.
+async function runInvoiceAnalysis(args, ctx, biz) {
+  const { hasDoc } = invoiceSource(args);
+  const s = ctx.services;
   let doc;
   let read;
   if (hasDoc) {
@@ -205,6 +220,143 @@ async function analyzeInvoice(args, ctx) {
   };
 }
 
+/* ── submit_invoice_draft (WRITE — pending draft only) ───────────────────── */
+// The ONE write the connector can make: a payable DRAFT built from the CFO reading of an
+// invoice. It never creates a confirmed record (approval_status is always
+// 'pending_approval', whatever the caller's role), never moves cash and never pays anything.
+// Until a human approves it in CFO AI (Payables, or the Telegram Approve button) it is
+// excluded from cash, payables, runway and Radar.
+//
+// "The model proposes, CFO disposes": amount, supplier, currency and due date come from the
+// CFO extraction pipeline. Values the model supplies only fill gaps CFO could not read, and a
+// model amount that disagrees with CFO's reading is refused rather than silently chosen.
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+function pickAmount(cfoTotal, proposed) {
+  const cfo = cfoTotal == null || cfoTotal === '' ? null : Number(cfoTotal);
+  const model = proposed == null ? null : Number(proposed);
+  if (cfo != null && Number.isFinite(cfo) && cfo > 0) {
+    if (model != null && Number.isFinite(model)) {
+      const tolerance = Math.max(1, cfo * 0.005);
+      if (Math.abs(cfo - model) > tolerance) {
+        throw new ToolError('amount_mismatch',
+          'The amount you supplied does not match the total CFO read from the invoice. '
+          + 'Check the invoice with the user and resend with the correct amount, or omit amount.',
+          { cfo_total: cfo, supplied_amount: model });
+      }
+    }
+    return { amount: cfo, amount_source: 'cfo_extraction' };
+  }
+  if (model != null && Number.isFinite(model) && model > 0) {
+    return { amount: model, amount_source: 'model_reading' };
+  }
+  throw new ToolError('amount_unreadable',
+    'CFO could not read the invoice total. Ask the user for the total and pass it as amount.');
+}
+
+async function submitInvoiceDraft(args, ctx) {
+  invoiceSource(args);
+  const s = ctx.services;
+  const biz = await resolveCompany(ctx, args.company_id);
+  if (!s.canCreateFinancialRequest(biz.role)) {
+    throw new ToolError('forbidden_role', 'Your role in this company cannot submit payables.');
+  }
+  await requireInvoiceGates(biz, s);
+
+  const analysis = await runInvoiceAnalysis(args, ctx, biz);
+  const inv = analysis.invoice;
+
+  const { amount, amount_source } = pickAmount(inv.total, args.amount);
+
+  const counterparty = String(inv.supplier || args.counterparty || '').trim();
+  if (!counterparty) {
+    throw new ToolError('counterparty_missing',
+      'CFO could not read the supplier. Ask the user who issued the invoice and pass it as counterparty.');
+  }
+
+  // Same rule as the Telegram channel: payables downstream are IDR-only until FX lands.
+  // Never reinterpret an amount across currencies. CFO may default to IDR when the text names
+  // no currency, so EVERY source is checked: if the model read USD, that is not overridden.
+  const seen = [inv.currency, args.currency].filter(Boolean).map((c) => s.normalizeCurrency(c));
+  const unsupported = seen.find((c) => !s.isSupportedTelegramCurrency(c));
+  if (unsupported) {
+    throw new ToolError('currency_not_supported',
+      `Payable drafts currently support IDR only; this invoice is in ${unsupported}.`, { currency: unsupported });
+  }
+  const currency = seen[0] || s.normalizeCurrency(biz.business.base_currency || 'IDR');
+  if (!s.isSupportedTelegramCurrency(currency)) {
+    throw new ToolError('currency_not_supported',
+      `Payable drafts currently support IDR only; this company's base currency is ${currency}.`, { currency });
+  }
+
+  const dueDate = (inv.due_date && inv.due_date.value) || args.due_date || null;
+  if (dueDate && !DATE_RE.test(String(dueDate))) {
+    throw new ToolError('invalid_due_date', 'due_date must be YYYY-MM-DD.');
+  }
+
+  const descParts = [];
+  if (inv.invoice_number) descParts.push(`Invoice ${inv.invoice_number}`);
+  if (inv.description || args.description) descParts.push(String(inv.description || args.description).slice(0, 200));
+
+  const conf = analysis.extraction_confidence;
+  const r = await s.createPendingPayableDraft(biz, ctx.mcpUser.userId, {
+    counterparty: counterparty.slice(0, 200),
+    amount,
+    amount_source,
+    currency,
+    due_date: dueDate,
+    description: descParts.join(' — ') || null,
+    invoice_number: inv.invoice_number || null,
+    raw_input_text: args.invoice_text ? String(args.invoice_text).slice(0, 4000) : null,
+    confidence_score: conf === 'high' ? 0.9 : conf === 'medium' ? 0.6 : conf ? 0.3 : null,
+  });
+
+  if (r.error === 'duplicate_payable') {
+    throw new ToolError('duplicate_payable',
+      'An open payable for this supplier and amount already exists in this company. No draft was created.',
+      { existing: r.existing });
+  }
+  if (r.error === 'plan_limit_reached') {
+    throw new ToolError('plan_limit_reached',
+      'The company has reached its monthly invoice limit on its current plan. No draft was created.',
+      { upgrade_required: true, limit: r.limit, usage: r.usage });
+  }
+  if (r.error) throw new ToolError('draft_not_created', 'CFO Finance could not create the draft.');
+
+  const d = r.debt;
+  const warnings = [...(analysis.warnings || [])];
+  if (analysis.duplicate && analysis.duplicate.duplicate) {
+    warnings.push('A document with the same invoice number is already stored in CFO Finance — check before approving.');
+  }
+  if (amount_source === 'model_reading') {
+    warnings.push('The amount was read by the AI assistant, not by CFO. Verify it before approving.');
+  }
+
+  return {
+    company: companyRef(biz),
+    written: true,
+    draft: {
+      id: d.id,
+      type: 'payable',
+      approval_status: 'pending_approval',
+      counterparty: d.counterparty,
+      amount: Number(d.amount),
+      amount_source,
+      currency: d.currency,
+      due_date: d.due_date || null,
+      invoice_number: inv.invoice_number || null,
+      description: d.description || null,
+    },
+    confirm_in_app_url: ctx.webAppUrl ? `${ctx.webAppUrl}/payables` : null,
+    telegram_approval_sent: (r.telegram_notified || 0) > 0,
+    counts_in_cash_flow: false,
+    warnings,
+    next_step: 'The draft is waiting for approval in CFO AI. It does not affect cash, payables or '
+      + 'runway until an owner/admin approves it (Payables screen or the Telegram Approve button). '
+      + 'Nothing has been paid.',
+  };
+}
+
 /* ── registry ────────────────────────────────────────────────────────────── */
 function phase1Tools(ctx) {
   return [
@@ -269,4 +421,46 @@ function phase1Tools(ctx) {
   ];
 }
 
-module.exports = { phase1Tools };
+// Write tools — registered ONLY when MCP_WRITE_TOOLS_ENABLED=true (read per request).
+function writeTools(ctx) {
+  return [
+    {
+      name: 'submit_invoice_draft',
+      config: {
+        title: 'Submit invoice as payable draft',
+        description: 'Create a PAYABLE DRAFT in CFO Finance from an invoice the user wants to pay. '
+          + 'The draft is always "pending approval": it does not pay anything and does not affect cash, '
+          + 'payables or runway until the user approves it in CFO AI (Payables screen or Telegram). '
+          + 'Use it only when the user asks to send/upload/record an invoice to CFO. Run analyze_invoice '
+          + 'first and show the user the result. Provide EXACTLY ONE of document_id or invoice_text. '
+          + 'Amount, supplier, currency and due date are taken from CFO\'s own reading; counterparty, '
+          + 'amount and due_date you pass only fill gaps CFO could not read, and a conflicting amount is '
+          + 'refused. IDR invoices only for now.',
+        inputSchema: {
+          company_id: COMPANY_ID,
+          document_id: z.string().min(1).max(64).optional()
+            .describe('Id of a document already stored in CFO Finance for this company'),
+          invoice_text: z.string().max(20000).optional()
+            .describe('Full text of the invoice as read from the file (keep labels, numbers and dates)'),
+          counterparty: z.string().min(1).max(200).optional()
+            .describe('Supplier name as you read it — used only if CFO cannot read it'),
+          amount: z.number().positive().optional()
+            .describe('Invoice total as you read it — must match CFO\'s reading if CFO can read one'),
+          currency: z.string().min(3).max(3).optional()
+            .describe('ISO currency code as you read it, e.g. IDR'),
+          due_date: z.string().regex(DATE_RE).optional()
+            .describe('Due date YYYY-MM-DD as you read it — used only if CFO cannot read it'),
+          description: z.string().max(200).optional()
+            .describe('Short description of what the invoice is for'),
+        },
+        annotations: {
+          title: 'Submit invoice as payable draft',
+          readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false,
+        },
+      },
+      handler: guarded('submit_invoice_draft', ctx, submitInvoiceDraft),
+    },
+  ];
+}
+
+module.exports = { phase1Tools, writeTools };

@@ -6687,6 +6687,133 @@ app.post('/api/debts/from-telegram', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// ── MCP write: pending payable draft from an invoice ─────────────────────────
+// Called ONLY by the MCP tool submit_invoice_draft (server/mcp/tools.js), behind
+// MCP_WRITE_TOOLS_ENABLED. It creates a payable in the SAME draft state the Telegram
+// input channel uses for non-privileged members: approval_status = 'pending_approval'.
+//
+// The rule that makes this safe: an AI client never creates a confirmed record, whatever
+// the caller's role. Even the owner's own submission lands as a draft. Pending drafts are
+// excluded from cash, payables, runway and Radar (see the openDebts filter in the Pulse
+// builder), so nothing changes the company's numbers until a human approves the draft in
+// Payables or via the Telegram Approve button — the existing approve endpoints, unchanged.
+//
+// The amount, counterparty and currency arrive already validated by the MCP layer against
+// the CFO extraction pipeline. This function owns only persistence: plan limit, duplicate
+// guard, insert, audit, notification. Returns { debt } or { error, ...details }.
+async function createPendingPayableDraft(biz, actingUserId, draft) {
+  const businessId = biz.business.id;
+
+  // Plan limit — same rule as POST /api/debts (debts are the MVP invoice proxy).
+  try {
+    const access = await getCurrentAccess(actingUserId, businessId);
+    const maxInvoices = access && access.limits ? access.limits.max_invoices_per_month : null;
+    if (maxInvoices !== null && maxInvoices !== undefined) {
+      const monthStart = new Date();
+      monthStart.setDate(1);
+      monthStart.setHours(0, 0, 0, 0);
+      const { count } = await supabase.from('debts')
+        .select('id', { count: 'exact', head: true })
+        .eq('business_id', businessId)
+        .gte('created_at', monthStart.toISOString());
+      if (isLimitReached(maxInvoices, count || 0)) {
+        return { error: 'plan_limit_reached', limit: maxInvoices, usage: count || 0 };
+      }
+    }
+  } catch (limitErr) {
+    console.warn('[mcp-draft] limit check failed:', limitErr.message);
+  }
+
+  // Duplicate guard: an open (non-rejected, unpaid) payable for the same supplier and
+  // amount in this company. Re-sending the same invoice must not create a second draft.
+  const { data: similar } = await supabase.from('debts')
+    .select('id, counterparty, amount, due_date, approval_status, status')
+    .eq('business_id', businessId)
+    .eq('type', 'payable')
+    .eq('amount', draft.amount)
+    .ilike('counterparty', String(draft.counterparty).replace(/[\\%_]/g, (c) => `\\${c}`))
+    .not('status', 'in', '("paid","cancelled")')
+    .neq('approval_status', 'rejected')
+    .limit(1);
+  if (similar && similar.length) {
+    const d = similar[0];
+    return { error: 'duplicate_payable', existing: {
+      id: d.id, counterparty: d.counterparty, amount: Number(d.amount),
+      due_date: d.due_date || null, approval_status: d.approval_status,
+    } };
+  }
+
+  const { data: userRows } = await supabase.from('users')
+    .select('id, username, first_name').eq('id', actingUserId).limit(1);
+  const u = userRows && userRows[0];
+  const actorName = (u && (u.first_name || u.username)) || null;
+
+  const insertRow = {
+    ...bizWriteFields(biz, actingUserId),
+    type:                 'payable',
+    counterparty:         draft.counterparty,
+    amount:               draft.amount,
+    original_amount:      draft.amount,   // locked; never mutated
+    paid_amount:          0,
+    currency:             draft.currency,
+    due_date:             draft.due_date || null,
+    description:          draft.description || null,
+    notes:                'Submitted via AI assistant (CFO AI connector). Awaiting approval.',
+    status:               'open',
+    source_channel:       'mcp',
+    raw_input_text:       draft.raw_input_text || null,
+    confidence_score:     draft.confidence_score ?? null,
+    created_by_name:      actorName,
+    created_by_role:      biz.role,
+    approval_status:      'pending_approval',   // ALWAYS — never auto-approved from MCP
+    approved_by_user_id:  null,
+    approved_at:          null,
+    approved_via_channel: null,
+    last_action_channel:  'mcp',
+  };
+  const { data, error } = await supabase.from('debts').insert(insertRow).select().single();
+  if (error) {
+    console.error('[mcp-draft] insert failed:', error.message);
+    return { error: 'insert_failed' };
+  }
+
+  await recordAudit({
+    businessId, actorUserId: actingUserId, actorRole: biz.role, channel: 'mcp',
+    entityType: 'debt', entityId: data.id, action: 'mcp_payable_draft_created',
+    after: {
+      type: 'payable', counterparty: data.counterparty, amount: Number(data.amount),
+      currency: data.currency, due_date: data.due_date || null,
+      approval_status: 'pending_approval', invoice_number: draft.invoice_number || null,
+      amount_source: draft.amount_source || null,
+    },
+  });
+
+  // Approval request to the people who may approve (owner included — this is how the
+  // founder gets the one-tap Approve for a draft they asked their AI assistant to file).
+  let notified = { sent: 0 };
+  try {
+    const lang = await getUserLanguage(biz.ownerUserId).catch(() => 'en');
+    const text = notificationText('mcp_payable_submitted', lang, {
+      counterparty: data.counterparty,
+      amount: `${Number(data.amount).toLocaleString('en-US')} ${data.currency || 'IDR'}`,
+      due: data.due_date || '—',
+      createdBy: actorName || '—',
+      invoice: draft.invoice_number || '—',
+    });
+    const webAppUrl = process.env.WEB_APP_URL || 'https://helm-finance-web-production.up.railway.app';
+    notified = await notifyBusinessAdminsViaTelegram(biz.ownerUserId, text, [
+      [ { text: '📊 View impact', callback_data: `debt_impact:${data.id}` } ],
+      [ { text: '✅ Approve', callback_data: `debt_approve:${data.id}` },
+        { text: '❌ Reject',  callback_data: `debt_reject:${data.id}` } ],
+      [ { text: '🌐 Open', url: `${webAppUrl}/payables` } ],
+    ], { category: 'team_approvals', businessId: businessId }) || { sent: 0 };
+  } catch (e) {
+    console.warn('[mcp-draft] notify failed:', e.message);
+  }
+
+  return { debt: computeDebtStatus(data), telegram_notified: (notified && notified.sent) || 0 };
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // TEAM & INVITE SYSTEM
 // ─────────────────────────────────────────────────────────────────────────────
@@ -8782,6 +8909,11 @@ const NOTIFICATION_TEMPLATES = {
     en: (p) => `📤 <b>New payable request</b>\n\nSupplier: ${p.counterparty}\nAmount: <b>${p.amount}</b>\nDue: ${p.due}\nCreated by: ${p.createdBy} · ${p.role}\nSource: Telegram · ⏳ Pending approval${p.raw ? `\n\n💬 "${p.raw}"` : ''}`,
     ru: (p) => `📤 <b>Новая заявка: оплата поставщику</b>\n\nПоставщик: ${p.counterparty}\nСумма: <b>${p.amount}</b>\nСрок: ${p.due}\nСоздал: ${p.createdBy} · ${p.role}\nИсточник: Telegram · ⏳ Ожидает подтверждения${p.raw ? `\n\n💬 «${p.raw}»` : ''}`,
     id: (p) => `📤 <b>Permintaan pembayaran baru</b>\n\nPemasok: ${p.counterparty}\nJumlah: <b>${p.amount}</b>\nJatuh tempo: ${p.due}\nDibuat oleh: ${p.createdBy} · ${p.role}\nSumber: Telegram · ⏳ Menunggu persetujuan${p.raw ? `\n\n💬 "${p.raw}"` : ''}`,
+  },
+  mcp_payable_submitted: {
+    en: (p) => `🤖 <b>Invoice draft from your AI assistant</b>\n\nSupplier: ${p.counterparty}\nAmount: <b>${p.amount}</b>\nDue: ${p.due}\nInvoice: ${p.invoice}\nSubmitted by: ${p.createdBy}\nSource: CFO AI connector · ⏳ Pending approval\n\nNot counted in cash flow until approved.`,
+    ru: (p) => `🤖 <b>Черновик инвойса от AI-ассистента</b>\n\nПоставщик: ${p.counterparty}\nСумма: <b>${p.amount}</b>\nСрок: ${p.due}\nИнвойс: ${p.invoice}\nОтправил: ${p.createdBy}\nИсточник: коннектор CFO AI · ⏳ Ожидает подтверждения\n\nНе учитывается в cash flow до подтверждения.`,
+    id: (p) => `🤖 <b>Draf invoice dari asisten AI</b>\n\nPemasok: ${p.counterparty}\nJumlah: <b>${p.amount}</b>\nJatuh tempo: ${p.due}\nInvoice: ${p.invoice}\nDikirim oleh: ${p.createdBy}\nSumber: konektor CFO AI · ⏳ Menunggu persetujuan\n\nTidak dihitung dalam arus kas sampai disetujui.`,
   },
   telegram_payment_reported: {
     en: (p) => `💰 <b>Payment reported</b>\n\n${p.counterparty} reportedly paid <b>${p.amount}</b>.\nReported by: ${p.createdBy} · ${p.role}\nNeeds confirmation before it counts as received.`,
@@ -13849,7 +13981,11 @@ require('./mcp').attachMcp(app, {
     buildAiCfoContext, buildRequiredDocuments,
     loadDocumentScoped, readDocumentForIntake, readTextForIntake, analyzeDocumentReading,
     findDocumentDuplicate, linkedInvoiceSettlement, invoiceReadinessPreview,
+    // write capability (only registered when MCP_WRITE_TOOLS_ENABLED=true): pending drafts
+    canCreateFinancialRequest, isSupportedTelegramCurrency, normalizeCurrency,
+    createPendingPayableDraft,
   },
+  webAppUrl: process.env.WEB_APP_URL || 'https://helm-finance-web-production.up.railway.app',
 });
 
 // Liveness probe — JSON, never the SPA shell. No DB call (pure process liveness).

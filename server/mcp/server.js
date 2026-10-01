@@ -6,7 +6,7 @@
 // boundary — it contains NO accounting logic; tool handlers live in tools.js and call the
 // existing CFO services injected from server/index.js.
 
-const { phase1Tools } = require('./tools');
+const { phase1Tools, writeTools } = require('./tools');
 
 const SERVER_INSTRUCTIONS = [
   'CFO AI (CFO Finance) MCP server. CFO AI is the system of record for accounting and documents;',
@@ -15,6 +15,13 @@ const SERVER_INSTRUCTIONS = [
   'guess a company_id. Tools return structured data computed by CFO Finance; present it to the user',
   'and do not recompute financial figures yourself. To analyze an invoice the user gave you, pass its',
   'full text to analyze_invoice; amounts you read are treated as a model reading and need confirmation.',
+].join(' ');
+
+// Appended only when write tools are enabled (MCP_WRITE_TOOLS_ENABLED=true).
+const WRITE_INSTRUCTIONS = [
+  'Exception to read-only: submit_invoice_draft creates a payable DRAFT that waits for the user\'s',
+  'approval inside CFO AI. Use it only when the user asks to send an invoice to CFO, after showing them',
+  'the analyze_invoice result. It never pays anything; tell the user to confirm the draft in CFO AI.',
 ].join(' ');
 
 let _sdk = null;
@@ -37,7 +44,7 @@ function serverInfo(baseUrl) {
   const info = {
     name: 'cfo-finance-mcp',
     title: 'CFO AI',
-    version: '0.3.0',
+    version: '0.4.0',
     description: 'CFO AI — Financial OS: your companies, financial position, missing documents and invoice analysis (read-only).',
   };
   if (baseUrl) {
@@ -58,9 +65,10 @@ async function buildServer(ctx) {
   const { McpServer } = await loadSdk();
   const server = new McpServer(
     serverInfo(ctx && ctx.baseUrl),
-    { instructions: SERVER_INSTRUCTIONS },
+    { instructions: ctx && ctx.writeToolsEnabled ? `${SERVER_INSTRUCTIONS} ${WRITE_INSTRUCTIONS}` : SERVER_INSTRUCTIONS },
   );
-  for (const t of phase1Tools(ctx)) {
+  const tools = ctx && ctx.writeToolsEnabled ? [...phase1Tools(ctx), ...writeTools(ctx)] : phase1Tools(ctx);
+  for (const t of tools) {
     server.registerTool(t.name, t.config, t.handler);
   }
   return server;
@@ -81,4 +89,4 @@ async function handleMcpRequest(req, res, ctx) {
   await transport.handleRequest(req, res, req.body);
 }
 
-module.exports = { handleMcpRequest, buildServer, serverInfo, SERVER_INSTRUCTIONS };
+module.exports = { handleMcpRequest, buildServer, serverInfo, SERVER_INSTRUCTIONS, WRITE_INSTRUCTIONS };

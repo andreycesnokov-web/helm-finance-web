@@ -91,6 +91,11 @@ function DebtRow({ debt, accounts, token, onRefresh }) {
                 ✈ Telegram
               </span>
             )}
+            {debt.source_channel === 'mcp' && (
+              <span style={{ fontSize: 10, fontWeight: 700, background: '#F1EDFF', color: '#5B3FC4', borderRadius: 6, padding: '2px 6px', letterSpacing: '0.02em' }}>
+                ✦ AI assistant
+              </span>
+            )}
           </div>
           <div className="item-row-sub">
             {fmtDate(debt.due_date)}{debt.description ? ` · ${debt.description}` : ''}

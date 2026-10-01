@@ -611,7 +611,8 @@ test('every business-scoped send site passes a businessId', () => {
     .map((m) => SRC.slice(m.index, m.index + 1200))
     .filter((c) => !c.startsWith('notifyBusinessAdminsViaTelegram(ownerUserId, text, buttons')
                 && !c.startsWith('notifyBusinessAdminsViaTelegram()'));
-  assert.strictEqual(calls.length, 5, `expected 5 call sites, found ${calls.length}`);
+  // 6th site: createPendingPayableDraft (MCP submit_invoice_draft approval request).
+  assert.strictEqual(calls.length, 6, `expected 6 call sites, found ${calls.length}`);
   for (const call of calls) {
     assert.match(call, /category: '[a-z_]+'/, 'a send site names no category');
     assert.match(call, /businessId:/, `a send site passes no businessId:\n${call.slice(0, 200)}`);
