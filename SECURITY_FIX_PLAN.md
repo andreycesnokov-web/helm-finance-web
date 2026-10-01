@@ -413,7 +413,7 @@ read it from `req.cookies` in the auth middleware instead of
 
 | Variable | Required | Notes |
 |----------|----------|-------|
-| `VITE_BOT_USERNAME` | ✅ | Bot username for Login Widget (without @). e.g. `HCfinance_Bot` |
+| `VITE_BOT_USERNAME` | ✅ | Bot username for Login Widget (without @). e.g. `CFOAIFinance_Bot` |
 
 ---
 

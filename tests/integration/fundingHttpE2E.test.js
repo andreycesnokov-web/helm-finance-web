@@ -77,6 +77,9 @@ async function api(base, method, path, userId, body) {
   await db.query(`SELECT rpc_revoke_personal_business_connection('${RELREV}',${U.bbOwner},'web')`);
 
   // ── boot the REAL router over HTTP ─────────────────────────────────────────
+  // This suite exercises the Personal→Business bridge itself, so it runs with the
+  // bridge kill-switch ON (default OFF gates the bridge fully in prod until approved).
+  process.env.PERSONAL_FUNDING_BRIDGE_ENABLED = 'true';
   const app = express();
   app.use(express.json());
   const auth = (req, res, next) => { const id = req.headers['x-user-id']; if (!id) return res.status(401).json({ error: 'no token' }); req.user = { userId: Number(id) }; next(); };

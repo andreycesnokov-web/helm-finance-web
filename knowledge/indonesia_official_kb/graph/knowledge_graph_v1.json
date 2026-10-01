@@ -1,0 +1,6576 @@
+{
+  "graph_version": "1.0",
+  "generated_at": "2026-09-02",
+  "jurisdiction": "Indonesia",
+  "generated_from": [
+    "source_registry.json",
+    "rule_candidates/tax_rule_candidates.json",
+    "rule_candidates/compliance_rule_candidates.json",
+    "rule_candidates/evidence_rule_candidates.json",
+    "rule_candidates/invoice_review_matrix_v1.json"
+  ],
+  "hard_rule": "This graph is a review structure, not legal advice and not a tax advice engine.",
+  "policy": "Every node and every edge is status=under_review, active=false, legal_verified=false. source_ids resolve to registry source_ids only — never to summaries/_extracted/ or any derived file. relationship_basis is 'official_source' when archived official bytes support the link, and 'product_interpretation' when the link is our product design. Neither sets legal_verified.",
+  "precedence": "raw_sources/ + MANIFEST.json SHA-256 is authoritative; summaries/_extracted/ is derived text.",
+  "counts": {
+    "nodes": 207,
+    "edges": 320,
+    "node_types": {
+      "accountant_review_flag": 1,
+      "company_profile_field": 14,
+      "compliance_rule_candidate": 5,
+      "evidence_requirement": 8,
+      "filing_package_field": 5,
+      "missing_data_question": 32,
+      "official_source": 75,
+      "required_document": 27,
+      "risk_flag": 4,
+      "tax_rule_candidate": 18,
+      "transaction_type": 18
+    },
+    "edge_types": {
+      "amends": 1,
+      "cannot_prove": 4,
+      "currentness_supported_by": 6,
+      "derives_from": 44,
+      "feeds_filing_package": 10,
+      "has_risk": 26,
+      "may_apply_to": 22,
+      "needs_reviewer": 14,
+      "raises_missing_question": 32,
+      "related_to": 30,
+      "requires_accountant_review": 18,
+      "requires_company_profile_field": 19,
+      "requires_document": 74,
+      "supports": 20
+    },
+    "transaction_types": 18,
+    "required_documents": 27,
+    "company_profile_fields": 14,
+    "mixed_invoice_paths": 5,
+    "documents_missing_source": 23
+  },
+  "nodes": [
+    {
+      "id": "src:DJP_PPN_001",
+      "type": "official_source",
+      "label": "Ketentuan Nilai Lain sebagai Dasar Pengenaan Pajak dan Besaran Tertentu PPN (PMK 11/2025)",
+      "status": "under_review",
+      "source_id": "DJP_PPN_001",
+      "authority": "DJP",
+      "trust_level": "regulation",
+      "document_number": "PMK 11 Tahun 2025",
+      "verification_status": "fetch_verified",
+      "currentness_result": null,
+      "not_chunkable": null
+    },
+    {
+      "id": "src:KEMENKEU_PPN_002",
+      "type": "official_source",
+      "label": "PMK Nomor 11 Tahun 2025 (PDF, JDIH Kemenkeu)",
+      "status": "under_review",
+      "source_id": "KEMENKEU_PPN_002",
+      "authority": "JDIH Kemenkeu",
+      "trust_level": "regulation",
+      "document_number": "PMK 11 Tahun 2025",
+      "verification_status": "fetch_verified",
+      "currentness_result": null,
+      "not_chunkable": null
+    },
+    {
+      "id": "src:BPK_PPN_003",
+      "type": "official_source",
+      "label": "PMK No. 11 Tahun 2025 (peraturan.bpk.go.id)",
+      "status": "under_review",
+      "source_id": "BPK_PPN_003",
+      "authority": "Other official",
+      "trust_level": "regulation",
+      "document_number": "PMK 11 Tahun 2025",
+      "verification_status": "fetch_verified",
+      "currentness_result": null,
+      "not_chunkable": null
+    },
+    {
+      "id": "src:DJP_PPN_004",
+      "type": "official_source",
+      "label": "PMK 131/2024: Tarif PPN Sebelas-Dua Belas",
+      "status": "under_review",
+      "source_id": "DJP_PPN_004",
+      "authority": "DJP",
+      "trust_level": "official_guidance",
+      "document_number": "PMK 131 Tahun 2024",
+      "verification_status": "fetch_verified",
+      "currentness_result": null,
+      "not_chunkable": null
+    },
+    {
+      "id": "src:DJP_PPN_005",
+      "type": "official_source",
+      "label": "Pemerintah Terbitkan Aturan DPP Nilai Lain dan Besaran Tertentu PPN",
+      "status": "under_review",
+      "source_id": "DJP_PPN_005",
+      "authority": "DJP",
+      "trust_level": "announcement",
+      "document_number": null,
+      "verification_status": "search_listed",
+      "currentness_result": null,
+      "not_chunkable": null
+    },
+    {
+      "id": "src:DJP_PPN_006",
+      "type": "official_source",
+      "label": "Siaran Pers SP-4: Aturan DPP Nilai Lain dan Besaran Tertentu PPN (PDF)",
+      "status": "under_review",
+      "source_id": "DJP_PPN_006",
+      "authority": "DJP",
+      "trust_level": "announcement",
+      "document_number": "SP-4/2025",
+      "verification_status": "search_listed",
+      "currentness_result": null,
+      "not_chunkable": null
+    },
+    {
+      "id": "src:DJP_PPN_007",
+      "type": "official_source",
+      "label": "Perubahan atas PMK 11 Tahun 2025 tentang Nilai Lain sebagai DPP dan Besaran Tertentu PPN",
+      "status": "under_review",
+      "source_id": "DJP_PPN_007",
+      "authority": "DJP",
+      "trust_level": "regulation",
+      "document_number": null,
+      "verification_status": "fetch_verified",
+      "currentness_result": null,
+      "not_chunkable": null
+    },
+    {
+      "id": "src:DJP_PPN_008",
+      "type": "official_source",
+      "label": "PPN 2025: Kebijakan Baru, Beban Pajak Tetap Ringan untuk Masyarakat (PDF)",
+      "status": "under_review",
+      "source_id": "DJP_PPN_008",
+      "authority": "DJP",
+      "trust_level": "announcement",
+      "document_number": "SP-1/2025",
+      "verification_status": "search_listed",
+      "currentness_result": null,
+      "not_chunkable": null
+    },
+    {
+      "id": "src:DJP_PPN_009",
+      "type": "official_source",
+      "label": "PPN 2025: Kebijakan Baru (halaman)",
+      "status": "under_review",
+      "source_id": "DJP_PPN_009",
+      "authority": "DJP",
+      "trust_level": "announcement",
+      "document_number": null,
+      "verification_status": "search_listed",
+      "currentness_result": null,
+      "not_chunkable": null
+    },
+    {
+      "id": "src:KEMENKEU_PPN_010",
+      "type": "official_source",
+      "label": "Pemberlakuan Tarif PPN 12% Sejak Tahun 2025 (Kemenkeu Learning Center)",
+      "status": "under_review",
+      "source_id": "KEMENKEU_PPN_010",
+      "authority": "Kemenkeu",
+      "trust_level": "official_guidance",
+      "document_number": null,
+      "verification_status": "search_listed",
+      "currentness_result": null,
+      "not_chunkable": null
+    },
+    {
+      "id": "src:DJP_PPH23_001",
+      "type": "official_source",
+      "label": "PPh Pasal 23/26 — halaman topik DJP",
+      "status": "under_review",
+      "source_id": "DJP_PPH23_001",
+      "authority": "DJP",
+      "trust_level": "official_guidance",
+      "document_number": null,
+      "verification_status": "search_listed",
+      "currentness_result": null,
+      "not_chunkable": null
+    },
+    {
+      "id": "src:DJP_PPH23_002",
+      "type": "official_source",
+      "label": "Pemotongan Pajak Penghasilan - Pasal 23",
+      "status": "under_review",
+      "source_id": "DJP_PPH23_002",
+      "authority": "DJP",
+      "trust_level": "official_guidance",
+      "document_number": null,
+      "verification_status": "fetch_verified",
+      "currentness_result": null,
+      "not_chunkable": null
+    },
+    {
+      "id": "src:DJP_PPH23_003",
+      "type": "official_source",
+      "label": "Jenis Jasa Lain yang atas Imbalannya Dipotong PPh Pasal 23 ayat (1) huruf c",
+      "status": "under_review",
+      "source_id": "DJP_PPH23_003",
+      "authority": "DJP",
+      "trust_level": "regulation",
+      "document_number": null,
+      "verification_status": "fetch_verified",
+      "currentness_result": null,
+      "not_chunkable": null
+    },
+    {
+      "id": "src:DJP_PPH23_004",
+      "type": "official_source",
+      "label": "Bendahara Pemerintah Harus Paham: Tidak Semua Jasa Dikenakan PPh Pasal 23",
+      "status": "under_review",
+      "source_id": "DJP_PPH23_004",
+      "authority": "DJP",
+      "trust_level": "official_guidance",
+      "document_number": null,
+      "verification_status": "search_listed",
+      "currentness_result": null,
+      "not_chunkable": null
+    },
+    {
+      "id": "src:DJP_PPH23_005",
+      "type": "official_source",
+      "label": "Salah Kaprah Pengenaan PPh Pasal 21 dan PPh Pasal 23 atas Jasa",
+      "status": "under_review",
+      "source_id": "DJP_PPH23_005",
+      "authority": "DJP",
+      "trust_level": "official_guidance",
+      "document_number": null,
+      "verification_status": "fetch_verified",
+      "currentness_result": null,
+      "not_chunkable": null
+    },
+    {
+      "id": "src:DJP_PPH23_006",
+      "type": "official_source",
+      "label": "Konsultan — perlakuan PPh atas jasa konsultan",
+      "status": "under_review",
+      "source_id": "DJP_PPH23_006",
+      "authority": "DJP",
+      "trust_level": "official_guidance",
+      "document_number": null,
+      "verification_status": "fetch_verified",
+      "currentness_result": null,
+      "not_chunkable": null
+    },
+    {
+      "id": "src:DJP_PPH23_007",
+      "type": "official_source",
+      "label": "Penyuluh Sukoharjo: Pemotongan PPh 23 Tanpa Batas Minimum Transaksi",
+      "status": "under_review",
+      "source_id": "DJP_PPH23_007",
+      "authority": "DJP",
+      "trust_level": "official_guidance",
+      "document_number": null,
+      "verification_status": "search_listed",
+      "currentness_result": null,
+      "not_chunkable": null
+    },
+    {
+      "id": "src:DJP_PPH23_008",
+      "type": "official_source",
+      "label": "Jasa Hotel Dipotong PPh Pasal 23?",
+      "status": "under_review",
+      "source_id": "DJP_PPH23_008",
+      "authority": "DJP",
+      "trust_level": "official_guidance",
+      "document_number": null,
+      "verification_status": "search_listed",
+      "currentness_result": null,
+      "not_chunkable": null
+    },
+    {
+      "id": "src:KEMENKEU_PPH23_009",
+      "type": "official_source",
+      "label": "Pajak Penghasilan Pasal 23 — DJPb Kemenkeu (KPPN Tapaktuan)",
+      "status": "under_review",
+      "source_id": "KEMENKEU_PPH23_009",
+      "authority": "Kemenkeu",
+      "trust_level": "official_guidance",
+      "document_number": null,
+      "verification_status": "fetch_verified",
+      "currentness_result": null,
+      "not_chunkable": null
+    },
+    {
+      "id": "src:KEMENKEU_PPH23_010",
+      "type": "official_source",
+      "label": "PPh Pasal 23 — DJPb Kemenkeu (KPPN Banda Aceh)",
+      "status": "under_review",
+      "source_id": "KEMENKEU_PPH23_010",
+      "authority": "Kemenkeu",
+      "trust_level": "official_guidance",
+      "document_number": null,
+      "verification_status": "search_listed",
+      "currentness_result": null,
+      "not_chunkable": null
+    },
+    {
+      "id": "src:DJP_PPH42_001",
+      "type": "official_source",
+      "label": "PPh Pasal 4 ayat (2) — halaman topik DJP",
+      "status": "under_review",
+      "source_id": "DJP_PPH42_001",
+      "authority": "DJP",
+      "trust_level": "official_guidance",
+      "document_number": null,
+      "verification_status": "search_listed",
+      "currentness_result": null,
+      "not_chunkable": null
+    },
+    {
+      "id": "src:DJP_PPH42_002",
+      "type": "official_source",
+      "label": "Pemotongan Pajak Penghasilan - Pasal 4 Ayat (2)",
+      "status": "under_review",
+      "source_id": "DJP_PPH42_002",
+      "authority": "DJP",
+      "trust_level": "official_guidance",
+      "document_number": null,
+      "verification_status": "fetch_verified",
+      "currentness_result": null,
+      "not_chunkable": null
+    },
+    {
+      "id": "src:DJP_PPH42_003",
+      "type": "official_source",
+      "label": "Pemotongan Pajak Penghasilan - Pasal 4 Ayat (2) (halaman kedua)",
+      "status": "under_review",
+      "source_id": "DJP_PPH42_003",
+      "authority": "DJP",
+      "trust_level": "official_guidance",
+      "document_number": null,
+      "verification_status": "fetch_verified",
+      "currentness_result": null,
+      "not_chunkable": null
+    },
+    {
+      "id": "src:DJP_PPH42_004",
+      "type": "official_source",
+      "label": "Pembayaran Sendiri PPh Final Pasal 4 ayat 2 Orang Pribadi",
+      "status": "under_review",
+      "source_id": "DJP_PPH42_004",
+      "authority": "DJP",
+      "trust_level": "official_guidance",
+      "document_number": null,
+      "verification_status": "search_listed",
+      "currentness_result": null,
+      "not_chunkable": null
+    },
+    {
+      "id": "src:DJP_PPH42_005",
+      "type": "official_source",
+      "label": "Wajib Pajak Pahami Mekanisme PPh Setor Sendiri",
+      "status": "under_review",
+      "source_id": "DJP_PPH42_005",
+      "authority": "DJP",
+      "trust_level": "official_guidance",
+      "document_number": null,
+      "verification_status": "search_listed",
+      "currentness_result": null,
+      "not_chunkable": null
+    },
+    {
+      "id": "src:DJP_PPH42_006",
+      "type": "official_source",
+      "label": "Waspadai Salah Tarif PPh Biaya Layanan Gedung",
+      "status": "under_review",
+      "source_id": "DJP_PPH42_006",
+      "authority": "DJP",
+      "trust_level": "official_guidance",
+      "document_number": null,
+      "verification_status": "fetch_verified",
+      "currentness_result": null,
+      "not_chunkable": null
+    },
+    {
+      "id": "src:KEMENKEU_PPH21_001",
+      "type": "official_source",
+      "label": "PMK Nomor 168 Tahun 2023 — PPh Pasal 21 (PDF, JDIH Kemenkeu)",
+      "status": "under_review",
+      "source_id": "KEMENKEU_PPH21_001",
+      "authority": "JDIH Kemenkeu",
+      "trust_level": "regulation",
+      "document_number": "PMK 168 Tahun 2023",
+      "verification_status": "fetch_verified",
+      "currentness_result": null,
+      "not_chunkable": true
+    },
+    {
+      "id": "src:DJP_PPH21_002",
+      "type": "official_source",
+      "label": "PMK 168 Tahun 2023 Tentang PPh Pasal 21 TER (PDF, DJP mirror)",
+      "status": "under_review",
+      "source_id": "DJP_PPH21_002",
+      "authority": "DJP",
+      "trust_level": "regulation",
+      "document_number": "PMK 168 Tahun 2023",
+      "verification_status": "search_listed",
+      "currentness_result": null,
+      "not_chunkable": null
+    },
+    {
+      "id": "src:BPK_PPH21_003",
+      "type": "official_source",
+      "label": "PMK No. 168 Tahun 2023 (peraturan.bpk.go.id)",
+      "status": "under_review",
+      "source_id": "BPK_PPH21_003",
+      "authority": "Other official",
+      "trust_level": "regulation",
+      "document_number": "PMK 168 Tahun 2023",
+      "verification_status": "search_listed",
+      "currentness_result": null,
+      "not_chunkable": null
+    },
+    {
+      "id": "src:DJP_PPH21_004",
+      "type": "official_source",
+      "label": "PMK 168 Tahun 2023 PPh Pasal 21 TER — penjelasan DJP",
+      "status": "under_review",
+      "source_id": "DJP_PPH21_004",
+      "authority": "DJP",
+      "trust_level": "official_guidance",
+      "document_number": "PMK 168 Tahun 2023",
+      "verification_status": "search_listed",
+      "currentness_result": null,
+      "not_chunkable": null
+    },
+    {
+      "id": "src:DJP_PPH21_005",
+      "type": "official_source",
+      "label": "Live Instagram KPP Gropet: PPh Pasal 21 TER",
+      "status": "under_review",
+      "source_id": "DJP_PPH21_005",
+      "authority": "DJP",
+      "trust_level": "official_guidance",
+      "document_number": null,
+      "verification_status": "search_listed",
+      "currentness_result": null,
+      "not_chunkable": null
+    },
+    {
+      "id": "src:DJP_PPHBADAN_001",
+      "type": "official_source",
+      "label": "WP OP UMKM: Fasilitas PPh Final dan Ketentuan Umum",
+      "status": "under_review",
+      "source_id": "DJP_PPHBADAN_001",
+      "authority": "DJP",
+      "trust_level": "official_guidance",
+      "document_number": "PP 55 Tahun 2022",
+      "verification_status": "fetch_verified",
+      "currentness_result": null,
+      "not_chunkable": null
+    },
+    {
+      "id": "src:DJP_PPHBADAN_002",
+      "type": "official_source",
+      "label": "DJP Perjelas Teknis Pengaturan Pajak UMKM",
+      "status": "under_review",
+      "source_id": "DJP_PPHBADAN_002",
+      "authority": "DJP",
+      "trust_level": "official_guidance",
+      "document_number": "PP 55 Tahun 2022",
+      "verification_status": "search_listed",
+      "currentness_result": null,
+      "not_chunkable": null
+    },
+    {
+      "id": "src:DJP_PPHBADAN_003",
+      "type": "official_source",
+      "label": "PP 20/2026: Tarif PPh 0,5% bagi UMKM Orang Pribadi Berlaku Selamanya",
+      "status": "under_review",
+      "source_id": "DJP_PPHBADAN_003",
+      "authority": "DJP",
+      "trust_level": "announcement",
+      "document_number": "PP 20 Tahun 2026",
+      "verification_status": "search_listed",
+      "currentness_result": null,
+      "not_chunkable": null
+    },
+    {
+      "id": "src:DJP_PPHBADAN_004",
+      "type": "official_source",
+      "label": "Partisipasi Terakhir Tarif Setengah Persen",
+      "status": "under_review",
+      "source_id": "DJP_PPHBADAN_004",
+      "authority": "DJP",
+      "trust_level": "official_guidance",
+      "document_number": null,
+      "verification_status": "search_listed",
+      "currentness_result": null,
+      "not_chunkable": null
+    },
+    {
+      "id": "src:DJP_PPHBADAN_005",
+      "type": "official_source",
+      "label": "Wajib Pajak UMKM, Kenali Hak dan Kewajiban Perpajakannya",
+      "status": "under_review",
+      "source_id": "DJP_PPHBADAN_005",
+      "authority": "DJP",
+      "trust_level": "official_guidance",
+      "document_number": null,
+      "verification_status": "search_listed",
+      "currentness_result": null,
+      "not_chunkable": null
+    },
+    {
+      "id": "src:DJP_CORETAX_001",
+      "type": "official_source",
+      "label": "Coretaxpedia — FAQ Coretax",
+      "status": "under_review",
+      "source_id": "DJP_CORETAX_001",
+      "authority": "DJP",
+      "trust_level": "faq",
+      "document_number": null,
+      "verification_status": "fetch_verified",
+      "currentness_result": null,
+      "not_chunkable": null
+    },
+    {
+      "id": "src:DJP_CORETAX_002",
+      "type": "official_source",
+      "label": "Buku Panduan Coretax DJP",
+      "status": "under_review",
+      "source_id": "DJP_CORETAX_002",
+      "authority": "DJP",
+      "trust_level": "official_guidance",
+      "document_number": null,
+      "verification_status": "search_listed",
+      "currentness_result": null,
+      "not_chunkable": null
+    },
+    {
+      "id": "src:DJP_CORETAX_003",
+      "type": "official_source",
+      "label": "Coretax — halaman utama DJP",
+      "status": "under_review",
+      "source_id": "DJP_CORETAX_003",
+      "authority": "DJP",
+      "trust_level": "official_guidance",
+      "document_number": null,
+      "verification_status": "search_listed",
+      "currentness_result": null,
+      "not_chunkable": null
+    },
+    {
+      "id": "src:DJP_CORETAX_004",
+      "type": "official_source",
+      "label": "Panduan Ringkas Coretax DJP",
+      "status": "under_review",
+      "source_id": "DJP_CORETAX_004",
+      "authority": "DJP",
+      "trust_level": "official_guidance",
+      "document_number": null,
+      "verification_status": "fetch_verified",
+      "currentness_result": null,
+      "not_chunkable": null
+    },
+    {
+      "id": "src:DJP_CORETAX_005",
+      "type": "official_source",
+      "label": "FAQ Coretax (halaman DJP)",
+      "status": "under_review",
+      "source_id": "DJP_CORETAX_005",
+      "authority": "DJP",
+      "trust_level": "faq",
+      "document_number": null,
+      "verification_status": "search_listed",
+      "currentness_result": null,
+      "not_chunkable": null
+    },
+    {
+      "id": "src:DJP_CORETAX_006",
+      "type": "official_source",
+      "label": "Keterangan Tertulis Pembaruan Informasi Implementasi Coretax DJP",
+      "status": "under_review",
+      "source_id": "DJP_CORETAX_006",
+      "authority": "DJP",
+      "trust_level": "announcement",
+      "document_number": null,
+      "verification_status": "search_listed",
+      "currentness_result": null,
+      "not_chunkable": null
+    },
+    {
+      "id": "src:DJP_BUPOT_001",
+      "type": "official_source",
+      "label": "Buku Manual Coretax — Seri Bukti Potong PPh (PDF, v1.0 3 Feb 2025)",
+      "status": "under_review",
+      "source_id": "DJP_BUPOT_001",
+      "authority": "DJP",
+      "trust_level": "official_guidance",
+      "document_number": null,
+      "verification_status": "fetch_verified",
+      "currentness_result": null,
+      "not_chunkable": true
+    },
+    {
+      "id": "src:DJP_BUPOT_002",
+      "type": "official_source",
+      "label": "Petugas Pajak Beri Asistensi Penggunaan E-Bupot di Coretax DJP",
+      "status": "under_review",
+      "source_id": "DJP_BUPOT_002",
+      "authority": "DJP",
+      "trust_level": "official_guidance",
+      "document_number": null,
+      "verification_status": "fetch_verified",
+      "currentness_result": null,
+      "not_chunkable": null
+    },
+    {
+      "id": "src:DJP_FAKTUR_001",
+      "type": "official_source",
+      "label": "Coretax — proses bisnis Faktur Pajak (dalam Panduan Ringkas)",
+      "status": "under_review",
+      "source_id": "DJP_FAKTUR_001",
+      "authority": "DJP",
+      "trust_level": "official_guidance",
+      "document_number": null,
+      "verification_status": "search_listed",
+      "currentness_result": null,
+      "not_chunkable": null
+    },
+    {
+      "id": "src:DJP_TOOL_001",
+      "type": "official_source",
+      "label": "Kalkulator Pajak DJP",
+      "status": "under_review",
+      "source_id": "DJP_TOOL_001",
+      "authority": "DJP",
+      "trust_level": "official_guidance",
+      "document_number": null,
+      "verification_status": "search_listed",
+      "currentness_result": null,
+      "not_chunkable": null
+    },
+    {
+      "id": "src:OSS_001",
+      "type": "official_source",
+      "label": "OSS RBA — Sistem Perizinan Berusaha Terintegrasi Secara Elektronik",
+      "status": "under_review",
+      "source_id": "OSS_001",
+      "authority": "OSS",
+      "trust_level": "official_guidance",
+      "document_number": null,
+      "verification_status": "fetch_verified",
+      "currentness_result": null,
+      "not_chunkable": true
+    },
+    {
+      "id": "src:OSS_002",
+      "type": "official_source",
+      "label": "OSS Berbasis Risiko — portal perizinan",
+      "status": "under_review",
+      "source_id": "OSS_002",
+      "authority": "OSS",
+      "trust_level": "official_guidance",
+      "document_number": null,
+      "verification_status": "search_listed",
+      "currentness_result": null,
+      "not_chunkable": null
+    },
+    {
+      "id": "src:OSS_003",
+      "type": "official_source",
+      "label": "OSS RBA — Regulations",
+      "status": "under_review",
+      "source_id": "OSS_003",
+      "authority": "OSS",
+      "trust_level": "official_guidance",
+      "document_number": null,
+      "verification_status": "fetch_verified",
+      "currentness_result": null,
+      "not_chunkable": true
+    },
+    {
+      "id": "src:OSS_KBLI_001",
+      "type": "official_source",
+      "label": "OSS RBA — Klasifikasi Baku Lapangan Usaha Indonesia (KBLI) 2020",
+      "status": "under_review",
+      "source_id": "OSS_KBLI_001",
+      "authority": "OSS",
+      "trust_level": "official_guidance",
+      "document_number": "KBLI 2020",
+      "verification_status": "fetch_verified",
+      "currentness_result": null,
+      "not_chunkable": true
+    },
+    {
+      "id": "src:OSS_KBLI_002",
+      "type": "official_source",
+      "label": "OSS RBA — contoh detail KBLI (portal web tanpa tujuan komersial)",
+      "status": "under_review",
+      "source_id": "OSS_KBLI_002",
+      "authority": "OSS",
+      "trust_level": "official_guidance",
+      "document_number": null,
+      "verification_status": "search_listed",
+      "currentness_result": null,
+      "not_chunkable": null
+    },
+    {
+      "id": "src:BKPM_OSS_001",
+      "type": "official_source",
+      "label": "Pengenalan tentang OSS Berbasis Risiko",
+      "status": "under_review",
+      "source_id": "BKPM_OSS_001",
+      "authority": "BKPM",
+      "trust_level": "official_guidance",
+      "document_number": "UU 11 Tahun 2020",
+      "verification_status": "unreachable",
+      "currentness_result": null,
+      "not_chunkable": null
+    },
+    {
+      "id": "src:BKPM_NIB_001",
+      "type": "official_source",
+      "label": "Genap Dua Tahun, OSS Berbasis Risiko Sudah Terbitkan Lebih Dari 5 Juta NIB",
+      "status": "under_review",
+      "source_id": "BKPM_NIB_001",
+      "authority": "BKPM",
+      "trust_level": "announcement",
+      "document_number": null,
+      "verification_status": "search_listed",
+      "currentness_result": null,
+      "not_chunkable": null
+    },
+    {
+      "id": "src:BKPM_OSS_002",
+      "type": "official_source",
+      "label": "OSS Berbasis Risiko Permudah Sistem Perizinan UMKM",
+      "status": "under_review",
+      "source_id": "BKPM_OSS_002",
+      "authority": "BKPM",
+      "trust_level": "official_guidance",
+      "document_number": null,
+      "verification_status": "search_listed",
+      "currentness_result": null,
+      "not_chunkable": null
+    },
+    {
+      "id": "src:OSS_LIC_001",
+      "type": "official_source",
+      "label": "Pengajuan Perizinan Berusaha Risiko Menengah Tinggi",
+      "status": "under_review",
+      "source_id": "OSS_LIC_001",
+      "authority": "OSS",
+      "trust_level": "official_guidance",
+      "document_number": null,
+      "verification_status": "search_listed",
+      "currentness_result": null,
+      "not_chunkable": null
+    },
+    {
+      "id": "src:OSS_LKPM_001",
+      "type": "official_source",
+      "label": "Laporan Kegiatan Penanaman Modal (LKPM) — panduan OSS",
+      "status": "under_review",
+      "source_id": "OSS_LKPM_001",
+      "authority": "OSS",
+      "trust_level": "official_guidance",
+      "document_number": null,
+      "verification_status": "search_listed",
+      "currentness_result": null,
+      "not_chunkable": null
+    },
+    {
+      "id": "src:OSS_LKPM_002",
+      "type": "official_source",
+      "label": "LKPM Non UMK — tahap konstruksi/persiapan",
+      "status": "under_review",
+      "source_id": "OSS_LKPM_002",
+      "authority": "OSS",
+      "trust_level": "official_guidance",
+      "document_number": null,
+      "verification_status": "search_listed",
+      "currentness_result": null,
+      "not_chunkable": null
+    },
+    {
+      "id": "src:OSS_LKPM_003",
+      "type": "official_source",
+      "label": "Kewajiban Penyampaian LKPM Periode Triwulan I Tahun 2021",
+      "status": "under_review",
+      "source_id": "OSS_LKPM_003",
+      "authority": "OSS",
+      "trust_level": "announcement",
+      "document_number": "Peraturan BKPM 6 Tahun 2020",
+      "verification_status": "search_listed",
+      "currentness_result": null,
+      "not_chunkable": null
+    },
+    {
+      "id": "src:BKPM_LKPM_001",
+      "type": "official_source",
+      "label": "Penyampaian LKPM — pengumuman BKPM",
+      "status": "under_review",
+      "source_id": "BKPM_LKPM_001",
+      "authority": "BKPM",
+      "trust_level": "announcement",
+      "document_number": null,
+      "verification_status": "search_listed",
+      "currentness_result": null,
+      "not_chunkable": null
+    },
+    {
+      "id": "src:BKPM_LKPM_002",
+      "type": "official_source",
+      "label": "Kementerian Investasi Ajak Investor Segera Sampaikan LKPM",
+      "status": "under_review",
+      "source_id": "BKPM_LKPM_002",
+      "authority": "BKPM",
+      "trust_level": "announcement",
+      "document_number": null,
+      "verification_status": "search_listed",
+      "currentness_result": null,
+      "not_chunkable": null
+    },
+    {
+      "id": "src:BKPM_LKPM_003",
+      "type": "official_source",
+      "label": "Kewajiban Penyampaian LKPM Triwulan II dan Semester I Tahun 2018",
+      "status": "under_review",
+      "source_id": "BKPM_LKPM_003",
+      "authority": "BKPM",
+      "trust_level": "announcement",
+      "document_number": null,
+      "verification_status": "search_listed",
+      "currentness_result": null,
+      "not_chunkable": null
+    },
+    {
+      "id": "src:BPJSTK_001",
+      "type": "official_source",
+      "label": "Peraturan dan Regulasi BPJS Ketenagakerjaan",
+      "status": "under_review",
+      "source_id": "BPJSTK_001",
+      "authority": "BPJS",
+      "trust_level": "official_guidance",
+      "document_number": null,
+      "verification_status": "search_listed",
+      "currentness_result": null,
+      "not_chunkable": null
+    },
+    {
+      "id": "src:BPJSTK_002",
+      "type": "official_source",
+      "label": "Cara Pendaftaran BPJS Ketenagakerjaan",
+      "status": "under_review",
+      "source_id": "BPJSTK_002",
+      "authority": "BPJS",
+      "trust_level": "official_guidance",
+      "document_number": null,
+      "verification_status": "search_listed",
+      "currentness_result": null,
+      "not_chunkable": null
+    },
+    {
+      "id": "src:BPJSTK_003",
+      "type": "official_source",
+      "label": "Peraturan BPJS Nomor 1 Tahun 2016 (PDF)",
+      "status": "under_review",
+      "source_id": "BPJSTK_003",
+      "authority": "BPJS",
+      "trust_level": "regulation",
+      "document_number": "PER BPJS 01/2016",
+      "verification_status": "search_listed",
+      "currentness_result": null,
+      "not_chunkable": null
+    },
+    {
+      "id": "src:BPJSTK_004",
+      "type": "official_source",
+      "label": "Formulir 1 BPJS Ketenagakerjaan — pendaftaran badan usaha (PDF)",
+      "status": "under_review",
+      "source_id": "BPJSTK_004",
+      "authority": "BPJS",
+      "trust_level": "official_guidance",
+      "document_number": null,
+      "verification_status": "search_listed",
+      "currentness_result": null,
+      "not_chunkable": null
+    },
+    {
+      "id": "src:BPJSTK_005",
+      "type": "official_source",
+      "label": "Formulir 1a BPJS Ketenagakerjaan — pendaftaran/perubahan data pekerja (PDF)",
+      "status": "under_review",
+      "source_id": "BPJSTK_005",
+      "authority": "BPJS",
+      "trust_level": "official_guidance",
+      "document_number": null,
+      "verification_status": "search_listed",
+      "currentness_result": null,
+      "not_chunkable": null
+    },
+    {
+      "id": "src:BPK_PPH42_PP34_001",
+      "type": "official_source",
+      "label": "PP Nomor 34 Tahun 2017 — teks lengkap (PDF)",
+      "status": "under_review",
+      "source_id": "BPK_PPH42_PP34_001",
+      "authority": "Other official",
+      "trust_level": "regulation",
+      "document_number": "PP 34 Tahun 2017",
+      "verification_status": "fetch_verified",
+      "currentness_result": "berlaku",
+      "not_chunkable": true
+    },
+    {
+      "id": "src:BPK_PPH42_PP34_002",
+      "type": "official_source",
+      "label": "PP No. 34 Tahun 2017 (JDIH BPK RI, halaman detail)",
+      "status": "under_review",
+      "source_id": "BPK_PPH42_PP34_002",
+      "authority": "Other official",
+      "trust_level": "regulation",
+      "document_number": "PP 34 Tahun 2017",
+      "verification_status": "fetch_verified",
+      "currentness_result": "berlaku",
+      "not_chunkable": null
+    },
+    {
+      "id": "src:KEMENKEU_PPH42_PP34_003",
+      "type": "official_source",
+      "label": "PP 34 Tahun 2017 (JDIH Kemenkeu)",
+      "status": "under_review",
+      "source_id": "KEMENKEU_PPH42_PP34_003",
+      "authority": "JDIH Kemenkeu",
+      "trust_level": "regulation",
+      "document_number": "PP 34 Tahun 2017",
+      "verification_status": "fetch_verified",
+      "currentness_result": "berlaku",
+      "not_chunkable": null
+    },
+    {
+      "id": "src:DJP_PPH42_PP34_004",
+      "type": "official_source",
+      "label": "Pajak Penghasilan atas Penghasilan dari Persewaan Tanah dan/atau Bangunan (teks PP 34/2017 di DJP)",
+      "status": "under_review",
+      "source_id": "DJP_PPH42_PP34_004",
+      "authority": "DJP",
+      "trust_level": "regulation",
+      "document_number": "PP 34 Tahun 2017",
+      "verification_status": "fetch_verified",
+      "currentness_result": "berlaku",
+      "not_chunkable": null
+    },
+    {
+      "id": "src:KEMENKEU_PPH23_PMK141_001",
+      "type": "official_source",
+      "label": "PMK 141/PMK.03/2015 — teks lengkap (PDF, JDIH Kemenkeu)",
+      "status": "under_review",
+      "source_id": "KEMENKEU_PPH23_PMK141_001",
+      "authority": "JDIH Kemenkeu",
+      "trust_level": "regulation",
+      "document_number": "141/PMK.03/2015",
+      "verification_status": "fetch_verified",
+      "currentness_result": "berlaku",
+      "not_chunkable": true
+    },
+    {
+      "id": "src:BPK_PPH23_PMK141_002",
+      "type": "official_source",
+      "label": "PMK No. 141/PMK.03/2015 (JDIH BPK RI, halaman detail)",
+      "status": "under_review",
+      "source_id": "BPK_PPH23_PMK141_002",
+      "authority": "Other official",
+      "trust_level": "regulation",
+      "document_number": "141/PMK.03/2015",
+      "verification_status": "fetch_verified",
+      "currentness_result": "berlaku",
+      "not_chunkable": null
+    },
+    {
+      "id": "src:DJP_PPH23_PMK141_003",
+      "type": "official_source",
+      "label": "Jenis Jasa Lain sebagaimana dimaksud dalam Pasal 23 ayat (1) huruf c angka 2 UU PPh (teks PMK 141/2015 di DJP)",
+      "status": "under_review",
+      "source_id": "DJP_PPH23_PMK141_003",
+      "authority": "DJP",
+      "trust_level": "regulation",
+      "document_number": "141/PMK.03/2015",
+      "verification_status": "fetch_verified",
+      "currentness_result": "berlaku",
+      "not_chunkable": null
+    },
+    {
+      "id": "src:DJP_PPH23_PENGACARA_004",
+      "type": "official_source",
+      "label": "Pengacara — perlakuan PPh atas jasa pengacara",
+      "status": "under_review",
+      "source_id": "DJP_PPH23_PENGACARA_004",
+      "authority": "DJP",
+      "trust_level": "official_guidance",
+      "document_number": null,
+      "verification_status": "fetch_verified",
+      "currentness_result": null,
+      "not_chunkable": null
+    },
+    {
+      "id": "src:KEMENKEU_PPH23_PMK141_004",
+      "type": "official_source",
+      "label": "141/PMK.03/2015 — halaman detail & riwayat dokumen (JDIH Kemenkeu)",
+      "status": "under_review",
+      "source_id": "KEMENKEU_PPH23_PMK141_004",
+      "authority": "JDIH Kemenkeu",
+      "trust_level": "official_guidance",
+      "document_number": "141/PMK.03/2015",
+      "verification_status": "fetch_verified",
+      "currentness_result": "berlaku",
+      "not_chunkable": null
+    },
+    {
+      "id": "tax:TAX_ID_PPH23_LEGAL_001",
+      "type": "tax_rule_candidate",
+      "label": "TAX_ID_PPH23_LEGAL_001",
+      "status": "under_review",
+      "tax_type": "PPh 23",
+      "rate": 0.02,
+      "base": "jumlah_bruto_excluding_ppn",
+      "final_or_creditable": "creditable",
+      "confidence": "medium",
+      "active": false,
+      "legal_verified": false,
+      "needs_reviewer": true
+    },
+    {
+      "id": "tax:TAX_ID_PPH23_PROFESSIONAL_002",
+      "type": "tax_rule_candidate",
+      "label": "TAX_ID_PPH23_PROFESSIONAL_002",
+      "status": "under_review",
+      "tax_type": "PPh 23",
+      "rate": 0.02,
+      "base": "needs_reviewer",
+      "final_or_creditable": "creditable",
+      "confidence": "medium",
+      "active": false,
+      "legal_verified": false,
+      "needs_reviewer": true
+    },
+    {
+      "id": "tax:TAX_ID_PPH42_RENTAL_001",
+      "type": "tax_rule_candidate",
+      "label": "TAX_ID_PPH42_RENTAL_001",
+      "status": "under_review",
+      "tax_type": "PPh 4(2)",
+      "rate": 0.1,
+      "base": "jumlah_bruto_nilai_persewaan_including_service_and_facility_charges",
+      "final_or_creditable": "final",
+      "confidence": "medium",
+      "active": false,
+      "legal_verified": false,
+      "needs_reviewer": true
+    },
+    {
+      "id": "tax:TAX_ID_PPN_OUTPUT_001",
+      "type": "tax_rule_candidate",
+      "label": "TAX_ID_PPN_OUTPUT_001",
+      "status": "under_review",
+      "tax_type": "PPN",
+      "rate": null,
+      "base": "needs_reviewer",
+      "final_or_creditable": "creditable",
+      "confidence": "medium",
+      "active": false,
+      "legal_verified": false,
+      "needs_reviewer": true
+    },
+    {
+      "id": "tax:TAX_ID_PPN_INPUT_002",
+      "type": "tax_rule_candidate",
+      "label": "TAX_ID_PPN_INPUT_002",
+      "status": "under_review",
+      "tax_type": "PPN",
+      "rate": null,
+      "base": "needs_reviewer",
+      "final_or_creditable": "creditable",
+      "confidence": "low",
+      "active": false,
+      "legal_verified": false,
+      "needs_reviewer": true
+    },
+    {
+      "id": "tax:TAX_ID_PPH21_PAYROLL_001",
+      "type": "tax_rule_candidate",
+      "label": "TAX_ID_PPH21_PAYROLL_001",
+      "status": "under_review",
+      "tax_type": "PPh 21",
+      "rate": null,
+      "base": "gross_employment_income",
+      "final_or_creditable": "creditable",
+      "confidence": "low",
+      "active": false,
+      "legal_verified": false,
+      "needs_reviewer": true
+    },
+    {
+      "id": "tax:TAX_ID_PPHBADAN_UMKM_001",
+      "type": "tax_rule_candidate",
+      "label": "TAX_ID_PPHBADAN_UMKM_001",
+      "status": "under_review",
+      "tax_type": "PPh Badan (final UMKM)",
+      "rate": 0.005,
+      "base": "monthly_gross_turnover",
+      "final_or_creditable": "final",
+      "confidence": "low",
+      "active": false,
+      "legal_verified": false,
+      "needs_reviewer": true
+    },
+    {
+      "id": "tax:TAX_ID_PPHBADAN_GENERAL_002",
+      "type": "tax_rule_candidate",
+      "label": "TAX_ID_PPHBADAN_GENERAL_002",
+      "status": "under_review",
+      "tax_type": "PPh Badan",
+      "rate": null,
+      "base": "needs_reviewer",
+      "final_or_creditable": "n/a",
+      "confidence": "low",
+      "active": false,
+      "legal_verified": false,
+      "needs_reviewer": true
+    },
+    {
+      "id": "comp:COMP_ID_NIB_001",
+      "type": "compliance_rule_candidate",
+      "label": "COMP_ID_NIB_001",
+      "status": "under_review",
+      "topic": "nib",
+      "obligation": "Business must hold a NIB issued through OSS as its single business identity",
+      "confidence": "low",
+      "active": false,
+      "legal_verified": false,
+      "needs_reviewer": true
+    },
+    {
+      "id": "comp:COMP_ID_KBLI_001",
+      "type": "compliance_rule_candidate",
+      "label": "COMP_ID_KBLI_001",
+      "status": "under_review",
+      "topic": "kbli",
+      "obligation": "Business activity must be classified under KBLI 2020, which drives licensing requirements",
+      "confidence": "low",
+      "active": false,
+      "legal_verified": false,
+      "needs_reviewer": true
+    },
+    {
+      "id": "comp:COMP_ID_LICENCE_RISK_001",
+      "type": "compliance_rule_candidate",
+      "label": "COMP_ID_LICENCE_RISK_001",
+      "status": "under_review",
+      "topic": "business_licenses",
+      "obligation": "Licensing follows a risk tier: Rendah (R), Menengah Rendah (MR), Menengah Tinggi (MT), Tinggi (T)",
+      "confidence": "low",
+      "active": false,
+      "legal_verified": false,
+      "needs_reviewer": true
+    },
+    {
+      "id": "comp:COMP_ID_LKPM_001",
+      "type": "compliance_rule_candidate",
+      "label": "COMP_ID_LKPM_001",
+      "status": "under_review",
+      "topic": "lkpm",
+      "obligation": "Investment companies must submit periodic LKPM investment activity reports",
+      "confidence": "low",
+      "active": false,
+      "legal_verified": false,
+      "needs_reviewer": true
+    },
+    {
+      "id": "comp:COMP_ID_BPJS_001",
+      "type": "compliance_rule_candidate",
+      "label": "COMP_ID_BPJS_001",
+      "status": "under_review",
+      "topic": "bpjs",
+      "obligation": "Employers must register themselves and their workers with BPJS",
+      "confidence": "low",
+      "active": false,
+      "legal_verified": false,
+      "needs_reviewer": true
+    },
+    {
+      "id": "doc:invoice",
+      "type": "required_document",
+      "label": "invoice",
+      "status": "under_review",
+      "source_status": "missing_source",
+      "source_ids": [],
+      "needs_reviewer": true
+    },
+    {
+      "id": "doc:payment_proof",
+      "type": "required_document",
+      "label": "payment proof",
+      "status": "under_review",
+      "source_status": "missing_source",
+      "source_ids": [],
+      "needs_reviewer": true
+    },
+    {
+      "id": "doc:bank_statement",
+      "type": "required_document",
+      "label": "bank statement",
+      "status": "under_review",
+      "source_status": "missing_source",
+      "source_ids": [],
+      "needs_reviewer": true
+    },
+    {
+      "id": "doc:faktur_pajak",
+      "type": "required_document",
+      "label": "faktur pajak",
+      "status": "under_review",
+      "source_status": "sourced",
+      "source_ids": [
+        "DJP_PPN_001",
+        "KEMENKEU_PPN_002"
+      ],
+      "needs_reviewer": true
+    },
+    {
+      "id": "doc:bukti_potong",
+      "type": "required_document",
+      "label": "bukti potong",
+      "status": "under_review",
+      "source_status": "sourced",
+      "source_ids": [
+        "DJP_BUPOT_002",
+        "DJP_PPH23_002",
+        "DJP_PPH42_002"
+      ],
+      "needs_reviewer": true
+    },
+    {
+      "id": "doc:vendor_npwp",
+      "type": "required_document",
+      "label": "vendor npwp",
+      "status": "under_review",
+      "source_status": "missing_source",
+      "source_ids": [],
+      "needs_reviewer": true
+    },
+    {
+      "id": "doc:vendor_nik",
+      "type": "required_document",
+      "label": "vendor nik",
+      "status": "under_review",
+      "source_status": "missing_source",
+      "source_ids": [],
+      "needs_reviewer": true
+    },
+    {
+      "id": "doc:vendor_pkp_status_evidence",
+      "type": "required_document",
+      "label": "vendor pkp status evidence",
+      "status": "under_review",
+      "source_status": "missing_source",
+      "source_ids": [],
+      "needs_reviewer": true
+    },
+    {
+      "id": "doc:rental_agreement",
+      "type": "required_document",
+      "label": "rental agreement",
+      "status": "under_review",
+      "source_status": "sourced",
+      "source_ids": [
+        "DJP_PPH42_002",
+        "DJP_PPH42_006"
+      ],
+      "needs_reviewer": true
+    },
+    {
+      "id": "doc:service_agreement",
+      "type": "required_document",
+      "label": "service agreement",
+      "status": "under_review",
+      "source_status": "missing_source",
+      "source_ids": [],
+      "needs_reviewer": true
+    },
+    {
+      "id": "doc:contractor_agreement",
+      "type": "required_document",
+      "label": "contractor agreement",
+      "status": "under_review",
+      "source_status": "missing_source",
+      "source_ids": [],
+      "needs_reviewer": true
+    },
+    {
+      "id": "doc:employment_contract",
+      "type": "required_document",
+      "label": "employment contract",
+      "status": "under_review",
+      "source_status": "missing_source",
+      "source_ids": [],
+      "needs_reviewer": true
+    },
+    {
+      "id": "doc:payroll_docs",
+      "type": "required_document",
+      "label": "payroll docs",
+      "status": "under_review",
+      "source_status": "sourced",
+      "source_ids": [
+        "BPJSTK_004",
+        "BPJSTK_005",
+        "KEMENKEU_PPH21_001"
+      ],
+      "needs_reviewer": true
+    },
+    {
+      "id": "doc:asset_purchase_invoice",
+      "type": "required_document",
+      "label": "asset purchase invoice",
+      "status": "under_review",
+      "source_status": "missing_source",
+      "source_ids": [],
+      "needs_reviewer": true
+    },
+    {
+      "id": "doc:delivery_note_goods_receipt",
+      "type": "required_document",
+      "label": "delivery note goods receipt",
+      "status": "under_review",
+      "source_status": "missing_source",
+      "source_ids": [],
+      "needs_reviewer": true
+    },
+    {
+      "id": "doc:import_documents",
+      "type": "required_document",
+      "label": "import documents",
+      "status": "under_review",
+      "source_status": "missing_source",
+      "source_ids": [],
+      "needs_reviewer": true
+    },
+    {
+      "id": "doc:loan_agreement",
+      "type": "required_document",
+      "label": "loan agreement",
+      "status": "under_review",
+      "source_status": "missing_source",
+      "source_ids": [],
+      "needs_reviewer": true
+    },
+    {
+      "id": "doc:shareholder_loan_agreement",
+      "type": "required_document",
+      "label": "shareholder loan agreement",
+      "status": "under_review",
+      "source_status": "missing_source",
+      "source_ids": [],
+      "needs_reviewer": true
+    },
+    {
+      "id": "doc:intercompany_agreement",
+      "type": "required_document",
+      "label": "intercompany agreement",
+      "status": "under_review",
+      "source_status": "missing_source",
+      "source_ids": [],
+      "needs_reviewer": true
+    },
+    {
+      "id": "doc:company_deed_akta",
+      "type": "required_document",
+      "label": "company deed akta",
+      "status": "under_review",
+      "source_status": "missing_source",
+      "source_ids": [],
+      "needs_reviewer": true
+    },
+    {
+      "id": "doc:sk_kemenkumham",
+      "type": "required_document",
+      "label": "sk kemenkumham",
+      "status": "under_review",
+      "source_status": "missing_source",
+      "source_ids": [],
+      "needs_reviewer": true
+    },
+    {
+      "id": "doc:nib",
+      "type": "required_document",
+      "label": "nib",
+      "status": "under_review",
+      "source_status": "missing_source",
+      "source_ids": [],
+      "needs_reviewer": true
+    },
+    {
+      "id": "doc:oss_profile",
+      "type": "required_document",
+      "label": "oss profile",
+      "status": "under_review",
+      "source_status": "missing_source",
+      "source_ids": [],
+      "needs_reviewer": true
+    },
+    {
+      "id": "doc:kbli",
+      "type": "required_document",
+      "label": "kbli",
+      "status": "under_review",
+      "source_status": "missing_source",
+      "source_ids": [],
+      "needs_reviewer": true
+    },
+    {
+      "id": "doc:bpjs_evidence",
+      "type": "required_document",
+      "label": "bpjs evidence",
+      "status": "under_review",
+      "source_status": "missing_source",
+      "source_ids": [],
+      "needs_reviewer": true
+    },
+    {
+      "id": "doc:lkpm_evidence",
+      "type": "required_document",
+      "label": "lkpm evidence",
+      "status": "under_review",
+      "source_status": "missing_source",
+      "source_ids": [],
+      "needs_reviewer": true
+    },
+    {
+      "id": "doc:receipt_kwitansi",
+      "type": "required_document",
+      "label": "receipt kwitansi",
+      "status": "under_review",
+      "source_status": "missing_source",
+      "source_ids": [],
+      "needs_reviewer": true
+    },
+    {
+      "id": "ev:supplier_invoice",
+      "type": "evidence_requirement",
+      "label": "supplier invoice",
+      "status": "under_review",
+      "what_it_proves": "the obligation exists and its amount",
+      "used_for": "payable",
+      "source_status": "missing_source",
+      "needs_reviewer": true
+    },
+    {
+      "id": "ev:faktur_pajak",
+      "type": "evidence_requirement",
+      "label": "faktur pajak",
+      "status": "under_review",
+      "what_it_proves": "VAT was charged and is potentially creditable",
+      "used_for": "tax",
+      "source_status": "sourced",
+      "needs_reviewer": true
+    },
+    {
+      "id": "ev:bukti_potong",
+      "type": "evidence_requirement",
+      "label": "bukti potong",
+      "status": "under_review",
+      "what_it_proves": "that tax was withheld, by whom, and through which reporting channel",
+      "used_for": "tax",
+      "source_status": "sourced",
+      "needs_reviewer": true
+    },
+    {
+      "id": "ev:payment_proof",
+      "type": "evidence_requirement",
+      "label": "payment proof",
+      "status": "under_review",
+      "what_it_proves": "money actually moved",
+      "used_for": "payable | receivable | bank reconciliation",
+      "source_status": "missing_source",
+      "needs_reviewer": true
+    },
+    {
+      "id": "ev:bank_statement",
+      "type": "evidence_requirement",
+      "label": "bank statement",
+      "status": "under_review",
+      "what_it_proves": "the movement as recorded by the bank",
+      "used_for": "bank reconciliation",
+      "source_status": "missing_source",
+      "needs_reviewer": true
+    },
+    {
+      "id": "ev:payroll_documents",
+      "type": "evidence_requirement",
+      "label": "payroll documents",
+      "status": "under_review",
+      "what_it_proves": "employment cost and PPh 21 basis",
+      "used_for": "payroll | tax",
+      "source_status": "sourced",
+      "needs_reviewer": true
+    },
+    {
+      "id": "ev:rental_agreement",
+      "type": "evidence_requirement",
+      "label": "rental agreement",
+      "status": "under_review",
+      "what_it_proves": "the rental relationship, period, and base rent",
+      "used_for": "payable | tax",
+      "source_status": "sourced",
+      "needs_reviewer": true
+    },
+    {
+      "id": "ev:receipt_kwitansi",
+      "type": "evidence_requirement",
+      "label": "receipt kwitansi",
+      "status": "under_review",
+      "what_it_proves": "receipt of payment by the payee",
+      "used_for": "payable | receivable",
+      "source_status": "missing_source",
+      "needs_reviewer": true
+    },
+    {
+      "id": "flag:accountant_review",
+      "type": "accountant_review_flag",
+      "label": "Accountant review required",
+      "status": "under_review",
+      "always_true_in_v1": true
+    },
+    {
+      "id": "risk:mixed_treatment",
+      "type": "risk_flag",
+      "label": "Invoice may carry more than one tax treatment",
+      "status": "under_review",
+      "severity": "high"
+    },
+    {
+      "id": "risk:rate_unsourced",
+      "type": "risk_flag",
+      "label": "No official source supports a rate for this transaction type",
+      "status": "under_review",
+      "severity": "medium"
+    },
+    {
+      "id": "risk:entity_vs_individual",
+      "type": "risk_flag",
+      "label": "Provider legal form unknown (PPh 21 vs PPh 23)",
+      "status": "under_review",
+      "severity": "high"
+    },
+    {
+      "id": "risk:currentness_unproven",
+      "type": "risk_flag",
+      "label": "Instrument currentness evidenced but not legally verified",
+      "status": "under_review",
+      "severity": "medium"
+    },
+    {
+      "id": "filing:spt_masa_pph_unifikasi",
+      "type": "filing_package_field",
+      "label": "SPT Masa PPh Unifikasi",
+      "status": "under_review",
+      "source_status": "not_designed",
+      "needs_reviewer": true
+    },
+    {
+      "id": "filing:spt_masa_ppn",
+      "type": "filing_package_field",
+      "label": "SPT Masa PPN",
+      "status": "under_review",
+      "source_status": "not_designed",
+      "needs_reviewer": true
+    },
+    {
+      "id": "filing:bukti_potong_series",
+      "type": "filing_package_field",
+      "label": "Bukti potong series (e-Bupot / Coretax)",
+      "status": "under_review",
+      "source_status": "not_designed",
+      "needs_reviewer": true
+    },
+    {
+      "id": "filing:faktur_pajak_series",
+      "type": "filing_package_field",
+      "label": "Faktur pajak series",
+      "status": "under_review",
+      "source_status": "not_designed",
+      "needs_reviewer": true
+    },
+    {
+      "id": "filing:ssp_billing_code",
+      "type": "filing_package_field",
+      "label": "SSP / billing code (MAP-KJS)",
+      "status": "under_review",
+      "source_status": "not_designed",
+      "needs_reviewer": true
+    },
+    {
+      "id": "txn:rent",
+      "type": "transaction_type",
+      "label": "Rent",
+      "status": "under_review",
+      "possible_tax_treatment": [
+        "PPh 4(2) final"
+      ],
+      "possible_rate": 0.1,
+      "tax_base": "jumlah_bruto_nilai_persewaan_including_service_and_facility_charges",
+      "confidence": "medium",
+      "active": false,
+      "legal_verified": false,
+      "accountant_review_required": true
+    },
+    {
+      "id": "q:001",
+      "type": "missing_data_question",
+      "label": "Is the tenant a Pemotong under PP 34/2017 Pasal 3(2)?",
+      "status": "under_review",
+      "needs_reviewer": true
+    },
+    {
+      "id": "q:002",
+      "type": "missing_data_question",
+      "label": "Does the invoice include charges billed by a THIRD PARTY rather than the landlord?",
+      "status": "under_review",
+      "needs_reviewer": true
+    },
+    {
+      "id": "q:003",
+      "type": "missing_data_question",
+      "label": "Is any part of this lodging/accommodation (excluded from the final regime)?",
+      "status": "under_review",
+      "needs_reviewer": true
+    },
+    {
+      "id": "txn:service_fee",
+      "type": "transaction_type",
+      "label": "Service fee",
+      "status": "under_review",
+      "possible_tax_treatment": [
+        "PPh 23"
+      ],
+      "possible_rate": 0.02,
+      "tax_base": "jumlah_bruto_excluding_ppn",
+      "confidence": "medium",
+      "active": false,
+      "legal_verified": false,
+      "accountant_review_required": true
+    },
+    {
+      "id": "q:004",
+      "type": "missing_data_question",
+      "label": "Is the supplier an ENTITY (badan) or an individual? Individual may be PPh 21, not PPh 23.",
+      "status": "under_review",
+      "needs_reviewer": true
+    },
+    {
+      "id": "q:005",
+      "type": "missing_data_question",
+      "label": "Does the supplier have an NPWP? (uplift may apply)",
+      "status": "under_review",
+      "needs_reviewer": true
+    },
+    {
+      "id": "q:006",
+      "type": "missing_data_question",
+      "label": "Which enumerated jasa lain item does this service fall under?",
+      "status": "under_review",
+      "needs_reviewer": true
+    },
+    {
+      "id": "txn:management_service",
+      "type": "transaction_type",
+      "label": "Management service",
+      "status": "under_review",
+      "possible_tax_treatment": [
+        "PPh 23"
+      ],
+      "possible_rate": 0.02,
+      "tax_base": "jumlah_bruto_excluding_ppn",
+      "confidence": "low",
+      "active": false,
+      "legal_verified": false,
+      "accountant_review_required": true
+    },
+    {
+      "id": "q:007",
+      "type": "missing_data_question",
+      "label": "Who pays whom? Landlord->third party differs from tenant->landlord.",
+      "status": "under_review",
+      "needs_reviewer": true
+    },
+    {
+      "id": "q:008",
+      "type": "missing_data_question",
+      "label": "Is this billed as part of rent by the landlord (then PPh 4(2)) or separately by a manager (then PPh 23)?",
+      "status": "under_review",
+      "needs_reviewer": true
+    },
+    {
+      "id": "txn:building_service_charge",
+      "type": "transaction_type",
+      "label": "Building service / service charge",
+      "status": "under_review",
+      "possible_tax_treatment": [
+        "PPh 4(2) final",
+        "PPh 23"
+      ],
+      "possible_rate": null,
+      "tax_base": "needs_reviewer",
+      "confidence": "low",
+      "active": false,
+      "legal_verified": false,
+      "accountant_review_required": true
+    },
+    {
+      "id": "tax:unmapped:pph_4_2_final",
+      "type": "tax_rule_candidate",
+      "label": "PPh 4(2) final",
+      "status": "under_review",
+      "rate": null,
+      "base": "needs_reviewer",
+      "active": false,
+      "legal_verified": false,
+      "needs_reviewer": true,
+      "source_status": "no_candidate_yet"
+    },
+    {
+      "id": "tax:unmapped:pph_23",
+      "type": "tax_rule_candidate",
+      "label": "PPh 23",
+      "status": "under_review",
+      "rate": null,
+      "base": "needs_reviewer",
+      "active": false,
+      "legal_verified": false,
+      "needs_reviewer": true,
+      "source_status": "no_candidate_yet"
+    },
+    {
+      "id": "q:009",
+      "type": "missing_data_question",
+      "label": "Is this charge billed by the landlord or by a separate manager?",
+      "status": "under_review",
+      "needs_reviewer": true
+    },
+    {
+      "id": "q:010",
+      "type": "missing_data_question",
+      "label": "Is it contracted separately from the lease?",
+      "status": "under_review",
+      "needs_reviewer": true
+    },
+    {
+      "id": "q:011",
+      "type": "missing_data_question",
+      "label": "Does the tenant pay the manager directly?",
+      "status": "under_review",
+      "needs_reviewer": true
+    },
+    {
+      "id": "txn:contractor_freelancer",
+      "type": "transaction_type",
+      "label": "Contractor / freelancer",
+      "status": "under_review",
+      "possible_tax_treatment": [
+        "PPh 23",
+        "PPh 21"
+      ],
+      "possible_rate": null,
+      "tax_base": "needs_reviewer",
+      "confidence": "low",
+      "active": false,
+      "legal_verified": false,
+      "accountant_review_required": true
+    },
+    {
+      "id": "tax:unmapped:pph_21",
+      "type": "tax_rule_candidate",
+      "label": "PPh 21",
+      "status": "under_review",
+      "rate": null,
+      "base": "needs_reviewer",
+      "active": false,
+      "legal_verified": false,
+      "needs_reviewer": true,
+      "source_status": "no_candidate_yet"
+    },
+    {
+      "id": "q:012",
+      "type": "missing_data_question",
+      "label": "Is the provider an individual (PPh 21) or an entity (PPh 23)?",
+      "status": "under_review",
+      "needs_reviewer": true
+    },
+    {
+      "id": "q:013",
+      "type": "missing_data_question",
+      "label": "If an entity, which jasa lain item applies?",
+      "status": "under_review",
+      "needs_reviewer": true
+    },
+    {
+      "id": "txn:salary_payroll",
+      "type": "transaction_type",
+      "label": "Salary / payroll",
+      "status": "under_review",
+      "possible_tax_treatment": [
+        "PPh 21"
+      ],
+      "possible_rate": null,
+      "tax_base": "needs_reviewer",
+      "confidence": "low",
+      "active": false,
+      "legal_verified": false,
+      "accountant_review_required": true
+    },
+    {
+      "id": "q:014",
+      "type": "missing_data_question",
+      "label": "Is the employee permanent or non-permanent?",
+      "status": "under_review",
+      "needs_reviewer": true
+    },
+    {
+      "id": "q:015",
+      "type": "missing_data_question",
+      "label": "Which TER category applies?",
+      "status": "under_review",
+      "needs_reviewer": true
+    },
+    {
+      "id": "txn:marketing_advertising",
+      "type": "transaction_type",
+      "label": "Marketing / advertising",
+      "status": "under_review",
+      "possible_tax_treatment": [
+        "PPh 23"
+      ],
+      "possible_rate": null,
+      "tax_base": "needs_reviewer",
+      "confidence": "low",
+      "active": false,
+      "legal_verified": false,
+      "accountant_review_required": true
+    },
+    {
+      "id": "q:016",
+      "type": "missing_data_question",
+      "label": "Which enumerated jasa lain item covers this?",
+      "status": "under_review",
+      "needs_reviewer": true
+    },
+    {
+      "id": "q:017",
+      "type": "missing_data_question",
+      "label": "Is any part media placement rather than a service?",
+      "status": "under_review",
+      "needs_reviewer": true
+    },
+    {
+      "id": "txn:software_subscription",
+      "type": "transaction_type",
+      "label": "Software subscription",
+      "status": "under_review",
+      "possible_tax_treatment": [
+        "PPh 23",
+        "PPh 26",
+        "PPN"
+      ],
+      "possible_rate": null,
+      "tax_base": "needs_reviewer",
+      "confidence": "low",
+      "active": false,
+      "legal_verified": false,
+      "accountant_review_required": true
+    },
+    {
+      "id": "tax:unmapped:pph_26",
+      "type": "tax_rule_candidate",
+      "label": "PPh 26",
+      "status": "under_review",
+      "rate": null,
+      "base": "needs_reviewer",
+      "active": false,
+      "legal_verified": false,
+      "needs_reviewer": true,
+      "source_status": "no_candidate_yet"
+    },
+    {
+      "id": "tax:unmapped:ppn",
+      "type": "tax_rule_candidate",
+      "label": "PPN",
+      "status": "under_review",
+      "rate": null,
+      "base": "needs_reviewer",
+      "active": false,
+      "legal_verified": false,
+      "needs_reviewer": true,
+      "source_status": "no_candidate_yet"
+    },
+    {
+      "id": "q:018",
+      "type": "missing_data_question",
+      "label": "Is the supplier resident or non-resident? Non-resident may be PPh 26, not PPh 23.",
+      "status": "under_review",
+      "needs_reviewer": true
+    },
+    {
+      "id": "q:019",
+      "type": "missing_data_question",
+      "label": "Is this a licence/royalty or a service?",
+      "status": "under_review",
+      "needs_reviewer": true
+    },
+    {
+      "id": "q:020",
+      "type": "missing_data_question",
+      "label": "Is PPN-PMSE charged by a foreign provider?",
+      "status": "under_review",
+      "needs_reviewer": true
+    },
+    {
+      "id": "txn:equipment_capex",
+      "type": "transaction_type",
+      "label": "Equipment / CAPEX",
+      "status": "under_review",
+      "possible_tax_treatment": [
+        "PPN"
+      ],
+      "possible_rate": null,
+      "tax_base": "needs_reviewer",
+      "confidence": "low",
+      "active": false,
+      "legal_verified": false,
+      "accountant_review_required": true
+    },
+    {
+      "id": "q:021",
+      "type": "missing_data_question",
+      "label": "Is this goods only, or goods plus installation service?",
+      "status": "under_review",
+      "needs_reviewer": true
+    },
+    {
+      "id": "q:022",
+      "type": "missing_data_question",
+      "label": "Is the supplier PKP?",
+      "status": "under_review",
+      "needs_reviewer": true
+    },
+    {
+      "id": "txn:import_related_invoice",
+      "type": "transaction_type",
+      "label": "Import-related invoice",
+      "status": "under_review",
+      "possible_tax_treatment": [
+        "PPh 22",
+        "PPN Impor",
+        "bea masuk"
+      ],
+      "possible_rate": null,
+      "tax_base": "needs_reviewer",
+      "confidence": "low",
+      "active": false,
+      "legal_verified": false,
+      "accountant_review_required": true
+    },
+    {
+      "id": "tax:unmapped:pph_22",
+      "type": "tax_rule_candidate",
+      "label": "PPh 22",
+      "status": "under_review",
+      "rate": null,
+      "base": "needs_reviewer",
+      "active": false,
+      "legal_verified": false,
+      "needs_reviewer": true,
+      "source_status": "no_candidate_yet"
+    },
+    {
+      "id": "tax:unmapped:ppn_impor",
+      "type": "tax_rule_candidate",
+      "label": "PPN Impor",
+      "status": "under_review",
+      "rate": null,
+      "base": "needs_reviewer",
+      "active": false,
+      "legal_verified": false,
+      "needs_reviewer": true,
+      "source_status": "no_candidate_yet"
+    },
+    {
+      "id": "tax:unmapped:bea_masuk",
+      "type": "tax_rule_candidate",
+      "label": "bea masuk",
+      "status": "under_review",
+      "rate": null,
+      "base": "needs_reviewer",
+      "active": false,
+      "legal_verified": false,
+      "needs_reviewer": true,
+      "source_status": "no_candidate_yet"
+    },
+    {
+      "id": "q:023",
+      "type": "missing_data_question",
+      "label": "Which customs document evidences this?",
+      "status": "under_review",
+      "needs_reviewer": true
+    },
+    {
+      "id": "q:024",
+      "type": "missing_data_question",
+      "label": "Is PPh 22 import collected at the border?",
+      "status": "under_review",
+      "needs_reviewer": true
+    },
+    {
+      "id": "txn:loan_interest",
+      "type": "transaction_type",
+      "label": "Loan interest",
+      "status": "under_review",
+      "possible_tax_treatment": [
+        "PPh 23",
+        "PPh 26"
+      ],
+      "possible_rate": null,
+      "tax_base": "needs_reviewer",
+      "confidence": "low",
+      "active": false,
+      "legal_verified": false,
+      "accountant_review_required": true
+    },
+    {
+      "id": "q:025",
+      "type": "missing_data_question",
+      "label": "Is the lender a domestic entity, a bank, or non-resident?",
+      "status": "under_review",
+      "needs_reviewer": true
+    },
+    {
+      "id": "q:026",
+      "type": "missing_data_question",
+      "label": "Is a tax treaty in play?",
+      "status": "under_review",
+      "needs_reviewer": true
+    },
+    {
+      "id": "txn:intercompany_payment",
+      "type": "transaction_type",
+      "label": "Intercompany payment",
+      "status": "under_review",
+      "possible_tax_treatment": [
+        "PPh 23",
+        "PPh 26",
+        "transfer pricing"
+      ],
+      "possible_rate": null,
+      "tax_base": "needs_reviewer",
+      "confidence": "low",
+      "active": false,
+      "legal_verified": false,
+      "accountant_review_required": true
+    },
+    {
+      "id": "tax:unmapped:transfer_pricing",
+      "type": "tax_rule_candidate",
+      "label": "transfer pricing",
+      "status": "under_review",
+      "rate": null,
+      "base": "needs_reviewer",
+      "active": false,
+      "legal_verified": false,
+      "needs_reviewer": true,
+      "source_status": "no_candidate_yet"
+    },
+    {
+      "id": "q:027",
+      "type": "missing_data_question",
+      "label": "Is the counterparty domestic or foreign?",
+      "status": "under_review",
+      "needs_reviewer": true
+    },
+    {
+      "id": "q:028",
+      "type": "missing_data_question",
+      "label": "Is this a service, a royalty, interest, or a capital movement?",
+      "status": "under_review",
+      "needs_reviewer": true
+    },
+    {
+      "id": "q:029",
+      "type": "missing_data_question",
+      "label": "Are the parties related for transfer-pricing purposes?",
+      "status": "under_review",
+      "needs_reviewer": true
+    },
+    {
+      "id": "txn:mixed_invoice",
+      "type": "transaction_type",
+      "label": "Mixed invoice",
+      "status": "under_review",
+      "possible_tax_treatment": [
+        "multiple"
+      ],
+      "possible_rate": null,
+      "tax_base": "needs_reviewer",
+      "confidence": "high",
+      "active": false,
+      "legal_verified": false,
+      "accountant_review_required": true
+    },
+    {
+      "id": "tax:unmapped:multiple",
+      "type": "tax_rule_candidate",
+      "label": "multiple",
+      "status": "under_review",
+      "rate": null,
+      "base": "needs_reviewer",
+      "active": false,
+      "legal_verified": false,
+      "needs_reviewer": true,
+      "source_status": "no_candidate_yet"
+    },
+    {
+      "id": "q:030",
+      "type": "missing_data_question",
+      "label": "Which invoice lines belong to which component?",
+      "status": "under_review",
+      "needs_reviewer": true
+    },
+    {
+      "id": "q:031",
+      "type": "missing_data_question",
+      "label": "Is there one agreement or several?",
+      "status": "under_review",
+      "needs_reviewer": true
+    },
+    {
+      "id": "q:032",
+      "type": "missing_data_question",
+      "label": "Who is the counterparty for each component?",
+      "status": "under_review",
+      "needs_reviewer": true
+    },
+    {
+      "id": "txn:mixed:rent_plus_service_charge",
+      "type": "transaction_type",
+      "label": "Rent + service charge",
+      "status": "under_review",
+      "mixed": true,
+      "active": false,
+      "legal_verified": false,
+      "accountant_review_required": true,
+      "engine_behaviour": "This invoice may contain mixed tax treatments. Accountant review required."
+    },
+    {
+      "id": "txn:mixed:rent_plus_building_management",
+      "type": "transaction_type",
+      "label": "Rent + building management",
+      "status": "under_review",
+      "mixed": true,
+      "active": false,
+      "legal_verified": false,
+      "accountant_review_required": true,
+      "engine_behaviour": "This invoice may contain mixed tax treatments. Accountant review required."
+    },
+    {
+      "id": "txn:mixed:goods_plus_service",
+      "type": "transaction_type",
+      "label": "Goods + service",
+      "status": "under_review",
+      "mixed": true,
+      "active": false,
+      "legal_verified": false,
+      "accountant_review_required": true,
+      "engine_behaviour": "This invoice may contain mixed tax treatments. Accountant review required."
+    },
+    {
+      "id": "txn:mixed:software_plus_implementation",
+      "type": "transaction_type",
+      "label": "Software + implementation service",
+      "status": "under_review",
+      "mixed": true,
+      "active": false,
+      "legal_verified": false,
+      "accountant_review_required": true,
+      "engine_behaviour": "This invoice may contain mixed tax treatments. Accountant review required."
+    },
+    {
+      "id": "txn:mixed:equipment_plus_installation",
+      "type": "transaction_type",
+      "label": "Equipment + installation service",
+      "status": "under_review",
+      "mixed": true,
+      "active": false,
+      "legal_verified": false,
+      "accountant_review_required": true,
+      "engine_behaviour": "This invoice may contain mixed tax treatments. Accountant review required."
+    },
+    {
+      "id": "cpf:legal_entity_type",
+      "type": "company_profile_field",
+      "label": "legal entity type",
+      "status": "under_review",
+      "needs_reviewer": true,
+      "product_note": "drives suggestions and checklists; not yet wired to any backend field"
+    },
+    {
+      "id": "cpf:pt_pma_status",
+      "type": "company_profile_field",
+      "label": "pt pma status",
+      "status": "under_review",
+      "needs_reviewer": true,
+      "product_note": "drives suggestions and checklists; not yet wired to any backend field"
+    },
+    {
+      "id": "cpf:country",
+      "type": "company_profile_field",
+      "label": "country",
+      "status": "under_review",
+      "needs_reviewer": true,
+      "product_note": "drives suggestions and checklists; not yet wired to any backend field"
+    },
+    {
+      "id": "cpf:tax_id_npwp",
+      "type": "company_profile_field",
+      "label": "tax id npwp",
+      "status": "under_review",
+      "needs_reviewer": true,
+      "product_note": "drives suggestions and checklists; not yet wired to any backend field"
+    },
+    {
+      "id": "cpf:pkp_status",
+      "type": "company_profile_field",
+      "label": "pkp status",
+      "status": "under_review",
+      "needs_reviewer": true,
+      "product_note": "drives suggestions and checklists; not yet wired to any backend field"
+    },
+    {
+      "id": "cpf:kbli_code",
+      "type": "company_profile_field",
+      "label": "kbli code",
+      "status": "under_review",
+      "needs_reviewer": true,
+      "product_note": "drives suggestions and checklists; not yet wired to any backend field"
+    },
+    {
+      "id": "cpf:business_activity_description",
+      "type": "company_profile_field",
+      "label": "business activity description",
+      "status": "under_review",
+      "needs_reviewer": true,
+      "product_note": "drives suggestions and checklists; not yet wired to any backend field"
+    },
+    {
+      "id": "cpf:employees_yes_no",
+      "type": "company_profile_field",
+      "label": "employees yes no",
+      "status": "under_review",
+      "needs_reviewer": true,
+      "product_note": "drives suggestions and checklists; not yet wired to any backend field"
+    },
+    {
+      "id": "cpf:rent_payments_yes_no",
+      "type": "company_profile_field",
+      "label": "rent payments yes no",
+      "status": "under_review",
+      "needs_reviewer": true,
+      "product_note": "drives suggestions and checklists; not yet wired to any backend field"
+    },
+    {
+      "id": "cpf:service_vendors_yes_no",
+      "type": "company_profile_field",
+      "label": "service vendors yes no",
+      "status": "under_review",
+      "needs_reviewer": true,
+      "product_note": "drives suggestions and checklists; not yet wired to any backend field"
+    },
+    {
+      "id": "cpf:foreign_ownership_yes_no",
+      "type": "company_profile_field",
+      "label": "foreign ownership yes no",
+      "status": "under_review",
+      "needs_reviewer": true,
+      "product_note": "drives suggestions and checklists; not yet wired to any backend field"
+    },
+    {
+      "id": "cpf:intercompany_transactions_yes_no",
+      "type": "company_profile_field",
+      "label": "intercompany transactions yes no",
+      "status": "under_review",
+      "needs_reviewer": true,
+      "product_note": "drives suggestions and checklists; not yet wired to any backend field"
+    },
+    {
+      "id": "cpf:imports_yes_no",
+      "type": "company_profile_field",
+      "label": "imports yes no",
+      "status": "under_review",
+      "needs_reviewer": true,
+      "product_note": "drives suggestions and checklists; not yet wired to any backend field"
+    },
+    {
+      "id": "cpf:payroll_yes_no",
+      "type": "company_profile_field",
+      "label": "payroll yes no",
+      "status": "under_review",
+      "needs_reviewer": true,
+      "product_note": "drives suggestions and checklists; not yet wired to any backend field"
+    }
+  ],
+  "edges": [
+    {
+      "id": "e0001",
+      "from": "src:DJP_PPH23_PMK141_003",
+      "type": "currentness_supported_by",
+      "to": "src:BPK_PPH23_PMK141_002",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "DJP_PPH23_PMK141_003",
+        "BPK_PPH23_PMK141_002"
+      ],
+      "note": "status page reports 'berlaku' as of 2026-09-02"
+    },
+    {
+      "id": "e0002",
+      "from": "src:DJP_PPH23_PMK141_003",
+      "type": "currentness_supported_by",
+      "to": "src:KEMENKEU_PPH23_PMK141_004",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "DJP_PPH23_PMK141_003",
+        "KEMENKEU_PPH23_PMK141_004"
+      ],
+      "note": "status page reports 'berlaku' as of 2026-09-02"
+    },
+    {
+      "id": "e0003",
+      "from": "src:DJP_PPH23_002",
+      "type": "currentness_supported_by",
+      "to": "src:BPK_PPH23_PMK141_002",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "DJP_PPH23_002",
+        "BPK_PPH23_PMK141_002"
+      ],
+      "note": "status page reports 'berlaku' as of 2026-09-02"
+    },
+    {
+      "id": "e0004",
+      "from": "src:DJP_PPH23_002",
+      "type": "currentness_supported_by",
+      "to": "src:KEMENKEU_PPH23_PMK141_004",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "DJP_PPH23_002",
+        "KEMENKEU_PPH23_PMK141_004"
+      ],
+      "note": "status page reports 'berlaku' as of 2026-09-02"
+    },
+    {
+      "id": "e0005",
+      "from": "src:DJP_PPH42_PP34_004",
+      "type": "currentness_supported_by",
+      "to": "src:BPK_PPH42_PP34_002",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "DJP_PPH42_PP34_004",
+        "BPK_PPH42_PP34_002"
+      ],
+      "note": "status page reports 'berlaku' as of 2026-09-02"
+    },
+    {
+      "id": "e0006",
+      "from": "src:DJP_PPH42_PP34_004",
+      "type": "currentness_supported_by",
+      "to": "src:KEMENKEU_PPH42_PP34_003",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "DJP_PPH42_PP34_004",
+        "KEMENKEU_PPH42_PP34_003"
+      ],
+      "note": "status page reports 'berlaku' as of 2026-09-02"
+    },
+    {
+      "id": "e0007",
+      "from": "src:DJP_PPN_007",
+      "type": "amends",
+      "to": "src:DJP_PPN_001",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "DJP_PPN_007",
+        "DJP_PPN_001"
+      ],
+      "note": "PMK 53/2025 amends PMK 11/2025; Pasal II states it takes effect 1 August 2025"
+    },
+    {
+      "id": "e0008",
+      "from": "tax:TAX_ID_PPH23_LEGAL_001",
+      "type": "derives_from",
+      "to": "src:DJP_PPH23_PMK141_003",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "DJP_PPH23_PMK141_003"
+      ]
+    },
+    {
+      "id": "e0009",
+      "from": "tax:TAX_ID_PPH23_LEGAL_001",
+      "type": "derives_from",
+      "to": "src:KEMENKEU_PPH23_PMK141_001",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "KEMENKEU_PPH23_PMK141_001"
+      ]
+    },
+    {
+      "id": "e0010",
+      "from": "tax:TAX_ID_PPH23_LEGAL_001",
+      "type": "derives_from",
+      "to": "src:BPK_PPH23_PMK141_002",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "BPK_PPH23_PMK141_002"
+      ]
+    },
+    {
+      "id": "e0011",
+      "from": "tax:TAX_ID_PPH23_LEGAL_001",
+      "type": "derives_from",
+      "to": "src:DJP_PPH23_002",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "DJP_PPH23_002"
+      ]
+    },
+    {
+      "id": "e0012",
+      "from": "tax:TAX_ID_PPH23_LEGAL_001",
+      "type": "derives_from",
+      "to": "src:DJP_PPH23_005",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "DJP_PPH23_005"
+      ]
+    },
+    {
+      "id": "e0013",
+      "from": "tax:TAX_ID_PPH23_LEGAL_001",
+      "type": "derives_from",
+      "to": "src:DJP_PPH23_PENGACARA_004",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "DJP_PPH23_PENGACARA_004"
+      ]
+    },
+    {
+      "id": "e0014",
+      "from": "tax:TAX_ID_PPH23_PROFESSIONAL_002",
+      "type": "derives_from",
+      "to": "src:DJP_PPH23_002",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "DJP_PPH23_002"
+      ]
+    },
+    {
+      "id": "e0015",
+      "from": "tax:TAX_ID_PPH23_PROFESSIONAL_002",
+      "type": "derives_from",
+      "to": "src:DJP_PPH23_003",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "DJP_PPH23_003"
+      ]
+    },
+    {
+      "id": "e0016",
+      "from": "tax:TAX_ID_PPH23_PROFESSIONAL_002",
+      "type": "derives_from",
+      "to": "src:DJP_PPH23_006",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "DJP_PPH23_006"
+      ]
+    },
+    {
+      "id": "e0017",
+      "from": "tax:TAX_ID_PPH42_RENTAL_001",
+      "type": "derives_from",
+      "to": "src:DJP_PPH42_PP34_004",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "DJP_PPH42_PP34_004"
+      ]
+    },
+    {
+      "id": "e0018",
+      "from": "tax:TAX_ID_PPH42_RENTAL_001",
+      "type": "derives_from",
+      "to": "src:BPK_PPH42_PP34_001",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "BPK_PPH42_PP34_001"
+      ]
+    },
+    {
+      "id": "e0019",
+      "from": "tax:TAX_ID_PPH42_RENTAL_001",
+      "type": "derives_from",
+      "to": "src:KEMENKEU_PPH42_PP34_003",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "KEMENKEU_PPH42_PP34_003"
+      ]
+    },
+    {
+      "id": "e0020",
+      "from": "tax:TAX_ID_PPH42_RENTAL_001",
+      "type": "derives_from",
+      "to": "src:BPK_PPH42_PP34_002",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "BPK_PPH42_PP34_002"
+      ]
+    },
+    {
+      "id": "e0021",
+      "from": "tax:TAX_ID_PPH42_RENTAL_001",
+      "type": "derives_from",
+      "to": "src:DJP_PPH42_002",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "DJP_PPH42_002"
+      ]
+    },
+    {
+      "id": "e0022",
+      "from": "tax:TAX_ID_PPH42_RENTAL_001",
+      "type": "derives_from",
+      "to": "src:DJP_PPH42_006",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "DJP_PPH42_006"
+      ]
+    },
+    {
+      "id": "e0023",
+      "from": "tax:TAX_ID_PPN_OUTPUT_001",
+      "type": "derives_from",
+      "to": "src:KEMENKEU_PPN_002",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "KEMENKEU_PPN_002"
+      ]
+    },
+    {
+      "id": "e0024",
+      "from": "tax:TAX_ID_PPN_OUTPUT_001",
+      "type": "derives_from",
+      "to": "src:DJP_PPN_001",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "DJP_PPN_001"
+      ]
+    },
+    {
+      "id": "e0025",
+      "from": "tax:TAX_ID_PPN_OUTPUT_001",
+      "type": "derives_from",
+      "to": "src:DJP_PPN_007",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "DJP_PPN_007"
+      ]
+    },
+    {
+      "id": "e0026",
+      "from": "tax:TAX_ID_PPN_OUTPUT_001",
+      "type": "derives_from",
+      "to": "src:DJP_PPN_004",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "DJP_PPN_004"
+      ]
+    },
+    {
+      "id": "e0027",
+      "from": "tax:TAX_ID_PPN_OUTPUT_001",
+      "type": "derives_from",
+      "to": "src:BPK_PPN_003",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "BPK_PPN_003"
+      ]
+    },
+    {
+      "id": "e0028",
+      "from": "tax:TAX_ID_PPN_INPUT_002",
+      "type": "derives_from",
+      "to": "src:DJP_PPN_001",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "DJP_PPN_001"
+      ]
+    },
+    {
+      "id": "e0029",
+      "from": "tax:TAX_ID_PPN_INPUT_002",
+      "type": "derives_from",
+      "to": "src:DJP_CORETAX_004",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "DJP_CORETAX_004"
+      ]
+    },
+    {
+      "id": "e0030",
+      "from": "tax:TAX_ID_PPH21_PAYROLL_001",
+      "type": "derives_from",
+      "to": "src:KEMENKEU_PPH21_001",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "KEMENKEU_PPH21_001"
+      ]
+    },
+    {
+      "id": "e0031",
+      "from": "tax:TAX_ID_PPH21_PAYROLL_001",
+      "type": "derives_from",
+      "to": "src:DJP_PPH21_002",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "DJP_PPH21_002"
+      ]
+    },
+    {
+      "id": "e0032",
+      "from": "tax:TAX_ID_PPH21_PAYROLL_001",
+      "type": "derives_from",
+      "to": "src:BPK_PPH21_003",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "BPK_PPH21_003"
+      ]
+    },
+    {
+      "id": "e0033",
+      "from": "tax:TAX_ID_PPH21_PAYROLL_001",
+      "type": "derives_from",
+      "to": "src:DJP_PPH21_004",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "DJP_PPH21_004"
+      ]
+    },
+    {
+      "id": "e0034",
+      "from": "tax:TAX_ID_PPHBADAN_UMKM_001",
+      "type": "derives_from",
+      "to": "src:DJP_PPHBADAN_001",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "DJP_PPHBADAN_001"
+      ]
+    },
+    {
+      "id": "e0035",
+      "from": "tax:TAX_ID_PPHBADAN_UMKM_001",
+      "type": "derives_from",
+      "to": "src:DJP_PPHBADAN_002",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "DJP_PPHBADAN_002"
+      ]
+    },
+    {
+      "id": "e0036",
+      "from": "tax:TAX_ID_PPHBADAN_UMKM_001",
+      "type": "derives_from",
+      "to": "src:DJP_PPHBADAN_003",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "DJP_PPHBADAN_003"
+      ]
+    },
+    {
+      "id": "e0037",
+      "from": "comp:COMP_ID_NIB_001",
+      "type": "derives_from",
+      "to": "src:OSS_001",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "OSS_001"
+      ]
+    },
+    {
+      "id": "e0038",
+      "from": "comp:COMP_ID_NIB_001",
+      "type": "derives_from",
+      "to": "src:BKPM_NIB_001",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "BKPM_NIB_001"
+      ]
+    },
+    {
+      "id": "e0039",
+      "from": "comp:COMP_ID_NIB_001",
+      "type": "derives_from",
+      "to": "src:BKPM_OSS_001",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "BKPM_OSS_001"
+      ]
+    },
+    {
+      "id": "e0040",
+      "from": "comp:COMP_ID_KBLI_001",
+      "type": "derives_from",
+      "to": "src:OSS_KBLI_001",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "OSS_KBLI_001"
+      ]
+    },
+    {
+      "id": "e0041",
+      "from": "comp:COMP_ID_KBLI_001",
+      "type": "derives_from",
+      "to": "src:OSS_KBLI_002",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "OSS_KBLI_002"
+      ]
+    },
+    {
+      "id": "e0042",
+      "from": "comp:COMP_ID_LICENCE_RISK_001",
+      "type": "derives_from",
+      "to": "src:BKPM_OSS_001",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "BKPM_OSS_001"
+      ]
+    },
+    {
+      "id": "e0043",
+      "from": "comp:COMP_ID_LICENCE_RISK_001",
+      "type": "derives_from",
+      "to": "src:OSS_003",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "OSS_003"
+      ]
+    },
+    {
+      "id": "e0044",
+      "from": "comp:COMP_ID_LICENCE_RISK_001",
+      "type": "derives_from",
+      "to": "src:OSS_LIC_001",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "OSS_LIC_001"
+      ]
+    },
+    {
+      "id": "e0045",
+      "from": "comp:COMP_ID_LKPM_001",
+      "type": "derives_from",
+      "to": "src:OSS_LKPM_001",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "OSS_LKPM_001"
+      ]
+    },
+    {
+      "id": "e0046",
+      "from": "comp:COMP_ID_LKPM_001",
+      "type": "derives_from",
+      "to": "src:OSS_LKPM_003",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "OSS_LKPM_003"
+      ]
+    },
+    {
+      "id": "e0047",
+      "from": "comp:COMP_ID_LKPM_001",
+      "type": "derives_from",
+      "to": "src:BKPM_LKPM_001",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "BKPM_LKPM_001"
+      ]
+    },
+    {
+      "id": "e0048",
+      "from": "comp:COMP_ID_BPJS_001",
+      "type": "derives_from",
+      "to": "src:BPJSTK_001",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "BPJSTK_001"
+      ]
+    },
+    {
+      "id": "e0049",
+      "from": "comp:COMP_ID_BPJS_001",
+      "type": "derives_from",
+      "to": "src:BPJSTK_002",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "BPJSTK_002"
+      ]
+    },
+    {
+      "id": "e0050",
+      "from": "comp:COMP_ID_BPJS_001",
+      "type": "derives_from",
+      "to": "src:BPJSTK_003",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "BPJSTK_003"
+      ]
+    },
+    {
+      "id": "e0051",
+      "from": "comp:COMP_ID_BPJS_001",
+      "type": "derives_from",
+      "to": "src:BPJSTK_004",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "BPJSTK_004"
+      ]
+    },
+    {
+      "id": "e0052",
+      "from": "doc:faktur_pajak",
+      "type": "supports",
+      "to": "src:DJP_PPN_001",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "DJP_PPN_001"
+      ]
+    },
+    {
+      "id": "e0053",
+      "from": "doc:faktur_pajak",
+      "type": "supports",
+      "to": "src:KEMENKEU_PPN_002",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "KEMENKEU_PPN_002"
+      ]
+    },
+    {
+      "id": "e0054",
+      "from": "doc:bukti_potong",
+      "type": "supports",
+      "to": "src:DJP_BUPOT_002",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "DJP_BUPOT_002"
+      ]
+    },
+    {
+      "id": "e0055",
+      "from": "doc:bukti_potong",
+      "type": "supports",
+      "to": "src:DJP_PPH23_002",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "DJP_PPH23_002"
+      ]
+    },
+    {
+      "id": "e0056",
+      "from": "doc:bukti_potong",
+      "type": "supports",
+      "to": "src:DJP_PPH42_002",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "DJP_PPH42_002"
+      ]
+    },
+    {
+      "id": "e0057",
+      "from": "doc:rental_agreement",
+      "type": "supports",
+      "to": "src:DJP_PPH42_002",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "DJP_PPH42_002"
+      ]
+    },
+    {
+      "id": "e0058",
+      "from": "doc:rental_agreement",
+      "type": "supports",
+      "to": "src:DJP_PPH42_006",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "DJP_PPH42_006"
+      ]
+    },
+    {
+      "id": "e0059",
+      "from": "doc:payroll_docs",
+      "type": "supports",
+      "to": "src:BPJSTK_004",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "BPJSTK_004"
+      ]
+    },
+    {
+      "id": "e0060",
+      "from": "doc:payroll_docs",
+      "type": "supports",
+      "to": "src:BPJSTK_005",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "BPJSTK_005"
+      ]
+    },
+    {
+      "id": "e0061",
+      "from": "doc:payroll_docs",
+      "type": "supports",
+      "to": "src:KEMENKEU_PPH21_001",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "KEMENKEU_PPH21_001"
+      ]
+    },
+    {
+      "id": "e0062",
+      "from": "comp:COMP_ID_NIB_001",
+      "type": "requires_document",
+      "to": "doc:nib",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "OSS_001",
+        "BKPM_NIB_001",
+        "BKPM_OSS_001"
+      ]
+    },
+    {
+      "id": "e0063",
+      "from": "comp:COMP_ID_KBLI_001",
+      "type": "requires_document",
+      "to": "doc:nib",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "OSS_KBLI_001",
+        "OSS_KBLI_002"
+      ]
+    },
+    {
+      "id": "e0064",
+      "from": "comp:COMP_ID_KBLI_001",
+      "type": "requires_document",
+      "to": "doc:oss_profile",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "OSS_KBLI_001",
+        "OSS_KBLI_002"
+      ]
+    },
+    {
+      "id": "e0065",
+      "from": "comp:COMP_ID_LICENCE_RISK_001",
+      "type": "requires_document",
+      "to": "doc:oss_profile",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "BKPM_OSS_001",
+        "OSS_003",
+        "OSS_LIC_001"
+      ]
+    },
+    {
+      "id": "e0066",
+      "from": "comp:COMP_ID_LKPM_001",
+      "type": "requires_document",
+      "to": "doc:lkpm_evidence",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "OSS_LKPM_001",
+        "OSS_LKPM_003",
+        "BKPM_LKPM_001"
+      ]
+    },
+    {
+      "id": "e0067",
+      "from": "comp:COMP_ID_BPJS_001",
+      "type": "requires_document",
+      "to": "doc:bpjs_evidence",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "BPJSTK_001",
+        "BPJSTK_002",
+        "BPJSTK_003",
+        "BPJSTK_004"
+      ]
+    },
+    {
+      "id": "e0068",
+      "from": "comp:COMP_ID_BPJS_001",
+      "type": "requires_document",
+      "to": "doc:nib",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "BPJSTK_001",
+        "BPJSTK_002",
+        "BPJSTK_003",
+        "BPJSTK_004"
+      ]
+    },
+    {
+      "id": "e0069",
+      "from": "comp:COMP_ID_BPJS_001",
+      "type": "requires_document",
+      "to": "doc:vendor_npwp",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "BPJSTK_001",
+        "BPJSTK_002",
+        "BPJSTK_003",
+        "BPJSTK_004"
+      ]
+    },
+    {
+      "id": "e0070",
+      "from": "ev:supplier_invoice",
+      "type": "related_to",
+      "to": "doc:invoice",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0071",
+      "from": "ev:faktur_pajak",
+      "type": "supports",
+      "to": "src:KEMENKEU_PPN_002",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "KEMENKEU_PPN_002"
+      ]
+    },
+    {
+      "id": "e0072",
+      "from": "ev:faktur_pajak",
+      "type": "supports",
+      "to": "src:DJP_PPN_001",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "DJP_PPN_001"
+      ]
+    },
+    {
+      "id": "e0073",
+      "from": "ev:faktur_pajak",
+      "type": "related_to",
+      "to": "doc:faktur_pajak",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0074",
+      "from": "ev:bukti_potong",
+      "type": "supports",
+      "to": "src:DJP_PPH23_002",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "DJP_PPH23_002"
+      ]
+    },
+    {
+      "id": "e0075",
+      "from": "ev:bukti_potong",
+      "type": "supports",
+      "to": "src:DJP_PPH42_002",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "DJP_PPH42_002"
+      ]
+    },
+    {
+      "id": "e0076",
+      "from": "ev:bukti_potong",
+      "type": "supports",
+      "to": "src:DJP_BUPOT_002",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "DJP_BUPOT_002"
+      ]
+    },
+    {
+      "id": "e0077",
+      "from": "ev:bukti_potong",
+      "type": "related_to",
+      "to": "doc:bukti_potong",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0078",
+      "from": "ev:payment_proof",
+      "type": "related_to",
+      "to": "doc:payment_proof",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0079",
+      "from": "ev:bank_statement",
+      "type": "related_to",
+      "to": "doc:bank_statement",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0080",
+      "from": "ev:payroll_documents",
+      "type": "supports",
+      "to": "src:KEMENKEU_PPH21_001",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "KEMENKEU_PPH21_001"
+      ]
+    },
+    {
+      "id": "e0081",
+      "from": "ev:payroll_documents",
+      "type": "supports",
+      "to": "src:BPJSTK_004",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "BPJSTK_004"
+      ]
+    },
+    {
+      "id": "e0082",
+      "from": "ev:payroll_documents",
+      "type": "supports",
+      "to": "src:BPJSTK_005",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "BPJSTK_005"
+      ]
+    },
+    {
+      "id": "e0083",
+      "from": "ev:payroll_documents",
+      "type": "related_to",
+      "to": "doc:payroll_docs",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0084",
+      "from": "ev:rental_agreement",
+      "type": "supports",
+      "to": "src:DJP_PPH42_002",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "DJP_PPH42_002"
+      ]
+    },
+    {
+      "id": "e0085",
+      "from": "ev:rental_agreement",
+      "type": "supports",
+      "to": "src:DJP_PPH42_006",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "DJP_PPH42_006"
+      ]
+    },
+    {
+      "id": "e0086",
+      "from": "ev:rental_agreement",
+      "type": "related_to",
+      "to": "doc:rental_agreement",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0087",
+      "from": "ev:receipt_kwitansi",
+      "type": "related_to",
+      "to": "doc:receipt_kwitansi",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0088",
+      "from": "txn:rent",
+      "type": "may_apply_to",
+      "to": "tax:TAX_ID_PPH42_RENTAL_001",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "DJP_PPH42_PP34_004",
+        "BPK_PPH42_PP34_001",
+        "DJP_PPH42_002"
+      ],
+      "note": "rate 0.1, base jumlah_bruto_nilai_persewaan_including_service_and_facility_charges"
+    },
+    {
+      "id": "e0089",
+      "from": "txn:rent",
+      "type": "requires_document",
+      "to": "doc:rental_agreement",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "DJP_PPH42_PP34_004",
+        "BPK_PPH42_PP34_001",
+        "DJP_PPH42_002"
+      ]
+    },
+    {
+      "id": "e0090",
+      "from": "txn:rent",
+      "type": "requires_document",
+      "to": "doc:invoice",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0091",
+      "from": "txn:rent",
+      "type": "requires_document",
+      "to": "doc:faktur_pajak",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "DJP_PPH42_PP34_004",
+        "BPK_PPH42_PP34_001",
+        "DJP_PPH42_002"
+      ]
+    },
+    {
+      "id": "e0092",
+      "from": "txn:rent",
+      "type": "requires_document",
+      "to": "doc:bukti_potong",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "DJP_PPH42_PP34_004",
+        "BPK_PPH42_PP34_001",
+        "DJP_PPH42_002"
+      ]
+    },
+    {
+      "id": "e0093",
+      "from": "txn:rent",
+      "type": "requires_document",
+      "to": "doc:payment_proof",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0094",
+      "from": "txn:rent",
+      "type": "requires_document",
+      "to": "doc:vendor_npwp",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0095",
+      "from": "txn:rent",
+      "type": "raises_missing_question",
+      "to": "q:001",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0096",
+      "from": "txn:rent",
+      "type": "raises_missing_question",
+      "to": "q:002",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0097",
+      "from": "txn:rent",
+      "type": "raises_missing_question",
+      "to": "q:003",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0098",
+      "from": "txn:rent",
+      "type": "requires_accountant_review",
+      "to": "flag:accountant_review",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [],
+      "note": "v1 policy: every suggestion is reviewed before any record is created"
+    },
+    {
+      "id": "e0099",
+      "from": "txn:rent",
+      "type": "feeds_filing_package",
+      "to": "filing:spt_masa_pph_unifikasi",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [],
+      "note": "future filing design, not implemented"
+    },
+    {
+      "id": "e0100",
+      "from": "txn:rent",
+      "type": "feeds_filing_package",
+      "to": "filing:bukti_potong_series",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [],
+      "note": "future filing design, not implemented"
+    },
+    {
+      "id": "e0101",
+      "from": "txn:rent",
+      "type": "feeds_filing_package",
+      "to": "filing:ssp_billing_code",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [],
+      "note": "future filing design, not implemented"
+    },
+    {
+      "id": "e0102",
+      "from": "txn:rent",
+      "type": "has_risk",
+      "to": "risk:currentness_unproven",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0103",
+      "from": "txn:service_fee",
+      "type": "may_apply_to",
+      "to": "tax:TAX_ID_PPH23_LEGAL_001",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "DJP_PPH23_PMK141_003",
+        "KEMENKEU_PPH23_PMK141_001",
+        "DJP_PPH23_002"
+      ],
+      "note": "rate 0.02, base jumlah_bruto_excluding_ppn"
+    },
+    {
+      "id": "e0104",
+      "from": "txn:service_fee",
+      "type": "requires_document",
+      "to": "doc:invoice",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0105",
+      "from": "txn:service_fee",
+      "type": "requires_document",
+      "to": "doc:service_agreement",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0106",
+      "from": "txn:service_fee",
+      "type": "requires_document",
+      "to": "doc:faktur_pajak",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "DJP_PPH23_PMK141_003",
+        "KEMENKEU_PPH23_PMK141_001",
+        "DJP_PPH23_002"
+      ]
+    },
+    {
+      "id": "e0107",
+      "from": "txn:service_fee",
+      "type": "requires_document",
+      "to": "doc:bukti_potong",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "DJP_PPH23_PMK141_003",
+        "KEMENKEU_PPH23_PMK141_001",
+        "DJP_PPH23_002"
+      ]
+    },
+    {
+      "id": "e0108",
+      "from": "txn:service_fee",
+      "type": "requires_document",
+      "to": "doc:payment_proof",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0109",
+      "from": "txn:service_fee",
+      "type": "requires_document",
+      "to": "doc:vendor_npwp",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0110",
+      "from": "txn:service_fee",
+      "type": "requires_document",
+      "to": "doc:vendor_pkp_status_evidence",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0111",
+      "from": "txn:service_fee",
+      "type": "raises_missing_question",
+      "to": "q:004",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0112",
+      "from": "txn:service_fee",
+      "type": "raises_missing_question",
+      "to": "q:005",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0113",
+      "from": "txn:service_fee",
+      "type": "raises_missing_question",
+      "to": "q:006",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0114",
+      "from": "txn:service_fee",
+      "type": "requires_accountant_review",
+      "to": "flag:accountant_review",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [],
+      "note": "v1 policy: every suggestion is reviewed before any record is created"
+    },
+    {
+      "id": "e0115",
+      "from": "txn:service_fee",
+      "type": "feeds_filing_package",
+      "to": "filing:spt_masa_pph_unifikasi",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [],
+      "note": "future filing design, not implemented"
+    },
+    {
+      "id": "e0116",
+      "from": "txn:service_fee",
+      "type": "feeds_filing_package",
+      "to": "filing:bukti_potong_series",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [],
+      "note": "future filing design, not implemented"
+    },
+    {
+      "id": "e0117",
+      "from": "txn:service_fee",
+      "type": "has_risk",
+      "to": "risk:entity_vs_individual",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "DJP_PPH23_005"
+      ]
+    },
+    {
+      "id": "e0118",
+      "from": "txn:service_fee",
+      "type": "has_risk",
+      "to": "risk:currentness_unproven",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0119",
+      "from": "txn:management_service",
+      "type": "may_apply_to",
+      "to": "tax:TAX_ID_PPH23_PROFESSIONAL_002",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "DJP_PPH42_006",
+        "DJP_PPH23_PMK141_003"
+      ],
+      "note": "rate 0.02, base jumlah_bruto_excluding_ppn"
+    },
+    {
+      "id": "e0120",
+      "from": "txn:management_service",
+      "type": "requires_document",
+      "to": "doc:invoice",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0121",
+      "from": "txn:management_service",
+      "type": "requires_document",
+      "to": "doc:service_agreement",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0122",
+      "from": "txn:management_service",
+      "type": "requires_document",
+      "to": "doc:faktur_pajak",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "DJP_PPH42_006",
+        "DJP_PPH23_PMK141_003"
+      ]
+    },
+    {
+      "id": "e0123",
+      "from": "txn:management_service",
+      "type": "requires_document",
+      "to": "doc:bukti_potong",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "DJP_PPH42_006",
+        "DJP_PPH23_PMK141_003"
+      ]
+    },
+    {
+      "id": "e0124",
+      "from": "txn:management_service",
+      "type": "requires_document",
+      "to": "doc:payment_proof",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0125",
+      "from": "txn:management_service",
+      "type": "requires_document",
+      "to": "doc:vendor_npwp",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0126",
+      "from": "txn:management_service",
+      "type": "raises_missing_question",
+      "to": "q:007",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0127",
+      "from": "txn:management_service",
+      "type": "raises_missing_question",
+      "to": "q:008",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0128",
+      "from": "txn:management_service",
+      "type": "requires_accountant_review",
+      "to": "flag:accountant_review",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [],
+      "note": "v1 policy: every suggestion is reviewed before any record is created"
+    },
+    {
+      "id": "e0129",
+      "from": "txn:management_service",
+      "type": "feeds_filing_package",
+      "to": "filing:spt_masa_pph_unifikasi",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [],
+      "note": "future filing design, not implemented"
+    },
+    {
+      "id": "e0130",
+      "from": "txn:management_service",
+      "type": "feeds_filing_package",
+      "to": "filing:bukti_potong_series",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [],
+      "note": "future filing design, not implemented"
+    },
+    {
+      "id": "e0131",
+      "from": "txn:management_service",
+      "type": "has_risk",
+      "to": "risk:mixed_treatment",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "DJP_PPH42_PP34_004",
+        "DJP_PPH42_006"
+      ]
+    },
+    {
+      "id": "e0132",
+      "from": "txn:management_service",
+      "type": "has_risk",
+      "to": "risk:entity_vs_individual",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "DJP_PPH23_005"
+      ]
+    },
+    {
+      "id": "e0133",
+      "from": "txn:management_service",
+      "type": "has_risk",
+      "to": "risk:currentness_unproven",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0134",
+      "from": "txn:building_service_charge",
+      "type": "may_apply_to",
+      "to": "tax:unmapped:pph_4_2_final",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "DJP_PPH42_PP34_004",
+        "DJP_PPH42_006"
+      ],
+      "note": "treatment named but no source-backed candidate exists"
+    },
+    {
+      "id": "e0135",
+      "from": "txn:building_service_charge",
+      "type": "may_apply_to",
+      "to": "tax:unmapped:pph_23",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "DJP_PPH42_PP34_004",
+        "DJP_PPH42_006"
+      ],
+      "note": "treatment named but no source-backed candidate exists"
+    },
+    {
+      "id": "e0136",
+      "from": "txn:building_service_charge",
+      "type": "requires_document",
+      "to": "doc:rental_agreement",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "DJP_PPH42_PP34_004",
+        "DJP_PPH42_006"
+      ]
+    },
+    {
+      "id": "e0137",
+      "from": "txn:building_service_charge",
+      "type": "requires_document",
+      "to": "doc:service_agreement",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0138",
+      "from": "txn:building_service_charge",
+      "type": "requires_document",
+      "to": "doc:invoice",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0139",
+      "from": "txn:building_service_charge",
+      "type": "requires_document",
+      "to": "doc:faktur_pajak",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "DJP_PPH42_PP34_004",
+        "DJP_PPH42_006"
+      ]
+    },
+    {
+      "id": "e0140",
+      "from": "txn:building_service_charge",
+      "type": "requires_document",
+      "to": "doc:bukti_potong",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "DJP_PPH42_PP34_004",
+        "DJP_PPH42_006"
+      ]
+    },
+    {
+      "id": "e0141",
+      "from": "txn:building_service_charge",
+      "type": "requires_document",
+      "to": "doc:payment_proof",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0142",
+      "from": "txn:building_service_charge",
+      "type": "raises_missing_question",
+      "to": "q:009",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0143",
+      "from": "txn:building_service_charge",
+      "type": "raises_missing_question",
+      "to": "q:010",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0144",
+      "from": "txn:building_service_charge",
+      "type": "raises_missing_question",
+      "to": "q:011",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0145",
+      "from": "txn:building_service_charge",
+      "type": "requires_accountant_review",
+      "to": "flag:accountant_review",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [],
+      "note": "v1 policy: every suggestion is reviewed before any record is created"
+    },
+    {
+      "id": "e0146",
+      "from": "txn:building_service_charge",
+      "type": "has_risk",
+      "to": "risk:rate_unsourced",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0147",
+      "from": "txn:building_service_charge",
+      "type": "has_risk",
+      "to": "risk:mixed_treatment",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "DJP_PPH42_PP34_004",
+        "DJP_PPH42_006"
+      ]
+    },
+    {
+      "id": "e0148",
+      "from": "txn:contractor_freelancer",
+      "type": "may_apply_to",
+      "to": "tax:unmapped:pph_23",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "DJP_PPH23_005",
+        "DJP_PPH23_PMK141_003"
+      ],
+      "note": "treatment named but no source-backed candidate exists"
+    },
+    {
+      "id": "e0149",
+      "from": "txn:contractor_freelancer",
+      "type": "may_apply_to",
+      "to": "tax:unmapped:pph_21",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "DJP_PPH23_005",
+        "DJP_PPH23_PMK141_003"
+      ],
+      "note": "treatment named but no source-backed candidate exists"
+    },
+    {
+      "id": "e0150",
+      "from": "txn:contractor_freelancer",
+      "type": "requires_document",
+      "to": "doc:contractor_agreement",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0151",
+      "from": "txn:contractor_freelancer",
+      "type": "requires_document",
+      "to": "doc:invoice",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0152",
+      "from": "txn:contractor_freelancer",
+      "type": "requires_document",
+      "to": "doc:bukti_potong",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "DJP_PPH23_005",
+        "DJP_PPH23_PMK141_003"
+      ]
+    },
+    {
+      "id": "e0153",
+      "from": "txn:contractor_freelancer",
+      "type": "requires_document",
+      "to": "doc:payment_proof",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0154",
+      "from": "txn:contractor_freelancer",
+      "type": "requires_document",
+      "to": "doc:vendor_npwp",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0155",
+      "from": "txn:contractor_freelancer",
+      "type": "requires_document",
+      "to": "doc:vendor_nik",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0156",
+      "from": "txn:contractor_freelancer",
+      "type": "raises_missing_question",
+      "to": "q:012",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0157",
+      "from": "txn:contractor_freelancer",
+      "type": "raises_missing_question",
+      "to": "q:013",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0158",
+      "from": "txn:contractor_freelancer",
+      "type": "requires_accountant_review",
+      "to": "flag:accountant_review",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [],
+      "note": "v1 policy: every suggestion is reviewed before any record is created"
+    },
+    {
+      "id": "e0159",
+      "from": "txn:contractor_freelancer",
+      "type": "has_risk",
+      "to": "risk:rate_unsourced",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0160",
+      "from": "txn:contractor_freelancer",
+      "type": "has_risk",
+      "to": "risk:entity_vs_individual",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "DJP_PPH23_005"
+      ]
+    },
+    {
+      "id": "e0161",
+      "from": "txn:salary_payroll",
+      "type": "may_apply_to",
+      "to": "tax:unmapped:pph_21",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "KEMENKEU_PPH21_001"
+      ],
+      "note": "treatment named but no source-backed candidate exists"
+    },
+    {
+      "id": "e0162",
+      "from": "txn:salary_payroll",
+      "type": "requires_document",
+      "to": "doc:employment_contract",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0163",
+      "from": "txn:salary_payroll",
+      "type": "requires_document",
+      "to": "doc:payroll_docs",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "KEMENKEU_PPH21_001"
+      ]
+    },
+    {
+      "id": "e0164",
+      "from": "txn:salary_payroll",
+      "type": "requires_document",
+      "to": "doc:bukti_potong",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "KEMENKEU_PPH21_001"
+      ]
+    },
+    {
+      "id": "e0165",
+      "from": "txn:salary_payroll",
+      "type": "requires_document",
+      "to": "doc:payment_proof",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0166",
+      "from": "txn:salary_payroll",
+      "type": "requires_document",
+      "to": "doc:bpjs_evidence",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0167",
+      "from": "txn:salary_payroll",
+      "type": "raises_missing_question",
+      "to": "q:014",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0168",
+      "from": "txn:salary_payroll",
+      "type": "raises_missing_question",
+      "to": "q:015",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0169",
+      "from": "txn:salary_payroll",
+      "type": "requires_accountant_review",
+      "to": "flag:accountant_review",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [],
+      "note": "v1 policy: every suggestion is reviewed before any record is created"
+    },
+    {
+      "id": "e0170",
+      "from": "txn:salary_payroll",
+      "type": "feeds_filing_package",
+      "to": "filing:bukti_potong_series",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [],
+      "note": "future filing design, not implemented"
+    },
+    {
+      "id": "e0171",
+      "from": "txn:salary_payroll",
+      "type": "has_risk",
+      "to": "risk:rate_unsourced",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0172",
+      "from": "txn:marketing_advertising",
+      "type": "may_apply_to",
+      "to": "tax:unmapped:pph_23",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "DJP_PPH23_PMK141_003"
+      ],
+      "note": "treatment named but no source-backed candidate exists"
+    },
+    {
+      "id": "e0173",
+      "from": "txn:marketing_advertising",
+      "type": "requires_document",
+      "to": "doc:invoice",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0174",
+      "from": "txn:marketing_advertising",
+      "type": "requires_document",
+      "to": "doc:service_agreement",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0175",
+      "from": "txn:marketing_advertising",
+      "type": "requires_document",
+      "to": "doc:faktur_pajak",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "DJP_PPH23_PMK141_003"
+      ]
+    },
+    {
+      "id": "e0176",
+      "from": "txn:marketing_advertising",
+      "type": "requires_document",
+      "to": "doc:bukti_potong",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "DJP_PPH23_PMK141_003"
+      ]
+    },
+    {
+      "id": "e0177",
+      "from": "txn:marketing_advertising",
+      "type": "requires_document",
+      "to": "doc:payment_proof",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0178",
+      "from": "txn:marketing_advertising",
+      "type": "raises_missing_question",
+      "to": "q:016",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0179",
+      "from": "txn:marketing_advertising",
+      "type": "raises_missing_question",
+      "to": "q:017",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0180",
+      "from": "txn:marketing_advertising",
+      "type": "requires_accountant_review",
+      "to": "flag:accountant_review",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [],
+      "note": "v1 policy: every suggestion is reviewed before any record is created"
+    },
+    {
+      "id": "e0181",
+      "from": "txn:marketing_advertising",
+      "type": "has_risk",
+      "to": "risk:rate_unsourced",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0182",
+      "from": "txn:software_subscription",
+      "type": "may_apply_to",
+      "to": "tax:unmapped:pph_23",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "DJP_PPH23_PMK141_003"
+      ],
+      "note": "treatment named but no source-backed candidate exists"
+    },
+    {
+      "id": "e0183",
+      "from": "txn:software_subscription",
+      "type": "may_apply_to",
+      "to": "tax:unmapped:pph_26",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "DJP_PPH23_PMK141_003"
+      ],
+      "note": "treatment named but no source-backed candidate exists"
+    },
+    {
+      "id": "e0184",
+      "from": "txn:software_subscription",
+      "type": "may_apply_to",
+      "to": "tax:unmapped:ppn",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "DJP_PPH23_PMK141_003"
+      ],
+      "note": "treatment named but no source-backed candidate exists"
+    },
+    {
+      "id": "e0185",
+      "from": "txn:software_subscription",
+      "type": "requires_document",
+      "to": "doc:invoice",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0186",
+      "from": "txn:software_subscription",
+      "type": "requires_document",
+      "to": "doc:service_agreement",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0187",
+      "from": "txn:software_subscription",
+      "type": "requires_document",
+      "to": "doc:faktur_pajak",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "DJP_PPH23_PMK141_003"
+      ]
+    },
+    {
+      "id": "e0188",
+      "from": "txn:software_subscription",
+      "type": "requires_document",
+      "to": "doc:payment_proof",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0189",
+      "from": "txn:software_subscription",
+      "type": "requires_document",
+      "to": "doc:vendor_npwp",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0190",
+      "from": "txn:software_subscription",
+      "type": "raises_missing_question",
+      "to": "q:018",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0191",
+      "from": "txn:software_subscription",
+      "type": "raises_missing_question",
+      "to": "q:019",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0192",
+      "from": "txn:software_subscription",
+      "type": "raises_missing_question",
+      "to": "q:020",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0193",
+      "from": "txn:software_subscription",
+      "type": "requires_accountant_review",
+      "to": "flag:accountant_review",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [],
+      "note": "v1 policy: every suggestion is reviewed before any record is created"
+    },
+    {
+      "id": "e0194",
+      "from": "txn:software_subscription",
+      "type": "has_risk",
+      "to": "risk:rate_unsourced",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0195",
+      "from": "txn:software_subscription",
+      "type": "has_risk",
+      "to": "risk:mixed_treatment",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "DJP_PPH42_PP34_004",
+        "DJP_PPH42_006"
+      ]
+    },
+    {
+      "id": "e0196",
+      "from": "txn:equipment_capex",
+      "type": "may_apply_to",
+      "to": "tax:unmapped:ppn",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [],
+      "note": "treatment named but no source-backed candidate exists"
+    },
+    {
+      "id": "e0197",
+      "from": "txn:equipment_capex",
+      "type": "requires_document",
+      "to": "doc:asset_purchase_invoice",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0198",
+      "from": "txn:equipment_capex",
+      "type": "requires_document",
+      "to": "doc:delivery_note_goods_receipt",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0199",
+      "from": "txn:equipment_capex",
+      "type": "requires_document",
+      "to": "doc:faktur_pajak",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0200",
+      "from": "txn:equipment_capex",
+      "type": "requires_document",
+      "to": "doc:payment_proof",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0201",
+      "from": "txn:equipment_capex",
+      "type": "raises_missing_question",
+      "to": "q:021",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0202",
+      "from": "txn:equipment_capex",
+      "type": "raises_missing_question",
+      "to": "q:022",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0203",
+      "from": "txn:equipment_capex",
+      "type": "requires_accountant_review",
+      "to": "flag:accountant_review",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [],
+      "note": "v1 policy: every suggestion is reviewed before any record is created"
+    },
+    {
+      "id": "e0204",
+      "from": "txn:equipment_capex",
+      "type": "feeds_filing_package",
+      "to": "filing:spt_masa_ppn",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [],
+      "note": "future filing design, not implemented"
+    },
+    {
+      "id": "e0205",
+      "from": "txn:equipment_capex",
+      "type": "feeds_filing_package",
+      "to": "filing:faktur_pajak_series",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [],
+      "note": "future filing design, not implemented"
+    },
+    {
+      "id": "e0206",
+      "from": "txn:equipment_capex",
+      "type": "has_risk",
+      "to": "risk:rate_unsourced",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0207",
+      "from": "txn:equipment_capex",
+      "type": "cannot_prove",
+      "to": "risk:rate_unsourced",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [],
+      "note": "no official source collected for this transaction type at all"
+    },
+    {
+      "id": "e0208",
+      "from": "txn:import_related_invoice",
+      "type": "may_apply_to",
+      "to": "tax:unmapped:pph_22",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [],
+      "note": "treatment named but no source-backed candidate exists"
+    },
+    {
+      "id": "e0209",
+      "from": "txn:import_related_invoice",
+      "type": "may_apply_to",
+      "to": "tax:unmapped:ppn_impor",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [],
+      "note": "treatment named but no source-backed candidate exists"
+    },
+    {
+      "id": "e0210",
+      "from": "txn:import_related_invoice",
+      "type": "may_apply_to",
+      "to": "tax:unmapped:bea_masuk",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [],
+      "note": "treatment named but no source-backed candidate exists"
+    },
+    {
+      "id": "e0211",
+      "from": "txn:import_related_invoice",
+      "type": "requires_document",
+      "to": "doc:invoice",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0212",
+      "from": "txn:import_related_invoice",
+      "type": "requires_document",
+      "to": "doc:import_documents",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0213",
+      "from": "txn:import_related_invoice",
+      "type": "requires_document",
+      "to": "doc:payment_proof",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0214",
+      "from": "txn:import_related_invoice",
+      "type": "raises_missing_question",
+      "to": "q:023",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0215",
+      "from": "txn:import_related_invoice",
+      "type": "raises_missing_question",
+      "to": "q:024",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0216",
+      "from": "txn:import_related_invoice",
+      "type": "requires_accountant_review",
+      "to": "flag:accountant_review",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [],
+      "note": "v1 policy: every suggestion is reviewed before any record is created"
+    },
+    {
+      "id": "e0217",
+      "from": "txn:import_related_invoice",
+      "type": "has_risk",
+      "to": "risk:rate_unsourced",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0218",
+      "from": "txn:import_related_invoice",
+      "type": "cannot_prove",
+      "to": "risk:rate_unsourced",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [],
+      "note": "no official source collected for this transaction type at all"
+    },
+    {
+      "id": "e0219",
+      "from": "txn:loan_interest",
+      "type": "may_apply_to",
+      "to": "tax:unmapped:pph_23",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [],
+      "note": "treatment named but no source-backed candidate exists"
+    },
+    {
+      "id": "e0220",
+      "from": "txn:loan_interest",
+      "type": "may_apply_to",
+      "to": "tax:unmapped:pph_26",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [],
+      "note": "treatment named but no source-backed candidate exists"
+    },
+    {
+      "id": "e0221",
+      "from": "txn:loan_interest",
+      "type": "requires_document",
+      "to": "doc:loan_agreement",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0222",
+      "from": "txn:loan_interest",
+      "type": "requires_document",
+      "to": "doc:shareholder_loan_agreement",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0223",
+      "from": "txn:loan_interest",
+      "type": "requires_document",
+      "to": "doc:payment_proof",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0224",
+      "from": "txn:loan_interest",
+      "type": "requires_document",
+      "to": "doc:bukti_potong",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0225",
+      "from": "txn:loan_interest",
+      "type": "raises_missing_question",
+      "to": "q:025",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0226",
+      "from": "txn:loan_interest",
+      "type": "raises_missing_question",
+      "to": "q:026",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0227",
+      "from": "txn:loan_interest",
+      "type": "requires_accountant_review",
+      "to": "flag:accountant_review",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [],
+      "note": "v1 policy: every suggestion is reviewed before any record is created"
+    },
+    {
+      "id": "e0228",
+      "from": "txn:loan_interest",
+      "type": "has_risk",
+      "to": "risk:rate_unsourced",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0229",
+      "from": "txn:loan_interest",
+      "type": "cannot_prove",
+      "to": "risk:rate_unsourced",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [],
+      "note": "no official source collected for this transaction type at all"
+    },
+    {
+      "id": "e0230",
+      "from": "txn:intercompany_payment",
+      "type": "may_apply_to",
+      "to": "tax:unmapped:pph_23",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [],
+      "note": "treatment named but no source-backed candidate exists"
+    },
+    {
+      "id": "e0231",
+      "from": "txn:intercompany_payment",
+      "type": "may_apply_to",
+      "to": "tax:unmapped:pph_26",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [],
+      "note": "treatment named but no source-backed candidate exists"
+    },
+    {
+      "id": "e0232",
+      "from": "txn:intercompany_payment",
+      "type": "may_apply_to",
+      "to": "tax:unmapped:transfer_pricing",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [],
+      "note": "treatment named but no source-backed candidate exists"
+    },
+    {
+      "id": "e0233",
+      "from": "txn:intercompany_payment",
+      "type": "requires_document",
+      "to": "doc:intercompany_agreement",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0234",
+      "from": "txn:intercompany_payment",
+      "type": "requires_document",
+      "to": "doc:invoice",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0235",
+      "from": "txn:intercompany_payment",
+      "type": "requires_document",
+      "to": "doc:payment_proof",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0236",
+      "from": "txn:intercompany_payment",
+      "type": "raises_missing_question",
+      "to": "q:027",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0237",
+      "from": "txn:intercompany_payment",
+      "type": "raises_missing_question",
+      "to": "q:028",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0238",
+      "from": "txn:intercompany_payment",
+      "type": "raises_missing_question",
+      "to": "q:029",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0239",
+      "from": "txn:intercompany_payment",
+      "type": "requires_accountant_review",
+      "to": "flag:accountant_review",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [],
+      "note": "v1 policy: every suggestion is reviewed before any record is created"
+    },
+    {
+      "id": "e0240",
+      "from": "txn:intercompany_payment",
+      "type": "has_risk",
+      "to": "risk:rate_unsourced",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0241",
+      "from": "txn:intercompany_payment",
+      "type": "has_risk",
+      "to": "risk:mixed_treatment",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "DJP_PPH42_PP34_004",
+        "DJP_PPH42_006"
+      ]
+    },
+    {
+      "id": "e0242",
+      "from": "txn:intercompany_payment",
+      "type": "cannot_prove",
+      "to": "risk:rate_unsourced",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [],
+      "note": "no official source collected for this transaction type at all"
+    },
+    {
+      "id": "e0243",
+      "from": "txn:mixed_invoice",
+      "type": "may_apply_to",
+      "to": "tax:unmapped:multiple",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "DJP_PPH42_PP34_004",
+        "DJP_PPH42_006",
+        "DJP_PPH23_PMK141_003"
+      ],
+      "note": "treatment named but no source-backed candidate exists"
+    },
+    {
+      "id": "e0244",
+      "from": "txn:mixed_invoice",
+      "type": "requires_document",
+      "to": "doc:invoice",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0245",
+      "from": "txn:mixed_invoice",
+      "type": "requires_document",
+      "to": "doc:rental_agreement",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "DJP_PPH42_PP34_004",
+        "DJP_PPH42_006",
+        "DJP_PPH23_PMK141_003"
+      ]
+    },
+    {
+      "id": "e0246",
+      "from": "txn:mixed_invoice",
+      "type": "requires_document",
+      "to": "doc:service_agreement",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0247",
+      "from": "txn:mixed_invoice",
+      "type": "requires_document",
+      "to": "doc:faktur_pajak",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "DJP_PPH42_PP34_004",
+        "DJP_PPH42_006",
+        "DJP_PPH23_PMK141_003"
+      ]
+    },
+    {
+      "id": "e0248",
+      "from": "txn:mixed_invoice",
+      "type": "requires_document",
+      "to": "doc:bukti_potong",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "DJP_PPH42_PP34_004",
+        "DJP_PPH42_006",
+        "DJP_PPH23_PMK141_003"
+      ]
+    },
+    {
+      "id": "e0249",
+      "from": "txn:mixed_invoice",
+      "type": "requires_document",
+      "to": "doc:payment_proof",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0250",
+      "from": "txn:mixed_invoice",
+      "type": "raises_missing_question",
+      "to": "q:030",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0251",
+      "from": "txn:mixed_invoice",
+      "type": "raises_missing_question",
+      "to": "q:031",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0252",
+      "from": "txn:mixed_invoice",
+      "type": "raises_missing_question",
+      "to": "q:032",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0253",
+      "from": "txn:mixed_invoice",
+      "type": "requires_accountant_review",
+      "to": "flag:accountant_review",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [],
+      "note": "v1 policy: every suggestion is reviewed before any record is created"
+    },
+    {
+      "id": "e0254",
+      "from": "txn:mixed_invoice",
+      "type": "has_risk",
+      "to": "risk:rate_unsourced",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0255",
+      "from": "txn:mixed_invoice",
+      "type": "has_risk",
+      "to": "risk:mixed_treatment",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "DJP_PPH42_PP34_004",
+        "DJP_PPH42_006"
+      ]
+    },
+    {
+      "id": "e0256",
+      "from": "txn:mixed_invoice",
+      "type": "related_to",
+      "to": "txn:mixed:rent_plus_service_charge",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0257",
+      "from": "txn:mixed:rent_plus_service_charge",
+      "type": "related_to",
+      "to": "txn:rent",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [],
+      "note": "component that may carry its own treatment"
+    },
+    {
+      "id": "e0258",
+      "from": "txn:mixed:rent_plus_service_charge",
+      "type": "related_to",
+      "to": "txn:building_service_charge",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [],
+      "note": "component that may carry its own treatment"
+    },
+    {
+      "id": "e0259",
+      "from": "txn:mixed:rent_plus_service_charge",
+      "type": "has_risk",
+      "to": "risk:mixed_treatment",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "DJP_PPH42_PP34_004",
+        "DJP_PPH42_006"
+      ]
+    },
+    {
+      "id": "e0260",
+      "from": "txn:mixed:rent_plus_service_charge",
+      "type": "requires_accountant_review",
+      "to": "flag:accountant_review",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [],
+      "note": "a single rate must never be applied to the whole invoice"
+    },
+    {
+      "id": "e0261",
+      "from": "txn:mixed_invoice",
+      "type": "related_to",
+      "to": "txn:mixed:rent_plus_building_management",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0262",
+      "from": "txn:mixed:rent_plus_building_management",
+      "type": "related_to",
+      "to": "txn:rent",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [],
+      "note": "component that may carry its own treatment"
+    },
+    {
+      "id": "e0263",
+      "from": "txn:mixed:rent_plus_building_management",
+      "type": "related_to",
+      "to": "txn:management_service",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [],
+      "note": "component that may carry its own treatment"
+    },
+    {
+      "id": "e0264",
+      "from": "txn:mixed:rent_plus_building_management",
+      "type": "has_risk",
+      "to": "risk:mixed_treatment",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "DJP_PPH42_PP34_004",
+        "DJP_PPH42_006"
+      ]
+    },
+    {
+      "id": "e0265",
+      "from": "txn:mixed:rent_plus_building_management",
+      "type": "requires_accountant_review",
+      "to": "flag:accountant_review",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [],
+      "note": "a single rate must never be applied to the whole invoice"
+    },
+    {
+      "id": "e0266",
+      "from": "txn:mixed_invoice",
+      "type": "related_to",
+      "to": "txn:mixed:goods_plus_service",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0267",
+      "from": "txn:mixed:goods_plus_service",
+      "type": "related_to",
+      "to": "txn:equipment_capex",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [],
+      "note": "component that may carry its own treatment"
+    },
+    {
+      "id": "e0268",
+      "from": "txn:mixed:goods_plus_service",
+      "type": "related_to",
+      "to": "txn:service_fee",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [],
+      "note": "component that may carry its own treatment"
+    },
+    {
+      "id": "e0269",
+      "from": "txn:mixed:goods_plus_service",
+      "type": "has_risk",
+      "to": "risk:mixed_treatment",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "DJP_PPH42_PP34_004",
+        "DJP_PPH42_006"
+      ]
+    },
+    {
+      "id": "e0270",
+      "from": "txn:mixed:goods_plus_service",
+      "type": "requires_accountant_review",
+      "to": "flag:accountant_review",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [],
+      "note": "a single rate must never be applied to the whole invoice"
+    },
+    {
+      "id": "e0271",
+      "from": "txn:mixed_invoice",
+      "type": "related_to",
+      "to": "txn:mixed:software_plus_implementation",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0272",
+      "from": "txn:mixed:software_plus_implementation",
+      "type": "related_to",
+      "to": "txn:software_subscription",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [],
+      "note": "component that may carry its own treatment"
+    },
+    {
+      "id": "e0273",
+      "from": "txn:mixed:software_plus_implementation",
+      "type": "related_to",
+      "to": "txn:service_fee",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [],
+      "note": "component that may carry its own treatment"
+    },
+    {
+      "id": "e0274",
+      "from": "txn:mixed:software_plus_implementation",
+      "type": "has_risk",
+      "to": "risk:mixed_treatment",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "DJP_PPH42_PP34_004",
+        "DJP_PPH42_006"
+      ]
+    },
+    {
+      "id": "e0275",
+      "from": "txn:mixed:software_plus_implementation",
+      "type": "requires_accountant_review",
+      "to": "flag:accountant_review",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [],
+      "note": "a single rate must never be applied to the whole invoice"
+    },
+    {
+      "id": "e0276",
+      "from": "txn:mixed_invoice",
+      "type": "related_to",
+      "to": "txn:mixed:equipment_plus_installation",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0277",
+      "from": "txn:mixed:equipment_plus_installation",
+      "type": "related_to",
+      "to": "txn:equipment_capex",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [],
+      "note": "component that may carry its own treatment"
+    },
+    {
+      "id": "e0278",
+      "from": "txn:mixed:equipment_plus_installation",
+      "type": "related_to",
+      "to": "txn:service_fee",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [],
+      "note": "component that may carry its own treatment"
+    },
+    {
+      "id": "e0279",
+      "from": "txn:mixed:equipment_plus_installation",
+      "type": "has_risk",
+      "to": "risk:mixed_treatment",
+      "relationship_basis": "official_source",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [
+        "DJP_PPH42_PP34_004",
+        "DJP_PPH42_006"
+      ]
+    },
+    {
+      "id": "e0280",
+      "from": "txn:mixed:equipment_plus_installation",
+      "type": "requires_accountant_review",
+      "to": "flag:accountant_review",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [],
+      "note": "a single rate must never be applied to the whole invoice"
+    },
+    {
+      "id": "e0281",
+      "from": "txn:service_fee",
+      "type": "requires_company_profile_field",
+      "to": "cpf:legal_entity_type",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [],
+      "note": "the suggestion cannot be completed without this profile value"
+    },
+    {
+      "id": "e0282",
+      "from": "txn:salary_payroll",
+      "type": "requires_company_profile_field",
+      "to": "cpf:legal_entity_type",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [],
+      "note": "the suggestion cannot be completed without this profile value"
+    },
+    {
+      "id": "e0283",
+      "from": "cpf:legal_entity_type",
+      "type": "related_to",
+      "to": "comp:COMP_ID_NIB_001",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0284",
+      "from": "cpf:legal_entity_type",
+      "type": "needs_reviewer",
+      "to": "flag:accountant_review",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0285",
+      "from": "txn:intercompany_payment",
+      "type": "requires_company_profile_field",
+      "to": "cpf:pt_pma_status",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [],
+      "note": "the suggestion cannot be completed without this profile value"
+    },
+    {
+      "id": "e0286",
+      "from": "txn:import_related_invoice",
+      "type": "requires_company_profile_field",
+      "to": "cpf:pt_pma_status",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [],
+      "note": "the suggestion cannot be completed without this profile value"
+    },
+    {
+      "id": "e0287",
+      "from": "cpf:pt_pma_status",
+      "type": "needs_reviewer",
+      "to": "flag:accountant_review",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0288",
+      "from": "cpf:country",
+      "type": "needs_reviewer",
+      "to": "flag:accountant_review",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0289",
+      "from": "txn:service_fee",
+      "type": "requires_company_profile_field",
+      "to": "cpf:tax_id_npwp",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [],
+      "note": "the suggestion cannot be completed without this profile value"
+    },
+    {
+      "id": "e0290",
+      "from": "txn:rent",
+      "type": "requires_company_profile_field",
+      "to": "cpf:tax_id_npwp",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [],
+      "note": "the suggestion cannot be completed without this profile value"
+    },
+    {
+      "id": "e0291",
+      "from": "cpf:tax_id_npwp",
+      "type": "needs_reviewer",
+      "to": "flag:accountant_review",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0292",
+      "from": "txn:service_fee",
+      "type": "requires_company_profile_field",
+      "to": "cpf:pkp_status",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [],
+      "note": "the suggestion cannot be completed without this profile value"
+    },
+    {
+      "id": "e0293",
+      "from": "txn:equipment_capex",
+      "type": "requires_company_profile_field",
+      "to": "cpf:pkp_status",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [],
+      "note": "the suggestion cannot be completed without this profile value"
+    },
+    {
+      "id": "e0294",
+      "from": "txn:rent",
+      "type": "requires_company_profile_field",
+      "to": "cpf:pkp_status",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [],
+      "note": "the suggestion cannot be completed without this profile value"
+    },
+    {
+      "id": "e0295",
+      "from": "cpf:pkp_status",
+      "type": "needs_reviewer",
+      "to": "flag:accountant_review",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0296",
+      "from": "cpf:kbli_code",
+      "type": "related_to",
+      "to": "comp:COMP_ID_KBLI_001",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0297",
+      "from": "cpf:kbli_code",
+      "type": "related_to",
+      "to": "comp:COMP_ID_LICENCE_RISK_001",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0298",
+      "from": "cpf:kbli_code",
+      "type": "needs_reviewer",
+      "to": "flag:accountant_review",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0299",
+      "from": "cpf:business_activity_description",
+      "type": "related_to",
+      "to": "comp:COMP_ID_KBLI_001",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0300",
+      "from": "cpf:business_activity_description",
+      "type": "needs_reviewer",
+      "to": "flag:accountant_review",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0301",
+      "from": "txn:salary_payroll",
+      "type": "requires_company_profile_field",
+      "to": "cpf:employees_yes_no",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [],
+      "note": "the suggestion cannot be completed without this profile value"
+    },
+    {
+      "id": "e0302",
+      "from": "cpf:employees_yes_no",
+      "type": "related_to",
+      "to": "comp:COMP_ID_BPJS_001",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0303",
+      "from": "cpf:employees_yes_no",
+      "type": "needs_reviewer",
+      "to": "flag:accountant_review",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0304",
+      "from": "txn:rent",
+      "type": "requires_company_profile_field",
+      "to": "cpf:rent_payments_yes_no",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [],
+      "note": "the suggestion cannot be completed without this profile value"
+    },
+    {
+      "id": "e0305",
+      "from": "txn:building_service_charge",
+      "type": "requires_company_profile_field",
+      "to": "cpf:rent_payments_yes_no",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [],
+      "note": "the suggestion cannot be completed without this profile value"
+    },
+    {
+      "id": "e0306",
+      "from": "cpf:rent_payments_yes_no",
+      "type": "needs_reviewer",
+      "to": "flag:accountant_review",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0307",
+      "from": "txn:service_fee",
+      "type": "requires_company_profile_field",
+      "to": "cpf:service_vendors_yes_no",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [],
+      "note": "the suggestion cannot be completed without this profile value"
+    },
+    {
+      "id": "e0308",
+      "from": "txn:management_service",
+      "type": "requires_company_profile_field",
+      "to": "cpf:service_vendors_yes_no",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [],
+      "note": "the suggestion cannot be completed without this profile value"
+    },
+    {
+      "id": "e0309",
+      "from": "txn:contractor_freelancer",
+      "type": "requires_company_profile_field",
+      "to": "cpf:service_vendors_yes_no",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [],
+      "note": "the suggestion cannot be completed without this profile value"
+    },
+    {
+      "id": "e0310",
+      "from": "cpf:service_vendors_yes_no",
+      "type": "needs_reviewer",
+      "to": "flag:accountant_review",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0311",
+      "from": "txn:intercompany_payment",
+      "type": "requires_company_profile_field",
+      "to": "cpf:foreign_ownership_yes_no",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [],
+      "note": "the suggestion cannot be completed without this profile value"
+    },
+    {
+      "id": "e0312",
+      "from": "cpf:foreign_ownership_yes_no",
+      "type": "related_to",
+      "to": "comp:COMP_ID_LKPM_001",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0313",
+      "from": "cpf:foreign_ownership_yes_no",
+      "type": "needs_reviewer",
+      "to": "flag:accountant_review",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0314",
+      "from": "txn:intercompany_payment",
+      "type": "requires_company_profile_field",
+      "to": "cpf:intercompany_transactions_yes_no",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [],
+      "note": "the suggestion cannot be completed without this profile value"
+    },
+    {
+      "id": "e0315",
+      "from": "cpf:intercompany_transactions_yes_no",
+      "type": "needs_reviewer",
+      "to": "flag:accountant_review",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0316",
+      "from": "txn:import_related_invoice",
+      "type": "requires_company_profile_field",
+      "to": "cpf:imports_yes_no",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [],
+      "note": "the suggestion cannot be completed without this profile value"
+    },
+    {
+      "id": "e0317",
+      "from": "cpf:imports_yes_no",
+      "type": "needs_reviewer",
+      "to": "flag:accountant_review",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0318",
+      "from": "txn:salary_payroll",
+      "type": "requires_company_profile_field",
+      "to": "cpf:payroll_yes_no",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": [],
+      "note": "the suggestion cannot be completed without this profile value"
+    },
+    {
+      "id": "e0319",
+      "from": "cpf:payroll_yes_no",
+      "type": "related_to",
+      "to": "comp:COMP_ID_BPJS_001",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    },
+    {
+      "id": "e0320",
+      "from": "cpf:payroll_yes_no",
+      "type": "needs_reviewer",
+      "to": "flag:accountant_review",
+      "relationship_basis": "product_interpretation",
+      "review_required": true,
+      "status": "under_review",
+      "active": false,
+      "legal_verified": false,
+      "source_ids": []
+    }
+  ]
+}

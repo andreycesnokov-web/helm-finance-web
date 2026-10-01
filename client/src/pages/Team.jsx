@@ -2,6 +2,15 @@ import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '../hooks/useAuth'
 import { useTranslation } from '../hooks/useTranslation'
 import { apiFetch } from '../lib/api'
+import {
+  CATEGORY_LABELS, orderCategories, accessSummary, ineligibleReason, grantsDiff, hasChanges,
+} from '../lib/teamNotificationAccess'
+
+// ── Company Admin notification grants (migration 046) — build-time gate ──
+// Default OFF. Vite substitutes import.meta.env at build time, so when unset this folds to false
+// and the whole grants UI — the summary, the dialog, its handlers — is dropped from the bundle,
+// leaving the Team page exactly as it ships today.
+const GRANTS_UI = import.meta.env.VITE_COMPANY_NOTIFICATION_GRANTS_ENABLED === 'true'
 
 const ROLE_LABELS = {
   owner:    { label: 'Owner',    color: '#1565C0', bg: '#E3F2FD' },
@@ -202,6 +211,90 @@ function InviteModal({ token, onClose, onCreated }) {
 }
 
 // ── Main Component ────────────────────────────────────────────────────────────
+// ── Notification access dialog (owner-only, flag-gated) ──────────────────────
+// A focused sheet for one member: the owner sees their own alerts read-only; a CEO/CFO gets
+// category toggles; every other role is disabled with a reason. Save PUTs only the diff.
+function NotificationAccessDialog({ token, member, categories, onClose, onSaved }) {
+  const original = member.granted || {}
+  const [edited, setEdited] = useState(() => ({ ...original }))
+  const [saving, setSaving] = useState(false)
+  const [error, setError]   = useState('')
+
+  const ineligible = ineligibleReason(member)
+  const cats = orderCategories(categories)
+
+  const save = async () => {
+    const diff = grantsDiff(original, edited)
+    if (!Object.keys(diff).length) { onClose(); return }
+    setSaving(true); setError('')
+    try {
+      await apiFetch(`/team/members/${member.member_id}/notification-grants`, token,
+        { method: 'PUT', body: { grants: diff } })
+      onSaved()
+    } catch (e) {
+      // apiFetch throws Error whose message is the backend code; keep it human and offer retry.
+      setError('Could not save notification access. Please try again.')
+    } finally { setSaving(false) }
+  }
+
+  return (
+    <div onClick={onClose}
+      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 200, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+      <div onClick={e => e.stopPropagation()}
+        style={{ background: 'var(--bg)', borderRadius: '16px 16px 0 0', padding: '20px 16px 32px', width: '100%', maxWidth: 480, maxHeight: '80vh', overflowY: 'auto' }}>
+        <div style={{ width: 36, height: 3, background: 'var(--border-2)', borderRadius: 2, margin: '0 auto 16px' }} />
+        <div style={{ fontSize: 16, fontWeight: 800, marginBottom: 2 }}>Notification access</div>
+        <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 16 }}>
+          {member.name} · <RoleBadge role={member.role} />
+        </div>
+
+        {member.is_owner ? (
+          <div style={{ fontSize: 13, color: 'var(--text-2)', background: 'var(--bg-2)', borderRadius: 10, padding: '12px 14px', lineHeight: 1.6 }}>
+            The owner receives all company alerts for this business. This cannot be turned off here.
+          </div>
+        ) : ineligible ? (
+          <div style={{ fontSize: 13, color: 'var(--text-2)', background: 'var(--bg-2)', borderRadius: 10, padding: '12px 14px', lineHeight: 1.6 }}>
+            {ineligible}
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            {cats.map(c => (
+              <label key={c}
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '11px 4px', borderBottom: '0.5px solid var(--border)', cursor: 'pointer' }}>
+                <span style={{ fontSize: 14, color: 'var(--text)' }}>{CATEGORY_LABELS[c] || c}</span>
+                <input type="checkbox" checked={edited[c] === true} disabled={saving}
+                  onChange={e => setEdited(prev => ({ ...prev, [c]: e.target.checked }))}
+                  style={{ width: 18, height: 18, flexShrink: 0, cursor: 'pointer' }} />
+              </label>
+            ))}
+          </div>
+        )}
+
+        {error && (
+          <div style={{ marginTop: 12, fontSize: 12, color: 'var(--red-dark)', background: 'var(--red-light)', borderRadius: 8, padding: '8px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+            <span>{error}</span>
+            <button onClick={save} disabled={saving}
+              style={{ padding: '4px 10px', borderRadius: 7, border: '1px solid var(--red-dark)', background: 'transparent', color: 'var(--red-dark)', fontSize: 12, cursor: 'pointer' }}>Retry</button>
+          </div>
+        )}
+
+        <div style={{ display: 'flex', gap: 8, marginTop: 20 }}>
+          {!member.is_owner && !ineligible && (
+            <button onClick={save} disabled={saving || !hasChanges(original, edited)}
+              style={{ flex: 1, padding: '12px', borderRadius: 10, border: 'none', background: 'var(--text)', color: 'var(--bg)', fontSize: 14, fontWeight: 700, cursor: 'pointer', opacity: (saving || !hasChanges(original, edited)) ? 0.5 : 1 }}>
+              {saving ? 'Saving…' : 'Save'}
+            </button>
+          )}
+          <button onClick={onClose} disabled={saving}
+            style={{ flex: member.is_owner || ineligible ? 1 : 0.6, padding: '12px', borderRadius: 10, border: '1px solid var(--border-2)', background: 'transparent', color: 'var(--text)', fontSize: 14, cursor: 'pointer' }}>
+            {member.is_owner || ineligible ? 'Close' : 'Cancel'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function Team() {
   const { token } = useAuth()
   const { t } = useTranslation()
@@ -214,6 +307,9 @@ export default function Team() {
   const [removing,    setRemoving]    = useState(null)
   const [editRole,    setEditRole]    = useState(null) // { memberId, current }
   const [newRole,     setNewRole]     = useState('')
+  // Grants UI (flag-gated). Held separately so the Team payload shape is untouched when off.
+  const [grantsData,  setGrantsData]  = useState(null)  // { categories, members: [...] }
+  const [grantMember, setGrantMember] = useState(null)  // the member whose dialog is open
 
   const load = useCallback(() => {
     setLoading(true)
@@ -223,7 +319,17 @@ export default function Team() {
       .finally(() => setLoading(false))
   }, [token])
 
+  // Grants matrix, loaded only when the feature is on and the viewer is the owner. A 404 (flag off
+  // server-side, or non-owner) is swallowed — the page simply shows no access controls.
+  const loadGrants = useCallback(() => {
+    if (!GRANTS_UI) return
+    apiFetch('/team/notification-grants', token)
+      .then(setGrantsData)
+      .catch(() => setGrantsData(null))
+  }, [token])
+
   useEffect(() => { load() }, [load])
+  useEffect(() => { loadGrants() }, [loadGrants])
 
   const handleRevoke = async (code) => {
     if (!confirm('Revoke this invite link?')) return
@@ -327,11 +433,29 @@ export default function Team() {
                       Joined {fmtDate(m.joined_at)}
                       {m.telegram_id && <span> · @tg</span>}
                     </div>
+                    {GRANTS_UI && grantsData && (() => {
+                      const g = grantsData.members?.find(x => x.member_id === m.id)
+                      return g ? (
+                        <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 3 }}>
+                          🔔 {accessSummary(g)}
+                        </div>
+                      ) : null
+                    })()}
                   </div>
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
                   <RoleBadge role={m.role} />
+                  {GRANTS_UI && grantsData && myRole === 'owner' && (() => {
+                    const g = grantsData.members?.find(x => x.member_id === m.id)
+                    return g ? (
+                      <button
+                        onClick={() => setGrantMember(g)}
+                        title="Notification access"
+                        style={{ padding: '4px 8px', borderRadius: 7, fontSize: 11, background: 'var(--bg-2)', color: 'var(--text-3)', border: '0.5px solid var(--border)', cursor: 'pointer' }}
+                      >🔔</button>
+                    ) : null
+                  })()}
                   {canManage && m.role !== 'owner' && (
                     <div style={{ display: 'flex', gap: 4 }}>
                       <button
@@ -422,6 +546,16 @@ export default function Team() {
 
       {showInvite && (
         <InviteModal token={token} onClose={() => setShowInvite(false)} onCreated={load} />
+      )}
+
+      {GRANTS_UI && grantMember && (
+        <NotificationAccessDialog
+          token={token}
+          member={grantMember}
+          categories={grantsData?.categories}
+          onClose={() => setGrantMember(null)}
+          onSaved={() => { setGrantMember(null); loadGrants() }}
+        />
       )}
     </div>
   )

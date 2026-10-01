@@ -3,15 +3,25 @@
 // the API key or the token-bearing link (the magic link is logged ONLY by the caller in
 // dev). Returns a small status object that never contains the API key.
 
+// Minimal HTML-context escape for interpolating a URL into href/text. The magic link is
+// server-generated (APP_BASE_URL + hex token), but we escape defensively so no value can
+// break out of the attribute or inject markup into the email body.
+function escapeHtml(s) {
+  return String(s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
 function magicLinkHtml(url) {
   // No financial data. Single primary action + expiry note + plain URL fallback.
+  const safe = escapeHtml(url);
   return [
     '<div style="font-family:Arial,Helvetica,sans-serif;max-width:480px;margin:0 auto;color:#111">',
     '<h2 style="font-size:18px;margin:0 0 12px">Sign in to CFO AI</h2>',
     '<p style="font-size:14px;color:#555;margin:0 0 18px">Click the button below to sign in. This link expires in 10 minutes and can be used once.</p>',
-    `<p style="margin:0 0 18px"><a href="${url}" style="display:inline-block;padding:11px 20px;border-radius:8px;background:#3399FF;color:#fff;text-decoration:none;font-weight:600">Sign in</a></p>`,
+    `<p style="margin:0 0 18px"><a href="${safe}" style="display:inline-block;padding:11px 20px;border-radius:8px;background:#3399FF;color:#fff;text-decoration:none;font-weight:600">Sign in</a></p>`,
     `<p style="font-size:12px;color:#888;margin:0 0 6px">Or paste this link into your browser:</p>`,
-    `<p style="font-size:12px;color:#888;word-break:break-all;margin:0">${url}</p>`,
+    `<p style="font-size:12px;color:#888;word-break:break-all;margin:0">${safe}</p>`,
     '<p style="font-size:12px;color:#aaa;margin:18px 0 0">If you did not request this, you can safely ignore this email.</p>',
     '</div>',
   ].join('');

@@ -3,11 +3,19 @@
 // New fields (not yet in schema — see migration 040 PROPOSAL) are LOCAL DRAFT until 040
 // is applied. Obligations come from /api/accountant/applicability (deterministic, no LLM).
 // No tax-calculation/logic change; no OCR/extraction/filing. Mobile-safe.
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { apiFetch } from '../../lib/api'
 import { useAuth } from '../../hooks/useAuth'
 import { useWorkspace } from '../../shell/WorkspaceProvider'
 import { PageHeader, Card, Btn, StatusBadge, Stat, ErrorState, LoadingSkeleton, Icon } from '../../shell/ui'
+import DocumentIntakeModal from '../../components/DocumentIntakeModal'
+import ArchiveDocumentModal from '../../components/ArchiveDocumentModal'
+import { getSignedUrl } from '../../lib/documents'
+import { previewActionLabel, previewModeFor, formatFileSize, formatUploadedAt, fileKindLabel } from '../../lib/documentPreview'
+import { openDocumentSafely, POPUP_BLOCKED_MESSAGE, OPEN_FAILED_MESSAGE } from '../../lib/openDocument'
+import { createRequestGuard } from '../../lib/requestGuard'
+import { buildReadiness, isFieldNotRequired } from '../../lib/accountantReadiness'
+import { groupChecklist, TRUNCATED_NOTICE } from '../../lib/documentKnowledge'
 
 // Which UI fields persist to the backend today vs. live as local draft (await 040).
 const PERSISTED = new Set(['country', 'jurisdiction', 'legal_entity_type', 'npwp', 'pkp_status', 'vat_status', 'financial_year_start', 'financial_year_end', 'nib', 'employee_status'])
@@ -22,21 +30,41 @@ const VSTATES = {
   extracted: { label: 'Extracted from document', tone: 'info' },
   accountant_verified: { label: 'Accountant verified', tone: 'success' },
   conflict: { label: 'Conflict', tone: 'danger' },
+  not_required: { label: 'Not required', tone: 'neutral' },
 }
-const REQUIRED_DOCS = ['NPWP', 'NIB', 'PKP certificate', 'Akta', 'SK Kemenkumham', 'OSS / licenses', 'KBLI support documents', 'BPJS registration (if employees)']
 
-export function BusinessAccountant() {
+export function BusinessAccountant({ onProfileSaved, onDocumentsChanged } = {}) {
   const { token } = useAuth()
   const { active, scopeKey } = useWorkspace()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [form, setForm] = useState({})
   const [obligations, setObligations] = useState({ applicable_rules: [], missing_profile_fields: [] })
-  const [docs, setDocs] = useState({})          // documents checklist (local placeholder)
   const [saving, setSaving] = useState(false)
-  const [readiness, setReadiness] = useState(null)
+  const [savedMissingFields, setSavedMissingFields] = useState([])
+  const [profileSaved, setProfileSaved] = useState(false)
+  // Document intake (Phase 1): real checklist + classified inbox for the ACTIVE business.
+  const [checklist, setChecklist] = useState(null)
+  const [intake, setIntake] = useState(null)
+  const [intakeLoading, setIntakeLoading] = useState(true)
+  const [intakeErr, setIntakeErr] = useState('')
+  // Ignores responses from a workspace the user has already switched away from.
+  const intakeGuard = useRef(createRequestGuard())
+  const [showUpload, setShowUpload] = useState(false)
+  const [openWhy, setOpenWhy] = useState(null)   // doc_type whose knowledge panel is expanded
+  const [confirming, setConfirming] = useState(null)
+  const [archiving, setArchiving] = useState(null)   // the document awaiting confirmation
+  const [archiveBusy, setArchiveBusy] = useState(false)
+  const [opening, setOpening] = useState(null)
+  const [openFallback, setOpenFallback] = useState({})   // docId -> signed URL to click
+  const [openError, setOpenError] = useState({})         // docId -> message
 
   useEffect(() => {
+    // Saved-profile state belongs to ONE workspace: clear it before anything else so
+    // business A's "Profile saved" banner and missing-field list can never be shown
+    // under business B.
+    setProfileSaved(false); setSavedMissingFields([])
+    setObligations({ applicable_rules: [], missing_profile_fields: [] })
     if (!token || !active) return
     let on = true; setLoading(true); setError(null)
     Promise.all([
@@ -52,8 +80,92 @@ export function BusinessAccountant() {
     return () => { on = false }
   }, [token, active?.id, scopeKey])
 
+  // Re-fetched per active workspace (scopeKey bumps on switch), so documents from another
+  // business can never linger on screen.
+  const loadIntake = useCallback(() => {
+    // Clear FIRST: never leave the previous workspace's documents on screen while the new
+    // workspace loads.
+    setChecklist(null); setIntake(null); setIntakeErr('')
+    if (!token || !active) { setIntakeLoading(false); return }
+    setIntakeLoading(true)
+    const req = intakeGuard.current.start()
+    const opts = { signal: req.signal }
+    Promise.allSettled([
+      apiFetch('/ai-accountant/required-documents', token, opts),
+      apiFetch('/ai-accountant/document-intake', token, opts),
+    ]).then(([cl, ik]) => {
+      if (req.isStale()) return                       // a newer workspace load already won
+      if (cl.status === 'fulfilled') setChecklist(cl.value)
+      else setIntakeErr(cl.reason?.message || 'Checklist unavailable')
+      if (ik.status === 'fulfilled') setIntake(ik.value)
+      setIntakeLoading(false)
+    })
+  }, [token, active?.id])
+
+  useEffect(() => {
+    loadIntake()
+    // Abort in-flight work when the workspace changes or the page unmounts.
+    return () => intakeGuard.current.abort()
+  }, [loadIntake, scopeKey])
+
+  const confirmType = async (docId, docType) => {
+    setConfirming(docId)
+    try {
+      await apiFetch(`/ai-accountant/documents/${docId}/classification`, token, { method: 'PATCH', body: { doc_type: docType } })
+      loadIntake()
+      if (typeof onDocumentsChanged === 'function') onDocumentsChanged()
+    } catch (e) { alert(e.message || 'Could not update the document type') } finally { setConfirming(null) }
+  }
+
+  // Re-read an existing document's content (documents uploaded before Phase 2, or where
+  // extraction failed). Never overwrites a manually confirmed type — the backend refuses.
+  const reclassify = async (docId) => {
+    setConfirming(docId)
+    try {
+      await apiFetch(`/ai-accountant/documents/${docId}/reclassify`, token, { method: 'POST' })
+      loadIntake()
+    } catch (e) { alert(e.message || 'Could not re-read the document') } finally { setConfirming(null) }
+  }
+
+  // Open the file itself, popup-safe: the tab is claimed synchronously inside this click and
+  // navigated once the short-lived signed URL arrives. A blocked popup or a failed request
+  // becomes visible inline instead of doing nothing. The storage path never reaches the
+  // client through any list payload; the signed URL itself IS the access grant.
+  const openDocument = async (d) => {
+    setOpening(d.id)
+    setOpenError(e => ({ ...e, [d.id]: null }))
+    setOpenFallback(f => ({ ...f, [d.id]: null }))
+    const r = await openDocumentSafely({ fetchUrl: () => getSignedUrl(token, d.id, previewModeFor(d)) })
+    if (r.status === 'blocked') setOpenFallback(f => ({ ...f, [d.id]: r.url }))
+    if (r.status === 'error') setOpenError(e => ({ ...e, [d.id]: OPEN_FAILED_MESSAGE }))
+    setOpening(null)
+  }
+
+  // Soft archive through the existing audited endpoint: sets archived_at, deletes nothing.
+  // The intake list and the checklist both exclude archived documents, so one reload is enough
+  // to drop it from the inbox, the checklist counts and the readiness card together.
+  const archiveDocument = async (d) => {
+    setArchiveBusy(true)
+    try {
+      await apiFetch(`/documents/${d.id}/archive`, token, { method: 'POST' })
+      setArchiving(null)
+      loadIntake()
+      if (typeof onDocumentsChanged === 'function') onDocumentsChanged()
+    } catch (e) {
+      // The backend is the source of truth for the role gate; make its refusal readable.
+      const msg = /role cannot|permission|403/i.test(e.message || '')
+        ? 'You do not have permission to archive this document.'
+        : (e.message || 'Could not archive the document')
+      alert(msg)
+    } finally { setArchiveBusy(false) }
+  }
+
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
-  const vstatus = (k) => (form.field_verification?.[k]) || (form[k] !== undefined && form[k] !== '' && form[k] !== null ? 'user_declared' : 'missing')
+  // A field that does not apply (PKP effective date on a Non-PKP company) must not be
+  // reported as Missing — nothing is missing, it simply does not apply.
+  const vstatus = (k) => isFieldNotRequired(form, k)
+    ? 'not_required'
+    : (form.field_verification?.[k]) || (form[k] !== undefined && form[k] !== '' && form[k] !== null ? 'user_declared' : 'missing')
 
   const save = useCallback(async () => {
     setSaving(true); setError(null)
@@ -67,21 +179,33 @@ export function BusinessAccountant() {
       // refresh obligations + build readiness summary
       const ap = await apiFetch('/accountant/applicability', token).catch(() => obligations)
       setObligations(ap)
-      const missingFields = (res?.completeness?.missing || ap.missing_profile_fields || [])
-      const missingDocs = REQUIRED_DOCS.filter(d => !docs[d])
-      const riskFlags = []
-      if (form.foreign_owned === 'yes' && form.pkp_status !== 'pkp_registered') riskFlags.push('Foreign-owned (PT PMA) without confirmed PKP status')
-      if (form.employee_status === 'has_employees' && !form.bpjs_registered) riskFlags.push('Has employees but BPJS not registered')
-      setReadiness({
-        obligations: (ap.applicable_rules || []).length,
-        missingDocs: missingDocs.length,
-        verificationGaps: missingFields.length,
-        riskFlags,
-        next: missingDocs.includes('NIB') || missingDocs.includes('PKP certificate')
-          ? 'Upload NIB and PKP certificate.' : (missingFields[0] ? `Complete ${missingFields[0].replace(/_/g, ' ')}.` : 'Request accountant verification.'),
-      })
+      setSavedMissingFields(res?.completeness?.missing || ap.missing_profile_fields || [])
+      setProfileSaved(true)
+      // The Workbench holds its own copy of the checklist; the profile decides what the
+      // checklist requires, so it has to be told the profile changed.
+      if (typeof onProfileSaved === 'function') onProfileSaved()
+      // The profile drives which documents are required — reload the checklist so the
+      // readiness card and the Compliance Documents card stay on the same answer.
+      loadIntake()
     } catch (e) { setError(e.message) } finally { setSaving(false) }
-  }, [form, docs, token, active, obligations])
+  }, [form, token, active, obligations, loadIntake, onProfileSaved])
+
+  // Readiness is DERIVED from the checklist payload, not from a second local list, so the
+  // card can never contradict Compliance Documents.
+  // Grouped, knowledge-annotated view of the SAME checklist payload.
+  // `form` is passed so the legal-entity document is described for the entity the user
+  // actually has (a CV must not be shown PT wording).
+  const grouped = useMemo(() => groupChecklist(checklist, form), [checklist, form])
+
+  const readiness = useMemo(() => buildReadiness(checklist, {
+    form,
+    missingFields: savedMissingFields.length ? savedMissingFields : (obligations.missing_profile_fields || []),
+    obligations: (obligations.applicable_rules || []).length,
+  }), [checklist, form, savedMissingFields, obligations])
+
+  // Shared props for <Field>. Field itself lives at MODULE scope (see bottom of file) so
+  // its component identity is stable across renders — that is what keeps input focus.
+  const fp = { form, set, vstatus }
 
   const head = (
     <PageHeader eyebrow="Business Workspace · AI Accountant" title="Company Tax & Compliance Profile"
@@ -90,28 +214,27 @@ export function BusinessAccountant() {
   if (loading) return <>{head}<Card><LoadingSkeleton rows={6} height={18} /></Card></>
   if (error && !form) return <>{head}<ErrorState description={error} onRetry={() => location.reload()} /></>
 
-  const Field = ({ label, k, type = 'text', options, placeholder }) => (
-    <div style={{ minWidth: 0 }}>
-      <label style={LBL}>{label} {!PERSISTED.has(k) && <span style={{ color: 'var(--text-muted)', fontWeight: 500, fontSize: 11 }}>· draft</span>}</label>
-      {options
-        ? <select style={INP} value={form[k] || ''} onChange={e => set(k, e.target.value)}><option value="">—</option>{options.map(o => <option key={o.value ?? o} value={o.value ?? o}>{o.label ?? o}</option>)}</select>
-        : <input style={INP} type={type} value={form[k] || ''} placeholder={placeholder} onChange={e => set(k, e.target.value)} />}
-      <div style={{ marginTop: 6 }}><StatusBadge tone={VSTATES[vstatus(k)].tone}>{VSTATES[vstatus(k)].label}</StatusBadge></div>
-    </div>
-  )
-
   return (
     <>{head}
-      {readiness && (
+      {!intakeLoading && (
         <Card title="AI Accountant readiness" action={<StatusBadge tone="warning">Needs accountant review</StatusBadge>} className="cfo-accountant-readiness" >
-          <div style={{ fontSize: 14, color: 'var(--text-secondary)', marginBottom: 14 }}>Profile saved. Preliminary assessment (not final tax advice):</div>
+          <div style={{ fontSize: 14, color: 'var(--text-secondary)', marginBottom: 14 }}>
+            {profileSaved ? 'Profile saved. ' : ''}Preliminary assessment (not final tax advice). Document counts come from the Compliance Documents checklist below:
+          </div>
           <div className="cfo-grid cfo-grid-4" style={{ marginBottom: 14 }}>
             <Stat k="Likely obligations" v={readiness.obligations} />
-            <Stat k="Missing documents" v={readiness.missingDocs} tone={readiness.missingDocs ? 'neg' : 'pos'} />
+            <Stat k="Missing documents" v={readiness.available ? readiness.missingDocs : '—'} tone={readiness.missingDocs ? 'neg' : 'pos'} />
+            <Stat k="Need confirmation" v={readiness.available ? readiness.needsConfirmation : '—'} tone={readiness.needsConfirmation ? 'neg' : 'pos'} />
             <Stat k="Verification gaps" v={readiness.verificationGaps} tone={readiness.verificationGaps ? 'neg' : 'pos'} />
-            <Stat k="Risk flags" v={readiness.riskFlags.length} tone={readiness.riskFlags.length ? 'neg' : 'pos'} />
           </div>
-          {readiness.riskFlags.map((r, i) => <div key={i} style={{ fontSize: 13, color: 'var(--danger)', marginBottom: 4 }}>⚠ {r}</div>)}
+          {/* A risk is a real gap (red); an advisory describes a choice the user already made
+              and should confirm — it must not look like an error. */}
+          {readiness.riskFlags.map((r, i) => (
+            <div key={i} style={{ fontSize: 13, marginBottom: 4,
+              color: r.severity === 'advisory' ? 'var(--text-secondary)' : 'var(--danger)' }}>
+              {r.severity === 'advisory' ? 'ℹ' : '⚠'} {r.message}
+            </div>
+          ))}
           <div style={{ marginTop: 8, padding: 12, background: 'var(--info-soft)', borderRadius: 'var(--radius-md)', fontSize: 14 }}>
             <strong>Suggested next action:</strong> {readiness.next}
           </div>
@@ -120,47 +243,47 @@ export function BusinessAccountant() {
 
       {error && <div style={{ color: 'var(--danger)', fontSize: 13, margin: '10px 0' }}>{error}</div>}
 
-      <div className="cfo-grid cfo-grid-2" style={{ marginTop: readiness ? 18 : 0 }}>
+      <div className="cfo-grid cfo-grid-2" style={{ marginTop: 18 }}>
         <Card title="1 · Basic Tax Profile">
           <div className="cfo-form2">
-            <Field label="Country" k="country" options={['Indonesia', 'Singapore', 'Other']} />
-            <Field label="Jurisdiction" k="jurisdiction" placeholder="e.g. ID" />
-            <Field label="Legal entity type" k="legal_entity_type" options={LEGAL_ENTITY} />
-            <Field label="Foreign-owned company" k="foreign_owned" options={[{ value: 'yes', label: 'Yes' }, { value: 'no', label: 'No' }, { value: 'unknown', label: 'Unknown' }]} />
-            <Field label="Company legal name" k="company_legal_name" />
-            <Field label="Brand / trading name" k="brand_name" />
+            <Field {...fp} label="Country" k="country" options={['Indonesia', 'Singapore', 'Other']} />
+            <Field {...fp} label="Jurisdiction" k="jurisdiction" placeholder="e.g. ID" />
+            <Field {...fp} label="Legal entity type" k="legal_entity_type" options={LEGAL_ENTITY} />
+            <Field {...fp} label="Foreign-owned company" k="foreign_owned" options={[{ value: 'yes', label: 'Yes' }, { value: 'no', label: 'No' }, { value: 'unknown', label: 'Unknown' }]} />
+            <Field {...fp} label="Company legal name" k="company_legal_name" />
+            <Field {...fp} label="Brand / trading name" k="brand_name" />
           </div>
         </Card>
 
         <Card title="2 · Tax Identity">
           <div className="cfo-form2">
-            <Field label="NPWP" k="npwp" placeholder="00.000.000.0-000.000" />
-            <Field label="KPP (registered tax office)" k="kpp" />
-            <Field label="PKP status" k="pkp_status" options={[{ value: 'pkp_registered', label: 'PKP registered' }, { value: 'non_pkp', label: 'Non-PKP' }, { value: 'unknown', label: 'Unknown' }]} />
-            <Field label="PKP effective date" k="pkp_effective_date" type="date" />
-            <Field label="Financial year start" k="financial_year_start" type="date" />
-            <Field label="Financial year end" k="financial_year_end" type="date" />
+            <Field {...fp} label="NPWP" k="npwp" placeholder="00.000.000.0-000.000" />
+            <Field {...fp} label="KPP (registered tax office)" k="kpp" />
+            <Field {...fp} label="PKP status" k="pkp_status" options={[{ value: 'pkp_registered', label: 'PKP registered' }, { value: 'non_pkp', label: 'Non-PKP' }, { value: 'unknown', label: 'Unknown' }]} />
+            <Field {...fp} label="PKP effective date" k="pkp_effective_date" type="date" />
+            <Field {...fp} label="Financial year start" k="financial_year_start" type="date" />
+            <Field {...fp} label="Financial year end" k="financial_year_end" type="date" />
           </div>
         </Card>
 
         <Card title="3 · Business Activity">
           <div className="cfo-form2">
-            <Field label="NIB number" k="nib" />
-            <Field label="NIB issue date" k="nib_issue_date" type="date" />
-            <Field label="Primary KBLI" k="primary_kbli" placeholder="e.g. 62090" />
-            <Field label="Additional KBLI" k="additional_kbli" placeholder="comma-separated" />
-            <Field label="Actual business activities" k="actual_business_activities" />
+            <Field {...fp} label="NIB number" k="nib" />
+            <Field {...fp} label="NIB issue date" k="nib_issue_date" type="date" />
+            <Field {...fp} label="Primary KBLI" k="primary_kbli" placeholder="e.g. 62090" />
+            <Field {...fp} label="Additional KBLI" k="additional_kbli" placeholder="comma-separated" />
+            <Field {...fp} label="Actual business activities" k="actual_business_activities" />
           </div>
         </Card>
 
         <Card title="4 · Employees">
           <div className="cfo-form2">
-            <Field label="Has employees" k="employee_status" options={[{ value: 'has_employees', label: 'Yes' }, { value: 'no_employees', label: 'No' }]} />
-            <Field label="Employee count" k="employee_count" type="number" />
-            <Field label="Local employees" k="local_employee_count" type="number" />
-            <Field label="Foreign employees" k="foreign_employee_count" type="number" />
-            <Field label="Payroll frequency" k="payroll_frequency" options={['Monthly', 'Bi-weekly', 'Weekly']} />
-            <Field label="BPJS registered" k="bpjs_registered" options={[{ value: 'true', label: 'Yes' }, { value: 'false', label: 'No' }]} />
+            <Field {...fp} label="Has employees" k="employee_status" options={[{ value: 'has_employees', label: 'Yes' }, { value: 'no_employees', label: 'No' }]} />
+            <Field {...fp} label="Employee count" k="employee_count" type="number" />
+            <Field {...fp} label="Local employees" k="local_employee_count" type="number" />
+            <Field {...fp} label="Foreign employees" k="foreign_employee_count" type="number" />
+            <Field {...fp} label="Payroll frequency" k="payroll_frequency" options={['Monthly', 'Bi-weekly', 'Weekly']} />
+            <Field {...fp} label="BPJS registered" k="bpjs_registered" options={[{ value: 'true', label: 'Yes' }, { value: 'false', label: 'No' }]} />
           </div>
         </Card>
 
@@ -174,28 +297,266 @@ export function BusinessAccountant() {
           </div>
         </Card>
 
-        <Card title="6 · Required Documents" action={<StatusBadge tone="neutral">Document Center</StatusBadge>}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {REQUIRED_DOCS.map(d => (
-              <label key={d} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 14, cursor: 'pointer' }}>
-                <input type="checkbox" checked={!!docs[d]} onChange={e => setDocs(s => ({ ...s, [d]: e.target.checked }))} />
-                <Icon.doc width="15" height="15" /> {d}
-                <span style={{ marginLeft: 'auto' }}><StatusBadge tone={docs[d] ? 'success' : 'danger'}>{docs[d] ? 'Linked' : 'Missing'}</StatusBadge></span>
-              </label>
+      </div>
+
+      {/* ── Document intake (Phase 1) ─────────────────────────────────────────
+          One upload window; CFO AI classifies and files. The checklist is PRELIMINARY and
+          driven by the saved profile — an uncertain match shows "needs review" and never
+          counts as satisfied. */}
+      <div style={{ marginTop: 18 }}>
+        <Card
+          title="Compliance documents · preliminary"
+          action={<span style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            {intake?.needs_review_count > 0 && <StatusBadge tone="warning">{intake.needs_review_count} need review</StatusBadge>}
+            <Btn sm onClick={() => setShowUpload(true)}>Upload documents</Btn>
+          </span>}>
+
+          {intakeErr && <div style={{ fontSize: 13, color: 'var(--danger)', marginBottom: 10 }}>{intakeErr}</div>}
+          {intakeLoading && <LoadingSkeleton rows={4} height={16} />}
+          {!intakeLoading && !checklist && !intakeErr && <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>Checklist unavailable.</div>}
+
+          {!intakeLoading && checklist && <>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
+              {/* Counts of rows we were given are observations and survive truncation;
+                  "missing" is an inference, so on a truncated set it reads "missing unknown"
+                  rather than a confident "0 missing". */}
+              {grouped.summary.map(b => (
+                <StatusBadge key={b.key} tone={b.tone}>{b.label}</StatusBadge>
+              ))}
+            </div>
+
+            {/* Minimum company pack: the short list worth doing first. */}
+            <div style={{ padding: '10px 12px', marginBottom: 12, border: '1px solid var(--border-default)', borderRadius: 'var(--radius-md)', background: 'var(--info-soft)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <strong style={{ fontSize: 13.5 }}>Minimum company pack</strong>
+                {grouped.pack.countable
+                  ? <StatusBadge tone={grouped.pack.complete ? 'success' : 'warning'}>
+                      {grouped.pack.satisfied} of {grouped.pack.total} in place
+                    </StatusBadge>
+                  : <StatusBadge tone="neutral">Checklist incomplete</StatusBadge>}
+              </div>
+              {/* A truncated document set cannot prove absence, so neither an exact count nor a
+                  "still needed" list may be shown — only a neutral prompt to review. */}
+              {!grouped.pack.countable ? (
+                <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 4 }}>
+                  {TRUNCATED_NOTICE}
+                </div>
+              ) : (
+                <>
+                  <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 4 }}>
+                    {grouped.pack.complete
+                      ? 'Every document this profile needs for company identity and tax registration is uploaded.'
+                      : <>Still needed: {grouped.pack.outstanding.map(i => i.label).join(', ')}.</>}
+                  </div>
+                  {grouped.payroll.applies && (
+                    <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 6 }}>
+                      <strong>Payroll compliance</strong> (separate from the company pack):{' '}
+                      {grouped.payroll.outstanding.length
+                        ? <>still needed &mdash; {grouped.payroll.outstanding.map(i => i.label).join(', ')}.</>
+                        : 'in place.'}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+
+            {/* Grouped checklist with an inline knowledge panel per row. */}
+            {grouped.groups.map(g => (
+              <div key={g.key} style={{ marginBottom: 14 }}>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 6, flexWrap: 'wrap' }}>
+                  <strong style={{ fontSize: 13 }}>{g.label}</strong>
+                  <span style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>{g.blurb}</span>
+                </div>
+                <div style={{ border: '1px solid var(--border-default)', borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>
+                  {g.items.map((it, i) => (
+                    <div key={it.type} style={{ borderTop: i ? '0.5px solid var(--border-subtle)' : 'none' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', flexWrap: 'wrap' }}>
+                        <Icon.doc width="15" height="15" />
+                        <span style={{ flex: 1, minWidth: 160 }}>
+                          <span style={{ fontSize: 13.5, fontWeight: 600 }}>{it.label}</span>
+                          {it.knowledge && (
+                            <span style={{ display: 'block', fontSize: 11.5, color: 'var(--text-muted)' }}>
+                              {it.knowledge.official_indonesian_name}
+                            </span>
+                          )}
+                          <span style={{ display: 'block', fontSize: 11.5, color: 'var(--text-muted)' }}>{it.reason}</span>
+                        </span>
+                        <StatusBadge tone={
+                          it.priority === 'not_required' ? 'neutral'
+                            : it.priority === 'payroll_required' ? 'info'
+                              : it.priority === 'core_required' || it.priority === 'conditional_required' ? 'warning' : 'neutral'
+                        }>{it.priority_label}</StatusBadge>
+                        <StatusBadge tone={
+                          it.status === 'uploaded' ? 'success'
+                            : it.status === 'needs_review' ? 'warning'
+                              : it.status === 'missing' && grouped.pack.countable ? 'danger' : 'neutral'
+                        }>{it.status === 'missing' && !grouped.pack.countable
+                          ? 'not verified' : it.status.replace('_', ' ')}</StatusBadge>
+                        {it.knowledge && (
+                          <Btn sm variant="ghost" onClick={() => setOpenWhy(openWhy === it.type ? null : it.type)}>
+                            {openWhy === it.type ? 'Hide' : 'Why needed?'}
+                          </Btn>
+                        )}
+                      </div>
+                      {openWhy === it.type && it.knowledge && (
+                        <div style={{ padding: '2px 12px 12px 37px', fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+                          <div><strong>Official name:</strong> {it.knowledge.official_indonesian_name}</div>
+                          <div><strong>What it is:</strong> {it.knowledge.plain_language_description}</div>
+                          <div><strong>Why needed:</strong> {it.knowledge.why_needed}</div>
+                          <div><strong>When required:</strong> {it.knowledge.when_required}</div>
+                          <div><strong>Where to get it:</strong> {it.knowledge.where_to_get}</div>
+                          {!!(it.knowledge.aliases || []).length && (
+                            <div style={{ color: 'var(--text-muted)' }}>Also called: {it.knowledge.aliases.join(', ')}</div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
             ))}
-            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>Linking uses the existing Document Center. OCR / extraction / filing are not part of V1.</div>
-          </div>
+
+            {(checklist.warnings || []).map((w, i) => (
+              <div key={i} style={{ marginTop: 8, fontSize: 12, color: 'var(--warning)' }}>⚠ {w}</div>
+            ))}
+            <div style={{ marginTop: 10, fontSize: 11.5, color: 'var(--text-muted)', lineHeight: 1.55 }}>{checklist.disclaimer}</div>
+          </>}
         </Card>
       </div>
+
+      {/* Intake inbox — confirm or correct what was detected. */}
+      {!intakeLoading && intake?.documents?.length > 0 && (
+        <div style={{ marginTop: 14 }}>
+          <Card title={`Document intake · ${intake.documents.length}`} action={<StatusBadge tone="neutral">{intake.business?.name || 'This workspace'}</StatusBadge>}>
+            <div style={{ border: '1px solid var(--border-default)', borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>
+              {intake.documents.map((d, i) => (
+                <div key={d.id} style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', padding: '10px 12px', borderTop: i ? '0.5px solid var(--border-subtle)' : 'none' }}>
+                  <span style={{ flex: 1, minWidth: 180 }}>
+                    <span style={{ fontSize: 13.5, fontWeight: 600, display: 'block', overflow: 'hidden', textOverflow: 'ellipsis' }}>{d.file_name || '(unnamed file)'}</span>
+                    {/* Enough context to answer "what is this file?" without opening it. */}
+                    <span style={{ display: 'block', fontSize: 11.5, color: 'var(--text-muted)' }}>
+                      {[fileKindLabel(d), formatFileSize(d.file_size), formatUploadedAt(d.uploaded_at)]
+                        .filter(Boolean).join(' · ') || 'No file details available'}
+                    </span>
+                    {/* A blocked popup is never a silent no-op: the user gets a real link, and
+                        clicking it is a fresh gesture the browser accepts. */}
+                    {openFallback[d.id] && (
+                      <span style={{ display: 'block', fontSize: 11.5, marginTop: 2, color: 'var(--warning)' }}>
+                        {POPUP_BLOCKED_MESSAGE}{' '}
+                        <a href={openFallback[d.id]} target="_blank" rel="noopener noreferrer"
+                          style={{ color: 'var(--brand-electric-blue)', textDecoration: 'underline' }}>
+                          {previewModeFor(d) === 'view' ? 'Open document' : 'Download document'}
+                        </a>
+                      </span>
+                    )}
+                    {openError[d.id] && (
+                      <span style={{ display: 'block', fontSize: 11.5, marginTop: 2, color: 'var(--danger)' }}>
+                        {openError[d.id]}
+                      </span>
+                    )}
+                    <span style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>
+                      {d.intake.confidence} confidence · routed to {d.routed_to.replace('_', ' ')}
+                      {intake.content_classification_enabled && d.intake.extraction?.text_available === false && ' · text could not be read'}
+                    </span>
+                    {/* Why we think so — marker labels only, never document text. */}
+                    {d.intake.explanation && (
+                      <span style={{ display: 'block', fontSize: 11.5, color: 'var(--text-secondary)', marginTop: 2 }}>
+                        {d.intake.explanation}
+                      </span>
+                    )}
+                    {d.intake.signals?.conflict && (
+                      <span style={{ display: 'block', fontSize: 11.5, color: 'var(--warning)', marginTop: 2 }}>
+                        ⚠ File name suggests {d.intake.signals.conflict.file_name_suggests}, content suggests {d.intake.signals.conflict.content_suggests}.
+                      </span>
+                    )}
+                  </span>
+                  <StatusBadge tone={
+                    d.intake.classification_status === 'manually_confirmed' ? 'success'
+                      : d.intake.classification_status === 'auto_classified' ? 'info' : 'warning'
+                  }>{d.intake.classification_status.replace(/_/g, ' ')}</StatusBadge>
+                  {/* Manual correction always available — AI classification is never the last word. */}
+                  <select
+                    className="cfo-input" style={{ maxWidth: 210 }}
+                    value={d.intake.doc_type}
+                    disabled={confirming === d.id}
+                    onChange={e => confirmType(d.id, e.target.value)}>
+                    {(intake.types || []).map(t => <option key={t.type} value={t.type}>{t.label}</option>)}
+                  </select>
+                  {/* See the document before being asked to classify it. */}
+                  <Btn sm variant="ghost" disabled={opening === d.id} onClick={() => openDocument(d)}>
+                    {opening === d.id ? 'Opening…' : previewActionLabel(d)}
+                  </Btn>
+                  <Btn sm variant="ghost" disabled={confirming === d.id || d.intake.classification_status === 'manually_confirmed'}
+                    onClick={() => confirmType(d.id, d.intake.doc_type)}>
+                    {confirming === d.id ? '…' : 'Confirm'}
+                  </Btn>
+                  {intake.content_classification_enabled && d.intake.classification_status !== 'manually_confirmed' && (
+                    <Btn sm variant="ghost" disabled={confirming === d.id} onClick={() => reclassify(d.id)}>
+                      {confirming === d.id ? 'Reading…' : 'Re-read'}
+                    </Btn>
+                  )}
+                  {/* Soft archive — never a hard delete. Confirmation happens in the modal. */}
+                  <Btn sm variant="ghost" disabled={archiveBusy} onClick={() => setArchiving(d)}>Archive</Btn>
+                </div>
+              ))}
+            </div>
+            <div style={{ marginTop: 10, fontSize: 11.5, color: 'var(--text-muted)', lineHeight: 1.55 }}>
+              {intake.note} Confirming a type files the document into its compliance area and updates the checklist.
+              Archiving removes a document from this checklist and keeps the file for audit and
+              history. To change a confirmed type, pick a different type and confirm again.
+            </div>
+          </Card>
+        </div>
+      )}
 
       <div style={{ marginTop: 18, display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
         <Btn onClick={save} disabled={saving}>{saving ? 'Saving…' : 'Save profile'}</Btn>
       </div>
+      {archiving && (
+        <ArchiveDocumentModal
+          doc={archiving}
+          businessName={intake?.business?.name || active?.name}
+          busy={archiveBusy}
+          onCancel={() => (archiveBusy ? null : setArchiving(null))}
+          onConfirm={archiveDocument}
+        />
+      )}
+
+      {showUpload && (
+        <DocumentIntakeModal
+          business={intake?.business || active}
+          onClose={() => setShowUpload(false)}
+          onUploaded={loadIntake}
+        />
+      )}
       <div style={{ marginTop: 12, fontSize: 12, color: 'var(--text-muted)' }}>
         Verification states: {Object.values(VSTATES).map(v => v.label).join(' · ')}. Persisted fields sync to your account; “draft” fields are saved locally until the additive profile migration is applied. This is a preliminary assessment, not final legal/tax advice.
       </div>
     </>
   )
 }
+// Tax-profile input. MUST stay at module scope.
+//
+// This used to be declared inside BusinessAccountant. Because a component declared during
+// render gets a NEW function identity on every render, React treated each keystroke as a
+// different component type, unmounted the subtree and mounted a fresh <input> — so the field
+// lost focus after a single character. Keeping the declaration here makes the element type
+// stable, so React updates the existing input in place and focus/caret survive typing.
+//
+// Values stay STRINGS end to end: identifiers such as NPWP/NIB keep leading zeros, dots and
+// dashes, and are never coerced to numbers. No masking is applied while typing.
+function Field({ label, k, type = 'text', options, placeholder, form, set, vstatus }) {
+  return (
+    <div style={{ minWidth: 0 }}>
+      <label style={LBL}>{label} {!PERSISTED.has(k) && <span style={{ color: 'var(--text-muted)', fontWeight: 500, fontSize: 11 }}>· draft</span>}</label>
+      {options
+        ? <select style={INP} value={form[k] ?? ''} onChange={e => set(k, e.target.value)}><option value="">—</option>{options.map(o => <option key={o.value ?? o} value={o.value ?? o}>{o.label ?? o}</option>)}</select>
+        : <input style={INP} type={type} value={form[k] ?? ''} placeholder={placeholder} onChange={e => set(k, e.target.value)} />}
+      {/* Status chip may change while typing; it is a sibling, so it never remounts the input. */}
+      <div style={{ marginTop: 6 }}><StatusBadge tone={VSTATES[vstatus(k)].tone}>{VSTATES[vstatus(k)].label}</StatusBadge></div>
+    </div>
+  )
+}
+
 const LBL = { display: 'block', fontSize: 12.5, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }
 const INP = { width: '100%', maxWidth: '100%', padding: '10px 11px', border: '1px solid var(--border-default)', borderRadius: 'var(--radius-md)', fontFamily: 'var(--font-ui)', fontSize: 14, background: 'var(--surface-card)', color: 'var(--text-primary)', boxSizing: 'border-box' }

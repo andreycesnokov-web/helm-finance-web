@@ -1,0 +1,381 @@
+{
+  "manifest_version": "1.0",
+  "generated_at": "2026-09-02",
+  "pass": "currentness_evidence_patch",
+  "integrity_note": "sha256 is over the EXACT bytes archived at local_file. A row without local_file has no hash because no file exists — nothing here is invented.",
+  "entry_count": 32,
+  "entries": [
+    {
+      "source_id": "BKPM_OSS_001",
+      "official_url": "https://www4.bkpm.go.id/id/publikasi/detail/berita/pengenalan-tentang-oss-berbasis-risiko",
+      "local_file": "",
+      "sha256": "",
+      "retrieved_at": "",
+      "content_type": "",
+      "file_size_bytes": "",
+      "verification_status": "unreachable",
+      "notes": "DNS did not resolve for host www4.bkpm.go.id. Kept in registry, not summarised."
+    },
+    {
+      "source_id": "BPK_PPH23_PMK141_002",
+      "official_url": "https://peraturan.bpk.go.id/Details/115652/pmk-no-141pmk032015",
+      "local_file": "knowledge/indonesia_official_kb/raw_sources/tax/pph_23/BPK_PPH23_PMK141_002.html",
+      "sha256": "c1605b55c5031077a750d79af4c7ec7165822aebbc2651f1cea7b3d6bfd7dee2",
+      "retrieved_at": "2026-09-02T13:39:54Z",
+      "content_type": "text/html; charset=utf-8",
+      "file_size_bytes": 39260,
+      "verification_status": "fetch_verified",
+      "notes": "Downloaded, hashed and title-confirmed."
+    },
+    {
+      "source_id": "BPK_PPH42_PP34_001",
+      "official_url": "https://peraturan.bpk.go.id/Download/54909/PP%20Nomor%2034%20Tahun%202017.pdf",
+      "local_file": "knowledge/indonesia_official_kb/raw_sources/tax/pph_4_2/BPK_PPH42_PP34_001.pdf",
+      "sha256": "2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6",
+      "retrieved_at": "2026-09-02T13:39:50Z",
+      "content_type": "application/pdf",
+      "file_size_bytes": 1114110,
+      "verification_status": "fetch_verified",
+      "notes": "PDF archived; SCANNED (CCITTFax, 0 text ops) — not_chunkable, content not read."
+    },
+    {
+      "source_id": "BPK_PPH42_PP34_002",
+      "official_url": "https://peraturan.bpk.go.id/Details/64693",
+      "local_file": "knowledge/indonesia_official_kb/raw_sources/tax/pph_4_2/BPK_PPH42_PP34_002.html",
+      "sha256": "b55b5439d6d1f363734e5f4ec11e14b287ad8f92d59426698bd621c5963f330e",
+      "retrieved_at": "2026-09-02T13:39:50Z",
+      "content_type": "text/html; charset=utf-8",
+      "file_size_bytes": 40423,
+      "verification_status": "fetch_verified",
+      "notes": "Downloaded, hashed and title-confirmed."
+    },
+    {
+      "source_id": "BPK_PPN_003",
+      "official_url": "https://peraturan.bpk.go.id/Details/313574/pmk-no-11-tahun-2025",
+      "local_file": "knowledge/indonesia_official_kb/raw_sources/tax/ppn_vat/BPK_PPN_003.html",
+      "sha256": "80364cee6cb0c17c58087953d8560fe020592c4df4bf92ce925c4273d2d97ac1",
+      "retrieved_at": "2026-09-02T13:12:59Z",
+      "content_type": "text/html; charset=utf-8",
+      "file_size_bytes": 42018,
+      "verification_status": "fetch_verified",
+      "notes": "Downloaded, hashed and title-confirmed."
+    },
+    {
+      "source_id": "DJP_BUPOT_001",
+      "official_url": "https://www.pajak.go.id/sites/default/files/2025-02/Buku%20Manual%20Coretax%202024%20-%20Seri%20Bukti%20Potong%20PPh.pdf",
+      "local_file": "knowledge/indonesia_official_kb/raw_sources/tax/bukti_potong/DJP_BUPOT_001.pdf",
+      "sha256": "94bc1cc4599519f744b52ece9a816dab3f74d24a29b177a8db8c3d7fd7e63709",
+      "retrieved_at": "2026-09-02T13:13:03Z",
+      "content_type": "application/pdf",
+      "file_size_bytes": 2825675,
+      "verification_status": "fetch_verified",
+      "notes": "PDF archived; no text recoverable by the repo extractor — not_chunkable. No fact in this KB derives from it."
+    },
+    {
+      "source_id": "DJP_BUPOT_002",
+      "official_url": "https://pajak.go.id/en/node/114234",
+      "local_file": "knowledge/indonesia_official_kb/raw_sources/tax/bukti_potong/DJP_BUPOT_002.html",
+      "sha256": "50fcd1dfafbba0e34dc67e73c613609c3fd11334990431eeda18a987efd786ce",
+      "retrieved_at": "2026-09-02T13:13:04Z",
+      "content_type": "text/html; charset=UTF-8",
+      "file_size_bytes": 54448,
+      "verification_status": "fetch_verified",
+      "notes": "Downloaded, hashed and title-confirmed."
+    },
+    {
+      "source_id": "DJP_CORETAX_001",
+      "official_url": "https://pajak.go.id/coretaxpedia/",
+      "local_file": "knowledge/indonesia_official_kb/raw_sources/tax/coretax/DJP_CORETAX_001.html",
+      "sha256": "d90d43ef3fbf9a56934d3b79fbd6deb1cb95ca6a207ba6fdbcf63041d59705e1",
+      "retrieved_at": "2026-09-02T13:13:05Z",
+      "content_type": "text/html; charset=UTF-8",
+      "file_size_bytes": 314936,
+      "verification_status": "fetch_verified",
+      "notes": "Downloaded, hashed and title-confirmed."
+    },
+    {
+      "source_id": "DJP_CORETAX_004",
+      "official_url": "https://www.pajak.go.id/en/node/113547",
+      "local_file": "knowledge/indonesia_official_kb/raw_sources/tax/faktur_pajak/DJP_CORETAX_004.html",
+      "sha256": "61e786bb69838794510684aca09c011de8e4981b2901eab0f7cc4de88c5853a3",
+      "retrieved_at": "2026-09-02T13:13:00Z",
+      "content_type": "text/html; charset=UTF-8",
+      "file_size_bytes": 48547,
+      "verification_status": "fetch_verified",
+      "notes": "Downloaded, hashed and title-confirmed."
+    },
+    {
+      "source_id": "DJP_PPH23_002",
+      "official_url": "https://www.pajak.go.id/en/node/35004",
+      "local_file": "knowledge/indonesia_official_kb/raw_sources/tax/pph_23/DJP_PPH23_002.html",
+      "sha256": "7cf184691b72f0d69401fda511af0c9a89a39258253b04ad492fc15854268143",
+      "retrieved_at": "2026-09-02T13:12:48Z",
+      "content_type": "text/html; charset=UTF-8",
+      "file_size_bytes": 91384,
+      "verification_status": "fetch_verified",
+      "notes": "Downloaded, hashed and title-confirmed."
+    },
+    {
+      "source_id": "DJP_PPH23_003",
+      "official_url": "https://pajak.go.id/index.php/id/peraturan/jenis-jasa-lain-yang-atas-imbalannya-dipotong-pajak-penghasilan-berdasarkan-pasal-23-0",
+      "local_file": "knowledge/indonesia_official_kb/raw_sources/tax/pph_23/DJP_PPH23_003.html",
+      "sha256": "b692705e1b8d55c8bbdd164c2abc8e36ae7a8165751633da3e7ac7ade7017ad4",
+      "retrieved_at": "2026-09-02T13:12:49Z",
+      "content_type": "text/html; charset=UTF-8",
+      "file_size_bytes": 74101,
+      "verification_status": "fetch_verified",
+      "notes": "Downloaded, hashed and title-confirmed."
+    },
+    {
+      "source_id": "DJP_PPH23_005",
+      "official_url": "https://pajak.go.id/en/artikel/salah-kaprah-pengenaan-pph-pasal-21-dan-pph-pasal-23-atas-jasa",
+      "local_file": "knowledge/indonesia_official_kb/raw_sources/tax/pph_23/DJP_PPH23_005.html",
+      "sha256": "ec9c9ece5df39dd7d9304662a6115692a7a83d334a4661bd554592a5df3e82df",
+      "retrieved_at": "2026-09-02T13:12:50Z",
+      "content_type": "text/html; charset=UTF-8",
+      "file_size_bytes": 57775,
+      "verification_status": "fetch_verified",
+      "notes": "Downloaded, hashed and title-confirmed."
+    },
+    {
+      "source_id": "DJP_PPH23_006",
+      "official_url": "https://pajak.go.id/en/node/37829",
+      "local_file": "knowledge/indonesia_official_kb/raw_sources/tax/pph_23/DJP_PPH23_006.html",
+      "sha256": "11900c3022d98f15f8bf3a325762103506b093ba50b3a70d66c44ed63412c483",
+      "retrieved_at": "2026-09-02T13:12:51Z",
+      "content_type": "text/html; charset=UTF-8",
+      "file_size_bytes": 147923,
+      "verification_status": "fetch_verified",
+      "notes": "Downloaded, hashed and title-confirmed."
+    },
+    {
+      "source_id": "DJP_PPH23_PENGACARA_004",
+      "official_url": "https://pajak.go.id/en/node/38170",
+      "local_file": "knowledge/indonesia_official_kb/raw_sources/tax/pph_23/DJP_PPH23_PENGACARA_004.html",
+      "sha256": "c9e1f4b0c7179f5bfaa0b99fa9e5bfe24abec569c9b34005ed74f7e8a6723bd1",
+      "retrieved_at": "2026-09-02T13:39:55Z",
+      "content_type": "text/html; charset=UTF-8",
+      "file_size_bytes": 73621,
+      "verification_status": "fetch_verified",
+      "notes": "Downloaded, hashed and title-confirmed."
+    },
+    {
+      "source_id": "DJP_PPH23_PMK141_003",
+      "official_url": "https://www.pajak.go.id/en/node/63200",
+      "local_file": "knowledge/indonesia_official_kb/raw_sources/tax/pph_23/DJP_PPH23_PMK141_003.html",
+      "sha256": "21ce9d3d7991b109aad027a53b8c0c1e30bee3c95013faa74c50f0e4f41a10d1",
+      "retrieved_at": "2026-09-02T13:39:54Z",
+      "content_type": "text/html; charset=UTF-8",
+      "file_size_bytes": 125331,
+      "verification_status": "fetch_verified",
+      "notes": "Downloaded, hashed and title-confirmed."
+    },
+    {
+      "source_id": "DJP_PPH42_002",
+      "official_url": "https://pajak.go.id/en/node/35022",
+      "local_file": "knowledge/indonesia_official_kb/raw_sources/tax/pph_4_2/DJP_PPH42_002.html",
+      "sha256": "42de5946abca061c98b7fbb41111e9166326acb5af1abfd44775543408a9b189",
+      "retrieved_at": "2026-09-02T13:12:53Z",
+      "content_type": "text/html; charset=UTF-8",
+      "file_size_bytes": 84525,
+      "verification_status": "fetch_verified",
+      "notes": "Downloaded, hashed and title-confirmed."
+    },
+    {
+      "source_id": "DJP_PPH42_003",
+      "official_url": "https://www.pajak.go.id/en/node/35073",
+      "local_file": "knowledge/indonesia_official_kb/raw_sources/tax/pph_4_2/DJP_PPH42_003.html",
+      "sha256": "5fdae0edca213b1d49933646994a32978ccf1127faa3f73e17e8f26fbe349653",
+      "retrieved_at": "2026-09-02T13:12:54Z",
+      "content_type": "text/html; charset=UTF-8",
+      "file_size_bytes": 57008,
+      "verification_status": "fetch_verified",
+      "notes": "Downloaded, hashed and title-confirmed."
+    },
+    {
+      "source_id": "DJP_PPH42_006",
+      "official_url": "https://www.pajak.go.id/index.php/en/node/25637",
+      "local_file": "knowledge/indonesia_official_kb/raw_sources/tax/pph_4_2/DJP_PPH42_006.html",
+      "sha256": "ed0fc790e22007481ef7a6ac2cd6441e7d4e7071ec350ba1fe06a080ffa8ad15",
+      "retrieved_at": "2026-09-02T13:12:55Z",
+      "content_type": "text/html; charset=UTF-8",
+      "file_size_bytes": 59390,
+      "verification_status": "fetch_verified",
+      "notes": "Downloaded, hashed and title-confirmed."
+    },
+    {
+      "source_id": "DJP_PPH42_PP34_004",
+      "official_url": "https://www.pajak.go.id/index.php/en/node/59057",
+      "local_file": "knowledge/indonesia_official_kb/raw_sources/tax/pph_4_2/DJP_PPH42_PP34_004.html",
+      "sha256": "c0da95b7cf5c2408ea9241ef702d436a33dabb3c9073eaca851e3ba0bd4d0e33",
+      "retrieved_at": "2026-09-02T13:39:52Z",
+      "content_type": "text/html; charset=UTF-8",
+      "file_size_bytes": 104244,
+      "verification_status": "fetch_verified",
+      "notes": "Downloaded, hashed and title-confirmed."
+    },
+    {
+      "source_id": "DJP_PPHBADAN_001",
+      "official_url": "https://www.pajak.go.id/en/node/113050",
+      "local_file": "knowledge/indonesia_official_kb/raw_sources/tax/pph_badan/DJP_PPHBADAN_001.html",
+      "sha256": "16fadae0088f3f348cf6624b06f28268011c45a05eb17dbf97f7dc4f20505131",
+      "retrieved_at": "2026-09-02T13:13:22Z",
+      "content_type": "text/html; charset=UTF-8",
+      "file_size_bytes": 57458,
+      "verification_status": "fetch_verified",
+      "notes": "Downloaded, hashed and title-confirmed."
+    },
+    {
+      "source_id": "DJP_PPN_001",
+      "official_url": "https://www.pajak.go.id/en/node/113878",
+      "local_file": "knowledge/indonesia_official_kb/raw_sources/tax/ppn_vat/DJP_PPN_001.html",
+      "sha256": "7f289680104e11a4b8a6aa37284dd8284ee9fbde46a3818522e5f46e1153fb99",
+      "retrieved_at": "2026-09-02T13:12:55Z",
+      "content_type": "text/html; charset=UTF-8",
+      "file_size_bytes": 247989,
+      "verification_status": "fetch_verified",
+      "notes": "Downloaded, hashed and title-confirmed."
+    },
+    {
+      "source_id": "DJP_PPN_004",
+      "official_url": "https://www.pajak.go.id/en/node/113453",
+      "local_file": "knowledge/indonesia_official_kb/raw_sources/tax/ppn_vat/DJP_PPN_004.html",
+      "sha256": "9ebb22a0273df653e337aed501e894a7c3b0b0745a76b6cc6fe0b824b878b79a",
+      "retrieved_at": "2026-09-02T13:12:58Z",
+      "content_type": "text/html; charset=UTF-8",
+      "file_size_bytes": 59040,
+      "verification_status": "fetch_verified",
+      "notes": "Downloaded, hashed and title-confirmed."
+    },
+    {
+      "source_id": "DJP_PPN_007",
+      "official_url": "https://www.pajak.go.id/en/node/117215",
+      "local_file": "knowledge/indonesia_official_kb/raw_sources/tax/ppn_vat/DJP_PPN_007.html",
+      "sha256": "42d17e4cedca56a151ad6381f1bf5f3b54aa68696295009d8a1e12fbe5ce40e4",
+      "retrieved_at": "2026-09-02T13:12:59Z",
+      "content_type": "text/html; charset=UTF-8",
+      "file_size_bytes": 71548,
+      "verification_status": "fetch_verified",
+      "notes": "Downloaded, hashed and title-confirmed."
+    },
+    {
+      "source_id": "KEMENKEU_PPH21_001",
+      "official_url": "https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf",
+      "local_file": "knowledge/indonesia_official_kb/raw_sources/tax/pph_21/KEMENKEU_PPH21_001.pdf",
+      "sha256": "6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858",
+      "retrieved_at": "2026-09-02T13:13:22Z",
+      "content_type": "application/pdf",
+      "file_size_bytes": 5374488,
+      "verification_status": "fetch_verified",
+      "notes": "PDF archived; no text recoverable by the repo extractor — not_chunkable. No fact in this KB derives from it."
+    },
+    {
+      "source_id": "KEMENKEU_PPH23_009",
+      "official_url": "https://djpb.kemenkeu.go.id/kppn/tapaktuan/id/informasi/perpajakan/pph-pasal-23.html",
+      "local_file": "knowledge/indonesia_official_kb/raw_sources/tax/pph_23/KEMENKEU_PPH23_009.html",
+      "sha256": "6ce514a335aa0d78614470ed4bea5a0ea91c78c80c3cd7b7c5ebad381825b4bb",
+      "retrieved_at": "2026-09-02T13:12:53Z",
+      "content_type": "text/html; charset=utf-8",
+      "file_size_bytes": 122513,
+      "verification_status": "fetch_verified",
+      "notes": "Downloaded, hashed and title-confirmed."
+    },
+    {
+      "source_id": "KEMENKEU_PPH23_PMK141_001",
+      "official_url": "https://jdih.kemenkeu.go.id/api/download/fullText/2015/141~PMK.03~2015Per.pdf",
+      "local_file": "knowledge/indonesia_official_kb/raw_sources/tax/pph_23/KEMENKEU_PPH23_PMK141_001.pdf",
+      "sha256": "cd107a9b7de8ad12b6eff1e3cf64f512b712f63ce58e62b3dba2a35d6ccbf1f4",
+      "retrieved_at": "2026-09-02T13:39:53Z",
+      "content_type": "application/pdf",
+      "file_size_bytes": 598778,
+      "verification_status": "fetch_verified",
+      "notes": "PDF archived; text ops present but repo extractor rejects encoding — not_chunkable this pass."
+    },
+    {
+      "source_id": "KEMENKEU_PPH23_PMK141_004",
+      "official_url": "https://jdih.kemenkeu.go.id/dok/141-pmk-03-2015",
+      "local_file": "knowledge/indonesia_official_kb/raw_sources/tax/pph_23/KEMENKEU_PPH23_PMK141_004.html",
+      "sha256": "af20708ebc18b9d05f88b467dc349919cd18b72f0c4b60d8672fd071647f0e9b",
+      "retrieved_at": "2026-09-02T13:55:07Z",
+      "content_type": "text/html; charset=utf-8",
+      "file_size_bytes": 188405,
+      "verification_status": "fetch_verified",
+      "notes": "Currentness evidence for PMK 141/PMK.03/2015 (status + Riwayat Dokumen)."
+    },
+    {
+      "source_id": "KEMENKEU_PPH42_PP34_003",
+      "official_url": "https://jdih.kemenkeu.go.id/dok/pp-34-tahun-2017",
+      "local_file": "knowledge/indonesia_official_kb/raw_sources/tax/pph_4_2/KEMENKEU_PPH42_PP34_003.html",
+      "sha256": "5e6a4f3db6d7abf9e3f389cfe1a4b31fd46d74a9de7a8a048fe40051d6d2ed1a",
+      "retrieved_at": "2026-09-02T13:39:51Z",
+      "content_type": "text/html; charset=utf-8",
+      "file_size_bytes": 186014,
+      "verification_status": "fetch_verified",
+      "notes": "Downloaded, hashed and title-confirmed."
+    },
+    {
+      "source_id": "KEMENKEU_PPN_002",
+      "official_url": "https://jdih.kemenkeu.go.id/api/download/52955502-8733-4fdd-98ce-bb03c31cda0b/2025pmkeuangan11.pdf",
+      "local_file": "knowledge/indonesia_official_kb/raw_sources/tax/ppn_vat/KEMENKEU_PPN_002.pdf",
+      "sha256": "373a13e091cc697145b6624aa450c3dc60c8594501e900685964584152b35b6c",
+      "retrieved_at": "2026-09-02T13:12:58Z",
+      "content_type": "application/pdf",
+      "file_size_bytes": 914438,
+      "verification_status": "fetch_verified",
+      "notes": "Downloaded, hashed and title-confirmed."
+    },
+    {
+      "source_id": "OSS_001",
+      "official_url": "https://oss.go.id/en",
+      "local_file": "knowledge/indonesia_official_kb/raw_sources/compliance/oss/OSS_001.html",
+      "sha256": "bd0888ca5dec166e2915a2a7a9922a8c86d14371b1b41f413190bb4d78ac4cf7",
+      "retrieved_at": "2026-09-02T13:13:06Z",
+      "content_type": "text/html; charset=utf-8",
+      "file_size_bytes": 212361,
+      "verification_status": "fetch_verified",
+      "notes": "Client-rendered SPA; archived bytes contain title/chrome only."
+    },
+    {
+      "source_id": "OSS_003",
+      "official_url": "https://oss.go.id/en/regulasi",
+      "local_file": "knowledge/indonesia_official_kb/raw_sources/compliance/oss/OSS_003.html",
+      "sha256": "3b85e4dbbc05681deb8c9f900529c810c4737ced9df16be1814c01947770da7e",
+      "retrieved_at": "2026-09-02T13:13:07Z",
+      "content_type": "text/html; charset=utf-8",
+      "file_size_bytes": 116950,
+      "verification_status": "fetch_verified",
+      "notes": "Client-rendered SPA; archived bytes contain title/chrome only."
+    },
+    {
+      "source_id": "OSS_KBLI_001",
+      "official_url": "https://oss.go.id/en/kbli",
+      "local_file": "knowledge/indonesia_official_kb/raw_sources/compliance/kbli/OSS_KBLI_001.html",
+      "sha256": "910475d7c2582f0abd8aab6d48afd1155ed26560145c283e8b34baf068bc08c5",
+      "retrieved_at": "2026-09-02T13:13:08Z",
+      "content_type": "text/html; charset=utf-8",
+      "file_size_bytes": 183200,
+      "verification_status": "fetch_verified",
+      "notes": "Client-rendered SPA; archived bytes contain title/chrome only."
+    }
+  ],
+  "not_chunkable": {
+    "policy": "Archived and hashed, but no readable text — no fact in this KB may derive from these.",
+    "source_ids": [
+      "BPK_PPH42_PP34_001",
+      "KEMENKEU_PPH23_PMK141_001",
+      "DJP_BUPOT_001",
+      "KEMENKEU_PPH21_001",
+      "OSS_001",
+      "OSS_003",
+      "OSS_KBLI_001"
+    ],
+    "diagnostics": {
+      "BPK_PPH42_PP34_001": "scanned: /Font=15, 0 text operators, 14 CCITTFaxDecode streams — OCR would be required",
+      "KEMENKEU_PPH23_PMK141_001": "/Font=117, ~72 text operators, 41 DCTDecode — text exists but encoding not decodable by the repo extractor",
+      "DJP_BUPOT_001": "/Font=28, ~9 text operators — largely image-based",
+      "KEMENKEU_PPH21_001": "/Font=304, ~315 text operators, 66 JBIG2Decode — text exists but encoding not decodable by the repo extractor",
+      "OSS_001/OSS_003/OSS_KBLI_001": "client-rendered SPA; archived HTML is page chrome only"
+    },
+    "note": "For PP 34/2017 and PMK 141/2015 this is NOT a blocker: the same instruments were read as HTML at DJP_PPH42_PP34_004 and DJP_PPH23_PMK141_003 respectively. OCR was NOT attempted — no OCR tooling is available here and hand-rolling a CID decoder would risk plausible-looking garbage in a legal KB."
+  }
+}

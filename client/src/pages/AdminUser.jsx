@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { apiFetch } from '../lib/api'
+import { triState } from '../lib/preflight'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -146,6 +147,10 @@ function StatCard({ label, value, sub, accent }) {
 }
 
 // ── Profile row ───────────────────────────────────────────────────────────────
+// null/undefined must read as unavailable, never as 0.
+const na = (v) => (v === null || v === undefined ? 'n/a' : String(v))
+const dbtn = { fontSize: 12, padding: '5px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text-4)', opacity: 0.55, cursor: 'not-allowed', fontFamily: 'inherit' }
+
 function ProfileRow({ label, value }) {
   return (
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', padding: '11px 16px', borderBottom: '0.5px solid var(--border)', gap: 16 }}>
@@ -166,13 +171,47 @@ export default function AdminUser() {
   const [data, setData]       = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError]     = useState(null)
+  // Admin link-email action state
+  const [linkEmail, setLinkEmail] = useState('')
+  const [linkBusy, setLinkBusy]   = useState(false)
+  const [linkResult, setLinkResult] = useState(null) // { kind: 'linked'|'already'|'conflict'|'error', ... }
 
-  useEffect(() => {
-    if (!token || !id) return
+  // Cleanup & Reset preflight (read-only assessment; never mutates)
+  const [cpf, setCpf] = useState(null)
+  const [cpfErr, setCpfErr] = useState('')
+
+  const load = () => {
     apiFetch(`/admin/users/${id}`, token)
       .then(d => { setData(d); setLoading(false) })
       .catch(e => { setError(e); setLoading(false) })
-  }, [token, id])
+    apiFetch(`/admin/users/${id}/cleanup-preflight`, token)
+      .then(r => { setCpf(r); setCpfErr('') })
+      .catch(e => { setCpf(null); setCpfErr(e.message || 'Preflight failed.') })
+  }
+  useEffect(() => {
+    if (!token || !id) return
+    load()
+  }, [token, id]) // eslint-disable-line
+
+  // Link an email identity to THIS user. Raw fetch so we can read the 409 conflict body.
+  const submitLinkEmail = async (e) => {
+    e?.preventDefault?.()
+    const email = linkEmail.trim().toLowerCase()
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setLinkResult({ kind: 'error', message: 'Enter a valid email address.' }); return }
+    setLinkBusy(true); setLinkResult(null)
+    try {
+      const res = await fetch(`/api/admin/users/${id}/link-email`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ email }),
+      })
+      const body = await res.json().catch(() => ({}))
+      if (res.status === 201 && body.status === 'linked') { setLinkResult({ kind: 'linked', email }); setLinkEmail(''); load() }
+      else if (body.status === 'already_linked') { setLinkResult({ kind: 'already', email }) }
+      else if (res.status === 409 && body.status === 'conflict') { setLinkResult({ kind: 'conflict', email, existing: body.existing_user }) }
+      else { setLinkResult({ kind: 'error', message: body.error || 'Could not link email.' }) }
+    } catch { setLinkResult({ kind: 'error', message: 'Network error.' }) }
+    finally { setLinkBusy(false) }
+  }
 
   // ── Loading ───────────────────────────────────────────────────────────────
   if (loading) {
@@ -208,8 +247,9 @@ export default function AdminUser() {
     )
   }
 
-  const { user, summary, monthly_activity, recent_activity } = data
+  const { user, summary, monthly_activity, recent_activity, email_identities = [], businesses = [] } = data
   const displayName = [user.first_name, user.last_name].filter(Boolean).join(' ') || `User ${user.id}`
+  const tgConnected = user.is_telegram_connected
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>
@@ -240,7 +280,10 @@ export default function AdminUser() {
                 <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)' }}>@{user.username}</span>
               )}
               <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)', fontFamily: 'monospace' }}>ID: {user.id}</span>
-              <span style={{ fontSize: 11, color: '#12B76A', fontWeight: 600 }}>✓ Telegram connected</span>
+              {tgConnected
+                ? <span style={{ fontSize: 11, color: '#12B76A', fontWeight: 600 }}>✓ Telegram connected</span>
+                : <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', fontWeight: 600 }}>Email-first account</span>}
+              {email_identities.length > 0 && <span style={{ fontSize: 11, color: '#60a5fa', fontWeight: 600 }}>✉ {email_identities.length} email{email_identities.length > 1 ? 's' : ''}</span>}
             </div>
           </div>
         </div>
@@ -282,8 +325,138 @@ export default function AdminUser() {
             <ProfileRow label="Last activity"  value={fmtDateTime(summary.last_activity_at)} />
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '11px 16px', gap: 16 }}>
               <span style={{ fontSize: 13, color: 'var(--text-3)', fontWeight: 500 }}>Telegram</span>
-              <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 20, background: '#E1F5EE', color: '#085041' }}>✓ Connected</span>
+              {tgConnected
+                ? <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 20, background: '#E1F5EE', color: '#085041' }}>✓ Connected</span>
+                : <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 20, background: 'var(--bg)', color: 'var(--text-4)' }}>Not linked</span>}
             </div>
+          </div>
+        </div>
+
+        {/* ── Login identities ─── */}
+        <div style={{ marginBottom: 24 }}>
+          <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>Login Identities</div>
+          <div style={{ background: 'var(--bg-2)', borderRadius: 14, border: '1px solid var(--border)', overflow: 'hidden' }}>
+            <ProfileRow label="Telegram identity" value={tgConnected ? `ID ${user.id}${user.username ? ` · @${user.username}` : ''}` : null} />
+            {email_identities.length === 0
+              ? <ProfileRow label="Email identities" value={null} />
+              : email_identities.map((e, i) => (
+                  <ProfileRow key={i} label={i === 0 ? 'Email identities' : ''} value={`${e.email}${e.verified ? '  ✓ verified' : '  (unverified)'}`} />
+                ))}
+          </div>
+
+          {/* Admin action: link an email to THIS user (email + Telegram = one account) */}
+          <form onSubmit={submitLinkEmail} style={{ marginTop: 12, background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: 14, padding: '14px 16px' }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', marginBottom: 4 }}>Link an email to this account</div>
+            <div style={{ fontSize: 12, color: 'var(--text-3)', lineHeight: 1.5, marginBottom: 10 }}>
+              Lets this user sign in by email and keep the same business access. Admin-verified. Never merges two accounts.
+            </div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <input type="email" value={linkEmail} onChange={e => { setLinkEmail(e.target.value); setLinkResult(null) }}
+                placeholder="name@example.com"
+                style={{ flex: 1, minWidth: 200, padding: '9px 12px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)', fontSize: 14, fontFamily: 'inherit' }} />
+              <button type="submit" disabled={linkBusy || !linkEmail.trim()} style={{ padding: '9px 18px', borderRadius: 10, background: 'var(--brand)', color: '#fff', border: 'none', fontSize: 14, fontWeight: 600, cursor: linkBusy ? 'default' : 'pointer', fontFamily: 'inherit', opacity: linkBusy || !linkEmail.trim() ? 0.6 : 1 }}>
+                {linkBusy ? 'Linking…' : 'Link email'}
+              </button>
+            </div>
+            {linkResult?.kind === 'linked' && <div style={{ marginTop: 10, fontSize: 13, color: '#085041', background: '#E1F5EE', borderRadius: 8, padding: '8px 12px' }}>✓ Linked <strong>{linkResult.email}</strong> to this account. Email login now resolves here.</div>}
+            {linkResult?.kind === 'already' && <div style={{ marginTop: 10, fontSize: 13, color: 'var(--text-3)', background: 'var(--bg)', borderRadius: 8, padding: '8px 12px' }}>Already linked to this account — no change.</div>}
+            {linkResult?.kind === 'error' && <div style={{ marginTop: 10, fontSize: 13, color: '#b3261e', background: '#FDECEA', borderRadius: 8, padding: '8px 12px' }}>{linkResult.message}</div>}
+            {linkResult?.kind === 'conflict' && (
+              <div style={{ marginTop: 10, fontSize: 13, color: '#92400e', background: '#FEF3C7', borderRadius: 8, padding: '10px 12px', lineHeight: 1.5 }}>
+                <strong>Conflict:</strong> {linkResult.email} already belongs to a different account
+                (ID {linkResult.existing?.user_id}{linkResult.existing?.display_name ? ` · ${linkResult.existing.display_name}` : ''}
+                {linkResult.existing?.businesses?.length ? ` · ${linkResult.existing.businesses.length} business(es)` : ''}).
+                Not linked — merging two accounts is a separate, future flow.
+              </div>
+            )}
+          </form>
+        </div>
+
+        {/* ── Business memberships ─── */}
+        <div style={{ marginBottom: 24 }}>
+          <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>Business Memberships</div>
+          <div style={{ background: 'var(--bg-2)', borderRadius: 14, border: '1px solid var(--border)', overflow: 'hidden' }}>
+            {businesses.length === 0
+              ? <div style={{ padding: '14px 16px', fontSize: 13, color: 'var(--text-4)' }}>No business memberships.</div>
+              : businesses.map((b, i) => (
+                  <div key={b.id || i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, padding: '11px 16px', borderBottom: i < businesses.length - 1 ? '0.5px solid var(--border)' : 'none' }}>
+                    <span style={{ minWidth: 0 }}>
+                      <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{b.name || '(unnamed)'}</span>
+                      <span style={{ display: 'block', fontSize: 11, color: 'var(--text-3)', marginTop: 2 }}>{[b.type, b.business_code].filter(Boolean).join(' · ')}</span>
+                    </span>
+                    <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 20, background: 'var(--bg)', color: 'var(--text-2)' }}>{b.role}{b.status && b.status !== 'active' ? ` · ${b.status}` : ''}</span>
+                  </div>
+                ))}
+          </div>
+        </div>
+
+        {/* ── Cleanup & Reset (read-only assessment; no destructive action available) ─── */}
+        <div style={{ marginBottom: 24 }}>
+          <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>Cleanup &amp; Reset</div>
+          <div style={{ background: 'var(--bg-2)', borderRadius: 14, border: '1px solid var(--border)', overflow: 'hidden' }}>
+            {cpfErr && <div style={{ padding: '12px 16px', fontSize: 13, color: '#b3261e', background: '#FDECEA' }}>Cleanup preflight unavailable: {cpfErr}</div>}
+            {!cpf && !cpfErr && <div style={{ padding: '14px 16px', fontSize: 13, color: 'var(--text-3)' }}>Loading cleanup preflight…</div>}
+            {cpf && <>
+              <ProfileRow label="Identity" value={`${cpf.user.identity_type}${cpf.user.email_masked ? ` · ${cpf.user.email_masked}` : ''}`} />
+              <ProfileRow label="Email identity" value={triState(cpf.user.has_email_identity)} />
+              <ProfileRow label="Telegram identity" value={triState(cpf.user.has_telegram_identity)} />
+              <ProfileRow label="Owned workspaces" value={na(cpf.ownership.owned_workspaces_count)} />
+              <ProfileRow label="— personal / company" value={`${na(cpf.ownership.personal_workspaces_count)} / ${na(cpf.ownership.company_workspaces_count)}`} />
+              <ProfileRow label="— archived" value={na(cpf.ownership.archived_workspaces_count)} />
+              <ProfileRow label="Memberships" value={na(cpf.ownership.memberships_count)} />
+              <ProfileRow label="Transactions" value={na(cpf.data_counts.transactions_count)} />
+              <ProfileRow label="Documents" value={na(cpf.data_counts.documents_count)} />
+              <ProfileRow label="Wallets (owned workspaces)" value={na(cpf.data_counts.wallets_count)} />
+              <ProfileRow label="Audit events" value={na(cpf.data_counts.audit_events_count)} />
+              <ProfileRow label="Safe to archive/reset" value={cpf.safe_to_archive_or_reset === true
+                ? 'yes — no financial data or documents'
+                : cpf.identity_complete === false || cpf.ownership_truncated
+                  ? 'no — some data could not be read'
+                  : 'no — data present or counts unknown'} />
+
+              {cpf.owned_workspaces?.length > 0 && (
+                <div style={{ padding: '11px 16px', borderTop: '0.5px solid var(--border)' }}>
+                  <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 6 }}>Owned workspaces (open to archive/restore):</div>
+                  {cpf.owned_workspaces.map(w => (
+                    <div key={w.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 10, padding: '4px 0' }}>
+                      <a href={`/admin/businesses/${w.id}`} style={{ fontSize: 13, color: 'var(--accent,#4F46E5)', textDecoration: 'none' }}>{w.name || '(unnamed)'}</a>
+                      <span style={{ fontSize: 11, color: 'var(--text-3)' }}>{w.type}{w.status === 'archived' ? ' · archived' : ''}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {cpf.risk_flags?.length > 0 && (
+                <div style={{ padding: '11px 16px', borderTop: '0.5px solid var(--border)', display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                  {cpf.risk_flags.map(f => (
+                    <span key={f} style={{ fontSize: 11, fontWeight: 700, padding: '3px 9px', borderRadius: 20, background: '#FEF3C7', color: '#92400e' }}>{f}</span>
+                  ))}
+                </div>
+              )}
+              {cpf.recommended_actions?.length > 0 && (
+                <div style={{ padding: '11px 16px', borderTop: '0.5px solid var(--border)', fontSize: 12, color: 'var(--text-2)' }}>
+                  Recommended: {cpf.recommended_actions.join(' · ')}
+                </div>
+              )}
+              {cpf.warnings?.length > 0 && (
+                <div style={{ padding: '11px 16px', borderTop: '0.5px solid var(--border)' }}>
+                  {cpf.warnings.map((w, i) => <div key={i} style={{ fontSize: 12, color: '#92400e' }}>{w}</div>)}
+                </div>
+              )}
+
+              {/* Blocked actions — shown so the operator knows why, wired to nothing. */}
+              <div style={{ padding: '12px 16px', borderTop: '0.5px solid var(--border)', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <button disabled title="Reset is not enabled yet. Use archive/restore for now." style={dbtn}>Reset test data (disabled)</button>
+                <button disabled title="Requires user status migration and session handling." style={dbtn}>Suspend user (not available yet)</button>
+                <button disabled title="Hard delete is not available in production." style={dbtn}>Hard delete (unavailable)</button>
+              </div>
+              <div style={{ padding: '0 16px 14px', fontSize: 11.5, color: 'var(--text-4)', lineHeight: 1.6 }}>
+                Reset is not enabled yet. Use archive/restore for now — it would later cover: {(cpf.reset_scope_preview || []).join(', ')}.<br />
+                User account archive/suspend is <b>Not available yet</b> — requires user status migration and session handling (Phase 2).<br />
+                Hard delete is not available in production. Use archive/restore or reset-test-data workflows.<br />
+                Cleanup itself happens on the workspace page: open a workspace above to archive or restore it (reason + typed name required, always audited).
+              </div>
+            </>}
           </div>
         </div>
 

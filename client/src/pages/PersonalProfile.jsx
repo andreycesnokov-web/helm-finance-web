@@ -8,10 +8,11 @@ import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { setActiveBusinessId } from '../lib/api'
-import PersonalDashboard from './PersonalDashboard'
+import PersonalWorkspace from './PersonalDashboard'
 
-// Personal Account v1 dashboard (personal finance) is gated separately from email
-// auth. When ON, /account leads with personal finance and demotes the business block.
+// Personal Account v1 (personal finance) is gated separately from email auth. When ON,
+// /account becomes the full Personal Workspace shell (mirrors the Business shell). When
+// OFF, /account keeps the legacy centered business-launcher page below — unchanged.
 const PERSONAL_V1 = import.meta.env.VITE_PERSONAL_ACCOUNT_V1_ENABLED === 'true'
 
 const COMMON_TZ = ['Asia/Jakarta', 'Asia/Makassar', 'Asia/Singapore', 'Asia/Bangkok', 'Europe/Moscow', 'UTC']
@@ -34,6 +35,7 @@ export default function PersonalProfile() {
   const navigate = useNavigate()
   const [form, setForm] = useState({ display_name: '', locale: '', timezone: '', avatar_url: '' })
   const [businesses, setBusinesses] = useState([])
+  const [loginMethods, setLoginMethods] = useState(null)
   const [loading, setLoading] = useState(true)
   const [showProfile, setShowProfile] = useState(false)
   const [showJoin, setShowJoin] = useState(false)
@@ -52,10 +54,12 @@ export default function PersonalProfile() {
     Promise.all([
       fetch('/api/me/profile', h).then(r => r.json()).catch(() => ({})),
       fetch('/api/workspaces', h).then(r => r.json()).catch(() => ({})),
-    ]).then(([prof, ws]) => {
+      fetch('/api/me/login-methods', h).then(r => r.json()).catch(() => null),
+    ]).then(([prof, ws, lm]) => {
       const p = prof.profile || {}
       setForm({ display_name: p.display_name || '', locale: p.locale || '', timezone: p.timezone || '', avatar_url: p.avatar_url || '' })
       setBusinesses(Array.isArray(ws.business) ? ws.business : [])
+      setLoginMethods(lm && !lm.error ? lm : null)
     }).catch(() => setError('Could not load your account.')).finally(() => setLoading(false))
   }, [token]) // eslint-disable-line
 
@@ -115,7 +119,15 @@ export default function PersonalProfile() {
   }
 
   const openBusiness = (b) => {
-    try { setActiveBusinessId(b.id); localStorage.setItem('activeWorkspaceId', b.id) } catch { /* */ }
+    // Sync ALL THREE workspace keys so PulseWrapper/WorkspaceProvider resolve to this
+    // business — otherwise a stale last_active_workspace_id='personal' bounces the user
+    // back to /account. (activeBusinessId = API scope; activeWorkspaceId + last_active =
+    // WorkspaceProvider selection.)
+    try {
+      setActiveBusinessId(b.id)
+      localStorage.setItem('activeWorkspaceId', b.id)
+      localStorage.setItem('last_active_workspace_id', b.id)
+    } catch { /* */ }
     navigate('/business/pulse')
   }
 
@@ -126,6 +138,20 @@ export default function PersonalProfile() {
   const lbl = { fontSize: 12, fontWeight: 600, color: 'var(--text-2,#555)', margin: '12px 0 6px', display: 'block' }
   const primary = { padding: '12px 16px', borderRadius: 10, border: 'none', background: 'var(--brand,#3399FF)', color: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }
   const ghost = { padding: '10px 14px', borderRadius: 10, border: '1px solid var(--border-2,#ccc)', background: 'none', color: 'var(--text,#111)', fontSize: 14, cursor: 'pointer', fontFamily: 'inherit' }
+  // Mobile-first onboarding choice card (full-width, stacked, tappable).
+  const choice = { display: 'block', width: '100%', textAlign: 'left', padding: '14px 16px', borderRadius: 12, border: '1px solid var(--border-2,#e3e8ee)', background: 'var(--bg-2,#f7f9fb)', color: 'var(--text,#111)', cursor: 'pointer', fontFamily: 'inherit' }
+  const choiceTitle = { display: 'block', fontSize: 15, fontWeight: 700, marginBottom: 3 }
+  const choiceSub = { display: 'block', fontSize: 12.5, color: 'var(--text-3,#777)', lineHeight: 1.45 }
+  // §6 separation copy — shown in Personal Account so the boundary is explicit.
+  const separationCopy = (
+    <div style={{ marginTop: 14, fontSize: 12.5, color: 'var(--text-3,#777)', lineHeight: 1.5, padding: '10px 12px', borderRadius: 10, background: 'var(--bg-2,#f4f7fa)' }}>
+      Your personal wallets and business wallets are separate. Money only moves between them
+      through an explicit owner loan, capital contribution, reimbursement, or dividend flow.
+    </div>
+  )
+
+  // Flag ON → full Personal Workspace shell (mirrors Business). Flag OFF → legacy page below.
+  if (PERSONAL_V1) return <PersonalWorkspace />
 
   if (loading) return <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-3,#777)' }}>Loading…</div>
 
@@ -164,32 +190,41 @@ export default function PersonalProfile() {
           style={{ background: 'none', border: 'none', color: 'var(--red,#d33)', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>Sign out</button>
       </div>
       <p style={{ fontSize: 14, color: 'var(--text-2,#6B7E92)', marginTop: 0, marginBottom: 22, lineHeight: 1.5 }}>
-        {PERSONAL_V1
-          ? 'Your personal financial workspace. Business workspaces are optional — create or join one below.'
-          : 'Your personal login for CFO AI. Create a business or join one from an invitation.'}
+        Your personal login for CFO AI. Create a business or join one from an invitation.
       </p>
-
-      {/* Personal finance (Phase 2) leads when enabled */}
-      {PERSONAL_V1 && <PersonalDashboard token={token} />}
-
-      {/* Business workspaces — demoted to a secondary block when personal finance is on */}
-      {PERSONAL_V1 && <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-2,#6B7E92)', margin: '4px 0 8px' }}>Business workspaces</div>}
 
       {/* Onboarding / workspaces */}
       {businesses.length === 0 ? (
-        <div style={{ ...card, textAlign: 'center' }}>
-          <div style={{ fontSize: 17, fontWeight: 700, marginBottom: 6 }}>Create your first business workspace</div>
-          <div style={{ fontSize: 14, color: 'var(--text-3,#777)', marginBottom: 18, lineHeight: 1.5 }}>
-            Hi, {greeting}. Start a business to invite your team and track finances — or join a business you've been invited to.
+        <div style={card}>
+          <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 3 }}>Welcome, {greeting}</div>
+          <div style={{ fontSize: 13.5, color: 'var(--text-3,#777)', marginBottom: 14, lineHeight: 1.5 }}>What would you like to do first?</div>
+          <div style={{ display: 'grid', gap: 10 }}>
+            <button style={choice} onClick={() => navigate('/business/new')}>
+              <span style={choiceTitle}>Create a business workspace</span>
+              <span style={choiceSub}>Start a separate workspace for company money and your team.</span>
+            </button>
+            {/* Personal finance entry is gated by VITE_PERSONAL_ACCOUNT_V1_ENABLED. When
+                enabled, /account renders the full Personal Workspace which owns this path. */}
+            {PERSONAL_V1 ? (
+              <button style={choice} onClick={() => navigate('/account')}>
+                <span style={choiceTitle}>Manage my personal finances</span>
+                <span style={choiceSub}>Track your personal wallets and spending — kept separate from any business.</span>
+              </button>
+            ) : (
+              <div style={{ ...choice, cursor: 'default', opacity: 0.6 }} aria-disabled="true">
+                <span style={choiceTitle}>Manage my personal finances</span>
+                <span style={choiceSub}>Personal finance tools are coming soon.</span>
+              </div>
+            )}
           </div>
-          <button style={{ ...primary, width: '100%', maxWidth: 320 }} onClick={() => navigate('/business/new')}>+ Create new business</button>
-          <div style={{ maxWidth: 320, margin: '0 auto' }}>{joinBlock}</div>
+          <div style={{ marginTop: 4 }}>{joinBlock}</div>
+          {separationCopy}
         </div>
       ) : (
         <div style={card}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-            <div style={{ fontSize: 15, fontWeight: 700 }}>Your businesses</div>
-            <button style={ghost} onClick={() => navigate('/business/new')}>+ Create another</button>
+            <div style={{ fontSize: 15, fontWeight: 700 }}>Your business workspaces</div>
+            <button style={ghost} onClick={() => navigate('/business/new')}>+ Create another company workspace</button>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {businesses.map(b => (
@@ -201,13 +236,43 @@ export default function PersonalProfile() {
                     {b.business_code ? `Code ${b.business_code}` : ''}{b.business_code && b.role ? ' · ' : ''}{b.role || ''}
                   </span>
                 </span>
-                <button style={{ ...primary, padding: '8px 16px' }} onClick={() => openBusiness(b)}>Open</button>
+                <button style={{ ...primary, padding: '8px 16px' }} onClick={() => openBusiness(b)}>Open business</button>
               </div>
             ))}
           </div>
           {joinBlock}
+          {separationCopy}
         </div>
       )}
+
+      {/* Login & Security (read-only status; email/link changes are verification/admin-managed) */}
+      <div style={{ ...card, marginTop: 16 }}>
+        <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 12 }}>Login &amp; Security</div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+            <span style={{ fontSize: 13, color: 'var(--text-2,#555)' }}>Email</span>
+            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text,#111)', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {loginMethods?.email || <span style={{ color: 'var(--text-3,#999)', fontWeight: 400 }}>Not linked</span>}
+              {loginMethods?.email && loginMethods?.email_verified && <span style={{ marginLeft: 6, fontSize: 11, color: 'var(--green-dark,#1a7f37)' }}>✓ verified</span>}
+            </span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+            <span style={{ fontSize: 13, color: 'var(--text-2,#555)' }}>Telegram</span>
+            <span style={{ fontSize: 13, fontWeight: 600, color: loginMethods?.telegram_linked ? 'var(--green-dark,#1a7f37)' : 'var(--text-3,#999)' }}>
+              {loginMethods?.telegram_linked ? 'Linked' : 'Not linked'}
+            </span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+            <span style={{ fontSize: 13, color: 'var(--text-2,#555)' }}>Display name</span>
+            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text,#111)' }}>{form.display_name || loginMethods?.display_name || greeting}</span>
+          </div>
+        </div>
+        <div style={{ marginTop: 12, fontSize: 12, color: 'var(--text-3,#888)', lineHeight: 1.5 }}>
+          Email and Telegram are login methods for the same account when linked. To change or
+          link an email, contact support — email changes are verification-based and, for
+          existing Telegram accounts, linked by an administrator.
+        </div>
+      </div>
 
       {/* Profile settings (secondary, collapsible) */}
       <div style={{ ...card, marginTop: 16 }}>
@@ -256,7 +321,6 @@ export default function PersonalProfile() {
       <div style={{ marginTop: 16, fontSize: 12, color: 'var(--text-3,#999)', textAlign: 'center', lineHeight: 1.5 }}>
         No personal wallets or transactions yet — personal finance comes later.
       </div>
-      {user?.id != null && <div style={{ marginTop: 10, fontSize: 10, color: 'var(--text-4,#bbb)', textAlign: 'center' }}>id {String(user.id)}</div>}
     </div>
   )
 }

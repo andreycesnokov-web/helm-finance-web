@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '../hooks/useAuth'
 import { useTranslation } from '../hooks/useTranslation'
 import { apiFetch, fmt } from '../lib/api'
+import { applicableMissingFields } from '../lib/accountantReadiness'
 import { getLang } from '../i18n/index'
 
 // Compact label map (page-local, ru/en/id).
@@ -132,7 +133,9 @@ export default function Accountant() {
         <>
           {/* Status tiles + quick links */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 10, marginBottom: 12 }}>
-            {[[l.completeness, `${summary.completeness?.percent ?? 0}%`], [l.upcoming90, (summary.upcoming || []).length], [l.overdueN, (summary.overdue || []).length], [l.missingN, (summary.missing_profile_fields || []).length]].map(([k, v], i) => (
+            {/* A field that does not apply to this profile (vat_status on a Non-PKP company)
+                is not missing — count the same filtered list the AI Accountant pages use. */}
+            {[[l.completeness, `${summary.completeness?.percent ?? 0}%`], [l.upcoming90, (summary.upcoming || []).length], [l.overdueN, (summary.overdue || []).length], [l.missingN, applicableMissingFields(profile || {}, summary.missing_profile_fields || []).length]].map(([k, v], i) => (
               <div key={i} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: '10px 12px' }}>
                 <div style={{ fontSize: 11, color: 'var(--text-3)' }}>{k}</div>
                 <div style={{ fontSize: 20, fontWeight: 800 }}>{v}</div>

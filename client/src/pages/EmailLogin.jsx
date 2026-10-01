@@ -5,6 +5,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
+import { consumePostLoginRedirect } from '../lib/api'
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
@@ -31,6 +32,12 @@ export default function EmailLogin() {
       })
       const data = await res.json().catch(() => ({}))
       if (res.status === 404) { setError('Email sign-in is not available.'); return }
+      // Temporary backend/DB failure: the link was NOT stored and NOT sent — stay on step 1
+      // so we never claim a link is on its way (that produced the "invalid or expired" loop).
+      if (data.error === 'auth_temporarily_unavailable') {
+        setError(data.message || 'Login is temporarily unavailable. Please try again in a few minutes.')
+        return
+      }
       if (!res.ok) { setError(data.error === 'rate_limited' ? 'Too many requests. Try again later.' : 'Could not send the link.'); return }
       setEmail(em); setStep(2)
       if (data.magic_link) setDevLink(data.magic_link) // local/dev convenience only
@@ -53,7 +60,7 @@ export default function EmailLogin() {
         return
       }
       loginWithToken(data.token, data.user ? { id: data.user.id, firstName: data.user.display_name } : null)
-      navigate('/account')
+      navigate(consumePostLoginRedirect() || '/account')
     } catch { setError('Network error. Please try again.') }
     finally { setBusy(false) }
   }

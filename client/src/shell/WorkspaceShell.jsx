@@ -79,13 +79,13 @@ function Nav({ groups, activeKey, onNavigate }) {
   )
 }
 
-export default function WorkspaceShell({ workspaces, activeId, onSelectWorkspace, nav, activeKey, onNavigate, children }) {
+export default function WorkspaceShell({ workspaces, activeId, onSelectWorkspace, nav, mobileNav, activeKey, onNavigate, children }) {
   const [drawer, setDrawer] = useState(false)
   const all = [...(workspaces?.personal || []), ...(workspaces?.business || [])]
   const active = all.find(w => String(w.id) === String(activeId)) || all[0]
   const isPersonal = active?.type === 'personal'
   const footer = isPersonal
-    ? <span className="cfo-badge cfo-badge-private"><Icon.lock /> Private workspace</span>
+    ? <span className="cfo-badge cfo-badge-private"><Icon.lock /> Personal workspace</span>
     : <span className="cfo-badge cfo-badge-shared"><Icon.users /> Shared team workspace</span>
 
   const SwitcherEl = <WorkspaceSwitcher workspaces={workspaces} activeId={activeId} onSelect={onSelectWorkspace} />
@@ -105,7 +105,7 @@ export default function WorkspaceShell({ workspaces, activeId, onSelectWorkspace
       <header className="cfo-mobilehead">
         <img className="cfo-mobilesym" src={SYMBOL} alt="CFO AI" />
         {isPersonal
-          ? <span className="cfo-badge cfo-badge-private"><Icon.lock /> Private</span>
+          ? <span className="cfo-badge cfo-badge-private"><Icon.lock /> Personal</span>
           : <span className="cfo-badge cfo-badge-shared"><Icon.users /> {active?.role || 'Team'}</span>}
         <button className="cfo-burger" aria-label="Menu" onClick={() => setDrawer(true)}><span /><span /><span /></button>
       </header>
@@ -115,7 +115,7 @@ export default function WorkspaceShell({ workspaces, activeId, onSelectWorkspace
       <div className={`cfo-drawer${drawer ? ' is-open' : ''}`}>
         <div className="cfo-brand"><img src={LOGO_WORDMARK} alt="CFO AI" /></div>
         {SwitcherEl}
-        <Nav groups={nav} activeKey={activeKey} onNavigate={go} />
+        <Nav groups={mobileNav || nav} activeKey={activeKey} onNavigate={go} />
         <div className="cfo-side-foot">{footer}</div>
       </div>
 

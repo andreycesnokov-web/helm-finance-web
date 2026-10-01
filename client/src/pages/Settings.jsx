@@ -4,6 +4,15 @@ import { useAuth } from '../hooks/useAuth'
 import { useAccess } from '../hooks/useAccess'
 import { useTranslation } from '../hooks/useTranslation'
 import { apiFetch } from '../lib/api'
+import {
+  DEFAULT_BOT_USERNAME, connectionState, isSafeDeepLink, errorKey, minutesUntil, isExpired,
+} from '../lib/telegramConnect'
+
+// ── PR4b2 dark gate ──
+// Default OFF. Vite substitutes import.meta.env at build time, so when the variable is unset this
+// comparison folds to `false` and the bundler drops the card, its handlers and their API paths
+// out of the bundle: with the flag off the feature is ABSENT, not merely hidden behind a style.
+const TELEGRAM_LINKING_UI = import.meta.env.VITE_TELEGRAM_LINKING_UI_ENABLED === 'true'
 
 const LANGUAGES = [
   { code: 'en', label: 'English', flag: '🇬🇧' },
@@ -52,6 +61,21 @@ const BIZ_TIMEZONES = [
 
 export default function Settings() {
   const { token, logout } = useAuth()
+  // The canonical bot name comes from the backend (TELEGRAM_BOT_USERNAME), the same source
+  // TeamOnboarding uses. It used to be hardcoded here and in three translation files, which is
+  // how this page ended up still advertising a bot the product had moved off.
+  const [botUsername, setBotUsername] = useState(DEFAULT_BOT_USERNAME)
+
+  // ── PR4b2: Telegram account linking ──
+  // The minted link lives in component state and nowhere else. It is deliberately NOT put in
+  // localStorage or sessionStorage: it is a single-use credential with a short life, and
+  // persisting it would outlive both properties for no benefit.
+  const [tgStatus, setTgStatus] = useState(null)      // null = still loading
+  const [tgLink, setTgLink] = useState(null)          // { deep_link, expires_at }
+  const [tgBusy, setTgBusy] = useState('')            // '' | 'status' | 'link' | 'unlink'
+  const [tgError, setTgError] = useState('')
+  const [tgCopied, setTgCopied] = useState(false)
+  const [showTgUnlink, setShowTgUnlink] = useState(false)
   const { access, planLabel, isTrialActive, effectivePlan, refreshAccess } = useAccess()
   const navigate = useNavigate()
   const fileRef = useRef()
@@ -115,7 +139,49 @@ export default function Settings() {
     }
   }
 
+  // Status only. No token is minted here — a link is created solely when the user asks for one,
+  // so simply opening Settings never burns one.
+  const tgState = TELEGRAM_LINKING_UI ? connectionState(tgStatus) : 'off'
+
+  const loadTelegram = () => {
+    setTgBusy('status')
+    return apiFetch('/account/integrations/telegram', token)
+      .then(s => { setTgStatus(s); setTgError('') })
+      .catch(e => { setTgStatus({ status: 'error' }); setTgError(errorKey(e).key) })
+      .finally(() => setTgBusy(''))
+  }
+
+  const generateTelegramLink = async () => {
+    setTgBusy('link'); setTgError(''); setTgCopied(false)
+    try {
+      const r = await apiFetch('/account/integrations/telegram/link-token', token, { method: 'POST' })
+      // The backend builds the deep link and already enforces Telegram's payload limit; it is
+      // re-checked here because this is what gets put in front of the user.
+      if (!isSafeDeepLink(r.deep_link)) { setTgError('telegram.errTemporary'); return }
+      setTgLink({ deep_link: r.deep_link, expires_at: r.expires_at })
+    } catch (e) {
+      setTgLink(null)
+      setTgError(errorKey(e).key)
+    } finally { setTgBusy('') }
+  }
+
+  const unlinkTelegram = async () => {
+    setTgBusy('unlink'); setTgError('')
+    try {
+      await apiFetch('/account/integrations/telegram/unlink', token, { method: 'POST' })
+      setTgLink(null)              // any outstanding link is meaningless now
+      setShowTgUnlink(false)
+      await loadTelegram()
+    } catch (e) {
+      setTgError(errorKey(e).key)
+    } finally { setTgBusy('') }
+  }
+
   const loadRefData = () => {
+    if (TELEGRAM_LINKING_UI) loadTelegram()
+    apiFetch('/telegram/config', token)
+      .then(c => { if (c?.bot_username) setBotUsername(c.bot_username) })
+      .catch(() => { /* keep the default; the link must never dead-end */ })
     apiFetch('/cashflow-categories', token).then(d => setCategories(d.categories || [])).catch(() => {})
     apiFetch('/business-directions', token).then(d => setDirections(d.directions || [])).catch(() => {})
     apiFetch('/activity-types', token).then(d => setActivityTypes(d.activityTypes || [])).catch(() => {})
@@ -350,15 +416,124 @@ export default function Settings() {
         </div>
       </div>
 
+      {TELEGRAM_LINKING_UI && (<>
+      {/* ── PR4b2: Telegram account linking ─────────────────────────────────
+          Identity only. This connects a Telegram account to THIS CFO AI account; it grants no
+          access and selects no workspace — membership stays in business_members. */}
+      <div style={{ margin: '0 16px 8px', fontSize: 11, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: 0.5 }}>{t('settings.telegramConnect')}</div>
+      <div style={{ margin: '0 16px 16px', background: 'var(--bg-2)', borderRadius: 12, padding: '14px 16px' }}>
+        {tgState === 'loading' ? (
+          <div style={{ fontSize: 13, color: 'var(--text-3)' }}>…</div>
+        ) : tgState === 'error' ? (
+          /* Fail closed. A failed status lookup means we do not KNOW whether this account is
+             linked, so the card offers nothing that presumes an answer — no Connect, no
+             Disconnect, only Retry. "Not connected" here would assert a fact we do not have. */
+          <>
+            <div style={{ fontSize: 14, color: 'var(--text)', marginBottom: 8 }}>{t('settings.tgStatusUnavailable')}</div>
+            <div style={{ fontSize: 12, color: 'var(--text-3)', lineHeight: 1.6, marginBottom: 12 }}>{t('settings.tgDescUnavailable')}</div>
+            {tgError && (
+              <div style={{ fontSize: 12, color: 'var(--red-dark)', background: 'var(--red-light)', borderRadius: 8, padding: '8px 12px', marginBottom: 12 }}>
+                {t('settings.' + tgError.replace('telegram.', ''))}
+              </div>
+            )}
+            <button onClick={loadTelegram} disabled={tgBusy !== ''}
+              style={{ width: '100%', padding: '11px', borderRadius: 10, border: '1px solid var(--border-2)', background: 'transparent', color: 'var(--text)', fontSize: 14, cursor: 'pointer' }}>
+              {t('settings.tgRetry')}
+            </button>
+          </>
+        ) : (
+          <>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 8 }}>
+              <div style={{ fontSize: 14, color: 'var(--text)' }}>
+                {tgState === 'connected' ? t('settings.tgStatusConnected')
+                  : tgState === 'revoked' ? t('settings.tgStatusRevoked')
+                  : t('settings.tgStatusNotConnected')}
+              </div>
+              {tgState === 'connected' && (
+                <div style={{ fontSize: 12, color: 'var(--text-3)' }}>
+                  {tgStatus?.handle ? '@' + tgStatus.handle : ''}{tgStatus?.external_user_id_masked ? ' · ' + tgStatus.external_user_id_masked : ''}
+                </div>
+              )}
+            </div>
+
+            <div style={{ fontSize: 12, color: 'var(--text-3)', lineHeight: 1.6, marginBottom: 12 }}>
+              {tgState === 'connected' ? t('settings.tgDescConnected')
+                : tgState === 'revoked' ? t('settings.tgDescRevoked')
+                : t('settings.tgDescUnlinked')}
+            </div>
+
+            {tgStatus?.legacy_conflict && (
+              <div style={{ fontSize: 12, color: 'var(--text-3)', background: 'var(--bg)', borderRadius: 8, padding: '8px 12px', marginBottom: 12, lineHeight: 1.6 }}>
+                {t('settings.tgLegacyConflict')}
+              </div>
+            )}
+
+            {tgError && (
+              <div style={{ fontSize: 12, color: 'var(--red-dark)', background: 'var(--red-light)', borderRadius: 8, padding: '8px 12px', marginBottom: 12 }}>
+                {t('settings.' + tgError.replace('telegram.', ''))}
+              </div>
+            )}
+
+            {tgState === 'connected' ? (
+              <button onClick={() => setShowTgUnlink(true)} disabled={tgBusy !== ''}
+                style={{ width: '100%', padding: '11px', borderRadius: 10, border: '1px solid var(--border-2)', background: 'transparent', color: 'var(--red-dark)', fontSize: 14, cursor: 'pointer' }}>
+                {t('settings.tgUnlink')}
+              </button>
+            ) : tgLink && !isExpired(tgLink.expires_at) ? (
+              <>
+                <a href={tgLink.deep_link} target="_blank" rel="noreferrer"
+                  style={{ display: 'block', textAlign: 'center', padding: '11px', borderRadius: 10, background: '#229ED9', color: '#fff', fontSize: 14, textDecoration: 'none', marginBottom: 8 }}>
+                  {t('settings.tgOpenTelegram')}
+                </a>
+                <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+                  <button onClick={async () => {
+                    // "Copied" has to mean copied. writeText rejects on permission or an insecure
+                    // context and is missing outright in some browsers; saying it worked would
+                    // leave the user pasting nothing and blaming the link.
+                    setTgError('')
+                    if (!navigator.clipboard?.writeText) { setTgCopied(false); setTgError('telegram.errCopyFailed'); return }
+                    try { await navigator.clipboard.writeText(tgLink.deep_link); setTgCopied(true) }
+                    catch { setTgCopied(false); setTgError('telegram.errCopyFailed') }
+                  }}
+                    style={{ flex: 1, padding: '9px', borderRadius: 10, border: '1px solid var(--border-2)', background: 'transparent', color: 'var(--text)', fontSize: 13, cursor: 'pointer' }}>
+                    {tgCopied ? t('settings.tgCopied') : t('settings.tgCopyLink')}
+                  </button>
+                  <button onClick={loadTelegram} disabled={tgBusy !== ''}
+                    style={{ flex: 1, padding: '9px', borderRadius: 10, border: '1px solid var(--border-2)', background: 'transparent', color: 'var(--text)', fontSize: 13, cursor: 'pointer' }}>
+                    {t('settings.tgRefresh')}
+                  </button>
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--text-3)', lineHeight: 1.6 }}>
+                  {t('settings.tgLinkExpires').replace('{min}', String(minutesUntil(tgLink.expires_at)))}<br />
+                  {t('settings.tgAfterOpen')}
+                </div>
+              </>
+            ) : (
+              <>
+                <button onClick={generateTelegramLink} disabled={tgBusy !== ''}
+                  style={{ width: '100%', padding: '11px', borderRadius: 10, border: 'none', background: 'var(--text)', color: 'var(--bg)', fontSize: 14, cursor: 'pointer' }}>
+                  {tgBusy === 'link' ? t('settings.tgGenerating')
+                    : tgLink ? t('settings.tgNewLink') : t('settings.tgConnect')}
+                </button>
+                {tgLink && isExpired(tgLink.expires_at) && (
+                  <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 8 }}>{t('settings.tgLinkExpired')}</div>
+                )}
+              </>
+            )}
+          </>
+        )}
+      </div>
+      </>)}
+
       <div style={{ margin: '0 16px 8px', fontSize: 11, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: 0.5 }}>{t('settings.telegramBot')}</div>
       <div style={{ margin: '0 16px 16px', background: 'var(--bg-2)', borderRadius: 12 }}>
-        <a href="https://t.me/HCfinance_Bot" target="_blank" rel="noreferrer" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 16px', textDecoration: 'none' }}>
+        <a href={`https://t.me/${botUsername}`} target="_blank" rel="noreferrer" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 16px', textDecoration: 'none' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <div style={{ width: 32, height: 32, borderRadius: 8, background: '#229ED9', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="white"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.562 8.248l-2.008 9.457c-.145.658-.537.818-1.084.508l-3-2.21-1.447 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.12l-6.871 4.326-2.962-.924c-.643-.204-.657-.643.136-.953l11.57-4.461c.537-.194 1.006.131.871.764z"/></svg>
             </div>
             <div>
-              <div style={{ fontSize: 14, color: 'var(--text)', marginBottom: 1 }}>{t('settings.openBot')}</div>
+              <div style={{ fontSize: 14, color: 'var(--text)', marginBottom: 1 }}>{t('settings.openBot').replace('{bot}', botUsername)}</div>
               <div style={{ fontSize: 11, color: 'var(--text-3)' }}>{t('settings.addViaChat')}</div>
             </div>
           </div>
@@ -704,6 +879,27 @@ export default function Settings() {
             <div style={{ fontSize: 13, color: 'var(--text-3)', marginBottom: 20 }}>{t('settings.signOutNote')}</div>
             <button onClick={handleLogout} style={{ width: '100%', padding: 13, borderRadius: 10, background: 'var(--red)', color: '#fff', border: 'none', fontSize: 14, fontWeight: 500, marginBottom: 8 }}>{t('settings.signOut')}</button>
             <button onClick={() => setShowLogout(false)} style={{ width: '100%', padding: 11, borderRadius: 10, background: 'none', color: 'var(--text-3)', border: '0.5px solid var(--border)', fontSize: 13 }}>{t('common.cancel')}</button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Disconnect Telegram confirmation ── */}
+      {TELEGRAM_LINKING_UI && showTgUnlink && (
+        <div onClick={() => setShowTgUnlink(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 200, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+          <div onClick={e => e.stopPropagation()} style={{ background: 'var(--bg)', borderRadius: '16px 16px 0 0', padding: '20px 16px 36px', width: '100%', maxWidth: 480 }}>
+            <div style={{ width: 36, height: 3, background: 'var(--border-2)', borderRadius: 2, margin: '0 auto 20px' }} />
+            <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 8, textAlign: 'center' }}>{t('settings.tgUnlinkTitle')}</div>
+            {/* Says plainly what is NOT affected: disconnecting an identity is not deleting an
+                account, and the difference matters at exactly this moment. */}
+            <div style={{ fontSize: 13, color: 'var(--text-3)', marginBottom: 20, lineHeight: 1.6 }}>{t('settings.tgUnlinkBody')}</div>
+            <button onClick={unlinkTelegram} disabled={tgBusy !== ''}
+              style={{ width: '100%', padding: '13px', borderRadius: 10, border: 'none', background: 'var(--red-dark)', color: '#fff', fontSize: 15, cursor: 'pointer', marginBottom: 8 }}>
+              {t('settings.tgUnlinkConfirm')}
+            </button>
+            <button onClick={() => setShowTgUnlink(false)}
+              style={{ width: '100%', padding: '13px', borderRadius: 10, border: '1px solid var(--border-2)', background: 'transparent', color: 'var(--text)', fontSize: 15, cursor: 'pointer' }}>
+              {t('settings.tgCancel')}
+            </button>
           </div>
         </div>
       )}

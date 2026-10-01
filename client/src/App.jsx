@@ -53,6 +53,7 @@ import TeamOnboarding, { MemberTutorial } from './pages/TeamOnboarding'
 import JoinInvite from './pages/JoinInvite'
 import Admin from './pages/Admin'
 import AdminUser from './pages/AdminUser'
+import AdminDashboard from './pages/AdminDashboard'
 import AdminBusinesses from './pages/AdminBusinesses'
 import AdminBusinessDetail from './pages/AdminBusinessDetail'
 import AdminAccessAudit from './pages/AdminAccessAudit'
@@ -68,7 +69,10 @@ import TelegramLogin from './pages/TelegramLogin'
 import PersonalProfile from './pages/PersonalProfile'
 import { PersonalLayout, PersonalShell, PersonalOverview, PersonalAccounts, PersonalTransactions, PersonalOnboarding } from './pages/personal'
 import { BusinessLayout, BusinessShell, BusinessPulse, BusinessAccounts, BusinessTransactions, BusinessPayables, BusinessReceivables, BusinessInvoices, BusinessFunding, BusinessNew, BusinessIntercompany } from './pages/business'
-import { BusinessAccountant } from './pages/business/Accountant'
+// Premium hub renders the Workbench/Calendar/Tax Draft module when
+// VITE_AI_ACCOUNTANT_PREMIUM=true; flag off → the existing profile page unchanged.
+import { BusinessAccountantHub } from './pages/business/AccountantPremium'
+import TaxSplit from './pages/business/TaxSplit'
 
 // Personal/Funding UI requires migrations 037–039. OFF by default so production stays
 // safe until they're applied. Enable in env: VITE_PERSONAL_FUNDING_UI_ENABLED=true.
@@ -435,6 +439,11 @@ function PulseWrapper() {
   // Email-first Personal Account with no business yet → land on /account onboarding,
   // never the Business shell. Only when the email-auth UI is enabled; Telegram/legacy
   // (business !== null, or flag off) keep the existing /business/pulse behavior.
+  let lastWorkspace = null
+  try { lastWorkspace = localStorage.getItem('last_active_workspace_id') || localStorage.getItem('activeWorkspaceId') } catch {}
+  if (EMAIL_AUTH_UI && lastWorkspace === 'personal') {
+    return <Navigate to="/account" replace />
+  }
   if (EMAIL_AUTH_UI && access && access.business === null) {
     return <Navigate to="/account" replace />
   }
@@ -594,7 +603,9 @@ export default function App() {
             <Route path="/business/transactions" element={<BusinessShell><BusinessTransactions /></BusinessShell>} />
             <Route path="/business/payables" element={<BusinessShell><BusinessPayables /></BusinessShell>} />
             <Route path="/business/receivables" element={<BusinessShell><BusinessReceivables /></BusinessShell>} />
-            <Route path="/business/accountant" element={<BusinessShell><BusinessAccountant /></BusinessShell>} />
+            <Route path="/business/accountant" element={<BusinessShell><BusinessAccountantHub /></BusinessShell>} />
+            {/* AI Tax Split V1 — suggestion-only invoice→tax→accountant flow. */}
+            <Route path="/business/accountant/tax-split" element={<BusinessShell><TaxSplit /></BusinessShell>} />
             <Route path="/business/invoices" element={<BusinessShell><BusinessInvoices /></BusinessShell>} />
             {/* Not-yet-migrated modules: existing components rendered INSIDE the premium
                 shell (real content + premium sidebar/header), so the user never sees the
@@ -621,6 +632,11 @@ export default function App() {
           <Route path="/onboarding" element={<OnboardingRoute />} />
           {/* Hidden admin routes — not in sidebar, protected by ADMIN_TELEGRAM_IDS on backend */}
           <Route path="/admin"           element={<Layout><Admin /></Layout>} />
+          {/* Platform Admin Dashboard (read-only owner console) */}
+          <Route path="/admin/dashboard" element={<Layout><AdminDashboard /></Layout>} />
+          {/* Users console is also reachable at /admin/users (same list as /admin) so the
+              natural URL renders instead of an unmatched-route blank page. */}
+          <Route path="/admin/users"     element={<Layout><Admin /></Layout>} />
           <Route path="/admin/users/:id" element={<Layout><AdminUser /></Layout>} />
           <Route path="/admin/businesses" element={<Layout><AdminBusinesses /></Layout>} />
           <Route path="/admin/businesses/:businessId" element={<Layout><AdminBusinessDetail /></Layout>} />

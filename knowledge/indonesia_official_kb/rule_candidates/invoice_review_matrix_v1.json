@@ -1,0 +1,459 @@
+{
+  "matrix_version": "1.0",
+  "generated_at": "2026-09-02",
+  "generated_from": "rule_candidates/invoice_transaction_candidates.json",
+  "jurisdiction": "Indonesia",
+  "hard_rule": "This is a review matrix, not a tax advice engine.",
+  "policy": "Every row is status=under_review, legal_verified=false, active=false, accountant_review_required=true. possible_rate and tax_base are populated ONLY where archived official bytes support them; otherwise null or 'needs_reviewer'. A row is a prompt for a human, never an instruction to the product. Nothing here may be wired into AI Invoice Review, and nothing here may be written to tax_rules with status='active'.",
+  "precedence": "raw_sources/ + MANIFEST.json SHA-256 is authoritative. summaries/_extracted/ is derived review text and never a source of truth. source_ids name registry sources, never derived files.",
+  "row_count": 13,
+  "matrix": [
+    {
+      "transaction_type": "rent",
+      "label": "Rent",
+      "possible_tax_treatment": [
+        "PPh 4(2) final"
+      ],
+      "possible_rate": 0.1,
+      "tax_base": "jumlah_bruto_nilai_persewaan_including_service_and_facility_charges",
+      "required_documents": [
+        "rental_agreement",
+        "supplier_invoice_or_kwitansi",
+        "faktur_pajak_if_supplier_is_pkp",
+        "bukti_potong_pph_4_2",
+        "payment_proof"
+      ],
+      "missing_data_questions": [
+        "Is the tenant a Pemotong under PP 34/2017 Pasal 3(2)?",
+        "Does the invoice include charges billed by a THIRD PARTY rather than the landlord?",
+        "Is any part of this lodging/accommodation (excluded from the final regime)?"
+      ],
+      "accountant_review_required": true,
+      "source_ids": [
+        "DJP_PPH42_PP34_004",
+        "BPK_PPH42_PP34_001",
+        "DJP_PPH42_002"
+      ],
+      "confidence": "medium",
+      "active": false,
+      "legal_verified": false,
+      "status": "under_review",
+      "source_verification_status": "fetch_verified",
+      "risk": null,
+      "engine_behaviour": null,
+      "currentness_result": "berlaku",
+      "notes": "Rate and base cited to PP 34/2017 Pasal 4(1)-(2) read from archived bytes. FINAL tax — not a creditable withholding; do not model as a simple deduction.",
+      "candidate_id": "TXN_RENT"
+    },
+    {
+      "transaction_type": "service_fee",
+      "label": "Service fee",
+      "possible_tax_treatment": [
+        "PPh 23"
+      ],
+      "possible_rate": 0.02,
+      "tax_base": "jumlah_bruto_excluding_ppn",
+      "required_documents": [
+        "supplier_invoice",
+        "faktur_pajak_if_supplier_is_pkp",
+        "bukti_potong_pph_23",
+        "payment_proof"
+      ],
+      "missing_data_questions": [
+        "Is the supplier an ENTITY (badan) or an individual? Individual may be PPh 21, not PPh 23.",
+        "Does the supplier have an NPWP? (uplift may apply)",
+        "Which enumerated jasa lain item does this service fall under?"
+      ],
+      "accountant_review_required": true,
+      "source_ids": [
+        "DJP_PPH23_PMK141_003",
+        "KEMENKEU_PPH23_PMK141_001",
+        "DJP_PPH23_002"
+      ],
+      "confidence": "medium",
+      "active": false,
+      "legal_verified": false,
+      "status": "under_review",
+      "source_verification_status": "fetch_verified",
+      "risk": null,
+      "engine_behaviour": null,
+      "currentness_result": "berlaku",
+      "notes": "Rate and base cited to PMK 141/PMK.03/2015 Pasal 1(1) read from archived bytes: '2% dari jumlah bruto tidak termasuk Pajak Pertambahan Nilai'. Whether PMK 141/2015 is still current is UNCONFIRMED.",
+      "candidate_id": "TXN_SERVICE_FEE"
+    },
+    {
+      "transaction_type": "management_service",
+      "label": "Management service",
+      "possible_tax_treatment": [
+        "PPh 23"
+      ],
+      "possible_rate": 0.02,
+      "tax_base": "jumlah_bruto_excluding_ppn",
+      "required_documents": [
+        "supplier_invoice",
+        "faktur_pajak_if_supplier_is_pkp",
+        "bukti_potong_pph_23",
+        "payment_proof"
+      ],
+      "missing_data_questions": [
+        "Who pays whom? Landlord->third party differs from tenant->landlord.",
+        "Is this billed as part of rent by the landlord (then PPh 4(2)) or separately by a manager (then PPh 23)?"
+      ],
+      "accountant_review_required": true,
+      "source_ids": [
+        "DJP_PPH42_006",
+        "DJP_PPH23_PMK141_003"
+      ],
+      "confidence": "low",
+      "active": false,
+      "legal_verified": false,
+      "status": "under_review",
+      "source_verification_status": "fetch_verified",
+      "risk": "high",
+      "engine_behaviour": null,
+      "currentness_result": "berlaku",
+      "notes": "DJP_PPH42_006 states third-party building services are jasa manajemen at 2% under Pasal 23. But PP 34/2017 Pasal 4(2) puts service charges billed BY THE LANDLORD inside the rental base. The boundary is 'who pays whom' on our reading — that reading is NOT stated by either instrument and needs a reviewer.",
+      "candidate_id": "TXN_MANAGEMENT_SERVICE"
+    },
+    {
+      "transaction_type": "building_service_charge",
+      "label": "Building service / service charge",
+      "possible_tax_treatment": [
+        "PPh 4(2) final",
+        "PPh 23"
+      ],
+      "possible_rate": null,
+      "tax_base": "needs_reviewer",
+      "required_documents": [
+        "rental_agreement",
+        "supplier_invoice",
+        "faktur_pajak_if_supplier_is_pkp",
+        "bukti_potong",
+        "payment_proof"
+      ],
+      "missing_data_questions": [
+        "Is this charge billed by the landlord or by a separate manager?",
+        "Is it contracted separately from the lease?",
+        "Does the tenant pay the manager directly?"
+      ],
+      "accountant_review_required": true,
+      "source_ids": [
+        "DJP_PPH42_PP34_004",
+        "DJP_PPH42_006"
+      ],
+      "confidence": "low",
+      "active": false,
+      "legal_verified": false,
+      "status": "under_review",
+      "source_verification_status": "fetch_verified",
+      "risk": "high",
+      "engine_behaviour": "always_review",
+      "currentness_result": null,
+      "notes": "DELIBERATELY AMBIGUOUS. PP 34/2017 Pasal 4(2) says a service charge relating to the rented property is in the rental gross even if separately contracted; DJP_PPH42_006 says third-party building services are PPh 23. Both are archived and read. The engine MUST NOT pick one — route to accountant review.",
+      "candidate_id": "TXN_BUILDING_SERVICE_CHARGE"
+    },
+    {
+      "transaction_type": "contractor_freelancer",
+      "label": "Contractor / freelancer",
+      "possible_tax_treatment": [
+        "PPh 23",
+        "PPh 21"
+      ],
+      "possible_rate": null,
+      "tax_base": "needs_reviewer",
+      "required_documents": [
+        "supplier_invoice_or_contract",
+        "bukti_potong",
+        "payment_proof"
+      ],
+      "missing_data_questions": [
+        "Is the provider an individual (PPh 21) or an entity (PPh 23)?",
+        "If an entity, which jasa lain item applies?"
+      ],
+      "accountant_review_required": true,
+      "source_ids": [
+        "DJP_PPH23_005",
+        "DJP_PPH23_PMK141_003"
+      ],
+      "confidence": "low",
+      "active": false,
+      "legal_verified": false,
+      "status": "under_review",
+      "source_verification_status": "fetch_verified",
+      "risk": null,
+      "engine_behaviour": null,
+      "currentness_result": null,
+      "notes": "rate deliberately null: the article depends on the provider's legal form, which our data cannot determine.",
+      "candidate_id": "TXN_CONTRACTOR_FREELANCER"
+    },
+    {
+      "transaction_type": "salary_payroll",
+      "label": "Salary / payroll",
+      "possible_tax_treatment": [
+        "PPh 21"
+      ],
+      "possible_rate": null,
+      "tax_base": "needs_reviewer",
+      "required_documents": [
+        "payroll_register",
+        "payslip",
+        "bukti_potong_pph_21",
+        "payment_proof"
+      ],
+      "missing_data_questions": [
+        "Is the employee permanent or non-permanent?",
+        "Which TER category applies?"
+      ],
+      "accountant_review_required": true,
+      "source_ids": [
+        "KEMENKEU_PPH21_001"
+      ],
+      "confidence": "low",
+      "active": false,
+      "legal_verified": false,
+      "status": "under_review",
+      "source_verification_status": "fetch_verified_bytes_only",
+      "risk": null,
+      "engine_behaviour": "out_of_scope_v1",
+      "currentness_result": null,
+      "notes": "rate null by design: PMK 168/2023 uses a TER lookup TABLE, not a scalar. The PDF is archived and hashed but NOT READABLE, so nothing here derives from it. Out of scope for v1 arithmetic.",
+      "candidate_id": "TXN_SALARY_PAYROLL"
+    },
+    {
+      "transaction_type": "marketing_advertising",
+      "label": "Marketing / advertising",
+      "possible_tax_treatment": [
+        "PPh 23"
+      ],
+      "possible_rate": null,
+      "tax_base": "needs_reviewer",
+      "required_documents": [
+        "supplier_invoice",
+        "faktur_pajak_if_supplier_is_pkp",
+        "bukti_potong_pph_23",
+        "payment_proof"
+      ],
+      "missing_data_questions": [
+        "Which enumerated jasa lain item covers this?",
+        "Is any part media placement rather than a service?"
+      ],
+      "accountant_review_required": true,
+      "source_ids": [
+        "DJP_PPH23_PMK141_003"
+      ],
+      "confidence": "low",
+      "active": false,
+      "legal_verified": false,
+      "status": "under_review",
+      "source_verification_status": "fetch_verified",
+      "risk": null,
+      "engine_behaviour": null,
+      "currentness_result": null,
+      "notes": "PMK 141/2015 item (t) covers making promotional media (film, iklan, poster, banner, baliho, folder). Whether a given marketing invoice falls there is NOT established — rate left null.",
+      "candidate_id": "TXN_MARKETING_ADVERTISING"
+    },
+    {
+      "transaction_type": "software_subscription",
+      "label": "Software subscription",
+      "possible_tax_treatment": [
+        "PPh 23",
+        "PPh 26",
+        "PPN"
+      ],
+      "possible_rate": null,
+      "tax_base": "needs_reviewer",
+      "required_documents": [
+        "supplier_invoice",
+        "faktur_pajak_if_supplier_is_pkp",
+        "payment_proof"
+      ],
+      "missing_data_questions": [
+        "Is the supplier resident or non-resident? Non-resident may be PPh 26, not PPh 23.",
+        "Is this a licence/royalty or a service?",
+        "Is PPN-PMSE charged by a foreign provider?"
+      ],
+      "accountant_review_required": true,
+      "source_ids": [
+        "DJP_PPH23_PMK141_003"
+      ],
+      "confidence": "low",
+      "active": false,
+      "legal_verified": false,
+      "status": "under_review",
+      "source_verification_status": "fetch_verified",
+      "risk": "high",
+      "engine_behaviour": null,
+      "currentness_result": null,
+      "notes": "PMK 141/2015 item (u) covers services relating to software/hardware/computer systems INCLUDING maintenance and repair. A pure licence/subscription may instead be royalty. NOT resolved — rate null.",
+      "candidate_id": "TXN_SOFTWARE_SUBSCRIPTION"
+    },
+    {
+      "transaction_type": "equipment_capex",
+      "label": "Equipment / CAPEX",
+      "possible_tax_treatment": [
+        "PPN"
+      ],
+      "possible_rate": null,
+      "tax_base": "needs_reviewer",
+      "required_documents": [
+        "supplier_invoice",
+        "faktur_pajak_if_supplier_is_pkp",
+        "payment_proof",
+        "asset_record"
+      ],
+      "missing_data_questions": [
+        "Is this goods only, or goods plus installation service?",
+        "Is the supplier PKP?"
+      ],
+      "accountant_review_required": true,
+      "source_ids": [],
+      "confidence": "low",
+      "active": false,
+      "legal_verified": false,
+      "status": "under_review",
+      "source_verification_status": "not_sourced",
+      "risk": null,
+      "engine_behaviour": null,
+      "currentness_result": null,
+      "notes": "Goods purchases are generally not PPh 23 objects, but no source was collected to state that. rate null.",
+      "candidate_id": "TXN_EQUIPMENT_CAPEX"
+    },
+    {
+      "transaction_type": "import_related_invoice",
+      "label": "Import-related invoice",
+      "possible_tax_treatment": [
+        "PPh 22",
+        "PPN Impor",
+        "bea masuk"
+      ],
+      "possible_rate": null,
+      "tax_base": "needs_reviewer",
+      "required_documents": [
+        "supplier_invoice",
+        "customs_document_PIB",
+        "payment_proof"
+      ],
+      "missing_data_questions": [
+        "Which customs document evidences this?",
+        "Is PPh 22 import collected at the border?"
+      ],
+      "accountant_review_required": true,
+      "source_ids": [],
+      "confidence": "low",
+      "active": false,
+      "legal_verified": false,
+      "status": "under_review",
+      "source_verification_status": "not_sourced",
+      "risk": null,
+      "engine_behaviour": null,
+      "currentness_result": null,
+      "notes": "NO SOURCE COLLECTED for import taxes in this KB. Entirely needs_reviewer.",
+      "candidate_id": "TXN_IMPORT_RELATED_INVOICE"
+    },
+    {
+      "transaction_type": "loan_interest",
+      "label": "Loan interest",
+      "possible_tax_treatment": [
+        "PPh 23",
+        "PPh 26"
+      ],
+      "possible_rate": null,
+      "tax_base": "needs_reviewer",
+      "required_documents": [
+        "loan_agreement",
+        "interest_schedule",
+        "payment_proof"
+      ],
+      "missing_data_questions": [
+        "Is the lender a domestic entity, a bank, or non-resident?",
+        "Is a tax treaty in play?"
+      ],
+      "accountant_review_required": true,
+      "source_ids": [],
+      "confidence": "low",
+      "active": false,
+      "legal_verified": false,
+      "status": "under_review",
+      "source_verification_status": "not_sourced",
+      "risk": null,
+      "engine_behaviour": null,
+      "currentness_result": null,
+      "notes": "Interest is a Pasal 23(1)(a) object, distinct from the jasa lain regime, and banks are commonly excluded. NO SOURCE COLLECTED — rate null.",
+      "candidate_id": "TXN_LOAN_INTEREST"
+    },
+    {
+      "transaction_type": "intercompany_payment",
+      "label": "Intercompany payment",
+      "possible_tax_treatment": [
+        "PPh 23",
+        "PPh 26",
+        "transfer pricing"
+      ],
+      "possible_rate": null,
+      "tax_base": "needs_reviewer",
+      "required_documents": [
+        "intercompany_agreement",
+        "supplier_invoice",
+        "transfer_pricing_documentation",
+        "payment_proof"
+      ],
+      "missing_data_questions": [
+        "Is the counterparty domestic or foreign?",
+        "Is this a service, a royalty, interest, or a capital movement?",
+        "Are the parties related for transfer-pricing purposes?"
+      ],
+      "accountant_review_required": true,
+      "source_ids": [],
+      "confidence": "low",
+      "active": false,
+      "legal_verified": false,
+      "status": "under_review",
+      "source_verification_status": "not_sourced",
+      "risk": "high",
+      "engine_behaviour": null,
+      "currentness_result": null,
+      "notes": "NO SOURCE COLLECTED. Related-party pricing has its own documentation regime not covered here. Always accountant review.",
+      "candidate_id": "TXN_INTERCOMPANY_PAYMENT"
+    },
+    {
+      "transaction_type": "mixed_invoice",
+      "label": "Mixed invoice",
+      "possible_tax_treatment": [
+        "multiple"
+      ],
+      "possible_rate": null,
+      "tax_base": "needs_reviewer",
+      "required_documents": [
+        "supplier_invoice",
+        "underlying_agreement",
+        "faktur_pajak_if_supplier_is_pkp",
+        "payment_proof"
+      ],
+      "missing_data_questions": [
+        "Which invoice lines belong to which component?",
+        "Is there one agreement or several?",
+        "Who is the counterparty for each component?"
+      ],
+      "accountant_review_required": true,
+      "source_ids": [
+        "DJP_PPH42_PP34_004",
+        "DJP_PPH42_006",
+        "DJP_PPH23_PMK141_003"
+      ],
+      "confidence": "high",
+      "active": false,
+      "legal_verified": false,
+      "status": "under_review",
+      "source_verification_status": "fetch_verified",
+      "risk": "high",
+      "engine_behaviour": {
+        "must": "This invoice may contain mixed tax treatments. Accountant review required.",
+        "must_not": "Apply a single rate to the whole invoice when mixed components are detected.",
+        "may": "Show the components it believes it has identified, each labelled as a suggestion."
+      },
+      "currentness_result": null,
+      "notes": "Grounded in archived text on BOTH sides: PP 34/2017 Pasal 4(2) pulls landlord-billed service charges INTO the 10% rental base even when separately contracted, while DJP_PPH42_006 puts third-party building services at 2% under Pasal 23. A single invoice can therefore legitimately carry two treatments. Splitting is a judgement the engine must not make alone.",
+      "candidate_id": "TXN_MIXED_INVOICE"
+    }
+  ]
+}
