@@ -1,16 +1,19 @@
-// MCP identity resolution — PHASE 1 (dev-only).
+// MCP identity resolution.
 //
-// There is NO Supabase Auth mapping for existing CFO users yet
-// (see _specs/mcp-identity-mapping-findings.md). Until the OAuth 2.1 + explicit
-// account-linking work in PR2, the /mcp surface resolves identity from either:
-//   1. a configured shared dev token (MCP_DEV_TOKEN -> MCP_DEV_USER_ID), or
-//   2. the existing CFO custom JWT (same secret the web app uses).
-// Both resolve to a public.users id. From there the EXISTING tenant/role checks
-// (resolveActiveBusiness / requireBusiness) apply unchanged. OAuth replaces this
-// resolver in PR2 without changing anything downstream.
+// The /mcp surface resolves the caller to a CFO user (public.users.id) from, in order:
+//   1. an OAuth access token issued by this server's authorization server ("Sign in with
+//      CFO Finance" — Claude Connectors, ChatGPT, Claude Code via OAuth). Requires the
+//      cfo:read scope and a token issued for THIS resource (RFC 8707);
+//   2. a configured shared dev token (MCP_DEV_TOKEN -> MCP_DEV_USER_ID) — development and
+//      header-only clients;
+//   3. the existing CFO custom JWT (same secret the web app uses) — development.
+// All three end at a public.users id; from there the EXISTING tenant/role checks
+// (resolveActiveBusiness / role gates) apply unchanged.
 
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
+
+const READ_SCOPE = 'cfo:read';
 
 // Constant-time string compare (avoids leaking the dev token via response timing).
 function safeEqual(a, b) {
@@ -21,12 +24,24 @@ function safeEqual(a, b) {
   return crypto.timingSafeEqual(ab, bb);
 }
 
-function resolveMcpUser(req, JWT_SECRET) {
+function bearerToken(req) {
   const raw = (req.headers && req.headers.authorization) || '';
-  const token = raw.startsWith('Bearer ') ? raw.slice(7).trim() : '';
+  return raw.startsWith('Bearer ') ? raw.slice(7).trim() : '';
+}
+
+/**
+ * @param {object} req
+ * @param {object} opts
+ * @param {string} opts.JWT_SECRET
+ * @param {(token:string)=>Promise<object>} [opts.verifyOAuth]  provider.verifyAccessToken, when OAuth is on
+ * @param {string} [opts.resourceUrl]   canonical /mcp URL the token must be issued for
+ * @returns {Promise<{userId:number, via:string, clientId?:string}|null>}
+ */
+async function resolveMcpUser(req, opts = {}) {
+  const token = bearerToken(req);
   if (!token) return null;
 
-  // Dev token path (shared/staging testing only). Constant-time comparison.
+  // 1. Dev token (constant-time). Checked first so a dev token never hits the database.
   if (process.env.MCP_DEV_TOKEN && safeEqual(token, process.env.MCP_DEV_TOKEN)) {
     // Fail closed on a missing/blank/non-integer id (Number('') is 0, which must not pass).
     const raw = String(process.env.MCP_DEV_USER_ID || '').trim();
@@ -34,13 +49,27 @@ function resolveMcpUser(req, JWT_SECRET) {
     return Number.isSafeInteger(uid) && uid !== 0 ? { userId: uid, via: 'dev_token' } : null;
   }
 
-  // Existing CFO custom JWT path.
+  // 2. OAuth access token. Ours are opaque base64url (no dots); a JWT is never looked up.
+  if (opts.verifyOAuth && !token.includes('.')) {
+    try {
+      const info = await opts.verifyOAuth(token);
+      if (!Array.isArray(info.scopes) || !info.scopes.includes(READ_SCOPE)) return null;
+      if (opts.resourceUrl && info.resource
+        && info.resource.href.replace(/\/$/, '') !== opts.resourceUrl.replace(/\/$/, '')) return null;
+      const uid = Number(info.extra && info.extra.userId);
+      return Number.isSafeInteger(uid) && uid !== 0
+        ? { userId: uid, via: 'oauth', clientId: info.clientId }
+        : null;
+    } catch { return null; }
+  }
+
+  // 3. Existing CFO custom JWT.
   try {
-    const d = jwt.verify(token, JWT_SECRET);
+    const d = jwt.verify(token, opts.JWT_SECRET);
     if (d && d.userId != null) return { userId: d.userId, via: 'app_jwt' };
   } catch { /* invalid/expired token → unauthenticated */ }
 
   return null;
 }
 
-module.exports = { resolveMcpUser };
+module.exports = { resolveMcpUser, bearerToken, READ_SCOPE };

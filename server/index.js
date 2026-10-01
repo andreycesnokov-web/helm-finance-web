@@ -13817,28 +13817,26 @@ app.delete('/api/documents/:id/links/:linkId', auth, async (req, res) => {
 // Mounted under /api; shares auth, the service-role client and access helpers.
 app.use('/api', personalFundingRouter({ supabase, auth, getBusinessAccess, resolveUserDisplayName, TX }));
 
-// Liveness probe — JSON, never the SPA shell. No DB call (pure process liveness).
-app.get('/api/health', (req, res) => {
-  res.json({ ok: true, service: 'helm-finance-web', ts: new Date().toISOString() });
-});
-
-// Unknown /api/* → JSON 404, NOT the SPA HTML shell. Registered after every real
-// /api route (incl. personalFundingRouter above) so it only catches misses. Keeps API
-// clients from receiving 200 + index.html for a mistyped/removed endpoint.
-app.use('/api', (req, res) => {
-  res.status(404).json({ error: 'not_found', path: req.originalUrl });
-});
-
 // ─────────────────────────────────────────────────────────────────────────────
-// MCP adapter — read-only Phase 1, gated by MCP_SERVER_ENABLED (default OFF → 404).
-// Thin interface over existing services; must be mounted BEFORE the SPA catch-all so
-// `/mcp` is not shadowed. See _specs/mcp-server-audit-and-plan.md.
+// MCP adapter — read-only tools, gated by MCP_SERVER_ENABLED (default OFF → 404); OAuth
+// "Sign in with CFO Finance" for AI clients gated by MCP_OAUTH_ENABLED. Mounted BEFORE the
+// /api 404 handler (it owns /api/mcp-oauth) and before the SPA catch-all (it owns /mcp,
+// /oauth/consent headers, /authorize, /token, /register, /revoke, /.well-known/oauth-*).
+// See _specs/mcp-server-audit-and-plan.md and _specs/mcp-oauth.md.
 //
 // The adapter receives the SAME functions the web routes use (dependency injection), so
-// there is one implementation of every rule. Everything passed here is read-only.
+// there is one implementation of every rule. Everything passed as `services` is read-only.
 // ─────────────────────────────────────────────────────────────────────────────
 require('./mcp').attachMcp(app, {
   JWT_SECRET,
+  supabase,          // OAuth storage only (mcp_oauth_* tables, migration 057)
+  auth,              // the consent page signs the user in with the existing CFO login
+  onOAuthEvent: (ev) => recordAudit({
+    actorUserId: ev.user_id ?? null, channel: 'mcp', entityType: 'mcp_oauth',
+    entityId: ev.client_id ?? null, action: ev.action,
+    after: ev.grant_id ? { grant_id: ev.grant_id, client_name: ev.client_name ?? undefined }
+      : (ev.client_name ? { client_name: ev.client_name } : null),
+  }),
   services: {
     // identity → company. Read-only: a lookup can never bootstrap a workspace
     // (ensureDefaultBusiness would; findDefaultBusiness never does).
@@ -13852,6 +13850,18 @@ require('./mcp').attachMcp(app, {
     loadDocumentScoped, readDocumentForIntake, readTextForIntake, analyzeDocumentReading,
     findDocumentDuplicate, linkedInvoiceSettlement, invoiceReadinessPreview,
   },
+});
+
+// Liveness probe — JSON, never the SPA shell. No DB call (pure process liveness).
+app.get('/api/health', (req, res) => {
+  res.json({ ok: true, service: 'helm-finance-web', ts: new Date().toISOString() });
+});
+
+// Unknown /api/* → JSON 404, NOT the SPA HTML shell. Registered after every real
+// /api route (incl. personalFundingRouter above) so it only catches misses. Keeps API
+// clients from receiving 200 + index.html for a mistyped/removed endpoint.
+app.use('/api', (req, res) => {
+  res.status(404).json({ error: 'not_found', path: req.originalUrl });
 });
 
 // SPA catch-all — MUST be the last route so it never shadows API endpoints.
