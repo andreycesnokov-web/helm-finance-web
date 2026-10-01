@@ -1,4 +1,4 @@
-// "Sign in with CFO Finance" — consent screen for AI clients (Claude Connectors, ChatGPT,
+// "Sign in with CFO AI" — consent screen for AI clients (Claude Connectors, ChatGPT,
 // Claude Code). Reached from the MCP authorization server's /authorize redirect:
 //   /oauth/consent?request=<id>
 // The user signs in with the EXISTING CFO login (post_login_redirect brings them back here),
@@ -12,12 +12,12 @@ const EMAIL_AUTH_UI = import.meta.env.VITE_EMAIL_AUTH_ENABLED === 'true'
 
 const TEXT = {
   ru: {
-    title: 'Подключение к CFO Finance',
-    asks: (c) => `${c} запрашивает доступ к вашему аккаунту CFO Finance`,
+    title: 'Подключение к CFO AI',
+    asks: (c) => `${c} запрашивает доступ к вашему аккаунту CFO AI`,
     willRead: 'Что будет доступно:',
     readOnly: 'Только чтение: компании, финансовая сводка, недостающие документы и разбор инвойсов. Ничего нельзя создать, изменить или удалить.',
     returnTo: (h) => `После решения вы вернётесь на ${h}.`,
-    signedIn: (n) => (n ? `Вы вошли как ${n}.` : 'Вы вошли в CFO Finance.'),
+    signedIn: (n) => (n ? `Вы вошли как ${n}.` : 'Вы вошли в CFO AI.'),
     notYou: 'Это не вы? Выйти',
     allow: 'Разрешить',
     deny: 'Отклонить',
@@ -29,12 +29,12 @@ const TEXT = {
     revokeHint: 'Отключить доступ можно в любой момент в настройках коннекторов вашего ИИ-клиента.',
   },
   en: {
-    title: 'Connect to CFO Finance',
-    asks: (c) => `${c} wants to access your CFO Finance account`,
+    title: 'Connect to CFO AI',
+    asks: (c) => `${c} wants to access your CFO AI account`,
     willRead: 'It will be able to:',
     readOnly: 'Read only: your companies, financial summary, missing documents and invoice analyses. Nothing can be created, changed or deleted.',
     returnTo: (h) => `After you decide, you will return to ${h}.`,
-    signedIn: (n) => (n ? `Signed in as ${n}.` : 'You are signed in to CFO Finance.'),
+    signedIn: (n) => (n ? `Signed in as ${n}.` : 'You are signed in to CFO AI.'),
     notYou: 'Not you? Sign out',
     allow: 'Allow',
     deny: 'Deny',
@@ -108,6 +108,8 @@ export default function OAuthConsent() {
 
   return (
     <div style={{ maxWidth: 420, margin: '0 auto', padding: '48px 20px' }}>
+      <img src="/brand/logo_main_navy_transparent_2400.png" alt="CFO AI — Financial OS"
+        style={{ height: 48, width: 'auto', maxWidth: '70vw', objectFit: 'contain', display: 'block', marginBottom: 24 }} />
       <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 18 }}>{t.title}</h1>
 
       {!info && !error && <p style={muted}>{t.loading}</p>}

@@ -10,7 +10,7 @@
 
 const { resolveMcpUser, bearerToken } = require('./auth');
 const { handleMcpRequest } = require('./server');
-const { createOAuthIntegration } = require('./oauth');
+const { createOAuthIntegration, publicBaseUrl } = require('./oauth');
 
 function attachMcp(app, deps = {}) {
   const JWT_SECRET = deps.JWT_SECRET;
@@ -65,7 +65,8 @@ function attachMcp(app, deps = {}) {
     }
 
     try {
-      await handleMcpRequest(req, res, { mcpUser, services });
+      // baseUrl lets serverInfo advertise the brand icons with absolute URLs.
+      await handleMcpRequest(req, res, { mcpUser, services, baseUrl: publicBaseUrl() });
     } catch (e) {
       // Do not leak internal error detail to the client; log it server-side.
       console.error('[mcp] request error:', e && e.message);
