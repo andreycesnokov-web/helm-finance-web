@@ -335,7 +335,13 @@ function processDocument(input = {}) {
   // ── the money ────────────────────────────────────────────────────────────
   const amount = parseAmount(
     type === 'payment_proof' ? fields.amount : (fields.gross_amount ?? fields.amount));
-  const date = fields.transfer_date_text || fields.document_date || null;
+  // The invoice parser does not set document_date; the dates module (documentDates.js) reads
+  // the document's own date and the payment date. Without it a correctly read invoice date
+  // still produced "No date could be read". Only a DETECTED/confirmable value is used.
+  const dateOf = (d) => (d && d.value && d.status !== 'not_found' ? d.value : null);
+  const dates = input.dates || {};
+  const date = fields.transfer_date_text || fields.document_date
+    || dateOf(dates.document_date) || dateOf(dates.payment_date) || null;
   const currency = fields.currency || 'IDR';
 
   const recordKind = RECORD_BY_TYPE[type] || 'none';

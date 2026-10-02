@@ -443,4 +443,25 @@ t('OCR tax never removes the accountant, and creates nothing', () => {
   }
 });
 
+
+/* The invoice parser does not set document_date; the dates module does. A correctly read
+   invoice date used to produce "No date could be read; the draft will need one." (seen live
+   on the PT. PARA LEGALS invoice, 2026-10-02). */
+t('the document date from the dates module reaches the suggested record', () => {
+  const D = require('../server/lib/documentDates');
+  const text = SUPPLIER_INVOICE + '\nTanggal: 25 September 2026\n';
+  const extraction = X.extractFromText(text, { text_available: true });
+  const dates = D.extractDates(text, { document_type: extraction.document_type });
+  const r = O.processDocument({ document: {}, extraction, businessName: US, dates });
+  assert.strictEqual(r.financial_record.date, '2026-09-25');
+  assert.ok(!r.warnings.some((w) => /No date could be read/.test(w)), r.warnings.join(' | '));
+  // Without dates (older callers) behaviour is unchanged.
+  const r0 = O.processDocument({ document: {}, extraction, businessName: US });
+  assert.strictEqual(r0.financial_record.date, null);
+  // A not_found date is never used.
+  const r1 = O.processDocument({ document: {}, extraction, businessName: US,
+    dates: { document_date: { value: null, status: 'not_found' } } });
+  assert.strictEqual(r1.financial_record.date, null);
+});
+
 console.log(`\n${pass} passed`);

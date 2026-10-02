@@ -26,16 +26,19 @@ async function sha256Hex(file) {
  * The promise resolves with the upload-complete body, whose `document.id` is the ONLY
  * evidence that the upload actually succeeded. A stored object alone is not.
  */
-export async function uploadDocument(token, file, meta = {}, link = null, onStage = null) {
+export async function uploadDocument(token, file, meta = {}, link = null, onStage = null, opts = {}) {
   const payload = {
     file_name: file.name, mime_type: file.type || 'application/octet-stream',
     file_size: file.size, document_type: meta.document_type || null,
   }
+  // opts.businessId: upload into a specific company instead of the active workspace (the
+  // AI-assistant upload link names its company). The server still checks membership.
+  const headers = opts.businessId ? { 'x-business-id': opts.businessId } : undefined
   // Preliminary hash so the backend can short-circuit a same-business duplicate
   // before we waste an upload. The backend re-verifies the hash server-side.
   const sha256 = await sha256Hex(file)
   onStage?.('storing')
-  const init = await apiFetch('/documents/upload-init', token, { method: 'POST', body: { ...payload, sha256 } })
+  const init = await apiFetch('/documents/upload-init', token, { method: 'POST', headers, body: { ...payload, sha256 } })
   const putRes = await fetch(init.upload_url, {
     method: 'PUT',
     headers: { 'content-type': payload.mime_type, 'x-upsert': 'false' },
@@ -45,6 +48,7 @@ export async function uploadDocument(token, file, meta = {}, link = null, onStag
   onStage?.('creating')
   return apiFetch('/documents/upload-complete', token, {
     method: 'POST',
+    headers,
     body: {
       document_id: init.document_id, storage_path: init.storage_path,
       ...payload, sha256, ...meta, link: link || undefined,
