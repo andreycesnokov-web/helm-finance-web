@@ -15,7 +15,10 @@ const TEXT = {
     title: 'Подключение к CFO AI',
     asks: (c) => `${c} запрашивает доступ к вашему аккаунту CFO AI`,
     willRead: 'Что будет доступно:',
-    readOnly: 'Только чтение: компании, финансовая сводка, недостающие документы и разбор инвойсов. Ничего нельзя создать, изменить или удалить.',
+    read: 'Читать: компании, финансовая сводка, недостающие документы и разбор инвойсов.',
+    drafts: 'Создавать черновики счетов к оплате из инвойсов, которые вы отправите. Черновик ждёт вашего подтверждения в CFO AI: ничего не оплачивается, а деньги, долги и runway не меняются, пока вы его не подтвердите.',
+    readOnlyNote: 'Ничего нельзя создать, изменить или удалить.',
+    noDeleteNote: 'Ничего нельзя оплатить, изменить или удалить.',
     returnTo: (h) => `После решения вы вернётесь на ${h}.`,
     signedIn: (n) => (n ? `Вы вошли как ${n}.` : 'Вы вошли в CFO AI.'),
     notYou: 'Это не вы? Выйти',
@@ -32,7 +35,10 @@ const TEXT = {
     title: 'Connect to CFO AI',
     asks: (c) => `${c} wants to access your CFO AI account`,
     willRead: 'It will be able to:',
-    readOnly: 'Read only: your companies, financial summary, missing documents and invoice analyses. Nothing can be created, changed or deleted.',
+    read: 'Read your companies, financial summary, missing documents and invoice analyses.',
+    drafts: 'Create payable drafts from invoices you send. A draft waits for your approval in CFO AI: nothing is paid, and your cash, payables and runway do not change until you approve it.',
+    readOnlyNote: 'Nothing can be created, changed or deleted.',
+    noDeleteNote: 'Nothing can be paid, changed or deleted.',
     returnTo: (h) => `After you decide, you will return to ${h}.`,
     signedIn: (n) => (n ? `Signed in as ${n}.` : 'You are signed in to CFO AI.'),
     notYou: 'Not you? Sign out',
@@ -105,6 +111,8 @@ export default function OAuthConsent() {
     color: primary ? (enabled ? '#fff' : 'var(--text-4, #999)') : 'var(--text, #111)',
   })
   const muted = { fontSize: 13, color: 'var(--text-3, #777)' }
+  // What the server will actually grant (it drops cfo:drafts while write tools are off).
+  const canDraft = !!(info && Array.isArray(info.scopes) && info.scopes.some((s) => s.scope === 'cfo:drafts'))
 
   return (
     <div style={{ maxWidth: 420, margin: '0 auto', padding: '48px 20px' }}>
@@ -119,7 +127,11 @@ export default function OAuthConsent() {
           <p style={{ fontSize: 16, fontWeight: 600, marginBottom: 14 }}>{t.asks(info.client_name)}</p>
           <div style={{ padding: '14px 16px', borderRadius: 10, background: 'var(--bg-2, #f4f6f8)', marginBottom: 14 }}>
             <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-2, #555)', marginBottom: 6 }}>{t.willRead}</div>
-            <div style={{ fontSize: 14, color: 'var(--text-2, #555)' }}>{t.readOnly}</div>
+            <ul style={{ fontSize: 14, color: 'var(--text-2, #555)', margin: 0, paddingLeft: 18 }}>
+              <li style={{ marginBottom: 4 }}>{t.read}</li>
+              {canDraft && <li style={{ marginBottom: 4 }}>{t.drafts}</li>}
+            </ul>
+            <div style={{ fontSize: 13, color: 'var(--text-3, #777)', marginTop: 8 }}>{canDraft ? t.noDeleteNote : t.readOnlyNote}</div>
           </div>
           <p style={{ ...muted, marginBottom: 6 }}>{t.returnTo(info.redirect_host)}</p>
           <p style={{ ...muted, marginBottom: 18 }}>

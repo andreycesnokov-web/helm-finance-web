@@ -14,6 +14,17 @@ const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 
 const READ_SCOPE = 'cfo:read';
+const DRAFTS_SCOPE = 'cfo:drafts';
+
+// May this caller use the write (pending-draft) tools? An OAuth caller only when the user
+// granted cfo:drafts on the consent page — a grant made under the read-only consent stays
+// read-only even after MCP_WRITE_TOOLS_ENABLED is turned on. The dev token and the CFO JWT are
+// the account owner's own credentials (not a third-party grant), so they are not scope-limited.
+function canWriteDrafts(mcpUser) {
+  if (!mcpUser) return false;
+  if (mcpUser.via !== 'oauth') return true;
+  return Array.isArray(mcpUser.scopes) && mcpUser.scopes.includes(DRAFTS_SCOPE);
+}
 
 // Constant-time string compare (avoids leaking the dev token via response timing).
 function safeEqual(a, b) {
@@ -35,7 +46,7 @@ function bearerToken(req) {
  * @param {string} opts.JWT_SECRET
  * @param {(token:string)=>Promise<object>} [opts.verifyOAuth]  provider.verifyAccessToken, when OAuth is on
  * @param {string} [opts.resourceUrl]   canonical /mcp URL the token must be issued for
- * @returns {Promise<{userId:number, via:string, clientId?:string}|null>}
+ * @returns {Promise<{userId:number, via:string, clientId?:string, scopes?:string[]}|null>}
  */
 async function resolveMcpUser(req, opts = {}) {
   const token = bearerToken(req);
@@ -58,7 +69,7 @@ async function resolveMcpUser(req, opts = {}) {
         && info.resource.href.replace(/\/$/, '') !== opts.resourceUrl.replace(/\/$/, '')) return null;
       const uid = Number(info.extra && info.extra.userId);
       return Number.isSafeInteger(uid) && uid !== 0
-        ? { userId: uid, via: 'oauth', clientId: info.clientId }
+        ? { userId: uid, via: 'oauth', clientId: info.clientId, scopes: info.scopes.slice() }
         : null;
     } catch { return null; }
   }
@@ -72,4 +83,4 @@ async function resolveMcpUser(req, opts = {}) {
   return null;
 }
 
-module.exports = { resolveMcpUser, bearerToken, READ_SCOPE };
+module.exports = { resolveMcpUser, bearerToken, canWriteDrafts, READ_SCOPE, DRAFTS_SCOPE };

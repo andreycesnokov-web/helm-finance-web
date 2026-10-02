@@ -66,7 +66,12 @@ function attachMcp(app, deps = {}) {
 
     try {
       // baseUrl lets serverInfo advertise the brand icons with absolute URLs.
-      await handleMcpRequest(req, res, { mcpUser, services, baseUrl: publicBaseUrl() });
+      // Write tools (pending drafts only) are a separate flag, also read per request:
+      // MCP_WRITE_TOOLS_ENABLED=true registers them; anything else keeps Phase-1 read-only.
+      const writeToolsEnabled = process.env.MCP_WRITE_TOOLS_ENABLED === 'true';
+      await handleMcpRequest(req, res, {
+        mcpUser, services, baseUrl: publicBaseUrl(), writeToolsEnabled, webAppUrl: deps.webAppUrl || null,
+      });
     } catch (e) {
       // Do not leak internal error detail to the client; log it server-side.
       console.error('[mcp] request error:', e && e.message);
