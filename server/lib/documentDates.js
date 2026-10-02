@@ -50,11 +50,19 @@ function parseDate(raw) {
   const original = String(raw || '').trim();
   if (!original) return null;
 
-  // 4 Agustus 2026 / 04 Aug 2026 — a named month cannot be ambiguous.
-  const named = new RegExp(String.raw`\b(\d{1,2})\s*[-\s/]?\s*(${MONTH_WORDS})\.?\s*[-\s/,]?\s*(\d{2,4})\b`, 'i').exec(original);
+  // 4 Agustus 2026 / 04 Aug 2026 / 25th September 2026 — a named month cannot be ambiguous.
+  const named = new RegExp(String.raw`\b(\d{1,2})(?:st|nd|rd|th)?\s*[-\s/]?\s*(${MONTH_WORDS})\.?\s*[-\s/,]?\s*(\d{2,4})\b`, 'i').exec(original);
   if (named) {
     const d = Number(named[1]); const m = MONTHS[named[2].toLowerCase()]; const y = fourDigitYear(Number(named[3]));
     if (validDate(y, m, d)) return { value: iso(y, m, d), original: named[0].trim(), status: 'detected', note: null };
+  }
+  // September 25th 2026 / Sept 25, 2026 — month first, as English letters write it. Still
+  // a named month, so still unambiguous. The year must be four digits here: "Sep 25 26"
+  // is too thin to read.
+  const monthFirst = new RegExp(String.raw`\b(${MONTH_WORDS})\.?\s+(\d{1,2})(?:st|nd|rd|th)?,?\s+(\d{4})\b`, 'i').exec(original);
+  if (monthFirst) {
+    const m = MONTHS[monthFirst[1].toLowerCase()]; const d = Number(monthFirst[2]); const y = Number(monthFirst[3]);
+    if (validDate(y, m, d)) return { value: iso(y, m, d), original: monthFirst[0].trim(), status: 'detected', note: null };
   }
 
   // ISO first: 2026-08-04 is unambiguous by construction.
@@ -145,8 +153,10 @@ function extractDates(text = '', opts = {}) {
   // if exactly one candidate exists. Several unlabelled dates are not a reading.
   if (!doc) {
     // Named months count too — a kwitansi often prints "04 September 2026" bare.
+    // So does the letter form "Denpasar, September 25th 2026" under a signature.
     const anyDate = new RegExp(
-      String.raw`\b\d{1,2}\s*[-\s/]?\s*(?:${MONTH_WORDS})\.?\s*[-\s/,]?\s*\d{2,4}\b`
+      String.raw`\b\d{1,2}(?:st|nd|rd|th)?\s*[-\s/]?\s*(?:${MONTH_WORDS})\.?\s*[-\s/,]?\s*\d{2,4}\b`
+      + String.raw`|\b(?:${MONTH_WORDS})\.?\s+\d{1,2}(?:st|nd|rd|th)?,?\s+\d{4}\b`
       + String.raw`|\b\d{1,2}[-/.]\d{1,2}[-/.]\d{2,4}\b|\b\d{4}-\d{2}-\d{2}\b`, 'gi');
     const all = [...docText.matchAll(anyDate)].map((m) => m[0]);
     const unique = [...new Set(all)];

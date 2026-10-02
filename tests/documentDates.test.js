@@ -111,5 +111,25 @@ t('several unlabelled dates are not guessed between', () => {
   assert.strictEqual(r.document_date.status, 'not_found');
 });
 
+
+const PL = require('./fixtures/paralegals_invoice');
+t('paralegals: "Denpasar, September 25th 2026" is the document date', () => {
+  for (const text of [PL.PARALEGALS_INVOICE, PL.PARALEGALS_INVOICE_ONE_LINE]) {
+    const r = D.extractDates(text, { document_type: 'invoice' });
+    assert.strictEqual(r.document_date.value, '2026-09-25');
+    assert.strictEqual(r.document_date.status, 'detected');
+    assert.strictEqual(r.due_date.status, 'not_found');
+  }
+});
+
+t('month-first and ordinal dates are read; all unambiguous', () => {
+  for (const s of ['September 25th 2026', 'Sept 25, 2026', '25th September 2026', '25 September 2026', '25/09/2026']) {
+    const r = D.parseDate(s);
+    assert.strictEqual(r && r.value, '2026-09-25', s);
+    assert.strictEqual(r.status, 'detected', s);
+  }
+  assert.strictEqual(D.parseDate('February 30th 2026'), null, 'an impossible date is not a reading');
+});
+
 console.log(`\n${fail === 0 ? `ALL PASS — ${pass} passed, 0 failed` : `${pass} passed, ${fail} FAILED`}`);
 process.exitCode = fail === 0 ? 0 : 1;

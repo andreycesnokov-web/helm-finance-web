@@ -232,6 +232,15 @@ function suggestFromDocument(extraction = {}, opts = {}) {
     accounts.push({ bank_name: f.bank_name || null, account_number: f.from_account_number,
       account_name: f.from_account_name || null, currency: f.currency || 'IDR', is_primary: true });
   }
+  // On an invoice the payment instructions name the ISSUER's account. That is the
+  // counterparty's only when the issuer is the counterparty (a bill to us, role vendor); on
+  // an invoice we issued it is our own account and must not be filed against the client.
+  // A holder name that clearly belongs to someone else is not attached either.
+  if (f.payee_account_number && isVendorSide
+    && (!f.payee_account_name || !name || nameSimilarity(f.payee_account_name, name) >= 0.85)) {
+    accounts.push({ bank_name: f.payee_bank_name || null, account_number: f.payee_account_number,
+      account_name: f.payee_account_name || null, currency: f.currency || 'IDR', is_primary: true });
+  }
 
   const defaults = suggestDefaults(f.description);
   const aliases = [...new Set([name, f.to_account_name, f.from_account_name]
