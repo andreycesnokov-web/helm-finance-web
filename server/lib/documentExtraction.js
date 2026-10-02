@@ -135,6 +135,12 @@ const NAME_STOPS = [
   /\b(?:sudah|telah)\s+terima\b/i, /\bberupa\b/i, /\buntuk\s+pembayaran\b/i,
   /\bterbilang\b/i, /\bsebesar\b/i,
   /\d{2}\.\d{3}\.\d{3}/,
+  // A street address, a "City, date" line, a signature block, a table header and a
+  // signatory's title all follow a company name directly in one-line PDF text.
+  /\b(?:jl|jln)\.?\s/i, /\bjalan\b/i, /\btelp\b/i, /\bdescription\b/i, /\buraian\b/i,
+  /\b[A-Z][a-z]+,\s*(?:\d{1,2}(?:st|nd|rd|th)?\s+)?(?:jan|feb|mar|apr|mei|may|jun|jul|agu|agt|aug|sep|okt|oct|nov|nop|des|dec)[a-z]*\b/,
+  /\b(?:best\s+)?regards?\b/i, /\bhormat\s+kami\b/i,
+  /\b(?:director|direktur|komisaris)\b/i,
 ];
 
 function trimName(v) {
@@ -208,6 +214,24 @@ function extractReceiptFields(text) {
   return { fields: f, warnings };
 }
 
+/* What the document is for. A "Description" label is often a TABLE HEADER — "No ·
+   Description · Amount" — and taking the rest of that line answered "Amount". Column
+   headings are skipped and the first item line is used, without its row number or price. */
+const COLUMN_WORDS = /^(?:(?:no|qty|quantity|unit|amount|price|harga|jumlah|total|subtotal|rp|satuan|banyaknya)\b[\s.:|]*)+/i;
+function describeAfter(text) {
+  const win = windowAfter(text, /\b(?:nama\s+barang|keterangan|description|uraian)\b/i, 240);
+  if (win === null) return null;
+  for (const line of win.split(/\r?\n/)) {
+    let v = line.replace(/^[\s:|\-]+/, '').replace(COLUMN_WORDS, '').trim();
+    v = v.replace(/^\d{1,3}[.)]?\s+/, '');                                    // row number
+    v = v.split(/\s+(?:rp\.?\s*)?\d[\d.,]*\d(?:\s|$)/i)[0];                    // its price
+    v = v.split(/\b(?:total|subtotal|jumlah|grand\s+total)\b/i)[0];
+    v = v.replace(/\s+/g, ' ').replace(/[\s:,.\-|]+$/, '').trim();
+    if (v.length >= 5) return v.slice(0, 200);
+  }
+  return null;
+}
+
 /* ── invoice / faktur pajak ────────────────────────────────────────────────*/
 function extractInvoiceFields(text) {
   const f = {};
@@ -220,9 +244,14 @@ function extractInvoiceFields(text) {
   if (serialRaw) f.tax_invoice_serial = serialRaw.replace(/[\s.\-]/g, '');
 
   // Commercial reference. Kept separate from the tax serial: they are different numbers.
+  // A reference always carries a digit. Without that rule a bare "INVOICE" title followed by
+  // "Nomor : 832/INV/IX/2026" answered with the word "Nomor" (or "Invoice" itself), and the
+  // duplicate check then keyed on a word every invoice shares.
+  const REF = String.raw`(?=[A-Z\/\-]*\d)[A-Z0-9][A-Z0-9\/\-.]{3,30}[A-Z0-9]`;
   f.document_number =
-    afterLabel(text, /\b(?:no\.?\s*)?invoice\s*(?:no\.?|number|#)?/i, String.raw`[A-Z0-9][A-Z0-9\/\-]{4,30}`)
-    || afterLabel(text, /\b(?:nomor|no\.?)\s*(?:dokumen|tagihan|referensi)/i, String.raw`[A-Z0-9][A-Z0-9\/\-]{4,30}`)
+    afterLabel(text, /\b(?:no\.?\s*)?invoice\s*(?:no\.?|number|#|nomor)\s*/i, REF)
+    || afterLabel(text, /\b(?:nomor|no\.?)\s*(?:invoice|dokumen|tagihan|referensi|faktur)?\s*:/i, REF)
+    || afterLabel(text, /\b(?:no\.?\s*)?invoice\b/i, REF)
     || (/\b([A-Z]\d{9,12})\b/.exec(text) || [])[1]
     || null;
 
@@ -231,7 +260,35 @@ function extractInvoiceFields(text) {
     || afterLabel(text, /\b(?:dari|from|vendor|penjual)\b/i, String.raw`[^\r\n]{3,120}`));
   f.buyer_name = trimName(
     afterLabel(text, /pembeli\s+barang\s+kena\s+pajak[\s\S]{0,40}?nama/i, String.raw`[^\r\n]{3,120}`)
-    || afterLabel(text, /\b(?:kepada|bill\s+to|buyer|pembeli)\b/i, String.raw`[^\r\n]{3,120}`));
+    || afterLabel(text, /\b(?:kepada(?:\s+yth\.?)?|bill\s+to|buyer|pembeli|to\s*:)/i, String.raw`[^\r\n]{3,120}`));
+
+  // No labelled party: fall back to the party BLOCKS (documentParties.js) — the letterhead,
+  // the signature block ("Best Regard", "Hormat kami") and the payment instructions
+  // ("atas nama") name the issuer; "To :" / "Kepada" the buyer. A side with no block of its
+  // own stays null rather than borrowing the other side's name.
+  if (!f.issuer_name || !f.buyer_name) {
+    const { parties } = require('./documentParties').extractParties(text);
+    const firstOf = (role) => (parties.find((p) => p.role === role) || {}).legal_name || null;
+    if (!f.issuer_name) f.issuer_name = trimName(firstOf('issuer_or_receiver'));
+    if (!f.buyer_name) f.buyer_name = trimName(firstOf('buyer_or_payer'));
+    if (f.issuer_name && f.buyer_name && f.issuer_name.toUpperCase() === f.buyer_name.toUpperCase()) {
+      f.buyer_name = null;
+      warnings.push('The same company was read as both issuer and buyer; the buyer was left empty.');
+    }
+  }
+
+  // Payment instructions: "Bank BNI · Rek. No : 0123456789 · atas nama : PT ...". The account
+  // the invoice asks to be paid INTO belongs to the issuer, which is how a supplier is later
+  // recognised by its bank account. Read only when an account number is actually printed.
+  const accNo = afterLabel(text, /\b(?:no\.?\s*)?rek(?:ening)?\.?\s*(?:no\.?|nomor)?|\baccount\s*(?:no\.?|number)/i,
+    String.raw`\d[\d\-\s.]{5,24}\d`);
+  if (accNo) {
+    f.payee_account_number = accNo.replace(/[\s.]/g, '');
+    const bank = /\bbank\s+(bca|bni|bri|mandiri|btn|cimb(?:\s+niaga)?|permata|danamon|maybank|ocbc(?:\s+nisp)?|panin|bsi|mega|jago|sinarmas)\b/i.exec(text)
+      || /\b(bca|bni|bri|mandiri)\b/i.exec(text);
+    f.payee_bank_name = bank ? bank[1].toUpperCase() : null;
+    f.payee_account_name = trimName(afterLabel(text, /\b(?:atas\s+nama|a\.n\.|account\s+name)\b/i, String.raw`[^\r\n]{3,80}`));
+  }
 
   const npwps = [...String(text).matchAll(/\b(\d{2}\.\d{3}\.\d{3}\.\d[-.]\d{3}\.\d{3})\b/g)].map((m) => m[1]);
   if (npwps[0]) f.issuer_npwp = npwps[0];
@@ -263,7 +320,7 @@ function extractInvoiceFields(text) {
   const period = /(\d{1,2}\s+\w+\s+\d{4})\s*(?:s\/d|sampai|-|–|to)\s*(\d{1,2}\s+\w+\s+\d{4})/i.exec(text);
   if (period) { f.period_start_text = period[1]; f.period_end_text = period[2]; }
 
-  const desc = afterLabel(text, /\b(?:nama\s+barang|keterangan|description|uraian)\b/i, String.raw`[^\r\n]{5,200}`);
+  const desc = describeAfter(text);
   if (desc) f.description = desc;
 
   return { fields: f, warnings };
@@ -323,6 +380,8 @@ const EMPTY_FIELDS = {
   transfer_date_text: null, amount: null, fee: null, payment_method: null,
   from_account_number: null, from_account_name: null,
   to_account_number: null, to_account_name: null,
+  // Invoice payment instructions — the account the issuer asks to be paid into.
+  payee_bank_name: null, payee_account_number: null, payee_account_name: null,
 };
 
 // Kinds that are evidence rather than a transaction: nothing is created from them.

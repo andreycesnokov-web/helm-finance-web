@@ -142,5 +142,28 @@ t('NPWP is normalised for comparison but shown as printed', () => {
   assert.strictEqual(seller.npwp_normalized, '013362389054000');
 });
 
+
+const PL = require('./fixtures/paralegals_invoice');
+t('paralegals: letterhead/signature/"atas nama" are the issuer, "To :" the buyer', () => {
+  for (const text of [PL.PARALEGALS_INVOICE, PL.PARALEGALS_INVOICE_ONE_LINE]) {
+    const { parties } = P.extractParties(text);
+    const issuers = parties.filter((x) => x.role === 'issuer_or_receiver').map((x) => x.legal_name.toUpperCase());
+    const buyers = parties.filter((x) => x.role === 'buyer_or_payer').map((x) => x.legal_name);
+    assert.deepStrictEqual([...new Set(issuers)], ['PT. PARA LEGALS INDONESIA'], JSON.stringify(parties));
+    assert.deepStrictEqual(buyers, ['PT Helm Care Indonesia'], JSON.stringify(parties));
+  }
+});
+
+t('"Total" does not open a buyer block (the "To" inside it is not a label)', () => {
+  const { parties } = P.extractParties('PT Satu Dua\nTotal 1.000.000\natas nama : PT Satu Dua');
+  assert.ok(!parties.some((x) => x.role === 'buyer_or_payer'), JSON.stringify(parties));
+});
+
+t('paralegals: the counterparty of Helm Care Indonesia is PT. PARA LEGALS INDONESIA', () => {
+  const r = P.resolveCounterparty(PL.PARALEGALS_INVOICE_ONE_LINE, { name: 'Helm Care Indonesia' });
+  assert.strictEqual(r.status, 'ok');
+  assert.strictEqual(r.counterparty.legal_name, 'PT. PARA LEGALS INDONESIA');
+});
+
 console.log(`\n${fail === 0 ? `ALL PASS — ${pass} passed, 0 failed` : `${pass} passed, ${fail} FAILED`}`);
 process.exitCode = fail === 0 ? 0 : 1;

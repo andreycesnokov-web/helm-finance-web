@@ -192,4 +192,73 @@ t('no reference means duplicates cannot be claimed', () => {
   assert.ok(/cannot be detected automatically/i.test(r.reason));
 });
 
+
+/* ── PT. PARA LEGALS INDONESIA 832/INV/IX/2026 (live MCP test, 2026-10-02) ──────────────
+   Supplier only in the letterhead / signature / "atas nama"; buyer after "To :"; the
+   number after "Nomor :" under a bare "INVOICE" title. Same document as one-line text. */
+const PL = require('./fixtures/paralegals_invoice');
+for (const [name, text] of [['multi-line', PL.PARALEGALS_INVOICE], ['one-line', PL.PARALEGALS_INVOICE_ONE_LINE]]) {
+  t('paralegals (' + name + '): supplier, buyer, number, total and description are read', () => {
+    const r = X.extractFromText(text, { text_available: true });
+    assert.strictEqual(r.document_type, 'invoice');
+    assert.strictEqual(r.fields.document_number, '832/INV/IX/2026');
+    assert.strictEqual(r.fields.issuer_name, 'PT. PARA LEGALS INDONESIA');
+    assert.strictEqual(r.fields.buyer_name, 'PT Helm Care Indonesia');
+    assert.strictEqual(r.fields.gross_amount, 17500000);
+    assert.strictEqual(r.fields.description, 'Jasa konsultasi hukum - perubahan anggaran dasar');
+  });
+  t('paralegals (' + name + '): payment instructions become the issuer\'s bank account', () => {
+    const f = X.extractFromText(text, { text_available: true }).fields;
+    assert.strictEqual(f.payee_bank_name, 'BNI');
+    assert.strictEqual(f.payee_account_number, '0000-1111-22');
+    assert.strictEqual(f.payee_account_name, 'PT. Para Legals Indonesia');
+  });
+}
+
+t('a bare INVOICE title never becomes the document number', () => {
+  const r = X.extractFromText('INVOICE\nNomor : 77/INV/X/2026\nFrom: PT Satu Dua\nTotal: 1.000.000', { text_available: true });
+  assert.strictEqual(r.fields.document_number, '77/INV/X/2026');
+  const r2 = X.extractFromText('INVOICE\nInvoice No: INV-2026-0012\nTotal 5.000', { text_available: true });
+  assert.strictEqual(r2.fields.document_number, 'INV-2026-0012');
+});
+
+t('a "Kepada Yth." buyer is read without the salutation', () => {
+  const r = X.extractFromText('INVOICE No: A-12345\nKepada Yth. PT Helm Care Indonesia\nTotal: 2.000.000', { text_available: true });
+  assert.strictEqual(r.fields.buyer_name, 'PT Helm Care Indonesia');
+});
+
+t('no account number printed means no payee account is invented', () => {
+  const r = X.extractFromText('INVOICE No: A-12345\nFrom: PT Satu Dua\nBank BNI\nTotal: 2.000.000', { text_available: true });
+  assert.strictEqual(r.fields.payee_account_number, null);
+  assert.strictEqual(r.fields.payee_bank_name, null);
+});
+
+const intake = (text, businessName, counterparties = []) => require('../server/lib/documentIntakeOrchestrator').processDocument({
+  document: { id: null, document_type: null, extracted_json: {} },
+  extraction: X.extractFromText(text, { text_available: true }),
+  businessName, counterparties, existingLinks: {}, taxRules: [], readSource: 'embedded_text',
+});
+
+t('paralegals: the full intake reads it as a bill to pay from PT. PARA LEGALS INDONESIA', () => {
+  const r = intake(PL.PARALEGALS_INVOICE, 'Helm Care Indonesia');
+  assert.strictEqual(r.document.direction, 'payable');
+  const cp = r.counterparty.suggested_counterparty;
+  assert.strictEqual(cp.legal_name, 'PT. PARA LEGALS INDONESIA');
+  assert.strictEqual(cp.role, 'vendor');
+  assert.strictEqual(cp.bank_accounts[0].account_number, '0000-1111-22');
+});
+
+t('paralegals: an existing supplier saved under another name is recognised by its bank account', () => {
+  const r = intake(PL.PARALEGALS_INVOICE, 'Helm Care Indonesia', [{ id: 'cp-7', legal_name: 'Paralegal',
+    display_name: 'Paralegal', aliases: [], bank_accounts: [{ bank_name: 'BNI', account_number: '0000111122' }] }]);
+  assert.strictEqual(r.counterparty.matched_counterparty_id, 'cp-7');
+});
+
+t('an invoice WE issued does not file our own account against the client', () => {
+  const text = PL.PARALEGALS_INVOICE.replace('To : PT Helm Care Indonesia', 'To : PT Klien Maju Sejahtera');
+  const r = intake(text, 'Para Legals Indonesia');
+  assert.strictEqual(r.document.direction, 'receivable');
+  assert.deepStrictEqual(r.counterparty.suggested_counterparty.bank_accounts, []);
+});
+
 console.log(`\n${pass} passed`);

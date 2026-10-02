@@ -35,12 +35,20 @@ const BLOCK_LABELS = [
   { re: /\bpenjual\b/i, role: 'issuer_or_receiver' },
   { re: /\bsupplier\b/i, role: 'issuer_or_receiver' },
   { re: /\bvendor\b/i, role: 'issuer_or_receiver' },
+  // The signature block and the payment instructions both name the ISSUER: the company
+  // that signs the invoice and the holder of the account it asks to be paid into. Many
+  // Indonesian service invoices name the supplier nowhere else but the letterhead.
+  { re: /\b(?:best\s+)?regards?\b|\bhormat\s+kami\b|\bsincerely\b/i, role: 'issuer_or_receiver' },
+  { re: /\batas\s+nama\b|\baccount\s+name\b/i, role: 'issuer_or_receiver' },
   // buyer / payer
   { re: /pembeli\s+barang\s+kena\s+pajak/i, role: 'buyer_or_payer' },
   { re: /\bpembeli\b/i, role: 'buyer_or_payer' },
   { re: /\bkepada\s*:?/i, role: 'buyer_or_payer' },
   { re: /\bbill\s+to\b/i, role: 'buyer_or_payer' },
-  { re: /\bto\s*:?/i, role: 'buyer_or_payer' },
+  // "To :" only with its colon. Bare "to" is prose ("transfer to"), and without the word
+  // boundary the "To" of "Total" opened a buyer block — which handed the supplier named in
+  // the payment instructions below it to the BUYER side.
+  { re: /\bto\b\s*:/i, role: 'buyer_or_payer' },
   { re: /(?:sudah|telah)\s+terima\s+dari/i, role: 'buyer_or_payer' },
 ];
 
@@ -59,7 +67,15 @@ const TITLE_WORDS = /^(?:KWITANSI|KUITANSI|INVOICE|FAKTUR|NOTA|RECEIPT|TAGIHAN|B
  *  legal form still reads as a name: at least two words, and no digits. */
 function companyIn(section) {
   const legal = LEGAL_FORM.exec(section);
-  if (legal) return legal[0];
+  if (legal) {
+    // One-line PDF text: "atas nama : PT. Para Legals Indonesia Denpasar, September 25th".
+    // The name pattern stops at the comma, so the place before a date is still attached.
+    const rest = section.slice(legal.index + legal[0].length);
+    if (/^,\s*(?:\d{1,2}(?:st|nd|rd|th)?\s+)?(?:jan|feb|mar|apr|mei|may|jun|jul|agu|agt|aug|sep|okt|oct|nov|nop|des|dec)[a-z]*\b/i.test(rest)) {
+      return legal[0].replace(/\s+[A-Z][a-z]+\s*$/, '');
+    }
+    return legal[0];
+  }
   const caps = CAPS_RUN.exec(section);
   if (!caps) return null;
   const v = caps[0].trim();
@@ -111,11 +127,19 @@ function splitBlocks(text) {
   return blocks;
 }
 
+// "Denpasar, September 25th 2026" — a place and a date, never part of a company name.
+const CITY_DATE = /\b[A-Z][a-z]+,\s*(?:\d{1,2}(?:st|nd|rd|th)?\s+)?(?:jan|feb|mar|apr|mei|may|jun|jul|agu|agt|aug|sep|okt|oct|nov|nop|des|dec)[a-z]*\b/;
+
 function cleanName(raw) {
   if (!raw) return null;
   let s = String(raw).replace(/^[\s:.\-]+/, '').replace(/\s+/g, ' ').trim();
-  // Stop at anything that begins the next field.
+  // Stop at anything that begins the next field — including a street address ("Jl."),
+  // which follows the name directly when PDF text has no line breaks.
   s = s.split(/\b(?:npwp|alamat|address|telp|phone|email|tanggal|jumlah|netto|total|harga|no\.?\s|kode)\b/i)[0];
+  s = s.split(/\b(?:jl|jln|jalan)\b\.?\s/i)[0];
+  s = s.split(CITY_DATE)[0];
+  // A signatory's title printed under the company name in a signature block.
+  s = s.split(/\b(?:director|direktur|manager|komisaris|owner|ceo|cfo)\b/i)[0];
   s = s.replace(/[\s:,.\-]+$/, '').trim();
   return s.length >= 3 ? s.slice(0, 120) : null;
 }
