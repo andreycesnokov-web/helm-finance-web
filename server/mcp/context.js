@@ -69,6 +69,17 @@ async function resolveCompany(ctx, companyId) {
   }
 }
 
+// The user's memberships, looked up ONCE per MCP request (the server is built per request, so
+// the ctx object is per request). Shared by the tool-list filter and get_company_context.
+// Never used for an access decision — the resolver re-checks membership on every call.
+function memberships(ctx) {
+  if (!ctx._memberships) {
+    ctx._memberships = Promise.resolve(ctx.services.listAccessibleWorkspaces(ctx.mcpUser.userId));
+    ctx._memberships.catch(() => { ctx._memberships = null; });
+  }
+  return ctx._memberships;
+}
+
 function companyRef(biz) {
   return {
     company_id: biz.business.id,
@@ -78,4 +89,4 @@ function companyRef(biz) {
   };
 }
 
-module.exports = { ToolError, ok, fail, guarded, resolveCompany, companyRef };
+module.exports = { ToolError, ok, fail, guarded, resolveCompany, companyRef, memberships };

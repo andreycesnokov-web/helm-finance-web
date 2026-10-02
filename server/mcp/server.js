@@ -8,6 +8,7 @@
 
 const { phase1Tools, writeTools } = require('./tools');
 const { canWriteDrafts } = require('./auth');
+const { memberships } = require('./context');
 
 const SERVER_INSTRUCTIONS = [
   'CFO AI (CFO Finance) MCP server. CFO AI is the system of record for accounting and documents;',
@@ -70,11 +71,38 @@ async function buildServer(ctx) {
     serverInfo(ctx && ctx.baseUrl),
     { instructions: withWrite ? `${SERVER_INSTRUCTIONS} ${WRITE_INSTRUCTIONS}` : SERVER_INSTRUCTIONS },
   );
-  const tools = withWrite ? [...phase1Tools(ctx), ...writeTools(ctx)] : phase1Tools(ctx);
+  const all = withWrite ? [...phase1Tools(ctx), ...writeTools(ctx)] : phase1Tools(ctx);
+  const roles = await companyRoles(ctx);
+  // UX only: list the tools the user can use in at least one of their companies. Every call
+  // still re-checks the role in the company it acts in — hiding a tool is never the gate.
+  // A predicate that cannot be evaluated keeps the tool listed: the filter must never be the
+  // reason a request fails.
+  const usable = (t) => !t.availableFor || roles.some((r) => {
+    try { return t.availableFor(r, ctx.services); } catch { return true; }
+  });
+  const tools = roles ? all.filter(usable) : all;
   for (const t of tools) {
     server.registerTool(t.name, t.config, t.handler);
   }
   return server;
+}
+
+// The user's roles across their COMPANY workspaces (personal workspaces are not served by these
+// tools). null = unknown (no identity, no memberships, or the lookup failed) → no filtering;
+// the per-call checks then answer with the real reason (no_business, forbidden_role, …).
+async function companyRoles(ctx) {
+  const s = ctx && ctx.services;
+  const uid = ctx && ctx.mcpUser && ctx.mcpUser.userId;
+  if (uid == null || !s || typeof s.listAccessibleWorkspaces !== 'function') return null;
+  try {
+    const rows = await memberships(ctx);
+    const roles = [...new Set((rows || [])
+      .filter((m) => m && m.role && !(m.businesses && m.businesses.type === 'personal'))
+      .map((m) => m.role))];
+    return roles.length ? roles : null;
+  } catch {
+    return null;
+  }
 }
 
 async function handleMcpRequest(req, res, ctx) {
