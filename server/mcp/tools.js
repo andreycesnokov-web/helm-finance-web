@@ -357,6 +357,146 @@ async function submitInvoiceDraft(args, ctx) {
   };
 }
 
+/* ── submit_receivable_draft (WRITE — pending draft only) ────────────────── */
+// "We invoiced a client and expect to be paid." Creates a RECEIVABLE draft — always
+// 'pending_approval', never counted in receivables, net position or the CFO context until a
+// human approves it in CFO AI. Two ways in:
+//   * from the user's own words (customer + amount, optional due date / invoice number);
+//   * from an invoice the company issued (invoice_text or document_id) — then CFO reads it and
+//     its total wins; a conflicting amount from the model is refused, as for payables.
+const norm = (v) => String(v || '').toLowerCase().replace(/\b(pt|cv|tbk|ltd|llc|inc)\b\.?/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
+
+async function submitReceivableDraft(args, ctx) {
+  const s = ctx.services;
+  const hasDoc = !!args.document_id;
+  const hasText = typeof args.invoice_text === 'string' && args.invoice_text.trim().length > 0;
+  if (hasDoc && hasText) throw new ToolError('invalid_arguments', 'Provide at most one of document_id or invoice_text.');
+  const biz = await resolveCompany(ctx, args.company_id);
+  if (!s.canCreateFinancialRequest(biz.role)) {
+    throw new ToolError('forbidden_role', 'Your role in this company cannot submit receivables.');
+  }
+
+  const warnings = [];
+  let inv = {};
+  let analysis = null;
+  if (hasDoc || hasText) {
+    await requireInvoiceGates(biz, s);
+    analysis = await runInvoiceAnalysis(args, ctx, biz);
+    inv = analysis.invoice || {};
+    warnings.push(...(analysis.warnings || []));
+    // An invoice billed TO this company is a bill to pay, not money to collect.
+    const us = norm(biz.business.name).length >= 4 ? norm(biz.business.name) : ''; // too short to match safely
+    if (us && inv.buyer && norm(inv.buyer).includes(us)) {
+      throw new ToolError('looks_like_payable',
+        `This invoice is billed to ${biz.business.name} — it is a bill to pay, not a receivable. `
+        + 'Use submit_invoice_draft instead, or check the invoice with the user.', { buyer: inv.buyer });
+    }
+    if (us && inv.supplier && !norm(inv.supplier).includes(us)) {
+      warnings.push(`The invoice issuer reads as "${inv.supplier}", not ${biz.business.name}. Check it is your own invoice before approving.`);
+    }
+    if (analysis.duplicate && analysis.duplicate.duplicate) {
+      warnings.push('A document with the same invoice number is already stored in CFO Finance — check before approving.');
+    }
+  }
+
+  let amount; let amount_source;
+  if (analysis) {
+    ({ amount, amount_source } = pickAmount(inv.total, args.amount));
+  } else {
+    const a = args.amount == null ? null : Number(args.amount);
+    if (a == null || !Number.isFinite(a) || a <= 0) {
+      throw new ToolError('amount_missing', 'Ask the user for the amount the client owes and pass it as amount.');
+    }
+    amount = a; amount_source = 'user_statement';
+  }
+
+  const counterparty = String(inv.buyer || args.customer || '').trim();
+  if (!counterparty) {
+    throw new ToolError('customer_missing', 'Ask the user who owes the money and pass it as customer.');
+  }
+
+  // IDR only, exactly as for payables: receivable amounts downstream (display, payment,
+  // aggregation) do not read the currency yet. Never reinterpret an amount across currencies.
+  const seen = [inv.currency, args.currency].filter(Boolean).map((c) => s.normalizeCurrency(c));
+  const unsupported = seen.find((c) => !s.isSupportedTelegramCurrency(c));
+  if (unsupported) {
+    throw new ToolError('currency_not_supported',
+      `Receivable drafts currently support IDR only; this one is in ${unsupported}.`, { currency: unsupported });
+  }
+  const currency = seen[0] || s.normalizeCurrency(biz.business.base_currency || 'IDR');
+  if (!s.isSupportedTelegramCurrency(currency)) {
+    throw new ToolError('currency_not_supported',
+      `Receivable drafts currently support IDR only; this company's base currency is ${currency}.`, { currency });
+  }
+
+  const dueDate = (inv.due_date && inv.due_date.value) || args.due_date || null;
+  if (dueDate && !DATE_RE.test(String(dueDate))) {
+    throw new ToolError('invalid_due_date', 'due_date must be YYYY-MM-DD.');
+  }
+
+  const invoiceNumber = inv.invoice_number || args.invoice_number || null;
+  const descParts = [];
+  if (invoiceNumber) descParts.push(`Invoice ${String(invoiceNumber).slice(0, 64)}`);
+  if (inv.description || args.description) descParts.push(String(inv.description || args.description).slice(0, 200));
+
+  const conf = analysis ? analysis.extraction_confidence : null;
+  const r = await s.createPendingDebtDraft(biz, ctx.mcpUser.userId, {
+    counterparty: counterparty.slice(0, 200),
+    amount,
+    amount_source,
+    currency,
+    due_date: dueDate,
+    description: descParts.join(' — ') || null,
+    invoice_number: invoiceNumber,
+    raw_input_text: args.invoice_text ? String(args.invoice_text).slice(0, 4000) : null,
+    confidence_score: conf === 'high' ? 0.9 : conf === 'medium' ? 0.6 : conf ? 0.3 : null,
+  }, 'receivable');
+
+  if (r.error === 'duplicate_receivable') {
+    throw new ToolError('duplicate_receivable',
+      'An open receivable for this client and amount already exists in this company. No draft was created.',
+      { existing: r.existing });
+  }
+  if (r.error === 'plan_limit_reached') {
+    throw new ToolError('plan_limit_reached',
+      'The company has reached its monthly invoice limit on its current plan. No draft was created.',
+      { upgrade_required: true, limit: r.limit, usage: r.usage });
+  }
+  if (r.error) throw new ToolError('draft_not_created', 'CFO Finance could not create the draft.');
+
+  if (amount_source === 'model_reading') {
+    warnings.push('The amount was read by the AI assistant, not by CFO. Verify it before approving.');
+  }
+  if (amount_source === 'user_statement') {
+    warnings.push('Recorded from what the user said, without an invoice document. Attach the invoice in CFO AI if there is one.');
+  }
+
+  const d = r.debt;
+  return {
+    company: companyRef(biz),
+    written: true,
+    draft: {
+      id: d.id,
+      type: 'receivable',
+      approval_status: 'pending_approval',
+      counterparty: d.counterparty,
+      amount: Number(d.amount),
+      amount_source,
+      currency: d.currency,
+      due_date: d.due_date || null,
+      invoice_number: invoiceNumber,
+      description: d.description || null,
+    },
+    confirm_in_app_url: ctx.webAppUrl ? `${ctx.webAppUrl}/receivables` : null,
+    telegram_approval_sent: (r.telegram_notified || 0) > 0,
+    counts_in_receivables: false,
+    warnings,
+    next_step: 'The draft is waiting for approval in CFO AI. It does not count in receivables or '
+      + 'net position until an owner/admin approves it (Receivables screen or the Telegram Approve '
+      + 'button). No money has moved.',
+  };
+}
+
 /* ── registry ────────────────────────────────────────────────────────────── */
 function phase1Tools(ctx) {
   return [
@@ -459,6 +599,40 @@ function writeTools(ctx) {
         },
       },
       handler: guarded('submit_invoice_draft', ctx, submitInvoiceDraft),
+    },
+    {
+      name: 'submit_receivable_draft',
+      config: {
+        title: 'Record a receivable draft',
+        description: 'Record money a CLIENT owes the company (an invoice the company issued) as a '
+          + 'RECEIVABLE DRAFT in CFO Finance. The draft is always "pending approval": it does not count '
+          + 'in receivables or net position until the user approves it in CFO AI (Receivables screen or '
+          + 'Telegram). Use it only when the user asks to record what a client owes. Either pass customer '
+          + '+ amount from what the user said, or pass the issued invoice as invoice_text / document_id '
+          + '(then CFO reads it: its total wins and a conflicting amount is refused). Bills the company '
+          + 'must PAY go to submit_invoice_draft instead. Confirm customer, amount and due date with the '
+          + 'user before calling. IDR only for now.',
+        inputSchema: {
+          company_id: COMPANY_ID,
+          customer: z.string().min(1).max(200).optional()
+            .describe('Client who owes the money (required unless CFO reads it from the invoice)'),
+          amount: z.number().positive().optional()
+            .describe('Amount the client owes (required unless CFO reads it from the invoice)'),
+          currency: z.string().min(3).max(3).optional().describe('ISO currency code, e.g. IDR'),
+          due_date: z.string().regex(DATE_RE).optional().describe('When the client should pay, YYYY-MM-DD'),
+          invoice_number: z.string().min(1).max(64).optional().describe('The invoice number the company issued'),
+          description: z.string().max(200).optional().describe('What the client is paying for'),
+          invoice_text: z.string().max(20000).optional()
+            .describe('Full text of the issued invoice, if the user shared it'),
+          document_id: z.string().min(1).max(64).optional()
+            .describe('Id of the issued invoice already stored in CFO Finance for this company'),
+        },
+        annotations: {
+          title: 'Record a receivable draft',
+          readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false,
+        },
+      },
+      handler: guarded('submit_receivable_draft', ctx, submitReceivableDraft),
     },
   ];
 }

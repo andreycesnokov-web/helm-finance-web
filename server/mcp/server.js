@@ -20,9 +20,11 @@ const SERVER_INSTRUCTIONS = [
 
 // Appended only when write tools are enabled (MCP_WRITE_TOOLS_ENABLED=true).
 const WRITE_INSTRUCTIONS = [
-  'Exception to read-only: submit_invoice_draft creates a payable DRAFT that waits for the user\'s',
-  'approval inside CFO AI. Use it only when the user asks to send an invoice to CFO, after showing them',
-  'the analyze_invoice result. It never pays anything; tell the user to confirm the draft in CFO AI.',
+  'Exception to read-only: submit_invoice_draft (a bill the company must PAY) and',
+  'submit_receivable_draft (money a CLIENT owes the company) create DRAFTS that wait for the user\'s',
+  'approval inside CFO AI. Use them only when the user asks to record something, after confirming the',
+  'details with them (for an invoice, show the analyze_invoice result first). They never move money;',
+  'tell the user to confirm the draft in CFO AI.',
 ].join(' ');
 
 let _sdk = null;

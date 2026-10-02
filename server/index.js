@@ -6701,7 +6701,16 @@ app.post('/api/debts/from-telegram', async (req, res) => {
 // The amount, counterparty and currency arrive already validated by the MCP layer against
 // the CFO extraction pipeline. This function owns only persistence: plan limit, duplicate
 // guard, insert, audit, notification. Returns { debt } or { error, ...details }.
+// The same function backs submit_receivable_draft (type 'receivable'): an invoice the
+// company issued, recorded as "money we expect" — still a pending draft, still excluded from
+// receivables / net position until approved.
 async function createPendingPayableDraft(biz, actingUserId, draft) {
+  return createPendingDebtDraft(biz, actingUserId, draft, 'payable');
+}
+
+async function createPendingDebtDraft(biz, actingUserId, draft, type) {
+  if (type !== 'payable' && type !== 'receivable') return { error: 'invalid_type' };
+  const isRecv = type === 'receivable';
   const businessId = biz.business.id;
 
   // Plan limit — same rule as POST /api/debts (debts are the MVP invoice proxy).
@@ -6724,12 +6733,13 @@ async function createPendingPayableDraft(biz, actingUserId, draft) {
     console.warn('[mcp-draft] limit check failed:', limitErr.message);
   }
 
-  // Duplicate guard: an open (non-rejected, unpaid) payable for the same supplier and
-  // amount in this company. Re-sending the same invoice must not create a second draft.
+  // Duplicate guard: an open (non-rejected, unpaid) record of the same type for the same
+  // counterparty and amount in this company. Re-sending the same invoice must not create a
+  // second draft.
   const { data: similar } = await supabase.from('debts')
     .select('id, counterparty, amount, due_date, approval_status, status')
     .eq('business_id', businessId)
-    .eq('type', 'payable')
+    .eq('type', type)
     .eq('amount', draft.amount)
     .ilike('counterparty', String(draft.counterparty).replace(/[\\%_]/g, (c) => `\\${c}`))
     .not('status', 'in', '("paid","cancelled")')
@@ -6737,7 +6747,7 @@ async function createPendingPayableDraft(biz, actingUserId, draft) {
     .limit(1);
   if (similar && similar.length) {
     const d = similar[0];
-    return { error: 'duplicate_payable', existing: {
+    return { error: isRecv ? 'duplicate_receivable' : 'duplicate_payable', existing: {
       id: d.id, counterparty: d.counterparty, amount: Number(d.amount),
       due_date: d.due_date || null, approval_status: d.approval_status,
     } };
@@ -6750,7 +6760,7 @@ async function createPendingPayableDraft(biz, actingUserId, draft) {
 
   const insertRow = {
     ...bizWriteFields(biz, actingUserId),
-    type:                 'payable',
+    type,
     counterparty:         draft.counterparty,
     amount:               draft.amount,
     original_amount:      draft.amount,   // locked; never mutated
@@ -6779,9 +6789,9 @@ async function createPendingPayableDraft(biz, actingUserId, draft) {
 
   await recordAudit({
     businessId, actorUserId: actingUserId, actorRole: biz.role, channel: 'mcp',
-    entityType: 'debt', entityId: data.id, action: 'mcp_payable_draft_created',
+    entityType: 'debt', entityId: data.id, action: isRecv ? 'mcp_receivable_draft_created' : 'mcp_payable_draft_created',
     after: {
-      type: 'payable', counterparty: data.counterparty, amount: Number(data.amount),
+      type, counterparty: data.counterparty, amount: Number(data.amount),
       currency: data.currency, due_date: data.due_date || null,
       approval_status: 'pending_approval', invoice_number: draft.invoice_number || null,
       amount_source: draft.amount_source || null,
@@ -6793,7 +6803,7 @@ async function createPendingPayableDraft(biz, actingUserId, draft) {
   let notified = { sent: 0 };
   try {
     const lang = await getUserLanguage(biz.ownerUserId).catch(() => 'en');
-    const text = notificationText('mcp_payable_submitted', lang, {
+    const text = notificationText(isRecv ? 'mcp_receivable_submitted' : 'mcp_payable_submitted', lang, {
       counterparty: data.counterparty,
       amount: `${Number(data.amount).toLocaleString('en-US')} ${data.currency || 'IDR'}`,
       due: data.due_date || '—',
@@ -6805,7 +6815,7 @@ async function createPendingPayableDraft(biz, actingUserId, draft) {
       [ { text: '📊 View impact', callback_data: `debt_impact:${data.id}` } ],
       [ { text: '✅ Approve', callback_data: `debt_approve:${data.id}` },
         { text: '❌ Reject',  callback_data: `debt_reject:${data.id}` } ],
-      [ { text: '🌐 Open', url: `${webAppUrl}/payables` } ],
+      [ { text: '🌐 Open', url: `${webAppUrl}/${isRecv ? 'receivables' : 'payables'}` } ],
     ], { category: 'team_approvals', businessId: businessId }) || { sent: 0 };
   } catch (e) {
     console.warn('[mcp-draft] notify failed:', e.message);
@@ -8914,6 +8924,11 @@ const NOTIFICATION_TEMPLATES = {
     en: (p) => `🤖 <b>Invoice draft from your AI assistant</b>\n\nSupplier: ${p.counterparty}\nAmount: <b>${p.amount}</b>\nDue: ${p.due}\nInvoice: ${p.invoice}\nSubmitted by: ${p.createdBy}\nSource: CFO AI connector · ⏳ Pending approval\n\nNot counted in cash flow until approved.`,
     ru: (p) => `🤖 <b>Черновик инвойса от AI-ассистента</b>\n\nПоставщик: ${p.counterparty}\nСумма: <b>${p.amount}</b>\nСрок: ${p.due}\nИнвойс: ${p.invoice}\nОтправил: ${p.createdBy}\nИсточник: коннектор CFO AI · ⏳ Ожидает подтверждения\n\nНе учитывается в cash flow до подтверждения.`,
     id: (p) => `🤖 <b>Draf invoice dari asisten AI</b>\n\nPemasok: ${p.counterparty}\nJumlah: <b>${p.amount}</b>\nJatuh tempo: ${p.due}\nInvoice: ${p.invoice}\nDikirim oleh: ${p.createdBy}\nSumber: konektor CFO AI · ⏳ Menunggu persetujuan\n\nTidak dihitung dalam arus kas sampai disetujui.`,
+  },
+  mcp_receivable_submitted: {
+    en: (p) => `🤖 <b>Receivable draft from your AI assistant</b>\n\nClient: ${p.counterparty}\nAmount: <b>${p.amount}</b>\nDue: ${p.due}\nInvoice: ${p.invoice}\nSubmitted by: ${p.createdBy}\nSource: CFO AI connector · ⏳ Pending approval\n\nNot counted in receivables until approved.`,
+    ru: (p) => `🤖 <b>Черновик дебиторки от AI-ассистента</b>\n\nКлиент: ${p.counterparty}\nСумма: <b>${p.amount}</b>\nСрок: ${p.due}\nИнвойс: ${p.invoice}\nОтправил: ${p.createdBy}\nИсточник: коннектор CFO AI · ⏳ Ожидает подтверждения\n\nНе учитывается в дебиторке до подтверждения.`,
+    id: (p) => `🤖 <b>Draf piutang dari asisten AI</b>\n\nKlien: ${p.counterparty}\nJumlah: <b>${p.amount}</b>\nJatuh tempo: ${p.due}\nInvoice: ${p.invoice}\nDikirim oleh: ${p.createdBy}\nSumber: konektor CFO AI · ⏳ Menunggu persetujuan\n\nTidak dihitung dalam piutang sampai disetujui.`,
   },
   telegram_payment_reported: {
     en: (p) => `💰 <b>Payment reported</b>\n\n${p.counterparty} reportedly paid <b>${p.amount}</b>.\nReported by: ${p.createdBy} · ${p.role}\nNeeds confirmation before it counts as received.`,
@@ -13983,7 +13998,7 @@ require('./mcp').attachMcp(app, {
     findDocumentDuplicate, linkedInvoiceSettlement, invoiceReadinessPreview,
     // write capability (only registered when MCP_WRITE_TOOLS_ENABLED=true): pending drafts
     canCreateFinancialRequest, isSupportedTelegramCurrency, normalizeCurrency,
-    createPendingPayableDraft,
+    createPendingPayableDraft, createPendingDebtDraft,
   },
   webAppUrl: process.env.WEB_APP_URL || 'https://helm-finance-web-production.up.railway.app',
 });
