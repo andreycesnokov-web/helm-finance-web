@@ -13,7 +13,7 @@
 //     a second accounting engine; it needs a CFO service first.
 
 const { z } = require('zod');
-const { ToolError, guarded, resolveCompany, companyRef } = require('./context');
+const { ToolError, guarded, resolveCompany, companyRef, memberships } = require('./context');
 
 const COMPANY_ID = z.string().min(1).max(64).optional()
   .describe('CFO company id from get_company_context. Omit to use the default company.');
@@ -22,11 +22,11 @@ const RO = { readOnlyHint: true, destructiveHint: false, idempotentHint: true, o
 /* ── get_company_context ─────────────────────────────────────────────────── */
 async function getCompanyContext(_args, ctx) {
   const userId = ctx.mcpUser.userId;
-  const [memberships, def] = await Promise.all([
-    ctx.services.listAccessibleWorkspaces(userId),
+  const [rows, def] = await Promise.all([
+    memberships(ctx),
     ctx.services.findDefaultBusiness(userId),
   ]);
-  const companies = (memberships || []).map((m) => {
+  const companies = (rows || []).map((m) => {
     const b = m.businesses || {};
     const isPersonal = b.type === 'personal';
     return {
@@ -114,22 +114,60 @@ function invoiceSource(args) {
   return { hasDoc, hasText };
 }
 
-async function requireInvoiceGates(biz, s) {
-  // Same gates as the web app's zero-write extraction (/api/documents/:id/extract).
-  if (!s.canViewBusinessFinance(biz.role)) {
-    throw new ToolError('forbidden_role', 'Your role in this company cannot view business finance.');
-  }
+// Two levels of access to an invoice, mirroring the web app:
+//   * FULL — roles that can view business finance (owner/ceo/admin/cfo/accountant/auditor):
+//     the whole analysis, including what CFO derives from the company's OTHER records
+//     (counterparty directory matches, package readiness, other documents).
+//   * SUBMIT-ONLY — roles that may only file requests (manager/employee): they can read the
+//     invoice they hold and file it as a draft, exactly as in the web app and Telegram, but
+//     see nothing derived from the company's books.
+const fullView = (biz, s) => s.canViewBusinessFinance(biz.role);
+const canSubmitRequests = (biz, s) => s.canCreateFinancialRequest(biz.role) && s.canUploadDocument(biz.role);
+
+async function requireDocumentsAccess(biz, s) {
   if (!await s.hasDocumentsAccess(biz)) {
     throw new ToolError('document_center_not_enabled',
       'Document Center is not enabled for this company.', { upgrade_required: true });
   }
 }
 
+async function requireInvoiceGates(biz, s) {
+  if (!fullView(biz, s) && !canSubmitRequests(biz, s)) {
+    throw new ToolError('forbidden_role', 'Your role in this company cannot read invoices.');
+  }
+  await requireDocumentsAccess(biz, s);
+}
+
+// What a submit-only role sees: the invoice's own fields and the extraction's own warnings.
+// Warnings from the counterparty matcher can name directory entries, and the duplicate check
+// can point at another user's document, so both are reduced to a generic line.
+const GENERIC_DUPLICATE = 'This invoice may already be recorded in CFO AI. Your approver will check before approving.';
+function restrictedAnalysis(a) {
+  const warnings = [...(a.extractionWarnings || [])];
+  if (a.duplicate && a.duplicate.duplicate) warnings.push(GENERIC_DUPLICATE);
+  return {
+    company: a.company,
+    source: a.source,
+    document_id: a.document_id,
+    written: false,
+    view: 'limited_for_role',
+    document: a.document ? { type: a.document.type || null, direction: a.document.direction || null } : null,
+    invoice: a.invoice,
+    extraction_confidence: a.extraction_confidence,
+    missing_fields: a.missing_fields,
+    warnings,
+    requires_confirmation: true,
+    note: 'Limited view for your role: the invoice\'s own fields only. You can file it as a draft '
+      + 'for approval with submit_invoice_draft.',
+  };
+}
+
 async function analyzeInvoice(args, ctx) {
   invoiceSource(args);
   const biz = await resolveCompany(ctx, args.company_id);
   await requireInvoiceGates(biz, ctx.services);
-  return runInvoiceAnalysis(args, ctx, biz);
+  const a = await runInvoiceAnalysis(args, ctx, biz);
+  return fullView(biz, ctx.services) ? a : restrictedAnalysis(a);
 }
 
 // The CFO reading of an invoice. Shared by analyze_invoice (read-only) and
@@ -144,6 +182,13 @@ async function runInvoiceAnalysis(args, ctx, biz) {
     doc = await s.loadDocumentScoped(biz, String(args.document_id));
     if (!doc) throw new ToolError('document_not_found', 'No such document in this company.');
     if (doc.archived_at) throw new ToolError('document_archived', 'That document has been archived.');
+    // Business scoping alone is not the web rule: a manager/employee may only open their own
+    // uploads or documents linked to their own requests. Anything else is "not found" — and
+    // the check fails closed if the visibility service is not wired.
+    if (!fullView(biz, s)
+      && !(s.canAccessDocument && await s.canAccessDocument(biz, ctx.mcpUser.userId, doc))) {
+      throw new ToolError('document_not_found', 'No such document in this company.');
+    }
     read = await s.readDocumentForIntake(biz, doc);
     if (read.error) throw new ToolError(read.error, 'The document file could not be read.');
   } else {
@@ -173,7 +218,7 @@ async function runInvoiceAnalysis(args, ctx, biz) {
   const dates = read.dates || {};
   const dateOf = (d) => (d && d.value ? { value: d.value, status: d.status } : { value: null, status: (d && d.status) || 'not_found' });
 
-  return {
+  const result = {
     company: companyRef(biz),
     source: hasDoc ? 'stored_document' : 'client_text',
     document_id: doc.id || null,
@@ -218,6 +263,11 @@ async function runInvoiceAnalysis(args, ctx, biz) {
     next_actions: intake.next_actions || [],
     requires_confirmation: true,
   };
+  // The extraction's own warnings — about this document only, nothing from the company's
+  // records. Non-enumerable, so it is never serialised into a full response; the limited
+  // view for submit-only roles is built from it.
+  Object.defineProperty(result, 'extractionWarnings', { value: [...(ex.warnings || [])], enumerable: false });
+  return result;
 }
 
 /* ── submit_invoice_draft (WRITE — pending draft only) ───────────────────── */
@@ -258,10 +308,17 @@ async function submitInvoiceDraft(args, ctx) {
   invoiceSource(args);
   const s = ctx.services;
   const biz = await resolveCompany(ctx, args.company_id);
-  if (!s.canCreateFinancialRequest(biz.role)) {
+  // The same gate as filing a request in the web app or Telegram: anyone who may create a
+  // financial request and upload a document. Viewing the company's finances is NOT required —
+  // a manager/employee files drafts too; they just see less (see restrictedAnalysis).
+  if (!canSubmitRequests(biz, s)) {
     throw new ToolError('forbidden_role', 'Your role in this company cannot submit payables.');
   }
-  await requireInvoiceGates(biz, s);
+  await requireDocumentsAccess(biz, s);
+  const full = fullView(biz, s);
+  // Approver roles approve; everyone else's draft is a REQUEST (e.g. a reimbursement).
+  const isRequest = s.canApproveFinancialRecord ? !s.canApproveFinancialRecord(biz.role)
+    : !['owner', 'ceo', 'admin', 'cfo'].includes(biz.role);
 
   const analysis = await runInvoiceAnalysis(args, ctx, biz);
   const inv = analysis.invoice;
@@ -312,6 +369,13 @@ async function submitInvoiceDraft(args, ctx) {
   });
 
   if (r.error === 'duplicate_payable') {
+    // A submit-only role learns THAT it exists, never its id, amount or counterparty — those
+    // are another record of the company's books.
+    if (!full) {
+      throw new ToolError('duplicate_payable',
+        'A matching open payable already exists in this company, so no draft was created. '
+        + 'Ask your approver if you think this invoice is new.');
+    }
     throw new ToolError('duplicate_payable',
       'An open payable for this supplier and amount already exists in this company. No draft was created.',
       { existing: r.existing });
@@ -324,9 +388,11 @@ async function submitInvoiceDraft(args, ctx) {
   if (r.error) throw new ToolError('draft_not_created', 'CFO Finance could not create the draft.');
 
   const d = r.debt;
-  const warnings = [...(analysis.warnings || [])];
+  const warnings = full ? [...(analysis.warnings || [])] : [...(analysis.extractionWarnings || [])];
   if (analysis.duplicate && analysis.duplicate.duplicate) {
-    warnings.push('A document with the same invoice number is already stored in CFO Finance — check before approving.');
+    warnings.push(full
+      ? 'A document with the same invoice number is already stored in CFO Finance — check before approving.'
+      : GENERIC_DUPLICATE);
   }
   if (amount_source === 'model_reading') {
     warnings.push('The amount was read by the AI assistant, not by CFO. Verify it before approving.');
@@ -335,6 +401,11 @@ async function submitInvoiceDraft(args, ctx) {
   return {
     company: companyRef(biz),
     written: true,
+    ...(isRequest ? {
+      submitted_as: 'request',
+      request_note: 'This is your request (for example a reimbursement). An owner, admin or CFO of the '
+        + 'company must approve it in CFO AI; you will be notified when it is approved or rejected.',
+    } : {}),
     draft: {
       id: d.id,
       type: 'payable',
@@ -362,6 +433,7 @@ function phase1Tools(ctx) {
   return [
     {
       name: 'get_company_context',
+      availableFor: () => true,
       config: {
         title: 'Get company context',
         description: 'List the CFO Finance companies the signed-in user belongs to, with their role and '
@@ -374,6 +446,7 @@ function phase1Tools(ctx) {
     },
     {
       name: 'get_financial_summary',
+      availableFor: (role, s) => s.canViewBusinessFinance(role),
       config: {
         title: 'Get financial summary',
         description: 'Current financial position of one company, computed by CFO Finance: cash, this '
@@ -386,6 +459,7 @@ function phase1Tools(ctx) {
     },
     {
       name: 'get_missing_documents',
+      availableFor: (role, s) => s.canViewBusinessFinance(role) || s.canUploadDocument(role),
       config: {
         title: 'Get missing documents',
         description: 'The company\'s required-documents checklist from CFO Finance: which accounting and '
@@ -398,6 +472,8 @@ function phase1Tools(ctx) {
     },
     {
       name: 'analyze_invoice',
+      availableFor: (role, s) => s.canViewBusinessFinance(role)
+        || (s.canCreateFinancialRequest(role) && s.canUploadDocument(role)),
       config: {
         title: 'Analyze an invoice',
         description: 'Run an invoice through the CFO Finance document pipeline and return what it says: '
@@ -426,6 +502,7 @@ function writeTools(ctx) {
   return [
     {
       name: 'submit_invoice_draft',
+      availableFor: (role, s) => s.canCreateFinancialRequest(role) && s.canUploadDocument(role),
       config: {
         title: 'Submit invoice as payable draft',
         description: 'Create a PAYABLE DRAFT in CFO Finance from an invoice the user wants to pay. '
@@ -435,7 +512,8 @@ function writeTools(ctx) {
           + 'first and show the user the result. Provide EXACTLY ONE of document_id or invoice_text. '
           + 'Amount, supplier, currency and due date are taken from CFO\'s own reading; counterparty, '
           + 'amount and due_date you pass only fill gaps CFO could not read, and a conflicting amount is '
-          + 'refused. IDR invoices only for now.',
+          + 'refused. IDR invoices only for now. For a manager or employee the draft is a request (e.g. a '
+          + 'reimbursement) that an owner, admin or CFO must approve.',
         inputSchema: {
           company_id: COMPANY_ID,
           document_id: z.string().min(1).max(64).optional()

@@ -13976,7 +13976,14 @@ require('./mcp').attachMcp(app, {
     findDefaultBusiness,
     resolveBusinessReadOnly: (req) => _resolveActiveBusiness(supabase, (uid) => findDefaultBusiness(uid), req),
     // role / plan gates — identical to the web routes
-    canViewBusinessFinance, canUploadDocument, hasDocumentsAccess,
+    canViewBusinessFinance, canUploadDocument, hasDocumentsAccess, canApproveFinancialRecord,
+    // Per-document visibility for manager/employee — the SAME rule as GET /api/documents:
+    // their own uploads, or documents linked to a request they created.
+    canAccessDocument: async (biz, userId, doc) => {
+      if (canViewAllDocuments(biz.role)) return true;
+      const [withLinks] = await attachLinks(biz, [doc]);
+      return userCanAccessDoc(biz, userId, biz.role, withLinks || doc);
+    },
     // read capabilities
     buildAiCfoContext, buildRequiredDocuments,
     loadDocumentScoped, readDocumentForIntake, readTextForIntake, analyzeDocumentReading,
