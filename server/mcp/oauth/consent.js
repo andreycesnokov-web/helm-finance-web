@@ -13,8 +13,9 @@ const { sha256 } = require('./store');
 const { TTL, randomToken } = require('./provider');
 
 const SCOPE_TEXT = {
-  'cfo:read': 'Read your companies, financial summary, missing documents and invoice analyses. '
-    + 'Nothing can be created, changed or deleted.',
+  'cfo:read': 'Read your companies, financial summary, missing documents and invoice analyses.',
+  'cfo:drafts': 'Create payable drafts from invoices you send. A draft waits for your approval in '
+    + 'CFO AI: nothing is paid, and cash, payables and runway do not change until you approve it.',
 };
 
 function createConsentRouter({ store, auth, now = () => Date.now(), onEvent = () => {} }) {

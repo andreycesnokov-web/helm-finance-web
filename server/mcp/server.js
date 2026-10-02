@@ -7,6 +7,7 @@
 // existing CFO services injected from server/index.js.
 
 const { phase1Tools, writeTools } = require('./tools');
+const { canWriteDrafts } = require('./auth');
 
 const SERVER_INSTRUCTIONS = [
   'CFO AI (CFO Finance) MCP server. CFO AI is the system of record for accounting and documents;',
@@ -63,11 +64,13 @@ function serverInfo(baseUrl) {
 // can be driven by the HTTP transport (production) or an in-memory client (tests).
 async function buildServer(ctx) {
   const { McpServer } = await loadSdk();
+  // Write tools need BOTH the server flag and, for OAuth callers, the cfo:drafts grant.
+  const withWrite = !!(ctx && ctx.writeToolsEnabled && canWriteDrafts(ctx.mcpUser));
   const server = new McpServer(
     serverInfo(ctx && ctx.baseUrl),
-    { instructions: ctx && ctx.writeToolsEnabled ? `${SERVER_INSTRUCTIONS} ${WRITE_INSTRUCTIONS}` : SERVER_INSTRUCTIONS },
+    { instructions: withWrite ? `${SERVER_INSTRUCTIONS} ${WRITE_INSTRUCTIONS}` : SERVER_INSTRUCTIONS },
   );
-  const tools = ctx && ctx.writeToolsEnabled ? [...phase1Tools(ctx), ...writeTools(ctx)] : phase1Tools(ctx);
+  const tools = withWrite ? [...phase1Tools(ctx), ...writeTools(ctx)] : phase1Tools(ctx);
   for (const t of tools) {
     server.registerTool(t.name, t.config, t.handler);
   }

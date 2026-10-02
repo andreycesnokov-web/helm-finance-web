@@ -26,7 +26,7 @@ const CLAUDE_CB = 'https://claude.ai/api/mcp/auth_callback';
 const OWNER = -1;
 
 let server; let base; let store; let clock; const events = []; const calls = [];
-const ENV_KEYS = ['MCP_SERVER_ENABLED', 'MCP_OAUTH_ENABLED', 'MCP_PUBLIC_BASE_URL', 'MCP_DEV_TOKEN', 'MCP_ALLOW_UNAUTHENTICATED'];
+const ENV_KEYS = ['MCP_SERVER_ENABLED', 'MCP_OAUTH_ENABLED', 'MCP_PUBLIC_BASE_URL', 'MCP_DEV_TOKEN', 'MCP_ALLOW_UNAUTHENTICATED', 'MCP_WRITE_TOOLS_ENABLED'];
 const savedEnv = {};
 
 // Stand-in for the web app's JWT middleware: the test says who is signed in.
@@ -62,6 +62,7 @@ beforeEach(() => {
   process.env.MCP_OAUTH_ENABLED = 'true';
   process.env.MCP_PUBLIC_BASE_URL = base;
   delete process.env.MCP_DEV_TOKEN; delete process.env.MCP_ALLOW_UNAUTHENTICATED;
+  delete process.env.MCP_WRITE_TOOLS_ENABLED;
 });
 
 /* ── helpers ──────────────────────────────────────────────────────────────── */
@@ -110,10 +111,10 @@ async function consent(requestId, approve, user = OWNER) {
     { json: { approve }, headers: { 'x-test-user': String(user) } });
 }
 const requestIdFrom = (location) => new URL(location).searchParams.get('request');
-async function fullGrant(user = OWNER) {
+async function fullGrant(user = OWNER, scope = 'cfo:read') {
   const client = await registerClaude();
   const p = pkce();
-  const a = await startAuthorize(client.client_id, { challenge: p.challenge });
+  const a = await startAuthorize(client.client_id, { challenge: p.challenge, scope });
   const c = await consent(requestIdFrom(a.headers.location), true, user);
   const code = new URL(c.data.redirect_to).searchParams.get('code');
   const t = await request('POST', '/token', { form: { grant_type: 'authorization_code', code,
@@ -137,7 +138,7 @@ test('discovery: authorization-server and protected-resource metadata point at t
   const rs = await request('GET', '/.well-known/oauth-protected-resource/mcp');
   assert.strictEqual(rs.status, 200);
   assert.strictEqual(rs.data.resource, `${base}/mcp`);
-  assert.deepStrictEqual(rs.data.scopes_supported, ['cfo:read']);
+  assert.deepStrictEqual(rs.data.scopes_supported, ['cfo:read', 'cfo:drafts']);
 });
 
 test('/mcp without a token answers 401 and tells the client where to sign in', async () => {
@@ -330,6 +331,61 @@ test('revoking the token disconnects the client', async () => {
 test('a random or JWT-shaped bearer is not an OAuth token', async () => {
   assert.strictEqual((await mcp(crypto.randomBytes(32).toString('base64url'))).status, 401);
   assert.strictEqual((await mcp('a.b.c')).status, 401);
+});
+
+/* ── write scope (cfo:drafts) ────────────────────────────────────────────── */
+const toolNames = async (token) => {
+  const r = await mcp(token, { jsonrpc: '2.0', id: 3, method: 'tools/list', params: {} });
+  assert.strictEqual(r.status, 200, r.raw);
+  return r.data.result.tools.map((t) => t.name);
+};
+
+test('a grant made under the read-only consent never gets the write tool, even after write tools are turned on', async () => {
+  const { client, tokens } = await fullGrant(OWNER, ''); // no scope requested, write tools OFF
+  assert.strictEqual(tokens.scope, 'cfo:read');
+  process.env.MCP_WRITE_TOOLS_ENABLED = 'true';
+  const names = await toolNames(tokens.access_token);
+  assert.strictEqual(names.length, 4);
+  assert.ok(!names.includes('submit_invoice_draft'), 'read-only grant can write');
+  // Refreshing that grant cannot pick the write scope up either.
+  const rf = await request('POST', '/token', { form: { grant_type: 'refresh_token',
+    refresh_token: tokens.refresh_token, client_id: client.client_id, scope: 'cfo:read cfo:drafts' } });
+  assert.strictEqual(rf.status, 400, rf.raw);
+  assert.strictEqual(rf.data.error, 'invalid_scope');
+});
+
+test('with write tools on, the consent page lists cfo:drafts and that grant sees submit_invoice_draft', async () => {
+  process.env.MCP_WRITE_TOOLS_ENABLED = 'true';
+  const client = await registerClaude();
+  const p = pkce();
+  const a = await startAuthorize(client.client_id, { challenge: p.challenge, scope: '' });
+  const id = requestIdFrom(a.headers.location);
+  const view = await request('GET', `/api/mcp-oauth/requests/${id}`, { headers: { 'x-test-user': String(OWNER) } });
+  assert.deepStrictEqual(view.data.scopes.map((s) => s.scope), ['cfo:read', 'cfo:drafts']);
+  assert.match(view.data.scopes[1].description, /approval/);
+  const c = await consent(id, true);
+  const code = new URL(c.data.redirect_to).searchParams.get('code');
+  const t = await request('POST', '/token', { form: { grant_type: 'authorization_code', code,
+    code_verifier: p.verifier, client_id: client.client_id, redirect_uri: CLAUDE_CB } });
+  assert.strictEqual(t.data.scope, 'cfo:read cfo:drafts');
+  assert.ok((await toolNames(t.data.access_token)).includes('submit_invoice_draft'));
+  // Turning the server flag off hides the tool again, whatever the grant says.
+  delete process.env.MCP_WRITE_TOOLS_ENABLED;
+  assert.ok(!(await toolNames(t.data.access_token)).includes('submit_invoice_draft'));
+});
+
+test('cfo:drafts is not granted while write tools are off, even when the client asks for it', async () => {
+  const client = await registerClaude();
+  const a = await startAuthorize(client.client_id, { challenge: pkce().challenge, scope: 'cfo:read cfo:drafts' });
+  const view = await request('GET', `/api/mcp-oauth/requests/${requestIdFrom(a.headers.location)}`,
+    { headers: { 'x-test-user': String(OWNER) } });
+  assert.deepStrictEqual(view.data.scopes.map((s) => s.scope), ['cfo:read']);
+  // An explicit read-only request stays read-only when write tools are on.
+  process.env.MCP_WRITE_TOOLS_ENABLED = 'true';
+  const b = await startAuthorize(client.client_id, { challenge: pkce().challenge, scope: 'cfo:read' });
+  const vb = await request('GET', `/api/mcp-oauth/requests/${requestIdFrom(b.headers.location)}`,
+    { headers: { 'x-test-user': String(OWNER) } });
+  assert.deepStrictEqual(vb.data.scopes.map((s) => s.scope), ['cfo:read']);
 });
 
 /* ── off switch ───────────────────────────────────────────────────────────── */

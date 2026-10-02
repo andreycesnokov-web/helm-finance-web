@@ -12,8 +12,22 @@
 const crypto = require('crypto');
 const { sha256 } = require('./store');
 
-const SCOPES = Object.freeze({ READ: 'cfo:read' });
-const SUPPORTED_SCOPES = [SCOPES.READ];
+// cfo:read   — the Phase-1 read tools.
+// cfo:drafts — create PENDING-APPROVAL drafts (submit_invoice_draft). Never confirmed records,
+//              never payments. Granted only while MCP_WRITE_TOOLS_ENABLED is on, so the consent
+//              page never shows the user a capability the server would not actually offer, and a
+//              grant made under a read-only consent can never be used to write.
+const SCOPES = Object.freeze({ READ: 'cfo:read', DRAFTS: 'cfo:drafts' });
+const SUPPORTED_SCOPES = [SCOPES.READ, SCOPES.DRAFTS];
+const draftsEnabledFromEnv = () => process.env.MCP_WRITE_TOOLS_ENABLED === 'true';
+
+// What this authorization actually grants. Unknown scopes were already refused. cfo:read is
+// always included (every token must be able to identify the company it acts in); cfo:drafts
+// only when write tools are on — requested explicitly, or by default when nothing is requested.
+function grantedScopes(requested, draftsEnabled) {
+  const wantsDrafts = requested.length ? requested.includes(SCOPES.DRAFTS) : true;
+  return draftsEnabled && wantsDrafts ? [SCOPES.READ, SCOPES.DRAFTS] : [SCOPES.READ];
+}
 
 const TTL = Object.freeze({
   requestSeconds: 10 * 60,       // consent page must be completed within 10 minutes
@@ -56,6 +70,7 @@ function createCfoOAuthProvider(opts) {
   const { store, resourceUrl, consentUrlFor, errors } = opts;
   const now = opts.now || (() => Date.now());
   const onEvent = opts.onEvent || (() => {});
+  const draftsEnabled = opts.draftsEnabled || draftsEnabledFromEnv;
   const E = errors;
 
   function toClientInfo(row) {
@@ -136,7 +151,7 @@ function createCfoOAuthProvider(opts) {
       const requested = (params.scopes || []).filter(Boolean);
       const unknown = requested.filter((s) => !SUPPORTED_SCOPES.includes(s));
       if (unknown.length) throw new E.InvalidScopeError(`Unsupported scope: ${unknown.join(' ')}`);
-      const scopes = requested.length ? requested : [SCOPES.READ];
+      const scopes = grantedScopes(requested, draftsEnabled());
       const id = randomToken();
       await store.createRequest({
         id,
@@ -228,5 +243,5 @@ function createCfoOAuthProvider(opts) {
 }
 
 module.exports = {
-  createCfoOAuthProvider, redirectUriAllowed, SCOPES, SUPPORTED_SCOPES, TTL, randomToken,
+  createCfoOAuthProvider, redirectUriAllowed, SCOPES, SUPPORTED_SCOPES, TTL, randomToken, grantedScopes,
 };

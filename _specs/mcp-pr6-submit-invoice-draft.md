@@ -32,8 +32,25 @@ connector was read-only (Phase 1), so the last step was manual re-entry.
   payables, runway and Radar (Pulse builder `openDebts` filter).
 - Payables UI: drafts from the connector show an "✦ AI assistant" badge.
 
+## Consent scope `cfo:drafts` (added in review)
+The original PR registered the write tool for every caller once the flag was on — including
+OAuth grants the user approved on a consent page that said "Read only… Nothing can be created".
+That would have turned an existing read-only grant into a write grant without asking.
+
+- New OAuth scope **`cfo:drafts`** (advertised in `scopes_supported`). An OAuth caller gets
+  `submit_invoice_draft` only when its token carries it (`canWriteDrafts` in `mcp/auth.js`);
+  the server flag is still required as well. Dev token / CFO JWT are the owner's own
+  credentials and are not scope-limited.
+- Granted only while `MCP_WRITE_TOOLS_ENABLED=true` — by default when the client asks for no
+  scope, or when it asks for it explicitly. An explicit `cfo:read` request stays read-only.
+- Existing grants keep their scopes; a refresh cannot widen them. **The connector must be
+  reconnected** to obtain `cfo:drafts`.
+- The consent page lists exactly what is granted: read, plus (only with `cfo:drafts`) "create
+  payable drafts that wait for your approval — nothing is paid".
+- Tests: 3 new cases in `mcpOAuth.test.js`.
+
 ## Not changed
-No migrations (uses columns from 013/016/017). No auth changes. No payments/billing. No change
+No migrations (uses columns from 013/016/017). No change to sign-in/identity. No payments/billing. No change
 to approval rules or role gates. No Railway env changed.
 
 ## Risks
@@ -45,8 +62,9 @@ to approval rules or role gates. No Railway env changed.
 
 ## Rollout
 1. Merge with flag OFF (no production change).
-2. Set `MCP_WRITE_TOOLS_ENABLED=true` on Railway when approved; reconnect the connector in
-   Claude so the client refreshes its tool list.
+2. Set `MCP_WRITE_TOOLS_ENABLED=true` on Railway when approved; **disconnect and reconnect**
+   the connector in Claude so it gets a new grant with `cfo:drafts` (the consent page now
+   lists the draft capability) and refreshes its tool list.
 3. Smoke: analyse a test invoice → submit → see draft in Payables + Telegram → approve → numbers
    appear in Pulse; reject path leaves numbers unchanged.
 
