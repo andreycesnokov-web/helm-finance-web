@@ -116,7 +116,7 @@ test('flag OFF: submit_invoice_draft is not registered (Phase-1 stays read-only)
   try {
     const names = (await client.listTools()).tools.map((t) => t.name);
     assert.ok(!names.includes('submit_invoice_draft'));
-    assert.deepStrictEqual(names.sort(), ['analyze_invoice', 'get_company_context', 'get_financial_summary', 'get_missing_documents']);
+    assert.deepStrictEqual(names.sort(), ['analyze_invoice', 'get_company_context', 'get_financial_summary', 'get_missing_documents', 'list_documents']);
   } finally { await close(); }
 });
 

@@ -209,7 +209,8 @@ test('tools/list follows the roles: a manager has no get_financial_summary, an o
   assert.ok(!mgr.includes('get_financial_summary'), mgr.join());
   assert.ok(mgr.includes('analyze_invoice') && mgr.includes('submit_invoice_draft'));
   assert.deepStrictEqual(await list({ 'biz-a': 'owner' }),
-    ['analyze_invoice', 'get_company_context', 'get_financial_summary', 'get_missing_documents', 'submit_invoice_draft']);
+    ['analyze_invoice', 'get_company_context', 'get_financial_summary', 'get_missing_documents', 'link_document',
+      'list_documents', 'submit_invoice_draft', 'upload_document']);
   const aud = await list({ 'biz-a': 'auditor' });
   assert.ok(aud.includes('get_financial_summary') && !aud.includes('submit_invoice_draft'), aud.join());
 });

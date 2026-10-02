@@ -13118,59 +13118,98 @@ app.get('/api/documents', auth, async (req, res) => {
     if (!canViewBusinessFinance(biz.role) && !canUploadDocument(biz.role)) return res.status(403).json({ error: 'Your role cannot view documents' });
     if (!await hasDocumentsAccess(biz)) return res.status(403).json({ error: 'Document Center is not enabled on this plan', upgrade_required: true });
 
-    const { type, date_from, date_to, counterparty, uploaded_by, search,
-            linked_status, debt_id, transaction_id, compliance_id, status } = req.query;
-
-    // Link-target filters: resolve document ids from the link table first.
-    let restrictIds = null;
-    const target = debt_id ? ['debt', debt_id] : transaction_id ? ['transaction', transaction_id] : compliance_id ? ['compliance', compliance_id] : null;
-    if (target) {
-      const def = docV.LINK_TARGETS[target[0]];
-      const { data } = await supabase.from(def.table).select('document_id')
-        .eq('business_id', biz.business.id).eq(def.column, target[1]);
-      restrictIds = (data || []).map(r => r.document_id);
-      if (!restrictIds.length) return res.json({ documents: [] });
-    }
-
-    let q = supabase.from('financial_documents').select('*').eq('business_id', biz.business.id);
-    if (status === 'archived') q = q.not('archived_at', 'is', null);
-    else q = q.is('archived_at', null);
-    // Manager/employee are restricted — filtered in JS after links resolve
-    // (own uploads OR linked to a debt they created). No SQL created_by filter
-    // here so linked-to-own-debt docs are not excluded prematurely.
-    if (type) q = q.eq('document_type', type);
-    if (counterparty) q = q.eq('issuer_counterparty_id', counterparty);
-    if (uploaded_by) q = q.eq('created_by_user_id', uploaded_by);
-    if (date_from) q = q.gte('document_date', date_from);
-    if (date_to) q = q.lte('document_date', date_to);
-    if (search) q = q.ilike('document_number', `%${search}%`);
-    if (restrictIds) q = q.in('id', restrictIds);
-    q = q.order('created_at', { ascending: false }).limit(Math.min(Number(req.query.limit) || 100, 200));
-
-    let { data: docs, error } = await q;
-    if (error) return res.status(500).json({ error: error.message });
-    docs = docs || [];
-
-    // File metadata
-    const fileIds = [...new Set(docs.map(d => d.file_id).filter(Boolean))];
-    const fileMap = new Map();
-    if (fileIds.length) {
-      const { data: files } = await supabase.from('document_files')
-        .select('id, file_name, mime_type, file_size, upload_channel').in('id', fileIds);
-      for (const f of (files || [])) fileMap.set(f.id, f);
-    }
-    let out = docs.map(d => ({ ...publicDocRow(d), file: publicFileRow(fileMap.get(d.file_id)) || null }));
-    out = await attachLinks(biz, out);
-    // Restricted roles: keep only own uploads + docs linked to their own debts.
-    if (!canViewAllDocuments(biz.role)) {
-      const owned = await ownedDebtIds(biz, req.user.userId);
-      out = out.filter(d => docA.canAccessDocument({ role: biz.role, userId: req.user.userId, doc: d, ownedDebtIds: owned }));
-    }
-    if (linked_status === 'linked') out = out.filter(d => d.links.length > 0);
-    if (linked_status === 'unlinked') out = out.filter(d => d.links.length === 0);
-    res.json({ documents: out });
+    const r = await listDocumentsForUser(biz, req.user.userId, req.query);
+    if (r.error) return res.status(500).json({ error: r.error });
+    res.json({ documents: r.documents });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
+
+// The document list with the SAME role-level visibility as the Document Center. Shared by
+// GET /api/documents and the MCP list_documents tool. The caller runs the role / plan gates.
+//
+// Filters (all optional): type, date_from, date_to, counterparty, uploaded_by, search,
+// linked_status (linked|unlinked), debt_id | transaction_id | compliance_id, status
+// ('archived' → archived only, otherwise active only), limit (≤200). Extra filters used by
+// the MCP adapter: document_id, uploaded_after (ISO), review ('needs_review').
+async function listDocumentsForUser(biz, userId, filters = {}) {
+  const { type, date_from, date_to, counterparty, uploaded_by, search,
+          linked_status, debt_id, transaction_id, compliance_id, status,
+          document_id, uploaded_after, review } = filters;
+
+  // Link-target filters: resolve document ids from the link table first.
+  let restrictIds = null;
+  const target = debt_id ? ['debt', debt_id] : transaction_id ? ['transaction', transaction_id] : compliance_id ? ['compliance', compliance_id] : null;
+  if (target) {
+    const def = docV.LINK_TARGETS[target[0]];
+    const { data } = await supabase.from(def.table).select('document_id')
+      .eq('business_id', biz.business.id).eq(def.column, target[1]);
+    restrictIds = (data || []).map(r => r.document_id);
+    if (!restrictIds.length) return { documents: [] };
+  }
+
+  let q = supabase.from('financial_documents').select('*').eq('business_id', biz.business.id);
+  if (status === 'archived') q = q.not('archived_at', 'is', null);
+  else q = q.is('archived_at', null);
+  // Manager/employee are restricted — filtered in JS after links resolve
+  // (own uploads OR linked to a debt they created). No SQL created_by filter
+  // here so linked-to-own-debt docs are not excluded prematurely.
+  if (type) q = q.eq('document_type', type);
+  if (counterparty) q = q.eq('issuer_counterparty_id', counterparty);
+  if (uploaded_by) q = q.eq('created_by_user_id', uploaded_by);
+  if (date_from) q = q.gte('document_date', date_from);
+  if (date_to) q = q.lte('document_date', date_to);
+  if (search) q = q.ilike('document_number', `%${search}%`);
+  if (document_id) q = q.eq('id', document_id);
+  if (uploaded_after) q = q.gte('created_at', uploaded_after);
+  if (restrictIds) q = q.in('id', restrictIds);
+  q = q.order('created_at', { ascending: false }).limit(Math.min(Number(filters.limit) || 100, 200));
+
+  let { data: docs, error } = await q;
+  if (error) return { error: error.message };
+  docs = docs || [];
+
+  // File metadata
+  const fileIds = [...new Set(docs.map(d => d.file_id).filter(Boolean))];
+  const fileMap = new Map();
+  if (fileIds.length) {
+    const { data: files } = await supabase.from('document_files')
+      .select('id, file_name, mime_type, file_size, upload_channel').in('id', fileIds);
+    for (const f of (files || [])) fileMap.set(f.id, f);
+  }
+  let out = docs.map(d => ({ ...publicDocRow(d), file: publicFileRow(fileMap.get(d.file_id)) || null }));
+  out = await attachLinks(biz, out);
+  // Restricted roles: keep only own uploads + docs linked to their own debts.
+  if (!canViewAllDocuments(biz.role)) {
+    const owned = await ownedDebtIds(biz, userId);
+    out = out.filter(d => docA.canAccessDocument({ role: biz.role, userId, doc: d, ownedDebtIds: owned }));
+  }
+  if (linked_status === 'linked') out = out.filter(d => d.links.length > 0);
+  if (linked_status === 'unlinked') out = out.filter(d => d.links.length === 0);
+  // "Needs review": not attached to anything yet, and the intake did not reach a state where a
+  // concrete action is ready — or the type itself is still unconfirmed.
+  if (review === 'needs_review') {
+    out = out.filter((d) => {
+      if (d.links.length) return false;
+      const ej = d.extracted_json || {};
+      const st = ej.ai_intake_v2 && ej.ai_intake_v2.status;
+      return !st || st !== 'ready_to_confirm'
+        || (ej.ai_intake && ej.ai_intake.classification_status === 'needs_review');
+    });
+  }
+  return { documents: out };
+}
+
+// A short-lived view/download URL for one document, after the caller's access check.
+// Shared by POST /api/documents/:id/signed-url and the MCP adapter. Audited.
+async function signedDocumentUrl(biz, actorUserId, doc, { mode = 'view', channel = 'web' } = {}) {
+  const { data: fileRows } = await supabase.from('document_files').select('storage_path, file_name').eq('id', doc.file_id).limit(1);
+  if (!fileRows?.length) return { error: 'file_not_found', status: 404 };
+  const opts = mode === 'download' ? { download: fileRows[0].file_name } : {};
+  const { data, error } = await supabase.storage.from(DOC_BUCKET).createSignedUrl(fileRows[0].storage_path, SIGNED_URL_TTL, opts);
+  if (error) return { error: 'storage_unavailable', status: 500, detail: error.message };
+  await logDocumentAudit(biz, { document_id: doc.id, actor_user_id: actorUserId, action: 'signed_url_issued', channel, metadata: { mode } });
+  return { url: data.signedUrl, expires_in: SIGNED_URL_TTL };
+}
 
 // GET /api/documents/:id — detail.
 app.get('/api/documents/:id', auth, async (req, res) => {
@@ -13247,96 +13286,196 @@ app.post('/api/documents/upload-complete', auth, async (req, res) => {
     const { data: blob, error: dlErr } = await supabase.storage.from(DOC_BUCKET).download(expectedPath);
     if (dlErr || !blob) return res.status(400).json({ error: 'upload_not_found' });
     const buf = Buffer.from(await blob.arrayBuffer());
-    const removeOrphan = () => supabase.storage.from(DOC_BUCKET).remove([expectedPath]).catch(() => {});
-    if (buf.length === 0) { await removeOrphan(); return res.status(400).json({ error: 'empty_upload' }); }
-    if (buf.length > docV.MAX_FILE_BYTES) { await removeOrphan(); return res.status(413).json({ error: 'file_too_large' }); }
-    const verifiedHash = crypto.createHash('sha256').update(buf).digest('hex');
-    // If the client claimed a hash that doesn't match the real bytes → tamper.
-    if (docV.isValidSha256(b.sha256) && b.sha256.toLowerCase() !== verifiedHash) {
-      await removeOrphan();
-      return res.status(409).json({ error: 'hash_mismatch' });
+    const r = await finalizeDocumentUpload(biz, req.user.userId, {
+      buf, documentId: b.document_id, storagePath: expectedPath, channel: 'web', body: b,
+    });
+    if (r.error) {
+      const { status, error, ...rest } = r;
+      return res.status(status || 500).json({ error, ...rest });
     }
-
-    // ── Stage 2 dedup + atomic create. rpc_document_finalize_upload inserts
-    //    document_files + financial_documents + the 'uploaded' audit row in ONE
-    //    transaction (migration 036). The UNIQUE(business_id, sha256_hash) index
-    //    serialises concurrent duplicates; on conflict the RPC aborts. ─────────
-    const fileId = crypto.randomUUID();
-    const notes = (b.description || '').toString().slice(0, 2000) || null;
-    const pFile = {
-      id: fileId, business_id: biz.business.id, storage_path: expectedPath,
-      file_name: docV.safeFilename(b.file_name), mime_type: b.mime_type, file_size: buf.length,
-      sha256_hash: verifiedHash, upload_channel: 'web',
-    };
-    const pDoc = {
-      id: b.document_id, business_id: biz.business.id,
-      document_type: b.document_type || 'other',
-      document_number: b.title ? String(b.title).slice(0, 200) : (b.document_number || null),
-      document_date: b.document_date || null,
-      period_start: b.period_start || null, period_end: b.period_end || null,
-      issuer_counterparty_id: b.counterparty_id || null,
-      currency: b.currency || 'IDR',
-      gross_amount: (b.amount != null && isFinite(Number(b.amount))) ? Number(b.amount) : null,
-      extracted_json: notes ? { notes } : null,
-    };
-    // Which screen the upload came from. Review metadata only: it never becomes the
-    // document_type column, and an unrecognised value is discarded rather than stored.
-    const intentRow = uploadIntentLib.buildUploadIntent(b.upload_source, { declaredType: b.document_type });
-    if (intentRow) pDoc.extracted_json = { ...(pDoc.extracted_json || {}), upload_intent: intentRow };
-    // ── Phase 2: content-based classification, best effort ──────────────────
-    // The verified bytes are already in memory, so no second storage read is needed.
-    // Never blocks or fails the upload: on any problem this falls back to the Phase 1
-    // file-name verdict, which is what shipped before.
-    try {
-      const intake = classifyUploadedBytes(buf, {
-        file_name: pFile.file_name, mime_type: pFile.mime_type, company_name: biz.business?.name,
-      });
-      pDoc.extracted_json = { ...(pDoc.extracted_json || {}), ai_intake: intake };
-    } catch (e) {
-      console.warn(`[doc-intake] content classification skipped: ${e.message}`);
-    }
-    const { data: doc, error: rpcErr } = await supabase.rpc('rpc_document_finalize_upload',
-      { p_file: pFile, p_doc: pDoc, p_actor: req.user.userId, p_channel: 'web' });
-    if (rpcErr) {
-      await removeOrphan();
-      if (/duplicate|unique/i.test(rpcErr.message)) {
-        const { data: dupf } = await supabase.from('document_files')
-          .select('id').eq('business_id', biz.business.id).eq('sha256_hash', verifiedHash).limit(1);
-        let existing = null;
-        if (dupf?.length) {
-          const { data: ex } = await supabase.from('financial_documents')
-            .select('id').eq('business_id', biz.business.id).eq('file_id', dupf[0].id).limit(1);
-          existing = ex?.[0]?.id || null;
-        }
-        return res.status(409).json({ error: 'duplicate', duplicate: true, existing_document_id: existing });
-      }
-      return res.status(500).json({ error: 'document_finalize_failed', detail: rpcErr.message });
-    }
-
-    // Optional link — best-effort; never lose the upload if linking fails.
-    let link_result = null;
-    if (b.link && b.link.target_type && b.link.target_id != null) {
-      const r = await linkDocument(biz, doc, b.link.target_type, b.link.target_id, req.user.userId);
-      link_result = r.ok ? { ok: true } : { ok: false, error: r.error };
-    }
-
-    // Run the intake pipeline so a freshly uploaded document arrives with its meaning
-    // already worked out, rather than sitting inert until someone opens it. It writes
-    // only review metadata — no counterparty, payable or transaction is created here.
-    //
-    // FAIL-OPEN by construction: the file is already stored and the row already exists,
-    // so a parsing problem must never turn a successful upload into an error. A failure
-    // leaves the document without an intake summary, and /intake can be called again.
-    let intake = null;
-    try {
-      const r = await runDocumentIntake(biz, doc, { persist: true, actorUserId: req.user.userId });
-      if (!r.error) intake = r.intake;
-    } catch (e) {
-      console.error(`[doc-intake-v2] post-upload run failed for ${doc.id}: ${e.message}`);
-    }
-
-    res.json({ document: publicDocRow(doc), link_result, intake });
+    res.json({ document: publicDocRow(r.doc), link_result: r.link_result, intake: r.intake });
   } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// The second half of every upload, whoever brought the bytes: the web app (client PUT to a
+// signed URL, then upload-complete downloads them) or the MCP connector (bytes in the call,
+// see storeDocumentBytes). One function so a document gets the same verification, dedup,
+// atomic create + audit, optional link and intake run whichever channel it came through.
+// The caller has already run the role / plan / storage gates and validated name + type.
+// Returns { doc, link_result, intake } or { error, status, ...details }.
+async function finalizeDocumentUpload(biz, actorUserId, { buf, documentId, storagePath, channel = 'web', body: b = {} }) {
+  const removeOrphan = () => supabase.storage.from(DOC_BUCKET).remove([storagePath]).catch(() => {});
+  if (buf.length === 0) { await removeOrphan(); return { error: 'empty_upload', status: 400 }; }
+  if (buf.length > docV.MAX_FILE_BYTES) { await removeOrphan(); return { error: 'file_too_large', status: 413 }; }
+  const verifiedHash = crypto.createHash('sha256').update(buf).digest('hex');
+  // If the client claimed a hash that doesn't match the real bytes → tamper.
+  if (docV.isValidSha256(b.sha256) && b.sha256.toLowerCase() !== verifiedHash) {
+    await removeOrphan();
+    return { error: 'hash_mismatch', status: 409 };
+  }
+
+  // ── Stage 2 dedup + atomic create. rpc_document_finalize_upload inserts
+  //    document_files + financial_documents + the 'uploaded' audit row in ONE
+  //    transaction (migration 036). The UNIQUE(business_id, sha256_hash) index
+  //    serialises concurrent duplicates; on conflict the RPC aborts. ─────────
+  const fileId = crypto.randomUUID();
+  const notes = (b.description || '').toString().slice(0, 2000) || null;
+  const pFile = {
+    id: fileId, business_id: biz.business.id, storage_path: storagePath,
+    file_name: docV.safeFilename(b.file_name), mime_type: b.mime_type, file_size: buf.length,
+    sha256_hash: verifiedHash, upload_channel: channel,
+  };
+  const pDoc = {
+    id: documentId, business_id: biz.business.id,
+    document_type: b.document_type || 'other',
+    document_number: b.title ? String(b.title).slice(0, 200) : (b.document_number || null),
+    document_date: b.document_date || null,
+    period_start: b.period_start || null, period_end: b.period_end || null,
+    issuer_counterparty_id: b.counterparty_id || null,
+    currency: b.currency || 'IDR',
+    gross_amount: (b.amount != null && isFinite(Number(b.amount))) ? Number(b.amount) : null,
+    extracted_json: notes ? { notes } : null,
+  };
+  // Which screen the upload came from. Review metadata only: it never becomes the
+  // document_type column, and an unrecognised value is discarded rather than stored.
+  const intentRow = uploadIntentLib.buildUploadIntent(b.upload_source, { declaredType: b.document_type });
+  if (intentRow) pDoc.extracted_json = { ...(pDoc.extracted_json || {}), upload_intent: intentRow };
+  // ── Phase 2: content-based classification, best effort ──────────────────
+  // The verified bytes are already in memory, so no second storage read is needed.
+  // Never blocks or fails the upload: on any problem this falls back to the Phase 1
+  // file-name verdict, which is what shipped before.
+  try {
+    const intake = classifyUploadedBytes(buf, {
+      file_name: pFile.file_name, mime_type: pFile.mime_type, company_name: biz.business?.name,
+    });
+    pDoc.extracted_json = { ...(pDoc.extracted_json || {}), ai_intake: intake };
+  } catch (e) {
+    console.warn(`[doc-intake] content classification skipped: ${e.message}`);
+  }
+  const { data: doc, error: rpcErr } = await supabase.rpc('rpc_document_finalize_upload',
+    { p_file: pFile, p_doc: pDoc, p_actor: actorUserId, p_channel: channel });
+  if (rpcErr) {
+    await removeOrphan();
+    if (/duplicate|unique/i.test(rpcErr.message)) {
+      return { error: 'duplicate', status: 409, duplicate: true,
+        existing_document_id: await documentIdByHash(biz, verifiedHash) };
+    }
+    return { error: 'document_finalize_failed', status: 500, detail: rpcErr.message };
+  }
+
+  // Optional link — best-effort; never lose the upload if linking fails.
+  let link_result = null;
+  if (b.link && b.link.target_type && b.link.target_id != null) {
+    const r = await linkDocument(biz, doc, b.link.target_type, b.link.target_id, actorUserId, channel);
+    link_result = r.ok ? { ok: true, link_id: r.link_id } : { ok: false, error: r.error };
+  }
+
+  // Run the intake pipeline so a freshly uploaded document arrives with its meaning
+  // already worked out, rather than sitting inert until someone opens it. It writes
+  // only review metadata — no counterparty, payable or transaction is created here.
+  //
+  // FAIL-OPEN by construction: the file is already stored and the row already exists,
+  // so a parsing problem must never turn a successful upload into an error. A failure
+  // leaves the document without an intake summary, and /intake can be called again.
+  let intake = null;
+  try {
+    const r = await runDocumentIntake(biz, doc, { persist: true, actorUserId });
+    if (!r.error) intake = r.intake;
+  } catch (e) {
+    console.error(`[doc-intake-v2] post-upload run failed for ${doc.id}: ${e.message}`);
+  }
+  return { doc, link_result, intake };
+}
+
+// The document already holding these exact bytes in THIS business, or null.
+async function documentIdByHash(biz, sha256Hex) {
+  const { data: dupf } = await supabase.from('document_files')
+    .select('id').eq('business_id', biz.business.id).eq('sha256_hash', sha256Hex).limit(1);
+  if (!dupf?.length) return null;
+  const { data: ex } = await supabase.from('financial_documents')
+    .select('id').eq('business_id', biz.business.id).eq('file_id', dupf[0].id).limit(1);
+  return ex?.[0]?.id || null;
+}
+
+// MCP upload: the bytes arrive in the tool call, so the SERVER writes them to storage (the
+// web app has the browser PUT them to a signed URL instead) and then finalises exactly like
+// upload-complete. Same validation (name, MIME, size), same business-scoped hash dedup
+// before anything is written, same storage path scheme. Gates are the caller's.
+async function storeDocumentBytes(biz, actorUserId, { buf, fileName, mimeType, documentType = null, link = null, channel = 'mcp' }) {
+  const h = await getDocumentsHealth();
+  if (!h.storage_ready) return { error: 'documents_unavailable', status: 503 };
+  const v = docV.validateUpload({ file_name: fileName, mime_type: mimeType, file_size: buf.length, document_type: documentType || undefined });
+  if (!v.ok) return { error: v.error, status: 400 };
+  const sha = crypto.createHash('sha256').update(buf).digest('hex');
+  const existing = await documentIdByHash(biz, sha);
+  if (existing) return { error: 'duplicate', status: 409, duplicate: true, existing_document_id: existing };
+
+  const documentId = crypto.randomUUID();
+  const storagePath = docV.buildStoragePath(biz.business.id, documentId, fileName);
+  const { error: upErr } = await supabase.storage.from(DOC_BUCKET)
+    .upload(storagePath, buf, { contentType: mimeType, upsert: false });
+  if (upErr) return { error: 'storage_unavailable', status: 503 };
+  return finalizeDocumentUpload(biz, actorUserId, {
+    buf, documentId, storagePath, channel,
+    body: { file_name: fileName, mime_type: mimeType, document_type: documentType || undefined, sha256: sha,
+      upload_source: 'ai_assistant', link },
+  });
+}
+
+// ── Upload link for AI assistants (MCP upload_document, link mode) ─────────────
+// Some AI clients cannot pass file bytes through a tool call. They hand the user a link to a
+// CFO page instead: app.cfo-ai.site/upload#t=<token>. Owner decision (2026-10-02): no table,
+// a signed short-lived token — 15 minutes, bound to ONE user and ONE company — and the page
+// ALSO requires the user to be signed in to CFO as that same user, so a forwarded link is
+// useless to anyone else. The token is in the URL FRAGMENT, which browsers never send to a
+// server, so it does not reach access logs or a Referer header.
+//
+// The token logic (derived key, audience, 15-minute TTL) lives in server/lib/uploadLink.js.
+// The upload itself goes through the ordinary upload-init / upload-complete routes with their
+// own auth, role and plan gates: the token only names the company and the intent; it grants
+// nothing the user could not do in the app.
+const uploadLinkLib = require('./lib/uploadLink');
+const uploadLinkEnabled = () => process.env.MCP_SERVER_ENABLED === 'true' && process.env.MCP_WRITE_TOOLS_ENABLED === 'true';
+
+function issueUploadLink(biz, userId, { documentType = null, link = null } = {}) {
+  const t = uploadLinkLib.issueUploadLinkToken(JWT_SECRET, { userId, businessId: biz.business.id, documentType, link });
+  const base = (process.env.MCP_PUBLIC_BASE_URL || process.env.APP_BASE_URL || process.env.WEB_APP_URL || '').replace(/\/+$/, '');
+  return { url: `${base}/upload#t=${t.token}`, expires_at: t.expires_at, issued_at: t.issued_at };
+}
+
+// The upload page never renders inside someone else's frame (a framed drop zone could be
+// used to trick a signed-in user into dropping a file), and is never cached.
+app.get('/upload', (req, res, next) => {
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('Content-Security-Policy', "frame-ancestors 'none'");
+  res.setHeader('Cache-Control', 'no-store');
+  next();
+});
+
+// POST /api/upload-link/session — the /upload page asks what a link is for. Signed-in user
+// only, and only the user the link was issued to. Returns the company and the intent; the
+// page then uploads with the normal document routes, scoped to that company.
+app.post('/api/upload-link/session', auth, async (req, res) => {
+  try {
+    if (!uploadLinkEnabled()) return res.status(404).json({ error: 'not_found' });
+    const p = uploadLinkLib.verifyUploadLinkToken(JWT_SECRET, req.body && req.body.token);
+    if (!p) return res.status(410).json({ error: 'link_expired_or_invalid' });
+    if (String(p.userId) !== String(req.user.userId)) return res.status(403).json({ error: 'link_for_another_account' });
+    req.headers['x-business-id'] = p.businessId;
+    const biz = await requireBusiness(req, res); if (!biz) return;
+    if (biz.business.id !== p.businessId) return res.status(403).json({ error: 'workspace_not_accessible' });
+    if (!canUploadDocument(biz.role)) return res.status(403).json({ error: 'Your role cannot upload documents' });
+    if (!await hasDocumentsAccess(biz)) return res.status(403).json({ error: 'Document Center is not enabled', upgrade_required: true });
+    res.json({
+      company: { id: biz.business.id, name: biz.business.name || null },
+      expires_at: p.expires_at,
+      document_type: p.documentType,
+      link: p.link,
+    });
+  } catch (e) {
+    console.error(`[upload-link] session failed: ${e.message}`);
+    res.status(500).json({ error: 'upload_link_unavailable' });
+  }
 });
 
 // POST /api/documents/:id/signed-url — short-lived view/download URL after access check.
@@ -13351,13 +13490,10 @@ app.post('/api/documents/:id/signed-url', auth, async (req, res) => {
     const [docWithLinks] = await attachLinks(biz, [doc]);
     if (!await userCanAccessDoc(biz, req.user.userId, biz.role, docWithLinks))
       return res.status(403).json({ error: 'You do not have access to this document' });
-    const { data: fileRows } = await supabase.from('document_files').select('storage_path, file_name').eq('id', doc.file_id).limit(1);
-    if (!fileRows?.length) return res.status(404).json({ error: 'File not found' });
-    const mode = req.body?.mode === 'download' ? { download: fileRows[0].file_name } : {};
-    const { data, error } = await supabase.storage.from(DOC_BUCKET).createSignedUrl(fileRows[0].storage_path, SIGNED_URL_TTL, mode);
-    if (error) return res.status(500).json({ error: 'storage_unavailable', detail: error.message });
-    await logDocumentAudit(biz, { document_id: doc.id, actor_user_id: req.user.userId, action: 'signed_url_issued', metadata: { mode: req.body?.mode || 'view' } });
-    res.json({ url: data.signedUrl, expires_in: SIGNED_URL_TTL });
+    const r = await signedDocumentUrl(biz, req.user.userId, doc, { mode: req.body?.mode === 'download' ? 'download' : (req.body?.mode || 'view') });
+    if (r.error === 'file_not_found') return res.status(404).json({ error: 'File not found' });
+    if (r.error) return res.status(r.status || 500).json({ error: r.error, detail: r.detail });
+    res.json({ url: r.url, expires_in: r.expires_in });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -13646,6 +13782,7 @@ async function analyzeDocumentReading(biz, doc, read) {
     // and a cross-check — never a classification.
     uploadIntent: (doc.extracted_json || {}).upload_intent || null,
     readSource, ocr,
+    dates: read.dates || null,
   });
 }
 
@@ -13893,11 +14030,11 @@ app.post('/api/documents/:id/archive', auth, async (req, res) => {
 
 // Shared link helper — rpc_document_link validates same-business (document AND
 // target) and writes the link + audit atomically (migration 036).
-async function linkDocument(biz, doc, targetType, targetId, actorUserId) {
+async function linkDocument(biz, doc, targetType, targetId, actorUserId, channel = 'web') {
   if (!docV.LINK_TARGETS[targetType]) return { ok: false, error: 'invalid_target_type', status: 400 };
   const { data, error } = await supabase.rpc('rpc_document_link', {
     p_document_id: doc.id, p_business_id: biz.business.id,
-    p_target_type: targetType, p_target_id: String(targetId), p_actor: actorUserId, p_channel: 'web',
+    p_target_type: targetType, p_target_id: String(targetId), p_actor: actorUserId, p_channel: channel,
   });
   if (error) {
     if (/cross-business/i.test(error.message)) return { ok: false, error: 'cross_business_link_forbidden', status: 403 };
@@ -13991,6 +14128,28 @@ require('./mcp').attachMcp(app, {
     // write capability (only registered when MCP_WRITE_TOOLS_ENABLED=true): pending drafts
     canCreateFinancialRequest, isSupportedTelegramCurrency, normalizeCurrency,
     createPendingPayableDraft,
+    // documents (Phase 2 · B) — the same functions the Document Center routes use
+    canManageDocuments,
+    listDocumentsForUser,
+    signedDocumentUrl: (biz, userId, doc) => signedDocumentUrl(biz, userId, doc, { mode: 'view', channel: 'mcp' }),
+    storeDocumentBytes: (biz, userId, input) => storeDocumentBytes(biz, userId, { ...input, channel: 'mcp' }),
+    issueUploadLink,
+    publicDocument: (doc) => publicDocRow(doc),
+    linkDocument: (biz, doc, targetType, targetId, userId) => linkDocument(biz, doc, targetType, targetId, userId, 'mcp'),
+    unlinkDocument: async (biz, doc, linkId, userId) => {
+      const { error } = await supabase.rpc('rpc_document_unlink', {
+        p_link_id: linkId, p_document_id: doc.id, p_business_id: biz.business.id, p_actor: userId, p_channel: 'mcp',
+      });
+      if (error) return { ok: false, error: /not found/i.test(error.message) ? 'link_not_found' : 'unlink_failed' };
+      return { ok: true };
+    },
+    documentLinks: async (biz, doc) => ((await attachLinks(biz, [doc]))[0] || {}).links || [],
+    // A debt of THIS business, for link targets — type and approval state only.
+    loadDebtScoped: async (biz, id) => {
+      const { data } = await supabase.from('debts').select('id, type, approval_status, status, created_by_user_id')
+        .eq('id', id).eq('business_id', biz.business.id).limit(1);
+      return data?.[0] || null;
+    },
   },
   webAppUrl: process.env.WEB_APP_URL || 'https://helm-finance-web-production.up.railway.app',
 });

@@ -388,6 +388,18 @@ async function submitInvoiceDraft(args, ctx) {
   if (r.error) throw new ToolError('draft_not_created', 'CFO Finance could not create the draft.');
 
   const d = r.debt;
+  // A stored document the draft was built from is attached to it, so the draft and its
+  // evidence travel together (the invoice "folder"). Best effort: the draft stands either way.
+  let documentLinked = null;
+  if (analysis.document_id && s.linkDocument) {
+    try {
+      const lr = await s.linkDocument(biz, { id: analysis.document_id }, 'debt', d.id, ctx.mcpUser.userId);
+      documentLinked = lr && lr.ok ? { ok: true, document_id: analysis.document_id }
+        : { ok: false, document_id: analysis.document_id, error: (lr && lr.error) || 'link_failed' };
+    } catch {
+      documentLinked = { ok: false, document_id: analysis.document_id, error: 'link_failed' };
+    }
+  }
   const warnings = full ? [...(analysis.warnings || [])] : [...(analysis.extractionWarnings || [])];
   if (analysis.duplicate && analysis.duplicate.duplicate) {
     warnings.push(full
@@ -421,11 +433,251 @@ async function submitInvoiceDraft(args, ctx) {
     confirm_in_app_url: ctx.webAppUrl ? `${ctx.webAppUrl}/payables` : null,
     telegram_approval_sent: (r.telegram_notified || 0) > 0,
     counts_in_cash_flow: false,
+    document_attached: documentLinked,
     warnings,
     next_step: 'The draft is waiting for approval in CFO AI. It does not affect cash, payables or '
       + 'runway until an owner/admin approves it (Payables screen or the Telegram Approve button). '
       + 'Nothing has been paid.',
   };
+}
+
+/* ── documents (Phase 2 · B) ─────────────────────────────────────────────── */
+// Thin adapters over the Document Center's own functions (listDocumentsForUser,
+// storeDocumentBytes, linkDocument, signedDocumentUrl in server/index.js). Same role, plan and
+// visibility rules as the web app. Responses carry structured metadata only — never document
+// text, storage paths, hashes or uploader ids.
+const DOCUMENT_TYPES = ['vendor_invoice', 'customer_invoice', 'tax_invoice', 'bukti_potong',
+  'tax_billing', 'payment_proof', 'filing_confirmation', 'bank_document', 'other'];
+const LINK_TYPES = ['payable', 'receivable', 'transaction'];
+const PERIOD_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
+// The JSON body limit is 10 MB, and base64 is 4/3 of the bytes. Bigger files use the link.
+const MAX_INLINE_BYTES = 7 * 1024 * 1024;
+
+async function requireDocumentsView(biz, s) {
+  if (!s.canViewBusinessFinance(biz.role) && !s.canUploadDocument(biz.role)) {
+    throw new ToolError('forbidden_role', 'Your role in this company cannot view documents.');
+  }
+  await requireDocumentsAccess(biz, s);
+}
+
+// One document as the connector shows it. Review metadata from the intake summary, never text.
+function documentView(d) {
+  const ej = d.extracted_json || {};
+  const v2 = ej.ai_intake_v2 || null;
+  const v1 = ej.ai_intake || null;
+  return {
+    document_id: d.id,
+    document_type: d.document_type || null,
+    file: d.file ? { name: d.file.file_name || null, mime_type: d.file.mime_type || null, size: d.file.file_size ?? null,
+      channel: d.file.upload_channel || null } : null,
+    uploaded_at: d.created_at || null,
+    document_number: d.document_number || null,
+    document_date: d.document_date || null,
+    amount: d.gross_amount == null ? null : Number(d.gross_amount),
+    currency: d.currency || null,
+    archived: !!d.archived_at,
+    links: (d.links || []).map((l) => ({ target_type: l.target_type, target_id: l.target_id })),
+    classification: v1 ? { type: v1.doc_type || null, confidence: v1.confidence || null, status: v1.classification_status || null } : null,
+    intake: v2 ? {
+      status: v2.status || null, type: v2.document_type || null, direction: v2.direction || null,
+      suggested_record_type: v2.suggested_record_type || null, amount: v2.amount ?? null, currency: v2.currency || null,
+      counterparty_status: v2.counterparty_status || null, missing_fields: v2.missing_fields || [],
+    } : null,
+  };
+}
+
+async function listDocuments(args, ctx) {
+  const s = ctx.services;
+  const biz = await resolveCompany(ctx, args.company_id);
+  await requireDocumentsView(biz, s);
+  if (args.period && !PERIOD_RE.test(args.period)) throw new ToolError('invalid_period', 'period must be YYYY-MM.');
+  const limit = Math.min(Math.max(Number(args.limit) || 20, 1), 50);
+  const filters = {
+    status: args.status === 'archived' ? 'archived' : undefined,
+    linked_status: args.status === 'linked' || args.status === 'unlinked' ? args.status : undefined,
+    review: args.status === 'needs_review' ? 'needs_review' : undefined,
+    counterparty: args.counterparty_id || undefined,
+    document_id: args.document_id || undefined,
+    uploaded_after: args.uploaded_after || undefined,
+    // A period is filtered below on the document's own date (or its upload date when the
+    // document has none), so fetch the full window first.
+    limit: args.period ? 200 : limit,
+  };
+  const r = await s.listDocumentsForUser(biz, ctx.mcpUser.userId, filters);
+  if (r.error) throw new ToolError('documents_unavailable', 'CFO Finance could not list the documents.');
+  let docs = r.documents || [];
+  if (args.period) {
+    docs = docs.filter((d) => String(d.document_date || d.created_at || '').slice(0, 7) === args.period);
+  }
+  if (args.document_id && !docs.length) throw new ToolError('document_not_found', 'No such document in this company.');
+  const truncated = docs.length > limit;
+  docs = docs.slice(0, limit);
+
+  const out = docs.map(documentView);
+  // Download links are issued one by one (each is audited) and only for a short list.
+  if (args.include_download_url) {
+    if (out.length > 5) {
+      throw new ToolError('too_many_for_download_links', 'Download links are issued for at most 5 documents at a time. '
+        + 'Narrow the list (document_id, period, status) and ask again.');
+    }
+    for (let i = 0; i < out.length; i++) {
+      const u = await s.signedDocumentUrl(biz, ctx.mcpUser.userId, docs[i]);
+      out[i].download_url = u && u.url ? u.url : null;
+      out[i].download_url_expires_in_seconds = u && u.url ? u.expires_in : null;
+    }
+  }
+  return {
+    company: companyRef(biz),
+    count: out.length,
+    truncated,
+    filters: { status: args.status || null, period: args.period || null, counterparty_id: args.counterparty_id || null,
+      document_id: args.document_id || null, uploaded_after: args.uploaded_after || null },
+    period_basis: args.period ? 'document date, or upload date when the document has none' : null,
+    documents: out,
+  };
+}
+
+// A link target in THIS company, checked before anything is written. payable/receivable are
+// debts of that type; a restricted role may only attach to a request it created itself.
+async function resolveLinkTarget(biz, s, userId, linkTo, { manage }) {
+  if (!linkTo) return null;
+  if (!LINK_TYPES.includes(linkTo.type)) throw new ToolError('invalid_link_target', `link type must be one of ${LINK_TYPES.join(', ')}.`);
+  if (linkTo.type === 'transaction') {
+    if (!manage) throw new ToolError('forbidden_role', 'Your role cannot attach documents to transactions.');
+    return { target_type: 'transaction', target_id: String(linkTo.id) };
+  }
+  const debt = await s.loadDebtScoped(biz, linkTo.id);
+  if (!debt || debt.type !== linkTo.type) throw new ToolError('link_target_not_found', `No such ${linkTo.type} in this company.`);
+  if (!manage && String(debt.created_by_user_id) !== String(userId)) {
+    throw new ToolError('link_target_not_found', `No such ${linkTo.type} in this company.`);
+  }
+  return { target_type: 'debt', target_id: String(debt.id) };
+}
+
+const BASE64_RE = /^[A-Za-z0-9+/\r\n]+={0,2}\s*$/;
+
+async function uploadDocument(args, ctx) {
+  const s = ctx.services;
+  const biz = await resolveCompany(ctx, args.company_id);
+  if (!s.canUploadDocument(biz.role)) throw new ToolError('forbidden_role', 'Your role in this company cannot upload documents.');
+  await requireDocumentsAccess(biz, s);
+  if (args.document_type && !DOCUMENT_TYPES.includes(args.document_type)) {
+    throw new ToolError('invalid_document_type', `document_type must be one of ${DOCUMENT_TYPES.join(', ')}.`);
+  }
+  const manage = s.canManageDocuments(biz.role);
+  const link = await resolveLinkTarget(biz, s, ctx.mcpUser.userId, args.link_to, { manage });
+
+  // ── Mode 2: no bytes → a 15-minute upload link for this user and company ─────────────────
+  if (!args.file_base64) {
+    if (args.file_name || args.mime_type) {
+      throw new ToolError('invalid_arguments', 'file_name and mime_type go with file_base64. Omit all three to get an upload link.');
+    }
+    const l = s.issueUploadLink(biz, ctx.mcpUser.userId, { documentType: args.document_type || null, link });
+    return {
+      company: companyRef(biz),
+      mode: 'upload_link',
+      written: false,
+      upload_url: l.url,
+      expires_at: l.expires_at,
+      instructions: 'Give the user this link. It opens a CFO AI page where they drop the file; they must be '
+        + 'signed in to CFO AI with the same account. The link works for 15 minutes and only uploads into '
+        + `${biz.business.name || 'this company'}.`,
+      next_step: `When the user says the file is uploaded, call list_documents with uploaded_after="${l.issued_at}" `
+        + 'to find it, then analyze_invoice with its document_id.',
+    };
+  }
+
+  // ── Mode 1: the bytes are in the call ─────────────────────────────────────────────────────
+  if (!args.file_name || !args.mime_type) {
+    throw new ToolError('invalid_arguments', 'file_name and mime_type are required with file_base64.');
+  }
+  const b64 = String(args.file_base64).replace(/^data:[^;]+;base64,/, '');
+  if (!BASE64_RE.test(b64)) throw new ToolError('invalid_file', 'file_base64 is not valid base64.');
+  const buf = Buffer.from(b64, 'base64');
+  if (!buf.length) throw new ToolError('invalid_file', 'The file is empty.');
+  if (buf.length > MAX_INLINE_BYTES) {
+    throw new ToolError('file_too_large_for_inline', 'Files over 7 MB cannot be sent inside the chat. Call upload_document '
+      + 'without file_base64 to get an upload link instead.');
+  }
+
+  const r = await s.storeDocumentBytes(biz, ctx.mcpUser.userId, {
+    buf, fileName: String(args.file_name).slice(0, 200), mimeType: args.mime_type,
+    documentType: args.document_type || null, link: link ? { target_type: link.target_type, target_id: link.target_id } : null,
+  });
+  if (r.error === 'duplicate') {
+    return {
+      company: companyRef(biz), mode: 'inline', written: false,
+      duplicate: true, existing_document_id: r.existing_document_id || null,
+      next_step: 'This exact file is already stored in CFO AI. Use existing_document_id with analyze_invoice.',
+    };
+  }
+  if (r.error) {
+    const known = { mime_not_allowed: 'This file type is not accepted. Use PDF, JPG, PNG, CSV or Excel.',
+      file_too_large: 'The file is larger than 20 MB.', invalid_file_name: 'The file name is not valid.',
+      documents_unavailable: 'Document storage is temporarily unavailable. Try again later.',
+      storage_unavailable: 'Document storage is temporarily unavailable. Try again later.' };
+    throw new ToolError(r.error in known ? r.error : 'upload_failed', known[r.error] || 'CFO AI could not store the file.');
+  }
+
+  const doc = r.doc;
+  const i = r.intake || null;
+  const full = fullView(biz, s);
+  return {
+    company: companyRef(biz),
+    mode: 'inline',
+    written: true,
+    duplicate: false,
+    document_id: doc.id,
+    document_type: doc.document_type || null,
+    linked: r.link_result ? !!r.link_result.ok : false,
+    link_error: r.link_result && !r.link_result.ok ? r.link_result.error : null,
+    // The intake ran on upload (same as the web app). Finance roles see its summary; a
+    // submit-only role sees the document's own reading only.
+    intake: i ? {
+      status: i.status,
+      type: i.document && i.document.type,
+      direction: i.document && i.document.direction,
+      suggested_record_type: i.financial_record && i.financial_record.suggested_record_type,
+      amount: i.financial_record ? i.financial_record.amount : null,
+      currency: i.financial_record ? i.financial_record.currency : null,
+      missing_fields: i.missing_fields || [],
+      ...(full ? { counterparty_status: i.counterparty && i.counterparty.status } : {}),
+    } : null,
+    next_step: 'The document is stored in the Document Center. Call analyze_invoice with this document_id for the full '
+      + 'reading, or submit_invoice_draft with it to file a draft (the document is attached automatically).',
+  };
+}
+
+async function linkDocumentTool(args, ctx) {
+  const s = ctx.services;
+  const biz = await resolveCompany(ctx, args.company_id);
+  if (!s.canManageDocuments(biz.role)) throw new ToolError('forbidden_role', 'Your role in this company cannot link documents.');
+  await requireDocumentsAccess(biz, s);
+  const doc = await s.loadDocumentScoped(biz, String(args.document_id));
+  if (!doc) throw new ToolError('document_not_found', 'No such document in this company.');
+  if (doc.archived_at) throw new ToolError('document_archived', 'That document has been archived.');
+  const target = await resolveLinkTarget(biz, s, ctx.mcpUser.userId, { type: args.target_type, id: args.target_id }, { manage: true });
+
+  if (args.unlink) {
+    const links = await s.documentLinks(biz, doc);
+    const hit = links.find((l) => l.target_type === target.target_type && String(l.target_id) === target.target_id);
+    if (!hit) throw new ToolError('link_not_found', 'This document is not attached to that record.');
+    const r = await s.unlinkDocument(biz, doc, hit.link_id, ctx.mcpUser.userId);
+    if (!r.ok) throw new ToolError(r.error || 'unlink_failed', 'CFO AI could not detach the document.');
+    return { company: companyRef(biz), written: true, action: 'unlinked', document_id: doc.id,
+      target: { type: args.target_type, id: target.target_id } };
+  }
+
+  const r = await s.linkDocument(biz, doc, target.target_type, target.target_id, ctx.mcpUser.userId);
+  if (!r.ok) {
+    const map = { already_linked: 'The document is already attached to that record.',
+      cross_business_link_forbidden: 'That record belongs to another company.',
+      target_not_found: `No such ${args.target_type} in this company.` };
+    throw new ToolError(r.error in map ? r.error : 'link_failed', map[r.error] || 'CFO AI could not attach the document.');
+  }
+  return { company: companyRef(biz), written: true, action: 'linked', document_id: doc.id,
+    target: { type: args.target_type, id: target.target_id },
+    note: 'Attaching a document records evidence only. It does not approve, pay or settle anything.' };
 }
 
 /* ── registry ────────────────────────────────────────────────────────────── */
@@ -494,6 +746,33 @@ function phase1Tools(ctx) {
       },
       handler: guarded('analyze_invoice', ctx, analyzeInvoice),
     },
+    {
+      name: 'list_documents',
+      availableFor: (role, s) => s.canViewBusinessFinance(role) || s.canUploadDocument(role),
+      config: {
+        title: 'List documents',
+        description: 'Documents stored in the company\'s CFO Document Center: type, file name, number, date, '
+          + 'amount, what they are attached to, and the intake review status. Read-only. Use it to find a '
+          + 'document_id (e.g. after the user uploads a file through an upload link: uploaded_after), to see '
+          + 'what still needs review (status="needs_review") or what is not attached yet (status="unlinked"). '
+          + 'Managers/employees see only their own uploads. include_download_url adds a 10-minute view link '
+          + '(at most 5 documents). Never returns document text.',
+        inputSchema: {
+          company_id: COMPANY_ID,
+          status: z.enum(['needs_review', 'unlinked', 'linked', 'archived']).optional()
+            .describe('needs_review = not attached and not ready; unlinked/linked = attachment state; archived'),
+          period: z.string().regex(PERIOD_RE).optional().describe('Month YYYY-MM (document date, else upload date)'),
+          counterparty_id: z.string().min(1).max(64).optional().describe('Only documents of this counterparty'),
+          document_id: z.string().min(1).max(64).optional().describe('One document'),
+          uploaded_after: z.string().datetime({ offset: true }).optional()
+            .describe('ISO timestamp — documents uploaded after it (use the issued time of an upload link)'),
+          limit: z.number().int().min(1).max(50).optional().describe('Default 20'),
+          include_download_url: z.boolean().optional().describe('Add short-lived view links (max 5 documents)'),
+        },
+        annotations: { ...RO, title: 'List documents' },
+      },
+      handler: guarded('list_documents', ctx, listDocuments),
+    },
   ];
 }
 
@@ -537,6 +816,59 @@ function writeTools(ctx) {
         },
       },
       handler: guarded('submit_invoice_draft', ctx, submitInvoiceDraft),
+    },
+    {
+      name: 'upload_document',
+      availableFor: (role, s) => s.canUploadDocument(role),
+      config: {
+        title: 'Upload a document to CFO',
+        description: 'Store a file (invoice, receipt, payment proof, tax document, contract…) in the company\'s CFO '
+          + 'Document Center; CFO reads and classifies it on upload. Use it when the user asks to upload/save a '
+          + 'document to CFO. Two modes: (1) pass file_base64 + file_name + mime_type (PDF/JPG/PNG/CSV/Excel, up '
+          + 'to 7 MB); (2) if you cannot pass the file bytes, call it WITHOUT file_base64 to get a 15-minute '
+          + 'upload link for the user (they must be signed in to CFO AI). An identical file is never stored twice '
+          + '(duplicate + existing_document_id). Optional link_to attaches it to a payable/receivable/transaction. '
+          + 'Nothing is approved or paid.',
+        inputSchema: {
+          company_id: COMPANY_ID,
+          file_base64: z.string().max(10 * 1024 * 1024).optional().describe('The file bytes, base64-encoded'),
+          file_name: z.string().min(1).max(200).optional().describe('File name with extension, e.g. invoice-832.pdf'),
+          mime_type: z.string().min(3).max(120).optional().describe('e.g. application/pdf, image/jpeg'),
+          document_type: z.enum(DOCUMENT_TYPES).optional()
+            .describe('Only if the user said what it is; CFO classifies the content anyway'),
+          link_to: z.object({
+            type: z.enum(LINK_TYPES),
+            id: z.union([z.string().min(1).max(64), z.number().int()]),
+          }).optional().describe('Attach to an existing payable / receivable / transaction of this company'),
+        },
+        annotations: {
+          title: 'Upload a document to CFO',
+          readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false,
+        },
+      },
+      handler: guarded('upload_document', ctx, uploadDocument),
+    },
+    {
+      name: 'link_document',
+      availableFor: (role, s) => s.canManageDocuments(role),
+      config: {
+        title: 'Attach or detach a document',
+        description: 'Attach a stored document to a payable, receivable or transaction of the same company (e.g. a '
+          + 'payment proof to the invoice it pays), or detach it with unlink=true. Evidence only: it never '
+          + 'approves, pays or settles anything. Owner/admin/CFO/accountant roles.',
+        inputSchema: {
+          company_id: COMPANY_ID,
+          document_id: z.string().min(1).max(64).describe('Document id from list_documents / upload_document'),
+          target_type: z.enum(LINK_TYPES).describe('payable, receivable or transaction'),
+          target_id: z.union([z.string().min(1).max(64), z.number().int()]).describe('Id of that record'),
+          unlink: z.boolean().optional().describe('true = detach instead of attach'),
+        },
+        annotations: {
+          title: 'Attach or detach a document',
+          readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false,
+        },
+      },
+      handler: guarded('link_document', ctx, linkDocumentTool),
     },
   ];
 }

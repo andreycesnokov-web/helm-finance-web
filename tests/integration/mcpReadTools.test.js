@@ -140,12 +140,12 @@ async function call(services, name, args = {}, user = { userId: OWNER, via: 'dev
 
 /* ── registry ─────────────────────────────────────────────────────────────── */
 
-test('exactly four read-only tools are exposed — no period-readiness tool without an engine', async () => {
+test('only the read-only tools are exposed — no period-readiness tool without an engine', async () => {
   const { client, close } = await connect({ mcpUser: { userId: OWNER }, services: fakeServices() });
   try {
     const { tools } = await client.listTools();
     assert.deepStrictEqual(tools.map((t) => t.name).sort(),
-      ['analyze_invoice', 'get_company_context', 'get_financial_summary', 'get_missing_documents']);
+      ['analyze_invoice', 'get_company_context', 'get_financial_summary', 'get_missing_documents', 'list_documents']);
     for (const t of tools) {
       assert.strictEqual(t.annotations.readOnlyHint, true, `${t.name} must be readOnlyHint`);
       assert.strictEqual(t.annotations.destructiveHint, false, `${t.name} must not be destructive`);

@@ -345,7 +345,8 @@ test('a grant made under the read-only consent never gets the write tool, even a
   assert.strictEqual(tokens.scope, 'cfo:read');
   process.env.MCP_WRITE_TOOLS_ENABLED = 'true';
   const names = await toolNames(tokens.access_token);
-  assert.strictEqual(names.length, 4);
+  assert.ok(!names.some((n) => ['submit_invoice_draft', 'upload_document', 'link_document'].includes(n)), names.join());
+  assert.strictEqual(names.length, 5);
   assert.ok(!names.includes('submit_invoice_draft'), 'read-only grant can write');
   // Refreshing that grant cannot pick the write scope up either.
   const rf = await request('POST', '/token', { form: { grant_type: 'refresh_token',
