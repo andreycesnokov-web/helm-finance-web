@@ -18,6 +18,7 @@ import { cashItems, forecast, applyScenario } from '../lib/radarSeries'
 import { findWithholdingRule, computeInvoicePlan } from '../../pages/business/InvoiceReviewDrawer'
 import DecisionActions from '../components/DecisionActions'
 import BillChecklist from '../components/BillChecklist'
+import WithholdingCard from '../components/WithholdingCard'
 import { StatusPill } from './Bills'
 
 const fmtTime = (iso, lang) => {
@@ -160,6 +161,7 @@ export default function BillDetail({ kind = 'payable' }) {
           </Card>
 
           <BillChecklist d={d} hasInvoice={hasInvoice} paid={s === 'paid'} slipNeeded={!!split} />
+          <WithholdingCard d={d} />
         </div>
       </div>
     </div>

@@ -15,6 +15,7 @@ const TX = require('./lib/transactionClass');
 const TARGETS = require('./lib/businessTargets');   // Design v2 P-01/P-08 (migrations 058, 059)
 const CHECKLIST = require('./lib/billChecklist');   // Design v2 P-05 (migration 061)
 const PNLMAP = require('./lib/pnlMapping');         // Design v2 P-10 (migration 062)
+const DW = require('./lib/debtWithholding');        // remaining balance with withholdings (batch 10)
 // Telegram-created payables are IDR-only until multi-currency payables exist end to end.
 // See server/lib/telegramCurrency.js for why refusing beats recording a wrong row.
 const { isSupportedTelegramCurrency, currencyNotSupported, normalizeCurrency } = require('./lib/telegramCurrency');
@@ -1012,7 +1013,7 @@ app.get('/api/pulse', auth, async (req, res) => {
       .select('*').or(bizOr)
       .or('is_training.is.null,is_training.eq.false')
       .order('due_date', { ascending: true });
-    const debts = enrichDebts(rawDebts);
+    const debts = await enrichDebtsFor(biz.business.id, rawDebts);
 
     // Reminders
     const { data: reminders } = await supabase.from('reminders')
@@ -1209,35 +1210,36 @@ app.get('/api/pulse', auth, async (req, res) => {
  * Returns plain object with extra derived fields merged into debt.
  */
 function computeDebtStatus(debt) {
-  const effectiveAmount = Number(debt.original_amount || debt.amount || 0);
-  const paidAmount      = Number(debt.paid_amount     || 0);
-  const remaining       = Math.max(0, effectiveAmount - paidAmount);
-  const now             = new Date();
-  const dueDate         = debt.due_date ? new Date(debt.due_date) : null;
-  const daysOverdue     = dueDate ? Math.floor((now - dueDate) / 86400000) : 0;
-
-  let status;
-  if (debt.status === 'cancelled')             status = 'cancelled';
-  else if (debt.is_settled || remaining <= 0)  status = 'paid';
-  else if (paidAmount > 0)                     status = 'partial';
-  else if (dueDate && now > dueDate)           status = 'overdue';
-  else                                         status = 'open';
-
-  return {
-    ...debt,
-    // Normalised amounts
-    original_amount: effectiveAmount,
-    paid_amount:     paidAmount,
-    remaining_amount: remaining,
-    // Status
-    status,
-    days_overdue: status === 'overdue' ? daysOverdue : 0,
-  };
+  // remaining = amount − paid_amount − withholding allocations (DECISIONS.md, final decisions
+  // item 5). A bill with no withholding (withholding_allocated absent) is calculated exactly as
+  // before; see server/lib/debtWithholding.js and tests/debtWithholding.test.js.
+  return DW.debtStatusOf(debt, new Date());
 }
 
 /** Enrich an array of debts with computed status fields. */
 function enrichDebts(debts) {
   return (debts || []).map(computeDebtStatus);
+}
+
+// Withholding allocations of one business: { [debt_id]: { amount, waiting_slip } }.
+// Read-only. Any read error (e.g. a database without 031) → {} so the old figures stand.
+async function loadWithholdings(businessId) {
+  if (!businessId) return {};
+  try {
+    const { data: allocs, error } = await supabase.from('debt_settlement_allocations')
+      .select('debt_id, settlement_source_type, withholding_record_id, allocated_amount')
+      .eq('business_id', businessId).eq('settlement_source_type', 'withholding_record');
+    if (error || !allocs?.length) return {};
+    const ids = [...new Set(allocs.map((a) => a.withholding_record_id).filter(Boolean))];
+    const { data: recs } = await supabase.from('withholding_records')
+      .select('id, status, bukti_potong_document_id').eq('business_id', businessId).in('id', ids);
+    return DW.withholdingByDebt(allocs, recs || []);
+  } catch { return {}; }
+}
+
+/** enrichDebts with this business's withholding allocations taken into account. */
+async function enrichDebtsFor(businessId, debts) {
+  return enrichDebts(DW.attachWithholdings(debts || [], await loadWithholdings(businessId)));
 }
 
 app.get('/api/debts', auth, async (req, res) => {
@@ -1260,7 +1262,7 @@ app.get('/api/debts', auth, async (req, res) => {
   // By default include all (not just unsettled) so UI can show paid history
   const { data, error } = await query;
   if (error) return res.status(500).json({ error: error.message });
-  res.json(enrichDebts(data));
+  res.json(await enrichDebtsFor(biz.business.id, data));
 });
 
 app.post('/api/debts', auth, async (req, res) => {
@@ -1366,16 +1368,19 @@ app.patch('/api/debts/:id/settle', auth, async (req, res) => {
   const debt = debts?.[0];
   if (!debt) return res.status(404).json({ error: 'Debt not found' });
   const fullAmount = Number(debt?.original_amount || debt?.amount || 0);
+  // A recorded withholding already settles its part: paid_amount covers only the rest, so
+  // paid_amount + withholding never exceeds the bill (batch 10). No withholding → as before.
+  const withheld = Number((await loadWithholdings(biz.business.id))[String(debt.id)]?.amount || 0);
   const { data, error } = await supabase.from('debts')
     .update({
       is_settled:   true,
       settled_at:   new Date().toISOString(),
       status:       'paid',
-      paid_amount:  fullAmount,
+      paid_amount:  Math.max(0, fullAmount - withheld),
     })
     .eq('id', debt.id).select().single();
   if (error) return res.status(500).json({ error: error.message });
-  res.json(computeDebtStatus(data));
+  res.json(computeDebtStatus({ ...data, withholding_allocated: withheld }));
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1780,6 +1785,73 @@ app.patch('/api/debts/:id/checklist', auth, async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// ── POST /api/debts/:id/withholding — record a withholding on a bill or invoice ─────
+// DECISIONS.md, final decisions item 5 (batch 10). Typical case: a customer pays our
+// invoice minus PPh 23. Creates a withholding_record (031) — status 'waiting_slip' until a
+// bukti potong is linked — and allocates it to the invoice (settlement_source_type =
+// 'withholding_record'), so the remaining balance (computeDebtStatus) drops by that amount.
+// Direction comes from debts.type. owner/ceo/admin/cfo/accountant; audited.
+// No money moves, paid_amount is untouched, migration 031 is unchanged. When the 031 guard
+// rejects the allocation, the record is removed again and the answer is 409 with the
+// message from DECISIONS.md — never a silent failure.
+app.post('/api/debts/:id/withholding', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (biz.business?.type === 'personal')
+      return res.status(403).json({ error: 'business_workspace_required' });
+    if (!DW.canRecordWithholding(biz.role))
+      return res.status(403).json({ error: 'Only an accountant, owner, admin or CFO can record a withholding' });
+
+    const { data: rows } = await supabase.from('debts').select('*')
+      .eq('id', req.params.id).eq('business_id', biz.business.id).limit(1);
+    const raw = rows?.[0];
+    if (!raw) return res.status(404).json({ error: 'Debt not found' });
+    const withheldBefore = Number((await loadWithholdings(biz.business.id))[String(raw.id)]?.amount || 0);
+    const debt = { ...raw, withholding_allocated: withheldBefore };
+
+    const v = DW.withholdingFromBody(req.body || {}, debt);
+    if (v.error) return res.status(v.error === 'exceeds_remaining' ? 409 : 400).json(v);
+
+    if (v.slip) {
+      const { data: docs } = await supabase.from('financial_documents')
+        .select('id, business_id, document_type, archived_at').eq('id', v.slip).eq('business_id', biz.business.id).limit(1);
+      const doc = docs?.[0];
+      if (!doc) return res.status(404).json({ error: 'document_not_found_in_this_business' });
+      if (doc.archived_at) return res.status(400).json({ error: 'document_archived' });
+      if (doc.document_type !== 'bukti_potong') return res.status(400).json({ error: 'document_is_not_a_withholding_slip' });
+    }
+
+    const { data: rec, error: recErr } = await supabase.from('withholding_records').insert({
+      business_id: biz.business.id, debt_id: raw.id, tax_type: v.taxType,
+      withholding_amount: v.amount, bukti_potong_document_id: v.slip, status: v.status,
+      context_type: raw.type === 'payable' ? 'vendor_invoice' : 'other',
+    }).select('id, status, tax_type, withholding_amount, bukti_potong_document_id').single();
+    if (recErr) return res.status(500).json({ error: recErr.message });
+
+    const { data: alloc, error: aErr } = await supabase.from('debt_settlement_allocations').insert({
+      business_id: biz.business.id, debt_id: raw.id, settlement_source_type: 'withholding_record',
+      withholding_record_id: rec.id, allocated_amount: v.amount, created_by_user_id: req.user.userId,
+    }).select('id, allocated_amount').single();
+    if (aErr) {
+      // Undo the record so nothing half-written remains.
+      await supabase.from('withholding_records').delete().eq('id', rec.id).eq('business_id', biz.business.id);
+      if (DW.isGuardRejection(aErr)) return res.status(409).json({ error: 'settlement_guard_rejected', message: DW.GUARD_MESSAGE });
+      return res.status(500).json({ error: aErr.message });
+    }
+
+    await recordAudit({
+      businessId: biz.business.id, actorUserId: req.user.userId, actorRole: biz.role,
+      entityType: 'debt', entityId: raw.id, action: 'debt_withholding_recorded',
+      before: { remaining_amount: DW.remainingOf(debt), withholding_allocated: withheldBefore },
+      after: { withholding_record_id: rec.id, allocation_id: alloc.id, amount: v.amount, tax_type: v.taxType, status: v.status,
+        remaining_amount: DW.remainingOf({ ...debt, withholding_allocated: withheldBefore + v.amount }) },
+    });
+    res.json({ withholding: rec, allocation: alloc,
+      debt: computeDebtStatus({ ...raw, withholding_allocated: withheldBefore + v.amount, withholding_waiting_slip: !v.slip }) });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // ── GET /api/withholding-slips — read-only: withholding records and their slips ──────
 // Design v2 P-05 option B: the bill checklist and the Accountant "Tax slips to make"
 // counter read the bukti potong from withholding_records.bukti_potong_document_id
@@ -1956,7 +2028,7 @@ async function loadBusinessDebt(biz, debtId) {
   const { data } = await supabase.from('debts').select('*')
     .eq('id', debtId).or(bizOrFilter(biz))
     .or('is_training.is.null,is_training.eq.false').limit(1);
-  return data?.[0] ? enrichDebts([data[0]])[0] : null;
+  return data?.[0] ? (await enrichDebtsFor(biz.business.id, [data[0]]))[0] : null;
 }
 
 // GET /api/decisions/debts/:id/approval — assess approving a pending request
@@ -10786,14 +10858,17 @@ app.post('/api/debts/:id/pay', auth, async (req, res) => {
   const paymentAmount  = Number(amount);
   const effectiveTotal = Number(debt.original_amount || debt.amount || 0);
   const alreadyPaid    = Number(debt.paid_amount || 0);
-  const remaining      = Math.max(0, effectiveTotal - alreadyPaid);
+  // Same formula as computeDebtStatus: withholding allocations are already settled, so a
+  // payment can never cover them a second time (DECISIONS.md, final decisions item 5).
+  const withheld       = Number((await loadWithholdings(biz.business.id))[String(debt.id)]?.amount || 0);
+  const remaining      = DW.remainingOf({ ...debt, withholding_allocated: withheld });
 
   if (paymentAmount > remaining + 0.01) {
     return res.status(400).json({ error: `Payment amount exceeds remaining balance (${remaining})` });
   }
 
   const newPaidAmount = alreadyPaid + paymentAmount;
-  const isFullyPaid   = newPaidAmount >= effectiveTotal - 0.01;
+  const isFullyPaid   = newPaidAmount + withheld >= effectiveTotal - 0.01;
   const newStatus     = isFullyPaid ? 'paid' : 'partial';
 
   // Wallet must belong to the same business (legacy: owner's user_id)
@@ -10842,8 +10917,8 @@ app.post('/api/debts/:id/pay', auth, async (req, res) => {
   res.json({
     ok:           true,
     isFullyPaid,
-    remaining:    Math.max(0, effectiveTotal - newPaidAmount),
-    debt:         computeDebtStatus(updatedDebt),
+    remaining:    Math.max(0, effectiveTotal - newPaidAmount - withheld),
+    debt:         computeDebtStatus({ ...updatedDebt, withholding_allocated: withheld }),
   });
 })
 
@@ -11113,7 +11188,7 @@ async function buildAiCfoContext(userId, language = 'en', biz = null) {
     getCurrentAccess(biz ? biz.ownerUserId : userId),
   ]);
 
-  const debts = enrichDebts(rawDebts);
+  const debts = biz ? await enrichDebtsFor(biz.business.id, rawDebts) : enrichDebts(rawDebts);
 
   // ── Wallet scope split ────────────────────────────────────────────────────
   const allWallets      = wallets || [];
@@ -11363,7 +11438,7 @@ async function buildBusinessFinancialSnapshot(biz, language = 'en', asOfDate = n
   const dailyBurn = burn.burn_rate_daily;
 
   // Debts — only approved/open count as confirmed; pending tracked separately.
-  const debts = enrichDebts(rawDebts);
+  const debts = await enrichDebtsFor(biz.business.id, rawDebts);
   const confirmed = debts.filter(d => !['paid', 'cancelled'].includes(d.status) && (d.approval_status === 'approved' || !d.approval_status));
   const pending   = debts.filter(d => d.approval_status === 'pending_approval' && !['paid', 'cancelled'].includes(d.status));
 

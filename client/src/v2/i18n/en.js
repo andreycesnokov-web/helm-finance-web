@@ -99,6 +99,17 @@ export default {
     forbidden: 'Your role can submit but not decide. An owner, admin or CFO decides.',
     done: { approve: 'Approved. Nothing is paid until someone pays it.', reject: 'Rejected.', ask: 'Question sent.' },
   },
+  wh: {
+    titleIn: 'Tax withheld by the customer', titleOut: 'Tax we withheld', waiting: 'Waiting for the tax slip', slipIn: 'slip received',
+    hintIn: 'If the customer paid less because they withheld PPh 23, record it here. Your revenue stays at the full invoice; the withheld part is a prepayment of your own tax.',
+    hintOut: 'If you paid the supplier less because you withheld tax, record it here. The withheld part is paid to the tax office, not to the supplier.',
+    recordIn: 'Record tax withheld by the customer', recordOut: 'Record tax we withheld', amount: 'Amount withheld (IDR)', max: 'Up to {v} still open',
+    taxType: 'Tax', slip: 'Withholding slip (bukti potong)', slipLater: 'Not received yet — add it later',
+    note: 'No money moves. The open balance goes down by this amount; your accountant credits it against your income tax.', save: 'Record withholding',
+    forbidden: 'Only an accountant, owner, admin or CFO can record a withholding.', exceeds: 'That is more than the {v} still open.',
+    slipWhere: 'Upload the slip when it arrives:',
+    type: { pph_23: 'PPh 23', pph_4_2: 'PPh 4(2)', pph_21: 'PPh 21', pph_26: 'PPh 26', pph_22: 'PPh 22', other: 'Other' },
+  },
   lock: { payrollTitle: 'Payroll is not part of your plan', approvalsTitle: 'Approvals are not part of your plan', text: 'Your current plan does not include this. Nothing is lost — it opens as soon as the plan includes it.' },
   bills: {
     sub: 'What you’re owed and what you owe, in one place', addBill: 'Add a bill', newInvoice: 'New invoice',
