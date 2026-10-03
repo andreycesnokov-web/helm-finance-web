@@ -74,10 +74,12 @@ export default {
     legend: { expected: 'Expected', range: 'Range from best to worst case', worst: 'Worst case · no customer pays, every bill does' },
     chartSummary: 'Expected cash at the end: {end}. Lowest point {low} on {lowDate}. Worst case lowest {worst} on {worstDate}.',
     whatIf: 'What if…', whatIfHint: 'Try a decision before you make it. Nothing is saved.',
-    chip: { worst: 'Worst case', late: '{who} pays 2 weeks late', collect: 'Collect {who} this week', approve: 'If you approve {who}', ask: 'Ask your own' },
+    chip: { delay: 'Pay {who} 2 weeks later', revenue: 'Revenue −20%', hire: 'Hire 1 person', hireNote: 'Needs a salary to test — ask AI CFO for now', worst: 'Worst case', late: '{who} pays 2 weeks late', collect: 'Collect {who} this week', approve: 'If you approve {who}', ask: 'Ask your own' },
     say: {
       worst1: 'In the worst case cash falls to', worst2: '{v} on {d}', daysOfSpend: 'about {n} days of spending',
       collect: 'Collecting {who} ({amt}) this week lifts that low to {v}.',
+      delay: 'If you pay {who} 2 weeks later, expected cash on {d} is {end}, with the lowest point {low} on {lowD}.',
+      revenue: 'If customers pay 20% less ({amt} less in this period), expected cash on {d} is {end}, with the lowest point {low} on {lowD}.',
       approve: 'If you approve {who} ({amt}), expected cash on {d} is {end}, with the lowest point {low} on {lowD}. Nothing is approved here.',
       late: 'If {who} pays 2 weeks late, expected cash on {d} is {end}, with the lowest point {low} on {lowD}.',
     },
@@ -199,6 +201,7 @@ export default {
     emptyTitle: 'No accounts yet', emptyText: 'Add the bank accounts and cash boxes the company uses.',
   },
   tx: {
+    nothingToExport: 'Nothing to export in this view',
     sub: 'Every movement of money — from bank imports, Telegram and what you add yourself', export: 'Export',
     needN: '{n} transactions need a category.', needHint: 'Until then they are excluded from your figures.', reviewN: 'Review {n}',
     search: 'Search', searchPh: 'Search name, amount, note', kind: 'Type',
@@ -239,6 +242,7 @@ export default {
     rateN: '{n}% a year', dueBy: 'due {d}', outstanding: '{v} still owed', markPaid: 'Mark paid today',
     founderTitle: 'A loan from you', founder: 'Record it here as a founder loan. It is kept on the company side only; your personal accounts are not touched.',
     upcomingTitle: 'Repayments coming up', split: 'principal {p} · interest {i}', repaymentTo: 'Repayment · {who}', loan: 'Loan',
+    updateTitle: 'Investor update', updateText: 'AI CFO can draft a short update from these figures.', updateLink: 'Draft it with AI CFO',
   },
   acct: {
     sections: 'AI Accountant sections', tab: { close: 'Month close', packages: 'Documents by transaction', taxes: 'Tax calendar', profile: 'Tax profile' },
@@ -254,7 +258,7 @@ export default {
     stage: { done: 'Paid or filed', overdue: 'Overdue', calculated: 'Calculated', todo: 'To prepare' },
     askLabel: 'Ask about taxes and documents', askPh: 'e.g. Do I need to withhold tax on a legal services bill?', send: 'Send', sources: 'Rules used',
     chip: { q1: 'When do I become PKP?', q2: 'What does my accountant still need?', q3: 'Which suppliers need a withholding slip?' },
-    pk: { complete: 'Complete', ofN: 'of {n} in this month', missing: 'Missing a document', nocat: 'No category', slips: 'Tax slips to make', filter: 'Filter folders',
+    pk: { downloadFolder: 'Download folder', complete: 'Complete', ofN: 'of {n} in this month', missing: 'Missing a document', nocat: 'No category', slips: 'Tax slips to make', filter: 'Filter folders',
       f: { allN: 'All · {n}', incompleteN: 'Not complete · {n}', out: 'Money out', in: 'Money in', payroll: 'Payroll' },
       st: { complete: 'Complete', missingN: 'Missing {n}', nocat: 'No category', open: 'In progress' },
       item: { invoice: 'Supplier invoice', ourInvoice: 'Our invoice', proof: 'Payment proof', received: 'Payment received', receipt: 'Receipt', category: 'Category', payslips: 'Payslips', pph21calc: 'PPh 21 calculation', bankTransfer: 'Bank transfer', slip: 'Withholding slip', check: 'Accountant check' },
@@ -317,6 +321,7 @@ export default {
     skip: 'Skip for now and go to Pulse',
   },
   ask: {
+    typeFirst: 'Type a question first',
     looking: 'Looking at: {what}', fullPage: 'Open the full AI CFO page', close: 'Close', send: 'Send',
     intro: 'Ask about your cash, bills, runway or a decision you are weighing. Answers use only this company’s data.',
     chip1: 'Why did cash change this month?', chip2: 'Which bills can wait?', chip3: 'Can I afford a new hire?',
@@ -344,7 +349,7 @@ export default {
     estimateNote: 'Counted when money moved, by the existing classifier — until category groups and accrual rules are set up (invoiced revenue, received bills), these are estimates.',
     needsReview: '{n} records need a category and are left out.',
     revenue: 'Revenue · {m}', revenueShort: 'Revenue', upOn: '{n}% up on {m}', downOn: '{n}% down on {m}',
-    gross: 'Gross profit', margin: '{n}% margin', net: 'Net profit', afterDepreciation: 'After depreciation from the asset register', noDepreciation: 'Before depreciation — needs the asset register',
+    gross: 'Gross profit', margin: '{n}% margin', net: 'Net profit', afterDepreciation: 'After depreciation from the asset register', export: 'Export', noDepreciation: 'Before depreciation — needs the asset register',
     profit: { note: 'Compared with {c}, costs changed by {costs} in [{m}]({link}).', askQ: 'Why did profit change in {m}?' },
     askCfo: 'Ask AI CFO', chart: { revGross: 'Revenue and gross profit · last 12 months', ebitdaNet: 'EBITDA and net profit · last 12 months' },
     waterfall: 'From revenue to profit · {m}', direct: 'Direct costs', opex: 'Operating costs', depreciation: 'Depreciation', needsAssets: 'needs the asset register',
@@ -361,6 +366,7 @@ export default {
     tax: { turnover: 'Turnover tax (0.5%)', income: 'Income tax' },
     g: { revenue: 'Revenue', direct_cost: 'Direct cost', operating_cost: 'Operating cost', interest: 'Loan interest', other_income: 'Other income', tax: 'Tax', asset_purchase: 'Asset purchase', funding: 'Funding', transfer: 'Transfer' },
     groups: {
+      nothingChanged: 'Nothing changed yet',
       open: 'Profit groups', setUp: 'Set up profit groups', title: 'Profit groups', sub: 'Which group each of your categories belongs to',
       notAppliedTitle: 'Not available yet', notApplied: 'Profit groups can be saved once the owner applies migration 062.', notAppliedNote: 'Waiting for migration 062',
       save: 'Save groups', saved: 'Saved {n} changes. They are logged.', forbidden: 'Only an owner, CEO, admin or CFO can confirm profit groups.',
@@ -410,6 +416,7 @@ export default {
     withoutLife: '{n} assets have no useful life yet, so no wear and tear is counted for them. It comes from the verified tax rules only.',
   },
   addAsset: {
+    checking: 'Checking the register…',
     sub: 'Drop the purchase invoice — CFO AI fills in the rest and tells you which documents are missing', save: 'Save asset', registerSoon: 'Asset register not set up yet',
     s1: 'Drop the invoice', s1Hint: 'PDF, photo or a forwarded email. Several items on one invoice become separate assets.',
     s2: 'Fill in the details', s2Hint: 'Name, price, date, supplier and the asset type.', s3: 'Check and add documents', s3Hint: 'The list changes with the asset type.',

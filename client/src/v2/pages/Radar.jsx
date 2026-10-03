@@ -90,6 +90,8 @@ export default function Radar() {
   const daysOfSpend = burn > 0 ? Math.round(Math.max(0, f.worstLowest.value) / burn) : null
   const late = scenario.kind === 'late' ? chips.find((c) => c.kind === 'late') : null
   const approving = scenario.kind === 'approve' ? chips.find((c) => c.kind === 'approve') : null
+  const delaying = scenario.kind === 'delay' ? chips.find((c) => c.kind === 'delay') : null
+  const dropping = scenario.kind === 'revenue' ? chips.find((c) => c.kind === 'revenue') : null
 
   return (
     <div className="v2-radar">
@@ -125,17 +127,22 @@ export default function Radar() {
           <div className="v2-chips" role="group" aria-label={t('radar.whatIf')}>
             <button type="button" className="v2-chip" aria-pressed={scenario.kind === 'worst'} onClick={() => setScenario({ kind: 'worst' })}>{t('radar.chip.worst')}</button>
             {chips.map((c) => (
-              <button key={c.kind + c.key} type="button" className="v2-chip" aria-pressed={scenario.key === c.key && scenario.kind === c.kind}
+              <button key={c.kind + c.key} type="button" className="v2-chip" aria-pressed={scenario.kind === c.kind && (c.key == null || scenario.key === c.key)}
                 onClick={() => setScenario(c)}>
                 {t(`radar.chip.${c.kind}`, { who: c.label })}
               </button>
             ))}
+            <button type="button" className="v2-chip" disabled title={t('radar.chip.hireNote')}>{t('radar.chip.hire')}</button>
             <button type="button" className="v2-chip v2-chip-ask" onClick={() => openAsk()}><I.plus size={16} />{t('radar.chip.ask')}</button>
           </div>
           <div className="v2-callout">
             <span className="v2-callout-ic" aria-hidden="true"><I.cfo size={18} /></span>
             <p className="v2-callout-text">
-              {approving
+              {dropping
+                ? t('radar.say.revenue', { amt: money(dropping.amount), end: money(f.end.value), d: shortDate(f.end.date, lang), low: money(f.lowest.value), lowD: shortDate(f.lowest.date, lang) })
+                : delaying
+                ? t('radar.say.delay', { who: delaying.label, end: money(f.end.value), d: shortDate(f.end.date, lang), low: money(f.lowest.value), lowD: shortDate(f.lowest.date, lang) })
+                : approving
                 ? t('radar.say.approve', { who: approving.label, amt: money(approving.amount), end: money(f.end.value), d: shortDate(f.end.date, lang), low: money(f.lowest.value), lowD: shortDate(f.lowest.date, lang) })
                 : late
                 ? t('radar.say.late', { who: late.label, end: money(f.end.value), d: shortDate(f.end.date, lang), low: money(f.lowest.value), lowD: shortDate(f.lowest.date, lang) })

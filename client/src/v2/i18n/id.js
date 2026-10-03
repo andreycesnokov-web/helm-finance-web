@@ -74,10 +74,12 @@ export default {
     legend: { expected: 'Perkiraan', range: 'Rentang terbaik hingga terburuk', worst: 'Terburuk · tidak ada pelanggan membayar, semua tagihan dibayar' },
     chartSummary: 'Perkiraan kas akhir: {end}. Titik terendah {low} pada {lowDate}. Terendah skenario terburuk {worst} pada {worstDate}.',
     whatIf: 'Bagaimana jika…', whatIfHint: 'Coba keputusan sebelum diambil. Tidak ada yang disimpan.',
-    chip: { worst: 'Skenario terburuk', late: '{who} bayar 2 minggu terlambat', collect: 'Tagih {who} minggu ini', approve: 'Jika Anda menyetujui {who}', ask: 'Tanya sendiri' },
+    chip: { delay: 'Bayar {who} 2 minggu lebih lambat', revenue: 'Pendapatan −20%', hire: 'Rekrut 1 orang', hireNote: 'Perlu gaji untuk dihitung — tanyakan AI CFO dulu', worst: 'Skenario terburuk', late: '{who} bayar 2 minggu terlambat', collect: 'Tagih {who} minggu ini', approve: 'Jika Anda menyetujui {who}', ask: 'Tanya sendiri' },
     say: {
       worst1: 'Dalam skenario terburuk kas turun ke', worst2: '{v} pada {d}', daysOfSpend: 'sekitar {n} hari pengeluaran',
       collect: 'Menagih {who} ({amt}) minggu ini menaikkan titik terendah ke {v}.',
+      delay: 'Jika Anda membayar {who} 2 minggu lebih lambat, kas yang diharapkan pada {d} adalah {end}, titik terendah {low} pada {lowD}.',
+      revenue: 'Jika pelanggan membayar 20% lebih sedikit ({amt} lebih sedikit periode ini), kas yang diharapkan pada {d} adalah {end}, titik terendah {low} pada {lowD}.',
       approve: 'Jika Anda menyetujui {who} ({amt}), kas yang diharapkan pada {d} adalah {end}, titik terendah {low} pada {lowD}. Tidak ada yang disetujui di sini.',
       late: 'Jika {who} bayar 2 minggu terlambat, perkiraan kas pada {d} adalah {end}, terendah {low} pada {lowD}.',
     },
@@ -199,6 +201,7 @@ export default {
     emptyTitle: 'Belum ada rekening', emptyText: 'Tambahkan rekening bank dan kas tunai perusahaan.',
   },
   tx: {
+    nothingToExport: 'Tidak ada yang bisa diekspor di tampilan ini',
     sub: 'Setiap pergerakan uang — dari mutasi bank, Telegram, dan yang Anda tambahkan', export: 'Ekspor',
     needN: '{n} transaksi belum berkategori.', needHint: 'Sampai dikategorikan, transaksi ini tidak masuk angka Anda.', reviewN: 'Tinjau {n}',
     search: 'Cari', searchPh: 'Cari nama, jumlah, catatan', kind: 'Jenis',
@@ -239,6 +242,7 @@ export default {
     rateN: '{n}% per tahun', dueBy: 'jatuh tempo {d}', outstanding: '{v} masih terutang', markPaid: 'Tandai dibayar hari ini',
     founderTitle: 'Pinjaman dari Anda', founder: 'Catat di sini sebagai pinjaman pendiri. Hanya dicatat di sisi perusahaan; rekening pribadi Anda tidak tersentuh.',
     upcomingTitle: 'Cicilan mendatang', split: 'pokok {p} · bunga {i}', repaymentTo: 'Cicilan · {who}', loan: 'Pinjaman',
+    updateTitle: 'Laporan investor', updateText: 'AI CFO bisa menyusun laporan singkat dari angka ini.', updateLink: 'Susun dengan AI CFO',
   },
   acct: {
     sections: 'Bagian AI Akuntan', tab: { close: 'Tutup buku', packages: 'Dokumen per transaksi', taxes: 'Kalender pajak', profile: 'Profil pajak' },
@@ -254,7 +258,7 @@ export default {
     stage: { done: 'Dibayar atau dilapor', overdue: 'Terlambat', calculated: 'Dihitung', todo: 'Disiapkan' },
     askLabel: 'Tanya soal pajak dan dokumen', askPh: 'mis. Apakah tagihan jasa hukum perlu dipotong pajak?', send: 'Kirim', sources: 'Aturan yang dipakai',
     chip: { q1: 'Kapan saya menjadi PKP?', q2: 'Apa yang masih dibutuhkan akuntan?', q3: 'Pemasok mana yang perlu bukti potong?' },
-    pk: { complete: 'Lengkap', ofN: 'dari {n} di bulan ini', missing: 'Kurang dokumen', nocat: 'Tanpa kategori', slips: 'Bukti potong dibuat', filter: 'Saring folder',
+    pk: { downloadFolder: 'Unduh folder', complete: 'Lengkap', ofN: 'dari {n} di bulan ini', missing: 'Kurang dokumen', nocat: 'Tanpa kategori', slips: 'Bukti potong dibuat', filter: 'Saring folder',
       f: { allN: 'Semua · {n}', incompleteN: 'Belum lengkap · {n}', out: 'Uang keluar', in: 'Uang masuk', payroll: 'Gaji' },
       st: { complete: 'Lengkap', missingN: 'Kurang {n}', nocat: 'Tanpa kategori', open: 'Berjalan' },
       item: { invoice: 'Faktur pemasok', ourInvoice: 'Faktur kami', proof: 'Bukti bayar', received: 'Pembayaran diterima', receipt: 'Struk', category: 'Kategori', payslips: 'Slip gaji', pph21calc: 'Perhitungan PPh 21', bankTransfer: 'Transfer bank', slip: 'Bukti potong', check: 'Pemeriksaan akuntan' },
@@ -317,6 +321,7 @@ export default {
     skip: 'Lewati dan ke Pulse',
   },
   ask: {
+    typeFirst: 'Ketik pertanyaan dulu',
     looking: 'Melihat: {what}', fullPage: 'Buka halaman AI CFO', close: 'Tutup', send: 'Kirim',
     intro: 'Tanyakan soal kas, tagihan, runway, atau keputusan yang sedang dipertimbangkan. Jawaban hanya memakai data perusahaan ini.',
     chip1: 'Mengapa kas berubah bulan ini?', chip2: 'Tagihan mana yang bisa ditunda?', chip3: 'Apakah saya mampu merekrut orang baru?',
@@ -344,7 +349,7 @@ export default {
     estimateNote: 'Dihitung saat uang bergerak, oleh pengklasifikasi yang ada — sampai grup kategori dan aturan akrual diatur (pendapatan yang ditagih, tagihan yang diterima), angka ini estimasi.',
     needsReview: '{n} catatan belum berkategori dan tidak dihitung.',
     revenue: 'Pendapatan · {m}', revenueShort: 'Pendapatan', upOn: 'naik {n}% dari {m}', downOn: 'turun {n}% dari {m}',
-    gross: 'Laba kotor', margin: 'margin {n}%', net: 'Laba bersih', afterDepreciation: 'Setelah penyusutan dari daftar aset', noDepreciation: 'Sebelum penyusutan — perlu daftar aset',
+    gross: 'Laba kotor', margin: 'margin {n}%', net: 'Laba bersih', afterDepreciation: 'Setelah penyusutan dari daftar aset', export: 'Ekspor', noDepreciation: 'Sebelum penyusutan — perlu daftar aset',
     profit: { note: 'Dibanding {c}, biaya berubah {costs} pada [{m}]({link}).', askQ: 'Mengapa laba berubah pada {m}?' },
     askCfo: 'Tanya AI CFO', chart: { revGross: 'Pendapatan dan laba kotor · 12 bulan', ebitdaNet: 'EBITDA dan laba bersih · 12 bulan' },
     waterfall: 'Dari pendapatan ke laba · {m}', direct: 'Biaya langsung', opex: 'Biaya operasional', depreciation: 'Penyusutan', needsAssets: 'perlu daftar aset',
@@ -361,6 +366,7 @@ export default {
     tax: { turnover: 'Pajak omzet (0,5%)', income: 'Pajak penghasilan' },
     g: { revenue: 'Pendapatan', direct_cost: 'Biaya langsung', operating_cost: 'Biaya operasional', interest: 'Bunga pinjaman', other_income: 'Pendapatan lain', tax: 'Pajak', asset_purchase: 'Pembelian aset', funding: 'Pendanaan', transfer: 'Transfer' },
     groups: {
+      nothingChanged: 'Belum ada perubahan',
       open: 'Grup laba', setUp: 'Atur grup laba', title: 'Grup laba', sub: 'Grup untuk setiap kategori Anda',
       notAppliedTitle: 'Belum tersedia', notApplied: 'Grup laba bisa disimpan setelah pemilik menerapkan migrasi 062.', notAppliedNote: 'Menunggu migrasi 062',
       save: 'Simpan grup', saved: '{n} perubahan disimpan dan dicatat.', forbidden: 'Hanya pemilik, CEO, admin atau CFO yang bisa mengonfirmasi grup laba.',
@@ -410,6 +416,7 @@ export default {
     withoutLife: '{n} aset belum punya umur manfaat, jadi penyusutannya belum dihitung. Umur hanya berasal dari aturan pajak terverifikasi.',
   },
   addAsset: {
+    checking: 'Memeriksa daftar…',
     sub: 'Seret faktur pembelian — CFO AI mengisi sisanya dan memberi tahu dokumen yang kurang', save: 'Simpan aset', registerSoon: 'Daftar aset belum diatur',
     s1: 'Seret faktur', s1Hint: 'PDF, foto, atau email yang diteruskan. Beberapa barang dalam satu faktur menjadi aset terpisah.',
     s2: 'Isi rinciannya', s2Hint: 'Nama, harga, tanggal, pemasok, dan jenis aset.', s3: 'Periksa dan tambah dokumen', s3Hint: 'Daftar berubah sesuai jenis aset.',

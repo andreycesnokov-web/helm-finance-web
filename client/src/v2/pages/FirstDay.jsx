@@ -7,7 +7,7 @@
 // The existing guided onboarding stays at /business/onboarding/classic.
 import { Link } from 'react-router-dom'
 import I from '../icons'
-import { PageHead, Card, Pill, Btn, Skeleton } from '../ui'
+import { PageHead, Card, Pill, Btn, Skeleton, ErrorBox } from '../ui'
 import { useT } from '../i18n'
 import { useApi } from '../data'
 
@@ -16,6 +16,7 @@ export default function FirstDay() {
   const counts = useApi('/business/financial-counts')
   const prof = useApi('/accountant/profile')
   if (counts.loading) return <><PageHead title={t('first.title')} /><Card><Skeleton rows={5} /></Card></>
+  if (counts.error) return <><PageHead title={t('first.title')} /><ErrorBox error={counts.error} onRetry={counts.reload} /></>
   const c = counts.data?.counts || {}
   const pct = prof.data?.completeness?.percent ?? 0
   const steps = [

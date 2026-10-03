@@ -55,7 +55,7 @@ function AskBox() {
         <label htmlFor="acc-ask" className="v2-field-label">{t('acct.askLabel')}</label>
         <div className="v2-askrow">
           <input id="acc-ask" className="v2-input" value={q} onChange={(e) => setQ(e.target.value)} placeholder={t('acct.askPh')} maxLength={500} />
-          <button type="submit" className="v2-btn v2-btn-primary" aria-label={t('acct.send')} disabled={st.busy || !q.trim()}><I.send size={16} /></button>
+          <button type="submit" className="v2-btn v2-btn-primary" aria-label={t('acct.send')} title={q.trim() ? undefined : t('ask.typeFirst')} disabled={st.busy || !q.trim()}><I.send size={16} /></button>
         </div>
       </form>
       <div className="v2-chips">
@@ -236,6 +236,7 @@ function PackagesTab({ month }) {
                 ))}
               </ul>
               {cur.key.startsWith('debt:') && <Link to={`/business/${cur.kind === 'in' ? 'receivables' : 'payables'}/${cur.id}`}>{t('bills.open')}</Link>}
+              <NotYet note={t('acct.packageSoon')}>{t('acct.pk.downloadFolder')}</NotYet>
             </Card>
           )}
           <Card title={t('acct.pk.whatTitle')}><p className="v2-sec">{t('acct.pk.what')}</p></Card>

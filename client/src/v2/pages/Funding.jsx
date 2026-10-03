@@ -10,7 +10,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
 import I from '../icons'
-import { PageHead, Card, Pill, Btn, NotYet, Empty, Skeleton } from '../ui'
+import { PageHead, Card, Pill, Btn, NotYet, Empty, Skeleton, ErrorBox } from '../ui'
 import { useT, useLang } from '../i18n'
 import { useApi, useInvalidate } from '../data'
 import { createFunding, markRepaymentPaid, actionError } from '../lib/actions'
@@ -122,6 +122,8 @@ export default function Funding() {
   const head = <PageHead title={t('nav.funding')} sub={t('fund.sub')}
     actions={available ? (canEdit && <Btn variant="primary" icon={<I.plus size={16} />} onClick={() => setAdding(true)}>{t('fund.record')}</Btn>) : <NotYet note={t('fund.notApplied')}>{t('fund.record')}</NotYet>} />
   if (reg.loading) return <div className="v2-page">{head}<Card><Skeleton rows={6} /></Card></div>
+  // 404 = a server without the register routes yet: shown as "not available", not as an error.
+  if (reg.error && reg.error.status !== 404) return <div className="v2-page">{head}<ErrorBox error={reg.error.status === 403 ? t('perf.forbidden') : reg.error} onRetry={reg.reload} /></div>
   const records = reg.data?.records || []
   return (
     <div className="v2-page">
@@ -164,6 +166,7 @@ export default function Funding() {
         <aside className="v2-col">
           <Card title={t('fund.howTitle')}><p className="v2-sec">{t('fund.how')}</p></Card>
           <Card title={t('fund.founderTitle')}><p className="v2-sec">{t('fund.founder')}</p></Card>
+          <Card title={t('fund.updateTitle')}><p className="v2-sec">{t('fund.updateText')}</p><Link to="/business/ai-cfo">{t('fund.updateLink')}</Link></Card>
           <Card title={t('fund.intercoTitle')}><p className="v2-sec">{t('fund.interco')}</p><Link to="/business/intercompany">{t('fund.intercoLink')}</Link></Card>
         </aside>
       </div>

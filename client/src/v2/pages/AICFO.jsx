@@ -99,7 +99,7 @@ export default function AICFO() {
           <label htmlFor="cfo-ask" className="v2-field-label">{t('cfo.askLabel')}</label>
           <div className="v2-askrow">
             <input id="cfo-ask" className="v2-input" value={q} onChange={(e) => setQ(e.target.value)} placeholder={t('cfo.askPh')} maxLength={2000} />
-            <button type="submit" className="v2-btn v2-btn-primary" aria-label={t('ask.send')} disabled={!q.trim()}><I.send size={16} /></button>
+            <button type="submit" className="v2-btn v2-btn-primary" aria-label={t('ask.send')} title={q.trim() ? undefined : t('ask.typeFirst')} disabled={!q.trim()}><I.send size={16} /></button>
           </div>
         </form>
         <div className="v2-chips">{chips.map((k) => <button key={k} type="button" className="v2-chip" onClick={() => openAsk(t(`cfo.chip.${k}`))}>{t(`cfo.chip.${k}`)}</button>)}</div>

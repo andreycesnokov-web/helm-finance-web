@@ -162,3 +162,9 @@ export function monthCompare(transactions = [], month, compare) {
   const payments = [...a].filter((t) => txCashDelta(t) < 0).sort((x, y) => txCashDelta(x) - txCashDelta(y)).slice(0, 8)
   return { changes, costsNow: total(outA), costsBefore: total(outB), revenueNow: inA, revenueBefore: inB, payments, count: a.length }
 }
+
+/** CSV of the monthly rows shown on a Performance tab (Export). Numbers as they are shown. */
+export function rowsCsv(rows = [], columns = []) {
+  const esc = (v) => { const s = String(v ?? ''); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s }
+  return [columns.join(','), ...rows.map((r) => columns.map((c) => esc(r[c])).join(','))].join('\n')
+}
