@@ -252,3 +252,16 @@ The answers are in `DECISIONS.md`, which overrides section 5.
   - asset-linked bills and payments are left out of profit;
   - depreciation sits after EBITDA.
 - **Assets & balance:** real register, book values, equipment in "The company owns". Net worth is shown only once the funding register exists too.
+
+## 11. Batch 12 — P-03 funding register
+- **Migration 064:**
+  - tables `business_funding_records` and `business_funding_repayments`;
+  - isolation triggers;
+  - repayments are allowed only on loans;
+  - one payment settles only one repayment;
+  - no Personal or bridge columns.
+- **API:** `GET/POST /api/business-funding`, `POST /api/business-funding/:id/repayments`, `POST /api/business-funding/repayments/:rid/paid`. Writes need owner, ceo, admin or cfo and are audited.
+- **Effect on the numbers:**
+  - Performance: a payment linked to a repayment is split; the interest goes to the `interest` group in the month it falls due, and the principal never reaches profit.
+  - Radar, Pulse, Approvals and Bill detail: unpaid repayments are scheduled outflows.
+  - Assets: loans count in "The company owes", and net worth is shown once both registers exist.

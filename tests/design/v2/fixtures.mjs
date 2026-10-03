@@ -107,6 +107,17 @@ export const routes = {
       accumulated: 0, book_value: 7200000, monthly_depreciation: null, depreciation_by_month: {}, purchase_debt_id: null }],
     totals: { cost: 7200000, book_value: 7200000, without_life: 1 }, depreciation_by_month: {} }),
   'POST /api/assets': () => ({ asset: { id: 'as2' } }),
+  // P-03: a founder loan with a schedule and investor equity (synthetic).
+  'GET /api/business-funding': () => ({ available: true, can_edit: true,
+    records: [
+      { id: 'f1', source_kind: 'founder', instrument: 'loan', lender_name: 'Founder loan', amount: 60000000, received_on: iso(-90), interest_rate_annual: 6, due_on: iso(270), status: 'active', outstanding: 55000000,
+        next_repayment: { id: 'rp2', due_on: iso(8), principal: 5000000, interest: 300000 }, repayments: [] },
+      { id: 'f2', source_kind: 'investor', instrument: 'equity', lender_name: 'Angel investor', amount: 40000000, received_on: iso(-200), status: 'active', outstanding: 0, next_repayment: null, repayments: [] },
+    ],
+    upcoming: [{ id: 'rp2', funding_record_id: 'f1', due_on: iso(8), principal: 5000000, interest: 300000, amount: 5300000, lender: 'Founder loan', overdue: false }],
+    totals: { raised_equity: 40000000, raised_loans: 60000000, loans_outstanding: 55000000, next_repayment: { id: 'rp2', due_on: iso(8), amount: 5300000 } },
+    interest_by_month: {}, repayment_transactions: [] }),
+  'POST /api/business-funding': () => ({ record: { id: 'f9' }, repayments: [] }),
   'GET /api/bank-import/batches': () => ({ batches: [{ id: 'b1', wallet_id: 'w1', statement_end: iso(-1), status: 'review_required' }] }),
   'GET /api/accountant/rules': () => ({ jurisdiction: 'ID', rules: [{ id: 'r1', rule_code: 'ID_PPH23_SERVICES', title: 'PPh 23 · services', obligation_type: 'withholding', parameters: { rate: 2 } }] }),
   'GET /api/accountant/summary': () => ({ overdue: [], upcoming: [

@@ -17,6 +17,7 @@ const CHECKLIST = require('./lib/billChecklist');   // Design v2 P-05 (migration
 const PNLMAP = require('./lib/pnlMapping');         // Design v2 P-10 (migration 062)
 const DW = require('./lib/debtWithholding');        // remaining balance with withholdings (batch 10)
 const ASSETS = require('./lib/assetRegister');      // Design v2 P-11 (migration 063)
+const BFUND = require('./lib/businessFunding');     // Design v2 P-03 (migration 064)
 // Telegram-created payables are IDR-only until multi-currency payables exist end to end.
 // See server/lib/telegramCurrency.js for why refusing beats recording a wrong row.
 const { isSupportedTelegramCurrency, currencyNotSupported, normalizeCurrency } = require('./lib/telegramCurrency');
@@ -8345,6 +8346,112 @@ app.post('/api/assets/:id/dispose', auth, async (req, res) => {
     await recordAudit({ businessId: biz.business.id, actorUserId: req.user.userId, actorRole: biz.role,
       entityType: 'asset', entityId: before.id, action: 'asset_disposed', before: { disposed_on: before.disposed_on }, after: { disposed_on: on } });
     res.json({ asset: ASSETS.publicAsset(data, ymKey(), []) });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── Business funding register (Design v2 P-03; migration 064) ──────────────────────
+// Path /api/business-funding — NOT /api/funding, which is the Personal↔Business bridge
+// (routes/personalFunding.js, gated off). Nothing here reads or writes Personal: a founder
+// loan is recorded business-side only. Business only. GET: finance roles. Writes:
+// owner/ceo/admin/cfo, audited. Before 064: GET available:false, writes 409.
+async function ownRow(table, id, businessId) {
+  const { data } = await supabase.from(table).select('id').eq('id', id).eq('business_id', businessId).limit(1);
+  return !!data?.length;
+}
+const fundMissing = (e) => /relation .*business_funding.* does not exist|Could not find the table/i.test(e?.message || '');
+
+app.get('/api/business-funding', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (biz.business?.type === 'personal') return res.status(403).json({ error: 'business_workspace_required' });
+    if (!canViewBusinessFinance(biz.role)) return res.status(403).json({ error: 'Your role does not allow viewing funding' });
+    const { data: recs, error } = await supabase.from('business_funding_records').select('*')
+      .eq('business_id', biz.business.id).order('received_on', { ascending: false });
+    if (error) return res.json({ available: false, records: [], upcoming: [], totals: null, can_edit: false });
+    const { data: reps } = await supabase.from('business_funding_repayments').select('*').eq('business_id', biz.business.id);
+    const sum = BFUND.summarize(recs || [], reps || [], { today: new Date().toISOString().slice(0, 10), months: lastMonthKeys(12) });
+    res.json({ available: true, can_edit: BFUND.canEditFunding(biz.role), ...sum });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/business-funding', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (biz.business?.type === 'personal') return res.status(403).json({ error: 'business_workspace_required' });
+    if (!BFUND.canEditFunding(biz.role)) return res.status(403).json({ error: 'Only owner, CEO, admin or CFO can record funding' });
+    const v = BFUND.recordFromBody(req.body || {});
+    if (v.error) return res.status(400).json(v);
+    if (v.row.counterparty_id && !(await ownRow('counterparties', v.row.counterparty_id, biz.business.id)))
+      return res.status(404).json({ error: 'counterparty_not_found_in_this_business' });
+    if (v.row.received_transaction_id != null && !(await ownRow('transactions', v.row.received_transaction_id, biz.business.id)))
+      return res.status(404).json({ error: 'transaction_not_found_in_this_business' });
+    const { data: rec, error } = await supabase.from('business_funding_records')
+      .insert({ ...v.row, business_id: biz.business.id, created_by_user_id: req.user.userId }).select('*').single();
+    if (error && fundMissing(error)) return res.status(409).json({ error: 'migration_not_applied', migration: '064' });
+    if (error) return res.status(500).json({ error: error.message });
+    let schedule = [];
+    if (v.schedule.length) {
+      const { data: reps, error: sErr } = await supabase.from('business_funding_repayments')
+        .insert(v.schedule.map((r) => ({ ...r, business_id: biz.business.id, funding_record_id: rec.id, created_by_user_id: req.user.userId }))).select('*');
+      if (sErr) {
+        await supabase.from('business_funding_records').delete().eq('id', rec.id).eq('business_id', biz.business.id);
+        return res.status(400).json({ error: 'schedule_rejected', detail: sErr.message });
+      }
+      schedule = reps || [];
+    }
+    await recordAudit({ businessId: biz.business.id, actorUserId: req.user.userId, actorRole: biz.role,
+      entityType: 'business_funding', entityId: rec.id, action: 'funding_recorded', after: { ...rec, schedule_count: schedule.length } });
+    res.json({ record: rec, repayments: schedule });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/business-funding/:id/repayments', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (biz.business?.type === 'personal') return res.status(403).json({ error: 'business_workspace_required' });
+    if (!BFUND.canEditFunding(biz.role)) return res.status(403).json({ error: 'Only owner, CEO, admin or CFO can change repayments' });
+    const v = BFUND.repaymentFromBody(req.body || {});
+    if (v.error) return res.status(400).json(v);
+    const { data: recs, error: rErr } = await supabase.from('business_funding_records').select('id, instrument')
+      .eq('id', req.params.id).eq('business_id', biz.business.id).limit(1);
+    if (rErr && fundMissing(rErr)) return res.status(409).json({ error: 'migration_not_applied', migration: '064' });
+    if (!recs?.length) return res.status(404).json({ error: 'funding_not_found_in_this_business' });
+    if (recs[0].instrument !== 'loan') return res.status(400).json({ error: 'equity_has_no_repayments' });
+    const { data, error } = await supabase.from('business_funding_repayments')
+      .insert({ ...v.row, business_id: biz.business.id, funding_record_id: recs[0].id, created_by_user_id: req.user.userId }).select('*').single();
+    if (error) return res.status(500).json({ error: error.message });
+    await recordAudit({ businessId: biz.business.id, actorUserId: req.user.userId, actorRole: biz.role,
+      entityType: 'business_funding', entityId: recs[0].id, action: 'funding_repayment_scheduled', after: data });
+    res.json({ repayment: data });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/business-funding/repayments/:rid/paid', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (biz.business?.type === 'personal') return res.status(403).json({ error: 'business_workspace_required' });
+    if (!BFUND.canEditFunding(biz.role)) return res.status(403).json({ error: 'Only owner, CEO, admin or CFO can change repayments' });
+    const v = BFUND.paidFromBody(req.body || {});
+    if (v.error) return res.status(400).json(v);
+    const { data: rows, error: rErr } = await supabase.from('business_funding_repayments').select('*')
+      .eq('id', req.params.rid).eq('business_id', biz.business.id).limit(1);
+    if (rErr && fundMissing(rErr)) return res.status(409).json({ error: 'migration_not_applied', migration: '064' });
+    const before = rows?.[0];
+    if (!before) return res.status(404).json({ error: 'repayment_not_found_in_this_business' });
+    if (v.paid_transaction_id != null && !(await ownRow('transactions', v.paid_transaction_id, biz.business.id)))
+      return res.status(404).json({ error: 'transaction_not_found_in_this_business' });
+    const { data, error } = await supabase.from('business_funding_repayments').update(v)
+      .eq('id', before.id).eq('business_id', biz.business.id).select('*').single();
+    if (error && /duplicate key|bfrp_paid_tx_uniq/i.test(error.message || '')) return res.status(409).json({ error: 'payment_already_used' });
+    if (error) return res.status(500).json({ error: error.message });
+    await recordAudit({ businessId: biz.business.id, actorUserId: req.user.userId, actorRole: biz.role,
+      entityType: 'business_funding', entityId: before.funding_record_id, action: 'funding_repayment_paid',
+      before: { paid_on: before.paid_on, paid_transaction_id: before.paid_transaction_id }, after: v });
+    res.json({ repayment: data });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 

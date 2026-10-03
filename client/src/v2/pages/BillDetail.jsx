@@ -36,6 +36,7 @@ export default function BillDetail({ kind = 'payable' }) {
   const debts = useApi('/debts')
   const rules = useApi('/accountant/rules')
   const pulse = useApi('/pulse?scope=business')
+  const fund = useApi('/business-funding')
   const listPath = kind === 'receivable' ? '/business/receivables' : '/business/payables'
 
   const d = useMemo(() => (Array.isArray(debts.data) ? debts.data : []).find((x) => String(x.id) === String(id)), [debts.data, id])
@@ -61,7 +62,7 @@ export default function BillDetail({ kind = 'payable' }) {
     const p = pulse.data
     // A bill waiting for approval is not counted anywhere else; here it is counted as
     // if approved, because the question is "what happens if this one goes ahead".
-    const all = applyScenario(cashItems({ debts: (p.debts || []).some((x) => String(x.id) === String(d.id)) ? p.debts : [...(p.debts || []), d] }).items,
+    const all = applyScenario(cashItems({ debts: (p.debts || []).some((x) => String(x.id) === String(d.id)) ? p.debts : [...(p.debts || []), d], repayments: fund.data?.upcoming || [] }).items,
       { kind: 'approve', key: `debt:${d.id}` })
     const without = all.filter((x) => x.key !== `debt:${d.id}`)
     const f1 = forecast({ balance: p.totalBalance, burnRate: p.burnRate, items: all })

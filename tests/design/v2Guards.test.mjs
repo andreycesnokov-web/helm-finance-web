@@ -41,6 +41,9 @@ export const WRITE_ALLOW = [
   { method: 'POST', path: '/withholding' },     // POST /api/debts/:id/withholding
   // Batch 11 — P-11 asset register: role-checked and audited on the server.
   { method: 'POST', path: "'/assets'" },        // POST /api/assets
+  // Batch 12 — P-03 funding register (NOT the bridge's /api/funding): role-checked, audited.
+  { method: 'POST', path: "'/business-funding'" },          // POST /api/business-funding
+  { method: 'POST', path: '/paid`' },                       // POST /api/business-funding/repayments/:rid/paid
 ]
 const ACTIONS = path.join(V2, 'lib', 'actions.js')
 // POSTs that ask an existing AI endpoint a question and change no data. Only in lib/ask.js.
@@ -122,7 +125,7 @@ t('every allowed write exists on the server (batch 8 routes are the approved one
     /app\.post\('\/api\/debts\/:id\/request-info'/, /app\.patch\('\/api\/transactions\/:id'/, /app\.post\('\/api\/counterparties'/,
     /app\.patch\('\/api\/counterparties\/:id'/, /app\.patch\('\/api\/business\/targets'/, /app\.patch\('\/api\/debts\/:id\/checklist'/,
     /app\.patch\('\/api\/pnl-mapping'/, /app\.post\('\/api\/debts\/:id\/withholding'/,
-    /app\.post\('\/api\/assets'/]) {
+    /app\.post\('\/api\/assets'/, /app\.post\('\/api\/business-funding'/, /app\.post\('\/api\/business-funding\/repayments\/:rid\/paid'/]) {
     assert.ok(r.test(server), `server route ${r} missing`)
   }
 })

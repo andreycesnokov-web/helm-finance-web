@@ -105,6 +105,16 @@ t('asset register (P-11): a registered purchase is not a cost; depreciation come
   assert.deepStrictEqual([noReg.opex, noReg.depreciation], [10000, 0], 'without the register the bills are costs as categorised')
 })
 
+t('funding register (P-03): a repayment payment is split — principal never profit, interest below EBITDA', () => {
+  const tx = [{ id: 80, type: 'expense', category: 'Аренда офиса', amount_original: 2500, transaction_date: '2026-09-10' },
+    { id: 81, type: 'income', category: 'Cleaning service income', amount_original: 1000, transaction_date: '2026-09-03' }]
+  const funding = { available: true, repayment_transactions: ['80'], interest_by_month: { '2026-09': 500 } }
+  const { rows, hasFunding } = accrualRows({ transactions: tx, categories: cats, months: M, funding })
+  const r = rows[1]
+  assert.deepStrictEqual([r.opex, r.ebitda, r.interest, r.net], [0, 1000, 500, 500])
+  assert.ok(hasFunding)
+})
+
 t('refunds reduce the group they belong to', () => {
   const tx = [
     { id: 1, type: 'income', category: 'Cleaning service income', amount_original: 100, transaction_date: '2026-09-01' },

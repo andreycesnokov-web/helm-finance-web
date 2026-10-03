@@ -23,6 +23,7 @@ export default function Approvals() {
   const [tab, setTab] = useState('waiting')
   const debts = useApi('/debts')
   const pulse = useApi('/pulse?scope=business')
+  const fund = useApi('/business-funding')
   const list = Array.isArray(debts.data) ? debts.data : []
   const waiting = list.filter(isPending).sort((a, b) => String(a.due_date || '9') < String(b.due_date || '9') ? -1 : 1)
   const decided = list.filter((d) => d.approved_at && ['approved', 'rejected'].includes(d.approval_status))
@@ -33,12 +34,12 @@ export default function Approvals() {
   const after = useMemo(() => {
     if (!pulse.data) return {}
     const p = pulse.data
-    const items = cashItems({ debts: [...(p.debts || []).filter((x) => !waiting.some((w) => String(w.id) === String(x.id))), ...waiting] }).items
+    const items = cashItems({ debts: [...(p.debts || []).filter((x) => !waiting.some((w) => String(w.id) === String(x.id))), ...waiting], repayments: fund.data?.upcoming || [] }).items
     return Object.fromEntries(items.filter((i) => i.tag === 'approval').map((i) => {
       const f = forecast({ balance: p.totalBalance, burnRate: p.burnRate, items: applyScenario(items, { kind: 'approve', key: i.key }) })
       return [String(i.id), f.days[i.day]?.expected]
     }))
-  }, [pulse.data, waiting]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [pulse.data, waiting, fund.data]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const head = <PageHead title={t('nav.approvals')} sub={t('approvals.sub')} />
   if (debts.loading) return <>{head}<Card><Skeleton rows={5} /></Card></>

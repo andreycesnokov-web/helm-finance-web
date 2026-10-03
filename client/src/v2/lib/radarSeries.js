@@ -6,6 +6,8 @@
 //   expected  balance + every receivable − every payable − burnRate × days
 //   best      balance + every receivable − half of every payable        (no burn)
 //   worst     balance − every payable − burnRate × days                  (no receivable)
+// Loan repayments come from the funding register (GET /api/business-funding, P-03) when it
+// exists; they are scheduled payments like bills.
 // Inputs are figures GET /api/pulse already returns (totalBalance, burnRate, debts) and,
 // optionally, tax obligations the verified engine has CALCULATED
 // (GET /api/accountant/obligations, status 'calculated'). Nothing is estimated here.
@@ -40,7 +42,7 @@ function tagOf(d, dir) {
  * Dated cash items inside the horizon.
  * @returns {{ items: Array, excluded: { foreign: number, undated: number } }}
  */
-export function cashItems({ debts = [], obligations = [], today = new Date(), horizon = DEFAULT_HORIZON } = {}) {
+export function cashItems({ debts = [], obligations = [], repayments = [], today = new Date(), horizon = DEFAULT_HORIZON } = {}) {
   const t0 = startOfDay(today)
   const items = []
   const excluded = { foreign: 0, undated: 0 }
@@ -73,6 +75,19 @@ export function cashItems({ debts = [], obligations = [], today = new Date(), ho
       key: `tax:${o.obligation_type}:${o.period}`, source: 'tax', dir: 'out', amount: num(o.amount), day,
       date: isoDay(new Date(t0.getTime() + day * DAY)), label: o.title, note: o.period, tag: 'deadline',
       counted: true,
+    })
+  }
+  // Loan repayments from the funding register (P-03): unpaid, principal + interest, IDR.
+  for (const r of Array.isArray(repayments) ? repayments : []) {
+    const amount = num(r && r.amount)
+    if (!r || !(amount > 0) || !r.due_on) continue
+    const raw = Math.round((startOfDay(r.due_on) - t0) / DAY)
+    const day = Math.max(0, raw)
+    if (day > horizon) continue
+    items.push({
+      key: `loan:${r.id}`, id: r.id, source: 'funding', dir: 'out', amount, day,
+      date: isoDay(new Date(t0.getTime() + day * DAY)), due_date: r.due_on, label: r.lender || '', note: '',
+      tag: raw < 0 ? 'late' : 'scheduled', counted: true,
     })
   }
   items.sort((a, b) => a.day - b.day || (a.dir === b.dir ? b.amount - a.amount : a.dir === 'out' ? -1 : 1))

@@ -22,6 +22,9 @@
 //     / purchase_transaction_id) is left out whatever its category — no double counting —
 //     and the register's straight-line depreciation (computed by the server from the verified
 //     rule) is subtracted after EBITDA: operating profit = EBITDA − depreciation.
+//   * Funding register (P-03): a payment that settles a loan repayment is split by the
+//     register — principal is funding (never profit), interest goes to the 'interest' group
+//     in the month the repayment falls due — instead of using the payment's category.
 import { txDate } from './obligations.js'
 
 export const GROUPS = ['revenue', 'direct_cost', 'operating_cost', 'interest', 'other_income', 'tax', 'asset_purchase', 'funding', 'transfer']
@@ -53,7 +56,7 @@ const debtCounts = (d) => d && d.status !== 'cancelled' && d.is_training !== tru
  * Monthly accrual rows from confirmed groups.
  * @returns {{ rows: Array, coverage: { categorised, total, missing: Array } }}
  */
-export function accrualRows({ transactions = [], debts = [], categories = [], months = [], assets = null } = {}) {
+export function accrualRows({ transactions = [], debts = [], categories = [], months = [], assets = null, funding = null } = {}) {
   const map = groupMap(categories)
   const inWindow = new Set(months)
   const sums = Object.fromEntries(months.map((k) => [k, Object.fromEntries(GROUPS.map((g) => [g, 0]))]))
@@ -66,6 +69,8 @@ export function accrualRows({ transactions = [], debts = [], categories = [], mo
   const assetDebts = new Set(assetList.map((a) => a.purchase_debt_id).filter((x) => x != null).map(String))
   const assetTx = new Set(assetList.map((a) => a.purchase_transaction_id).filter((x) => x != null).map(String))
   const dep = assets?.depreciation_by_month || {}
+  const repaymentTx = new Set((funding?.repayment_transactions || []).map(String))
+  const loanInterest = funding?.interest_by_month || {}
 
   for (const d of debts || []) {
     if (!debtCounts(d) || assetDebts.has(String(d.id))) continue
@@ -81,7 +86,7 @@ export function accrualRows({ transactions = [], debts = [], categories = [], mo
   for (const t of transactions || []) {
     if (!t || !PROFIT_TX_TYPES.includes(t.type)) continue
     if ((t.scope || 'business') !== 'business' || (t.currency_original && t.currency_original !== 'IDR')) continue
-    if (settlementTx.has(String(t.id)) || assetTx.has(String(t.id))) continue
+    if (settlementTx.has(String(t.id)) || assetTx.has(String(t.id)) || repaymentTx.has(String(t.id))) continue
     const k = txDate(t).slice(0, 7)
     if (!inWindow.has(k)) continue
     total++
@@ -102,7 +107,7 @@ export function accrualRows({ transactions = [], debts = [], categories = [], mo
     const depreciation = Number(dep[k]) || 0
     const operating = ebitda - depreciation
     const otherIncome = s.other_income
-    const interest = 0 - s.interest
+    const interest = 0 - s.interest + (Number(loanInterest[k]) || 0)
     const pbt = operating + otherIncome - interest
     const tax = 0 - s.tax
     const empty = GROUPS.every((g) => s[g] === 0)
@@ -112,6 +117,7 @@ export function accrualRows({ transactions = [], debts = [], categories = [], mo
   return {
     rows,
     hasRegister: !!assets && assets.available === true,
+    hasFunding: !!funding && funding.available === true,
     coverage: { categorised, total, missing: [...missing.entries()].map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count) },
   }
 }
