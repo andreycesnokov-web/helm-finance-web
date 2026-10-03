@@ -16,6 +16,7 @@ const TARGETS = require('./lib/businessTargets');   // Design v2 P-01/P-08 (migr
 const CHECKLIST = require('./lib/billChecklist');   // Design v2 P-05 (migration 061)
 const PNLMAP = require('./lib/pnlMapping');         // Design v2 P-10 (migration 062)
 const DW = require('./lib/debtWithholding');        // remaining balance with withholdings (batch 10)
+const ASSETS = require('./lib/assetRegister');      // Design v2 P-11 (migration 063)
 // Telegram-created payables are IDR-only until multi-currency payables exist end to end.
 // See server/lib/telegramCurrency.js for why refusing beats recording a wrong row.
 const { isSupportedTelegramCurrency, currencyNotSupported, normalizeCurrency } = require('./lib/telegramCurrency');
@@ -8254,6 +8255,96 @@ app.patch('/api/pnl-mapping', auth, async (req, res) => {
       });
     }
     res.json({ ok: true, changed: changed.length });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── Asset register (Design v2 P-11; migration 063) ─────────────────────────────────
+// Business only. GET: finance roles; POST create / dispose: owner/ceo/admin/cfo/accountant,
+// audited. Group and useful life come ONLY from active, verified tax_rules with
+// obligation_type 'depreciation' (effectiveRuleActive); without one an asset is saved with
+// no life and no depreciation is shown. Depreciation is computed, never stored.
+// Before 063: GET answers available:false, writes 409.
+async function verifiedDepreciationGroups() {
+  const { data } = await supabase.from('tax_rules').select('*, official_sources(*)')
+    .eq('obligation_type', 'depreciation').eq('status', 'active');
+  return ASSETS.depreciationGroups(data || [], (r) => effectiveRuleActive(r, r.official_sources || null));
+}
+const ymKey = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+function lastMonthKeys(n = 12) {
+  const now = new Date(); const out = [];
+  for (let i = n - 1; i >= 0; i--) out.push(ymKey(new Date(now.getFullYear(), now.getMonth() - i, 1)));
+  return out;
+}
+
+app.get('/api/assets', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (biz.business?.type === 'personal') return res.status(403).json({ error: 'business_workspace_required' });
+    if (!canViewBusinessFinance(biz.role)) return res.status(403).json({ error: 'Your role does not allow viewing assets' });
+    const { data, error } = await supabase.from('assets').select('*')
+      .eq('business_id', biz.business.id).order('acquired_on', { ascending: false });
+    if (error) return res.json({ available: false, assets: [], groups: [], can_edit: false });
+    const groups = await verifiedDepreciationGroups();
+    const months = lastMonthKeys(12);
+    const asOf = ymKey();
+    const assets = (data || []).map((a) => ASSETS.publicAsset(a, asOf, months));
+    const live = assets.filter((a) => !a.disposed_on);
+    res.json({
+      available: true, as_of: asOf, groups, can_edit: ASSETS.canEditAssets(biz.role),
+      assets, totals: { cost: live.reduce((x, a) => x + Number(a.cost), 0), book_value: live.reduce((x, a) => x + a.book_value, 0),
+        without_life: live.filter((a) => !a.useful_life_months).length },
+      depreciation_by_month: Object.fromEntries(months.map((m) => [m, assets.reduce((x, a) => x + (a.depreciation_by_month[m] || 0), 0)])),
+    });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/assets', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (biz.business?.type === 'personal') return res.status(403).json({ error: 'business_workspace_required' });
+    if (!ASSETS.canEditAssets(biz.role)) return res.status(403).json({ error: 'Only an accountant, owner, admin or CFO can add assets' });
+    const v = ASSETS.assetFromBody(req.body || {}, await verifiedDepreciationGroups());
+    if (v.error) return res.status(400).json(v);
+    // Every link must be this business's own row (the 063 trigger enforces it again).
+    const own = async (table, id) => {
+      const { data } = await supabase.from(table).select('id').eq('id', id).eq('business_id', biz.business.id).limit(1);
+      return !!data?.length;
+    };
+    for (const [k, table] of [['purchase_debt_id', 'debts'], ['purchase_transaction_id', 'transactions'], ['purchase_document_id', 'financial_documents'], ['supplier_counterparty_id', 'counterparties']]) {
+      if (v.row[k] != null && !(await own(table, v.row[k]))) return res.status(404).json({ error: `${k.replace(/_id$/, '')}_not_found_in_this_business` });
+    }
+    const { data, error } = await supabase.from('assets')
+      .insert({ ...v.row, business_id: biz.business.id, created_by_user_id: req.user.userId }).select('*').single();
+    if (error && /relation .*assets.* does not exist|Could not find the table/i.test(error.message || '')) return res.status(409).json({ error: 'migration_not_applied', migration: '063' });
+    if (error && /duplicate key|assets_purchase_(debt|tx)_uniq/i.test(error.message || '')) return res.status(409).json({ error: 'purchase_already_registered' });
+    if (error) return res.status(500).json({ error: error.message });
+    await recordAudit({ businessId: biz.business.id, actorUserId: req.user.userId, actorRole: biz.role,
+      entityType: 'asset', entityId: data.id, action: 'asset_created', after: data });
+    res.json({ asset: ASSETS.publicAsset(data, ymKey(), []) });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/assets/:id/dispose', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (biz.business?.type === 'personal') return res.status(403).json({ error: 'business_workspace_required' });
+    if (!ASSETS.canEditAssets(biz.role)) return res.status(403).json({ error: 'Only an accountant, owner, admin or CFO can dispose of assets' });
+    const on = req.body?.disposed_on;
+    if (typeof on !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(on)) return res.status(400).json({ error: 'invalid_disposed_on' });
+    const { data: rows, error: rErr } = await supabase.from('assets').select('*').eq('id', req.params.id).eq('business_id', biz.business.id).limit(1);
+    if (rErr) return res.status(409).json({ error: 'migration_not_applied', migration: '063' });
+    const before = rows?.[0];
+    if (!before) return res.status(404).json({ error: 'asset_not_found_in_this_business' });
+    if (on < before.acquired_on) return res.status(400).json({ error: 'disposed_before_acquired' });
+    const { data, error } = await supabase.from('assets').update({ disposed_on: on, updated_at: new Date().toISOString() })
+      .eq('id', before.id).eq('business_id', biz.business.id).select('*').single();
+    if (error) return res.status(500).json({ error: error.message });
+    await recordAudit({ businessId: biz.business.id, actorUserId: req.user.userId, actorRole: biz.role,
+      entityType: 'asset', entityId: before.id, action: 'asset_disposed', before: { disposed_on: before.disposed_on }, after: { disposed_on: on } });
+    res.json({ asset: ASSETS.publicAsset(data, ymKey(), []) });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 

@@ -39,6 +39,8 @@ export const WRITE_ALLOW = [
   { method: 'PATCH', path: "'/pnl-mapping'" },  // PATCH /api/pnl-mapping
   // Batch 10 — DECISIONS.md final decisions item 5: role-checked and audited on the server.
   { method: 'POST', path: '/withholding' },     // POST /api/debts/:id/withholding
+  // Batch 11 — P-11 asset register: role-checked and audited on the server.
+  { method: 'POST', path: "'/assets'" },        // POST /api/assets
 ]
 const ACTIONS = path.join(V2, 'lib', 'actions.js')
 // POSTs that ask an existing AI endpoint a question and change no data. Only in lib/ask.js.
@@ -119,7 +121,8 @@ t('every allowed write exists on the server (batch 8 routes are the approved one
   for (const r of [/app\.patch\('\/api\/debts\/:id\/approve'/, /app\.patch\('\/api\/debts\/:id\/reject'/,
     /app\.post\('\/api\/debts\/:id\/request-info'/, /app\.patch\('\/api\/transactions\/:id'/, /app\.post\('\/api\/counterparties'/,
     /app\.patch\('\/api\/counterparties\/:id'/, /app\.patch\('\/api\/business\/targets'/, /app\.patch\('\/api\/debts\/:id\/checklist'/,
-    /app\.patch\('\/api\/pnl-mapping'/, /app\.post\('\/api\/debts\/:id\/withholding'/]) {
+    /app\.patch\('\/api\/pnl-mapping'/, /app\.post\('\/api\/debts\/:id\/withholding'/,
+    /app\.post\('\/api\/assets'/]) {
     assert.ok(r.test(server), `server route ${r} missing`)
   }
 })
