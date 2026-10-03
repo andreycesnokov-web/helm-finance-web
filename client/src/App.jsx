@@ -554,6 +554,12 @@ function SwipeBackIndicator() {
 const DESIGN_PREVIEW_ON = import.meta.env.VITE_DESIGN_PREVIEW_ENABLED === 'true'
 const DesignPreview = DESIGN_PREVIEW_ON ? lazy(() => import('./pages/DesignPreview')) : null
 
+// Design v2 (approved 3 Oct 2026, _specs/design-v2). Build-time flag, default OFF.
+// Read at module scope and imported lazily, like DesignPreview above, so with the
+// flag off Rollup drops the import: no v2 code, styles, strings or API calls ship.
+const DESIGN_V2 = import.meta.env.VITE_DESIGN_V2 === 'true'
+const V2BusinessApp = DESIGN_V2 ? lazy(() => import('./v2/BusinessApp')) : null
+
 export default function App() {
   return (
     <BrowserRouter>
@@ -625,6 +631,14 @@ export default function App() {
           )}
           {/* Business Workspace in premium shell (Phase 3, presentation-only). Legacy
               /,/accounts routes remain untouched during the migration. */}
+          {/* Design v2: with VITE_DESIGN_V2=true every /business/* route is served by the
+              v2 app (same paths; existing pages reused inside the v2 shell). Flag off:
+              the block below is exactly what shipped before. */}
+          {DESIGN_V2 ? (
+            <Route element={<BusinessLayout />}>
+              <Route path="/business/*" element={<Suspense fallback={null}><V2BusinessApp /></Suspense>} />
+            </Route>
+          ) : (
           <Route element={<BusinessLayout />}>
             <Route path="/business/pulse" element={<BusinessShell><BusinessPulse /></BusinessShell>} />
             {/* Use the full legacy Accounts (add/edit/archive/balances) inside the premium
@@ -665,6 +679,7 @@ export default function App() {
                 product; writes nothing but the caller's own progress. */}
             <Route path="/business/onboarding" element={<BusinessShell><BusinessOnboarding /></BusinessShell>} />
           </Route>
+          )}
           {/* Public invite page — no auth required to view, Telegram widget handles login */}
           <Route path="/invite/:code" element={<JoinInvite />} />
           {/* Standalone onboarding — accessible directly to re-run setup */}
