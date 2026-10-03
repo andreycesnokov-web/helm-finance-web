@@ -138,3 +138,23 @@ These are not part of PR #110. They go into the next batch as separate, small ch
 - **New counterparty roles.** "Landlord" and "lender" are accepted by the old UI and by MCP. Confirm this is intended, or limit the roles to v2.
 - **`telegramActorWiring` test.** Its list of allowed migrations is out of date (048–061). Fix it as a separate change that touches only the test.
 - **Weekly brief.** It is stored only; nothing sends it. Sending it needs a scheduler, which is a Railway/env change. Do not add one without separate approval.
+
+## Final decisions for the remaining work (3 Oct 2026)
+
+Codex is not available. From now on: **Claude Code writes, Claude (in the owner's chat) reviews each PR instead of Codex, and the owner merges and applies migrations.** The questions above that were waiting for Codex are closed as follows; the owner agreed to proceed.
+
+1. **061 slip column: option B.** Remove `debts.withholding_slip_document_id`, its index and its trigger from 061. The slip lives only in `withholding_records.bukti_potong_document_id`. 061 keeps only the accountant check.
+2. **Server routes outside the flag:** accepted. They are additive and return empty values or 409 until the migrations are applied.
+3. **Counterparty roles landlord and lender:** accepted everywhere (old UI and MCP). They are additive and harmless.
+4. **Weekly brief scheduler:** not now. The brief is stored only. A scheduler is a separate, explicitly approved Railway change after the release.
+5. **PPh 23 withheld by a customer (remaining balance):**
+   - Owner's narrow option 1 as written above:
+     - remaining = amount − `paid_amount` − withholding allocations;
+     - calculated in `computeDebtStatus`;
+     - the same formula in `/api/debts/:id/pay`.
+   - Migration 031 is not changed. When the 031 guard rejects a withholding allocation (the invoice already has transaction allocations), the route answers 409 with a clear message: "This invoice already has payment records in the settlement log; record the withholding with the accountant." It is never a silent failure.
+   - The existing conflict between `/allocate` and `/pay` is reported in `PROPOSALS.md` as a finding. It is not fixed without approval.
+6. **Assets register (P-11) and funding register (P-03): approved** as additive migrations, after the release batches.
+   - P-03 has no link to Personal: the founder loan stays business-side only until the bridge is approved.
+   - Depreciation is straight-line; asset groups and useful lives come from the verified tax rule engine.
+7. **Release:** the owner applies migrations (test database first, then production) and turns `VITE_DESIGN_V2` on in Railway. Nobody else does.
