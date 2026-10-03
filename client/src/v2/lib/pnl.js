@@ -18,6 +18,10 @@
 //     deposit interest after the bank's final tax) − interest (loans we owe) → profit before
 //     tax − tax (the company's own tax) → net profit.
 //   * asset_purchase, funding and transfer are never in profit.
+//   * Asset register (P-11): a bill or payment registered as an asset (assets.purchase_debt_id
+//     / purchase_transaction_id) is left out whatever its category — no double counting —
+//     and the register's straight-line depreciation (computed by the server from the verified
+//     rule) is subtracted after EBITDA: operating profit = EBITDA − depreciation.
 import { txDate } from './obligations.js'
 
 export const GROUPS = ['revenue', 'direct_cost', 'operating_cost', 'interest', 'other_income', 'tax', 'asset_purchase', 'funding', 'transfer']
@@ -49,7 +53,7 @@ const debtCounts = (d) => d && d.status !== 'cancelled' && d.is_training !== tru
  * Monthly accrual rows from confirmed groups.
  * @returns {{ rows: Array, coverage: { categorised, total, missing: Array } }}
  */
-export function accrualRows({ transactions = [], debts = [], categories = [], months = [] } = {}) {
+export function accrualRows({ transactions = [], debts = [], categories = [], months = [], assets = null } = {}) {
   const map = groupMap(categories)
   const inWindow = new Set(months)
   const sums = Object.fromEntries(months.map((k) => [k, Object.fromEntries(GROUPS.map((g) => [g, 0]))]))
@@ -58,9 +62,13 @@ export function accrualRows({ transactions = [], debts = [], categories = [], mo
   const miss = (name) => { const k = name || '—'; missing.set(k, (missing.get(k) || 0) + 1) }
 
   const settlementTx = new Set((debts || []).map((d) => d && d.linked_transaction_id).filter((x) => x != null).map(String))
+  const assetList = Array.isArray(assets?.assets) ? assets.assets : []
+  const assetDebts = new Set(assetList.map((a) => a.purchase_debt_id).filter((x) => x != null).map(String))
+  const assetTx = new Set(assetList.map((a) => a.purchase_transaction_id).filter((x) => x != null).map(String))
+  const dep = assets?.depreciation_by_month || {}
 
   for (const d of debts || []) {
-    if (!debtCounts(d)) continue
+    if (!debtCounts(d) || assetDebts.has(String(d.id))) continue
     const k = debtMonth(d)
     if (!inWindow.has(k)) continue
     total++
@@ -73,7 +81,7 @@ export function accrualRows({ transactions = [], debts = [], categories = [], mo
   for (const t of transactions || []) {
     if (!t || !PROFIT_TX_TYPES.includes(t.type)) continue
     if ((t.scope || 'business') !== 'business' || (t.currency_original && t.currency_original !== 'IDR')) continue
-    if (settlementTx.has(String(t.id))) continue
+    if (settlementTx.has(String(t.id)) || assetTx.has(String(t.id))) continue
     const k = txDate(t).slice(0, 7)
     if (!inWindow.has(k)) continue
     total++
@@ -91,17 +99,19 @@ export function accrualRows({ transactions = [], debts = [], categories = [], mo
     const gross = revenue - direct
     const opex = 0 - s.operating_cost
     const ebitda = gross - opex
-    const operating = ebitda // depreciation arrives with the asset register (P-11)
+    const depreciation = Number(dep[k]) || 0
+    const operating = ebitda - depreciation
     const otherIncome = s.other_income
     const interest = 0 - s.interest
     const pbt = operating + otherIncome - interest
     const tax = 0 - s.tax
     const empty = GROUPS.every((g) => s[g] === 0)
-    return { month: k, empty, revenue, direct, gross, opex, ebitda, operating, otherIncome, interest, pbt, tax,
+    return { month: k, empty: empty && !depreciation, revenue, direct, gross, opex, ebitda, depreciation, operating, otherIncome, interest, pbt, tax,
       net: pbt - tax, assets: 0 - s.asset_purchase, margin: revenue > 0 ? gross / revenue : null }
   })
   return {
     rows,
+    hasRegister: !!assets && assets.available === true,
     coverage: { categorised, total, missing: [...missing.entries()].map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count) },
   }
 }

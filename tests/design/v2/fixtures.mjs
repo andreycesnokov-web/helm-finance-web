@@ -101,6 +101,12 @@ export const routes = {
     categories: pnlCats.map((c) => ({ ...c, suggestion: c.name === 'Fuel' ? { pnl_group: 'direct_cost', note: 'Q4.', source: 'generic' } : c.name === 'Sales' ? { pnl_group: 'revenue', note: null, source: 'kbli_81210' } : null })),
     missing_from_template: [{ name: 'Loan interest', pnl_group: 'interest', note: 'Q1: only interest on loans the company owes; below EBITDA.', kbli_prefix: '81210' }] }),
   'PATCH /api/pnl-mapping': () => ({ ok: true, changed: 1 }),
+  // P-11: no verified depreciation rule in the harness → assets have no life (the honest state).
+  'GET /api/assets': () => ({ available: true, as_of: iso(0).slice(0, 7), groups: [], can_edit: true,
+    assets: [{ id: 'as1', name: 'Floor scrubber', asset_type: 'machines', quantity: 1, cost: 7200000, acquired_on: iso(-20), useful_life_months: null,
+      accumulated: 0, book_value: 7200000, monthly_depreciation: null, depreciation_by_month: {}, purchase_debt_id: null }],
+    totals: { cost: 7200000, book_value: 7200000, without_life: 1 }, depreciation_by_month: {} }),
+  'POST /api/assets': () => ({ asset: { id: 'as2' } }),
   'GET /api/bank-import/batches': () => ({ batches: [{ id: 'b1', wallet_id: 'w1', statement_end: iso(-1), status: 'review_required' }] }),
   'GET /api/accountant/rules': () => ({ jurisdiction: 'ID', rules: [{ id: 'r1', rule_code: 'ID_PPH23_SERVICES', title: 'PPh 23 · services', obligation_type: 'withholding', parameters: { rate: 2 } }] }),
   'GET /api/accountant/summary': () => ({ overdue: [], upcoming: [

@@ -135,6 +135,8 @@ Format: what · fields · why · risk · what the UI does meanwhile.
 
 ## P-11 · Asset register and depreciation (batch 6)
 
+> **Approved → batch 11 (migration 063).** `GET/POST /api/assets`, `POST /api/assets/:id/dispose`. The useful life comes only from an active, verified `tax_rules` row with `obligation_type = 'depreciation'`; none exists yet, so assets are saved without a life until a platform admin adds and verifies that rule.
+
 - **What:** assets bought above the threshold, with cost, date, quantity, location,
   useful life from the verified tax rules, monthly depreciation, documents per type.
 - **Fields:** `assets(id, business_id, name, asset_type, quantity, cost, currency,

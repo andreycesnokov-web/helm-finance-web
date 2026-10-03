@@ -128,7 +128,7 @@ function ProfitTab({ rows, sel, t, lang, needsReview, tx, accrual = null }) {
         <Kpi label={t('perf.revenue', { m: mName(cur.month, lang, 'short') })} value={money(cur.revenue)} sub={prev && pct(cur.revenue, prev.revenue) != null ? t(cur.revenue >= prev.revenue ? 'perf.upOn' : 'perf.downOn', { n: Math.abs(pct(cur.revenue, prev.revenue)), m: mName(prev.month, lang, 'short') }) : null} />
         <Kpi label={t('perf.gross')} value={money(cur.gross, { sign: cur.gross < 0 })} sub={cur.margin != null ? t('perf.margin', { n: Math.round(cur.margin * 100) }) : null} />
         <Kpi label="EBITDA" value={money(cur.ebitda, { sign: cur.ebitda < 0 })} tone={cur.ebitda < 0 ? 'v2-neg' : ''} />
-        <Kpi label={t('perf.net')} value={money(cur.net, { sign: cur.net < 0 })} tone={cur.net < 0 ? 'v2-neg' : ''} sub={t('perf.noDepreciation')} />
+        <Kpi label={t('perf.net')} value={money(cur.net, { sign: cur.net < 0 })} tone={cur.net < 0 ? 'v2-neg' : ''} sub={accrual?.hasRegister ? t('perf.afterDepreciation') : t('perf.noDepreciation')} />
       </div>
       <Card>
         <p className="v2-sec v2-note-ai"><AiText text={note} /></p>
@@ -148,7 +148,9 @@ function ProfitTab({ rows, sel, t, lang, needsReview, tx, accrual = null }) {
             <dt><strong>{t('perf.gross')}</strong>{cur.margin != null && <span className="v2-muted"> · {t('perf.margin', { n: Math.round(cur.margin * 100) })}</span>}</dt><dd className="v2-num v2-r"><strong>{money(cur.gross)}</strong></dd>
             <dt>{t('perf.opex')}</dt><dd className="v2-num v2-r">{money(-cur.opex, { sign: true })}</dd>
             <dt><strong>EBITDA</strong></dt><dd className="v2-num v2-r"><strong>{money(cur.ebitda)}</strong></dd>
-            <dt>{t('perf.depreciation')}</dt><dd className="v2-r v2-muted">{t('perf.needsAssets')}</dd>
+            <dt>{t('perf.depreciation')}</dt>{accrual?.hasRegister
+              ? <dd className="v2-num v2-r">{money(-cur.depreciation, { sign: cur.depreciation > 0 })}</dd>
+              : <dd className="v2-r v2-muted">{t('perf.needsAssets')}</dd>}
             {accrual && <><dt><strong>{t('perf.operatingProfit')}</strong></dt><dd className="v2-num v2-r"><strong>{money(cur.operating)}</strong></dd>
               <dt>{t('perf.otherIncome')}<span className="v2-muted"> · {t('perf.otherIncomeNet')}</span></dt><dd className="v2-num v2-r">{money(cur.otherIncome, { sign: cur.otherIncome !== 0 })}</dd></>}
             <dt>{accrual ? t('perf.loanInterest') : t('perf.interest')}</dt><dd className="v2-num v2-r">{money(-cur.interest, { sign: cur.interest > 0 })}</dd>
@@ -301,6 +303,7 @@ export default function Performance() {
   const cats = useApi('/cashflow-categories')
   const debts = useApi('/debts')
   const prof = useApi('/accountant/profile')
+  const assets = useApi('/assets')
   useAskContext(t('nav.performance'), drillOn ? mName(drill.month, lang) : mName(sel, lang))
 
   const series = ins.data?.series || []
@@ -312,9 +315,9 @@ export default function Performance() {
   const confirmed = mappingConfirmed(catList)
   const accrual = useMemo(() => {
     if (!confirmed) return null
-    const r = accrualRows({ transactions: txs, debts: Array.isArray(debts.data) ? debts.data : [], categories: catList, months })
+    const r = accrualRows({ transactions: txs, debts: Array.isArray(debts.data) ? debts.data : [], categories: catList, months, assets: assets.data })
     return { ...r, taxKey: taxLabelKey(prof.data?.profile?.tax_regime) }
-  }, [confirmed, txs, debts.data, catList, months, prof.data]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [confirmed, txs, debts.data, catList, months, prof.data, assets.data]) // eslint-disable-line react-hooks/exhaustive-deps
   const setMonth = (m) => { const n = new URLSearchParams(); n.set('month', m); navigate(`${location.pathname}?${n}`, { replace: true }) }
 
   const head = (

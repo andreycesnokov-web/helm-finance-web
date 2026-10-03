@@ -231,3 +231,24 @@ The answers are in `DECISIONS.md`, which overrides section 5.
 - **Settings Targets copy:** now says that only Pulse uses the targets.
 - **`telegramActorWiring`:** migration allow-list updated, in a test-only commit.
 - **PROPOSALS F-01:** the `/allocate` vs `/pay` finding.
+
+## 9. Batch 10 — PPh 23 withheld by a customer
+- `computeDebtStatus`: remaining = amount − `paid_amount` − withholding allocations (`server/lib/debtWithholding.js`). It is identical for bills with no withholding (3000-case equivalence test).
+- `/pay` uses the same formula.
+- `POST /api/debts/:id/withholding`:
+  - creates a withholding record and its allocation (031, unchanged);
+  - when the guard rejects, answers 409 with the DECISIONS.md message;
+  - is audited.
+- v2 Bill detail has a "Tax withheld" card.
+- This is shared Business logic, not behind the flag.
+
+## 10. Batch 11 — P-11 asset register
+- **Migration 063 `assets`:**
+  - isolation trigger;
+  - a bill or payment can be registered only once;
+  - a useful life only together with the rule that set it.
+- **Server:** `server/lib/assetRegister.js`. Straight-line depreciation from the month of acquisition, computed on the fly. Groups come only from verified `depreciation` tax rules.
+- **Performance:**
+  - asset-linked bills and payments are left out of profit;
+  - depreciation sits after EBITDA.
+- **Assets & balance:** real register, book values, equipment in "The company owns". Net worth is shown only once the funding register exists too.

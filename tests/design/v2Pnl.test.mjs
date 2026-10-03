@@ -92,6 +92,19 @@ t('assets, funding and transfers are never profit; other workspaces and currenci
   assert.deepStrictEqual([r.revenue, r.net, r.assets], [0, 0, 7000])
 })
 
+t('asset register (P-11): a registered purchase is not a cost; depreciation comes after EBITDA', () => {
+  const debts = [{ id: 70, type: 'payable', category: 'Аренда офиса', original_amount: 7000, created_at: '2026-09-02T00:00:00Z', status: 'paid', approval_status: 'approved' }]
+  const tx = [{ id: 71, type: 'expense', category: 'Аренда офиса', amount_original: 3000, transaction_date: '2026-09-03' },
+    { id: 72, type: 'income', category: 'Cleaning service income', amount_original: 1000, transaction_date: '2026-09-03' }]
+  const assets = { available: true, assets: [{ purchase_debt_id: 70 }, { purchase_transaction_id: 71 }], depreciation_by_month: { '2026-09': 125 } }
+  const { rows, hasRegister } = accrualRows({ transactions: tx, debts, categories: cats, months: M, assets })
+  const r = rows[1]
+  assert.deepStrictEqual([r.opex, r.ebitda, r.depreciation, r.operating, r.net], [0, 1000, 125, 875, 875])
+  assert.ok(hasRegister)
+  const noReg = accrualRows({ transactions: tx, debts, categories: cats, months: M }).rows[1]
+  assert.deepStrictEqual([noReg.opex, noReg.depreciation], [10000, 0], 'without the register the bills are costs as categorised')
+})
+
 t('refunds reduce the group they belong to', () => {
   const tx = [
     { id: 1, type: 'income', category: 'Cleaning service income', amount_original: 100, transaction_date: '2026-09-01' },
