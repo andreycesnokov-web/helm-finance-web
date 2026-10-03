@@ -125,7 +125,7 @@ export const routes = {
     { id: 'ev2', rule_code: 'ID_SPT_MASA', title: 'SPT Masa PPh 21', period: iso(-20).slice(0, 7), due_date: iso(12), status: 'upcoming', payment_status: 'unpaid', days: 12 },
   ], missing_profile_fields: [] }),
   'POST /api/accountant/ask': () => ({ answer: 'Synthetic answer for the screenshot harness.', used_rules: [{ rule_code: 'ID_PPH23_SERVICES' }] }),
-  'GET /api/accountant/profile': () => ({ profile: { company_legal_name: 'PT Demo Trading', legal_entity_type: 'pt', foreign_owned: 'no', country: 'ID', financial_year_start: '01-01', financial_year_end: '12-31', npwp: '0123456789012345', pkp_status: 'non_pkp', tax_regime: 'general', primary_kbli: '81210', field_verification: {} }, completeness: { percent: 86 } }),
+  'GET /api/accountant/profile': () => ({ profile: { company_legal_name: 'PT Demo Trading', legal_entity_type: 'pt', foreign_owned: 'no', country: 'ID', financial_year_start: '01-01', financial_year_end: '12-31', npwp: '0123456789012345', pkp_status: 'non_pkp', tax_regime: 'normal', primary_kbli: '81210', field_verification: {} }, completeness: { percent: 86 } }),
   'GET /api/accountant/applicability': () => ({ applicable_rules: [{ rule_code: 'ID_PPH21', title: 'PPh 21', reason: 'You have employees.' }, { rule_code: 'ID_PPH23_SERVICES', title: 'PPh 23', reason: 'You pay for services.' }],
     excluded_rules: [{ rule_code: 'ID_PPN', reason: 'Not PKP.' }], missing_profile_fields: [] }),
   'GET /api/ai-accountant/required-documents': () => ({ items: [{ type: 'akta', status: 'uploaded' }, { type: 'nib', status: 'uploaded' }, { type: 'npwp', status: 'needs_review' }, { type: 'sk_kemenkumham', status: 'missing' }] }),
