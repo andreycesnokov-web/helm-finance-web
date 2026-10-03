@@ -75,7 +75,7 @@ for (const vp of [{ name: 'desktop', width: 1440, height: 1000 }, { name: 'phone
         document.querySelectorAll('.v2-root a, .v2-root button').forEach((el) => {
           const rect = el.getBoundingClientRect()
           if (!rect.width || !rect.height) return
-          if (el.closest('.v2-legacy') || el.matches('.v2-inline, .v2-skip')) return
+          if (el.closest('.v2-legacy, .v2-legacy-embed') || el.matches('.v2-inline, .v2-skip')) return
           if (getComputedStyle(el).display === 'inline') return
           if (rect.height < 43.5) small.push(`${el.tagName.toLowerCase()} "${(el.textContent || el.getAttribute('aria-label') || '').trim().slice(0, 30)}" ${Math.round(rect.height)}px`)
         })

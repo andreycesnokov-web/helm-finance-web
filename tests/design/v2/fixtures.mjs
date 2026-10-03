@@ -68,15 +68,35 @@ export function route(method, path) {
         payroll_enabled: true, approval_flow_enabled: true, advanced_radar_enabled: true,
       },
     },
-    'GET /api/debts': DEBTS,
+    'GET /api/debts': DEBTS.map((d) => d.id === 'd4' ? { ...d, approved_at: iso(-3), approval_status: 'approved' } : d),
     'GET /api/transactions': { transactions: TXS },
     'GET /api/wallets': { wallets: PULSE.accounts.map((a) => ({ ...a, is_active: true, scope: 'business' })) },
     'GET /api/accountant/summary': { upcoming: [
       { title: 'PPh 23 — monthly payment', due_date: day(12), days: 12, status: 'upcoming', period: 'prev', rule_code: 'PPH23_MONTHLY' },
     ], overdue: [] },
+    'GET /api/counterparties': { counterparties: [
+      { id: 'c1', name: 'CV Harbor Supply', legal_name: 'CV Harbor Supply', role: 'customer', npwp: '0123456789012345', pkp_status: 'non_pkp', bank_accounts: [{ account_number: '1' }] },
+      { id: 'c2', name: 'PT Legal Partners', legal_name: 'PT Legal Partners Indonesia', display_name: 'PT Legal Partners', role: 'vendor', npwp: null, pkp_status: 'unknown', bank_accounts: [] },
+      { id: 'c3', name: 'PT Office Tower', role: 'vendor', npwp: '0123456789012345', pkp_status: 'pkp', bank_accounts: [{ account_number: '2' }] },
+    ] },
+    'GET /api/bank-import/batches': { batches: [{ id: 'bt1', wallet_id: 'w1', status: 'review_required', statement_end: day(-2), row_count: 12, imported_count: 10 }] },
+    'GET /api/payroll/overview': { employees: [
+      { id: 'e1', name: 'Dewi Lestari', role: 'Operations manager', default_salary: 6500000, currency: 'IDR', pay_day: 5 },
+      { id: 'e2', name: 'Budi Santoso', role: 'Field technician', default_salary: 3600000, currency: 'IDR', pay_day: 5 },
+    ], payments: [{ id: 'pp1', employee_id: 'e1', period_month: '2026-09', payment_date: day(-28), status: 'paid', net_amount: 6435000,
+      payroll_payment_items: [{ direction: 'addition', amount: 6500000, label: 'Salary' }, { direction: 'deduction', amount: 65000, label: 'PPh 21' }] }],
+      summary: { employee_count: 2, paid_this_month: 0, total_paid_all: 6435000, payments_this_month: 0 } },
     'GET /api/business/financial-counts': { ok: true, counts: { transactions: 24, wallets: 3, debts: 9 } },
   }
   const key = `${method} ${p}`
   if (key in R) return { status: 200, body: R[key] }
+  const m = p.match(/^\/api\/invoices\/([^/]+)\/settlement$/)
+  if (method === 'GET' && m) return { status: 200, body: { ok: true, invoice: { debt_id: m[1], document_number: 'INV-TEST-1' },
+    settlement: { paid_amount: 0, remaining_amount: 10000000, status: 'unpaid' },
+    closeout: { checklist: [
+      { key: 'invoice', label: 'Invoice', required: true, present: true },
+      { key: 'tax_invoice', label: 'Tax invoice', required: false, present: false },
+      { key: 'payment_proof', label: 'Payment proof', required: true, present: false },
+      { key: 'accountant_confirmation', label: 'Accountant confirmation', required: true, present: false }] } } }
   return null
 }

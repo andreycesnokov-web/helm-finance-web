@@ -183,3 +183,33 @@ export function ChartFrame({ title, legend, table, children, showTableLabel, sho
     </div>
   )
 }
+
+/**
+ * Overview ⇄ Manage switch for pages whose full editing lives in the existing
+ * page. `?view=manage` renders `manage` (the existing component, unchanged), so
+ * nothing the old page could do is lost while v2 shows its overview.
+ */
+export function ViewSwitch({ view, onChange, overviewLabel, manageLabel }) {
+  return <Tabs size="sm" label={overviewLabel} active={view} onChange={onChange} items={[
+    { key: 'overview', label: overviewLabel }, { key: 'manage', label: manageLabel }]} />
+}
+
+/** Small inline dialog (reason / note) — used before an existing write action. */
+export function PromptDialog({ open, title, label, confirmLabel, cancelLabel, onConfirm, onCancel, busy, error, required }) {
+  if (!open) return null
+  return (
+    <div className="v2-dialog-scrim" role="presentation" onMouseDown={(e) => { if (e.target === e.currentTarget && !busy) onCancel() }}>
+      <form className="v2-dialog" role="dialog" aria-modal="true" aria-label={title}
+        onSubmit={(e) => { e.preventDefault(); const v = new FormData(e.currentTarget).get('note'); if (required && !String(v).trim()) return; onConfirm(String(v || '').trim()) }}>
+        <h2 className="v2-h2">{title}</h2>
+        <label className="v2-field"><span className="v2-field-label">{label}</span>
+          <textarea name="note" rows={3} className="v2-input" autoFocus required={required} /></label>
+        {error && <div className="v2-field-error" role="alert">{error}</div>}
+        <div className="v2-dialog-actions">
+          <Btn onClick={onCancel} disabled={busy}>{cancelLabel}</Btn>
+          <Btn variant="primary" type="submit" disabled={busy}>{confirmLabel}</Btn>
+        </div>
+      </form>
+    </div>
+  )
+}

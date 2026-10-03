@@ -15,22 +15,26 @@ import Placeholder from './pages/Placeholder'
 import More from './pages/More'
 import Pulse from './pages/Pulse'
 import Radar from './pages/Radar'
+import Bills from './pages/Bills'
+import BillDetail from './pages/BillDetail'
+import ApprovalsV2 from './pages/Approvals'
+import CounterpartiesV2 from './pages/Counterparties'
+import AddCounterparty from './pages/AddCounterparty'
+import AccountsV2 from './pages/Accounts'
+import TransactionsV2 from './pages/Transactions'
+import PayrollV2 from './pages/Payroll'
+import FundingV2 from './pages/Funding'
 
 // Existing pages, reused verbatim.
 import {
-  BusinessTransactions, BusinessPayables, BusinessReceivables, BusinessInvoices,
-  BusinessIncomingPayments, BusinessPaymentConnections, BusinessFunding, BusinessNew,
+  BusinessIncomingPayments, BusinessPaymentConnections, BusinessNew,
   BusinessIntercompany, BusinessDocuments,
 } from '../pages/business'
 import { BusinessAccountantHub } from '../pages/business/AccountantPremium'
 import BusinessOnboarding from '../pages/business/Onboarding'
 import TaxSplit from '../pages/business/TaxSplit'
 import InvoiceSettlement from '../pages/business/InvoiceSettlement'
-import Counterparties from '../pages/business/Counterparties'
-import Accounts from '../pages/Accounts'
 import AICFO from '../pages/AICFO'
-import Payroll from '../pages/Payroll'
-import Approvals from '../pages/Approvals'
 import Team from '../pages/Team'
 import Settings from '../pages/Settings'
 import BankImport from '../pages/BankImport'
@@ -53,22 +57,22 @@ export default function BusinessApp() {
           <Route path="ai-cfo" element={<Legacy><AICFO /></Legacy>} />
 
           {/* Money */}
-          <Route path="accounts" element={<Legacy><Accounts /></Legacy>} />
-          <Route path="transactions" element={<Legacy><BusinessTransactions /></Legacy>} />
-          <Route path="funding-investors" element={<Legacy><BusinessFunding /></Legacy>} />
+          <Route path="accounts" element={<AccountsV2 />} />
+          <Route path="transactions" element={<TransactionsV2 />} />
+          <Route path="funding-investors" element={<FundingV2 />} />
           <Route path="assets" element={<Placeholder titleKey="nav.assets" icon="building" />} />
           <Route path="assets/new" element={<Placeholder titleKey="screen.addAsset" icon="building" />} />
 
           {/* Obligations */}
-          <Route path="payables" element={<Legacy><BusinessPayables /></Legacy>} />
-          <Route path="payables/:id" element={<Placeholder titleKey="screen.billDetail" icon="receipt" />} />
-          <Route path="receivables" element={<Legacy><BusinessReceivables /></Legacy>} />
-          <Route path="receivables/:id" element={<Placeholder titleKey="screen.invoiceDetail" icon="receipt" />} />
-          <Route path="invoices" element={<Legacy><BusinessInvoices /></Legacy>} />
-          <Route path="payroll" element={<Legacy><Payroll /></Legacy>} />
-          <Route path="approvals" element={<Legacy><Approvals /></Legacy>} />
-          <Route path="counterparties" element={<Legacy><Counterparties /></Legacy>} />
-          <Route path="counterparties/new" element={<Placeholder titleKey="screen.addCounterparty" icon="users" />} />
+          <Route path="payables" element={<Bills />} />
+          <Route path="payables/:id" element={<BillDetail />} />
+          <Route path="receivables" element={<Bills />} />
+          <Route path="receivables/:id" element={<BillDetail />} />
+          <Route path="invoices" element={<Bills />} />
+          <Route path="payroll" element={<PayrollV2 />} />
+          <Route path="approvals" element={<ApprovalsV2 />} />
+          <Route path="counterparties" element={<CounterpartiesV2 />} />
+          <Route path="counterparties/new" element={<AddCounterparty />} />
 
           {/* Accounting */}
           <Route path="documents" element={<Legacy><BusinessDocuments /></Legacy>} />
