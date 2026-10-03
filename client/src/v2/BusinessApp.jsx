@@ -52,8 +52,10 @@ import V2Documents from './pages/Documents'
 import V2Settings from './pages/Settings'
 import FirstDay from './pages/FirstDay'
 import V2AICFO from './pages/AICFO'
+import Performance from './pages/Performance'
+import Assets from './pages/Assets'
+import AddAsset from './pages/AddAsset'
 import { AskProvider } from './ai/AskContext'
-import Placeholder from './pages/Placeholder'
 
 function V2Frame() {
   const t = useT()
@@ -81,9 +83,9 @@ export default function BusinessApp() {
           {/* Overview */}
           <Route path="pulse" element={<V2Pulse />} />
           <Route path="radar" element={<V2Radar />} />
-          <Route path="performance" element={<Placeholder titleKey="screen.performance" icon="performance" />} />
-          <Route path="performance/cash" element={<Placeholder titleKey="screen.performanceCash" icon="performance" />} />
-          <Route path="performance/forecast" element={<Placeholder titleKey="screen.performanceForecast" icon="radar" current="/business/radar" />} />
+          <Route path="performance" element={<Performance />} />
+          <Route path="performance/cash" element={<Performance />} />
+          <Route path="performance/forecast" element={<Performance />} />
           <Route path="ai-cfo" element={<V2AICFO />} />
           <Route path="ai-cfo/classic" element={<AICFO />} />
           {/* Money */}
@@ -92,8 +94,8 @@ export default function BusinessApp() {
           <Route path="transactions" element={<V2Transactions />} />
           <Route path="transactions/classic" element={<BusinessTransactions />} />
           <Route path="funding-investors" element={<V2Funding />} />
-          <Route path="assets" element={<Placeholder titleKey="screen.assets" icon="assets" />} />
-          <Route path="assets/new" element={<Placeholder titleKey="screen.addAsset" icon="assets" />} />
+          <Route path="assets" element={<Assets />} />
+          <Route path="assets/new" element={<AddAsset />} />
           <Route path="bank-import" element={<BankImport />} />
           <Route path="incoming-payments" element={<BusinessIncomingPayments />} />
           <Route path="intercompany" element={<BusinessIntercompany />} />
