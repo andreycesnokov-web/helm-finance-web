@@ -17,6 +17,7 @@ import { useT } from '../i18n'
 import { useApi } from '../data'
 import { shellCounts } from '../lib/shellCounts'
 import AskPanel from '../ai/AskPanel'
+import ErrorBoundary from '../components/ErrorBoundary'
 
 const SYMBOL = '/brand/symbol_navy_transparent.svg'
 
@@ -92,10 +93,11 @@ export default function V2Shell({ children }) {
         <div className="v2-switcher">
           <WorkspaceSwitcher workspaces={workspaces} activeId={active?.id} onSelect={select} />
         </div>
-        <Link to="/business/add" className="v2-addbtn">
+        {/* Disabled until Add is migrated: the legacy page defaults to Personal (review 8.2 #3). */}
+        <button type="button" className="v2-addbtn" disabled aria-disabled="true" title={t('nav.addSoon')}>
           <span className="v2-addbtn-main"><I.plus />{t('nav.add')}</span>
-          <span className="v2-addbtn-hint">{t('nav.addHint')}</span>
-        </Link>
+          <span className="v2-addbtn-hint">{t('nav.addSoon')}</span>
+        </button>
         <nav className="v2-navgroups">
           {NAV_GROUPS.map((g) => (
             <div key={g.key} className="v2-navgroup">
@@ -135,15 +137,23 @@ export default function V2Shell({ children }) {
       </header>
 
       <main id="v2-main" className="v2-main cfo-main" tabIndex={-1}>
-        <div className="v2-main-inner">{children}</div>
+        <div className="v2-main-inner"><ErrorBoundary>{children}</ErrorBoundary></div>
       </main>
 
-      <AskPanel />
+      <ErrorBoundary compact><AskPanel /></ErrorBoundary>
 
       <nav className="v2-tabbar" aria-label={t('nav.tabs')}>
         {TABS.map((tb) => {
           const Ic = I[tb.icon]
           const on = tabKey === tb.key
+          if (tb.disabled) {
+            return (
+              <button key={tb.key} type="button" className={`v2-tab${tb.primary ? ' v2-tab-add' : ''}`} disabled aria-disabled="true" title={t('nav.addSoon')}>
+                {tb.primary ? <span className="v2-tab-addicon"><Ic size={24} /></span> : <Ic size={20} />}
+                <span>{t(tb.labelKey)}</span>
+              </button>
+            )
+          }
           return (
             <Link key={tb.key} to={tb.to} className={`v2-tab${on ? ' is-active' : ''}${tb.primary ? ' v2-tab-add' : ''}`}
               aria-current={on ? 'page' : undefined}>

@@ -1,7 +1,7 @@
 // Settings (designs/Settings.dc.html). An overview of the rules every screen follows,
 // with each change made where it is made today: the existing Settings page (Classic),
 // Team, the Company profile and Bank import. Targets & alerts are edited here (P-01, P-08,
-// components/TargetsCard.jsx). Reads: GET /api/team, GET /api/accountant/profile,
+// components/TargetsCard.jsx). Reads: GET /api/team, GET /api/accountant/applicability,
 // GET /api/access/status (plan). Telegram linking is NOT touched here.
 import { Link } from 'react-router-dom'
 import { useAccess } from '../../hooks/useAccess'
@@ -20,7 +20,8 @@ export default function Settings() {
   const { active } = useWorkspace()
   const { planLabel } = useAccess()
   const team = useApi('/team')
-  const prof = useApi('/accountant/profile')
+  // Completeness comes from /applicability; /profile does not return it (review 8.2 #7).
+  const prof = useApi('/accountant/applicability')
   const members = team.data?.members || []
   const pct = prof.data?.completeness?.percent
   return (
