@@ -81,7 +81,10 @@ export const routes = {
   'PATCH /api/counterparties/:id': (u) => ({ counterparty: counterparties.find((c) => u.pathname.endsWith('/' + c.id)) || counterparties[0] }),
   'PATCH /api/debts/:id/checklist': () => ({ id: 'd1', checklist: { accountant_checked_at: null, accountant_checked_by: null } }),
   // P-05 option B: the slip comes from withholding_records (031).
-  'GET /api/withholding-slips': () => ({ available: true, by_debt: { d7: { slip_document_id: 'doc3', records: [{ id: 'w1', status: 'reported', bukti_potong_document_id: 'doc3' }] } } }),
+  'GET /api/withholding-slips': () => ({ available: true, by_debt: {
+    d7: { slip_document_id: 'doc3', records: [{ id: 'w1', status: 'reported', tax_type: 'pph_23', withholding_amount: 452000, bukti_potong_document_id: 'doc3' }] },
+    d4: { slip_document_id: null, records: [{ id: 'w2', status: 'waiting_slip', tax_type: 'pph_23', withholding_amount: 386000, bukti_potong_document_id: null }] } } }),
+  'POST /api/debts/:id/withholding': () => ({ withholding: { id: 'w9', status: 'waiting_slip' }, allocation: { id: 'a9' } }),
   'GET /api/workspaces': () => workspaces,
   'PATCH /api/workspace-preferences': () => ({ ok: true }),
   'GET /api/admin/status': () => ({ is_admin: true }),

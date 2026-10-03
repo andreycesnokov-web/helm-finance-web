@@ -97,6 +97,17 @@ export default {
     forbidden: 'Peran Anda hanya bisa mengajukan. Pemilik, admin, atau CFO yang memutuskan.',
     done: { approve: 'Disetujui. Belum ada yang dibayar sampai seseorang membayarnya.', reject: 'Ditolak.', ask: 'Pertanyaan terkirim.' },
   },
+  wh: {
+    titleIn: 'Pajak yang dipotong pelanggan', titleOut: 'Pajak yang kami potong', waiting: 'Menunggu bukti potong', slipIn: 'bukti potong diterima',
+    hintIn: 'Jika pelanggan membayar kurang karena memotong PPh 23, catat di sini. Pendapatan tetap sebesar faktur penuh; bagian yang dipotong adalah pembayaran di muka pajak Anda.',
+    hintOut: 'Jika Anda membayar pemasok lebih sedikit karena memotong pajak, catat di sini. Bagian yang dipotong disetor ke kantor pajak, bukan ke pemasok.',
+    recordIn: 'Catat pajak yang dipotong pelanggan', recordOut: 'Catat pajak yang kami potong', amount: 'Jumlah dipotong (IDR)', max: 'Maksimal {v} yang masih terbuka',
+    taxType: 'Pajak', slip: 'Bukti potong', slipLater: 'Belum diterima — tambahkan nanti',
+    note: 'Tidak ada uang yang berpindah. Saldo terbuka turun sebesar jumlah ini; akuntan mengkreditkannya ke pajak penghasilan Anda.', save: 'Catat pemotongan',
+    forbidden: 'Hanya akuntan, pemilik, admin atau CFO yang bisa mencatat pemotongan.', exceeds: 'Itu lebih dari {v} yang masih terbuka.',
+    slipWhere: 'Unggah bukti potong saat diterima:',
+    type: { pph_23: 'PPh 23', pph_4_2: 'PPh 4(2)', pph_21: 'PPh 21', pph_26: 'PPh 26', pph_22: 'PPh 22', other: 'Lainnya' },
+  },
   bills: {
     sub: 'Piutang dan utang Anda, di satu tempat', addBill: 'Tambah tagihan', newInvoice: 'Faktur baru',
     owedToYou: 'Piutang · {n} faktur', youOwe: 'Utang · {n} tagihan', lateAmt: '{v} terlambat', dueSoon: '{v} jatuh tempo 14 hari ke depan',
