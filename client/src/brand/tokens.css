@@ -138,4 +138,23 @@
   --section-gap:       var(--space-8);
   --card-padding:      var(--space-5);   /* 20px desktop */
   --card-padding-sm:   var(--space-4);   /* 16px mobile  */
+
+  /* ── Design v2 (_specs/design-v2, approved 3 Oct 2026) ─────────────────────
+     Added for the v2 screens behind VITE_DESIGN_V2. Nothing above changed value;
+     with the flag off these declarations are unused. */
+  --radius-card:    20px;   /* cards (hero uses --radius-xl) */
+  --radius-control: 10px;   /* buttons, inputs, nav rows */
+  --radius-pill:    999px;  /* chips and status pills */
+  /* Chart series, fixed order. Never two y-axes; every chart has a table view. */
+  --chart-1: #2A6FD1;
+  --chart-2: #D98A1C;
+  --chart-3: #16A085;
+  /* Text and figures on the navy hero. */
+  --on-navy-muted: #AFC6DE;
+  --on-navy-pos:   #7FE3B6;
+  --on-navy-neg:   #FFB4A8;
+  /* Layout. */
+  --v2-sidebar-width: 248px;
+  --v2-content-max:   1120px;
+  --touch-min:        44px;
 }

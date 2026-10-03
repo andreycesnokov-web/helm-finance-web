@@ -554,6 +554,14 @@ function SwipeBackIndicator() {
 const DESIGN_PREVIEW_ON = import.meta.env.VITE_DESIGN_PREVIEW_ENABLED === 'true'
 const DesignPreview = DESIGN_PREVIEW_ON ? lazy(() => import('./pages/DesignPreview')) : null
 
+// CFO AI redesign v2 (_specs/design-v2). Build-time flag, default OFF. The whole v2
+// workspace sits behind ONE lazy boundary: with the flag OFF this import() is in a dead
+// branch, Rollup never emits the chunk, and the legacy /business route tree below is
+// exactly what ships today. With the flag ON, /business/* is handed to the v2 app,
+// which keeps every existing /business path resolvable.
+const DESIGN_V2 = import.meta.env.VITE_DESIGN_V2 === 'true'
+const V2BusinessApp = DESIGN_V2 ? lazy(() => import('./v2/BusinessApp')) : null
+
 export default function App() {
   return (
     <BrowserRouter>
@@ -625,6 +633,11 @@ export default function App() {
           )}
           {/* Business Workspace in premium shell (Phase 3, presentation-only). Legacy
               /,/accounts routes remain untouched during the migration. */}
+          {DESIGN_V2 ? (
+            <Route path="/business/*" element={
+              <Suspense fallback={null}><V2BusinessApp /></Suspense>
+            } />
+          ) : (
           <Route element={<BusinessLayout />}>
             <Route path="/business/pulse" element={<BusinessShell><BusinessPulse /></BusinessShell>} />
             {/* Use the full legacy Accounts (add/edit/archive/balances) inside the premium
@@ -665,6 +678,7 @@ export default function App() {
                 product; writes nothing but the caller's own progress. */}
             <Route path="/business/onboarding" element={<BusinessShell><BusinessOnboarding /></BusinessShell>} />
           </Route>
+          )}
           {/* Public invite page — no auth required to view, Telegram widget handles login */}
           <Route path="/invite/:code" element={<JoinInvite />} />
           {/* Standalone onboarding — accessible directly to re-run setup */}
