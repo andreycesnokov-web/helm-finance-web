@@ -6,7 +6,8 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import I from '../icons'
-import { PageHead, Card, Pill, Skeleton, ErrorBox, Empty } from '../ui'
+import { PageHead, Card, Pill, Skeleton, ErrorBox, Empty, Locked } from '../ui'
+import { useAccess } from '../../hooks/useAccess'
 import { useT, useLang } from '../i18n'
 import { useApi } from '../data'
 import { money, shortDate } from '../lib/format'
@@ -23,6 +24,7 @@ export default function Approvals() {
   const [tab, setTab] = useState('waiting')
   const debts = useApi('/debts')
   const pulse = useApi('/pulse?scope=business')
+  const { hasFeature, loading: accessLoading } = useAccess()
   const list = Array.isArray(debts.data) ? debts.data : []
   const waiting = list.filter(isPending).sort((a, b) => String(a.due_date || '9') < String(b.due_date || '9') ? -1 : 1)
   const decided = list.filter((d) => d.approved_at && ['approved', 'rejected'].includes(d.approval_status))
@@ -41,6 +43,8 @@ export default function Approvals() {
   }, [pulse.data, waiting]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const head = <PageHead title={t('nav.approvals')} sub={t('approvals.sub')} />
+  // Same plan gate as the legacy Approvals page (review 8.2 #10).
+  if (!accessLoading && !hasFeature('approval_flow_enabled')) return <>{head}<Locked title={t('lock.approvalsTitle')} text={t('lock.text')} /></>
   if (debts.loading) return <>{head}<Card><Skeleton rows={5} /></Card></>
   if (debts.error) return <>{head}<ErrorBox error={debts.error} onRetry={debts.reload} /></>
 

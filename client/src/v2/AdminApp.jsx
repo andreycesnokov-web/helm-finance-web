@@ -12,6 +12,7 @@ import { Navigate, NavLink, useParams } from 'react-router-dom'
 import './v2.css'
 import { useAuth } from '../hooks/useAuth'
 import I from './icons'
+import ErrorBoundary from './components/ErrorBoundary'
 import { useT } from './i18n'
 import AdminOverview from './admin/AdminOverview'
 import AdminCompanies from './admin/AdminCompanies'
@@ -50,7 +51,7 @@ function AdminShell({ children }) {
               <NavLink key={to} to={to} className={({ isActive }) => `v2-tab-link${isActive ? ' is-on' : ''}`}>{t(k)}</NavLink>
             ))}
           </nav>
-          {children}
+          <ErrorBoundary>{children}</ErrorBoundary>
         </div>
       </main>
     </div>

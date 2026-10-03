@@ -92,3 +92,14 @@ export function ErrorBox({ error, onRetry }) {
     </div>
   )
 }
+
+/** Plan-gated feature (review 8.2 #10): same gate as the legacy pages, honest and calm.
+ *  No upgrade button — billing is not part of this redesign. */
+export function Locked({ title, text }) {
+  return (
+    <div className="v2-card v2-locked" role="status">
+      <I.lock size={22} />
+      <div><p className="v2-empty-title">{title}</p><p className="v2-empty-text">{text}</p></div>
+    </div>
+  )
+}

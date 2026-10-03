@@ -49,7 +49,8 @@ function DecisionRow({ d, t, lang }) {
           <span className="v2-dec-meta">{[d.note, t('pulse.dec.wasDue', { d: shortDate(d.due_date, lang) })].filter(Boolean).join(' · ')}</span>
         </div>
         <span className="v2-dec-amt v2-num v2-pos">{money(d.amount, { sign: true })}</span>
-        <div className="v2-dec-actions"><Btn variant="primary" to="/business/receivables">{t('pulse.dec.remind')}</Btn></div>
+        {/* Reminders have no channel yet (DECISIONS Q4): open the invoice instead (review 8.2 #5). */}
+        <div className="v2-dec-actions"><Btn to={`/business/receivables/${encodeURIComponent(d.id)}`}>{t('pulse.dec.openInvoice')}</Btn></div>
       </div>
     )
   }
@@ -70,8 +71,8 @@ export default function Pulse() {
   const t = useT()
   const lang = useLang()
   const pulse = useApi('/pulse?scope=business')
-  const ins30 = useApi(`/pulse/advanced-insights?from=${daysAgo(30)}&to=${daysAgo(0)}`)
-  const ins60 = useApi(`/pulse/advanced-insights?from=${daysAgo(60)}&to=${daysAgo(31)}`)
+  const ins30 = useApi(`/pulse/advanced-insights?scope=business&from=${daysAgo(30)}&to=${daysAgo(0)}`)
+  const ins60 = useApi(`/pulse/advanced-insights?scope=business&from=${daysAgo(60)}&to=${daysAgo(31)}`)
   const obl = useApi('/accountant/obligations')
   // P-01 / P-08. Missing, failed or null → the documented defaults (60 days, no floor).
   const targets = useApi('/business/targets')

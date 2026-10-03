@@ -4,7 +4,10 @@
 // that does not gets its sidebar name. The context travels inside the question text
 // (no backend change — PROPOSALS P-02). The panel only answers and links to screens;
 // it never approves or pays anything.
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
+// The thread belongs to ONE workspace (review 8.2 #2): it is cleared when the active
+// business or scope changes, and an answer that arrives after a switch is dropped.
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
+import { useWorkspace } from '../../shell/WorkspaceProvider'
 import { useLocation } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
 import { askCfo } from '../lib/ask'
@@ -25,6 +28,10 @@ export function AskProvider({ children }) {
   const [open, setOpen] = useState(false)
   const [thread, setThread] = useState([])
   const [pageCtx, setPageCtx] = useState(null)
+  const { active, scopeKey } = useWorkspace()
+  const wsKey = `${active?.id ?? ''}|${scopeKey ?? ''}`
+  const wsRef = useRef(wsKey)
+  useEffect(() => { wsRef.current = wsKey; setThread([]) }, [wsKey])
 
   // A page's declared context only applies while that page is shown.
   const navKey = activeNavKey(loc.pathname)
@@ -37,12 +44,14 @@ export function AskProvider({ children }) {
     const q = String(question || '').trim()
     if (!q) return
     const id = Date.now() + Math.random()
-    setThread((th) => [...th, { id, q, looking, loading: true }])
+    const asked = wsRef.current
+    setThread((th) => [...th, { id, q, looking, loading: true, ws: asked }])
+    // A late answer for a workspace that is no longer active is dropped.
+    const settle = (patch) => { if (wsRef.current !== asked) return; setThread((th) => th.map((m) => (m.id === id ? { ...m, loading: false, ...patch } : m))) }
     try {
-      const r = await askCfo(token, buildQuestion(q, looking))
-      setThread((th) => th.map((m) => (m.id === id ? { ...m, loading: false, answer: r } : m)))
+      settle({ answer: await askCfo(token, buildQuestion(q, looking)) })
     } catch (e) {
-      setThread((th) => th.map((m) => (m.id === id ? { ...m, loading: false, error: e?.status === 403 ? 'forbidden' : (e?.message || 'failed') } : m)))
+      settle({ error: e?.status === 403 ? 'forbidden' : (e?.message || 'failed') })
     }
   }, [token, looking])
 
