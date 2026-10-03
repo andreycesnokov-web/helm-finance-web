@@ -55,7 +55,7 @@ export function Btn({ variant = 'secondary', to, href, icon, children, className
 export function NotYet({ children, note, className = '' }) {
   const t = useT()
   return (
-    <button type="button" className={`v2-btn v2-btn-secondary ${className}`} disabled
+    <button type="button" className={`v2-btn v2-btn-secondary v2-btn-notyet ${className}`} disabled
       aria-disabled="true" title={note || t('placeholder.soon')}>
       {children}<span className="v2-notyet">{note || t('placeholder.soon')}</span>
     </button>

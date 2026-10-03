@@ -44,6 +44,25 @@ export const workspaces = {
   ],
 }
 
+export const wallets = [
+  { id: 'w1', name: 'BCA Operating', currency: 'IDR', type: 'bank', scope: 'business', balance: 71200000, is_active: true },
+  { id: 'w2', name: 'Mandiri Payroll', currency: 'IDR', type: 'bank', scope: 'business', balance: 23100000, is_active: true, entity_name: 'Payroll' },
+  { id: 'w3', name: 'Cash box', currency: 'IDR', type: 'cash', scope: 'business', balance: 2100000, is_active: true },
+]
+export const counterparties = [
+  { id: 'c1', name: 'PT Example Supplies', legal_name: 'PT Example Supplies', display_name: 'PT Example Supplies', role: 'vendor', npwp: '0123456789012345', pkp_status: 'pkp', bank_accounts: [{ account_number: '1234567890' }], source_system: 'mcp' },
+  { id: 'c2', name: 'Example Supply', legal_name: 'Example Supply', display_name: 'Example Supply', role: 'vendor', npwp: null, pkp_status: 'unknown', bank_accounts: [{ account_number: '1234567890' }] },
+  { id: 'c3', name: 'CV Sample Client', legal_name: 'CV Sample Client', display_name: 'CV Sample Client', role: 'customer', npwp: '987654321098765', pkp_status: 'non_pkp', bank_accounts: [] },
+  { id: 'c4', name: 'PT Test Resort', legal_name: 'PT Test Resort', display_name: 'PT Test Resort', role: 'customer', npwp: '111122223333444', pkp_status: 'pkp', bank_accounts: [], default_tax_treatment: 'Possibly PPh 23 — needs accountant review' },
+]
+export const transactions = [
+  { id: 101, type: 'income', description: 'Gateway settlement', category: 'Sales', amount_original: 3100000, currency_original: 'IDR', wallet_id: 'w1', transaction_date: iso(-1), scope: 'business', bank_import_batch_id: 'b1' },
+  { id: 102, type: 'expense', description: 'TRF 0192 FUEL', category: null, amount_original: 450000, currency_original: 'IDR', wallet_id: 'w1', transaction_date: iso(-2), scope: 'business', bank_import_batch_id: 'b1' },
+  { id: 103, type: 'expense', description: 'Electricity', category: 'Utilities', amount_original: 2050000, currency_original: 'IDR', wallet_id: 'w1', transaction_date: iso(-3), scope: 'business' },
+  { id: 104, type: 'transfer', description: 'BCA → Mandiri', category: 'Transfer', amount_original: 20000000, currency_original: 'IDR', wallet_id: 'w1', transaction_date: iso(-6), scope: 'business' },
+  { id: 105, type: 'expense', description: 'Marketplace order', category: '', amount_original: 380000, currency_original: 'IDR', wallet_id: 'w3', transaction_date: iso(-7), scope: 'business' },
+  { id: 106, type: 'payroll', description: 'Payroll', category: 'Payroll', amount_original: 21000000, currency_original: 'IDR', wallet_id: 'w2', transaction_date: iso(-5), scope: 'business' },
+]
 export const routes = {
   'GET /api/pulse': () => pulse,
   'GET /api/workspaces': () => workspaces,
@@ -52,6 +71,20 @@ export const routes = {
   'GET /api/access/status': () => ({ limits: {}, usage: {}, plan: { effective_plan: 'founder' } }),
   'GET /api/business/financial-counts': () => ({ ok: true, counts: { transactions: 40, wallets: 3, debts: 7 } }),
   'GET /api/debts': () => debts,
+  'GET /api/wallets': () => ({ wallets }),
+  'GET /api/counterparties': () => ({ counterparties }),
+  'GET /api/transactions': (u) => (u.searchParams.get('type') === 'transfer' ? transactions.filter((t) => t.type === 'transfer') : transactions),
+  'GET /api/cashflow-categories': () => ({ categories: [{ name: 'Sales' }, { name: 'Supplies' }, { name: 'Utilities' }, { name: 'Fuel' }] }),
+  'GET /api/bank-import/batches': () => ({ batches: [{ id: 'b1', wallet_id: 'w1', statement_end: iso(-1), status: 'review_required' }] }),
+  'GET /api/accountant/rules': () => ({ jurisdiction: 'ID', rules: [{ id: 'r1', rule_code: 'ID_PPH23_SERVICES', title: 'PPh 23 · services', obligation_type: 'withholding', parameters: { rate: 2 } }] }),
+  'GET /api/payroll/overview': () => ({
+    employees: [{ id: 'e1', name: 'Employee One', role: 'Operations', default_salary: 6000000, default_wallet_id: 'w2' }, { id: 'e2', name: 'Employee Two', role: 'Sales', default_salary: 4000000 }],
+    payments: [
+      { id: 'p1', employee_id: 'e1', employee_name: 'Employee One', period_month: iso(-5).slice(0, 7), payment_date: iso(-5), status: 'paid', gross_amount: 6000000, net_amount: 5820000,
+        payroll_payment_items: [{ direction: 'addition', amount: 6000000, label: 'Salary' }, { direction: 'deduction', amount: 60000, label: 'PPh 21' }, { direction: 'deduction', amount: 120000, label: 'BPJS' }] },
+      { id: 'p2', employee_id: 'e2', employee_name: 'Employee Two', period_month: iso(-5).slice(0, 7), payment_date: iso(-5), status: 'paid', gross_amount: 4000000, net_amount: 3920000,
+        payroll_payment_items: [{ direction: 'addition', amount: 4000000, label: 'Salary' }, { direction: 'deduction', amount: 80000, label: 'BPJS' }] },
+    ], summary: {} }),
   'GET /api/pulse/advanced-insights': (u) => ({ ok: true, metrics: u.searchParams.get('to') === iso(-31)
     ? { operating_revenue: 52300000, operating_cash_out: 70100000, capex: 0, tax_expense: 0, interest_expense: 0 }
     : { operating_revenue: 61200000, operating_cash_out: 96100000, capex: 14800000, tax_expense: 1200000, interest_expense: 0 } }),
