@@ -73,7 +73,7 @@ export default function Radar() {
       title={t('nav.radar')}
       sub={t('radar.sub', { n: horizon, from: shortDate(from, lang), to: shortDate(to, lang) })}
       actions={
-        <div className="v2-seg" role="group" aria-label={t('radar.horizon')}>
+        <div className="v2-seg v2-seg-wrap" role="group" aria-label={t('radar.horizon')}>
           {HORIZONS.map((h) => {
             const locked = h !== DEFAULT_HORIZON && !advanced
             return (
