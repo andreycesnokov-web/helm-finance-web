@@ -14,13 +14,28 @@
 // items with a remaining amount count (radarFigures sums every debt ever, including
 // paid ones), an overdue item lands today, items due after the horizon are left out,
 // and non-IDR items are excluded from the IDR line (never mixed without conversion).
+//
+// Pending approval (DECISIONS.md, open question 2): an item waiting for approval is
+// listed with a "Waiting for approval" tag but is NOT counted in any line or total
+// (`counted: false`), the same way the server leaves it out of Pulse totals. The
+// 'approve' what-if counts one such item, on screen only.
 
 export const KEY_DATE_MIN_IDR = 1_000_000
 export const DEFAULT_HORIZON = 30
 export const LATE_SHIFT_DAYS = 14
 
 const DAY = 86400000
-const startOfDay = (d) => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x }
+// Dates are LOCAL calendar days (review 8.2 #14). A date-only string such as '2026-10-08'
+// is read as that local day: `new Date('2026-10-08')` would be UTC midnight, which is the
+// previous local day west of UTC. Day offsets are added with setDate, never as 24 h
+// multiples, so a DST change cannot move an item to the wrong date.
+const startOfDay = (d) => {
+  const m = typeof d === 'string' && /^(\d{4})-(\d{2})-(\d{2})$/.exec(d)
+  const x = m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : new Date(d)
+  x.setHours(0, 0, 0, 0); return x
+}
+const addDays = (t0, n) => { const x = new Date(t0); x.setDate(x.getDate() + n); return x }
+const dayDiff = (a, b) => Math.round((Date.UTC(a.getFullYear(), a.getMonth(), a.getDate()) - Date.UTC(b.getFullYear(), b.getMonth(), b.getDate())) / DAY)
 const isoDay = (d) => { const x = new Date(d); return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}` }
 const num = (v) => { const n = Number(v); return Number.isFinite(n) ? n : 0 }
 
@@ -48,24 +63,26 @@ export function cashItems({ debts = [], obligations = [], today = new Date(), ho
     if (!d.due_date) { excluded.undated++; continue }
     const due = startOfDay(d.due_date)
     if (Number.isNaN(due.getTime())) { excluded.undated++; continue }
-    const day = Math.max(0, Math.round((due - t0) / DAY))
+    const day = Math.max(0, dayDiff(due, t0))
     if (day > horizon) continue
     const dir = d.type === 'receivable' ? 'in' : 'out'
     items.push({
       key: `debt:${d.id}`, id: d.id, source: 'debt', dir, amount, day,
-      date: isoDay(new Date(t0.getTime() + day * DAY)), due_date: d.due_date,
+      date: isoDay(addDays(t0, day)), due_date: d.due_date,
       label: d.counterparty || d.description || '', note: d.description || '',
       tag: tagOf(d, dir), days_overdue: num(d.days_overdue), type: d.type,
+      counted: d.approval_status !== 'pending_approval',
     })
   }
   for (const o of Array.isArray(obligations) ? obligations : []) {
     if (!o || o.status !== 'calculated' || !(num(o.amount) > 0) || !o.due_date) continue
     if (o.currency && o.currency !== 'IDR') { excluded.foreign++; continue }
-    const day = Math.max(0, Math.round((startOfDay(o.due_date) - t0) / DAY))
+    const day = Math.max(0, dayDiff(startOfDay(o.due_date), t0))
     if (day > horizon) continue
     items.push({
       key: `tax:${o.obligation_type}:${o.period}`, source: 'tax', dir: 'out', amount: num(o.amount), day,
-      date: isoDay(new Date(t0.getTime() + day * DAY)), label: o.title, note: o.period, tag: 'deadline',
+      date: isoDay(addDays(t0, day)), label: o.title, note: o.period, tag: 'deadline',
+      counted: true,
     })
   }
   items.sort((a, b) => a.day - b.day || (a.dir === b.dir ? b.amount - a.amount : a.dir === 'out' ? -1 : 1))
@@ -77,16 +94,26 @@ export function cashItems({ debts = [], obligations = [], today = new Date(), ho
  * same rules above.
  *   { kind: 'late', key }     the item arrives LATE_SHIFT_DAYS later
  *   { kind: 'collect', key }  the receivable is treated as certain (also in worst case)
+ *   { kind: 'approve', key }  an item waiting for approval is counted as if approved
  */
 export function applyScenario(items, scenario) {
   if (!scenario || !scenario.key) return items
   return items.map((it) => {
     if (it.key !== scenario.key) return it
-    if (scenario.kind === 'late') return { ...it, day: it.day + LATE_SHIFT_DAYS, shifted: true }
+    if (scenario.kind === 'late') {
+      // Shift the day AND the date from it, so the moved item shows its new date.
+      const day = it.day + LATE_SHIFT_DAYS
+      const date = it.date ? isoDay(addDays(startOfDay(it.date), LATE_SHIFT_DAYS)) : it.date
+      return { ...it, day, date, shifted: true }
+    }
     if (scenario.kind === 'collect') return { ...it, day: Math.min(it.day, 6), certain: true }
+    if (scenario.kind === 'approve') return { ...it, counted: true, assumed: true }
     return it
   })
 }
+
+/** Counted in lines and totals? Pending approval is not (see header). */
+export const isCounted = (it) => it.counted !== false
 
 /** Day-by-day series and the headline figures. */
 export function forecast({ balance = 0, burnRate = 0, items = [], horizon = DEFAULT_HORIZON, today = new Date() } = {}) {
@@ -95,13 +122,13 @@ export function forecast({ balance = 0, burnRate = 0, items = [], horizon = DEFA
   const days = []
   let inAll = 0, outAll = 0, inCertain = 0
   const byDay = new Map()
-  for (const it of items) { if (!byDay.has(it.day)) byDay.set(it.day, []); byDay.get(it.day).push(it) }
+  for (const it of items.filter(isCounted)) { if (!byDay.has(it.day)) byDay.set(it.day, []); byDay.get(it.day).push(it) }
   for (let d = 0; d <= horizon; d++) {
     for (const it of byDay.get(d) || []) {
       if (it.dir === 'in') { inAll += it.amount; if (it.certain) inCertain += it.amount } else outAll += it.amount
     }
     days.push({
-      day: d, date: isoDay(new Date(t0.getTime() + d * DAY)),
+      day: d, date: isoDay(addDays(t0, d)),
       expected: b + inAll - outAll - burn * d,
       best: b + inAll - outAll * 0.5,
       worst: b + inCertain - outAll - burn * d,
@@ -127,7 +154,7 @@ export function withCashAfter(items, { balance = 0, burnRate = 0 } = {}) {
   return items.map((it) => {
     running -= num(burnRate) * (it.day - lastDay)
     lastDay = it.day
-    running += it.dir === 'in' ? it.amount : -it.amount
+    if (isCounted(it)) running += it.dir === 'in' ? it.amount : -it.amount
     return { ...it, cashAfter: running }
   })
 }
@@ -141,14 +168,22 @@ export function keyDates(items, { filter = 'all', min = KEY_DATE_MIN_IDR } = {})
   return { shown, total: all.length, hiddenCount: hidden.length, hiddenSum: hidden.reduce((s, x) => s + x.amount, 0) }
 }
 
-/** Two data-driven what-if chips: the biggest receivable paying late, and collecting
- *  the biggest late one now. Returns [] when the data has neither. */
+/** Items waiting for approval: listed, not counted. */
+export function pendingSummary(items) {
+  const xs = items.filter((it) => !isCounted(it))
+  return { count: xs.length, sum: xs.reduce((s, x) => s + x.amount, 0) }
+}
+
+/** Data-driven what-if chips: the biggest receivable paying late, collecting the
+ *  biggest late one now, and approving the biggest pending item. [] when none apply. */
 export function scenarioChips(items) {
-  const ins = items.filter((it) => it.dir === 'in')
+  const ins = items.filter((it) => it.dir === 'in' && isCounted(it))
   const out = []
   const biggest = [...ins].sort((a, b) => b.amount - a.amount)[0]
   if (biggest) out.push({ kind: 'late', key: biggest.key, label: biggest.label, amount: biggest.amount })
   const late = ins.filter((it) => it.tag === 'late').sort((a, b) => b.amount - a.amount)[0]
   if (late) out.push({ kind: 'collect', key: late.key, label: late.label, amount: late.amount })
+  const pending = items.filter((it) => !isCounted(it)).sort((a, b) => b.amount - a.amount)[0]
+  if (pending) out.push({ kind: 'approve', key: pending.key, label: pending.label, amount: pending.amount, dir: pending.dir })
   return out
 }

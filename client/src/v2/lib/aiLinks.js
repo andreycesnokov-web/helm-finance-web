@@ -10,7 +10,9 @@
 // target page reads the filter from its own URL. Pure; tested in v2AiLinks.test.mjs.
 
 // cfo://<key> → route. Every target is a read-only screen.
-export const LINK_PAGES = {
+// Null-prototype maps + own-key checks: AI text is untrusted, so keys such as
+// "constructor", "__proto__" or "toString" must never resolve to Object.prototype members.
+export const LINK_PAGES = Object.assign(Object.create(null), {
   pulse: '/business/pulse',
   radar: '/business/radar',
   performance: '/business/performance',
@@ -27,17 +29,20 @@ export const LINK_PAGES = {
   documents: '/business/documents',
   accountant: '/business/accountant',
   assets: '/business/assets',
-}
+})
 const ROUTES = new Set(Object.values(LINK_PAGES))
 
-const PARAMS = {
+const PARAMS = Object.assign(Object.create(null), {
   month: /^\d{4}-(0[1-9]|1[0-2])$/,
   compare: /^\d{4}-(0[1-9]|1[0-2])$/,
   focus: /^[a-z0-9][a-z0-9-]{0,39}$/,
   tab: /^[a-z]{1,20}$/,
   filter: /^[a-z]{1,20}$/,
   q: /^[\p{L}\p{N} .,'-]{1,60}$/u,
-}
+})
+const own = (o, k) => typeof k === 'string' && Object.prototype.hasOwnProperty.call(o, k)
+const page = (key) => (own(LINK_PAGES, key) && typeof LINK_PAGES[key] === 'string' ? LINK_PAGES[key] : null)
+const okParam = (k, v) => own(PARAMS, k) && PARAMS[k] instanceof RegExp && typeof v === 'string' && PARAMS[k].test(v)
 
 /** Validate a link target. Returns the safe in-app path, or null. */
 export function safeTarget(raw) {
@@ -48,7 +53,7 @@ export function safeTarget(raw) {
     const rest = s.slice(6)
     const i = rest.indexOf('?')
     const key = (i < 0 ? rest : rest.slice(0, i)).replace(/\/+$/, '')
-    path = LINK_PAGES[key]
+    path = page(key)
     query = i < 0 ? '' : rest.slice(i + 1)
     if (!path) return null
   } else if (s.startsWith('/business/')) {
@@ -65,7 +70,7 @@ export function safeTarget(raw) {
       const [k, v = ''] = part.split('=')
       let val
       try { val = decodeURIComponent(v.replace(/\+/g, ' ')) } catch { return null }
-      if (!PARAMS[k] || !PARAMS[k].test(val) || out.has(k)) return null
+      if (!okParam(k, val) || out.has(k)) return null
       out.set(k, val)
     }
   }
@@ -77,11 +82,15 @@ const LINK_RE = /\[([^\]\n]{1,80})\]\(([^)\s]{1,300})\)/g
 
 /** Split AI text into [{ type: 'text', text } | { type: 'link', text, to }]. */
 export function parseAiText(text) {
+  try { return parseUnsafe(text) } catch { return [{ type: 'text', text: String(text ?? '') }] }
+}
+function parseUnsafe(text) {
   const s = String(text ?? '')
   const out = []
   let last = 0
   for (const m of s.matchAll(LINK_RE)) {
-    const to = safeTarget(m[2])
+    let to = null
+    try { to = safeTarget(m[2]) } catch { to = null }
     if (m.index > last) out.push({ type: 'text', text: s.slice(last, m.index) })
     out.push(to ? { type: 'link', text: m[1], to } : { type: 'text', text: m[1] })
     last = m.index + m[0].length
@@ -109,6 +118,6 @@ export function drillLink(page, { month, compare, focus } = {}) {
 /** Read the drill-down filter a target page received. Invalid values are dropped. */
 export function readDrill(search) {
   const sp = new URLSearchParams(search || '')
-  const pick = (k) => { const v = sp.get(k); return v && PARAMS[k].test(v) ? v : null }
+  const pick = (k) => { const v = sp.get(k); return v && okParam(k, v) ? v : null }
   return { month: pick('month'), compare: pick('compare'), focus: pick('focus') }
 }

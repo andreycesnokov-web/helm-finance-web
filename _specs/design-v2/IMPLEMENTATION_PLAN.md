@@ -179,3 +179,36 @@ Deviations from the plan above, each explained in its PR:
   endpoint was needed in batch 6.
 - Every existing `/business` page stays reachable inside the v2 shell under `…/classic`,
   `…/manage` or `…/tools`.
+
+## 7. Batch 8 — owner decisions applied (3 Oct 2026)
+
+The answers are in `DECISIONS.md`, which overrides section 5.
+
+- **Open questions.**
+  - Money numerals keep the tokens (JetBrains Mono).
+  - `pending_approval` items are counted nowhere:
+    - not in the Pulse forecast, "Next 7 days", or the Performance forecast;
+    - not in the Radar lines or cash-after.
+  - Radar lists pending items with the "Waiting for approval" tag. It also offers an on-screen "If you approve …" what-if; nothing is saved.
+  - Approvals and Bill detail count one pending item as if approved, because that is their question.
+  - Approve and reject still use the existing endpoints only.
+- **P-01 and P-08: targets.**
+  - Migrations 058 and 059 add the targets. They are read with `GET /api/business/targets` and written with `PATCH /api/business/targets`.
+  - The write path is for Business workspaces only, needs owner, ceo, admin or cfo, and is audited.
+  - Pulse uses the runway target, or 60 when it is null, and warns below the minimum cash.
+  - The targets are edited in Settings → Targets & alerts.
+  - The weekly brief is stored but not sent: there is no scheduler.
+- **P-04: counterparty tax fields.**
+  - Migration 060 adds entity form and payment terms. The `landlord` and `lender` roles are application roles.
+  - They are written through the existing POST and PATCH `/api/counterparties`. Setting the tax fields needs the accountant role or above.
+  - New v2 edit route: `/business/counterparties/:id/edit`.
+- **P-05: bill checklist (option B, batch 8.1).**
+  - Migration 061 adds only the accountant check. The withholding slip is read from `withholding_records.bukti_potong_document_id` (031) with the read-only `GET /api/withholding-slips`.
+  - The check is written with `PATCH /api/debts/:id/checklist`, which needs the accountant role or above and is audited.
+  - `POST /api/debts` now strips these fields from the body it spreads.
+  - The marks show in Bill detail and in the Accountant packages.
+- **P-10.** `P10_TEMPLATE.md` is ready for owner review. There is no migration yet.
+- **Not applied anywhere.** Until the owner applies migrations 058–061:
+  - GET reads return nulls;
+  - the batch-8 writes answer 409 `migration_not_applied`;
+  - the screens show that state.

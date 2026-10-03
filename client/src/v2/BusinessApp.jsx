@@ -114,6 +114,7 @@ export default function BusinessApp() {
           <Route path="counterparties" element={<V2Counterparties />} />
           <Route path="counterparties/manage" element={<Counterparties />} />
           <Route path="counterparties/new" element={<AddCounterparty />} />
+          <Route path="counterparties/:id/edit" element={<AddCounterparty />} />
           {/* Accounting */}
           <Route path="documents" element={<V2Documents />} />
           <Route path="documents/classic" element={<BusinessDocuments />} />

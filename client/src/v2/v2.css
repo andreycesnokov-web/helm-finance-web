@@ -257,6 +257,9 @@
 .v2-desk { display: none; }
 @media (min-width: 1025px) { .v2-phone { display: none !important; } .v2-desk { display: inline-flex; } }
 .v2-root a { color: var(--text-link); }
+.v2-linkbtn { background: none; border: 0; padding: 0; min-height: var(--touch-min); font: inherit; font-weight: 600; color: var(--text-link); cursor: pointer; text-decoration: underline; white-space: nowrap; }
+.v2-linkbtn:disabled { color: var(--text-muted); cursor: default; }
+.v2-linkbtn:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
 .v2-root a.v2-btn-primary, .v2-root a.v2-addbtn, .v2-root a.v2-tab, .v2-root a.v2-nav,
 .v2-root a.v2-morerow, .v2-root a.v2-btn, .v2-root a.v2-tile, .v2-root a.v2-topbar-ws, .v2-root a.v2-iconbtn { text-decoration: none; }
 .v2-root a.v2-btn-primary { color: var(--action-primary-text); }
@@ -270,6 +273,7 @@
 
 /* Segmented control */
 .v2-seg { display: inline-flex; flex-wrap: nowrap !important; max-width: 100%; overflow-x: auto; gap: 2px; padding: 3px; background: var(--surface-card); border: 1px solid var(--border-default); border-radius: var(--radius-md); flex-wrap: wrap; }
+.v2-seg.v2-seg-wrap { flex-wrap: wrap !important; overflow-x: visible; }
 .v2-seg-btn {
   font: inherit; font-size: var(--text-sm); font-weight: 700; color: var(--text-secondary);
   min-height: 36px; padding: 0 var(--space-3); border: 0; border-radius: var(--radius-control); background: transparent;
@@ -810,3 +814,12 @@
 .v2-flag > .v2-pill { grid-area: s; }
 .v2-flag > .v2-small { grid-area: k; }
 @media (min-width: 1025px) { .v2-flag { grid-template-columns: minmax(0, 1fr) 200px auto; grid-template-areas: "n k s"; } }
+
+/* Disabled "+ Add" until Add is migrated (review 8.2 #3) */
+.v2-addbtn:disabled, .v2-tab:disabled { opacity: .55; cursor: not-allowed; }
+button.v2-tab { background: none; border: 0; font: inherit; color: inherit; }
+button.v2-addbtn { border: 0; font: inherit; text-align: left; width: 100%; }
+/* Disabled Add (review 8.2 #3): the note sits under the label and wraps, never cut off. */
+button.v2-addbtn:disabled { height: auto; min-height: var(--touch-min); padding: 8px 14px; flex-direction: column; align-items: flex-start; justify-content: center; gap: 2px; }
+button.v2-addbtn:disabled .v2-addbtn-hint { white-space: normal; }
+.v2-locked { display: flex; gap: var(--space-3); align-items: flex-start; padding: var(--space-5); }

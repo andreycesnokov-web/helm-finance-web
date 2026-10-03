@@ -12,6 +12,8 @@ const FININ = require('./lib/financialInsights');
 const SETTLE = require('./lib/invoiceSettlement');
 const docA = require('./lib/documentAccess');
 const TX = require('./lib/transactionClass');
+const TARGETS = require('./lib/businessTargets');   // Design v2 P-01/P-08 (migrations 058, 059)
+const CHECKLIST = require('./lib/billChecklist');   // Design v2 P-05 (migration 061)
 // Telegram-created payables are IDR-only until multi-currency payables exist end to end.
 // See server/lib/telegramCurrency.js for why refusing beats recording a wrong row.
 const { isSupportedTelegramCurrency, currencyNotSupported, normalizeCurrency } = require('./lib/telegramCurrency');
@@ -1294,7 +1296,9 @@ app.post('/api/debts', auth, async (req, res) => {
   const confirmed = canCreateConfirmedFinancialRecord(biz.role);
   const amount = Number(req.body.amount || 0);
   const insertRow = {
-    ...req.body,
+    // The bill checklist marks (migration 061) are set only through
+    // PATCH /api/debts/:id/checklist, which checks the role and writes an audit row.
+    ...CHECKLIST.withoutChecklistFields(req.body),
     ...bizWriteFields(biz, userId),
     original_amount: amount,  // lock original amount; never mutate this
     paid_amount:     0,
@@ -1731,6 +1735,68 @@ app.post('/api/debts/:id/request-info', auth, async (req, res) => {
 
     notifyRequestCreatorViaTelegram({ debt: data, event: 'request_info', actorUserId: userId, actorRole: biz.role, note: note || null });
     res.json(computeDebtStatus(data));
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── PATCH /api/debts/:id/checklist — bill checklist: accountant check (Design v2 P-05) ──
+// The withholding slip is NOT set here: it lives in withholding_records (migration 031)
+// and is read with GET /api/withholding-slips. Accountant role and above; audited.
+// Nothing closes on its own: this never pays, settles, approves or files anything.
+// Before migration 061 is applied the columns do not exist → 409, nothing written.
+app.patch('/api/debts/:id/checklist', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (biz.business?.type === 'personal')
+      return res.status(403).json({ error: 'business_workspace_required' });
+    if (!CHECKLIST.canEditChecklist(biz.role))
+      return res.status(403).json({ error: 'Only an accountant, owner, admin or CFO can update the bill checklist' });
+
+    const { patch, error: vErr } = CHECKLIST.checklistPatchFromBody(req.body || {}, { userId: req.user.userId });
+    if (vErr) return res.status(400).json({ error: vErr });
+
+    const { data: rows, error: rErr } = await supabase.from('debts')
+      .select('id, business_id, accountant_checked_at, accountant_checked_by')
+      .eq('id', req.params.id).eq('business_id', biz.business.id).limit(1);
+    if (rErr && TARGETS.isMissingColumn(rErr)) return res.status(409).json({ error: 'migration_not_applied', migration: '061' });
+    if (rErr) return res.status(500).json({ error: rErr.message });
+    const before = rows?.[0];
+    if (!before) return res.status(404).json({ error: 'Debt not found' });
+
+    const { data, error } = await supabase.from('debts').update(patch)
+      .eq('id', before.id).eq('business_id', biz.business.id)
+      .select('id, accountant_checked_at, accountant_checked_by').single();
+    if (error && TARGETS.isMissingColumn(error)) return res.status(409).json({ error: 'migration_not_applied', migration: '061' });
+    if (error) return res.status(500).json({ error: error.message });
+
+    const pick = (r) => ({ accountant_checked_at: r.accountant_checked_at ?? null, accountant_checked_by: r.accountant_checked_by ?? null });
+    await recordAudit({
+      businessId: biz.business.id, actorUserId: req.user.userId, actorRole: biz.role,
+      entityType: 'debt', entityId: before.id, action: 'debt_checklist_updated',
+      before: pick(before), after: pick(data),
+    });
+    res.json({ id: data.id, checklist: pick(data) });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── GET /api/withholding-slips — read-only: withholding records and their slips ──────
+// Design v2 P-05 option B: the bill checklist and the Accountant "Tax slips to make"
+// counter read the bukti potong from withholding_records.bukti_potong_document_id
+// (migration 031). Business-scoped, finance roles only, READ-ONLY. If the table is absent
+// the answer is an empty map with available:false, so the screens keep their old state.
+app.get('/api/withholding-slips', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (biz.business?.type === 'personal')
+      return res.status(403).json({ error: 'business_workspace_required' });
+    if (!canViewBusinessFinance(biz.role))
+      return res.status(403).json({ error: 'Your role does not allow viewing withholding records' });
+    const { data, error } = await supabase.from('withholding_records')
+      .select('id, debt_id, status, tax_type, withholding_amount, bukti_potong_document_id')
+      .eq('business_id', biz.business.id).not('debt_id', 'is', null).limit(2000);
+    if (error) return res.json({ by_debt: {}, available: false });
+    res.json({ by_debt: CHECKLIST.slipsByDebt(data), available: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -8160,6 +8226,9 @@ function cpPublic(row, accounts) {
     group_name: row.group_name || null,
     default_category: row.default_category || null,
     default_tax_treatment: row.default_tax_treatment || null,
+    // Design v2 P-04 (migration 060). Absent column → null, so nothing breaks before apply.
+    entity_form: row.entity_form ?? null,
+    payment_terms_days: row.payment_terms_days ?? null,
     status: row.status || (row.is_active === false ? 'archived' : 'active'),
     is_active: row.is_active !== false,
     source_system: row.source_system || null,
@@ -8247,6 +8316,11 @@ app.post('/api/counterparties', auth, async (req, res) => {
       return res.status(400).json({ error: 'invalid_role', allowed: CP_ROLES });
     if (b.pkp_status && !['unknown', 'pkp', 'non_pkp'].includes(b.pkp_status))
       return res.status(400).json({ error: 'invalid_pkp_status' });
+    // Tax fields (P-04): validated, and only the accountant role and above may set them.
+    const tax = CPI.taxFieldsFromBody(b);
+    if (tax.error) return res.status(400).json({ error: tax.error, allowed: tax.allowed });
+    if (Object.keys(tax.fields).length && !CPI.canSetTaxFields(biz.role))
+      return res.status(403).json({ error: 'Only an accountant, owner, admin or CFO can set entity form or payment terms' });
 
     const bankAccounts = Array.isArray(b.bank_accounts) ? b.bank_accounts : [];
     const candidate = {
@@ -8282,8 +8356,12 @@ app.post('/api/counterparties', auth, async (req, res) => {
       status: 'active',
       source_system: b.source_system || null, external_id: b.external_id || null,
       external_url: b.external_url || null,
+      // Only when sent, so a database without migration 060 keeps accepting creates.
+      ...tax.fields,
     };
     const { data, error } = await supabase.from('counterparties').insert(row).select().single();
+    if (error && Object.keys(tax.fields).length && TARGETS.isMissingColumn(error))
+      return res.status(409).json({ error: 'migration_not_applied', migration: '060' });
     if (error) {
       console.error(`[counterparties] create failed: ${error.message}`);
       return res.status(500).json({ error: error.message });
@@ -8334,8 +8412,12 @@ app.patch('/api/counterparties/:id', auth, async (req, res) => {
       return res.status(400).json({ error: 'invalid_role', allowed: CP_ROLES });
     if (b.pkp_status && !['unknown', 'pkp', 'non_pkp'].includes(b.pkp_status))
       return res.status(400).json({ error: 'invalid_pkp_status' });
+    const tax = CPI.taxFieldsFromBody(b);
+    if (tax.error) return res.status(400).json({ error: tax.error, allowed: tax.allowed });
+    if (Object.keys(tax.fields).length && !CPI.canSetTaxFields(biz.role))
+      return res.status(403).json({ error: 'Only an accountant, owner, admin or CFO can set entity form or payment terms' });
 
-    const patch = { updated_at: new Date().toISOString() };
+    const patch = { updated_at: new Date().toISOString(), ...tax.fields };
     const setIf = (key, val) => { if (val !== undefined) patch[key] = val; };
     setIf('name', b.legal_name ?? b.name);
     setIf('legal_name', b.legal_name ?? b.name);
@@ -8368,6 +8450,8 @@ app.patch('/api/counterparties/:id', auth, async (req, res) => {
     const { data, error } = await supabase.from('counterparties')
       .update(patch).eq('id', existing.id).eq('business_id', existing.business_id)
       .select().single();
+    if (error && Object.keys(tax.fields).length && TARGETS.isMissingColumn(error))
+      return res.status(409).json({ error: 'migration_not_applied', migration: '060' });
     if (error) throw error;
 
     // Bank accounts are ADDED here, never silently replaced: dropping an account a
@@ -10687,6 +10771,65 @@ app.post('/api/debts/:id/pay', auth, async (req, res) => {
 // ── Business Settings Endpoint ───────────────────────────────────────────────
 // PATCH /api/business/current — owner/admin can update safe fields
 const BUSINESS_ALLOWED_CURRENCIES = ['IDR', 'USD', 'EUR', 'SGD', 'MYR', 'THB', 'CNY'];
+
+// ── Business targets and alerts (Design v2 P-01 + P-08; migrations 058, 059) ──
+// runway target, minimum cash, weekly brief schedule. Business workspaces only, never
+// Personal. Read: finance roles. Write: owner/ceo/admin/cfo, audited.
+// No financial effect. The weekly brief is NOT sent by anything yet (no scheduler); when
+// it is, recipients come from notificationPolicy ('ai_cfo_summary'), not from here.
+// Before the migrations are applied: GET returns nulls with available:false (the UI keeps
+// its defaults), PATCH returns 409 and writes nothing.
+async function loadBusinessTargets(businessId) {
+  const { data, error } = await supabase.from('businesses')
+    .select(TARGETS.COLUMNS.join(', ')).eq('id', businessId).limit(1);
+  if (error && TARGETS.isMissingColumn(error)) return { row: null, available: false };
+  if (error) throw error;
+  return { row: data?.[0] || null, available: true };
+}
+
+app.get('/api/business/targets', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (biz.business?.type === 'personal')
+      return res.status(403).json({ error: 'business_workspace_required' });
+    if (!canViewBusinessFinance(biz.role))
+      return res.status(403).json({ error: 'Your role does not allow viewing business targets' });
+    const { row, available } = await loadBusinessTargets(biz.business.id);
+    res.json({ targets: TARGETS.publicTargets(row), available, can_edit: TARGETS.canEditTargets(biz.role) });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.patch('/api/business/targets', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (biz.business?.type === 'personal')
+      return res.status(403).json({ error: 'business_workspace_required' });
+    if (!TARGETS.canEditTargets(biz.role))
+      return res.status(403).json({ error: 'Only owner, CEO, admin or CFO can change targets' });
+
+    const { patch, error: vErr, field } = TARGETS.targetsPatchFromBody(req.body || {});
+    if (vErr) return res.status(400).json({ error: vErr, field });
+    if (!Object.keys(patch).length) return res.status(400).json({ error: 'no_target_fields', allowed: TARGETS.COLUMNS });
+
+    const { row: before, available } = await loadBusinessTargets(biz.business.id);
+    if (!available) return res.status(409).json({ error: 'migration_not_applied', migration: '058/059' });
+
+    const { data, error } = await supabase.from('businesses')
+      .update({ ...patch, updated_at: new Date().toISOString() })
+      .eq('id', biz.business.id).select(TARGETS.COLUMNS.join(', ')).single();
+    if (error && TARGETS.isMissingColumn(error)) return res.status(409).json({ error: 'migration_not_applied', migration: '058/059' });
+    if (error) return res.status(500).json({ error: error.message });
+
+    await recordAudit({
+      businessId: biz.business.id, actorUserId: req.user.userId, actorRole: biz.role,
+      entityType: 'business', entityId: biz.business.id, action: 'business_targets_updated',
+      before: TARGETS.publicTargets(before), after: TARGETS.publicTargets(data),
+    });
+    res.json({ targets: TARGETS.publicTargets(data), available: true, can_edit: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
 
 app.patch('/api/business/current', auth, async (req, res) => {
   try {

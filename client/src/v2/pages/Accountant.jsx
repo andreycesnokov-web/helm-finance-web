@@ -8,7 +8,8 @@
 // (engine-calculated amounts). The ask box uses the existing POST /api/accountant/ask,
 // which answers from the verified rules and changes no data.
 // "Engines calculate, AI explains": no rate, date or amount is computed in this file.
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { useWorkspace } from '../../shell/WorkspaceProvider'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
 import I from '../icons'
@@ -19,6 +20,7 @@ import { money, shortDate } from '../lib/format'
 import { monthOptions, defaultCloseMonth, closeReadiness, packages, packageSummary, monthGrid, complianceEvents, eventStage } from '../lib/accounting'
 import { askAccountant } from '../lib/ask'
 import AccountantTabs from '../components/AccountantTabs'
+import { findWithholdingRule } from '../../pages/business/InvoiceReviewDrawer'
 
 const monthLabel = (key, lang) => {
   const [y, m] = key.split('-').map(Number)
@@ -41,12 +43,18 @@ function AskBox() {
   const { token } = useAuth()
   const [q, setQ] = useState('')
   const [st, setSt] = useState({ busy: false, answer: null, err: null })
+  // One business's answer never shows under another (review 8.2 #2).
+  const { active, scopeKey } = useWorkspace()
+  const wsKey = `${active?.id ?? ''}|${scopeKey ?? ''}`
+  const wsRef = useRef(wsKey)
+  useEffect(() => { wsRef.current = wsKey; setQ(''); setSt({ busy: false, answer: null, err: null }) }, [wsKey])
   const ask = async (question) => {
     const text = (question ?? q).trim()
     if (!text) return
+    const asked = wsRef.current
     setQ(text); setSt({ busy: true, answer: null, err: null })
-    try { const r = await askAccountant(token, text); setSt({ busy: false, answer: r, err: null }) }
-    catch (e) { setSt({ busy: false, answer: null, err: e?.status === 403 ? t('dec.forbidden') : e.message }) }
+    try { const r = await askAccountant(token, text); if (wsRef.current === asked) setSt({ busy: false, answer: r, err: null }) }
+    catch (e) { if (wsRef.current === asked) setSt({ busy: false, answer: null, err: e?.status === 403 ? t('dec.forbidden') : e.message }) }
   }
   return (
     <Card>
@@ -169,7 +177,11 @@ function PackagesTab({ month }) {
   const [sel, setSel] = useState(null)
   const tx = useApi('/transactions?period=all')
   const debts = useApi('/debts')
-  const rows = useMemo(() => packages({ month, transactions: Array.isArray(tx.data) ? tx.data : [], debts: Array.isArray(debts.data) ? debts.data : [] }), [month, tx.data, debts.data])
+  const rules = useApi('/accountant/rules')
+  // A slip is expected only when the verified engine has a withholding rate (as on Bill detail).
+  const slipNeeded = findWithholdingRule(rules.data?.rules || [])?.rate != null
+  const slips = useApi('/withholding-slips')
+  const rows = useMemo(() => packages({ month, slipNeeded, slips: slips.data, transactions: Array.isArray(tx.data) ? tx.data : [], debts: Array.isArray(debts.data) ? debts.data : [] }), [month, tx.data, debts.data, slipNeeded, slips.data])
   if (tx.loading || debts.loading) return <Card><Skeleton rows={6} /></Card>
   if (tx.error) return <ErrorBox error={tx.error} onRetry={tx.reload} />
   const s = packageSummary(rows)
@@ -182,7 +194,10 @@ function PackagesTab({ month }) {
         <div className="v2-tile"><span className="v2-tile-label">{t('acct.pk.complete')}</span><span className="v2-tile-val v2-num">{s.complete}</span><span className="v2-tile-sub">{t('acct.pk.ofN', { n: s.total })}</span></div>
         <div className="v2-tile"><span className="v2-tile-label">{t('acct.pk.missing')}</span><span className="v2-tile-val v2-num">{s.missing}</span></div>
         <div className="v2-tile"><span className="v2-tile-label">{t('acct.pk.nocat')}</span><span className="v2-tile-val v2-num">{s.nocat}</span></div>
-        <div className="v2-tile"><span className="v2-tile-label">{t('acct.pk.slips')}</span><span className="v2-tile-val v2-muted">—</span><span className="v2-tile-sub">{t('bill.doc.notTracked')}</span></div>
+        <div className="v2-tile"><span className="v2-tile-label">{t('acct.pk.slips')}</span>
+          {s.slipsToMake == null
+            ? <><span className="v2-tile-val v2-muted">—</span><span className="v2-tile-sub">{t('bill.doc.notTracked')}</span></>
+            : <span className="v2-tile-val v2-num">{s.slipsToMake}</span>}</div>
       </div>
       <div className="v2-grid-detail">
         <Card className="v2-col">
@@ -218,8 +233,10 @@ function PackagesTab({ month }) {
                   <li key={i.key} className={i.done ? 'is-done' : ''}>
                     <span className="v2-check-mark" aria-hidden="true">{i.done ? <I.check size={14} /> : null}</span>
                     <span className="v2-check-text"><span>{t(`acct.pk.item.${i.key}`)}</span>
-                      <span className="v2-muted v2-small">{i.done ? t('bill.doc.have') : i.unknown ? t('bill.doc.notTracked') : i.pending ? t('bill.doc.proofSub') : t('bill.doc.missing')}</span></span>
-                    {!i.done && !i.unknown && !i.pending && (i.key === 'category'
+                      <span className="v2-muted v2-small">{i.done ? t('bill.doc.have') : i.unknown ? t('bill.doc.notTracked') : i.pending ? t('bill.doc.proofSub') : i.review ? t('bill.ck.notChecked') : t('bill.doc.missing')}</span></span>
+                    {!i.done && !i.unknown && !i.pending && (i.review || i.key === 'slip'
+                      ? <Link to={`/business/${cur.kind === 'in' ? 'receivables' : 'payables'}/${cur.id}`}>{t('bills.open')}</Link>
+                      : i.key === 'category'
                       ? <Link to="/business/transactions">{t('tx.chooseCategory')}</Link>
                       : <Link to="/business/documents">{t('bill.upload')}</Link>)}
                   </li>
@@ -282,7 +299,7 @@ function TaxesTab({ month }) {
         </Card>
         <Card title={t('acct.ahead')}>
           <TaxList events={later} lang={lang} t={t} limit={12} empty="acct.noLater" />
-          <Link to="/accountant/calendar">{t('acct.fullEngineCalendar')}</Link>
+          {/* No link to /accountant/calendar: that page calls the write-on-read endpoint (DECISIONS Q5). */}
         </Card>
       </div>
       <aside className="v2-col">

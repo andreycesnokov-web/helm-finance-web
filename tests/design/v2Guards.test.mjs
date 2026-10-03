@@ -31,6 +31,10 @@ export const WRITE_ALLOW = [
   { method: 'POST', path: '/request-info' },    // POST  /api/debts/:id/request-info
   { method: 'PATCH', path: '/transactions/' },  // PATCH /api/transactions/:id (category)
   { method: 'POST', path: "'/counterparties'" },// POST  /api/counterparties
+  // Batch 8 — approved proposals (DECISIONS.md): role-checked and audited on the server.
+  { method: 'PATCH', path: '`/counterparties/' }, // PATCH /api/counterparties/:id (P-04)
+  { method: 'PATCH', path: "'/business/targets'" }, // PATCH /api/business/targets (P-01, P-08)
+  { method: 'PATCH', path: '/checklist' },      // PATCH /api/debts/:id/checklist (P-05)
 ]
 const ACTIONS = path.join(V2, 'lib', 'actions.js')
 // POSTs that ask an existing AI endpoint a question and change no data. Only in lib/ask.js.
@@ -106,10 +110,11 @@ t('v2 makes no mutating request outside the reviewed allow-list', () => {
   }
 })
 
-t('no new write endpoint: every allowed write exists on the server today', () => {
+t('every allowed write exists on the server (batch 8 routes are the approved ones only)', () => {
   const server = read(path.join(ROOT, 'server/index.js'))
   for (const r of [/app\.patch\('\/api\/debts\/:id\/approve'/, /app\.patch\('\/api\/debts\/:id\/reject'/,
-    /app\.post\('\/api\/debts\/:id\/request-info'/, /app\.patch\('\/api\/transactions\/:id'/, /app\.post\('\/api\/counterparties'/]) {
+    /app\.post\('\/api\/debts\/:id\/request-info'/, /app\.patch\('\/api\/transactions\/:id'/, /app\.post\('\/api\/counterparties'/,
+    /app\.patch\('\/api\/counterparties\/:id'/, /app\.patch\('\/api\/business\/targets'/, /app\.patch\('\/api\/debts\/:id\/checklist'/]) {
     assert.ok(r.test(server), `server route ${r} missing`)
   }
 })

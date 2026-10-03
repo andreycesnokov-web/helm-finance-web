@@ -1,6 +1,6 @@
 // Pulse (design v2) model. Run: node tests/design/v2PulseModel.test.mjs
 import assert from 'node:assert'
-import { runwayDays, pulseStatus, headlineKey, decisions, nextDays, flowOf, pctChange, obligationTiles, RUNWAY_TARGET_DAYS } from '../../client/src/v2/lib/pulseModel.js'
+import { runwayDays, pulseStatus, headlineKey, decisions, nextDays, flowOf, pctChange, obligationTiles, RUNWAY_TARGET_DAYS, runwayTarget, minCash } from '../../client/src/v2/lib/pulseModel.js'
 
 let pass = 0, fail = 0
 const t = (name, fn) => { try { fn(); pass++; console.log(`  ok  ${name}`) } catch (e) { fail++; console.log(`  XX  ${name}\n      ${e.message}`) } }
@@ -44,6 +44,26 @@ t('next 7 days adds measured day-to-day spending to money going out', () => {
     { burnRate: 2, forecastDays: [{ day: 7, date: 'd7', expected: 50 }] })
   assert.deepStrictEqual([n.comingIn, n.goingOut, n.dayToDay], [10, 18, 14])
   assert.deepStrictEqual(n.cashOn, { date: 'd7', value: 50 })
+})
+
+t('next 7 days leaves pending approval out of sums and list (DECISIONS.md q2)', () => {
+  const n = nextDays([{ day: 1, dir: 'in', amount: 10 }, { day: 2, dir: 'out', amount: 40, counted: false, tag: 'approval' }], { burnRate: 0 })
+  assert.deepStrictEqual([n.comingIn, n.goingOut, n.list.length], [10, 0, 1])
+})
+
+t('runway target and minimum cash: business setting when valid, documented default otherwise (P-01, P-08)', () => {
+  assert.strictEqual(runwayTarget(null), RUNWAY_TARGET_DAYS)
+  assert.strictEqual(runwayTarget({ runway_target_days: null }), 60)
+  assert.strictEqual(runwayTarget({ runway_target_days: 90 }), 90)
+  assert.strictEqual(runwayTarget({ runway_target_days: 0 }), 60)
+  assert.strictEqual(runwayTarget({ runway_target_days: 12.5 }), 60)
+  assert.strictEqual(minCash(null), null)
+  assert.strictEqual(minCash({ min_cash_idr: '25000000.00' }), 25e6)
+  assert.strictEqual(minCash({ min_cash_idr: -1 }), null)
+  assert.strictEqual(pulseStatus({ runway: 100, lowestExpected: 10e6, target: 60, floor: 20e6 }), 'warn')
+  assert.strictEqual(headlineKey('warn', { runway: 100, lowestExpected: 10e6, target: 60, floor: 20e6 }), 'pulse.head.belowFloor')
+  assert.strictEqual(pulseStatus({ runway: 70, lowestExpected: 10e6, target: 90 }), 'warn')
+  assert.strictEqual(pulseStatus({ runway: 70, lowestExpected: 10e6 }), 'good')
 })
 
 t('money in/out excludes funding, transfers and opening balances', () => {

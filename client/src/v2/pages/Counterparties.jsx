@@ -1,5 +1,6 @@
 // Counterparties (designs/Counterparties.dc.html). Directory from GET /api/counterparties,
-// open balances and payment habits from GET /api/debts (matched by name).
+// open balances and payment habits from GET /api/debts (matched by name). A name opens
+// the v2 edit form (existing PATCH /api/counterparties/:id); "Edit details" stays Classic.
 // Duplicate suggestions (same NPWP or same bank account) are shown, never merged:
 // "Keep both" only hides the suggestion on this device; merging is not available.
 import { useMemo, useState } from 'react'
@@ -82,7 +83,7 @@ export default function Counterparties() {
               return (
                 <div key={c.id} className="v2-cprow" role="row">
                   <span role="cell" className="v2-cp-name">
-                    <Link to="/business/counterparties/manage">{c.display_name || c.name}</Link>
+                    <Link to={`/business/counterparties/${encodeURIComponent(c.id)}/edit`}>{c.display_name || c.name}</Link>
                     {c.source_system === 'mcp' && <span className="v2-muted v2-small">{t('cp.byAi')}</span>}
                   </span>
                   <span role="cell"><Pill tone="neutral">{t(`cp.role.${c.role || 'other'}`)}</Pill></span>
@@ -92,8 +93,10 @@ export default function Counterparties() {
                   <span role="cell" className="v2-small">{!h || h.paidCount === 0 ? <span className="v2-muted">{t('cp.noHistory')}</span>
                     : h.avgLate ? t('cp.avgLate', { n: h.avgLate }) : t('cp.onTime', { k: h.onTime, n: h.paidCount })}</span>
                   <span role="cell" className="v2-small">
-                    {[c.pkp_status === 'pkp' ? 'PKP' : c.pkp_status === 'non_pkp' ? 'Non-PKP' : null,
-                      c.npwp ? t('cp.npwpOnFile') : null, c.default_tax_treatment].filter(Boolean).join(' · ')
+                    {[c.entity_form ? t(`cp.form.ef.${c.entity_form}`) : null,
+                      c.pkp_status === 'pkp' ? 'PKP' : c.pkp_status === 'non_pkp' ? 'Non-PKP' : null,
+                      c.npwp ? t('cp.npwpOnFile') : null, c.default_tax_treatment,
+                      c.payment_terms_days != null ? t('cp.termsN', { n: c.payment_terms_days }) : null].filter(Boolean).join(' · ')
                       || <Pill tone="warn">{t('cp.missing')}</Pill>}
                   </span>
                 </div>

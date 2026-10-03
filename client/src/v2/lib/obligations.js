@@ -71,6 +71,22 @@ export function withholdingSplit(amount, engineRate) {
   return { gross, rate, tax, net: gross - tax }
 }
 
+/**
+ * Does this bill carry a withholding treatment? (review 8.2 #9)
+ *   'withhold'  the counterparty's default tax treatment names a withholding (PPh 23 / 4(2) /
+ *               "withhold") and does not say "no"/"not"/"none"
+ *   'applied'   the bill was already created net of withholding (its description says so)
+ *   null        no treatment → no split is shown (goods, fuel, "no withholding" parties …)
+ * The rate itself still comes only from the verified rule engine.
+ */
+export function withholdingTreatment(debt, counterparty) {
+  if (!debt || debt.type === 'receivable' || (debt.currency || 'IDR') !== 'IDR') return null
+  if (/\bwithheld\b/i.test(String(debt.description || ''))) return 'applied'
+  const tt = String(counterparty?.default_tax_treatment || '').toLowerCase()
+  if (!tt || /\b(no|not|none|tidak)\b/.test(tt)) return null
+  return /pph[\s_]*23|4\s*\(\s*2\s*\)|pph[\s_]*4[\s_]*2|withhold|potong/.test(tt) ? 'withhold' : null
+}
+
 /** How a counterparty has paid (receivables) or been paid (payables), from history. */
 export function payerHistory(debts = [], name) {
   const key = String(name || '').trim().toLowerCase()
@@ -134,7 +150,8 @@ export function holderMatches(holder, legalName) {
 /** Counterparty list filter: all | customer | supplier | missing. */
 export function cpFilter(cp, f) {
   if (f === 'customer') return cp.role === 'customer' || cp.role === 'both'
-  if (f === 'supplier') return cp.role === 'vendor' || cp.role === 'both'
+  // A landlord supplies the premises; a lender is not a supplier (P-04 roles).
+  if (f === 'supplier') return cp.role === 'vendor' || cp.role === 'both' || cp.role === 'landlord'
   if (f === 'missing') return !cp.npwp
   return true
 }
@@ -214,4 +231,23 @@ export function latestPayrollRun(overview) {
     tax: people.some((x) => x.tax != null) ? sum('tax') : null,
     paid: inRun.every((p) => p.status === 'paid'), date: inRun.map((p) => p.payment_date).filter(Boolean).sort().pop() || null,
   }
+}
+
+/**
+ * Bill detail checklist (designs/BillDetail.dc.html): invoice, payment proof, withholding
+ * slip (only when the verified engine computed a withholding) and accountant check.
+ *   slip   read from withholding_records.bukti_potong_document_id (migration 031, via
+ *          GET /api/withholding-slips) — `slips` is { available, by_debt }. Read-only here.
+ *   check  the P-05 mark (migration 061); before 061 it is `unknown`, never claimed done.
+ */
+export function billChecklistItems(d, { hasInvoice = false, paid = false, slipNeeded = false, slips = null } = {}) {
+  const checkTracked = !!d && Object.prototype.hasOwnProperty.call(d, 'accountant_checked_at')
+  const slipTracked = slips?.available === true
+  const slipDoc = slipTracked ? slips.by_debt?.[String(d?.id)]?.slip_document_id || null : null
+  return [
+    { key: 'invoice', done: !!hasInvoice, link: hasInvoice ? '/business/documents' : null },
+    { key: 'proof', done: !!paid && !!(d?.linked_transaction_id || d?.last_payment_at) },
+    ...(slipNeeded ? [{ key: 'slip', done: !!slipDoc, unknown: !slipTracked, documentId: slipDoc }] : []),
+    { key: 'check', done: checkTracked && !!d.accountant_checked_at, unknown: !checkTracked, editable: checkTracked },
+  ]
 }

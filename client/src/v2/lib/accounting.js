@@ -55,10 +55,19 @@ export function closeReadiness({ month, transactions = [], debts = [], batches =
 
 /**
  * Documents by transaction: one row per bill/invoice and per uncategorised transaction of
- * the month, with the package it needs. Only what the records carry is marked done; the
- * withholding slip is "not tracked yet" (PROPOSALS P-05).
+ * the month, with the package it needs. Only what the records carry is marked done.
+ *
+ * P-05:
+ *   slip   the withholding slip — only for IDR supplier bills when the verified engine has a
+ *          withholding rate (`slipNeeded`, the same test Bill detail uses). Read from
+ *          withholding_records (migration 031) via `slips` = { available, by_debt }; while
+ *          that read is unavailable the slip is "not tracked here yet".
+ *   check  "checked by an accountant" (migration 061) — a review mark, not a document: an
+ *          unchecked bill is 'open', never 'missing'. Before 061 there is no check item.
  */
-export function packages({ month, transactions = [], debts = [] }) {
+export const checklistTracked = (d) => !!d && Object.prototype.hasOwnProperty.call(d, 'accountant_checked_at')
+
+export function packages({ month, transactions = [], debts = [], slipNeeded = false, slips = null }) {
   const rows = []
   for (const d of debts) {
     if (d.is_training === true || d.status === 'cancelled' || !inMonth(d.due_date || d.created_at, month)) continue
@@ -68,7 +77,11 @@ export function packages({ month, transactions = [], debts = [] }) {
       { key: pay ? 'invoice' : 'ourInvoice', done: hasDocs(d) },
       { key: pay ? 'proof' : 'received', done: paid && !!(d.linked_transaction_id || d.last_payment_at), pending: !paid },
     ]
-    const missing = items.filter((i) => !i.done && !i.pending).length
+    const tracked = checklistTracked(d)
+    if (pay && slipNeeded && (d.currency || 'IDR') === 'IDR')
+      items.push(slips?.available === true ? { key: 'slip', done: !!slips.by_debt?.[String(d.id)]?.slip_document_id } : { key: 'slip', unknown: true })
+    if (tracked) items.push({ key: 'check', done: !!d.accountant_checked_at, review: true })
+    const missing = items.filter((i) => !i.done && !i.pending && !i.unknown && !i.review).length
     rows.push({ key: `debt:${d.id}`, id: d.id, kind: pay ? 'out' : 'in', date: d.due_date || String(d.created_at || '').slice(0, 10),
       label: d.counterparty || '', note: d.description || '', amount: Number(d.original_amount ?? d.amount ?? 0), items,
       status: missing ? 'missing' : items.every((i) => i.done) ? 'complete' : 'open', missing })
@@ -92,6 +105,9 @@ export function packageSummary(rows) {
     complete: rows.filter((r) => r.status === 'complete').length,
     missing: rows.filter((r) => r.status === 'missing').length,
     nocat: rows.filter((r) => r.status === 'nocat').length,
+    // Withholding slips still to make: null while P-05 is not tracked (no row has the column).
+    slipsToMake: rows.some((r) => r.items.some((i) => i.key === 'slip' && !i.unknown))
+      ? rows.filter((r) => r.items.some((i) => i.key === 'slip' && !i.unknown && !i.done)).length : null,
   }
 }
 

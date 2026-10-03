@@ -45,7 +45,9 @@ export const SETTINGS_ITEM = {
 export const TABS = [
   { key: 'pulse', labelKey: 'nav.pulse', to: '/business/pulse', icon: 'pulse' },
   { key: 'radar', labelKey: 'nav.radar', to: '/business/radar', icon: 'radar' },
-  { key: 'add', labelKey: 'nav.add', to: '/business/add', icon: 'plus', primary: true },
+  // "+ Add" is disabled until Add is migrated (review 8.2 #3): the legacy /business/add page
+  // saves with scope 'personal' by default, which would mix Personal into Business.
+  { key: 'add', labelKey: 'nav.add', to: null, icon: 'plus', primary: true, disabled: true },
   { key: 'cfo', labelKey: 'nav.cfo', to: '/business/ai-cfo', icon: 'cfo' },
   { key: 'more', labelKey: 'nav.more', to: '/business/more', icon: 'menu' },
 ]

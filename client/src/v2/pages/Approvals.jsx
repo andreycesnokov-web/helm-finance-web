@@ -6,12 +6,13 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import I from '../icons'
-import { PageHead, Card, Pill, Skeleton, ErrorBox, Empty } from '../ui'
+import { PageHead, Card, Pill, Skeleton, ErrorBox, Empty, Locked } from '../ui'
+import { useAccess } from '../../hooks/useAccess'
 import { useT, useLang } from '../i18n'
 import { useApi } from '../data'
 import { money, shortDate } from '../lib/format'
 import { isPending, remaining } from '../lib/obligations'
-import { cashItems, forecast } from '../lib/radarSeries'
+import { cashItems, forecast, applyScenario } from '../lib/radarSeries'
 import DecisionActions from '../components/DecisionActions'
 import { detailPath } from './Bills'
 
@@ -23,21 +24,27 @@ export default function Approvals() {
   const [tab, setTab] = useState('waiting')
   const debts = useApi('/debts')
   const pulse = useApi('/pulse?scope=business')
+  const { hasFeature, loading: accessLoading } = useAccess()
   const list = Array.isArray(debts.data) ? debts.data : []
   const waiting = list.filter(isPending).sort((a, b) => String(a.due_date || '9') < String(b.due_date || '9') ? -1 : 1)
   const decided = list.filter((d) => d.approved_at && ['approved', 'rejected'].includes(d.approval_status))
     .sort((a, b) => (a.approved_at < b.approved_at ? 1 : -1)).slice(0, 10)
 
-  // Expected cash right after each waiting item's date, if it is approved (Radar rules).
+  // Expected cash right after each waiting item's date, if THAT item is approved (Radar
+  // rules). Other waiting items stay uncounted, as they are on Pulse and Radar.
   const after = useMemo(() => {
     if (!pulse.data) return {}
     const p = pulse.data
     const items = cashItems({ debts: [...(p.debts || []).filter((x) => !waiting.some((w) => String(w.id) === String(x.id))), ...waiting] }).items
-    const f = forecast({ balance: p.totalBalance, burnRate: p.burnRate, items })
-    return Object.fromEntries(items.filter((i) => i.tag === 'approval').map((i) => [String(i.id), f.days[i.day]?.expected]))
+    return Object.fromEntries(items.filter((i) => i.tag === 'approval').map((i) => {
+      const f = forecast({ balance: p.totalBalance, burnRate: p.burnRate, items: applyScenario(items, { kind: 'approve', key: i.key }) })
+      return [String(i.id), f.days[i.day]?.expected]
+    }))
   }, [pulse.data, waiting]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const head = <PageHead title={t('nav.approvals')} sub={t('approvals.sub')} />
+  // Same plan gate as the legacy Approvals page (review 8.2 #10).
+  if (!accessLoading && !hasFeature('approval_flow_enabled')) return <>{head}<Locked title={t('lock.approvalsTitle')} text={t('lock.text')} /></>
   if (debts.loading) return <>{head}<Card><Skeleton rows={5} /></Card></>
   if (debts.error) return <>{head}<ErrorBox error={debts.error} onRetry={debts.reload} /></>
 

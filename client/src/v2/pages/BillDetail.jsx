@@ -5,6 +5,7 @@
 // (verified rule engine — the ONLY source of a withholding rate), GET /api/pulse (cash effect
 // with the Radar rules). Approve / Reject / Ask for details use the existing endpoints and
 // only appear while the item is waiting for approval; the server enforces who may decide.
+// The Documents checklist (incl. the P-05 slip and accountant check) is components/BillChecklist.
 import { useMemo } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import I from '../icons'
@@ -12,10 +13,11 @@ import { Card, Pill, Btn, Skeleton, ErrorBox, Empty } from '../ui'
 import { useT, useLang } from '../i18n'
 import { useApi } from '../data'
 import { money, shortDate } from '../lib/format'
-import { remaining, billStatus, withholdingSplit } from '../lib/obligations'
-import { cashItems, forecast } from '../lib/radarSeries'
-import { findWithholdingRule } from '../../pages/business/InvoiceReviewDrawer'
+import { remaining, billStatus, withholdingTreatment } from '../lib/obligations'
+import { cashItems, forecast, applyScenario } from '../lib/radarSeries'
+import { findWithholdingRule, computeInvoicePlan } from '../../pages/business/InvoiceReviewDrawer'
 import DecisionActions from '../components/DecisionActions'
+import BillChecklist from '../components/BillChecklist'
 import { StatusPill } from './Bills'
 
 const fmtTime = (iso, lang) => {
@@ -33,6 +35,7 @@ export default function BillDetail({ kind = 'payable' }) {
   const debts = useApi('/debts')
   const rules = useApi('/accountant/rules')
   const pulse = useApi('/pulse?scope=business')
+  const cps = useApi('/counterparties')
   const listPath = kind === 'receivable' ? '/business/receivables' : '/business/payables'
 
   const d = useMemo(() => (Array.isArray(debts.data) ? debts.data : []).find((x) => String(x.id) === String(id)), [debts.data, id])
@@ -50,13 +53,23 @@ export default function BillDetail({ kind = 'payable' }) {
   const isPay = d.type !== 'receivable'
   const amount = remaining(d)
   const s = billStatus(d)
-  const split = isPay && (d.currency || 'IDR') === 'IDR' ? withholdingSplit(d.original_amount ?? d.amount, engine?.rate) : null
+  // The split is shown only when the counterparty or bill carries a withholding treatment, and
+  // it is computed on what is still to pay — never on every IDR bill (review 8.2 #9).
+  const cp = (cps.data?.counterparties || []).find((c) => [c.name, c.legal_name, c.display_name].some((n) => n && String(n).trim().toLowerCase() === String(d.counterparty || '').trim().toLowerCase()))
+  const treatment = withholdingTreatment(d, cp)
+  const plan = treatment === 'withhold' && engine?.rate
+    ? computeInvoicePlan({ doc: { gross_amount: amount, currency: 'IDR' }, supplier: d.counterparty, treatment: 'withhold', rate: engine.rate, engine, dir: 'payable' })
+    : null
+  const split = plan && plan.rateValid && amount > 0 ? { gross: amount, rate: plan.rateNum, tax: plan.withheld, net: plan.net } : null
 
   // Cash effect with the same rules Radar uses: forecast with and without this item.
   let effect = null
   if (pulse.data && (d.currency || 'IDR') === 'IDR' && s !== 'paid' && s !== 'cancelled') {
     const p = pulse.data
-    const all = cashItems({ debts: (p.debts || []).some((x) => String(x.id) === String(d.id)) ? p.debts : [...(p.debts || []), d] }).items
+    // A bill waiting for approval is not counted anywhere else; here it is counted as
+    // if approved, because the question is "what happens if this one goes ahead".
+    const all = applyScenario(cashItems({ debts: (p.debts || []).some((x) => String(x.id) === String(d.id)) ? p.debts : [...(p.debts || []), d] }).items,
+      { kind: 'approve', key: `debt:${d.id}` })
     const without = all.filter((x) => x.key !== `debt:${d.id}`)
     const f1 = forecast({ balance: p.totalBalance, burnRate: p.burnRate, items: all })
     const f0 = forecast({ balance: p.totalBalance, burnRate: p.burnRate, items: without })
@@ -69,12 +82,6 @@ export default function BillDetail({ kind = 'payable' }) {
 
   const docs = Array.isArray(d.attachments) ? d.attachments : []
   const hasInvoice = docs.length > 0 || !!d.attachment_url
-  const checklist = [
-    { key: 'invoice', done: hasInvoice, sub: null, link: hasInvoice ? '/business/documents' : null },
-    { key: 'proof', done: s === 'paid' && !!(d.linked_transaction_id || d.last_payment_at), sub: t('bill.doc.proofSub') },
-    ...(split ? [{ key: 'slip', done: false, sub: t('bill.doc.slipSub'), unknown: true }] : []),
-    { key: 'check', done: false, sub: null, unknown: true },
-  ]
   const history = [
     d.created_at && { at: d.created_at, text: d.source_channel === 'mcp' ? t('bill.hist.createdAi', { who: d.created_by_name || '' })
       : d.source_channel === 'telegram' ? t('bill.hist.createdTg', { who: d.created_by_name || '' }) : d.created_by_name ? t('bill.hist.created', { who: d.created_by_name }) : t('bill.hist.createdAnon') },
@@ -113,7 +120,7 @@ export default function BillDetail({ kind = 'payable' }) {
               ) : (
                 <>
                   <div className="v2-split"><div className="v2-split-box"><span className="v2-stat-label">{t('bill.total')}</span><span className="v2-stat-mid v2-num">{money(d.original_amount ?? d.amount, { currency: d.currency || 'IDR' })}</span></div></div>
-                  <p className="v2-muted v2-small">{rules.loading ? '' : t('bill.noRate')}</p>
+                  <p className="v2-muted v2-small">{rules.loading ? '' : treatment === 'applied' ? t('bill.alreadyNet') : t('bill.noRate')}</p>
                 </>
               )}
             </Card>
@@ -152,21 +159,7 @@ export default function BillDetail({ kind = 'payable' }) {
             <Link className="v2-more-link" to="/business/radar">{t('bill.seeRadar')}</Link>
           </Card>
 
-          <Card title={t('bill.documents')} aside={t('bill.docCount', { n: checklist.filter((c) => c.done).length, m: checklist.length })}>
-            <ul className="v2-check">
-              {checklist.map((c) => (
-                <li key={c.key} className={c.done ? 'is-done' : ''}>
-                  <span className="v2-check-mark" aria-hidden="true">{c.done ? <I.check size={14} /> : null}</span>
-                  <span className="v2-check-text">
-                    <span>{t(`bill.doc.${c.key}`)}<span className="v2-sr"> — {c.done ? t('bill.doc.have') : c.unknown ? t('bill.doc.notTracked') : t('bill.doc.missing')}</span></span>
-                    {(c.sub || c.unknown) && <span className="v2-muted v2-small">{[c.sub, c.unknown ? t('bill.doc.notTracked') : null].filter(Boolean).join(' · ')}</span>}
-                  </span>
-                  {c.link ? <Link to={c.link}>{t('bill.view')}</Link> : !c.done && !c.unknown ? <Link to="/business/documents">{t('bill.upload')}</Link> : null}
-                </li>
-              ))}
-            </ul>
-            <p className="v2-muted v2-small">{t('bill.closeNote')}</p>
-          </Card>
+          <BillChecklist d={d} hasInvoice={hasInvoice} paid={s === 'paid'} slipNeeded={!!split} />
         </div>
       </div>
     </div>
