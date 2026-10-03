@@ -52,4 +52,11 @@ export const routes = {
   'GET /api/access/status': () => ({ limits: {}, usage: {}, plan: { effective_plan: 'founder' } }),
   'GET /api/business/financial-counts': () => ({ ok: true, counts: { transactions: 40, wallets: 3, debts: 7 } }),
   'GET /api/debts': () => debts,
+  'GET /api/pulse/advanced-insights': (u) => ({ ok: true, metrics: u.searchParams.get('to') === iso(-31)
+    ? { operating_revenue: 52300000, operating_cash_out: 70100000, capex: 0, tax_expense: 0, interest_expense: 0 }
+    : { operating_revenue: 61200000, operating_cash_out: 96100000, capex: 14800000, tax_expense: 1200000, interest_expense: 0 } }),
+  'GET /api/accountant/obligations': () => ({ period: '2026-09', obligations: [
+    { obligation_type: 'pph_21_26', title: 'PPH 21/26', currency: 'IDR', period: '2026-09', due_date: iso(7), status: 'calculated', amount: 1340000 },
+    { obligation_type: 'pph_23', title: 'PPH 23', currency: 'IDR', period: '2026-09', due_date: iso(7), status: 'insufficient_data', amount: null },
+  ] }),
 }

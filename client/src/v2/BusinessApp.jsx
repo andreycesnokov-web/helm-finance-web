@@ -14,7 +14,7 @@ import { Navigate, Outlet, Route, Routes } from 'react-router-dom'
 import './v2.css'
 import { useWorkspace } from '../shell/WorkspaceProvider'
 import {
-  BusinessLayout, BusinessPulse, BusinessTransactions, BusinessPayables, BusinessReceivables,
+  BusinessLayout, BusinessTransactions, BusinessPayables, BusinessReceivables,
   BusinessInvoices, BusinessIncomingPayments, BusinessPaymentConnections, BusinessFunding,
   BusinessNew, BusinessIntercompany, BusinessDocuments,
 } from '../pages/business'
@@ -25,7 +25,6 @@ import InvoiceSettlement from '../pages/business/InvoiceSettlement'
 import Counterparties from '../pages/business/Counterparties'
 import Accounts from '../pages/Accounts'
 import AICFO from '../pages/AICFO'
-import Radar from '../pages/Radar'
 import Payroll from '../pages/Payroll'
 import Approvals from '../pages/Approvals'
 import Team from '../pages/Team'
@@ -37,6 +36,8 @@ import { V2DataProvider } from './data'
 import { useT } from './i18n'
 import { Skeleton, ErrorBox } from './ui'
 import More from './pages/More'
+import V2Pulse from './pages/Pulse'
+import V2Radar from './pages/Radar'
 import Placeholder from './pages/Placeholder'
 
 function V2Frame() {
@@ -61,8 +62,8 @@ export default function BusinessApp() {
       <Route element={<BusinessLayout />}>
         <Route element={<V2Frame />}>
           {/* Overview */}
-          <Route path="pulse" element={<BusinessPulse />} />
-          <Route path="radar" element={<Radar />} />
+          <Route path="pulse" element={<V2Pulse />} />
+          <Route path="radar" element={<V2Radar />} />
           <Route path="performance" element={<Placeholder titleKey="screen.performance" icon="performance" />} />
           <Route path="performance/cash" element={<Placeholder titleKey="screen.performanceCash" icon="performance" />} />
           <Route path="performance/forecast" element={<Placeholder titleKey="screen.performanceForecast" icon="radar" current="/business/radar" />} />
