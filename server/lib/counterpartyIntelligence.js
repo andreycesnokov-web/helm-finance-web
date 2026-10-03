@@ -106,7 +106,44 @@ function detectRole({ issuer_name, buyer_name, business_name, payment_direction 
 }
 
 /* ── matching ──────────────────────────────────────────────────────────────*/
-const ROLES = ['vendor', 'customer', 'both', 'tax_authority', 'bank', 'employee', 'other'];
+// landlord / lender: Design v2 P-04 (DECISIONS.md). Stored in the existing, unconstrained
+// `type` column, so they need no migration. They name the relationship only; any tax
+// treatment comes from the verified rule engine, never from the role.
+const ROLES = ['vendor', 'customer', 'both', 'tax_authority', 'bank', 'employee', 'landlord', 'lender', 'other'];
+
+/* ── tax fields (Design v2 P-04, migration 060) ─────────────────────────────*/
+// What kind of party this is, as the owner states it. Mirrors the CHECK in migration 060.
+const ENTITY_FORMS = ['pt', 'cv', 'person', 'foreign', 'other'];
+const PAYMENT_TERMS_MAX = 365;
+// Who may set the tax fields: the people who answer for tax treatment.
+const TAX_FIELD_ROLES = ['owner', 'ceo', 'admin', 'cfo', 'accountant'];
+
+/**
+ * Validate entity_form / payment_terms_days from a request body. Only keys that are
+ * present are returned; null clears a value. Never throws.
+ * @returns {{ fields: object, error?: string, allowed?: any }}
+ */
+function taxFieldsFromBody(b = {}) {
+  const fields = {};
+  if (b.entity_form !== undefined) {
+    const v = b.entity_form === '' ? null : b.entity_form;
+    if (v !== null && !ENTITY_FORMS.includes(v)) return { fields: {}, error: 'invalid_entity_form', allowed: ENTITY_FORMS };
+    fields.entity_form = v;
+  }
+  if (b.payment_terms_days !== undefined) {
+    const raw = b.payment_terms_days;
+    if (raw === null || raw === '') fields.payment_terms_days = null;
+    else {
+      const n = (typeof raw === 'number' || (typeof raw === 'string' && /^\s*\d+\s*$/.test(raw))) ? Number(raw) : NaN;
+      if (!Number.isInteger(n) || n < 0 || n > PAYMENT_TERMS_MAX)
+        return { fields: {}, error: 'invalid_payment_terms_days', allowed: `0..${PAYMENT_TERMS_MAX}` };
+      fields.payment_terms_days = n;
+    }
+  }
+  return { fields };
+}
+
+const canSetTaxFields = (role) => TAX_FIELD_ROLES.includes(role);
 
 /**
  * @param candidate { legal_name, npwp, bank_accounts:[{account_number,...}], aliases:[] }
@@ -313,7 +350,7 @@ function findDuplicates(candidate = {}, existing = []) {
 }
 
 module.exports = {
-  ROLES, LEGAL_FORMS,
+  ROLES, LEGAL_FORMS, ENTITY_FORMS, PAYMENT_TERMS_MAX, TAX_FIELD_ROLES, taxFieldsFromBody, canSetTaxFields,
   normalizeName, nameTokens, normalizeNpwp, normalizeAccount, nameSimilarity,
   detectRole, matchCounterparty, suggestFromDocument, suggestFromPayment,
   suggestDefaults, findDuplicates,

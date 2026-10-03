@@ -5,11 +5,27 @@
 //   pulse     GET /api/pulse?scope=business      (cash now, burn, runway, debts)
 //   insights  GET /api/pulse/advanced-insights   (last-30-day in/out, server classifier)
 //   forecast  radarSeries.forecast()              (existing Radar rules, per day)
-// Pulse totals are NOT changed: pending_approval items stay out of the figures the
-// server computes; they appear here only as decisions (rule 2, open question).
+// Pending approval (DECISIONS.md, open question 2): items with approval_status
+// 'pending_approval' are NOT in any Pulse total — not the server figures, not the
+// forecast, not "Next 7 days". They appear here only as decisions; Radar lists them
+// with a "Waiting for approval" tag.
 
-// Product default until a per-business runway target exists (PROPOSALS.md P-01).
+// Product default; a business may set its own (P-01, businesses.runway_target_days).
 export const RUNWAY_TARGET_DAYS = 60
+
+/** The runway target in days: the business setting when it is a sane number, else 60. */
+export function runwayTarget(targets) {
+  const n = Number(targets?.runway_target_days)
+  return Number.isInteger(n) && n >= 1 && n <= 730 ? n : RUNWAY_TARGET_DAYS
+}
+
+/** Minimum cash (P-08) when set, else null. */
+export function minCash(targets) {
+  const v = targets?.min_cash_idr
+  if (v == null || v === '') return null
+  const n = Number(v)
+  return Number.isFinite(n) && n >= 0 ? n : null
+}
 // The server returns 999 when there is no burn to measure runway against.
 export const RUNWAY_UNKNOWN = 999
 
@@ -23,19 +39,20 @@ export function runwayDays(pulse) {
 /**
  * Overall status from runway and the 30-day forecast.
  *   crit  runway ≤ 14 days, or expected cash below zero inside 30 days
- *   warn  runway below target
+ *   warn  runway below the target, or expected cash dips under the minimum cash (P-08)
  *   good  otherwise (including "no burn measured")
  */
-export function pulseStatus({ runway, lowestExpected, target = RUNWAY_TARGET_DAYS }) {
+export function pulseStatus({ runway, lowestExpected, target = RUNWAY_TARGET_DAYS, floor = null }) {
   if ((runway != null && runway <= 14) || (lowestExpected != null && lowestExpected < 0)) return 'crit'
   if (runway != null && runway < target) return 'warn'
+  if (floor != null && lowestExpected != null && lowestExpected < floor) return 'warn'
   return 'good'
 }
 
 /** Headline copy key for the hero. */
-export function headlineKey(status, { runway, lowestExpected }) {
+export function headlineKey(status, { runway, lowestExpected, target = RUNWAY_TARGET_DAYS, floor = null }) {
   if (status === 'crit') return lowestExpected != null && lowestExpected < 0 ? 'pulse.head.short' : 'pulse.head.critical'
-  if (status === 'warn') return 'pulse.head.belowTarget'
+  if (status === 'warn') return runway != null && runway < target ? 'pulse.head.belowTarget' : (floor != null ? 'pulse.head.belowFloor' : 'pulse.head.belowTarget')
   return runway == null ? 'pulse.head.noBurn' : 'pulse.head.covered'
 }
 
@@ -74,7 +91,7 @@ export function decisions({ debts = [], obligations = [], today = new Date() } =
 
 /** Next 7 days from the dated forecast items and the measured burn. */
 export function nextDays(items, { burnRate = 0, forecastDays = [], days = 7 } = {}) {
-  const within = items.filter((it) => it.day <= days)
+  const within = items.filter((it) => it.day <= days && it.counted !== false)
   const comingIn = within.filter((it) => it.dir === 'in').reduce((s, x) => s + x.amount, 0)
   const goingOutItems = within.filter((it) => it.dir === 'out').reduce((s, x) => s + x.amount, 0)
   const dayToDay = Math.max(0, Number(burnRate) || 0) * days

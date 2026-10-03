@@ -14,7 +14,7 @@ import { useApi } from '../data'
 import { money, shortDate, longDate } from '../lib/format'
 import { cashItems, forecast } from '../lib/radarSeries'
 import {
-  RUNWAY_TARGET_DAYS, runwayDays, pulseStatus, headlineKey, decisions, nextDays, flowOf, pctChange, obligationTiles,
+  runwayTarget, minCash, runwayDays, pulseStatus, headlineKey, decisions, nextDays, flowOf, pctChange, obligationTiles,
 } from '../lib/pulseModel'
 import { useAskContext } from '../ai/AskContext'
 
@@ -73,6 +73,8 @@ export default function Pulse() {
   const ins30 = useApi(`/pulse/advanced-insights?from=${daysAgo(30)}&to=${daysAgo(0)}`)
   const ins60 = useApi(`/pulse/advanced-insights?from=${daysAgo(60)}&to=${daysAgo(31)}`)
   const obl = useApi('/accountant/obligations')
+  // P-01 / P-08. Missing, failed or null → the documented defaults (60 days, no floor).
+  const targets = useApi('/business/targets')
   useAskContext(t('nav.pulse'), t('pulse.today'))
 
   const m = useMemo(() => {
@@ -82,15 +84,19 @@ export default function Pulse() {
     const { items } = cashItems({ debts: p.debts, obligations })
     const f = forecast({ balance: p.totalBalance, burnRate: p.burnRate, items })
     const runway = runwayDays(p)
-    const status = pulseStatus({ runway, lowestExpected: f.lowest.value })
+    const tg = targets.data?.targets || null
+    const target = runwayTarget(tg)
+    const floor = minCash(tg)
+    const status = pulseStatus({ runway, lowestExpected: f.lowest.value, target, floor })
     return {
-      p, f, runway, status, head: headlineKey(status, { runway, lowestExpected: f.lowest.value }),
+      p, f, runway, status, target, floor, targetIsDefault: tg?.runway_target_days == null,
+      head: headlineKey(status, { runway, lowestExpected: f.lowest.value, target, floor }),
       decs: decisions({ debts: p.debts || [], obligations }),
       next: nextDays(items, { burnRate: p.burnRate, forecastDays: f.days }),
       tiles: obligationTiles(p),
       accounts: (p.accounts || []).filter((a) => (a.scope || 'business') === 'business'),
     }
-  }, [pulse.data, obl.data])
+  }, [pulse.data, obl.data, targets.data])
 
   const flow = flowOf(ins30.data?.ok !== false ? ins30.data?.metrics : null)
   const prev = flowOf(ins60.data?.ok !== false ? ins60.data?.metrics : null)
@@ -102,11 +108,11 @@ export default function Pulse() {
   if (pulse.error) return <>{head}<ErrorBox error={pulse.error} onRetry={pulse.reload} /></>
   if (!m) return head
 
-  const { p, f, runway, status, decs, next, tiles } = m
+  const { p, f, runway, status, decs, next, tiles, target, floor } = m
   const st = STATUS[status]
   const monthName = new Date().toLocaleDateString(lang === 'ru' ? 'ru-RU' : lang === 'id' ? 'id-ID' : 'en-GB', { month: 'long' })
   const currencies = [...new Set(m.accounts.map((a) => a.currency || 'IDR'))]
-  const runwayPct = runway == null ? 0 : Math.min(100, Math.round((runway / RUNWAY_TARGET_DAYS) * 100))
+  const runwayPct = runway == null ? 0 : Math.min(100, Math.round((runway / target) * 100))
   const inPct = flow && prev ? pctChange(flow.moneyIn, prev.moneyIn) : null
 
   return (
@@ -115,7 +121,7 @@ export default function Pulse() {
       <section className="v2-hero" aria-labelledby="v2-hero-title">
         <div className="v2-hero-text">
           <Pill tone={st.tone} dot>{t(st.key)}</Pill>
-          <h2 id="v2-hero-title" className="v2-hero-title">{t(m.head, { month: monthName, target: RUNWAY_TARGET_DAYS })}</h2>
+          <h2 id="v2-hero-title" className="v2-hero-title">{t(m.head, { month: monthName, target, floor: floor == null ? '' : money(floor) })}</h2>
           <p className="v2-hero-p">
             {flow && (flow.net < 0
               ? t('pulse.say.spendMore', { v: money(-flow.net) })
@@ -135,11 +141,11 @@ export default function Pulse() {
             <div className="v2-hero-cell">
               <span className="v2-hero-label">{t('pulse.runway')}</span>
               <span className="v2-hero-mid v2-num">{runway == null ? t('pulse.runwayNone') : t('pulse.daysN', { n: runway })}</span>
-              <div className="v2-meter" role="meter" aria-valuemin={0} aria-valuemax={RUNWAY_TARGET_DAYS} aria-valuenow={runway ?? 0}
-                aria-label={t('pulse.runwayVsTarget', { n: runway ?? 0, target: RUNWAY_TARGET_DAYS })}>
+              <div className="v2-meter" role="meter" aria-valuemin={0} aria-valuemax={target} aria-valuenow={runway ?? 0}
+                aria-label={t('pulse.runwayVsTarget', { n: runway ?? 0, target })}>
                 <span className={`v2-meter-fill v2-meter-${status}`} style={{ width: `${runwayPct}%` }} />
               </div>
-              <span className="v2-hero-meta">{t('pulse.target', { n: RUNWAY_TARGET_DAYS })}</span>
+              <span className="v2-hero-meta">{t('pulse.target', { n: target })}{floor != null && ` · ${t('pulse.minCash', { v: money(floor) })}`}</span>
             </div>
             <div className="v2-hero-cell">
               <span className="v2-hero-label">{t('pulse.net30')}</span>
@@ -186,7 +192,7 @@ export default function Pulse() {
               return (
                 <li key={it.key} className="v2-next-row">
                   <span className="v2-next-day"><span>{d.toLocaleDateString(lang === 'ru' ? 'ru-RU' : lang === 'id' ? 'id-ID' : 'en-GB', { weekday: 'short' })}</span><span className="v2-num">{d.getDate()}</span></span>
-                  <span className="v2-next-what">{it.label}{it.tag === 'approval' && <span className="v2-next-tag"> · {t('radar.tag.approval')}</span>}</span>
+                  <span className="v2-next-what">{it.label}</span>
                   <span className={`v2-num v2-next-amt ${it.dir === 'in' ? 'v2-pos' : ''}`}>{money(it.dir === 'in' ? it.amount : -it.amount, { sign: true })}</span>
                 </li>
               )

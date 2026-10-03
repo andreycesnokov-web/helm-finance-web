@@ -12,7 +12,10 @@ export const debts = [
   { id: 'd5', type: 'payable', counterparty: 'Small Vendor', description: 'Cleaning cloths', amount: 350000, remaining_amount: 350000, original_amount: 350000, paid_amount: 0, due_date: iso(9), status: 'open', approval_status: 'approved', currency: 'IDR', created_at: iso(-2) },
   { id: 'd6', type: 'payable', counterparty: 'Tax office (PPh 23)', description: 'Withholding', amount: 710000, remaining_amount: 710000, original_amount: 710000, paid_amount: 0, due_date: iso(12), status: 'open', approval_status: 'approved', currency: 'IDR', created_at: iso(-1) },
   { id: 'd7', type: 'payable', counterparty: 'PT Contractor Demo', description: 'Site repair', amount: 22600000, remaining_amount: 22600000, original_amount: 22600000, paid_amount: 0, due_date: iso(18), status: 'open', approval_status: 'approved', currency: 'IDR', created_at: iso(-3) },
-]
+].map((d) => ({ withholding_slip_document_id: null, accountant_checked_at: null, accountant_checked_by: null, ...d }))
+// P-05 marks (migration 061) on two bills, so Bill detail and Accountant show both states.
+Object.assign(debts.find((d) => d.id === 'd3'), { accountant_checked_at: iso(-1) + 'T09:00:00Z', accountant_checked_by: 2 })
+Object.assign(debts.find((d) => d.id === 'd7'), { withholding_slip_document_id: 'doc3' })
 
 export const recentTxs = [
   { id: 't1', type: 'income', description: 'Client payment', amount_original: 9200000, currency_original: 'IDR', transaction_date: iso(-1) },
@@ -50,9 +53,10 @@ export const wallets = [
   { id: 'w3', name: 'Cash box', currency: 'IDR', type: 'cash', scope: 'business', balance: 2100000, is_active: true },
 ]
 export const counterparties = [
-  { id: 'c1', name: 'PT Example Supplies', legal_name: 'PT Example Supplies', display_name: 'PT Example Supplies', role: 'vendor', npwp: '0123456789012345', pkp_status: 'pkp', bank_accounts: [{ account_number: '1234567890' }], source_system: 'mcp' },
+  { id: 'c1', name: 'PT Example Supplies', legal_name: 'PT Example Supplies', display_name: 'PT Example Supplies', role: 'vendor', entity_form: 'pt', payment_terms_days: 30, npwp: '0123456789012345', pkp_status: 'pkp', bank_accounts: [{ account_number: '1234567890' }], source_system: 'mcp' },
   { id: 'c2', name: 'Example Supply', legal_name: 'Example Supply', display_name: 'Example Supply', role: 'vendor', npwp: null, pkp_status: 'unknown', bank_accounts: [{ account_number: '1234567890' }] },
   { id: 'c3', name: 'CV Sample Client', legal_name: 'CV Sample Client', display_name: 'CV Sample Client', role: 'customer', npwp: '987654321098765', pkp_status: 'non_pkp', bank_accounts: [] },
+  { id: 'c5', name: 'Landlord Example', legal_name: 'Landlord Example', display_name: 'Landlord Example', role: 'landlord', entity_form: 'person', payment_terms_days: 0, npwp: '222233334444555', pkp_status: 'non_pkp', bank_accounts: [] },
   { id: 'c4', name: 'PT Test Resort', legal_name: 'PT Test Resort', display_name: 'PT Test Resort', role: 'customer', npwp: '111122223333444', pkp_status: 'pkp', bank_accounts: [], default_tax_treatment: 'Possibly PPh 23 — needs accountant review' },
 ]
 export const transactions = [
@@ -65,6 +69,12 @@ export const transactions = [
 ]
 export const routes = {
   'GET /api/pulse': () => pulse,
+  // Batch 8 (approved proposals P-01, P-08, P-04, P-05)
+  'GET /api/business/targets': () => ({ available: true, can_edit: true, targets: { runway_target_days: 75, min_cash_idr: '50000000', weekly_brief_cron: '0 8 * * 1', weekly_brief: { day: 1, hour: 8, minute: 0 }, default_runway_target_days: 60 } }),
+  'PATCH /api/business/targets': () => ({ available: true, can_edit: true, targets: { runway_target_days: 75, min_cash_idr: '50000000', weekly_brief_cron: '0 8 * * 1', weekly_brief: { day: 1, hour: 8, minute: 0 }, default_runway_target_days: 60 } }),
+  'GET /api/counterparties/:id': (u) => ({ counterparty: counterparties.find((c) => u.pathname.endsWith('/' + c.id)) || counterparties[0] }),
+  'PATCH /api/counterparties/:id': (u) => ({ counterparty: counterparties.find((c) => u.pathname.endsWith('/' + c.id)) || counterparties[0] }),
+  'PATCH /api/debts/:id/checklist': () => ({ id: 'd1', checklist: { withholding_slip_document_id: null, accountant_checked_at: null, accountant_checked_by: null } }),
   'GET /api/workspaces': () => workspaces,
   'PATCH /api/workspace-preferences': () => ({ ok: true }),
   'GET /api/admin/status': () => ({ is_admin: true }),
@@ -88,6 +98,7 @@ export const routes = {
   'GET /api/ai-accountant/required-documents': () => ({ items: [{ type: 'akta', status: 'uploaded' }, { type: 'nib', status: 'uploaded' }, { type: 'npwp', status: 'needs_review' }, { type: 'sk_kemenkumham', status: 'missing' }] }),
   'GET /api/documents': () => ({ documents: [
     { id: 'doc1', document_type: 'receipt', review_status: 'needs_review', links: [], created_at: iso(-2), file: { file_name: 'IMG_0042.jpg', upload_channel: 'telegram' } },
+    { id: 'doc3', document_type: 'bukti_potong', document_number: 'BP-0091', document_date: iso(-1), review_status: 'confirmed', links: [], created_at: iso(-1), file: { file_name: 'bukti-potong-0091.pdf', upload_channel: 'web' } },
     { id: 'doc2', document_type: 'invoice', review_status: 'confirmed', links: [{ id: 'l1' }], gross_amount: 8400000, currency: 'IDR', created_at: iso(-1), file: { file_name: 'invoice-demo-supplies.pdf', upload_channel: 'mcp' } },
   ] }),
   'GET /api/ai-cfo/context': () => ({

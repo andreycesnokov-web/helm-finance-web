@@ -1,6 +1,6 @@
 // Radar series: the existing scenario rules, per day. Run: node tests/design/v2RadarSeries.test.mjs
 import assert from 'node:assert'
-import { cashItems, forecast, keyDates, applyScenario, withCashAfter, scenarioChips, KEY_DATE_MIN_IDR } from '../../client/src/v2/lib/radarSeries.js'
+import { cashItems, forecast, keyDates, applyScenario, withCashAfter, scenarioChips, pendingSummary, KEY_DATE_MIN_IDR } from '../../client/src/v2/lib/radarSeries.js'
 import { radarFigures } from '../../client/src/lib/radarFigures.js'
 
 let pass = 0, fail = 0
@@ -34,7 +34,8 @@ t('pending approval items are tagged, never silently treated as confirmed', () =
 
 t('day 30 equals the existing radarFigures rules over the same open items', () => {
   const { items } = cashItems({ debts, today })
-  const open = debts.filter((d) => items.some((i) => i.id === d.id)).map((d) => ({ ...d, amount: d.remaining_amount }))
+  // Pending approval is not counted (DECISIONS.md), so it is not in the legacy input either.
+  const open = debts.filter((d) => items.some((i) => i.id === d.id && i.counted)).map((d) => ({ ...d, amount: d.remaining_amount }))
   const legacy = radarFigures({ totalBalance: 50e6, burnRate: 200e3, debts: open })
   const f = forecast({ balance: 50e6, burnRate: 200e3, items, today })
   const last = f.days[30]
@@ -80,8 +81,32 @@ t('what-if: late shifts the item, collect makes it count in the worst case', () 
 t('chips come from the data', () => {
   const { items } = cashItems({ debts, today })
   const c = scenarioChips(items)
-  assert.deepStrictEqual(c.map((x) => [x.kind, x.key]), [['late', 'debt:1'], ['collect', 'debt:4']])
+  assert.deepStrictEqual(c.map((x) => [x.kind, x.key]), [['late', 'debt:1'], ['collect', 'debt:4'], ['approve', 'debt:8']])
   assert.deepStrictEqual(scenarioChips([]), [])
+})
+
+t('pending approval: listed, not in any line, cash after or total (DECISIONS.md q2)', () => {
+  const { items } = cashItems({ debts, today })
+  const pend = items.find((i) => i.id === 8)
+  assert.strictEqual(pend.counted, false)
+  const without = forecast({ balance: 50e6, burnRate: 0, items: items.filter((i) => i.id !== 8), today })
+  const withIt = forecast({ balance: 50e6, burnRate: 0, items, today })
+  assert.deepStrictEqual(withIt.days, without.days)
+  const rows = withCashAfter([...items].sort((a, b) => a.day - b.day), { balance: 50e6, burnRate: 0 })
+  const i8 = rows.findIndex((r) => r.id === 8)
+  assert.strictEqual(rows[i8].cashAfter, rows[i8 - 1].cashAfter)
+  assert.deepStrictEqual(pendingSummary(items), { count: 1, sum: 2e6 })
+  assert.ok(keyDates(items).shown.some((i) => i.id === 8), 'still listed on Radar')
+})
+
+t('what-if approve counts the pending item on screen only', () => {
+  const { items } = cashItems({ debts, today })
+  const a = applyScenario(items, { kind: 'approve', key: 'debt:8' })
+  assert.strictEqual(a.find((i) => i.id === 8).counted, true)
+  assert.strictEqual(items.find((i) => i.id === 8).counted, false, 'original untouched')
+  const base = forecast({ balance: 50e6, burnRate: 0, items, today })
+  const f = forecast({ balance: 50e6, burnRate: 0, items: a, today })
+  assert.strictEqual(base.days[30].expected - f.days[30].expected, 2e6)
 })
 
 t('engine-calculated tax obligations become deadline items; uncalculated ones do not', () => {

@@ -1,6 +1,11 @@
 # Design v2 — proposals that need owner approval
 
-Nothing in this file is implemented. Each entry is something a v2 screen would need
+**Owner decisions (3 Oct 2026, `DECISIONS.md`):**
+- P-01, P-04, P-05 and P-08 are approved and implemented in batch 8 (migrations 058–061, not applied).
+- The P-10 template is in `P10_TEMPLATE.md` for review.
+- Everything else below is still a proposal.
+
+Before batch 8, nothing in this file was implemented. Each entry is something a v2 screen would need
 that does not exist today (a table, a column, a setting, an endpoint shape). Until it
 is approved, the screen shows an honest empty / "not set up yet" state or a documented
 default. Migrations are NOT written; AGENTS.md requires explicit approval first.
@@ -8,6 +13,8 @@ default. Migrations are NOT written; AGENTS.md requires explicit approval first.
 Format: what · fields · why · risk · what the UI does meanwhile.
 
 ## P-01 · Per-business runway target (batch 2)
+
+> **Approved → batch 8.** Migration `058_business_runway_target.sql`; `GET/PATCH /api/business/targets`; Pulse uses it, 60 when null.
 
 - **What:** a runway target in days, per business.
 - **Fields:** `businesses.runway_target_days int null` (or a row in an existing settings
@@ -43,6 +50,8 @@ Format: what · fields · why · risk · what the UI does meanwhile.
 
 ## P-04 · Counterparty tax fields (batch 3)
 
+> **Approved → batch 8.** Migration `060_counterparty_tax_fields.sql` (`entity_form`, `payment_terms_days`); `landlord`/`lender` roles need no column (they go in the unconstrained `type`). Written through the existing POST/PATCH `/api/counterparties`; accountant role and above.
+
 - **What:** entity form (PT / CV / person / foreign), landlord and lender roles,
   payment terms in days.
 - **Fields:** `counterparties.entity_form text null`, extend the role list with
@@ -54,6 +63,8 @@ Format: what · fields · why · risk · what the UI does meanwhile.
   form saves through the existing POST /api/counterparties.
 
 ## P-05 · Bill document checklist status (batch 3)
+
+> **Approved → batch 8.** Migration `061_bill_checklist_status.sql` (+ isolation trigger); `PATCH /api/debts/:id/checklist`; accountant role and above; audited.
 
 - **What:** per-bill status for the withholding slip (bukti potong) and the accountant check.
 - **Fields:** `debts.withholding_slip_document_id uuid null`, `debts.accountant_checked_at
@@ -86,6 +97,8 @@ Format: what · fields · why · risk · what the UI does meanwhile.
 
 ## P-08 · Targets and alerts (batch 4, extends P-01)
 
+> **Approved → batch 8.** Migration `059_business_targets_alerts.sql`. The schedule is stored only: **no brief is sent**. There is no scheduler; that needs its own approval, and recipients must come from `notificationPolicy`.
+
 - **What:** minimum cash and the weekly brief schedule, next to the runway target.
 - **Fields:** `businesses.min_cash_idr numeric null`, `businesses.weekly_brief_cron text null`.
 - **Why:** Settings → Targets & alerts.
@@ -102,6 +115,8 @@ Format: what · fields · why · risk · what the UI does meanwhile.
 - **Meanwhile:** "Not filled in", with a note that it is not stored yet.
 
 ## P-10 · Category → group mapping and accrual profit (batch 6)
+
+> **Next step.** No migration yet. Template for owner review: `P10_TEMPLATE.md`.
 
 - **What:** every cash-flow category belongs to exactly one group (revenue, direct cost,
   operating cost, asset purchase, funding, tax, transfer), seeded per industry template from

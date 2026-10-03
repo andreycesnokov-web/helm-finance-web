@@ -134,7 +134,8 @@ export function holderMatches(holder, legalName) {
 /** Counterparty list filter: all | customer | supplier | missing. */
 export function cpFilter(cp, f) {
   if (f === 'customer') return cp.role === 'customer' || cp.role === 'both'
-  if (f === 'supplier') return cp.role === 'vendor' || cp.role === 'both'
+  // A landlord supplies the premises; a lender is not a supplier (P-04 roles).
+  if (f === 'supplier') return cp.role === 'vendor' || cp.role === 'both' || cp.role === 'landlord'
   if (f === 'missing') return !cp.npwp
   return true
 }
@@ -214,4 +215,20 @@ export function latestPayrollRun(overview) {
     tax: people.some((x) => x.tax != null) ? sum('tax') : null,
     paid: inRun.every((p) => p.status === 'paid'), date: inRun.map((p) => p.payment_date).filter(Boolean).sort().pop() || null,
   }
+}
+
+/**
+ * Bill detail checklist (designs/BillDetail.dc.html): invoice, payment proof, withholding
+ * slip (only when the verified engine computed a withholding) and accountant check.
+ * The slip and check are P-05 marks (migration 061); before 061 they are `unknown` and
+ * never claimed done. `editable` rows may be set through PATCH /api/debts/:id/checklist.
+ */
+export function billChecklistItems(d, { hasInvoice = false, paid = false, slipNeeded = false } = {}) {
+  const tracked = !!d && Object.prototype.hasOwnProperty.call(d, 'accountant_checked_at')
+  return [
+    { key: 'invoice', done: !!hasInvoice, link: hasInvoice ? '/business/documents' : null },
+    { key: 'proof', done: !!paid && !!(d?.linked_transaction_id || d?.last_payment_at) },
+    ...(slipNeeded ? [{ key: 'slip', done: tracked && !!d.withholding_slip_document_id, unknown: !tracked, editable: tracked }] : []),
+    { key: 'check', done: tracked && !!d.accountant_checked_at, unknown: !tracked, editable: tracked },
+  ]
 }

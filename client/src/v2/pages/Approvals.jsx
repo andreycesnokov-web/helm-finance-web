@@ -11,7 +11,7 @@ import { useT, useLang } from '../i18n'
 import { useApi } from '../data'
 import { money, shortDate } from '../lib/format'
 import { isPending, remaining } from '../lib/obligations'
-import { cashItems, forecast } from '../lib/radarSeries'
+import { cashItems, forecast, applyScenario } from '../lib/radarSeries'
 import DecisionActions from '../components/DecisionActions'
 import { detailPath } from './Bills'
 
@@ -28,13 +28,16 @@ export default function Approvals() {
   const decided = list.filter((d) => d.approved_at && ['approved', 'rejected'].includes(d.approval_status))
     .sort((a, b) => (a.approved_at < b.approved_at ? 1 : -1)).slice(0, 10)
 
-  // Expected cash right after each waiting item's date, if it is approved (Radar rules).
+  // Expected cash right after each waiting item's date, if THAT item is approved (Radar
+  // rules). Other waiting items stay uncounted, as they are on Pulse and Radar.
   const after = useMemo(() => {
     if (!pulse.data) return {}
     const p = pulse.data
     const items = cashItems({ debts: [...(p.debts || []).filter((x) => !waiting.some((w) => String(w.id) === String(x.id))), ...waiting] }).items
-    const f = forecast({ balance: p.totalBalance, burnRate: p.burnRate, items })
-    return Object.fromEntries(items.filter((i) => i.tag === 'approval').map((i) => [String(i.id), f.days[i.day]?.expected]))
+    return Object.fromEntries(items.filter((i) => i.tag === 'approval').map((i) => {
+      const f = forecast({ balance: p.totalBalance, burnRate: p.burnRate, items: applyScenario(items, { kind: 'approve', key: i.key }) })
+      return [String(i.id), f.days[i.day]?.expected]
+    }))
   }, [pulse.data, waiting]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const head = <PageHead title={t('nav.approvals')} sub={t('approvals.sub')} />

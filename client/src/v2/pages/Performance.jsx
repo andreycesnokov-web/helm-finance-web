@@ -15,7 +15,7 @@ import { useT, useLang } from '../i18n'
 import { useApi } from '../data'
 import { money, shortDate } from '../lib/format'
 import BarChart from '../charts/BarChart'
-import { cashItems, forecast } from '../lib/radarSeries'
+import { cashItems, forecast, isCounted } from '../lib/radarSeries'
 import { readDrill, drillLink } from '../lib/aiLinks'
 import { txDate } from '../lib/obligations'
 import {
@@ -205,7 +205,8 @@ function CashTab({ rows, sel, cash, t, lang }) {
 
 function ForecastTab({ pulse, obligations, burnMonthly, t, lang }) {
   const p = pulse
-  const { items } = cashItems({ debts: p.debts, obligations })
+  // Pending approval is not counted (DECISIONS.md q2), same as Pulse and Radar.
+  const items = cashItems({ debts: p.debts, obligations }).items.filter(isCounted)
   const f = forecast({ balance: p.totalBalance, burnRate: p.burnRate, items })
   const ins = items.filter((i) => i.dir === 'in'), outs = items.filter((i) => i.dir === 'out')
   const sum = (xs) => xs.reduce((s, x) => s + x.amount, 0)

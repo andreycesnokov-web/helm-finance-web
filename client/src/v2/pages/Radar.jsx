@@ -15,7 +15,8 @@ import { money, shortDate } from '../lib/format'
 import ForecastChart from '../charts/ForecastChart'
 import { useAsk, useAskContext } from '../ai/AskContext'
 import {
-  cashItems, forecast, keyDates, applyScenario, withCashAfter, scenarioChips, KEY_DATE_MIN_IDR, DEFAULT_HORIZON,
+  cashItems, forecast, keyDates, applyScenario, withCashAfter, scenarioChips, pendingSummary, isCounted,
+  KEY_DATE_MIN_IDR, DEFAULT_HORIZON,
 } from '../lib/radarSeries'
 
 const HORIZONS = [30, 60, 90]
@@ -54,7 +55,7 @@ export default function Radar() {
     const collect = chips.find((c) => c.kind === 'collect')
     const fCollect = collect ? forecast({ balance: p.totalBalance, burnRate: p.burnRate, items: applyScenario(items, collect), horizon }) : null
     const listed = withCashAfter(used.filter((it) => it.day <= horizon).sort((a, b) => a.day - b.day), { balance: p.totalBalance, burnRate: p.burnRate })
-    return { items: listed, excluded, chips, f, collect, fCollect, burn: Number(p.burnRate) || 0 }
+    return { items: listed, excluded, chips, f, collect, fCollect, burn: Number(p.burnRate) || 0, pending: pendingSummary(used) }
   }, [pulse.data, obl.data, horizon, scenario])
 
   const from = new Date()
@@ -87,6 +88,7 @@ export default function Radar() {
   const kd = keyDates(model.items, { filter })
   const daysOfSpend = burn > 0 ? Math.round(Math.max(0, f.worstLowest.value) / burn) : null
   const late = scenario.kind === 'late' ? chips.find((c) => c.kind === 'late') : null
+  const approving = scenario.kind === 'approve' ? chips.find((c) => c.kind === 'approve') : null
 
   return (
     <div className="v2-radar">
@@ -124,7 +126,7 @@ export default function Radar() {
             {chips.map((c) => (
               <button key={c.kind + c.key} type="button" className="v2-chip" aria-pressed={scenario.key === c.key && scenario.kind === c.kind}
                 onClick={() => setScenario(c)}>
-                {c.kind === 'late' ? t('radar.chip.late', { who: c.label }) : t('radar.chip.collect', { who: c.label })}
+                {t(`radar.chip.${c.kind}`, { who: c.label })}
               </button>
             ))}
             <button type="button" className="v2-chip v2-chip-ask" onClick={() => openAsk()}><I.plus size={16} />{t('radar.chip.ask')}</button>
@@ -132,7 +134,9 @@ export default function Radar() {
           <div className="v2-callout">
             <span className="v2-callout-ic" aria-hidden="true"><I.cfo size={18} /></span>
             <p className="v2-callout-text">
-              {late
+              {approving
+                ? t('radar.say.approve', { who: approving.label, amt: money(approving.amount), end: money(f.end.value), d: shortDate(f.end.date, lang), low: money(f.lowest.value), lowD: shortDate(f.lowest.date, lang) })
+                : late
                 ? t('radar.say.late', { who: late.label, end: money(f.end.value), d: shortDate(f.end.date, lang), low: money(f.lowest.value), lowD: shortDate(f.lowest.date, lang) })
                 : <>{t('radar.say.worst1')} <strong>{t('radar.say.worst2', { v: money(f.worstLowest.value), d: shortDate(f.worstLowest.date, lang) })}</strong>
                   {daysOfSpend >= 1 && ` — ${t('radar.say.daysOfSpend', { n: daysOfSpend })}`}.
@@ -175,7 +179,7 @@ export default function Radar() {
                 <span role="cell" className="v2-kd-status"><TagPill it={it} /></span>
                 <span role="cell" className={`v2-kd-amt v2-r v2-num ${it.dir === 'in' ? 'v2-pos' : ''}`}>{money(it.dir === 'in' ? it.amount : -it.amount, { sign: true })}
                   {it.tag !== 'scheduled' && <span className="v2-kd-tagm"><TagPill it={it} /></span>}</span>
-                <span role="cell" className="v2-kd-after v2-r v2-num">{money(it.cashAfter)}</span>
+                <span role="cell" className="v2-kd-after v2-r v2-num">{isCounted(it) ? money(it.cashAfter) : <span className="v2-muted v2-small">{t('radar.notCounted')}</span>}</span>
               </div>
             ))}
           </div>
@@ -183,7 +187,8 @@ export default function Radar() {
         <div className="v2-foot">
           <span>{t('radar.showing', { n: kd.shown.length, m: kd.total })}
             {kd.hiddenCount > 0 && ` · ${t('radar.hidden', { k: kd.hiddenCount, min: money(KEY_DATE_MIN_IDR), sum: money(kd.hiddenSum) })}`}
-            {model.excluded.foreign > 0 && ` · ${t('radar.foreign', { k: model.excluded.foreign })}`}</span>
+            {model.excluded.foreign > 0 && ` · ${t('radar.foreign', { k: model.excluded.foreign })}`}
+            {model.pending.count > 0 && ` · ${t('radar.pendingNote', { k: model.pending.count, sum: money(model.pending.sum) })}`}</span>
           <Link to="/business/transactions">{t('radar.showAll', { m: kd.total })}</Link>
         </div>
       </Card>

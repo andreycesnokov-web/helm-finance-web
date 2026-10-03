@@ -1,12 +1,19 @@
-// The ONLY place v2 writes anything. Every call reuses an existing endpoint with its
-// existing server-side role check — no new write endpoint exists for v2. The list is
-// mirrored in tests/design/v2Guards.test.mjs (WRITE_ALLOW) and in each batch report.
+// The ONLY place v2 writes anything. Every call has a server-side role check and the
+// list is mirrored in tests/design/v2Guards.test.mjs (WRITE_ALLOW) and in each batch report.
+// Batches 1–7 only reused existing endpoints. Batch 8 adds the write paths for the
+// proposals the owner approved in _specs/design-v2/DECISIONS.md (role check + audit row):
 //
 //   PATCH /api/debts/:id/approve       same call the legacy Payables/Receivables pages make
 //   PATCH /api/debts/:id/reject        same, with a reason
 //   POST  /api/debts/:id/request-info  existing "ask for details" (used by the Telegram bot)
 //   PATCH /api/transactions/:id        category only — same call the legacy Transactions page makes
 //   POST  /api/counterparties          existing create; the server refuses likely duplicates (409)
+//   PATCH /api/counterparties/:id      existing edit — batch 8 uses it for entity form, role, terms (P-04)
+//   PATCH /api/business/targets        NEW in batch 8 — runway target, minimum cash, weekly brief (P-01, P-08)
+//   PATCH /api/debts/:id/checklist     NEW in batch 8 — withholding slip, accountant check (P-05)
+//
+// Before the owner applies migrations 058–061 the server answers 409 migration_not_applied
+// for the batch-8 writes; the screens say so instead of failing silently.
 //
 // Paying a bill and creating a bill/invoice reuse the existing DebtPaymentModal and
 // DebtFormModal components unchanged, so their writes are the legacy ones.
@@ -27,8 +34,18 @@ export const setTransactionCategory = (token, id, category) =>
 export const createCounterparty = (token, body) =>
   apiFetch('/counterparties', token, { method: 'POST', body })
 
+export const updateCounterparty = (token, id, body) =>
+  apiFetch(`/counterparties/${encodeURIComponent(id)}`, token, { method: 'PATCH', body })
+
+export const updateBusinessTargets = (token, body) =>
+  apiFetch('/business/targets', token, { method: 'PATCH', body })
+
+export const updateBillChecklist = (token, id, body) =>
+  apiFetch(`/debts/${encodeURIComponent(id)}/checklist`, token, { method: 'PATCH', body })
+
 /** Server error → short user-facing text. 403 means the role may not do this. */
 export function actionError(e) {
   if (e?.status === 403) return 'forbidden'
+  if (e?.status === 409 && e?.data?.error === 'migration_not_applied') return 'notApplied'
   return e?.data?.message || e?.message || 'failed'
 }

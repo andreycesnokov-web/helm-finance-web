@@ -1,16 +1,17 @@
 // Settings (designs/Settings.dc.html). An overview of the rules every screen follows,
 // with each change made where it is made today: the existing Settings page (Classic),
-// Team, the Company profile and Bank import. Reads: GET /api/team, GET /api/accountant/profile,
+// Team, the Company profile and Bank import. Targets & alerts are edited here (P-01, P-08,
+// components/TargetsCard.jsx). Reads: GET /api/team, GET /api/accountant/profile,
 // GET /api/access/status (plan). Telegram linking is NOT touched here.
 import { Link } from 'react-router-dom'
 import { useAccess } from '../../hooks/useAccess'
 import { useWorkspace } from '../../shell/WorkspaceProvider'
 import I from '../icons'
-import { PageHead, Card, Pill, Btn, NotYet } from '../ui'
+import { PageHead, Card, Pill, Btn } from '../ui'
 import { useT } from '../i18n'
 import { useApi } from '../data'
 import { initial } from '../lib/format'
-import { RUNWAY_TARGET_DAYS } from '../lib/pulseModel'
+import TargetsCard from '../components/TargetsCard'
 
 const SECTIONS = ['targets', 'company', 'team', 'connections', 'plan']
 
@@ -29,15 +30,7 @@ export default function Settings() {
         {SECTIONS.map((s) => <a key={s} className="v2-tab-link" href={`#set-${s}`}>{t(`set.s.${s}`)}</a>)}
       </nav>
 
-      <Card id="set-targets" title={t('set.s.targets')}>
-        <p className="v2-sec">{t('set.targetsHint')}</p>
-        <dl className="v2-dl">
-          <dt>{t('set.runway')}</dt><dd>{t('pulse.daysN', { n: RUNWAY_TARGET_DAYS })} <span className="v2-muted v2-small">· {t('set.runwayDefault')}</span></dd>
-          <dt>{t('set.minCash')}</dt><dd><span className="v2-muted">{t('placeholder.notSetUp')}</span></dd>
-          <dt>{t('set.brief')}</dt><dd><span className="v2-muted">{t('placeholder.notSetUp')}</span></dd>
-        </dl>
-        <NotYet note={t('cp.form.needsProposal')}>{t('set.editTargets')}</NotYet>
-      </Card>
+      <TargetsCard />
 
       <Card id="set-company" title={t('set.s.company')}>
         <p className="v2-sec">{pct != null ? t('prof.pct', { n: pct }) : t('prof.unknownPct')}</p>

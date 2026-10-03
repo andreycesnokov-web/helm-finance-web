@@ -3,8 +3,7 @@
 import assert from 'node:assert'
 import {
   billStatus, tabForPath, billSummary, billRows, withholdingSplit, payerHistory, duplicatePairs, npwpFormat,
-  holderMatches, cpFilter, txFilter, needsCategory, txDir, toCsv, statementFreshness, latestPayrollRun, txSource,
-} from '../../client/src/v2/lib/obligations.js'
+  holderMatches, cpFilter, txFilter, needsCategory, txDir, toCsv, statementFreshness, latestPayrollRun, txSource, billChecklistItems } from '../../client/src/v2/lib/obligations.js'
 
 let pass = 0, fail = 0
 const t = (name, fn) => { try { fn(); pass++; console.log(`  ok  ${name}`) } catch (e) { fail++; console.log(`  XX  ${name}\n      ${e.message}`) } }
@@ -135,6 +134,20 @@ t('payroll: latest period, PPh 21 only when recorded', () => {
   assert.deepStrictEqual([run.gross, run.net, run.tax, run.bpjs], [150, 140, 4, 6])
   assert.strictEqual(run.people.find((p) => p.name === 'B').tax, null)
   assert.strictEqual(latestPayrollRun({ payments: [] }), null)
+})
+
+t('bill checklist: P-05 rows unknown before 061, from stored marks after (never claimed)', () => {
+  const before = billChecklistItems({ id: 1, status: 'open' }, { hasInvoice: true, slipNeeded: true })
+  assert.deepStrictEqual(before.map((c) => [c.key, c.done, !!c.unknown]), [['invoice', true, false], ['proof', false, false], ['slip', false, true], ['check', false, true]])
+  const after = billChecklistItems({ id: 1, status: 'paid', last_payment_at: 'x', withholding_slip_document_id: 'd', accountant_checked_at: null }, { paid: true, slipNeeded: true })
+  assert.deepStrictEqual(after.map((c) => [c.key, c.done, !!c.editable]), [['invoice', false, false], ['proof', true, false], ['slip', true, true], ['check', false, true]])
+  assert.ok(!billChecklistItems({ accountant_checked_at: null }, { slipNeeded: false }).some((c) => c.key === 'slip'), 'no slip without an engine withholding')
+})
+
+t('landlord counts as a supplier; lender does not (P-04 roles)', () => {
+  assert.ok(cpFilter({ role: 'landlord' }, 'supplier'))
+  assert.ok(!cpFilter({ role: 'lender' }, 'supplier'))
+  assert.ok(!cpFilter({ role: 'lender' }, 'customer'))
 })
 
 console.log(`\n${pass} passed, ${fail} failed`)
