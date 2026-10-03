@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Admin — companies</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&amp;family=Manrope:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#F4F6F8}
+a{color:#1565C0;text-decoration:none}a:hover{color:#003366}
+.ic{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.num{font-variant-numeric:tabular-nums lining-nums}
+.btn{font-family:inherit;font-size:14px;font-weight:700;border-radius:10px;height:40px;padding:0 16px;border:1px solid #DDE5EC;background:#FFFFFF;color:#003366;cursor:pointer;display:inline-flex;align-items:center;gap:8px;white-space:nowrap}
+.btn-p{background:#1565C0;border-color:#1565C0;color:#FFFFFF}
+.tag{font-size:12px;font-weight:800;border-radius:999px;padding:3px 10px;white-space:nowrap;display:inline-block}
+.card{background:#FFFFFF;border:1px solid #DDE5EC;border-radius:20px}
+.kpi{padding:18px 20px;display:flex;flex-direction:column;gap:6px;min-width:0}
+.kl{font-size:13px;font-weight:600;color:#5A6E82}
+.kv{font-size:24px;font-weight:800}
+.ks{font-size:13px;color:#3D556E;line-height:1.45}
+.lg{display:inline-flex;align-items:center;gap:8px}
+.sw{width:12px;height:12px;border-radius:3px;display:inline-block}
+.wf{display:grid;grid-template-columns:170px minmax(0,1fr) 110px;gap:14px;align-items:center;padding:9px 0;font-size:14px}
+.wf>*{min-width:0}
+.trk{position:relative;height:22px}
+.cl{display:grid;grid-template-columns:minmax(0,1fr) 96px 96px;gap:12px;padding:9px 0;border-top:1px solid #EDF1F5;font-size:14px}
+.cl>*{min-width:0}
+details summary{cursor:pointer;font-size:13px;font-weight:700;color:#1565C0;list-style:none}
+.tb{width:100%;border-collapse:collapse;font-size:13px;margin-top:10px}
+.tb th,.tb td{padding:6px 8px;border-top:1px solid #EDF1F5;text-align:right;white-space:nowrap}
+.tb th:first-child,.tb td:first-child{text-align:left}
+.tb th{color:#5A6E82;font-weight:700}
+.row3{display:grid;gap:12px;align-items:center;padding:12px 0;border-top:1px solid #EDF1F5;font-size:14px}
+.row3>*{min-width:0}
+.ell{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cl{grid-template-columns:minmax(0,1fr) auto auto;gap:16px}
+a.btn-p,a.btn-p:hover{color:#FFFFFF}
+</style>
+</helmet>
+<div style="min-height: 100vh; display: grid; grid-template-columns: 248px minmax(0, 1fr); background: #F4F6F8; font-family: 'Manrope', 'Segoe UI', sans-serif; color: #003366;">
+<aside style="width: 248px; min-height: 100vh; box-sizing: border-box; background: #002447; color: #FFFFFF; padding: 22px 16px; display: flex; flex-direction: column; gap: 22px;">
+<div style="display: flex; align-items: center; gap: 10px; padding: 0 8px;"><img src="/_blob/b0b57bf77915b0c8b409293040a8568d" alt="" style="width: 30px; height: 30px;"><span style="display: flex; flex-direction: column;"><span style="font-family: 'Archivo Black', 'Manrope', sans-serif; font-size: 17px;">CFO AI</span><span style="font-size: 11px; font-weight: 800; letter-spacing: 1px; color: #F2B544;">PLATFORM ADMIN</span></span></div>
+<nav style="display: flex; flex-direction: column; gap: 2px;"><a href="AdminOverview.dc.html" style="display: flex; align-items: center; gap: 12px; height: 40px; padding: 0 12px; border-radius: 10px; font-size: 14px; font-weight: 600; text-decoration: none; color: #C9D8E8;"><svg class="ic" viewBox="0 0 24 24"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg>Overview</a><a href="AdminCompanies.dc.html" style="display: flex; align-items: center; gap: 12px; height: 40px; padding: 0 12px; border-radius: 10px; font-size: 14px; font-weight: 600; text-decoration: none; background: #0F4A85; color: #FFFFFF;"><svg class="ic" viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M9 7h2M13 7h2M9 11h2M13 11h2M9 15h6"/></svg>Companies</a><a href="AdminSystem.dc.html" style="display: flex; align-items: center; gap: 12px; height: 40px; padding: 0 12px; border-radius: 10px; font-size: 14px; font-weight: 600; text-decoration: none; color: #C9D8E8;"><svg class="ic" viewBox="0 0 24 24"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg>Flags & system</a></nav>
+<div style="margin-top: auto; display: flex; flex-direction: column; gap: 10px;">
+<div style="background: #0A3C6E; border-radius: 12px; padding: 12px; font-size: 12px; line-height: 1.5; color: #C9D8E8;">You see accounts, usage and health. Client balances and transactions stay closed unless the client grants access.</div>
+<a href="Main.dc.html" style="display: flex; align-items: center; gap: 10px; height: 40px; padding: 0 12px; border-radius: 10px; font-size: 14px; font-weight: 700; color: #FFFFFF; border: 1px solid #1E4D7A; text-decoration: none;"><svg class="ic" viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg>Back to my company</a>
+</div>
+</aside>
+<main style="padding: 32px 40px 48px;">
+<div style="max-width: 1120px; margin: 0 auto; display: flex; flex-direction: column; gap: 22px;">
+<header style="display: flex; align-items: flex-end; justify-content: space-between; gap: 24px;">
+<div style="display: flex; flex-direction: column; gap: 6px;"><h1 style="margin: 0; font-family: 'Archivo Black', 'Manrope', sans-serif; font-size: 30px; font-weight: 400;">Companies</h1><p style="margin: 0; font-size: 15px; color: #3D556E;">118 workspaces · 68 companies and 50 personal-only users</p></div>
+<div style="display: flex; align-items: center; gap: 10px;"><span class="tag" style="background: #FBF1DF; color: #8B5A08;">Sample data</span><a class="btn" href="AdminOverview.dc.html">Overview</a></div>
+</header>
+<div style="display: flex; flex-wrap: wrap; gap: 8px;">
+<button class="btn" aria-pressed="true" style="height: 36px; background: #003366; color: #FFFFFF; border-color: #003366;">All · 68</button><button class="btn" style="height: 36px;">Paying · 46</button><button class="btn" style="height: 36px;">Trial · 22</button><button class="btn" style="height: 36px;">Needs attention · 6</button><span style="flex: 1;"></span><span style="display: flex; align-items: center; min-height: 36px; padding: 0 14px; border: 1px solid #C2CFDB; border-radius: 10px; background: #FFFFFF; font-size: 14px; color: #5A6E82; min-width: 220px;">Search company or email</span>
+</div>
+<div style="display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 20px; align-items: start;">
+<section class="card" style="padding: 10px 16px 10px; min-width: 0;">
+<div class="row3" style="grid-template-columns: minmax(0, 1.6fr) 110px 66px 52px 92px 104px; border-top: none; font-size: 12px; font-weight: 700; color: #5A6E82; padding: 6px 8px;"><span>Company</span><span>Plan</span><span>Setup</span><span>AI · 30 d</span><span>Last active</span><span>Status</span></div>
+<div class="row3" style="grid-template-columns: minmax(0, 1.6fr) 110px 66px 52px 92px 104px; background: #F5FAFF; box-shadow: inset 3px 0 0 #1565C0; padding-left: 8px; padding-right: 8px;"><span style="display: flex; flex-direction: column; gap: 2px; min-width: 0;"><span class="ell" style="font-weight: 700;">Warung Seminyak Group</span><span class="ell" style="font-size: 12px; color: #5A6E82;">Restaurants · 3 outlets · since Feb 2026</span></span><span class="ell">Founder</span><span class="num">4/4</span><span class="num" style="font-size: 13px;">412</span><span class="ell" style="color: #3D556E;">Today</span><span><span class="tag" style="background: #E5F4EE; color: #0F7A52;">Healthy</span></span></div><div class="row3" style="grid-template-columns: minmax(0, 1.6fr) 110px 66px 52px 92px 104px; padding-left: 8px; padding-right: 8px;"><span style="display: flex; flex-direction: column; gap: 2px; min-width: 0;"><span class="ell" style="font-weight: 700;">Ubud Villas Rental</span><span class="ell" style="font-size: 12px; color: #5A6E82;">Property rental · since Apr 2026</span></span><span class="ell">Founder</span><span class="num">4/4</span><span class="num" style="font-size: 13px;">288</span><span class="ell" style="color: #3D556E;">Today</span><span><span class="tag" style="background: #E5F4EE; color: #0F7A52;">Healthy</span></span></div><div class="row3" style="grid-template-columns: minmax(0, 1.6fr) 110px 66px 52px 92px 104px; padding-left: 8px; padding-right: 8px;"><span style="display: flex; flex-direction: column; gap: 2px; min-width: 0;"><span class="ell" style="font-weight: 700;">Bali Build Developer</span><span class="ell" style="font-size: 12px; color: #5A6E82;">Property development · since Jun 2026</span></span><span class="ell">Founder</span><span class="num">3/4</span><span class="num" style="font-size: 13px;">95</span><span class="ell" style="color: #3D556E;">Yesterday</span><span><span class="tag" style="background: #FBF1DF; color: #8B5A08;">Setup stuck</span></span></div><div class="row3" style="grid-template-columns: minmax(0, 1.6fr) 110px 66px 52px 92px 104px; padding-left: 8px; padding-right: 8px;"><span style="display: flex; flex-direction: column; gap: 2px; min-width: 0;"><span class="ell" style="font-weight: 700;">Canggu Coworking</span><span class="ell" style="font-size: 12px; color: #5A6E82;">Coworking · since Mar 2026</span></span><span class="ell">Starter</span><span class="num">4/4</span><span class="num" style="font-size: 13px;">140</span><span class="ell" style="color: #3D556E;">2 days ago</span><span><span class="tag" style="background: #E5F4EE; color: #0F7A52;">Healthy</span></span></div><div class="row3" style="grid-template-columns: minmax(0, 1.6fr) 110px 66px 52px 92px 104px; padding-left: 8px; padding-right: 8px;"><span style="display: flex; flex-direction: column; gap: 2px; min-width: 0;"><span class="ell" style="font-weight: 700;">Kopi Kita Roasters</span><span class="ell" style="font-size: 12px; color: #5A6E82;">Café and roastery · since May 2026</span></span><span class="ell">Starter</span><span class="num">4/4</span><span class="num" style="font-size: 13px;">198</span><span class="ell" style="color: #3D556E;">Today</span><span><span class="tag" style="background: #FBF1DF; color: #8B5A08;">At AI limit</span></span></div><div class="row3" style="grid-template-columns: minmax(0, 1.6fr) 110px 66px 52px 92px 104px; padding-left: 8px; padding-right: 8px;"><span style="display: flex; flex-direction: column; gap: 2px; min-width: 0;"><span class="ell" style="font-weight: 700;">Sanur Dive Center</span><span class="ell" style="font-size: 12px; color: #5A6E82;">Tourism · since Jan 2026</span></span><span class="ell">Starter</span><span class="num">2/4</span><span class="num" style="font-size: 13px;">6</span><span class="ell" style="color: #3D556E;">19 days ago</span><span><span class="tag" style="background: #FBEAEA; color: #C62828;">Past due</span></span></div><div class="row3" style="grid-template-columns: minmax(0, 1.6fr) 110px 66px 52px 92px 104px; padding-left: 8px; padding-right: 8px;"><span style="display: flex; flex-direction: column; gap: 2px; min-width: 0;"><span class="ell" style="font-weight: 700;">Lombok Surf Camp</span><span class="ell" style="font-size: 12px; color: #5A6E82;">Tourism · since Sep 2026</span></span><span class="ell">Trial · 3 days left</span><span class="num">2/4</span><span class="num" style="font-size: 13px;">12</span><span class="ell" style="color: #3D556E;">4 days ago</span><span><span class="tag" style="background: #FBF1DF; color: #8B5A08;">Trial ends</span></span></div><div class="row3" style="grid-template-columns: minmax(0, 1.6fr) 110px 66px 52px 92px 104px; padding-left: 8px; padding-right: 8px;"><span style="display: flex; flex-direction: column; gap: 2px; min-width: 0;"><span class="ell" style="font-weight: 700;">Helm Care Indonesia</span><span class="ell" style="font-size: 12px; color: #5A6E82;">Services and vending · since Mar 2026</span></span><span class="ell">Founder</span><span class="num">4/4</span><span class="num" style="font-size: 13px;">310</span><span class="ell" style="color: #3D556E;">Today</span><span><span class="tag" style="background: #E5F4EE; color: #0F7A52;">Healthy</span></span></div>
+<p style="margin: 10px 8px 4px; font-size: 12px; color: #5A6E82;">Showing 8 of 68 · sorted by last active</p>
+</section>
+<section class="card" style="padding: 20px 22px; display: flex; flex-direction: column; gap: 14px; min-width: 0;">
+<div style="display: flex; flex-direction: column; gap: 4px;"><span style="font-size: 12px; font-weight: 700; color: #5A6E82;">Selected</span><h3 style="margin: 0; font-size: 20px; font-weight: 800;">Warung Seminyak Group</h3><span style="font-size: 13px; color: #3D556E;">PT · restaurants, 3 outlets · owner [owner email]</span></div>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px;">
+<div style="background: #F4F6F8; border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 4px;"><span style="font-size: 12px; color: #5A6E82; font-weight: 600;">Plan</span><span style="font-weight: 800;">Founder</span><span style="font-size: 12px; color: #5A6E82;">Renews 14 Oct · card</span></div>
+<div style="background: #F4F6F8; border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 4px;"><span style="font-size: 12px; color: #5A6E82; font-weight: 600;">Team</span><span style="font-weight: 800;">4 people</span><span style="font-size: 12px; color: #5A6E82;">Owner, 2 managers, accountant</span></div>
+<div style="background: #F4F6F8; border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 4px;"><span style="font-size: 12px; color: #5A6E82; font-weight: 600;">AI questions</span><span class="num" style="font-weight: 800;">412 of 600</span><span style="font-size: 12px; color: #5A6E82;">Resets 14 Oct</span></div>
+<div style="background: #F4F6F8; border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 4px;"><span style="font-size: 12px; color: #5A6E82; font-weight: 600;">Connected</span><span style="font-weight: 800;">Telegram, Claude</span><span style="font-size: 12px; color: #5A6E82;">MCP write tools: pilot</span></div>
+</div>
+<div style="border: 1px solid #DDE5EC; border-radius: 14px; padding: 14px; display: flex; flex-direction: column; gap: 8px;">
+<span style="display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 800;"><svg class="ic" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>Their financial data is closed</span>
+<span style="font-size: 13px; line-height: 1.5; color: #3D556E;">You see the plan, usage and errors. Balances, transactions and documents open only if the owner approves a request in their app — for 24 hours, read-only, and written to their audit log.</span>
+<button class="btn" style="align-self: flex-start; height: 36px;">Request support access</button>
+</div>
+<div style="display: flex; flex-wrap: wrap; gap: 8px;"><button class="btn" style="height: 36px;">Extend trial</button><button class="btn" style="height: 36px;">Change plan</button><button class="btn" style="height: 36px;">Message owner</button></div>
+<div style="display: flex; flex-direction: column; gap: 0;">
+<span style="font-size: 13px; font-weight: 800; margin-bottom: 4px;">Recent activity</span>
+<div class="cl" style="border-top: none; grid-template-columns: 70px minmax(0, 1fr);"><span class="num" style="color: #5A6E82;">Today</span><span>Imported BCA statement · 212 rows</span></div>
+<div class="cl" style="grid-template-columns: 70px minmax(0, 1fr);"><span class="num" style="color: #5A6E82;">1 Oct</span><span>Accountant closed September</span></div>
+<div class="cl" style="grid-template-columns: 70px minmax(0, 1fr);"><span class="num" style="color: #5A6E82;">28 Sep</span><span>Claude sent 3 invoice drafts · all approved</span></div>
+</div>
+</section>
+</div>
+
+</div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1060}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

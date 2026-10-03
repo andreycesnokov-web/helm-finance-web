@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Accounts — desktop</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&amp;family=Manrope:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#F4F6F8}
+a{color:#1565C0;text-decoration:none}a:hover{color:#003366}
+.ic{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.num{font-variant-numeric:tabular-nums lining-nums}
+.btn{font-family:inherit;font-size:14px;font-weight:700;border-radius:10px;height:40px;padding:0 16px;border:1px solid #DDE5EC;background:#FFFFFF;color:#003366;cursor:pointer;display:inline-flex;align-items:center;gap:8px;white-space:nowrap}
+.btn-p{background:#1565C0;border-color:#1565C0;color:#FFFFFF}
+.tag{font-size:12px;font-weight:800;border-radius:999px;padding:3px 10px;white-space:nowrap;display:inline-block}
+.acc{display:grid;grid-template-columns:44px minmax(0,1fr) 200px 150px 40px;gap:16px;align-items:center;padding:16px 0;border-top:1px solid #EDF1F5}
+a.btn-p,a.btn-p:hover{color:#FFFFFF}
+a.btn:hover,a.chip:hover{filter:brightness(0.97)}
+</style>
+</helmet>
+<div style="min-height: 100vh; display: grid; grid-template-columns: 248px minmax(0, 1fr); background: #F4F6F8; font-family: 'Manrope', 'Segoe UI', sans-serif; color: #003366;">
+<dc-import name="Sidebar" active="accounts" hint-size="248px,100%"></dc-import>
+<main style="padding: 32px 40px 48px;">
+<div style="max-width: 1120px; margin: 0 auto; display: flex; flex-direction: column; gap: 24px;">
+
+<header style="display: flex; align-items: flex-end; justify-content: space-between; gap: 24px;">
+<div style="display: flex; flex-direction: column; gap: 6px;">
+<h1 style="margin: 0; font-family: 'Archivo Black', 'Manrope', sans-serif; font-size: 30px; font-weight: 400;">Accounts</h1>
+<p style="margin: 0; font-size: 15px; color: #3D556E;">Where the company's money is right now</p>
+</div>
+<div style="display: flex; gap: 10px;">
+<a class="btn" href="Documents.dc.html"><svg class="ic" viewBox="0 0 24 24"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 20h16"/></svg>Import statement</a>
+<button class="btn btn-p"><svg class="ic" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>Add account</button>
+</div>
+</header>
+
+<section style="background: #FFFFFF; border: 1px solid #DDE5EC; border-radius: 24px; padding: 28px; display: flex; flex-direction: column; gap: 18px;">
+<div style="display: flex; align-items: flex-end; justify-content: space-between; gap: 24px;">
+<div style="display: flex; flex-direction: column; gap: 4px;">
+<span style="font-size: 14px; font-weight: 600; color: #5A6E82;">Total cash · 4 accounts</span>
+<span class="num" style="font-size: 40px; font-weight: 800; letter-spacing: -0.5px;">Rp 122.9M</span>
+</div>
+<span style="font-size: 14px; color: #3D556E; text-align: right;">Personal money is kept in your Personal workspace<br>and is never counted here.</span>
+</div>
+<div role="img" aria-label="Cash by account: BCA 59 percent, Mandiri 31 percent, Midtrans 7 percent, cash box 3 percent" style="display: flex; height: 14px; border-radius: 8px; overflow: hidden; gap: 3px;">
+<div style="width: 59%; background: #003366;"></div>
+<div style="width: 31%; background: #3399FF;"></div>
+<div style="width: 7%; background: #8FC3F5;"></div>
+<div style="width: 3%; background: #C2CFDB;"></div>
+</div>
+<div style="display: flex; gap: 24px; font-size: 13px; color: #3D556E;">
+<span style="display: inline-flex; align-items: center; gap: 8px;"><span style="width: 10px; height: 10px; border-radius: 3px; background: #003366;"></span>BCA · Operating</span>
+<span style="display: inline-flex; align-items: center; gap: 8px;"><span style="width: 10px; height: 10px; border-radius: 3px; background: #3399FF;"></span>Mandiri · Payroll</span>
+<span style="display: inline-flex; align-items: center; gap: 8px;"><span style="width: 10px; height: 10px; border-radius: 3px; background: #8FC3F5;"></span>Midtrans</span>
+<span style="display: inline-flex; align-items: center; gap: 8px;"><span style="width: 10px; height: 10px; border-radius: 3px; background: #C2CFDB;"></span>Cash box</span>
+</div>
+</section>
+
+<div style="display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr); gap: 24px; align-items: start;">
+<section style="background: #FFFFFF; border: 1px solid #DDE5EC; border-radius: 20px; padding: 8px 24px 12px;">
+<div class="acc" style="border-top: none;">
+<span style="width: 44px; height: 44px; border-radius: 12px; background: #E6F1FB; color: #003366; display: flex; align-items: center; justify-content: center;"><svg class="ic" viewBox="0 0 24 24"><path d="M3 10l9-6 9 6M5 10v8M19 10v8M9 10v8M15 10v8M3 20h18"/></svg></span>
+<div style="display: flex; flex-direction: column; gap: 3px;"><span style="font-size: 15px; font-weight: 700;">BCA · Operating</span><span style="font-size: 13px; color: #5A6E82;">Bank account · main account for clients and suppliers</span></div>
+<div style="display: flex; flex-direction: column; gap: 3px;"><span style="font-size: 13px; color: #3D556E;">Statement imported 1 Oct</span><a href="Transactions.dc.html" style="font-size: 13px; font-weight: 700;">2 lines to review</a></div>
+<span class="num" style="font-size: 16px; font-weight: 800; text-align: right;">Rp 72.4M</span>
+<button class="btn" aria-label="More for BCA Operating" style="width: 40px; padding: 0; justify-content: center; border: none;"><svg class="ic" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></button>
+</div>
+<div class="acc">
+<span style="width: 44px; height: 44px; border-radius: 12px; background: #E6F1FB; color: #003366; display: flex; align-items: center; justify-content: center;"><svg class="ic" viewBox="0 0 24 24"><path d="M3 10l9-6 9 6M5 10v8M19 10v8M9 10v8M15 10v8M3 20h18"/></svg></span>
+<div style="display: flex; flex-direction: column; gap: 3px;"><span style="font-size: 15px; font-weight: 700;">Mandiri · Payroll</span><span style="font-size: 13px; color: #0F7A52; font-weight: 600;">Covers the 5 Oct payroll of Rp 24.0M</span></div>
+<div style="display: flex; flex-direction: column; gap: 3px;"><span style="font-size: 13px; color: #5A6E82; font-weight: 700;">Last statement 30 Sep</span><a href="#" style="font-size: 13px; font-weight: 700;">Upload newer statement</a></div>
+<span class="num" style="font-size: 16px; font-weight: 800; text-align: right;">Rp 38.0M</span>
+<button class="btn" aria-label="More for Mandiri Payroll" style="width: 40px; padding: 0; justify-content: center; border: none;"><svg class="ic" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></button>
+</div>
+<div class="acc">
+<span style="width: 44px; height: 44px; border-radius: 12px; background: #E6F1FB; color: #003366; display: flex; align-items: center; justify-content: center;"><svg class="ic" viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18M7 15h3"/></svg></span>
+<div style="display: flex; flex-direction: column; gap: 3px;"><span style="font-size: 15px; font-weight: 700;">Midtrans</span><span style="font-size: 13px; color: #5A6E82;">Payment gateway · card and QRIS sales</span></div>
+<div style="display: flex; flex-direction: column; gap: 3px;"><span style="font-size: 13px; color: #0F7A52; font-weight: 700;">Connected · synced 2 Oct</span><span style="font-size: 13px; color: #5A6E82;">Settles to BCA every day</span></div>
+<span class="num" style="font-size: 16px; font-weight: 800; text-align: right;">Rp 8.3M</span>
+<button class="btn" aria-label="More for Midtrans" style="width: 40px; padding: 0; justify-content: center; border: none;"><svg class="ic" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></button>
+</div>
+<div class="acc">
+<span style="width: 44px; height: 44px; border-radius: 12px; background: #F4F6F8; color: #003366; display: flex; align-items: center; justify-content: center;"><svg class="ic" viewBox="0 0 24 24"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/></svg></span>
+<div style="display: flex; flex-direction: column; gap: 3px;"><span style="font-size: 15px; font-weight: 700;">Cash box · Denpasar</span><span style="font-size: 13px; color: #5A6E82;">Cash · kept by Dewi</span></div>
+<div style="display: flex; flex-direction: column; gap: 3px;"><span style="font-size: 13px; color: #3D556E;">Counted 30 Sep</span><a href="#" style="font-size: 13px; font-weight: 700;">Recount</a></div>
+<span class="num" style="font-size: 16px; font-weight: 800; text-align: right;">Rp 4.2M</span>
+<button class="btn" aria-label="More for cash box" style="width: 40px; padding: 0; justify-content: center; border: none;"><svg class="ic" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></button>
+</div>
+</section>
+
+<aside style="display: flex; flex-direction: column; gap: 16px;">
+<section style="background: #FFFFFF; border: 1px solid #DDE5EC; border-radius: 20px; padding: 22px; display: flex; flex-direction: column; gap: 14px;">
+<h3 style="margin: 0; font-size: 17px; font-weight: 800;">Keep balances true</h3>
+<p style="margin: 0; font-size: 14px; line-height: 1.55; color: #3D556E;">Pulse and Radar are only as right as these balances. Mandiri was last updated 2 days ago.</p>
+<a class="btn btn-p" style="justify-content: center;" href="Documents.dc.html">Upload Mandiri statement</a>
+</section>
+<section style="background: #FFFFFF; border: 1px solid #DDE5EC; border-radius: 20px; padding: 22px; display: flex; flex-direction: column; gap: 12px;">
+<h3 style="margin: 0; font-size: 17px; font-weight: 800;">Moves between accounts</h3>
+<p style="margin: 0; font-size: 14px; color: #3D556E;">Transfers are not income or spending.</p>
+<div style="display: flex; justify-content: space-between; font-size: 14px; padding-top: 4px;"><span>27 Sep · BCA → Mandiri</span><span class="num" style="font-weight: 800;">Rp 20.0M</span></div>
+<div style="display: flex; justify-content: space-between; font-size: 14px;"><span>Daily · Midtrans → BCA</span><span class="num" style="font-weight: 800;">auto</span></div>
+</section>
+</aside>
+</div>
+
+</div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1000}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

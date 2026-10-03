@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Settings — desktop</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&amp;family=Manrope:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#F4F6F8}
+a{color:#1565C0;text-decoration:none}a:hover{color:#003366}
+.ic{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.num{font-variant-numeric:tabular-nums lining-nums}
+.btn{font-family:inherit;font-size:14px;font-weight:700;border-radius:10px;height:40px;padding:0 16px;border:1px solid #DDE5EC;background:#FFFFFF;color:#003366;cursor:pointer;display:inline-flex;align-items:center;gap:8px;white-space:nowrap}
+.btn-p{background:#1565C0;border-color:#1565C0;color:#FFFFFF}
+.tag{font-size:12px;font-weight:800;border-radius:999px;padding:3px 10px;white-space:nowrap;display:inline-block}
+.sn{display:flex;align-items:center;height:40px;padding:0 12px;border-radius:10px;font-size:14px;font-weight:600;color:#3D556E}
+.fld{display:grid;grid-template-columns:220px minmax(0,1fr);gap:16px;align-items:center;padding:14px 0;border-top:1px solid #EDF1F5;font-size:14px}
+.inp{font-family:inherit;font-size:15px;color:#003366;height:40px;border:1px solid #C2CFDB;border-radius:10px;padding:0 12px;background:#FFFFFF;width:160px}
+.tm{display:grid;grid-template-columns:36px minmax(0,1fr) 120px minmax(0,1.4fr);gap:14px;align-items:center;padding:12px 0;border-top:1px solid #EDF1F5;font-size:14px}
+.cn{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:14px;align-items:center;padding:13px 0;border-top:1px solid #EDF1F5;font-size:14px}
+a.btn-p,a.btn-p:hover{color:#FFFFFF}
+a.btn:hover,a.chip:hover{filter:brightness(0.97)}
+</style>
+</helmet>
+<div style="min-height: 100vh; display: grid; grid-template-columns: 248px minmax(0, 1fr); background: #F4F6F8; font-family: 'Manrope', 'Segoe UI', sans-serif; color: #003366;">
+<dc-import name="Sidebar" active="settings" hint-size="248px,100%"></dc-import>
+<main style="padding: 32px 40px 48px;">
+<div style="max-width: 1120px; margin: 0 auto; display: flex; flex-direction: column; gap: 22px;">
+
+<header style="display: flex; flex-direction: column; gap: 6px;">
+<h1 style="margin: 0; font-family: 'Archivo Black', 'Manrope', sans-serif; font-size: 30px; font-weight: 400;">Settings</h1>
+<p style="margin: 0; font-size: 15px; color: #3D556E;">Nusantara Facilities · the rules every screen follows</p>
+</header>
+
+<div style="display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 28px; align-items: start;">
+<nav aria-label="Settings sections" style="display: flex; flex-direction: column; gap: 2px;">
+<a class="sn" href="#targets" style="background: #E6F1FB; color: #003366;">Targets &amp; alerts</a>
+<a class="sn" href="CompanyProfile.dc.html">Company &amp; tax profile</a>
+<a class="sn" href="#team">Team &amp; roles</a>
+<a class="sn" href="#connections">Connections</a>
+<a class="sn" href="#plan">Plan</a>
+</nav>
+
+<div style="display: flex; flex-direction: column; gap: 20px;">
+<section id="targets" style="background: #FFFFFF; border: 1px solid #DDE5EC; border-radius: 20px; padding: 20px 24px 10px;">
+<h3 style="margin: 0 0 4px; font-size: 17px; font-weight: 800;">Targets &amp; alerts</h3>
+<p style="margin: 0 0 6px; font-size: 13px; color: #5A6E82;">Pulse, Radar and AI CFO judge your health against these — not a generic rule.</p>
+<div class="fld"><label for="rt" style="font-weight: 700;">Runway target</label><span style="display: flex; align-items: center; gap: 10px;"><input id="rt" class="inp num" value="60 days"><span style="color: #5A6E82;">Below this, status turns to Attention</span></span></div>
+<div class="fld"><label for="cb" style="font-weight: 700;">Minimum cash</label><span style="display: flex; align-items: center; gap: 10px;"><input id="cb" class="inp num" placeholder="Not set"><span style="color: #5A6E82;">Optional · Radar always warns before cash would go below zero</span></span></div>
+<div class="fld"><label for="wb" style="font-weight: 700;">Weekly brief</label><span style="display: flex; align-items: center; gap: 10px;"><input id="wb" class="inp" value="Monday 08:00"><span style="color: #5A6E82;">Sent to Telegram</span></span></div>
+</section>
+
+<section id="company" style="background: #FFFFFF; border: 1px solid #DDE5EC; border-radius: 20px; padding: 20px 24px; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px; align-items: center;">
+<div style="display: flex; flex-direction: column; gap: 6px; min-width: 0;">
+<h3 style="margin: 0; font-size: 17px; font-weight: 800;">Company &amp; tax profile</h3>
+<span style="font-size: 14px; color: #3D556E;">PT Nusantara Facilities · PMDN · NIB with 2 business activities · not PKP</span>
+<span style="font-size: 13px; color: #8B5A08; font-weight: 700;">90% complete · commissioner missing</span>
+</div>
+<a class="btn btn-p" href="CompanyProfile.dc.html">Open profile</a>
+</section>
+
+<section id="team" style="background: #FFFFFF; border: 1px solid #DDE5EC; border-radius: 20px; padding: 20px 24px 10px;">
+<div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;"><h3 style="margin: 0; font-size: 17px; font-weight: 800;">Team &amp; roles</h3><button class="btn">Invite</button></div>
+<div class="tm"><span style="width: 36px; height: 36px; border-radius: 50%; background: #003366; color: #FFFFFF; display: flex; align-items: center; justify-content: center; font-weight: 800;">A</span><span style="font-weight: 700;">Andrew <span style="font-weight: 500; color: #5A6E82;">(you)</span></span><span class="tag" style="background: #E6F1FB; color: #1565C0; justify-self: start;">Owner</span><span style="color: #3D556E;">Sees everything · approves</span></div>
+<div class="tm"><span style="width: 36px; height: 36px; border-radius: 50%; background: #E6F1FB; color: #003366; display: flex; align-items: center; justify-content: center; font-weight: 800;">D</span><span style="font-weight: 700;">Dewi Lestari</span><span class="tag" style="background: #F4F6F8; color: #3D556E; justify-self: start;">Manager</span><span style="color: #3D556E;">Submits bills and expenses · sees only her own</span></div>
+<div class="tm"><span style="width: 36px; height: 36px; border-radius: 50%; background: #E6F1FB; color: #003366; display: flex; align-items: center; justify-content: center; font-weight: 800;">B</span><span style="font-weight: 700;">Budi Santoso</span><span class="tag" style="background: #F4F6F8; color: #3D556E; justify-self: start;">Employee</span><span style="color: #3D556E;">Submits expense claims from Telegram</span></div>
+<div class="tm"><span style="width: 36px; height: 36px; border-radius: 50%; background: #E6F1FB; color: #003366; display: flex; align-items: center; justify-content: center; font-weight: 800;">R</span><span style="font-weight: 700;">Rina</span><span class="tag" style="background: #F4F6F8; color: #3D556E; justify-self: start;">Accountant</span><span style="color: #3D556E;">Documents and taxes · cannot approve payments</span></div>
+</section>
+
+<section id="connections" style="background: #FFFFFF; border: 1px solid #DDE5EC; border-radius: 20px; padding: 20px 24px 10px;">
+<h3 style="margin: 0 0 4px; font-size: 17px; font-weight: 800;">Connections</h3>
+<div class="cn"><span><strong>Telegram</strong><br><span style="color: #5A6E82;">Add things by text or photo, approve with one tap</span></span><span class="tag" style="background: #E5F4EE; color: #0F7A52;">Connected</span></div>
+<div class="cn"><span><strong>AI assistants</strong><br><span style="color: #5A6E82;">Claude · can read and create drafts that wait for your approval</span></span><span style="display: flex; gap: 8px; align-items: center;"><span class="tag" style="background: #E5F4EE; color: #0F7A52;">Claude connected</span><button class="btn" style="height: 34px;">Connect ChatGPT</button></span></div>
+<div class="cn"><span><strong>Bank statements</strong><br><span style="color: #5A6E82;">BCA and Mandiri by file upload</span></span><a class="btn" style="height: 34px;" href="Accounts.dc.html">Import</a></div>
+<div class="cn"><span><strong>Midtrans</strong><br><span style="color: #5A6E82;">Payment gateway sales sync daily</span></span><span class="tag" style="background: #E5F4EE; color: #0F7A52;">Connected</span></div>
+</section>
+
+<section id="plan" style="background: #FFFFFF; border: 1px solid #DDE5EC; border-radius: 20px; padding: 20px 24px; display: flex; align-items: center; justify-content: space-between; gap: 16px;">
+<span><strong style="font-size: 17px;">Starter plan</strong><br><span class="num" style="font-size: 14px; color: #5A6E82;">142 of 200 AI questions left this month · Founder adds 60 and 90-day Radar</span></span>
+<button class="btn btn-p">See Founder plan</button>
+</section>
+</div>
+</div>
+
+</div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1500}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

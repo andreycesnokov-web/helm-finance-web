@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Assets and balance — desktop</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&amp;family=Manrope:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#F4F6F8}
+a{color:#1565C0;text-decoration:none}a:hover{color:#003366}
+.ic{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.num{font-variant-numeric:tabular-nums lining-nums}
+.btn{font-family:inherit;font-size:14px;font-weight:700;border-radius:10px;height:40px;padding:0 16px;border:1px solid #DDE5EC;background:#FFFFFF;color:#003366;cursor:pointer;display:inline-flex;align-items:center;gap:8px;white-space:nowrap}
+.btn-p{background:#1565C0;border-color:#1565C0;color:#FFFFFF}
+.tag{font-size:12px;font-weight:800;border-radius:999px;padding:3px 10px;white-space:nowrap;display:inline-block}
+.bl{display:flex;justify-content:space-between;gap:12px;padding:9px 0;border-top:1px solid #EDF1F5;font-size:14px}
+.ar{display:grid;grid-template-columns:minmax(0,1.6fr) 50px 90px 110px 110px minmax(0,1.1fr) 120px;gap:12px;align-items:center;padding:13px 0;border-top:1px solid #EDF1F5;font-size:14px}
+.ar>*{min-width:0}
+.fn{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+a.btn-p,a.btn-p:hover{color:#FFFFFF}
+a.btn:hover,a.chip:hover{filter:brightness(0.97)}
+</style>
+</helmet>
+<div style="min-height: 100vh; display: grid; grid-template-columns: 248px minmax(0, 1fr); background: #F4F6F8; font-family: 'Manrope', 'Segoe UI', sans-serif; color: #003366;">
+<dc-import name="Sidebar" active="assets" hint-size="248px,100%"></dc-import>
+<main style="padding: 32px 40px 48px;">
+<div style="max-width: 1120px; margin: 0 auto; display: flex; flex-direction: column; gap: 22px;">
+
+<header style="display: flex; align-items: flex-end; justify-content: space-between; gap: 24px;">
+<div style="display: flex; flex-direction: column; gap: 6px;">
+<h1 style="margin: 0; font-family: 'Archivo Black', 'Manrope', sans-serif; font-size: 30px; font-weight: 400;">Assets &amp; balance</h1>
+<p style="margin: 0; font-size: 15px; color: #3D556E;">What Nusantara Facilities owns and what it owes · as of today, 2 Oct 2026</p>
+</div>
+<a class="btn btn-p" href="AddAsset.dc.html"><svg class="ic" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>Add asset</a>
+</header>
+
+<section style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px;">
+<div style="background: #FFFFFF; border: 1px solid #DDE5EC; border-radius: 20px; padding: 20px 22px 10px;">
+<span style="font-size: 14px; font-weight: 600; color: #5A6E82;">The company owns</span>
+<div class="num" style="font-size: 30px; font-weight: 800; margin: 4px 0 10px;">Rp 470.1M</div>
+<div class="bl"><span>Cash in accounts</span><span class="num" style="font-weight: 700;">Rp 122.9M</span></div>
+<div class="bl"><span>Owed by customers</span><span class="num" style="font-weight: 700;">Rp 78.2M</span></div>
+<div class="bl"><span>Equipment and other assets</span><span class="num" style="font-weight: 700;">Rp 269.0M</span></div>
+</div>
+<div style="background: #FFFFFF; border: 1px solid #DDE5EC; border-radius: 20px; padding: 20px 22px 10px;">
+<span style="font-size: 14px; font-weight: 600; color: #5A6E82;">The company owes</span>
+<div class="num" style="font-size: 30px; font-weight: 800; margin: 4px 0 10px;">Rp 110.7M</div>
+<div class="bl"><span>Bills to pay</span><span class="num" style="font-weight: 700;">Rp 33.0M</span></div>
+<div class="bl"><span>Taxes and BPJS for September</span><span class="num" style="font-weight: 700;">Rp 2.7M</span></div>
+<div class="bl"><span>Loans · founder and Nusantara Holding</span><span class="num" style="font-weight: 700;">Rp 75.0M</span></div>
+</div>
+<div style="background: #003366; color: #FFFFFF; border-radius: 20px; padding: 20px 22px; display: flex; flex-direction: column; gap: 8px;">
+<span style="font-size: 14px; font-weight: 600; color: #C9D8E8;">Net worth · owners' equity</span>
+<span class="num" style="font-size: 30px; font-weight: 800;">Rp 359.4M</span>
+<span style="font-size: 13px; line-height: 1.5; color: #C9D8E8;">Rp 920.0M put in by shareholders (you Rp 800.0M, angel Rp 120.0M), minus Rp 560.6M of losses so far.</span>
+<span style="font-size: 12px; line-height: 1.5; color: #9FB6CD; margin-top: auto;">A simple management view. The official balance sheet comes from Rina with the annual return.</span>
+</div>
+</section>
+
+<section style="background: #FFFFFF; border: 1px solid #DDE5EC; border-radius: 20px; padding: 18px 24px 10px;">
+<div style="display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 4px;">
+<h3 style="margin: 0; font-size: 17px; font-weight: 800;">Asset register</h3>
+<span class="num" style="font-size: 13px; color: #5A6E82;">Bought for Rp 504.4M · worth Rp 269.0M today</span>
+</div>
+<div class="ar" style="border-top: none; font-size: 12px; font-weight: 700; color: #5A6E82; padding: 8px 0;"><span>Asset</span><span style="text-align: right;">Qty</span><span>Bought</span><span style="text-align: right;">Cost</span><span style="text-align: right;">Value now</span><span>Where</span><span>Documents</span></div>
+<div class="ar"><span style="display: flex; flex-direction: column; gap: 2px;"><span class="fn" style="font-weight: 700;">Disinfection vending machines</span><span class="fn" style="font-size: 12px; color: #5A6E82;">Machines · 4-year life</span></span><span class="num" style="text-align: right;">24</span><span class="num">Jun 2024</span><span class="num" style="text-align: right;">Rp 300.0M</span><span class="num" style="text-align: right; font-weight: 800;">Rp 125.0M</span><span class="fn" style="color: #3D556E;">Denpasar, Kuta, Canggu</span><span><span class="tag" style="background: #E5F4EE; color: #0F7A52;">Complete</span></span></div>
+<div class="ar"><span style="display: flex; flex-direction: column; gap: 2px;"><span class="fn" style="font-weight: 700;">Vending machines · batch 2</span><span class="fn" style="font-size: 12px; color: #5A6E82;">Machines · 4-year life</span></span><span class="num" style="text-align: right;">6</span><span class="num">Apr 2026</span><span class="num" style="text-align: right;">Rp 78.0M</span><span class="num" style="text-align: right; font-weight: 800;">Rp 68.2M</span><span class="fn" style="color: #3D556E;">Ubud</span><span><span class="tag" style="background: #E5F4EE; color: #0F7A52;">Complete</span></span></div>
+<div class="ar"><span style="display: flex; flex-direction: column; gap: 2px;"><span class="fn" style="font-weight: 700;">Delivery motorbikes</span><span class="fn" style="font-size: 12px; color: #5A6E82;">Vehicles · registered to the company</span></span><span class="num" style="text-align: right;">2</span><span class="num">Feb 2025</span><span class="num" style="text-align: right;">Rp 52.0M</span><span class="num" style="text-align: right; font-weight: 800;">Rp 30.3M</span><span class="fn" style="color: #3D556E;">Workshop</span><span><span class="tag" style="background: #FBF1DF; color: #8B5A08;">STNK due Feb</span></span></div>
+<div class="ar"><span style="display: flex; flex-direction: column; gap: 2px;"><span class="fn" style="font-weight: 700;">Laptops</span><span class="fn" style="font-size: 12px; color: #5A6E82;">Computers</span></span><span class="num" style="text-align: right;">4</span><span class="num">Aug 2025</span><span class="num" style="text-align: right;">Rp 46.0M</span><span class="num" style="text-align: right; font-weight: 800;">Rp 32.6M</span><span class="fn" style="color: #3D556E;">Office · Dewi, Ayu, Komang, you</span><span><span class="tag" style="background: #E5F4EE; color: #0F7A52;">Complete</span></span></div>
+<div class="ar"><span style="display: flex; flex-direction: column; gap: 2px;"><span class="fn" style="font-weight: 700;">Office furniture</span><span class="fn" style="font-size: 12px; color: #5A6E82;">Desks, chairs, storage</span></span><span class="num" style="text-align: right;">1 set</span><span class="num">May 2024</span><span class="num" style="text-align: right;">Rp 18.6M</span><span class="num" style="text-align: right; font-weight: 800;">Rp 7.4M</span><span class="fn" style="color: #3D556E;">Office · Denpasar</span><span><span class="tag" style="background: #E5F4EE; color: #0F7A52;">Complete</span></span></div>
+<div class="ar"><span style="display: flex; flex-direction: column; gap: 2px;"><span class="fn" style="font-weight: 700;">Workshop tools</span><span class="fn" style="font-size: 12px; color: #5A6E82;">Tools</span></span><span class="num" style="text-align: right;">1 set</span><span class="num">Jan 2025</span><span class="num" style="text-align: right;">Rp 9.8M</span><span class="num" style="text-align: right; font-weight: 800;">Rp 5.5M</span><span class="fn" style="color: #3D556E;">Workshop</span><span><span class="tag" style="background: #FBEAEA; color: #C62828;">Invoice missing</span></span></div>
+</section>
+
+<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px;">
+<section style="background: #FFFFFF; border: 1px solid #DDE5EC; border-radius: 20px; padding: 20px; display: flex; flex-direction: column; gap: 8px;">
+<h3 style="margin: 0; font-size: 16px; font-weight: 800;">Wear and tear</h3>
+<p style="margin: 0; font-size: 14px; line-height: 1.55; color: #3D556E;">Assets lose about <strong class="num">Rp 10.5M</strong> of value a month. It's a cost in your accounts, never a cash payment — so it never shows on Radar.</p>
+</section>
+<section style="background: #FFFFFF; border: 1px solid #DDE5EC; border-radius: 20px; padding: 20px; display: flex; flex-direction: column; gap: 8px;">
+<h3 style="margin: 0; font-size: 16px; font-weight: 800;">Assets add themselves</h3>
+<p style="margin: 0; font-size: 14px; line-height: 1.55; color: #3D556E;">When you approve a bill for equipment over Rp 5M, CFO AI asks "Is this an asset?" and moves it here with its invoice.</p>
+</section>
+<section style="background: #FFFFFF; border: 1px solid #DDE5EC; border-radius: 20px; padding: 20px; display: flex; flex-direction: column; gap: 8px;">
+<h3 style="margin: 0; font-size: 16px; font-weight: 800;">One register per company</h3>
+<p style="margin: 0; font-size: 14px; line-height: 1.55; color: #3D556E;">Every company you add keeps its own assets and balance. Personal things stay in Personal.</p>
+</section>
+</div>
+
+</div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1180}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

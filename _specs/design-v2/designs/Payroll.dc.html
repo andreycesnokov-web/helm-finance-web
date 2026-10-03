@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Payroll — desktop</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&amp;family=Manrope:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#F4F6F8}
+a{color:#1565C0;text-decoration:none}a:hover{color:#003366}
+.ic{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.num{font-variant-numeric:tabular-nums lining-nums}
+.btn{font-family:inherit;font-size:14px;font-weight:700;border-radius:10px;height:40px;padding:0 16px;border:1px solid #DDE5EC;background:#FFFFFF;color:#003366;cursor:pointer;display:inline-flex;align-items:center;gap:8px;white-space:nowrap}
+.btn-p{background:#1565C0;border-color:#1565C0;color:#FFFFFF}
+.tag{font-size:12px;font-weight:800;border-radius:999px;padding:3px 10px;white-space:nowrap;display:inline-block}
+.pr{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) 120px 110px 120px;gap:14px;align-items:center;padding:13px 0;border-top:1px solid #EDF1F5;font-size:14px}
+a.btn-p,a.btn-p:hover{color:#FFFFFF}
+a.btn:hover,a.chip:hover{filter:brightness(0.97)}
+</style>
+</helmet>
+<div style="min-height: 100vh; display: grid; grid-template-columns: 248px minmax(0, 1fr); background: #F4F6F8; font-family: 'Manrope', 'Segoe UI', sans-serif; color: #003366;">
+<dc-import name="Sidebar" active="payroll" hint-size="248px,100%"></dc-import>
+<main style="padding: 32px 40px 48px;">
+<div style="max-width: 1120px; margin: 0 auto; display: flex; flex-direction: column; gap: 22px;">
+
+<header style="display: flex; align-items: flex-end; justify-content: space-between; gap: 24px;">
+<div style="display: flex; flex-direction: column; gap: 6px;">
+<h1 style="margin: 0; font-family: 'Archivo Black', 'Manrope', sans-serif; font-size: 30px; font-weight: 400;">Payroll</h1>
+<p style="margin: 0; font-size: 15px; color: #3D556E;">October run · 6 people · paid on 5 Oct</p>
+</div>
+<div style="display: flex; gap: 10px;">
+<a class="btn" href="Settings.dc.html">Add person</a>
+<button class="btn">Edit run</button>
+</div>
+</header>
+
+<section style="background: #FFFFFF; border: 1px solid #DDE5EC; border-radius: 24px; padding: 26px; display: grid; grid-template-columns: minmax(0, 1.2fr) repeat(3, minmax(0, 1fr)); gap: 24px; align-items: end;">
+<div style="display: flex; flex-direction: column; gap: 6px;">
+<span class="tag" style="align-self: flex-start; background: #E5F4EE; color: #0F7A52;">Approved 28 Sep · scheduled</span>
+<span style="font-size: 14px; font-weight: 600; color: #5A6E82;">Paid to people on 5 Oct</span>
+<span class="num" style="font-size: 36px; font-weight: 800;">Rp 24.0M</span>
+<span style="font-size: 13px; color: #0F7A52; font-weight: 700;">Mandiri · Payroll has Rp 38.0M — enough</span>
+</div>
+<div style="display: flex; flex-direction: column; gap: 4px; padding-left: 20px; border-left: 1px solid #EDF1F5;"><span style="font-size: 13px; font-weight: 600; color: #5A6E82;">Gross salaries</span><span class="num" style="font-size: 22px; font-weight: 800;">Rp 24.9M</span></div>
+<div style="display: flex; flex-direction: column; gap: 4px; padding-left: 20px; border-left: 1px solid #EDF1F5;"><span style="font-size: 13px; font-weight: 600; color: #5A6E82;">PPh 21 withheld</span><span class="num" style="font-size: 22px; font-weight: 800;">Rp 65K</span><span style="font-size: 12px; color: #5A6E82;">pay to DJP by Mon 16 Nov</span></div>
+<div style="display: flex; flex-direction: column; gap: 4px; padding-left: 20px; border-left: 1px solid #EDF1F5;"><span style="font-size: 13px; font-weight: 600; color: #5A6E82;">BPJS, employee part</span><span class="num" style="font-size: 22px; font-weight: 800;">Rp 0.8M</span><span style="font-size: 12px; color: #5A6E82;">+ Rp 1.3M company part</span></div>
+</section>
+
+<section style="background: #FFFFFF; border: 1px solid #DDE5EC; border-radius: 20px; padding: 8px 24px 12px;">
+<div class="pr" style="border-top: none; font-size: 12px; font-weight: 700; color: #5A6E82; padding: 10px 0;"><span>Person</span><span>Role</span><span style="text-align: right;">Gross</span><span style="text-align: right;">PPh 21</span><span style="text-align: right;">Take-home</span></div>
+<div class="pr"><span style="font-weight: 700;">Dewi Lestari</span><span style="color: #3D556E;">Operations manager</span><span class="num" style="text-align: right;">Rp 6.5M</span><span class="num" style="text-align: right;">Rp 65K</span><span class="num" style="text-align: right; font-weight: 800;">Rp 6.23M</span></div>
+<div class="pr"><span style="font-weight: 700;">Ni Luh Ayu</span><span style="color: #3D556E;">Sales</span><span class="num" style="text-align: right;">Rp 4.0M</span><span class="num" style="text-align: right; color: #5A6E82;">—</span><span class="num" style="text-align: right; font-weight: 800;">Rp 3.87M</span></div>
+<div class="pr"><span style="font-weight: 700;">Budi Santoso</span><span style="color: #3D556E;">Field technician</span><span class="num" style="text-align: right;">Rp 3.6M</span><span class="num" style="text-align: right; color: #5A6E82;">—</span><span class="num" style="text-align: right; font-weight: 800;">Rp 3.48M</span></div>
+<div class="pr"><span style="font-weight: 700;">Made Arta</span><span style="color: #3D556E;">Field technician</span><span class="num" style="text-align: right;">Rp 3.6M</span><span class="num" style="text-align: right; color: #5A6E82;">—</span><span class="num" style="text-align: right; font-weight: 800;">Rp 3.48M</span></div>
+<div class="pr"><span style="font-weight: 700;">Wayan Putra</span><span style="color: #3D556E;">Field technician</span><span class="num" style="text-align: right;">Rp 3.6M</span><span class="num" style="text-align: right; color: #5A6E82;">—</span><span class="num" style="text-align: right; font-weight: 800;">Rp 3.48M</span></div>
+<div class="pr"><span style="font-weight: 700;">Komang Sari</span><span style="color: #3D556E;">Admin</span><span class="num" style="text-align: right;">Rp 3.6M</span><span class="num" style="text-align: right; color: #5A6E82;">—</span><span class="num" style="text-align: right; font-weight: 800;">Rp 3.48M</span></div>
+<p style="margin: 10px 0 2px; font-size: 12px; line-height: 1.5; color: #5A6E82;">PPh 21 uses the monthly TER rates. Pay of Rp 5.4M or less has no withholding; Rina confirms each person's category.</p>
+</section>
+
+<section style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px;">
+<div style="background: #FFFFFF; border: 1px solid #DDE5EC; border-radius: 20px; padding: 22px; display: flex; flex-direction: column; gap: 8px;">
+<h3 style="margin: 0; font-size: 17px; font-weight: 800;">Payroll vs money in</h3>
+<p style="margin: 0; font-size: 14px; line-height: 1.55; color: #3D556E;">People cost Rp 26.2M a month with BPJS — a third of the money that came in over the last 30 days.</p>
+</div>
+<div style="background: #FFFFFF; border: 1px solid #DDE5EC; border-radius: 20px; padding: 22px; display: flex; flex-direction: column; gap: 8px;">
+<h3 style="margin: 0; font-size: 17px; font-weight: 800;">Thinking of hiring?</h3>
+<p style="margin: 0; font-size: 14px; line-height: 1.55; color: #3D556E;">Safe hiring budget today is Rp 0 — check again after Sinar Abadi pays on 16 Oct.</p>
+<a href="AICFO.dc.html" style="font-size: 14px; font-weight: 700;">Ask AI CFO</a>
+</div>
+</section>
+
+</div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1060}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Pulse — desktop</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&amp;family=Manrope:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#F4F6F8}
+a{color:#1565C0;text-decoration:none}a:hover{color:#003366}
+.ic{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.num{font-variant-numeric:tabular-nums lining-nums}
+.nav{display:flex;align-items:center;gap:12px;height:40px;padding:0 12px;border-radius:10px;color:#3D556E;font-size:14px;font-weight:600}
+.nav:hover{background:#F4F6F8;color:#003366}
+.grp{font-size:12px;font-weight:700;color:#5A6E82;padding:0 12px;margin:0 0 4px}
+.btn{font-family:inherit;font-size:14px;font-weight:700;border-radius:10px;height:40px;padding:0 16px;border:1px solid #DDE5EC;background:#FFFFFF;color:#003366;cursor:pointer;display:inline-flex;align-items:center;gap:8px;white-space:nowrap}
+.btn-p{background:#1565C0;border-color:#1565C0;color:#FFFFFF}
+a.btn-p,a.btn-p:hover{color:#FFFFFF}
+a.btn:hover,a.chip:hover{filter:brightness(0.97)}
+</style>
+</helmet>
+<div style="min-height: 100vh; display: grid; grid-template-columns: 248px minmax(0, 1fr); background: #F4F6F8; font-family: 'Manrope', 'Segoe UI', sans-serif; color: #003366;">
+<dc-import name="Sidebar" active="pulse" hint-size="248px,100%"></dc-import>
+
+<main style="padding: 32px 40px 48px;">
+<div style="max-width: 1120px; margin: 0 auto; display: flex; flex-direction: column; gap: 24px;">
+
+<header style="display: flex; align-items: flex-end; justify-content: space-between; gap: 24px;">
+<div style="display: flex; flex-direction: column; gap: 6px;">
+<h1 style="margin: 0; font-family: 'Archivo Black', 'Manrope', sans-serif; font-size: 30px; font-weight: 400; letter-spacing: 0.2px;">Pulse</h1>
+<p style="margin: 0; font-size: 15px; color: #3D556E;">Friday, 2 October · updated 2 min ago</p>
+</div>
+<div style="display: flex; gap: 10px;">
+<a class="btn" aria-label="Notifications" style="width: 40px; padding: 0; justify-content: center;" href="Approvals.dc.html"><svg class="ic" viewBox="0 0 24 24"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10 21a2 2 0 0 0 4 0"/></svg></a>
+</div>
+</header>
+
+<section style="background: #003366; color: #FFFFFF; border-radius: 24px; padding: 32px 36px; display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); gap: 40px; align-items: center;">
+<div style="display: flex; flex-direction: column; gap: 14px;">
+<span style="align-self: flex-start; display: inline-flex; align-items: center; gap: 8px; background: #FBF1DF; color: #8B5A08; font-size: 13px; font-weight: 800; border-radius: 999px; padding: 5px 12px;"><span style="width: 8px; height: 8px; border-radius: 50%; background: #B5740B;"></span>Attention</span>
+<h2 style="margin: 0; font-size: 26px; line-height: 1.25; font-weight: 800; text-wrap: pretty;">You're covered for October, but runway is below your 60-day target.</h2>
+<p style="margin: 0; font-size: 15px; line-height: 1.55; color: #C9D8E8; text-wrap: pretty;">You spend about Rp 64M a month more than comes in. October looks better only because customers owe you Rp 78.2M. If Sinar Abadi pays two weeks late and Mitra Bali doesn't pay, cash dips to Rp 42.9M on 30 Oct.</p>
+<a href="Radar.dc.html" style="align-self: flex-start; display: inline-flex; align-items: center; gap: 6px; color: #FFFFFF; font-size: 14px; font-weight: 700; border-bottom: 1px solid #3399FF; padding-bottom: 2px;">See the 30-day forecast<svg class="ic" viewBox="0 0 24 24" style="width: 16px; height: 16px;"><path d="M9 6l6 6-6 6"/></svg></a>
+</div>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px; background: #1E4D7A; border-radius: 16px; overflow: hidden;">
+<div style="background: #0A3C6E; padding: 18px 20px; display: flex; flex-direction: column; gap: 6px; grid-column: span 2;">
+<span style="font-size: 13px; font-weight: 600; color: #C9D8E8;">Cash now</span>
+<span class="num" style="font-size: 40px; font-weight: 800; letter-spacing: -0.5px;">Rp 122.9M</span>
+<span style="font-size: 13px; color: #C9D8E8;">4 business accounts · IDR</span>
+</div>
+<div style="background: #0A3C6E; padding: 18px 20px; display: flex; flex-direction: column; gap: 8px;">
+<span style="font-size: 13px; font-weight: 600; color: #C9D8E8;">Runway</span>
+<span class="num" style="font-size: 26px; font-weight: 800;">58 days</span>
+<div style="height: 6px; border-radius: 6px; background: #1E4D7A;"><div style="width: 97%; height: 6px; border-radius: 6px; background: #F2B544;"></div></div>
+<span style="font-size: 12px; color: #C9D8E8;">Target 60 days</span>
+</div>
+<div style="background: #0A3C6E; padding: 18px 20px; display: flex; flex-direction: column; gap: 8px;">
+<span style="font-size: 13px; font-weight: 600; color: #C9D8E8;">Net · last 30 days</span>
+<span class="num" style="font-size: 26px; font-weight: 800; color: #FFB4AB;">−Rp 75.2M</span>
+<span style="font-size: 12px; color: #C9D8E8;">In Rp 78.7M · out Rp 153.9M</span>
+</div>
+</div>
+</section>
+
+<div style="display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr); gap: 24px; align-items: start;">
+
+<section style="background: #FFFFFF; border: 1px solid #DDE5EC; border-radius: 20px; padding: 24px; display: flex; flex-direction: column; gap: 6px;">
+<div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+<h3 style="margin: 0; font-size: 18px; font-weight: 800;">Needs your decision</h3>
+<span class="num" style="font-size: 13px; font-weight: 700; color: #5A6E82;">4 items</span>
+</div>
+
+<div style="display: grid; grid-template-columns: 40px minmax(0, 1fr) auto auto; gap: 14px; align-items: center; padding: 14px 0; border-top: 1px solid #EDF1F5;">
+<span style="width: 40px; height: 40px; border-radius: 12px; background: #E6F1FB; color: #1565C0; display: flex; align-items: center; justify-content: center;"><svg class="ic" viewBox="0 0 24 24"><path d="M5 3h14v18l-3-2-2 2-2-2-2 2-2-2-3 2z"/><path d="M9 8h6M9 12h6"/></svg></span>
+<div style="display: flex; flex-direction: column; gap: 3px; min-width: 0;">
+<span style="font-size: 15px; font-weight: 700;">Approve bill · PT Para Legals Indonesia</span>
+<span style="font-size: 13px; color: #5A6E82;">Legal services, Sep · added by AI assistant · due 10 Oct</span>
+</div>
+<span class="num" style="font-size: 15px; font-weight: 800;">Rp 10.0M</span>
+<div style="display: flex; gap: 8px;"><a class="btn" href="BillDetail.dc.html">Review</a><a class="btn btn-p" href="Approvals.dc.html">Approve</a></div>
+</div>
+
+<div style="display: grid; grid-template-columns: 40px minmax(0, 1fr) auto auto; gap: 14px; align-items: center; padding: 14px 0; border-top: 1px solid #EDF1F5;">
+<span style="width: 40px; height: 40px; border-radius: 12px; background: #E6F1FB; color: #1565C0; display: flex; align-items: center; justify-content: center;"><svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg></span>
+<div style="display: flex; flex-direction: column; gap: 3px; min-width: 0;">
+<span style="font-size: 15px; font-weight: 700;">Approve expense claim · Budi</span>
+<span style="font-size: 13px; color: #5A6E82;">Fuel for site visits · sent from Telegram</span>
+</div>
+<span class="num" style="font-size: 15px; font-weight: 800;">Rp 300K</span>
+<div style="display: flex; gap: 8px;"><a class="btn" href="Approvals.dc.html">Review</a><a class="btn btn-p" href="Approvals.dc.html">Approve</a></div>
+</div>
+
+<div style="display: grid; grid-template-columns: 40px minmax(0, 1fr) auto auto; gap: 14px; align-items: center; padding: 14px 0; border-top: 1px solid #EDF1F5;">
+<span style="width: 40px; height: 40px; border-radius: 12px; background: #FBEAEA; color: #C62828; display: flex; align-items: center; justify-content: center;"><svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span>
+<div style="display: flex; flex-direction: column; gap: 3px; min-width: 0;">
+<span style="font-size: 15px; font-weight: 700;">CV Mitra Bali is 9 days late</span>
+<span style="font-size: 13px; color: #5A6E82;">Invoice INV-0412 · was due 23 Sep · collecting it adds 6 days of runway</span>
+</div>
+<span class="num" style="font-size: 15px; font-weight: 800; color: #0F7A52;">+Rp 12.5M</span>
+<div style="display: flex; gap: 8px;"><a class="btn btn-p" href="Bills.dc.html">Send reminder</a></div>
+</div>
+
+<div style="display: grid; grid-template-columns: 40px minmax(0, 1fr) auto auto; gap: 14px; align-items: center; padding: 14px 0; border-top: 1px solid #EDF1F5;">
+<span style="width: 40px; height: 40px; border-radius: 12px; background: #FBF1DF; color: #8B5A08; display: flex; align-items: center; justify-content: center;"><svg class="ic" viewBox="0 0 24 24"><path d="M12 3l9.5 17h-19z"/><path d="M12 10v4M12 17h.01"/></svg></span>
+<div style="display: flex; flex-direction: column; gap: 3px; min-width: 0;">
+<span style="font-size: 15px; font-weight: 700;">PPh 23 for September</span>
+<span style="font-size: 13px; color: #5A6E82;">Tax · pay by 15 Oct, report by 20 Oct · 13 days left</span>
+</div>
+<span class="num" style="font-size: 15px; font-weight: 800;">Rp 620K</span>
+<div style="display: flex; gap: 8px;"><a class="btn" href="AccountantTaxes.dc.html">Prepare</a></div>
+</div>
+
+<div style="display: flex; align-items: center; gap: 10px; padding: 14px 16px; margin-top: 6px; background: #F4F6F8; border-radius: 12px; font-size: 14px; color: #3D556E;">
+<svg class="ic" viewBox="0 0 24 24" style="color: #5A6E82;"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 20h16"/></svg>
+<span style="flex-grow: 1;">3 payment proofs missing for September — your accountant needs them to close the month.</span>
+<a href="Documents.dc.html" style="font-weight: 700;">Upload</a>
+</div>
+</section>
+
+<section style="background: #FFFFFF; border: 1px solid #DDE5EC; border-radius: 20px; padding: 24px; display: flex; flex-direction: column; gap: 16px;">
+<div style="display: flex; align-items: baseline; justify-content: space-between;">
+<h3 style="margin: 0; font-size: 18px; font-weight: 800;">Next 7 days</h3>
+<a href="Radar.dc.html" style="font-size: 13px; font-weight: 700;">Full forecast</a>
+</div>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px;">
+<div style="background: #E5F4EE; border-radius: 14px; padding: 14px 16px; display: flex; flex-direction: column; gap: 4px;">
+<span style="font-size: 13px; font-weight: 600; color: #0F7A52;">Coming in</span>
+<span class="num" style="font-size: 20px; font-weight: 800; color: #0F7A52;">+Rp 27.2M</span>
+<span style="font-size: 12px; color: #3D556E;">incl. daily sales ≈ Rp 9.7M</span>
+</div>
+<div style="background: #F4F6F8; border-radius: 14px; padding: 14px 16px; display: flex; flex-direction: column; gap: 4px;">
+<span style="font-size: 13px; font-weight: 600; color: #3D556E;">Going out</span>
+<span class="num" style="font-size: 20px; font-weight: 800;">−Rp 40.5M</span>
+<span style="font-size: 12px; color: #3D556E;">incl. day-to-day ≈ Rp 9.8M</span>
+</div>
+</div>
+<div style="display: flex; flex-direction: column;">
+<div style="display: grid; grid-template-columns: 52px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 12px 0; border-bottom: 1px solid #EDF1F5;">
+<span style="display: flex; flex-direction: column; font-size: 12px; font-weight: 700; color: #5A6E82; line-height: 1.2;">Mon<span class="num" style="font-size: 18px; color: #003366; font-weight: 800;">5</span></span>
+<span style="font-size: 14px; font-weight: 600;">Payroll · 6 people</span>
+<span class="num" style="font-size: 14px; font-weight: 800;">−Rp 24.0M</span>
+</div>
+<div style="display: grid; grid-template-columns: 52px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 12px 0; border-bottom: 1px solid #EDF1F5;">
+<span style="display: flex; flex-direction: column; font-size: 12px; font-weight: 700; color: #5A6E82; line-height: 1.2;">Tue<span class="num" style="font-size: 18px; color: #003366; font-weight: 800;">6</span></span>
+<span style="font-size: 14px; font-weight: 600;">Office rent · Denpasar</span>
+<span class="num" style="font-size: 14px; font-weight: 800;">−Rp 6.7M</span>
+</div>
+<div style="display: grid; grid-template-columns: 52px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 12px 0;">
+<span style="display: flex; flex-direction: column; font-size: 12px; font-weight: 700; color: #5A6E82; line-height: 1.2;">Thu<span class="num" style="font-size: 18px; color: #003366; font-weight: 800;">8</span></span>
+<span style="display: flex; flex-direction: column; gap: 2px;"><span style="font-size: 14px; font-weight: 600;">PT Bali Resort Group</span><span style="font-size: 12px; color: #5A6E82;">Expected payment · usually on time</span></span>
+<span class="num" style="font-size: 14px; font-weight: 800; color: #0F7A52;">+Rp 17.5M</span>
+</div>
+</div>
+<div style="display: flex; justify-content: space-between; align-items: center; padding: 14px 16px; border-radius: 12px; background: #F4F6F8;">
+<span style="font-size: 14px; color: #3D556E;">Cash on 9 Oct</span>
+<span class="num" style="font-size: 16px; font-weight: 800;">≈ Rp 109.6M</span>
+</div>
+</section>
+</div>
+
+<section style="background: #FFFFFF; border: 1px solid #DDE5EC; border-radius: 20px; padding: 6px; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));">
+<div style="padding: 18px 20px; display: flex; flex-direction: column; gap: 6px;">
+<span style="font-size: 13px; font-weight: 600; color: #5A6E82;">Money in · last 30 days</span>
+<span class="num" style="font-size: 22px; font-weight: 800;">Rp 78.7M</span>
+<span style="font-size: 13px; font-weight: 700; color: #0F7A52;">12% up on the previous 30 days</span>
+</div>
+<div style="padding: 18px 20px; display: flex; flex-direction: column; gap: 6px; border-left: 1px solid #EDF1F5;">
+<span style="font-size: 13px; font-weight: 600; color: #5A6E82;">Money out · last 30 days</span>
+<span class="num" style="font-size: 22px; font-weight: 800;">Rp 153.9M</span>
+<span style="font-size: 13px; font-weight: 700; color: #3D556E;">Incl. Rp 26.0M one-off repair</span>
+</div>
+<div style="padding: 18px 20px; display: flex; flex-direction: column; gap: 6px; border-left: 1px solid #EDF1F5;">
+<span style="font-size: 13px; font-weight: 600; color: #5A6E82;">Owed to you</span>
+<span class="num" style="font-size: 22px; font-weight: 800;">Rp 78.2M</span>
+<span style="font-size: 13px; font-weight: 700; color: #C62828;">Rp 12.5M late</span>
+</div>
+<div style="padding: 18px 20px; display: flex; flex-direction: column; gap: 6px; border-left: 1px solid #EDF1F5;">
+<span style="font-size: 13px; font-weight: 600; color: #5A6E82;">You owe</span>
+<span class="num" style="font-size: 22px; font-weight: 800;">Rp 33.0M</span>
+<span style="font-size: 13px; font-weight: 700; color: #3D556E;">3 bills · nothing overdue</span>
+</div>
+</section>
+
+</div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1160}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

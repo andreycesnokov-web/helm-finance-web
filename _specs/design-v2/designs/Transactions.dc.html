@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Transactions — desktop</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&amp;family=Manrope:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#F4F6F8}
+a{color:#1565C0;text-decoration:none}a:hover{color:#003366}
+.ic{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.num{font-variant-numeric:tabular-nums lining-nums}
+.btn{font-family:inherit;font-size:14px;font-weight:700;border-radius:10px;height:40px;padding:0 16px;border:1px solid #DDE5EC;background:#FFFFFF;color:#003366;cursor:pointer;display:inline-flex;align-items:center;gap:8px;white-space:nowrap}
+.btn-p{background:#1565C0;border-color:#1565C0;color:#FFFFFF}
+.chip{font-family:inherit;font-size:14px;font-weight:700;border-radius:999px;height:36px;padding:0 14px;border:1px solid #DDE5EC;background:#FFFFFF;color:#3D556E;cursor:pointer;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.tag{font-size:12px;font-weight:800;border-radius:999px;padding:3px 10px;white-space:nowrap;display:inline-block}
+.tr{display:grid;grid-template-columns:70px minmax(0,1fr) 190px 130px 110px 130px;gap:14px;align-items:center;padding:14px 0;border-top:1px solid #EDF1F5;font-size:14px}
+a.btn-p,a.btn-p:hover{color:#FFFFFF}
+a.btn:hover,a.chip:hover{filter:brightness(0.97)}
+</style>
+</helmet>
+<div style="min-height: 100vh; display: grid; grid-template-columns: 248px minmax(0, 1fr); background: #F4F6F8; font-family: 'Manrope', 'Segoe UI', sans-serif; color: #003366;">
+<dc-import name="Sidebar" active="transactions" hint-size="248px,100%"></dc-import>
+<main style="padding: 32px 40px 48px;">
+<div style="max-width: 1120px; margin: 0 auto; display: flex; flex-direction: column; gap: 22px;">
+
+<header style="display: flex; align-items: flex-end; justify-content: space-between; gap: 24px;">
+<div style="display: flex; flex-direction: column; gap: 6px;">
+<h1 style="margin: 0; font-family: 'Archivo Black', 'Manrope', sans-serif; font-size: 30px; font-weight: 400;">Transactions</h1>
+<p style="margin: 0; font-size: 15px; color: #3D556E;">Every movement of money, from banks, Midtrans, Telegram and what you add yourself</p>
+</div>
+<div style="display: flex; gap: 10px;">
+<button class="btn">Export</button>
+<a class="btn btn-p" href="MobileAdd.dc.html"><svg class="ic" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>Add</a>
+</div>
+</header>
+
+<section style="display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; gap: 14px; align-items: center; background: #FBF1DF; border-radius: 16px; padding: 14px 18px;">
+<span style="width: 40px; height: 40px; border-radius: 12px; background: #FFFFFF; color: #8B5A08; display: flex; align-items: center; justify-content: center;"><svg class="ic" viewBox="0 0 24 24"><path d="M12 3l9.5 17h-19z"/><path d="M12 10v4M12 17h.01"/></svg></span>
+<span style="font-size: 15px; color: #003366;"><strong>3 transactions need a category.</strong> Until then they count as "other spending" and blur your numbers.</span>
+<button class="btn btn-p">Review 3</button>
+</section>
+
+<div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+<label for="tx-search" style="display: flex; align-items: center; gap: 8px; height: 40px; padding: 0 14px; border: 1px solid #DDE5EC; border-radius: 10px; background: #FFFFFF; width: 280px; color: #5A6E82;"><svg class="ic" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><input id="tx-search" placeholder="Search name, amount, note" style="border: none; outline: none; font-family: inherit; font-size: 14px; color: #003366; background: transparent; width: 100%;"></label>
+<button class="chip" aria-pressed="true" style="background: #003366; border-color: #003366; color: #FFFFFF;">All</button>
+<button class="chip">Money in</button>
+<button class="chip">Money out</button>
+<button class="chip">Transfers</button>
+<button class="chip">Needs review · 3</button>
+<span style="flex-grow: 1;"></span>
+<button class="chip">All accounts<svg class="ic" viewBox="0 0 24 24" style="width: 14px; height: 14px;"><path d="M6 9l6 6 6-6"/></svg></button>
+<button class="chip">Last 30 days<svg class="ic" viewBox="0 0 24 24" style="width: 14px; height: 14px;"><path d="M6 9l6 6 6-6"/></svg></button>
+</div>
+
+<section style="background: #FFFFFF; border: 1px solid #DDE5EC; border-radius: 20px; padding: 6px 24px 10px;">
+<div class="tr" style="border-top: none; font-size: 12px; font-weight: 700; color: #5A6E82; padding: 10px 0;"><span>Date</span><span>What</span><span>Category</span><span>Account</span><span>Source</span><span style="text-align: right;">Amount</span></div>
+<div class="tr"><span class="num" style="color: #5A6E82; font-weight: 700;">2 Oct</span><span style="display: flex; flex-direction: column; gap: 2px;"><span style="font-weight: 700;">Midtrans settlement</span><span style="font-size: 13px; color: #5A6E82;">41 vending payments</span></span><span><span class="tag" style="background: #E5F4EE; color: #0F7A52;">Sales</span></span><span>BCA</span><span style="color: #5A6E82;">Midtrans</span><span class="num" style="text-align: right; font-weight: 800; color: #0F7A52;">+Rp 3.2M</span></div>
+<div class="tr" style="background: #FFFBF3;"><span class="num" style="color: #5A6E82; font-weight: 700;">1 Oct</span><span style="display: flex; flex-direction: column; gap: 2px;"><span style="font-weight: 700;">TRF 0192 BUDI S</span><span style="font-size: 13px; color: #8B5A08;">Looks like Budi's fuel claim — match it?</span></span><span><button class="btn" style="height: 32px; font-size: 13px; border-color: #B5740B; color: #8B5A08;">Choose category</button></span><span>BCA</span><span style="color: #5A6E82;">Bank import</span><span class="num" style="text-align: right; font-weight: 800;">−Rp 450K</span></div>
+<div class="tr"><span class="num" style="color: #5A6E82; font-weight: 700;">1 Oct</span><span style="display: flex; flex-direction: column; gap: 2px;"><span style="font-weight: 700;">PLN</span><span style="font-size: 13px; color: #5A6E82;">Electricity, September</span></span><span><span class="tag" style="background: #F4F6F8; color: #3D556E;">Utilities</span></span><span>BCA</span><span style="color: #5A6E82;">Bank import</span><span class="num" style="text-align: right; font-weight: 800;">−Rp 2.1M</span></div>
+<div class="tr"><span class="num" style="color: #5A6E82; font-weight: 700;">30 Sep</span><span style="display: flex; flex-direction: column; gap: 2px;"><span style="font-weight: 700;">PT Bali Resort Group</span><span style="font-size: 13px; color: #5A6E82;">Paid invoice INV-0409 in full</span></span><span><span class="tag" style="background: #E5F4EE; color: #0F7A52;">Sales</span></span><span>BCA</span><span style="color: #5A6E82;">Bank import</span><span class="num" style="text-align: right; font-weight: 800; color: #0F7A52;">+Rp 22.0M</span></div>
+<div class="tr"><span class="num" style="color: #5A6E82; font-weight: 700;">29 Sep</span><span style="display: flex; flex-direction: column; gap: 2px;"><span style="font-weight: 700;">PT Kimia Bersih</span><span style="font-size: 13px; color: #8B5A08;">Payment proof missing</span></span><span><span class="tag" style="background: #F4F6F8; color: #3D556E;">Supplies</span></span><span>BCA</span><span style="color: #5A6E82;">Bank import</span><span class="num" style="text-align: right; font-weight: 800;">−Rp 6.8M</span></div>
+<div class="tr"><span class="num" style="color: #5A6E82; font-weight: 700;">28 Sep</span><span style="display: flex; flex-direction: column; gap: 2px;"><span style="font-weight: 700;">Midtrans settlement</span><span style="font-size: 13px; color: #5A6E82;">38 vending payments</span></span><span><span class="tag" style="background: #E5F4EE; color: #0F7A52;">Sales</span></span><span>BCA</span><span style="color: #5A6E82;">Midtrans</span><span class="num" style="text-align: right; font-weight: 800; color: #0F7A52;">+Rp 2.9M</span></div>
+<div class="tr"><span class="num" style="color: #5A6E82; font-weight: 700;">27 Sep</span><span style="display: flex; flex-direction: column; gap: 2px;"><span style="font-weight: 700;">BCA → Mandiri</span><span style="font-size: 13px; color: #5A6E82;">Not income or spending</span></span><span><span class="tag" style="background: #F4F6F8; color: #3D556E;">Transfer</span></span><span>BCA, Mandiri</span><span style="color: #5A6E82;">Bank import</span><span class="num" style="text-align: right; font-weight: 800; color: #5A6E82;">Rp 20.0M</span></div>
+<div class="tr" style="background: #FFFBF3;"><span class="num" style="color: #5A6E82; font-weight: 700;">26 Sep</span><span style="display: flex; flex-direction: column; gap: 2px;"><span style="font-weight: 700;">Tokopedia</span><span style="font-size: 13px; color: #5A6E82;">Sent by Dewi with receipt</span></span><span><button class="btn" style="height: 32px; font-size: 13px; border-color: #B5740B; color: #8B5A08;">Choose category</button></span><span>Cash box</span><span style="color: #5A6E82;">Telegram</span><span class="num" style="text-align: right; font-weight: 800;">−Rp 380K</span></div>
+<div class="tr" style="background: #FFFBF3;"><span class="num" style="color: #5A6E82; font-weight: 700;">25 Sep</span><span style="display: flex; flex-direction: column; gap: 2px;"><span style="font-weight: 700;">QRIS 88213 WARUNG</span><span style="font-size: 13px; color: #5A6E82;">No note</span></span><span><button class="btn" style="height: 32px; font-size: 13px; border-color: #B5740B; color: #8B5A08;">Choose category</button></span><span>BCA</span><span style="color: #5A6E82;">Bank import</span><span class="num" style="text-align: right; font-weight: 800;">−Rp 215K</span></div>
+<div style="display: flex; justify-content: space-between; align-items: center; padding: 14px 0 6px; border-top: 1px solid #EDF1F5; font-size: 13px; color: #5A6E82;"><span>Showing 9 of 62 in the last 30 days</span><a href="#" style="font-weight: 700;">Load more</a></div>
+</section>
+
+</div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1060}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Add — mobile</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&amp;family=Manrope:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#F4F6F8}
+a{color:#1565C0;text-decoration:none}
+.ic{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.num{font-variant-numeric:tabular-nums lining-nums}
+.btn{font-family:inherit;font-size:15px;font-weight:700;border-radius:12px;height:48px;padding:0 16px;border:1px solid #DDE5EC;background:#FFFFFF;color:#003366;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:8px;white-space:nowrap}
+.btn-p{background:#1565C0;border-color:#1565C0;color:#FFFFFF}
+.seg{font-family:inherit;font-size:14px;font-weight:700;border-radius:10px;height:40px;border:none;background:transparent;color:#5A6E82;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px}
+.pv{display:grid;grid-template-columns:110px minmax(0,1fr);gap:10px;align-items:center;min-height:44px;border-top:1px solid #EDF1F5;font-size:15px}
+a.btn-p,a.btn-p:hover{color:#FFFFFF}
+a.btn:hover,a.chip:hover{filter:brightness(0.97)}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; background: #4D6680; font-family: 'Manrope', 'Segoe UI', sans-serif; color: #003366; display: flex; flex-direction: column; justify-content: flex-end;">
+<section role="dialog" aria-label="Add" style="background: #FFFFFF; border-radius: 24px 24px 0 0; padding: 10px 16px 28px; display: flex; flex-direction: column; gap: 16px;">
+<span style="align-self: center; width: 40px; height: 5px; border-radius: 3px; background: #DDE5EC;"></span>
+<div style="display: flex; align-items: center; justify-content: space-between;"><h2 style="margin: 0; font-size: 20px; font-weight: 800;">Add</h2><a href="PulseMobile.dc.html" aria-label="Close" style="width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; color: #3D556E;"><svg class="ic" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></a></div>
+<div role="group" aria-label="How to add" style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); background: #F4F6F8; border-radius: 12px; padding: 4px; gap: 4px;">
+<button class="seg" aria-pressed="true" style="background: #FFFFFF; color: #003366; box-shadow: 0 1px 3px rgba(0, 51, 102, 0.08);">Type</button>
+<button class="seg"><svg class="ic" viewBox="0 0 24 24" style="width: 16px; height: 16px;"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>Speak</button>
+<button class="seg"><svg class="ic" viewBox="0 0 24 24" style="width: 16px; height: 16px;"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/></svg>Invoice</button>
+</div>
+<label for="add-text" style="display: flex; flex-direction: column; gap: 6px;"><span style="font-size: 13px; font-weight: 700; color: #5A6E82;">Say it the way you'd tell your accountant</span>
+<textarea id="add-text" rows="2" style="font-family: inherit; font-size: 17px; line-height: 1.4; color: #003366; border: 1px solid #3399FF; border-radius: 14px; padding: 12px 14px; resize: none;">Bought cleaning cloths for 250k yesterday, paid from the cash box</textarea></label>
+<div style="background: #F8FAFC; border: 1px solid #DDE5EC; border-radius: 16px; padding: 4px 14px 6px;">
+<div class="pv" style="border-top: none;"><span style="color: #5A6E82;">Type</span><span style="font-weight: 700;">Money out · expense</span></div>
+<div class="pv"><span style="color: #5A6E82;">Amount</span><span class="num" style="font-weight: 800;">Rp 250,000</span></div>
+<div class="pv"><span style="color: #5A6E82;">Category</span><span style="font-weight: 700;">Supplies</span></div>
+<div class="pv"><span style="color: #5A6E82;">From</span><span style="font-weight: 700;">Cash box · Denpasar</span></div>
+<div class="pv"><span style="color: #5A6E82;">Date</span><span style="font-weight: 700;">1 Oct</span></div>
+</div>
+<span style="font-size: 13px; color: #5A6E82;">Tap any line to change it. Nothing is saved until you press Save.</span>
+<div style="display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: 10px;"><button class="btn">Attach receipt</button><a class="btn btn-p" href="PulseMobile.dc.html">Save</a></div>
+</section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

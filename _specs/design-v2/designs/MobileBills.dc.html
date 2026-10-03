@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Bills and invoices — mobile</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&amp;family=Manrope:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#F4F6F8}
+a{color:#1565C0;text-decoration:none}
+.ic{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.num{font-variant-numeric:tabular-nums lining-nums}
+.seg{font-family:inherit;font-size:14px;font-weight:700;border-radius:10px;height:40px;border:none;background:transparent;color:#5A6E82;cursor:pointer}
+.tag{font-size:12px;font-weight:800;border-radius:999px;padding:3px 10px;white-space:nowrap;display:inline-block}
+.li{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 12px;padding:14px 0;border-top:1px solid #EDF1F5;align-items:center}
+.tab{display:flex;flex-direction:column;align-items:center;gap:4px;font-size:11px;font-weight:700;color:#5A6E82;min-width:56px;padding-top:8px}
+a.btn-p,a.btn-p:hover{color:#FFFFFF}
+a.btn:hover,a.chip:hover{filter:brightness(0.97)}
+</style>
+</helmet>
+<div style="width: 390px; height: 1300px; box-sizing: border-box; background: #F4F6F8; font-family: 'Manrope', 'Segoe UI', sans-serif; color: #003366; display: flex; flex-direction: column;">
+<div style="display: flex; align-items: center; justify-content: space-between; padding: 10px 8px; background: #FFFFFF; border-bottom: 1px solid #DDE5EC;">
+<span style="display: flex; align-items: center; gap: 4px;"><a href="MobileMore.dc.html" aria-label="Back" style="width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; color: #003366;"><svg class="ic" viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg></a><span style="font-size: 17px; font-weight: 800;">Bills &amp; invoices</span></span>
+<a href="MobileAdd.dc.html" aria-label="New invoice or bill" style="width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; color: #1565C0;"><svg class="ic" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></a>
+</div>
+<div style="padding: 16px 16px 24px; display: flex; flex-direction: column; gap: 14px; flex-grow: 1;">
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px;">
+<div style="background: #FFFFFF; border: 1px solid #DDE5EC; border-radius: 16px; padding: 14px; display: flex; flex-direction: column; gap: 4px;"><span style="font-size: 12px; font-weight: 600; color: #5A6E82;">Owed to you</span><span class="num" style="font-size: 20px; font-weight: 800; color: #0F7A52;">Rp 78.2M</span><span style="font-size: 12px; font-weight: 700; color: #C62828;">Rp 12.5M late</span></div>
+<div style="background: #FFFFFF; border: 1px solid #DDE5EC; border-radius: 16px; padding: 14px; display: flex; flex-direction: column; gap: 4px;"><span style="font-size: 12px; font-weight: 600; color: #5A6E82;">You owe</span><span class="num" style="font-size: 20px; font-weight: 800;">Rp 33.0M</span><span style="font-size: 12px; font-weight: 700; color: #1565C0;">Rp 10.0M to approve</span></div>
+</div>
+<div role="group" aria-label="Show" style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); background: #E9EEF3; border-radius: 12px; padding: 4px; gap: 4px;">
+<button class="seg" aria-pressed="true" style="background: #FFFFFF; color: #003366;">To collect · 3</button>
+<button class="seg">To pay · 3</button>
+</div>
+<section style="background: #FFFFFF; border: 1px solid #DDE5EC; border-radius: 16px; padding: 2px 16px;">
+<div class="li" style="border-top: none;"><span style="font-size: 15px; font-weight: 800;">CV Mitra Bali</span><span class="num" style="font-size: 15px; font-weight: 800;">Rp 12.5M</span><span><span class="tag" style="background: #FBEAEA; color: #C62828;">9 days late</span></span><a href="#" style="font-size: 14px; font-weight: 700; justify-self: end; min-height: 44px; display: flex; align-items: center;">Send reminder</a></div>
+<div class="li"><span style="font-size: 15px; font-weight: 800;">PT Bali Resort Group</span><span class="num" style="font-size: 15px; font-weight: 800;">Rp 17.5M</span><span style="font-size: 13px; color: #5A6E82;">Due 8 Oct · usually on time</span><span></span></div>
+<div class="li"><span style="font-size: 15px; font-weight: 800;">PT Sinar Abadi</span><span class="num" style="font-size: 15px; font-weight: 800;">Rp 48.2M</span><span><span class="tag" style="background: #FBF1DF; color: #8B5A08;">Due 16 Oct · often late</span></span><a href="#" style="font-size: 14px; font-weight: 700; justify-self: end; min-height: 44px; display: flex; align-items: center;">Remind early</a></div>
+</section>
+<div style="display: grid; grid-template-columns: 36px minmax(0, 1fr); gap: 12px; align-items: center; background: #E6F1FB; border-radius: 14px; padding: 12px 14px; font-size: 14px; line-height: 1.45;"><span style="width: 36px; height: 36px; border-radius: 10px; background: #FFFFFF; color: #1565C0; display: flex; align-items: center; justify-content: center;"><svg class="ic" viewBox="0 0 24 24" style="width: 18px; height: 18px;"><path d="M17 7L7 17M7 9v8h8"/></svg></span><span>Rp 1.2M from "PT MSA" matches no invoice. <a href="#" style="font-weight: 700;">Match it</a></span></div>
+</div>
+<nav style="display: flex; justify-content: space-around; align-items: flex-start; background: #FFFFFF; border-top: 1px solid #DDE5EC; padding: 6px 8px 22px;">
+<a class="tab" href="PulseMobile.dc.html"><svg class="ic" viewBox="0 0 24 24"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg>Pulse</a>
+<a class="tab" href="RadarMobile.dc.html"><svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/></svg>Radar</a>
+<a class="tab" href="MobileAdd.dc.html" aria-label="Add" style="padding-top: 0;"><span style="width: 52px; height: 52px; border-radius: 16px; background: #1565C0; color: #FFFFFF; display: flex; align-items: center; justify-content: center; margin-top: -18px; box-shadow: 0 6px 16px rgba(0, 51, 102, 0.22);"><svg class="ic" viewBox="0 0 24 24" style="width: 24px; height: 24px;"><path d="M12 5v14M5 12h14"/></svg></span>Add</a>
+<a class="tab" href="AICFOMobile.dc.html"><svg class="ic" viewBox="0 0 24 24"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/></svg>AI CFO</a>
+<a class="tab" href="MobileMore.dc.html" style="color: #1565C0;"><svg class="ic" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg>More</a>
+</nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":1300}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>
