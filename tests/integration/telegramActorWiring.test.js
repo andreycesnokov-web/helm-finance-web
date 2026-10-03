@@ -366,6 +366,23 @@ test('no migration was added by PR2.5', () => {
   const ALLOWED = new Set([
     '046_company_notification_grants.sql',
     '047_notification_grants_actor_authorization.sql',
+    // Later, separately reviewed features. Each was approved on its own; none came with the
+    // telegram-actor wiring. Listed by name so any OTHER unexpected migration still fails.
+    '048_incoming_payments_foundation.sql',
+    '049_incoming_payments_bank_import_provenance.sql',
+    '050_incoming_payment_match_candidates.sql',
+    '051_payment_provider_connections.sql',
+    '052_payment_provider_credentials.sql',
+    '053_support_center_foundation.sql',
+    '054_onboarding_foundation.sql',
+    '055_counterparty_intelligence_v1.sql',
+    '057_mcp_oauth.sql',
+    // Design v2 (DECISIONS.md): P-01, P-08, P-04, P-05, P-10.
+    '058_business_runway_target.sql',
+    '059_business_targets_alerts.sql',
+    '060_counterparty_tax_fields.sql',
+    '061_bill_checklist_status.sql',
+    '062_pnl_groups_industry_templates.sql',
   ]);
   const unexpected = migs.filter((f) => /^04[6-9]_|^0[5-9]\d_/.test(f) && !ALLOWED.has(f));
   assert.strictEqual(unexpected.length, 0, `unexpected migration(s): ${unexpected.join(', ')}`);
