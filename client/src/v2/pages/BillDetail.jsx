@@ -13,9 +13,9 @@ import { Card, Pill, Btn, Skeleton, ErrorBox, Empty } from '../ui'
 import { useT, useLang } from '../i18n'
 import { useApi } from '../data'
 import { money, shortDate } from '../lib/format'
-import { remaining, billStatus, withholdingSplit } from '../lib/obligations'
+import { remaining, billStatus, withholdingTreatment } from '../lib/obligations'
 import { cashItems, forecast, applyScenario } from '../lib/radarSeries'
-import { findWithholdingRule } from '../../pages/business/InvoiceReviewDrawer'
+import { findWithholdingRule, computeInvoicePlan } from '../../pages/business/InvoiceReviewDrawer'
 import DecisionActions from '../components/DecisionActions'
 import BillChecklist from '../components/BillChecklist'
 import { StatusPill } from './Bills'
@@ -35,6 +35,7 @@ export default function BillDetail({ kind = 'payable' }) {
   const debts = useApi('/debts')
   const rules = useApi('/accountant/rules')
   const pulse = useApi('/pulse?scope=business')
+  const cps = useApi('/counterparties')
   const listPath = kind === 'receivable' ? '/business/receivables' : '/business/payables'
 
   const d = useMemo(() => (Array.isArray(debts.data) ? debts.data : []).find((x) => String(x.id) === String(id)), [debts.data, id])
@@ -52,7 +53,14 @@ export default function BillDetail({ kind = 'payable' }) {
   const isPay = d.type !== 'receivable'
   const amount = remaining(d)
   const s = billStatus(d)
-  const split = isPay && (d.currency || 'IDR') === 'IDR' ? withholdingSplit(d.original_amount ?? d.amount, engine?.rate) : null
+  // The split is shown only when the counterparty or bill carries a withholding treatment, and
+  // it is computed on what is still to pay — never on every IDR bill (review 8.2 #9).
+  const cp = (cps.data?.counterparties || []).find((c) => [c.name, c.legal_name, c.display_name].some((n) => n && String(n).trim().toLowerCase() === String(d.counterparty || '').trim().toLowerCase()))
+  const treatment = withholdingTreatment(d, cp)
+  const plan = treatment === 'withhold' && engine?.rate
+    ? computeInvoicePlan({ doc: { gross_amount: amount, currency: 'IDR' }, supplier: d.counterparty, treatment: 'withhold', rate: engine.rate, engine, dir: 'payable' })
+    : null
+  const split = plan && plan.rateValid && amount > 0 ? { gross: amount, rate: plan.rateNum, tax: plan.withheld, net: plan.net } : null
 
   // Cash effect with the same rules Radar uses: forecast with and without this item.
   let effect = null
@@ -112,7 +120,7 @@ export default function BillDetail({ kind = 'payable' }) {
               ) : (
                 <>
                   <div className="v2-split"><div className="v2-split-box"><span className="v2-stat-label">{t('bill.total')}</span><span className="v2-stat-mid v2-num">{money(d.original_amount ?? d.amount, { currency: d.currency || 'IDR' })}</span></div></div>
-                  <p className="v2-muted v2-small">{rules.loading ? '' : t('bill.noRate')}</p>
+                  <p className="v2-muted v2-small">{rules.loading ? '' : treatment === 'applied' ? t('bill.alreadyNet') : t('bill.noRate')}</p>
                 </>
               )}
             </Card>

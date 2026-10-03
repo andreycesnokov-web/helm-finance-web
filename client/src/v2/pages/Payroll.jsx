@@ -4,7 +4,8 @@
 // verified rule engine, not in UI code). Adding people and running payroll stay on the
 // existing page (Manage payroll).
 import I from '../icons'
-import { PageHead, Card, Btn, Skeleton, ErrorBox, Empty, Pill } from '../ui'
+import { PageHead, Card, Btn, Skeleton, ErrorBox, Empty, Pill, Locked } from '../ui'
+import { useAccess } from '../../hooks/useAccess'
 import { useT, useLang } from '../i18n'
 import { useApi } from '../data'
 import { money, shortDate } from '../lib/format'
@@ -20,12 +21,15 @@ export default function Payroll() {
   const lang = useLang()
   const ov = useApi('/payroll/overview')
   const wallets = useApi('/wallets')
-  const ins = useApi(`/pulse/advanced-insights?from=${daysAgo(30)}&to=${daysAgo(0)}`)
+  const ins = useApi(`/pulse/advanced-insights?scope=business&from=${daysAgo(30)}&to=${daysAgo(0)}`)
+  const { hasFeature, loading: accessLoading } = useAccess()
   useAskContext(t('nav.payroll'), null)
   const head = (
     <PageHead title={t('nav.payroll')} sub={t('pay.sub')}
       actions={<><Btn to="/business/payroll/manage">{t('pay.addPerson')}</Btn><Btn variant="primary" to="/business/payroll/manage">{t('pay.manage')}</Btn></>} />
   )
+  // Same plan gate as the legacy Payroll page (review 8.2 #10).
+  if (!accessLoading && !hasFeature('payroll_enabled')) return <>{head}<Locked title={t('lock.payrollTitle')} text={t('lock.text')} /></>
   if (ov.loading) return <>{head}<Card><Skeleton rows={6} /></Card></>
   if (ov.error) return <>{head}<ErrorBox error={ov.error?.status === 403 ? t('pay.forbidden') : ov.error} onRetry={ov.error?.status === 403 ? null : ov.reload} /></>
 

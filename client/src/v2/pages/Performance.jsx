@@ -80,6 +80,14 @@ function Drill({ drill, tx, t, lang, clear }) {
           </Card>
         </aside>
       </div>
+      {c.excluded.length > 0 && (
+        <Card title={t('perf.drill.excluded')}>
+          <p className="v2-muted v2-small">{t('perf.drill.excludedSub')}</p>
+          <ul className="v2-moves">
+            {c.excluded.map((x) => <li key={x.cls}><span>{t(`perf.cls.${x.cls}`)}</span><span className="v2-num">{money(x.amount, { sign: true })}</span></li>)}
+          </ul>
+        </Card>
+      )}
       <Card title={t('perf.drill.payments', { m: mName(drill.month, lang) })} aside={<Link to="/business/transactions">{t('perf.drill.allTx')}</Link>}>
         {c.payments.length === 0 ? <p className="v2-muted">—</p> : (
           <ul className="v2-moves">
@@ -162,16 +170,19 @@ function CashTab({ rows, sel, cash, t, lang }) {
   const burn = burn3(rows, currentKey)
   const runway = burn ? runwayFrom(cash, burn.monthly) : null
   const funding12 = rows.reduce((s, r) => s + r.funding, 0)
+  const fundIn12 = rows.reduce((s, r) => s + r.fundingIn, 0), fundOut12 = rows.reduce((s, r) => s + r.fundingOut, 0)
   const lastCapex = [...rows].reverse().find((r) => r.equipment > 0)
   const flowRows = rows.map((r) => ({ key: r.month, label: mName(r.month, lang), short: mName(r.month, lang, 'short'), values: { operating: r.operating, equipment: -r.equipment, funding: r.funding } }))
   const endRows = rows.map((r) => ({ key: r.month, label: mName(r.month, lang), short: mName(r.month, lang, 'short'), values: { cash: r.endCash } }))
   return (
     <>
       <div className="v2-tiles">
-        <Kpi label={t('perf.cash.operating', { m: mName(cur.month, lang, 'short') })} value={money(cur.operating, { sign: true })} tone={cur.operating < 0 ? 'v2-neg' : 'v2-pos'} />
+        <Kpi label={t('perf.cash.operating', { m: mName(cur.month, lang, 'short') })} value={money(cur.operating, { sign: true })} tone={cur.operating < 0 ? 'v2-neg' : 'v2-pos'}
+          sub={cur.incomplete ? <Pill tone="warn">{t('perf.cash.incomplete', { v: money(cur.unclassified) })}</Pill> : null} />
         <Kpi label={t('perf.cash.equipment', { m: mName(cur.month, lang, 'short') })} value={money(cur.equipment)} sub={lastCapex && lastCapex.month !== cur.month ? t('perf.cash.lastCapex', { v: money(lastCapex.equipment), m: mName(lastCapex.month, lang, 'short') }) : null} />
         <Kpi label={t('perf.cash.free', { m: mName(cur.month, lang, 'short') })} value={money(cur.free, { sign: true })} sub={t('perf.cash.freeSub')} />
-        <Kpi label={t('perf.cash.funding12')} value={money(funding12, { sign: funding12 > 0 })} sub={<Link to="/business/funding-investors">{t('nav.funding')}</Link>} />
+        <Kpi label={t('perf.cash.funding12')} value={money(funding12, { sign: funding12 !== 0 })}
+          sub={<>{t('perf.cash.fundingInOut', { a: money(fundIn12), b: money(fundOut12) })} · <Link to="/business/funding-investors">{t('nav.funding')}</Link></>} />
       </div>
       <Card title={t('perf.cash.whereTitle')}>
         <p className="v2-muted v2-small">{t('perf.cash.whereSub')}</p>
@@ -193,6 +204,7 @@ function CashTab({ rows, sel, cash, t, lang }) {
                 <dd className="v2-num v2-r"><strong>{runway == null ? t('perf.cash.notBurning') : t('pulse.daysN', { n: runway })}</strong></dd>
               </dl>
             ) : <p className="v2-muted">{t('perf.cash.noBurn')}</p>}
+            {burn?.incomplete && <p><Pill tone="warn">{t('perf.cash.burnIncomplete')}</Pill></p>}
           </Card>
           <Card title={t('perf.cash.bridgeTitle')}>
             <p className="v2-sec">{t('perf.cash.bridgeNa')}</p><Pill tone="warn">{t('placeholder.notSetUp')}</Pill>
@@ -255,7 +267,7 @@ export default function Performance() {
   const sp = new URLSearchParams(location.search)
   const sel = sp.get('month') && months.includes(sp.get('month')) ? sp.get('month') : months[months.length - 2]
   const pulse = useApi('/pulse?scope=business')
-  const ins = useApi(`/pulse/advanced-insights?from=${months[0]}-01&to=${new Date().toISOString().slice(0, 10)}`)
+  const ins = useApi(`/pulse/advanced-insights?scope=business&from=${months[0]}-01&to=${new Date().toISOString().slice(0, 10)}`)
   const tx = useApi('/transactions?period=all')
   const obl = useApi('/accountant/obligations')
   useAskContext(t('nav.performance'), drillOn ? mName(drill.month, lang) : mName(sel, lang))
@@ -281,6 +293,9 @@ export default function Performance() {
     </nav>
   )
   if (ins.loading || pulse.loading) return <div className="v2-page">{head}{tabs}<Card><Skeleton rows={8} /></Card></div>
+  const needTx = drillOn || tab !== 'forecast'
+  if (needTx && tx.loading) return <div className="v2-page">{head}{tabs}<Card><Skeleton rows={8} /></Card></div>
+  if (needTx && tx.error) return <div className="v2-page">{head}{tabs}<ErrorBox error={tx.error} onRetry={tx.reload} /></div>
   if (ins.error || pulse.error) return <div className="v2-page">{head}{tabs}<ErrorBox error={(ins.error || pulse.error)?.status === 403 ? t('perf.forbidden') : (ins.error || pulse.error)} onRetry={() => { ins.reload(); pulse.reload() }} /></div>
 
   const nothing = pRows.every((r) => r.empty) && !txs.length

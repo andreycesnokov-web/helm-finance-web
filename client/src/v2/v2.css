@@ -814,3 +814,12 @@
 .v2-flag > .v2-pill { grid-area: s; }
 .v2-flag > .v2-small { grid-area: k; }
 @media (min-width: 1025px) { .v2-flag { grid-template-columns: minmax(0, 1fr) 200px auto; grid-template-areas: "n k s"; } }
+
+/* Disabled "+ Add" until Add is migrated (review 8.2 #3) */
+.v2-addbtn:disabled, .v2-tab:disabled { opacity: .55; cursor: not-allowed; }
+button.v2-tab { background: none; border: 0; font: inherit; color: inherit; }
+button.v2-addbtn { border: 0; font: inherit; text-align: left; width: 100%; }
+/* Disabled Add (review 8.2 #3): the note sits under the label and wraps, never cut off. */
+button.v2-addbtn:disabled { height: auto; min-height: var(--touch-min); padding: 8px 14px; flex-direction: column; align-items: flex-start; justify-content: center; gap: 2px; }
+button.v2-addbtn:disabled .v2-addbtn-hint { white-space: normal; }
+.v2-locked { display: flex; gap: var(--space-3); align-items: flex-start; padding: var(--space-5); }

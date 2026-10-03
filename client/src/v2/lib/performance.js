@@ -7,14 +7,19 @@
 //    series (GET /api/pulse/advanced-insights → series: revenue, direct_costs, opex, …) as an
 //    ESTIMATE, labelled "counted when money moved". Depreciation needs the asset register
 //    (P-11) and is shown as not available — never as zero.
-//  * Cash: operating cash flow = revenue − operating cash out (same classifier); equipment =
-//    capex; funding = classified funding; month-end cash walks back from today's balance over
-//    recorded transactions with the cash-impact rules /api/pulse uses.
+//  * Cash: operating cash flow = revenue − (direct + operating costs + tax + interest paid)
+//    from the same classifier. A month with unclassified money ("needs review") is flagged
+//    `incomplete`, because the true figure may be lower or higher. Equipment = capex.
+//    Funding is SIGNED, from the transactions themselves (lib/cashClass.js mirrors the
+//    server classifier): money in (loans, owner money) is +, repayments, withdrawals and
+//    dividends are −. Month-end cash walks back from today's balance over recorded
+//    transactions with the cash-impact rules /api/pulse uses.
 //  * Burn = average of (operating cash flow + equipment) over the last 3 full months, as a
 //    positive number when cash is going out. Runway = cash ÷ burn × 30.
 //  * Forecast: the Radar 30-day series (lib/radarSeries.js); after that, the average burn.
 //    Loan repayments are not known (no funding register, P-03) and are said to be missing.
 import { txDate } from './obligations.js'
+import { classOf, COST_CLASSES } from './cashClass.js'
 
 const pad = (n) => String(n).padStart(2, '0')
 const num = (v) => { const n = Number(v); return Number.isFinite(n) ? n : 0 }
@@ -58,14 +63,22 @@ export function txCashDelta(t) {
   return 0
 }
 
-/** Cash rows per month: operating, equipment, funding (classifier) and month-end cash (walk-back). */
+const isBizIdr = (t) => (t.scope || 'business') === 'business' && !(t.currency_original && t.currency_original !== 'IDR')
+
+/** Cash rows per month: operating, equipment, signed funding and month-end cash (walk-back). */
 export function cashRows({ series = [], transactions = [], balance = 0, months }) {
   const by = Object.fromEntries((series || []).map((s) => [s.period, s]))
   const deltaBy = {}
+  const fundIn = {}, fundOut = {}
   for (const t of transactions) {
-    if ((t.scope || 'business') !== 'business' || (t.currency_original && t.currency_original !== 'IDR')) continue
+    if (!isBizIdr(t)) continue
     const k = txDate(t).slice(0, 7)
-    deltaBy[k] = num(deltaBy[k]) + txCashDelta(t)
+    const d = txCashDelta(t)
+    deltaBy[k] = num(deltaBy[k]) + d
+    if (classOf(t) === 'financing') {
+      if (d > 0) fundIn[k] = num(fundIn[k]) + d
+      else if (d < 0) fundOut[k] = num(fundOut[k]) - d
+    }
   }
   // End-of-month cash: today's balance minus everything that moved after that month.
   const allKeys = Object.keys(deltaBy).sort()
@@ -73,9 +86,12 @@ export function cashRows({ series = [], transactions = [], balance = 0, months }
   for (const k of months) endCash[k] = num(balance) - allKeys.filter((x) => x > k).reduce((s, x) => s + deltaBy[x], 0)
   return months.map((k) => {
     const s = by[k] || {}
-    const operating = num(s.revenue) - num(s.operating_cash_out ?? (num(s.direct_costs) + num(s.opex)))
-    return { month: k, operating, equipment: num(s.capex), funding: num(s.other_cash_movement?.funding), endCash: endCash[k],
-      free: operating - num(s.capex), empty: !by[k] }
+    const costs = num(s.direct_costs) + num(s.opex) + num(s.tax_expense) + num(s.interest_expense)
+    const operating = num(s.revenue) - costs
+    const fIn = num(fundIn[k]), fOut = num(fundOut[k])
+    return { month: k, operating, equipment: num(s.capex), funding: fIn - fOut, fundingIn: fIn, fundingOut: fOut,
+      endCash: endCash[k], free: operating - num(s.capex), empty: !by[k],
+      unclassified: num(s.other_cash_movement?.needs_review), incomplete: num(s.other_cash_movement?.needs_review) > 0 }
   })
 }
 
@@ -84,7 +100,8 @@ export function burn3(rows, currentKey) {
   const full = rows.filter((r) => r.month !== currentKey && !r.empty).slice(-3)
   if (!full.length) return null
   const avg = full.reduce((s, r) => s + (r.operating - r.equipment), 0) / full.length
-  return { monthly: -avg, months: full.map((r) => r.month), perMonth: full.map((r) => ({ month: r.month, value: r.operating - r.equipment })) }
+  return { monthly: -avg, months: full.map((r) => r.month), incomplete: full.some((r) => r.incomplete),
+    perMonth: full.map((r) => ({ month: r.month, value: r.operating - r.equipment, incomplete: !!r.incomplete })) }
 }
 
 export function runwayFrom(cash, burnMonthly) {
@@ -139,26 +156,37 @@ export function threeMonths({ days = [], burnMonthly, today = new Date() }) {
   return out
 }
 
-/** Drill-down: what changed in `month` vs `compare`, by category, from transactions. */
+/**
+ * Drill-down: what changed in `month` vs `compare`, from transactions.
+ * Revenue counts only rows the classifier calls revenue; costs only direct and operating
+ * costs. Everything else (opening balances, loans, owner money, transfers, tax, interest,
+ * equipment, unclassified) is listed separately as `excluded`, by class and signed.
+ */
 export function monthCompare(transactions = [], month, compare) {
-  const pick = (k) => transactions.filter((t) => txDate(t).slice(0, 7) === k && (t.scope || 'business') === 'business')
-  const sumBy = (rows, dir) => {
-    const m = {}
+  const pick = (k) => transactions.filter((t) => txDate(t).slice(0, 7) === k && isBizIdr(t))
+  const split = (rows) => {
+    const costs = {}, excluded = {}
+    let revenue = 0
     for (const t of rows) {
       const d = txCashDelta(t)
-      if (dir === 'out' ? d >= 0 : d <= 0) continue
-      const c = String(t.category || '').trim() || '—'
-      m[c] = num(m[c]) + Math.abs(d)
+      if (!d) continue
+      const cls = classOf(t)
+      if (cls === 'revenue') revenue += d
+      else if (COST_CLASSES.includes(cls)) {
+        const c = String(t.category || '').trim() || '—'
+        costs[c] = num(costs[c]) - d
+      } else excluded[cls] = num(excluded[cls]) + d
     }
-    return m
+    return { costs, excluded, revenue }
   }
   const a = pick(month), b = compare ? pick(compare) : []
-  const outA = sumBy(a, 'out'), outB = sumBy(b, 'out')
-  const cats = [...new Set([...Object.keys(outA), ...Object.keys(outB)])]
-  const changes = cats.map((c) => ({ category: c, now: num(outA[c]), before: num(outB[c]), delta: num(outA[c]) - num(outB[c]) }))
+  const A = split(a), B = split(b)
+  const cats = [...new Set([...Object.keys(A.costs), ...Object.keys(B.costs)])]
+  const changes = cats.map((c) => ({ category: c, now: num(A.costs[c]), before: num(B.costs[c]), delta: num(A.costs[c]) - num(B.costs[c]) }))
     .filter((x) => x.delta !== 0).sort((x, y) => y.delta - x.delta)
   const total = (m) => Object.values(m).reduce((s, v) => s + v, 0)
-  const inA = total(sumBy(a, 'in')), inB = total(sumBy(b, 'in'))
-  const payments = [...a].filter((t) => txCashDelta(t) < 0).sort((x, y) => txCashDelta(x) - txCashDelta(y)).slice(0, 8)
-  return { changes, costsNow: total(outA), costsBefore: total(outB), revenueNow: inA, revenueBefore: inB, payments, count: a.length }
+  const excluded = Object.entries(A.excluded).map(([cls, amount]) => ({ cls, amount })).filter((x) => x.amount !== 0)
+    .sort((x, y) => Math.abs(y.amount) - Math.abs(x.amount))
+  const payments = [...a].filter((t) => txCashDelta(t) < 0 && COST_CLASSES.includes(classOf(t))).sort((x, y) => txCashDelta(x) - txCashDelta(y)).slice(0, 8)
+  return { changes, costsNow: total(A.costs), costsBefore: total(B.costs), revenueNow: A.revenue, revenueBefore: B.revenue, excluded, payments, count: a.length }
 }

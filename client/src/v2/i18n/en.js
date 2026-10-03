@@ -1,6 +1,7 @@
 // Design v2 — English (final wording from _specs/design-v2/designs).
 export default {
   nav: {
+    addSoon: 'Not available in the new design yet',
     group: { overview: 'Overview', money: 'Money', obligations: 'Obligations', accounting: 'Accounting' },
     pulse: 'Pulse', radar: 'Radar', performance: 'Performance', cfo: 'AI CFO',
     accounts: 'Accounts', transactions: 'Transactions', funding: 'Funding', assets: 'Assets & balance',
@@ -13,6 +14,7 @@ export default {
   },
   badge: { late: '{n} late' },
   shell: {
+    crash: 'Something went wrong on this screen. Your data is safe.',
     brand: 'CFO AI', notifications: 'Notifications', openMore: 'Open workspace menu',
     switchHint: 'Switch company or go to Personal', company: 'Company', personal: 'Personal',
     companies: 'Companies', createCompany: 'Create company workspace',
@@ -55,7 +57,7 @@ export default {
     dec: {
       approveBill: 'Approve bill · {who}', approveInvoice: 'Approve invoice · {who}', due: 'due {d}',
       review: 'Review', approve: 'Approve', late: '{who} is {n} days late', wasDue: 'was due {d}',
-      remind: 'Send reminder', tax: '{what} for {period}', taxMeta: 'Tax · pay by {d} · {n} days left', prepare: 'Prepare',
+      remind: 'Send reminder', openInvoice: 'Open invoice', tax: '{what} for {period}', taxMeta: 'Tax · pay by {d} · {n} days left', prepare: 'Prepare',
     },
     next7: 'Next 7 days', fullForecast: 'Full forecast', comingIn: 'Coming in', goingOut: 'Going out',
     dayToDay: 'incl. day-to-day ≈ {v}', noNext: 'No dated payments in the next 7 days.', cashOn: 'Cash on {d}',
@@ -97,6 +99,7 @@ export default {
     forbidden: 'Your role can submit but not decide. An owner, admin or CFO decides.',
     done: { approve: 'Approved. Nothing is paid until someone pays it.', reject: 'Rejected.', ask: 'Question sent.' },
   },
+  lock: { payrollTitle: 'Payroll is not part of your plan', approvalsTitle: 'Approvals are not part of your plan', text: 'Your current plan does not include this. Nothing is lost — it opens as soon as the plan includes it.' },
   bills: {
     sub: 'What you’re owed and what you owe, in one place', addBill: 'Add a bill', newInvoice: 'New invoice',
     owedToYou: 'Owed to you · {n} invoices', youOwe: 'You owe · {n} bills', lateAmt: '{v} late', dueSoon: '{v} due in the next 14 days',
@@ -114,7 +117,7 @@ export default {
     breadcrumb: 'Breadcrumb', notFound: 'Not found', notFoundText: 'This item does not exist in this company, or your role cannot see it.', back: 'Back to Bills & invoices',
     youPay: 'What you’ll actually pay', suggested: 'Suggested · your accountant confirms', total: 'Invoice total', toSupplier: 'To the supplier', toTax: 'To the tax office',
     rateFrom: '{rule} at {rate}%', splitNote: 'If {rule} applies to this supplier, you withhold it and pay it to the tax office yourself. The rate comes from the verified rule set. Confirm with your accountant before paying.',
-    noRate: 'No withholding rate is set up in the verified rule set, so no split is suggested.',
+    noRate: 'No withholding rate is set up in the verified rule set, so no split is suggested.', alreadyNet: 'This bill was entered net of withholding already.',
     details: 'Details', invoiceNo: 'Invoice number', created: 'Added', dueDate: 'Due date', noDue: 'No due date', paidSoFar: 'Paid so far', category: 'Category',
     history: 'History', effect: 'Effect on your cash', cashAfter: 'Cash after paying on {d}', lowest: 'Lowest point · {d}', unchanged: 'unchanged',
     noEffect: 'Not in the 30-day forecast (paid, no due date, or another currency).', seeRadar: 'See it on Radar',
@@ -227,7 +230,7 @@ export default {
     download: 'Download package (PDF + files)', packageSoon: 'Not available yet', toFinish: 'To finish {m}',
     check: { statements: 'Bank statements · {ok} of {n} accounts cover the month end', bills: 'Bills and invoices with a document · {ok} of {n}', categories: 'Transactions with a category · {ok} of {n}', review: 'Accountant review' },
     done: 'Done', notDone: 'not done', seePackages: 'See folders',
-    taxesDue: 'Taxes due in {m}', fullCalendar: 'Full calendar', noEvents: 'No tax deadlines generated yet — complete the tax profile to build the calendar.',
+    taxesDue: 'Taxes due in {m}', fullCalendar: 'Full calendar', noEvents: 'No tax deadlines are stored for this business yet. Your accountant adds them; nothing is generated from this screen.',
     taxNote: 'Dates and amounts come from the verified tax rules and your records. Your accountant confirms before anything is paid.',
     stage: { done: 'Paid or filed', overdue: 'Overdue', calculated: 'Calculated', todo: 'To prepare' },
     askLabel: 'Ask about taxes and documents', askPh: 'e.g. Do I need to withhold tax on a legal services bill?', send: 'Send', sources: 'Rules used',
@@ -261,7 +264,7 @@ export default {
     drop: 'Add PDFs or photos', dropHint: 'Or send them to the CFO AI bot in Telegram, or to your AI assistant. We read the amount, date and supplier; you check before anything is saved.', choose: 'Choose files',
     look: 'Needs a look · {n}', inMonth: '{m} · {n}', allGood: 'Nothing needs a look.', none: 'No documents in this month.',
     ch: { web: 'Uploaded here', telegram: 'Telegram', mcp: 'AI assistant', email: 'Email' },
-    type: { invoice: 'Invoice', receipt: 'Receipt', bank_statement: 'Bank statement', contract: 'Contract', payment_proof: 'Payment proof', tax: 'Tax document', other: 'Document' },
+    type: { vendor_invoice: 'Supplier invoice', customer_invoice: 'Invoice to a customer', tax_invoice: 'Tax invoice (faktur pajak)', bukti_potong: 'Withholding slip (bukti potong)', tax_billing: 'Tax billing code', filing_confirmation: 'Filing receipt', bank_document: 'Bank document', invoice: 'Invoice', receipt: 'Receipt', bank_statement: 'Bank statement', contract: 'Contract', payment_proof: 'Payment proof', tax: 'Tax document', other: 'Document' },
     linked: 'Linked', notLinked: 'Not linked', fix: 'Fix',
     missingFor: 'Missing for {m}', missingHint: 'Paid bills without a payment proof — your accountant needs them to close the month.', noneMissing: 'Nothing missing.',
   },
@@ -334,7 +337,7 @@ export default {
       h5: 'Taxes you withhold for others (PPh 21, PPh 23) are not your cost.' },
     setupTitle: 'Set up for your type of business', setupText: 'Every category belongs to one group: revenue, direct cost, operating cost, asset purchase, funding, tax or transfer. The groups will be picked from your KBLI codes once that mapping exists.',
     emptyTitle: 'No figures yet', emptyText: 'Import a bank statement or add transactions to see performance.',
-    cash: { operating: 'Operating cash flow · {m}', equipment: 'Equipment bought · {m}', lastCapex: '{v} in {m}', free: 'Free cash flow · {m}', freeSub: 'Operating cash flow minus equipment',
+    cash: { fundingInOut: 'In {a} · out {b}', incomplete: '{v} this month could not be classified, so this figure is incomplete.', burnIncomplete: 'Incomplete: some of these months have money that could not be classified.', operating: 'Operating cash flow · {m}', equipment: 'Equipment bought · {m}', lastCapex: '{v} in {m}', free: 'Free cash flow · {m}', freeSub: 'Operating cash flow minus equipment',
       funding12: 'Funding · 12 months', whereTitle: 'Where cash came from and went', whereSub: 'Last 12 months · above zero came in, below zero went out',
       operatingShort: 'Operating cash flow', equipmentShort: 'Equipment bought', fundingShort: 'Funding · loans and equity',
       endTitle: 'Cash at month end', endSub: 'All business accounts, from recorded transactions', endShort: 'Cash at month end',
@@ -348,10 +351,11 @@ export default {
       toPayList: 'To pay · {v}', toCollectList: 'To collect · {v}', moveTitle: 'To move the cash-out date',
       moveText: 'Collecting late invoices, cutting the largest recurring cost or extending a loan all move the date. Try a change before you make it.',
       plan: 'Plan it with AI CFO', planQ: 'What would move our cash-out date the most?' },
-    drill: { chip: '{m} · compared with {c}', clear: 'Clear filter', all: 'All months', opened: 'Opened from an AI note',
+    drill: { excluded: 'Not counted as revenue or cost', excludedSub: 'Real money that moved this month, kept out of the figures above.', chip: '{m} · compared with {c}', clear: 'Clear filter', all: 'All months', opened: 'Opened from an AI note',
       costsAdded: 'Costs changed', revenueAdded: 'Revenue changed', fromTo: 'From {a} to {b}', records: 'Records in the month',
       whatChanged: 'What changed in {m}', noChange: 'No change by category.', aiNote: 'Ask AI CFO to explain the change in plain words, from these numbers.',
       askQ: 'What changed in {m} compared with {c}, and why?', payments: '{m} payments behind it', allTx: 'All transactions' },
+    cls: { opening_balance: 'Opening balances', financing: 'Loans and owner money', transfer: 'Moves between own accounts', balance_correction: 'Balance corrections', tax: 'Taxes paid', interest: 'Interest paid', capex: 'Equipment bought', other: 'Other', unknown: 'Not classified yet' },
   },
   assets: {
     sub: 'What the company owns and what it owes · as of {d}', owns: 'The company owns', owes: 'The company owes',

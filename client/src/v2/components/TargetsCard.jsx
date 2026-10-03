@@ -8,6 +8,7 @@ import { useAuth } from '../../hooks/useAuth'
 import { useApi, useInvalidate } from '../data'
 import { updateBusinessTargets, actionError } from '../lib/actions'
 import { runwayTarget, minCash } from '../lib/pulseModel'
+import { targetsPatch } from '../lib/targetsForm'
 import { money } from '../lib/format'
 import { useT, useLang } from '../i18n'
 import { Card, Btn, NotYet, Skeleton } from '../ui'
@@ -49,13 +50,12 @@ export default function TargetsCard() {
   }
   const save = async (e) => {
     e.preventDefault()
+    // Only changed fields are sent; the stored brief minute is kept (lib/targetsForm.js).
+    const body = targetsPatch(tg, form)
+    if (!Object.keys(body).length) { setForm(null); return }
     setBusy(true); setErr(null)
     try {
-      await updateBusinessTargets(token, {
-        runway_target_days: form.runway === '' ? null : Number(form.runway),
-        min_cash_idr: form.minCash === '' ? null : String(form.minCash),
-        weekly_brief: form.day === '' ? null : { day: Number(form.day), hour: Number(form.hour), minute: 0 },
-      })
+      await updateBusinessTargets(token, body)
       setForm(null); setSaved(true); invalidate()
     } catch (x) {
       const code = actionError(x)
