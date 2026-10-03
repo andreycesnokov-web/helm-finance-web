@@ -815,6 +815,17 @@
 .v2-flag > .v2-small { grid-area: k; }
 @media (min-width: 1025px) { .v2-flag { grid-template-columns: minmax(0, 1fr) 200px auto; grid-template-areas: "n k s"; } }
 
+/* Profit groups (P-10) */
+.v2-grouplist { list-style: none; margin: 0; padding: 0; }
+.v2-grouprow { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-2); padding: 12px 0; border-top: 1px solid var(--border-subtle); align-items: center; }
+.v2-grouprow:first-child { border-top: 0; }
+.v2-group-name { display: flex; flex-direction: column; gap: 2px; min-width: 0; overflow-wrap: anywhere; }
+.v2-group-pick { margin: 0; }
+.v2-group-pick .v2-select { width: 100%; }
+@media (min-width: 720px) {
+  .v2-grouprow { grid-template-columns: minmax(0, 1fr) 240px; gap: var(--space-4); }
+}
+
 /* Disabled "+ Add" until Add is migrated (review 8.2 #3) */
 .v2-addbtn:disabled, .v2-tab:disabled { opacity: .55; cursor: not-allowed; }
 button.v2-tab { background: none; border: 0; font: inherit; color: inherit; }

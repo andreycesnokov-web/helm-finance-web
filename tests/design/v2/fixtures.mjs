@@ -58,6 +58,12 @@ export const counterparties = [
   { id: 'c5', name: 'Landlord Example', legal_name: 'Landlord Example', display_name: 'Landlord Example', role: 'landlord', entity_form: 'person', payment_terms_days: 0, npwp: '222233334444555', pkp_status: 'non_pkp', bank_accounts: [] },
   { id: 'c4', name: 'PT Test Resort', legal_name: 'PT Test Resort', display_name: 'PT Test Resort', role: 'customer', npwp: '111122223333444', pkp_status: 'pkp', bank_accounts: [], default_tax_treatment: 'Possibly PPh 23 — needs accountant review' },
 ]
+const pnlCats = [
+  { id: 'aaaaaaaa-0000-4000-8000-000000000001', name: 'Sales', group_type: 'inflow', pnl_group: 'revenue' },
+  { id: 'aaaaaaaa-0000-4000-8000-000000000002', name: 'Supplies', group_type: 'outflow', pnl_group: 'direct_cost' },
+  { id: 'aaaaaaaa-0000-4000-8000-000000000003', name: 'Utilities', group_type: 'outflow', pnl_group: 'operating_cost' },
+  { id: 'aaaaaaaa-0000-4000-8000-000000000004', name: 'Fuel', group_type: 'outflow', pnl_group: null },
+]
 export const transactions = [
   { id: 101, type: 'income', description: 'Gateway settlement', category: 'Sales', amount_original: 3100000, currency_original: 'IDR', wallet_id: 'w1', transaction_date: iso(-1), scope: 'business', bank_import_batch_id: 'b1' },
   { id: 102, type: 'expense', description: 'TRF 0192 FUEL', category: null, amount_original: 450000, currency_original: 'IDR', wallet_id: 'w1', transaction_date: iso(-2), scope: 'business', bank_import_batch_id: 'b1' },
@@ -85,7 +91,13 @@ export const routes = {
   'GET /api/wallets': () => ({ wallets }),
   'GET /api/counterparties': () => ({ counterparties }),
   'GET /api/transactions': (u) => (u.searchParams.get('type') === 'transfer' ? transactions.filter((t) => t.type === 'transfer') : transactions),
-  'GET /api/cashflow-categories': () => ({ categories: [{ name: 'Sales' }, { name: 'Supplies' }, { name: 'Utilities' }, { name: 'Fuel' }] }),
+  // P-10: three categories confirmed, one not — Profit shows the accrual view and the coverage line.
+  'GET /api/cashflow-categories': () => ({ categories: pnlCats }),
+  'GET /api/pnl-mapping': () => ({ available: true, can_edit: true, confirmed: true, kbli: ['81210', '47999'], tax_regime: 'pph_final_umkm',
+    groups: ['revenue', 'direct_cost', 'operating_cost', 'interest', 'other_income', 'tax', 'asset_purchase', 'funding', 'transfer'],
+    categories: pnlCats.map((c) => ({ ...c, suggestion: c.name === 'Fuel' ? { pnl_group: 'direct_cost', note: 'Q4.', source: 'generic' } : c.name === 'Sales' ? { pnl_group: 'revenue', note: null, source: 'kbli_81210' } : null })),
+    missing_from_template: [{ name: 'Loan interest', pnl_group: 'interest', note: 'Q1: only interest on loans the company owes; below EBITDA.', kbli_prefix: '81210' }] }),
+  'PATCH /api/pnl-mapping': () => ({ ok: true, changed: 1 }),
   'GET /api/bank-import/batches': () => ({ batches: [{ id: 'b1', wallet_id: 'w1', statement_end: iso(-1), status: 'review_required' }] }),
   'GET /api/accountant/rules': () => ({ jurisdiction: 'ID', rules: [{ id: 'r1', rule_code: 'ID_PPH23_SERVICES', title: 'PPh 23 · services', obligation_type: 'withholding', parameters: { rate: 2 } }] }),
   'GET /api/accountant/summary': () => ({ overdue: [], upcoming: [

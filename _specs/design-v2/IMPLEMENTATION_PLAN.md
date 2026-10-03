@@ -212,3 +212,22 @@ The answers are in `DECISIONS.md`, which overrides section 5.
   - GET reads return nulls;
   - the batch-8 writes answer 409 `migration_not_applied`;
   - the screens show that state.
+
+## 8. Batch 9 — P-10 profit groups and small fixes
+
+- **Migration 062** (not applied):
+  - `cashflow_categories.pnl_group`: nullable, CHECK on the 9 groups, and a CHECK that only business rows may hold one;
+  - `industry_templates`, seeded with suggestions: generic `*` (50 rows, covering all 46 system categories), 81210 (9 rows), 47999 (8 rows).
+- **Mapping endpoints:**
+  - `GET /api/pnl-mapping`: finance roles; returns suggestions by KBLI.
+  - `PATCH /api/pnl-mapping`: owner, ceo, admin, cfo. Only this business's categories; audited as `pnl_mapping_confirmed`.
+  - Both are Business only.
+- **Performance → Profit:** switches to `lib/pnl.js` accrual rows once any category is confirmed:
+  - interest goes below EBITDA;
+  - other income goes below operating profit and is shown net;
+  - the tax line reads "Turnover tax (0.5%)" for UMKM regimes;
+  - "N of M records have a category"; uncategorised records are never guessed.
+  - Pulse and AI CFO are unchanged.
+- **Settings Targets copy:** now says that only Pulse uses the targets.
+- **`telegramActorWiring`:** migration allow-list updated, in a test-only commit.
+- **PROPOSALS F-01:** the `/allocate` vs `/pay` finding.

@@ -116,7 +116,7 @@ Format: what · fields · why · risk · what the UI does meanwhile.
 
 ## P-10 · Category → group mapping and accrual profit (batch 6)
 
-> **Next step.** No migration yet. Template for owner review: `P10_TEMPLATE.md`.
+> **Approved → batch 9 (migration 062).** 9 groups (DECISIONS.md "P-10 decisions"). `GET/PATCH /api/pnl-mapping`; Performance → Profit switches to the accrual view once a business confirms; page `/business/performance/groups`.
 
 - **What:** every cash-flow category belongs to exactly one group (revenue, direct cost,
   operating cost, asset purchase, funding, tax, transfer), seeded per industry template from
@@ -173,3 +173,27 @@ Format: what · fields · why · risk · what the UI does meanwhile.
   a security review (auth middleware) and the client-side approval screen (not drawn).
 - **Meanwhile:** the button is disabled with "Waiting for the grant design approval"; admin
   screens read only /api/admin/* counts (enforced by tests/design/v2AdminModel.test.mjs).
+
+## F-01 · Finding: `/allocate` and `/pay` count the same money twice against the 031 guard
+
+**Status: reported only.** DECISIONS.md, final decisions item 5, says it is not fixed without approval. Found while preparing batch 10, and checked against `main`.
+
+**What happens**
+- `POST /api/debts/:id/pay` raises `debts.paid_amount` and creates the payment transaction.
+- `POST /api/invoices/:debtId/allocate` describes itself as "audit trail only". It records a transaction as a `debt_settlement_allocations` row with `settlement_source_type = 'transaction'`.
+- The DB guard `fn_debt_settlement_guard` (migration 031) allows allocations only up to `invoice amount − paid_amount`. It counts **every** allocation, including `transaction` ones.
+
+**The problem**
+- `paid_amount` and transaction allocations describe the same money, but the guard adds them together.
+- Example: an invoice of 100 is paid 90 through `/pay`, which leaves room for 10.
+  - Allocating that same 90 payment through `/allocate` is rejected: 90 > 10. This happens today, without v2.
+  - Once any transaction allocation exists, the room left for a later withholding allocation is smaller, or zero.
+
+**Effect on batch 10**
+- The withholding route answers **409** with the message from DECISIONS.md: "This invoice already has payment records in the settlement log; record the withholding with the accountant."
+- It does this whenever the guard rejects. It never fails silently, and it never raises `paid_amount` instead.
+
+**Options for later (each needs the owner's approval)**
+- **A. Fix the guard (changes 031).** It would count only non-`transaction` allocations against `invoice amount − paid_amount`.
+- **B. Stop `/allocate` writing allocation rows.** Keep the audit trail in `audit_events` instead.
+- **C. Make allocations the single source of truth for payments.** `/pay` would write a `transaction` allocation, and `paid_amount` would become a derived figure. This is the larger change.
