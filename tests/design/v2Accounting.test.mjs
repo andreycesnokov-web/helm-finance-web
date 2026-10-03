@@ -61,13 +61,14 @@ t('packages before migration 061: slip not tracked, no check item, nothing claim
   assert.strictEqual(packageSummary(rows).slipsToMake, null)
 })
 
-t('packages after 061 (P-05): slip and accountant check from the stored marks', () => {
+t('packages with P-05 option B: slip from withholding_records, check from 061', () => {
   const base = { type: 'payable', due_date: '2026-09-05', status: 'paid', last_payment_at: '2026-09-05', attachments: [{}] }
-  const rows = packages({ month: '2026-09', slipNeeded: true, debts: [
-    { ...base, id: 1, withholding_slip_document_id: 'doc', accountant_checked_at: '2026-09-30T10:00:00Z', accountant_checked_by: 5 },
-    { ...base, id: 2, withholding_slip_document_id: null, accountant_checked_at: null, accountant_checked_by: null },
-    { ...base, id: 3, currency: 'USD', withholding_slip_document_id: null, accountant_checked_at: null, accountant_checked_by: null },
-    { id: 4, type: 'receivable', due_date: '2026-09-06', status: 'paid', last_payment_at: '2026-09-06', attachments: [{}], withholding_slip_document_id: null, accountant_checked_at: null, accountant_checked_by: null },
+  const slips = { available: true, by_debt: { 1: { slip_document_id: 'doc' }, 2: { slip_document_id: null } } }
+  const rows = packages({ month: '2026-09', slipNeeded: true, slips, debts: [
+    { ...base, id: 1, accountant_checked_at: '2026-09-30T10:00:00Z', accountant_checked_by: 5 },
+    { ...base, id: 2, accountant_checked_at: null, accountant_checked_by: null },
+    { ...base, id: 3, currency: 'USD', accountant_checked_at: null, accountant_checked_by: null },
+    { id: 4, type: 'receivable', due_date: '2026-09-06', status: 'paid', last_payment_at: '2026-09-06', attachments: [{}], accountant_checked_at: null, accountant_checked_by: null },
   ] })
   const by = Object.fromEntries(rows.map((r) => [r.id, r]))
   assert.strictEqual(by[1].status, 'complete')
@@ -75,8 +76,10 @@ t('packages after 061 (P-05): slip and accountant check from the stored marks', 
   assert.strictEqual(by[3].status, 'open', 'no slip for a non-IDR bill; unchecked = open, not missing')
   assert.ok(!by[4].items.some((i) => i.key === 'slip'), 'no slip for an invoice to a customer')
   assert.strictEqual(packageSummary(rows).slipsToMake, 1)
-  const noRule = packages({ month: '2026-09', slipNeeded: false, debts: [{ ...base, id: 5, withholding_slip_document_id: null, accountant_checked_at: null, accountant_checked_by: null }] })
+  const noRule = packages({ month: '2026-09', slipNeeded: false, slips, debts: [{ ...base, id: 5, accountant_checked_at: null, accountant_checked_by: null }] })
   assert.ok(!noRule[0].items.some((i) => i.key === 'slip'), 'no engine rate → no slip expected')
+  const unread = packages({ month: '2026-09', slipNeeded: true, slips: { available: false }, debts: [{ ...base, id: 6 }] })
+  assert.deepStrictEqual(unread[0].items.find((i) => i.key === 'slip'), { key: 'slip', unknown: true }, 'unreadable → not tracked, never claimed')
 })
 
 t('calendar grid is Monday-first and whole weeks', () => {

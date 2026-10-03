@@ -1738,9 +1738,9 @@ app.post('/api/debts/:id/request-info', auth, async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// ── PATCH /api/debts/:id/checklist — bill document checklist (Design v2 P-05) ──
-// Two marks a person sets: the withholding slip (a bukti potong document of THIS business)
-// and "checked by an accountant". Accountant role and above; every change audited.
+// ── PATCH /api/debts/:id/checklist — bill checklist: accountant check (Design v2 P-05) ──
+// The withholding slip is NOT set here: it lives in withholding_records (migration 031)
+// and is read with GET /api/withholding-slips. Accountant role and above; audited.
 // Nothing closes on its own: this never pays, settles, approves or files anything.
 // Before migration 061 is applied the columns do not exist → 409, nothing written.
 app.patch('/api/debts/:id/checklist', auth, async (req, res) => {
@@ -1752,39 +1752,51 @@ app.patch('/api/debts/:id/checklist', auth, async (req, res) => {
     if (!CHECKLIST.canEditChecklist(biz.role))
       return res.status(403).json({ error: 'Only an accountant, owner, admin or CFO can update the bill checklist' });
 
-    const { patch, slipId, error: vErr } = CHECKLIST.checklistPatchFromBody(req.body || {}, { userId: req.user.userId });
+    const { patch, error: vErr } = CHECKLIST.checklistPatchFromBody(req.body || {}, { userId: req.user.userId });
     if (vErr) return res.status(400).json({ error: vErr });
 
     const { data: rows, error: rErr } = await supabase.from('debts')
-      .select('id, business_id, withholding_slip_document_id, accountant_checked_at, accountant_checked_by')
+      .select('id, business_id, accountant_checked_at, accountant_checked_by')
       .eq('id', req.params.id).eq('business_id', biz.business.id).limit(1);
     if (rErr && TARGETS.isMissingColumn(rErr)) return res.status(409).json({ error: 'migration_not_applied', migration: '061' });
     if (rErr) return res.status(500).json({ error: rErr.message });
     const before = rows?.[0];
     if (!before) return res.status(404).json({ error: 'Debt not found' });
 
-    if (slipId) {
-      const { data: docs } = await supabase.from('financial_documents')
-        .select('id, business_id, document_type, archived_at')
-        .eq('id', slipId).eq('business_id', biz.business.id).limit(1);
-      const problem = CHECKLIST.slipProblem(docs?.[0], biz.business.id);
-      if (problem) return res.status(problem === 'document_not_found_in_this_business' ? 404 : 400).json({ error: problem });
-    }
-
     const { data, error } = await supabase.from('debts').update(patch)
       .eq('id', before.id).eq('business_id', biz.business.id)
-      .select('id, withholding_slip_document_id, accountant_checked_at, accountant_checked_by').single();
+      .select('id, accountant_checked_at, accountant_checked_by').single();
     if (error && TARGETS.isMissingColumn(error)) return res.status(409).json({ error: 'migration_not_applied', migration: '061' });
     if (error) return res.status(500).json({ error: error.message });
 
-    const pick = (r) => ({ withholding_slip_document_id: r.withholding_slip_document_id ?? null,
-      accountant_checked_at: r.accountant_checked_at ?? null, accountant_checked_by: r.accountant_checked_by ?? null });
+    const pick = (r) => ({ accountant_checked_at: r.accountant_checked_at ?? null, accountant_checked_by: r.accountant_checked_by ?? null });
     await recordAudit({
       businessId: biz.business.id, actorUserId: req.user.userId, actorRole: biz.role,
       entityType: 'debt', entityId: before.id, action: 'debt_checklist_updated',
       before: pick(before), after: pick(data),
     });
     res.json({ id: data.id, checklist: pick(data) });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── GET /api/withholding-slips — read-only: withholding records and their slips ──────
+// Design v2 P-05 option B: the bill checklist and the Accountant "Tax slips to make"
+// counter read the bukti potong from withholding_records.bukti_potong_document_id
+// (migration 031). Business-scoped, finance roles only, READ-ONLY. If the table is absent
+// the answer is an empty map with available:false, so the screens keep their old state.
+app.get('/api/withholding-slips', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (biz.business?.type === 'personal')
+      return res.status(403).json({ error: 'business_workspace_required' });
+    if (!canViewBusinessFinance(biz.role))
+      return res.status(403).json({ error: 'Your role does not allow viewing withholding records' });
+    const { data, error } = await supabase.from('withholding_records')
+      .select('id, debt_id, status, tax_type, withholding_amount, bukti_potong_document_id')
+      .eq('business_id', biz.business.id).not('debt_id', 'is', null).limit(2000);
+    if (error) return res.json({ by_debt: {}, available: false });
+    res.json({ by_debt: CHECKLIST.slipsByDebt(data), available: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 

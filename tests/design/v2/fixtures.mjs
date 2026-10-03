@@ -12,10 +12,9 @@ export const debts = [
   { id: 'd5', type: 'payable', counterparty: 'Small Vendor', description: 'Cleaning cloths', amount: 350000, remaining_amount: 350000, original_amount: 350000, paid_amount: 0, due_date: iso(9), status: 'open', approval_status: 'approved', currency: 'IDR', created_at: iso(-2) },
   { id: 'd6', type: 'payable', counterparty: 'Tax office (PPh 23)', description: 'Withholding', amount: 710000, remaining_amount: 710000, original_amount: 710000, paid_amount: 0, due_date: iso(12), status: 'open', approval_status: 'approved', currency: 'IDR', created_at: iso(-1) },
   { id: 'd7', type: 'payable', counterparty: 'PT Contractor Demo', description: 'Site repair', amount: 22600000, remaining_amount: 22600000, original_amount: 22600000, paid_amount: 0, due_date: iso(18), status: 'open', approval_status: 'approved', currency: 'IDR', created_at: iso(-3) },
-].map((d) => ({ withholding_slip_document_id: null, accountant_checked_at: null, accountant_checked_by: null, ...d }))
-// P-05 marks (migration 061) on two bills, so Bill detail and Accountant show both states.
+].map((d) => ({ accountant_checked_at: null, accountant_checked_by: null, ...d }))
+// P-05 accountant check (migration 061) on one bill; d7's slip comes from /withholding-slips.
 Object.assign(debts.find((d) => d.id === 'd3'), { accountant_checked_at: iso(-1) + 'T09:00:00Z', accountant_checked_by: 2 })
-Object.assign(debts.find((d) => d.id === 'd7'), { withholding_slip_document_id: 'doc3' })
 
 export const recentTxs = [
   { id: 't1', type: 'income', description: 'Client payment', amount_original: 9200000, currency_original: 'IDR', transaction_date: iso(-1) },
@@ -74,7 +73,9 @@ export const routes = {
   'PATCH /api/business/targets': () => ({ available: true, can_edit: true, targets: { runway_target_days: 75, min_cash_idr: '50000000', weekly_brief_cron: '0 8 * * 1', weekly_brief: { day: 1, hour: 8, minute: 0 }, default_runway_target_days: 60 } }),
   'GET /api/counterparties/:id': (u) => ({ counterparty: counterparties.find((c) => u.pathname.endsWith('/' + c.id)) || counterparties[0] }),
   'PATCH /api/counterparties/:id': (u) => ({ counterparty: counterparties.find((c) => u.pathname.endsWith('/' + c.id)) || counterparties[0] }),
-  'PATCH /api/debts/:id/checklist': () => ({ id: 'd1', checklist: { withholding_slip_document_id: null, accountant_checked_at: null, accountant_checked_by: null } }),
+  'PATCH /api/debts/:id/checklist': () => ({ id: 'd1', checklist: { accountant_checked_at: null, accountant_checked_by: null } }),
+  // P-05 option B: the slip comes from withholding_records (031).
+  'GET /api/withholding-slips': () => ({ available: true, by_debt: { d7: { slip_document_id: 'doc3', records: [{ id: 'w1', status: 'reported', bukti_potong_document_id: 'doc3' }] } } }),
   'GET /api/workspaces': () => workspaces,
   'PATCH /api/workspace-preferences': () => ({ ok: true }),
   'GET /api/admin/status': () => ({ is_admin: true }),

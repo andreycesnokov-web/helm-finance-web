@@ -64,7 +64,7 @@ Format: what · fields · why · risk · what the UI does meanwhile.
 
 ## P-05 · Bill document checklist status (batch 3)
 
-> **Approved → batch 8.** Migration `061_bill_checklist_status.sql` (+ isolation trigger); `PATCH /api/debts/:id/checklist`; accountant role and above; audited.
+> **Approved → batch 8, reworked to option B (DECISIONS.md, final decisions item 1).** Migration `061_bill_checklist_status.sql` adds only `accountant_checked_at/by`; `PATCH /api/debts/:id/checklist` (accountant role and above, audited). The slip is **not** a debts column: it is read from `withholding_records.bukti_potong_document_id` (031) through the read-only `GET /api/withholding-slips`.
 
 - **What:** per-bill status for the withholding slip (bukti potong) and the accountant check.
 - **Fields:** `debts.withholding_slip_document_id uuid null`, `debts.accountant_checked_at

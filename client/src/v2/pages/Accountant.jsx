@@ -173,7 +173,8 @@ function PackagesTab({ month }) {
   const rules = useApi('/accountant/rules')
   // A slip is expected only when the verified engine has a withholding rate (as on Bill detail).
   const slipNeeded = findWithholdingRule(rules.data?.rules || [])?.rate != null
-  const rows = useMemo(() => packages({ month, slipNeeded, transactions: Array.isArray(tx.data) ? tx.data : [], debts: Array.isArray(debts.data) ? debts.data : [] }), [month, tx.data, debts.data, slipNeeded])
+  const slips = useApi('/withholding-slips')
+  const rows = useMemo(() => packages({ month, slipNeeded, slips: slips.data, transactions: Array.isArray(tx.data) ? tx.data : [], debts: Array.isArray(debts.data) ? debts.data : [] }), [month, tx.data, debts.data, slipNeeded, slips.data])
   if (tx.loading || debts.loading) return <Card><Skeleton rows={6} /></Card>
   if (tx.error) return <ErrorBox error={tx.error} onRetry={tx.reload} />
   const s = packageSummary(rows)

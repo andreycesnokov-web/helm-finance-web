@@ -202,9 +202,9 @@ The answers are in `DECISIONS.md`, which overrides section 5.
   - Migration 060 adds entity form and payment terms. The `landlord` and `lender` roles are application roles.
   - They are written through the existing POST and PATCH `/api/counterparties`. Setting the tax fields needs the accountant role or above.
   - New v2 edit route: `/business/counterparties/:id/edit`.
-- **P-05: bill checklist.**
-  - Migration 061 adds the withholding slip and the accountant check, with an isolation trigger.
-  - Written with `PATCH /api/debts/:id/checklist`, which needs the accountant role or above and is audited.
+- **P-05: bill checklist (option B, batch 8.1).**
+  - Migration 061 adds only the accountant check. The withholding slip is read from `withholding_records.bukti_potong_document_id` (031) with the read-only `GET /api/withholding-slips`.
+  - The check is written with `PATCH /api/debts/:id/checklist`, which needs the accountant role or above and is audited.
   - `POST /api/debts` now strips these fields from the body it spreads.
   - The marks show in Bill detail and in the Accountant packages.
 - **P-10.** `P10_TEMPLATE.md` is ready for owner review. There is no migration yet.

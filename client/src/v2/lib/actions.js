@@ -10,7 +10,8 @@
 //   POST  /api/counterparties          existing create; the server refuses likely duplicates (409)
 //   PATCH /api/counterparties/:id      existing edit — batch 8 uses it for entity form, role, terms (P-04)
 //   PATCH /api/business/targets        NEW in batch 8 — runway target, minimum cash, weekly brief (P-01, P-08)
-//   PATCH /api/debts/:id/checklist     NEW in batch 8 — withholding slip, accountant check (P-05)
+//   PATCH /api/debts/:id/checklist     NEW in batch 8 — accountant check only (P-05 option B: the
+//                                      withholding slip lives in withholding_records and is read-only here)
 //
 // Before the owner applies migrations 058–061 the server answers 409 migration_not_applied
 // for the batch-8 writes; the screens say so instead of failing silently.

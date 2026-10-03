@@ -38,15 +38,23 @@ t('GET /api/business/targets: finance roles only, Personal refused, works before
   assert.ok(/available/.test(h));
 });
 
-t('PATCH /api/debts/:id/checklist: business-scoped, role, slip verified in this business, audit', () => {
+t('PATCH /api/debts/:id/checklist: business-scoped, role, audit; option B — no slip write', () => {
   const h = handler('patch', '/api/debts/:id/checklist');
   assert.ok(h.includes('CHECKLIST.canEditChecklist(biz.role)'));
   assert.ok(/from\('debts'\)[\s\S]*\.eq\('business_id', biz\.business\.id\)/.test(h));
-  assert.ok(/from\('financial_documents'\)[\s\S]*\.eq\('business_id', biz\.business\.id\)/.test(h));
-  assert.ok(h.includes('CHECKLIST.slipProblem'));
   assert.ok(/recordAudit\([\s\S]*debt_checklist_updated/.test(h));
+  assert.ok(!/withholding_slip_document_id/.test(h), 'no slip column written');
   assert.ok(!/status:\s*'paid'|approval_status|settle/.test(h.replace(/^\s*\/\/.*$/gm, '')), 'never pays, settles or approves');
   assert.ok(h.includes("{ userId: req.user.userId }"), 'actor from the token');
+});
+
+t('GET /api/withholding-slips: read-only, business-scoped, finance roles, Personal refused', () => {
+  const h = handler('get', '/api/withholding-slips');
+  assert.ok(h.includes('canViewBusinessFinance(biz.role)'));
+  assert.ok(h.includes('business_workspace_required'));
+  assert.ok(/from\('withholding_records'\)[\s\S]*\.eq\('business_id', biz\.business\.id\)/.test(h));
+  assert.ok(!/\.(insert|update|delete|upsert)\(/.test(h), 'read-only');
+  assert.ok(!/withholding_slip_document_id/.test(src), 'option B: the removed column is not referenced anywhere on the server');
 });
 
 t('POST /api/debts strips the checklist fields from the spread body', () => {

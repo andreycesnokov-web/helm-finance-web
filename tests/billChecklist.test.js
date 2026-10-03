@@ -1,4 +1,4 @@
-// Bill document checklist (Design v2 P-05). Pure validation and shaping.
+// Bill checklist (Design v2 P-05, option B). Pure validation and shaping.
 // Run: node tests/billChecklist.test.js
 const assert = require('node:assert');
 const C = require('../server/lib/billChecklist');
@@ -6,8 +6,6 @@ const C = require('../server/lib/billChecklist');
 let pass = 0, fail = 0;
 const t = (name, fn) => { try { fn(); pass++; console.log(`  ok  ${name}`); } catch (e) { fail++; console.log(`  XX  ${name}\n      ${e.message}`); } };
 console.log('\nBill checklist');
-const BIZ = '11111111-1111-4111-8111-111111111111';
-const DOC = 'aaaaaaaa-0000-4000-8000-0000000000d1';
 
 t('accountant role and above may edit; manager / employee / auditor may not', () => {
   for (const r of ['owner', 'ceo', 'admin', 'cfo', 'accountant']) assert.ok(C.canEditChecklist(r), r);
@@ -29,12 +27,9 @@ t('who is always the authenticated actor, never the body', () => {
   assert.strictEqual(C.checklistPatchFromBody({ accountant_checked: true }, {}).error, 'actor_required');
 });
 
-t('slip id must be a uuid; null clears; caller is told to verify it', () => {
-  const r = C.checklistPatchFromBody({ withholding_slip_document_id: DOC }, { userId: 1 });
-  assert.deepStrictEqual([r.patch, r.slipId], [{ withholding_slip_document_id: DOC }, DOC]);
-  const c = C.checklistPatchFromBody({ withholding_slip_document_id: null }, { userId: 1 });
-  assert.deepStrictEqual([c.patch, c.slipId], [{ withholding_slip_document_id: null }, null]);
-  for (const bad of ['x', 123, "'; drop table debts; --", {}]) assert.strictEqual(C.checklistPatchFromBody({ withholding_slip_document_id: bad }).error, 'invalid_withholding_slip_document_id');
+t('option B: the slip cannot be written through the checklist', () => {
+  assert.strictEqual(C.checklistPatchFromBody({ withholding_slip_document_id: 'aaaaaaaa-0000-4000-8000-000000000001' }, { userId: 1 }).error, 'no_checklist_fields');
+  assert.ok(!C.COLUMNS.includes('withholding_slip_document_id'));
 });
 
 t('a non-boolean check flag and an empty body are rejected', () => {
@@ -43,17 +38,23 @@ t('a non-boolean check flag and an empty body are rejected', () => {
   assert.strictEqual(C.checklistPatchFromBody({ status: 'paid', approval_status: 'approved' }, { userId: 1 }).error, 'no_checklist_fields', 'cannot be used to settle or approve');
 });
 
-t('slip document: same business, not archived, a bukti potong', () => {
-  assert.strictEqual(C.slipProblem({ business_id: BIZ, document_type: 'bukti_potong' }, BIZ), null);
-  assert.strictEqual(C.slipProblem({ business_id: 'other', document_type: 'bukti_potong' }, BIZ), 'document_not_found_in_this_business');
-  assert.strictEqual(C.slipProblem(null, BIZ), 'document_not_found_in_this_business');
-  assert.strictEqual(C.slipProblem({ business_id: BIZ, document_type: 'bukti_potong', archived_at: '2026-01-01' }, BIZ), 'document_archived');
-  assert.strictEqual(C.slipProblem({ business_id: BIZ, document_type: 'vendor_invoice' }, BIZ), 'document_is_not_a_withholding_slip');
+t('POST /api/debts body loses the checklist fields, keeps the rest', () => {
+  const out = C.withoutChecklistFields({ amount: 5, counterparty: 'X', accountant_checked_at: 'now', accountant_checked_by: 1 });
+  assert.deepStrictEqual(out, { amount: 5, counterparty: 'X' });
 });
 
-t('POST /api/debts body loses the checklist fields, keeps the rest', () => {
-  const out = C.withoutChecklistFields({ amount: 5, counterparty: 'X', withholding_slip_document_id: DOC, accountant_checked_at: 'now', accountant_checked_by: 1 });
-  assert.deepStrictEqual(out, { amount: 5, counterparty: 'X' });
+t('slips by debt: from withholding_records, first slip wins, records kept', () => {
+  const m = C.slipsByDebt([
+    { id: 'w1', debt_id: 7, status: 'suggested', withholding_amount: 10, bukti_potong_document_id: null },
+    { id: 'w2', debt_id: 7, status: 'reported', withholding_amount: 5, bukti_potong_document_id: 'doc9' },
+    { id: 'w3', debt_id: 8, status: 'suggested', bukti_potong_document_id: null },
+    { id: 'w4', debt_id: null, bukti_potong_document_id: 'docX' },
+  ]);
+  assert.deepStrictEqual(Object.keys(m).sort(), ['7', '8']);
+  assert.strictEqual(m['7'].slip_document_id, 'doc9');
+  assert.strictEqual(m['7'].records.length, 2);
+  assert.strictEqual(m['8'].slip_document_id, null);
+  assert.deepStrictEqual(C.slipsByDebt(null), {});
 });
 
 console.log(`\n${pass} passed, ${fail} failed`);

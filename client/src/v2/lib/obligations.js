@@ -220,15 +220,18 @@ export function latestPayrollRun(overview) {
 /**
  * Bill detail checklist (designs/BillDetail.dc.html): invoice, payment proof, withholding
  * slip (only when the verified engine computed a withholding) and accountant check.
- * The slip and check are P-05 marks (migration 061); before 061 they are `unknown` and
- * never claimed done. `editable` rows may be set through PATCH /api/debts/:id/checklist.
+ *   slip   read from withholding_records.bukti_potong_document_id (migration 031, via
+ *          GET /api/withholding-slips) — `slips` is { available, by_debt }. Read-only here.
+ *   check  the P-05 mark (migration 061); before 061 it is `unknown`, never claimed done.
  */
-export function billChecklistItems(d, { hasInvoice = false, paid = false, slipNeeded = false } = {}) {
-  const tracked = !!d && Object.prototype.hasOwnProperty.call(d, 'accountant_checked_at')
+export function billChecklistItems(d, { hasInvoice = false, paid = false, slipNeeded = false, slips = null } = {}) {
+  const checkTracked = !!d && Object.prototype.hasOwnProperty.call(d, 'accountant_checked_at')
+  const slipTracked = slips?.available === true
+  const slipDoc = slipTracked ? slips.by_debt?.[String(d?.id)]?.slip_document_id || null : null
   return [
     { key: 'invoice', done: !!hasInvoice, link: hasInvoice ? '/business/documents' : null },
     { key: 'proof', done: !!paid && !!(d?.linked_transaction_id || d?.last_payment_at) },
-    ...(slipNeeded ? [{ key: 'slip', done: tracked && !!d.withholding_slip_document_id, unknown: !tracked, editable: tracked }] : []),
-    { key: 'check', done: tracked && !!d.accountant_checked_at, unknown: !tracked, editable: tracked },
+    ...(slipNeeded ? [{ key: 'slip', done: !!slipDoc, unknown: !slipTracked, documentId: slipDoc }] : []),
+    { key: 'check', done: checkTracked && !!d.accountant_checked_at, unknown: !checkTracked, editable: checkTracked },
   ]
 }

@@ -136,11 +136,13 @@ t('payroll: latest period, PPh 21 only when recorded', () => {
   assert.strictEqual(latestPayrollRun({ payments: [] }), null)
 })
 
-t('bill checklist: P-05 rows unknown before 061, from stored marks after (never claimed)', () => {
+t('bill checklist: slip read from withholding_records, check from 061, never claimed', () => {
   const before = billChecklistItems({ id: 1, status: 'open' }, { hasInvoice: true, slipNeeded: true })
   assert.deepStrictEqual(before.map((c) => [c.key, c.done, !!c.unknown]), [['invoice', true, false], ['proof', false, false], ['slip', false, true], ['check', false, true]])
-  const after = billChecklistItems({ id: 1, status: 'paid', last_payment_at: 'x', withholding_slip_document_id: 'd', accountant_checked_at: null }, { paid: true, slipNeeded: true })
-  assert.deepStrictEqual(after.map((c) => [c.key, c.done, !!c.editable]), [['invoice', false, false], ['proof', true, false], ['slip', true, true], ['check', false, true]])
+  const slips = { available: true, by_debt: { 1: { slip_document_id: 'd' } } }
+  const after = billChecklistItems({ id: 1, status: 'paid', last_payment_at: 'x', accountant_checked_at: null }, { paid: true, slipNeeded: true, slips })
+  assert.deepStrictEqual(after.map((c) => [c.key, c.done, !!c.editable]), [['invoice', false, false], ['proof', true, false], ['slip', true, false], ['check', false, true]])
+  assert.strictEqual(after.find((c) => c.key === 'slip').documentId, 'd')
   assert.ok(!billChecklistItems({ accountant_checked_at: null }, { slipNeeded: false }).some((c) => c.key === 'slip'), 'no slip without an engine withholding')
 })
 

@@ -57,16 +57,17 @@ export function closeReadiness({ month, transactions = [], debts = [], batches =
  * Documents by transaction: one row per bill/invoice and per uncategorised transaction of
  * the month, with the package it needs. Only what the records carry is marked done.
  *
- * P-05 (migration 061): once the debt rows carry `accountant_checked_at`, bills also show
+ * P-05:
  *   slip   the withholding slip — only for IDR supplier bills when the verified engine has a
- *          withholding rate (`slipNeeded`, the same test Bill detail uses)
- *   check  "checked by an accountant" — a review mark, not a document: an unchecked bill is
- *          'open', never 'missing'
- * Before 061 the slip is "not tracked here yet" and there is no check item.
+ *          withholding rate (`slipNeeded`, the same test Bill detail uses). Read from
+ *          withholding_records (migration 031) via `slips` = { available, by_debt }; while
+ *          that read is unavailable the slip is "not tracked here yet".
+ *   check  "checked by an accountant" (migration 061) — a review mark, not a document: an
+ *          unchecked bill is 'open', never 'missing'. Before 061 there is no check item.
  */
 export const checklistTracked = (d) => !!d && Object.prototype.hasOwnProperty.call(d, 'accountant_checked_at')
 
-export function packages({ month, transactions = [], debts = [], slipNeeded = false }) {
+export function packages({ month, transactions = [], debts = [], slipNeeded = false, slips = null }) {
   const rows = []
   for (const d of debts) {
     if (d.is_training === true || d.status === 'cancelled' || !inMonth(d.due_date || d.created_at, month)) continue
@@ -78,7 +79,7 @@ export function packages({ month, transactions = [], debts = [], slipNeeded = fa
     ]
     const tracked = checklistTracked(d)
     if (pay && slipNeeded && (d.currency || 'IDR') === 'IDR')
-      items.push(tracked ? { key: 'slip', done: !!d.withholding_slip_document_id } : { key: 'slip', unknown: true })
+      items.push(slips?.available === true ? { key: 'slip', done: !!slips.by_debt?.[String(d.id)]?.slip_document_id } : { key: 'slip', unknown: true })
     if (tracked) items.push({ key: 'check', done: !!d.accountant_checked_at, review: true })
     const missing = items.filter((i) => !i.done && !i.pending && !i.unknown && !i.review).length
     rows.push({ key: `debt:${d.id}`, id: d.id, kind: pay ? 'out' : 'in', date: d.due_date || String(d.created_at || '').slice(0, 10),
