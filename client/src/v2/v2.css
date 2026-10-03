@@ -834,3 +834,7 @@ button.v2-addbtn { border: 0; font: inherit; text-align: left; width: 100%; }
 button.v2-addbtn:disabled { height: auto; min-height: var(--touch-min); padding: 8px 14px; flex-direction: column; align-items: flex-start; justify-content: center; gap: 2px; }
 button.v2-addbtn:disabled .v2-addbtn-hint { white-space: normal; }
 .v2-locked { display: flex; gap: var(--space-3); align-items: flex-start; padding: var(--space-5); }
+
+/* Two actions in one bills row (late invoice: Mark received + Coming soon reminder) */
+.v2-btnpair { display: inline-flex; flex-wrap: wrap; gap: var(--space-2); justify-content: flex-end; }
+.v2-stack { display: flex; flex-direction: column; gap: 2px; }

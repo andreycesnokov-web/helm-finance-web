@@ -14,6 +14,7 @@ export default {
   },
   badge: { late: '{n} terlambat' },
   shell: {
+    skip: 'Lewati ke konten', 
     crash: 'Terjadi kesalahan di layar ini. Data Anda aman.',
     brand: 'CFO AI', notifications: 'Notifikasi', openMore: 'Buka menu ruang kerja',
     switchHint: 'Ganti perusahaan atau ke Pribadi', company: 'Perusahaan', personal: 'Pribadi',
@@ -57,7 +58,7 @@ export default {
     dec: {
       approveBill: 'Setujui tagihan · {who}', approveInvoice: 'Setujui faktur · {who}', due: 'jatuh tempo {d}',
       review: 'Tinjau', approve: 'Setujui', late: '{who} terlambat {n} hari', wasDue: 'jatuh tempo {d}',
-      remind: 'Kirim pengingat', openInvoice: 'Buka faktur', tax: '{what} untuk {period}', taxMeta: 'Pajak · bayar sebelum {d} · sisa {n} hari', prepare: 'Siapkan',
+      remind: 'Kirim pengingat', openInvoice: 'Buka faktur', tax: '{what} untuk {period}', taxOverdue: 'Pajak · jatuh tempo {d} · terlambat {n} hari', taxMeta: 'Pajak · bayar sebelum {d} · sisa {n} hari', prepare: 'Siapkan',
     },
     next7: '7 hari ke depan', fullForecast: 'Proyeksi lengkap', comingIn: 'Masuk', goingOut: 'Keluar',
     dayToDay: 'termasuk harian ≈ {v}', noNext: 'Tidak ada pembayaran terjadwal dalam 7 hari.', cashOn: 'Kas pada {d}',
@@ -96,7 +97,7 @@ export default {
     pendingNote: '{k} menunggu persetujuan ({sum}) ditampilkan tetapi tidak masuk garis', notCounted: 'tidak dihitung', showAll: 'Tampilkan semua {m}',
   },
   dec: {
-    reject: 'Tolak', ask: 'Minta rincian', approve: 'Setujui', cancel: 'Batal', send: 'Kirim', confirmReject: 'Tolak',
+    ownItem: 'Anda yang mengajukan ini, jadi orang lain yang menyetujui. Pemilik atau CEO boleh menyetujui miliknya sendiri.', reject: 'Tolak', ask: 'Minta rincian', approve: 'Setujui', cancel: 'Batal', send: 'Kirim', confirmReject: 'Tolak',
     reasonLabel: 'Mengapa ditolak?', reasonPh: 'mis. bukan biaya usaha', askLabel: 'Apa yang perlu diketahui?', askPh: 'mis. lampirkan fakturnya',
     forbidden: 'Peran Anda hanya bisa mengajukan. Pemilik, admin, atau CFO yang memutuskan.',
     done: { approve: 'Disetujui. Belum ada yang dibayar sampai seseorang membayarnya.', reject: 'Ditolak.', ask: 'Pertanyaan terkirim.' },
@@ -195,7 +196,7 @@ export default {
   },
   acc: {
     sub: 'Di mana uang perusahaan saat ini', import: 'Impor mutasi', add: 'Tambah rekening', total: 'Total kas · {n} rekening',
-    personalNote: 'Uang pribadi disimpan di ruang kerja Pribadi dan tidak pernah dihitung di sini.', shareLabel: 'Kas per rekening: {list}',
+    labelledPersonal: 'Ditandai pribadi', labelledNote: '{n} rekening milik perusahaan ini ditandai pribadi. Tetap dihitung sebagai milik perusahaan seperti sebelumnya; tanyakan ke akuntan apakah tandanya atau pemiliknya yang salah.', personalNote: 'Uang pribadi disimpan di ruang kerja Pribadi dan tidak pernah dihitung di sini.', shareLabel: 'Kas per rekening: {list}',
     kind: { bank: 'Rekening bank', cash: 'Kas tunai', ewallet: 'Dompet digital', card: 'Kartu', gateway: 'Payment gateway', other: 'Rekening' },
     statementOn: 'Mutasi diimpor {d}', toReview: 'baris perlu ditinjau', noStatement: 'Belum ada mutasi diimpor', upload: 'Unggah mutasi', manual: 'Diperbarui manual',
     more: 'Rincian {name}', otherCcy: 'Rekening mata uang lain ditampilkan tetapi tidak dijumlahkan ke total IDR.',
@@ -455,7 +456,8 @@ export default {
     plans: 'Paket', plansNote: 'Harga masih sementara sampai penagihan diatur.',
     plan: { free: 'Free', founder: 'Founder', starter: 'Starter', business: 'Business', pro: 'Pro', enterprise: 'Enterprise', trial: 'Coba' },
     needsYou: 'Perlu Anda', all: 'Semua', tone: { crit: 'Gagal', warn: 'Pantau', good: 'Sehat' },
-    need: { dbDegraded: 'Basis data tidak terjangkau atau metrik habis waktu', trialsEnding: '{n} masa coba berakhir minggu ini', noLogin: '{n} pengguna tanpa metode login', allGood: 'Tidak ada yang perlu Anda saat ini' },
+    need: { warn: { dbError: '{what} tidak bisa dibaca (kesalahan basis data)', timeout: 'Sebagian angka dasbor habis waktu dan tidak ada', cap: 'Sebagian angka mencapai batas aman dan merupakan perkiraan', inconsistent: 'Sebagian hitungan identitas tidak cocok dan tidak ditampilkan', other: 'Server melaporkan masalah pada sebuah angka' }, dbDegraded: 'Basis data tidak terjangkau atau metrik habis waktu', trialsEnding: '{n} masa coba berakhir minggu ini', noLogin: '{n} pengguna tanpa metode login', allGood: 'Tidak ada yang perlu Anda saat ini' },
+    partial: 'Hitungan mencakup {n} pertama dari {m} ruang kerja', found: '{n} ditemukan untuk “{q}”', payments: 'Koneksi pembayaran', 
     companiesSub: '{n} ruang kerja · {c} perusahaan dan {p} hanya pribadi', filter: 'Saring perusahaan', search: 'Cari perusahaan atau kode',
     f: { all: 'Semua · {n}', paying: 'Berbayar · {n}', trial: 'Coba · {n}', attention: 'Perlu perhatian · {n}' },
     col: { company: 'Perusahaan', plan: 'Paket', setup: 'Penyiapan', last: 'Aktif terakhir', status: 'Status' },

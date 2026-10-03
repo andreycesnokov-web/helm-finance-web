@@ -14,6 +14,7 @@ export default {
   },
   badge: { late: '{n} late' },
   shell: {
+    skip: 'Skip to content', 
     crash: 'Something went wrong on this screen. Your data is safe.',
     brand: 'CFO AI', notifications: 'Notifications', openMore: 'Open workspace menu',
     switchHint: 'Switch company or go to Personal', company: 'Company', personal: 'Personal',
@@ -57,7 +58,7 @@ export default {
     dec: {
       approveBill: 'Approve bill · {who}', approveInvoice: 'Approve invoice · {who}', due: 'due {d}',
       review: 'Review', approve: 'Approve', late: '{who} is {n} days late', wasDue: 'was due {d}',
-      remind: 'Send reminder', openInvoice: 'Open invoice', tax: '{what} for {period}', taxMeta: 'Tax · pay by {d} · {n} days left', prepare: 'Prepare',
+      remind: 'Send reminder', openInvoice: 'Open invoice', tax: '{what} for {period}', taxOverdue: 'Tax · was due {d} · {n} days overdue', taxMeta: 'Tax · pay by {d} · {n} days left', prepare: 'Prepare',
     },
     next7: 'Next 7 days', fullForecast: 'Full forecast', comingIn: 'Coming in', goingOut: 'Going out',
     dayToDay: 'incl. day-to-day ≈ {v}', noNext: 'No dated payments in the next 7 days.', cashOn: 'Cash on {d}',
@@ -96,7 +97,7 @@ export default {
     pendingNote: '{k} waiting for approval ({sum}) are listed but not in the line', notCounted: 'not counted', showAll: 'Show all {m}',
   },
   dec: {
-    reject: 'Reject', ask: 'Ask for details', approve: 'Approve', cancel: 'Cancel', send: 'Send', confirmReject: 'Reject',
+    ownItem: 'You submitted this, so someone else approves it. The owner or CEO may approve their own.', reject: 'Reject', ask: 'Ask for details', approve: 'Approve', cancel: 'Cancel', send: 'Send', confirmReject: 'Reject',
     reasonLabel: 'Why are you rejecting it?', reasonPh: 'e.g. not a business expense', askLabel: 'What do you need to know?', askPh: 'e.g. please attach the invoice',
     forbidden: 'Your role can submit but not decide. An owner, admin or CFO decides.',
     done: { approve: 'Approved. Nothing is paid until someone pays it.', reject: 'Rejected.', ask: 'Question sent.' },
@@ -195,7 +196,7 @@ export default {
   },
   acc: {
     sub: 'Where the company’s money is right now', import: 'Import statement', add: 'Add account', total: 'Total cash · {n} accounts',
-    personalNote: 'Personal money is kept in your Personal workspace and is never counted here.', shareLabel: 'Cash by account: {list}',
+    labelledPersonal: 'Labelled personal', labelledNote: '{n} of these accounts belong to this company but are labelled personal. They are counted as the company’s, as before; ask your accountant whether the label or the owner is wrong.', personalNote: 'Personal money is kept in your Personal workspace and is never counted here.', shareLabel: 'Cash by account: {list}',
     kind: { bank: 'Bank account', cash: 'Cash', ewallet: 'E-wallet', card: 'Card', gateway: 'Payment gateway', other: 'Account' },
     statementOn: 'Statement imported {d}', toReview: 'lines to review', noStatement: 'No statement imported yet', upload: 'Upload statement', manual: 'Updated by hand',
     more: 'Details for {name}', otherCcy: 'Accounts in other currencies are listed but not added to the IDR total.',
@@ -455,7 +456,8 @@ export default {
     plans: 'Plans', plansNote: 'Prices are placeholders until billing is set.',
     plan: { free: 'Free', founder: 'Founder', starter: 'Starter', business: 'Business', pro: 'Pro', enterprise: 'Enterprise', trial: 'Trial' },
     needsYou: 'Needs you', all: 'All', tone: { crit: 'Failing', warn: 'Watch', good: 'Healthy' },
-    need: { dbDegraded: 'Database unreachable or metrics timed out', trialsEnding: '{n} trials end this week', noLogin: '{n} users have no login method', allGood: 'Nothing needs you right now' },
+    need: { warn: { dbError: '{what} could not be read (database error)', timeout: 'Some dashboard figures timed out and are missing', cap: 'Some figures hit the safety limit and are approximate', inconsistent: 'Some identity counts did not add up and are not shown', other: 'The server reported a problem with a figure' }, dbDegraded: 'Database unreachable or metrics timed out', trialsEnding: '{n} trials end this week', noLogin: '{n} users have no login method', allGood: 'Nothing needs you right now' },
+    partial: 'Counts cover the first {n} of {m} workspaces', found: '{n} found for “{q}”', payments: 'Payment connections', 
     companiesSub: '{n} workspaces · {c} companies and {p} personal-only', filter: 'Filter companies', search: 'Search company or code',
     f: { all: 'All · {n}', paying: 'Paying · {n}', trial: 'Trial · {n}', attention: 'Needs attention · {n}' },
     col: { company: 'Company', plan: 'Plan', setup: 'Setup', last: 'Last active', status: 'Status' },

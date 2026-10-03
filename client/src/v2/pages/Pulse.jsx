@@ -59,7 +59,9 @@ function DecisionRow({ d, t, lang }) {
       <span className="v2-dec-ic v2-tone-warn" aria-hidden="true"><I.warn /></span>
       <div className="v2-dec-text">
         <span className="v2-dec-title">{t('pulse.dec.tax', { what: d.label, period: d.period })}</span>
-        <span className="v2-dec-meta">{t('pulse.dec.taxMeta', { d: shortDate(d.due_date, lang), n: Math.max(0, d.days) })}</span>
+        <span className={`v2-dec-meta${d.overdue ? ' v2-neg' : ''}`}>{d.overdue
+          ? t('pulse.dec.taxOverdue', { d: shortDate(d.due_date, lang), n: -d.days })
+          : t('pulse.dec.taxMeta', { d: shortDate(d.due_date, lang), n: d.days })}</span>
       </div>
       <span className="v2-dec-amt v2-num">{money(d.amount)}</span>
       <div className="v2-dec-actions"><Btn to="/business/accountant">{t('pulse.dec.prepare')}</Btn></div>

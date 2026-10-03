@@ -31,17 +31,24 @@ export function TagPill({ it }) {
   return <Pill tone={TAG_TONE[it.tag] || 'neutral'}>{text}</Pill>
 }
 
+// "Show all" opens the list the shown items come from (upcoming invoices and bills),
+// matching the In / Out filter — not past transactions.
+export const SHOW_ALL = { in: '/business/receivables', out: '/business/payables', all: '/business/invoices' }
+
 export default function Radar() {
   const t = useT()
   const lang = useLang()
-  const { hasFeature } = useAccess()
+  const { hasFeature, loading: accessLoading } = useAccess()
   const pulse = useApi('/pulse?scope=business')
   const obl = useApi('/accountant/obligations')
   const fund = useApi('/business-funding') // P-03: loan repayments land on Radar
-  const [horizon, setHorizon] = useState(DEFAULT_HORIZON)
+  const [picked, setHorizon] = useState(DEFAULT_HORIZON)
   const [scenario, setScenario] = useState({ kind: 'worst' })
   const [filter, setFilter] = useState('all')
-  const advanced = hasFeature('advanced_radar_enabled')
+  // hasFeature fails open while the plan is loading, so the longer horizons wait for it, and a
+  // horizon picked earlier falls back to 30 days when the plan does not include it.
+  const advanced = !accessLoading && hasFeature('advanced_radar_enabled')
+  const horizon = advanced ? picked : DEFAULT_HORIZON
   const { openAsk } = useAsk()
   useAskContext(t('nav.radar'), t('radar.days', { n: horizon }))
 
@@ -198,7 +205,7 @@ export default function Radar() {
             {kd.hiddenCount > 0 && ` · ${t('radar.hidden', { k: kd.hiddenCount, min: money(KEY_DATE_MIN_IDR), sum: money(kd.hiddenSum) })}`}
             {model.excluded.foreign > 0 && ` · ${t('radar.foreign', { k: model.excluded.foreign })}`}
             {model.pending.count > 0 && ` · ${t('radar.pendingNote', { k: model.pending.count, sum: money(model.pending.sum) })}`}</span>
-          <Link to="/business/transactions">{t('radar.showAll', { m: kd.total })}</Link>
+          <Link to={SHOW_ALL[filter] || SHOW_ALL.all}>{t('radar.showAll', { m: kd.total })}</Link>
         </div>
       </Card>
     </div>

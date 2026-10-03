@@ -17,7 +17,7 @@ import { PageHead, Card, Pill, Btn, NotYet, Skeleton, ErrorBox, Empty } from '..
 import { useT, useLang } from '../i18n'
 import { useApi } from '../data'
 import { money, shortDate } from '../lib/format'
-import { monthOptions, defaultCloseMonth, closeReadiness, packages, packageSummary, monthGrid, complianceEvents, eventStage } from '../lib/accounting'
+import { monthOptions, accountantMonth, closeReadiness, packages, packageSummary, monthGrid, complianceEvents, eventStage } from '../lib/accounting'
 import { askAccountant } from '../lib/ask'
 import AccountantTabs from '../components/AccountantTabs'
 import { findWithholdingRule } from '../../pages/business/InvoiceReviewDrawer'
@@ -326,10 +326,10 @@ export default function Accountant() {
   const t = useT()
   const [sp, setSp] = useSearchParams()
   const tab = ['packages', 'taxes'].includes(sp.get('tab')) ? sp.get('tab') : 'close'
-  const now = new Date()
-  const thisMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
-  const [month, setMonth] = useState(() => sp.get('month') || (tab === 'taxes' ? thisMonth : defaultCloseMonth()))
-  const pickMonth = (m) => { setMonth(m); const n = new URLSearchParams(sp); n.set('month', m); setSp(n, { replace: true }) }
+  // Read from the URL on every render: validated, and reset to the tab's default on a tab
+  // switch (the tab links carry no month).
+  const month = accountantMonth(sp.get('month'), tab)
+  const pickMonth = (m) => { const n = new URLSearchParams(sp); n.set('month', m); setSp(n, { replace: true }) }
   const sub = t(`acct.sub.${tab}`)
   return (
     <div className="v2-page">

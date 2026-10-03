@@ -201,3 +201,42 @@ Format: what · fields · why · risk · what the UI does meanwhile.
 - **A. Fix the guard (changes 031).** It would count only non-`transaction` allocations against `invoice amount − paid_amount`.
 - **B. Stop `/allocate` writing allocation rows.** Keep the audit trail in `audit_events` instead.
 - **C. Make allocations the single source of truth for payments.** `/pay` would write a `transaction` allocation, and `paid_amount` would become a derived figure. This is the larger change.
+
+## F-02 · Finding: `POST /api/counterparties` has no role check
+
+**Status: reported only (review 8.2). Pre-existing on `main`; not changed by design v2.**
+
+**What happens**
+- `POST /api/counterparties` (`server/index.js`) calls `requireBusiness` and validates the body.
+- The only role check is for the P-04 tax fields (`CPI.canSetTaxFields`, batch 8).
+- Any member of the business can create a counterparty, whatever their role, including roles that can only view or submit.
+
+**Why it matters**
+- Counterparties feed bills, invoices, withholding treatment and duplicate detection.
+- A viewer adding one is not a money movement, but it changes what others see and pick.
+
+**Options (each needs the owner's approval; backend change)**
+- **A.** Allow create for the roles that may create financial records (`canCreateConfirmedFinancialRecord`), or that plus `manager`. Answer 403 otherwise.
+- **B.** Keep create open, but make a viewer-created counterparty pending until a finance role confirms it.
+
+The v2 Add counterparty screen keeps working under either option: it already shows the server's 403 text.
+
+## F-03 · Finding: clickable AI phrases need a backend prompt change
+
+**Status: reported only (review 8.2).**
+
+**What exists**
+- `client/src/v2/lib/aiLinks.js` turns `[text](/business/…?…)` and `[text](cfo://…)` in AI answers into links.
+- It accepts only allow-listed pages and parameters. Since review fix 8.2 #1 it also cannot be broken by keys such as `constructor`.
+
+**What is missing**
+- Nothing on the server asks the model to write such links. No AI CFO or AI Accountant prompt in `server/` mentions them.
+- So real answers today are plain text. The links appear only in the design's own notes, for example the Performance note.
+
+**What it would take (backend; needs approval)**
+- Add to the AI CFO system prompt:
+  - the allow-listed link forms;
+  - the pages and parameters from `LINK_PAGES` / `PARAMS`;
+  - the rule to use them only for figures the answer actually cites.
+- Add a server-side test that the prompt lists exactly the client allow-list, so the two cannot drift.
+- The client needs no change: unknown or malformed links already degrade to plain text.

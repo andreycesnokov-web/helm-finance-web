@@ -18,6 +18,7 @@
 //    positive number when cash is going out. Runway = cash ÷ burn × 30.
 //  * Forecast: the Radar 30-day series (lib/radarSeries.js); after that, the average burn.
 //    Loan repayments are not known (no funding register, P-03) and are said to be missing.
+import { csvCell } from './csv.js'
 import { txDate } from './obligations.js'
 import { classOf, COST_CLASSES } from './cashClass.js'
 
@@ -193,6 +194,6 @@ export function monthCompare(transactions = [], month, compare) {
 
 /** CSV of the monthly rows shown on a Performance tab (Export). Numbers as they are shown. */
 export function rowsCsv(rows = [], columns = []) {
-  const esc = (v) => { const s = String(v ?? ''); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s }
+  const esc = csvCell
   return [columns.join(','), ...rows.map((r) => columns.map((c) => esc(r[c])).join(','))].join('\n')
 }

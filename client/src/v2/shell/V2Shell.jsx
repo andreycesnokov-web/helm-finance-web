@@ -83,7 +83,7 @@ export default function V2Shell({ children }) {
 
   return (
     <div className="v2-root v2-shell" data-v2="shell">
-      <a className="v2-skip" href="#v2-main">Skip to content</a>
+      <a className="v2-skip" href="#v2-main">{t('shell.skip')}</a>
 
       <aside className="v2-sidebar" aria-label={t('nav.main')}>
         <div className="v2-brand">

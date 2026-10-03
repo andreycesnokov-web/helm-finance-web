@@ -163,7 +163,7 @@ export const routes = {
   'GET /api/admin/businesses/:id/members': () => ({ members: [{ role: 'owner' }, { role: 'accountant' }] }),
   'GET /api/admin/businesses/:id/usage': () => ({ usage: { wallets: 3, transactions_this_month: 12, documents: 5 } }),
   'GET /api/admin/access-audit': () => ({ events: [{ id: 'a1', action: 'trial_activated', business_code: 'HF-001', reason: 'pilot', changed_at: iso(-3) }] }),
-  'GET /api/team': () => ({ members: [{ id: 'm1', user_id: 1, role: 'owner', display_name: 'Demo Owner' }, { id: 'm2', user_id: 2, role: 'accountant', display_name: 'Demo Accountant' }] }),
+  'GET /api/team': () => ({ members: [{ id: 'm1', user_id: 1, role: 'owner', display_name: 'Demo Owner' }, { id: 'm2', user_id: 2, role: 'accountant', display_name: 'Demo Accountant' }], invites: [], my_role: 'owner' }),
   'GET /api/payroll/overview': () => ({
     employees: [{ id: 'e1', name: 'Employee One', role: 'Operations', default_salary: 6000000, default_wallet_id: 'w2' }, { id: 'e2', name: 'Employee Two', role: 'Sales', default_salary: 4000000 }],
     payments: [

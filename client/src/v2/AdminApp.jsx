@@ -25,7 +25,7 @@ function AdminShell({ children }) {
   const link = (to, label) => <NavLink to={to} className={({ isActive }) => `v2-nav${isActive ? ' is-active' : ''}`}>{label}</NavLink>
   return (
     <div className="v2-root v2-shell v2-admin" data-v2="admin">
-      <a className="v2-skip" href="#v2-main">Skip to content</a>
+      <a className="v2-skip" href="#v2-main">{t('shell.skip')}</a>
       <aside className="v2-sidebar v2-admin-side" aria-label={t('admin.nav')}>
         <div className="v2-brand"><img src={SYMBOL} alt="" aria-hidden="true" width="32" height="32" /><span className="v2-brand-name">{t('shell.brand')}</span></div>
         <span className="v2-admin-tag">{t('admin.tag')}</span>
@@ -37,6 +37,7 @@ function AdminShell({ children }) {
         <p className="v2-muted v2-small v2-admin-privacy"><I.admin size={14} /> {t('admin.privacy')}</p>
         <div className="v2-sidefoot">
           <NavLink to="/admin" className="v2-nav v2-nav-muted">{t('admin.users')}</NavLink>
+          <NavLink to="/admin/payment-connections" className="v2-nav v2-nav-muted">{t('admin.payments')}</NavLink>
           <NavLink to="/business/pulse" className="v2-nav v2-nav-muted"><I.chevLeft />{t('admin.back')}</NavLink>
         </div>
       </aside>

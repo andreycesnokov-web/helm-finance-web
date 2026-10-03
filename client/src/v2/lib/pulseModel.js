@@ -57,6 +57,12 @@ export function headlineKey(status, { runway, lowestExpected, target = RUNWAY_TA
 }
 
 const OPEN = (d) => d && !['paid', 'cancelled'].includes(d.status)
+// A date-only 'YYYY-MM-DD' is that LOCAL day (new Date() would read it as UTC midnight).
+const localDay = (v) => {
+  const m = typeof v === 'string' && /^(\d{4})-(\d{2})-(\d{2})$/.exec(v)
+  const x = m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : new Date(v)
+  x.setHours(0, 0, 0, 0); return x
+}
 const amt = (d) => Number(d.remaining_amount ?? d.amount ?? 0)
 
 /**
@@ -78,13 +84,16 @@ export function decisions({ debts = [], obligations = [], today = new Date() } =
     out.push({ kind: 'late', id: d.id, label: d.counterparty || '', note: d.description || '',
       amount: amt(d), due_date: d.due_date, days: Number(d.days_overdue) || 0 })
   }
-  const t0 = new Date(today); t0.setHours(0, 0, 0, 0)
+  const t0 = localDay(today)
   for (const o of obligations) {
     if (!o || o.status !== 'calculated' || !o.due_date) continue
-    const days = Math.round((new Date(o.due_date) - t0) / 86400000)
+    const due = localDay(o.due_date)
+    if (Number.isNaN(due.getTime())) continue
+    const days = Math.round((Date.UTC(due.getFullYear(), due.getMonth(), due.getDate()) - Date.UTC(t0.getFullYear(), t0.getMonth(), t0.getDate())) / 86400000)
     if (days > 31) continue
+    // Past the due date: overdue by -days, never "0 days left".
     out.push({ kind: 'tax', id: `${o.obligation_type}:${o.period}`, label: o.title, period: o.period,
-      amount: Number(o.amount), due_date: o.due_date, days })
+      amount: Number(o.amount), due_date: o.due_date, days, overdue: days < 0 })
   }
   return out
 }
@@ -120,16 +129,21 @@ export function pctChange(now, before) {
   return Math.round(((Number(now) - Number(before)) / Number(before)) * 100)
 }
 
-/** Owed to you / You owe tiles from the server's confirmed totals and the debt list. */
+/**
+ * Owed to you / You owe tiles. Totals, counts and late amounts all come from ONE filter —
+ * open, confirmed (approved or no approval step), IDR — so a tile never shows a total that
+ * its own count or "late" line does not add up to. Pending approval stays out (DECISIONS q2);
+ * other currencies are not added to IDR without conversion.
+ */
 export function obligationTiles(pulse) {
   const debts = Array.isArray(pulse?.debts) ? pulse.debts : []
-  const confirmed = debts.filter((d) => OPEN(d) && (d.approval_status === 'approved' || !d.approval_status))
+  const confirmed = debts.filter((d) => OPEN(d) && (d.approval_status === 'approved' || !d.approval_status) && (d.currency || 'IDR') === 'IDR')
   const rec = confirmed.filter((d) => d.type === 'receivable')
   const pay = confirmed.filter((d) => d.type === 'payable')
-  const lateSum = (xs) => xs.filter((d) => d.status === 'overdue').reduce((s, d) => s + amt(d), 0)
+  const sum = (xs) => xs.reduce((s, d) => s + amt(d), 0)
+  const late = (xs) => xs.filter((d) => d.status === 'overdue')
   return {
-    owedToYou: Number(pulse?.receivables ?? 0), owedLate: lateSum(rec),
-    youOwe: Number(pulse?.payables ?? 0), oweCount: pay.length, oweLate: lateSum(pay),
-    oweLateCount: pay.filter((d) => d.status === 'overdue').length,
+    owedToYou: sum(rec), owedLate: sum(late(rec)), owedCount: rec.length,
+    youOwe: sum(pay), oweCount: pay.length, oweLate: sum(late(pay)), oweLateCount: late(pay).length,
   }
 }

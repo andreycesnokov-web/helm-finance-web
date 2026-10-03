@@ -60,7 +60,20 @@ t('payer history from paid items', () => {
     { counterparty: 'acme ', status: 'paid', due_date: '2026-08-01', last_payment_at: '2026-07-30' },
     { counterparty: 'Acme', status: 'overdue', remaining_amount: 5, type: 'receivable' },
   ], 'ACME')
-  assert.deepStrictEqual([h.paidCount, h.onTime, h.avgLate, h.openTotal, h.lateNow], [2, 1, 4, 5, 5])
+  assert.deepStrictEqual([h.paidCount, h.onTime, h.avgLate, h.theyOwe, h.lateTheyOwe, h.weOwe], [2, 1, 4, 5, 5, 0])
+})
+
+t('payer history: directions apart, pending left out, any of the names, null when nothing matches', () => {
+  const debts = [
+    { counterparty: 'PT Maju', type: 'receivable', status: 'open', remaining_amount: 100 },
+    { counterparty: 'Maju', type: 'payable', status: 'overdue', remaining_amount: 30 },
+    { counterparty: 'Maju', type: 'payable', status: 'open', remaining_amount: 999, approval_status: 'pending_approval' },
+    { counterparty: 'Other', type: 'payable', status: 'open', remaining_amount: 7 },
+  ]
+  const h = payerHistory(debts, ['PT Maju Jaya', 'PT Maju', 'Maju'])
+  assert.deepStrictEqual([h.theyOwe, h.weOwe, h.lateTheyOwe, h.lateWeOwe], [100, 30, 0, 30])
+  assert.strictEqual(payerHistory(debts, ['Nobody']), null, 'no match → null, so a fallback name can be tried')
+  assert.strictEqual(payerHistory(debts, [null, '']), null)
 })
 
 t('duplicates by NPWP or bank account; never by name alone', () => {

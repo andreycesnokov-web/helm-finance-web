@@ -1,11 +1,17 @@
-// Accounts (designs/Accounts.dc.html). Business wallets only (GET /api/wallets is
-// business-scoped by the server); personal money is never fetched or counted here.
+// Accounts (designs/Accounts.dc.html). This company's wallets only (GET /api/wallets is
+// business-scoped by the server); the Personal workspace is never fetched or counted here.
 // Statement freshness from GET /api/bank-import/batches; moves between accounts from
 // GET /api/transactions (type=transfer). Adding/editing accounts stays on the existing
 // page (Manage accounts).
+//
+// A wallet or transfer labelled scope='personal' can still carry this company's business_id
+// (migration 017 backfill; _specs/accounts-personal-scope-ambiguity.md). The label does not
+// prove ownership either way, so such rows are NOT dropped and NOT re-totalled: they stay in
+// the list and the total exactly as the API returns them, with a "Labelled personal" chip and
+// a note saying so. Fixing the label or the owner is a data decision, not done here.
 import { Link } from 'react-router-dom'
 import I from '../icons'
-import { PageHead, Card, Btn, Skeleton, ErrorBox, Empty } from '../ui'
+import { PageHead, Card, Btn, Pill, Skeleton, ErrorBox, Empty } from '../ui'
 import { useT, useLang } from '../i18n'
 import { useApi } from '../data'
 import { money, shortDate, daysUntil } from '../lib/format'
@@ -27,7 +33,8 @@ export default function Accounts() {
   if (w.loading) return <>{head}<Card><Skeleton rows={5} /></Card></>
   if (w.error) return <>{head}<ErrorBox error={w.error} onRetry={w.reload} /></>
 
-  const wallets = (w.data?.wallets || []).filter((x) => (x.scope || 'business') === 'business' && x.is_active !== false)
+  const wallets = (w.data?.wallets || []).filter((x) => x.is_active !== false)
+  const labelledPersonal = wallets.filter((x) => x.scope === 'personal')
   const idr = wallets.filter((x) => (x.currency || 'IDR') === 'IDR')
   const other = wallets.filter((x) => (x.currency || 'IDR') !== 'IDR')
   const total = idr.reduce((s, x) => s + Number(x.balance || 0), 0)
@@ -55,6 +62,7 @@ export default function Accounts() {
                 <span className="v2-stat-big v2-num">{money(total)}</span>
               </div>
               <p className="v2-muted v2-small">{t('acc.personalNote')}</p>
+              {labelledPersonal.length > 0 && <p className="v2-small"><Pill tone="warn">{t('acc.labelledPersonal')}</Pill> {t('acc.labelledNote', { n: labelledPersonal.length })}</p>}
             </div>
             {posSum > 0 && (
               <>
@@ -75,7 +83,7 @@ export default function Accounts() {
                   <li key={x.id} className="v2-acc">
                     <span className="v2-dec-ic v2-tone-info" aria-hidden="true">{x.type === 'cash' ? <I.funding /> : <I.accounts />}</span>
                     <span className="v2-acc-text">
-                      <span className="v2-dec-title">{x.name}</span>
+                      <span className="v2-dec-title">{x.name}{x.scope === 'personal' && <> <Pill tone="warn">{t('acc.labelledPersonal')}</Pill></>}</span>
                       <span className="v2-dec-meta">{[t(KIND[x.type] || 'acc.kind.other'), x.entity_name, x.currency !== 'IDR' ? x.currency : null].filter(Boolean).join(' · ')}</span>
                       <span className="v2-small">{fr
                         ? <>{t('acc.statementOn', { d: shortDate(fr.date, lang) })}{fr.status === 'review_required' && <> · <Link to="/business/bank-import">{t('acc.toReview')}</Link></>}</>
@@ -99,7 +107,7 @@ export default function Accounts() {
             <p className="v2-muted v2-small">{t('acc.movesNote')}</p>
             {moves.length === 0 ? <p className="v2-muted">{t('acc.noMoves')}</p> : (
               <ul className="v2-moves">
-                {moves.map((m) => <li key={m.id}><span>{shortDate(txDate(m), lang)} · {m.description || t('acc.transfer')}</span><span className="v2-num">{money(m.amount_original, { currency: m.currency_original || 'IDR' })}</span></li>)}
+                {moves.map((m) => <li key={m.id}><span>{shortDate(txDate(m), lang)} · {m.description || t('acc.transfer')}{m.scope === 'personal' && <> <Pill tone="warn">{t('acc.labelledPersonal')}</Pill></>}</span><span className="v2-num">{money(m.amount_original, { currency: m.currency_original || 'IDR' })}</span></li>)}
               </ul>
             )}
           </Card>

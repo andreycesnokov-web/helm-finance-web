@@ -81,7 +81,27 @@ t('obligation tiles use the server totals and confirmed items', () => {
     { type: 'payable', status: 'open', amount: 12 },
     { type: 'payable', status: 'open', approval_status: 'pending_approval', amount: 99 },
   ] })
-  assert.deepStrictEqual([tl.owedToYou, tl.owedLate, tl.youOwe, tl.oweCount, tl.oweLateCount], [30, 10, 12, 1, 0])
+  assert.deepStrictEqual([tl.owedToYou, tl.owedLate, tl.youOwe, tl.oweCount, tl.oweLateCount], [10, 10, 12, 1, 0])
+})
+
+t('tiles: totals and lists use the same filter (review 8.2 should-fix)', () => {
+  const tl = obligationTiles({ receivables: 999, payables: 999, debts: [
+    { type: 'receivable', status: 'open', amount: 5 },
+    { type: 'receivable', status: 'open', amount: 7, approval_status: 'pending_approval' },
+    { type: 'payable', status: 'overdue', remaining_amount: 4, amount: 9 },
+    { type: 'payable', status: 'open', amount: 100, currency: 'USD' },
+    { type: 'payable', status: 'paid', amount: 50 },
+  ] })
+  assert.deepStrictEqual([tl.owedToYou, tl.owedCount, tl.youOwe, tl.oweCount, tl.oweLate, tl.oweLateCount], [5, 1, 4, 1, 4, 1])
+})
+
+t('past-due tax is overdue, not "0 days left"; date-only due dates are local days', () => {
+  const today = new Date(2026, 9, 3, 10)
+  const ds = decisions({ today, obligations: [
+    { status: 'calculated', due_date: '2026-09-30', obligation_type: 'pph21', period: '2026-08', amount: 1 },
+    { status: 'calculated', due_date: '2026-10-10', obligation_type: 'pph21', period: '2026-09', amount: 1 },
+  ] })
+  assert.deepStrictEqual(ds.map((d) => [d.days, d.overdue]), [[-3, true], [7, false]])
 })
 
 console.log(`\n${pass} passed, ${fail} failed`)

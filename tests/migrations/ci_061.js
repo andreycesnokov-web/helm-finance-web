@@ -31,6 +31,8 @@ INSERT INTO debts (business_id, user_id, type, counterparty, amount, approval_st
   const cols = (await db.query(`SELECT column_name FROM information_schema.columns WHERE table_name='debts' ORDER BY column_name`)).rows.map((r) => r.column_name);
   ok('adds exactly accountant_checked_at and accountant_checked_by', cols.includes('accountant_checked_at') && cols.includes('accountant_checked_by') && cols.length === 9 + 2);
   ok('option B: no withholding slip column on debts', !cols.includes('withholding_slip_document_id'));
+  ok('pair CHECK added NOT VALID then validated (review 8.2): convalidated = true', (await db.query(`SELECT convalidated v FROM pg_constraint WHERE conname = 'debts_accountant_check_pair_chk'`)).rows[0]?.v === true);
+  { const sql = MIG('061_bill_checklist_status.sql'); ok('NOT VALID inside the transaction, VALIDATE after COMMIT', /NOT VALID;/.test(sql) && sql.indexOf('VALIDATE CONSTRAINT') > sql.indexOf('COMMIT;')); }
   ok('option B: no trigger added', (await db.query(`SELECT count(*)::int n FROM pg_trigger WHERE NOT tgisinternal`)).rows[0].n === triggersBefore);
 
   const after = (await db.query('SELECT * FROM debts ORDER BY id')).rows;
