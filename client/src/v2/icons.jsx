@@ -40,6 +40,7 @@ export const I = {
   arrowUp: (p) => <S {...p}><path d="M12 19V5M5 12l7-7 7 7" /></S>,
   arrowDown: (p) => <S {...p}><path d="M12 5v14M19 12l-7 7-7-7" /></S>,
   send: (p) => <S {...p}><path d="M22 2L11 13" /><path d="M22 2l-7 20-4-9-9-4z" /></S>,
+  link: (p) => <S {...p}><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.5 1.5" /><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.5-1.5" /></S>,
   table: (p) => <S {...p}><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M3 10h18M9 4v16" /></S>,
 }
 

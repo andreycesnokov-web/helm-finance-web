@@ -33,6 +33,9 @@ export const WRITE_ALLOW = [
   { method: 'POST', path: "'/counterparties'" },// POST  /api/counterparties
 ]
 const ACTIONS = path.join(V2, 'lib', 'actions.js')
+// POSTs that ask an existing AI endpoint a question and change no data. Only in lib/ask.js.
+const ASK = path.join(V2, 'lib', 'ask.js')
+const ASK_ALLOW = ["'/accountant/ask'", "'/ai-cfo/ask'"]
 
 console.log('\nDesign v2 — flag')
 
@@ -86,6 +89,13 @@ t('v2 makes no mutating request outside the reviewed allow-list', () => {
   for (const f of src) {
     const s = code(read(f))
     const writes = [...s.matchAll(/method:\s*['"](POST|PUT|PATCH|DELETE)['"]/g)]
+    if (f === ASK) {
+      for (const m of writes) {
+        const line = s.slice(s.lastIndexOf('\n', m.index), m.index)
+        assert.ok(m[1] === 'POST' && ASK_ALLOW.some((a) => line.includes(a)), `${rel(f)}: only POST to ${ASK_ALLOW.join(', ')}`)
+      }
+      continue
+    }
     if (f !== ACTIONS) { assert.strictEqual(writes.length, 0, `${rel(f)} writes; only lib/actions.js may`); continue }
     for (const m of writes) {
       const line = s.slice(s.lastIndexOf('\n', m.index), m.index)
@@ -106,7 +116,7 @@ t('no new write endpoint: every allowed write exists on the server today', () =>
 
 t('no direct apiFetch writes hidden behind a helper outside actions.js', () => {
   for (const f of src) {
-    if (f === ACTIONS) continue
+    if (f === ACTIONS || f === ASK) continue
     assert.ok(!/\bapiFetch\(/.test(code(read(f))) || f.endsWith('data.jsx'), `${rel(f)} calls apiFetch directly (reads go through useApi)`)
   }
 })
