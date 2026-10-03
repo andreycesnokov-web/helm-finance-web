@@ -244,10 +244,10 @@ function CashTab({ rows, sel, cash, t, lang }) {
   )
 }
 
-function ForecastTab({ pulse, obligations, burnMonthly, t, lang }) {
+function ForecastTab({ pulse, obligations, repayments = [], burnMonthly, t, lang }) {
   const p = pulse
   // Pending approval is not counted (DECISIONS.md q2), same as Pulse and Radar.
-  const items = cashItems({ debts: p.debts, obligations }).items.filter(isCounted)
+  const items = cashItems({ debts: p.debts, obligations, repayments }).items.filter(isCounted)
   const f = forecast({ balance: p.totalBalance, burnRate: p.burnRate, items })
   const ins = items.filter((i) => i.dir === 'in'), outs = items.filter((i) => i.dir === 'out')
   const sum = (xs) => xs.reduce((s, x) => s + x.amount, 0)
@@ -304,6 +304,7 @@ export default function Performance() {
   const debts = useApi('/debts')
   const prof = useApi('/accountant/profile')
   const assets = useApi('/assets')
+  const fund = useApi('/business-funding')
   useAskContext(t('nav.performance'), drillOn ? mName(drill.month, lang) : mName(sel, lang))
 
   const series = ins.data?.series || []
@@ -315,9 +316,9 @@ export default function Performance() {
   const confirmed = mappingConfirmed(catList)
   const accrual = useMemo(() => {
     if (!confirmed) return null
-    const r = accrualRows({ transactions: txs, debts: Array.isArray(debts.data) ? debts.data : [], categories: catList, months, assets: assets.data })
+    const r = accrualRows({ transactions: txs, debts: Array.isArray(debts.data) ? debts.data : [], categories: catList, months, assets: assets.data, funding: fund.data })
     return { ...r, taxKey: taxLabelKey(prof.data?.profile?.tax_regime) }
-  }, [confirmed, txs, debts.data, catList, months, prof.data, assets.data]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [confirmed, txs, debts.data, catList, months, prof.data, assets.data, fund.data]) // eslint-disable-line react-hooks/exhaustive-deps
   const setMonth = (m) => { const n = new URLSearchParams(); n.set('month', m); navigate(`${location.pathname}?${n}`, { replace: true }) }
 
   const head = (
@@ -348,7 +349,7 @@ export default function Performance() {
         : nothing ? <Card><Empty icon={<I.performance size={28} />} title={t('perf.emptyTitle')} text={t('perf.emptyText')} action={<Btn variant="primary" to="/business/bank-import">{t('acc.import')}</Btn>} /></Card>
         : tab === 'profit' ? <ProfitTab rows={accrual ? accrual.rows : pRows} accrual={accrual} sel={sel} t={t} lang={lang} needsReview={Number(ins.data?.needs_review_count) || 0} tx={txs} />
         : tab === 'cash' ? <CashTab rows={cRows} sel={sel} cash={pulse.data?.totalBalance} t={t} lang={lang} />
-        : <ForecastTab pulse={pulse.data} obligations={obl.data?.obligations || []} burnMonthly={burn?.monthly} t={t} lang={lang} />}
+        : <ForecastTab pulse={pulse.data} obligations={obl.data?.obligations || []} repayments={fund.data?.upcoming || []} burnMonthly={burn?.monthly} t={t} lang={lang} />}
     </div>
   )
 }

@@ -120,6 +120,16 @@ t('what-if approve counts the pending item on screen only', () => {
   assert.strictEqual(base.days[30].expected - f.days[30].expected, 2e6)
 })
 
+t('loan repayments from the funding register are scheduled outflows; overdue ones land today as late', () => {
+  const { items } = cashItems({ today, repayments: [
+    { id: 'r1', due_on: D(10), amount: 2.5e6, lender: 'Founder' }, { id: 'r2', due_on: D(-3), amount: 1e6, lender: 'Bank' },
+    { id: 'r3', due_on: D(60), amount: 1e6 }, { id: 'r4', due_on: D(5), amount: 0 },
+  ] })
+  assert.deepStrictEqual(items.map((i) => [i.key, i.day, i.tag, i.dir]), [['loan:r2', 0, 'late', 'out'], ['loan:r1', 10, 'scheduled', 'out']])
+  const f = forecast({ balance: 10e6, burnRate: 0, items, today })
+  assert.strictEqual(f.days[30].expected, 10e6 - 3.5e6)
+})
+
 t('engine-calculated tax obligations become deadline items; uncalculated ones do not', () => {
   const { items } = cashItems({ today, obligations: [
     { obligation_type: 'pph_21_26', title: 'PPH 21/26', period: '2026-09', due_date: D(7), status: 'calculated', amount: 1.2e6, currency: 'IDR' },

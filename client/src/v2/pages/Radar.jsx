@@ -37,6 +37,7 @@ export default function Radar() {
   const { hasFeature } = useAccess()
   const pulse = useApi('/pulse?scope=business')
   const obl = useApi('/accountant/obligations')
+  const fund = useApi('/business-funding') // P-03: loan repayments land on Radar
   const [horizon, setHorizon] = useState(DEFAULT_HORIZON)
   const [scenario, setScenario] = useState({ kind: 'worst' })
   const [filter, setFilter] = useState('all')
@@ -47,7 +48,7 @@ export default function Radar() {
   const model = useMemo(() => {
     if (!pulse.data) return null
     const p = pulse.data
-    const { items, excluded } = cashItems({ debts: p.debts, obligations: obl.data?.obligations || [], horizon })
+    const { items, excluded } = cashItems({ debts: p.debts, obligations: obl.data?.obligations || [], repayments: fund.data?.upcoming || [], horizon })
     const chips = scenarioChips(items)
     const active = scenario.kind === 'worst' ? null : scenario
     const used = applyScenario(items, active)
@@ -56,7 +57,7 @@ export default function Radar() {
     const fCollect = collect ? forecast({ balance: p.totalBalance, burnRate: p.burnRate, items: applyScenario(items, collect), horizon }) : null
     const listed = withCashAfter(used.filter((it) => it.day <= horizon).sort((a, b) => a.day - b.day), { balance: p.totalBalance, burnRate: p.burnRate })
     return { items: listed, excluded, chips, f, collect, fCollect, burn: Number(p.burnRate) || 0, pending: pendingSummary(used) }
-  }, [pulse.data, obl.data, horizon, scenario])
+  }, [pulse.data, obl.data, fund.data, horizon, scenario])
 
   const from = new Date()
   const to = new Date(); to.setDate(to.getDate() + horizon)
@@ -174,6 +175,7 @@ export default function Radar() {
                 <span role="cell" className="v2-kd-what">
                   {it.source === 'debt' && it.type === 'payable'
                     ? <Link to={`/business/payables/${it.id}`}>{it.label}</Link>
+                    : it.source === 'funding' ? <Link to="/business/funding-investors">{t('fund.repaymentTo', { who: it.label || t('fund.loan') })}</Link>
                     : it.label}
                 </span>
                 <span role="cell" className="v2-kd-status"><TagPill it={it} /></span>

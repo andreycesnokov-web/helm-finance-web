@@ -76,13 +76,14 @@ export default function Pulse() {
   const obl = useApi('/accountant/obligations')
   // P-01 / P-08. Missing, failed or null → the documented defaults (60 days, no floor).
   const targets = useApi('/business/targets')
+  const fund = useApi('/business-funding') // P-03: loan repayments are scheduled payments
   useAskContext(t('nav.pulse'), t('pulse.today'))
 
   const m = useMemo(() => {
     const p = pulse.data
     if (!p) return null
     const obligations = obl.data?.obligations || []
-    const { items } = cashItems({ debts: p.debts, obligations })
+    const { items } = cashItems({ debts: p.debts, obligations, repayments: fund.data?.upcoming || [] })
     const f = forecast({ balance: p.totalBalance, burnRate: p.burnRate, items })
     const runway = runwayDays(p)
     const tg = targets.data?.targets || null
@@ -97,7 +98,7 @@ export default function Pulse() {
       tiles: obligationTiles(p),
       accounts: (p.accounts || []).filter((a) => (a.scope || 'business') === 'business'),
     }
-  }, [pulse.data, obl.data, targets.data])
+  }, [pulse.data, obl.data, targets.data, fund.data])
 
   const flow = flowOf(ins30.data?.ok !== false ? ins30.data?.metrics : null)
   const prev = flowOf(ins60.data?.ok !== false ? ins60.data?.metrics : null)

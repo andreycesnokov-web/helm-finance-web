@@ -35,6 +35,8 @@ Format: what · fields · why · risk · what the UI does meanwhile.
 
 ## P-03 · Funding register (batch 3)
 
+> **Approved → batch 12 (migration 064).** Tables are `business_funding_records` and `business_funding_repayments`, because `funding_repayments` already belongs to the bridge (038). The API is `/api/business-funding`, not the bridge's `/api/funding`. A founder loan is recorded business-side only. Loan interest goes to profit as `interest`; repayments show on Radar.
+
 - **What:** a business-scoped table of funding records: equity, founder loans,
   intercompany loans, with terms and a repayment schedule.
 - **Fields:** `funding_records(id, business_id, source_kind [founder|investor|intercompany|bank],

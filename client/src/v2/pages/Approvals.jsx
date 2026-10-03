@@ -24,6 +24,7 @@ export default function Approvals() {
   const [tab, setTab] = useState('waiting')
   const debts = useApi('/debts')
   const pulse = useApi('/pulse?scope=business')
+  const fund = useApi('/business-funding')
   const { hasFeature, loading: accessLoading } = useAccess()
   const list = Array.isArray(debts.data) ? debts.data : []
   const waiting = list.filter(isPending).sort((a, b) => String(a.due_date || '9') < String(b.due_date || '9') ? -1 : 1)
@@ -35,12 +36,12 @@ export default function Approvals() {
   const after = useMemo(() => {
     if (!pulse.data) return {}
     const p = pulse.data
-    const items = cashItems({ debts: [...(p.debts || []).filter((x) => !waiting.some((w) => String(w.id) === String(x.id))), ...waiting] }).items
+    const items = cashItems({ debts: [...(p.debts || []).filter((x) => !waiting.some((w) => String(w.id) === String(x.id))), ...waiting], repayments: fund.data?.upcoming || [] }).items
     return Object.fromEntries(items.filter((i) => i.tag === 'approval').map((i) => {
       const f = forecast({ balance: p.totalBalance, burnRate: p.burnRate, items: applyScenario(items, { kind: 'approve', key: i.key }) })
       return [String(i.id), f.days[i.day]?.expected]
     }))
-  }, [pulse.data, waiting]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [pulse.data, waiting, fund.data]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const head = <PageHead title={t('nav.approvals')} sub={t('approvals.sub')} />
   // Same plan gate as the legacy Approvals page (review 8.2 #10).
