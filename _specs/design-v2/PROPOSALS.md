@@ -100,3 +100,36 @@ Format: what · fields · why · risk · what the UI does meanwhile.
 - **Why:** Company profile → People; needed for the annual return.
 - **Risk:** personal data (names, ownership); access limited to owner/accountant.
 - **Meanwhile:** "Not filled in", with a note that it is not stored yet.
+
+## P-10 · Category → group mapping and accrual profit (batch 6)
+
+- **What:** every cash-flow category belongs to exactly one group (revenue, direct cost,
+  operating cost, asset purchase, funding, tax, transfer), seeded per industry template from
+  the KBLI codes; plus accrual rules (revenue in the invoice month, costs in the month the
+  bill is received, including unpaid bills).
+- **Fields:** `cashflow_categories.pnl_group text null` (CHECK on the 7 groups),
+  `industry_templates(kbli_prefix, category_name, pnl_group)`, and an accrual read model
+  (a server function, no new table) over `debts` + `transactions`.
+- **Why:** PERFORMANCE_METRICS.md Profit view; coverage "N of M records have a category";
+  the profit-to-cash bridge.
+- **Risk:** medium — it changes what Performance reports; existing Pulse/AI figures use the
+  keyword classifier and must not silently change. Needs tests on the formulas and an
+  owner-confirmed template.
+- **Meanwhile:** Profit is labelled *Estimate · counted when money moved* (existing classifier),
+  the bridge shows "not set up yet".
+
+## P-11 · Asset register and depreciation (batch 6)
+
+- **What:** assets bought above the threshold, with cost, date, quantity, location,
+  useful life from the verified tax rules, monthly depreciation, documents per type.
+- **Fields:** `assets(id, business_id, name, asset_type, quantity, cost, currency,
+  acquired_on, supplier_counterparty_id null, purchase_debt_id null, purchase_document_id null,
+  useful_life_months, depreciation_method, location text null, custodian text null,
+  disposed_on null, created_by, created_at)`; depreciation is computed, not stored.
+- **Why:** Assets & balance, Add asset, Performance net profit (depreciation) and
+  "assets add themselves" when an equipment bill is approved.
+- **Risk:** medium — touches profit; must not double-count a purchase as both a cost and
+  an asset. Useful life must come from the tax rule engine, not UI.
+- **Meanwhile:** the register and "Save asset" are honest "not set up yet"; the purchase
+  invoice can already be uploaded; Assets shows only the known parts of the balance and no
+  net worth.

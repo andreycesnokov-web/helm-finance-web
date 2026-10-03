@@ -115,7 +115,13 @@ export const routes = {
       { id: 'p2', employee_id: 'e2', employee_name: 'Employee Two', period_month: iso(-5).slice(0, 7), payment_date: iso(-5), status: 'paid', gross_amount: 4000000, net_amount: 3920000,
         payroll_payment_items: [{ direction: 'addition', amount: 4000000, label: 'Salary' }, { direction: 'deduction', amount: 80000, label: 'BPJS' }] },
     ], summary: {} }),
-  'GET /api/pulse/advanced-insights': (u) => ({ ok: true, metrics: u.searchParams.get('to') === iso(-31)
+  'GET /api/pulse/advanced-insights': (u) => ({ ok: true, needs_review_count: 2, series: Array.from({ length: 12 }, (_, i) => {
+    const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - 11 + i)
+    const k = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+    const rev = 30e6 + i * 3e6, dir = rev * 0.55, opex = 22e6 + (i > 5 ? 9e6 : 0)
+    return { period: k, revenue: rev, direct_costs: dir, opex, operating_cash_out: dir + opex, capex: i === 6 ? 40e6 : 0, tax_expense: 0, interest_expense: 0,
+      other_cash_movement: { funding: i === 8 ? 60e6 : 0 } }
+  }), metrics: u.searchParams.get('to') === iso(-31)
     ? { operating_revenue: 52300000, operating_cash_out: 70100000, capex: 0, tax_expense: 0, interest_expense: 0 }
     : { operating_revenue: 61200000, operating_cash_out: 96100000, capex: 14800000, tax_expense: 1200000, interest_expense: 0 } }),
   'GET /api/accountant/obligations': () => ({ period: '2026-09', obligations: [
