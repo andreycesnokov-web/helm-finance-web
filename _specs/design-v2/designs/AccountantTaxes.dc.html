@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>AI Accountant — tax calendar</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&amp;family=Manrope:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#F4F6F8}
+a{color:#1565C0;text-decoration:none}a:hover{color:#003366}
+.ic{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.num{font-variant-numeric:tabular-nums lining-nums}
+.btn{font-family:inherit;font-size:14px;font-weight:700;border-radius:10px;height:40px;padding:0 16px;border:1px solid #DDE5EC;background:#FFFFFF;color:#003366;cursor:pointer;display:inline-flex;align-items:center;gap:8px;white-space:nowrap}
+.btn-p{background:#1565C0;border-color:#1565C0;color:#FFFFFF}
+.tag{font-size:12px;font-weight:800;border-radius:999px;padding:3px 10px;white-space:nowrap;display:inline-block}
+.cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px}
+.dh{font-size:12px;font-weight:700;color:#5A6E82;text-align:center;padding:4px 0}
+.dc{min-height:64px;border-radius:10px;background:#F8FAFC;padding:6px 7px;display:flex;flex-direction:column;gap:4px;min-width:0}
+.dn{font-size:12px;font-weight:700;color:#5A6E82}
+.ev{font-size:11px;font-weight:700;border-radius:6px;padding:2px 5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tr{display:grid;grid-template-columns:70px minmax(0,1.5fr) 100px minmax(0,1.6fr) 120px;gap:12px;align-items:center;padding:14px 0;border-top:1px solid #EDF1F5;font-size:14px}
+.tr>*{min-width:0}
+.st{display:flex;align-items:center;gap:4px}
+.sd{width:10px;height:10px;border-radius:50%}
+.sl{width:14px;height:2px;background:#DDE5EC}
+.yr{display:grid;grid-template-columns:110px minmax(0,1fr) 170px;gap:12px;align-items:center;padding:12px 0;border-top:1px solid #EDF1F5;font-size:14px}
+.yr>*{min-width:0}
+a.btn-p,a.btn-p:hover{color:#FFFFFF}
+a.btn:hover,a.chip:hover{filter:brightness(0.97)}
+</style>
+</helmet>
+<div style="min-height: 100vh; display: grid; grid-template-columns: 248px minmax(0, 1fr); background: #F4F6F8; font-family: 'Manrope', 'Segoe UI', sans-serif; color: #003366;">
+<dc-import name="Sidebar" active="accountant" hint-size="248px,100%"></dc-import>
+<main style="padding: 32px 40px 48px;">
+<div style="max-width: 1120px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px;">
+
+<header style="display: flex; align-items: flex-end; justify-content: space-between; gap: 24px;">
+<div style="display: flex; flex-direction: column; gap: 6px;">
+<h1 style="margin: 0; font-family: 'Archivo Black', 'Manrope', sans-serif; font-size: 30px; font-weight: 400;">AI Accountant</h1>
+<p style="margin: 0; font-size: 15px; color: #3D556E;">Every tax to pay and every report to file — with reminders before each date</p>
+</div>
+<button class="btn">October 2026<svg class="ic" viewBox="0 0 24 24" style="width: 14px; height: 14px;"><path d="M6 9l6 6 6-6"/></svg></button>
+</header>
+
+<nav aria-label="AI Accountant sections" style="display: flex; gap: 26px; border-bottom: 1px solid #DDE5EC;">
+<a href="Accountant.dc.html" style="font-size: 14px; font-weight: 700; color: #5A6E82; padding: 10px 2px;">Month close</a>
+<a href="AccountantPackages.dc.html" style="font-size: 14px; font-weight: 700; color: #5A6E82; padding: 10px 2px;">Documents by transaction</a>
+<a href="AccountantTaxes.dc.html" aria-current="page" style="font-size: 14px; font-weight: 700; color: #003366; padding: 10px 2px; border-bottom: 2px solid #003366;">Tax calendar</a>
+<a href="CompanyProfile.dc.html" style="font-size: 14px; font-weight: 700; color: #5A6E82; padding: 10px 2px;">Tax profile</a>
+</nav>
+
+<div style="display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); gap: 20px; align-items: start;">
+<section style="background: #FFFFFF; border: 1px solid #DDE5EC; border-radius: 20px; padding: 18px 18px 16px; display: flex; flex-direction: column; gap: 10px;">
+<div style="display: flex; align-items: baseline; justify-content: space-between;"><h3 style="margin: 0; font-size: 17px; font-weight: 800;">October 2026</h3><span class="num" style="font-size: 13px; color: #5A6E82;">Taxes for September · Rp 1.48M</span></div>
+<div class="cal">
+<span class="dh">Mon</span><span class="dh">Tue</span><span class="dh">Wed</span><span class="dh">Thu</span><span class="dh">Fri</span><span class="dh">Sat</span><span class="dh">Sun</span>
+<span></span><span></span><span></span>
+<div class="dc"><span class="dn num">1</span></div>
+<div class="dc" style="outline: 2px solid #1565C0;"><span class="dn num" style="color: #1565C0;">2 · today</span></div>
+<div class="dc"><span class="dn num">3</span></div>
+<div class="dc"><span class="dn num">4</span></div>
+<div class="dc"><span class="dn num">5</span></div>
+<div class="dc"><span class="dn num">6</span></div>
+<div class="dc"><span class="dn num">7</span></div>
+<div class="dc"><span class="dn num">8</span></div>
+<div class="dc"><span class="dn num">9</span></div>
+<div class="dc"><span class="dn num">10</span></div>
+<div class="dc"><span class="dn num">11</span></div>
+<div class="dc"><span class="dn num">12</span><span class="ev" style="background: #E6F1FB; color: #1565C0;">Reminder</span></div>
+<div class="dc"><span class="dn num">13</span></div>
+<div class="dc"><span class="dn num">14</span></div>
+<div class="dc" style="background: #FBF1DF;"><span class="dn num" style="color: #8B5A08;">15</span><span class="ev" style="background: #FFFFFF; color: #8B5A08;">Pay PPh 21·23·4(2)</span><span class="ev" style="background: #FFFFFF; color: #8B5A08;">BPJS TK</span></div>
+<div class="dc"><span class="dn num">16</span></div>
+<div class="dc"><span class="dn num">17</span></div>
+<div class="dc"><span class="dn num">18</span></div>
+<div class="dc"><span class="dn num">19</span></div>
+<div class="dc" style="background: #E6F1FB;"><span class="dn num" style="color: #1565C0;">20</span><span class="ev" style="background: #FFFFFF; color: #1565C0;">File 2 SPT Masa</span></div>
+<div class="dc"><span class="dn num">21</span></div>
+<div class="dc"><span class="dn num">22</span></div>
+<div class="dc"><span class="dn num">23</span></div>
+<div class="dc"><span class="dn num">24</span></div>
+<div class="dc"><span class="dn num">25</span></div>
+<div class="dc"><span class="dn num">26</span></div>
+<div class="dc"><span class="dn num">27</span></div>
+<div class="dc"><span class="dn num">28</span></div>
+<div class="dc"><span class="dn num">29</span></div>
+<div class="dc"><span class="dn num">30</span></div>
+<div class="dc"><span class="dn num">31</span><span class="ev" style="background: #F4F6F8; color: #5A6E82;">No PPN · not PKP</span></div>
+<span></span>
+</div>
+</section>
+
+<aside style="display: flex; flex-direction: column; gap: 16px;">
+<section style="background: #003366; color: #FFFFFF; border-radius: 20px; padding: 22px; display: flex; flex-direction: column; gap: 10px;">
+<span style="font-size: 13px; font-weight: 600; color: #C9D8E8;">Next deadline</span>
+<span style="font-size: 22px; font-weight: 800; line-height: 1.25;">Pay September taxes by Thu 15 Oct</span>
+<span class="num" style="font-size: 30px; font-weight: 800;">Rp 1.48M</span>
+<span style="font-size: 13px; line-height: 1.5; color: #C9D8E8;">The billing code for PPh 21 is ready. PPh 23 and 4(2) need three withholding slips first.</span>
+<button class="btn" style="justify-content: center; background: #FFFFFF; border-color: #FFFFFF; color: #003366;">Get billing codes</button>
+</section>
+<section style="background: #FFFFFF; border: 1px solid #DDE5EC; border-radius: 20px; padding: 20px; display: flex; flex-direction: column; gap: 10px;">
+<h3 style="margin: 0; font-size: 16px; font-weight: 800;">Reminders</h3>
+<label style="display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 14px; min-height: 40px;"><span>3 days before · Telegram</span><input type="checkbox" checked style="width: 20px; height: 20px;"></label>
+<label style="display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 14px; min-height: 40px;"><span>On the day · Telegram and email</span><input type="checkbox" checked style="width: 20px; height: 20px;"></label>
+<label style="display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 14px; min-height: 40px;"><span>Also remind Rina</span><input type="checkbox" checked style="width: 20px; height: 20px;"></label>
+</section>
+</aside>
+</div>
+
+<section style="background: #FFFFFF; border: 1px solid #DDE5EC; border-radius: 20px; padding: 18px 22px 8px;">
+<div style="display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 4px;"><h3 style="margin: 0; font-size: 17px; font-weight: 800;">This month, step by step</h3>
+<span style="display: flex; gap: 14px; font-size: 12px; color: #5A6E82;"><span>Calculated</span><span>·</span><span>Billing code</span><span>·</span><span>Paid</span><span>·</span><span>Reported</span></span></div>
+<div class="tr" style="font-size: 12px; font-weight: 700; color: #5A6E82; border-top: none; padding: 6px 0;"><span>Due</span><span>What</span><span style="text-align: right;">Amount</span><span>Progress</span><span>Who</span></div>
+<div class="tr"><span class="num" style="font-weight: 700;">10 Oct</span><span>BPJS Kesehatan · September</span><span class="num" style="text-align: right; font-weight: 800;">Rp 0.9M</span><span class="st"><span class="sd" style="background: #0F7A52;"></span><span class="sl" style="background: #0F7A52;"></span><span class="sd" style="background: #0F7A52;"></span><span class="sl" style="background: #0F7A52;"></span><span class="sd" style="background: #0F7A52;"></span><span style="font-size: 12px; color: #0F7A52; font-weight: 700; margin-left: 8px;">Paid 30 Sep · receipt saved</span></span><span style="color: #3D556E;">You</span></div>
+<div class="tr"><span class="num" style="font-weight: 700;">15 Oct</span><span>PPh 21 · September salaries</span><span class="num" style="text-align: right; font-weight: 800;">Rp 120K</span><span class="st"><span class="sd" style="background: #0F7A52;"></span><span class="sl" style="background: #0F7A52;"></span><span class="sd" style="background: #0F7A52;"></span><span class="sl"></span><span class="sd" style="border: 2px solid #C2CFDB;"></span><span class="sl"></span><span class="sd" style="border: 2px solid #C2CFDB;"></span><span style="font-size: 12px; color: #3D556E; font-weight: 700; margin-left: 8px;">Billing code ready</span></span><span style="color: #3D556E;">You pay</span></div>
+<div class="tr"><span class="num" style="font-weight: 700;">15 Oct</span><span>PPh 23 · CV Desain Kreatif, PT Jasa Teknik</span><span class="num" style="text-align: right; font-weight: 800;">Rp 620K</span><span class="st"><span class="sd" style="background: #0F7A52;"></span><span class="sl"></span><span class="sd" style="border: 2px solid #B5740B;"></span><span class="sl"></span><span class="sd" style="border: 2px solid #C2CFDB;"></span><span class="sl"></span><span class="sd" style="border: 2px solid #C2CFDB;"></span><span style="font-size: 12px; color: #8B5A08; font-weight: 700; margin-left: 8px;">2 slips to create first</span></span><span style="color: #3D556E;">Rina, then you</span></div>
+<div class="tr"><span class="num" style="font-weight: 700;">15 Oct</span><span>PPh 4(2) · office rent, 10%</span><span class="num" style="text-align: right; font-weight: 800;">Rp 740K</span><span class="st"><span class="sd" style="background: #0F7A52;"></span><span class="sl"></span><span class="sd" style="border: 2px solid #B5740B;"></span><span class="sl"></span><span class="sd" style="border: 2px solid #C2CFDB;"></span><span class="sl"></span><span class="sd" style="border: 2px solid #C2CFDB;"></span><span style="font-size: 12px; color: #8B5A08; font-weight: 700; margin-left: 8px;">1 slip to create first</span></span><span style="color: #3D556E;">Rina, then you</span></div>
+<div class="tr"><span class="num" style="font-weight: 700;">15 Oct</span><span>BPJS Ketenagakerjaan · September</span><span class="num" style="text-align: right; font-weight: 800;">Rp 1.2M</span><span class="st"><span class="sd" style="background: #0F7A52;"></span><span class="sl"></span><span class="sd" style="border: 2px solid #C2CFDB;"></span><span class="sl"></span><span class="sd" style="border: 2px solid #C2CFDB;"></span><span style="font-size: 12px; color: #3D556E; font-weight: 700; margin-left: 8px;">Calculated</span></span><span style="color: #3D556E;">You pay</span></div>
+<div class="tr"><span class="num" style="font-weight: 700;">20 Oct</span><span>Two reports · SPT Masa PPh 21 and Unifikasi (23, 4(2))</span><span class="num" style="text-align: right; color: #5A6E82;">—</span><span class="st"><span class="sd" style="border: 2px solid #C2CFDB;"></span><span style="font-size: 12px; color: #5A6E82; font-weight: 700; margin-left: 8px;">After the taxes are paid</span></span><span style="color: #3D556E;">Rina files</span></div>
+<p style="margin: 6px 0 10px; font-size: 12px; line-height: 1.5; color: #5A6E82;">Dates and rates come from the verified rule set and your tax profile. A deadline on a weekend or holiday shows with the working day that applies. Rina confirms every amount before you pay.</p>
+</section>
+
+<section style="background: #FFFFFF; border: 1px solid #DDE5EC; border-radius: 20px; padding: 18px 22px 8px;">
+<h3 style="margin: 0 0 4px; font-size: 17px; font-weight: 800;">The year ahead</h3>
+<div class="yr" style="border-top: none;"><span class="num" style="font-weight: 700;">Every month</span><span>Pay withheld taxes by the 15th, file two SPT Masa reports by the 20th, BPJS by the 10th and 15th</span><span style="color: #3D556E;">Automatic</span></div>
+<div class="yr"><span class="num" style="font-weight: 700;">31 Jan 2027</span><span>Give each employee their annual PPh 21 slip (1721-A1)</span><span style="color: #3D556E;">Rina prepares</span></div>
+<div class="yr"><span class="num" style="font-weight: 700;">31 Mar 2027</span><span>Personal annual returns for you and staff</span><span style="color: #3D556E;">Reminder only</span></div>
+<div class="yr"><span class="num" style="font-weight: 700;">30 Apr 2027</span><span>Company annual return (SPT Tahunan PPh Badan) with 2026 financial statements</span><span><span class="tag" style="background: #E6F1FB; color: #1565C0;">8 of 12 months closed</span></span></div>
+<div class="yr"><span class="num" style="font-weight: 700;">Watch</span><span>PKP threshold: revenue so far Rp 612M of Rp 4.8B this year</span><span style="color: #3D556E;">AI watches</span></div>
+</section>
+
+</div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1640}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

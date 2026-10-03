@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Performance — April expansion</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&amp;family=Manrope:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#F4F6F8}
+a{color:#1565C0;text-decoration:none}a:hover{color:#003366}
+.ic{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.num{font-variant-numeric:tabular-nums lining-nums}
+.btn{font-family:inherit;font-size:14px;font-weight:700;border-radius:10px;height:40px;padding:0 16px;border:1px solid #DDE5EC;background:#FFFFFF;color:#003366;cursor:pointer;display:inline-flex;align-items:center;gap:8px;white-space:nowrap}
+.btn-p{background:#1565C0;border-color:#1565C0;color:#FFFFFF}
+.tag{font-size:12px;font-weight:800;border-radius:999px;padding:3px 10px;white-space:nowrap;display:inline-block}
+.card{background:#FFFFFF;border:1px solid #DDE5EC;border-radius:20px}
+.kpi{padding:18px 20px;display:flex;flex-direction:column;gap:6px;min-width:0}
+.kl{font-size:13px;font-weight:600;color:#5A6E82}
+.kv{font-size:24px;font-weight:800}
+.ks{font-size:13px;color:#3D556E;line-height:1.45}
+.lg{display:inline-flex;align-items:center;gap:8px}
+.sw{width:12px;height:12px;border-radius:3px;display:inline-block}
+.wf{display:grid;grid-template-columns:170px minmax(0,1fr) 110px;gap:14px;align-items:center;padding:9px 0;font-size:14px}
+.wf>*{min-width:0}
+.trk{position:relative;height:22px}
+.cl{display:grid;grid-template-columns:minmax(0,1fr) 96px 96px;gap:12px;padding:9px 0;border-top:1px solid #EDF1F5;font-size:14px}
+.cl>*{min-width:0}
+details summary{cursor:pointer;font-size:13px;font-weight:700;color:#1565C0;list-style:none}
+.tb{width:100%;border-collapse:collapse;font-size:13px;margin-top:10px}
+.tb th,.tb td{padding:6px 8px;border-top:1px solid #EDF1F5;text-align:right;white-space:nowrap}
+.tb th:first-child,.tb td:first-child{text-align:left}
+.tb th{color:#5A6E82;font-weight:700}
+
+</style>
+</helmet>
+<div style="min-height: 100vh; display: grid; grid-template-columns: 248px minmax(0, 1fr); background: #F4F6F8; font-family: 'Manrope', 'Segoe UI', sans-serif; color: #003366;">
+<dc-import name="Sidebar" active="performance" hint-size="248px,100%"></dc-import>
+<main style="padding: 32px 40px 48px;">
+<div style="max-width: 1120px; margin: 0 auto; display: flex; flex-direction: column; gap: 22px;">
+<header style="display: flex; align-items: flex-end; justify-content: space-between; gap: 24px;">
+<div style="display: flex; flex-direction: column; gap: 6px;">
+<h1 style="margin: 0; font-family: 'Archivo Black', 'Manrope', sans-serif; font-size: 30px; font-weight: 400;">Performance</h1>
+<p style="margin: 0; font-size: 15px; color: #3D556E;">Is the business making money, and where does the cash go</p>
+</div>
+<div style="display: flex; gap: 10px;"><button class="btn">September 2026<svg class="ic" viewBox="0 0 24 24" style="width: 14px; height: 14px;"><path d="M6 9l6 6 6-6"/></svg></button><button class="btn"><svg class="ic" viewBox="0 0 24 24" style="width: 16px; height: 16px;"><path d="M12 4v11M7 10l5 5 5-5"/><path d="M4 20h16"/></svg>Export</button></div>
+</header>
+<nav aria-label="Performance views" style="display: flex; gap: 26px; border-bottom: 1px solid #DDE5EC;"><a href="Performance.dc.html" aria-current="page" style="font-size: 14px; font-weight: 700; color: #003366; padding: 10px 2px; border-bottom: 2px solid #003366;">Profit</a><a href="PerformanceCash.dc.html" style="font-size: 14px; font-weight: 700; color: #5A6E82; padding: 10px 2px;">Cash</a><a href="PerformanceForecast.dc.html" style="font-size: 14px; font-weight: 700; color: #5A6E82; padding: 10px 2px;">Forecast</a></nav>
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px;">
+<a href="Performance.dc.html" class="btn" style="height: 36px;"><svg class="ic" viewBox="0 0 24 24" style="width: 16px; height: 16px;"><path d="M15 6l-6 6 6 6"/></svg>All months</a>
+<span style="display: inline-flex; align-items: center; gap: 8px; height: 36px; padding: 0 8px 0 14px; border-radius: 999px; background: #003366; color: #FFFFFF; font-size: 14px; font-weight: 700;">April 2026 expansion · compared with March<a href="Performance.dc.html" aria-label="Clear filter" style="width: 24px; height: 24px; border-radius: 50%; background: #1E4D7A; color: #FFFFFF; display: inline-flex; align-items: center; justify-content: center;"><svg class="ic" viewBox="0 0 24 24" style="width: 14px; height: 14px;"><path d="M6 6l12 12M18 6L6 18"/></svg></a></span>
+<span style="font-size: 13px; color: #5A6E82;">Opened from the AI note</span>
+</div>
+
+<section class="card" style="padding: 6px; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));">
+<div class="kpi"><span class="kl">Monthly costs added</span><span class="num kv">+Rp 30.5M</span><span class="ks">From Rp 65.8M in March to Rp 96.3M</span></div>
+<div class="kpi" style="border-left: 1px solid #EDF1F5;"><span class="kl">Revenue added</span><span class="num kv" style="color: #0F7A52;">+Rp 5.0M</span><span class="ks">First month of the new sites</span></div>
+<div class="kpi" style="border-left: 1px solid #EDF1F5;"><span class="kl">Machines bought · one-off</span><span class="num kv">Rp 78.0M</span><span class="ks">An asset, not a cost · Rp 1.6M a month of depreciation</span></div>
+<div class="kpi" style="border-left: 1px solid #EDF1F5;"><span class="kl">EBITDA</span><span class="num kv">−Rp 38.3M</span><span class="ks" style="color: #8B5A08; font-weight: 700;">Was −Rp 12.8M in March</span></div>
+</section>
+
+<div style="display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 20px; align-items: start;">
+<section class="card" style="padding: 20px 24px 12px; min-width: 0;">
+<div style="display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 4px;"><h3 style="margin: 0; font-size: 17px; font-weight: 800;">What got more expensive in April</h3><span style="font-size: 13px; color: #5A6E82;">Change vs March · Rp millions</span></div>
+<div style="display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr) 96px; gap: 14px; align-items: center; padding: 11px 0; border-top: 1px solid #EDF1F5;">
+<span style="display: flex; flex-direction: column; gap: 2px; min-width: 0;"><span style="font-size: 14px; font-weight: 700;">Other day-to-day costs</span><span style="font-size: 12px; color: #5A6E82;">Fuel, consumables and site upkeep for the new locations</span></span>
+<span style="height: 14px; border-radius: 4px; background: #EDF1F5;"><span title="Other day-to-day costs: Rp 10.0M → Rp 22.0M" style="display: block; height: 14px; width: 100.0%; border-radius: 4px; background: #2A6FD1;"></span></span>
+<span class="num" style="text-align: right; display: flex; flex-direction: column;"><span style="font-weight: 800;">+Rp 12.0M</span><span style="font-size: 12px; color: #5A6E82;">10.0 → 22.0</span></span></div><div style="display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr) 96px; gap: 14px; align-items: center; padding: 11px 0; border-top: 1px solid #EDF1F5;">
+<span style="display: flex; flex-direction: column; gap: 2px; min-width: 0;"><span style="font-size: 14px; font-weight: 700;">Location fees</span><span style="font-size: 12px; color: #5A6E82;">24 → 30 sites · new contracts in Ubud</span></span>
+<span style="height: 14px; border-radius: 4px; background: #EDF1F5;"><span title="Location fees: Rp 20.0M → Rp 30.0M" style="display: block; height: 14px; width: 83.3%; border-radius: 4px; background: #2A6FD1;"></span></span>
+<span class="num" style="text-align: right; display: flex; flex-direction: column;"><span style="font-weight: 800;">+Rp 10.0M</span><span style="font-size: 12px; color: #5A6E82;">20.0 → 30.0</span></span></div><div style="display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr) 96px; gap: 14px; align-items: center; padding: 11px 0; border-top: 1px solid #EDF1F5;">
+<span style="display: flex; flex-direction: column; gap: 2px; min-width: 0;"><span style="font-size: 14px; font-weight: 700;">People</span><span style="font-size: 12px; color: #5A6E82;">2 field technicians hired</span></span>
+<span style="height: 14px; border-radius: 4px; background: #EDF1F5;"><span title="People: Rp 13.5M → Rp 20.0M" style="display: block; height: 14px; width: 54.2%; border-radius: 4px; background: #2A6FD1;"></span></span>
+<span class="num" style="text-align: right; display: flex; flex-direction: column;"><span style="font-weight: 800;">+Rp 6.5M</span><span style="font-size: 12px; color: #5A6E82;">13.5 → 20.0</span></span></div><div style="display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr) 96px; gap: 14px; align-items: center; padding: 11px 0; border-top: 1px solid #EDF1F5;">
+<span style="display: flex; flex-direction: column; gap: 2px; min-width: 0;"><span style="font-size: 14px; font-weight: 700;">Design and marketing</span><span style="font-size: 12px; color: #5A6E82;">Launch of the Ubud sites</span></span>
+<span style="height: 14px; border-radius: 4px; background: #EDF1F5;"><span title="Design and marketing: Rp 2.0M → Rp 3.0M" style="display: block; height: 14px; width: 8.3%; border-radius: 4px; background: #2A6FD1;"></span></span>
+<span class="num" style="text-align: right; display: flex; flex-direction: column;"><span style="font-weight: 800;">+Rp 1.0M</span><span style="font-size: 12px; color: #5A6E82;">2.0 → 3.0</span></span></div><div style="display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr) 96px; gap: 14px; align-items: center; padding: 11px 0; border-top: 1px solid #EDF1F5;">
+<span style="display: flex; flex-direction: column; gap: 2px; min-width: 0;"><span style="font-size: 14px; font-weight: 700;">Cleaning chemicals</span><span style="font-size: 12px; color: #5A6E82;">More machines, more refills</span></span>
+<span style="height: 14px; border-radius: 4px; background: #EDF1F5;"><span title="Cleaning chemicals: Rp 7.7M → Rp 8.5M" style="display: block; height: 14px; width: 6.7%; border-radius: 4px; background: #2A6FD1;"></span></span>
+<span class="num" style="text-align: right; display: flex; flex-direction: column;"><span style="font-weight: 800;">+Rp 0.8M</span><span style="font-size: 12px; color: #5A6E82;">7.7 → 8.5</span></span></div><div style="display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr) 96px; gap: 14px; align-items: center; padding: 11px 0; border-top: 1px solid #EDF1F5;">
+<span style="display: flex; flex-direction: column; gap: 2px; min-width: 0;"><span style="font-size: 14px; font-weight: 700;">Utilities</span><span style="font-size: 12px; color: #5A6E82;">Power for 6 more machines</span></span>
+<span style="height: 14px; border-radius: 4px; background: #EDF1F5;"><span title="Utilities: Rp 1.8M → Rp 2.0M" style="display: block; height: 14px; width: 1.7%; border-radius: 4px; background: #2A6FD1;"></span></span>
+<span class="num" style="text-align: right; display: flex; flex-direction: column;"><span style="font-weight: 800;">+Rp 0.2M</span><span style="font-size: 12px; color: #5A6E82;">1.8 → 2.0</span></span></div>
+<div style="display: flex; justify-content: space-between; padding: 12px 0 6px; border-top: 1px solid #DDE5EC; font-size: 14px;"><span style="font-weight: 800;">Total added every month</span><span class="num" style="font-weight: 800;">+Rp 30.5M</span></div>
+<p style="margin: 4px 0 6px; font-size: 12px; color: #5A6E82;">Rent, legal and payment fees did not change.</p>
+</section>
+<div style="display: flex; flex-direction: column; gap: 20px; min-width: 0;">
+<section style="background: #003366; color: #FFFFFF; border-radius: 20px; padding: 20px 22px; display: flex; flex-direction: column; gap: 10px;">
+<span style="display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; color: #C9D8E8;"><svg class="ic" viewBox="0 0 24 24" style="color: #3399FF;"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/></svg>AI CFO</span>
+<span style="font-size: 15px; line-height: 1.55; color: #DCE7F2;">The expansion added <strong style="color: #FFFFFF;">Rp 30.5M of costs a month</strong> but only Rp 5.0M of revenue in its first month. By September revenue is Rp 54M higher than in March, while costs are Rp 107M higher (Rp 80M without the one-off repair). The new sites have not paid for themselves yet.</span>
+<div style="display: flex; flex-wrap: wrap; gap: 8px;"><a class="btn" href="AskPanel.dc.html" style="background: #FFFFFF; border-color: #FFFFFF; color: #003366;">Which new sites earn the least?</a><a class="btn" href="Radar.dc.html" style="background: transparent; border-color: #3D6A96; color: #FFFFFF;">Try closing 2 sites</a></div>
+</section>
+<section class="card" style="padding: 20px 24px 10px;">
+<h3 style="margin: 0 0 4px; font-size: 17px; font-weight: 800;">Before and after</h3>
+<div class="cl" style="border-top: none; font-size: 12px; font-weight: 700; color: #5A6E82; grid-template-columns: minmax(0,1fr) 90px 90px 90px;"><span></span><span style="text-align: right;">March</span><span style="text-align: right;">April</span><span style="text-align: right;">September</span></div>
+<div class="cl" style="grid-template-columns: minmax(0,1fr) 90px 90px 90px;"><span>Revenue</span><span class="num" style="text-align: right;">53.0</span><span class="num" style="text-align: right;">58.0</span><span class="num" style="text-align: right; font-weight: 800;">107.0</span></div>
+<div class="cl" style="grid-template-columns: minmax(0,1fr) 90px 90px 90px;"><span>All costs</span><span class="num" style="text-align: right;">65.8</span><span class="num" style="text-align: right;">96.3</span><span class="num" style="text-align: right; font-weight: 800;">172.7</span></div>
+<div class="cl" style="grid-template-columns: minmax(0,1fr) 90px 90px 90px;"><span style="font-weight: 800;">EBITDA</span><span class="num" style="text-align: right;">−12.8</span><span class="num" style="text-align: right;">−38.3</span><span class="num" style="text-align: right; font-weight: 800;">−65.7</span></div>
+<div class="cl" style="grid-template-columns: minmax(0,1fr) 90px 90px 90px;"><span>Machines working</span><span class="num" style="text-align: right;">24</span><span class="num" style="text-align: right;">30</span><span class="num" style="text-align: right; font-weight: 800;">30</span></div>
+</section>
+</div>
+</div>
+
+<section class="card" style="padding: 20px 24px 10px;">
+<div style="display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 4px;"><h3 style="margin: 0; font-size: 17px; font-weight: 800;">April payments behind it</h3><a href="Transactions.dc.html" style="font-size: 13px; font-weight: 700;">All April transactions</a></div>
+<a href="Assets.dc.html" style="display: grid; grid-template-columns: 56px minmax(0, 1fr) 120px 110px; gap: 12px; align-items: center; padding: 12px 0; border-top: 1px solid #EDF1F5; font-size: 14px; color: #003366;"><span class="num" style="color: #5A6E82; font-weight: 700;">3 Apr</span><span style="display: flex; flex-direction: column; gap: 2px; min-width: 0;"><span style="font-weight: 700;">Disinfection machines · batch 2</span><span style="font-size: 12px; color: #5A6E82;">6 units · PT [Machine supplier]</span></span><span><span class="tag" style="background: #E6F1FB; color: #1565C0;">Asset</span></span><span class="num" style="text-align: right; font-weight: 800;">−Rp 78.0M</span></a><a href="Payroll.dc.html" style="display: grid; grid-template-columns: 56px minmax(0, 1fr) 120px 110px; gap: 12px; align-items: center; padding: 12px 0; border-top: 1px solid #EDF1F5; font-size: 14px; color: #003366;"><span class="num" style="color: #5A6E82; font-weight: 700;">5 Apr</span><span style="display: flex; flex-direction: column; gap: 2px; min-width: 0;"><span style="font-weight: 700;">Payroll · April</span><span style="font-size: 12px; color: #5A6E82;">First month with 2 new technicians</span></span><span><span class="tag" style="background: #F4F6F8; color: #3D556E;">People</span></span><span class="num" style="text-align: right; font-weight: 800;">−Rp 18.4M</span></a><a href="Counterparties.dc.html" style="display: grid; grid-template-columns: 56px minmax(0, 1fr) 120px 110px; gap: 12px; align-items: center; padding: 12px 0; border-top: 1px solid #EDF1F5; font-size: 14px; color: #003366;"><span class="num" style="color: #5A6E82; font-weight: 700;">10 Apr</span><span style="display: flex; flex-direction: column; gap: 2px; min-width: 0;"><span style="font-weight: 700;">Location fees · 6 new Ubud sites</span><span style="font-size: 12px; color: #5A6E82;">First month</span></span><span><span class="tag" style="background: #F4F6F8; color: #3D556E;">Location fees</span></span><span class="num" style="text-align: right; font-weight: 800;">−Rp 6.0M</span></a><a href="Counterparties.dc.html" style="display: grid; grid-template-columns: 56px minmax(0, 1fr) 120px 110px; gap: 12px; align-items: center; padding: 12px 0; border-top: 1px solid #EDF1F5; font-size: 14px; color: #003366;"><span class="num" style="color: #5A6E82; font-weight: 700;">12 Apr</span><span style="display: flex; flex-direction: column; gap: 2px; min-width: 0;"><span style="font-weight: 700;">Launch banners and signage</span><span style="font-size: 12px; color: #5A6E82;">CV Desain Kreatif</span></span><span><span class="tag" style="background: #F4F6F8; color: #3D556E;">Marketing</span></span><span class="num" style="text-align: right; font-weight: 800;">−Rp 1.0M</span></a><a href="Transactions.dc.html" style="display: grid; grid-template-columns: 56px minmax(0, 1fr) 120px 110px; gap: 12px; align-items: center; padding: 12px 0; border-top: 1px solid #EDF1F5; font-size: 14px; color: #003366;"><span class="num" style="color: #5A6E82; font-weight: 700;">25 Apr</span><span style="display: flex; flex-direction: column; gap: 2px; min-width: 0;"><span style="font-weight: 700;">Location fees · 24 existing sites</span><span style="font-size: 12px; color: #5A6E82;">April</span></span><span><span class="tag" style="background: #F4F6F8; color: #3D556E;">Location fees</span></span><span class="num" style="text-align: right; font-weight: 800;">−Rp 24.0M</span></a>
+<p style="margin: 10px 0 6px; font-size: 12px; color: #5A6E82;">The machine purchase went to the asset register, so it shows in cash and on Assets, not as an April cost.</p>
+</section>
+
+</div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1340}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>
