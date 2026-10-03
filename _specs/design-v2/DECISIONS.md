@@ -79,7 +79,25 @@ The P-10 migration puts a CHECK constraint on exactly these 9 values from the st
    - The withheld amount is a **prepayment of our own income tax**. It is credited later against PPh 25/29 using the customer's bukti potong.
    - In the data it is **not a cash-flow category and not one of the 9 groups**. It is recorded as a `withholding_record` (migration 031) allocated to the invoice through `debt_settlement_allocations` (`settlement_source_type = 'withholding_record'`). The bukti potong link is `withholding_records.bukti_potong_document_id`. The direction comes from the invoice: `debts.type = 'receivable'` means withheld by the customer. No new migration is needed.
    - **An allocation alone does not change what Pulse and Radar show.** Today the remaining balance comes from `computeDebtStatus` in `server/index.js`: `original_amount − paid_amount`. It does not read `debt_settlement_allocations`, and the existing `/allocate` route is an audit trail only. The next batch must therefore add a server route that records the withholding and also makes the remaining balance 0.
-   - That route has to fit the existing DB guard in 031 (`fn_debt_settlement_guard`). The guard limits allocations to `ceiling − paid_amount`, so an invoice already marked paid at the net amount has no room left for the withheld part. Codex decides how the two fit together before this is coded: count withholding allocations in the remaining balance, or have the route update `paid_amount` together with the allocation. There are tests for both directions (receivable withheld by the customer; payable withheld by us) and for business isolation.
+   - **Owner's preferred option: change only how the remaining balance is calculated.**
+     - Remaining = invoice amount − `paid_amount` − the sum of allocations with `settlement_source_type = 'withholding_record'`.
+     - `transaction` allocations are not subtracted. They are an audit trail of money already counted in `paid_amount`.
+     - It is calculated in one place, `computeDebtStatus`, so Pulse, Radar, the old UI and Telegram all see the same remaining balance.
+     - "Waiting for the customer's tax slip" comes from `withholding_records.status`. Such an invoice never turns "overdue".
+   - **Rejected option: also raising `paid_amount`.** The DB guard in 031 (`fn_debt_settlement_guard`) treats `paid_amount` and allocations as separate money that adds up. The same 10 would be counted twice, and later allocations on the invoice would be rejected. Getting around that would mean changing 031, which is not touched.
+   - **Two conflicts Codex must resolve before coding (checked against `main`):**
+     1. **The DB guard and transaction allocations.** `fn_debt_settlement_guard` allows allocations up to `ceiling − paid_amount`. It counts **all** allocations, including `transaction` ones. `POST /api/debts/:id/pay` raises `paid_amount`, and `/allocate` then records the same money as a `transaction` allocation.
+        - Example: an invoice of 100 is paid 90 through `/pay`, so the room left is 10. Recording the 90 in `/allocate` is already rejected by the DB; this happens today, regardless of v2.
+        - If a transaction allocation exists, a withholding allocation of 10 is rejected too: 90 + 10 > 10.
+        - The withholding route only works when no transaction allocations exist on the invoice. Codex decides whether that is acceptable or whether the guard needs an approved fix. Changing 031 needs the owner's explicit approval. In both cases the existing `/allocate` conflict is reported as a separate finding.
+     2. **`/api/debts/:id/pay` has its own remaining calculation** (`effectiveTotal − alreadyPaid`). It does not use `computeDebtStatus`. After a withholding of 10 on an invoice of 100, it would still accept a payment of 100. The pay route must use the same remaining formula, or overpayment becomes possible.
+   - **Tests:**
+     - both directions: receivable withheld by the customer, and payable withheld by us;
+     - an invoice with no withholding is calculated exactly as before;
+     - `/pay` rejects an overpayment after a withholding;
+     - a "waiting for slip" invoice is never overdue;
+     - business isolation.
+   - **Scope.** `computeDebtStatus` and `/pay` are shared by all workspaces' Business screens. This is a change to existing Business behaviour, not only v2. It is a separate batch with its own review, not behind the v2 flag, and it does not touch Personal.
    - Until the bukti potong arrives, it shows as "waiting for the customer's tax slip" and is never treated as an unpaid balance or as a bad debt.
    - This does **not** apply when the company pays the UMKM final tax (PP 55/2022) and has given the customer its certificate (Surat Keterangan PP 55). Then the customer does not withhold PPh 23. The accountant confirms the document per customer.
    - P-10 must keep these cases separate, or contract margins will be understated.
