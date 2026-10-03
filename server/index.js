@@ -1368,16 +1368,19 @@ app.patch('/api/debts/:id/settle', auth, async (req, res) => {
   const debt = debts?.[0];
   if (!debt) return res.status(404).json({ error: 'Debt not found' });
   const fullAmount = Number(debt?.original_amount || debt?.amount || 0);
+  // A recorded withholding already settles its part: paid_amount covers only the rest, so
+  // paid_amount + withholding never exceeds the bill (batch 10). No withholding → as before.
+  const withheld = Number((await loadWithholdings(biz.business.id))[String(debt.id)]?.amount || 0);
   const { data, error } = await supabase.from('debts')
     .update({
       is_settled:   true,
       settled_at:   new Date().toISOString(),
       status:       'paid',
-      paid_amount:  fullAmount,
+      paid_amount:  Math.max(0, fullAmount - withheld),
     })
     .eq('id', debt.id).select().single();
   if (error) return res.status(500).json({ error: error.message });
-  res.json(computeDebtStatus(data));
+  res.json(computeDebtStatus({ ...data, withholding_allocated: withheld }));
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
