@@ -377,12 +377,13 @@ test('no migration was added by PR2.5', () => {
     '054_onboarding_foundation.sql',
     '055_counterparty_intelligence_v1.sql',
     '057_mcp_oauth.sql',
-    // Design v2 (DECISIONS.md): P-01, P-08, P-04, P-05, P-10.
+    // Design v2 (DECISIONS.md): P-01, P-08, P-04, P-05, P-10, P-11.
     '058_business_runway_target.sql',
     '059_business_targets_alerts.sql',
     '060_counterparty_tax_fields.sql',
     '061_bill_checklist_status.sql',
     '062_pnl_groups_industry_templates.sql',
+    '063_asset_register.sql',                // P-11
   ]);
   const unexpected = migs.filter((f) => /^04[6-9]_|^0[5-9]\d_/.test(f) && !ALLOWED.has(f));
   assert.strictEqual(unexpected.length, 0, `unexpected migration(s): ${unexpected.join(', ')}`);
