@@ -1,7 +1,9 @@
 // Performance (designs/Performance, PerformanceCash, PerformanceForecast, PerformanceMobile,
 // PerformanceApril) — /business/performance, /performance/cash, /performance/forecast.
 // Read-only. Spec: specs/PERFORMANCE_METRICS.md; what the data allows today is explained in
-// lib/performance.js. Profit is an ESTIMATE and says so; Cash and Forecast are cash view.
+// lib/performance.js. Profit is an ESTIMATE and says so — until the business confirms its
+// category → group mapping (P-10, /business/performance/groups); then Profit is the accrual
+// view from lib/pnl.js. Cash and Forecast are cash view.
 // The two views are never mixed in one figure.
 //
 // Drill-down (DESIGN_SPEC rule 6): ?month=YYYY-MM&compare=YYYY-MM&focus=<key> shows a filter
@@ -21,6 +23,7 @@ import { txDate } from '../lib/obligations'
 import {
   lastMonths, profitRows, cashRows, burn3, runwayFrom, weekBuckets, cashOutDate, threeMonths, monthCompare, prevMonth,
 } from '../lib/performance'
+import { mappingConfirmed, accrualRows, taxLabelKey } from '../lib/pnl'
 import { AskButton } from '../ai/AskPanel'
 import { useAskContext } from '../ai/AskContext'
 import AiText from '../ai/AiText'
@@ -91,7 +94,7 @@ function Drill({ drill, tx, t, lang, clear }) {
   )
 }
 
-function ProfitTab({ rows, sel, t, lang, needsReview, tx }) {
+function ProfitTab({ rows, sel, t, lang, needsReview, tx, accrual = null }) {
   const cur = rows.find((r) => r.month === sel) || rows[rows.length - 1]
   const prev = rows.find((r) => r.month === prevMonth(cur.month))
   const chartRows = rows.map((r) => ({ key: r.month, label: mName(r.month, lang), short: mName(r.month, lang, 'short'), values: { revenue: r.revenue, gross: r.gross, ebitda: r.ebitda, net: r.net } }))
@@ -100,11 +103,19 @@ function ProfitTab({ rows, sel, t, lang, needsReview, tx }) {
   const note = t('perf.profit.note', { m: mName(cur.month, lang), c: mName(prevMonth(cur.month), lang), costs: money(cmp.costsNow - cmp.costsBefore, { sign: true }), link: noteLink })
   return (
     <>
-      <div className="v2-banner v2-tone-info" role="note">
-        <Pill tone="info">{t('perf.estimate')}</Pill>
-        <span className="v2-banner-text">{t('perf.estimateNote')}{needsReview > 0 && ` ${t('perf.needsReview', { n: needsReview })}`}</span>
-        <Btn to="/business/accountant">{t('acct.tab.close')}</Btn>
-      </div>
+      {accrual ? (
+        <div className="v2-banner v2-tone-good" role="note">
+          <Pill tone="good">{t('perf.accrual')}</Pill>
+          <span className="v2-banner-text">{t('perf.accrualNote')} {t('perf.coverage', { n: accrual.coverage.categorised, m: accrual.coverage.total })}</span>
+          <Btn to="/business/performance/groups">{t('perf.groups.open')}</Btn>
+        </div>
+      ) : (
+        <div className="v2-banner v2-tone-info" role="note">
+          <Pill tone="info">{t('perf.estimate')}</Pill>
+          <span className="v2-banner-text">{t('perf.estimateNote')}{needsReview > 0 && ` ${t('perf.needsReview', { n: needsReview })}`}</span>
+          <Btn to="/business/accountant">{t('acct.tab.close')}</Btn>
+        </div>
+      )}
       <div className="v2-tiles">
         <Kpi label={t('perf.revenue', { m: mName(cur.month, lang, 'short') })} value={money(cur.revenue)} sub={prev && pct(cur.revenue, prev.revenue) != null ? t(cur.revenue >= prev.revenue ? 'perf.upOn' : 'perf.downOn', { n: Math.abs(pct(cur.revenue, prev.revenue)), m: mName(prev.month, lang, 'short') }) : null} />
         <Kpi label={t('perf.gross')} value={money(cur.gross, { sign: cur.gross < 0 })} sub={cur.margin != null ? t('perf.margin', { n: Math.round(cur.margin * 100) }) : null} />
@@ -122,7 +133,7 @@ function ProfitTab({ rows, sel, t, lang, needsReview, tx }) {
           series={[{ key: 'ebitda', label: 'EBITDA' }, { key: 'net', label: t('perf.net') }]} /></Card>
       </div>
       <div className="v2-grid-detail">
-        <Card title={t('perf.waterfall', { m: mName(cur.month, lang) })} aside={<Pill tone="info">{t('perf.estimate')}</Pill>} className="v2-col">
+        <Card title={t('perf.waterfall', { m: mName(cur.month, lang) })} aside={accrual ? <Pill tone="good">{t('perf.accrual')}</Pill> : <Pill tone="info">{t('perf.estimate')}</Pill>} className="v2-col">
           <dl className="v2-dl v2-dl-tight v2-waterfall">
             <dt>{t('perf.revenueShort')}</dt><dd className="v2-num v2-r">{money(cur.revenue)}</dd>
             <dt>{t('perf.direct')}</dt><dd className="v2-num v2-r">{money(-cur.direct, { sign: true })}</dd>
@@ -130,8 +141,12 @@ function ProfitTab({ rows, sel, t, lang, needsReview, tx }) {
             <dt>{t('perf.opex')}</dt><dd className="v2-num v2-r">{money(-cur.opex, { sign: true })}</dd>
             <dt><strong>EBITDA</strong></dt><dd className="v2-num v2-r"><strong>{money(cur.ebitda)}</strong></dd>
             <dt>{t('perf.depreciation')}</dt><dd className="v2-r v2-muted">{t('perf.needsAssets')}</dd>
-            <dt>{t('perf.interest')}</dt><dd className="v2-num v2-r">{money(-cur.interest, { sign: cur.interest > 0 })}</dd>
-            <dt>{t('perf.incomeTax')}</dt><dd className="v2-num v2-r">{cur.ebitda - cur.interest > 0 ? money(-cur.tax, { sign: true }) : t('perf.lossNoTax')}</dd>
+            {accrual && <><dt><strong>{t('perf.operatingProfit')}</strong></dt><dd className="v2-num v2-r"><strong>{money(cur.operating)}</strong></dd>
+              <dt>{t('perf.otherIncome')}<span className="v2-muted"> · {t('perf.otherIncomeNet')}</span></dt><dd className="v2-num v2-r">{money(cur.otherIncome, { sign: cur.otherIncome !== 0 })}</dd></>}
+            <dt>{accrual ? t('perf.loanInterest') : t('perf.interest')}</dt><dd className="v2-num v2-r">{money(-cur.interest, { sign: cur.interest > 0 })}</dd>
+            {accrual
+              ? <><dt>{t(`perf.tax.${accrual.taxKey}`)}</dt><dd className="v2-num v2-r">{money(-cur.tax, { sign: cur.tax !== 0 })}</dd></>
+              : <><dt>{t('perf.incomeTax')}</dt><dd className="v2-num v2-r">{cur.ebitda - cur.interest > 0 ? money(-cur.tax, { sign: true }) : t('perf.lossNoTax')}</dd></>}
             <dt><strong>{t('perf.net')}</strong></dt><dd className="v2-num v2-r"><strong>{money(cur.net)}</strong></dd>
           </dl>
         </Card>
@@ -149,7 +164,19 @@ function ProfitTab({ rows, sel, t, lang, needsReview, tx }) {
           <Card title={t('perf.howTitle')}>
             <ul className="v2-bullets">{['h1', 'h2', 'h3', 'h4', 'h5'].map((k) => <li key={k}>{t(`perf.how.${k}`)}</li>)}</ul>
           </Card>
-          <Card title={t('perf.setupTitle')}><p className="v2-sec">{t('perf.setupText')}</p><Pill tone="warn">{t('placeholder.notSetUp')}</Pill></Card>
+          {accrual ? (
+            <Card title={t('perf.coverageTitle')} aside={<Link to="/business/performance/groups">{t('perf.groups.open')}</Link>}>
+              <p className="v2-sec">{t('perf.coverage', { n: accrual.coverage.categorised, m: accrual.coverage.total })}</p>
+              {accrual.coverage.missing.length > 0 && (
+                <ul className="v2-moves">{accrual.coverage.missing.slice(0, 6).map((x) => (
+                  <li key={x.name}><span>{x.name === '—' ? t('perf.noCategory') : x.name}</span><span className="v2-num">{x.count}</span></li>
+                ))}</ul>
+              )}
+              <p className="v2-muted v2-small">{t('perf.coverageNote')}</p>
+            </Card>
+          ) : (
+            <Card title={t('perf.setupTitle')}><p className="v2-sec">{t('perf.setupText')}</p><Btn variant="primary" to="/business/performance/groups">{t('perf.groups.setUp')}</Btn></Card>
+          )}
         </aside>
       </div>
     </>
@@ -258,6 +285,10 @@ export default function Performance() {
   const ins = useApi(`/pulse/advanced-insights?from=${months[0]}-01&to=${new Date().toISOString().slice(0, 10)}`)
   const tx = useApi('/transactions?period=all')
   const obl = useApi('/accountant/obligations')
+  // P-10: confirmed category groups switch Profit to the accrual view.
+  const cats = useApi('/cashflow-categories')
+  const debts = useApi('/debts')
+  const prof = useApi('/accountant/profile')
   useAskContext(t('nav.performance'), drillOn ? mName(drill.month, lang) : mName(sel, lang))
 
   const series = ins.data?.series || []
@@ -265,6 +296,13 @@ export default function Performance() {
   const pRows = useMemo(() => profitRows(series, months), [series, months])
   const cRows = useMemo(() => cashRows({ series, transactions: txs, balance: pulse.data?.totalBalance, months }), [series, txs, pulse.data, months])
   const burn = burn3(cRows, months[months.length - 1])
+  const catList = cats.data?.categories || []
+  const confirmed = mappingConfirmed(catList)
+  const accrual = useMemo(() => {
+    if (!confirmed) return null
+    const r = accrualRows({ transactions: txs, debts: Array.isArray(debts.data) ? debts.data : [], categories: catList, months })
+    return { ...r, taxKey: taxLabelKey(prof.data?.profile?.tax_regime) }
+  }, [confirmed, txs, debts.data, catList, months, prof.data]) // eslint-disable-line react-hooks/exhaustive-deps
   const setMonth = (m) => { const n = new URLSearchParams(); n.set('month', m); navigate(`${location.pathname}?${n}`, { replace: true }) }
 
   const head = (
@@ -290,7 +328,7 @@ export default function Performance() {
       {tabs}
       {drillOn ? <Drill drill={drill} tx={txs} t={t} lang={lang} clear={() => navigate(location.pathname)} />
         : nothing ? <Card><Empty icon={<I.performance size={28} />} title={t('perf.emptyTitle')} text={t('perf.emptyText')} action={<Btn variant="primary" to="/business/bank-import">{t('acc.import')}</Btn>} /></Card>
-        : tab === 'profit' ? <ProfitTab rows={pRows} sel={sel} t={t} lang={lang} needsReview={Number(ins.data?.needs_review_count) || 0} tx={txs} />
+        : tab === 'profit' ? <ProfitTab rows={accrual ? accrual.rows : pRows} accrual={accrual} sel={sel} t={t} lang={lang} needsReview={Number(ins.data?.needs_review_count) || 0} tx={txs} />
         : tab === 'cash' ? <CashTab rows={cRows} sel={sel} cash={pulse.data?.totalBalance} t={t} lang={lang} />
         : <ForecastTab pulse={pulse.data} obligations={obl.data?.obligations || []} burnMonthly={burn?.monthly} t={t} lang={lang} />}
     </div>

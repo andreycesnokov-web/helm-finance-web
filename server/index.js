@@ -14,6 +14,7 @@ const docA = require('./lib/documentAccess');
 const TX = require('./lib/transactionClass');
 const TARGETS = require('./lib/businessTargets');   // Design v2 P-01/P-08 (migrations 058, 059)
 const CHECKLIST = require('./lib/billChecklist');   // Design v2 P-05 (migration 061)
+const PNLMAP = require('./lib/pnlMapping');         // Design v2 P-10 (migration 062)
 // Telegram-created payables are IDR-only until multi-currency payables exist end to end.
 // See server/lib/telegramCurrency.js for why refusing beats recording a wrong row.
 const { isSupportedTelegramCurrency, currencyNotSupported, normalizeCurrency } = require('./lib/telegramCurrency');
@@ -8107,6 +8108,84 @@ app.get('/api/cashflow-categories', auth, async (req, res) => {
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
+});
+
+// ── Profit-group mapping (Design v2 P-10; migration 062) ──────────────────────────
+// GET: this business's categories with their confirmed pnl_group and a SUGGESTION from
+// industry_templates (by the business's KBLI codes). Finance roles; Business only.
+// PATCH: confirm or clear groups for this business's own categories. owner/ceo/admin/cfo;
+// every write audited (pnl_mapping_confirmed). Suggestions are never written by the server
+// on its own. Before 062: GET answers available:false, PATCH 409.
+app.get('/api/pnl-mapping', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (biz.business?.type === 'personal')
+      return res.status(403).json({ error: 'business_workspace_required' });
+    if (!canViewBusinessFinance(biz.role))
+      return res.status(403).json({ error: 'Your role does not allow viewing the profit mapping' });
+    const { data: cats, error: cErr } = await supabase.from('cashflow_categories')
+      .select('id, name, group_type, activity_type, is_active, pnl_group')
+      .eq('business_id', biz.business.id).order('sort_order', { ascending: true }).order('name', { ascending: true });
+    if (cErr && TARGETS.isMissingColumn(cErr)) return res.json({ available: false, groups: PNLMAP.GROUPS, categories: [], can_edit: false });
+    if (cErr) throw cErr;
+    const { data: tpl, error: tErr } = await supabase.from('industry_templates')
+      .select('kbli_prefix, category_name, pnl_group, note, sort_order').limit(2000);
+    if (tErr) return res.json({ available: false, groups: PNLMAP.GROUPS, categories: [], can_edit: false });
+    const { data: profRows } = await supabase.from('tax_profiles')
+      .select('primary_kbli, additional_kbli, tax_regime').eq('business_id', biz.business.id).limit(1);
+    const codes = PNLMAP.kbliCodes(profRows?.[0]);
+    const categories = (cats || []).filter((c) => c.is_active !== false)
+      .map((c) => ({ ...c, suggestion: PNLMAP.suggestFor(c.name, tpl, codes) }));
+    res.json({
+      available: true, groups: PNLMAP.GROUPS, kbli: codes, tax_regime: profRows?.[0]?.tax_regime || null,
+      confirmed: categories.some((c) => c.pnl_group), categories,
+      missing_from_template: PNLMAP.missingTemplateCategories(categories, tpl, codes),
+      can_edit: PNLMAP.canEditMapping(biz.role),
+    });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.patch('/api/pnl-mapping', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (biz.business?.type === 'personal')
+      return res.status(403).json({ error: 'business_workspace_required' });
+    if (!PNLMAP.canEditMapping(biz.role))
+      return res.status(403).json({ error: 'Only owner, CEO, admin or CFO can confirm the profit mapping' });
+    const { items, error: vErr } = PNLMAP.mappingsFromBody(req.body || {});
+    if (vErr) return res.status(400).json({ error: vErr });
+
+    const ids = items.map((i) => i.category_id);
+    const { data: rows, error: rErr } = await supabase.from('cashflow_categories')
+      .select('id, name, pnl_group').eq('business_id', biz.business.id).in('id', ids);
+    if (rErr && TARGETS.isMissingColumn(rErr)) return res.status(409).json({ error: 'migration_not_applied', migration: '062' });
+    if (rErr) throw rErr;
+    // Every id must be this business's own category; nothing is written otherwise.
+    if ((rows || []).length !== ids.length)
+      return res.status(404).json({ error: 'category_not_found_in_this_business' });
+
+    const before = Object.fromEntries(rows.map((r) => [r.id, r.pnl_group ?? null]));
+    const changed = items.filter((i) => before[i.category_id] !== i.pnl_group);
+    for (const i of changed) {
+      const { error } = await supabase.from('cashflow_categories')
+        .update({ pnl_group: i.pnl_group, updated_at: new Date().toISOString() })
+        .eq('id', i.category_id).eq('business_id', biz.business.id);
+      if (error && TARGETS.isMissingColumn(error)) return res.status(409).json({ error: 'migration_not_applied', migration: '062' });
+      if (error) throw error;
+    }
+    if (changed.length) {
+      const names = Object.fromEntries(rows.map((r) => [r.id, r.name]));
+      await recordAudit({
+        businessId: biz.business.id, actorUserId: req.user.userId, actorRole: biz.role,
+        entityType: 'pnl_mapping', entityId: biz.business.id, action: 'pnl_mapping_confirmed',
+        before: changed.map((i) => ({ category_id: i.category_id, name: names[i.category_id], pnl_group: before[i.category_id] })),
+        after: changed.map((i) => ({ category_id: i.category_id, name: names[i.category_id], pnl_group: i.pnl_group })),
+      });
+    }
+    res.json({ ok: true, changed: changed.length });
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 // POST /api/cashflow-categories — create user custom category

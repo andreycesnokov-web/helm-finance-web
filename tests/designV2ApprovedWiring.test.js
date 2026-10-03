@@ -73,11 +73,26 @@ t('POST and PATCH /api/counterparties: tax fields validated and role-gated; audi
   assert.ok(/entity_form: row\.entity_form \?\? null/.test(src) && /payment_terms_days: row\.payment_terms_days \?\? null/.test(src), 'public shape null-safe');
 });
 
+t('P-10 mapping: business-scoped, Personal refused, role, audit; ids checked against this business', () => {
+  const g = handler('get', '/api/pnl-mapping');
+  assert.ok(g.includes('canViewBusinessFinance(biz.role)') && g.includes('business_workspace_required'));
+  assert.ok(!/\.(insert|update|delete|upsert)\(/.test(g), 'GET is read-only');
+  const p = handler('patch', '/api/pnl-mapping');
+  assert.ok(p.includes('business_workspace_required'));
+  assert.ok(p.includes('PNLMAP.canEditMapping(biz.role)'));
+  assert.ok(p.includes('PNLMAP.mappingsFromBody'));
+  assert.ok(/from\('cashflow_categories'\)[\s\S]*\.eq\('business_id', biz\.business\.id\)\.in\('id', ids\)/.test(p));
+  assert.ok(p.includes('category_not_found_in_this_business'));
+  assert.ok(/\.update\([\s\S]*\.eq\('id', i\.category_id\)\.eq\('business_id', biz\.business\.id\)/.test(p));
+  assert.ok(/recordAudit\([\s\S]*pnl_mapping_confirmed/.test(p));
+  assert.ok(!/industry_templates[\s\S]*\.update\(/.test(p), 'never writes suggestions');
+});
+
 t('no new migration touches 037–043 or R001, and the new ones are 058–061 only', () => {
   const dir = fs.readdirSync(path.join(__dirname, '..', 'migrations'));
   for (const n of ['058_business_runway_target.sql', '059_business_targets_alerts.sql', '060_counterparty_tax_fields.sql', '061_bill_checklist_status.sql'])
     assert.ok(dir.includes(n), n);
-  for (const n of dir.filter((f) => /^06[01]_|^05[89]_/.test(f))) {
+  for (const n of dir.filter((f) => /^06[01]_|^05[89]_/.test(f))) { // 062 seeds its own new table (checked in ci_062)
     const sql = fs.readFileSync(path.join(__dirname, '..', 'migrations', n), 'utf8').replace(/^\s*--.*$/gm, '');
     assert.ok(!/\bDROP\s+(TABLE|COLUMN)\b/i.test(sql), n + ': no drops outside comments');
     assert.ok(!/ALTER\s+COLUMN/i.test(sql), n + ': no existing column changed');

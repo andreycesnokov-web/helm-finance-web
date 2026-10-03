@@ -42,6 +42,7 @@ import BillDetail from './pages/BillDetail'
 import V2Approvals from './pages/Approvals'
 import V2Counterparties from './pages/Counterparties'
 import AddCounterparty from './pages/AddCounterparty'
+import ProfitGroups from './pages/ProfitGroups'
 import V2Accounts from './pages/Accounts'
 import V2Transactions from './pages/Transactions'
 import V2Payroll from './pages/Payroll'
@@ -86,6 +87,7 @@ export default function BusinessApp() {
           <Route path="performance" element={<Performance />} />
           <Route path="performance/cash" element={<Performance />} />
           <Route path="performance/forecast" element={<Performance />} />
+          <Route path="performance/groups" element={<ProfitGroups />} />
           <Route path="ai-cfo" element={<V2AICFO />} />
           <Route path="ai-cfo/classic" element={<AICFO />} />
           {/* Money */}

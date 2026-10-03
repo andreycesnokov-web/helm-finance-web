@@ -10,6 +10,7 @@
 //   POST  /api/counterparties          existing create; the server refuses likely duplicates (409)
 //   PATCH /api/counterparties/:id      existing edit — batch 8 uses it for entity form, role, terms (P-04)
 //   PATCH /api/business/targets        NEW in batch 8 — runway target, minimum cash, weekly brief (P-01, P-08)
+//   PATCH /api/pnl-mapping             NEW in batch 9 — confirm category → profit group (P-10)
 //   PATCH /api/debts/:id/checklist     NEW in batch 8 — accountant check only (P-05 option B: the
 //                                      withholding slip lives in withholding_records and is read-only here)
 //
@@ -43,6 +44,9 @@ export const updateBusinessTargets = (token, body) =>
 
 export const updateBillChecklist = (token, id, body) =>
   apiFetch(`/debts/${encodeURIComponent(id)}/checklist`, token, { method: 'PATCH', body })
+
+export const updatePnlMapping = (token, body) =>
+  apiFetch('/pnl-mapping', token, { method: 'PATCH', body })
 
 /** Server error → short user-facing text. 403 means the role may not do this. */
 export function actionError(e) {
