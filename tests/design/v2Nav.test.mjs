@@ -29,7 +29,17 @@ t('phone tab bar is Pulse · Radar · + Add · AI CFO · More', () => {
 })
 
 t('every nav and tab destination is a registered v2 route', () => {
-  for (const it of [...allNavItems(), ...TABS]) assert.ok(v2Paths.has(it.to), `${it.to} is not routed in BusinessApp.jsx`)
+  for (const it of [...allNavItems(), ...TABS]) {
+    if (it.disabled) continue
+    assert.ok(v2Paths.has(it.to), `${it.to} is not routed in BusinessApp.jsx`)
+  }
+})
+
+t('"+ Add" is disabled until Add is migrated — never the legacy Personal-default page (review 8.2 #3)', () => {
+  const add = TABS.find((x) => x.key === 'add')
+  assert.ok(add.disabled && add.to === null)
+  for (const f of ['client/src/v2/shell/V2Shell.jsx', 'client/src/v2/pages/Transactions.jsx', 'client/src/v2/nav.js'])
+    assert.ok(!/to=["'{]?\/business\/add\b|to: '\/business\/add'/.test(read(f)), `${f} links to /business/add`)
 })
 
 t('every legacy /business route is still routed when the flag is on', () => {

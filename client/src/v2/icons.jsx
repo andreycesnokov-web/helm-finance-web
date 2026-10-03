@@ -33,6 +33,7 @@ export const I = {
   close: (p) => <S {...p}><path d="M6 6l12 12M18 6L6 18" /></S>,
   upload: (p) => <S {...p}><path d="M12 16V4M7 9l5-5 5 5" /><path d="M4 20h16" /></S>,
   clock: (p) => <S {...p}><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></S>,
+  lock: (p) => <S {...p}><rect x="5" y="11" width="14" height="9" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></S>,
   warn: (p) => <S {...p}><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" /><path d="M12 9v4M12 17h.01" /></S>,
   check: (p) => <S {...p}><path d="M5 12l5 5 9-10" /></S>,
   info: (p) => <S {...p}><circle cx="12" cy="12" r="9" /><path d="M12 11v5M12 8h.01" /></S>,
