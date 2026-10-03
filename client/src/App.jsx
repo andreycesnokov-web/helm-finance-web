@@ -561,6 +561,9 @@ const DesignPreview = DESIGN_PREVIEW_ON ? lazy(() => import('./pages/DesignPrevi
 // which keeps every existing /business path resolvable.
 const DESIGN_V2 = import.meta.env.VITE_DESIGN_V2 === 'true'
 const V2BusinessApp = DESIGN_V2 ? lazy(() => import('./v2/BusinessApp')) : null
+// Platform admin v2 (overview, companies, flags & system). Same flag, same lazy boundary;
+// every other /admin route stays the existing page.
+const V2AdminApp = DESIGN_V2 ? lazy(() => import('./v2/AdminApp')) : null
 
 export default function App() {
   return (
@@ -686,13 +689,27 @@ export default function App() {
           {/* Hidden admin routes — not in sidebar, protected by ADMIN_TELEGRAM_IDS on backend */}
           <Route path="/admin"           element={<Layout><Admin /></Layout>} />
           {/* Platform Admin Dashboard (read-only owner console) */}
-          <Route path="/admin/dashboard" element={<Layout><AdminDashboard /></Layout>} />
+          {DESIGN_V2 ? (
+            <>
+              <Route path="/admin/dashboard" element={<Suspense fallback={null}><V2AdminApp page="overview" /></Suspense>} />
+              {/* v2 only: the new Flags & system page. */}
+              <Route path="/admin/system" element={<Suspense fallback={null}><V2AdminApp page="system" /></Suspense>} />
+            </>
+          ) : <Route path="/admin/dashboard" element={<Layout><AdminDashboard /></Layout>} />}
           {/* Users console is also reachable at /admin/users (same list as /admin) so the
               natural URL renders instead of an unmatched-route blank page. */}
           <Route path="/admin/users"     element={<Layout><Admin /></Layout>} />
           <Route path="/admin/users/:id" element={<Layout><AdminUser /></Layout>} />
-          <Route path="/admin/businesses" element={<Layout><AdminBusinesses /></Layout>} />
-          <Route path="/admin/businesses/:businessId" element={<Layout><AdminBusinessDetail /></Layout>} />
+          {DESIGN_V2
+            ? <Route path="/admin/businesses" element={<Suspense fallback={null}><V2AdminApp page="companies" /></Suspense>} />
+            : <Route path="/admin/businesses" element={<Layout><AdminBusinesses /></Layout>} />}
+          {DESIGN_V2 ? (
+            <>
+              <Route path="/admin/businesses/:businessId" element={<Suspense fallback={null}><V2AdminApp page="companies" /></Suspense>} />
+              {/* v2 only: the existing company tools (plan, trial, archive) stay one click away. */}
+              <Route path="/admin/businesses/:businessId/tools" element={<Layout><AdminBusinessDetail /></Layout>} />
+            </>
+          ) : <Route path="/admin/businesses/:businessId" element={<Layout><AdminBusinessDetail /></Layout>} />}
           <Route path="/admin/access-audit" element={<Layout><AdminAccessAudit /></Layout>} />
           <Route path="/admin/payment-connections" element={<Layout><AdminPaymentConnections /></Layout>} />
           <Route path="/admin/tax-rules" element={<Layout><TaxRulesAdmin /></Layout>} />

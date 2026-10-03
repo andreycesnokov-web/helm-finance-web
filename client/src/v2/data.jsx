@@ -68,3 +68,24 @@ export function useApi(path) {
 export function useInvalidate() {
   return useContext(Ctx)?.invalidate || (() => {})
 }
+
+/**
+ * Platform-admin reads (not workspace-scoped). The server is the gate: every
+ * /api/admin route runs requireAdmin, so a non-admin gets 403 and the screen says so.
+ * GET only — admin screens in v2 never write.
+ */
+export function useAdminApi(path) {
+  const { token } = useAuth()
+  const [st, setSt] = useState({ loading: !!path, error: null, data: null })
+  const [nonce, setNonce] = useState(0)
+  useEffect(() => {
+    if (!path || !token) { setSt({ loading: false, error: null, data: null }); return }
+    let on = true
+    setSt({ loading: true, error: null, data: null })
+    apiFetch(path, token)
+      .then((d) => { if (on) setSt({ loading: false, error: null, data: d }) })
+      .catch((e) => { if (on) setSt({ loading: false, error: e, data: null }) })
+    return () => { on = false }
+  }, [path, token, nonce])
+  return { ...st, reload: () => setNonce((n) => n + 1) }
+}

@@ -133,3 +133,28 @@ Format: what · fields · why · risk · what the UI does meanwhile.
 - **Meanwhile:** the register and "Save asset" are honest "not set up yet"; the purchase
   invoice can already be uploaded; Assets shows only the known parts of the balance and no
   net worth.
+
+## P-12 · Admin metrics: usage, AI cost, service health (batch 7)
+
+- **What:** a usage-event store (AI CFO questions, documents read, MCP drafts, Telegram
+  messages) with provider cost per event, and uptime/error counters per service.
+- **Fields:** `usage_events(id, business_id, kind, units, cost_idr null, created_at)`,
+  `service_checks(service, checked_at, ok, detail)`.
+- **Why:** Platform overview (AI usage, AI cost, plan limits) and Flags & system (services).
+- **Risk:** low for privacy if it stores counts only — never prompts, answers or amounts.
+- **Meanwhile:** these blocks say "Not tracked yet"; database reachability and the deployed
+  commit come from the existing dashboard response.
+
+## P-13 · Support-access grants (batch 7)
+
+- **What:** the platform owner requests read-only access to one client company; the client
+  owner approves in their app; access lasts 24 hours and is written to the client's audit log.
+- **Fields:** `support_access_grants(id, business_id, requested_by, reason, status
+  [requested|approved|denied|expired|revoked], approved_by null, approved_at null,
+  expires_at null, created_at)` + server middleware that admits admin reads of that business
+  only while a grant is approved and unexpired, and audits every read.
+- **Why:** DESIGN_SPEC rule 7; the "Request support access" button in Companies.
+- **Risk:** high — it opens client financial data to platform staff. Needs owner approval,
+  a security review (auth middleware) and the client-side approval screen (not drawn).
+- **Meanwhile:** the button is disabled with "Waiting for the grant design approval"; admin
+  screens read only /api/admin/* counts (enforced by tests/design/v2AdminModel.test.mjs).
