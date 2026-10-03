@@ -15,6 +15,8 @@ import { shortDate } from '../lib/format'
 import AccountantTabs from '../components/AccountantTabs'
 
 const DOCS = ['akta', 'sk_kemenkumham', 'nib', 'npwp']
+// Tax regime values the legacy profile form stores; anything else is shown as stored.
+const REGIMES = ['normal', 'pp23_final', 'pph_final_umkm']
 const show = (v) => (v == null || v === '' || (Array.isArray(v) && !v.length) ? null : Array.isArray(v) ? v.join(', ') : String(v))
 const mask = (v) => { const s = String(v || '').replace(/\D/g, ''); return s.length > 4 ? `···· ${s.slice(-4)}` : show(v) }
 
@@ -94,7 +96,7 @@ export default function CompanyProfile() {
               <Row t={t} label="NPWP" value={mask(p.npwp || p.tax_identifier)} source={src('npwp')} />
               <Row t={t} label={t('prof.kpp')} value={show(p.kpp)} />
               <Row t={t} label={t('prof.vat')} value={p.pkp_status === 'pkp' ? 'PKP' : p.pkp_status === 'non_pkp' ? t('cp.form.notPkp') : null} source={p.pkp_effective_date ? shortDate(p.pkp_effective_date, lang) : null} />
-              <Row t={t} label={t('prof.regime')} value={show(p.tax_regime)} />
+              <Row t={t} label={t('prof.regime')} value={REGIMES.includes(p.tax_regime) ? t(`prof.regimeV.${p.tax_regime}`) : show(p.tax_regime)} />
             </dl>
           </Card>
 

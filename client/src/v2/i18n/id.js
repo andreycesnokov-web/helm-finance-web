@@ -17,7 +17,7 @@ export default {
     skip: 'Lewati ke konten', 
     crash: 'Terjadi kesalahan di layar ini. Data Anda aman.',
     brand: 'CFO AI', notifications: 'Notifikasi', openMore: 'Buka menu ruang kerja',
-    switchHint: 'Ganti perusahaan atau ke Pribadi', company: 'Perusahaan', personal: 'Pribadi',
+    wsGroupCompany: 'Ruang kerja perusahaan', wsCreate: 'Buat ruang kerja perusahaan', wsCreateHint: 'Uang dan tim perusahaan terpisah', wsMember: 'Anggota', switchHint: 'Ganti perusahaan atau ke Pribadi', company: 'Perusahaan', personal: 'Pribadi',
     companies: 'Perusahaan', createCompany: 'Buat ruang kerja perusahaan',
     loading: 'Memuat ruang kerja…', loadError: 'Gagal memuat ruang kerja', retry: 'Coba lagi',
   },
@@ -274,7 +274,7 @@ export default {
     billingCodes: 'Dapatkan kode billing', reminders: 'Pengingat', remindersText: 'Pengingat tenggat dikirim lewat pengingat Telegram yang sudah ada.', reminderSettings: 'Atur pengingat',
   },
   prof: {
-    sub: 'CFO AI memakai ini untuk menentukan pajak, laporan, dan tenggat Anda', edit: 'Ubah profil', notFilled: 'Belum diisi', from: 'dari {s}', confirmed: 'dikonfirmasi',
+    regimeV: { normal: 'Umum (tarif normal)', pp23_final: 'Final 0,5% (PP 23/2018)', pph_final_umkm: 'Final 0,5% UMKM' }, sub: 'CFO AI memakai ini untuk menentukan pajak, laporan, dan tenggat Anda', edit: 'Ubah profil', notFilled: 'Belum diisi', from: 'dari {s}', confirmed: 'dikonfirmasi',
     pct: 'Profil {n}% lengkap', unknownPct: 'Kelengkapan tidak diketahui', uploadHint: 'Unggah dokumen perusahaan — AI mengisi kolom, Anda mengonfirmasi',
     doc: { akta: 'Akta pendirian', sk_kemenkumham: 'SK Kemenkumham', nib: 'NIB dari OSS', npwp: 'Kartu NPWP' },
     docSt: { needs_review: 'perlu ditinjau', missing: 'belum ada', optional: 'opsional', not_required: 'tidak wajib' },

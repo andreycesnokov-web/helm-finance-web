@@ -17,7 +17,7 @@ export default {
     skip: 'Skip to content', 
     crash: 'Something went wrong on this screen. Your data is safe.',
     brand: 'CFO AI', notifications: 'Notifications', openMore: 'Open workspace menu',
-    switchHint: 'Switch company or go to Personal', company: 'Company', personal: 'Personal',
+    wsGroupCompany: 'Company workspaces', wsCreate: 'Create company workspace', wsCreateHint: 'Separate company money and team', wsMember: 'Member', switchHint: 'Switch company or go to Personal', company: 'Company', personal: 'Personal',
     companies: 'Companies', createCompany: 'Create company workspace',
     loading: 'Loading your workspace…', loadError: 'Couldn’t load your workspaces', retry: 'Try again',
   },
@@ -274,7 +274,7 @@ export default {
     billingCodes: 'Get billing codes', reminders: 'Reminders', remindersText: 'Deadline reminders are sent by the existing Telegram reminders.', reminderSettings: 'Reminder settings',
   },
   prof: {
-    sub: 'CFO AI uses this to work out your taxes, reports and deadlines', edit: 'Edit profile', notFilled: 'Not filled in', from: 'from {s}', confirmed: 'confirmed',
+    regimeV: { normal: 'General (standard rates)', pp23_final: 'Final 0.5% (PP 23/2018)', pph_final_umkm: 'Final 0.5% for small business (UMKM)' }, sub: 'CFO AI uses this to work out your taxes, reports and deadlines', edit: 'Edit profile', notFilled: 'Not filled in', from: 'from {s}', confirmed: 'confirmed',
     pct: 'Profile {n}% complete', unknownPct: 'Completeness unknown', uploadHint: 'Upload your company documents — AI fills the fields, you confirm',
     doc: { akta: 'Deed of establishment', sk_kemenkumham: 'SK Kemenkumham', nib: 'NIB from OSS', npwp: 'NPWP card' },
     docSt: { needs_review: 'needs review', missing: 'missing', optional: 'optional', not_required: 'not required' },

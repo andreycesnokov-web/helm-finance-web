@@ -91,7 +91,11 @@ export default function V2Shell({ children }) {
           <span className="v2-brand-name">{t('shell.brand')}</span>
         </div>
         <div className="v2-switcher">
-          <WorkspaceSwitcher workspaces={workspaces} activeId={active?.id} onSelect={select} />
+          <WorkspaceSwitcher workspaces={workspaces} activeId={active?.id} onSelect={select} labels={{
+            personal: t('shell.personal'), company: t('shell.company'), groupPersonal: t('shell.personal'), groupCompany: t('shell.wsGroupCompany'),
+            create: t('shell.wsCreate'), createHint: t('shell.wsCreateHint'),
+            role: (r) => (r && ['owner', 'admin', 'ceo', 'cfo', 'accountant', 'manager', 'employee', 'auditor'].includes(r) ? t(`set.role.${r}`) : t('shell.wsMember')),
+          }} />
         </div>
         {/* Disabled until Add is migrated: the legacy page defaults to Personal (review 8.2 #3). */}
         <button type="button" className="v2-addbtn" disabled aria-disabled="true" title={t('nav.addSoon')}>

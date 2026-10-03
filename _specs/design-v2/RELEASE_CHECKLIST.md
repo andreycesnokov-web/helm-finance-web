@@ -65,23 +65,25 @@ All seven are additive and idempotent: running one twice is harmless. Each file 
 
 ---
 
-## 3. Turning the redesign on (Railway)
+## 3. Turning the redesign on
 
-`VITE_DESIGN_V2` is a **build-time** flag. Vite reads it while `npm run build` builds `client/dist`, so changing it needs a rebuild.
+**Status (3 Oct 2026): ON in production.** The owner approved the release. Migrations 058–064 are applied to the production database ("CFO FInance").
 
-1. Railway → project → the **web** service (`helm-finance-web`, branch `main`) → **Variables**.
-2. Add `VITE_DESIGN_V2` = `true`.
-3. Redeploy the service. The root `build` script rebuilds the client: `cd client && npm ci && npm run build`.
-4. Check:
-   - `/business` opens the new shell with the left menu Pulse · Radar · Performance · AI CFO.
-   - `/admin` shows the new admin for a platform admin.
-   - Every old page is still reachable under `…/classic`, `…/manage` or `…/tools`.
+`VITE_DESIGN_V2` is a **build-time** flag. Vite reads it while `npm run build` builds `client/dist`.
+
+**How it is switched on:** the committed file `client/.env.production` sets `VITE_DESIGN_V2=true`. Railway runs the root `build` script (`cd client && npm ci && npm run build`) on every deploy of `main`, so every production build includes the redesign. No Railway variable is needed.
+
+After a deploy, check:
+- `/business` opens the new shell with the left menu Pulse · Radar · Performance · AI CFO.
+- `/admin` shows the new admin for a platform admin.
+- Every old page is still reachable under `…/classic`, `…/manage` or `…/tools`.
+- The language switch (EN / RU / ID) changes every screen. The workspace switcher shows the role in the chosen language.
 
 Do **not** change any other variable for this release. The weekly brief scheduler is **not** part of the release; it needs its own approval later.
 
 ## 4. Rollback
 
-- **Screens:** set `VITE_DESIGN_V2` back to `false` (or delete it) and redeploy. The old UI comes back exactly; the flag-OFF bundle is byte-identical to `main`.
+- **Screens, without a code change:** in Railway → the web service → **Variables**, add `VITE_DESIGN_V2` = `false` and redeploy. A real environment variable overrides `client/.env.production`, so the old UI comes back. To make it permanent, set the value in `client/.env.production` to `false`.
 - **Data:** the migrations do not need to be rolled back. Everything they add is additive and is ignored by the old UI. If you ever must, each migration file ends with its own rollback block. Read it first: the asset and funding tables hold data that owners entered.
 - **Batch 10 (withholding) is not behind the flag.** If it has to be undone, revert its PR. Withholding records already written stay in `withholding_records` and `debt_settlement_allocations` (031) and do no harm.
 

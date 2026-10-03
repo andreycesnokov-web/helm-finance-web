@@ -17,7 +17,7 @@ export default {
     skip: 'Перейти к содержимому', 
     crash: 'На этом экране что-то пошло не так. Данные в порядке.',
     brand: 'CFO AI', notifications: 'Уведомления', openMore: 'Открыть меню рабочего пространства',
-    switchHint: 'Сменить компанию или перейти в личное', company: 'Компания', personal: 'Личное',
+    wsGroupCompany: 'Компании', wsCreate: 'Создать компанию', wsCreateHint: 'Отдельные деньги и команда компании', wsMember: 'Участник', switchHint: 'Сменить компанию или перейти в личное', company: 'Компания', personal: 'Личное',
     companies: 'Компании', createCompany: 'Создать компанию',
     loading: 'Загружаем рабочее пространство…', loadError: 'Не удалось загрузить рабочие пространства', retry: 'Повторить',
   },
@@ -274,7 +274,7 @@ export default {
     billingCodes: 'Получить коды оплаты', reminders: 'Напоминания', remindersText: 'Напоминания о сроках отправляются существующими напоминаниями в Telegram.', reminderSettings: 'Настроить напоминания',
   },
   prof: {
-    sub: 'По этим данным CFO AI определяет налоги, отчёты и сроки', edit: 'Редактировать профиль', notFilled: 'Не заполнено', from: 'из: {s}', confirmed: 'подтверждено',
+    regimeV: { normal: 'Общий (стандартные ставки)', pp23_final: 'Финальный 0,5% (PP 23/2018)', pph_final_umkm: 'Финальный 0,5% для малого бизнеса (UMKM)' }, sub: 'По этим данным CFO AI определяет налоги, отчёты и сроки', edit: 'Редактировать профиль', notFilled: 'Не заполнено', from: 'из: {s}', confirmed: 'подтверждено',
     pct: 'Профиль заполнен на {n}%', unknownPct: 'Заполненность неизвестна', uploadHint: 'Загрузите документы компании — AI заполнит поля, вы подтвердите',
     doc: { akta: 'Учредительный акт', sk_kemenkumham: 'SK Kemenkumham', nib: 'NIB из OSS', npwp: 'Карточка NPWP' },
     docSt: { needs_review: 'нужна проверка', missing: 'нет', optional: 'необязательно', not_required: 'не требуется' },
