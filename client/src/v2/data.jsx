@@ -33,7 +33,10 @@ export function V2DataProvider({ children }) {
     return p
   }, [token, wsId])
 
-  const value = useMemo(() => ({ get, gen, wsId }), [get, gen, wsId])
+  // After a write: drop every cached read so badges, Pulse and lists refetch.
+  const invalidate = useCallback(() => { cache.current = new Map(); setGen((g) => g + 1) }, [])
+
+  const value = useMemo(() => ({ get, gen, wsId, invalidate }), [get, gen, wsId, invalidate])
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
 }
 
@@ -59,4 +62,9 @@ export function useApi(path) {
   }, [ctx?.get, ctx?.gen, path, nonce]) // eslint-disable-line react-hooks/exhaustive-deps
   const reload = useCallback(() => { forceRef.current = true; setNonce((n) => n + 1) }, [])
   return { ...st, reload }
+}
+
+/** Drop the whole workspace read cache (call after a successful write). */
+export function useInvalidate() {
+  return useContext(Ctx)?.invalidate || (() => {})
 }

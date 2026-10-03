@@ -15,7 +15,7 @@ import './v2.css'
 import { useWorkspace } from '../shell/WorkspaceProvider'
 import {
   BusinessLayout, BusinessTransactions, BusinessPayables, BusinessReceivables,
-  BusinessInvoices, BusinessIncomingPayments, BusinessPaymentConnections, BusinessFunding,
+  BusinessInvoices, BusinessIncomingPayments, BusinessPaymentConnections,
   BusinessNew, BusinessIntercompany, BusinessDocuments,
 } from '../pages/business'
 import { BusinessAccountantHub } from '../pages/business/AccountantPremium'
@@ -26,7 +26,6 @@ import Counterparties from '../pages/business/Counterparties'
 import Accounts from '../pages/Accounts'
 import AICFO from '../pages/AICFO'
 import Payroll from '../pages/Payroll'
-import Approvals from '../pages/Approvals'
 import Team from '../pages/Team'
 import Settings from '../pages/Settings'
 import BankImport from '../pages/BankImport'
@@ -38,6 +37,15 @@ import { Skeleton, ErrorBox } from './ui'
 import More from './pages/More'
 import V2Pulse from './pages/Pulse'
 import V2Radar from './pages/Radar'
+import Bills from './pages/Bills'
+import BillDetail from './pages/BillDetail'
+import V2Approvals from './pages/Approvals'
+import V2Counterparties from './pages/Counterparties'
+import AddCounterparty from './pages/AddCounterparty'
+import V2Accounts from './pages/Accounts'
+import V2Transactions from './pages/Transactions'
+import V2Payroll from './pages/Payroll'
+import V2Funding from './pages/Funding'
 import Placeholder from './pages/Placeholder'
 
 function V2Frame() {
@@ -69,23 +77,31 @@ export default function BusinessApp() {
           <Route path="performance/forecast" element={<Placeholder titleKey="screen.performanceForecast" icon="radar" current="/business/radar" />} />
           <Route path="ai-cfo" element={<AICFO />} />
           {/* Money */}
-          <Route path="accounts" element={<Accounts />} />
-          <Route path="transactions" element={<BusinessTransactions />} />
-          <Route path="funding-investors" element={<BusinessFunding />} />
+          <Route path="accounts" element={<V2Accounts />} />
+          <Route path="accounts/manage" element={<Accounts />} />
+          <Route path="transactions" element={<V2Transactions />} />
+          <Route path="transactions/classic" element={<BusinessTransactions />} />
+          <Route path="funding-investors" element={<V2Funding />} />
           <Route path="assets" element={<Placeholder titleKey="screen.assets" icon="assets" />} />
           <Route path="assets/new" element={<Placeholder titleKey="screen.addAsset" icon="assets" />} />
           <Route path="bank-import" element={<BankImport />} />
           <Route path="incoming-payments" element={<BusinessIncomingPayments />} />
           <Route path="intercompany" element={<BusinessIntercompany />} />
           {/* Obligations */}
-          <Route path="payables" element={<BusinessPayables />} />
-          <Route path="payables/:id" element={<Placeholder titleKey="screen.billDetail" icon="bills" current="/business/payables" />} />
-          <Route path="receivables" element={<BusinessReceivables />} />
-          <Route path="invoices" element={<BusinessInvoices />} />
-          <Route path="payroll" element={<Payroll />} />
-          <Route path="approvals" element={<Approvals />} />
-          <Route path="counterparties" element={<Counterparties />} />
-          <Route path="counterparties/new" element={<Placeholder titleKey="screen.addCounterparty" icon="counterparties" current="/business/counterparties" />} />
+          <Route path="payables" element={<Bills key="pay" />} />
+          <Route path="payables/classic" element={<BusinessPayables />} />
+          <Route path="payables/:id" element={<BillDetail kind="payable" />} />
+          <Route path="receivables" element={<Bills key="collect" />} />
+          <Route path="receivables/classic" element={<BusinessReceivables />} />
+          <Route path="receivables/:id" element={<BillDetail kind="receivable" />} />
+          <Route path="invoices" element={<Bills key="all" />} />
+          <Route path="invoices/classic" element={<BusinessInvoices />} />
+          <Route path="payroll" element={<V2Payroll />} />
+          <Route path="payroll/manage" element={<Payroll />} />
+          <Route path="approvals" element={<V2Approvals />} />
+          <Route path="counterparties" element={<V2Counterparties />} />
+          <Route path="counterparties/manage" element={<Counterparties />} />
+          <Route path="counterparties/new" element={<AddCounterparty />} />
           {/* Accounting */}
           <Route path="documents" element={<BusinessDocuments />} />
           <Route path="accountant" element={<BusinessAccountantHub />} />

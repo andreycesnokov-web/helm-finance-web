@@ -22,10 +22,17 @@ const rel = (f) => path.relative(ROOT, f)
 let pass = 0, fail = 0
 const t = (name, fn) => { try { fn(); pass++; console.log(`  ok  ${name}`) } catch (e) { fail++; console.log(`  XX  ${name}\n      ${e.message}`) } }
 
-// Mutating calls v2 is allowed to make. Every entry reuses an EXISTING endpoint and an
-// existing server-side role check; it is listed in the batch report. Batch 1: none.
+// Mutating calls v2 is allowed to make. Every entry reuses an EXISTING endpoint with its
+// existing server-side role check; it is listed in the batch report. All of them live in
+// client/src/v2/lib/actions.js — no other v2 file may write.
 export const WRITE_ALLOW = [
+  { method: 'PATCH', path: '/approve' },        // PATCH /api/debts/:id/approve
+  { method: 'PATCH', path: '/reject' },         // PATCH /api/debts/:id/reject
+  { method: 'POST', path: '/request-info' },    // POST  /api/debts/:id/request-info
+  { method: 'PATCH', path: '/transactions/' },  // PATCH /api/transactions/:id (category)
+  { method: 'POST', path: "'/counterparties'" },// POST  /api/counterparties
 ]
+const ACTIONS = path.join(V2, 'lib', 'actions.js')
 
 console.log('\nDesign v2 — flag')
 
@@ -78,11 +85,29 @@ t('v2 never overrides the business scope header', () => {
 t('v2 makes no mutating request outside the reviewed allow-list', () => {
   for (const f of src) {
     const s = code(read(f))
-    for (const m of s.matchAll(/method:\s*['"](POST|PUT|PATCH|DELETE)['"]/g)) {
-      const around = s.slice(Math.max(0, m.index - 200), m.index)
-      const hit = WRITE_ALLOW.find((w) => around.includes(w.path) && w.method === m[1])
-      assert.ok(hit, `${rel(f)}: ${m[1]} not in WRITE_ALLOW`)
+    const writes = [...s.matchAll(/method:\s*['"](POST|PUT|PATCH|DELETE)['"]/g)]
+    if (f !== ACTIONS) { assert.strictEqual(writes.length, 0, `${rel(f)} writes; only lib/actions.js may`); continue }
+    for (const m of writes) {
+      const line = s.slice(s.lastIndexOf('\n', m.index), m.index)
+      const hit = WRITE_ALLOW.find((w) => line.includes(w.path) && w.method === m[1])
+      assert.ok(hit, `${rel(f)}: ${m[1]} ${line.trim().slice(0, 80)} not in WRITE_ALLOW`)
     }
+    assert.strictEqual(writes.length, WRITE_ALLOW.length, 'every allowed write is used exactly once')
+  }
+})
+
+t('no new write endpoint: every allowed write exists on the server today', () => {
+  const server = read(path.join(ROOT, 'server/index.js'))
+  for (const r of [/app\.patch\('\/api\/debts\/:id\/approve'/, /app\.patch\('\/api\/debts\/:id\/reject'/,
+    /app\.post\('\/api\/debts\/:id\/request-info'/, /app\.patch\('\/api\/transactions\/:id'/, /app\.post\('\/api\/counterparties'/]) {
+    assert.ok(r.test(server), `server route ${r} missing`)
+  }
+})
+
+t('no direct apiFetch writes hidden behind a helper outside actions.js', () => {
+  for (const f of src) {
+    if (f === ACTIONS) continue
+    assert.ok(!/\bapiFetch\(/.test(code(read(f))) || f.endsWith('data.jsx'), `${rel(f)} calls apiFetch directly (reads go through useApi)`)
   }
 })
 
