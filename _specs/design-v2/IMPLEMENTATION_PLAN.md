@@ -162,3 +162,20 @@ Screens → data:
 2. Should Pulse totals include `pending_approval` items (rule 2)? Implemented: excluded, tagged.
 3. Approve buttons outside Approvals (Pulse, Bill detail) reuse the existing approve endpoint
    and role check — confirm that is wanted, or keep them as links to Approvals only.
+
+## 6. Status (3 Oct 2026)
+
+All seven batches are implemented behind `VITE_DESIGN_V2` (OFF build byte-identical JS).
+Branches are `design-v2-r2/bN-…` because an earlier, stopped session had already used
+`design-v2/bN-…` (its PRs #98–#101 are superseded by #102–#108; the owner closes them).
+
+Deviations from the plan above, each explained in its PR:
+- Approvals, Bill detail and Transactions reuse existing write endpoints (approve/reject/
+  request-info, transaction category, counterparty create) — all in `v2/lib/actions.js`,
+  enforced by `tests/design/v2Guards.test.mjs`.
+- The tax calendar reads `/api/accountant/summary`, not `/api/accountant/calendar`
+  (the latter writes `compliance_events` on every call).
+- Profit is an Estimate from the existing classifier until P-10; no new read-only
+  endpoint was needed in batch 6.
+- Every existing `/business` page stays reachable inside the v2 shell under `…/classic`,
+  `…/manage` or `…/tools`.

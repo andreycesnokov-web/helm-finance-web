@@ -84,7 +84,7 @@ else ok(`${others.length} static files identical`)
 
 const bundle = [...fs.readdirSync(path.join(ROOT, 'client', 'dist', 'assets'))]
   .map((f) => fs.readFileSync(path.join(ROOT, 'client', 'dist', 'assets', f), 'utf8')).join('\n')
-const markers = ['v2-shell', 'data-v2', 'BusinessApp', 'VITE_DESIGN_V2', 'design-v2']
+const markers = ['v2-shell', 'data-v2', 'BusinessApp', 'AdminApp', 'VITE_DESIGN_V2', 'design-v2']
 const hits = markers.filter((m) => bundle.includes(m))
 if (hits.length) fail(`OFF bundle contains v2 markers: ${hits.join(', ')}`)
 else ok(`OFF bundle has 0 v2 markers (${markers.join(', ')})`)
@@ -92,8 +92,10 @@ else ok(`OFF bundle has 0 v2 markers (${markers.join(', ')})`)
 console.log('\nFlag ON')
 build(path.join(ROOT, 'client'), { VITE_DESIGN_V2: 'true' })
 const onFiles = fs.readdirSync(path.join(ROOT, 'client', 'dist', 'assets'))
-if (!onFiles.some((f) => /^BusinessApp-.*\.js$/.test(f))) fail('ON build has no v2 chunk')
-else ok(`ON build emits the v2 chunk (${onFiles.filter((f) => f.startsWith('BusinessApp')).join(', ')})`)
+for (const chunk of ['BusinessApp', 'AdminApp']) {
+  if (!onFiles.some((f) => new RegExp(`^${chunk}-.*\\.js$`).test(f))) fail(`ON build has no ${chunk} chunk`)
+  else ok(`ON build emits the ${chunk} chunk (${onFiles.filter((f) => f.startsWith(chunk)).join(', ')})`)
+}
 
 // Leave the tree as the production (OFF) build.
 build(path.join(ROOT, 'client'))

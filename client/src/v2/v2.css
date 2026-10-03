@@ -514,7 +514,8 @@
 .v2-dl dt { color: var(--text-secondary); padding-right: var(--space-3); }
 .v2-dl dt:first-of-type, .v2-dl dt:first-of-type + dd { border-top: 0; }
 .v2-dl-tight dt, .v2-dl-tight dd { padding: var(--space-2) 0; border-top: 0; }
-.v2-dl-tight { grid-template-columns: minmax(0, 1fr) auto; }
+.v2-dl-tight { grid-template-columns: minmax(6em, max-content) minmax(0, 1fr); }
+.v2-dl-tight dd { text-align: right; padding-left: var(--space-3); }
 .v2-hist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
 .v2-hist li { display: grid; grid-template-columns: 120px minmax(0, 1fr); gap: var(--space-3); }
 .v2-hist-at { color: var(--text-secondary); font-size: 13px; }
@@ -776,3 +777,36 @@
 .v2-bullets { margin: 0; padding-left: 1.2em; display: flex; flex-direction: column; gap: var(--space-2); color: var(--text-secondary); font-size: var(--text-sm); }
 .v2-waterfall dt, .v2-waterfall dd { border-top: 1px solid var(--border-subtle); padding: var(--space-2) 0; }
 .v2-note-ai { font-size: 15px; margin: 0 0 var(--space-3); }
+
+/* ── Batch 7: platform admin ─────────────────────────────────────────────── */
+.v2-admin-tag { align-self: flex-start; font-size: 11px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--warning-ink); background: var(--warning-soft); border-radius: var(--radius-pill); padding: 3px 10px; margin: 0 var(--space-2); }
+.v2-admin-privacy { display: flex; gap: 6px; align-items: flex-start; padding: 0 var(--space-2); margin: 0; }
+.v2-admin-inner > .v2-tabs { margin-bottom: var(--space-4); }
+.v2-funnel { list-style: none; margin: 0 0 var(--space-3); padding: 0; display: flex; flex-direction: column; gap: var(--space-3); }
+.v2-funnel li { display: grid; grid-template-columns: minmax(0, 160px) minmax(0, 1fr) 48px 48px; gap: var(--space-3); align-items: center; font-size: var(--text-sm); }
+.v2-funnel-bar { height: 10px; border-radius: var(--radius-pill); background: var(--border-subtle); overflow: hidden; }
+.v2-funnel-bar > span { display: block; height: 100%; background: var(--chart-1); border-radius: inherit; }
+.v2-funnel li > .v2-num { text-align: right; }
+.v2-needs-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-3); font-size: var(--text-sm); }
+.v2-needs-list li { display: flex; gap: var(--space-3); align-items: flex-start; }
+.v2-needs-list li > span:last-child { min-width: 0; overflow-wrap: anywhere; }
+.v2-adtable { display: flex; flex-direction: column; }
+.v2-adrow { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px var(--space-3); align-items: center; width: 100%; padding: var(--space-3) var(--space-2); font: inherit; color: inherit; text-align: left; background: none; border: 0; border-top: 1px solid var(--border-subtle); cursor: pointer; border-radius: var(--radius-sm); font-size: var(--text-sm); }
+.v2-adrow > :nth-child(n+2):not(:last-child) { display: none; }
+.v2-adrow.is-on { background: var(--info-soft); }
+.v2-adrow-head { display: none; cursor: default; }
+.v2-ad-name { display: flex; flex-direction: column; min-width: 0; overflow-wrap: anywhere; }
+@media (min-width: 1025px) {
+  .v2-adrow { grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr) 60px 100px 150px; }
+  .v2-adrow > :nth-child(n+2):not(:last-child) { display: block; }
+  .v2-adrow-head { display: grid; font-size: 12px; font-weight: 700; color: var(--text-muted); }
+}
+.v2-admin-detail { display: flex; flex-direction: column; gap: var(--space-3); }
+.v2-admin-detail .v2-h2, .v2-admin-detail p { margin: 0; }
+.v2-flags { list-style: none; margin: 0 0 var(--space-3); padding: 0; }
+.v2-flag { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "n s" "k k"; gap: 2px var(--space-3); align-items: center; padding: var(--space-3) 0; border-top: 1px solid var(--border-subtle); }
+.v2-flag:first-child { border-top: 0; }
+.v2-flag-name { grid-area: n; display: flex; flex-direction: column; min-width: 0; overflow-wrap: anywhere; }
+.v2-flag > .v2-pill { grid-area: s; }
+.v2-flag > .v2-small { grid-area: k; }
+@media (min-width: 1025px) { .v2-flag { grid-template-columns: minmax(0, 1fr) 200px auto; grid-template-areas: "n k s"; } }
