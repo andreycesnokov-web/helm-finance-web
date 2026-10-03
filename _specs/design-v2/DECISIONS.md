@@ -77,7 +77,9 @@ The P-10 migration puts a CHECK constraint on exactly these 9 values from the st
 1. **PPh 23 withheld from us by a customer.**
    - When a customer pays our cleaning invoice minus PPh 23, the withheld part is **neither a cost nor a reduction of revenue**. Revenue stays at the full invoice amount.
    - The withheld amount is a **prepayment of our own income tax**. It is credited later against PPh 25/29 using the customer's bukti potong.
-   - In the data it is **not a cash-flow category and not one of the 9 groups**. It is the difference between the invoice and the cash received, recorded on the invoice as "tax withheld by customer" and linked to the customer's bukti potong (P-05 / migration 061 holds the document link).
+   - In the data it is **not a cash-flow category and not one of the 9 groups**. It is recorded as a `withholding_record` (migration 031) allocated to the invoice through `debt_settlement_allocations` (`settlement_source_type = 'withholding_record'`). The bukti potong link is `withholding_records.bukti_potong_document_id`. The direction comes from the invoice: `debts.type = 'receivable'` means withheld by the customer. No new migration is needed.
+   - **An allocation alone does not change what Pulse and Radar show.** Today the remaining balance comes from `computeDebtStatus` in `server/index.js`: `original_amount − paid_amount`. It does not read `debt_settlement_allocations`, and the existing `/allocate` route is an audit trail only. The next batch must therefore add a server route that records the withholding and also makes the remaining balance 0.
+   - That route has to fit the existing DB guard in 031 (`fn_debt_settlement_guard`). The guard limits allocations to `ceiling − paid_amount`, so an invoice already marked paid at the net amount has no room left for the withheld part. Codex decides how the two fit together before this is coded: count withholding allocations in the remaining balance, or have the route update `paid_amount` together with the allocation. There are tests for both directions (receivable withheld by the customer; payable withheld by us) and for business isolation.
    - Until the bukti potong arrives, it shows as "waiting for the customer's tax slip" and is never treated as an unpaid balance or as a bad debt.
    - This does **not** apply when the company pays the UMKM final tax (PP 55/2022) and has given the customer its certificate (Surat Keterangan PP 55). Then the customer does not withhold PPh 23. The accountant confirms the document per customer.
    - P-10 must keep these cases separate, or contract margins will be understated.
@@ -99,6 +101,15 @@ The P-10 migration puts a CHECK constraint on exactly these 9 values from the st
   - UMKM turnover tax is labelled separately.
 - Until a business confirms its mapping, Performance keeps today's estimate. Pulse and AI CFO keep using the keyword classifier.
 - Tax rates still come only from the verified tax rule engine. No rates are written in UI code.
+
+## Question for Codex before migration 061 is applied (PR #110)
+
+`debts.withholding_slip_document_id` in 061 partly duplicates `withholding_records.bukti_potong_document_id` in 031. Decide before the owner applies 061:
+
+- **A. Keep 061 as it is.** The column is only a "slip attached" mark for the bill checklist. Amounts and details live in `withholding_records`.
+- **B. Drop the slip column from 061.** 061 keeps only the accountant check. The checklist reads the slip from `withholding_records`.
+
+The owner prefers **B**: the slip is stored in one place. If Codex agrees, #110 is reworked in one commit (migration, its tests, the server route and the checklist read) before 061 is applied.
 
 ## Fixes for the next batch (from the batch 8 report)
 
