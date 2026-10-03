@@ -69,3 +69,34 @@ Format: what · fields · why · risk · what the UI does meanwhile.
 - **Risk:** outbound messaging (email/Telegram) to a third party — needs consent,
   templates, rate limits and an audit trail. Not a UI-only change.
 - **Meanwhile:** the button is visible but disabled with "Coming soon".
+
+## P-07 · Accountant review and monthly package (batch 4)
+
+- **What:** "Send to your accountant for review", per-folder comments, and a monthly
+  ZIP (folder per transaction + Excel index + statements + tax summary).
+- **Fields:** `accounting_period_reviews(id, business_id, period, status, sent_at,
+  sent_by, reviewer_user_id, completed_at)`, `document_comments(id, business_id,
+  target_type, target_id, author_user_id, body, created_at)`; a server-side package
+  builder over existing documents (signed URLs only).
+- **Why:** Month close and Documents by transaction end in a review by the accountant.
+- **Risk:** medium — exports client documents; needs role checks (accountant role),
+  audit rows and size limits.
+- **Meanwhile:** both buttons are disabled with "not available yet"; "Accountant review"
+  shows "not tracked here yet".
+
+## P-08 · Targets and alerts (batch 4, extends P-01)
+
+- **What:** minimum cash and the weekly brief schedule, next to the runway target.
+- **Fields:** `businesses.min_cash_idr numeric null`, `businesses.weekly_brief_cron text null`.
+- **Why:** Settings → Targets & alerts.
+- **Risk:** low; the brief sends Telegram messages — reuse the existing notification policy.
+- **Meanwhile:** shown as "Not set up yet"; the runway target uses the 60-day default.
+
+## P-09 · Company people (batch 4)
+
+- **What:** directors, commissioners and shareholders with their share.
+- **Fields:** `company_people(id, business_id, role [director|commissioner|shareholder],
+  name, share_percent null, source_document_id null)`.
+- **Why:** Company profile → People; needed for the annual return.
+- **Risk:** personal data (names, ownership); access limited to owner/accountant.
+- **Meanwhile:** "Not filled in", with a note that it is not stored yet.

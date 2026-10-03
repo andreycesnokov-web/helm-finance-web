@@ -46,6 +46,11 @@ import V2Accounts from './pages/Accounts'
 import V2Transactions from './pages/Transactions'
 import V2Payroll from './pages/Payroll'
 import V2Funding from './pages/Funding'
+import V2Accountant from './pages/Accountant'
+import CompanyProfile from './pages/CompanyProfile'
+import V2Documents from './pages/Documents'
+import V2Settings from './pages/Settings'
+import FirstDay from './pages/FirstDay'
 import Placeholder from './pages/Placeholder'
 
 function V2Frame() {
@@ -103,16 +108,20 @@ export default function BusinessApp() {
           <Route path="counterparties/manage" element={<Counterparties />} />
           <Route path="counterparties/new" element={<AddCounterparty />} />
           {/* Accounting */}
-          <Route path="documents" element={<BusinessDocuments />} />
-          <Route path="accountant" element={<BusinessAccountantHub />} />
-          <Route path="accountant/tax-profile" element={<Placeholder titleKey="screen.companyProfile" icon="accountant" current="/business/accountant" />} />
+          <Route path="documents" element={<V2Documents />} />
+          <Route path="documents/classic" element={<BusinessDocuments />} />
+          <Route path="accountant" element={<V2Accountant />} />
+          <Route path="accountant/classic" element={<BusinessAccountantHub />} />
+          <Route path="accountant/tax-profile" element={<CompanyProfile />} />
           <Route path="accountant/tax-split" element={<TaxSplit />} />
           <Route path="accountant/settlement" element={<InvoiceSettlement />} />
           {/* Settings and workspace */}
-          <Route path="settings" element={<Settings />} />
+          <Route path="settings" element={<V2Settings />} />
+          <Route path="settings/classic" element={<Settings />} />
           <Route path="team" element={<Team />} />
           <Route path="payment-connections" element={<BusinessPaymentConnections />} />
-          <Route path="onboarding" element={<BusinessOnboarding />} />
+          <Route path="onboarding" element={<FirstDay />} />
+          <Route path="onboarding/classic" element={<BusinessOnboarding />} />
           <Route path="new" element={<BusinessNew />} />
           {/* Phone navigation */}
           <Route path="more" element={<More />} />
