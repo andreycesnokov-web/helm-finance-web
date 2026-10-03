@@ -71,6 +71,9 @@ export function route(method, path) {
     'GET /api/debts': DEBTS,
     'GET /api/transactions': { transactions: TXS },
     'GET /api/wallets': { wallets: PULSE.accounts.map((a) => ({ ...a, is_active: true, scope: 'business' })) },
+    'GET /api/accountant/summary': { upcoming: [
+      { title: 'PPh 23 — monthly payment', due_date: day(12), days: 12, status: 'upcoming', period: 'prev', rule_code: 'PPH23_MONTHLY' },
+    ], overdue: [] },
     'GET /api/business/financial-counts': { ok: true, counts: { transactions: 24, wallets: 3, debts: 9 } },
   }
   const key = `${method} ${p}`

@@ -13,10 +13,12 @@ import V2Shell from './shell/V2Shell'
 import { V2DataProvider } from './lib/data'
 import Placeholder from './pages/Placeholder'
 import More from './pages/More'
+import Pulse from './pages/Pulse'
+import Radar from './pages/Radar'
 
 // Existing pages, reused verbatim.
 import {
-  BusinessPulse, BusinessTransactions, BusinessPayables, BusinessReceivables, BusinessInvoices,
+  BusinessTransactions, BusinessPayables, BusinessReceivables, BusinessInvoices,
   BusinessIncomingPayments, BusinessPaymentConnections, BusinessFunding, BusinessNew,
   BusinessIntercompany, BusinessDocuments,
 } from '../pages/business'
@@ -27,7 +29,6 @@ import InvoiceSettlement from '../pages/business/InvoiceSettlement'
 import Counterparties from '../pages/business/Counterparties'
 import Accounts from '../pages/Accounts'
 import AICFO from '../pages/AICFO'
-import Radar from '../pages/Radar'
 import Payroll from '../pages/Payroll'
 import Approvals from '../pages/Approvals'
 import Team from '../pages/Team'
@@ -44,8 +45,8 @@ export default function BusinessApp() {
       <V2Shell>
         <Routes>
           {/* Overview */}
-          <Route path="pulse" element={<Legacy><BusinessPulse /></Legacy>} />
-          <Route path="radar" element={<Legacy><Radar /></Legacy>} />
+          <Route path="pulse" element={<Pulse />} />
+          <Route path="radar" element={<Radar />} />
           <Route path="performance" element={<Placeholder titleKey="nav.performance" icon="performance" />} />
           <Route path="performance/cash" element={<Placeholder titleKey="nav.performance" icon="performance" />} />
           <Route path="performance/forecast" element={<Placeholder titleKey="nav.performance" icon="performance" />} />
