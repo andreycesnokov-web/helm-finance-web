@@ -295,8 +295,8 @@ export default function Performance() {
   const months = useMemo(() => lastMonths(12), [])
   const sp = new URLSearchParams(location.search)
   const sel = sp.get('month') && months.includes(sp.get('month')) ? sp.get('month') : months[months.length - 2]
-  const pulse = useApi('/pulse?scope=business')
-  const ins = useApi(`/pulse/advanced-insights?scope=business&from=${months[0]}-01&to=${new Date().toISOString().slice(0, 10)}`)
+  const pulse = useApi('/pulse')
+  const ins = useApi(`/pulse/advanced-insights?from=${months[0]}-01&to=${new Date().toISOString().slice(0, 10)}`)
   const tx = useApi('/transactions?period=all')
   const obl = useApi('/accountant/obligations')
   // P-10: confirmed category groups switch Profit to the accrual view.

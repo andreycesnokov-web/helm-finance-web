@@ -1,4 +1,4 @@
-// Sidebar / More badges, derived from the existing GET /api/pulse?scope=business
+// Sidebar / More badges, derived from the existing GET /api/pulse
 // response. Pure and tested (tests/design/v2ShellCounts.test.mjs). Counts only —
 // no amounts — and every count follows the server's own definitions:
 //   late          debts the server marks status 'overdue' (enrichDebts), excluding

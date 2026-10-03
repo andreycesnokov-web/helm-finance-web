@@ -838,3 +838,13 @@ button.v2-addbtn:disabled .v2-addbtn-hint { white-space: normal; }
 /* Two actions in one bills row (late invoice: Mark received + Coming soon reminder) */
 .v2-btnpair { display: inline-flex; flex-wrap: wrap; gap: var(--space-2); justify-content: flex-end; }
 .v2-stack { display: flex; flex-direction: column; gap: 2px; }
+
+/* "+ Add" choice cards that are buttons (pages/AddEntry.jsx) */
+button.v2-start-btn { font: inherit; color: var(--text-primary); text-align: left; cursor: pointer; background: var(--surface-card); }
+button.v2-start-btn:focus-visible { outline: 2px solid var(--action-primary); outline-offset: 2px; }
+/* Phone: the six Add choices as a compact two-column grid, so the form is in view. */
+@media (max-width: 640px) {
+  .v2-addgrid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2); }
+  .v2-addgrid .v2-start { padding: var(--space-3); gap: 2px; }
+  .v2-addgrid .v2-start .v2-small { display: none; }
+}

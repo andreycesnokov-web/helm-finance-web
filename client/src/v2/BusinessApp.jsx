@@ -29,7 +29,7 @@ import Payroll from '../pages/Payroll'
 import Team from '../pages/Team'
 import Settings from '../pages/Settings'
 import BankImport from '../pages/BankImport'
-import Add from '../pages/Add'
+import AddEntry from './pages/AddEntry'
 import V2Shell from './shell/V2Shell'
 import { V2DataProvider } from './data'
 import { useT } from './i18n'
@@ -135,7 +135,7 @@ export default function BusinessApp() {
           <Route path="new" element={<BusinessNew />} />
           {/* Phone navigation */}
           <Route path="more" element={<More />} />
-          <Route path="add" element={<Add />} />
+          <Route path="add" element={<AddEntry />} />
           <Route index element={<Navigate to="pulse" replace />} />
           <Route path="*" element={<Navigate to="/business/pulse" replace />} />
         </Route>

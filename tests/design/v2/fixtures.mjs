@@ -107,6 +107,7 @@ export const routes = {
       accumulated: 0, book_value: 7200000, monthly_depreciation: null, depreciation_by_month: {}, purchase_debt_id: null }],
     totals: { cost: 7200000, book_value: 7200000, without_life: 1 }, depreciation_by_month: {} }),
   'POST /api/assets': () => ({ asset: { id: 'as2' } }),
+  'POST /api/transactions/batch': () => ({ inserted: 1, transactions: [{ id: 9001 }] }),
   // P-03: a founder loan with a schedule and investor equity (synthetic).
   'GET /api/business-funding': () => ({ available: true, can_edit: true,
     records: [

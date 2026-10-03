@@ -15,7 +15,7 @@ import { PageHead, Card, Btn, Pill, Skeleton, ErrorBox, Empty } from '../ui'
 import { useT, useLang } from '../i18n'
 import { useApi } from '../data'
 import { money, shortDate, daysUntil } from '../lib/format'
-import { statementFreshness, txDate } from '../lib/obligations'
+import { statementFreshness, txDate, unlinkedMoney } from '../lib/obligations'
 
 const KIND = { bank: 'acc.kind.bank', cash: 'acc.kind.cash', ewallet: 'acc.kind.ewallet', card: 'acc.kind.card', gateway: 'acc.kind.gateway' }
 const SERIES = ['var(--chart-1)', 'var(--chart-2)', 'var(--chart-3)', 'var(--brand-navy)', 'var(--text-muted)']
@@ -26,6 +26,7 @@ export default function Accounts() {
   const w = useApi('/wallets')
   const batches = useApi('/bank-import/batches')
   const transfers = useApi('/transactions?period=all&type=transfer')
+  const allTx = useApi('/transactions?period=all')
   const head = (
     <PageHead title={t('nav.accounts')} sub={t('acc.sub')}
       actions={<><Btn to="/business/bank-import">{t('acc.import')}</Btn><Btn variant="primary" icon={<I.plus size={16} />} to="/business/accounts/manage">{t('acc.add')}</Btn></>} />
@@ -35,6 +36,8 @@ export default function Accounts() {
 
   const wallets = (w.data?.wallets || []).filter((x) => x.is_active !== false)
   const labelledPersonal = wallets.filter((x) => x.scope === 'personal')
+  // Payments recorded without an account: they are in the company total on Pulse, in no account here.
+  const unlinked = Array.isArray(allTx.data) ? unlinkedMoney(allTx.data, w.data?.wallets || []) : { sum: 0, count: 0 }
   const idr = wallets.filter((x) => (x.currency || 'IDR') === 'IDR')
   const other = wallets.filter((x) => (x.currency || 'IDR') !== 'IDR')
   const total = idr.reduce((s, x) => s + Number(x.balance || 0), 0)
@@ -62,6 +65,7 @@ export default function Accounts() {
                 <span className="v2-stat-big v2-num">{money(total)}</span>
               </div>
               <p className="v2-muted v2-small">{t('acc.personalNote')}</p>
+              {unlinked.count > 0 && <p className="v2-small"><Pill tone="warn">{t('acc.unlinkedTitle', { n: unlinked.count })}</Pill> {t('acc.unlinked', { v: money(unlinked.sum, { sign: true }), total: money(total + unlinked.sum) })} <Link to="/business/transactions">{t('nav.transactions')}</Link></p>}
               {labelledPersonal.length > 0 && <p className="v2-small"><Pill tone="warn">{t('acc.labelledPersonal')}</Pill> {t('acc.labelledNote', { n: labelledPersonal.length })}</p>}
             </div>
             {posSum > 0 && (

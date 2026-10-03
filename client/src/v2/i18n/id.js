@@ -52,7 +52,7 @@ export default {
     seeForecast: 'Lihat proyeksi 30 hari', cashNow: 'Kas sekarang', accounts: '{n} rekening bisnis · {cur}',
     runway: 'Runway', runwayNone: 'Belum terukur', daysN: '{n} hari', target: 'Target {n} hari', minCash: 'minimum {v}',
     runwayVsTarget: 'Runway {n} hari dari target {target} hari',
-    net30: 'Bersih · 30 hari terakhir', inOut: 'Masuk {in} · keluar {out}', worstLine: 'Skenario terburuk: {v} pada {d}',
+    uncatN: '{n} tanpa kategori', net30: 'Bersih · 30 hari terakhir', inOut: 'Masuk {in} · keluar {out}', worstLine: 'Skenario terburuk: {v} pada {d}',
     needs: 'Perlu keputusan Anda', items: '{n} item', nothing: 'Tidak ada yang perlu diputuskan saat ini.',
     review: 'Tinjau', needCategory: '{n} transaksi belum berkategori — akuntan membutuhkannya untuk tutup buku.',
     dec: {
@@ -196,7 +196,7 @@ export default {
   },
   acc: {
     sub: 'Di mana uang perusahaan saat ini', import: 'Impor mutasi', add: 'Tambah rekening', total: 'Total kas · {n} rekening',
-    labelledPersonal: 'Ditandai pribadi', labelledNote: '{n} rekening milik perusahaan ini ditandai pribadi. Tetap dihitung sebagai milik perusahaan seperti sebelumnya; tanyakan ke akuntan apakah tandanya atau pemiliknya yang salah.', personalNote: 'Uang pribadi disimpan di ruang kerja Pribadi dan tidak pernah dihitung di sini.', shareLabel: 'Kas per rekening: {list}',
+    unlinkedTitle: '{n} tanpa rekening', unlinked: '{v} dicatat tanpa rekening, jadi tidak masuk saldo mana pun di sini. Termasuk itu, perusahaan punya {total} — angka di Pulse.', labelledPersonal: 'Ditandai pribadi', labelledNote: '{n} rekening milik perusahaan ini ditandai pribadi. Tetap dihitung sebagai milik perusahaan seperti sebelumnya; tanyakan ke akuntan apakah tandanya atau pemiliknya yang salah.', personalNote: 'Uang pribadi disimpan di ruang kerja Pribadi dan tidak pernah dihitung di sini.', shareLabel: 'Kas per rekening: {list}',
     kind: { bank: 'Rekening bank', cash: 'Kas tunai', ewallet: 'Dompet digital', card: 'Kartu', gateway: 'Payment gateway', other: 'Rekening' },
     statementOn: 'Mutasi diimpor {d}', toReview: 'baris perlu ditinjau', noStatement: 'Belum ada mutasi diimpor', upload: 'Unggah mutasi', manual: 'Diperbarui manual',
     more: 'Rincian {name}', otherCcy: 'Rekening mata uang lain ditampilkan tetapi tidak dijumlahkan ke total IDR.',
@@ -345,6 +345,18 @@ export default {
     open: 'Buka', whyBtn: 'Mengapa?', why: 'Mengapa Anda menyarankan: {what}?',
     askLabel: 'Tanya CFO Anda', askPh: 'mis. Apakah saya mampu membeli mesin baru bulan depan?',
     chip: { q1: 'Apakah saya mampu membeli mesin baru bulan depan?', q2: 'Mengapa runway lebih pendek dari bulan lalu?', q3: 'Bagaimana jika pendapatan turun 20%?', q4: 'Tulis laporan investor satu halaman' },
+  },
+  add: {
+    title: 'Tambah', sub: 'Catat sesuatu untuk perusahaan ini. Selalu masuk ke Bisnis, tidak pernah ke Pribadi.',
+    k: { expense: 'Pengeluaran', expenseHint: 'Uang keluar dari rekening perusahaan', income: 'Pemasukan', incomeHint: 'Uang masuk ke rekening perusahaan',
+      payable: 'Tagihan untuk dibayar', payableHint: 'Tagihan pemasok, dibayar nanti', receivable: 'Buat faktur', receivableHint: 'Pelanggan berutang kepada Anda',
+      document: 'Unggah dokumen', documentHint: 'Faktur, kuitansi atau bukti potong — AI membacanya', statement: 'Impor mutasi rekening', statementHint: 'Semua mutasi rekening sekaligus' },
+    amount: 'Jumlah', date: 'Tanggal', walletOut: 'Dibayar dari', walletIn: 'Diterima di', pickWallet: 'Pilih rekening',
+    noWallets: 'Tambahkan rekening perusahaan dulu.', descOut: 'Untuk apa', descIn: 'Siapa yang membayar, untuk apa', category: 'Kategori (opsional)', categoryPh: 'mis. Sewa kantor',
+    businessNote: 'Disimpan sebagai catatan perusahaan ini. Uang pribadi ada di ruang kerja Pribadi.',
+    saveOut: 'Simpan pengeluaran', saveIn: 'Simpan pemasukan', doneOut: 'Pengeluaran {v} tersimpan.', doneIn: 'Pemasukan {v} tersimpan.',
+    forbidden: 'Peran Anda dapat mengajukan permintaan, tetapi tidak mencatat uang langsung. Hubungi pemilik, admin atau CFO.',
+    err: { type: 'Pilih pengeluaran atau pemasukan.', amount: 'Masukkan jumlah dalam rupiah, mis. 1.500.000.', wallet: 'Pilih rekening.', date: 'Isi tanggal.', description: 'Tulis untuk apa.' },
   },
   perf: {
     sub: 'Apakah bisnis menghasilkan uang, dan ke mana kas mengalir', views: 'Tampilan kinerja', forbidden: 'Peran Anda tidak bisa melihat keuangan perusahaan.',

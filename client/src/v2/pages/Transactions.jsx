@@ -7,7 +7,7 @@ import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
 import I from '../icons'
-import { PageHead, Card, Btn, Skeleton, ErrorBox, Empty, NotYet } from '../ui'
+import { PageHead, Card, Btn, Skeleton, ErrorBox, Empty } from '../ui'
 import { useT, useLang } from '../i18n'
 import { useApi, useInvalidate } from '../data'
 import { money, shortDate } from '../lib/format'
@@ -52,7 +52,8 @@ export default function Transactions() {
   const tx = useApi('/transactions?period=all')
   const wallets = useApi('/wallets')
   const cats = useApi('/cashflow-categories')
-  const all = Array.isArray(tx.data) ? tx.data.filter((x) => (x.scope || 'business') === 'business') : []
+  // Every row of this company, whatever its scope label (lib/performance.js, isBizIdr).
+  const all = Array.isArray(tx.data) ? tx.data : []
   const walletName = Object.fromEntries((wallets.data?.wallets || []).map((w) => [String(w.id), w.name]))
   const categories = (cats.data?.categories || []).map((c) => c.name).filter(Boolean)
   const rows = useMemo(() => txFilter(all, { kind, walletId, days, q }), [all, kind, walletId, days, q])
@@ -66,7 +67,7 @@ export default function Transactions() {
   }
   const head = (
     <PageHead title={t('nav.transactions')} sub={t('tx.sub')}
-      actions={<><Btn onClick={exportCsv} disabled={!rows.length} title={rows.length ? undefined : t('tx.nothingToExport')}>{t('tx.export')}</Btn><NotYet note={t('nav.addSoon')}>{t('nav.add')}</NotYet></>} />
+      actions={<><Btn onClick={exportCsv} disabled={!rows.length} title={rows.length ? undefined : t('tx.nothingToExport')}>{t('tx.export')}</Btn><Btn variant="primary" icon={<I.plus size={16} />} to="/business/add">{t('nav.add')}</Btn></>} />
   )
   if (tx.loading) return <>{head}<Card><Skeleton rows={8} /></Card></>
   if (tx.error) return <>{head}<ErrorBox error={tx.error} onRetry={tx.reload} /></>

@@ -29,7 +29,7 @@ export function usePlatformAdmin() {
 }
 
 export function useShellCounts() {
-  const r = useApi('/pulse?scope=business')
+  const r = useApi('/pulse')
   return shellCounts(r.data)
 }
 
@@ -97,11 +97,10 @@ export default function V2Shell({ children }) {
             role: (r) => (r && ['owner', 'admin', 'ceo', 'cfo', 'accountant', 'manager', 'employee', 'auditor'].includes(r) ? t(`set.role.${r}`) : t('shell.wsMember')),
           }} />
         </div>
-        {/* Disabled until Add is migrated: the legacy page defaults to Personal (review 8.2 #3). */}
-        <button type="button" className="v2-addbtn" disabled aria-disabled="true" title={t('nav.addSoon')}>
+        {/* v2 Add page: business scope always (review 8.2 #3). */}
+        <Link to="/business/add" className="v2-addbtn">
           <span className="v2-addbtn-main"><I.plus />{t('nav.add')}</span>
-          <span className="v2-addbtn-hint">{t('nav.addSoon')}</span>
-        </button>
+        </Link>
         <nav className="v2-navgroups">
           {NAV_GROUPS.map((g) => (
             <div key={g.key} className="v2-navgroup">

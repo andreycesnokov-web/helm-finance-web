@@ -60,7 +60,8 @@ t('review 8.2 #11b: funding is signed — repayments, withdrawals and dividends 
     { type: 'expense', description: 'Owner withdrawal', amount_original: 10, transaction_date: '2026-09-05' },
     { type: 'expense', description: 'Loan repayment', amount_original: 77, transaction_date: '2026-09-06', scope: 'personal' },
   ] })
-  assert.deepStrictEqual([rows[0].fundingIn, rows[0].fundingOut, rows[0].funding], [150, 80, 70])
+  // The row labelled 'personal' is still this company's repayment (the label is the DB default).
+  assert.deepStrictEqual([rows[0].fundingIn, rows[0].fundingOut, rows[0].funding], [150, 157, -7])
 })
 
 t('burn uses the last 3 full months; runway = cash ÷ burn × 30', () => {

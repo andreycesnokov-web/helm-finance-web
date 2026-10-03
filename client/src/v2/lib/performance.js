@@ -64,7 +64,12 @@ export function txCashDelta(t) {
   return 0
 }
 
-const isBizIdr = (t) => (t.scope || 'business') === 'business' && !(t.currency_original && t.currency_original !== 'IDR')
+// Scope labels: inside a company every row the server returns belongs to that company (it
+// filters by business_id). The `scope` column is only a label — the database default is
+// 'personal', so most company payments carry it — and is not ownership. Personal money lives
+// in the separate Personal workspace and never reaches these endpoints. So no row is dropped
+// for its label (same rule as _specs/accounts-personal-scope-ambiguity.md).
+const isBizIdr = (t) => !(t.currency_original && t.currency_original !== 'IDR')
 
 /** Cash rows per month: operating, equipment, signed funding and month-end cash (walk-back). */
 export function cashRows({ series = [], transactions = [], balance = 0, months }) {

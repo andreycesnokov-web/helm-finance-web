@@ -23,7 +23,7 @@ export default function Approvals() {
   const lang = useLang()
   const [tab, setTab] = useState('waiting')
   const debts = useApi('/debts')
-  const pulse = useApi('/pulse?scope=business')
+  const pulse = useApi('/pulse')
   const fund = useApi('/business-funding')
   const { hasFeature, loading: accessLoading } = useAccess()
   const list = Array.isArray(debts.data) ? debts.data : []
