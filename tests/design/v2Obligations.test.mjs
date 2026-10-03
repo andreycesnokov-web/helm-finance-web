@@ -159,6 +159,7 @@ t('withholding split only with a treatment (review 8.2 #9)', () => {
   assert.strictEqual(withholdingTreatment(bill, { default_tax_treatment: 'PPh Final Pasal 4(2) candidate' }), 'withhold')
   assert.strictEqual(withholdingTreatment(bill, { default_tax_treatment: 'No withholding' }), null)
   assert.strictEqual(withholdingTreatment({ ...bill, description: 'gross 100 · withheld 2 (2%)' }, { default_tax_treatment: 'PPh 23' }), 'applied')
+  assert.strictEqual(withholdingTreatment({ ...bill, withholding_allocated: 200000 }, { default_tax_treatment: 'PPh 23' }), 'applied', 'a withholding record already reduced what is open')
   assert.strictEqual(withholdingTreatment({ ...bill, currency: 'USD' }, { default_tax_treatment: 'PPh 23' }), null)
   assert.strictEqual(withholdingTreatment({ ...bill, type: 'receivable' }, { default_tax_treatment: 'PPh 23' }), null)
 })

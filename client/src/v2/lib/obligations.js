@@ -82,6 +82,8 @@ export function withholdingSplit(amount, engineRate) {
 export function withholdingTreatment(debt, counterparty) {
   if (!debt || debt.type === 'receivable' || (debt.currency || 'IDR') !== 'IDR') return null
   if (/\bwithheld\b/i.test(String(debt.description || ''))) return 'applied'
+  // A withholding record already took the tax off what is still open (batch 10): never split twice.
+  if (Number(debt.withholding_allocated) > 0) return 'applied'
   const tt = String(counterparty?.default_tax_treatment || '').toLowerCase()
   if (!tt || /\b(no|not|none|tidak)\b/.test(tt)) return null
   return /pph[\s_]*23|4\s*\(\s*2\s*\)|pph[\s_]*4[\s_]*2|withhold|potong/.test(tt) ? 'withhold' : null
