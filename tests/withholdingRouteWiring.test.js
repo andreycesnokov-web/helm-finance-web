@@ -33,6 +33,12 @@ t('computeDebtStatus delegates to the tested module; list loaders use the busine
   assert.ok(/const debts = await enrichDebtsFor\(biz\.business\.id, rawDebts\);/.test(src), 'pulse and snapshot');
 });
 
+t('/settle marks only the part not already withheld as paid', () => {
+  const h = block("app.patch('/api/debts/:id/settle'");
+  assert.ok(h.includes('paid_amount:  Math.max(0, fullAmount - withheld)'));
+  assert.ok(h.includes('await loadWithholdings(biz.business.id)'));
+});
+
 t('migration 031 is not changed by this batch', () => {
   const head = require('node:child_process').execSync('git diff --name-only origin/main -- migrations/031_tax_document_linking.sql', { cwd: path.join(__dirname, '..') }).toString().trim();
   assert.strictEqual(head, '');
