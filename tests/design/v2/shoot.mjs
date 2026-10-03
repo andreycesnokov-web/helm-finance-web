@@ -24,10 +24,13 @@ for (const [label, vp] of [['desktop', { width: 1440, height: 1000 }], ['phone',
   page.on('pageerror', (e) => errors.push(String(e)))
   for (const p of paths) {
     errors.length = 0
-    await page.goto(`http://localhost:4318${p}`, { waitUntil: 'networkidle' })
+    // "path#click=<css>" clicks an element after load (e.g. to open the AI CFO panel).
+    const [url, click] = p.split('#click=')
+    await page.goto(`http://localhost:4318${url}`, { waitUntil: 'networkidle' })
     await page.waitForTimeout(400)
+    if (click) { await page.click(click); await page.waitForTimeout(600) }
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
-    const name = `${label}-${p.replace(/^\//, '').replace(/[/?=&]/g, '_') || 'root'}.png`
+    const name = `${label}-${p.replace(/^\//, '').replace(/[/?=&#:. \[\]"]/g, '_') || 'root'}.png`
     await page.screenshot({ path: path.join(outDir, name), fullPage: true })
     const bad = errors.filter((e) => !/not_in_fixture|404/.test(e))
     if (bad.length || overflow > 0) problems++

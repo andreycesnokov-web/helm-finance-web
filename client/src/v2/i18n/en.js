@@ -30,6 +30,7 @@ export default {
 
   chart: { showTable: 'Show as table', showChart: 'Show as chart' },
   pulse: {
+    today: 'today',
     status: { good: 'On track', warn: 'Attention', crit: 'Act now' },
     head: {
       covered: 'You’re covered: runway is above your {target}-day target.',
@@ -184,6 +185,7 @@ export default {
     emptyTitle: 'No transactions for this filter', emptyText: 'Change the filter or the period.', showing: 'Showing {n} of {m}', loadMore: 'Load more',
   },
   pay: {
+    hireQ: 'What would one more hire do to our runway?',
     sub: 'People, pay runs and what is withheld', addPerson: 'Add person', manage: 'Manage payroll',
     forbidden: 'Your role cannot open payroll.', emptyTitle: 'No people on payroll yet', emptyText: 'Add the people you pay to see each run here.',
     paid: 'Paid', scheduled: 'Scheduled', toPeople: 'Paid to people · {d}', walletHas: '{w} has {v}', enough: 'enough', notEnough: 'not enough',
@@ -269,5 +271,26 @@ export default {
       debts: 'Tell us who owes you and whom you owe', debtsHint: 'Type it or drop invoices · unlocks Radar', debtsCta: 'Add',
       team: 'Optional · invite your team and connect Telegram', teamHint: 'So expenses and approvals happen where people already are', teamCta: 'Set up' },
     skip: 'Skip for now and go to Pulse',
+  },
+  ask: {
+    looking: 'Looking at: {what}', fullPage: 'Open the full AI CFO page', close: 'Close', send: 'Send',
+    intro: 'Ask about your cash, bills, runway or a decision you are weighing. Answers use only this company’s data.',
+    chip1: 'Why did cash change this month?', chip2: 'Which bills can wait?', chip3: 'Can I afford a new hire?',
+    thinking: 'Thinking…', forbidden: 'Your role cannot use AI CFO.', from: 'AI CFO · from {what}',
+    source: 'Source: your numbers — cash {cash}, runway {runway}', rulesOnly: 'answered from rules, no AI provider',
+    followUp: 'Ask a follow-up…', placeholder: 'Ask your CFO…', note: 'Uses only this company’s data. AI CFO explains; it never approves or pays.',
+  },
+  cfo: {
+    sub: 'Your weekly brief and the decisions worth making', left: '{n} of {m} questions left this month', forbidden: 'Your role cannot use AI CFO.',
+    thisWeek: 'This week', noBrief: 'Not enough data for a brief yet.', seeForecast: 'See it on the forecast',
+    brief: { loss: 'This month you spent {v} more than came in.', gain: 'This month money in exceeded money out by {v}.', runway: 'Runway is {n} days.',
+      owed: 'Customers owe you {v}.', late: '{v} of it is late.', pending: '{n} items wait for your approval and are not in these figures.' },
+    score: 'CFO score', scoreOf: 'CFO score {n} out of 100', noScore: 'No score yet.',
+    f: { cash_health: 'Cash', runway: 'Runway', receivables: 'Collections', payables: 'Bills', expense_control: 'Spending' },
+    decisions: 'Decisions I recommend', noDecisions: 'Nothing urgent to decide.',
+    prio: { critical: 'Urgent', high: 'Important', medium: 'Worth doing', low: 'When you can' },
+    open: 'Open', whyBtn: 'Why?', why: 'Why do you recommend: {what}?',
+    askLabel: 'Ask your CFO', askPh: 'e.g. Can I afford a new machine next month?',
+    chip: { q1: 'Can I afford a new machine next month?', q2: 'Why is runway shorter than last month?', q3: 'What if revenue drops 20%?', q4: 'Write a one-page investor update' },
   },
 }

@@ -90,6 +90,22 @@ export const routes = {
     { id: 'doc1', document_type: 'receipt', review_status: 'needs_review', links: [], created_at: iso(-2), file: { file_name: 'IMG_0042.jpg', upload_channel: 'telegram' } },
     { id: 'doc2', document_type: 'invoice', review_status: 'confirmed', links: [{ id: 'l1' }], gross_amount: 8400000, currency: 'IDR', created_at: iso(-1), file: { file_name: 'invoice-demo-supplies.pdf', upload_channel: 'mcp' } },
   ] }),
+  'GET /api/ai-cfo/context': () => ({
+    cash: { total_balance: pulse.totalBalance }, runway_days: 51,
+    current_month: { income: 61200000, expenses: 118300000, net_flow: -57100000 },
+    receivables: { total_remaining: 33400000, overdue_total: 14100000, overdue_count: 1 },
+    pending_submissions: { count: 1 },
+    ai_alert: { status: 'warning', headline: 'Costs are running ahead of sales', description: 'Collections would lift the low point.' },
+    cfo_score: { score: 58, status: 'warning', label: 'Needs attention', summary: 'Spending and collections pull the score down.',
+      factors: { cash_health: { score: 70, impact: 'neutral' }, runway: { score: 55, impact: 'negative' }, receivables: { score: 40, impact: 'negative' }, payables: { score: 85, impact: 'positive' }, expense_control: { score: 38, impact: 'negative' } } },
+    next_actions: [
+      { title: 'Follow up: CV Sample Client', description: 'Overdue — send a payment reminder.', priority: 'high', route: '/receivables', amount: 14100000 },
+      { title: 'Review payables due this week', description: 'Two bills fall due within 7 days.', priority: 'medium', route: '/payables' },
+      { title: 'Hold new hires', description: 'Spending exceeds income this month.', priority: 'low', route: '/payroll' },
+    ],
+    usage: { max_ai_questions_per_month: 200, remaining_ai_questions: 200 },
+  }),
+  'POST /api/ai-cfo/ask': () => ({ answer: 'Synthetic harness answer. Costs rose after the [site expansion](cfo://performance?month=2026-04&compare=2026-03&focus=site-expansion); collections are late.', context_summary: { total_balance: pulse.totalBalance, runway_days: 51 }, used_ai_provider: false }),
   'GET /api/team': () => ({ members: [{ id: 'm1', user_id: 1, role: 'owner', display_name: 'Demo Owner' }, { id: 'm2', user_id: 2, role: 'accountant', display_name: 'Demo Accountant' }] }),
   'GET /api/payroll/overview': () => ({
     employees: [{ id: 'e1', name: 'Employee One', role: 'Operations', default_salary: 6000000, default_wallet_id: 'w2' }, { id: 'e2', name: 'Employee Two', role: 'Sales', default_salary: 4000000 }],

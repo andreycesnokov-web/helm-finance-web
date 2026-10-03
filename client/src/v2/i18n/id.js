@@ -30,6 +30,7 @@ export default {
 
   chart: { showTable: 'Tampilkan tabel', showChart: 'Tampilkan grafik' },
   pulse: {
+    today: 'hari ini',
     status: { good: 'Aman', warn: 'Perhatian', crit: 'Segera bertindak' },
     head: {
       covered: 'Kas aman: runway di atas target {target} hari.',
@@ -184,6 +185,7 @@ export default {
     emptyTitle: 'Tidak ada transaksi untuk saringan ini', emptyText: 'Ubah saringan atau periode.', showing: 'Menampilkan {n} dari {m}', loadMore: 'Muat lagi',
   },
   pay: {
+    hireQ: 'Apa dampak satu karyawan baru ke runway kita?',
     sub: 'Orang, pembayaran gaji, dan potongan', addPerson: 'Tambah orang', manage: 'Kelola penggajian',
     forbidden: 'Peran Anda tidak bisa membuka penggajian.', emptyTitle: 'Belum ada orang di penggajian', emptyText: 'Tambahkan orang yang Anda gaji untuk melihat setiap pembayaran di sini.',
     paid: 'Dibayar', scheduled: 'Terjadwal', toPeople: 'Dibayar ke orang · {d}', walletHas: '{w} berisi {v}', enough: 'cukup', notEnough: 'tidak cukup',
@@ -269,5 +271,26 @@ export default {
       debts: 'Siapa berutang kepada Anda dan kepada siapa Anda berutang', debtsHint: 'Ketik atau seret faktur · membuka Radar', debtsCta: 'Tambah',
       team: 'Opsional · undang tim dan hubungkan Telegram', teamHint: 'Agar biaya dan persetujuan terjadi di tempat orang sudah berada', teamCta: 'Atur' },
     skip: 'Lewati dan ke Pulse',
+  },
+  ask: {
+    looking: 'Melihat: {what}', fullPage: 'Buka halaman AI CFO', close: 'Tutup', send: 'Kirim',
+    intro: 'Tanyakan soal kas, tagihan, runway, atau keputusan yang sedang dipertimbangkan. Jawaban hanya memakai data perusahaan ini.',
+    chip1: 'Mengapa kas berubah bulan ini?', chip2: 'Tagihan mana yang bisa ditunda?', chip3: 'Apakah saya mampu merekrut orang baru?',
+    thinking: 'Berpikir…', forbidden: 'Peran Anda tidak bisa memakai AI CFO.', from: 'AI CFO · dari {what}',
+    source: 'Sumber: angka Anda — kas {cash}, runway {runway}', rulesOnly: 'dijawab dari aturan, tanpa penyedia AI',
+    followUp: 'Pertanyaan lanjutan…', placeholder: 'Tanya CFO Anda…', note: 'Hanya data perusahaan ini. AI CFO menjelaskan; tidak pernah menyetujui atau membayar.',
+  },
+  cfo: {
+    sub: 'Ringkasan mingguan dan keputusan yang layak diambil', left: 'Sisa {n} dari {m} pertanyaan bulan ini', forbidden: 'Peran Anda tidak bisa memakai AI CFO.',
+    thisWeek: 'Minggu ini', noBrief: 'Belum cukup data untuk ringkasan.', seeForecast: 'Lihat di proyeksi',
+    brief: { loss: 'Bulan ini pengeluaran {v} lebih besar dari pemasukan.', gain: 'Bulan ini pemasukan melebihi pengeluaran sebesar {v}.', runway: 'Runway {n} hari.',
+      owed: 'Pelanggan berutang {v} kepada Anda.', late: '{v} di antaranya terlambat.', pending: '{n} item menunggu persetujuan Anda dan belum masuk angka ini.' },
+    score: 'Skor CFO', scoreOf: 'Skor CFO {n} dari 100', noScore: 'Belum ada skor.',
+    f: { cash_health: 'Kas', runway: 'Runway', receivables: 'Penagihan', payables: 'Tagihan', expense_control: 'Pengeluaran' },
+    decisions: 'Keputusan yang saya sarankan', noDecisions: 'Tidak ada yang mendesak.',
+    prio: { critical: 'Mendesak', high: 'Penting', medium: 'Layak dilakukan', low: 'Saat sempat' },
+    open: 'Buka', whyBtn: 'Mengapa?', why: 'Mengapa Anda menyarankan: {what}?',
+    askLabel: 'Tanya CFO Anda', askPh: 'mis. Apakah saya mampu membeli mesin baru bulan depan?',
+    chip: { q1: 'Apakah saya mampu membeli mesin baru bulan depan?', q2: 'Mengapa runway lebih pendek dari bulan lalu?', q3: 'Bagaimana jika pendapatan turun 20%?', q4: 'Tulis laporan investor satu halaman' },
   },
 }

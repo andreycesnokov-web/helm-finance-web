@@ -16,6 +16,7 @@ import { NAV_GROUPS, SETTINGS_ITEM, TABS, activeNavKey, activeTabKey } from '../
 import { useT } from '../i18n'
 import { useApi } from '../data'
 import { shellCounts } from '../lib/shellCounts'
+import AskPanel from '../ai/AskPanel'
 
 const SYMBOL = '/brand/symbol_navy_transparent.svg'
 
@@ -136,6 +137,8 @@ export default function V2Shell({ children }) {
       <main id="v2-main" className="v2-main cfo-main" tabIndex={-1}>
         <div className="v2-main-inner">{children}</div>
       </main>
+
+      <AskPanel />
 
       <nav className="v2-tabbar" aria-label={t('nav.tabs')}>
         {TABS.map((tb) => {
