@@ -15,6 +15,7 @@
 //   POST  /api/assets                  NEW in batch 11 — add to the asset register (P-11)
 //   POST  /api/debts/:id/withholding   NEW in batch 10 — record tax withheld on a bill/invoice (no money moves)
 //   PATCH /api/pnl-mapping             NEW in batch 9 — confirm category → profit group (P-10)
+//   POST  /api/transactions/batch      existing — "+ Add" expense/income, always scope 'business' (lib/addEntry.js)
 //   PATCH /api/debts/:id/checklist     NEW in batch 8 — accountant check only (P-05 option B: the
 //                                      withholding slip lives in withholding_records and is read-only here)
 //
@@ -65,6 +66,9 @@ export const markRepaymentPaid = (token, id, body) =>
   apiFetch(`/business-funding/repayments/${encodeURIComponent(id)}/paid`, token, { method: 'POST', body })
 
 /** Server error → short user-facing text. 403 means the role may not do this. */
+export const createBusinessTransaction = (token, tx) =>
+  apiFetch('/transactions/batch', token, { method: 'POST', body: { transactions: [{ ...tx, scope: 'business' }] } })
+
 export function actionError(e) {
   if (e?.status === 403) return 'forbidden'
   if (e?.status === 409 && e?.data?.error === 'migration_not_applied') return 'notApplied'

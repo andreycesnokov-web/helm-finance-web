@@ -1,6 +1,6 @@
 // Pulse (design v2) model. Run: node tests/design/v2PulseModel.test.mjs
 import assert from 'node:assert'
-import { runwayDays, pulseStatus, headlineKey, decisions, nextDays, flowOf, pctChange, obligationTiles, RUNWAY_TARGET_DAYS, runwayTarget, minCash } from '../../client/src/v2/lib/pulseModel.js'
+import { cashFlow, runwayDays, pulseStatus, headlineKey, decisions, nextDays, flowOf, pctChange, obligationTiles, RUNWAY_TARGET_DAYS, runwayTarget, minCash } from '../../client/src/v2/lib/pulseModel.js'
 
 let pass = 0, fail = 0
 const t = (name, fn) => { try { fn(); pass++; console.log(`  ok  ${name}`) } catch (e) { fail++; console.log(`  XX  ${name}\n      ${e.message}`) } }
@@ -102,6 +102,21 @@ t('past-due tax is overdue, not "0 days left"; date-only due dates are local day
     { status: 'calculated', due_date: '2026-10-10', obligation_type: 'pph21', period: '2026-09', amount: 1 },
   ] })
   assert.deepStrictEqual(ds.map((d) => [d.days, d.overdue]), [[-3, true], [7, false]])
+})
+
+t('cash flow counts every company payment, labelled personal or without a category; not opening balances or transfers (production, 3 Oct)', () => {
+  const tx = [
+    { type: 'income', description: 'Payment: Andrew', amount_original: 120000, transaction_date: '2026-09-22', scope: 'personal' },
+    { type: 'income', description: 'Payment: Client Olga', amount_original: 150000, transaction_date: '2026-09-22', scope: 'personal' },
+    { type: 'expense', description: 'Payment: andrey', amount_original: 300000, transaction_date: '2026-09-10', scope: 'personal' },
+    { type: 'expense', description: 'Payment: DEMO Property Landlord', amount_original: 3000000, transaction_date: '2026-09-07', scope: 'personal' },
+    { type: 'expense', description: 'Payment: PT Circleka', amount_original: 29600000, transaction_date: '2026-09-04', scope: 'personal' },
+    { type: 'income', description: 'Opening balance · DEMO - Cash', amount_original: 5000000, transaction_date: '2026-09-04', scope: 'business' },
+    { type: 'transfer', description: 'to cash', amount_original: 1000000, transaction_date: '2026-09-05' },
+    { type: 'expense', description: 'Payment: old', amount_original: 999, transaction_date: '2026-09-02' },
+  ]
+  const f = cashFlow(tx, { from: '2026-09-03', to: '2026-10-03' })
+  assert.deepStrictEqual([f.moneyIn, f.moneyOut, f.net, f.unclassified, f.count], [270000, 32900000, -32630000, 5, 5])
 })
 
 console.log(`\n${pass} passed, ${fail} failed`)

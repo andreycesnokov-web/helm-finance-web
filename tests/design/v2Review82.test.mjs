@@ -41,10 +41,16 @@ t('#2 the AI thread and the Accountant ask box reset on a business or scope swit
   }
 })
 
-t('#4 every advanced-insights call is scoped to business', () => {
-  const calls = walk(V2).flatMap((f) => [...read(f).matchAll(/['`]\/pulse\/advanced-insights([^'`]*)['`]/g)].map((m) => [f, m[1]]))
-  assert.ok(calls.length >= 4, `expected the v2 calls, found ${calls.length}`)
-  for (const [f, q] of calls) assert.match(q, /[?&]scope=business\b/, `${f}: ${q}`)
+// #4 was reversed at release: production showed that inside a company the `scope` column is only
+// a label (its database default is 'personal'; 29 of 33 company bills carried it), so filtering on
+// it hid real company payments. Isolation is by business_id on the server; Personal is a separate
+// workspace. v2 therefore never filters company data by the scope label.
+t('#4 (reversed at release) no v2 read filters company data by the scope label', () => {
+  for (const f of walk(V2)) {
+    const s = read(f)
+    assert.ok(!/scope=business/.test(s), `${f} asks the server for scope=business`)
+    assert.ok(!/\(\w+\.scope \|\| 'business'\) [!=]== 'business'/.test(s), `${f} drops rows by their scope label`)
+  }
 })
 
 t('#5 no "Send reminder" action links anywhere; Radar shows it as NotYet', () => {

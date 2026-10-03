@@ -1,7 +1,7 @@
 // Pulse (designs/Main.dc.html, PulseMobile.dc.html). Cash view only.
 //
 // Data (all existing, all reads):
-//   GET /api/pulse?scope=business          cash now, burn, runway, receivables/payables, debts
+//   GET /api/pulse          cash now, burn, runway, receivables/payables, debts
 //   GET /api/pulse/advanced-insights       money in/out for the last 30 days and the 30 before
 //   GET /api/accountant/obligations        engine-CALCULATED tax amounts (role-gated; optional)
 // "Approve" links to Approvals and "Review" to the bill — Pulse itself changes nothing.
@@ -14,7 +14,7 @@ import { useApi } from '../data'
 import { money, shortDate, longDate } from '../lib/format'
 import { cashItems, forecast } from '../lib/radarSeries'
 import {
-  runwayTarget, minCash, runwayDays, pulseStatus, headlineKey, decisions, nextDays, flowOf, pctChange, obligationTiles,
+  runwayTarget, minCash, runwayDays, pulseStatus, headlineKey, decisions, nextDays, cashFlow, pctChange, obligationTiles,
 } from '../lib/pulseModel'
 import { useAskContext } from '../ai/AskContext'
 
@@ -72,9 +72,10 @@ function DecisionRow({ d, t, lang }) {
 export default function Pulse() {
   const t = useT()
   const lang = useLang()
-  const pulse = useApi('/pulse?scope=business')
-  const ins30 = useApi(`/pulse/advanced-insights?scope=business&from=${daysAgo(30)}&to=${daysAgo(0)}`)
-  const ins60 = useApi(`/pulse/advanced-insights?scope=business&from=${daysAgo(60)}&to=${daysAgo(31)}`)
+  const pulse = useApi('/pulse')
+  // Money in/out comes from the company's own transactions (cashFlow): every row of this
+  // company counts, including payments without a category that the classifier cannot name.
+  const txAll = useApi('/transactions?period=all')
   const obl = useApi('/accountant/obligations')
   // P-01 / P-08. Missing, failed or null → the documented defaults (60 days, no floor).
   const targets = useApi('/business/targets')
@@ -98,12 +99,13 @@ export default function Pulse() {
       decs: decisions({ debts: p.debts || [], obligations }),
       next: nextDays(items, { burnRate: p.burnRate, forecastDays: f.days }),
       tiles: obligationTiles(p),
-      accounts: (p.accounts || []).filter((a) => (a.scope || 'business') === 'business'),
+      accounts: p.accounts || [],
     }
   }, [pulse.data, obl.data, targets.data, fund.data])
 
-  const flow = flowOf(ins30.data?.ok !== false ? ins30.data?.metrics : null)
-  const prev = flowOf(ins60.data?.ok !== false ? ins60.data?.metrics : null)
+  const txs = Array.isArray(txAll.data) ? txAll.data : null
+  const flow = txs ? cashFlow(txs, { from: daysAgo(30), to: daysAgo(0) }) : null
+  const prev = txs ? cashFlow(txs, { from: daysAgo(60), to: daysAgo(31) }) : null
   const head = (
     <PageHead title={t('nav.pulse')} sub={longDate(new Date(), lang)}
       actions={<Link className="v2-iconbtn v2-iconbtn-boxed v2-desk" to="/business/approvals" aria-label={t('shell.notifications')}><I.bell size={20} /></Link>} />
@@ -154,7 +156,7 @@ export default function Pulse() {
             <div className="v2-hero-cell">
               <span className="v2-hero-label">{t('pulse.net30')}</span>
               <span className={`v2-hero-mid v2-num ${flow && flow.net < 0 ? 'v2-on-neg' : 'v2-on-pos'}`}>{flow ? money(flow.net, { sign: true }) : '—'}</span>
-              {flow && <span className="v2-hero-meta">{t('pulse.inOut', { in: money(flow.moneyIn), out: money(flow.moneyOut) })}</span>}
+              {flow && <span className="v2-hero-meta">{t('pulse.inOut', { in: money(flow.moneyIn), out: money(flow.moneyOut) })}{flow.unclassified > 0 && ` · ${t('pulse.uncatN', { n: flow.unclassified })}`}</span>}
             </div>
           </div>
           <Link className="v2-hero-worst v2-phone" to="/business/radar">

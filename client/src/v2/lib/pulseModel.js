@@ -2,13 +2,17 @@
 // four tiles show. Pure and tested (tests/design/v2PulseModel.test.mjs).
 //
 // Cash view only (DESIGN_SPEC rule 4). Every input is an existing response:
-//   pulse     GET /api/pulse?scope=business      (cash now, burn, runway, debts)
+//   pulse     GET /api/pulse      (cash now, burn, runway, debts)
+//   tx        GET /api/transactions (money in/out for the last 30 days, cashFlow)
 //   insights  GET /api/pulse/advanced-insights   (last-30-day in/out, server classifier)
 //   forecast  radarSeries.forecast()              (existing Radar rules, per day)
 // Pending approval (DECISIONS.md, open question 2): items with approval_status
 // 'pending_approval' are NOT in any Pulse total — not the server figures, not the
 // forecast, not "Next 7 days". They appear here only as decisions; Radar lists them
 // with a "Waiting for approval" tag.
+
+import { classOf } from './cashClass.js'
+import { txDate } from './obligations.js'
 
 // Product default; a business may set its own (P-01, businesses.runway_target_days).
 export const RUNWAY_TARGET_DAYS = 60
@@ -121,6 +125,33 @@ export function flowOf(metrics) {
   const moneyOut = Number(m.operating_cash_out ?? 0) + Number(m.capex ?? 0)
     + Number(m.tax_expense ?? 0) + Number(m.interest_expense ?? 0)
   return { moneyIn, moneyOut, net: moneyIn - moneyOut, capex: Number(m.capex ?? 0) }
+}
+
+/**
+ * Money that actually moved through the company's accounts in [from, to] (inclusive ISO dates),
+ * from its transactions — every row of this company, whatever its scope label. Opening
+ * balances, transfers between own accounts and balance corrections are not money in or out.
+ * Unlike flowOf it does not drop rows the classifier cannot name ("Payment: …" without a
+ * category): they are real cash, so they count, and `unclassified` says how many there are.
+ */
+const NOT_A_MOVE = ['opening_balance', 'transfer', 'balance_correction']
+export function cashFlow(transactions = [], { from, to }) {
+  let moneyIn = 0, moneyOut = 0, capex = 0, unclassified = 0, count = 0
+  for (const t of Array.isArray(transactions) ? transactions : []) {
+    if (!t || (t.currency_original && t.currency_original !== 'IDR')) continue
+    const d = txDate(t).slice(0, 10)
+    if (!d || d < from || d > to) continue
+    const sign = t.type === 'income' ? 1 : (t.type === 'expense' || t.type === 'payroll') ? -1 : 0
+    if (!sign) continue
+    const cls = classOf(t)
+    if (NOT_A_MOVE.includes(cls)) continue
+    const a = Math.abs(Number(t.amount_original ?? t.amount ?? 0)) || 0
+    if (sign > 0) moneyIn += a; else moneyOut += a
+    if (cls === 'capex' && sign < 0) capex += a
+    if (cls === 'unknown') unclassified++
+    count++
+  }
+  return { moneyIn, moneyOut, net: moneyIn - moneyOut, capex, unclassified, count }
 }
 
 /** Percentage change, or null when there is no base to compare with. */

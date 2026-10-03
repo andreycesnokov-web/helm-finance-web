@@ -1,6 +1,6 @@
 // Radar (designs/Radar.dc.html, RadarMobile.dc.html) — 30-day cash view.
 //
-// Data: GET /api/pulse?scope=business (cash now, burn, debts) and, when the role may
+// Data: GET /api/pulse (cash now, burn, debts) and, when the role may
 // read it, GET /api/accountant/obligations (only engine-CALCULATED tax amounts are
 // used). The line rules are the existing Radar rules — see lib/radarSeries.js.
 // What-if chips change only what is drawn here; nothing is saved.
@@ -39,7 +39,7 @@ export default function Radar() {
   const t = useT()
   const lang = useLang()
   const { hasFeature, loading: accessLoading } = useAccess()
-  const pulse = useApi('/pulse?scope=business')
+  const pulse = useApi('/pulse')
   const obl = useApi('/accountant/obligations')
   const fund = useApi('/business-funding') // P-03: loan repayments land on Radar
   const [picked, setHorizon] = useState(DEFAULT_HORIZON)

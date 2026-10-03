@@ -85,7 +85,8 @@ export function accrualRows({ transactions = [], debts = [], categories = [], mo
   }
   for (const t of transactions || []) {
     if (!t || !PROFIT_TX_TYPES.includes(t.type)) continue
-    if ((t.scope || 'business') !== 'business' || (t.currency_original && t.currency_original !== 'IDR')) continue
+    // Every company row counts, whatever its scope label (see lib/performance.js, isBizIdr).
+    if (t.currency_original && t.currency_original !== 'IDR') continue
     if (settlementTx.has(String(t.id)) || assetTx.has(String(t.id)) || repaymentTx.has(String(t.id))) continue
     const k = txDate(t).slice(0, 7)
     if (!inWindow.has(k)) continue

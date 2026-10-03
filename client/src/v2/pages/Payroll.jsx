@@ -21,7 +21,7 @@ export default function Payroll() {
   const lang = useLang()
   const ov = useApi('/payroll/overview')
   const wallets = useApi('/wallets')
-  const ins = useApi(`/pulse/advanced-insights?scope=business&from=${daysAgo(30)}&to=${daysAgo(0)}`)
+  const ins = useApi(`/pulse/advanced-insights?from=${daysAgo(30)}&to=${daysAgo(0)}`)
   const { hasFeature, loading: accessLoading } = useAccess()
   useAskContext(t('nav.payroll'), null)
   const head = (

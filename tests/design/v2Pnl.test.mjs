@@ -79,7 +79,7 @@ t('never guessed: uncategorised or unconfirmed records stay out of profit and ar
   assert.deepStrictEqual(coverage.missing.map((m) => m.name).sort(), ['Unconfirmed', '—'])
 })
 
-t('assets, funding and transfers are never profit; other workspaces and currencies are excluded', () => {
+t('assets, funding and transfers are never profit; other currencies are excluded; a "personal" label in a company still counts', () => {
   const tx = [
     { id: 1, type: 'expense', category: 'Cleaning machines', amount_original: 7000, transaction_date: '2026-09-01' },
     { id: 2, type: 'income', category: 'Получение кредитов и займов', amount_original: 5000, transaction_date: '2026-09-01' },
@@ -89,7 +89,8 @@ t('assets, funding and transfers are never profit; other workspaces and currenci
     { id: 6, type: 'transfer', category: 'Cleaning service income', amount_original: 50, transaction_date: '2026-09-01' },
   ]
   const r = accrualRows({ transactions: tx, categories: cats, months: M }).rows[1]
-  assert.deepStrictEqual([r.revenue, r.net, r.assets], [0, 0, 7000])
+  // Row 4 is a company row labelled 'personal' (the database default): it is company revenue.
+  assert.deepStrictEqual([r.revenue, r.net, r.assets], [50, 50, 7000])
 })
 
 t('asset register (P-11): a registered purchase is not a cost; depreciation comes after EBITDA', () => {

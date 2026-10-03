@@ -45,12 +45,13 @@ const hasDocs = (d) => (Array.isArray(d?.attachments) && d.attachments.length > 
  * Returns the checks and an overall percentage of complete records.
  */
 export function closeReadiness({ month, transactions = [], debts = [], batches = [], wallets = [] }) {
-  const tx = transactions.filter((t) => inMonth(txDate(t), month) && (t.scope || 'business') === 'business')
+  // Every company row counts, whatever its scope label (see lib/performance.js, isBizIdr).
+  const tx = transactions.filter((t) => inMonth(txDate(t), month))
   const noCat = tx.filter(needsCategory)
   const bills = debts.filter((d) => d.is_training !== true && d.status !== 'cancelled' && inMonth(d.due_date || d.created_at, month))
   const noDoc = bills.filter((d) => !hasDocs(d))
   const end = monthOptions(24).find((m) => m.key === month)?.end || `${month}-28`
-  const banks = wallets.filter((w) => w.type === 'bank' && w.is_active !== false && (w.scope || 'business') === 'business')
+  const banks = wallets.filter((w) => w.type === 'bank' && w.is_active !== false)
   const covered = banks.filter((w) => batches.some((b) => String(b.wallet_id) === String(w.id) && !['cancelled', 'failed'].includes(b.status) && String(b.statement_end || '') >= end))
   const records = tx.length + bills.length
   const complete = records - noCat.length - noDoc.length
@@ -99,7 +100,7 @@ export function packages({ month, transactions = [], debts = [], slipNeeded = fa
       status: missing ? 'missing' : items.every((i) => i.done) ? 'complete' : 'open', missing })
   }
   for (const t of transactions) {
-    if (!inMonth(txDate(t), month) || (t.scope || 'business') !== 'business') continue
+    if (!inMonth(txDate(t), month)) continue
     if (!needsCategory(t) && t.type !== 'payroll') continue
     const payroll = t.type === 'payroll'
     rows.push({ key: `tx:${t.id}`, id: t.id, kind: payroll ? 'payroll' : t.type === 'income' ? 'in' : 'out', date: txDate(t),

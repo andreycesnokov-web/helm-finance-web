@@ -264,3 +264,22 @@ export function billChecklistItems(d, { hasInvoice = false, paid = false, slipNe
     { key: 'check', done: checkTracked && !!d.accountant_checked_at, unknown: !checkTracked, editable: checkTracked },
   ]
 }
+
+/**
+ * Money rows that no account picks up: no wallet_id, and the source text matches no wallet
+ * name (GET /api/wallets links a row by wallet_id or by an exact source = wallet name).
+ * Their cash counts in the company total on Pulse but in no account balance, so Accounts
+ * shows the difference instead of hiding it. Signed: income +, expense/payroll −.
+ */
+export function unlinkedMoney(transactions = [], wallets = []) {
+  const names = new Set((wallets || []).map((w) => w.name))
+  let sum = 0, count = 0
+  for (const t of transactions || []) {
+    if (!t || t.wallet_id || names.has(t.source)) continue
+    const a = Number(t.amount_idr ?? t.amount_original ?? 0) || 0
+    const d = t.type === 'income' ? a : (t.type === 'expense' || t.type === 'payroll') ? -a : t.type === 'correction' ? a : 0
+    if (!d) continue
+    sum += d; count++
+  }
+  return { sum, count }
+}

@@ -35,7 +35,7 @@ export default function BillDetail({ kind = 'payable' }) {
   const { id } = useParams()
   const debts = useApi('/debts')
   const rules = useApi('/accountant/rules')
-  const pulse = useApi('/pulse?scope=business')
+  const pulse = useApi('/pulse')
   const fund = useApi('/business-funding')
   const cps = useApi('/counterparties')
   const listPath = kind === 'receivable' ? '/business/receivables' : '/business/payables'

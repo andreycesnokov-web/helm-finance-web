@@ -35,11 +35,15 @@ t('every nav and tab destination is a registered v2 route', () => {
   }
 })
 
-t('"+ Add" is disabled until Add is migrated — never the legacy Personal-default page (review 8.2 #3)', () => {
+t('"+ Add" opens the v2 Add page, which always records Business — never the legacy Personal-default page (review 8.2 #3)', () => {
   const add = TABS.find((x) => x.key === 'add')
-  assert.ok(add.disabled && add.to === null)
-  for (const f of ['client/src/v2/shell/V2Shell.jsx', 'client/src/v2/pages/Transactions.jsx', 'client/src/v2/nav.js'])
-    assert.ok(!/to=["'{]?\/business\/add\b|to: '\/business\/add'/.test(read(f)), `${f} links to /business/add`)
+  assert.ok(!add.disabled && add.to === '/business/add')
+  assert.match(app, /<Route path="add" element=\{<AddEntry \/>\} \/>/)
+  assert.ok(!/import Add from '\.\.\/pages\/Add'/.test(app), 'the legacy Add page is not imported by v2')
+  const page = read('client/src/v2/pages/AddEntry.jsx')
+  assert.match(page, /createBusinessTransaction\(token, body\.tx\)/)
+  assert.match(page, /<DebtFormModal mode=\{modal\} token=\{token\} lockBusinessScope/)
+  assert.match(read('client/src/v2/lib/actions.js'), /transactions: \[\{ \.\.\.tx, scope: 'business' \}\]/)
 })
 
 t('every legacy /business route is still routed when the flag is on', () => {

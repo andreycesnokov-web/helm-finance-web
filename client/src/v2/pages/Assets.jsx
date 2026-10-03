@@ -13,7 +13,7 @@ import { money, shortDate } from '../lib/format'
 export default function Assets() {
   const t = useT()
   const lang = useLang()
-  const pulse = useApi('/pulse?scope=business')
+  const pulse = useApi('/pulse')
   const obl = useApi('/accountant/obligations')
   const reg = useApi('/assets')
   const fund = useApi('/business-funding')

@@ -52,7 +52,7 @@ export default {
     seeForecast: 'See the 30-day forecast', cashNow: 'Cash now', accounts: '{n} business accounts · {cur}',
     runway: 'Runway', runwayNone: 'Not measured', daysN: '{n} days', target: 'Target {n} days', minCash: 'minimum {v}',
     runwayVsTarget: 'Runway {n} days of a {target}-day target',
-    net30: 'Net · last 30 days', inOut: 'In {in} · out {out}', worstLine: 'Worst case: {v} on {d}',
+    uncatN: '{n} without a category', net30: 'Net · last 30 days', inOut: 'In {in} · out {out}', worstLine: 'Worst case: {v} on {d}',
     needs: 'Needs your decision', items: '{n} items', nothing: 'Nothing needs your decision right now.',
     review: 'Review', needCategory: '{n} transactions need a category — your accountant needs them to close the month.',
     dec: {
@@ -196,7 +196,7 @@ export default {
   },
   acc: {
     sub: 'Where the company’s money is right now', import: 'Import statement', add: 'Add account', total: 'Total cash · {n} accounts',
-    labelledPersonal: 'Labelled personal', labelledNote: '{n} of these accounts belong to this company but are labelled personal. They are counted as the company’s, as before; ask your accountant whether the label or the owner is wrong.', personalNote: 'Personal money is kept in your Personal workspace and is never counted here.', shareLabel: 'Cash by account: {list}',
+    unlinkedTitle: '{n} not linked to an account', unlinked: '{v} was recorded without an account, so no balance here includes it. With it, the company has {total} — the figure on Pulse.', labelledPersonal: 'Labelled personal', labelledNote: '{n} of these accounts belong to this company but are labelled personal. They are counted as the company’s, as before; ask your accountant whether the label or the owner is wrong.', personalNote: 'Personal money is kept in your Personal workspace and is never counted here.', shareLabel: 'Cash by account: {list}',
     kind: { bank: 'Bank account', cash: 'Cash', ewallet: 'E-wallet', card: 'Card', gateway: 'Payment gateway', other: 'Account' },
     statementOn: 'Statement imported {d}', toReview: 'lines to review', noStatement: 'No statement imported yet', upload: 'Upload statement', manual: 'Updated by hand',
     more: 'Details for {name}', otherCcy: 'Accounts in other currencies are listed but not added to the IDR total.',
@@ -345,6 +345,18 @@ export default {
     open: 'Open', whyBtn: 'Why?', why: 'Why do you recommend: {what}?',
     askLabel: 'Ask your CFO', askPh: 'e.g. Can I afford a new machine next month?',
     chip: { q1: 'Can I afford a new machine next month?', q2: 'Why is runway shorter than last month?', q3: 'What if revenue drops 20%?', q4: 'Write a one-page investor update' },
+  },
+  add: {
+    title: 'Add', sub: 'Record something for this company. It always goes to Business, never to Personal.',
+    k: { expense: 'Expense', expenseHint: 'Money paid out of a company account', income: 'Income', incomeHint: 'Money received into a company account',
+      payable: 'Bill to pay', payableHint: 'A supplier bill, paid later', receivable: 'Invoice a customer', receivableHint: 'Money a customer owes you',
+      document: 'Upload a document', documentHint: 'Invoice, receipt or tax slip — AI reads it', statement: 'Import a bank statement', statementHint: 'All movements of an account at once' },
+    amount: 'Amount', date: 'Date', walletOut: 'Paid from', walletIn: 'Received into', pickWallet: 'Choose an account',
+    noWallets: 'Add a company account first.', descOut: 'What was it for', descIn: 'Who paid, for what', category: 'Category (optional)', categoryPh: 'e.g. Office rent',
+    businessNote: 'Saved as a company record in this business. Personal money is kept in your Personal workspace.',
+    saveOut: 'Save expense', saveIn: 'Save income', doneOut: 'Expense of {v} saved.', doneIn: 'Income of {v} saved.',
+    forbidden: 'Your role can submit requests but not record money directly. Ask an owner, admin or CFO.',
+    err: { type: 'Choose expense or income.', amount: 'Enter an amount in whole rupiah, e.g. 1.500.000.', wallet: 'Choose the account.', date: 'Enter a date.', description: 'Say what it was for.' },
   },
   perf: {
     sub: 'Is the business making money, and where does the cash go', views: 'Performance views', forbidden: 'Your role cannot view business finance.',
