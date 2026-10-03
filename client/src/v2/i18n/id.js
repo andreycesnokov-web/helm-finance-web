@@ -226,7 +226,7 @@ export default {
   },
   fund: {
     sub: 'Uang dari investor, dari Anda, dan dari perusahaan Anda yang lain — tidak pernah dihitung sebagai pendapatan', record: 'Catat pendanaan',
-    raised: 'Dana dari luar', toRepay: 'Masih harus dikembalikan', seen: 'Pendanaan di transaksi', seenSub: '12 bulan terakhir · bukan pendapatan',
+    raised: 'Dana dari luar', toRepay: 'Masih harus dikembalikan', seen: 'Pendanaan yang bergerak di transaksi', seenSub: '12 bulan terakhir · masuk dan keluar dijumlahkan, bukan saldo · bukan pendapatan',
     emptyTitle: 'Belum ada pendanaan', emptyText: 'Catat modal dan pinjaman beserta syaratnya. Cicilan pinjaman lalu muncul di Radar dan bunganya di Kinerja.',
     seeTx: 'Lihat transaksi', howTitle: 'Bagaimana pendanaan tampil di angka Anda',
     how: 'Pendanaan menambah kas dan runway di Pulse. Ini bukan pendapatan, jadi tidak membuat bulan tampak untung. Cicilan pinjaman dari daftar ini muncul di Radar; hanya bunganya yang masuk laba.',

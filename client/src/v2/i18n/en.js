@@ -226,7 +226,7 @@ export default {
   },
   fund: {
     sub: 'Money from investors, from you and from your other companies — never counted as revenue', record: 'Record funding',
-    raised: 'Raised from outside', toRepay: 'Still to pay back', seen: 'Funding seen in transactions', seenSub: 'last 12 months · classified, not revenue',
+    raised: 'Raised from outside', toRepay: 'Still to pay back', seen: 'Funding moved in transactions', seenSub: 'last 12 months · money in and out added together, not a balance · not revenue',
     emptyTitle: 'No funding recorded yet', emptyText: 'Record equity and loans with their terms. Loan repayments then appear on Radar and their interest in Performance.',
     seeTx: 'See transactions', howTitle: 'How funding shows in your numbers',
     how: 'It adds to cash and runway on Pulse. It is never revenue, so it cannot make a month look profitable. Loan repayments from this register appear on Radar; only their interest reaches profit.',
