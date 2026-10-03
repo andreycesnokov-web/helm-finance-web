@@ -6,7 +6,9 @@ import { radarFigures } from '../../client/src/lib/radarFigures.js'
 let pass = 0, fail = 0
 const t = (name, fn) => { try { fn(); pass++; console.log(`  ok  ${name}`) } catch (e) { fail++; console.log(`  XX  ${name}\n      ${e.message}`) } }
 const today = new Date('2026-10-03T10:00:00')
-const D = (n) => { const d = new Date('2026-10-03T00:00:00'); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10) }
+// Local calendar date n days from 3 Oct (toISOString would give the UTC date — the previous
+// day east of UTC — which is what made this file fail in UTC+7; review 8.2 #14).
+const D = (n) => { const d = new Date(2026, 9, 3 + n); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` }
 const debts = [
   { id: 1, type: 'receivable', counterparty: 'A', amount: 10e6, remaining_amount: 10e6, due_date: D(5), status: 'open', approval_status: 'approved' },
   { id: 2, type: 'payable', counterparty: 'B', amount: 4e6, remaining_amount: 4e6, due_date: D(2), status: 'open' },
@@ -71,11 +73,20 @@ t('what-if: late shifts the item, collect makes it count in the worst case', () 
   const { items } = cashItems({ debts, today })
   const late = applyScenario(items, { kind: 'late', key: 'debt:1' })
   assert.strictEqual(late.find((i) => i.id === 1).day, 19)
+  assert.strictEqual(late.find((i) => i.id === 1).date, D(19), 'the date moves with the day')
   const base = forecast({ balance: 5e6, burnRate: 0, items, today })
   const col = forecast({ balance: 5e6, burnRate: 0, items: applyScenario(items, { kind: 'collect', key: 'debt:4' }), today })
   assert.strictEqual(col.worstLowest.value - base.worstLowest.value >= 0, true)
   assert.strictEqual(col.days[30].worst - base.days[30].worst, 3e6)
   assert.strictEqual(applyScenario(items, null), items)
+})
+
+t('review 8.2 #14: a date-only due date is that LOCAL day in every time zone', () => {
+  const { items } = cashItems({ debts: [{ id: 1, type: 'payable', amount: 1, due_date: '2026-10-08', status: 'open' }], today })
+  assert.deepStrictEqual([items[0].day, items[0].date], [5, '2026-10-08'])
+  const f = forecast({ balance: 0, items: [], today })
+  assert.strictEqual(f.days[0].date, '2026-10-03')
+  assert.strictEqual(f.days[30].date, '2026-11-02')
 })
 
 t('chips come from the data', () => {

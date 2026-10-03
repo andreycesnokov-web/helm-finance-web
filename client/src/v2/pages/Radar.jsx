@@ -8,7 +8,7 @@ import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAccess } from '../../hooks/useAccess'
 import I from '../icons'
-import { PageHead, Card, Pill, Btn, Skeleton, ErrorBox, Empty } from '../ui'
+import { PageHead, Card, Pill, Btn, Skeleton, ErrorBox, Empty, NotYet } from '../ui'
 import { useT, useLang } from '../i18n'
 import { useApi } from '../data'
 import { money, shortDate } from '../lib/format'
@@ -142,7 +142,7 @@ export default function Radar() {
                   {daysOfSpend >= 1 && ` — ${t('radar.say.daysOfSpend', { n: daysOfSpend })}`}.
                   {collect && fCollect && ` ${t('radar.say.collect', { who: collect.label, amt: money(collect.amount), v: money(fCollect.worstLowest.value) })}`}</>}
             </p>
-            {collect && <Btn variant="primary" to="/business/receivables">{t('radar.sendReminder')}</Btn>}
+            {collect && <NotYet note={t('bills.reminderSoon')}>{t('radar.sendReminder')}</NotYet>}
           </div>
         </div>
       </Card>

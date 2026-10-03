@@ -17,6 +17,12 @@ const needsLook = (d) => ['needs_review', 'pending', 'pending_review'].includes(
   || ['failed', 'unreadable'].includes(d.extraction_status) || !(d.links || []).length
 const docMonth = (d) => String(d.document_date || d.created_at || '').slice(0, 7)
 
+// Every document type from migration 031 (and the intake types) has a label; anything else
+// reads "Document" instead of a raw key (review 8.2 #8).
+export const DOC_TYPES = ['vendor_invoice', 'customer_invoice', 'tax_invoice', 'bukti_potong', 'tax_billing', 'payment_proof',
+  'filing_confirmation', 'bank_document', 'other', 'invoice', 'receipt', 'bank_statement', 'contract', 'tax']
+export const docTypeLabel = (t, k) => t(`docs.type.${DOC_TYPES.includes(k) ? k : 'other'}`)
+
 export default function Documents() {
   const t = useT()
   const lang = useLang()
@@ -75,7 +81,7 @@ export default function Documents() {
                     <span className="v2-doc-text">
                       <span className="v2-dec-title v2-ellipsis" title={name}>{name}</span>
                       <span className="v2-dec-meta">{[t(`docs.ch.${d.file?.upload_channel || 'web'}`), shortDate(d.created_at, lang)].join(' · ')}</span>
-                      <span className="v2-small">{[d.document_type ? t(`docs.type.${d.document_type}`) : null, d.gross_amount ? money(d.gross_amount, { currency: d.currency || 'IDR' }) : null].filter(Boolean).join(' · ')}</span>
+                      <span className="v2-small">{[d.document_type ? docTypeLabel(t, d.document_type) : null, d.gross_amount ? money(d.gross_amount, { currency: d.currency || 'IDR' }) : null].filter(Boolean).join(' · ')}</span>
                     </span>
                     <Pill tone={linked ? 'good' : 'warn'}>{t(linked ? 'docs.linked' : 'docs.notLinked')}</Pill>
                     <Link to="/business/documents/classic">{needsLook(d) ? t('docs.fix') : t('bill.view')}</Link>

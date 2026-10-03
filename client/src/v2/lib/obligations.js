@@ -71,6 +71,22 @@ export function withholdingSplit(amount, engineRate) {
   return { gross, rate, tax, net: gross - tax }
 }
 
+/**
+ * Does this bill carry a withholding treatment? (review 8.2 #9)
+ *   'withhold'  the counterparty's default tax treatment names a withholding (PPh 23 / 4(2) /
+ *               "withhold") and does not say "no"/"not"/"none"
+ *   'applied'   the bill was already created net of withholding (its description says so)
+ *   null        no treatment → no split is shown (goods, fuel, "no withholding" parties …)
+ * The rate itself still comes only from the verified rule engine.
+ */
+export function withholdingTreatment(debt, counterparty) {
+  if (!debt || debt.type === 'receivable' || (debt.currency || 'IDR') !== 'IDR') return null
+  if (/\bwithheld\b/i.test(String(debt.description || ''))) return 'applied'
+  const tt = String(counterparty?.default_tax_treatment || '').toLowerCase()
+  if (!tt || /\b(no|not|none|tidak)\b/.test(tt)) return null
+  return /pph[\s_]*23|4\s*\(\s*2\s*\)|pph[\s_]*4[\s_]*2|withhold|potong/.test(tt) ? 'withhold' : null
+}
+
 /** How a counterparty has paid (receivables) or been paid (payables), from history. */
 export function payerHistory(debts = [], name) {
   const key = String(name || '').trim().toLowerCase()

@@ -14,7 +14,7 @@ const daysAgo = (n) => { const d = new Date(); d.setDate(d.getDate() - n); retur
 
 export default function Funding() {
   const t = useT()
-  const ins = useApi(`/pulse/advanced-insights?from=${daysAgo(365)}&to=${daysAgo(0)}`)
+  const ins = useApi(`/pulse/advanced-insights?scope=business&from=${daysAgo(365)}&to=${daysAgo(0)}`)
   const funding = ins.data?.metrics?.other_cash_movement?.funding
   return (
     <div className="v2-page">

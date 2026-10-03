@@ -25,7 +25,17 @@ export const DEFAULT_HORIZON = 30
 export const LATE_SHIFT_DAYS = 14
 
 const DAY = 86400000
-const startOfDay = (d) => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x }
+// Dates are LOCAL calendar days (review 8.2 #14). A date-only string such as '2026-10-08'
+// is read as that local day: `new Date('2026-10-08')` would be UTC midnight, which is the
+// previous local day west of UTC. Day offsets are added with setDate, never as 24 h
+// multiples, so a DST change cannot move an item to the wrong date.
+const startOfDay = (d) => {
+  const m = typeof d === 'string' && /^(\d{4})-(\d{2})-(\d{2})$/.exec(d)
+  const x = m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : new Date(d)
+  x.setHours(0, 0, 0, 0); return x
+}
+const addDays = (t0, n) => { const x = new Date(t0); x.setDate(x.getDate() + n); return x }
+const dayDiff = (a, b) => Math.round((Date.UTC(a.getFullYear(), a.getMonth(), a.getDate()) - Date.UTC(b.getFullYear(), b.getMonth(), b.getDate())) / DAY)
 const isoDay = (d) => { const x = new Date(d); return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}` }
 const num = (v) => { const n = Number(v); return Number.isFinite(n) ? n : 0 }
 
@@ -53,12 +63,12 @@ export function cashItems({ debts = [], obligations = [], today = new Date(), ho
     if (!d.due_date) { excluded.undated++; continue }
     const due = startOfDay(d.due_date)
     if (Number.isNaN(due.getTime())) { excluded.undated++; continue }
-    const day = Math.max(0, Math.round((due - t0) / DAY))
+    const day = Math.max(0, dayDiff(due, t0))
     if (day > horizon) continue
     const dir = d.type === 'receivable' ? 'in' : 'out'
     items.push({
       key: `debt:${d.id}`, id: d.id, source: 'debt', dir, amount, day,
-      date: isoDay(new Date(t0.getTime() + day * DAY)), due_date: d.due_date,
+      date: isoDay(addDays(t0, day)), due_date: d.due_date,
       label: d.counterparty || d.description || '', note: d.description || '',
       tag: tagOf(d, dir), days_overdue: num(d.days_overdue), type: d.type,
       counted: d.approval_status !== 'pending_approval',
@@ -67,11 +77,11 @@ export function cashItems({ debts = [], obligations = [], today = new Date(), ho
   for (const o of Array.isArray(obligations) ? obligations : []) {
     if (!o || o.status !== 'calculated' || !(num(o.amount) > 0) || !o.due_date) continue
     if (o.currency && o.currency !== 'IDR') { excluded.foreign++; continue }
-    const day = Math.max(0, Math.round((startOfDay(o.due_date) - t0) / DAY))
+    const day = Math.max(0, dayDiff(startOfDay(o.due_date), t0))
     if (day > horizon) continue
     items.push({
       key: `tax:${o.obligation_type}:${o.period}`, source: 'tax', dir: 'out', amount: num(o.amount), day,
-      date: isoDay(new Date(t0.getTime() + day * DAY)), label: o.title, note: o.period, tag: 'deadline',
+      date: isoDay(addDays(t0, day)), label: o.title, note: o.period, tag: 'deadline',
       counted: true,
     })
   }
@@ -90,7 +100,12 @@ export function applyScenario(items, scenario) {
   if (!scenario || !scenario.key) return items
   return items.map((it) => {
     if (it.key !== scenario.key) return it
-    if (scenario.kind === 'late') return { ...it, day: it.day + LATE_SHIFT_DAYS, shifted: true }
+    if (scenario.kind === 'late') {
+      // Shift the day AND the date from it, so the moved item shows its new date.
+      const day = it.day + LATE_SHIFT_DAYS
+      const date = it.date ? isoDay(addDays(startOfDay(it.date), LATE_SHIFT_DAYS)) : it.date
+      return { ...it, day, date, shifted: true }
+    }
     if (scenario.kind === 'collect') return { ...it, day: Math.min(it.day, 6), certain: true }
     if (scenario.kind === 'approve') return { ...it, counted: true, assumed: true }
     return it
@@ -113,7 +128,7 @@ export function forecast({ balance = 0, burnRate = 0, items = [], horizon = DEFA
       if (it.dir === 'in') { inAll += it.amount; if (it.certain) inCertain += it.amount } else outAll += it.amount
     }
     days.push({
-      day: d, date: isoDay(new Date(t0.getTime() + d * DAY)),
+      day: d, date: isoDay(addDays(t0, d)),
       expected: b + inAll - outAll - burn * d,
       best: b + inAll - outAll * 0.5,
       worst: b + inCertain - outAll - burn * d,
