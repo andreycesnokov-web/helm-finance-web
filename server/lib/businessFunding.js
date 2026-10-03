@@ -16,7 +16,13 @@ const MAX_SCHEDULE = 360;
 
 const canEditFunding = (role) => EDIT_ROLES.includes(role);
 const round2 = (n) => Math.round(n * 100) / 100;
-const money = (v) => (typeof v === 'number' || (typeof v === 'string' && /^\s*\d+(\.\d{1,2})?\s*$/.test(v)) ? Number(v) : NaN);
+// Finite and within NUMERIC(20,2) with room to spare (1e15 IDR); Infinity or a huge value
+// would otherwise reach the database and fail there as a 500.
+const MAX_IDR = 1e15;
+const money = (v) => {
+  const n = (typeof v === 'number' || (typeof v === 'string' && /^\s*\d+(\.\d{1,2})?\s*$/.test(v))) ? Number(v) : NaN;
+  return Number.isFinite(n) && n <= MAX_IDR ? n : NaN;
+};
 const isDate = (v) => typeof v === 'string' && DATE_RE.test(v) && !Number.isNaN(new Date(v).getTime());
 const txId = (v) => (v == null || v === '' ? null : /^\d+$/.test(String(v)) ? Number(v) : NaN);
 

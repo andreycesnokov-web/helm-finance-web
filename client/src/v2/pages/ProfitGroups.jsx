@@ -92,7 +92,7 @@ export default function ProfitGroups() {
                   <Btn onClick={() => setForm((f) => ({ ...f, ...Object.fromEntries(withSuggestion.map((c) => [c.id, c.suggestion.pnl_group])) }))}>
                     {t('perf.groups.useSuggestions', { n: withSuggestion.length })}</Btn>
                 )}
-                <Btn variant="primary" onClick={save} disabled={busy || changed.length === 0}>{t('perf.groups.saveN', { n: changed.length })}</Btn>
+                <Btn variant="primary" onClick={save} disabled={busy || changed.length === 0} title={changed.length === 0 ? t('perf.groups.nothingChanged') : undefined}>{t('perf.groups.saveN', { n: changed.length })}</Btn>
               </div>
             ) : <p className="v2-muted v2-small">{t('perf.groups.whoEdits')}</p>}
             {msg && <p className={msg.ok ? 'v2-dec-done' : 'v2-inline-err'} role={msg.ok ? 'status' : 'alert'}>{msg.ok && <I.check size={16} />}{msg.text}</p>}

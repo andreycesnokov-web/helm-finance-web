@@ -31,17 +31,24 @@ export function TagPill({ it }) {
   return <Pill tone={TAG_TONE[it.tag] || 'neutral'}>{text}</Pill>
 }
 
+// "Show all" opens the list the shown items come from (upcoming invoices and bills),
+// matching the In / Out filter — not past transactions.
+export const SHOW_ALL = { in: '/business/receivables', out: '/business/payables', all: '/business/invoices' }
+
 export default function Radar() {
   const t = useT()
   const lang = useLang()
-  const { hasFeature } = useAccess()
+  const { hasFeature, loading: accessLoading } = useAccess()
   const pulse = useApi('/pulse?scope=business')
   const obl = useApi('/accountant/obligations')
   const fund = useApi('/business-funding') // P-03: loan repayments land on Radar
-  const [horizon, setHorizon] = useState(DEFAULT_HORIZON)
+  const [picked, setHorizon] = useState(DEFAULT_HORIZON)
   const [scenario, setScenario] = useState({ kind: 'worst' })
   const [filter, setFilter] = useState('all')
-  const advanced = hasFeature('advanced_radar_enabled')
+  // hasFeature fails open while the plan is loading, so the longer horizons wait for it, and a
+  // horizon picked earlier falls back to 30 days when the plan does not include it.
+  const advanced = !accessLoading && hasFeature('advanced_radar_enabled')
+  const horizon = advanced ? picked : DEFAULT_HORIZON
   const { openAsk } = useAsk()
   useAskContext(t('nav.radar'), t('radar.days', { n: horizon }))
 
@@ -66,7 +73,7 @@ export default function Radar() {
       title={t('nav.radar')}
       sub={t('radar.sub', { n: horizon, from: shortDate(from, lang), to: shortDate(to, lang) })}
       actions={
-        <div className="v2-seg" role="group" aria-label={t('radar.horizon')}>
+        <div className="v2-seg v2-seg-wrap" role="group" aria-label={t('radar.horizon')}>
           {HORIZONS.map((h) => {
             const locked = h !== DEFAULT_HORIZON && !advanced
             return (
@@ -90,6 +97,8 @@ export default function Radar() {
   const daysOfSpend = burn > 0 ? Math.round(Math.max(0, f.worstLowest.value) / burn) : null
   const late = scenario.kind === 'late' ? chips.find((c) => c.kind === 'late') : null
   const approving = scenario.kind === 'approve' ? chips.find((c) => c.kind === 'approve') : null
+  const delaying = scenario.kind === 'delay' ? chips.find((c) => c.kind === 'delay') : null
+  const dropping = scenario.kind === 'revenue' ? chips.find((c) => c.kind === 'revenue') : null
 
   return (
     <div className="v2-radar">
@@ -125,17 +134,22 @@ export default function Radar() {
           <div className="v2-chips" role="group" aria-label={t('radar.whatIf')}>
             <button type="button" className="v2-chip" aria-pressed={scenario.kind === 'worst'} onClick={() => setScenario({ kind: 'worst' })}>{t('radar.chip.worst')}</button>
             {chips.map((c) => (
-              <button key={c.kind + c.key} type="button" className="v2-chip" aria-pressed={scenario.key === c.key && scenario.kind === c.kind}
+              <button key={c.kind + c.key} type="button" className="v2-chip" aria-pressed={scenario.kind === c.kind && (c.key == null || scenario.key === c.key)}
                 onClick={() => setScenario(c)}>
                 {t(`radar.chip.${c.kind}`, { who: c.label })}
               </button>
             ))}
+            <button type="button" className="v2-chip" disabled title={t('radar.chip.hireNote')}>{t('radar.chip.hire')}</button>
             <button type="button" className="v2-chip v2-chip-ask" onClick={() => openAsk()}><I.plus size={16} />{t('radar.chip.ask')}</button>
           </div>
           <div className="v2-callout">
             <span className="v2-callout-ic" aria-hidden="true"><I.cfo size={18} /></span>
             <p className="v2-callout-text">
-              {approving
+              {dropping
+                ? t('radar.say.revenue', { amt: money(dropping.amount), end: money(f.end.value), d: shortDate(f.end.date, lang), low: money(f.lowest.value), lowD: shortDate(f.lowest.date, lang) })
+                : delaying
+                ? t('radar.say.delay', { who: delaying.label, end: money(f.end.value), d: shortDate(f.end.date, lang), low: money(f.lowest.value), lowD: shortDate(f.lowest.date, lang) })
+                : approving
                 ? t('radar.say.approve', { who: approving.label, amt: money(approving.amount), end: money(f.end.value), d: shortDate(f.end.date, lang), low: money(f.lowest.value), lowD: shortDate(f.lowest.date, lang) })
                 : late
                 ? t('radar.say.late', { who: late.label, end: money(f.end.value), d: shortDate(f.end.date, lang), low: money(f.lowest.value), lowD: shortDate(f.lowest.date, lang) })
@@ -191,7 +205,7 @@ export default function Radar() {
             {kd.hiddenCount > 0 && ` · ${t('radar.hidden', { k: kd.hiddenCount, min: money(KEY_DATE_MIN_IDR), sum: money(kd.hiddenSum) })}`}
             {model.excluded.foreign > 0 && ` · ${t('radar.foreign', { k: model.excluded.foreign })}`}
             {model.pending.count > 0 && ` · ${t('radar.pendingNote', { k: model.pending.count, sum: money(model.pending.sum) })}`}</span>
-          <Link to="/business/transactions">{t('radar.showAll', { m: kd.total })}</Link>
+          <Link to={SHOW_ALL[filter] || SHOW_ALL.all}>{t('radar.showAll', { m: kd.total })}</Link>
         </div>
       </Card>
     </div>

@@ -36,7 +36,9 @@ function Row({ d, onPay, t, lang }) {
   const receivable = d.type === 'receivable'
   let action
   if (s === 'pending') action = <Btn to={detailPath(d)}>{t('bills.review')}</Btn>
-  else if (s === 'late' && receivable) action = <NotYet note={t('bills.reminderSoon')}>{t('bills.sendReminder')}</NotYet>
+  // A late invoice can still be marked received (existing POST /api/debts/:id/pay through
+  // DebtPaymentModal); sending a reminder is not built yet and stays "Coming soon".
+  else if (s === 'late' && receivable) action = <span className="v2-btnpair"><Btn onClick={() => onPay(d)}>{t('bills.markReceived')}</Btn><NotYet note={t('bills.reminderSoon')}>{t('bills.sendReminder')}</NotYet></span>
   else if (s === 'open' || s === 'partial' || s === 'late') action = <Btn onClick={() => onPay(d)}>{t(receivable ? 'bills.markReceived' : 'bills.markPaid')}</Btn>
   else action = <Btn to={detailPath(d)}>{t('bills.open')}</Btn>
   return (
@@ -83,6 +85,10 @@ export default function Bills() {
   const [pay, setPay] = useState(null)
   const debts = useApi('/debts')
   const wallets = useApi('/wallets')
+  // GET /api/wallets returns only this company's wallets (by business_id). A wallet labelled
+  // 'personal' is still company-held (_specs/accounts-personal-scope-ambiguity.md), so it is
+  // not dropped; DebtPaymentModal lists it with its name.
+  const bizWallets = (wallets.data?.wallets || []).filter((x) => x.is_active !== false)
 
   const list = Array.isArray(debts.data) ? debts.data : []
   const sum = useMemo(() => billSummary(list), [list])
@@ -97,7 +103,7 @@ export default function Bills() {
     <>
       {create && <DebtFormModal mode={create} token={token} lockBusinessScope
         onClose={() => setCreate(null)} onSuccess={() => { setCreate(null); invalidate() }} />}
-      {pay && <DebtPaymentModal debt={pay} accounts={wallets.data?.wallets || []} token={token}
+      {pay && <DebtPaymentModal debt={pay} accounts={bizWallets} token={token}
         onClose={() => setPay(null)} onSuccess={() => { setPay(null); invalidate() }} />}
     </>
   )

@@ -59,11 +59,37 @@ export function overview(list = [], now = new Date()) {
   }
 }
 
+// The dashboard sends sanitized English warnings (server/index.js, /api/admin/dashboard).
+// Two are static — they are sent on every load and say a metric is not built — so they are
+// not "needs you" items. The rest map to i18n keys; anything unknown is shown as a generic
+// warning with the server text as the detail.
+const STATIC_WARNINGS = [/not computed \(requires per-business aggregation\)/i, /duplicate_email_conflicts: unavailable/i]
+const WARNING_KEYS = [
+  [/^(.+): unavailable \(database error\)$/i, 'dbError'],
+  [/timed out/i, 'timeout'],
+  [/safety cap/i, 'cap'],
+  [/inconsistent counts/i, 'inconsistent'],
+  [/truncated/i, 'cap'],
+]
+/** One dashboard warning → { key, what? } for i18n, or null for a static warning. */
+export function warningItem(text) {
+  const s = String(text || '')
+  if (!s || STATIC_WARNINGS.some((re) => re.test(s))) return null
+  for (const [re, key] of WARNING_KEYS) {
+    const m = re.exec(s)
+    if (m) return key === 'dbError' ? { key, what: m[1] } : { key }
+  }
+  return { key: 'other', detail: s }
+}
+
 /** Needs-you items from the dashboard response. */
 export function needsYou(dash, ov) {
   const out = []
   if (dash?.system?.degraded || dash?.system?.db_reachable === false) out.push({ tone: 'crit', key: 'dbDegraded' })
-  for (const w of dash?.warnings || []) out.push({ tone: 'warn', key: 'warning', text: w })
+  for (const w of dash?.warnings || []) {
+    const it = warningItem(w)
+    if (it) out.push({ tone: 'warn', key: `warn.${it.key}`, what: it.what, detail: it.detail })
+  }
   if (ov?.trialsEndingWeek) out.push({ tone: 'warn', key: 'trialsEnding', n: ov.trialsEndingWeek })
   const r = dash?.identity_risks || {}
   if (r.users_without_login_identity) out.push({ tone: 'warn', key: 'noLogin', n: r.users_without_login_identity })

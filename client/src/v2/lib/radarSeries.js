@@ -110,8 +110,12 @@ export function cashItems({ debts = [], obligations = [], repayments = [], today
  *   { kind: 'late', key }     the item arrives LATE_SHIFT_DAYS later
  *   { kind: 'collect', key }  the receivable is treated as certain (also in worst case)
  *   { kind: 'approve', key }  an item waiting for approval is counted as if approved
+ *   { kind: 'revenue' }       every amount coming in is 20% smaller (prototype "Revenue −20%")
+ *   { kind: 'delay', key }    a bill is paid LATE_SHIFT_DAYS later
  */
+export const REVENUE_DROP = 0.2
 export function applyScenario(items, scenario) {
+  if (scenario && scenario.kind === 'revenue') return items.map((it) => (it.dir === 'in' ? { ...it, amount: Math.round(it.amount * (1 - REVENUE_DROP)), scaled: true } : it))
   if (!scenario || !scenario.key) return items
   return items.map((it) => {
     if (it.key !== scenario.key) return it
@@ -123,6 +127,7 @@ export function applyScenario(items, scenario) {
     }
     if (scenario.kind === 'collect') return { ...it, day: Math.min(it.day, 6), certain: true }
     if (scenario.kind === 'approve') return { ...it, counted: true, assumed: true }
+    if (scenario.kind === 'delay') return { ...it, day: it.day + LATE_SHIFT_DAYS, shifted: true }
     return it
   })
 }
@@ -198,6 +203,9 @@ export function scenarioChips(items) {
   if (biggest) out.push({ kind: 'late', key: biggest.key, label: biggest.label, amount: biggest.amount })
   const late = ins.filter((it) => it.tag === 'late').sort((a, b) => b.amount - a.amount)[0]
   if (late) out.push({ kind: 'collect', key: late.key, label: late.label, amount: late.amount })
+  const bill = items.filter((it) => it.dir === 'out' && isCounted(it) && it.source === 'debt').sort((a, b) => b.amount - a.amount)[0]
+  if (bill) out.push({ kind: 'delay', key: bill.key, label: bill.label, amount: bill.amount })
+  if (ins.length) out.push({ kind: 'revenue', key: null, label: '', amount: Math.round(ins.reduce((s, x) => s + x.amount, 0) * REVENUE_DROP) })
   const pending = items.filter((it) => !isCounted(it)).sort((a, b) => b.amount - a.amount)[0]
   if (pending) out.push({ kind: 'approve', key: pending.key, label: pending.label, amount: pending.amount, dir: pending.dir })
   return out

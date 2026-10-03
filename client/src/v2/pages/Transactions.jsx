@@ -66,7 +66,7 @@ export default function Transactions() {
   }
   const head = (
     <PageHead title={t('nav.transactions')} sub={t('tx.sub')}
-      actions={<><Btn onClick={exportCsv} disabled={!rows.length}>{t('tx.export')}</Btn><NotYet note={t('nav.addSoon')}>{t('nav.add')}</NotYet></>} />
+      actions={<><Btn onClick={exportCsv} disabled={!rows.length} title={rows.length ? undefined : t('tx.nothingToExport')}>{t('tx.export')}</Btn><NotYet note={t('nav.addSoon')}>{t('nav.add')}</NotYet></>} />
   )
   if (tx.loading) return <>{head}<Card><Skeleton rows={8} /></Card></>
   if (tx.error) return <>{head}<ErrorBox error={tx.error} onRetry={tx.reload} /></>

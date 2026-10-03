@@ -16,6 +16,11 @@
 -- ADDITIVE and IDEMPOTENT. Two nullable columns and one CHECK. Existing rows keep NULL.
 -- No existing column, constraint, index or trigger is changed.
 --
+-- LOCKING. The CHECK is added NOT VALID inside the transaction (no scan of existing rows
+-- while debts is locked), then VALIDATEd after COMMIT in its own statement, which scans
+-- under a lighter lock that does not block reads or writes. Every existing row passes: both
+-- new columns are NULL. Re-running VALIDATE on a validated constraint is a no-op.
+--
 -- WRITES go through PATCH /api/debts/:id/checklist only: owner/ceo/admin/cfo/accountant,
 -- each change written to audit_events. POST /api/debts strips these fields from its body.
 
@@ -25,11 +30,11 @@ ALTER TABLE public.debts
   ADD COLUMN IF NOT EXISTS accountant_checked_at TIMESTAMPTZ NULL,
   ADD COLUMN IF NOT EXISTS accountant_checked_by BIGINT      NULL;
 
--- Checked-at and checked-by are set and cleared together.
+-- Checked-at and checked-by are set and cleared together. NOT VALID here; validated below.
 DO $$ BEGIN
   ALTER TABLE public.debts
     ADD CONSTRAINT debts_accountant_check_pair_chk
-    CHECK ((accountant_checked_at IS NULL) = (accountant_checked_by IS NULL));
+    CHECK ((accountant_checked_at IS NULL) = (accountant_checked_by IS NULL)) NOT VALID;
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 COMMENT ON COLUMN public.debts.accountant_checked_at IS
@@ -37,10 +42,14 @@ COMMENT ON COLUMN public.debts.accountant_checked_at IS
 
 COMMIT;
 
+-- Outside the transaction above, so the scan does not hold its lock.
+ALTER TABLE public.debts VALIDATE CONSTRAINT debts_accountant_check_pair_chk;
+
 -- ── verification (run after applying) ────────────────────────────────────────
 -- SELECT column_name FROM information_schema.columns WHERE table_name = 'debts'
 --   AND column_name IN ('accountant_checked_at','accountant_checked_by');            -- 2 rows
 -- SELECT count(*) FROM public.debts WHERE accountant_checked_at IS NOT NULL;         -- 0 right after apply
+-- SELECT convalidated FROM pg_constraint WHERE conname = 'debts_accountant_check_pair_chk'; -- true
 --
 -- ── rollback (only if needed) ────────────────────────────────────────────────
 -- ALTER TABLE public.debts DROP CONSTRAINT IF EXISTS debts_accountant_check_pair_chk;

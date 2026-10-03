@@ -265,3 +265,17 @@ The answers are in `DECISIONS.md`, which overrides section 5.
   - Performance: a payment linked to a repayment is split; the interest goes to the `interest` group in the month it falls due, and the principal never reaches profit.
   - Radar, Pulse, Approvals and Bill detail: unpaid repayments are scheduled outflows.
   - Assets: loans count in "The company owes", and net worth is shown once both registers exist.
+
+## 12. Batch 13 — release readiness
+- **Release walk:** `tests/design/v2/walk.mjs` opens 32 screens at 1440 and 390, follows every in-app link (59) and checks every button.
+  - Result: 0 links that fall back to Pulse, 0 disabled buttons without a reason, 0 console errors, 0 overflow.
+  - It also runs with `FIXTURE_MODE=error` (every data call fails) and `FIXTURE_MODE=empty` (nothing recorded): the same zeros.
+  - Report: `artifacts/design-v2/b13/walk-report.json`.
+- **Prototype gaps closed:**
+  - Radar what-ifs "Revenue −20%" and "pay a bill 2 weeks later"; "Hire 1 person" stays disabled, with the reason shown.
+  - Performance → Export CSV.
+  - Funding → investor update with AI CFO.
+  - Accountant packages → "Download folder" disabled, with the reason shown.
+  - The remaining items are listed in `RELEASE_CHECKLIST.md` section 6.
+- **Missing states filled in:** First day (error), Funding (error vs. not available), Assets register (error), Add asset (checking).
+- **`RELEASE_CHECKLIST.md`:** merge order, migrations 058–064 with check queries, the Railway flag, rollback, and a manual test list.

@@ -17,7 +17,7 @@ import { PageHead, Card, Pill, Btn, NotYet, Skeleton, ErrorBox, Empty } from '..
 import { useT, useLang } from '../i18n'
 import { useApi } from '../data'
 import { money, shortDate } from '../lib/format'
-import { monthOptions, defaultCloseMonth, closeReadiness, packages, packageSummary, monthGrid, complianceEvents, eventStage } from '../lib/accounting'
+import { monthOptions, accountantMonth, closeReadiness, packages, packageSummary, monthGrid, complianceEvents, eventStage } from '../lib/accounting'
 import { askAccountant } from '../lib/ask'
 import AccountantTabs from '../components/AccountantTabs'
 import { findWithholdingRule } from '../../pages/business/InvoiceReviewDrawer'
@@ -62,7 +62,7 @@ function AskBox() {
         <label htmlFor="acc-ask" className="v2-field-label">{t('acct.askLabel')}</label>
         <div className="v2-askrow">
           <input id="acc-ask" className="v2-input" value={q} onChange={(e) => setQ(e.target.value)} placeholder={t('acct.askPh')} maxLength={500} />
-          <button type="submit" className="v2-btn v2-btn-primary" aria-label={t('acct.send')} disabled={st.busy || !q.trim()}><I.send size={16} /></button>
+          <button type="submit" className="v2-btn v2-btn-primary" aria-label={t('acct.send')} title={q.trim() ? undefined : t('ask.typeFirst')} disabled={st.busy || !q.trim()}><I.send size={16} /></button>
         </div>
       </form>
       <div className="v2-chips">
@@ -243,6 +243,7 @@ function PackagesTab({ month }) {
                 ))}
               </ul>
               {cur.key.startsWith('debt:') && <Link to={`/business/${cur.kind === 'in' ? 'receivables' : 'payables'}/${cur.id}`}>{t('bills.open')}</Link>}
+              <NotYet note={t('acct.packageSoon')}>{t('acct.pk.downloadFolder')}</NotYet>
             </Card>
           )}
           <Card title={t('acct.pk.whatTitle')}><p className="v2-sec">{t('acct.pk.what')}</p></Card>
@@ -325,10 +326,10 @@ export default function Accountant() {
   const t = useT()
   const [sp, setSp] = useSearchParams()
   const tab = ['packages', 'taxes'].includes(sp.get('tab')) ? sp.get('tab') : 'close'
-  const now = new Date()
-  const thisMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
-  const [month, setMonth] = useState(() => sp.get('month') || (tab === 'taxes' ? thisMonth : defaultCloseMonth()))
-  const pickMonth = (m) => { setMonth(m); const n = new URLSearchParams(sp); n.set('month', m); setSp(n, { replace: true }) }
+  // Read from the URL on every render: validated, and reset to the tab's default on a tab
+  // switch (the tab links carry no month).
+  const month = accountantMonth(sp.get('month'), tab)
+  const pickMonth = (m) => { const n = new URLSearchParams(sp); n.set('month', m); setSp(n, { replace: true }) }
   const sub = t(`acct.sub.${tab}`)
   return (
     <div className="v2-page">

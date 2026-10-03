@@ -27,6 +27,22 @@ export function start(port = PORT) {
           if (re.test(u.pathname)) { h = fn; break }
         }
       }
+      // FIXTURE_MODE=error: every data call fails (500); =empty: every data call answers
+      // with nothing. The shell's own calls (workspaces, access, admin status) still work, so
+      // each screen's error and empty states can be walked (tests/design/v2/walk.mjs).
+      const SHELL = /^\/api\/(workspaces|workspace-preferences|access\/status|admin\/status)$/
+      const mode = process.env.FIXTURE_MODE
+      // The app's own sign-in check calls a bare /api/pulse; v2 screens call it with ?scope=business.
+      const shellCall = SHELL.test(u.pathname) || (u.pathname === '/api/pulse' && !u.search)
+      if (mode && h && !shellCall && req.method === 'GET') {
+        if (mode === 'error') { res.writeHead(500, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: 'harness_error' })); return }
+        if (mode === 'empty') {
+          const sample = h ? h(u, req) : null
+          // runway 999 is what the server answers when there is no spending to measure.
+          const empty = (v) => Array.isArray(v) ? [] : v && typeof v === 'object' ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, typeof x === 'boolean' ? x : k === 'runway' ? 999 : empty(x)])) : typeof v === 'number' ? 0 : v
+          res.writeHead(h ? 200 : 404, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(h ? empty(sample) : { error: 'not_in_fixture' })); return
+        }
+      }
       const body = h ? h(u, req) : { error: 'not_in_fixture' }
       res.writeHead(h ? 200 : 404, { 'Content-Type': 'application/json' })
       res.end(JSON.stringify(body))

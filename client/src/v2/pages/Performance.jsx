@@ -21,7 +21,7 @@ import { cashItems, forecast, isCounted } from '../lib/radarSeries'
 import { readDrill, drillLink } from '../lib/aiLinks'
 import { txDate } from '../lib/obligations'
 import {
-  lastMonths, profitRows, cashRows, burn3, runwayFrom, weekBuckets, cashOutDate, threeMonths, monthCompare, prevMonth,
+  lastMonths, profitRows, cashRows, burn3, runwayFrom, weekBuckets, cashOutDate, threeMonths, monthCompare, prevMonth, rowsCsv,
 } from '../lib/performance'
 import { mappingConfirmed, accrualRows, taxLabelKey } from '../lib/pnl'
 import { AskButton } from '../ai/AskPanel'
@@ -319,15 +319,26 @@ export default function Performance() {
     const r = accrualRows({ transactions: txs, debts: Array.isArray(debts.data) ? debts.data : [], categories: catList, months, assets: assets.data, funding: fund.data })
     return { ...r, taxKey: taxLabelKey(prof.data?.profile?.tax_regime) }
   }, [confirmed, txs, debts.data, catList, months, prof.data, assets.data, fund.data]) // eslint-disable-line react-hooks/exhaustive-deps
+  // Export: the monthly rows of this tab as CSV (what is on screen, nothing recomputed).
+  const exportCsv = () => {
+    const profitCols = ['month', 'revenue', 'direct', 'gross', 'opex', 'ebitda', 'depreciation', 'operating', 'otherIncome', 'interest', 'tax', 'net']
+    const csv = tab === 'cash' ? rowsCsv(cRows, ['month', 'operating', 'equipment', 'funding', 'free', 'endCash'])
+      : rowsCsv(accrual ? accrual.rows : pRows, accrual ? profitCols : profitCols.filter((c) => !['depreciation', 'operating', 'otherIncome'].includes(c)))
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
+    a.download = `performance-${tab}-${accrual && tab === 'profit' ? 'accrual' : 'estimate'}-${months[months.length - 1]}.csv`
+    a.click(); URL.revokeObjectURL(a.href)
+  }
   const setMonth = (m) => { const n = new URLSearchParams(); n.set('month', m); navigate(`${location.pathname}?${n}`, { replace: true }) }
 
   const head = (
     <PageHead title={t('nav.performance')} sub={t('perf.sub')}
-      actions={!drillOn && tab !== 'forecast' && (
+      actions={!drillOn && tab !== 'forecast' && (<>
+        <Btn onClick={exportCsv}>{t('perf.export')}</Btn>
         <select className="v2-select" value={sel} onChange={(e) => setMonth(e.target.value)} aria-label={t('acct.month')}>
           {[...months].reverse().map((m) => <option key={m} value={m}>{mName(m, lang)}</option>)}
         </select>
-      )} />
+      </>)} />
   )
   const tabs = (
     <nav className="v2-tabs" aria-label={t('perf.views')}>

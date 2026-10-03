@@ -92,7 +92,7 @@ t('review 8.2 #14: a date-only due date is that LOCAL day in every time zone', (
 t('chips come from the data', () => {
   const { items } = cashItems({ debts, today })
   const c = scenarioChips(items)
-  assert.deepStrictEqual(c.map((x) => [x.kind, x.key]), [['late', 'debt:1'], ['collect', 'debt:4'], ['approve', 'debt:8']])
+  assert.deepStrictEqual(c.map((x) => [x.kind, x.key]), [['late', 'debt:1'], ['collect', 'debt:4'], ['delay', 'debt:2'], ['revenue', null], ['approve', 'debt:8']])
   assert.deepStrictEqual(scenarioChips([]), [])
 })
 
@@ -118,6 +118,15 @@ t('what-if approve counts the pending item on screen only', () => {
   const base = forecast({ balance: 50e6, burnRate: 0, items, today })
   const f = forecast({ balance: 50e6, burnRate: 0, items: a, today })
   assert.strictEqual(base.days[30].expected - f.days[30].expected, 2e6)
+})
+
+t('what-if revenue −20% shrinks money coming in; delay shifts a bill by two weeks', () => {
+  const { items } = cashItems({ debts, today })
+  const r = applyScenario(items, { kind: 'revenue' })
+  assert.strictEqual(r.find((i) => i.id === 1).amount, 8e6)
+  assert.strictEqual(r.find((i) => i.id === 2).amount, 4e6, 'money going out unchanged')
+  const d = applyScenario(items, { kind: 'delay', key: 'debt:2' })
+  assert.strictEqual(d.find((i) => i.id === 2).day, items.find((i) => i.id === 2).day + 14)
 })
 
 t('loan repayments from the funding register are scheduled outflows; overdue ones land today as late', () => {

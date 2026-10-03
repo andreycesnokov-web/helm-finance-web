@@ -3,7 +3,7 @@
 // (plan/trial changes). Their financial data stays closed: "Request support access" is
 // disabled until the grant design is approved (PROPOSALS P-13). Plan, trial and archive
 // tools stay on the existing page: /admin/businesses/:id/tools.
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import I from '../icons'
 import { PageHead, Card, Pill, Btn, NotYet, Skeleton } from '../ui'
@@ -61,24 +61,37 @@ export default function AdminCompanies({ selectedId }) {
   const nav = useNavigate()
   const [filter, setFilter] = useState('all')
   const [q, setQ] = useState('')
-  const list = useAdminApi('/admin/businesses?limit=200')
+  // Search runs on the server (GET /api/admin/businesses?search=, name or code), so it finds
+  // companies beyond the first 200 rows; typed text waits 300 ms before it is sent.
+  const [search, setSearch] = useState('')
+  useEffect(() => { const id = setTimeout(() => setSearch(q.trim()), 300); return () => clearTimeout(id) }, [q])
+  const list = useAdminApi(`/admin/businesses?limit=200${search ? `&search=${encodeURIComponent(search)}` : ''}`)
   const all = list.data?.businesses || []
+  const total = Number(list.data?.total ?? all.length)
+  const partial = total > all.length
   const companies = all.filter((b) => (b.type || 'business') !== 'personal')
-  const head = <PageHead title={t('admin.companies')} sub={t('admin.companiesSub', { n: all.length, c: companies.length, p: all.length - companies.length })} actions={<Link to="/admin/dashboard">{t('admin.overview')}</Link>} />
-  if (list.loading) return <>{head}<Card><Skeleton rows={8} /></Card></>
-  if (list.error) return <>{head}<AdminGate error={list.error} onRetry={list.reload} /></>
+  const head = <PageHead title={t('admin.companies')} sub={search ? t('admin.found', { n: total, q: search }) : t('admin.companiesSub', { n: total, c: companies.length, p: all.length - companies.length })} actions={<Link to="/admin/dashboard">{t('admin.overview')}</Link>} />
+  const filters = (
+    <div className="v2-filters">
+      <label className="v2-search"><I.search size={16} /><span className="v2-sr">{t('admin.search')}</span>
+        <input className="v2-input" type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder={t('admin.search')} /></label>
+    </div>
+  )
+  if (list.loading) return <>{head}{filters}<Card><Skeleton rows={8} /></Card></>
+  if (list.error) return <>{head}{filters}<AdminGate error={list.error} onRetry={list.reload} /></>
   const counts = Object.fromEntries(['all', 'paying', 'trial', 'attention'].map((f) => [f, filterCompanies(all, { filter: f }).length]))
-  const rows = filterCompanies(all, { filter, q })
+  const rows = filterCompanies(all, { filter })
   const sel = selectedId || rows[0]?.business_id || null
   return (
     <div className="v2-page">
       {head}
+      {partial && <p className="v2-small"><Pill tone="warn">{t('admin.partial', { n: all.length, m: total })}</Pill></p>}
       <div className="v2-filters">
         <div className="v2-chips" role="group" aria-label={t('admin.filter')}>
           {['all', 'paying', 'trial', 'attention'].map((k) => <button key={k} type="button" className="v2-chip v2-chip-sel" aria-pressed={filter === k} onClick={() => setFilter(k)}>{t(`admin.f.${k}`, { n: counts[k] })}</button>)}
         </div>
         <label className="v2-search"><I.search size={16} /><span className="v2-sr">{t('admin.search')}</span>
-          <input className="v2-input" type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder={t('admin.search')} /></label>
+          <input className="v2-input" type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder={t('admin.search')} autoFocus={!!q} /></label>
       </div>
       <div className="v2-grid-detail">
         <Card className="v2-col">

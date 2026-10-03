@@ -6,6 +6,11 @@
 // after a switch: the cache is dropped whenever WorkspaceProvider bumps scopeKey or
 // the active id changes, and entries are additionally namespaced by that id.
 //
+// Freshness: an entry is reused only while it is in flight or younger than FRESH_MS, which
+// dedupes the shell and the page asking for the same path in one render. A page mounted later
+// fetches again, so a write made on a legacy page (which never calls invalidate) is not
+// served stale when the user comes back to a v2 screen.
+//
 // Reads only. Nothing here mutates.
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { apiFetch } from '../lib/api'
@@ -13,6 +18,7 @@ import { useAuth } from '../hooks/useAuth'
 import { useWorkspace } from '../shell/WorkspaceProvider'
 
 const Ctx = createContext(null)
+export const FRESH_MS = 2000
 
 export function V2DataProvider({ children }) {
   const { token } = useAuth()
@@ -25,11 +31,14 @@ export function V2DataProvider({ children }) {
 
   const get = useCallback((path, { force = false } = {}) => {
     const key = `${wsId}|${path}`
-    if (!force && cache.current.has(key)) return cache.current.get(key)
+    const hit = cache.current.get(key)
+    if (!force && hit && (hit.at == null || Date.now() - hit.at < FRESH_MS)) return hit.p
     const p = apiFetch(path, token)
-    cache.current.set(key, p)
-    // A failed read must not stay cached: the next mount retries.
-    p.catch(() => { if (cache.current.get(key) === p) cache.current.delete(key) })
+    const entry = { p, at: null }
+    cache.current.set(key, entry)
+    p.then(() => { entry.at = Date.now() },
+      // A failed read must not stay cached: the next mount retries.
+      () => { if (cache.current.get(key) === entry) cache.current.delete(key) })
     return p
   }, [token, wsId])
 

@@ -2,16 +2,22 @@
 // Uses the existing debt endpoints (lib/actions.js); the server checks the role and
 // answers 403 for anyone who may only submit. Reject and Ask need a short text, typed
 // inline — no browser prompt(). Approving never pays anything.
+// The buttons follow the same rules (lib/decisions.js, role from GET /api/team): a role
+// that may only submit sees a note instead, and Approve is off on your own submission
+// unless you are the owner or CEO. While the role is loading the buttons stay off.
 import { useState } from 'react'
 import { useAuth } from '../../hooks/useAuth'
-import { useInvalidate } from '../data'
+import { useApi, useInvalidate } from '../data'
 import { approveDebt, rejectDebt, requestDebtInfo, actionError } from '../lib/actions'
+import { decisionRights } from '../lib/decisions'
 import { useT } from '../i18n'
 import I from '../icons'
 
 export default function DecisionActions({ debt, onDone, size = 'md' }) {
   const t = useT()
-  const { token } = useAuth()
+  const { token, user } = useAuth()
+  const team = useApi('/team')
+  const rights = decisionRights({ role: team.data?.my_role, userId: user?.id, debt })
   const invalidate = useInvalidate()
   const [mode, setMode] = useState(null)       // null | 'reject' | 'ask'
   const [text, setText] = useState('')
@@ -37,6 +43,7 @@ export default function DecisionActions({ debt, onDone, size = 'md' }) {
   if (done) {
     return <p className="v2-dec-done" role="status"><I.check size={16} />{t(`dec.done.${done}`)}</p>
   }
+  if (rights.known && !rights.canDecide) return <p className="v2-muted v2-small">{t('dec.forbidden')}</p>
 
   return (
     <div className={`v2-decide v2-decide-${size}`}>
@@ -56,11 +63,13 @@ export default function DecisionActions({ debt, onDone, size = 'md' }) {
         </form>
       ) : (
         <div className="v2-decide-row">
-          <button type="button" className="v2-btn v2-btn-secondary" onClick={() => setMode('reject')} disabled={busy}>{t('dec.reject')}</button>
-          <button type="button" className="v2-btn v2-btn-secondary" onClick={() => setMode('ask')} disabled={busy}>{t('dec.ask')}</button>
-          <button type="button" className="v2-btn v2-btn-primary" onClick={() => run('approve')} disabled={busy}><I.check size={16} />{t('dec.approve')}</button>
+          <button type="button" className="v2-btn v2-btn-secondary" onClick={() => setMode('reject')} disabled={busy || !rights.canDecide}>{t('dec.reject')}</button>
+          <button type="button" className="v2-btn v2-btn-secondary" onClick={() => setMode('ask')} disabled={busy || !rights.canDecide}>{t('dec.ask')}</button>
+          <button type="button" className="v2-btn v2-btn-primary" onClick={() => run('approve')} disabled={busy || !rights.canApprove}
+            title={rights.why === 'own' ? t('dec.ownItem') : undefined}><I.check size={16} />{t('dec.approve')}</button>
         </div>
       )}
+      {rights.why === 'own' && !mode && <p className="v2-muted v2-small">{t('dec.ownItem')}</p>}
       {err && <p className="v2-inline-err" role="alert">{err}</p>}
     </div>
   )

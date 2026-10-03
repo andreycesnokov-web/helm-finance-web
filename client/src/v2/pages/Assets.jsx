@@ -62,6 +62,7 @@ export default function Assets() {
       <div className="v2-grid-detail">
         <Card title={t('assets.register')} className="v2-col" aside={hasReg && list.length > 0 ? <span className="v2-num">{money(reg.data.totals.book_value)}</span> : null}>
           {reg.loading ? <Skeleton rows={4} />
+            : reg.error && reg.error.status !== 404 ? <ErrorBox error={reg.error} onRetry={reg.reload} />
             : !hasReg ? <Empty icon={<I.assets size={28} />} title={t('assets.notAppliedTitle')} text={t('assets.notApplied')} />
             : list.length === 0 ? <Empty icon={<I.assets size={28} />} title={t('assets.emptyTitle')} text={t('assets.emptyText')}
               action={<Btn variant="primary" to="/business/assets/new">{t('screen.addAsset')}</Btn>} />

@@ -25,6 +25,8 @@ export default function AdminOverview() {
   if (dash.error) return <>{head}<AdminGate error={dash.error} onRetry={dash.reload} /></>
   const d = dash.data || {}
   const ov = overview(list.data?.businesses || [])
+  // The list endpoint returns at most 200 rows; say so when the platform has more.
+  const partial = Number(list.data?.total) > (list.data?.businesses || []).length
   const items = needsYou(d, ov)
   const f = ov.funnel
   const pct = (x) => (f.signedUp ? `${Math.round((x / f.signedUp) * 100)}%` : '—')
@@ -62,10 +64,12 @@ export default function AdminOverview() {
           <Card title={t('admin.plans')}>
             <ul className="v2-moves">{Object.entries(ov.plans).map(([p, c]) => <li key={p}><span>{t(`admin.plan.${p}`)}</span><span className="v2-num">{c}</span></li>)}</ul>
             <p className="v2-muted v2-small">{t('admin.plansNote')}</p>
+            {partial && <p className="v2-small"><Pill tone="warn">{t('admin.partial', { n: (list.data?.businesses || []).length, m: list.data.total })}</Pill></p>}
           </Card>
           <Card title={t('admin.needsYou')} aside={<Link to="/admin/system">{t('admin.all')}</Link>}>
             <ul className="v2-needs-list">
-              {items.map((x, i) => <li key={i}><Pill tone={x.tone}>{t(`admin.tone.${x.tone}`)}</Pill><span>{x.text || t(`admin.need.${x.key}`, { n: x.n })}</span></li>)}
+              {items.map((x, i) => <li key={i}><Pill tone={x.tone}>{t(`admin.tone.${x.tone}`)}</Pill>
+                <span>{t(`admin.need.${x.key}`, { n: x.n, what: x.what })}{x.detail && <span className="v2-muted v2-small"> · {x.detail}</span>}</span></li>)}
             </ul>
           </Card>
         </aside>

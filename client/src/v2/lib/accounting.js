@@ -22,6 +22,18 @@ export function monthOptions(n = 12, today = new Date()) {
 /** The month to close by default: last month. */
 export const defaultCloseMonth = (today = new Date()) => monthOptions(2, today)[1].key
 
+/**
+ * The Accountant page month from ?month=. Only a month the picker offers (the last 12) is
+ * accepted; anything else — garbage, a future month, a month too old — falls back to the
+ * tab's default: the current month for Tax calendar, last month for close and packages.
+ * The tab links carry no month, so switching tabs resets it to that tab's default.
+ */
+export function accountantMonth(param, tab, today = new Date()) {
+  const keys = monthOptions(12, today).map((m) => m.key)
+  if (typeof param === 'string' && keys.includes(param)) return param
+  return tab === 'taxes' ? keys[0] : defaultCloseMonth(today)
+}
+
 const inMonth = (iso, key) => String(iso || '').slice(0, 7) === key
 const hasDocs = (d) => (Array.isArray(d?.attachments) && d.attachments.length > 0) || !!d?.attachment_url
 

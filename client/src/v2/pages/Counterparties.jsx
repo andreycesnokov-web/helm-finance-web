@@ -77,9 +77,8 @@ export default function Counterparties() {
               <span role="columnheader">{t('cp.col.tax')}</span>
             </div>
             {rows.map((c) => {
-              const h = payerHistory(dlist, c.legal_name || c.name) || payerHistory(dlist, c.display_name)
-              const owes = h && h.openTotal > 0
-              const theyOwe = owes && (h.type === 'receivable')
+              const h = payerHistory(dlist, [c.legal_name, c.name, c.display_name])
+              const bal = [h?.theyOwe > 0 && { k: 'cp.owes', v: h.theyOwe, late: h.lateTheyOwe > 0 }, h?.weOwe > 0 && { k: 'cp.youOwe', v: h.weOwe, late: h.lateWeOwe > 0 }].filter(Boolean)
               return (
                 <div key={c.id} className="v2-cprow" role="row">
                   <span role="cell" className="v2-cp-name">
@@ -87,8 +86,8 @@ export default function Counterparties() {
                     {c.source_system === 'mcp' && <span className="v2-muted v2-small">{t('cp.byAi')}</span>}
                   </span>
                   <span role="cell"><Pill tone="neutral">{t(`cp.role.${c.role || 'other'}`)}</Pill></span>
-                  <span role="cell" className="v2-num">{owes
-                    ? <span className={h.lateNow > 0 ? 'v2-neg' : ''}>{t(theyOwe ? 'cp.owes' : 'cp.youOwe', { v: money(h.openTotal) })}{h.lateNow > 0 ? ` · ${t('cp.late')}` : ''}</span>
+                  <span role="cell" className="v2-num v2-stack">{bal.length
+                    ? bal.map((b) => <span key={b.k} className={b.late ? 'v2-neg' : ''}>{t(b.k, { v: money(b.v) })}{b.late ? ` · ${t('cp.late')}` : ''}</span>)
                     : '—'}</span>
                   <span role="cell" className="v2-small">{!h || h.paidCount === 0 ? <span className="v2-muted">{t('cp.noHistory')}</span>
                     : h.avgLate ? t('cp.avgLate', { n: h.avgLate }) : t('cp.onTime', { k: h.onTime, n: h.paidCount })}</span>

@@ -3,6 +3,8 @@
 // Nothing here computes tax: a withholding split is only shown when the verified rule
 // engine supplied a rate (see withholdingSplit).
 
+import { csvCell } from './csv.js'
+
 const num = (v) => { const n = Number(v); return Number.isFinite(n) ? n : 0 }
 export const remaining = (d) => num(d?.remaining_amount ?? d?.amount)
 export const isOpen = (d) => !!d && !['paid', 'cancelled'].includes(d.status) && d.approval_status !== 'rejected'
@@ -89,21 +91,30 @@ export function withholdingTreatment(debt, counterparty) {
   return /pph[\s_]*23|4\s*\(\s*2\s*\)|pph[\s_]*4[\s_]*2|withhold|potong/.test(tt) ? 'withhold' : null
 }
 
-/** How a counterparty has paid (receivables) or been paid (payables), from history. */
-export function payerHistory(debts = [], name) {
-  const key = String(name || '').trim().toLowerCase()
-  if (!key) return null
-  const mine = debts.filter((d) => String(d.counterparty || '').trim().toLowerCase() === key)
+/**
+ * How a counterparty has paid (receivables) or been paid (payables), from history.
+ * `names` is every name the counterparty goes by (legal, display, short); a bill matches any
+ * of them. Open balances are split by direction — what they owe us and what we owe them are
+ * never added together — and items waiting for approval are left out, as on Pulse and Radar.
+ * Returns null when no name is given or nothing matches, so a caller can fall back.
+ */
+export function payerHistory(debts = [], names) {
+  const keys = new Set((Array.isArray(names) ? names : [names]).map((n) => String(n || '').trim().toLowerCase()).filter(Boolean))
+  if (!keys.size) return null
+  const mine = debts.filter((d) => keys.has(String(d.counterparty || '').trim().toLowerCase()))
+  if (!mine.length) return null
   const paid = mine.filter((d) => d.status === 'paid' && d.due_date && d.last_payment_at)
   const lateDays = paid.map((d) => Math.round((new Date(d.last_payment_at) - new Date(d.due_date)) / 86400000))
   const onTime = lateDays.filter((x) => x <= 0).length
   const avgLate = lateDays.length ? Math.round(lateDays.reduce((s, x) => s + Math.max(0, x), 0) / lateDays.length) : null
-  const open = mine.filter(isOpen)
+  const open = mine.filter((d) => isOpen(d) && !isPending(d))
+  const sum = (xs) => xs.reduce((s, d) => s + remaining(d), 0)
+  const theirs = open.filter((d) => d.type === 'receivable'), ours = open.filter((d) => d.type !== 'receivable')
+  const late = (xs) => xs.filter((d) => d.status === 'overdue')
   return {
     paidCount: paid.length, onTime, avgLate,
-    openTotal: open.reduce((s, d) => s + remaining(d), 0),
-    lateNow: open.filter((d) => d.status === 'overdue').reduce((s, d) => s + remaining(d), 0),
-    type: open[0]?.type || mine[0]?.type || null,
+    theyOwe: sum(theirs), weOwe: sum(ours),
+    lateTheyOwe: sum(late(theirs)), lateWeOwe: sum(late(ours)),
   }
 }
 
@@ -192,7 +203,7 @@ export function txSource(t) {
 
 /** CSV of the rows on screen (client-side export; no backend). */
 export function toCsv(rows) {
-  const esc = (v) => { const s = String(v ?? ''); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s }
+  const esc = csvCell
   const head = ['date', 'type', 'description', 'category', 'amount', 'currency', 'wallet_id', 'source']
   return [head.join(','), ...rows.map((t) => [txDate(t), t.type, t.description, t.category, t.amount_original, t.currency_original || 'IDR', t.wallet_id, t.source].map(esc).join(','))].join('\n')
 }

@@ -38,6 +38,7 @@ export default function AddAsset() {
   const fits = groups.filter((g) => g.asset_types.includes(f.asset_type))
   const group = f.asset_group ? groups.find((g) => g.code === f.asset_group) : fits.length === 1 ? fits[0] : null
   const available = reg.data?.available === true
+  const unknown = reg.loading
   const registered = useMemo(() => new Set((reg.data?.assets || []).map((a) => String(a.purchase_debt_id))), [reg.data])
   const bills = (Array.isArray(debts.data) ? debts.data : []).filter((d) => d.type === 'payable' && d.status !== 'cancelled' && !registered.has(String(d.id)))
 
@@ -58,7 +59,7 @@ export default function AddAsset() {
     setF((x) => ({ ...x, purchase_debt_id: e.target.value, ...(d ? { cost: String(d.original_amount ?? d.amount ?? ''), name: x.name || d.description || '', acquired_on: String(d.created_at || x.acquired_on).slice(0, 10) } : {}) }))
   }
 
-  const saveBtn = available ? <Btn variant="primary" onClick={save} disabled={busy}>{t('addAsset.save')}</Btn> : <NotYet note={t('assets.notApplied')}>{t('addAsset.save')}</NotYet>
+  const saveBtn = unknown ? <Btn variant="primary" disabled title={t('addAsset.checking')}>{t('addAsset.save')}</Btn> : available ? <Btn variant="primary" onClick={save} disabled={busy}>{t('addAsset.save')}</Btn> : <NotYet note={t('assets.notApplied')}>{t('addAsset.save')}</NotYet>
   return (
     <div className="v2-page">
       <PageHead title={t('screen.addAsset')} sub={t('addAsset.sub')} back={{ to: '/business/assets', label: t('nav.assets') }}
@@ -89,7 +90,7 @@ export default function AddAsset() {
             )}
           </Card>
           <Card title={t('addAsset.details')}>
-            {!available && <div className="v2-banner v2-tone-warn"><I.info size={18} /><span className="v2-banner-text">{t('assets.notApplied')}</span></div>}
+            {!available && !unknown && <div className="v2-banner v2-tone-warn"><I.info size={18} /><span className="v2-banner-text">{t('assets.notApplied')}</span></div>}
             <label className="v2-field"><span className="v2-field-label">{t('addAsset.name')}</span>
               <input className="v2-input" value={f.name} onChange={set('name')} maxLength={200} required /></label>
             <div className="v2-field">

@@ -86,7 +86,7 @@ export default function AskPanel() {
         <form className="v2-ask-foot" onSubmit={submit}>
           <label htmlFor="v2-ask-input" className="v2-sr">{t('ask.followUp')}</label>
           <input id="v2-ask-input" ref={inputRef} className="v2-input" value={q} onChange={(e) => setQ(e.target.value)} placeholder={t(thread.length ? 'ask.followUp' : 'ask.placeholder')} maxLength={2000} />
-          <button type="submit" className="v2-btn v2-btn-primary" aria-label={t('ask.send')} disabled={!q.trim()}><I.send size={16} /></button>
+          <button type="submit" className="v2-btn v2-btn-primary" aria-label={t('ask.send')} title={q.trim() ? undefined : t('ask.typeFirst')} disabled={!q.trim()}><I.send size={16} /></button>
         </form>
         <p className="v2-ask-note v2-muted v2-small">{t('ask.note')}</p>
       </aside>
