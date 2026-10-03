@@ -25,11 +25,11 @@ The PRs are stacked: each branch starts from the previous one. Merge them in thi
 | 6 | #107 | `design-v2-r2/b6-performance-assets` | Performance, assets (read-only) |
 | 7 | #108 | `design-v2-r2/b7-admin` | Platform admin |
 | 8 | #110 | `design-v2-r2/b8-approved` | Owner decisions, migrations 058–061 (option B) |
-| 9 | @PR9@ | `design-v2-r2/b9-p10` | P-10 profit groups, migration 062 |
-| 10 | @PR10@ | `design-v2-r2/b10-withholding` | PPh 23 withheld by a customer (**shared Business logic, not behind the flag**) |
-| 11 | @PR11@ | `design-v2-r2/b11-assets` | P-11 asset register, migration 063 |
-| 12 | @PR12@ | `design-v2-r2/b12-funding` | P-03 funding register, migration 064 |
-| 13 | @PR13@ | `design-v2-r2/b13-release` | Release walk, states, this checklist |
+| 9 | #112 | `design-v2-r2/b9-p10` | P-10 profit groups, migration 062 |
+| 10 | #113 | `design-v2-r2/b10-withholding` | PPh 23 withheld by a customer (**shared Business logic, not behind the flag**) |
+| 11 | #114 | `design-v2-r2/b11-assets` | P-11 asset register, migration 063 |
+| 12 | #115 | `design-v2-r2/b12-funding` | P-03 funding register, migration 064 |
+| 13 | #116 | `design-v2-r2/b13-release` | Release walk, states, this checklist |
 
 **What merging does with the flag still OFF:**
 - The client bundle stays as it is today; the flag-OFF JS is byte-identical to `main`.
