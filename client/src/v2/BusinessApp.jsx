@@ -51,6 +51,8 @@ import CompanyProfile from './pages/CompanyProfile'
 import V2Documents from './pages/Documents'
 import V2Settings from './pages/Settings'
 import FirstDay from './pages/FirstDay'
+import V2AICFO from './pages/AICFO'
+import { AskProvider } from './ai/AskContext'
 import Placeholder from './pages/Placeholder'
 
 function V2Frame() {
@@ -64,7 +66,9 @@ function V2Frame() {
   if (!active) return null
   return (
     <V2DataProvider>
-      <V2Shell><Outlet /></V2Shell>
+      <AskProvider>
+        <V2Shell><Outlet /></V2Shell>
+      </AskProvider>
     </V2DataProvider>
   )
 }
@@ -80,7 +84,8 @@ export default function BusinessApp() {
           <Route path="performance" element={<Placeholder titleKey="screen.performance" icon="performance" />} />
           <Route path="performance/cash" element={<Placeholder titleKey="screen.performanceCash" icon="performance" />} />
           <Route path="performance/forecast" element={<Placeholder titleKey="screen.performanceForecast" icon="radar" current="/business/radar" />} />
-          <Route path="ai-cfo" element={<AICFO />} />
+          <Route path="ai-cfo" element={<V2AICFO />} />
+          <Route path="ai-cfo/classic" element={<AICFO />} />
           {/* Money */}
           <Route path="accounts" element={<V2Accounts />} />
           <Route path="accounts/manage" element={<Accounts />} />

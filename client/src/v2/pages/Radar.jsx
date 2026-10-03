@@ -13,6 +13,7 @@ import { useT, useLang } from '../i18n'
 import { useApi } from '../data'
 import { money, shortDate } from '../lib/format'
 import ForecastChart from '../charts/ForecastChart'
+import { useAsk, useAskContext } from '../ai/AskContext'
 import {
   cashItems, forecast, keyDates, applyScenario, withCashAfter, scenarioChips, KEY_DATE_MIN_IDR, DEFAULT_HORIZON,
 } from '../lib/radarSeries'
@@ -39,6 +40,8 @@ export default function Radar() {
   const [scenario, setScenario] = useState({ kind: 'worst' })
   const [filter, setFilter] = useState('all')
   const advanced = hasFeature('advanced_radar_enabled')
+  const { openAsk } = useAsk()
+  useAskContext(t('nav.radar'), t('radar.days', { n: horizon }))
 
   const model = useMemo(() => {
     if (!pulse.data) return null
@@ -124,7 +127,7 @@ export default function Radar() {
                 {c.kind === 'late' ? t('radar.chip.late', { who: c.label }) : t('radar.chip.collect', { who: c.label })}
               </button>
             ))}
-            <Link className="v2-chip v2-chip-ask" to="/business/ai-cfo"><I.plus size={16} />{t('radar.chip.ask')}</Link>
+            <button type="button" className="v2-chip v2-chip-ask" onClick={() => openAsk()}><I.plus size={16} />{t('radar.chip.ask')}</button>
           </div>
           <div className="v2-callout">
             <span className="v2-callout-ic" aria-hidden="true"><I.cfo size={18} /></span>

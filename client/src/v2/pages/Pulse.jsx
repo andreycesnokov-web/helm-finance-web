@@ -16,6 +16,7 @@ import { cashItems, forecast } from '../lib/radarSeries'
 import {
   RUNWAY_TARGET_DAYS, runwayDays, pulseStatus, headlineKey, decisions, nextDays, flowOf, pctChange, obligationTiles,
 } from '../lib/pulseModel'
+import { useAskContext } from '../ai/AskContext'
 
 const iso = (d) => d.toISOString().slice(0, 10)
 const daysAgo = (n) => { const d = new Date(); d.setDate(d.getDate() - n); return iso(d) }
@@ -72,6 +73,7 @@ export default function Pulse() {
   const ins30 = useApi(`/pulse/advanced-insights?from=${daysAgo(30)}&to=${daysAgo(0)}`)
   const ins60 = useApi(`/pulse/advanced-insights?from=${daysAgo(60)}&to=${daysAgo(31)}`)
   const obl = useApi('/accountant/obligations')
+  useAskContext(t('nav.pulse'), t('pulse.today'))
 
   const m = useMemo(() => {
     const p = pulse.data

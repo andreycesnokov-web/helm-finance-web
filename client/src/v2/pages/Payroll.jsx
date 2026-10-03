@@ -3,7 +3,6 @@
 // RECORDED on the payment lines — this page never computes a tax (TER rates live in the
 // verified rule engine, not in UI code). Adding people and running payroll stay on the
 // existing page (Manage payroll).
-import { Link } from 'react-router-dom'
 import I from '../icons'
 import { PageHead, Card, Btn, Skeleton, ErrorBox, Empty, Pill } from '../ui'
 import { useT, useLang } from '../i18n'
@@ -11,6 +10,8 @@ import { useApi } from '../data'
 import { money, shortDate } from '../lib/format'
 import { latestPayrollRun } from '../lib/obligations'
 import { flowOf } from '../lib/pulseModel'
+import { AskButton } from '../ai/AskPanel'
+import { useAskContext } from '../ai/AskContext'
 
 const daysAgo = (n) => { const d = new Date(); d.setDate(d.getDate() - n); return d.toISOString().slice(0, 10) }
 
@@ -20,6 +21,7 @@ export default function Payroll() {
   const ov = useApi('/payroll/overview')
   const wallets = useApi('/wallets')
   const ins = useApi(`/pulse/advanced-insights?from=${daysAgo(30)}&to=${daysAgo(0)}`)
+  useAskContext(t('nav.payroll'), null)
   const head = (
     <PageHead title={t('nav.payroll')} sub={t('pay.sub')}
       actions={<><Btn to="/business/payroll/manage">{t('pay.addPerson')}</Btn><Btn variant="primary" to="/business/payroll/manage">{t('pay.manage')}</Btn></>} />
@@ -86,7 +88,7 @@ export default function Payroll() {
           </Card>
           <Card title={t('pay.hiring')}>
             <p className="v2-sec">{t('pay.hiringText')}</p>
-            <Link to="/business/ai-cfo">{t('pay.askCfo')}</Link>
+            <AskButton question={t('pay.hireQ')}>{t('pay.askCfo')}</AskButton>
           </Card>
         </aside>
       </div>
