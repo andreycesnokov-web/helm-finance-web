@@ -1,6 +1,6 @@
 // First day (designs/FirstDay.dc.html) — /business/onboarding.
 // Four steps to the first real answer, each marked done from data that exists:
-//   profile   tax profile completeness (GET /api/accountant/profile)
+//   profile   tax profile completeness (GET /api/accountant/applicability — /profile does not return it)
 //   accounts  wallets exist (GET /api/business/financial-counts)
 //   statement a bank statement was imported (same counts)
 //   debts     bills or invoices exist (same counts)
@@ -14,11 +14,11 @@ import { useApi } from '../data'
 export default function FirstDay() {
   const t = useT()
   const counts = useApi('/business/financial-counts')
-  const prof = useApi('/accountant/profile')
+  const appl = useApi('/accountant/applicability')
   if (counts.loading) return <><PageHead title={t('first.title')} /><Card><Skeleton rows={5} /></Card></>
   if (counts.error) return <><PageHead title={t('first.title')} /><ErrorBox error={counts.error} onRetry={counts.reload} /></>
   const c = counts.data?.counts || {}
-  const pct = prof.data?.completeness?.percent ?? 0
+  const pct = appl.data?.completeness?.percent ?? 0
   const steps = [
     { key: 'profile', done: pct >= 100, to: '/business/accountant/tax-profile' },
     { key: 'accounts', done: Number(c.wallets) > 0, to: '/business/accounts/manage' },

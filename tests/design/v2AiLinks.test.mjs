@@ -46,5 +46,18 @@ t('drillLink builds, readDrill reads back and drops junk', () => {
   assert.deepStrictEqual(readDrill('month=bad&focus=ok'), { month: null, compare: null, focus: 'ok' })
 })
 
+t('prototype keys never resolve: constructor, __proto__, toString, hasOwnProperty (review 8.2 #1)', () => {
+  for (const k of ['constructor', '__proto__', 'toString', 'hasOwnProperty', 'valueOf', 'prototype']) {
+    assert.strictEqual(safeTarget(`cfo://${k}`), null, k)
+    assert.strictEqual(safeTarget(`/business/pulse?${k}=1`), null, k)
+    assert.doesNotThrow(() => parseAiText(`see [x](/business/pulse?${k}=1) and [y](cfo://${k})`), k)
+    const segs = parseAiText(`see [x](/business/pulse?${k}=1)`)
+    assert.ok(segs.every((g) => g.type === 'text'), k)
+  }
+  assert.strictEqual(typeof safeTarget('cfo://toString'), 'object')
+  const d = readDrill('?constructor=1&__proto__=x&month=2026-04')
+  assert.deepStrictEqual(d, { month: '2026-04', compare: null, focus: null })
+})
+
 console.log(`\n${pass} passed, ${fail} failed`)
 process.exit(fail ? 1 : 0)

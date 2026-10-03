@@ -108,7 +108,7 @@ export default function Funding() {
   const { token } = useAuth()
   const invalidate = useInvalidate()
   const reg = useApi('/business-funding')
-  const ins = useApi(`/pulse/advanced-insights?from=${daysAgo(365)}&to=${daysAgo(0)}`)
+  const ins = useApi(`/pulse/advanced-insights?scope=business&from=${daysAgo(365)}&to=${daysAgo(0)}`)
   const [adding, setAdding] = useState(false)
   const [err, setErr] = useState(null)
   const seen = ins.data?.metrics?.other_cash_movement?.funding

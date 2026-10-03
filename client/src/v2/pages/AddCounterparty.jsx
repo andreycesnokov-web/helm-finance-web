@@ -6,7 +6,7 @@
 //
 // Entity form (PT/CV/person/foreign/other), landlord/lender roles and payment terms are
 // stored since batch 8 (P-04, migration 060, approved in DECISIONS.md). They are sent
-// only when filled in, so a database without 060 still accepts the rest; if it is missing
+// only when filled in (create) or changed (edit), so a database without 060 still accepts the rest; if it is missing
 // the server answers 409 and we say so. The accountant role and above may set them.
 // Tax rates are listed from the verified rule engine (GET /api/accountant/rules), never
 // typed here, and entity form never picks a rate on this screen.
@@ -19,6 +19,7 @@ import { useT } from '../i18n'
 import { useApi, useInvalidate } from '../data'
 import { createCounterparty, updateCounterparty, actionError } from '../lib/actions'
 import { npwpFormat, holderMatches } from '../lib/obligations'
+import { taxFieldsFor } from '../lib/counterpartyForm'
 
 const ROLES = [['vendor', 'cp.form.supplier'], ['customer', 'cp.form.customer'], ['both', 'cp.form.both'],
   ['landlord', 'cp.form.landlord'], ['lender', 'cp.form.lender']]
@@ -55,11 +56,8 @@ export default function AddCounterparty() {
     if (!f.legal_name.trim()) { setErr(t('cp.form.nameRequired')); return }
     if (termsBad) { setErr(t('cp.form.termsBad')); return }
     setBusy(true); setErr(null)
-    // P-04 fields: sent when filled in, or when an edit clears a stored value.
-    const taxFields = {
-      ...(f.entity_form || (editing && cp?.entity_form) ? { entity_form: f.entity_form || null } : {}),
-      ...(terms != null || (editing && cp?.payment_terms_days != null) ? { payment_terms_days: terms } : {}),
-    }
+    // P-04 fields: on create when filled in; on edit only when changed (lib/counterpartyForm.js).
+    const taxFields = taxFieldsFor({ editing, cp, entityForm: f.entity_form, terms })
     const body = {
       // On edit the role is sent only when changed: legacy rows may hold a type the role
       // list does not accept (e.g. 'supplier'), and resending it unchanged would be refused.

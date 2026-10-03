@@ -1,6 +1,7 @@
 // Design v2 — Bahasa Indonesia.
 export default {
   nav: {
+    addSoon: 'Belum tersedia di desain baru',
     group: { overview: 'Ringkasan', money: 'Uang', obligations: 'Kewajiban', accounting: 'Akuntansi' },
     pulse: 'Pulse', radar: 'Radar', performance: 'Kinerja', cfo: 'AI CFO',
     accounts: 'Rekening', transactions: 'Transaksi', funding: 'Pendanaan', assets: 'Aset & neraca',
@@ -13,6 +14,7 @@ export default {
   },
   badge: { late: '{n} terlambat' },
   shell: {
+    crash: 'Terjadi kesalahan di layar ini. Data Anda aman.',
     brand: 'CFO AI', notifications: 'Notifikasi', openMore: 'Buka menu ruang kerja',
     switchHint: 'Ganti perusahaan atau ke Pribadi', company: 'Perusahaan', personal: 'Pribadi',
     companies: 'Perusahaan', createCompany: 'Buat ruang kerja perusahaan',
@@ -55,7 +57,7 @@ export default {
     dec: {
       approveBill: 'Setujui tagihan · {who}', approveInvoice: 'Setujui faktur · {who}', due: 'jatuh tempo {d}',
       review: 'Tinjau', approve: 'Setujui', late: '{who} terlambat {n} hari', wasDue: 'jatuh tempo {d}',
-      remind: 'Kirim pengingat', tax: '{what} untuk {period}', taxMeta: 'Pajak · bayar sebelum {d} · sisa {n} hari', prepare: 'Siapkan',
+      remind: 'Kirim pengingat', openInvoice: 'Buka faktur', tax: '{what} untuk {period}', taxMeta: 'Pajak · bayar sebelum {d} · sisa {n} hari', prepare: 'Siapkan',
     },
     next7: '7 hari ke depan', fullForecast: 'Proyeksi lengkap', comingIn: 'Masuk', goingOut: 'Keluar',
     dayToDay: 'termasuk harian ≈ {v}', noNext: 'Tidak ada pembayaran terjadwal dalam 7 hari.', cashOn: 'Kas pada {d}',
@@ -110,6 +112,7 @@ export default {
     slipWhere: 'Unggah bukti potong saat diterima:',
     type: { pph_23: 'PPh 23', pph_4_2: 'PPh 4(2)', pph_21: 'PPh 21', pph_26: 'PPh 26', pph_22: 'PPh 22', other: 'Lainnya' },
   },
+  lock: { payrollTitle: 'Penggajian tidak termasuk paket Anda', approvalsTitle: 'Persetujuan tidak termasuk paket Anda', text: 'Paket Anda saat ini tidak mencakup ini. Tidak ada yang hilang — fitur terbuka begitu paket mencakupnya.' },
   bills: {
     sub: 'Piutang dan utang Anda, di satu tempat', addBill: 'Tambah tagihan', newInvoice: 'Faktur baru',
     owedToYou: 'Piutang · {n} faktur', youOwe: 'Utang · {n} tagihan', lateAmt: '{v} terlambat', dueSoon: '{v} jatuh tempo 14 hari ke depan',
@@ -127,7 +130,7 @@ export default {
     breadcrumb: 'Navigasi', notFound: 'Tidak ditemukan', notFoundText: 'Item ini tidak ada di perusahaan ini, atau peran Anda tidak bisa melihatnya.', back: 'Kembali ke Tagihan',
     youPay: 'Yang benar-benar Anda bayar', suggested: 'Saran · akuntan mengonfirmasi', total: 'Total faktur', toSupplier: 'Ke pemasok', toTax: 'Ke kantor pajak',
     rateFrom: '{rule} tarif {rate}%', splitNote: 'Jika {rule} berlaku untuk pemasok ini, Anda memotong dan menyetorkannya sendiri. Tarif berasal dari aturan terverifikasi. Konfirmasi dengan akuntan sebelum membayar.',
-    noRate: 'Belum ada tarif pemotongan di aturan terverifikasi, jadi tidak ada pembagian yang disarankan.',
+    noRate: 'Belum ada tarif pemotongan di aturan terverifikasi, jadi tidak ada pembagian yang disarankan.', alreadyNet: 'Tagihan ini sudah dicatat setelah dipotong pajak.',
     details: 'Rincian', invoiceNo: 'Nomor faktur', created: 'Ditambahkan', dueDate: 'Jatuh tempo', noDue: 'Tanpa jatuh tempo', paidSoFar: 'Sudah dibayar', category: 'Kategori',
     history: 'Riwayat', effect: 'Dampak ke kas', cashAfter: 'Kas setelah bayar pada {d}', lowest: 'Titik terendah · {d}', unchanged: 'tidak berubah',
     noEffect: 'Tidak ada di proyeksi 30 hari (lunas, tanpa jatuh tempo, atau mata uang lain).', seeRadar: 'Lihat di Radar',
@@ -226,7 +229,7 @@ export default {
   },
   fund: {
     sub: 'Uang dari investor, dari Anda, dan dari perusahaan Anda yang lain — tidak pernah dihitung sebagai pendapatan', record: 'Catat pendanaan',
-    raised: 'Dana dari luar', toRepay: 'Masih harus dikembalikan', seen: 'Pendanaan di transaksi', seenSub: '12 bulan terakhir · bukan pendapatan',
+    raised: 'Dana dari luar', toRepay: 'Masih harus dikembalikan', seen: 'Pendanaan yang bergerak di transaksi', seenSub: '12 bulan terakhir · masuk dan keluar dijumlahkan, bukan saldo · bukan pendapatan',
     emptyTitle: 'Belum ada pendanaan', emptyText: 'Catat modal dan pinjaman beserta syaratnya. Cicilan pinjaman lalu muncul di Radar dan bunganya di Kinerja.',
     seeTx: 'Lihat transaksi', howTitle: 'Bagaimana pendanaan tampil di angka Anda',
     how: 'Pendanaan menambah kas dan runway di Pulse. Ini bukan pendapatan, jadi tidak membuat bulan tampak untung. Cicilan pinjaman dari daftar ini muncul di Radar; hanya bunganya yang masuk laba.',
@@ -253,7 +256,7 @@ export default {
     download: 'Unduh paket (PDF + berkas)', packageSoon: 'Belum tersedia', toFinish: 'Untuk menutup {m}',
     check: { statements: 'Mutasi bank · {ok} dari {n} rekening mencakup akhir bulan', bills: 'Tagihan dan faktur dengan dokumen · {ok} dari {n}', categories: 'Transaksi berkategori · {ok} dari {n}', review: 'Tinjauan akuntan' },
     done: 'Selesai', notDone: 'belum selesai', seePackages: 'Lihat folder',
-    taxesDue: 'Pajak jatuh tempo di {m}', fullCalendar: 'Kalender lengkap', noEvents: 'Tenggat pajak belum dibuat — lengkapi profil pajak untuk membangun kalender.',
+    taxesDue: 'Pajak jatuh tempo di {m}', fullCalendar: 'Kalender lengkap', noEvents: 'Belum ada tenggat pajak tersimpan untuk bisnis ini. Akuntan Anda menambahkannya; layar ini tidak membuat apa pun.',
     taxNote: 'Tanggal dan jumlah berasal dari aturan pajak terverifikasi dan catatan Anda. Akuntan mengonfirmasi sebelum ada pembayaran.',
     stage: { done: 'Dibayar atau dilapor', overdue: 'Terlambat', calculated: 'Dihitung', todo: 'Disiapkan' },
     askLabel: 'Tanya soal pajak dan dokumen', askPh: 'mis. Apakah tagihan jasa hukum perlu dipotong pajak?', send: 'Kirim', sources: 'Aturan yang dipakai',
@@ -287,7 +290,7 @@ export default {
     drop: 'Tambahkan PDF atau foto', dropHint: 'Atau kirim ke bot CFO AI di Telegram, atau ke asisten AI Anda. Kami membaca jumlah, tanggal, dan pemasok; Anda mengecek sebelum disimpan.', choose: 'Pilih berkas',
     look: 'Perlu dilihat · {n}', inMonth: '{m} · {n}', allGood: 'Tidak ada yang perlu dilihat.', none: 'Tidak ada dokumen di bulan ini.',
     ch: { web: 'Diunggah di sini', telegram: 'Telegram', mcp: 'Asisten AI', email: 'Email' },
-    type: { invoice: 'Faktur', receipt: 'Struk', bank_statement: 'Mutasi bank', contract: 'Kontrak', payment_proof: 'Bukti bayar', tax: 'Dokumen pajak', other: 'Dokumen' },
+    type: { vendor_invoice: 'Faktur pemasok', customer_invoice: 'Faktur ke pelanggan', tax_invoice: 'Faktur pajak', bukti_potong: 'Bukti potong', tax_billing: 'Kode billing pajak', filing_confirmation: 'Bukti pelaporan', bank_document: 'Dokumen bank', invoice: 'Faktur', receipt: 'Struk', bank_statement: 'Mutasi bank', contract: 'Kontrak', payment_proof: 'Bukti bayar', tax: 'Dokumen pajak', other: 'Dokumen' },
     linked: 'Tertaut', notLinked: 'Belum tertaut', fix: 'Perbaiki',
     missingFor: 'Kurang untuk {m}', missingHint: 'Tagihan lunas tanpa bukti bayar — akuntan membutuhkannya untuk tutup buku.', noneMissing: 'Tidak ada yang kurang.',
   },
@@ -382,7 +385,7 @@ export default {
         r5: 'Pulse dan AI CFO memakai pengelompokan sendiri; hanya Kinerja yang memakai grup ini.' },
     },
     emptyTitle: 'Belum ada angka', emptyText: 'Impor mutasi bank atau tambahkan transaksi untuk melihat kinerja.',
-    cash: { operating: 'Arus kas operasi · {m}', equipment: 'Peralatan dibeli · {m}', lastCapex: '{v} pada {m}', free: 'Arus kas bebas · {m}', freeSub: 'Arus kas operasi dikurangi peralatan',
+    cash: { fundingInOut: 'Masuk {a} · keluar {b}', incomplete: '{v} bulan ini belum bisa diklasifikasikan, jadi angka ini belum lengkap.', burnIncomplete: 'Belum lengkap: beberapa bulan berisi uang yang belum diklasifikasikan.', operating: 'Arus kas operasi · {m}', equipment: 'Peralatan dibeli · {m}', lastCapex: '{v} pada {m}', free: 'Arus kas bebas · {m}', freeSub: 'Arus kas operasi dikurangi peralatan',
       funding12: 'Pendanaan · 12 bulan', whereTitle: 'Dari mana kas datang dan ke mana pergi', whereSub: '12 bulan · di atas nol masuk, di bawah nol keluar',
       operatingShort: 'Arus kas operasi', equipmentShort: 'Peralatan dibeli', fundingShort: 'Pendanaan · pinjaman dan ekuitas',
       endTitle: 'Kas akhir bulan', endSub: 'Semua rekening bisnis, dari transaksi tercatat', endShort: 'Kas akhir bulan',
@@ -396,10 +399,11 @@ export default {
       toPayList: 'Dibayar · {v}', toCollectList: 'Ditagih · {v}', moveTitle: 'Untuk menggeser tanggal kas habis',
       moveText: 'Menagih faktur terlambat, memotong biaya rutin terbesar, atau memperpanjang pinjaman semuanya menggeser tanggal. Coba perubahan sebelum dilakukan.',
       plan: 'Rencanakan dengan AI CFO', planQ: 'Apa yang paling menggeser tanggal kas habis kita?' },
-    drill: { chip: '{m} · dibanding {c}', clear: 'Hapus saringan', all: 'Semua bulan', opened: 'Dibuka dari catatan AI',
+    drill: { excluded: 'Tidak dihitung sebagai pendapatan atau biaya', excludedSub: 'Uang nyata yang bergerak bulan ini, di luar angka di atas.', chip: '{m} · dibanding {c}', clear: 'Hapus saringan', all: 'Semua bulan', opened: 'Dibuka dari catatan AI',
       costsAdded: 'Perubahan biaya', revenueAdded: 'Perubahan pendapatan', fromTo: 'Dari {a} ke {b}', records: 'Catatan di bulan ini',
       whatChanged: 'Apa yang berubah pada {m}', noChange: 'Tidak ada perubahan per kategori.', aiNote: 'Minta AI CFO menjelaskan perubahannya dengan bahasa sederhana dari angka ini.',
       askQ: 'Apa yang berubah pada {m} dibanding {c}, dan mengapa?', payments: 'Pembayaran {m}', allTx: 'Semua transaksi' },
+    cls: { opening_balance: 'Saldo awal', financing: 'Pinjaman dan uang pemilik', transfer: 'Pindah antar rekening sendiri', balance_correction: 'Koreksi saldo', tax: 'Pajak dibayar', interest: 'Bunga dibayar', capex: 'Pembelian peralatan', other: 'Lainnya', unknown: 'Belum diklasifikasikan' },
   },
   assets: {
     sub: 'Apa yang dimiliki dan diutang perusahaan · per {d}', owns: 'Perusahaan memiliki', owes: 'Perusahaan berutang',

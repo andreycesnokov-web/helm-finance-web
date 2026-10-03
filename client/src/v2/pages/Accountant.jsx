@@ -8,7 +8,8 @@
 // (engine-calculated amounts). The ask box uses the existing POST /api/accountant/ask,
 // which answers from the verified rules and changes no data.
 // "Engines calculate, AI explains": no rate, date or amount is computed in this file.
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { useWorkspace } from '../../shell/WorkspaceProvider'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
 import I from '../icons'
@@ -42,12 +43,18 @@ function AskBox() {
   const { token } = useAuth()
   const [q, setQ] = useState('')
   const [st, setSt] = useState({ busy: false, answer: null, err: null })
+  // One business's answer never shows under another (review 8.2 #2).
+  const { active, scopeKey } = useWorkspace()
+  const wsKey = `${active?.id ?? ''}|${scopeKey ?? ''}`
+  const wsRef = useRef(wsKey)
+  useEffect(() => { wsRef.current = wsKey; setQ(''); setSt({ busy: false, answer: null, err: null }) }, [wsKey])
   const ask = async (question) => {
     const text = (question ?? q).trim()
     if (!text) return
+    const asked = wsRef.current
     setQ(text); setSt({ busy: true, answer: null, err: null })
-    try { const r = await askAccountant(token, text); setSt({ busy: false, answer: r, err: null }) }
-    catch (e) { setSt({ busy: false, answer: null, err: e?.status === 403 ? t('dec.forbidden') : e.message }) }
+    try { const r = await askAccountant(token, text); if (wsRef.current === asked) setSt({ busy: false, answer: r, err: null }) }
+    catch (e) { if (wsRef.current === asked) setSt({ busy: false, answer: null, err: e?.status === 403 ? t('dec.forbidden') : e.message }) }
   }
   return (
     <Card>
@@ -293,7 +300,7 @@ function TaxesTab({ month }) {
         </Card>
         <Card title={t('acct.ahead')}>
           <TaxList events={later} lang={lang} t={t} limit={12} empty="acct.noLater" />
-          <Link to="/accountant/calendar">{t('acct.fullEngineCalendar')}</Link>
+          {/* No link to /accountant/calendar: that page calls the write-on-read endpoint (DECISIONS Q5). */}
         </Card>
       </div>
       <aside className="v2-col">

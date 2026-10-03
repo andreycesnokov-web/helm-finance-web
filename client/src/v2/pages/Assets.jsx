@@ -18,8 +18,11 @@ export default function Assets() {
   const reg = useApi('/assets')
   const fund = useApi('/business-funding')
   const head = <PageHead title={t('nav.assets')} sub={t('assets.sub', { d: shortDate(new Date(), lang) })} actions={<Btn variant="primary" icon={<I.plus size={16} />} to="/business/assets/new">{t('screen.addAsset')}</Btn>} />
-  if (pulse.loading) return <>{head}<Card><Skeleton rows={6} /></Card></>
+  // Owes and net worth include calculated taxes, so wait for /accountant/obligations as well:
+  // a slow or failed request must not read as "no taxes" (review 8.2 #11d).
+  if (pulse.loading || obl.loading) return <>{head}<Card><Skeleton rows={6} /></Card></>
   if (pulse.error) return <>{head}<ErrorBox error={pulse.error} onRetry={pulse.reload} /></>
+  if (obl.error) return <>{head}<ErrorBox error={obl.error} onRetry={obl.reload} /></>
   const p = pulse.data || {}
   const taxes = (obl.data?.obligations || []).filter((o) => o.status === 'calculated').reduce((s, o) => s + Number(o.amount || 0), 0)
   const hasReg = reg.data?.available === true

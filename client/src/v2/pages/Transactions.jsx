@@ -7,7 +7,7 @@ import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
 import I from '../icons'
-import { PageHead, Card, Btn, Skeleton, ErrorBox, Empty } from '../ui'
+import { PageHead, Card, Btn, Skeleton, ErrorBox, Empty, NotYet } from '../ui'
 import { useT, useLang } from '../i18n'
 import { useApi, useInvalidate } from '../data'
 import { money, shortDate } from '../lib/format'
@@ -66,7 +66,7 @@ export default function Transactions() {
   }
   const head = (
     <PageHead title={t('nav.transactions')} sub={t('tx.sub')}
-      actions={<><Btn onClick={exportCsv} disabled={!rows.length} title={rows.length ? undefined : t('tx.nothingToExport')}>{t('tx.export')}</Btn><Btn variant="primary" icon={<I.plus size={16} />} to="/business/add">{t('nav.add')}</Btn></>} />
+      actions={<><Btn onClick={exportCsv} disabled={!rows.length} title={rows.length ? undefined : t('tx.nothingToExport')}>{t('tx.export')}</Btn><NotYet note={t('nav.addSoon')}>{t('nav.add')}</NotYet></>} />
   )
   if (tx.loading) return <>{head}<Card><Skeleton rows={8} /></Card></>
   if (tx.error) return <>{head}<ErrorBox error={tx.error} onRetry={tx.reload} /></>
