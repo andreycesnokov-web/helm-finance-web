@@ -82,7 +82,7 @@ function assetFromBody(b = {}, groups = []) {
   if (!name) return { error: 'name_required' };
   if (!ASSET_TYPES.includes(b.asset_type)) return { error: 'invalid_asset_type', allowed: ASSET_TYPES };
   const cost = typeof b.cost === 'number' || (typeof b.cost === 'string' && /^\s*\d+(\.\d{1,2})?\s*$/.test(b.cost)) ? Number(b.cost) : NaN;
-  if (!(cost > 0)) return { error: 'invalid_cost' };
+  if (!(cost > 0) || !Number.isFinite(cost) || cost > 1e15) return { error: 'invalid_cost' };
   const qty = b.quantity == null || b.quantity === '' ? 1 : Number(b.quantity);
   if (!Number.isInteger(qty) || qty < 1) return { error: 'invalid_quantity' };
   if (typeof b.acquired_on !== 'string' || !DATE_RE.test(b.acquired_on) || Number.isNaN(new Date(b.acquired_on).getTime())) return { error: 'invalid_acquired_on' };

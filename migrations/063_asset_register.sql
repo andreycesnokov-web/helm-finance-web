@@ -82,6 +82,26 @@ CREATE TRIGGER trg_iso_assets BEFORE INSERT OR UPDATE ON public.assets
 COMMENT ON TABLE public.assets IS
   'Design v2 P-11: asset register. Depreciation is computed (straight line) from a verified depreciation tax rule; never stored, never guessed.';
 
+-- ── Backend-only table access (same as 037) ──────────────────────────────────
+-- Supabase grants new public tables to anon/authenticated by default, which would let a
+-- holder of the anon key read or write them through PostgREST and bypass the Express
+-- business-isolation checks. RLS on + revoke them; service_role (the backend) is granted
+-- explicitly. Idempotent and role-guarded.
+DO $$
+DECLARE t text; r text;
+BEGIN
+  FOREACH t IN ARRAY ARRAY['assets']
+  LOOP
+    EXECUTE format('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY', t);
+    FOR r IN SELECT rolname FROM pg_roles WHERE rolname IN ('anon','authenticated') LOOP
+      EXECUTE format('REVOKE ALL ON public.%I FROM %I', t, r);
+    END LOOP;
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN
+      EXECUTE format('GRANT SELECT, INSERT, UPDATE, DELETE ON public.%I TO service_role', t);
+    END IF;
+  END LOOP;
+END $$;
+
 COMMIT;
 
 -- ── verification (run after applying) ────────────────────────────────────────

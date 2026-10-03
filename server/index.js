@@ -1228,14 +1228,27 @@ function enrichDebts(debts) {
 async function loadWithholdings(businessId) {
   if (!businessId) return {};
   try {
-    const { data: allocs, error } = await supabase.from('debt_settlement_allocations')
-      .select('debt_id, settlement_source_type, withholding_record_id, allocated_amount')
-      .eq('business_id', businessId).eq('settlement_source_type', 'withholding_record');
-    if (error || !allocs?.length) return {};
+    // Paged: PostgREST returns at most 1,000 rows per request, and a silently cut list would
+    // leave some bills looking less settled than they are.
+    const allocs = [];
+    for (let from = 0; ; from += 1000) {
+      const { data, error } = await supabase.from('debt_settlement_allocations')
+        .select('debt_id, settlement_source_type, withholding_record_id, allocated_amount')
+        .eq('business_id', businessId).eq('settlement_source_type', 'withholding_record')
+        .order('debt_id', { ascending: true }).range(from, from + 999);
+      if (error) return {};
+      allocs.push(...(data || []));
+      if (!data || data.length < 1000) break;
+    }
+    if (!allocs.length) return {};
     const ids = [...new Set(allocs.map((a) => a.withholding_record_id).filter(Boolean))];
-    const { data: recs } = await supabase.from('withholding_records')
-      .select('id, status, bukti_potong_document_id').eq('business_id', businessId).in('id', ids);
-    return DW.withholdingByDebt(allocs, recs || []);
+    const recs = [];
+    for (let i = 0; i < ids.length; i += 100) { // keep each id list well under the URL limit
+      const { data } = await supabase.from('withholding_records')
+        .select('id, status, bukti_potong_document_id').eq('business_id', businessId).in('id', ids.slice(i, i + 100));
+      recs.push(...(data || []));
+    }
+    return DW.withholdingByDebt(allocs, recs);
   } catch { return {}; }
 }
 
@@ -1346,6 +1359,10 @@ app.patch('/api/debts/:id', auth, async (req, res) => {
       if (isNaN(amt) || amt <= 0) return res.status(400).json({ error: 'amount must be a positive number' });
       if (amt < Number(debt.paid_amount || 0))
         return res.status(400).json({ error: 'amount cannot be less than already paid' });
+      // A recorded withholding also settles part of the bill (batch 10).
+      const withheld = Number((await loadWithholdings(biz.business.id))[String(debt.id)]?.amount || 0);
+      if (withheld > 0 && amt < Number(debt.paid_amount || 0) + withheld)
+        return res.status(400).json({ error: 'amount cannot be less than already paid plus tax withheld' });
       updates.amount = amt;
       updates.original_amount = amt;
     }
@@ -1382,6 +1399,12 @@ app.patch('/api/debts/:id/settle', auth, async (req, res) => {
     })
     .eq('id', debt.id).select().single();
   if (error) return res.status(500).json({ error: error.message });
+  await recordAudit({
+    businessId: biz.business.id, actorUserId: req.user.userId, actorRole: biz.role,
+    entityType: 'debt', entityId: debt.id, action: 'debt_settled',
+    before: { status: debt.status, paid_amount: debt.paid_amount ?? null, is_settled: debt.is_settled ?? null },
+    after: { status: data.status, paid_amount: data.paid_amount, is_settled: true, withheld },
+  });
   res.json(computeDebtStatus({ ...data, withholding_allocated: withheld }));
 });
 
@@ -2957,9 +2980,13 @@ async function buildInvoiceSettlement(biz, debtId) {
     const allocationList = (allocs || []).map((a) => ({ allocated_amount: Number(a.allocated_amount) }));
     const allocatedTotal = allocationList.reduce((x, a) => x + a.allocated_amount, 0);
     const paidAmount = Number(debt.paid_amount || 0);
+    // Tax withheld by the customer (batch 10) settles its part too: without it a fully
+    // settled invoice with withholding would show the withheld amount as still open.
+    const withheldAmount = (allocs || []).filter((a) => a.settlement_source_type === 'withholding_record')
+      .reduce((x, a) => x + Number(a.allocated_amount || 0), 0);
     const settlement = SETTLE.settlementOf({
       invoice_total: invoiceTotal, base_amount: baseAmount, tax_amount: taxAmount,
-      allocations: paidAmount > 0 ? [{ allocated_amount: paidAmount }] : [],
+      allocations: [paidAmount, withheldAmount].filter((v) => v > 0).map((v) => ({ allocated_amount: v })),
     });
 
     const documents = {
@@ -4272,7 +4299,9 @@ app.post('/api/incoming-payments/:id/candidates', auth, async (req, res) => {
         message: 'Could not read receivables or transactions, so no matches were calculated.' });
     }
 
-    const proposals = IPM.buildCandidates(payment, { debts: debtRes.data || [], transactions: txRes.data || [] });
+    // Withholdings reduce what the customer still has to pay (batch 10), so a net payment matches.
+    const debtsWithWh = DW.attachWithholdings(debtRes.data || [], await loadWithholdings(businessId));
+    const proposals = IPM.buildCandidates(payment, { debts: debtsWithWh, transactions: txRes.data || [] });
 
     const saved = [];
     for (const p of proposals) {

@@ -39,6 +39,7 @@ const ins = (extra = {}) => {
   const before = await counts();
   try { await db.exec(MIG('063_asset_register.sql')); ok('clean apply 063', true); } catch (e) { ok('clean apply 063: ' + e.message, false); }
   try { await db.exec(MIG('063_asset_register.sql')); ok('second apply 063 (idempotent)', true); } catch (e) { ok('second apply: ' + e.message, false); }
+  ok('new tables have row-level security on, like 037 (pre-release review)', (await db.query(`SELECT count(*)::int n FROM pg_class WHERE relname IN ('assets') AND relrowsecurity`)).rows[0].n === 1);
   const after = await counts();
   ok('existing data unchanged', after.d === before.d && after.t === before.t);
   ok('table starts empty', (await db.query('SELECT count(*)::int n FROM assets')).rows[0].n === 0);

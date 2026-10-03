@@ -152,9 +152,11 @@ function scoreCurrency(payment, target) {
 function outstandingAmount(debt) {
   const effective = Number(debt.original_amount || debt.amount || 0);
   const paid = Number(debt.paid_amount || 0);
-  if (!Number.isFinite(effective) || !Number.isFinite(paid)) return 0;
+  // Tax the customer withheld (batch 10, attached by the route) is settled too.
+  const withheld = Number(debt.withholding_allocated || 0);
+  if (!Number.isFinite(effective) || !Number.isFinite(paid) || !Number.isFinite(withheld)) return 0;
   // Integer cents, consistent with the rest of this module.
-  return fromCents(Math.max(0, toCents(effective) - toCents(paid)));
+  return fromCents(Math.max(0, toCents(effective) - toCents(paid) - toCents(withheld)));
 }
 
 /**

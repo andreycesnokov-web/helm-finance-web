@@ -25,6 +25,7 @@ INSERT INTO transactions VALUES (1,'${A}',100000000),(2,'${A}',2500000),(3,'${B}
   const db = new PGlite(); await db.exec(BASELINE);
   try { await db.exec(MIG('064_business_funding_register.sql')); ok('clean apply 064', true); } catch (e) { ok('clean apply 064: ' + e.message, false); }
   try { await db.exec(MIG('064_business_funding_register.sql')); ok('second apply 064 (idempotent)', true); } catch (e) { ok('second apply: ' + e.message, false); }
+  ok('new tables have row-level security on, like 037 (pre-release review)', (await db.query(`SELECT count(*)::int n FROM pg_class WHERE relname IN ('business_funding_records', 'business_funding_repayments') AND relrowsecurity`)).rows[0].n === 2);
   ok('the bridge table funding_repayments is untouched', (await db.query(`SELECT count(*)::int n FROM funding_repayments`)).rows[0].n === 1
     && (await db.query(`SELECT count(*)::int n FROM information_schema.columns WHERE table_name='funding_repayments'`)).rows[0].n === 2);
   const cols = (await db.query(`SELECT column_name FROM information_schema.columns WHERE table_name IN ('business_funding_records','business_funding_repayments')`)).rows.map((r) => r.column_name);

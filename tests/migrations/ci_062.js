@@ -33,6 +33,7 @@ INSERT INTO cashflow_categories (user_id, name, group_type, business_id) VALUES
   try { await db.exec(MIG('062_pnl_groups_industry_templates.sql')); ok('clean apply 062', true); } catch (e) { ok('clean apply 062: ' + e.message, false); }
   const seeded = (await db.query('SELECT count(*)::int n FROM industry_templates')).rows[0].n;
   try { await db.exec(MIG('062_pnl_groups_industry_templates.sql')); ok('second apply 062 (idempotent)', true); } catch (e) { ok('second apply: ' + e.message, false); }
+  ok('new tables have row-level security on, like 037 (pre-release review)', (await db.query(`SELECT count(*)::int n FROM pg_class WHERE relname IN ('industry_templates') AND relrowsecurity`)).rows[0].n === 1);
   ok('second apply adds no template rows', (await db.query('SELECT count(*)::int n FROM industry_templates')).rows[0].n === seeded);
 
   const after = (await db.query('SELECT id, name, group_type, is_active, business_id, pnl_group FROM cashflow_categories ORDER BY id')).rows;
