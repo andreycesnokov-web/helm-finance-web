@@ -40,13 +40,15 @@ export default function Accounts() {
   const unlinked = Array.isArray(allTx.data) ? unlinkedMoney(allTx.data, w.data?.wallets || []) : { sum: 0, count: 0 }
   const idr = wallets.filter((x) => (x.currency || 'IDR') === 'IDR')
   const other = wallets.filter((x) => (x.currency || 'IDR') !== 'IDR')
-  const total = idr.reduce((s, x) => s + Number(x.balance || 0), 0)
-  const positive = idr.filter((x) => Number(x.balance) > 0)
-  const posSum = positive.reduce((s, x) => s + Number(x.balance), 0)
+  const total = w.data?.total_balance_idr != null
+    ? Number(w.data.total_balance_idr)
+    : wallets.reduce((s, x) => s + Number(x.balance_idr ?? x.balance ?? 0), 0)
+  const positive = wallets.filter((x) => Number(x.balance_idr ?? x.balance) > 0)
+  const posSum = positive.reduce((s, x) => s + Number(x.balance_idr ?? x.balance), 0)
   const fresh = statementFreshness(batches.data?.batches || [])
   const stale = idr.filter((x) => x.type === 'bank' && (!fresh[x.id] || daysUntil(fresh[x.id].date) < -7))
   const moves = (Array.isArray(transfers.data) ? transfers.data : []).slice(0, 4)
-  const shareLabel = positive.map((x) => `${x.name} ${Math.round((Number(x.balance) / posSum) * 100)}%`).join(', ')
+  const shareLabel = positive.map((x) => `${x.name} ${Math.round((Number(x.balance_idr ?? x.balance) / posSum) * 100)}%`).join(', ')
 
   if (!wallets.length) {
     return <>{head}<Card><Empty icon={<I.accounts size={28} />} title={t('acc.emptyTitle')} text={t('acc.emptyText')}
@@ -61,8 +63,9 @@ export default function Accounts() {
           <Card>
             <div className="v2-acc-total">
               <div className="v2-stat">
-                <span className="v2-stat-label">{t('acc.total', { n: idr.length })}</span>
+                <span className="v2-stat-label">{t('acc.total', { n: wallets.length })}</span>
                 <span className="v2-stat-big v2-num">{money(total)}</span>
+                {other.length > 0 && <span className="v2-muted v2-small">{t('acc.asOfDate', { d: shortDate(w.data?.as_of_date || new Date(), lang) })}</span>}
               </div>
               <p className="v2-muted v2-small">{t('acc.personalNote')}</p>
               {unlinked.count > 0 && <p className="v2-small"><Pill tone="warn">{t('acc.unlinkedTitle', { n: unlinked.count })}</Pill> {t('acc.unlinked', { v: money(unlinked.sum, { sign: true }), total: money(total + unlinked.sum) })} <Link to="/business/transactions">{t('nav.transactions')}</Link></p>}
@@ -71,7 +74,7 @@ export default function Accounts() {
             {posSum > 0 && (
               <>
                 <div className="v2-sharebar" role="img" aria-label={t('acc.shareLabel', { list: shareLabel })}>
-                  {positive.map((x, i) => <span key={x.id} style={{ width: `${(Number(x.balance) / posSum) * 100}%`, background: SERIES[i % SERIES.length] }} />)}
+                  {positive.map((x, i) => <span key={x.id} style={{ width: `${(Number(x.balance_idr ?? x.balance) / posSum) * 100}%`, background: SERIES[i % SERIES.length] }} />)}
                 </div>
                 <ul className="v2-sharelegend">
                   {positive.map((x, i) => <li key={x.id}><span className="v2-key-dot" style={{ background: SERIES[i % SERIES.length] }} aria-hidden="true" />{x.name}</li>)}
@@ -83,23 +86,27 @@ export default function Accounts() {
             <ul className="v2-acclist">
               {wallets.map((x) => {
                 const fr = fresh[x.id]
+                const isNonIdr = x.currency && x.currency !== 'IDR'
                 return (
                   <li key={x.id} className="v2-acc">
                     <span className="v2-dec-ic v2-tone-info" aria-hidden="true">{x.type === 'cash' ? <I.funding /> : <I.accounts />}</span>
                     <span className="v2-acc-text">
                       <span className="v2-dec-title">{x.name}{x.scope === 'personal' && <> <Pill tone="warn">{t('acc.labelledPersonal')}</Pill></>}</span>
-                      <span className="v2-dec-meta">{[t(KIND[x.type] || 'acc.kind.other'), x.entity_name, x.currency !== 'IDR' ? x.currency : null].filter(Boolean).join(' · ')}</span>
+                      <span className="v2-dec-meta">{[t(KIND[x.type] || 'acc.kind.other'), x.entity_name, isNonIdr ? x.currency : null].filter(Boolean).join(' · ')}</span>
                       <span className="v2-small">{fr
                         ? <>{t('acc.statementOn', { d: shortDate(fr.date, lang) })}{fr.status === 'review_required' && <> · <Link to="/business/bank-import">{t('acc.toReview')}</Link></>}</>
                         : x.type === 'bank' ? <><span className="v2-muted">{t('acc.noStatement')}</span> · <Link to="/business/bank-import">{t('acc.upload')}</Link></> : <span className="v2-muted">{t('acc.manual')}</span>}</span>
                     </span>
-                    <span className="v2-dec-amt v2-num">{money(x.balance, { currency: x.currency || 'IDR' })}</span>
+                    <span className="v2-dec-amt v2-num">
+                      <span>{money(x.balance, { currency: x.currency || 'IDR' })}</span>
+                      {isNonIdr && x.balance_idr != null && <span className="v2-muted v2-small" style={{ display: 'block', fontSize: '0.8rem', fontWeight: 400 }}>≈ {money(x.balance_idr, { currency: 'IDR' })}</span>}
+                    </span>
                     <Link className="v2-iconbtn" to="/business/accounts/manage" aria-label={t('acc.more', { name: x.name })}><I.chevRight size={18} /></Link>
                   </li>
                 )
               })}
             </ul>
-            {other.length > 0 && <p className="v2-muted v2-small">{t('acc.otherCcy')}</p>}
+            {other.length > 0 && <p className="v2-muted v2-small">{t('acc.asOfDate', { d: shortDate(w.data?.as_of_date || new Date(), lang) })}</p>}
           </Card>
         </div>
         <aside className="v2-col">

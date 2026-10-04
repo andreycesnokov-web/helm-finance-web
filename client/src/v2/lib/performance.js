@@ -57,7 +57,7 @@ export function profitRows(series = [], months) {
 const CASH_IN = ['income']
 const CASH_OUT = ['expense', 'payroll']
 export function txCashDelta(t) {
-  const a = num(t.amount_original)
+  const a = num(t.amount_idr != null ? t.amount_idr : t.amount_original)
   if (CASH_IN.includes(t.type)) return a
   if (CASH_OUT.includes(t.type)) return -a
   if (t.type === 'correction') return a
@@ -69,7 +69,7 @@ export function txCashDelta(t) {
 // 'personal', so most company payments carry it — and is not ownership. Personal money lives
 // in the separate Personal workspace and never reaches these endpoints. So no row is dropped
 // for its label (same rule as _specs/accounts-personal-scope-ambiguity.md).
-const isBizIdr = (t) => !(t.currency_original && t.currency_original !== 'IDR')
+const isBizIdr = (t) => !(t.currency_original && t.currency_original !== 'IDR' && t.amount_idr == null)
 
 /** Cash rows per month: operating, equipment, signed funding and month-end cash (walk-back). */
 export function cashRows({ series = [], transactions = [], balance = 0, months }) {

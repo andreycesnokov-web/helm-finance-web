@@ -22,5 +22,14 @@ t('type, account, date and description are required', () => {
   assert.strictEqual(addEntryBody({ ...ok, date: '03/10/2026' }).error, 'date')
   assert.strictEqual(addEntryBody({ ...ok, description: '   ' }).error, 'description')
 })
+t('foreign currency amounts: support decimal and thousand formats for USD, EUR, SGD, USDT', () => {
+  assert.deepStrictEqual(addEntryBody({ ...ok, currency: 'USD', amount: '12.50' }).tx, {
+    type: 'expense', amount: 12.5, currency: 'USD', wallet_id: 'w1',
+    transaction_date: '2026-10-03', description: 'Office rent', category: null, scope: 'business',
+  })
+  assert.strictEqual(addEntryBody({ ...ok, currency: 'EUR', amount: '1,500.25' }).tx.amount, 1500.25)
+  assert.strictEqual(addEntryBody({ ...ok, currency: 'SGD', amount: '1500,75' }).tx.amount, 1500.75)
+  assert.strictEqual(addEntryBody({ ...ok, currency: 'USDT', amount: '250.5' }).tx.amount, 250.5)
+})
 console.log(`\n${pass} passed, ${fail} failed`)
 process.exit(fail ? 1 : 0)
