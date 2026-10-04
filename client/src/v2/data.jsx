@@ -16,6 +16,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { apiFetch } from '../lib/api'
 import { useAuth } from '../hooks/useAuth'
 import { useWorkspace } from '../shell/WorkspaceProvider'
+import { scrubMarkers } from './lib/markers'
 
 const Ctx = createContext(null)
 export const FRESH_MS = 2000
@@ -33,7 +34,8 @@ export function V2DataProvider({ children }) {
     const key = `${wsId}|${path}`
     const hit = cache.current.get(key)
     if (!force && hit && (hit.at == null || Date.now() - hit.at < FRESH_MS)) return hit.p
-    const p = apiFetch(path, token)
+    // Technical tags such as "[CFO_AI_DEMO_PACK_V1]" are hidden from every screen (lib/markers.js).
+    const p = apiFetch(path, token).then(scrubMarkers)
     const entry = { p, at: null }
     cache.current.set(key, entry)
     p.then(() => { entry.at = Date.now() },
