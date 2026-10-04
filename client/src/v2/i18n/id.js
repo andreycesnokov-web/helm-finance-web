@@ -31,7 +31,7 @@ export default {
     companyProfile: 'Profil perusahaan',
   },
 
-  chart: { showTable: 'Tampilkan tabel', showChart: 'Tampilkan grafik' },
+  chart: { showTable: 'Tampilkan tabel', showChart: 'Tampilkan grafik', noData: 'Tidak ada angka bulan ini' },
   pulse: {
     today: 'hari ini',
     status: { good: 'Aman', warn: 'Perhatian', crit: 'Segera bertindak' },

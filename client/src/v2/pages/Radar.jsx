@@ -119,7 +119,7 @@ export default function Radar() {
           </div>
           <div className="v2-stat v2-stat-box v2-stat-warn">
             <span className="v2-stat-label">{t('radar.worstLowest')}</span>
-            <span className="v2-stat-mid v2-num">{money(f.worstLowest.value)}</span>
+            <span className={`v2-stat-mid v2-num${f.worstLowest.value < 0 ? ' v2-neg' : ''}`}>{money(f.worstLowest.value)}</span>
             <span className="v2-stat-sub">{f.worstLowest.day === 0 ? t('radar.today') : shortDate(f.worstLowest.date, lang)} · {t('radar.worstRule')}</span>
           </div>
         </div>

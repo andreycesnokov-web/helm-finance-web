@@ -315,8 +315,43 @@
 .v2-dot-exp { fill: var(--brand-navy); }
 .v2-dot-ring { fill: var(--surface-card); stroke: var(--brand-navy); stroke-width: 2; }
 .v2-dot-ring-warn { fill: var(--surface-card); stroke: var(--warning); stroke-width: 2; }
-.v2-annot { font-size: 12px; font-weight: 800; fill: var(--brand-navy); font-family: var(--font-ui); }
+.v2-annot { font-size: 13px; font-weight: 800; fill: var(--brand-navy); font-family: var(--font-ui); }
+.v2-annot-pill { fill: var(--surface-card); stroke: var(--brand-navy); stroke-opacity: .35; stroke-width: 1; filter: drop-shadow(0 1px 2px rgba(0, 51, 102, .08)); }
+.v2-annot-pill.is-warn { fill: var(--warning-soft); stroke: var(--warning); stroke-opacity: .6; }
 .v2-annot-warn { fill: var(--warning-ink); }
+/* Interactive layer (ForecastChart, BarChart): crosshair, hovered column, tooltip. */
+.v2-plot { position: relative; }
+.v2-chart-live { cursor: crosshair; touch-action: pan-y; outline: none; border-radius: var(--radius-sm); }
+.v2-chart-live:focus-visible { box-shadow: 0 0 0 3px var(--info-soft), 0 0 0 4px var(--action-primary); }
+.v2-axis-zero { stroke: var(--text-muted); stroke-width: 1.25; }
+.v2-below-zero { fill: var(--danger-soft); opacity: .55; }
+.v2-tick-neg { fill: var(--danger); }
+.v2-tick-on { fill: var(--text-primary); font-weight: 800; }
+.v2-cross line { stroke: var(--text-muted); stroke-width: 1; stroke-dasharray: 3 3; }
+.v2-dot-hover { fill: var(--brand-navy); stroke: var(--surface-card); stroke-width: 2.5; }
+.v2-col-hover { fill: var(--surface-page); }
+.v2-bars { transition: opacity .15s ease; }
+.v2-tip { position: absolute; z-index: 3; pointer-events: none; min-width: 168px; max-width: 260px; padding: 10px 12px;
+  background: var(--surface-card); border: 1px solid var(--border-default); border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg); font-size: 13px; color: var(--text-secondary); display: grid; gap: 4px; }
+.v2-tip-title { font-weight: 800; color: var(--text-primary); margin-bottom: 2px; }
+.v2-tip-row { display: grid; grid-template-columns: 14px auto 1fr; align-items: center; gap: 8px; white-space: nowrap; }
+.v2-tip-key { width: 14px; height: 0; border-top: 2.5px solid var(--k); }
+.v2-tip-key.is-dashed { border-top-style: dashed; }
+.v2-tip-key.is-box { height: 10px; border: 0; border-radius: 3px; background: var(--k); }
+.v2-tip-v { font-weight: 800; color: var(--text-primary); font-variant-numeric: tabular-nums; }
+.v2-tip-neg .v2-tip-v { color: var(--danger); }
+.v2-tip-l { overflow: hidden; text-overflow: ellipsis; }
+.v2-tip-note { color: var(--text-muted); }
+@media (prefers-reduced-motion: no-preference) {
+  .v2-reveal { animation: v2-reveal .9s cubic-bezier(.2, .7, .2, 1) both; }
+  .v2-fadein { animation: v2-fade .4s .7s ease both; }
+  .v2-bar { transform-box: fill-box; transform-origin: 50% 100%; animation: v2-grow .55s cubic-bezier(.2, .7, .2, 1) both; }
+  .v2-bar-neg { transform-origin: 50% 0%; }
+}
+@keyframes v2-reveal { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
+@keyframes v2-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes v2-grow { from { transform: scaleY(0); } to { transform: scaleY(1); } }
 .v2-legend { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-5); margin-top: var(--space-3); font-size: 13px; color: var(--text-secondary); }
 .v2-legend-item { display: inline-flex; align-items: center; gap: var(--space-2); }
 .v2-key { display: inline-block; width: 18px; height: 0; border-top: 2.5px solid var(--brand-navy); }
@@ -427,6 +462,7 @@
 .v2-stat-box { background: var(--surface-page); border-radius: var(--radius-md); padding: var(--space-3) 14px; }
 .v2-stat-warn { background: var(--warning-soft); }
 .v2-stat-warn .v2-stat-label, .v2-stat-warn .v2-stat-mid { color: var(--warning-ink); }
+.v2-stat-warn .v2-stat-mid.v2-neg { color: var(--danger); }
 @media (min-width: 1025px) {
   .v2-stats3 { grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1fr); gap: var(--space-6); align-items: end; }
   .v2-stat-main { grid-column: auto; }

@@ -31,7 +31,7 @@ export default {
     companyProfile: 'Профиль компании',
   },
 
-  chart: { showTable: 'Показать таблицей', showChart: 'Показать графиком' },
+  chart: { showTable: 'Показать таблицей', showChart: 'Показать графиком', noData: 'За этот месяц нет данных' },
   pulse: {
     today: 'сегодня',
     status: { good: 'Всё в порядке', warn: 'Внимание', crit: 'Нужны действия' },
