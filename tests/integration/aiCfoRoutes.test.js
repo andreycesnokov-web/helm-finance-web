@@ -47,9 +47,25 @@ mem.createClient().from('x').constructor.prototype.or = function(expr) {
   return this;
 };
 
+let mockAnthropicCalls = [];
+class MockAnthropic {
+  constructor(opts) {
+    this.apiKey = opts?.apiKey;
+    this.messages = {
+      create: async (params) => {
+        mockAnthropicCalls.push(params);
+        return {
+          content: [{ text: 'Mocked Anthropic CFO response: Cash runway is sufficient at 101 days.' }],
+        };
+      },
+    };
+  }
+}
+
 const origLoad = Module._load;
 Module._load = function (request) {
   if (request === '@supabase/supabase-js') return mem;
+  if (request === '@anthropic-ai/sdk') return MockAnthropic;
   return origLoad.apply(this, arguments);
 };
 
@@ -189,14 +205,30 @@ const t = async (name, fn) => {
   });
 
   await t('POST /api/ai-cfo/ask responds without ReferenceError (local fallback)', async () => {
+    delete process.env.ANTHROPIC_API_KEY;
     const res = await post('/ai-cfo/ask', {
       question: 'What is our current cash runway?',
       language: 'en',
     }, { user: USER_A, biz: BIZ_A });
     assert.equal(res.status, 200, `Expected 200, got ${res.status}: ${JSON.stringify(res.body)}`);
+    assert.equal(res.body.used_ai_provider, false, 'Used local fallback when no API key configured');
     assert.ok(res.body.answer, 'Returns answer');
     assert.ok(typeof res.body.answer === 'string', 'Answer is string');
     assert.ok(res.body.answer.length > 10, 'Answer is substantial');
+  });
+
+  await t('POST /api/ai-cfo/ask uses mock AI provider when API key is set (zero paid calls)', async () => {
+    process.env.ANTHROPIC_API_KEY = 'mock-key-for-test';
+    mockAnthropicCalls = [];
+    const res = await post('/ai-cfo/ask', {
+      question: 'What is our current cash runway?',
+      language: 'en',
+    }, { user: USER_A, biz: BIZ_A });
+    assert.equal(res.status, 200, `Expected 200, got ${res.status}: ${JSON.stringify(res.body)}`);
+    assert.equal(res.body.used_ai_provider, true, 'Indicates AI provider used');
+    assert.equal(mockAnthropicCalls.length, 1, 'Mock Anthropic called exactly once');
+    assert.ok(res.body.answer.includes('Mocked Anthropic CFO response'), 'Returns mocked provider text');
+    delete process.env.ANTHROPIC_API_KEY;
   });
 
   await t('POST /api/ai-cfo/ask rejects out-of-scope question via guardrail', async () => {
