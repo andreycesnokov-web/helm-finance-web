@@ -217,7 +217,7 @@ const en = {
     otherCurrenciesAside: '{n} in other currencies (not totalled yet)',
     noProvenBalance: 'Balance unavailable',
     currencyNotYetSupported: 'Not available yet — balances in this currency are not ready',
-    currencyLockedNote: 'Required. Only IDR wallets are available while balances in other currencies are being made native.',
+    currencyLockedNote: 'Required. Available currencies: IDR, USD, EUR, SGD, USDT.',
     currencyImmutable: 'A wallet keeps the currency it was created with.',
     walletsCountOne: '1 wallet',
     walletsCountMany: '{n} wallets',

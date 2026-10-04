@@ -215,7 +215,7 @@ const ru = {
     otherCurrenciesAside: 'в других валютах: {n} (пока не суммируются)',
     noProvenBalance: 'Баланс недоступен',
     currencyNotYetSupported: 'Пока недоступно — балансы в этой валюте не готовы',
-    currencyLockedNote: 'Обязательно. Пока доступны только кошельки в IDR: балансы в других валютах ещё переводятся на нативный расчёт.',
+    currencyLockedNote: 'Обязательно. Доступные валюты: IDR, USD, EUR, SGD, USDT.',
     currencyImmutable: 'Валюта кошелька задаётся при создании и не меняется.',
     walletsCountOne: '1 кошелёк',
     walletsCountMany: '{n} кошельков',
