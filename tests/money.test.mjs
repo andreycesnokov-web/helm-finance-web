@@ -21,8 +21,12 @@ eq('IDR 0 decimals grouped', M.formatAmount('1500000', 'IDR'), '1 500 000');
 eq('USD 2 decimals', M.formatAmount('1234.5', 'USD'), '1 234.50');
 eq('USD rounds half-up', M.formatAmount('1.005', 'USD'), '1.01');
 eq('BTC 8 decimals', M.formatAmount('0.00000001', 'BTC'), '0.00000001');
-eq('USDT 2 decimals', M.formatAmount('100.1', 'USDT'), '100.10');
+eq('JPY 0 decimals grouped', M.formatAmount('15000', 'JPY'), '15 000');
+eq('AUD 2 decimals', M.formatAmount('100.5', 'AUD'), '100.50');
 eq('formatMoney appends asset', M.formatMoney('100', 'USD'), '100.00 USD');
+eq('formatCurrency AUD', M.formatCurrency('100.5', 'AUD'), 'A$100.50');
+eq('formatCurrency JPY', M.formatCurrency('15000', 'JPY'), '¥15 000');
+eq('formatCurrency MYR', M.formatCurrency('250.2', 'MYR'), 'RM 250.20');
 eq('negative formats', M.formatAmount('-2500.5', 'USD'), '-2 500.50');
 
 // native totals stay per-asset (never collapse different assets)

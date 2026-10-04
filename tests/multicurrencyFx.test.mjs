@@ -28,6 +28,30 @@ test('toIdr: conversion for USD, EUR, SGD, USDT', async () => {
   const usdt = await fx.toIdr(1000, 'USDT', '2026-10-04')
   assert.equal(usdt.amount_idr, 16290000)
   assert.equal(usdt.booked_rate, '16290')
+
+  const myr = await fx.toIdr(100, 'MYR', '2026-10-04')
+  assert.equal(myr.amount_idr, 385000)
+  assert.equal(myr.booked_rate, '3850')
+
+  const thb = await fx.toIdr(1000, 'THB', '2026-10-04')
+  assert.equal(thb.amount_idr, 490000)
+  assert.equal(thb.booked_rate, '490')
+
+  const cny = await fx.toIdr(500, 'CNY', '2026-10-04')
+  assert.equal(cny.amount_idr, 1160000)
+  assert.equal(cny.booked_rate, '2320')
+
+  const aud = await fx.toIdr(100, 'AUD', '2026-10-04')
+  assert.equal(aud.amount_idr, 1080000)
+  assert.equal(aud.booked_rate, '10800')
+
+  const gbp = await fx.toIdr(100, 'GBP', '2026-10-04')
+  assert.equal(gbp.amount_idr, 2150000)
+  assert.equal(gbp.booked_rate, '21500')
+
+  const jpy = await fx.toIdr(10000, 'JPY', '2026-10-04')
+  assert.equal(jpy.amount_idr, 1100000)
+  assert.equal(jpy.booked_rate, '110')
 })
 
 test('toIdr: audited manual rate override', async () => {
@@ -53,6 +77,12 @@ test('getTodayRate: returns synchronous valuation rates', () => {
   assert.equal(fx.getTodayRate('EUR'), 17800)
   assert.equal(fx.getTodayRate('SGD'), 12500)
   assert.equal(fx.getTodayRate('USDT'), 16290)
+  assert.equal(fx.getTodayRate('MYR'), 3850)
+  assert.equal(fx.getTodayRate('THB'), 490)
+  assert.equal(fx.getTodayRate('CNY'), 2320)
+  assert.equal(fx.getTodayRate('AUD'), 10800)
+  assert.equal(fx.getTodayRate('GBP'), 21500)
+  assert.equal(fx.getTodayRate('JPY'), 110)
 })
 
 test('toIdr: rejects invalid amounts', async () => {

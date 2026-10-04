@@ -9,7 +9,7 @@ const SCALE = 18;
 const POW = 10n ** BigInt(SCALE);
 
 // Per-asset display precision (decimal places shown to the user).
-export const ASSET_PRECISION = { IDR: 0, USD: 2, USDT: 2, BTC: 8, ETH: 18 };
+export const ASSET_PRECISION = { IDR: 0, JPY: 0, USD: 2, USDT: 2, BTC: 8, ETH: 18 };
 const displayDigits = (asset) => (ASSET_PRECISION[asset] ?? 2);
 
 // ── scaled BigInt core (string in / string out) ────────────────────────────
@@ -62,6 +62,7 @@ export const formatMoney = (value, asset) => `${formatAmount(value, asset)} ${as
 // exactly the failure this module exists to prevent.
 export const CURRENCY_PREFIX = {
   IDR: 'Rp ', USD: '$', EUR: '\u20AC', SGD: 'S$', USDT: 'USDT ', MYR: 'RM ', THB: '\u0E3F', CNY: 'CN\u00A5',
+  AUD: 'A$', GBP: '£', JPY: '¥',
 };
 // ISO 4217 code -> the name a person reads. Shown beside the code wherever a
 // currency is chosen, because "SGD" and "S$" are not obvious to everyone who has
@@ -70,6 +71,7 @@ export const CURRENCY_NAMES = {
   IDR: 'Indonesian Rupiah', USD: 'US Dollar', EUR: 'Euro', SGD: 'Singapore Dollar',
   USDT: 'Tether USD',
   MYR: 'Malaysian Ringgit', THB: 'Thai Baht', CNY: 'Chinese Yuan',
+  AUD: 'Australian Dollar', GBP: 'British Pound', JPY: 'Japanese Yen',
 };
 
 export const currencyPrefix = (currency) => {
