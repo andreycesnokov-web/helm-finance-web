@@ -217,7 +217,7 @@ const id = {
     otherCurrenciesAside: '{n} dalam mata uang lain (belum dijumlahkan)',
     noProvenBalance: 'Saldo belum tersedia',
     currencyNotYetSupported: 'Belum tersedia — saldo dalam mata uang ini belum siap',
-    currencyLockedNote: 'Wajib diisi. Saat ini hanya dompet IDR yang tersedia sementara saldo mata uang lain disiapkan.',
+    currencyLockedNote: 'Wajib diisi. Mata uang yang tersedia: IDR, USD, EUR, SGD, USDT.',
     currencyImmutable: 'Mata uang dompet ditetapkan saat dibuat dan tidak dapat diubah.',
     walletsCountOne: '1 dompet',
     walletsCountMany: '{n} dompet',

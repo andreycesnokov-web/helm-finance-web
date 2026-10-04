@@ -29,6 +29,8 @@ import { PROVEN_NATIVE_CURRENCIES } from '../lib/walletBalanceContract'
  * @param styleFor    (code) => ({bg, color}) — the page's currency chip palette
  * @param t           the page's translation function
  */
+const SUPPORTED_WALLET_CURRENCIES = ['IDR', 'USD', 'EUR', 'SGD', 'USDT']
+
 export function WalletCurrencyField({ currencies, value, onChange, locked = false, styleFor, t }) {
   return (
     <>
@@ -39,7 +41,7 @@ export function WalletCurrencyField({ currencies, value, onChange, locked = fals
         style={{ display: 'flex', gap: 8, marginBottom: 6, flexWrap: 'wrap' }}>
         {currencies.map((c) => {
           const cs = styleFor(c)
-          const selectable = PROVEN_NATIVE_CURRENCIES.includes(c) && !locked
+          const selectable = (PROVEN_NATIVE_CURRENCIES.includes(c) && !locked) || (!locked && SUPPORTED_WALLET_CURRENCIES.includes(c))
           const active = value === c
           return (
             <button
@@ -65,7 +67,11 @@ export function WalletCurrencyField({ currencies, value, onChange, locked = fals
       <div className="wallet-currency-note"
         style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 14, lineHeight: 1.45 }}>
         {CURRENCY_NAMES[value] ? `${value} — ${CURRENCY_NAMES[value]}. ` : ''}
-        {locked ? t('accounts.currencyImmutable') : t('accounts.currencyLockedNote')}
+        {locked ? t('accounts.currencyImmutable') : (
+          SUPPORTED_WALLET_CURRENCIES.includes(value)
+            ? (value === 'IDR' ? t('accounts.currencyLockedNote') : (t('acc.asOfDate') ? t('acc.asOfDate', { d: 'today' }) : 'Valued in IDR at today’s daily rate.'))
+            : t('accounts.currencyLockedNote')
+        )}
       </div>
     </>
   )
