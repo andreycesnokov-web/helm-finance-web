@@ -29,7 +29,7 @@ import { PROVEN_NATIVE_CURRENCIES } from '../lib/walletBalanceContract'
  * @param styleFor    (code) => ({bg, color}) — the page's currency chip palette
  * @param t           the page's translation function
  */
-const SUPPORTED_WALLET_CURRENCIES = ['IDR', 'USD', 'EUR', 'SGD', 'USDT']
+const SUPPORTED_WALLET_CURRENCIES = ['IDR', 'USD', 'EUR', 'SGD', 'USDT', 'MYR', 'THB', 'CNY', 'AUD', 'GBP', 'JPY']
 
 export function WalletCurrencyField({ currencies, value, onChange, locked = false, styleFor, t }) {
   return (

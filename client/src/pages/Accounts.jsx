@@ -30,7 +30,7 @@ const WALLET_TYPES = [
   { value: '__custom__',      label: '✏️ Custom type…', adminOnly: true },
 ]
 
-const CURRENCIES = ['IDR', 'USD', 'EUR', 'SGD', 'USDT', 'MYR', 'THB', 'CNY']
+const CURRENCIES = ['IDR', 'USD', 'EUR', 'SGD', 'USDT', 'MYR', 'THB', 'CNY', 'AUD', 'GBP', 'JPY']
 
 // TYPE_ICON and the private CURRENCY_STYLE palette that used to sit here are
 // gone. The icons moved verbatim into AccountsBlocks.jsx and now draw at
@@ -51,6 +51,9 @@ const CURRENCY_SWATCH = {
   MYR: { bg: '#FFF1F2', color: '#9F1239' },
   THB: { bg: '#F0F9FF', color: '#0369A1' },
   CNY: { bg: '#FFF1F0', color: '#991B1B' },
+  AUD: { bg: '#ECFDF5', color: '#065F46' },
+  GBP: { bg: '#F5F3FF', color: '#5B21B6' },
+  JPY: { bg: '#FEF2F2', color: '#991B1B' },
 }
 const getCurrencyStyle = (currency) => CURRENCY_SWATCH[currency] || { bg: '#F1F5F9', color: '#475569' }
 
