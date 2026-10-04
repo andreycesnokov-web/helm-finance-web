@@ -105,7 +105,7 @@ function Drill({ drill, tx, t, lang, clear }) {
 function ProfitTab({ rows, sel, t, lang, needsReview, tx, accrual = null }) {
   const cur = rows.find((r) => r.month === sel) || rows[rows.length - 1]
   const prev = rows.find((r) => r.month === prevMonth(cur.month))
-  const chartRows = rows.map((r) => ({ key: r.month, label: mName(r.month, lang), short: mName(r.month, lang, 'short'), values: { revenue: r.revenue, gross: r.gross, ebitda: r.ebitda, net: r.net } }))
+  const chartRows = rows.map((r) => ({ key: r.month, empty: r.empty, label: mName(r.month, lang), short: mName(r.month, lang, 'short'), values: { revenue: r.revenue, gross: r.gross, ebitda: r.ebitda, net: r.net } }))
   const cmp = monthCompare(tx, cur.month, prevMonth(cur.month))
   const noteLink = drillLink('performance', { month: cur.month, compare: prevMonth(cur.month), focus: 'costs' })
   const note = t('perf.profit.note', { m: mName(cur.month, lang), c: mName(prevMonth(cur.month), lang), costs: money(cmp.costsNow - cmp.costsBefore, { sign: true }), link: noteLink })
@@ -201,7 +201,7 @@ function CashTab({ rows, sel, cash, t, lang }) {
   const funding12 = rows.reduce((s, r) => s + r.funding, 0)
   const fundIn12 = rows.reduce((s, r) => s + r.fundingIn, 0), fundOut12 = rows.reduce((s, r) => s + r.fundingOut, 0)
   const lastCapex = [...rows].reverse().find((r) => r.equipment > 0)
-  const flowRows = rows.map((r) => ({ key: r.month, label: mName(r.month, lang), short: mName(r.month, lang, 'short'), values: { operating: r.operating, equipment: -r.equipment, funding: r.funding } }))
+  const flowRows = rows.map((r) => ({ key: r.month, empty: r.empty, label: mName(r.month, lang), short: mName(r.month, lang, 'short'), values: { operating: r.operating, equipment: -r.equipment, funding: r.funding } }))
   const endRows = rows.map((r) => ({ key: r.month, label: mName(r.month, lang), short: mName(r.month, lang, 'short'), values: { cash: r.endCash } }))
   return (
     <>

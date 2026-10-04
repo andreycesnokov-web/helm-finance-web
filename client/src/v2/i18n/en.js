@@ -31,7 +31,7 @@ export default {
     companyProfile: 'Company profile',
   },
 
-  chart: { showTable: 'Show as table', showChart: 'Show as chart' },
+  chart: { showTable: 'Show as table', showChart: 'Show as chart', noData: 'No figures this month' },
   pulse: {
     today: 'today',
     status: { good: 'On track', warn: 'Attention', crit: 'Act now' },
