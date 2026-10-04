@@ -11201,6 +11201,40 @@ app.post('/api/debts/:id/pay', auth, async (req, res) => {
   const debt = debtRows?.[0];
   if (!debt) return res.status(404).json({ error: 'Debt not found' });
 
+  const debtCurrency = typeof debt.currency === 'string' ? debt.currency.trim().toUpperCase() : '';
+  if (!debtCurrency) {
+    return res.status(400).json({
+      error: 'debt_currency_missing',
+      message: 'Debt has no valid currency specified',
+    });
+  }
+
+  // Wallet must belong to the same business (legacy: owner's user_id)
+  let payWallet = null;
+  if (wallet_id) {
+    const { data: wRows } = await supabase.from('wallets')
+      .select('id, name, scope, currency').eq('id', wallet_id).or(bizOrFilter(biz)).limit(1);
+    if (!wRows?.length) return res.status(400).json({ error: 'Invalid or inaccessible wallet' });
+    payWallet = wRows[0];
+
+    const walletCurrency = typeof payWallet.currency === 'string' ? payWallet.currency.trim().toUpperCase() : '';
+    if (!walletCurrency) {
+      return res.status(400).json({
+        error: 'wallet_currency_missing',
+        message: 'Wallet has no valid currency specified',
+      });
+    }
+
+    if (walletCurrency !== debtCurrency) {
+      return res.status(400).json({
+        error: 'cross_currency_not_supported',
+        message: `Cross-currency debt payment is not supported yet: debt is in ${debtCurrency}, but wallet is in ${walletCurrency}`,
+        debt_currency: debtCurrency,
+        wallet_currency: walletCurrency,
+      });
+    }
+  }
+
   const paymentAmount  = Number(amount);
   const effectiveTotal = Number(debt.original_amount || debt.amount || 0);
   const alreadyPaid    = Number(debt.paid_amount || 0);
@@ -11217,18 +11251,9 @@ app.post('/api/debts/:id/pay', auth, async (req, res) => {
   const isFullyPaid   = newPaidAmount + withheld >= effectiveTotal - 0.01;
   const newStatus     = isFullyPaid ? 'paid' : 'partial';
 
-  // Wallet must belong to the same business (legacy: owner's user_id)
-  let payWallet = null;
-  if (wallet_id) {
-    const { data: wRows } = await supabase.from('wallets')
-      .select('id, name, scope, currency').eq('id', wallet_id).or(bizOrFilter(biz)).limit(1);
-    if (!wRows?.length) return res.status(400).json({ error: 'Invalid or inaccessible wallet' });
-    payWallet = wRows[0];
-  }
-
   // 1. Create transaction
   const txType = debt.type === 'payable' ? 'expense' : 'income';
-  const cur = (payWallet?.currency || debt.currency || 'IDR').toUpperCase();
+  const cur = (payWallet?.currency || debtCurrency).toUpperCase();
   const txDate = date ? new Date(date).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10);
   const fxRes = await fx.toIdr(paymentAmount, cur, txDate);
 

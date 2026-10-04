@@ -32,6 +32,7 @@ const REC_LABEL = {
 
 export default function DebtPaymentModal({ debt, accounts, token, onClose, onSuccess }) {
   const isReceivable = debt.type === 'receivable'
+  const debtCurrency = (debt.currency || 'IDR').toUpperCase()
 
   // Derive amounts — handle both old (no original_amount) and new schema
   const originalAmount  = Number(debt.original_amount || debt.amount || 0)
@@ -48,8 +49,9 @@ export default function DebtPaymentModal({ debt, accounts, token, onClose, onSuc
   const amountNum   = Number(amount)
   const isFullPay   = amountNum >= remaining - 0.01
   const selectedAcc = (accounts || []).find(a => String(a.id) === String(walletId))
-  // Wallet choice is required so the payment debits/credits the right account.
-  const canSubmit   = amountNum > 0 && amountNum <= remaining + 0.01 && !!walletId && !paying
+  const isCurrencyMatch = selectedAcc && (selectedAcc.currency || 'IDR').toUpperCase() === debtCurrency
+  // Wallet choice is required and its currency must match debt currency
+  const canSubmit   = amountNum > 0 && amountNum <= remaining + 0.01 && !!walletId && isCurrencyMatch && !paying
 
   // ── AI CFO payment check (deterministic simulation, no data change) ────────
   const [sim, setSim]       = useState(null)
@@ -123,26 +125,26 @@ export default function DebtPaymentModal({ debt, accounts, token, onClose, onSuc
         <div style={{ background: 'var(--bg-3)', borderRadius: 12, padding: '10px 14px', marginBottom: 16, border: '0.5px solid var(--border)' }}>
           <div style={rowStyle}>
             <span style={lblStyle}>Total amount</span>
-            <span style={valStyle}>{fmt(originalAmount)} IDR</span>
+            <span style={valStyle}>{fmt(originalAmount)} {debtCurrency}</span>
           </div>
           {isPartialAlready && (
             <div style={rowStyle}>
               <span style={lblStyle}>Already {isReceivable ? 'received' : 'paid'}</span>
               <span style={{ ...valStyle, color: isReceivable ? 'var(--green-dark)' : 'var(--red-dark)' }}>
-                {fmt(alreadyPaid)} IDR
+                {fmt(alreadyPaid)} {debtCurrency}
               </span>
             </div>
           )}
           <div style={{ ...rowStyle, borderBottom: 'none' }}>
             <span style={{ ...lblStyle, fontWeight: 700, color: 'var(--text-2)' }}>Remaining</span>
             <span style={{ fontSize: 15, fontWeight: 800, color: isReceivable ? 'var(--green-dark)' : 'var(--brand)' }}>
-              {fmt(remaining)} IDR
+              {fmt(remaining)} {debtCurrency}
             </span>
           </div>
         </div>
 
         {/* Payment amount */}
-        <label className="modal-label">Payment amount (IDR)</label>
+        <label className="modal-label">Payment amount ({debtCurrency})</label>
         <input
           type="number"
           className="modal-input"
@@ -179,13 +181,29 @@ export default function DebtPaymentModal({ debt, accounts, token, onClose, onSuc
           value={walletId}
           onChange={e => { setWalletId(e.target.value); setError('') }}
           className="modal-input"
-          style={{ marginBottom: walletId ? 14 : 8 }}
+          style={{ marginBottom: walletId ? 10 : 8 }}
         >
           <option value="">Select account…</option>
-          {(accounts || []).map(a => (
-            <option key={a.id || a.name} value={a.id}>{a.name} · {fmt(a.balance)} IDR</option>
-          ))}
+          {(accounts || []).map(a => {
+            const aCur = (a.currency || 'IDR').toUpperCase()
+            const isMatch = aCur === debtCurrency
+            return (
+              <option key={a.id || a.name} value={a.id} disabled={!isMatch}>
+                {a.name} · {fmt(a.balance)} {aCur}{!isMatch ? ` (${aCur} — cross-currency disabled)` : ''}
+              </option>
+            )
+          })}
         </select>
+        {walletId && !isCurrencyMatch && (
+          <div style={{ fontSize: 12, color: 'var(--red-dark)', marginBottom: 12, background: 'var(--red-light)', padding: '7px 11px', borderRadius: 8 }}>
+            Cross-currency payment is not supported yet. Please select an account in {debtCurrency}.
+          </div>
+        )}
+        {!(accounts || []).some(a => (a.currency || 'IDR').toUpperCase() === debtCurrency) && (accounts || []).length > 0 && (
+          <div style={{ fontSize: 12, color: 'var(--amber-dark)', marginBottom: 14 }}>
+            No {debtCurrency} accounts available. Please add a {debtCurrency} account in Accounts first.
+          </div>
+        )}
         {!walletId && (accounts || []).length === 0 && (
           <div style={{ fontSize: 12, color: 'var(--amber-dark)', marginBottom: 14 }}>
             No accounts yet — add one in Accounts first.
@@ -205,7 +223,7 @@ export default function DebtPaymentModal({ debt, accounts, token, onClose, onSuc
             <span>{isFullPay ? '✓' : '◑'}</span>
             {isFullPay
               ? `Will be marked as fully ${isReceivable ? 'received' : 'paid'}`
-              : `Partial payment — ${fmt(remaining - amountNum)} IDR remaining`}
+              : `Partial payment — ${fmt(remaining - amountNum)} ${debtCurrency} remaining`}
           </div>
         )}
 
@@ -272,8 +290,8 @@ export default function DebtPaymentModal({ debt, accounts, token, onClose, onSuc
           {paying
             ? 'Processing…'
             : isFullPay
-              ? `${isReceivable ? '✓ Mark fully received' : '✓ Mark fully paid'} · ${fmt(amountNum)} IDR`
-              : `Record partial · ${fmt(amountNum)} IDR`}
+              ? `${isReceivable ? '✓ Mark fully received' : '✓ Mark fully paid'} · ${fmt(amountNum)} ${debtCurrency}`
+              : `Record partial · ${fmt(amountNum)} ${debtCurrency}`}
         </button>
 
         <button onClick={onClose} disabled={paying} className="btn btn-ghost btn-block btn-lg">
