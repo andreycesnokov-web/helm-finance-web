@@ -10,6 +10,8 @@
  *   - Strictly READ-ONLY. Zero database writes, updates, or deletes.
  *   - Audits whether debts.currency matches linked transactions.currency_original
  *     and wallets.currency.
+ *   - Note: Verifies currency correspondence on linked records; does NOT prove
+ *     correctness of payment amounts or completeness of partial payment history.
  *   - Highlights debts where transaction linkage is ambiguous or missing.
  */
 

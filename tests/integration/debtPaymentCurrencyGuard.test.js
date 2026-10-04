@@ -56,6 +56,7 @@ mem.__seed('wallets', [
 
 mem.__seed('debts', [
   { id: 'debt-usd-1', business_id: BIZ_A, type: 'payable', counterparty: 'Vendor US', currency: 'USD', amount: 1000, original_amount: 1000, paid_amount: 0, status: 'open', approval_status: 'approved' },
+  { id: 'debt-usd-2', business_id: BIZ_A, type: 'payable', counterparty: 'Vendor Direct', currency: 'USD', amount: 500, original_amount: 500, paid_amount: 0, status: 'open', approval_status: 'approved' },
   { id: 'debt-idr-1', business_id: BIZ_A, type: 'payable', counterparty: 'Vendor ID', currency: 'IDR', amount: 16300000, original_amount: 16300000, paid_amount: 0, status: 'open', approval_status: 'approved' },
   { id: 'debt-no-cur', business_id: BIZ_A, type: 'payable', counterparty: 'Vendor Unknown', currency: null, amount: 500, original_amount: 500, paid_amount: 0, status: 'open', approval_status: 'approved' },
 ]);
@@ -246,6 +247,29 @@ const t = async (name, fn) => {
     assert.equal(debt.paid_amount, 16300000);
     assert.equal(debt.status, 'paid');
     assert.equal(debt.is_settled, true);
+  });
+
+  await t('9. Request without wallet_id (legacy contract): creates transaction in debtCurrency, does not bypass currency check', async () => {
+    const txCountBefore = (mem.__db.transactions || []).length;
+    const res = await postPay('debt-usd-2', {
+      amount: 250,
+      account: 'Petty Cash USD',
+      date: '2026-10-04',
+    });
+
+    assert.equal(res.status, 200, `Expected 200, got ${res.status}: ${JSON.stringify(res.body)}`);
+    assert.equal(res.body.ok, true);
+    assert.equal(res.body.remaining, 250);
+
+    const tx = (mem.__db.transactions || []).slice(txCountBefore)[0];
+    assert.ok(tx, 'Transaction created');
+    assert.equal(tx.amount_original, 250);
+    assert.equal(tx.currency_original, 'USD', 'Strictly matches debtCurrency');
+    assert.equal(tx.wallet_id, null, 'wallet_id is null');
+    assert.equal(tx.source, 'Petty Cash USD');
+
+    const debt = (mem.__db.debts || []).find(d => d.id === 'debt-usd-2');
+    assert.equal(debt.paid_amount, 250);
   });
 
   console.log(`\n${fail === 0 ? 'ALL PASS' : 'FAIL'} — ${pass} passed, ${fail} failed`);

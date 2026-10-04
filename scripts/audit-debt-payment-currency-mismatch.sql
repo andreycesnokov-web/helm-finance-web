@@ -3,8 +3,10 @@
 -- This script is strictly READ-ONLY. It makes ZERO modifications to the database.
 --
 -- LIMITATIONS & LINKAGE CONFIDENCE:
--- 1. High Confidence: Debts with `linked_transaction_id` populated (migration 015+).
---    Direct join to `transactions` and `wallets` guarantees 1:1 attribution.
+-- 1. Linked records (via debts.linked_transaction_id, migration 015+):
+--    Identifies currency mismatches between debt.currency and linked transaction/wallet.
+--    IMPORTANT: This check verifies currency correspondence between linked records;
+--    it does NOT prove the correctness of payment amounts or completeness of partial payment history.
 -- 2. Insufficient Linkage / Ambiguous:
 --    - Debts with `paid_amount > 0` but `linked_transaction_id IS NULL` (legacy rows).
 --    - Debts with multiple partial payments: `linked_transaction_id` only tracks the LAST payment.
