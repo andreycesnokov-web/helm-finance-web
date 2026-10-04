@@ -200,6 +200,7 @@ export default {
     kind: { bank: 'Rekening bank', cash: 'Kas tunai', ewallet: 'Dompet digital', card: 'Kartu', gateway: 'Payment gateway', other: 'Rekening' },
     statementOn: 'Mutasi diimpor {d}', toReview: 'baris perlu ditinjau', noStatement: 'Belum ada mutasi diimpor', upload: 'Unggah mutasi', manual: 'Diperbarui manual',
     more: 'Rincian {name}', otherCcy: 'Rekening mata uang lain ditampilkan tetapi tidak dijumlahkan ke total IDR.',
+    asOfDate: 'Berdasarkan kurs hari ini (per {d})',
     keepTrue: 'Jaga saldo tetap akurat', staleN: 'Pulse dan Radar hanya seakurat saldo ini. Belum ada mutasi terbaru untuk: {list}.', allFresh: 'Semua rekening bank punya mutasi 7 hari terakhir.',
     moves: 'Pindah antar rekening', movesNote: 'Transfer bukan pemasukan atau pengeluaran.', noMoves: 'Belum ada transfer.', transfer: 'Transfer',
     emptyTitle: 'Belum ada rekening', emptyText: 'Tambahkan rekening bank dan kas tunai perusahaan.',

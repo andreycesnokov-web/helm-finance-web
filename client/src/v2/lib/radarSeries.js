@@ -59,9 +59,10 @@ export function cashItems({ debts = [], obligations = [], repayments = [], today
   for (const d of Array.isArray(debts) ? debts : []) {
     if (!d || ['paid', 'cancelled'].includes(d.status)) continue
     if (d.approval_status === 'rejected') continue
-    const amount = num(d.remaining_amount ?? d.amount)
+    const isForeign = d.currency && d.currency !== 'IDR'
+    if (isForeign && d.amount_idr == null) { excluded.foreign++; continue }
+    const amount = num(isForeign ? d.amount_idr : (d.remaining_amount ?? d.amount))
     if (amount <= 0) continue
-    if (d.currency && d.currency !== 'IDR') { excluded.foreign++; continue }
     if (!d.due_date) { excluded.undated++; continue }
     const due = startOfDay(d.due_date)
     if (Number.isNaN(due.getTime())) { excluded.undated++; continue }
@@ -77,12 +78,15 @@ export function cashItems({ debts = [], obligations = [], repayments = [], today
     })
   }
   for (const o of Array.isArray(obligations) ? obligations : []) {
-    if (!o || o.status !== 'calculated' || !(num(o.amount) > 0) || !o.due_date) continue
-    if (o.currency && o.currency !== 'IDR') { excluded.foreign++; continue }
+    if (!o || o.status !== 'calculated' || !o.due_date) continue
+    const isForeignO = o.currency && o.currency !== 'IDR'
+    if (isForeignO && o.amount_idr == null) { excluded.foreign++; continue }
+    const oAmount = num(isForeignO ? o.amount_idr : o.amount)
+    if (!(oAmount > 0)) continue
     const day = Math.max(0, dayDiff(startOfDay(o.due_date), t0))
     if (day > horizon) continue
     items.push({
-      key: `tax:${o.obligation_type}:${o.period}`, source: 'tax', dir: 'out', amount: num(o.amount), day,
+      key: `tax:${o.obligation_type}:${o.period}`, source: 'tax', dir: 'out', amount: oAmount, day,
       date: isoDay(addDays(t0, day)), label: o.title, note: o.period, tag: 'deadline',
       counted: true,
     })

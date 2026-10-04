@@ -138,14 +138,15 @@ const NOT_A_MOVE = ['opening_balance', 'transfer', 'balance_correction']
 export function cashFlow(transactions = [], { from, to }) {
   let moneyIn = 0, moneyOut = 0, capex = 0, unclassified = 0, count = 0
   for (const t of Array.isArray(transactions) ? transactions : []) {
-    if (!t || (t.currency_original && t.currency_original !== 'IDR')) continue
+    if (!t) continue
+    if (t.currency_original && t.currency_original !== 'IDR' && t.amount_idr == null) continue
     const d = txDate(t).slice(0, 10)
     if (!d || d < from || d > to) continue
     const sign = t.type === 'income' ? 1 : (t.type === 'expense' || t.type === 'payroll') ? -1 : 0
     if (!sign) continue
     const cls = classOf(t)
     if (NOT_A_MOVE.includes(cls)) continue
-    const a = Math.abs(Number(t.amount_original ?? t.amount ?? 0)) || 0
+    const a = Math.abs(Number(t.amount_idr != null ? t.amount_idr : (t.amount_original ?? t.amount ?? 0))) || 0
     if (sign > 0) moneyIn += a; else moneyOut += a
     if (cls === 'capex' && sign < 0) capex += a
     if (cls === 'unknown') unclassified++
@@ -168,10 +169,10 @@ export function pctChange(now, before) {
  */
 export function obligationTiles(pulse) {
   const debts = Array.isArray(pulse?.debts) ? pulse.debts : []
-  const confirmed = debts.filter((d) => OPEN(d) && (d.approval_status === 'approved' || !d.approval_status) && (d.currency || 'IDR') === 'IDR')
+  const confirmed = debts.filter((d) => OPEN(d) && (d.approval_status === 'approved' || !d.approval_status) && ((d.currency || 'IDR') === 'IDR' || d.amount_idr != null))
   const rec = confirmed.filter((d) => d.type === 'receivable')
   const pay = confirmed.filter((d) => d.type === 'payable')
-  const sum = (xs) => xs.reduce((s, d) => s + amt(d), 0)
+  const sum = (xs) => xs.reduce((s, d) => s + (d.amount_idr != null ? Number(d.amount_idr) : amt(d)), 0)
   const late = (xs) => xs.filter((d) => d.status === 'overdue')
   return {
     owedToYou: sum(rec), owedLate: sum(late(rec)), owedCount: rec.length,

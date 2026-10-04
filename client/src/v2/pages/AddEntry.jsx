@@ -34,7 +34,10 @@ export default function AddEntry() {
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState(null)
   const [done, setDone] = useState(null)
-  const list = useMemo(() => (wallets.data?.wallets || []).filter((w) => w.is_active !== false && (w.currency || 'IDR') === 'IDR'), [wallets.data])
+  const list = useMemo(() => (wallets.data?.wallets || []).filter((w) => w.is_active !== false), [wallets.data])
+  const selectedWalletId = f.wallet_id || (list.length === 1 ? list[0].id : '')
+  const selectedWallet = list.find((w) => w.id === selectedWalletId)
+  const walletCurrency = (selectedWallet?.currency || 'IDR').toUpperCase()
   const set = (k) => (e) => setF((x) => ({ ...x, [k]: e.target.value }))
 
   const pick = (k) => {
@@ -45,13 +48,13 @@ export default function AddEntry() {
 
   const save = async (e) => {
     e.preventDefault()
-    const body = addEntryBody({ ...f, wallet_id: f.wallet_id || (list.length === 1 ? list[0].id : '') })
+    const body = addEntryBody({ ...f, wallet_id: selectedWalletId, currency: walletCurrency })
     if (body.error) { setErr(t(`add.err.${body.error}`)); return }
     setBusy(true); setErr(null)
     try {
       await createBusinessTransaction(token, body.tx)
       invalidate()
-      setDone({ type: body.tx.type, amount: body.tx.amount })
+      setDone({ type: body.tx.type, amount: body.tx.amount, currency: body.tx.currency })
       setF((x) => ({ ...EMPTY(x.type), wallet_id: x.wallet_id }))
     } catch (x) {
       setErr(actionError(x) === 'forbidden' ? t('add.forbidden') : (x?.data?.error || actionError(x)))
@@ -79,8 +82,8 @@ export default function AddEntry() {
           <form className="v2-form" onSubmit={save} noValidate>
             <div className="v2-field-row">
               <label className="v2-field">
-                <span className="v2-field-label">{t('add.amount')} (IDR)</span>
-                <input id="add-amount" className="v2-input" inputMode="numeric" autoComplete="off" value={f.amount} onChange={set('amount')} placeholder="1.500.000" required />
+                <span className="v2-field-label">{t('add.amount')} ({walletCurrency})</span>
+                <input id="add-amount" className="v2-input" inputMode="decimal" autoComplete="off" value={f.amount} onChange={set('amount')} placeholder={walletCurrency === 'IDR' ? '1.500.000' : '1,500.00'} required />
               </label>
               <label className="v2-field">
                 <span className="v2-field-label">{t('add.date')}</span>
@@ -92,9 +95,13 @@ export default function AddEntry() {
               {list.length === 0
                 ? <span className="v2-muted v2-small">{t('add.noWallets')} <Link to="/business/accounts/manage">{t('acc.add')}</Link></span>
                 : (
-                  <select id="add-wallet" className="v2-select" value={f.wallet_id || (list.length === 1 ? list[0].id : '')} onChange={set('wallet_id')} required>
+                  <select id="add-wallet" className="v2-select" value={selectedWalletId} onChange={set('wallet_id')} required>
                     {list.length > 1 && <option value="">{t('add.pickWallet')}</option>}
-                    {list.map((w) => <option key={w.id} value={w.id}>{w.name}{w.balance != null ? ` · ${money(w.balance)}` : ''}</option>)}
+                    {list.map((w) => (
+                      <option key={w.id} value={w.id}>
+                        {w.name}{w.currency && w.currency !== 'IDR' ? ` (${w.currency})` : ''}{w.balance != null ? ` · ${money(w.balance, { currency: w.currency || 'IDR' })}` : ''}
+                      </option>
+                    ))}
                   </select>
                 )}
             </label>
@@ -112,7 +119,7 @@ export default function AddEntry() {
               <button type="submit" className="v2-btn v2-btn-primary" disabled={busy || list.length === 0}>{t(kind === 'income' ? 'add.saveIn' : 'add.saveOut')}</button>
             </div>
             {err && <p className="v2-inline-err" role="alert">{err}</p>}
-            {done && <p className="v2-dec-done" role="status"><I.check size={16} />{t(done.type === 'income' ? 'add.doneIn' : 'add.doneOut', { v: money(done.amount) })} <Link to="/business/transactions">{t('nav.transactions')}</Link></p>}
+            {done && <p className="v2-dec-done" role="status"><I.check size={16} />{t(done.type === 'income' ? 'add.doneIn' : 'add.doneOut', { v: money(done.amount, { currency: done.currency || 'IDR' }) })} <Link to="/business/transactions">{t('nav.transactions')}</Link></p>}
           </form>
         )}
       </Card>

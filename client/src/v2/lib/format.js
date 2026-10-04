@@ -32,8 +32,11 @@ const prefix = (currency) => (!currency || currency === 'IDR' ? 'Rp ' : currency
 export function money(v, { currency = 'IDR', sign = false, full = false } = {}) {
   if (v === null || v === undefined || v === '' || Number.isNaN(Number(v))) return '—'
   const n = Number(v)
+  const isCcyWithCents = currency && currency !== 'IDR'
   const body = full
-    ? Math.round(Math.abs(n)).toLocaleString('en-US')
+    ? (isCcyWithCents && Number(n) % 1 !== 0
+        ? Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+        : Math.round(Math.abs(n)).toLocaleString('en-US'))
     : compact(n)
   const s = n < 0 ? MINUS : sign && n > 0 ? '+' : ''
   return `${s}${prefix(currency)}${body}`

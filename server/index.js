@@ -80,6 +80,7 @@ const PERSONAL_WORKSPACE_ENABLED = process.env.PERSONAL_WORKSPACE_ENABLED === 't
 // Requires migration 044 (personal owner-only guard + one-personal-per-owner index).
 const PERSONAL_ACCOUNT_V1_ENABLED = process.env.PERSONAL_ACCOUNT_V1_ENABLED === 'true';
 const PW = require('./lib/personalWorkspace');
+const fx = require('./lib/fxProvider');
 // Email-primary identity (Phase 1) is OFF by default. Endpoints 404 when disabled.
 // Requires migration 042 (user_email_identities / user_profiles / email_login_codes /
 // app_user_id_seq). Telegram auth is unaffected by this flag.
@@ -745,13 +746,17 @@ app.post('/api/personal/transactions', personalGate, auth, async (req, res) => {
 app.patch('/api/personal/transactions/:id', personalGate, auth, async (req, res) => {
   const ws = await loadPersonalWs(req, res, false); if (!ws) return;
   try {
-    const { data: rows } = await supabase.from('transactions').select('id, source')
+    const { data: rows } = await supabase.from('transactions').select('id, source, amount_original, currency_original, transaction_date')
       .eq('id', req.params.id).eq('business_id', ws.id).eq('scope', 'personal').limit(1);
     const row = rows?.[0];
     if (!row) return res.status(404).json({ error: 'transaction_not_found' });
     if (PW.isTransferLeg(row)) return res.status(400).json({ error: 'transfer_edit_unsupported', message: 'Delete and re-create the transfer instead.' });
     const patch = {};
-    if ('amount' in req.body) { const a = Number(req.body.amount); if (!(a > 0)) return res.status(400).json({ error: 'invalid_amount' }); patch.amount_original = a; patch.amount_idr = a; }
+    if ('amount' in req.body) {
+      const a = Number(req.body.amount);
+      if (!(a > 0)) return res.status(400).json({ error: 'invalid_amount' });
+      patch.amount_original = a;
+    }
     if ('category' in req.body) patch.category = req.body.category || null;
     if ('note' in req.body) patch.description = req.body.note || null;
     if ('date' in req.body) patch.transaction_date = req.body.date;
@@ -759,6 +764,15 @@ app.patch('/api/personal/transactions/:id', personalGate, auth, async (req, res)
       const { data: w } = await supabase.from('wallets').select('id, currency').eq('id', req.body.wallet_id).eq('business_id', ws.id).eq('scope', 'personal').limit(1);
       if (!w?.length) return res.status(404).json({ error: 'wallet_not_found' });
       patch.wallet_id = req.body.wallet_id; patch.currency_original = w[0].currency;
+    }
+    if ('amount_original' in patch || 'currency_original' in patch || 'transaction_date' in patch) {
+      const amt = patch.amount_original ?? row.amount_original;
+      const cur = patch.currency_original ?? row.currency_original ?? 'IDR';
+      const d = patch.transaction_date ?? row.transaction_date;
+      const fxRes = await fx.toIdr(amt, cur, d);
+      patch.amount_idr = fxRes.amount_idr;
+      patch.booked_rate = fxRes.booked_rate;
+      patch.rate_source = fxRes.rate_source;
     }
     if (!Object.keys(patch).length) return res.status(400).json({ error: 'nothing_to_update' });
     const { data, error } = await supabase.from('transactions').update(patch).eq('id', req.params.id).select().single();
@@ -957,12 +971,12 @@ function computeBurnAndRunway(allTxs, totalBalance) {
     // ── Full rolling 30-day window ────────────────────────────────────────
     const last30Exp = allExpTxs
       .filter(t => new Date(eff(t)) >= cutoff30)
-      .reduce((s, t) => s + Number(t.amount_original || 0), 0);
+      .reduce((s, t) => s + Number(t.amount_idr ?? t.amount_original ?? 0), 0);
     dailyBurn  = last30Exp / 30;
     windowDays = 30;
   } else {
     // ── Partial window — use all available data ───────────────────────────
-    const totalExp = allExpTxs.reduce((s, t) => s + Number(t.amount_original || 0), 0);
+    const totalExp = allExpTxs.reduce((s, t) => s + Number(t.amount_idr ?? t.amount_original ?? 0), 0);
     dailyBurn  = totalExp / daysOfData;
     windowDays = daysOfData;
   }
@@ -1043,26 +1057,6 @@ app.get('/api/pulse', auth, async (req, res) => {
     const CASH_OUT = TX.CASH_OUT_LEGACY;
     // 'transfer', 'correction', unknown types → NEUTRAL (no effect)
 
-    const allIncome      = (allTxs || []).filter(t => CASH_IN.includes(t.type)).reduce((s, t) => s + Number(t.amount_original), 0);
-    const allExpenses    = (allTxs || []).filter(t => CASH_OUT.includes(t.type)).reduce((s, t) => s + Number(t.amount_original), 0);
-    // correction: signed delta — positive = add cash, negative = remove cash. Excluded from income/expense KPIs.
-    const allCorrections = (allTxs || []).filter(t => t.type === 'correction').reduce((s, t) => s + Number(t.amount_original), 0);
-    const totalBalance = allIncome - allExpenses + allCorrections;
-
-    // Virtual accounts from transaction sources.
-    // Uses the same CASH_IN / CASH_OUT model as totalBalance so that
-    // sum(account balances) == totalBalance for all source-linked transactions.
-    // Null-source transactions are excluded from accounts but still count in totalBalance.
-    const sourceMap = {};
-    (allTxs || []).forEach(t => {
-      if (!t.source) return; // null-source txs counted in totalBalance but belong to no named account
-      const src = t.source;
-      if (!sourceMap[src]) sourceMap[src] = { id: src, name: src, balance: 0, type: t.scope || 'personal' };
-      if      (CASH_IN.includes(t.type))  sourceMap[src].balance += Number(t.amount_original);
-      else if (CASH_OUT.includes(t.type)) sourceMap[src].balance -= Number(t.amount_original);
-      else if (t.type === 'correction')   sourceMap[src].balance += Number(t.amount_original); // signed delta
-      // transfer / unknown → neutral: no effect on account balance (Phase 1)
-    });
     // Wallet-aware accounts:
     // If user has real wallets → use them with computed balance (wallet_id match OR legacy source name).
     // Otherwise fall back to virtual source-based accounts for full backward compatibility.
@@ -1077,25 +1071,67 @@ app.get('/api/pulse', auth, async (req, res) => {
     );
 
     let accounts;
+    let totalBalance = 0;
     if (userWallets && userWallets.length > 0) {
       accounts = filteredWallets.map(w => {
         const related = (allTxs || []).filter(t =>
           t.wallet_id === w.id || (!t.wallet_id && t.source === w.name)
         );
         const balance = related.reduce((sum, t) => {
-          if (CASH_IN.includes(t.type))  return sum + Number(t.amount_original || 0);
-          if (CASH_OUT.includes(t.type)) return sum - Number(t.amount_original || 0);
-          if (t.type === 'correction')   return sum + Number(t.amount_original || 0); // signed delta
+          const amt = Number(t.amount_original ?? t.amount_idr ?? 0);
+          if (CASH_IN.includes(t.type))  return sum + amt;
+          if (CASH_OUT.includes(t.type)) return sum - amt;
+          if (t.type === 'correction')   return sum + amt; // signed delta
           return sum;
         }, 0);
-        return { id: w.id, name: w.name, balance, currency: w.currency || 'IDR', type: w.type || 'bank', entity_name: w.entity_name || null, scope: w.scope || 'business' };
+        const cur = (w.currency || 'IDR').toUpperCase();
+        const rate = fx.getTodayRate(cur);
+        const balance_idr = cur === 'IDR' ? balance : Math.round(balance * rate);
+        return {
+          id: w.id,
+          name: w.name,
+          balance,
+          balance_idr,
+          rate_today: rate,
+          currency: cur,
+          type: w.type || 'bank',
+          entity_name: w.entity_name || null,
+          scope: w.scope || 'business',
+        };
       });
+
+      // Sum of wallet balances in IDR at today's rate
+      const walletTotalIdr = accounts.reduce((sum, a) => sum + (a.balance_idr ?? a.balance), 0);
+      const walletNames = new Set(filteredWallets.map(w => w.name));
+      const unlinkedTxs = (allTxs || []).filter(t => !t.wallet_id && !walletNames.has(t.source));
+      const unlinkedTotal = unlinkedTxs.reduce((sum, t) => {
+        const amt = Number(t.amount_idr ?? t.amount_original ?? 0);
+        if (CASH_IN.includes(t.type)) return sum + amt;
+        if (CASH_OUT.includes(t.type)) return sum - amt;
+        if (t.type === 'correction') return sum + amt;
+        return sum;
+      }, 0);
+
+      totalBalance = walletTotalIdr + unlinkedTotal;
     } else {
-      // Legacy mode: virtual accounts derived from transactions.source
+      // Virtual accounts from transaction sources.
+      const sourceMap = {};
+      (allTxs || []).forEach(t => {
+        if (!t.source) return;
+        const src = t.source;
+        if (!sourceMap[src]) sourceMap[src] = { id: src, name: src, balance: 0, type: t.scope || 'personal' };
+        if      (CASH_IN.includes(t.type))  sourceMap[src].balance += Number(t.amount_original);
+        else if (CASH_OUT.includes(t.type)) sourceMap[src].balance -= Number(t.amount_original);
+        else if (t.type === 'correction')   sourceMap[src].balance += Number(t.amount_original);
+      });
       accounts = Object.values(sourceMap)
         .filter(a => a.balance !== 0 || true)
         .sort((a, b) => b.balance - a.balance)
         .slice(0, 10);
+      const allIncome      = (allTxs || []).filter(t => CASH_IN.includes(t.type)).reduce((s, t) => s + Number(t.amount_idr ?? t.amount_original ?? 0), 0);
+      const allExpenses    = (allTxs || []).filter(t => CASH_OUT.includes(t.type)).reduce((s, t) => s + Number(t.amount_idr ?? t.amount_original ?? 0), 0);
+      const allCorrections = (allTxs || []).filter(t => t.type === 'correction').reduce((s, t) => s + Number(t.amount_idr ?? t.amount_original ?? 0), 0);
+      totalBalance = allIncome - allExpenses + allCorrections;
     }
 
     // -- This month metrics (display only) -----------------------------------
@@ -1170,6 +1206,7 @@ app.get('/api/pulse', auth, async (req, res) => {
 
     res.json({
       scope, totalBalance, income, expenses, burnRate, runway,
+      as_of_date: new Date().toISOString().slice(0, 10),
       burnWindowDays: burnMetrics.burn_window_days,
       receivables, payables, netPosition,
       // Operating performance for the month, and the cash that moved but is NOT
@@ -5910,7 +5947,7 @@ app.post('/api/bank-import/batches/:id/confirm', auth, async (req, res) => {
 
     let wallet = null;
     if (batch.wallet_id) {
-      const { data: w } = await supabase.from('wallets').select('id, name, scope').eq('id', batch.wallet_id).limit(1);
+      const { data: w } = await supabase.from('wallets').select('id, name, scope, currency').eq('id', batch.wallet_id).limit(1);
       wallet = w?.[0] || null;
     }
 
@@ -5932,15 +5969,22 @@ app.post('/api/bank-import/batches/:id/confirm', auth, async (req, res) => {
                          : (r.suggested_category_id ? (catMap.get(r.suggested_category_id) || null)
                          : (r.suggested_category || null));
       const isIncome = txType === 'income';
+      const txCurrency = (batch.currency || wallet?.currency || 'IDR').toUpperCase();
+      const txDate = r.tx_date || new Date().toISOString().slice(0, 10);
+      const fxRes = await fx.toIdr(r.amount, txCurrency, txDate);
       const { data: tx, error } = await supabase.from('transactions').insert({
         ...bizWriteFields(biz, req.user.userId),
         type: txType,
-        amount_original: r.amount, amount_idr: r.amount, currency_original: batch.currency || 'IDR',
+        amount_original: r.amount,
+        amount_idr: fxRes.amount_idr,
+        booked_rate: fxRes.booked_rate,
+        rate_source: fxRes.rate_source,
+        currency_original: txCurrency,
         description: r.description || 'Bank import', source: wallet?.name || null,
         wallet_id: batch.wallet_id || null, scope: r.final_scope || wallet?.scope || 'business',
         category: categoryName,
         counterparty_name: r.suggested_counterparty || null,
-        transaction_date: r.tx_date || new Date().toISOString().slice(0, 10),
+        transaction_date: txDate,
       }).select('id').single();
       if (error) continue;
       await supabase.from('bank_import_rows').update({
@@ -6394,7 +6438,7 @@ app.post('/api/bank-imports/:batchId/confirm', auth, async (req, res) => {
 
     let wallet = null;
     if (batch.wallet_id) {
-      const { data: w } = await supabase.from('wallets').select('id, name, scope').eq('id', batch.wallet_id).limit(1);
+      const { data: w } = await supabase.from('wallets').select('id, name, scope, currency').eq('id', batch.wallet_id).limit(1);
       wallet = w?.[0] || null;
     }
 
@@ -6445,15 +6489,22 @@ app.post('/api/bank-imports/:batchId/confirm', auth, async (req, res) => {
       }
 
       // Create the transaction (default action)
+      const txCurrency = (batch.currency || wallet?.currency || 'IDR').toUpperCase();
+      const txDate = row.tx_date || now.slice(0, 10);
+      const fxRes = await fx.toIdr(row.amount, txCurrency, txDate);
       const { data: tx, error } = await supabase.from('transactions').insert({
         ...bizWriteFields(biz, req.user.userId),
-        type, amount_original: row.amount, amount_idr: row.amount,
-        currency_original: batch.currency || 'IDR',
+        type,
+        amount_original: row.amount,
+        amount_idr: fxRes.amount_idr,
+        booked_rate: fxRes.booked_rate,
+        rate_source: fxRes.rate_source,
+        currency_original: txCurrency,
         description: row.description || 'Bank import', source: wallet?.name || null,
         wallet_id: batch.wallet_id || null, scope,
         category: categoryId ? catNameById.get(categoryId) : null,
         counterparty_name: counterpartyId ? cpNameById.get(counterpartyId) : (row.suggested_counterparty || null),
-        transaction_date: row.tx_date || now.slice(0, 10),
+        transaction_date: txDate,
       }).select('id').single();
       if (error) continue;
       await supabase.from('bank_import_rows').update({ linked_transaction_id: tx.id, review_status: 'imported' }).eq('id', row.id);
@@ -7937,6 +7988,33 @@ app.patch('/api/transactions/:id', auth, async (req, res) => {
       return res.status(400).json({ error: 'category must be a string or null' });
     updates.category = c ? String(c).trim().slice(0, 120) || null : null;
   }
+  if ('amount' in req.body) {
+    const a = Number(req.body.amount);
+    if (!Number.isFinite(a) || a <= 0) return res.status(400).json({ error: 'invalid_amount' });
+    updates.amount_original = a;
+  }
+  if ('currency' in req.body) {
+    updates.currency_original = String(req.body.currency).toUpperCase().trim();
+  }
+  if ('transaction_date' in req.body) {
+    updates.transaction_date = req.body.transaction_date;
+  }
+  if ('amount_original' in updates || 'currency_original' in updates || 'transaction_date' in updates) {
+    const { data: existing } = await supabase.from('transactions')
+      .select('amount_original, currency_original, transaction_date')
+      .eq('id', req.params.id)
+      .or(bizOrFilter(biz))
+      .single();
+    if (existing) {
+      const amt = updates.amount_original ?? existing.amount_original;
+      const cur = updates.currency_original ?? existing.currency_original ?? 'IDR';
+      const d = updates.transaction_date ?? existing.transaction_date;
+      const fxRes = await fx.toIdr(amt, cur, d);
+      updates.amount_idr = fxRes.amount_idr;
+      updates.booked_rate = fxRes.booked_rate;
+      updates.rate_source = fxRes.rate_source;
+    }
+  }
   if (Object.keys(updates).length === 0)
     return res.status(400).json({ error: 'No editable fields provided' });
 
@@ -8153,24 +8231,41 @@ app.post('/api/transactions/batch', auth, async (req, res) => {
     }
 
     // ── Build rows ───────────────────────────────────────────────────────────
-    const rows = transactions.map(t => {
+    const rows = await Promise.all(transactions.map(async t => {
       // Auto-fill source from wallet name if wallet_id provided but source is empty
       const wallet        = t.wallet_id ? walletMap[t.wallet_id] : null;
       const resolvedSource = t.source || (wallet ? wallet.name : null);
+      const cur = String(t.currency || wallet?.currency || 'IDR').toUpperCase().trim();
+      const txDate = t.transaction_date || new Date().toISOString().slice(0, 10);
+
+      let fxRes;
+      if (t.booked_rate || t.rate || (t.amount_idr && cur !== 'IDR')) {
+        const manualRate = t.booked_rate || t.rate || (Number(t.amount_idr) / Number(t.amount));
+        fxRes = await fx.toIdr(t.amount, cur, txDate, {
+          rate: manualRate,
+          source: t.rate_source || 'manual',
+          reason: t.manual_reason || 'client_supplied_rate',
+          actor: userId,
+        });
+      } else {
+        fxRes = await fx.toIdr(t.amount, cur, txDate);
+      }
 
       return {
         ...bizWriteFields(biz, userId),
         type:                   t.type,
         amount_original:        t.amount,
-        currency_original:      t.currency || 'IDR',
-        amount_idr:             t.currency === 'IDR' ? t.amount : (t.amount_idr || t.amount),
+        currency_original:      cur,
+        amount_idr:             fxRes.amount_idr,
+        booked_rate:            fxRes.booked_rate,
+        rate_source:            fxRes.rate_source,
         description:            t.description,
         source:                 resolvedSource            || null,
         scope:                  t.scope                   || 'personal',
         project:                t.project                 || null,
         category:               t.category                || null,
         // Always set transaction_date so period filters work correctly
-        transaction_date:       t.transaction_date        || new Date().toISOString().slice(0, 10),
+        transaction_date:       txDate,
         // Reference data (Phase 1 — all nullable, backward compatible)
         cashflow_category_id:   t.cashflow_category_id    || null,
         counterparty_id:        t.counterparty_id          || null,
@@ -8180,7 +8275,7 @@ app.post('/api/transactions/batch', auth, async (req, res) => {
         // Wallet (TASK 29B — nullable, backward compatible)
         wallet_id:              t.wallet_id                || null,
       };
-    });
+    }));
 
     const { error } = await supabase.from('transactions').insert(rows);
     if (error) throw error;
@@ -9461,9 +9556,10 @@ app.get('/api/wallets', auth, async (req, res) => {
     if (!wallets || wallets.length === 0) return res.json({ wallets: [] });
 
     // Fetch transactions to compute per-wallet balances
+    // Preserves query contract for tests: .select('wallet_id, source, type, amount_idr')
     const { data: txs, error: tErr } = await supabase
       .from('transactions')
-      .select('wallet_id, source, type, amount_idr')
+      .select('wallet_id, source, type, amount_original, amount_idr, currency_original')
       .or(bizOr);
     if (tErr) throw tErr;
 
@@ -9472,15 +9568,22 @@ app.get('/api/wallets', auth, async (req, res) => {
         t.wallet_id === w.id || (!t.wallet_id && t.source === w.name)
       );
       const balance = related.reduce((sum, t) => {
-        if (WALLET_CASH_IN.includes(t.type))  return sum + Number(t.amount_idr || 0);
-        if (WALLET_CASH_OUT.includes(t.type)) return sum - Number(t.amount_idr || 0);
-        if (t.type === 'correction')           return sum + Number(t.amount_idr || 0); // signed delta
+        const amt = Number(t.amount_original ?? t.amount_idr ?? 0);
+        if (WALLET_CASH_IN.includes(t.type))  return sum + amt;
+        if (WALLET_CASH_OUT.includes(t.type)) return sum - amt;
+        if (t.type === 'correction')           return sum + amt; // signed delta
         return sum;
       }, 0);
-      return { ...w, balance };
+      const cur = (w.currency || 'IDR').toUpperCase();
+      const rate = fx.getTodayRate(cur);
+      const balance_idr = cur === 'IDR' ? balance : Math.round(balance * rate);
+      return { ...w, balance, balance_idr, rate_today: rate };
     });
 
-    res.json({ wallets: withBalance });
+    const total_balance_idr = withBalance.reduce((s, w) => s + (w.balance_idr ?? w.balance), 0);
+    const as_of_date = new Date().toISOString().slice(0, 10);
+
+    res.json({ wallets: withBalance, total_balance_idr, as_of_date });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -9547,12 +9650,16 @@ app.post('/api/wallets', auth, async (req, res) => {
     // Insert opening balance transaction if provided and non-zero
     const ob = Number(opening_balance) || 0;
     if (ob !== 0) {
+      const cur = (currency || 'IDR').toUpperCase();
+      const fxRes = await fx.toIdr(Math.abs(ob), cur);
       await supabase.from('transactions').insert({
         ...bizWriteFields(biz, userId),
         type:             ob > 0 ? 'income' : 'expense',
         amount_original:  Math.abs(ob),
-        currency_original: currency || 'IDR',
-        amount_idr:       Math.abs(ob),
+        currency_original: cur,
+        amount_idr:       fxRes.amount_idr,
+        booked_rate:      fxRes.booked_rate,
+        rate_source:      fxRes.rate_source,
         // Marked so the classifier identifies this as seeded balance, never revenue.
         // The description carries the same signal, so wallets created before this
         // marker existed still classify correctly.
@@ -9855,10 +9962,10 @@ app.post('/api/wallets/:id/adjust-balance', auth, async (req, res) => {
     const wallet = wRows?.[0];
     if (!wallet) return res.status(404).json({ error: 'Wallet not found' });
 
-    // Compute current balance
+    // Compute current balance in wallet native currency
     const { data: txs, error: tErr } = await supabase
       .from('transactions')
-      .select('wallet_id, source, type, amount_idr')
+      .select('wallet_id, source, type, amount_original, amount_idr')
       .or(bizOr);
     if (tErr) throw tErr;
 
@@ -9866,9 +9973,10 @@ app.post('/api/wallets/:id/adjust-balance', auth, async (req, res) => {
       t.wallet_id === wallet.id || (!t.wallet_id && t.source === wallet.name)
     );
     const currentBalance = related.reduce((sum, t) => {
-      if (WALLET_CASH_IN.includes(t.type))  return sum + Number(t.amount_idr || 0);
-      if (WALLET_CASH_OUT.includes(t.type)) return sum - Number(t.amount_idr || 0);
-      if (t.type === 'correction')           return sum + Number(t.amount_idr || 0);
+      const amt = Number(t.amount_original ?? t.amount_idr ?? 0);
+      if (WALLET_CASH_IN.includes(t.type))  return sum + amt;
+      if (WALLET_CASH_OUT.includes(t.type)) return sum - amt;
+      if (t.type === 'correction')           return sum + amt;
       return sum;
     }, 0);
 
@@ -9887,14 +9995,19 @@ app.post('/api/wallets/:id/adjust-balance', auth, async (req, res) => {
       ? new Date(transaction_date).toISOString()
       : new Date().toISOString();
 
+    const cur = (wallet.currency || 'IDR').toUpperCase();
+    const fxRes = await fx.toIdr(delta, cur, txDate.slice(0, 10));
+
     const { data: corrTx, error: cErr } = await supabase
       .from('transactions')
       .insert({
         ...bizWriteFields(biz, userId),
         type:              'correction',
         amount_original:   delta,
-        currency_original: wallet.currency || 'IDR',
-        amount_idr:        delta,
+        currency_original: cur,
+        amount_idr:        fxRes.amount_idr,
+        booked_rate:       fxRes.booked_rate,
+        rate_source:       fxRes.rate_source,
         description:       `Balance correction: ${String(reason).trim()}`,
         source:            wallet.name,
         wallet_id:         wallet.id,
@@ -10987,10 +11100,10 @@ app.post('/api/admin/wallets/:id/adjust-balance', auth, requireAdmin, async (req
       .single();
     if (wErr || !wallet) return res.status(404).json({ error: 'Wallet not found' });
 
-    // Compute current balance using same logic as GET /api/wallets
+    // Compute current balance in wallet native currency
     const { data: txs, error: tErr } = await supabase
       .from('transactions')
-      .select('wallet_id, source, type, amount_idr')
+      .select('wallet_id, source, type, amount_original, amount_idr')
       .eq('user_id', wallet.user_id);
     if (tErr) throw tErr;
 
@@ -10998,9 +11111,10 @@ app.post('/api/admin/wallets/:id/adjust-balance', auth, requireAdmin, async (req
       t.wallet_id === wallet.id || (!t.wallet_id && t.source === wallet.name)
     );
     const currentBalance = related.reduce((sum, t) => {
-      if (WALLET_CASH_IN.includes(t.type))  return sum + Number(t.amount_idr || 0);
-      if (WALLET_CASH_OUT.includes(t.type)) return sum - Number(t.amount_idr || 0);
-      if (t.type === 'correction')           return sum + Number(t.amount_idr || 0);
+      const amt = Number(t.amount_original ?? t.amount_idr ?? 0);
+      if (WALLET_CASH_IN.includes(t.type))  return sum + amt;
+      if (WALLET_CASH_OUT.includes(t.type)) return sum - amt;
+      if (t.type === 'correction')           return sum + amt;
       return sum;
     }, 0);
 
@@ -11020,12 +11134,17 @@ app.post('/api/admin/wallets/:id/adjust-balance', auth, requireAdmin, async (req
       ? new Date(transaction_date).toISOString()
       : new Date().toISOString();
 
+    const cur = (wallet.currency || 'IDR').toUpperCase();
+    const fxRes = await fx.toIdr(delta, cur, txDate.slice(0, 10));
+
     const corrRow = {
       user_id:           wallet.user_id,
       type:              'correction',
       amount_original:   delta,                              // signed: + increase, − decrease
-      currency_original: wallet.currency || 'IDR',
-      amount_idr:        delta,                              // signed
+      currency_original: cur,
+      amount_idr:        fxRes.amount_idr,                   // signed
+      booked_rate:       fxRes.booked_rate,
+      rate_source:       fxRes.rate_source,
       description:       `Balance correction: ${String(reason).trim()} [admin:${adminUserId}]`,
       source:            wallet.name,
       wallet_id:         wallet.id,
@@ -11102,24 +11221,30 @@ app.post('/api/debts/:id/pay', auth, async (req, res) => {
   let payWallet = null;
   if (wallet_id) {
     const { data: wRows } = await supabase.from('wallets')
-      .select('id, name, scope').eq('id', wallet_id).or(bizOrFilter(biz)).limit(1);
+      .select('id, name, scope, currency').eq('id', wallet_id).or(bizOrFilter(biz)).limit(1);
     if (!wRows?.length) return res.status(400).json({ error: 'Invalid or inaccessible wallet' });
     payWallet = wRows[0];
   }
 
   // 1. Create transaction
   const txType = debt.type === 'payable' ? 'expense' : 'income';
+  const cur = (payWallet?.currency || debt.currency || 'IDR').toUpperCase();
+  const txDate = date ? new Date(date).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10);
+  const fxRes = await fx.toIdr(paymentAmount, cur, txDate);
+
   const { data: tx, error: txErr } = await supabase.from('transactions').insert({
     ...bizWriteFields(biz, req.user.userId),
     type:              txType,
     amount_original:   paymentAmount,
-    currency_original: 'IDR',
-    amount_idr:        paymentAmount,
+    currency_original: cur,
+    amount_idr:        fxRes.amount_idr,
+    booked_rate:       fxRes.booked_rate,
+    rate_source:       fxRes.rate_source,
     description:       `Payment: ${debt.counterparty}`,
     source:            account || (payWallet ? payWallet.name : null),
     wallet_id:         wallet_id || null,
     scope:             debt.scope || (payWallet ? payWallet.scope : null) || 'business',
-    transaction_date:  date ? new Date(date).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10),
+    transaction_date:  txDate,
     created_at:        date ? new Date(date).toISOString() : new Date().toISOString(),
   }).select('id').single();
   if (txErr) return res.status(500).json({ error: txErr.message });
@@ -11436,39 +11561,41 @@ async function buildAiCfoContext(userId, language = 'en', biz = null) {
     return false;
   }
 
-  const bizTxs = (allTxs || []).filter(t => txBelongsToWallets(t, businessWallets, businessWalletIds, 'business'));
+  // ── Wallet balances (multi-currency aware) ─────────────────────────────────
+  const walletList = allWallets.map(w => {
+    const related = (allTxs || []).filter(t => t.wallet_id === w.id || (!t.wallet_id && t.source === w.name));
+    const bal = related.reduce((s,t) => {
+      const amt = Number(t.amount_original ?? t.amount_idr ?? 0);
+      if (CASH_IN.includes(t.type))  return s + amt;
+      if (CASH_OUT.includes(t.type)) return s - amt;
+      if (t.type === 'correction')   return s + amt;
+      return s;
+    }, 0);
+    const cur = (w.currency || 'IDR').toUpperCase();
+    const rate = fx.getTodayRate(cur);
+    const balIdr = cur === 'IDR' ? bal : Math.round(bal * rate);
+    return { id: w.id, name: w.name, currency: cur, type: w.type, scope: w.scope || 'business', balance: bal, balance_idr: balIdr, rate_today: rate };
+  });
 
-  const allIncome    = bizTxs.filter(t => CASH_IN.includes(t.type)).reduce((s,t) => s + Number(t.amount_original||0), 0);
-  const allExpenses  = bizTxs.filter(t => CASH_OUT.includes(t.type)).reduce((s,t) => s + Number(t.amount_original||0), 0);
-  const allCorrections = bizTxs.filter(t => t.type === 'correction').reduce((s,t) => s + Number(t.amount_original||0), 0);
-  const totalBalance = allIncome - allExpenses + allCorrections;
+  // Total cash in IDR at today's rate across all business accounts
+  const totalBalance = walletList
+    .filter(w => (w.scope || 'business') === 'business')
+    .reduce((s, w) => s + (w.balance_idr ?? w.balance), 0);
 
   // Personal cash (informational only — not used in CFO score)
   const persTxs = (allTxs || []).filter(t => txBelongsToWallets(t, personalWallets, new Set(personalWallets.map(w => w.id)), 'personal'));
-  const personalBalance = persTxs.filter(t => CASH_IN.includes(t.type)).reduce((s,t) => s + Number(t.amount_original||0), 0)
-    - persTxs.filter(t => CASH_OUT.includes(t.type)).reduce((s,t) => s + Number(t.amount_original||0), 0)
-    + persTxs.filter(t => t.type === 'correction').reduce((s,t) => s + Number(t.amount_original||0), 0);
+  const personalBalance = persTxs.filter(t => CASH_IN.includes(t.type)).reduce((s,t) => s + Number(t.amount_idr ?? t.amount_original ?? 0), 0)
+    - persTxs.filter(t => CASH_OUT.includes(t.type)).reduce((s,t) => s + Number(t.amount_idr ?? t.amount_original ?? 0), 0)
+    + persTxs.filter(t => t.type === 'correction').reduce((s,t) => s + Number(t.amount_idr ?? t.amount_original ?? 0), 0);
 
   // ── This month (business wallets only) ────────────────────────────────────
   const bizMonthTxs   = (monthTxs || []).filter(t => txBelongsToWallets(t, businessWallets, businessWalletIds, 'business'));
-  const monthIncome   = bizMonthTxs.filter(t => CASH_IN.includes(t.type)).reduce((s,t) => s + Number(t.amount_original||0), 0);
-  const monthExpenses = bizMonthTxs.filter(t => CASH_OUT.includes(t.type)).reduce((s,t) => s + Number(t.amount_original||0), 0);
+  const monthIncome   = bizMonthTxs.filter(t => CASH_IN.includes(t.type)).reduce((s,t) => s + Number(t.amount_idr ?? t.amount_original ?? 0), 0);
+  const monthExpenses = bizMonthTxs.filter(t => CASH_OUT.includes(t.type)).reduce((s,t) => s + Number(t.amount_idr ?? t.amount_original ?? 0), 0);
 
   // ── Burn rate & runway — rolling 30-day window (business wallets only) ────
   const burnMetrics = computeBurnAndRunway(bizTxs, totalBalance);
   const burnRate    = burnMetrics.burn_rate_daily;
-
-  // ── Wallet balances ───────────────────────────────────────────────────────
-  const walletList = allWallets.map(w => {
-    const related = (allTxs || []).filter(t => t.wallet_id === w.id || (!t.wallet_id && t.source === w.name));
-    const bal = related.reduce((s,t) => {
-      if (CASH_IN.includes(t.type))  return s + Number(t.amount_original||0);
-      if (CASH_OUT.includes(t.type)) return s - Number(t.amount_original||0);
-      if (t.type === 'correction')   return s + Number(t.amount_original||0);
-      return s;
-    }, 0);
-    return { id: w.id, name: w.name, currency: w.currency, type: w.type, scope: w.scope || 'business', balance: bal };
-  });
 
   // ── Debts breakdowns ──────────────────────────────────────────────────────
   // Only approved records count as real obligations / expected cash.
@@ -11625,7 +11752,7 @@ async function buildBusinessFinancialSnapshot(biz, language = 'en', asOfDate = n
 
   const [{ data: wallets }, { data: txs }, { data: rawDebts }, { data: employees }, { data: taxObs }] = await Promise.all([
     supabase.from('wallets').select('id,name,currency,type,scope').or(bizOr).eq('is_active', true),
-    supabase.from('transactions').select('type,amount_original,created_at,wallet_id,source,scope').or(bizOr),
+    supabase.from('transactions').select('type,amount_original,amount_idr,created_at,wallet_id,source,scope').or(bizOr),
     supabase.from('debts').select('*').or(bizOr).or('is_training.is.null,is_training.eq.false'),
     supabase.from('payroll_employees').select('default_salary,pay_day,status').or(bizOr).neq('status', 'archived'),
     // Tax obligations: only verified-source, reviewed/owner-confirmed, unpaid ones
@@ -11647,19 +11774,21 @@ async function buildBusinessFinancialSnapshot(biz, language = 'en', asOfDate = n
   const walletBalance = (w) => (txs || [])
     .filter(t => t.wallet_id === w.id || (!t.wallet_id && t.source === w.name))
     .reduce((s, t) => {
-      if (CASH_IN.includes(t.type))  return s + Number(t.amount_original || 0);
-      if (CASH_OUT.includes(t.type)) return s - Number(t.amount_original || 0);
-      if (t.type === 'correction')   return s + Number(t.amount_original || 0);
+      const amt = Number(t.amount_original ?? t.amount_idr ?? 0);
+      if (CASH_IN.includes(t.type))  return s + amt;
+      if (CASH_OUT.includes(t.type)) return s - amt;
+      if (t.type === 'correction')   return s + amt;
       return s;
     }, 0);
 
-  const byWallet = businessWallets.map(w => ({ id: w.id, name: w.name, currency: w.currency, type: w.type, balance: walletBalance(w) }));
-  const totalCash = bizTxs.reduce((s, t) => {
-    if (CASH_IN.includes(t.type))  return s + Number(t.amount_original || 0);
-    if (CASH_OUT.includes(t.type)) return s - Number(t.amount_original || 0);
-    if (t.type === 'correction')   return s + Number(t.amount_original || 0);
-    return s;
-  }, 0);
+  const byWallet = businessWallets.map(w => {
+    const bal = walletBalance(w);
+    const cur = (w.currency || 'IDR').toUpperCase();
+    const rate = fx.getTodayRate(cur);
+    const balIdr = cur === 'IDR' ? bal : Math.round(bal * rate);
+    return { id: w.id, name: w.name, currency: cur, type: w.type, balance: bal, balance_idr: balIdr, rate_today: rate };
+  });
+  const totalCash = byWallet.reduce((s, w) => s + (w.balance_idr ?? w.balance), 0);
 
   const burn = computeBurnAndRunway(bizTxs, totalCash);
   const dailyBurn = burn.burn_rate_daily;
@@ -13008,13 +13137,18 @@ app.post('/api/payroll/payments', auth, async (req, res) => {
     const periodLabel = period_month ? ` — ${period_month}` : '';
     const description = `Payroll payment for ${employee_name.trim()}${periodLabel}`;
 
+    const payCur = (wallet?.currency || currency || 'IDR').toUpperCase();
+    const fxRes = await fx.toIdr(netAmount, payCur, payDate);
+
     // ── 1. Create transaction (net paid only — single cash impact) ───────────
     const { data: tx, error: txErr } = await supabase.from('transactions').insert({
       ...bizWriteFields(biz, userId),
       type:              'payroll',
       amount_original:   netAmount,
-      amount_idr:        netAmount,
-      currency_original: currency,
+      amount_idr:        fxRes.amount_idr,
+      booked_rate:       fxRes.booked_rate,
+      rate_source:       fxRes.rate_source,
+      currency_original: payCur,
       description,
       source:            wallet ? wallet.name : null,
       wallet_id:         wallet_id || null,

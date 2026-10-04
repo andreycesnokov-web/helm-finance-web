@@ -200,6 +200,7 @@ export default {
     kind: { bank: 'Bank account', cash: 'Cash', ewallet: 'E-wallet', card: 'Card', gateway: 'Payment gateway', other: 'Account' },
     statementOn: 'Statement imported {d}', toReview: 'lines to review', noStatement: 'No statement imported yet', upload: 'Upload statement', manual: 'Updated by hand',
     more: 'Details for {name}', otherCcy: 'Accounts in other currencies are listed but not added to the IDR total.',
+    asOfDate: 'Valued at today’s rate (as of {d})',
     keepTrue: 'Keep balances true', staleN: 'Pulse and Radar are only as right as these balances. No recent statement for: {list}.', allFresh: 'Every bank account has a statement from the last 7 days.',
     moves: 'Moves between accounts', movesNote: 'Transfers are not income or spending.', noMoves: 'No transfers recorded.', transfer: 'Transfer',
     emptyTitle: 'No accounts yet', emptyText: 'Add the bank accounts and cash boxes the company uses.',
