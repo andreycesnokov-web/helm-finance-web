@@ -54,9 +54,19 @@ class Q {
   }
   ilike(c, pat) { return this.like(c, pat); }
   or(expr) {
-    // Only the single-term form the code emits: `business_id.eq.<uuid>`
     const parts = String(expr).split(',').map((p) => {
-      const m = p.match(/^(\w+)\.eq\.(.*)$/); return m ? (r) => String(r[m[1]]) === m[2] : () => false;
+      const mNull = p.match(/^(\w+)\.is\.null$/);
+      if (mNull) return (r) => r[mNull[1]] == null;
+      const m = p.match(/^(\w+)\.eq\.(.*)$/);
+      if (m) {
+        const val = m[2];
+        return (r) => {
+          if (val === 'false') return r[m[1]] === false || r[m[1]] === 'false' || r[m[1]] == null;
+          if (val === 'true') return r[m[1]] === true || r[m[1]] === 'true';
+          return String(r[m[1]]) === val;
+        };
+      }
+      return () => false;
     });
     this.filters.push((r) => parts.some((f) => f(r)));
     return this;
