@@ -1,0 +1,26 @@
+# Indonesia Tax Knowledge Base
+
+Business AI Accountant research module, isolated from tax calculations and production.
+Baseline: origin/main `867209e5`; research date: 2026-10-06 (Asia/Shanghai).
+
+Run ingestion with Python 3 and pdfplumber/pypdf (existing bundled runtime):
+`python tools/indonesia_tax_kb/ingest.py --registry knowledge/indonesia_tax_kb/sources.json --store knowledge/indonesia_tax_kb/store`
+
+Run retrieval and tests with the repository's Node runtime:
+`node tools/indonesia_tax_kb/cli.cjs --question "Explain PPh 23" --language en --period 2026-10-01`
+`node --test tests/indonesiaTaxKnowledge.test.cjs`
+`python tests/indonesia_tax_ingestion_test.py`
+
+Rebuild the selected index: `python tools/indonesia_tax_kb/build_index.py --root knowledge/indonesia_tax_kb`.
+Regenerate inventories: `python tools/indonesia_tax_kb/report_inventory.py`.
+Regenerate cards, evaluations and example answers: `node tools/indonesia_tax_kb/evaluate.cjs`.
+Read-scope records in report_inventory.py are research evidence for this pass, not automatic certification
+of future files or versions; update them manually after reading a new exact SHA.
+
+No embeddings, new service, database migration, credentials, model calls, flags or route changes.
+Downloads are content-addressed, immutable and versioned; metadata and extraction are separate.
+The offline extractor preserves PDF pages and layout text, tables with cell matrices and bounding boxes.
+Automatic extraction is a candidate: table fidelity, scans and corrupted text must be reviewed.
+Curated fragments only quote reviewed extraction ranges and carry precise locators.
+Retrieval never determines an amount payable or activates a tax rule.
+See INVENTORY.md, INTEGRATION.md, REVIEW_GAPS.md and quality/ for evidence and limits.
