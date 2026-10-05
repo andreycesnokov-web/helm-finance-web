@@ -8325,6 +8325,14 @@ app.post('/api/transactions/batch', auth, async (req, res) => {
     if (error) throw error;
     res.json({ saved: rows.length });
   } catch (e) {
+    if (e.message && e.message.startsWith('fx_rate_unavailable:')) {
+      const cur = e.message.split(':')[1] || '';
+      return res.status(400).json({
+        error: 'fx_rate_unavailable',
+        message: `Exchange rate for currency ${cur} is unavailable.`,
+        currency: cur,
+      });
+    }
     res.status(500).json({ error: e.message });
   }
 });
@@ -9722,6 +9730,31 @@ app.post('/api/wallets', auth, async (req, res) => {
     }
     // ── End gate ─────────────────────────────────────────────────────────────
 
+    // Pre-validate FX rate for opening balance BEFORE creating wallet
+    const ob = Number(opening_balance) || 0;
+    let obFxRes = null;
+    const cur = (currency || 'IDR').toUpperCase();
+    if (ob !== 0) {
+      try {
+        if (req.body.rate || req.body.booked_rate) {
+          obFxRes = await fx.toIdr(Math.abs(ob), cur, null, {
+            rate: req.body.rate || req.body.booked_rate,
+            source: req.body.rate_source || 'manual',
+            reason: req.body.manual_reason || 'opening_balance_manual_rate',
+            actor: userId,
+          });
+        } else {
+          obFxRes = await fx.toIdr(Math.abs(ob), cur);
+        }
+      } catch (err) {
+        return res.status(400).json({
+          error: 'fx_rate_unavailable',
+          message: `Cannot initialize wallet: exchange rate for currency ${cur} is unavailable.`,
+          currency: cur,
+        });
+      }
+    }
+
     const { data: wallet, error: wErr } = await supabase
       .from('wallets')
       .insert({
@@ -9739,18 +9772,15 @@ app.post('/api/wallets', auth, async (req, res) => {
     if (wErr) throw wErr;
 
     // Insert opening balance transaction if provided and non-zero
-    const ob = Number(opening_balance) || 0;
-    if (ob !== 0) {
-      const cur = (currency || 'IDR').toUpperCase();
-      const fxRes = await fx.toIdr(Math.abs(ob), cur);
+    if (ob !== 0 && obFxRes) {
       await supabase.from('transactions').insert({
         ...bizWriteFields(biz, userId),
         type:             ob > 0 ? 'income' : 'expense',
         amount_original:  Math.abs(ob),
         currency_original: cur,
-        amount_idr:       fxRes.amount_idr,
-        booked_rate:      fxRes.booked_rate,
-        rate_source:      fxRes.rate_source,
+        amount_idr:       obFxRes.amount_idr,
+        booked_rate:      obFxRes.booked_rate,
+        rate_source:      obFxRes.rate_source,
         // Marked so the classifier identifies this as seeded balance, never revenue.
         // The description carries the same signal, so wallets created before this
         // marker existed still classify correctly.
@@ -10118,6 +10148,14 @@ app.post('/api/wallets/:id/adjust-balance', auth, async (req, res) => {
       transaction_id:   corrTx.id,
     });
   } catch (e) {
+    if (e.message && e.message.startsWith('fx_rate_unavailable:')) {
+      const cur = e.message.split(':')[1] || '';
+      return res.status(400).json({
+        error: 'fx_rate_unavailable',
+        message: `Exchange rate for currency ${cur} is unavailable.`,
+        currency: cur,
+      });
+    }
     res.status(500).json({ error: e.message });
   }
 });
@@ -11356,7 +11394,16 @@ app.post('/api/debts/:id/pay', auth, async (req, res) => {
   const txDate = date ? new Date(date).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10);
   let fxRes;
   try {
-    fxRes = await fx.toIdr(paymentAmount, cur, txDate);
+    if (req.body.rate || req.body.booked_rate) {
+      fxRes = await fx.toIdr(paymentAmount, cur, txDate, {
+        rate: req.body.rate || req.body.booked_rate,
+        source: req.body.rate_source || 'manual',
+        reason: req.body.manual_reason || 'debt_payment_manual_rate',
+        actor: req.user.userId,
+      });
+    } else {
+      fxRes = await fx.toIdr(paymentAmount, cur, txDate);
+    }
   } catch (fxErr) {
     return res.status(400).json({
       error: 'fx_rate_unavailable',
@@ -11967,14 +12014,29 @@ async function buildBusinessFinancialSnapshot(biz, language = 'en', asOfDate = n
       return s;
     }, 0);
 
+  let hasIncompleteBalance = false;
+  const unvaluedCurrencies = [];
   const byWallet = businessWallets.map(w => {
     const bal = walletBalance(w);
     const cur = (w.currency || 'IDR').toUpperCase();
-    const rate = fx.getTodayRate(cur);
-    const balIdr = cur === 'IDR' ? bal : Math.round(bal * rate);
-    return { id: w.id, name: w.name, currency: cur, type: w.type, balance: bal, balance_idr: balIdr, rate_today: rate };
+    const q = fx.getQuote(cur);
+    let rate = null;
+    let balIdr = null;
+    if (cur === 'IDR') {
+      rate = 1;
+      balIdr = bal;
+    } else if (q && q.rate != null && Number.isFinite(Number(q.rate))) {
+      rate = Number(q.rate);
+      balIdr = Math.round(bal * rate);
+    } else {
+      if (bal !== 0) {
+        hasIncompleteBalance = true;
+        if (!unvaluedCurrencies.includes(cur)) unvaluedCurrencies.push(cur);
+      }
+    }
+    return { id: w.id, name: w.name, currency: cur, type: w.type, balance: bal, balance_idr: balIdr, rate_today: rate, is_unvalued: balIdr === null && cur !== 'IDR' };
   });
-  const totalCash = byWallet.reduce((s, w) => s + (w.balance_idr ?? w.balance), 0);
+  const totalCash = byWallet.reduce((s, w) => s + (w.balance_idr ?? (w.currency === 'IDR' ? w.balance : 0)), 0);
 
   const burn = computeBurnAndRunway(bizTxs, totalCash);
   const dailyBurn = burn.burn_rate_daily;
@@ -12024,7 +12086,7 @@ async function buildBusinessFinancialSnapshot(biz, language = 'en', asOfDate = n
   return {
     business_id: biz.business.id,
     currency: biz.business.base_currency || 'IDR',
-    cash: { total: totalCash, by_wallet: byWallet, available_business_cash: totalCash },
+    cash: { total: totalCash, by_wallet: byWallet, available_business_cash: totalCash, has_incomplete_balance: hasIncompleteBalance, unvalued_currencies: unvaluedCurrencies },
     burn: { daily_burn: dailyBurn, monthly_expenses: dailyBurn * 30, rolling_window_days: burn.burn_window_days, runway_days: burn.runway_days },
     payables: { ...debtBuckets(payList), pending_amount: pending.filter(d => d.type === 'payable').reduce((s, d) => s + Number(d.remaining_amount || d.amount || 0), 0) },
     receivables: { ...debtBuckets(recvList), pending_amount: pending.filter(d => d.type === 'receivable').reduce((s, d) => s + Number(d.remaining_amount || d.amount || 0), 0) },

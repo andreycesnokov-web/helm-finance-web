@@ -103,8 +103,8 @@ class LiveFxState {
   constructor() {
     this.rates = new Map();
     this.metadata = {
-      source: 'fixed_accounting_table',
-      primary_source: 'Fixed Accounting Table',
+      source: 'uninitialized',
+      primary_source: 'Uninitialized',
       status: 'uninitialized',
       last_success_at: null,
       last_attempt_at: null,
@@ -121,11 +121,48 @@ class LiveFxState {
     this.minRefreshIntervalMs = 5 * 60 * 1000; // 5 minutes throttle
     this.loadFromDisk();
     if (this.rates.size === 0) {
-      this.initDefaultFixedRates();
+      if (process.env.FX_PROVIDER === 'mock') {
+        this.initMockRates();
+      } else {
+        this.initBaseIdrRate();
+      }
+    } else {
+      if (!this.rates.has('IDR')) {
+        this.initBaseIdrRate();
+      }
     }
   }
 
-  initDefaultFixedRates() {
+  initBaseIdrRate() {
+    const today = new Date().toISOString().slice(0, 10);
+    const nowIso = new Date().toISOString();
+    this.rates.set('IDR', {
+      currency: 'IDR',
+      pair: 'IDR/IDR',
+      direction: 'identity',
+      rate: 1,
+      rate_str: '1',
+      source: 'base_currency',
+      rate_type: 'base_currency',
+      rate_effective_date: today,
+      verified_at: today,
+      retrieved_at: nowIso,
+      calculated_at: nowIso,
+      as_of: today,
+      status: 'fresh',
+      is_fixed_accounting: false,
+      is_fallback: false,
+      fallback_reason: null,
+    });
+    this.metadata.status = 'uninitialized';
+    this.metadata.source = 'uninitialized';
+    this.metadata.primary_source = 'No live or cached rates';
+    this.metadata.rate_effective_date = null;
+    this.metadata.currencies_available = ['IDR'];
+    this.buildSourcesSummary();
+  }
+
+  initMockRates() {
     const today = new Date().toISOString().slice(0, 10);
     const nowIso = new Date().toISOString();
     this.rates.set('IDR', {
@@ -171,7 +208,7 @@ class LiveFxState {
     }
     this.metadata.status = 'fixed_accounting_table';
     this.metadata.source = 'fixed_accounting_table';
-    this.metadata.primary_source = 'Fixed Accounting Table';
+    this.metadata.primary_source = 'Fixed Accounting Table (Mock Provider)';
     this.metadata.rate_effective_date = null;
     this.metadata.currencies_available = Array.from(this.rates.keys());
     this.buildSourcesSummary();
@@ -203,9 +240,11 @@ class LiveFxState {
         if (data && data.rates && typeof data.rates === 'object') {
           this.rates.clear();
           for (const [cur, entry] of Object.entries(data.rates)) {
-            this.rates.set(cur, entry);
+            if (entry && (process.env.FX_PROVIDER === 'mock' || entry.source !== 'fixed_accounting_table')) {
+              this.rates.set(cur, entry);
+            }
           }
-          if (data.metadata) {
+          if (data.metadata && (process.env.FX_PROVIDER === 'mock' || data.metadata.source !== 'fixed_accounting_table')) {
             this.metadata = { ...this.metadata, ...data.metadata };
             // On cold start from disk without immediate network connection, mark as cached
             this.metadata.status = 'cached';
@@ -254,8 +293,8 @@ class LiveFxState {
   reset() {
     this.rates.clear();
     this.metadata = {
-      source: 'fixed_accounting_table',
-      primary_source: 'Fixed Accounting Table',
+      source: 'uninitialized',
+      primary_source: 'Uninitialized',
       status: 'uninitialized',
       last_success_at: null,
       last_attempt_at: null,
@@ -267,7 +306,11 @@ class LiveFxState {
       external_probes: null,
     };
     this.customConnector = null;
-    this.initDefaultFixedRates();
+    if (process.env.FX_PROVIDER === 'mock') {
+      this.initMockRates();
+    } else {
+      this.initBaseIdrRate();
+    }
   }
 
   async fetchJisdorLive() {
@@ -784,6 +827,9 @@ const hybridProvider = {
   name: 'hybrid',
   async getCurrentQuote(base, quote) {
     const cur = String(base).toUpperCase();
+    if (cur === quote) {
+      return normalize({ provider: 'identity', base: cur, quote, rate: '1', source_type: 'identity' });
+    }
     const q = liveState.getQuote(cur);
     if (q && q.rate != null && quote === 'IDR') {
       return normalize({
@@ -795,14 +841,18 @@ const hybridProvider = {
         rate_effective_date: q.rate_effective_date,
       });
     }
-    // Fall back to mock if rate not available
-    return mockProvider.getCurrentQuote(base, quote);
+    if (process.env.FX_PROVIDER === 'mock') {
+      return mockProvider.getCurrentQuote(base, quote);
+    }
+    throw new Error(`fx_rate_unavailable:${cur}`);
   },
   async getHistoricalQuote(base, quote, effectiveDate) {
-    // If quote on effectiveDate matches live/cached effectiveDate
     const cur = String(base).toUpperCase();
+    if (cur === quote) {
+      return normalize({ provider: 'identity', base: cur, quote, rate: '1', source_type: 'identity', rate_effective_date: effectiveDate });
+    }
     const q = liveState.getQuote(cur);
-    if (q && q.rate_effective_date === effectiveDate && quote === 'IDR') {
+    if (q && q.rate != null && q.rate_effective_date === effectiveDate && quote === 'IDR') {
       return normalize({
         provider: q.source,
         base: cur,
@@ -812,10 +862,16 @@ const hybridProvider = {
         rate_effective_date: effectiveDate,
       });
     }
-    return mockProvider.getHistoricalQuote(base, quote, effectiveDate);
+    if (process.env.FX_PROVIDER === 'mock') {
+      return mockProvider.getHistoricalQuote(base, quote, effectiveDate);
+    }
+    throw new Error(`fx_rate_unavailable:${cur}`);
   },
   async getCryptoQuote(base, quote) {
     const cur = String(base).toUpperCase();
+    if (cur === quote) {
+      return normalize({ provider: 'identity', base: cur, quote, rate: '1', source_type: 'identity' });
+    }
     const q = liveState.getQuote(cur);
     if (q && q.rate != null && quote === 'IDR') {
       return normalize({
@@ -828,7 +884,10 @@ const hybridProvider = {
         rate_effective_date: q.rate_effective_date,
       });
     }
-    return mockProvider.getCryptoQuote(base, quote);
+    if (process.env.FX_PROVIDER === 'mock') {
+      return mockProvider.getCryptoQuote(base, quote);
+    }
+    throw new Error(`fx_rate_unavailable:${cur}`);
   },
 };
 
@@ -918,13 +977,13 @@ function getTodayRate(currency = 'IDR') {
     return Number(q.rate);
   }
 
-  // 2. Fall back to mock table if in mock mode or fallback configured
-  if (process.env.FX_PROVIDER === 'mock' || !liveState.rates.size) {
+  // 2. ONLY if mock provider is explicitly configured
+  if (process.env.FX_PROVIDER === 'mock') {
     const rateStr = MOCK_RATES[`${cur}/IDR`];
     if (rateStr) return Number(rateStr);
   }
 
-  throw new Error(`unsupported_currency:${cur}`);
+  throw new Error(`fx_rate_unavailable:${cur}`);
 }
 
 function getQuote(currency) {
@@ -932,7 +991,7 @@ function getQuote(currency) {
   if (cur === 'IDR') {
     return liveState.getQuote('IDR') || {
       currency: 'IDR', pair: 'IDR/IDR', direction: 'identity', rate: 1, rate_str: '1',
-      source: 'base_currency', rate_type: 'base_currency', is_fixed_accounting: true,
+      source: 'base_currency', rate_type: 'base_currency', is_fixed_accounting: false,
       rate_effective_date: new Date().toISOString().slice(0, 10)
     };
   }

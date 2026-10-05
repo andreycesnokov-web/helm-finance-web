@@ -30,6 +30,7 @@ Object.assign(process.env, {
   TELEGRAM_WEBHOOK_SECRET: 'fake',
   PORT: '5614',
   NODE_ENV: 'test',
+  FX_PROVIDER: 'mock',
 });
 
 const origLoad = Module._load;

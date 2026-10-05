@@ -1,5 +1,6 @@
 // Unit tests for multi-currency toIdr helper and FX rate logic.
 // Follows RULES.md §3 (Rule 1 & Rule 2).
+process.env.FX_PROVIDER = 'mock';
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import fx from '../server/lib/fxProvider.js'
