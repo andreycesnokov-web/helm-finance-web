@@ -45,6 +45,11 @@ export default function DebtPaymentModal({ debt, accounts, token, onClose, onSuc
   const [payDate,  setPayDate]  = useState(new Date().toISOString().slice(0, 10))
   const [paying,   setPaying]   = useState(false)
   const [error,    setError]    = useState('')
+  const [idempotencyKey] = useState(() => (
+    typeof crypto !== 'undefined' && crypto.randomUUID
+      ? crypto.randomUUID()
+      : 'idemp_' + Date.now() + '_' + Math.random().toString(36).slice(2)
+  ))
 
   const amountNum   = Number(amount)
   const isFullPay   = amountNum >= remaining - 0.01
@@ -80,11 +85,15 @@ export default function DebtPaymentModal({ debt, accounts, token, onClose, onSuc
     try {
       const result = await apiFetch(`/debts/${debt.id}/pay`, token, {
         method: 'POST',
+        headers: {
+          'Idempotency-Key': idempotencyKey,
+        },
         body: {
-          amount:    amountNum,
-          wallet_id: walletId,
-          account:   selectedAcc?.name || undefined,
-          date:      payDate || undefined,
+          amount:          amountNum,
+          wallet_id:       walletId,
+          account:         selectedAcc?.name || undefined,
+          date:            payDate || undefined,
+          idempotency_key: idempotencyKey,
         },
       })
       onSuccess(result)
