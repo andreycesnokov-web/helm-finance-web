@@ -102,6 +102,33 @@ BEGIN
     RAISE EXCEPTION 'target_wallet_not_found: Target wallet does not exist or does not belong to active business';
   END IF;
 
+  -- Re-check transfer replay under wallet row locks
+  IF p_transfer_id IS NOT NULL THEN
+    SELECT 
+      MAX(CASE WHEN type = 'expense' THEN id END),
+      MAX(CASE WHEN type = 'income' THEN id END)
+    INTO v_debit_id, v_credit_id
+    FROM public.transactions
+    WHERE business_id = p_business_id AND transfer_id = p_transfer_id;
+
+    IF v_debit_id IS NOT NULL OR v_credit_id IS NOT NULL THEN
+      RETURN jsonb_build_object(
+        'ok', true,
+        'is_replay', true,
+        'transfer_id', p_transfer_id,
+        'debit_transaction_id', v_debit_id,
+        'credit_transaction_id', v_credit_id,
+        'from_wallet_id', p_from_wallet_id,
+        'to_wallet_id', p_to_wallet_id,
+        'source_amount', p_source_amount,
+        'source_currency', upper(trim(p_source_currency)),
+        'target_amount', p_target_amount,
+        'target_currency', upper(trim(p_target_currency)),
+        'transaction_date', p_transaction_date
+      );
+    END IF;
+  END IF;
+
   v_transfer_ref := 'xfer:' || p_transfer_id::text;
   v_desc := COALESCE(p_description, 'Transfer: ' || v_from_wallet.name || ' → ' || v_to_wallet.name);
 

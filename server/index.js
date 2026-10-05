@@ -10366,92 +10366,54 @@ app.post('/api/wallets/transfer', auth, async (req, res) => {
       }
     }
 
-    // Try RPC for row-locking and single DB transaction
-    if (typeof supabase.rpc === 'function') {
-      try {
-        const { data: rpcRes, error: rpcErr } = await supabase.rpc('rpc_execute_wallet_transfer', {
-          p_business_id: biz.business.id,
-          p_user_id: userId,
-          p_from_wallet_id: fromWallet.id,
-          p_to_wallet_id: toWallet.id,
-          p_source_amount: sourceAmount,
-          p_source_currency: fromCur,
-          p_source_amount_idr: fxResFrom.amount_idr,
-          p_source_booked_rate: fxResFrom.booked_rate,
-          p_target_amount: finalTargetAmount,
-          p_target_currency: toCur,
-          p_target_amount_idr: fxResTo.amount_idr,
-          p_target_booked_rate: fxResTo.booked_rate,
-          p_rate_source: rate_source || fxResFrom.rate_source || 'system',
-          p_description: desc,
-          p_transaction_date: txDate,
-          p_transfer_id: transferId,
-          p_scope: 'business',
-        });
-
-        if (!rpcErr && rpcRes && rpcRes.ok) {
-          const status = rpcRes.is_replay ? 200 : 201;
-          return res.status(status).json(rpcRes);
-        }
-        if (rpcErr && !rpcErr.message.includes('function') && !rpcErr.message.includes('does not exist')) {
-          return res.status(400).json({ error: rpcErr.message });
-        }
-      } catch (rpcErr) {
-        console.warn('[wallets/transfer] RPC execution skipped, using multi-row insert:', rpcErr.message);
-      }
+    // Strict atomic RPC execution: row-locking and single DB transaction
+    if (typeof supabase.rpc !== 'function') {
+      return res.status(500).json({
+        error: 'rpc_not_available',
+        message: 'Atomic RPC functions are not supported or available on client',
+      });
     }
 
-    // Fallback: Atomic multi-row insert (single statement executed atomically by PostgreSQL)
-    const debitLeg = {
-      ...bizWriteFields(biz, userId),
-      type: 'expense',
-      amount_original: sourceAmount,
-      currency_original: fromCur,
-      amount_idr: fxResFrom.amount_idr,
-      booked_rate: fxResFrom.booked_rate,
-      rate_source: fxResFrom.rate_source,
-      description: desc,
-      source: transferRef,
-      wallet_id: fromWallet.id,
-      scope: 'business',
-      category: 'Transfer',
-      transaction_date: txDate,
-      transfer_id: transferId,
-    };
+    try {
+      const { data: rpcRes, error: rpcErr } = await supabase.rpc('rpc_execute_wallet_transfer', {
+        p_business_id: biz.business.id,
+        p_user_id: userId,
+        p_from_wallet_id: fromWallet.id,
+        p_to_wallet_id: toWallet.id,
+        p_source_amount: sourceAmount,
+        p_source_currency: fromCur,
+        p_source_amount_idr: fxResFrom.amount_idr,
+        p_source_booked_rate: fxResFrom.booked_rate,
+        p_target_amount: finalTargetAmount,
+        p_target_currency: toCur,
+        p_target_amount_idr: fxResTo.amount_idr,
+        p_target_booked_rate: fxResTo.booked_rate,
+        p_rate_source: rate_source || fxResFrom.rate_source || 'system',
+        p_description: desc,
+        p_transaction_date: txDate,
+        p_transfer_id: transferId,
+        p_scope: 'business',
+      });
 
-    const creditLeg = {
-      ...bizWriteFields(biz, userId),
-      type: 'income',
-      amount_original: finalTargetAmount,
-      currency_original: toCur,
-      amount_idr: fxResTo.amount_idr,
-      booked_rate: fxResTo.booked_rate,
-      rate_source: fxResTo.rate_source,
-      description: desc,
-      source: transferRef,
-      wallet_id: toWallet.id,
-      scope: 'business',
-      category: 'Transfer',
-      transaction_date: txDate,
-      transfer_id: transferId,
-    };
-
-    const { data: inserted, error: insErr } = await supabase
-      .from('transactions')
-      .insert([debitLeg, creditLeg])
-      .select();
-
-    if (insErr) throw insErr;
-
-    res.status(201).json({
-      ok: true,
-      transfer_id: transferId,
-      transactions: inserted,
-      source_amount: sourceAmount,
-      source_currency: fromCur,
-      target_amount: finalTargetAmount,
-      target_currency: toCur,
-    });
+      if (!rpcErr && rpcRes && rpcRes.ok) {
+        const status = rpcRes.is_replay ? 200 : 201;
+        return res.status(status).json(rpcRes);
+      }
+      if (rpcErr) {
+        const msg = rpcErr.message || '';
+        if (msg.includes('function') && msg.includes('does not exist')) {
+          return res.status(500).json({
+            error: 'rpc_function_missing',
+            message: 'rpc_execute_wallet_transfer function does not exist in database',
+          });
+        }
+        return res.status(400).json({ error: rpcErr.message });
+      }
+      return res.status(500).json({ error: 'atomic_transfer_failed', message: 'No response from transfer RPC' });
+    } catch (rpcErr) {
+      console.error('[wallets/transfer] Fatal RPC execution error:', rpcErr.message);
+      return res.status(500).json({ error: 'atomic_transfer_failed', message: rpcErr.message });
+    }
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
