@@ -11412,6 +11412,102 @@ app.post('/api/debts/:id/pay', auth, async (req, res) => {
     });
   }
 
+  // Idempotency key handling
+  const idempotencyKey = (req.headers['idempotency-key'] || req.body?.idempotency_key || '').toString().trim();
+  const requestHash = crypto.createHash('sha256').update(JSON.stringify({
+    debt_id: String(debt.id),
+    amount: paymentAmount,
+    wallet_id: payWallet ? String(payWallet.id) : (wallet_id ? String(wallet_id) : null),
+    currency: cur,
+    date: txDate,
+  })).digest('hex');
+
+  if (idempotencyKey) {
+    try {
+      const { data: idempRow } = await supabase.from('debt_payment_idempotency')
+        .select('*')
+        .eq('business_id', biz.business.id)
+        .eq('key', idempotencyKey)
+        .maybeSingle();
+
+      if (idempRow) {
+        if (idempRow.request_hash === requestHash) {
+          return res.status(idempRow.response_status || 200).json({
+            ...idempRow.response_body,
+            is_replay: true,
+          });
+        } else {
+          return res.status(409).json({
+            error: 'idempotency_key_mismatch',
+            message: 'Idempotency key already used with different payment parameters',
+          });
+        }
+      }
+    } catch (idempErr) {
+      console.warn('[debts:pay] Idempotency lookup skipped:', idempErr.message);
+    }
+  }
+
+  // If wallet is present and RPC exists in Supabase, execute transactional RPC with FOR UPDATE locking
+  if (payWallet && typeof supabase.rpc === 'function') {
+    try {
+      const { data: rpcRes, error: rpcErr } = await supabase.rpc('rpc_record_debt_payment', {
+        p_business_id: biz.business.id,
+        p_user_id: req.user.userId,
+        p_debt_id: debt.id,
+        p_wallet_id: payWallet.id,
+        p_amount: paymentAmount,
+        p_currency: cur,
+        p_amount_idr: fxRes.amount_idr,
+        p_booked_rate: fxRes.booked_rate,
+        p_rate_source: fxRes.rate_source,
+        p_payment_date: txDate,
+        p_idempotency_key: idempotencyKey || null,
+        p_request_hash: requestHash,
+        p_account_name: payWallet.name,
+        p_created_at: date ? new Date(date).toISOString() : new Date().toISOString(),
+      });
+
+      if (rpcErr) {
+        const msg = rpcErr.message || '';
+        if (msg.includes('idempotency_key_mismatch')) {
+          return res.status(409).json({ error: 'idempotency_key_mismatch', message: msg });
+        }
+        if (msg.includes('payment_exceeds_remaining')) {
+          return res.status(400).json({ error: 'payment_exceeds_remaining', message: msg });
+        }
+        if (msg.includes('debt_already_closed')) {
+          return res.status(400).json({ error: 'debt_already_closed', message: msg });
+        }
+        if (msg.includes('cross_currency_not_supported') || msg.includes('debt_currency_mismatch')) {
+          return res.status(400).json({ error: 'cross_currency_not_supported', message: msg });
+        }
+        if (msg.includes('debt_not_found')) {
+          return res.status(404).json({ error: 'debt_not_found', message: msg });
+        }
+        if (!msg.includes('function') && !msg.includes('does not exist')) {
+          return res.status(500).json({ error: msg });
+        }
+        // If function doesn't exist, proceed to JS fallback below
+      } else if (rpcRes) {
+        if (rpcRes.is_replay) {
+          return res.status(rpcRes.status || 200).json({
+            ...rpcRes.data,
+            is_replay: true,
+          });
+        }
+        return res.json({
+          ok: true,
+          isFullyPaid: rpcRes.data.is_fully_paid,
+          remaining: Math.max(0, Number(rpcRes.data.remaining)),
+          debt: computeDebtStatus({ ...rpcRes.data.debt, withholding_allocated: withheld }),
+        });
+      }
+    } catch (rpcErr) {
+      console.warn('[debts:pay] RPC execution failed, continuing with JS fallback:', rpcErr.message);
+    }
+  }
+
   const { data: tx, error: txErr } = await supabase.from('transactions').insert({
     ...bizWriteFields(biz, req.user.userId),
     type:              txType,
@@ -11446,12 +11542,31 @@ app.post('/api/debts/:id/pay', auth, async (req, res) => {
     .update(debtUpdates).eq('id', debt.id).select().single();
   if (updateErr) return res.status(500).json({ error: updateErr.message });
 
-  res.json({
+  const responsePayload = {
     ok:           true,
     isFullyPaid,
     remaining:    Math.max(0, effectiveTotal - newPaidAmount - withheld),
     debt:         computeDebtStatus({ ...updatedDebt, withholding_allocated: withheld }),
-  });
+  };
+
+  if (idempotencyKey) {
+    try {
+      await supabase.from('debt_payment_idempotency').insert({
+        business_id: biz.business.id,
+        debt_id: debt.id,
+        user_id: req.user.userId,
+        key: idempotencyKey,
+        request_hash: requestHash,
+        transaction_id: tx?.id || null,
+        response_status: 200,
+        response_body: responsePayload,
+      });
+    } catch (idempSaveErr) {
+      console.warn('[debts:pay] Idempotency record insertion failed:', idempSaveErr.message);
+    }
+  }
+
+  res.json(responsePayload);
 })
 
 // ── Business Settings Endpoint ───────────────────────────────────────────────
