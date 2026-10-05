@@ -2916,7 +2916,7 @@ app.post('/api/accountant/ask', auth, async (req, res) => {
     // Fetch transactions for balances, counterparty summaries, and recent activity
     const { data: rawTxs, error: tErr } = await supabase
       .from('transactions')
-      .select('id, wallet_id, source, type, amount_original, amount_idr, currency_original, category, counterparty, description, created_at, date, transaction_date')
+      .select('id, wallet_id, source, type, amount_original, amount_idr, currency_original, category, counterparty, description, created_at, date, transaction_date, transfer_id')
       .or(bizOr)
       .order('created_at', { ascending: false });
 
