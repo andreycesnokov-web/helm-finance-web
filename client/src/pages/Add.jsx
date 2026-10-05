@@ -303,26 +303,31 @@ export default function Add() {
         })
       }
 
-      if (unlinked.length > 0) {
-        const payload = unlinked.map(tx => ({
-          type:        tx.type,
-          amount:      Number(tx.amount) || 0,
-          currency:    tx.currency || 'IDR',
-          description: tx.description || '',
-          source:      tx.source || null,
-          scope:       tx.scope || 'personal',
-          project:     tx.project || null,
-          category:    tx.category || null,
-          // Reference fields (Phase 1 — all optional)
-          cashflow_category_id:  tx.cashflow_category_id  || null,
-          counterparty_id:       tx.counterparty_id        || null,
-          counterparty_name:     tx.counterparty_name      || null,
-          business_direction_id: tx.business_direction_id  || null,
-          activity_type_id:      tx.activity_type_id       || null,
-          // Wallet (TASK 29B & TASK 30)
-          wallet_id:             tx.wallet_id              || null,
-          to_wallet_id:          tx.to_wallet_id           || null,
-        }))
+        const payload = unlinked.map(tx => {
+          if (tx.type === 'transfer' && !tx.transfer_id) {
+            tx.transfer_id = (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : 'xfer-' + Date.now() + '-' + Math.random().toString(36).slice(2))
+          }
+          return {
+            type:        tx.type,
+            amount:      Number(tx.amount) || 0,
+            currency:    tx.currency || 'IDR',
+            description: tx.description || '',
+            source:      tx.source || null,
+            scope:       tx.scope || 'personal',
+            project:     tx.project || null,
+            category:    tx.category || null,
+            // Reference fields (Phase 1 — all optional)
+            cashflow_category_id:  tx.cashflow_category_id  || null,
+            counterparty_id:       tx.counterparty_id        || null,
+            counterparty_name:     tx.counterparty_name      || null,
+            business_direction_id: tx.business_direction_id  || null,
+            activity_type_id:      tx.activity_type_id       || null,
+            // Wallet (TASK 29B & TASK 30)
+            wallet_id:             tx.wallet_id              || null,
+            to_wallet_id:          tx.to_wallet_id           || null,
+            transfer_id:           tx.transfer_id            || null,
+          }
+        })
         await apiFetch('/transactions/batch', token, { method: 'POST', body: { transactions: payload } })
       }
 

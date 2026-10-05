@@ -950,8 +950,9 @@ function computeBurnAndRunway(allTxs, totalBalance) {
   // every back-dated entry land in the current window, so a bulk import of last
   // quarter's spend read as if it had all been spent this month.
   const eff = (t) => FININ.effectiveDate(t);
-  // All expense transactions with a valid date
-  const allExpTxs = (allTxs || []).filter(t => CASH_OUT.includes(t.type) && eff(t));
+  const isTransfer = (t) => t.type === 'transfer' || !!t.transfer_id || t.category === 'Transfer';
+  // All expense transactions with a valid date (excluding internal transfers)
+  const allExpTxs = (allTxs || []).filter(t => CASH_OUT.includes(t.type) && !isTransfer(t) && eff(t));
 
   if (allExpTxs.length === 0) {
     // No expense data — cannot compute burn rate
@@ -10301,6 +10302,30 @@ app.post('/api/wallets/transfer', auth, async (req, res) => {
     const transferRef = `xfer:${transferId}`;
     const desc = (description && description.trim()) || `Transfer: ${fromWallet.name} → ${toWallet.name}`;
 
+    if (req.body.transfer_id) {
+      const bizOr = bizOrFilter(biz);
+      const { data: existingTxs } = await supabase
+        .from('transactions')
+        .select('*')
+        .or(bizOr)
+        .eq('transfer_id', req.body.transfer_id);
+
+      if (existingTxs && existingTxs.length > 0) {
+        return res.status(200).json({
+          ok: true,
+          is_replay: true,
+          transfer_id: req.body.transfer_id,
+          transactions: existingTxs,
+          from_wallet_id: fromWallet.id,
+          to_wallet_id: toWallet.id,
+          source_amount: sourceAmount,
+          source_currency: fromCur,
+          target_amount: Number(target_amount || sourceAmount),
+          target_currency: toCur,
+        });
+      }
+    }
+
     let fxResFrom;
     let fxResTo;
     let finalTargetAmount;
@@ -10365,7 +10390,8 @@ app.post('/api/wallets/transfer', auth, async (req, res) => {
         });
 
         if (!rpcErr && rpcRes && rpcRes.ok) {
-          return res.status(201).json(rpcRes);
+          const status = rpcRes.is_replay ? 200 : 201;
+          return res.status(status).json(rpcRes);
         }
         if (rpcErr && !rpcErr.message.includes('function') && !rpcErr.message.includes('does not exist')) {
           return res.status(400).json({ error: rpcErr.message });
@@ -12081,10 +12107,11 @@ async function buildAiCfoContext(userId, language = 'en', biz = null) {
     - persTxs.filter(t => CASH_OUT.includes(t.type)).reduce((s,t) => s + Number(t.amount_idr ?? t.amount_original ?? 0), 0)
     + persTxs.filter(t => t.type === 'correction').reduce((s,t) => s + Number(t.amount_idr ?? t.amount_original ?? 0), 0);
 
-  // ── This month (business wallets only) ────────────────────────────────────
+  // ── This month (business wallets only, transfers excluded) ─────────────────
   const bizMonthTxs   = (monthTxs || []).filter(t => txBelongsToWallets(t, businessWallets, businessWalletIds, 'business'));
-  const monthIncome   = bizMonthTxs.filter(t => CASH_IN.includes(t.type)).reduce((s,t) => s + Number(t.amount_idr ?? t.amount_original ?? 0), 0);
-  const monthExpenses = bizMonthTxs.filter(t => CASH_OUT.includes(t.type)).reduce((s,t) => s + Number(t.amount_idr ?? t.amount_original ?? 0), 0);
+  const isXfer = (t) => t.type === 'transfer' || !!t.transfer_id || t.category === 'Transfer';
+  const monthIncome   = bizMonthTxs.filter(t => CASH_IN.includes(t.type) && !isXfer(t)).reduce((s,t) => s + Number(t.amount_idr ?? t.amount_original ?? 0), 0);
+  const monthExpenses = bizMonthTxs.filter(t => CASH_OUT.includes(t.type) && !isXfer(t)).reduce((s,t) => s + Number(t.amount_idr ?? t.amount_original ?? 0), 0);
 
   // ── Burn rate & runway — rolling 30-day window (business wallets only) ────
   const bizTxs      = (allTxs || []).filter(t => txBelongsToWallets(t, businessWallets, businessWalletIds, 'business'));

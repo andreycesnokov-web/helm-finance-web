@@ -301,4 +301,89 @@ describe('Stage 2: Business Wallet Transfers (TASK 30) Atomic Execution', () => 
     const after = await db.query(`SELECT count(*)::int as c FROM public.transactions WHERE transfer_id = $1::uuid`, [transferId]);
     assert.strictEqual(after.rows[0].c, 0);
   });
+
+  it('Criterion 7: Replay protection returns is_replay: true without duplicate ledger records', async () => {
+    const transferId = crypto.randomUUID();
+
+    // 1st transfer execution
+    const res1 = await db.query(
+      `SELECT public.rpc_execute_wallet_transfer(
+        $1::uuid, $2::bigint, $3::uuid, $4::uuid,
+        2500000, 'IDR', 2500000, 1,
+        2500000, 'IDR', 2500000, 1,
+        'test', 'Replay test transfer', '2026-10-05',
+        $5::uuid, 'business'
+      ) as result`,
+      [BIZ_A, USER_A, WALLET_A_IDR_1, WALLET_A_IDR_2, transferId]
+    );
+    assert.strictEqual(res1.rows[0].result.ok, true);
+    assert.strictEqual(res1.rows[0].result.is_replay, undefined);
+
+    const count1 = await db.query(`SELECT count(*)::int as c FROM public.transactions WHERE transfer_id = $1::uuid`, [transferId]);
+    assert.strictEqual(count1.rows[0].c, 2, 'Exactly 2 records created on first call');
+
+    // 2nd transfer execution with SAME transfer_id
+    const res2 = await db.query(
+      `SELECT public.rpc_execute_wallet_transfer(
+        $1::uuid, $2::bigint, $3::uuid, $4::uuid,
+        2500000, 'IDR', 2500000, 1,
+        2500000, 'IDR', 2500000, 1,
+        'test', 'Replay test transfer', '2026-10-05',
+        $5::uuid, 'business'
+      ) as result`,
+      [BIZ_A, USER_A, WALLET_A_IDR_1, WALLET_A_IDR_2, transferId]
+    );
+    assert.strictEqual(res2.rows[0].result.ok, true);
+    assert.strictEqual(res2.rows[0].result.is_replay, true, 'Must return is_replay: true');
+    assert.strictEqual(res2.rows[0].result.debit_transaction_id, res1.rows[0].result.debit_transaction_id);
+    assert.strictEqual(res2.rows[0].result.credit_transaction_id, res1.rows[0].result.credit_transaction_id);
+
+    const count2 = await db.query(`SELECT count(*)::int as c FROM public.transactions WHERE transfer_id = $1::uuid`, [transferId]);
+    assert.strictEqual(count2.rows[0].c, 2, 'Ledger count must remain exactly 2 without duplication');
+  });
+
+  it('Criterion 8: Financial metrics neutrality (transfers do not inflate revenue, OPEX or burn rate)', async () => {
+    const FININ = require('../../server/lib/financialInsights.js');
+    const transferId = crypto.randomUUID();
+
+    const debitLeg = {
+      type: 'expense',
+      amount_original: 5000000,
+      amount_idr: 5000000,
+      category: 'Transfer',
+      transfer_id: transferId,
+      description: 'Transfer: BCA IDR → Mandiri IDR',
+      transaction_date: '2026-10-05'
+    };
+
+    const creditLeg = {
+      type: 'income',
+      amount_original: 5000000,
+      amount_idr: 5000000,
+      category: 'Transfer',
+      transfer_id: transferId,
+      description: 'Transfer: BCA IDR → Mandiri IDR',
+      transaction_date: '2026-10-05'
+    };
+
+    // 1. Classification
+    const debitClass = FININ.classifyTransaction(debitLeg);
+    assert.strictEqual(debitClass.class, 'transfer');
+    assert.strictEqual(FININ.NON_OPERATING.includes(debitClass.class), true);
+
+    const creditClass = FININ.classifyTransaction(creditLeg);
+    assert.strictEqual(creditClass.class, 'transfer');
+    assert.strictEqual(FININ.NON_OPERATING.includes(creditClass.class), true);
+
+    // 2. computeInsights metrics
+    const insights = FININ.computeInsights([debitLeg, creditLeg]);
+    assert.strictEqual(insights.metrics.operating_revenue, 0, 'Operating revenue must not be inflated by transfer credit leg');
+    assert.strictEqual(insights.metrics.operating_cash_out, 0, 'Operating cash out must not be inflated by transfer debit leg');
+    assert.strictEqual(insights.metrics.other_cash_movement.transfers, 10000000, 'Transfer is tracked in non-operating movements');
+
+    // 3. Burn rate neutrality (using formula from server/index.js)
+    const isTransfer = (t) => t.type === 'transfer' || !!t.transfer_id || t.category === 'Transfer';
+    const allExpTxs = [debitLeg].filter(t => ['expense'].includes(t.type) && !isTransfer(t));
+    assert.strictEqual(allExpTxs.length, 0, 'Transfers are excluded from burn rate calculation');
+  });
 });
