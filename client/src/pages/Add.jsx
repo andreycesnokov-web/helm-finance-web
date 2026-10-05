@@ -297,9 +297,12 @@ export default function Add() {
       })
 
       for (const { tx, debtId } of linked) {
+        const key = tx.idempotency_key || (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : 'add-debt-pay-' + Date.now() + '-' + Math.random().toString(36).slice(2))
+        tx.idempotency_key = key
         await apiFetch(`/debts/${debtId}/pay`, token, {
           method: 'POST',
-          body: { amount: tx.amount, account: tx.source || undefined },
+          headers: { 'Idempotency-Key': key },
+          body: { amount: tx.amount, account: tx.source || undefined, idempotency_key: key },
         })
       }
 

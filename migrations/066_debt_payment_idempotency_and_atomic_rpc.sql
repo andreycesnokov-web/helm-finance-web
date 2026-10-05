@@ -172,7 +172,8 @@ BEGIN
     'paid_amount', v_new_paid,
     'status', v_new_status,
     'transaction_id', v_tx_id,
-    'debt_id', v_debt.id
+    'debt_id', v_debt.id,
+    'debt', (SELECT to_jsonb(d) FROM public.debts d WHERE d.id = v_debt.id)
   );
 
   -- 9. Store in idempotency table if key provided
