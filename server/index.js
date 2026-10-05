@@ -11594,6 +11594,7 @@ async function buildAiCfoContext(userId, language = 'en', biz = null) {
   const monthExpenses = bizMonthTxs.filter(t => CASH_OUT.includes(t.type)).reduce((s,t) => s + Number(t.amount_idr ?? t.amount_original ?? 0), 0);
 
   // ── Burn rate & runway — rolling 30-day window (business wallets only) ────
+  const bizTxs      = (allTxs || []).filter(t => txBelongsToWallets(t, businessWallets, businessWalletIds, 'business'));
   const burnMetrics = computeBurnAndRunway(bizTxs, totalBalance);
   const burnRate    = burnMetrics.burn_rate_daily;
 
