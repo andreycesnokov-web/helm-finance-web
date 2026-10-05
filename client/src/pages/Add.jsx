@@ -319,8 +319,9 @@ export default function Add() {
           counterparty_name:     tx.counterparty_name      || null,
           business_direction_id: tx.business_direction_id  || null,
           activity_type_id:      tx.activity_type_id       || null,
-          // Wallet (TASK 29B)
+          // Wallet (TASK 29B & TASK 30)
           wallet_id:             tx.wallet_id              || null,
+          to_wallet_id:          tx.to_wallet_id           || null,
         }))
         await apiFetch('/transactions/batch', token, { method: 'POST', body: { transactions: payload } })
       }
@@ -736,9 +737,18 @@ export default function Add() {
                               </option>
                             ))}
                           </select>
-                          <div style={{ fontSize: 11, color: 'var(--text-4)', marginTop: 4 }}>
-                            ℹ Destination wallet is saved in description. Full debit/credit model in TASK 30.
-                          </div>
+                          {(() => {
+                            const fromW = t.wallet_id ? wallets.find(x => x.id === t.wallet_id) : null
+                            const toW   = t.to_wallet_id ? wallets.find(x => x.id === t.to_wallet_id) : null
+                            const isMulti = fromW && toW && (fromW.currency || 'IDR') !== (toW.currency || 'IDR')
+                            return (
+                              <div style={{ fontSize: 11, color: isMulti ? 'var(--brand)' : 'var(--text-3)', marginTop: 4 }}>
+                                {isMulti
+                                  ? `✓ Multi-currency transfer: ${fromW.currency || 'IDR'} → ${toW.currency || 'IDR'}. Converted automatically at official fixing rate.`
+                                  : '✓ Atomic double-entry transfer: debits source account and credits destination account.'}
+                              </div>
+                            )
+                          })()}
                         </div>
                       )}
 
