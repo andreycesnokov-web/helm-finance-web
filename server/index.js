@@ -81,6 +81,8 @@ const PERSONAL_WORKSPACE_ENABLED = process.env.PERSONAL_WORKSPACE_ENABLED === 't
 const PERSONAL_ACCOUNT_V1_ENABLED = process.env.PERSONAL_ACCOUNT_V1_ENABLED === 'true';
 const PW = require('./lib/personalWorkspace');
 const fx = require('./lib/fxProvider');
+const Anthropic = require('@anthropic-ai/sdk');
+const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 // Email-primary identity (Phase 1) is OFF by default. Endpoints 404 when disabled.
 // Requires migration 042 (user_email_identities / user_profiles / email_login_codes /
 // app_user_id_seq). Telegram auth is unaffected by this flag.
@@ -2887,8 +2889,8 @@ app.get('/api/accountant/summary', auth, async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// POST /api/accountant/ask — AI explains compliance using ONLY deterministic
-// data. It never invents a rate/deadline/requirement and always cites sources.
+// POST /api/accountant/ask — AI explains compliance and financial status using ONLY
+// deterministic data. It never invents a rate/deadline/requirement/figure and always cites sources.
 app.post('/api/accountant/ask', auth, async (req, res) => {
   try {
     const biz = await requireBusiness(req, res);
@@ -2896,12 +2898,125 @@ app.post('/api/accountant/ask', auth, async (req, res) => {
     if (!canViewBusinessFinance(biz.role)) return res.status(403).json({ error: 'Forbidden' });
     const question = String(req.body?.question || '').slice(0, 500);
     if (!question) return res.status(400).json({ error: 'question required' });
-    const language = normalizeLanguage(await getUserLanguage(req.user.userId));
+    const language = normalizeLanguage(req.body?.language || await getUserLanguage(req.user.userId));
     const disclaimer = AI_ACCOUNTANT_DISCLAIMER[language] || AI_ACCOUNTANT_DISCLAIMER.en;
     const data = await buildAccountantData(biz);
 
+    const bizOr = bizOrFilter(biz);
+
+    // Fetch wallets for financial context
+    const { data: rawWallets } = await supabase
+      .from('wallets')
+      .select('id, name, currency, type, is_active')
+      .or(bizOr)
+      .eq('is_active', true)
+      .order('sort_order', { ascending: true })
+      .order('created_at', { ascending: true });
+
+    // Fetch transactions for balances, counterparty summaries, and recent activity
+    const { data: rawTxs } = await supabase
+      .from('transactions')
+      .select('id, wallet_id, source, type, amount_original, amount_idr, currency_original, category, counterparty, description, created_at, date')
+      .or(bizOr)
+      .order('created_at', { ascending: false });
+
+    // Fetch and enrich debts / invoices (payable and receivable)
+    const { data: rawDebts } = await supabase
+      .from('debts')
+      .select('*')
+      .or(bizOr)
+      .or('is_training.is.null,is_training.eq.false')
+      .order('created_at', { ascending: false });
+
+    const enrichedDebts = await enrichDebtsFor(biz.business.id, rawDebts || []);
+
+    // Calculate balances for each active wallet
+    const walletsWithBalance = (rawWallets || []).map(w => {
+      const related = (rawTxs || []).filter(t => t.wallet_id === w.id || (!t.wallet_id && t.source === w.name));
+      const balance = related.reduce((sum, t) => {
+        const amt = Number(t.amount_original ?? t.amount_idr ?? 0);
+        if (WALLET_CASH_IN.includes(t.type))  return sum + amt;
+        if (WALLET_CASH_OUT.includes(t.type)) return sum - amt;
+        if (t.type === 'correction')          return sum + amt;
+        return sum;
+      }, 0);
+      return {
+        id: w.id,
+        name: w.name,
+        currency: (w.currency || 'IDR').toUpperCase(),
+        type: w.type,
+        balance
+      };
+    });
+
+    // Clean debt summaries
+    const debtsSummary = enrichedDebts.map(d => ({
+      id: d.id,
+      type: d.type, // 'payable' or 'receivable'
+      counterparty: d.counterparty || '',
+      currency: (d.currency || 'IDR').toUpperCase(),
+      original_amount: Number(d.original_amount ?? d.amount ?? 0),
+      paid_amount: Number(d.paid_amount || 0),
+      remaining_amount: Number(d.remaining_amount || 0),
+      status: d.status,
+      due_date: d.due_date || null,
+      description: d.description || ''
+    }));
+
+    // Aggregate counterparties across all debts
+    const counterpartiesMap = {};
+    for (const d of debtsSummary) {
+      const name = (d.counterparty || '').trim();
+      if (!name) continue;
+      const key = name.toLowerCase();
+      if (!counterpartiesMap[key]) {
+        counterpartiesMap[key] = {
+          name,
+          currency: d.currency,
+          total_payable_original: 0,
+          total_payable_paid: 0,
+          total_payable_remaining: 0,
+          total_receivable_original: 0,
+          total_receivable_paid: 0,
+          total_receivable_remaining: 0,
+          debts_count: 0
+        };
+      }
+      const cp = counterpartiesMap[key];
+      if (d.type === 'payable') {
+        cp.total_payable_original += d.original_amount;
+        cp.total_payable_paid += d.paid_amount;
+        cp.total_payable_remaining += d.remaining_amount;
+      } else if (d.type === 'receivable') {
+        cp.total_receivable_original += d.original_amount;
+        cp.total_receivable_paid += d.paid_amount;
+        cp.total_receivable_remaining += d.remaining_amount;
+      }
+      cp.debts_count += 1;
+    }
+
+    // Recent 30 transactions
+    const recentTransactions = (rawTxs || []).slice(0, 30).map(t => ({
+      id: t.id,
+      date: (t.date || t.created_at || '').slice(0, 10),
+      type: t.type,
+      amount: Number(t.amount_original ?? t.amount_idr ?? 0),
+      currency: (t.currency_original || 'IDR').toUpperCase(),
+      counterparty: t.counterparty || '',
+      category: t.category || '',
+      description: t.description || ''
+    }));
+
     // Only safe deterministic facts go to the model.
     const facts = {
+      company: {
+        id: biz.business.id,
+        name: biz.business.name || 'Company',
+        wallets: walletsWithBalance,
+        counterparties: Object.values(counterpartiesMap),
+        debts: debtsSummary,
+        recent_transactions: recentTransactions
+      },
       jurisdiction: data.jurisdiction,
       profile: data.profile ? { legal_entity_type: data.profile.legal_entity_type, tax_regime: data.profile.tax_regime, vat_status: data.profile.vat_status, employee_status: data.profile.employee_status, financial_year_start: data.profile.financial_year_start, financial_year_end: data.profile.financial_year_end } : null,
       profile_completeness_percent: data.completeness.percent,
@@ -2911,30 +3026,87 @@ app.post('/api/accountant/ask', auth, async (req, res) => {
       overdue_obligations: data.overdue.map(e => ({ title: e.title, due_date: e.due_date })),
       active_unverified_rules: data.active_unverified,
     };
-    const prompt = `You are the Helm Finance AI Accountant for ONE business. Answer in ${language === 'ru' ? 'Russian' : language === 'id' ? 'Indonesian' : 'English'}.
+    const prompt = `You are the Helm Finance AI Accountant for business "${biz.business?.name || 'Company'}". Answer in ${language === 'ru' ? 'Russian' : language === 'id' ? 'Indonesian' : 'English'}.
 
 STRICT RULES:
-- Use ONLY the deterministic facts below. NEVER invent a tax rate, deadline, filing frequency, threshold or legal interpretation.
-- If the facts do not contain an active rule needed to answer, say the determination is not possible yet and what is missing (e.g. missing profile fields, unverified rules).
-- When you state an obligation, cite its rule_code, version and official source title.
-- You explain and summarise; you do not calculate tax amounts (the deterministic engine does that later).
+- Use ONLY the deterministic facts below. NEVER invent a tax rate, deadline, filing frequency, threshold, legal interpretation, or financial figure.
+- For company financial questions (wallets, balances, debts, payables, receivables, counterparties, vendor payments, transactions): use the data in "facts.company". Report exact numbers, currencies, paid amounts, remaining amounts, and settlement statuses from "counterparties", "debts", or "wallets".
+- For tax compliance and legal obligations: cite rule_code, version, and official source title from "applicable_rules". If the facts do not contain an active rule needed to answer, say the determination is not possible yet and state what is missing.
+- You explain and summarise facts; you do not invent information not present in the facts.
 - Do not present this as official advice.
 
 FACTS:
-${JSON.stringify(facts)}
+${JSON.stringify(facts, null, 2)}
 
 QUESTION: ${question}`;
 
     let answer;
-    try {
-      const resp = await anthropic.messages.create({ model: 'claude-sonnet-4-5', max_tokens: 700, messages: [{ role: 'user', content: prompt }] });
-      answer = (resp.content?.[0]?.text || '').trim();
-    } catch {
-      // Local fallback keeps the feature usable if the model is unavailable.
-      answer = data.applicable_rules.length
-        ? `Applicable obligations: ${data.applicable_rules.map(r => `${r.title} (${r.rule_code} v${r.version})`).join('; ')}. ${data.overdue.length ? `${data.overdue.length} overdue. ` : ''}Confirm with a licensed professional.`
-        : `No active verified tax rules apply yet${data.missing_profile_fields.length ? ` — missing profile fields: ${data.missing_profile_fields.join(', ')}` : ''}. Determination not possible.`;
+    if (anthropic && process.env.ANTHROPIC_API_KEY) {
+      try {
+        const resp = await anthropic.messages.create({ model: 'claude-sonnet-4-5', max_tokens: 700, messages: [{ role: 'user', content: prompt }] });
+        answer = (resp.content?.[0]?.text || '').trim();
+      } catch (aiErr) {
+        console.warn('[accountant/ask] Anthropic API call failed, falling back to deterministic answer:', aiErr.message);
+      }
     }
+
+    if (!answer) {
+      const qLower = question.toLowerCase();
+      const cpList = Object.values(counterpartiesMap);
+      // 1. Longest / exact full-name match first
+      let matchedCp = cpList
+        .filter(cp => qLower.includes(cp.name.toLowerCase()))
+        .sort((a, b) => b.name.length - a.name.length)[0] || null;
+
+      // 2. Fallback to scoring specific tokens
+      if (!matchedCp) {
+        const commonTokens = new Set(['qa-7day-run01', 'pt', 'cv', 'ltd', 'inc', 'llc', 'the', 'vendor', 'supplier']);
+        let bestScore = 0;
+        for (const cp of cpList) {
+          const parts = cp.name.toLowerCase().split(/[\s_\-]+/).filter(p => p.length >= 3 && !commonTokens.has(p));
+          const score = parts.filter(p => qLower.includes(p)).length;
+          if (score > bestScore) {
+            bestScore = score;
+            matchedCp = cp;
+          }
+        }
+      }
+
+      const isRu = language === 'ru';
+      const isId = language === 'id';
+      const fmt = (n, cur) => `${Number(n || 0).toLocaleString(isRu ? 'ru-RU' : isId ? 'id-ID' : 'en-US')} ${cur}`;
+
+      if (matchedCp) {
+        if (isRu) {
+          const paidStr = fmt(matchedCp.total_payable_paid, matchedCp.currency);
+          const remStr = fmt(matchedCp.total_payable_remaining, matchedCp.currency);
+          const statusStr = matchedCp.total_payable_remaining === 0 ? 'полностью оплачен (paid)' : 'имеет непогашенный остаток';
+          answer = `Поставщику «${matchedCp.name}» оплачено ${paidStr}. Текущий остаток долга: ${remStr}. Долг ${statusStr}.`;
+        } else if (isId) {
+          const paidStr = fmt(matchedCp.total_payable_paid, matchedCp.currency);
+          const remStr = fmt(matchedCp.total_payable_remaining, matchedCp.currency);
+          const statusStr = matchedCp.total_payable_remaining === 0 ? 'lunas (paid)' : 'masih ada sisa';
+          answer = `Kepada pemasok "${matchedCp.name}" telah dibayar ${paidStr}. Sisa tagihan saat ini: ${remStr}. Tagihan ${statusStr}.`;
+        } else {
+          const paidStr = fmt(matchedCp.total_payable_paid, matchedCp.currency);
+          const remStr = fmt(matchedCp.total_payable_remaining, matchedCp.currency);
+          const statusStr = matchedCp.total_payable_remaining === 0 ? 'fully paid' : 'partially open';
+          answer = `Paid to vendor "${matchedCp.name}": ${paidStr}. Remaining debt: ${remStr}. Status: ${statusStr}.`;
+        }
+      } else if (/кошел|wallet|баланс|balance/i.test(qLower) && walletsWithBalance.length > 0) {
+        const wList = walletsWithBalance.map(w => `${w.name}: ${fmt(w.balance, w.currency)}`).join(', ');
+        answer = isRu
+          ? `Текущие балансы кошельков: ${wList}.`
+          : isId
+          ? `Saldo dompet saat ini: ${wList}.`
+          : `Current wallet balances: ${wList}.`;
+      } else {
+        answer = data.applicable_rules.length
+          ? `Applicable obligations: ${data.applicable_rules.map(r => `${r.title} (${r.rule_code} v${r.version})`).join('; ')}. ${data.overdue.length ? `${data.overdue.length} overdue. ` : ''}Confirm with a licensed professional.`
+          : `No active verified tax rules apply yet${data.missing_profile_fields.length ? ` — missing profile fields: ${data.missing_profile_fields.join(', ')}` : ''}. Determination not possible.`;
+      }
+    }
+
     res.json({ answer, disclaimer, used_rules: data.applicable_rules.map(r => ({ rule_code: r.rule_code, version: r.version })) });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -8141,9 +8313,6 @@ app.patch('/api/reminders/:id/snooze', auth, async (req, res) => {
 });
 
 // --- Parse API (AI) --------------------------------------------------------
-
-const Anthropic = require('@anthropic-ai/sdk');
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 app.post('/api/parse', auth, async (req, res) => {
   try {
