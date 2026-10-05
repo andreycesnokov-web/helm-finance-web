@@ -107,6 +107,26 @@ BEGIN
     RAISE EXCEPTION 'wallet_currency_mismatch: Wallet currency does not match payment currency';
   END IF;
 
+  -- 3b. Re-check idempotency record after acquiring locks to prevent concurrent race
+  IF p_idempotency_key IS NOT NULL AND trim(p_idempotency_key) <> '' THEN
+    SELECT * INTO v_existing
+    FROM public.debt_payment_idempotency
+    WHERE business_id = p_business_id AND key = trim(p_idempotency_key);
+
+    IF FOUND THEN
+      IF v_existing.request_hash = p_request_hash THEN
+        RETURN jsonb_build_object(
+          'ok', true,
+          'is_replay', true,
+          'status', v_existing.response_status,
+          'data', v_existing.response_body
+        );
+      ELSE
+        RAISE EXCEPTION 'idempotency_key_mismatch: Key already used with different payment parameters';
+      END IF;
+    END IF;
+  END IF;
+
   -- 4. Calculate remaining balance with exact precision
   v_effective_total := COALESCE(v_debt.original_amount, v_debt.amount, 0);
   v_remaining := GREATEST(0, v_effective_total - COALESCE(v_debt.paid_amount, 0));
@@ -196,7 +216,8 @@ BEGIN
       v_tx_id,
       200,
       v_result
-    );
+    )
+    ON CONFLICT (business_id, key) DO NOTHING;
   END IF;
 
   RETURN jsonb_build_object(
