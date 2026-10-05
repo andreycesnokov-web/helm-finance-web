@@ -52,16 +52,22 @@ function tagOf(d, dir) {
  * Dated cash items inside the horizon.
  * @returns {{ items: Array, excluded: { foreign: number, undated: number } }}
  */
-export function cashItems({ debts = [], obligations = [], repayments = [], today = new Date(), horizon = DEFAULT_HORIZON } = {}) {
+export function cashItems({ debts = [], obligations = [], repayments = [], today = new Date(), horizon = DEFAULT_HORIZON, rates } = {}) {
   const t0 = startOfDay(today)
   const items = []
   const excluded = { foreign: 0, undated: 0 }
   for (const d of Array.isArray(debts) ? debts : []) {
-    if (!d || ['paid', 'cancelled'].includes(d.status)) continue
+    if (!d || ['paid', 'cancelled'].includes(d.status) || d.is_settled === true) continue
     if (d.approval_status === 'rejected') continue
     const isForeign = d.currency && d.currency !== 'IDR'
-    if (isForeign && d.amount_idr == null) { excluded.foreign++; continue }
-    const amount = num(isForeign ? d.amount_idr : (d.remaining_amount ?? d.amount))
+    let amtIdr = d.amount_idr
+    if (isForeign && amtIdr == null && rates) {
+      const rObj = rates[d.currency]
+      const r = rObj != null && typeof rObj === 'object' ? rObj.rate : rObj
+      if (r && Number(r) > 0) amtIdr = Math.round(num(d.remaining_amount ?? d.amount) * Number(r))
+    }
+    if (isForeign && amtIdr == null) { excluded.foreign++; continue }
+    const amount = num(isForeign ? amtIdr : (d.remaining_amount ?? d.amount))
     if (amount <= 0) continue
     if (!d.due_date) { excluded.undated++; continue }
     const due = startOfDay(d.due_date)

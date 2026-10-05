@@ -118,6 +118,7 @@ const RADAR_FIXTURE = {
     { id: 'r2', type: 'receivable', counterparty: 'Bali Retail Group', amount: 17650000, due_date: inDays(23) },
     { id: 'p1', type: 'payable', counterparty: 'Kantor Pajak', amount: 21400000, due_date: inDays(4) },
     { id: 'p2', type: 'payable', counterparty: 'Supplier Nusantara', amount: 9800000, due_date: inDays(-3) },
+    { id: 'p3', type: 'payable', counterparty: 'Auditor Konsultan', amount: 15000000, due_date: null },
   ],
 }
 // The zero-data case: a workspace with a balance but nothing planned.
