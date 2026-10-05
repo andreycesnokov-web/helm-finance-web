@@ -309,6 +309,14 @@ export function AICFOSummary({ ctx, t, planLabel, aiQLeft }) {
     : runway >= 999 ? '∞'
       : `${runway} ${t('radar.days')}`
 
+  let fxNote = ''
+  const fxMeta = c.fx_metadata || cash.rates_metadata
+  if (cash.has_incomplete_balance) {
+    fxNote = ` · Incomplete FX (${(cash.unvalued_currencies || []).join(', ')})`
+  } else if (fxMeta?.rate_effective_date) {
+    fxNote = ` · FX ${fxMeta.rate_effective_date}`
+  }
+
   return (
     <SummaryCard
       flagship
@@ -320,7 +328,7 @@ export function AICFOSummary({ ctx, t, planLabel, aiQLeft }) {
          green there would compete with green that means "financially healthy". */
       label={`${t('aicfo.cash')} · ${biz.name || t('aicfo.myBusiness')}`}
       value={<span className="fin">{money(cash.total_balance, currency)}</span>}
-      meta={`${moneyFull(cash.total_balance, currency)} · ${planLabel}`}
+      meta={`${moneyFull(cash.total_balance, currency)} · ${planLabel}${fxNote}`}
       metrics={[
         { k: t('aicfo.runway'), v: runwayValue, tone: METRIC_TONE[rBand] },
         {

@@ -26,6 +26,7 @@ Object.assign(process.env, {
   TELEGRAM_WEBHOOK_SECRET: 'fake',
   PORT: '5611',
   NODE_ENV: 'test',
+  FX_PROVIDER: 'mock',
 });
 
 // Extend _memorySupabase .or() filter to handle is.null and eq.false

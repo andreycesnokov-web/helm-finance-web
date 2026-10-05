@@ -65,8 +65,31 @@ export default function Accounts() {
               <div className="v2-stat">
                 <span className="v2-stat-label">{t('acc.total', { n: wallets.length })}</span>
                 <span className="v2-stat-big v2-num">{money(total)}</span>
-                {other.length > 0 && <span className="v2-muted v2-small">{t('acc.asOfDate', { d: shortDate(w.data?.as_of_date || new Date(), lang) })}</span>}
+                {other.length > 0 && (
+                  <span className="v2-muted v2-small">
+                    {t('acc.asOfDate', { d: shortDate(w.data?.rates_metadata?.rate_effective_date || w.data?.as_of_date || new Date(), lang) })}
+                    {w.data?.rates_metadata?.source && (
+                      <> · {
+                        w.data.rates_metadata.source === 'bi_jisdor_hybrid' ? 'Bank Indonesia JISDOR, ExchangeRate-API, CoinGecko'
+                        : w.data.rates_metadata.source === 'exchangerate_api_hybrid' ? 'ExchangeRate-API, CoinGecko'
+                        : w.data.rates_metadata.source === 'bi_jisdor' ? 'Bank Indonesia JISDOR'
+                        : w.data.rates_metadata.source === 'exchangerate_api' ? 'ExchangeRate-API'
+                        : w.data.rates_metadata.source === 'coingecko' ? 'CoinGecko'
+                        : w.data.rates_metadata.source === 'fixed_accounting_table' ? 'Fixed accounting table'
+                        : w.data.rates_metadata.source
+                      }</>
+                    )}
+                    {w.data?.rates_metadata?.status === 'weekend_holding' && <> · <span className="v2-tag-info">Weekend holding</span></>}
+                    {w.data?.rates_metadata?.status === 'degraded' && <> · <span className="v2-tag-warn">Fallback rates</span></>}
+                    {w.data?.rates_metadata?.status === 'stale' && <> · <span className="v2-tag-warn">Stale rate</span></>}
+                  </span>
+                )}
               </div>
+              {w.data?.has_incomplete_balance && (
+                <p className="v2-small" style={{ color: 'var(--text-warn, #b45309)', marginTop: 4 }}>
+                  <Pill tone="warn">Incomplete valuation</Pill> {w.data.unvalued_currencies?.join(', ')} {w.data.unvalued_currencies?.length > 1 ? 'wallets have' : 'wallet has'} no FX rate and {w.data.unvalued_currencies?.length > 1 ? 'are' : 'is'} excluded from the IDR total.
+                </p>
+              )}
               <p className="v2-muted v2-small">{t('acc.personalNote')}</p>
               {unlinked.count > 0 && <p className="v2-small"><Pill tone="warn">{t('acc.unlinkedTitle', { n: unlinked.count })}</Pill> {t('acc.unlinked', { v: money(unlinked.sum, { sign: true }), total: money(total + unlinked.sum) })} <Link to="/business/transactions">{t('nav.transactions')}</Link></p>}
               {labelledPersonal.length > 0 && <p className="v2-small"><Pill tone="warn">{t('acc.labelledPersonal')}</Pill> {t('acc.labelledNote', { n: labelledPersonal.length })}</p>}
@@ -100,13 +123,27 @@ export default function Accounts() {
                     <span className="v2-dec-amt v2-num">
                       <span>{money(x.balance, { currency: x.currency || 'IDR' })}</span>
                       {isNonIdr && x.balance_idr != null && <span className="v2-muted v2-small" style={{ display: 'block', fontSize: '0.8rem', fontWeight: 400 }}>≈ {money(x.balance_idr, { currency: 'IDR' })}</span>}
+                      {isNonIdr && x.balance_idr == null && <span className="v2-muted v2-small" style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-warn, #b45309)' }}>No FX rate</span>}
                     </span>
                     <Link className="v2-iconbtn" to="/business/accounts/manage" aria-label={t('acc.more', { name: x.name })}><I.chevRight size={18} /></Link>
                   </li>
                 )
               })}
             </ul>
-            {other.length > 0 && <p className="v2-muted v2-small">{t('acc.asOfDate', { d: shortDate(w.data?.as_of_date || new Date(), lang) })}</p>}
+            {other.length > 0 && (
+              <p className="v2-muted v2-small">
+                {t('acc.asOfDate', { d: shortDate(w.data?.rates_metadata?.rate_effective_date || w.data?.as_of_date || new Date(), lang) })}
+                {w.data?.rates_metadata?.source && ` · ${
+                  w.data.rates_metadata.source === 'bi_jisdor_hybrid' ? 'Bank Indonesia JISDOR, ExchangeRate-API, CoinGecko'
+                  : w.data.rates_metadata.source === 'exchangerate_api_hybrid' ? 'ExchangeRate-API, CoinGecko'
+                  : w.data.rates_metadata.source === 'bi_jisdor' ? 'Bank Indonesia JISDOR'
+                  : w.data.rates_metadata.source === 'exchangerate_api' ? 'ExchangeRate-API'
+                  : w.data.rates_metadata.source === 'coingecko' ? 'CoinGecko'
+                  : w.data.rates_metadata.source === 'fixed_accounting_table' ? 'Fixed accounting table'
+                  : w.data.rates_metadata.source
+                }`}
+              </p>
+            )}
           </Card>
         </div>
         <aside className="v2-col">
