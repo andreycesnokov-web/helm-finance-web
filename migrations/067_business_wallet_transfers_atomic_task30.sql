@@ -55,6 +55,33 @@ BEGIN
     RAISE EXCEPTION 'cannot_transfer_to_same_wallet: Source and destination wallets must be different';
   END IF;
 
+  -- Replay / idempotency protection: return existing record if transfer_id was already executed
+  IF p_transfer_id IS NOT NULL THEN
+    SELECT 
+      MAX(CASE WHEN type = 'expense' THEN id END),
+      MAX(CASE WHEN type = 'income' THEN id END)
+    INTO v_debit_id, v_credit_id
+    FROM public.transactions
+    WHERE business_id = p_business_id AND transfer_id = p_transfer_id;
+
+    IF v_debit_id IS NOT NULL OR v_credit_id IS NOT NULL THEN
+      RETURN jsonb_build_object(
+        'ok', true,
+        'is_replay', true,
+        'transfer_id', p_transfer_id,
+        'debit_transaction_id', v_debit_id,
+        'credit_transaction_id', v_credit_id,
+        'from_wallet_id', p_from_wallet_id,
+        'to_wallet_id', p_to_wallet_id,
+        'source_amount', p_source_amount,
+        'source_currency', upper(trim(p_source_currency)),
+        'target_amount', p_target_amount,
+        'target_currency', upper(trim(p_target_currency)),
+        'transaction_date', p_transaction_date
+      );
+    END IF;
+  END IF;
+
   -- Lock and verify source wallet (enforcing business workspace boundary)
   SELECT * INTO v_from_wallet
   FROM public.wallets

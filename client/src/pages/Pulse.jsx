@@ -243,15 +243,20 @@ export default function Pulse({ onDataLoad }) {
       .catch(() => {})
   }, [token])
 
-  const reload = () => load(scope)
+  const [payIdempotencyKey, setPayIdempotencyKey] = useState('')
 
   const handlePay = async () => {
     setPaying(true)
+    const key = payIdempotencyKey || (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : 'pulse-pay-' + Date.now() + '-' + Math.random().toString(36).slice(2))
+    if (!payIdempotencyKey) setPayIdempotencyKey(key)
     try {
       await apiFetch(`/debts/${payModal.id}/pay`, token, {
-        method: 'POST', body: { amount: Number(payForm.amount), account: payForm.account }
+        method: 'POST',
+        headers: { 'Idempotency-Key': key },
+        body: { amount: Number(payForm.amount), account: payForm.account, idempotency_key: key }
       })
       setPayModal(null)
+      setPayIdempotencyKey('')
       reload()
     } catch(e) { alert(e.message) }
     finally { setPaying(false) }
@@ -823,7 +828,7 @@ export default function Pulse({ onDataLoad }) {
 
       {/* ── Pay modal ────────────────────────────────────────────────────────── */}
       {payModal && (
-        <Modal onClose={() => setPayModal(null)}>
+        <Modal onClose={() => { setPayModal(null); setPayIdempotencyKey(''); }}>
           <div style={{ fontSize: 'var(--text-lg)', fontWeight: 600, color: 'var(--text)', marginBottom: 3 }}>
             {payModal.type === 'receivable' ? t('pulse.markAsReceived') : t('pulse.markAsPaid')}
           </div>
@@ -855,7 +860,7 @@ export default function Pulse({ onDataLoad }) {
                 ? t('pulse.payInFull') + fmt(Number(payForm.amount)) + ' IDR'
                 : t('pulse.pay') + fmt(Number(payForm.amount)) + ' IDR'}
           </button>
-          <button onClick={() => setPayModal(null)} className={btnS}>{t('common.cancel')}</button>
+          <button onClick={() => { setPayModal(null); setPayIdempotencyKey(''); }} className={btnS}>{t('common.cancel')}</button>
         </Modal>
       )}
 
