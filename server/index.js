@@ -8250,9 +8250,9 @@ app.post('/api/transactions/batch', auth, async (req, res) => {
     }
 
     // ── Wallet validation ────────────────────────────────────────────────────
-    // Collect distinct wallet_ids supplied in this batch
+    // Collect distinct wallet_ids supplied in this batch (including transfer targets)
     const requestedWalletIds = [...new Set(
-      transactions.map(t => t.wallet_id).filter(Boolean)
+      transactions.flatMap(t => [t.wallet_id, t.to_wallet_id]).filter(Boolean)
     )];
 
     let walletMap = {}; // id → { id, name, currency }
@@ -8275,12 +8275,97 @@ app.post('/api/transactions/batch', auth, async (req, res) => {
     }
 
     // ── Build rows ───────────────────────────────────────────────────────────
-    const rows = await Promise.all(transactions.map(async t => {
-      // Auto-fill source from wallet name if wallet_id provided but source is empty
-      const wallet        = t.wallet_id ? walletMap[t.wallet_id] : null;
+    const rowBatches = await Promise.all(transactions.map(async t => {
+      const wallet   = t.wallet_id ? walletMap[t.wallet_id] : null;
+      const toWallet = t.to_wallet_id ? walletMap[t.to_wallet_id] : null;
+      const txDate   = t.transaction_date || new Date().toISOString().slice(0, 10);
+
+      // Complete atomic double-entry transfer (TASK 30)
+      if (t.type === 'transfer' && toWallet && wallet) {
+        const transferId = t.transfer_id || crypto.randomUUID();
+        const transferRef = `xfer:${transferId}`;
+        const fromCur = String(wallet.currency || t.currency || 'IDR').toUpperCase().trim();
+        const toCur   = String(toWallet.currency || 'IDR').toUpperCase().trim();
+        const sourceAmt = Number(t.amount);
+        const desc = t.description || `Transfer: ${wallet.name} → ${toWallet.name}`;
+
+        const fxFrom = await fx.toIdr(sourceAmt, fromCur, txDate);
+        let targetAmt;
+        let fxTo;
+
+        if (fromCur === toCur) {
+          targetAmt = sourceAmt;
+          fxTo = fxFrom;
+        } else {
+          if (t.target_amount && Number(t.target_amount) > 0) {
+            targetAmt = Number(t.target_amount);
+          } else if (t.booked_rate || t.rate) {
+            targetAmt = Math.round(sourceAmt * Number(t.booked_rate || t.rate) * 100) / 100;
+          } else {
+            if (fromCur === 'IDR') {
+              const qTo = await fx.toIdr(1, toCur, txDate);
+              targetAmt = Math.round((sourceAmt / (qTo.booked_rate || 1)) * 100) / 100;
+            } else if (toCur === 'IDR') {
+              targetAmt = fxFrom.amount_idr;
+            } else {
+              const qTo = await fx.toIdr(1, toCur, txDate);
+              targetAmt = Math.round((fxFrom.amount_idr / (qTo.booked_rate || 1)) * 100) / 100;
+            }
+          }
+
+          if (toCur === 'IDR') {
+            fxTo = { amount_idr: targetAmt, booked_rate: 1, rate_source: 'base_currency' };
+          } else {
+            fxTo = await fx.toIdr(targetAmt, toCur, txDate, {
+              rate: t.booked_rate || t.rate,
+              source: t.rate_source || 'transfer_cross_currency',
+              actor: userId,
+            });
+          }
+        }
+
+        const debitLeg = {
+          ...bizWriteFields(biz, userId),
+          type: 'expense',
+          amount_original: sourceAmt,
+          currency_original: fromCur,
+          amount_idr: fxFrom.amount_idr,
+          booked_rate: fxFrom.booked_rate,
+          rate_source: fxFrom.rate_source,
+          description: desc,
+          source: transferRef,
+          scope: t.scope || 'business',
+          project: t.project || null,
+          category: 'Transfer',
+          transaction_date: txDate,
+          wallet_id: wallet.id,
+          transfer_id: transferId,
+        };
+
+        const creditLeg = {
+          ...bizWriteFields(biz, userId),
+          type: 'income',
+          amount_original: targetAmt,
+          currency_original: toCur,
+          amount_idr: fxTo.amount_idr,
+          booked_rate: fxTo.booked_rate,
+          rate_source: fxTo.rate_source,
+          description: desc,
+          source: transferRef,
+          scope: t.scope || 'business',
+          project: t.project || null,
+          category: 'Transfer',
+          transaction_date: txDate,
+          wallet_id: toWallet.id,
+          transfer_id: transferId,
+        };
+
+        return [debitLeg, creditLeg];
+      }
+
+      // Standard non-transfer transaction (or transfer without to_wallet)
       const resolvedSource = t.source || (wallet ? wallet.name : null);
       const cur = String(t.currency || wallet?.currency || 'IDR').toUpperCase().trim();
-      const txDate = t.transaction_date || new Date().toISOString().slice(0, 10);
 
       let fxRes;
       if (t.booked_rate || t.rate || (t.amount_idr && cur !== 'IDR')) {
@@ -8295,7 +8380,7 @@ app.post('/api/transactions/batch', auth, async (req, res) => {
         fxRes = await fx.toIdr(t.amount, cur, txDate);
       }
 
-      return {
+      return [{
         ...bizWriteFields(biz, userId),
         type:                   t.type,
         amount_original:        t.amount,
@@ -8318,8 +8403,11 @@ app.post('/api/transactions/batch', auth, async (req, res) => {
         activity_type_id:       t.activity_type_id         || null,
         // Wallet (TASK 29B — nullable, backward compatible)
         wallet_id:              t.wallet_id                || null,
-      };
+        transfer_id:            t.transfer_id              || null,
+      }];
     }));
+
+    const rows = rowBatches.flat();
 
     const { error } = await supabase.from('transactions').insert(rows);
     if (error) throw error;
@@ -10156,6 +10244,189 @@ app.post('/api/wallets/:id/adjust-balance', auth, async (req, res) => {
         currency: cur,
       });
     }
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// POST /api/wallets/transfer — atomic double-entry transfer between business wallets (TASK 30)
+app.post('/api/wallets/transfer', auth, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canCreateConfirmedFinancialRecord(biz.role)) {
+      return res.status(403).json({ error: 'Your role does not allow creating wallet transfers' });
+    }
+
+    const {
+      from_wallet_id,
+      to_wallet_id,
+      amount,
+      target_amount,
+      rate,
+      rate_source,
+      date,
+      description,
+    } = req.body;
+
+    const sourceAmount = Number(amount);
+    if (isNaN(sourceAmount) || sourceAmount <= 0) {
+      return res.status(400).json({ error: 'invalid_amount', message: 'Transfer amount must be greater than zero' });
+    }
+
+    if (!from_wallet_id || !to_wallet_id || from_wallet_id === to_wallet_id) {
+      return res.status(400).json({ error: 'invalid_transfer_wallets', message: 'Source and destination wallets must be different' });
+    }
+
+    const bizOr = bizOrFilter(biz);
+    const { data: wallets, error: wErr } = await supabase
+      .from('wallets')
+      .select('id, name, currency, scope, is_active')
+      .or(bizOr)
+      .in('id', [from_wallet_id, to_wallet_id]);
+
+    if (wErr) throw wErr;
+
+    const fromWallet = (wallets || []).find(w => w.id === from_wallet_id && w.is_active);
+    const toWallet = (wallets || []).find(w => w.id === to_wallet_id && w.is_active);
+
+    if (!fromWallet || !toWallet) {
+      return res.status(404).json({ error: 'wallet_not_found', message: 'One or both wallets not found or inactive' });
+    }
+
+    const fromCur = (fromWallet.currency || 'IDR').toUpperCase();
+    const toCur   = (toWallet.currency || 'IDR').toUpperCase();
+    const txDate  = date ? new Date(date).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10);
+    const transferId = req.body.transfer_id || crypto.randomUUID();
+    const transferRef = `xfer:${transferId}`;
+    const desc = (description && description.trim()) || `Transfer: ${fromWallet.name} → ${toWallet.name}`;
+
+    let fxResFrom;
+    let fxResTo;
+    let finalTargetAmount;
+
+    // 1. Calculate source FX in IDR
+    fxResFrom = await fx.toIdr(sourceAmount, fromCur, txDate);
+
+    // 2. Multi-currency calculation
+    if (fromCur === toCur) {
+      finalTargetAmount = sourceAmount;
+      fxResTo = fxResFrom;
+    } else {
+      if (target_amount && Number(target_amount) > 0) {
+        finalTargetAmount = Number(target_amount);
+      } else if (rate && Number(rate) > 0) {
+        finalTargetAmount = Math.round(sourceAmount * Number(rate) * 100) / 100;
+      } else {
+        // Compute from quote
+        if (fromCur === 'IDR') {
+          const qTo = await fx.toIdr(1, toCur, txDate);
+          finalTargetAmount = Math.round((sourceAmount / (qTo.booked_rate || 1)) * 100) / 100;
+        } else if (toCur === 'IDR') {
+          finalTargetAmount = fxResFrom.amount_idr;
+        } else {
+          const qTo = await fx.toIdr(1, toCur, txDate);
+          finalTargetAmount = Math.round((fxResFrom.amount_idr / (qTo.booked_rate || 1)) * 100) / 100;
+        }
+      }
+
+      if (toCur === 'IDR') {
+        fxResTo = { amount_idr: finalTargetAmount, booked_rate: 1, rate_source: 'base_currency' };
+      } else {
+        fxResTo = await fx.toIdr(finalTargetAmount, toCur, txDate, {
+          rate: rate || (sourceAmount > 0 ? fxResFrom.amount_idr / finalTargetAmount : null),
+          source: rate_source || 'transfer_cross_currency',
+          actor: userId,
+        });
+      }
+    }
+
+    // Try RPC for row-locking and single DB transaction
+    if (typeof supabase.rpc === 'function') {
+      try {
+        const { data: rpcRes, error: rpcErr } = await supabase.rpc('rpc_execute_wallet_transfer', {
+          p_business_id: biz.business.id,
+          p_user_id: userId,
+          p_from_wallet_id: fromWallet.id,
+          p_to_wallet_id: toWallet.id,
+          p_source_amount: sourceAmount,
+          p_source_currency: fromCur,
+          p_source_amount_idr: fxResFrom.amount_idr,
+          p_source_booked_rate: fxResFrom.booked_rate,
+          p_target_amount: finalTargetAmount,
+          p_target_currency: toCur,
+          p_target_amount_idr: fxResTo.amount_idr,
+          p_target_booked_rate: fxResTo.booked_rate,
+          p_rate_source: rate_source || fxResFrom.rate_source || 'system',
+          p_description: desc,
+          p_transaction_date: txDate,
+          p_transfer_id: transferId,
+          p_scope: 'business',
+        });
+
+        if (!rpcErr && rpcRes && rpcRes.ok) {
+          return res.status(201).json(rpcRes);
+        }
+        if (rpcErr && !rpcErr.message.includes('function') && !rpcErr.message.includes('does not exist')) {
+          return res.status(400).json({ error: rpcErr.message });
+        }
+      } catch (rpcErr) {
+        console.warn('[wallets/transfer] RPC execution skipped, using multi-row insert:', rpcErr.message);
+      }
+    }
+
+    // Fallback: Atomic multi-row insert (single statement executed atomically by PostgreSQL)
+    const debitLeg = {
+      ...bizWriteFields(biz, userId),
+      type: 'expense',
+      amount_original: sourceAmount,
+      currency_original: fromCur,
+      amount_idr: fxResFrom.amount_idr,
+      booked_rate: fxResFrom.booked_rate,
+      rate_source: fxResFrom.rate_source,
+      description: desc,
+      source: transferRef,
+      wallet_id: fromWallet.id,
+      scope: 'business',
+      category: 'Transfer',
+      transaction_date: txDate,
+      transfer_id: transferId,
+    };
+
+    const creditLeg = {
+      ...bizWriteFields(biz, userId),
+      type: 'income',
+      amount_original: finalTargetAmount,
+      currency_original: toCur,
+      amount_idr: fxResTo.amount_idr,
+      booked_rate: fxResTo.booked_rate,
+      rate_source: fxResTo.rate_source,
+      description: desc,
+      source: transferRef,
+      wallet_id: toWallet.id,
+      scope: 'business',
+      category: 'Transfer',
+      transaction_date: txDate,
+      transfer_id: transferId,
+    };
+
+    const { data: inserted, error: insErr } = await supabase
+      .from('transactions')
+      .insert([debitLeg, creditLeg])
+      .select();
+
+    if (insErr) throw insErr;
+
+    res.status(201).json({
+      ok: true,
+      transfer_id: transferId,
+      transactions: inserted,
+      source_amount: sourceAmount,
+      source_currency: fromCur,
+      target_amount: finalTargetAmount,
+      target_currency: toCur,
+    });
+  } catch (e) {
     res.status(500).json({ error: e.message });
   }
 });
