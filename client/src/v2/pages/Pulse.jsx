@@ -86,7 +86,7 @@ export default function Pulse() {
     const p = pulse.data
     if (!p) return null
     const obligations = obl.data?.obligations || []
-    const { items } = cashItems({ debts: p.debts, obligations, repayments: fund.data?.upcoming || [] })
+    const { items } = cashItems({ debts: p.debts, obligations, repayments: fund.data?.upcoming || [], rates: p.rates })
     const f = forecast({ balance: p.totalBalance, burnRate: p.burnRate, items })
     const runway = runwayDays(p)
     const tg = targets.data?.targets || null
@@ -141,7 +141,17 @@ export default function Pulse() {
           <div className="v2-hero-cash">
             <span className="v2-hero-label">{t('pulse.cashNow')}</span>
             <span className="v2-hero-big v2-num">{money(p.totalBalance)}</span>
-            <span className="v2-hero-meta">{t('pulse.accounts', { n: m.accounts.length, cur: currencies.join(', ') || 'IDR' })}</span>
+            <span className="v2-hero-meta">
+              {t('pulse.accounts', { n: m.accounts.length, cur: currencies.join(', ') || 'IDR' })}
+              {currencies.some((c) => c !== 'IDR') && p.rates_metadata && (
+                <> · {p.rates_metadata.source === 'bi_jisdor' || p.rates_metadata.source === 'bi_jisdor_hybrid' ? 'JISDOR' : 'FX'}{p.rates_metadata.rate_effective_date ? ` (${shortDate(p.rates_metadata.rate_effective_date, lang)})` : ''}{p.rates_metadata.status === 'weekend_holding' ? ' [Weekend]' : p.rates_metadata.status === 'stale' ? ' [Stale]' : ''}</>
+              )}
+            </span>
+            {p.has_incomplete_balance && (
+              <span className="v2-small" style={{ display: 'block', color: 'var(--text-warn, #b45309)', marginTop: 2 }}>
+                ⚠️ Incomplete valuation ({p.unvalued_currencies?.join(', ') || 'foreign'})
+              </span>
+            )}
           </div>
           <div className="v2-hero-pair">
             <div className="v2-hero-cell">

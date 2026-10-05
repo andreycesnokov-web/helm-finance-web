@@ -1074,6 +1074,8 @@ app.get('/api/pulse', auth, async (req, res) => {
 
     let accounts;
     let totalBalance = 0;
+    let hasIncompleteBalance = false;
+    const unvaluedCurrencies = [];
     if (userWallets && userWallets.length > 0) {
       accounts = filteredWallets.map(w => {
         const related = (allTxs || []).filter(t =>
@@ -1087,28 +1089,56 @@ app.get('/api/pulse', auth, async (req, res) => {
           return sum;
         }, 0);
         const cur = (w.currency || 'IDR').toUpperCase();
-        const rate = fx.getTodayRate(cur);
-        const balance_idr = cur === 'IDR' ? balance : Math.round(balance * rate);
+        const q = fx.getQuote(cur);
+        let rate = null;
+        let balance_idr = null;
+        let rateSource = null;
+        let rateEffectiveDate = null;
+        let isFixed = false;
+        let rateType = null;
+
+        if (cur === 'IDR') {
+          rate = 1;
+          balance_idr = balance;
+          rateSource = 'base_currency';
+          rateEffectiveDate = asOfDate;
+          isFixed = true;
+          rateType = 'base_currency';
+        } else if (q && q.rate != null && Number.isFinite(Number(q.rate))) {
+          rate = Number(q.rate);
+          balance_idr = Math.round(balance * rate);
+          rateSource = q.source;
+          rateEffectiveDate = q.rate_effective_date;
+          isFixed = !!q.is_fixed_accounting;
+          rateType = q.rate_type || 'market_api';
+        } else {
+          if (balance !== 0) {
+            hasIncompleteBalance = true;
+            if (!unvaluedCurrencies.includes(cur)) unvaluedCurrencies.push(cur);
+          }
+        }
+
         return {
           id: w.id,
           name: w.name,
           balance,
           balance_idr,
           rate_today: rate,
-          rate_source: cur === 'IDR' ? 'base_currency' : 'fixed_accounting_table',
-          rate_effective_date: cur === 'IDR' ? asOfDate : null,
-          verified_at: cur === 'IDR' ? asOfDate : null,
-          is_fixed_accounting: true,
-          rate_type: cur === 'IDR' ? 'base_currency' : 'fixed_accounting_rate',
+          rate_source: rateSource,
+          rate_effective_date: rateEffectiveDate,
+          verified_at: rateEffectiveDate,
+          is_fixed_accounting: isFixed,
+          rate_type: rateType,
           currency: cur,
           type: w.type || 'bank',
           entity_name: w.entity_name || null,
           scope: w.scope || 'business',
+          is_unvalued: balance_idr === null && cur !== 'IDR',
         };
       });
 
-      // Sum of wallet balances in IDR at today's rate
-      const walletTotalIdr = accounts.reduce((sum, a) => sum + (a.balance_idr ?? a.balance), 0);
+      // Sum of wallet balances in IDR at today's rate (exclude unvalued non-IDR)
+      const walletTotalIdr = accounts.reduce((sum, a) => sum + (a.balance_idr ?? (a.currency === 'IDR' ? a.balance : 0)), 0);
       const walletNames = new Set(filteredWallets.map(w => w.name));
       const unlinkedTxs = (allTxs || []).filter(t => !t.wallet_id && !walletNames.has(t.source));
       const unlinkedTotal = unlinkedTxs.reduce((sum, t) => {
@@ -1211,42 +1241,16 @@ app.get('/api/pulse', auth, async (req, res) => {
       todayFocus.push({ id: r.id, title: r.title, meta: r.meta || '', type: 'reminder', done: false });
     });
 
-    const serverRates = {
-      IDR: {
-        rate: 1,
-        source: 'base_currency',
-        calculated_at: calculatedAt,
-        as_of: asOfDate,
-        date: asOfDate,
-        rate_effective_date: asOfDate,
-        verified_at: asOfDate,
-        is_fixed_accounting: true,
-        rate_type: 'base_currency',
-      },
-    };
-    for (const cur of ['USD', 'EUR', 'SGD', 'USDT', 'MYR', 'THB', 'CNY', 'AUD', 'GBP', 'JPY']) {
-      try {
-        const r = fx.getTodayRate(cur);
-        if (r) {
-          serverRates[cur] = {
-            rate: r,
-            source: 'fixed_accounting_table',
-            calculated_at: calculatedAt,
-            as_of: asOfDate,
-            date: asOfDate,
-            rate_effective_date: null,
-            verified_at: null,
-            is_fixed_accounting: true,
-            rate_type: 'fixed_accounting_rate',
-          };
-        }
-      } catch (_) {}
-    }
+    const serverRates = fx.getRatesMap(asOfDate, calculatedAt);
+    const ratesMetadata = fx.getProviderMetadata();
 
     res.json({
       scope, totalBalance, income, expenses, burnRate, runway,
       as_of_date: asOfDate,
       rates: serverRates,
+      rates_metadata: ratesMetadata,
+      has_incomplete_balance: hasIncompleteBalance,
+      unvalued_currencies: unvaluedCurrencies,
       burnWindowDays: burnMetrics.burn_window_days,
       receivables, payables, netPosition,
       // Operating performance for the month, and the cash that moved but is NOT
@@ -9603,6 +9607,8 @@ app.get('/api/wallets', auth, async (req, res) => {
       .or(bizOr);
     if (tErr) throw tErr;
 
+    let hasIncompleteBalance = false;
+    const unvaluedCurrencies = [];
     const withBalance = wallets.map(w => {
       const related = (txs || []).filter(t =>
         t.wallet_id === w.id || (!t.wallet_id && t.source === w.name)
@@ -9615,15 +9621,60 @@ app.get('/api/wallets', auth, async (req, res) => {
         return sum;
       }, 0);
       const cur = (w.currency || 'IDR').toUpperCase();
-      const rate = fx.getTodayRate(cur);
-      const balance_idr = cur === 'IDR' ? balance : Math.round(balance * rate);
-      return { ...w, balance, balance_idr, rate_today: rate };
+      const q = fx.getQuote(cur);
+      let rate = null;
+      let balance_idr = null;
+      let rateSource = null;
+      let rateEffectiveDate = null;
+      let isFixed = false;
+      let rateType = null;
+
+      if (cur === 'IDR') {
+        rate = 1;
+        balance_idr = balance;
+        rateSource = 'base_currency';
+        rateEffectiveDate = new Date().toISOString().slice(0, 10);
+        isFixed = true;
+        rateType = 'base_currency';
+      } else if (q && q.rate != null && Number.isFinite(Number(q.rate))) {
+        rate = Number(q.rate);
+        balance_idr = Math.round(balance * rate);
+        rateSource = q.source;
+        rateEffectiveDate = q.rate_effective_date;
+        isFixed = !!q.is_fixed_accounting;
+        rateType = q.rate_type || 'market_api';
+      } else {
+        if (balance !== 0) {
+          hasIncompleteBalance = true;
+          if (!unvaluedCurrencies.includes(cur)) unvaluedCurrencies.push(cur);
+        }
+      }
+
+      return {
+        ...w,
+        balance,
+        balance_idr,
+        rate_today: rate,
+        rate_source: rateSource,
+        rate_effective_date: rateEffectiveDate,
+        is_fixed_accounting: isFixed,
+        rate_type: rateType,
+        is_unvalued: balance_idr === null && cur !== 'IDR',
+      };
     });
 
-    const total_balance_idr = withBalance.reduce((s, w) => s + (w.balance_idr ?? w.balance), 0);
+    const total_balance_idr = withBalance.reduce((s, w) => s + (w.balance_idr ?? (w.currency === 'IDR' ? w.balance : 0)), 0);
     const as_of_date = new Date().toISOString().slice(0, 10);
 
-    res.json({ wallets: withBalance, total_balance_idr, as_of_date });
+    res.json({
+      wallets: withBalance,
+      total_balance_idr,
+      as_of_date,
+      rates: fx.getRatesMap(as_of_date),
+      rates_metadata: fx.getProviderMetadata(),
+      has_incomplete_balance: hasIncompleteBalance,
+      unvalued_currencies: unvaluedCurrencies,
+    });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -11635,6 +11686,8 @@ async function buildAiCfoContext(userId, language = 'en', biz = null) {
   }
 
   // ── Wallet balances (multi-currency aware) ─────────────────────────────────
+  let hasIncompleteBalance = false;
+  const unvaluedCurrencies = [];
   const walletList = allWallets.map(w => {
     const related = (allTxs || []).filter(t => t.wallet_id === w.id || (!t.wallet_id && t.source === w.name));
     const bal = related.reduce((s,t) => {
@@ -11645,15 +11698,55 @@ async function buildAiCfoContext(userId, language = 'en', biz = null) {
       return s;
     }, 0);
     const cur = (w.currency || 'IDR').toUpperCase();
-    const rate = fx.getTodayRate(cur);
-    const balIdr = cur === 'IDR' ? bal : Math.round(bal * rate);
-    return { id: w.id, name: w.name, currency: cur, type: w.type, scope: w.scope || 'business', balance: bal, balance_idr: balIdr, rate_today: rate };
+    const q = fx.getQuote(cur);
+    let balIdr = null;
+    let rateToday = null;
+    let rateSource = null;
+    let rateEffectiveDate = null;
+    let isFixed = false;
+    let rateType = null;
+
+    if (cur === 'IDR') {
+      balIdr = bal;
+      rateToday = 1;
+      rateSource = 'base_currency';
+      rateEffectiveDate = new Date().toISOString().slice(0, 10);
+      isFixed = true;
+      rateType = 'base_currency';
+    } else if (q && q.rate != null && Number.isFinite(Number(q.rate))) {
+      rateToday = Number(q.rate);
+      balIdr = Math.round(bal * rateToday);
+      rateSource = q.source;
+      rateEffectiveDate = q.rate_effective_date;
+      isFixed = !!q.is_fixed_accounting;
+      rateType = q.rate_type || 'market_api';
+    } else {
+      if (bal !== 0) {
+        hasIncompleteBalance = true;
+        if (!unvaluedCurrencies.includes(cur)) unvaluedCurrencies.push(cur);
+      }
+    }
+    return {
+      id: w.id,
+      name: w.name,
+      currency: cur,
+      type: w.type,
+      scope: w.scope || 'business',
+      balance: bal,
+      balance_idr: balIdr,
+      rate_today: rateToday,
+      rate_source: rateSource,
+      rate_effective_date: rateEffectiveDate,
+      is_fixed_accounting: isFixed,
+      rate_type: rateType,
+      is_unvalued: balIdr === null && cur !== 'IDR',
+    };
   });
 
   // Total cash in IDR at today's rate across all business accounts
   const totalBalance = walletList
     .filter(w => (w.scope || 'business') === 'business')
-    .reduce((s, w) => s + (w.balance_idr ?? w.balance), 0);
+    .reduce((s, w) => s + (w.balance_idr ?? (w.currency === 'IDR' ? w.balance : 0)), 0);
 
   // Personal cash (informational only — not used in CFO score)
   const persTxs = (allTxs || []).filter(t => txBelongsToWallets(t, personalWallets, new Set(personalWallets.map(w => w.id)), 'personal'));
@@ -11716,7 +11809,17 @@ async function buildAiCfoContext(userId, language = 'en', biz = null) {
 
   const partialCtx = {
     business:        { name: (accessData?.business || {}).name || 'My Business', base_currency: (accessData?.business || {}).base_currency || 'IDR', plan: (accessData?.business || {}).plan || 'free', effective_plan: (accessData?.accessState || {}).effectivePlan || 'free', trial_status: (accessData?.business || {}).trial_status || 'inactive', days_left_in_trial: (accessData?.accessState || {}).daysLeft || 0 },
-    cash:            { total_balance: totalBalance, wallets_count: businessWallets.length, wallets: walletList.filter(w => (w.scope||'business') === 'business').slice(0,5) },
+    cash:            {
+      total_balance: totalBalance,
+      has_incomplete_balance: hasIncompleteBalance,
+      unvalued_currencies: unvaluedCurrencies,
+      wallets_count: businessWallets.length,
+      wallets: walletList.filter(w => (w.scope||'business') === 'business').slice(0,5),
+      rates: fx.getRatesMap(),
+      rates_metadata: fx.getProviderMetadata(),
+    },
+    fx_metadata:     fx.getProviderMetadata(),
+    rates:           fx.getRatesMap(),
     wallets_summary: walletsSummary,
     current_month: { income: monthIncome, expenses: monthExpenses, net_flow: monthIncome - monthExpenses, transactions_count: (monthTxs||[]).length, burn_rate: burnRate, burn_window_days: burnMetrics.burn_window_days },
     receivables:   { total_remaining: recvTotal, overdue_total: recvOverdue.reduce((s,d)=>s+Number(d.remaining_amount||0),0), overdue_count: recvOverdue.length, partial_total: recvList.filter(d=>d.status==='partial').reduce((s,d)=>s+Number(d.remaining_amount||0),0), due_soon_total: recvDueSoon.reduce((s,d)=>s+Number(d.remaining_amount||0),0), top: recvList.slice(0,5).map(d=>({counterparty:d.counterparty,remaining_amount:d.remaining_amount,due_date:d.due_date,status:d.status,days_overdue:d.days_overdue})) },
@@ -12418,6 +12521,9 @@ function generateLocalCfoAnswer(question, ctx) {
   if (/cash|balance|money|сколько|остат|баланс|дене/.test(q)) {
     let ans = `**${biz.name}** has **${fmt(cash.total_balance)} ${currency}** in total cash`;
     if (cash.wallets_count > 0) ans += ` across ${cash.wallets_count} wallet${cash.wallets_count > 1 ? 's' : ''}`;
+    if (cash.has_incomplete_balance && (cash.unvalued_currencies || []).length > 0) {
+      ans += ` (excluding unvalued ${cash.unvalued_currencies.join(', ')} wallets)`;
+    }
     ans += '.';
     if (recv.total_remaining > 0) ans += `\n\nYou also have **${fmt(recv.total_remaining)} ${currency}** in outstanding receivables.`;
     if (pay.total_remaining > 0)  ans += `\n\nUpcoming payables: **${fmt(pay.total_remaining)} ${currency}**.`;
@@ -12756,8 +12862,8 @@ FINANCIAL CONTEXT:
 - Payables: ${ctx.payables.total_remaining.toLocaleString()} ${currency} pending (${ctx.payables.overdue_count} overdue)
 ${ctx.receivables.top.length > 0 ? `- Top receivables: ${ctx.receivables.top.map(r => `${r.counterparty} ${r.remaining_amount.toLocaleString()} (${r.status})`).join(', ')}` : ''}
 ${ctx.payables.top.length > 0 ? `- Top payables: ${ctx.payables.top.map(p => `${p.counterparty} ${p.remaining_amount.toLocaleString()} (${p.status})`).join(', ')}` : ''}
-- Wallets: ${ctx.cash.wallets.map(w => `${w.name} ${w.balance.toLocaleString()} ${w.currency}`).join(', ') || 'none'}
-${(ctx.pending_submissions?.count > 0) ? `- Pending team submissions (NOT confirmed — do NOT count in obligations, mention as potential cash pressure): ${ctx.pending_submissions.count} item(s), receivables ${ctx.pending_submissions.receivables_total.toLocaleString()}, payables ${ctx.pending_submissions.payables_total.toLocaleString()} ${currency} — ${ctx.pending_submissions.items.map(i => `${i.counterparty || '—'} ${Number(i.amount||0).toLocaleString()} (${i.type}, by ${i.created_by || 'team'})`).join(', ')}` : ''}
+- Wallets: ${ctx.cash.wallets.map(w => `${w.name} ${w.balance.toLocaleString()} ${w.currency}${w.is_unvalued ? ' (UNVALUED: NO FX RATE)' : ''}`).join(', ') || 'none'}
+${ctx.cash.has_incomplete_balance && ctx.cash.unvalued_currencies?.length ? `- FX INCOMPLETE: Currencies [${ctx.cash.unvalued_currencies.join(', ')}] have no available exchange rate and are excluded from the ${currency} cash total.\n` : ''}${ctx.fx_metadata?.rate_effective_date ? `- FX Valuation Date: ${ctx.fx_metadata.rate_effective_date} (source: ${ctx.fx_metadata.primary_source || ctx.fx_metadata.source}, status: ${ctx.fx_metadata.status})\n` : ''}${(ctx.pending_submissions?.count > 0) ? `- Pending team submissions (NOT confirmed — do NOT count in obligations, mention as potential cash pressure): ${ctx.pending_submissions.count} item(s), receivables ${ctx.pending_submissions.receivables_total.toLocaleString()}, payables ${ctx.pending_submissions.payables_total.toLocaleString()} ${currency} — ${ctx.pending_submissions.items.map(i => `${i.counterparty || '—'} ${Number(i.amount||0).toLocaleString()} (${i.type}, by ${i.created_by || 'team'})`).join(', ')}` : ''}
 ${(ctx.compliance?.upcoming?.length) ? `- Upcoming tax/compliance deadlines (dates from the Tax Rules Registry; estimated amounts not yet computed in V1 — treat as compliance pressure, advise confirming with the accountant): ${ctx.compliance.upcoming.map(e => `${e.title} due ${e.due_date} (${e.status})`).join('; ')}${ctx.compliance.overdue_count ? ` · ${ctx.compliance.overdue_count} OVERDUE` : ''}` : ''}
 - Risk signals: ${ctx.risks.map(r => r.title).join('; ') || 'none'}
 - Top actions: ${(ctx.next_actions || []).slice(0,3).map(a => a.title).join(' | ') || 'none'}
@@ -14912,4 +15018,9 @@ if (EMAIL_AUTH_ENABLED && EMAIL_PROVIDER !== 'resend' && !EMAIL_AUTH_DEV_RETURN_
     'delivered — do not enable the production UI until this is fixed.');
 }
 
-app.listen(PORT, () => console.log(`Helm Finance Web running on port ${PORT}`));
+app.listen(PORT, () => {
+  console.log(`Helm Finance Web running on port ${PORT}`);
+  if (process.env.NODE_ENV !== 'test') {
+    fx.initScheduler();
+  }
+});
