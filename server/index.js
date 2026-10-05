@@ -1204,9 +1204,23 @@ app.get('/api/pulse', auth, async (req, res) => {
       todayFocus.push({ id: r.id, title: r.title, meta: r.meta || '', type: 'reminder', done: false });
     });
 
+    const asOfDate = new Date().toISOString().slice(0, 10);
+    const serverRates = {
+      IDR: { rate: 1, source: 'base_currency', date: asOfDate }
+    };
+    for (const cur of ['USD', 'EUR', 'SGD', 'USDT', 'MYR', 'THB', 'CNY', 'AUD', 'GBP', 'JPY']) {
+      try {
+        const r = fx.getTodayRate(cur);
+        if (r) {
+          serverRates[cur] = { rate: r, source: 'server_snapshot', date: asOfDate };
+        }
+      } catch (_) {}
+    }
+
     res.json({
       scope, totalBalance, income, expenses, burnRate, runway,
-      as_of_date: new Date().toISOString().slice(0, 10),
+      as_of_date: asOfDate,
+      rates: serverRates,
       burnWindowDays: burnMetrics.burn_window_days,
       receivables, payables, netPosition,
       // Operating performance for the month, and the cash that moved but is NOT

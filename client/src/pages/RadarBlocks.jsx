@@ -125,21 +125,27 @@ export function RadarForecast({ figures: f, t, hasAdvanced = true }) {
         </Card>
       )}
 
-      {/* Forecast assumptions for overdue, undated, and horizon-excluded items */}
-      {(f.assumptions?.overdueCount > 0 || f.assumptions?.undatedCount > 0 || f.assumptions?.futureExcludedCount > 0) && (
+      {/* Forecast assumptions for overdue, undated, horizon-excluded items and burn rate note */}
+      {(f.assumptions?.overdueCount > 0 || f.assumptions?.undatedCount > 0 || f.assumptions?.futureExcludedCount > 0 || (f.payables?.length > 0 && f.monthlyBurn > 0)) && (
         <div className="radar-assumptions" style={{ marginBottom: '16px', padding: '12px 16px', background: 'var(--surface-card-muted, rgba(255,255,255,0.03))', borderRadius: 'var(--radius-md, 8px)', border: '1px solid var(--border-subtle)', fontSize: '12.5px', color: 'var(--text-secondary)' }}>
           <div style={{ fontWeight: '700', color: 'var(--text-primary)', marginBottom: '6px' }}>
             {t('radar.assumptionsTitle')}
           </div>
           <ul style={{ margin: 0, paddingLeft: '18px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-            {f.assumptions.overdueCount > 0 && (
-              <li>{t('radar.overdueAssumedNow').replace('{n}', f.assumptions.overdueCount)}</li>
+            {f.assumptions?.overduePayablesCount > 0 && (
+              <li>{t('radar.overduePayablesAssumed').replace('{n}', f.assumptions.overduePayablesCount)}</li>
             )}
-            {f.assumptions.undatedCount > 0 && (
+            {f.assumptions?.overdueReceivablesCount > 0 && (
+              <li>{t('radar.overdueReceivablesRisk').replace('{n}', f.assumptions.overdueReceivablesCount)}</li>
+            )}
+            {f.assumptions?.undatedCount > 0 && (
               <li>{t('radar.undatedAssumed30').replace('{n}', f.assumptions.undatedCount)}</li>
             )}
-            {f.assumptions.futureExcludedCount > 0 && (
+            {f.assumptions?.futureExcludedCount > 0 && (
               <li>{t('radar.futureExcluded').replace('{n}', f.assumptions.futureExcludedCount)}</li>
+            )}
+            {f.payables?.length > 0 && f.monthlyBurn > 0 && (
+              <li style={{ color: 'var(--text-muted)' }}>{t('radar.burnDoubleCountNotice')}</li>
             )}
           </ul>
         </div>

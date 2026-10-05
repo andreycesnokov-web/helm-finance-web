@@ -219,25 +219,139 @@ t('assumptions track overdue and undated obligations explicitly', () => {
   assert.strictEqual(f.receivables.find(r => r.id === '2').is_undated, true);
 });
 
-t('separation of scheduled discrete obligations from rolling operational burn rate', () => {
+t('burnRate source and double-counting boundary: recurring expenses present in both history and payables', () => {
+  // Scenario:
+  // Last month the company paid rent of Rp 10,000,000. It is in allTxs, so rolling daily burnRate is 10M / 30 = 333,333.
+  // Next month the company also has scheduled rent of Rp 10,000,000 entered in debts (payables).
+  const burnRate = 10000000 / 30;
   const f = radarFigures({
-    totalBalance: 200000000,
-    burnRate: 2000000, // 2M / day = 60M / month
+    totalBalance: 50000000,
+    burnRate,
     debts: [
-      { id: '1', type: 'payable', amount: 40000000 },
+      { id: 'rent_future', type: 'payable', amount: 10000000, due_date: '2026-10-15' },
     ],
   });
-  // totalOut is discrete scheduled payments = 40M
-  assert.strictEqual(f.totalOut, 40000000);
-  // monthlyBurn is operational burn = 60M
-  assert.strictEqual(f.monthlyBurn, 60000000);
-  // Expected balance proj30 = balance + totalIn - totalOut - burnRate * 30
-  // 200M + 0 - 40M - 60M = 100M
-  assert.strictEqual(f.proj30, 100000000);
-  // Worst case: balance - totalOut - burnRate * 30 = 200M - 40M - 60M = 100M
-  assert.strictEqual(f.projWorst, 100000000);
-  // Best case: balance + totalIn - totalOut * 0.5 = 200M + 0 - 20M = 180M
-  assert.strictEqual(f.projBest, 180000000);
+
+  // Discrete scheduled payables: 10M
+  assert.strictEqual(f.totalOut, 10000000);
+  // Rolling monthly burn from past 30 days: 10M
+  assert.strictEqual(f.monthlyBurn, 10000000);
+  // Both are subtracted in the forecast: 50M - 10M (payables) - 10M (monthlyBurn) = 30M
+  assert.strictEqual(f.proj30, 30000000);
+  // Verified boundary: Without transactional categorization or tagging on burnRate,
+  // the client cannot automatically deduct past recurring rent from rolling burnRate.
+  // The system explicitly records burnRateNote in assumptions and does NOT claim "No Double-Counting".
+  assert.ok(f.assumptions.burnRateNote.includes('Recurring expenses'));
+});
+
+t('no static client fallback FX rates: missing server rate flags incomplete forecast', () => {
+  // Without server rates in data.rates or data.accounts, foreign currency is NOT converted via static client table
+  const fWithoutServerRates = radarFigures({
+    totalBalance: 50000000,
+    burnRate: 0,
+    debts: [
+      { id: '1', type: 'payable', amount: 1000, currency: 'USD' },
+    ],
+  });
+  assert.strictEqual(fWithoutServerRates.hasIncompleteForecast, true);
+  assert.strictEqual(fWithoutServerRates.totalOut, 0, 'USD debt without server rate must NOT be summed');
+  assert.strictEqual(fWithoutServerRates.unconvertedDebts[0].reason, 'unknown_rate');
+
+  // WITH server rates (including source and date metadata)
+  const fWithServerRates = radarFigures({
+    totalBalance: 50000000,
+    burnRate: 0,
+    as_of_date: '2026-10-05',
+    rates: {
+      USD: { rate: 16300, source: 'server_snapshot', date: '2026-10-05' },
+    },
+    debts: [
+      { id: '1', type: 'payable', amount: 1000, currency: 'USD' },
+    ],
+  });
+  assert.strictEqual(fWithServerRates.hasIncompleteForecast, false);
+  assert.strictEqual(fWithServerRates.totalOut, 16300000);
+  assert.strictEqual(fWithServerRates.payables[0].rate_source, 'server_snapshot');
+  assert.strictEqual(fWithServerRates.payables[0].rate_date, '2026-10-05');
+});
+
+t('overdue receivables are NOT treated as guaranteed: dropped in worst case', () => {
+  const today = '2026-10-05';
+  const f = radarFigures({
+    totalBalance: 100000000,
+    burnRate: 1000000,
+    debts: [
+      { id: 'p_overdue', type: 'payable', amount: 5000000, due_date: '2026-10-01' },
+      { id: 'r_overdue', type: 'receivable', amount: 8000000, due_date: '2026-10-01' },
+    ],
+  }, { today });
+
+  // Separate tracking in assumptions
+  assert.strictEqual(f.assumptions.overduePayablesCount, 1);
+  assert.strictEqual(f.assumptions.overdueReceivablesCount, 1);
+
+  // In expected scenario (proj30): receivables are included under collection assumption
+  // balance (100M) + totalIn (8M) - totalOut (5M) - burnRate * 30 (30M) = 73M
+  assert.strictEqual(f.proj30, 73000000);
+
+  // In worst-case scenario (projWorst): overdue receivables are DROPPED (risk of default/non-payment)
+  // balance (100M) - totalOut (5M) - burnRate * 30 (30M) = 65M
+  assert.strictEqual(f.projWorst, 65000000);
+  assert.strictEqual(f.projWorst, f.balance - f.totalOut - f.monthlyBurn);
+});
+
+t('programmatic before -> after execution on exact same fixture', () => {
+  // Legacy / Old implementation before fix
+  function oldRadarFigures(d) {
+    const balance = Number(d?.totalBalance || 0);
+    const burnRate = Number(d?.burnRate || 0);
+    const monthlyBurn = Math.round(burnRate * 30);
+    const receivables = (d?.debts || []).filter(x => x?.type === 'receivable');
+    const payables = (d?.debts || []).filter(x => x?.type === 'payable');
+    const totalIn = receivables.reduce((s, x) => s + Number(x?.amount || 0), 0);
+    const totalOut = payables.reduce((s, x) => s + Number(x?.amount || 0), 0);
+    const proj30 = balance + totalIn - totalOut - burnRate * 30;
+    return { balance, burnRate, monthlyBurn, totalIn, totalOut, proj30 };
+  }
+
+  const fixture = {
+    totalBalance: 100000000,
+    burnRate: 1000000,
+    rates: {
+      USD: { rate: 16300, source: 'server_snapshot', date: '2026-10-05' },
+    },
+    debts: [
+      { id: 'D1', type: 'payable', amount: 10000000, status: 'paid', remaining_amount: 0 },
+      { id: 'D2', type: 'payable', amount: 1000, currency: 'USD', due_date: '2026-10-15' },
+      { id: 'D3', type: 'payable', amount: 20000000, currency: 'IDR', due_date: '2026-11-20' },
+      { id: 'D4', type: 'receivable', amount: 2000, currency: 'USD', due_date: '2026-10-10' },
+      { id: 'D5', type: 'payable', amount: 5000000, currency: 'IDR', due_date: '2026-10-01' },
+      { id: 'D6', type: 'receivable', amount: 500, currency: 'XYZ', due_date: '2026-10-12' },
+    ],
+  };
+
+  const oldRes = oldRadarFigures(fixture);
+  const newRes = radarFigures(fixture, { today: '2026-10-05' });
+
+  // OLD calculation verification:
+  // totalIn: D4 (2000) + D6 (500) = 2500
+  assert.strictEqual(oldRes.totalIn, 2500);
+  // totalOut: D1 (10M) + D2 (1000) + D3 (20M) + D5 (5M) = 35001000 (D5 was included!)
+  assert.strictEqual(oldRes.totalOut, 35001000);
+  // proj30: 100M + 2500 - 35001000 - 30M = 35001500
+  assert.strictEqual(oldRes.proj30, 35001500);
+
+  // NEW calculation verification:
+  // D1 excluded (paid)
+  // D2 converted: 1000 USD * 16300 = 16.3M
+  // D3 excluded from 30d horizon (due in 46 days)
+  // D4 converted: 2000 USD * 16300 = 32.6M
+  // D5 included: 5M (overdue payable)
+  // D6 excluded (XYZ rate missing) -> hasIncompleteForecast: true
+  assert.strictEqual(newRes.totalIn, 32600000);
+  assert.strictEqual(newRes.totalOut, 21300000);
+  assert.strictEqual(newRes.proj30, 81300000);
+  assert.strictEqual(newRes.hasIncompleteForecast, true);
 });
 
 console.log(fail ? `\n${pass} passed, ${fail} failed` : `\nALL PASS — ${pass} passed, 0 failed`);

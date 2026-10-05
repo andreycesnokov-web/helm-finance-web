@@ -55,7 +55,7 @@ export default function Radar() {
   const model = useMemo(() => {
     if (!pulse.data) return null
     const p = pulse.data
-    const { items, excluded } = cashItems({ debts: p.debts, obligations: obl.data?.obligations || [], repayments: fund.data?.upcoming || [], horizon })
+    const { items, excluded } = cashItems({ debts: p.debts, obligations: obl.data?.obligations || [], repayments: fund.data?.upcoming || [], horizon, rates: p.rates })
     const chips = scenarioChips(items)
     const active = scenario.kind === 'worst' ? null : scenario
     const used = applyScenario(items, active)
