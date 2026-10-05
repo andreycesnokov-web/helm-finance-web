@@ -75,7 +75,8 @@ describe('Security & Atomicity Audit: Prevention of Atomic Write Bypass', () => 
         transaction_id bigint,
         response_status integer NOT NULL,
         response_body jsonb NOT NULL,
-        created_at timestamptz NOT NULL DEFAULT now()
+        created_at timestamptz NOT NULL DEFAULT now(),
+        CONSTRAINT debt_payment_idempotency_biz_key_unique UNIQUE (business_id, key)
       );
     `);
 
