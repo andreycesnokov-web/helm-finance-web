@@ -75,6 +75,7 @@ describe('Real PostgreSQL Concurrency & Atomicity on 2 Independent Connections',
         created_by_user_id bigint,
         user_id bigint,
         type text NOT NULL,
+        category text,
         amount_original numeric NOT NULL,
         currency_original text NOT NULL,
         amount_idr numeric NOT NULL,
@@ -198,7 +199,7 @@ describe('Real PostgreSQL Concurrency & Atomicity on 2 Independent Connections',
 
     const debtRow = await client1.query(`SELECT paid_amount, status FROM public.debts WHERE id = $1`, [debtIdA]);
     assert.strictEqual(Number(debtRow.rows[0].paid_amount), 7000000, 'Debt paid_amount reflects exactly one payment (2M + 5M = 7M)');
-    assert.strictEqual(debtRow.rows[0].status, 'open');
+    assert.strictEqual(debtRow.rows[0].status, 'partial');
   });
 
   it('Check 3: Concurrent replay of transfer on 2 independent connections creates exactly one debit/credit pair', async () => {
