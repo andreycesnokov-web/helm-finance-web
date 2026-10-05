@@ -125,6 +125,24 @@ export function RadarForecast({ figures: f, t, hasAdvanced = true }) {
         </Card>
       )}
 
+      {/* Warning if any obligations lack due date and are excluded from forecast */}
+      {f.undatedDebts?.length > 0 && (
+        <Card className="radar-upsell" style={{ borderColor: 'var(--cfo-warn, #f59e0b)', marginBottom: '16px' }}>
+          <div className="radar-upsell-text">
+            <span className="radar-upsell-title" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Icon.warn width="16" height="16" />
+              {t('radar.undatedExcludedWarningTitle')}
+            </span>
+            <span className="radar-upsell-sub">
+              {t('radar.undatedExcludedWarningSub')
+                .replace('{count}', String(f.undatedDebts.length))
+                .replace('{amount}', fmt(f.assumptions?.undatedTotalIdr || 0))}
+            </span>
+          </div>
+          <StatusBadge tone="warn">{t('radar.excludedFromForecast')}</StatusBadge>
+        </Card>
+      )}
+
       {/* Forecast assumptions for overdue, undated, horizon-excluded items and burn rate note */}
       {(f.assumptions?.overdueCount > 0 || f.assumptions?.undatedCount > 0 || f.assumptions?.futureExcludedCount > 0 || (f.payables?.length > 0 && f.monthlyBurn > 0)) && (
         <div className="radar-assumptions" style={{ marginBottom: '16px', padding: '12px 16px', background: 'var(--surface-card-muted, rgba(255,255,255,0.03))', borderRadius: 'var(--radius-md, 8px)', border: '1px solid var(--border-subtle)', fontSize: '12.5px', color: 'var(--text-secondary)' }}>
@@ -139,7 +157,7 @@ export function RadarForecast({ figures: f, t, hasAdvanced = true }) {
               <li>{t('radar.overdueReceivablesRisk').replace('{n}', f.assumptions.overdueReceivablesCount)}</li>
             )}
             {f.assumptions?.undatedCount > 0 && (
-              <li>{t('radar.undatedAssumed30').replace('{n}', f.assumptions.undatedCount)}</li>
+              <li>{t('radar.undatedExcludedFromForecast').replace('{n}', f.assumptions.undatedCount)}</li>
             )}
             {f.assumptions?.futureExcludedCount > 0 && (
               <li>{t('radar.futureExcluded').replace('{n}', f.assumptions.futureExcludedCount)}</li>
@@ -218,6 +236,34 @@ export function RadarForecast({ figures: f, t, hasAdvanced = true }) {
       ) : (
         <Card title={t('radar.keyDates')}>
           <DataList items={keyDates} />
+        </Card>
+      )}
+
+      {/* Undated obligations section: displayed with counterparty, amounts and "Set date" action */}
+      {f.undatedDebts?.length > 0 && (
+        <Card title={t('radar.undatedTitle')}>
+          <div style={{ marginBottom: '12px', fontSize: '12.5px', color: 'var(--text-secondary)' }}>
+            {t('radar.undatedSub')}
+          </div>
+          <DataList
+            items={f.undatedDebts.map((x) => ({
+              id: `u${x.id}`,
+              dir: x.type === 'receivable' ? 'in' : 'out',
+              label: x.counterparty || x.description || t('radar.unknownCounterparty'),
+              sub: `${x.type === 'receivable' ? t('radar.receivable') : t('radar.payable')}${x.original_currency && x.original_currency !== 'IDR' ? ` · ${x.original_currency} ${fmt(x.original_amount)}` : ''}`,
+              amount: `${x.type === 'receivable' ? '+' : '−'}${fmt(Math.abs(x.amount_idr ?? x.amount))}`,
+              amountTone: x.type === 'receivable' ? 'cfo-pos' : 'cfo-neg',
+              action: (
+                <a
+                  href={x.type === 'receivable' ? `/business/receivables?edit=${x.id}` : `/business/payables?edit=${x.id}`}
+                  className="cfo-btn cfo-btn-ghost cfo-btn-sm"
+                  style={{ textDecoration: 'none', marginLeft: 'auto' }}
+                >
+                  {t('radar.setDateAction')}
+                </a>
+              ),
+            }))}
+          />
         </Card>
       )}
 

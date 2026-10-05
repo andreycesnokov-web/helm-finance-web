@@ -1003,6 +1003,8 @@ app.get('/api/pulse', auth, async (req, res) => {
     const language = normalizeLanguage(req.query.language || await getUserLanguage(req.user.userId));
     const scope = req.query.scope || 'all';
     const now = new Date();
+    const asOfDate = now.toISOString().slice(0, 10);
+    const calculatedAt = now.toISOString();
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
     const bizOr = bizOrFilter(biz);
 
@@ -1093,6 +1095,11 @@ app.get('/api/pulse', auth, async (req, res) => {
           balance,
           balance_idr,
           rate_today: rate,
+          rate_source: cur === 'IDR' ? 'base_currency' : 'fixed_accounting_table',
+          rate_effective_date: cur === 'IDR' ? asOfDate : null,
+          verified_at: cur === 'IDR' ? asOfDate : null,
+          is_fixed_accounting: true,
+          rate_type: cur === 'IDR' ? 'base_currency' : 'fixed_accounting_rate',
           currency: cur,
           type: w.type || 'bank',
           entity_name: w.entity_name || null,
@@ -1204,15 +1211,34 @@ app.get('/api/pulse', auth, async (req, res) => {
       todayFocus.push({ id: r.id, title: r.title, meta: r.meta || '', type: 'reminder', done: false });
     });
 
-    const asOfDate = new Date().toISOString().slice(0, 10);
     const serverRates = {
-      IDR: { rate: 1, source: 'base_currency', date: asOfDate }
+      IDR: {
+        rate: 1,
+        source: 'base_currency',
+        calculated_at: calculatedAt,
+        as_of: asOfDate,
+        date: asOfDate,
+        rate_effective_date: asOfDate,
+        verified_at: asOfDate,
+        is_fixed_accounting: true,
+        rate_type: 'base_currency',
+      },
     };
     for (const cur of ['USD', 'EUR', 'SGD', 'USDT', 'MYR', 'THB', 'CNY', 'AUD', 'GBP', 'JPY']) {
       try {
         const r = fx.getTodayRate(cur);
         if (r) {
-          serverRates[cur] = { rate: r, source: 'server_snapshot', date: asOfDate };
+          serverRates[cur] = {
+            rate: r,
+            source: 'fixed_accounting_table',
+            calculated_at: calculatedAt,
+            as_of: asOfDate,
+            date: asOfDate,
+            rate_effective_date: null,
+            verified_at: null,
+            is_fixed_accounting: true,
+            rate_type: 'fixed_accounting_rate',
+          };
         }
       } catch (_) {}
     }

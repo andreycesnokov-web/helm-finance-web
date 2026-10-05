@@ -26,8 +26,8 @@ t('summary card proj30, projBest, projWorst equal day 30 chart forecast on multi
     burnRate: 1500000,
     as_of_date: today,
     rates: {
-      USD: { rate: 16300, source: 'server_snapshot', date: today },
-      EUR: { rate: 17800, source: 'server_snapshot', date: today },
+      USD: { rate: 16300, source: 'fixed_accounting_table', calculated_at: today, rate_effective_date: null, is_fixed_accounting: true },
+      EUR: { rate: 17800, source: 'fixed_accounting_table', calculated_at: today, rate_effective_date: null, is_fixed_accounting: true },
     },
     debts: [
       // 1. Open IDR receivable inside horizon
@@ -48,6 +48,10 @@ t('summary card proj30, projBest, projWorst equal day 30 chart forecast on multi
       { id: '8', type: 'payable', counterparty: 'Draft X', amount: 9000000, approval_status: 'rejected' },
       // 9. Debt due in 45 days (> 30 days horizon, must be excluded from BOTH)
       { id: '9', type: 'payable', counterparty: 'Future Tax', amount: 40000000, due_date: '2026-11-20' },
+      // 10. Undated IDR receivable (must be excluded from BOTH 30d card and chart forecast)
+      { id: '10', type: 'receivable', counterparty: 'Undated Client', amount: 15000000, due_date: null, status: 'open' },
+      // 11. Undated USD payable (must be excluded from BOTH 30d card and chart forecast, converted in undated list: 500 * 16300 = 8.15M)
+      { id: '11', type: 'payable', counterparty: 'Undated Cloud SaaS', amount: 500, currency: 'USD', due_date: null, status: 'open' },
     ],
   };
 
@@ -59,13 +63,21 @@ t('summary card proj30, projBest, projWorst equal day 30 chart forecast on multi
   const chartForecast = forecast({ balance: pulseData.totalBalance, burnRate: pulseData.burnRate, items: chartItems, horizon: 30, today });
   const day30 = chartForecast.days[30];
 
-  // Inflows: PT Surya (25M) + Global Corp (16.3M) = 41.3M
+  // Inflows: PT Surya (25M) + Global Corp (16.3M) = 41.3M (Undated Client 15M is EXCLUDED)
   assert.strictEqual(cardFigures.totalIn, 41300000);
   assert.strictEqual(cardFigures.totalIn, chartItems.filter(i => i.dir === 'in').reduce((s, i) => s + i.amount, 0));
 
-  // Outflows: PLN (8M) + Vendor Tech (5M remaining) + Office Lease (12M overdue) = 25M
+  // Outflows: PLN (8M) + Vendor Tech (5M remaining) + Office Lease (12M overdue) = 25M (Undated Cloud SaaS 8.15M is EXCLUDED)
   assert.strictEqual(cardFigures.totalOut, 25000000);
   assert.strictEqual(cardFigures.totalOut, chartItems.filter(i => i.dir === 'out').reduce((s, i) => s + i.amount, 0));
+
+  // Undated exclusions: both card and chart exclude the 2 undated items
+  assert.strictEqual(excluded.undated, 2);
+  assert.strictEqual(cardFigures.undatedDebts.length, 2);
+  assert.strictEqual(cardFigures.assumptions.undatedCount, 2);
+  assert.strictEqual(cardFigures.assumptions.undatedReceivablesTotalIdr, 15000000);
+  assert.strictEqual(cardFigures.assumptions.undatedPayablesTotalIdr, 8150000);
+  assert.strictEqual(cardFigures.assumptions.undatedTotalIdr, 23150000);
 
   // Exclusions:
   // Paid (id 6), Settled (id 7), Rejected (id 8), Future >30d (id 9)

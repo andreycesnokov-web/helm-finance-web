@@ -44,7 +44,16 @@ export function radarFigures(data, options = {}) {
   // Rate lookup: server rates ONLY. No static client fallback table.
   // Base currency IDR is 1:1 by definition.
   const rates = {
-    IDR: { rate: 1, source: 'base_currency', date: asOfDate },
+    IDR: {
+      rate: 1,
+      source: 'base_currency',
+      calculated_at: asOfDate,
+      date: asOfDate,
+      rate_effective_date: asOfDate,
+      verified_at: asOfDate,
+      is_fixed_accounting: true,
+      rate_type: 'base_currency',
+    },
   };
 
   // 1. From server accounts rate_today
@@ -53,8 +62,13 @@ export function radarFigures(data, options = {}) {
       if (acc && acc.currency && acc.rate_today) {
         rates[String(acc.currency).trim().toUpperCase()] = {
           rate: Number(acc.rate_today),
-          source: 'server_account_snapshot',
+          source: acc.rate_source || 'fixed_accounting_table',
+          calculated_at: asOfDate,
           date: asOfDate,
+          rate_effective_date: acc.rate_effective_date !== undefined ? acc.rate_effective_date : null,
+          verified_at: acc.verified_at !== undefined ? acc.verified_at : null,
+          is_fixed_accounting: acc.is_fixed_accounting !== undefined ? Boolean(acc.is_fixed_accounting) : true,
+          rate_type: acc.rate_type || 'fixed_accounting_rate',
         };
       }
     }
@@ -67,14 +81,24 @@ export function radarFigures(data, options = {}) {
       if (entry != null && typeof entry === 'object' && entry.rate != null) {
         rates[curCode] = {
           rate: Number(entry.rate),
-          source: entry.source || 'server_snapshot',
+          source: entry.source || 'fixed_accounting_table',
+          calculated_at: entry.calculated_at || entry.as_of || asOfDate,
           date: entry.date || asOfDate,
+          rate_effective_date: entry.rate_effective_date !== undefined ? entry.rate_effective_date : null,
+          verified_at: entry.verified_at !== undefined ? entry.verified_at : null,
+          is_fixed_accounting: entry.is_fixed_accounting !== undefined ? Boolean(entry.is_fixed_accounting) : true,
+          rate_type: entry.rate_type || 'fixed_accounting_rate',
         };
       } else if (entry != null && !Number.isNaN(Number(entry))) {
         rates[curCode] = {
           rate: Number(entry),
-          source: 'server_snapshot',
+          source: 'fixed_accounting_table',
+          calculated_at: asOfDate,
           date: asOfDate,
+          rate_effective_date: null,
+          verified_at: null,
+          is_fixed_accounting: true,
+          rate_type: 'fixed_accounting_rate',
         };
       }
     }
@@ -88,13 +112,23 @@ export function radarFigures(data, options = {}) {
         rates[curCode] = {
           rate: Number(entry.rate),
           source: entry.source || 'options_override',
+          calculated_at: entry.calculated_at || asOfDate,
           date: entry.date || asOfDate,
+          rate_effective_date: entry.rate_effective_date !== undefined ? entry.rate_effective_date : null,
+          verified_at: entry.verified_at !== undefined ? entry.verified_at : null,
+          is_fixed_accounting: entry.is_fixed_accounting !== undefined ? Boolean(entry.is_fixed_accounting) : false,
+          rate_type: entry.rate_type || 'override_rate',
         };
       } else if (entry != null && !Number.isNaN(Number(entry))) {
         rates[curCode] = {
           rate: Number(entry),
           source: 'options_override',
+          calculated_at: asOfDate,
           date: asOfDate,
+          rate_effective_date: null,
+          verified_at: null,
+          is_fixed_accounting: false,
+          rate_type: 'override_rate',
         };
       }
     }
@@ -112,7 +146,7 @@ export function radarFigures(data, options = {}) {
   const overdueReceivables = [];
   const undatedItems = [];
 
-  const includeUndated = options.includeUndated !== undefined ? Boolean(options.includeUndated) : true;
+  const includeUndated = Boolean(options.includeUndated);
 
   for (const item of rawDebts) {
     if (!item) continue;
@@ -154,6 +188,11 @@ export function radarFigures(data, options = {}) {
     let rateSource = null;
     let rateDate = null;
 
+    let rateCalculatedAt = asOfDate;
+    let rateEffectiveDate = null;
+    let rateType = 'base_currency';
+    let isFixedAccounting = true;
+
     if (rawCur === null || rawCur === '') {
       // Explicitly missing currency
       rateMissing = true;
@@ -166,6 +205,10 @@ export function radarFigures(data, options = {}) {
         rateUsed = 1;
         rateSource = 'base_currency';
         rateDate = asOfDate;
+        rateCalculatedAt = asOfDate;
+        rateEffectiveDate = asOfDate;
+        rateType = 'base_currency';
+        isFixedAccounting = true;
         amountIdr = remaining;
       }
     } else {
@@ -173,8 +216,12 @@ export function radarFigures(data, options = {}) {
       const rObj = rates[cur];
       if (rObj && Number(rObj.rate) > 0) {
         rateUsed = Number(rObj.rate);
-        rateSource = rObj.source || 'server_snapshot';
+        rateSource = rObj.source || 'fixed_accounting_table';
         rateDate = rObj.date || asOfDate;
+        rateCalculatedAt = rObj.calculated_at || asOfDate;
+        rateEffectiveDate = rObj.rate_effective_date !== undefined ? rObj.rate_effective_date : null;
+        rateType = rObj.rate_type || 'fixed_accounting_rate';
+        isFixedAccounting = rObj.is_fixed_accounting !== undefined ? Boolean(rObj.is_fixed_accounting) : true;
         amountIdr = cur === 'IDR' ? remaining : Math.round(remaining * rateUsed);
       } else {
         rateMissing = true;
@@ -199,7 +246,27 @@ export function radarFigures(data, options = {}) {
 
     if (!due) {
       isUndated = true;
-      undatedItems.push(item);
+      const undatedEnriched = {
+        ...item,
+        amount: amountIdr,
+        remaining_amount: remaining,
+        currency: cur,
+        original_amount: remaining,
+        original_currency: cur,
+        amount_idr: amountIdr,
+        amountIdr,
+        rate_used: rateUsed,
+        rate_source: rateSource,
+        rate_date: rateDate,
+        rate_calculated_at: rateCalculatedAt,
+        rate_effective_date: rateEffectiveDate,
+        rate_type: rateType,
+        is_fixed_accounting: isFixedAccounting,
+        days_until: null,
+        is_overdue: false,
+        is_undated: true,
+      };
+      undatedItems.push(undatedEnriched);
       if (!includeUndated) {
         continue;
       }
@@ -233,6 +300,10 @@ export function radarFigures(data, options = {}) {
       rate_used: rateUsed,
       rate_source: rateSource,
       rate_date: rateDate,
+      rate_calculated_at: rateCalculatedAt,
+      rate_effective_date: rateEffectiveDate,
+      rate_type: rateType,
+      is_fixed_accounting: isFixedAccounting,
       days_until: daysUntil,
       is_overdue: isOverdue,
       is_undated: isUndated,
@@ -255,11 +326,17 @@ export function radarFigures(data, options = {}) {
 
   const hasIncompleteForecast = unconverted.length > 0;
 
+  const undatedReceivables = undatedItems.filter(x => x.type === 'receivable');
+  const undatedPayables = undatedItems.filter(x => x.type === 'payable');
+
   return {
     balance,
     burnRate,
     receivables,
     payables,
+    undatedDebts: undatedItems,
+    undatedReceivables,
+    undatedPayables,
     totalIn,
     totalOut,
     proj30,
@@ -277,6 +354,11 @@ export function radarFigures(data, options = {}) {
       overdueReceivablesCount: overdueReceivables.length,
       overdueCount: overduePayables.length + overdueReceivables.length,
       undatedCount: undatedItems.length,
+      undatedReceivablesCount: undatedReceivables.length,
+      undatedPayablesCount: undatedPayables.length,
+      undatedReceivablesTotalIdr: undatedReceivables.reduce((s, x) => s + (x.amountIdr || 0), 0),
+      undatedPayablesTotalIdr: undatedPayables.reduce((s, x) => s + (x.amountIdr || 0), 0),
+      undatedTotalIdr: undatedItems.reduce((s, x) => s + (x.amountIdr || 0), 0),
       futureExcludedCount: excludedFuture.length,
       futureExcludedTotalIdr: excludedFuture.reduce((s, x) => s + (x.amountIdr || 0), 0),
       excludedPaidOrCancelledCount: excludedPaidOrCancelled.length,

@@ -23,11 +23,12 @@ const FIXTURE = {
   totalBalance: 122850000,
   burnRate: 3282833,
   burnWindowDays: 30,
+  as_of_date: '2026-10-05',
   debts: [
-    { id: 'r1', type: 'receivable', counterparty: 'PT Sinar Abadi', amount: 48200000 },
-    { id: 'r2', type: 'receivable', counterparty: 'Bali Retail Group', amount: 17650000 },
-    { id: 'p1', type: 'payable', counterparty: 'Kantor Pajak', amount: 21400000 },
-    { id: 'p2', type: 'payable', counterparty: 'Supplier Nusantara', amount: 9800000 },
+    { id: 'r1', type: 'receivable', counterparty: 'PT Sinar Abadi', amount: 48200000, due_date: '2026-10-14' },
+    { id: 'r2', type: 'receivable', counterparty: 'Bali Retail Group', amount: 17650000, due_date: '2026-10-28' },
+    { id: 'p1', type: 'payable', counterparty: 'Kantor Pajak', amount: 21400000, due_date: '2026-10-09' },
+    { id: 'p2', type: 'payable', counterparty: 'Supplier Nusantara', amount: 9800000, due_date: '2026-10-02' },
   ],
 };
 
@@ -101,11 +102,11 @@ t('debts with status paid, cancelled, or is_settled are strictly excluded', () =
     totalBalance: 100000000,
     burnRate: 1000000,
     debts: [
-      { id: '1', type: 'payable', amount: 10000000, status: 'paid' },
-      { id: '2', type: 'payable', amount: 5000000, status: 'cancelled' },
-      { id: '3', type: 'payable', amount: 7000000, is_settled: true },
-      { id: '4', type: 'payable', amount: 8000000, approval_status: 'rejected' },
-      { id: '5', type: 'payable', amount: 12000000, status: 'open' },
+      { id: '1', type: 'payable', amount: 10000000, status: 'paid', due_date: '2026-10-15' },
+      { id: '2', type: 'payable', amount: 5000000, status: 'cancelled', due_date: '2026-10-15' },
+      { id: '3', type: 'payable', amount: 7000000, is_settled: true, due_date: '2026-10-15' },
+      { id: '4', type: 'payable', amount: 8000000, approval_status: 'rejected', due_date: '2026-10-15' },
+      { id: '5', type: 'payable', amount: 12000000, status: 'open', due_date: '2026-10-15' },
     ],
   });
   assert.strictEqual(f.payables.length, 1);
@@ -120,11 +121,11 @@ t('partially paid debts use remaining balance; confirmed zero never falls back t
     burnRate: 0,
     debts: [
       // Explicit remaining_amount = 0 should be treated as settled/paid, NOT fall back to original_amount
-      { id: '1', type: 'payable', original_amount: 50000000, paid_amount: 50000000, remaining_amount: 0 },
+      { id: '1', type: 'payable', original_amount: 50000000, paid_amount: 50000000, remaining_amount: 0, due_date: '2026-10-15' },
       // Partial payment with explicit remaining_amount
-      { id: '2', type: 'payable', original_amount: 30000000, paid_amount: 10000000, remaining_amount: 20000000 },
+      { id: '2', type: 'payable', original_amount: 30000000, paid_amount: 10000000, remaining_amount: 20000000, due_date: '2026-10-15' },
       // Partial payment calculated from original_amount - paid_amount
-      { id: '3', type: 'receivable', original_amount: 40000000, paid_amount: 15000000 },
+      { id: '3', type: 'receivable', original_amount: 40000000, paid_amount: 15000000, due_date: '2026-10-15' },
     ],
   });
   assert.strictEqual(f.payables.length, 1);
@@ -146,9 +147,9 @@ t('foreign currencies are converted to IDR via exchange rates, never summed 1:1'
     burnRate: 0,
     rates: { USD: 16000, EUR: 18000 },
     debts: [
-      { id: '1', type: 'receivable', amount: 1000, currency: 'USD' },
-      { id: '2', type: 'payable', amount: 500, currency: 'EUR' },
-      { id: '3', type: 'payable', amount: 2000000, currency: 'IDR' },
+      { id: '1', type: 'receivable', amount: 1000, currency: 'USD', due_date: '2026-10-15' },
+      { id: '2', type: 'payable', amount: 500, currency: 'EUR', due_date: '2026-10-15' },
+      { id: '3', type: 'payable', amount: 2000000, currency: 'IDR', due_date: '2026-10-15' },
     ],
   });
   // 1000 USD * 16000 = 16,000,000 IDR
@@ -167,9 +168,9 @@ t('missing currency or unknown FX rate flags incomplete forecast and excludes it
     totalBalance: 50000000,
     burnRate: 0,
     debts: [
-      { id: '1', type: 'receivable', amount: 1000, currency: 'UNKNOWN_CURRENCY' },
-      { id: '2', type: 'payable', amount: 500, currency: null },
-      { id: '3', type: 'payable', amount: 5000000, currency: 'IDR' },
+      { id: '1', type: 'receivable', amount: 1000, currency: 'UNKNOWN_CURRENCY', due_date: '2026-10-15' },
+      { id: '2', type: 'payable', amount: 500, currency: null, due_date: '2026-10-15' },
+      { id: '3', type: 'payable', amount: 5000000, currency: 'IDR', due_date: '2026-10-15' },
     ],
   });
   assert.strictEqual(f.hasIncompleteForecast, true);
@@ -199,24 +200,96 @@ t('horizon filtering excludes debts due beyond 30 days', () => {
   assert.strictEqual(f.assumptions.futureExcludedTotalIdr, 30000000);
 });
 
-t('assumptions track overdue and undated obligations explicitly', () => {
+t('assumptions track overdue and undated obligations explicitly under unified contract', () => {
   const today = '2026-10-01';
   const f = radarFigures({
     totalBalance: 100000000,
     burnRate: 0,
     debts: [
-      { id: '1', type: 'payable', amount: 5000000, due_date: '2026-09-20' }, // Overdue
-      { id: '2', type: 'receivable', amount: 8000000, due_date: null },        // Undated
-      { id: '3', type: 'payable', amount: 12000000, due_date: '2026-10-10' }, // Normal
+      { id: '1', type: 'payable', amount: 5000000, due_date: '2026-09-20' }, // Overdue -> included
+      { id: '2', type: 'receivable', amount: 8000000, due_date: null },        // Undated -> EXCLUDED from 30d forecast
+      { id: '3', type: 'payable', amount: 12000000, due_date: '2026-10-10' }, // Normal -> included
     ],
   }, { today });
 
-  assert.strictEqual(f.totalIn, 8000000);
+  // Undated item excluded from forecast inflows
+  assert.strictEqual(f.totalIn, 0);
   assert.strictEqual(f.totalOut, 17000000);
   assert.strictEqual(f.assumptions.overdueCount, 1);
   assert.strictEqual(f.assumptions.undatedCount, 1);
   assert.strictEqual(f.payables.find(p => p.id === '1').is_overdue, true);
-  assert.strictEqual(f.receivables.find(r => r.id === '2').is_undated, true);
+  assert.strictEqual(f.undatedDebts.find(r => r.id === '2').is_undated, true);
+});
+
+t('undated obligations are strictly excluded from 30-day forecast in both directions (in/out), including foreign currency', () => {
+  const today = '2026-10-05';
+  const data = {
+    totalBalance: 100000000,
+    burnRate: 1000000,
+    as_of_date: today,
+    rates: {
+      USD: { rate: 16300, source: 'fixed_accounting_table', calculated_at: today, rate_effective_date: null, is_fixed_accounting: true },
+      EUR: { rate: 17800, source: 'fixed_accounting_table', calculated_at: today, rate_effective_date: null, is_fixed_accounting: true },
+    },
+    debts: [
+      // Dated items (should be counted in 30d forecast)
+      { id: 'd_r1', type: 'receivable', amount: 10000000, currency: 'IDR', due_date: '2026-10-15' },
+      { id: 'd_p1', type: 'payable', amount: 5000000, currency: 'IDR', due_date: '2026-10-20' },
+
+      // Undated IDR items
+      { id: 'u_r1', type: 'receivable', amount: 20000000, currency: 'IDR', due_date: null },
+      { id: 'u_p1', type: 'payable', amount: 8000000, currency: 'IDR', due_date: undefined },
+
+      // Undated Foreign currency items (USD and EUR)
+      // 1000 USD * 16300 = 16,300,000 IDR
+      { id: 'u_r2_usd', type: 'receivable', amount: 1000, currency: 'USD', due_date: null },
+      // 500 EUR * 17800 = 8,900,000 IDR
+      { id: 'u_p2_eur', type: 'payable', amount: 500, currency: 'EUR', due_date: '' },
+    ],
+  };
+
+  const f = radarFigures(data, { today });
+
+  // 1. Forecast includes ONLY dated items:
+  assert.strictEqual(f.totalIn, 10000000);
+  assert.strictEqual(f.receivables.length, 1);
+  assert.strictEqual(f.receivables[0].id, 'd_r1');
+
+  assert.strictEqual(f.totalOut, 5000000);
+  assert.strictEqual(f.payables.length, 1);
+  assert.strictEqual(f.payables[0].id, 'd_p1');
+
+  // proj30 = 100M + 10M - 5M - 30M = 75M
+  assert.strictEqual(f.proj30, 75000000);
+  assert.strictEqual(f.projBest, 100000000 + 10000000 - 2500000);
+  assert.strictEqual(f.projWorst, 100000000 - 5000000 - 30000000);
+
+  // 2. Undated obligations are strictly excluded and collected in dedicated structures:
+  assert.strictEqual(f.undatedDebts.length, 4);
+  assert.strictEqual(f.assumptions.undatedCount, 4);
+  assert.strictEqual(f.assumptions.undatedReceivablesCount, 2);
+  assert.strictEqual(f.assumptions.undatedPayablesCount, 2);
+
+  // Undated receivables: 20M IDR + 16.3M IDR (USD) = 36.3M IDR
+  assert.strictEqual(f.assumptions.undatedReceivablesTotalIdr, 36300000);
+  // Undated payables: 8M IDR + 8.9M IDR (EUR) = 16.9M IDR
+  assert.strictEqual(f.assumptions.undatedPayablesTotalIdr, 16900000);
+  assert.strictEqual(f.assumptions.undatedTotalIdr, 53200000);
+
+  // All undated items carry converted amount_idr and metadata
+  const usdItem = f.undatedDebts.find(d => d.id === 'u_r2_usd');
+  assert.strictEqual(usdItem.amount_idr, 16300000);
+  assert.strictEqual(usdItem.rate_used, 16300);
+  assert.strictEqual(usdItem.rate_source, 'fixed_accounting_table');
+  assert.strictEqual(usdItem.rate_effective_date, null);
+  assert.strictEqual(usdItem.is_fixed_accounting, true);
+
+  const eurItem = f.undatedDebts.find(d => d.id === 'u_p2_eur');
+  assert.strictEqual(eurItem.amount_idr, 8900000);
+  assert.strictEqual(eurItem.rate_used, 17800);
+  assert.strictEqual(eurItem.rate_source, 'fixed_accounting_table');
+  assert.strictEqual(eurItem.rate_effective_date, null);
+  assert.strictEqual(eurItem.is_fixed_accounting, true);
 });
 
 t('burnRate source and double-counting boundary: recurring expenses present in both history and payables', () => {
@@ -250,29 +323,30 @@ t('no static client fallback FX rates: missing server rate flags incomplete fore
     totalBalance: 50000000,
     burnRate: 0,
     debts: [
-      { id: '1', type: 'payable', amount: 1000, currency: 'USD' },
+      { id: '1', type: 'payable', amount: 1000, currency: 'USD', due_date: '2026-10-15' },
     ],
   });
   assert.strictEqual(fWithoutServerRates.hasIncompleteForecast, true);
   assert.strictEqual(fWithoutServerRates.totalOut, 0, 'USD debt without server rate must NOT be summed');
   assert.strictEqual(fWithoutServerRates.unconvertedDebts[0].reason, 'unknown_rate');
 
-  // WITH server rates (including source and date metadata)
+  // WITH server rates (including honest source and date metadata)
   const fWithServerRates = radarFigures({
     totalBalance: 50000000,
     burnRate: 0,
     as_of_date: '2026-10-05',
     rates: {
-      USD: { rate: 16300, source: 'server_snapshot', date: '2026-10-05' },
+      USD: { rate: 16300, source: 'fixed_accounting_table', calculated_at: '2026-10-05', rate_effective_date: null, is_fixed_accounting: true },
     },
     debts: [
-      { id: '1', type: 'payable', amount: 1000, currency: 'USD' },
+      { id: '1', type: 'payable', amount: 1000, currency: 'USD', due_date: '2026-10-15' },
     ],
   });
   assert.strictEqual(fWithServerRates.hasIncompleteForecast, false);
   assert.strictEqual(fWithServerRates.totalOut, 16300000);
-  assert.strictEqual(fWithServerRates.payables[0].rate_source, 'server_snapshot');
-  assert.strictEqual(fWithServerRates.payables[0].rate_date, '2026-10-05');
+  assert.strictEqual(fWithServerRates.payables[0].rate_source, 'fixed_accounting_table');
+  assert.strictEqual(fWithServerRates.payables[0].rate_effective_date, null);
+  assert.strictEqual(fWithServerRates.payables[0].is_fixed_accounting, true);
 });
 
 t('overdue receivables are NOT treated as guaranteed: dropped in worst case', () => {
