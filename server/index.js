@@ -2905,7 +2905,7 @@ app.post('/api/accountant/ask', auth, async (req, res) => {
     const bizOr = bizOrFilter(biz);
 
     // Fetch wallets for financial context
-    const { data: rawWallets } = await supabase
+    const { data: rawWallets, error: wErr } = await supabase
       .from('wallets')
       .select('id, name, currency, type, is_active')
       .or(bizOr)
@@ -2914,19 +2914,26 @@ app.post('/api/accountant/ask', auth, async (req, res) => {
       .order('created_at', { ascending: true });
 
     // Fetch transactions for balances, counterparty summaries, and recent activity
-    const { data: rawTxs } = await supabase
+    const { data: rawTxs, error: tErr } = await supabase
       .from('transactions')
-      .select('id, wallet_id, source, type, amount_original, amount_idr, currency_original, category, counterparty, description, created_at, date')
+      .select('id, wallet_id, source, type, amount_original, amount_idr, currency_original, category, counterparty, description, created_at, date, transaction_date, transfer_id')
       .or(bizOr)
       .order('created_at', { ascending: false });
 
     // Fetch and enrich debts / invoices (payable and receivable)
-    const { data: rawDebts } = await supabase
+    const { data: rawDebts, error: dErr } = await supabase
       .from('debts')
       .select('*')
       .or(bizOr)
       .or('is_training.is.null,is_training.eq.false')
       .order('created_at', { ascending: false });
+
+    // Fail gracefully with 500 if database facts cannot be retrieved
+    if (wErr || tErr || dErr) {
+      const err = wErr || tErr || dErr;
+      console.error('[accountant/ask] Failed to load company financial facts:', err.message);
+      return res.status(500).json({ error: 'failed_to_load_financial_facts', message: err.message });
+    }
 
     const enrichedDebts = await enrichDebtsFor(biz.business.id, rawDebts || []);
 
@@ -2949,37 +2956,60 @@ app.post('/api/accountant/ask', auth, async (req, res) => {
       };
     });
 
-    // Clean debt summaries
-    const debtsSummary = enrichedDebts.map(d => ({
-      id: d.id,
-      type: d.type, // 'payable' or 'receivable'
-      counterparty: d.counterparty || '',
-      currency: (d.currency || 'IDR').toUpperCase(),
-      original_amount: Number(d.original_amount ?? d.amount ?? 0),
-      paid_amount: Number(d.paid_amount || 0),
-      remaining_amount: Number(d.remaining_amount || 0),
-      status: d.status,
-      due_date: d.due_date || null,
-      description: d.description || ''
-    }));
+    // Clean debt summaries with attached payment history breakdown
+    const debtsSummary = enrichedDebts.map(d => {
+      const dCounterparty = (d.counterparty || '').trim().toLowerCase();
+      const debtPayments = (rawTxs || []).filter(t => {
+        if (t.id === d.linked_transaction_id) return true;
+        if (t.counterparty && t.counterparty.trim().toLowerCase() === dCounterparty) return true;
+        if (t.description && (
+          t.description.toLowerCase().includes(`payment: ${dCounterparty}`) ||
+          t.description.toLowerCase().includes(`debt #${d.id}`)
+        )) return true;
+        return false;
+      }).map(ptx => ({
+        transaction_id: ptx.id,
+        amount: Number(ptx.amount_original ?? ptx.amount_idr ?? 0),
+        currency: (ptx.currency_original || d.currency || 'IDR').toUpperCase(),
+        date: (ptx.transaction_date || ptx.date || ptx.created_at || '').slice(0, 10),
+        source: ptx.source || null,
+        description: ptx.description || null,
+      }));
 
-    // Aggregate counterparties across all debts
+      return {
+        id: d.id,
+        type: d.type, // 'payable' or 'receivable'
+        counterparty: d.counterparty || '',
+        currency: (d.currency || 'IDR').toUpperCase(),
+        original_amount: Number(d.original_amount ?? d.amount ?? 0),
+        paid_amount: Number(d.paid_amount || 0),
+        remaining_amount: Number(d.remaining_amount || 0),
+        status: d.status,
+        due_date: d.due_date || null,
+        description: d.description || '',
+        payments: debtPayments,
+      };
+    });
+
+    // Aggregate counterparties across all debts (partitioned by counterparty + currency to guarantee currency isolation)
     const counterpartiesMap = {};
     for (const d of debtsSummary) {
       const name = (d.counterparty || '').trim();
       if (!name) continue;
-      const key = name.toLowerCase();
+      const ccy = (d.currency || 'IDR').toUpperCase();
+      const key = `${name.toLowerCase()}:${ccy}`;
       if (!counterpartiesMap[key]) {
         counterpartiesMap[key] = {
           name,
-          currency: d.currency,
+          currency: ccy,
           total_payable_original: 0,
           total_payable_paid: 0,
           total_payable_remaining: 0,
           total_receivable_original: 0,
           total_receivable_paid: 0,
           total_receivable_remaining: 0,
-          debts_count: 0
+          debts_count: 0,
+          payments: [],
         };
       }
       const cp = counterpartiesMap[key];
@@ -2993,6 +3023,13 @@ app.post('/api/accountant/ask', auth, async (req, res) => {
         cp.total_receivable_remaining += d.remaining_amount;
       }
       cp.debts_count += 1;
+      if (Array.isArray(d.payments)) {
+        for (const p of d.payments) {
+          if (!cp.payments.some(existing => existing.transaction_id === p.transaction_id)) {
+            cp.payments.push(p);
+          }
+        }
+      }
     }
 
     // Recent 30 transactions
@@ -3004,7 +3041,8 @@ app.post('/api/accountant/ask', auth, async (req, res) => {
       currency: (t.currency_original || 'IDR').toUpperCase(),
       counterparty: t.counterparty || '',
       category: t.category || '',
-      description: t.description || ''
+      description: t.description || '',
+      transfer_id: t.transfer_id || null,
     }));
 
     // Only safe deterministic facts go to the model.
@@ -3031,6 +3069,8 @@ app.post('/api/accountant/ask', auth, async (req, res) => {
 STRICT RULES:
 - Use ONLY the deterministic facts below. NEVER invent a tax rate, deadline, filing frequency, threshold, legal interpretation, or financial figure.
 - For company financial questions (wallets, balances, debts, payables, receivables, counterparties, vendor payments, transactions): use the data in "facts.company". Report exact numbers, currencies, paid amounts, remaining amounts, and settlement statuses from "counterparties", "debts", or "wallets".
+- Internal transfers between business wallets are neutral liquidity movements, NEVER business revenue/income or operating expense.
+- When describing a counterparty's debt history, report the original debt amount, each payment made (amount, date, transaction id link), remaining debt, and settlement status.
 - For tax compliance and legal obligations: cite rule_code, version, and official source title from "applicable_rules". If the facts do not contain an active rule needed to answer, say the determination is not possible yet and state what is missing.
 - You explain and summarise facts; you do not invent information not present in the facts.
 - Do not present this as official advice.
@@ -3077,22 +3117,38 @@ QUESTION: ${question}`;
       const fmt = (n, cur) => `${Number(n || 0).toLocaleString(isRu ? 'ru-RU' : isId ? 'id-ID' : 'en-US')} ${cur}`;
 
       if (matchedCp) {
-        if (isRu) {
-          const paidStr = fmt(matchedCp.total_payable_paid, matchedCp.currency);
-          const remStr = fmt(matchedCp.total_payable_remaining, matchedCp.currency);
-          const statusStr = matchedCp.total_payable_remaining === 0 ? 'полностью оплачен (paid)' : 'имеет непогашенный остаток';
-          answer = `Поставщику «${matchedCp.name}» оплачено ${paidStr}. Текущий остаток долга: ${remStr}. Долг ${statusStr}.`;
-        } else if (isId) {
-          const paidStr = fmt(matchedCp.total_payable_paid, matchedCp.currency);
-          const remStr = fmt(matchedCp.total_payable_remaining, matchedCp.currency);
-          const statusStr = matchedCp.total_payable_remaining === 0 ? 'lunas (paid)' : 'masih ada sisa';
-          answer = `Kepada pemasok "${matchedCp.name}" telah dibayar ${paidStr}. Sisa tagihan saat ini: ${remStr}. Tagihan ${statusStr}.`;
-        } else {
-          const paidStr = fmt(matchedCp.total_payable_paid, matchedCp.currency);
-          const remStr = fmt(matchedCp.total_payable_remaining, matchedCp.currency);
-          const statusStr = matchedCp.total_payable_remaining === 0 ? 'fully paid' : 'partially open';
-          answer = `Paid to vendor "${matchedCp.name}": ${paidStr}. Remaining debt: ${remStr}. Status: ${statusStr}.`;
+        const paidStr = fmt(matchedCp.total_payable_paid, matchedCp.currency);
+        const remStr = fmt(matchedCp.total_payable_remaining, matchedCp.currency);
+        const origStr = fmt(matchedCp.total_payable_original, matchedCp.currency);
+        const statusStr = matchedCp.total_payable_remaining === 0
+          ? (isRu ? 'полностью оплачен (paid)' : isId ? 'lunas (paid)' : 'fully paid (status: paid)')
+          : (isRu ? 'имеет непогашенный остаток' : isId ? 'masih ada sisa' : 'partially open');
+
+        let pmtDetails = '';
+        if (matchedCp.payments && matchedCp.payments.length > 0) {
+          const pmtLines = matchedCp.payments.map(p =>
+            `• ${fmt(p.amount, p.currency)} (${p.date}${p.transaction_id ? `, #${p.transaction_id}` : ''})`
+          ).join('\n');
+          pmtDetails = isRu
+            ? `\nИстория платежей:\n${pmtLines}`
+            : isId
+            ? `\nRiwayat pembayaran:\n${pmtLines}`
+            : `\nPayment breakdown:\n${pmtLines}`;
         }
+
+        if (isRu) {
+          answer = `Поставщику «${matchedCp.name}» (долг: ${origStr}) оплачено ${paidStr}. Текущий остаток долга: ${remStr}. Статус: ${statusStr}.${pmtDetails}`;
+        } else if (isId) {
+          answer = `Kepada pemasok "${matchedCp.name}" (total tagihan: ${origStr}) telah dibayar ${paidStr}. Sisa tagihan saat ini: ${remStr}. Status: ${statusStr}.${pmtDetails}`;
+        } else {
+          answer = `Vendor "${matchedCp.name}" (original debt: ${origStr}): total paid ${paidStr}, remaining debt ${remStr}, status: ${statusStr}.${pmtDetails}`;
+        }
+      } else if (/перевод|transfer|pindah/i.test(qLower)) {
+        answer = isRu
+          ? 'Внутренние переводы между счетами и кошельками компании являются нейтральными перемещениями ликвидности и не признаются доходом (выручкой) или операционным расходом бизнеса.'
+          : isId
+          ? 'Transfer internal antar dompet perusahaan adalah pergerakan likuiditas netral dan bukan pendapatan maupun beban operasional bisnis.'
+          : 'Internal transfers between company wallets are neutral liquidity movements, not business revenue or operating expenses.';
       } else if (/кошел|wallet|баланс|balance/i.test(qLower) && walletsWithBalance.length > 0) {
         const wList = walletsWithBalance.map(w => `${w.name}: ${fmt(w.balance, w.currency)}`).join(', ');
         answer = isRu
@@ -3100,6 +3156,12 @@ QUESTION: ${question}`;
           : isId
           ? `Saldo dompet saat ini: ${wList}.`
           : `Current wallet balances: ${wList}.`;
+      } else if (/поставщик|vendor|клиент|client|supplier/i.test(qLower)) {
+        answer = isRu
+          ? 'По указанному контрагенту в активной компании записей не найдено. Проверьте правильность названия или переключитесь на нужную компанию.'
+          : isId
+          ? 'Tidak ada data untuk pihak terkait yang dicari di perusahaan aktif. Periksa nama atau beralih ke perusahaan yang sesuai.'
+          : 'No records found for the specified counterparty in the active company. Please check the name or switch to the correct company.';
       } else {
         answer = data.applicable_rules.length
           ? `Applicable obligations: ${data.applicable_rules.map(r => `${r.title} (${r.rule_code} v${r.version})`).join('; ')}. ${data.overdue.length ? `${data.overdue.length} overdue. ` : ''}Confirm with a licensed professional.`
