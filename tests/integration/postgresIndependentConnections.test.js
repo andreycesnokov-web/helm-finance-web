@@ -90,6 +90,14 @@ describe('Real PostgreSQL Concurrency & Atomicity on 2 Independent Connections',
       );
     `);
 
+    // Insert businesses
+    await client1.query(`
+      INSERT INTO public.businesses (id, name) VALUES
+        ($1, 'Business A'),
+        ($2, 'Business B')
+      ON CONFLICT (id) DO NOTHING;
+    `, [BIZ_A, BIZ_B]);
+
     // 2. Load migrations 066 and 067
     const m66 = fs.readFileSync(path.join(__dirname, '../../migrations/066_debt_payment_idempotency_and_atomic_rpc.sql'), 'utf8');
     await client1.query(m66);
@@ -147,7 +155,7 @@ describe('Real PostgreSQL Concurrency & Atomicity on 2 Independent Connections',
     const replayCount = (r1.is_replay ? 1 : 0) + (r2.is_replay ? 1 : 0);
     assert.strictEqual(replayCount, 1, 'Exactly one connection executed the payment, the other received replay');
 
-    // Verify only ONE transaction record exists for this idempotency key
+    // Verify only ONE transaction record exists for this payment
     const txRows = await client1.query(
       `SELECT count(*)::int as count FROM public.transactions WHERE business_id = $1 AND description = 'Payment: Independent Conn Vendor'`,
       [BIZ_A]
@@ -230,23 +238,26 @@ describe('Real PostgreSQL Concurrency & Atomicity on 2 Independent Connections',
     const key = crypto.randomUUID();
     const countBefore = await client1.query(`SELECT count(*)::int as c FROM public.transactions WHERE business_id = $1`, [BIZ_A]);
 
-    // Call payment RPC with invalid negative amount which triggers check constraint/exception
+    // Call payment RPC with amount exceeding remaining (20M > remaining 3M) which triggers RAISE EXCEPTION
     await assert.rejects(
       async () => {
         await client1.query(
           `SELECT public.rpc_record_debt_payment(
-            $1::uuid, $2::bigint, $3::bigint, $4::uuid, -500000::numeric,
-            'IDR'::text, -500000::numeric, 1::numeric, 'system'::text, '2026-10-05'::date,
+            $1::uuid, $2::bigint, $3::bigint, $4::uuid, 20000000::numeric,
+            'IDR'::text, 20000000::numeric, 1::numeric, 'system'::text, '2026-10-05'::date,
             $5::text, 'invalid_hash'::text, 'BCA'::text, now()
           )`,
           [BIZ_A, USER_A, debtIdA, walletA, key]
         );
       },
-      /payment_amount_must_be_positive|invalid/
+      /payment_exceeds_remaining/
     );
 
     const countAfter = await client1.query(`SELECT count(*)::int as c FROM public.transactions WHERE business_id = $1`, [BIZ_A]);
     assert.strictEqual(countAfter.rows[0].c, countBefore.rows[0].c, 'No partial records created after rollback');
+
+    const debtRow = await client1.query(`SELECT paid_amount FROM public.debts WHERE id = $1`, [debtIdA]);
+    assert.strictEqual(Number(debtRow.rows[0].paid_amount), 7000000, 'Debt paid_amount unchanged');
   });
 
   it('Check 5: Same idempotency key with different payload triggers conflict without new records', async () => {
@@ -254,7 +265,7 @@ describe('Real PostgreSQL Concurrency & Atomicity on 2 Independent Connections',
     const hash1 = 'hash-check5-payload-1';
     const hash2 = 'hash-check5-payload-2';
 
-    // 1st request with hash1 succeeds
+    // 1st request with hash1 succeeds (1M payment, remaining 3M -> 2M)
     const res1 = await client1.query(
       `SELECT public.rpc_record_debt_payment(
         $1::uuid, $2::bigint, $3::bigint, $4::uuid, 1000000::numeric,
