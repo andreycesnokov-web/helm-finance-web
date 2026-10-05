@@ -74,6 +74,7 @@ mem.__seed('transactions', [
 
 mem.__seed('debts', [
   { id: 'debt-usd-1', business_id: BIZ_ID, type: 'payable', counterparty: 'AWS Cloud', currency: 'USD', amount: 200, original_amount: 200, paid_amount: 0, status: 'open', approval_status: 'approved', due_date: '2026-10-15' },
+  { id: 'debt-aed-1', business_id: BIZ_ID, type: 'payable', counterparty: 'Dubai Property', currency: 'AED', amount: 500, original_amount: 500, paid_amount: 0, status: 'open', approval_status: 'approved', due_date: '2026-10-25' },
 ]);
 
 // Start server
@@ -93,6 +94,19 @@ async function reqGet(urlPath) {
   });
   const body = await res.json().catch(() => null);
   return { status: res.status, body };
+}
+
+async function reqPost(urlPath, body) {
+  const res = await fetch(`http://127.0.0.1:${process.env.PORT}${urlPath}`, {
+    method: 'POST',
+    headers: {
+      ...authHeaders,
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
+  const json = await res.json().catch(() => null);
+  return { status: res.status, body: json };
 }
 
 (async () => {
@@ -170,46 +184,160 @@ async function reqGet(urlPath) {
     assert.notEqual(usdtQuote.rate, usdQuote.rate, 'USDT is NOT equated 1:1 to USD');
 
     const meta = fx.getProviderMetadata();
+    assert.equal(meta.source, 'bi_jisdor_hybrid');
+    assert.ok(meta.primary_source.includes('Bank Indonesia JISDOR'));
     assert.equal(meta.status, 'fresh');
     assert.equal(meta.rate_effective_date, '2026-10-02');
   });
 
-  // ── SCENARIO 2: Timeout / failure retains last good rate as stale ───────────
-  await test('2. Timeout / source failure preserves last good rate with its real effective date and marks status as stale', async () => {
-    // Inject failing connector simulating network timeout / downstream 503
+  // ── SCENARIO 2: JISDOR timeout fallback to ExchangeRate-API ────────────────
+  await test('2. JISDOR timeout honest fallback: ExchangeRate-API is used for USD without claiming JISDOR', async () => {
     fx.setMockConnector(async () => {
-      throw new Error('ETIMEDOUT: Connection to Bank Indonesia timed out');
+      const nowIso = new Date().toISOString();
+      return {
+        status: 'degraded',
+        source: 'exchangerate_api_hybrid',
+        primary_source: 'Mixed: ExchangeRate-API (USD & Fiat), CoinGecko (USDT) [Bank Indonesia JISDOR unavailable]',
+        rate_effective_date: '2026-10-05',
+        last_error: 'jisdor: jisdor_timeout',
+        external_probes: {
+          bi_jisdor: { ok: false, error: 'jisdor_timeout', rate: null },
+          exchangerate_api: { ok: true, rate_usd_idr: 17915.06 },
+          coingecko: { ok: true, rate_usdt_idr: 17878.16 }
+        },
+        rates: {
+          IDR: { currency: 'IDR', rate: 1, source: 'base_currency', status: 'fresh' },
+          USD: {
+            currency: 'USD', pair: 'USD/IDR', rate: 17915.06, rate_str: '17915.06',
+            source: 'exchangerate_api', rate_type: 'market_api', rate_effective_date: '2026-10-05',
+            status: 'fresh', is_fallback: true, fallback_reason: 'Bank Indonesia JISDOR unavailable (jisdor_timeout)',
+          },
+          EUR: { currency: 'EUR', rate: 20154.42, source: 'exchangerate_api', rate_type: 'market_api', status: 'fresh' },
+          USDT: { currency: 'USDT', rate: 17878.16, source: 'coingecko', rate_type: 'crypto_market_api', status: 'fresh' },
+        }
+      };
     });
 
     const refreshRes = await fx.refreshRates({ force: true });
-    assert.equal(refreshRes.ok, false, 'refreshRates flagged failure');
+    assert.equal(refreshRes.ok, true);
 
-    // Rates from last successful run MUST be preserved with their true effective date
-    const usdQuote = fx.getQuote('USD');
-    assert.equal(usdQuote.rate, 17898, 'Last successful USD rate preserved');
-    assert.equal(usdQuote.rate_effective_date, '2026-10-02', 'True effective date preserved');
+    const usd = fx.getQuote('USD');
+    assert.equal(usd.rate, 17915.06);
+    assert.equal(usd.source, 'exchangerate_api', 'USD source is honestly exchangerate_api');
+    assert.equal(usd.is_fallback, true, 'is_fallback flag is set');
+    assert.ok(usd.fallback_reason.includes('jisdor_timeout'), 'Fallback reason records JISDOR timeout');
 
     const meta = fx.getProviderMetadata();
-    assert.equal(meta.status, 'stale', 'Status changed to stale');
-    assert.ok(meta.last_error.includes('ETIMEDOUT'), 'Last error recorded');
+    assert.equal(meta.source, 'exchangerate_api_hybrid', 'Metadata source is exchangerate_api_hybrid');
+    assert.ok(!meta.primary_source.startsWith('Bank Indonesia'), 'Does NOT falsely claim Bank Indonesia as USD source');
+    assert.equal(meta.status, 'degraded', 'Overall status is degraded');
   });
 
-  // ── SCENARIO 3: Service restart persistence ────────────────────────────────
-  await test('3. Service restart persistence (reloads saved rates from disk cache across restarts)', async () => {
-    // Assert cache file exists and contains valid JSON
+  // ── SCENARIO 3: Partial failure: Fiat succeeds, CoinGecko fails ─────────────
+  await test('3. Partial failure: Fiat updates to fresh, while failed CoinGecko leaves USDT stale (never weekend_holding)', async () => {
+    // Current USDT quote before failure
+    const prevUsdt = fx.getQuote('USDT');
+    assert.ok(prevUsdt);
+
+    fx.setMockConnector(async () => {
+      // Simulate fiat ok, but crypto failure
+      return {
+        status: 'degraded',
+        source: 'exchangerate_api_hybrid',
+        primary_source: 'Mixed: ExchangeRate-API (USD & Fiat) [USDT stale]',
+        rate_effective_date: '2026-10-05',
+        last_error: 'crypto: coingecko_timeout',
+        rates: {
+          IDR: { currency: 'IDR', rate: 1, source: 'base_currency', status: 'fresh' },
+          USD: { currency: 'USD', rate: 17915.06, source: 'exchangerate_api', status: 'fresh' },
+          EUR: { currency: 'EUR', rate: 20154.42, source: 'exchangerate_api', status: 'fresh' },
+          USDT: {
+            ...prevUsdt,
+            status: 'stale',
+            fallback_reason: 'Crypto source failed (coingecko_timeout)',
+          }
+        }
+      };
+    });
+
+    const refreshRes = await fx.refreshRates({ force: true });
+    assert.equal(refreshRes.ok, true);
+
+    const usdt = fx.getQuote('USDT');
+    assert.equal(usdt.status, 'stale', 'USDT marked as stale');
+    assert.notEqual(usdt.status, 'weekend_holding', 'USDT is NEVER marked weekend_holding (24/7 crypto market)');
+    assert.equal(usdt.rate, prevUsdt.rate, 'USDT retains its previous known rate without guessing 1:1');
+
+    const meta = fx.getProviderMetadata();
+    assert.equal(meta.status, 'degraded');
+  });
+
+  // ── SCENARIO 4: Cold-start persistence and restoration from disk ───────────
+  await test('4. Cold-start persistence: restores saved rates from disk cache across process restarts', async () => {
+    // Save current state to disk
+    fx.saveToDisk();
     assert.ok(fs.existsSync(TEST_CACHE_FILE), 'Disk cache file exists');
 
-    // Create a new isolated LiveFxState instance (simulating fresh server restart)
+    // Create a new isolated LiveFxState instance (simulating fresh server restart without network)
     const freshState = new fx.LiveFxState();
     const usd = freshState.getQuote('USD');
     assert.ok(usd, 'USD quote restored from disk cache');
-    assert.equal(usd.rate, 17898, 'Restored rate matches cached rate');
-    assert.equal(usd.rate_effective_date, '2026-10-02', 'Restored rate effective date matches');
+    assert.equal(usd.rate, 17915.06, 'Restored rate matches cached rate');
     assert.equal(freshState.getMetadata().status, 'cached', 'Restored status is cached');
+    assert.equal(freshState.getMetadata().is_restored_from_cache, true, 'is_restored_from_cache is true');
+    assert.ok(freshState.getMetadata().cache_age_seconds >= 0, 'cache_age_seconds is computed');
   });
 
-  // ── SCENARIO 4: Currency without rate flags incomplete total and avoids 1:1 fallback
-  await test('4. Currency without rate returns null, avoids 1:1 fallback, and flags incomplete balance', async () => {
+  // ── SCENARIO 5: Write operations audit (manual rates, debt pay guard, transfers) ──
+  await test('5. Write operations audit: manual rate preserved, debt payment with unvalued currency rejected', async () => {
+    // 5A: toIdr manual rate override preservation
+    const manualTx = await fx.toIdr(100, 'USD', '2026-10-05', {
+      rate: '17500',
+      reason: 'Special client agreement',
+      actor: USER_ID,
+    });
+    assert.equal(manualTx.amount_idr, 1750000, 'Manual rate used for amount_idr');
+    assert.equal(manualTx.booked_rate, '17500', 'Manual booked_rate preserved');
+    assert.equal(manualTx.rate_source, 'manual', 'rate_source is manual');
+    assert.notEqual(manualTx.booked_rate, String(fx.getQuote('USD').rate), 'Live auto-rate did NOT overwrite manual rate');
+
+    // 5B: Cross-currency transfer legs and delta calculation
+    const wUsd = { id: 'w-wise-usd', name: 'Wise USD', currency: 'USD' };
+    const wIdr = { id: 'w-bca-idr', name: 'BCA IDR', currency: 'IDR' };
+    const transferRes = await fx.buildTransferLegs({
+      sourceWallet: wUsd,
+      targetWallet: wIdr,
+      sourceAmount: 100,
+      targetAmount: 1780000,
+      transactionDate: '2026-10-05',
+    });
+    assert.ok(transferRes.conversion, 'Conversion object created');
+    assert.equal(transferRes.conversion.source_asset, 'USD');
+    assert.equal(transferRes.conversion.target_asset, 'IDR');
+    assert.equal(transferRes.conversion.booked_rate, '17800');
+    assert.ok(transferRes.fxDeltaIdr !== undefined, 'fxDeltaIdr is recorded');
+
+    // 5C: Debt payment with unvalued currency (debt-aed-1) MUST be rejected before mutation
+    const initialTxsCount = mem.__db['transactions'].length;
+    const debtAed = mem.__db['debts'].find(d => d.id === 'debt-aed-1');
+    assert.equal(debtAed.paid_amount, 0);
+
+    const payRes = await reqPost('/api/debts/debt-aed-1/pay', {
+      amount: 100,
+      date: '2026-10-05',
+    });
+    assert.equal(payRes.status, 400, 'Payment with unvalued currency rejected with HTTP 400');
+    assert.equal(payRes.body.error, 'fx_rate_unavailable', 'Error is fx_rate_unavailable');
+
+    // Verify zero mutations in database
+    assert.equal(mem.__db['transactions'].length, initialTxsCount, 'Zero transactions created');
+    const unchangedDebt = mem.__db['debts'].find(d => d.id === 'debt-aed-1');
+    assert.equal(unchangedDebt.paid_amount, 0, 'Debt paid_amount untouched');
+    assert.equal(unchangedDebt.status, 'open', 'Debt status untouched');
+  });
+
+  // ── SCENARIO 6: Currency without rate flags incomplete total and avoids 1:1 fallback
+  await test('6. Currency without rate returns null, avoids 1:1 fallback, and flags incomplete balance', async () => {
     // Query currency without rate ('AED' is in wallets but not in FX provider)
     const aedQuote = fx.getQuote('AED');
     assert.equal(aedQuote, null, 'Unvalued currency quote returns null');
@@ -226,8 +354,9 @@ async function reqGet(urlPath) {
     assert.equal(aedWallet.is_unvalued, true, 'is_unvalued is true');
 
     // Total balance in IDR must NOT include AED as 1:1 (200 AED must not become 200 IDR)
-    // Wallets: BCA 10M IDR + Wise 1,000 USD * 17,898 + Binance 500 USDT * 17,894.22
-    const expectedValuedIdr = 10000000 + (1000 * 17898) + Math.round(500 * 17894.22);
+    const usdRate = fx.getQuote('USD').rate;
+    const usdtRate = fx.getQuote('USDT').rate;
+    const expectedValuedIdr = 10000000 + (1000 * usdRate) + Math.round(500 * usdtRate);
     assert.equal(walletsRes.body.total_balance_idr, expectedValuedIdr, 'Total excludes unvalued currency without 1:1 fallback');
 
     // Check GET /api/pulse
@@ -245,8 +374,8 @@ async function reqGet(urlPath) {
     assert.equal(cfoRes.body.cash.total_balance, expectedValuedIdr, 'AI CFO total_balance excludes unvalued currency');
   });
 
-  // ── SCENARIO 5: Weekend / non-publication days are marked as weekend_holding
-  await test('5. Weekend / non-publication days are marked as weekend_holding, not technical failure', async () => {
+  // ── SCENARIO 7: Weekend / non-publication days are marked as weekend_holding
+  await test('7. Weekend / non-publication days are marked as weekend_holding for bank fixing', async () => {
     const liveInstance = new fx.LiveFxState();
 
     // Sunday test
@@ -266,20 +395,20 @@ async function reqGet(urlPath) {
     assert.equal(liveInstance.isWeekendOrHolding(tuesdayAfternoon), false, 'Tuesday business hours is active');
   });
 
-  // ── SCENARIO 6: Immutability of historical transactions ────────────────────
-  await test('6. Immutability of historical transactions (booked_rate and amount_idr stay untouched)', async () => {
+  // ── SCENARIO 8: Immutability of historical transactions ────────────────────
+  await test('8. Immutability of historical transactions (booked_rate and amount_idr stay untouched)', async () => {
     // In database, tx-hist-1 was booked at 16,300 IDR/USD with amount_idr = 16,300,000
     const txRow = mem.__db['transactions'].find(t => t.id === 'tx-hist-1');
     assert.ok(txRow, 'Historical transaction exists in DB');
     assert.equal(txRow.booked_rate, 16300, 'Historical booked_rate is 16300');
     assert.equal(txRow.amount_idr, 16300000, 'Historical amount_idr is 16300000');
 
-    // Even though live rate is now 17,898, historical row is NEVER updated
+    // Even though live rate is now 17,915.06, historical row is NEVER updated
     assert.notEqual(txRow.booked_rate, fx.getQuote('USD').rate, 'Historical booked_rate is independent from live rate');
   });
 
-  // ── SCENARIO 7: Screen consistency across Accounts, Pulse, Radar, AI CFO ──
-  await test('7. Screen consistency: Accounts, Pulse, Radar, and AI CFO produce identical IDR valuations', async () => {
+  // ── SCENARIO 9: Screen consistency across Accounts, Pulse, Radar, AI CFO ──
+  await test('9. Screen consistency: Accounts, Pulse, Radar, and AI CFO produce identical IDR valuations', async () => {
     const walletsRes = await reqGet('/api/wallets');
     const pulseRes = await reqGet('/api/pulse?scope=business');
     const cfoRes = await reqGet('/api/ai-cfo/context');

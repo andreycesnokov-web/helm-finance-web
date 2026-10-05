@@ -86,9 +86,15 @@ function parseJisdorHtml(html) {
 // ── Cache & Persistence Management ──────────────────────────────────────────
 const DEFAULT_CACHE_PATH = path.join(__dirname, '..', 'data', 'fx_rates_cache.json');
 function getCacheFilePath() {
+  // 1. Explicit file path takes absolute precedence (e.g. volume file mount)
   if (process.env.FX_CACHE_FILE) return process.env.FX_CACHE_FILE;
-  if ((process.env.NODE_ENV === 'test' || process.argv.some(a => String(a).includes('test'))) && !process.env.FX_LIVE_ENABLE_PROD_CACHE) {
-    return path.join(__dirname, '..', 'data', 'test_fx_rates_cache.json');
+  // 2. Persistent storage directory (e.g. Railway Volume mount /data)
+  if (process.env.FX_CACHE_DIR) return path.join(process.env.FX_CACHE_DIR, 'fx_rates_cache.json');
+  // 3. Isolated test cache when running tests
+  const isTest = process.env.NODE_ENV === 'test' ||
+    process.argv.some(a => String(a).includes('test') || String(a).endsWith('.test.js') || String(a).endsWith('.test.mjs'));
+  if (isTest && !process.env.FX_LIVE_ENABLE_PROD_CACHE) {
+    return process.env.FX_TEST_CACHE_FILE || path.join(__dirname, '..', 'data', 'test_fx_rates_cache.json');
   }
   return DEFAULT_CACHE_PATH;
 }
@@ -97,8 +103,8 @@ class LiveFxState {
   constructor() {
     this.rates = new Map();
     this.metadata = {
-      source: 'bi_jisdor_hybrid',
-      primary_source: 'Bank Indonesia JISDOR (USD), ExchangeRate-API (Fiat), CoinGecko (USDT)',
+      source: 'fixed_accounting_table',
+      primary_source: 'Fixed Accounting Table',
       status: 'uninitialized',
       last_success_at: null,
       last_attempt_at: null,
@@ -106,6 +112,8 @@ class LiveFxState {
       rate_effective_date: null,
       as_of_date: new Date().toISOString().slice(0, 10),
       currencies_available: [],
+      sources_summary: {},
+      external_probes: null,
     };
     this.customConnector = null;
     this.schedulerTimer = null;
@@ -135,6 +143,8 @@ class LiveFxState {
       as_of: today,
       status: 'fresh',
       is_fixed_accounting: true,
+      is_fallback: false,
+      fallback_reason: null,
     });
     for (const cur of ['USD', 'EUR', 'SGD', 'USDT', 'MYR', 'THB', 'CNY', 'AUD', 'GBP', 'JPY']) {
       const rateStr = MOCK_RATES[`${cur}/IDR`];
@@ -154,6 +164,8 @@ class LiveFxState {
           as_of: today,
           status: 'fresh',
           is_fixed_accounting: true,
+          is_fallback: false,
+          fallback_reason: null,
         });
       }
     }
@@ -162,6 +174,24 @@ class LiveFxState {
     this.metadata.primary_source = 'Fixed Accounting Table';
     this.metadata.rate_effective_date = null;
     this.metadata.currencies_available = Array.from(this.rates.keys());
+    this.buildSourcesSummary();
+  }
+
+  buildSourcesSummary() {
+    const summary = {};
+    for (const [cur, entry] of this.rates.entries()) {
+      summary[cur] = {
+        source: entry.source,
+        rate: entry.rate,
+        rate_type: entry.rate_type,
+        rate_effective_date: entry.rate_effective_date,
+        status: entry.status,
+        is_fallback: !!entry.is_fallback,
+        fallback_reason: entry.fallback_reason || null,
+      };
+    }
+    this.metadata.sources_summary = summary;
+    return summary;
   }
 
   loadFromDisk() {
@@ -177,11 +207,15 @@ class LiveFxState {
           }
           if (data.metadata) {
             this.metadata = { ...this.metadata, ...data.metadata };
-            // On reload from disk without network, mark as cached if not fresh
-            if (this.metadata.status === 'fresh') {
-              this.metadata.status = 'cached';
+            // On cold start from disk without immediate network connection, mark as cached
+            this.metadata.status = 'cached';
+            this.metadata.is_restored_from_cache = true;
+            this.metadata.restored_at = isoNow();
+            if (data.saved_at) {
+              this.metadata.cache_age_seconds = Math.max(0, Math.floor((Date.now() - new Date(data.saved_at).getTime()) / 1000));
             }
           }
+          this.buildSourcesSummary();
         }
       }
     } catch (_) {
@@ -200,6 +234,7 @@ class LiveFxState {
       for (const [cur, entry] of this.rates.entries()) {
         serializableRates[cur] = entry;
       }
+      this.buildSourcesSummary();
       const payload = {
         version: 1,
         saved_at: isoNow(),
@@ -219,8 +254,8 @@ class LiveFxState {
   reset() {
     this.rates.clear();
     this.metadata = {
-      source: 'bi_jisdor_hybrid',
-      primary_source: 'Bank Indonesia JISDOR (USD), ExchangeRate-API (Fiat), CoinGecko (USDT)',
+      source: 'fixed_accounting_table',
+      primary_source: 'Fixed Accounting Table',
       status: 'uninitialized',
       last_success_at: null,
       last_attempt_at: null,
@@ -228,13 +263,16 @@ class LiveFxState {
       rate_effective_date: null,
       as_of_date: new Date().toISOString().slice(0, 10),
       currencies_available: [],
+      sources_summary: {},
+      external_probes: null,
     };
     this.customConnector = null;
+    this.initDefaultFixedRates();
   }
 
   async fetchJisdorLive() {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 8000);
+    const timeout = setTimeout(() => controller.abort(), 7000);
     try {
       const res = await fetch('https://www.bi.go.id/id/statistik/informasi-kurs/jisdor/default.aspx', {
         signal: controller.signal,
@@ -249,6 +287,9 @@ class LiveFxState {
       const parsed = parseJisdorHtml(html);
       if (!parsed) throw new Error('jisdor_parse_failed');
       return parsed;
+    } catch (err) {
+      if (err.name === 'AbortError') throw new Error('jisdor_timeout');
+      throw err;
     } finally {
       clearTimeout(timeout);
     }
@@ -256,7 +297,7 @@ class LiveFxState {
 
   async fetchExchangeRateApiLive() {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 8000);
+    const timeout = setTimeout(() => controller.abort(), 7000);
     try {
       const res = await fetch('https://open.er-api.com/v6/latest/USD', { signal: controller.signal });
       clearTimeout(timeout);
@@ -264,6 +305,9 @@ class LiveFxState {
       const data = await res.json();
       if (!data || !data.rates || !data.rates.IDR) throw new Error('exchangerate_api_invalid_payload');
       return data;
+    } catch (err) {
+      if (err.name === 'AbortError') throw new Error('exchangerate_api_timeout');
+      throw err;
     } finally {
       clearTimeout(timeout);
     }
@@ -271,7 +315,7 @@ class LiveFxState {
 
   async fetchCoinGeckoUsdtLive() {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 8000);
+    const timeout = setTimeout(() => controller.abort(), 7000);
     try {
       const res = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=tether&vs_currencies=idr,usd&include_last_updated_at=true', {
         signal: controller.signal,
@@ -281,6 +325,9 @@ class LiveFxState {
       const data = await res.json();
       if (!data?.tether?.idr) throw new Error('coingecko_invalid_payload');
       return data.tether;
+    } catch (err) {
+      if (err.name === 'AbortError') throw new Error('coingecko_timeout');
+      throw err;
     } finally {
       clearTimeout(timeout);
     }
@@ -329,6 +376,8 @@ class LiveFxState {
       as_of: today,
       status: 'fresh',
       is_fixed_accounting: true,
+      is_fallback: false,
+      fallback_reason: null,
     };
     this.rates.set('IDR', baseIdr);
 
@@ -351,6 +400,8 @@ class LiveFxState {
             as_of: today,
             status: 'fresh',
             is_fixed_accounting: true,
+            is_fallback: false,
+            fallback_reason: null,
           });
         }
       }
@@ -360,6 +411,7 @@ class LiveFxState {
       this.metadata.last_success_at = nowIso;
       this.metadata.last_error = null;
       this.metadata.currencies_available = Array.from(this.rates.keys());
+      this.buildSourcesSummary();
       this.isRefreshing = false;
       this.saveToDisk();
       return { ok: true, rates: this.getRatesMap(), metadata: this.metadata };
@@ -374,10 +426,16 @@ class LiveFxState {
             this.rates.set(cur, entry);
           }
           this.metadata.status = connResult.status || 'fresh';
+          this.metadata.source = connResult.source || (connResult.rates?.USD?.source === 'bi_jisdor' ? 'bi_jisdor_hybrid' : 'exchangerate_api_hybrid');
+          this.metadata.primary_source = connResult.primary_source || (this.metadata.source === 'bi_jisdor_hybrid'
+            ? 'Bank Indonesia JISDOR (USD), ExchangeRate-API (Fiat), CoinGecko (USDT)'
+            : 'ExchangeRate-API (USD & Fiat), CoinGecko (USDT)');
           this.metadata.last_success_at = nowIso;
-          this.metadata.last_error = null;
+          this.metadata.last_error = connResult.last_error || null;
           this.metadata.rate_effective_date = connResult.rate_effective_date || today;
           this.metadata.currencies_available = Array.from(this.rates.keys());
+          this.metadata.external_probes = connResult.external_probes || null;
+          this.buildSourcesSummary();
           this.isRefreshing = false;
           this.saveToDisk();
           return { ok: true, rates: this.getRatesMap(), metadata: this.metadata };
@@ -386,9 +444,13 @@ class LiveFxState {
         this.metadata.last_error = err.message;
         if (this.rates.size > 1) {
           this.metadata.status = 'stale';
+          for (const [, entry] of this.rates.entries()) {
+            if (!entry.is_fixed_accounting) entry.status = 'stale';
+          }
         } else {
           this.metadata.status = 'failed';
         }
+        this.buildSourcesSummary();
         this.isRefreshing = false;
         return { ok: false, error: err.message, rates: this.getRatesMap(), metadata: this.metadata };
       }
@@ -406,19 +468,50 @@ class LiveFxState {
       this.fetchCoinGeckoUsdtLive(),
     ]);
 
+    const jisdorError = pJisdor.status === 'rejected' ? (pJisdor.reason?.message || 'fetch_failed') : null;
+    const fiatError = pFiat.status === 'rejected' ? (pFiat.reason?.message || 'fetch_failed') : null;
+    const cryptoError = pCrypto.status === 'rejected' ? (pCrypto.reason?.message || 'fetch_failed') : null;
+
     if (pJisdor.status === 'fulfilled') jisdorResult = pJisdor.value;
-    else errors.push(`jisdor: ${pJisdor.reason.message}`);
+    else errors.push(`jisdor: ${jisdorError}`);
 
     if (pFiat.status === 'fulfilled') fiatResult = pFiat.value;
-    else errors.push(`fiat: ${pFiat.reason.message}`);
+    else errors.push(`fiat: ${fiatError}`);
 
     if (pCrypto.status === 'fulfilled') cryptoResult = pCrypto.value;
-    else errors.push(`crypto: ${pCrypto.reason.message}`);
+    else errors.push(`crypto: ${cryptoError}`);
+
+    this.metadata.external_probes = {
+      bi_jisdor: {
+        attempted_at: nowIso,
+        ok: !jisdorError,
+        error: jisdorError,
+        rate: jisdorResult?.rate || null,
+        rate_effective_date: jisdorResult?.rate_effective_date || null,
+      },
+      exchangerate_api: {
+        attempted_at: nowIso,
+        ok: !fiatError,
+        error: fiatError,
+        rate_usd_idr: fiatResult?.rates?.IDR ? Number(fiatResult.rates.IDR) : null,
+        time_last_update_utc: fiatResult?.time_last_update_utc || null,
+      },
+      coingecko: {
+        attempted_at: nowIso,
+        ok: !cryptoError,
+        error: cryptoError,
+        rate_usdt_idr: cryptoResult?.idr ? Number(cryptoResult.idr) : null,
+        last_updated_at: cryptoResult?.last_updated_at || null,
+      },
+    };
 
     let hasAnySuccess = false;
+    let usdSource = null;
+    let usdEffectiveDate = null;
 
     // 1. USD: priority Bank Indonesia JISDOR
     if (jisdorResult) {
+      const isWeekend = this.isWeekendOrHolding(now);
       this.rates.set('USD', {
         currency: 'USD',
         pair: 'USD/IDR',
@@ -431,13 +524,16 @@ class LiveFxState {
         retrieved_at: nowIso,
         calculated_at: nowIso,
         as_of: today,
-        status: 'fresh',
+        status: isWeekend ? 'weekend_holding' : 'fresh',
         is_fixed_accounting: false,
+        is_fallback: false,
+        fallback_reason: null,
       });
-      this.metadata.rate_effective_date = jisdorResult.rate_effective_date;
+      usdSource = 'bi_jisdor';
+      usdEffectiveDate = jisdorResult.rate_effective_date;
       hasAnySuccess = true;
     } else if (fiatResult && fiatResult.rates?.IDR) {
-      // Fallback USD rate from ExchangeRate-API with honest source
+      // Honest fallback USD rate from ExchangeRate-API with explicit source attribution
       const effectiveDate = new Date(fiatResult.time_last_update_utc).toISOString().slice(0, 10);
       this.rates.set('USD', {
         currency: 'USD',
@@ -453,11 +549,23 @@ class LiveFxState {
         as_of: today,
         status: 'fresh',
         is_fixed_accounting: false,
+        is_fallback: true,
+        fallback_reason: `Bank Indonesia JISDOR unavailable (${jisdorError})`,
       });
+      usdSource = 'exchangerate_api';
+      usdEffectiveDate = effectiveDate;
       hasAnySuccess = true;
+    } else {
+      const prevUsd = this.rates.get('USD');
+      if (prevUsd && !prevUsd.is_fixed_accounting) {
+        prevUsd.status = 'stale';
+        prevUsd.fallback_reason = `All USD sources failed (${errors.join('; ')})`;
+        usdSource = prevUsd.source;
+        usdEffectiveDate = prevUsd.rate_effective_date;
+      }
     }
 
-    // 2. Fiat: ExchangeRate-API
+    // 2. Fiat: ExchangeRate-API (EUR, SGD, MYR, THB, CNY, AUD, GBP, JPY)
     if (fiatResult && fiatResult.rates) {
       const effectiveDate = new Date(fiatResult.time_last_update_utc).toISOString().slice(0, 10);
       const idrBase = Number(fiatResult.rates.IDR);
@@ -479,13 +587,23 @@ class LiveFxState {
             as_of: today,
             status: 'fresh',
             is_fixed_accounting: false,
+            is_fallback: false,
+            fallback_reason: null,
           });
         }
       }
       hasAnySuccess = true;
+    } else if (fiatError) {
+      for (const cur of ['EUR', 'SGD', 'MYR', 'THB', 'CNY', 'AUD', 'GBP', 'JPY']) {
+        const prev = this.rates.get(cur);
+        if (prev && !prev.is_fixed_accounting) {
+          prev.status = 'stale';
+          prev.fallback_reason = `Fiat source failed (${fiatError})`;
+        }
+      }
     }
 
-    // 3. USDT: CoinGecko (Never equated automatically to USD)
+    // 3. USDT: CoinGecko (Crypto market trades 24/7; never equated 1:1 to USD)
     if (cryptoResult && cryptoResult.idr) {
       const effectiveDate = cryptoResult.last_updated_at
         ? new Date(cryptoResult.last_updated_at * 1000).toISOString().slice(0, 10)
@@ -503,22 +621,52 @@ class LiveFxState {
         retrieved_at: nowIso,
         calculated_at: nowIso,
         as_of: today,
-        status: 'fresh',
+        status: 'fresh', // Crypto market is 24/7; never weekend holding
         is_fixed_accounting: false,
+        is_fallback: false,
+        fallback_reason: null,
       });
       hasAnySuccess = true;
+    } else if (cryptoError) {
+      // Partial failure: CoinGecko down, retain previous USDT quote marked stale
+      const prevUsdt = this.rates.get('USDT');
+      if (prevUsdt && !prevUsdt.is_fixed_accounting) {
+        prevUsdt.status = 'stale';
+        prevUsdt.fallback_reason = `Crypto source failed (${cryptoError})`;
+      }
     }
 
+    this.buildSourcesSummary();
+
     if (hasAnySuccess) {
-      this.metadata.source = 'bi_jisdor_hybrid';
-      this.metadata.primary_source = 'Bank Indonesia JISDOR (USD), ExchangeRate-API (Fiat), CoinGecko (USDT)';
       this.metadata.last_success_at = nowIso;
       this.metadata.last_error = errors.length ? errors.join('; ') : null;
-      if (this.isWeekendOrHolding(now)) {
+      this.metadata.rate_effective_date = usdEffectiveDate || today;
+
+      // Honest source branding based on actual provider chosen:
+      if (usdSource === 'bi_jisdor') {
+        this.metadata.source = 'bi_jisdor_hybrid';
+        this.metadata.primary_source = cryptoResult
+          ? 'Mixed: Bank Indonesia JISDOR (USD), ExchangeRate-API (Fiat), CoinGecko (USDT)'
+          : 'Mixed: Bank Indonesia JISDOR (USD), ExchangeRate-API (Fiat) [USDT stale]';
+      } else {
+        this.metadata.source = 'exchangerate_api_hybrid';
+        this.metadata.primary_source = cryptoResult
+          ? 'Mixed: ExchangeRate-API (USD & Fiat), CoinGecko (USDT) [Bank Indonesia JISDOR unavailable]'
+          : 'ExchangeRate-API (USD & Fiat) [Bank Indonesia & CoinGecko unavailable]';
+      }
+
+      const usdQuote = this.rates.get('USD');
+      const usdtQuote = this.rates.get('USDT');
+
+      if (errors.length > 0 || usdQuote?.is_fallback || usdtQuote?.status === 'stale') {
+        this.metadata.status = 'degraded';
+      } else if (usdQuote?.status === 'weekend_holding') {
         this.metadata.status = 'weekend_holding';
       } else {
-        this.metadata.status = errors.length ? 'degraded' : 'fresh';
+        this.metadata.status = 'fresh';
       }
+
       this.metadata.currencies_available = Array.from(this.rates.keys());
       this.saveToDisk();
     } else {
@@ -934,6 +1082,8 @@ module.exports = {
   parseIndonesianDate,
   parseIndonesianAmount,
   buildTransferLegs,
+  saveToDisk: () => liveState.saveToDisk(),
+  loadFromDisk: () => liveState.loadFromDisk(),
   MOCK_RATES,
   SUPPORTED_CURRENCIES,
   LiveFxState,

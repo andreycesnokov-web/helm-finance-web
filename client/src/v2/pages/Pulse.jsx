@@ -144,7 +144,18 @@ export default function Pulse() {
             <span className="v2-hero-meta">
               {t('pulse.accounts', { n: m.accounts.length, cur: currencies.join(', ') || 'IDR' })}
               {currencies.some((c) => c !== 'IDR') && p.rates_metadata && (
-                <> · {p.rates_metadata.source === 'bi_jisdor' || p.rates_metadata.source === 'bi_jisdor_hybrid' ? 'JISDOR' : 'FX'}{p.rates_metadata.rate_effective_date ? ` (${shortDate(p.rates_metadata.rate_effective_date, lang)})` : ''}{p.rates_metadata.status === 'weekend_holding' ? ' [Weekend]' : p.rates_metadata.status === 'stale' ? ' [Stale]' : ''}</>
+                <> · {
+                  p.rates_metadata.source === 'bi_jisdor' ? 'JISDOR'
+                  : p.rates_metadata.source === 'bi_jisdor_hybrid' ? 'JISDOR + Market'
+                  : p.rates_metadata.source === 'exchangerate_api_hybrid' ? 'Market + Crypto'
+                  : p.rates_metadata.source === 'exchangerate_api' ? 'Market FX'
+                  : 'FX'
+                }{p.rates_metadata.rate_effective_date ? ` (${shortDate(p.rates_metadata.rate_effective_date, lang)})` : ''}{
+                  p.rates_metadata.status === 'weekend_holding' ? ' [Weekend]'
+                  : p.rates_metadata.status === 'degraded' ? ' [Fallback]'
+                  : p.rates_metadata.status === 'stale' ? ' [Stale]'
+                  : ''
+                }</>
               )}
             </span>
             {p.has_incomplete_balance && (

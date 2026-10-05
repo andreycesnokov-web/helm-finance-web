@@ -69,9 +69,18 @@ export default function Accounts() {
                   <span className="v2-muted v2-small">
                     {t('acc.asOfDate', { d: shortDate(w.data?.rates_metadata?.rate_effective_date || w.data?.as_of_date || new Date(), lang) })}
                     {w.data?.rates_metadata?.source && (
-                      <> · {w.data.rates_metadata.source === 'bi_jisdor' || w.data.rates_metadata.source === 'bi_jisdor_hybrid' ? 'Bank Indonesia JISDOR' : w.data.rates_metadata.source}</>
+                      <> · {
+                        w.data.rates_metadata.source === 'bi_jisdor_hybrid' ? 'Bank Indonesia JISDOR, ExchangeRate-API, CoinGecko'
+                        : w.data.rates_metadata.source === 'exchangerate_api_hybrid' ? 'ExchangeRate-API, CoinGecko'
+                        : w.data.rates_metadata.source === 'bi_jisdor' ? 'Bank Indonesia JISDOR'
+                        : w.data.rates_metadata.source === 'exchangerate_api' ? 'ExchangeRate-API'
+                        : w.data.rates_metadata.source === 'coingecko' ? 'CoinGecko'
+                        : w.data.rates_metadata.source === 'fixed_accounting_table' ? 'Fixed accounting table'
+                        : w.data.rates_metadata.source
+                      }</>
                     )}
                     {w.data?.rates_metadata?.status === 'weekend_holding' && <> · <span className="v2-tag-info">Weekend holding</span></>}
+                    {w.data?.rates_metadata?.status === 'degraded' && <> · <span className="v2-tag-warn">Fallback rates</span></>}
                     {w.data?.rates_metadata?.status === 'stale' && <> · <span className="v2-tag-warn">Stale rate</span></>}
                   </span>
                 )}
@@ -124,7 +133,15 @@ export default function Accounts() {
             {other.length > 0 && (
               <p className="v2-muted v2-small">
                 {t('acc.asOfDate', { d: shortDate(w.data?.rates_metadata?.rate_effective_date || w.data?.as_of_date || new Date(), lang) })}
-                {w.data?.rates_metadata?.source && ` · ${w.data.rates_metadata.source === 'bi_jisdor' || w.data.rates_metadata.source === 'bi_jisdor_hybrid' ? 'Bank Indonesia JISDOR' : w.data.rates_metadata.source}`}
+                {w.data?.rates_metadata?.source && ` · ${
+                  w.data.rates_metadata.source === 'bi_jisdor_hybrid' ? 'Bank Indonesia JISDOR, ExchangeRate-API, CoinGecko'
+                  : w.data.rates_metadata.source === 'exchangerate_api_hybrid' ? 'ExchangeRate-API, CoinGecko'
+                  : w.data.rates_metadata.source === 'bi_jisdor' ? 'Bank Indonesia JISDOR'
+                  : w.data.rates_metadata.source === 'exchangerate_api' ? 'ExchangeRate-API'
+                  : w.data.rates_metadata.source === 'coingecko' ? 'CoinGecko'
+                  : w.data.rates_metadata.source === 'fixed_accounting_table' ? 'Fixed accounting table'
+                  : w.data.rates_metadata.source
+                }`}
               </p>
             )}
           </Card>

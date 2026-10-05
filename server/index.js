@@ -11354,7 +11354,16 @@ app.post('/api/debts/:id/pay', auth, async (req, res) => {
   const txType = debt.type === 'payable' ? 'expense' : 'income';
   const cur = (payWallet?.currency || debtCurrency).toUpperCase();
   const txDate = date ? new Date(date).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10);
-  const fxRes = await fx.toIdr(paymentAmount, cur, txDate);
+  let fxRes;
+  try {
+    fxRes = await fx.toIdr(paymentAmount, cur, txDate);
+  } catch (fxErr) {
+    return res.status(400).json({
+      error: 'fx_rate_unavailable',
+      message: `Cannot record payment: exchange rate for currency ${cur} is unavailable.`,
+      currency: cur,
+    });
+  }
 
   const { data: tx, error: txErr } = await supabase.from('transactions').insert({
     ...bizWriteFields(biz, req.user.userId),
@@ -12829,6 +12838,27 @@ app.post('/api/ai-cfo/ask', auth, async (req, res) => {
         const hire  = ctx.hiring_readiness || {};
         const savedLangName = language === 'ru' ? 'Russian' : language === 'id' ? 'Indonesian' : 'English';
         const langInstruction = `LANGUAGE: Reply in the SAME language as the user's latest message (Russian, Indonesian, or English). If the language is unclear, default to ${savedLangName}. Write the entire reply — headings, recommendations and refusals — in that one language. Never announce or describe which language you use. Keep product terms like CFO AI, AI CFO, cash flow, runway in their original form.`;
+
+        // Granular per-currency FX breakdown
+        const nonBaseCurrencies = new Set([
+          'USD',
+          ...(ctx.cash.wallets || []).map(w => w.currency).filter(c => c && c.toUpperCase() !== currency.toUpperCase()),
+        ]);
+        const fxLines = [];
+        for (const cur of nonBaseCurrencies) {
+          const q = ctx.rates?.[cur];
+          if (q && q.rate != null) {
+            const srcLabel = q.source === 'bi_jisdor' ? 'Bank Indonesia JISDOR'
+              : q.source === 'exchangerate_api' ? 'ExchangeRate-API'
+              : q.source === 'coingecko' ? 'CoinGecko'
+              : q.source === 'fixed_accounting_table' ? 'Fixed Accounting Table'
+              : q.source;
+            const fallbackTxt = q.is_fallback ? ` [FALLBACK: ${q.fallback_reason || 'primary unavailable'}]` : '';
+            fxLines.push(`${cur}: 1 ${cur} = ${Number(q.rate).toLocaleString()} ${currency} (source: ${srcLabel}, date: ${q.rate_effective_date || q.as_of || 'current'}, status: ${q.status}${fallbackTxt})`);
+          }
+        }
+        const fxBlock = fxLines.length ? `\n- FX Rates & Sources (by currency):\n  * ${fxLines.join('\n  * ')}\n  * Overall Provider: ${ctx.fx_metadata?.primary_source || ctx.fx_metadata?.source || 'standard'} (status: ${ctx.fx_metadata?.status || 'active'})\n  * RULE: Each currency has its own specific source above. Never attribute non-USD currencies (like EUR or USDT) or fallback USD quotes to Bank Indonesia JISDOR.\n` : '';
+
         const systemPrompt = `You are CFO AI, a financial decision assistant for ${ctx.business.name} — a ${ctx.business.effective_plan} plan business using ${currency} as base currency.
 Answer like a calm, direct CFO speaking to a CEO. Be specific, conservative, action-oriented, and not dramatic.
 ${langInstruction}
@@ -12863,7 +12893,7 @@ FINANCIAL CONTEXT:
 ${ctx.receivables.top.length > 0 ? `- Top receivables: ${ctx.receivables.top.map(r => `${r.counterparty} ${r.remaining_amount.toLocaleString()} (${r.status})`).join(', ')}` : ''}
 ${ctx.payables.top.length > 0 ? `- Top payables: ${ctx.payables.top.map(p => `${p.counterparty} ${p.remaining_amount.toLocaleString()} (${p.status})`).join(', ')}` : ''}
 - Wallets: ${ctx.cash.wallets.map(w => `${w.name} ${w.balance.toLocaleString()} ${w.currency}${w.is_unvalued ? ' (UNVALUED: NO FX RATE)' : ''}`).join(', ') || 'none'}
-${ctx.cash.has_incomplete_balance && ctx.cash.unvalued_currencies?.length ? `- FX INCOMPLETE: Currencies [${ctx.cash.unvalued_currencies.join(', ')}] have no available exchange rate and are excluded from the ${currency} cash total.\n` : ''}${ctx.fx_metadata?.rate_effective_date ? `- FX Valuation Date: ${ctx.fx_metadata.rate_effective_date} (source: ${ctx.fx_metadata.primary_source || ctx.fx_metadata.source}, status: ${ctx.fx_metadata.status})\n` : ''}${(ctx.pending_submissions?.count > 0) ? `- Pending team submissions (NOT confirmed — do NOT count in obligations, mention as potential cash pressure): ${ctx.pending_submissions.count} item(s), receivables ${ctx.pending_submissions.receivables_total.toLocaleString()}, payables ${ctx.pending_submissions.payables_total.toLocaleString()} ${currency} — ${ctx.pending_submissions.items.map(i => `${i.counterparty || '—'} ${Number(i.amount||0).toLocaleString()} (${i.type}, by ${i.created_by || 'team'})`).join(', ')}` : ''}
+${ctx.cash.has_incomplete_balance && ctx.cash.unvalued_currencies?.length ? `- FX INCOMPLETE: Currencies [${ctx.cash.unvalued_currencies.join(', ')}] have no available exchange rate and are excluded from the ${currency} cash total.\n` : ''}${fxBlock}${(ctx.pending_submissions?.count > 0) ? `- Pending team submissions (NOT confirmed — do NOT count in obligations, mention as potential cash pressure): ${ctx.pending_submissions.count} item(s), receivables ${ctx.pending_submissions.receivables_total.toLocaleString()}, payables ${ctx.pending_submissions.payables_total.toLocaleString()} ${currency} — ${ctx.pending_submissions.items.map(i => `${i.counterparty || '—'} ${Number(i.amount||0).toLocaleString()} (${i.type}, by ${i.created_by || 'team'})`).join(', ')}` : ''}
 ${(ctx.compliance?.upcoming?.length) ? `- Upcoming tax/compliance deadlines (dates from the Tax Rules Registry; estimated amounts not yet computed in V1 — treat as compliance pressure, advise confirming with the accountant): ${ctx.compliance.upcoming.map(e => `${e.title} due ${e.due_date} (${e.status})`).join('; ')}${ctx.compliance.overdue_count ? ` · ${ctx.compliance.overdue_count} OVERDUE` : ''}` : ''}
 - Risk signals: ${ctx.risks.map(r => r.title).join('; ') || 'none'}
 - Top actions: ${(ctx.next_actions || []).slice(0,3).map(a => a.title).join(' | ') || 'none'}
