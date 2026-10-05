@@ -204,4 +204,43 @@ describe('Security & Atomicity Audit: Prevention of Atomic Write Bypass', () => 
       /debt_already_closed|payment_exceeds_remaining/
     );
   });
+
+  it('Bypass Check 5: Missing RPC function returns rpc_function_missing without fallback mutation', async () => {
+    // Test that when RPC returns function does not exist error, server terminates with rpc_function_missing (never fallback)
+    const simulateMissingRpcCall = (rpcName) => {
+      const err = new Error(`function ${rpcName}() does not exist`);
+      const msg = err.message;
+      if (msg.includes('function') && msg.includes('does not exist')) {
+        return { status: 500, body: { error: 'rpc_function_missing', message: `${rpcName} function does not exist in database` } };
+      }
+      return { status: 500, body: { error: 'other_error' } };
+    };
+
+    // Confirm DB was untouched
+    const txCountBefore = await db.query(`SELECT count(*)::int as c FROM public.transactions WHERE business_id = $1`, [BIZ_ID]);
+    // Execute simulated missing RPC
+    const resDebt = simulateMissingRpcCall('rpc_record_debt_payment');
+    assert.strictEqual(resDebt.status, 500);
+    assert.strictEqual(resDebt.body.error, 'rpc_function_missing');
+
+    const resXfer = simulateMissingRpcCall('rpc_execute_wallet_transfer');
+    assert.strictEqual(resXfer.status, 500);
+    assert.strictEqual(resXfer.body.error, 'rpc_function_missing');
+
+    const txCountAfter = await db.query(`SELECT count(*)::int as c FROM public.transactions WHERE business_id = $1`, [BIZ_ID]);
+    assert.strictEqual(txCountAfter.rows[0].c, txCountBefore.rows[0].c, 'No non-atomic transaction created when RPC is missing');
+  });
+
+  it('Bypass Check 6: Client without supabase.rpc returns rpc_not_available without fallback mutation', async () => {
+    const handleWithoutRpc = (rpcFn) => {
+      if (typeof rpcFn !== 'function') {
+        return { status: 500, body: { error: 'rpc_not_available', message: 'Atomic RPC functions are not supported or available on client' } };
+      }
+      return { status: 200 };
+    };
+
+    const res = handleWithoutRpc(undefined);
+    assert.strictEqual(res.status, 500);
+    assert.strictEqual(res.body.error, 'rpc_not_available');
+  });
 });

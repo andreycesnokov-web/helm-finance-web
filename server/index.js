@@ -10616,96 +10616,54 @@ app.post('/api/wallets/transfer', auth, async (req, res) => {
       }
     }
 
-    // Try RPC for row-locking and single DB transaction
-    if (typeof supabase.rpc === 'function') {
-      try {
-        const { data: rpcRes, error: rpcErr } = await supabase.rpc('rpc_execute_wallet_transfer', {
-          p_business_id: biz.business.id,
-          p_user_id: userId,
-          p_from_wallet_id: fromWallet.id,
-          p_to_wallet_id: toWallet.id,
-          p_source_amount: sourceAmount,
-          p_source_currency: fromCur,
-          p_source_amount_idr: fxResFrom.amount_idr,
-          p_source_booked_rate: fxResFrom.booked_rate,
-          p_target_amount: finalTargetAmount,
-          p_target_currency: toCur,
-          p_target_amount_idr: fxResTo.amount_idr,
-          p_target_booked_rate: fxResTo.booked_rate,
-          p_rate_source: rate_source || fxResFrom.rate_source || 'system',
-          p_description: desc,
-          p_transaction_date: txDate,
-          p_transfer_id: transferId,
-          p_scope: 'business',
-        });
-
-        if (!rpcErr && rpcRes && rpcRes.ok) {
-          const status = rpcRes.is_replay ? 200 : 201;
-          return res.status(status).json(rpcRes);
-        }
-        if (rpcErr) {
-          if (!rpcErr.message.includes('function') && !rpcErr.message.includes('does not exist')) {
-            return res.status(400).json({ error: rpcErr.message });
-          }
-          console.warn('[wallets/transfer] rpc_execute_wallet_transfer function not found in DB, using fallback');
-        }
-      } catch (rpcErr) {
-        console.error('[wallets/transfer] Fatal RPC execution error:', rpcErr.message);
-        return res.status(500).json({ error: 'atomic_transfer_failed', message: rpcErr.message });
-      }
+    // Strict atomic RPC execution: row-locking and single DB transaction
+    if (typeof supabase.rpc !== 'function') {
+      return res.status(500).json({
+        error: 'rpc_not_available',
+        message: 'Atomic RPC functions are not supported or available on client',
+      });
     }
 
-    // Fallback: Atomic multi-row insert (single statement executed atomically by PostgreSQL)
-    const debitLeg = {
-      ...bizWriteFields(biz, userId),
-      type: 'expense',
-      amount_original: sourceAmount,
-      currency_original: fromCur,
-      amount_idr: fxResFrom.amount_idr,
-      booked_rate: fxResFrom.booked_rate,
-      rate_source: fxResFrom.rate_source,
-      description: desc,
-      source: transferRef,
-      wallet_id: fromWallet.id,
-      scope: 'business',
-      category: 'Transfer',
-      transaction_date: txDate,
-      transfer_id: transferId,
-    };
+    try {
+      const { data: rpcRes, error: rpcErr } = await supabase.rpc('rpc_execute_wallet_transfer', {
+        p_business_id: biz.business.id,
+        p_user_id: userId,
+        p_from_wallet_id: fromWallet.id,
+        p_to_wallet_id: toWallet.id,
+        p_source_amount: sourceAmount,
+        p_source_currency: fromCur,
+        p_source_amount_idr: fxResFrom.amount_idr,
+        p_source_booked_rate: fxResFrom.booked_rate,
+        p_target_amount: finalTargetAmount,
+        p_target_currency: toCur,
+        p_target_amount_idr: fxResTo.amount_idr,
+        p_target_booked_rate: fxResTo.booked_rate,
+        p_rate_source: rate_source || fxResFrom.rate_source || 'system',
+        p_description: desc,
+        p_transaction_date: txDate,
+        p_transfer_id: transferId,
+        p_scope: 'business',
+      });
 
-    const creditLeg = {
-      ...bizWriteFields(biz, userId),
-      type: 'income',
-      amount_original: finalTargetAmount,
-      currency_original: toCur,
-      amount_idr: fxResTo.amount_idr,
-      booked_rate: fxResTo.booked_rate,
-      rate_source: fxResTo.rate_source,
-      description: desc,
-      source: transferRef,
-      wallet_id: toWallet.id,
-      scope: 'business',
-      category: 'Transfer',
-      transaction_date: txDate,
-      transfer_id: transferId,
-    };
-
-    const { data: inserted, error: insErr } = await supabase
-      .from('transactions')
-      .insert([debitLeg, creditLeg])
-      .select();
-
-    if (insErr) throw insErr;
-
-    res.status(201).json({
-      ok: true,
-      transfer_id: transferId,
-      transactions: inserted,
-      source_amount: sourceAmount,
-      source_currency: fromCur,
-      target_amount: finalTargetAmount,
-      target_currency: toCur,
-    });
+      if (!rpcErr && rpcRes && rpcRes.ok) {
+        const status = rpcRes.is_replay ? 200 : 201;
+        return res.status(status).json(rpcRes);
+      }
+      if (rpcErr) {
+        const msg = rpcErr.message || '';
+        if (msg.includes('function') && msg.includes('does not exist')) {
+          return res.status(500).json({
+            error: 'rpc_function_missing',
+            message: 'rpc_execute_wallet_transfer function does not exist in database',
+          });
+        }
+        return res.status(400).json({ error: rpcErr.message });
+      }
+      return res.status(500).json({ error: 'atomic_transfer_failed', message: 'No response from transfer RPC' });
+    } catch (rpcErr) {
+      console.error('[wallets/transfer] Fatal RPC execution error:', rpcErr.message);
+      return res.status(500).json({ error: 'atomic_transfer_failed', message: rpcErr.message });
+    }
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -12006,128 +11964,79 @@ app.post('/api/debts/:id/pay', auth, async (req, res) => {
     });
   }
 
-  // If wallet is present and RPC exists in Supabase, execute transactional RPC with FOR UPDATE locking
-  if (typeof supabase.rpc === 'function') {
-    try {
-      const { data: rpcRes, error: rpcErr } = await supabase.rpc('rpc_record_debt_payment', {
-        p_business_id: biz.business.id,
-        p_user_id: req.user.userId,
-        p_debt_id: debt.id,
-        p_wallet_id: payWallet.id,
-        p_amount: paymentAmount,
-        p_currency: cur,
-        p_amount_idr: fxRes.amount_idr,
-        p_booked_rate: fxRes.booked_rate,
-        p_rate_source: fxRes.rate_source,
-        p_payment_date: txDate,
-        p_idempotency_key: idempotencyKey || null,
-        p_request_hash: requestHash,
-        p_account_name: payWallet.name,
-        p_created_at: date ? new Date(date).toISOString() : new Date().toISOString(),
-      });
+  // Strict atomic RPC execution with FOR UPDATE locking and single DB transaction
+  if (typeof supabase.rpc !== 'function') {
+    return res.status(500).json({
+      error: 'rpc_not_available',
+      message: 'Atomic RPC functions are not supported or available on client',
+    });
+  }
 
-      if (rpcErr) {
-        const msg = rpcErr.message || '';
-        if (msg.includes('idempotency_key_mismatch')) {
-          return res.status(409).json({ error: 'idempotency_key_mismatch', message: msg });
-        }
-        if (msg.includes('payment_exceeds_remaining')) {
-          return res.status(400).json({ error: 'payment_exceeds_remaining', message: msg });
-        }
-        if (msg.includes('debt_already_closed')) {
-          return res.status(400).json({ error: 'debt_already_closed', message: msg });
-        }
-        if (msg.includes('cross_currency_not_supported') || msg.includes('debt_currency_mismatch')) {
-          return res.status(400).json({ error: 'cross_currency_not_supported', message: msg });
-        }
-        if (msg.includes('debt_not_found')) {
-          return res.status(404).json({ error: 'debt_not_found', message: msg });
-        }
-        if (msg.includes('function') && msg.includes('does not exist')) {
-          console.warn('[debts:pay] rpc_record_debt_payment function not found in DB, using fallback');
-        } else {
-          return res.status(500).json({ error: msg });
-        }
-      } else if (rpcRes) {
-        if (rpcRes.is_replay) {
-          return res.status(rpcRes.status || 200).json({
-            ...rpcRes.data,
-            is_replay: true,
-          });
-        }
-        return res.json({
-          ok: true,
-          isFullyPaid: rpcRes.data.is_fully_paid,
-          remaining: Math.max(0, Number(rpcRes.data.remaining)),
-          debt: computeDebtStatus({ ...rpcRes.data.debt, withholding_allocated: withheld }),
+  try {
+    const { data: rpcRes, error: rpcErr } = await supabase.rpc('rpc_record_debt_payment', {
+      p_business_id: biz.business.id,
+      p_user_id: req.user.userId,
+      p_debt_id: debt.id,
+      p_wallet_id: payWallet.id,
+      p_amount: paymentAmount,
+      p_currency: cur,
+      p_amount_idr: fxRes.amount_idr,
+      p_booked_rate: fxRes.booked_rate,
+      p_rate_source: fxRes.rate_source,
+      p_payment_date: txDate,
+      p_idempotency_key: idempotencyKey || null,
+      p_request_hash: requestHash,
+      p_account_name: payWallet.name,
+      p_created_at: date ? new Date(date).toISOString() : new Date().toISOString(),
+    });
+
+    if (rpcErr) {
+      const msg = rpcErr.message || '';
+      if (msg.includes('idempotency_key_mismatch')) {
+        return res.status(409).json({ error: 'idempotency_key_mismatch', message: msg });
+      }
+      if (msg.includes('payment_exceeds_remaining')) {
+        return res.status(400).json({ error: 'payment_exceeds_remaining', message: msg });
+      }
+      if (msg.includes('debt_already_closed')) {
+        return res.status(400).json({ error: 'debt_already_closed', message: msg });
+      }
+      if (msg.includes('cross_currency_not_supported') || msg.includes('debt_currency_mismatch')) {
+        return res.status(400).json({ error: 'cross_currency_not_supported', message: msg });
+      }
+      if (msg.includes('debt_not_found')) {
+        return res.status(404).json({ error: 'debt_not_found', message: msg });
+      }
+      if (msg.includes('function') && msg.includes('does not exist')) {
+        return res.status(500).json({
+          error: 'rpc_function_missing',
+          message: 'rpc_record_debt_payment function does not exist in database',
         });
       }
-    } catch (rpcErr) {
-      console.error('[debts:pay] Fatal RPC execution error:', rpcErr.message);
-      return res.status(500).json({ error: 'atomic_payment_failed', message: rpcErr.message });
+      return res.status(500).json({ error: msg });
     }
-  }
 
-  const { data: tx, error: txErr } = await supabase.from('transactions').insert({
-    ...bizWriteFields(biz, req.user.userId),
-    type:              txType,
-    amount_original:   paymentAmount,
-    currency_original: cur,
-    amount_idr:        fxRes.amount_idr,
-    booked_rate:       fxRes.booked_rate,
-    rate_source:       fxRes.rate_source,
-    description:       `Payment: ${debt.counterparty}`,
-    source:            account || (payWallet ? payWallet.name : null),
-    wallet_id:         wallet_id || (payWallet ? payWallet.id : null),
-    scope:             debt.scope || (payWallet ? payWallet.scope : null) || 'business',
-    transaction_date:  txDate,
-    created_at:        date ? new Date(date).toISOString() : new Date().toISOString(),
-  }).select('id').single();
-  if (txErr) return res.status(500).json({ error: txErr.message });
-
-  // 2. Update debt — track paid_amount; NEVER modify original amount
-  // Note: last_payment_at and linked_transaction_id require migration 015
-  const debtUpdates = {
-    paid_amount:            newPaidAmount,
-    status:                 newStatus,
-    last_payment_at:        new Date().toISOString(),
-    linked_transaction_id:  tx?.id || null,
-  };
-  if (isFullyPaid) {
-    debtUpdates.is_settled = true;
-    debtUpdates.settled_at = new Date().toISOString();
-  }
-
-  const { data: updatedDebt, error: updateErr } = await supabase.from('debts')
-    .update(debtUpdates).eq('id', debt.id).select().single();
-  if (updateErr) return res.status(500).json({ error: updateErr.message });
-
-  const responsePayload = {
-    ok:           true,
-    isFullyPaid,
-    remaining:    Math.max(0, effectiveTotal - newPaidAmount - withheld),
-    debt:         computeDebtStatus({ ...updatedDebt, withholding_allocated: withheld }),
-  };
-
-  if (idempotencyKey) {
-    try {
-      await supabase.from('debt_payment_idempotency').insert({
-        business_id: biz.business.id,
-        debt_id: debt.id,
-        user_id: req.user.userId,
-        key: idempotencyKey,
-        request_hash: requestHash,
-        transaction_id: tx?.id || null,
-        response_status: 200,
-        response_body: responsePayload,
+    if (rpcRes) {
+      if (rpcRes.is_replay) {
+        return res.status(rpcRes.status || 200).json({
+          ...rpcRes.data,
+          is_replay: true,
+        });
+      }
+      return res.json({
+        ok: true,
+        isFullyPaid: rpcRes.data.is_fully_paid,
+        remaining: Math.max(0, Number(rpcRes.data.remaining)),
+        debt: computeDebtStatus({ ...rpcRes.data.debt, withholding_allocated: withheld }),
       });
-    } catch (idempSaveErr) {
-      console.warn('[debts:pay] Idempotency record insertion failed:', idempSaveErr.message);
     }
-  }
 
-  res.json(responsePayload);
-})
+    return res.status(500).json({ error: 'atomic_payment_failed', message: 'No response from payment RPC' });
+  } catch (rpcErr) {
+    console.error('[debts:pay] Fatal RPC execution error:', rpcErr.message);
+    return res.status(500).json({ error: 'atomic_payment_failed', message: rpcErr.message });
+  }
+});
 
 // ── Business Settings Endpoint ───────────────────────────────────────────────
 // PATCH /api/business/current — owner/admin can update safe fields
