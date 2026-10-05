@@ -11209,14 +11209,22 @@ app.post('/api/debts/:id/pay', auth, async (req, res) => {
     });
   }
 
-  // Wallet must belong to the same business (legacy: owner's user_id)
+  // Wallet must belong to the same business (resolved by wallet_id or legacy matching by account name)
   let payWallet = null;
   if (wallet_id) {
     const { data: wRows } = await supabase.from('wallets')
       .select('id, name, scope, currency').eq('id', wallet_id).or(bizOrFilter(biz)).limit(1);
     if (!wRows?.length) return res.status(400).json({ error: 'Invalid or inaccessible wallet' });
     payWallet = wRows[0];
+  } else if (account && typeof account === 'string' && account.trim()) {
+    const { data: nameRows } = await supabase.from('wallets')
+      .select('id, name, scope, currency').eq('name', account.trim()).or(bizOrFilter(biz)).limit(1);
+    if (nameRows?.length) {
+      payWallet = nameRows[0];
+    }
+  }
 
+  if (payWallet) {
     const walletCurrency = typeof payWallet.currency === 'string' ? payWallet.currency.trim().toUpperCase() : '';
     if (!walletCurrency) {
       return res.status(400).json({
@@ -11228,7 +11236,7 @@ app.post('/api/debts/:id/pay', auth, async (req, res) => {
     if (walletCurrency !== debtCurrency) {
       return res.status(400).json({
         error: 'cross_currency_not_supported',
-        message: `Cross-currency debt payment is not supported yet: debt is in ${debtCurrency}, but wallet is in ${walletCurrency}`,
+        message: `Cross-currency debt payment is not supported yet: debt is in ${debtCurrency}, but wallet '${payWallet.name}' is in ${walletCurrency}`,
         debt_currency: debtCurrency,
         wallet_currency: walletCurrency,
       });
@@ -11267,7 +11275,7 @@ app.post('/api/debts/:id/pay', auth, async (req, res) => {
     rate_source:       fxRes.rate_source,
     description:       `Payment: ${debt.counterparty}`,
     source:            account || (payWallet ? payWallet.name : null),
-    wallet_id:         wallet_id || null,
+    wallet_id:         wallet_id || (payWallet ? payWallet.id : null),
     scope:             debt.scope || (payWallet ? payWallet.scope : null) || 'business',
     transaction_date:  txDate,
     created_at:        date ? new Date(date).toISOString() : new Date().toISOString(),
