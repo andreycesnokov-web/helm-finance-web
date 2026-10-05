@@ -5,8 +5,8 @@
 // Writes reuse the existing components unchanged: DebtFormModal (Add a bill / New
 // invoice, business scope locked) and DebtPaymentModal (Mark paid / Mark received).
 // The previous pages stay one click away under "Classic view".
-import { useMemo, useState } from 'react'
-import { Link, useLocation } from 'react-router-dom'
+import { useMemo, useState, useEffect } from 'react'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
 import DebtPaymentModal from '../../components/DebtPaymentModal'
 import DebtFormModal from '../../components/DebtFormModal'
@@ -78,11 +78,13 @@ export default function Bills() {
   const lang = useLang()
   const { token } = useAuth()
   const loc = useLocation()
+  const navigate = useNavigate()
   const invalidate = useInvalidate()
   const [tab, setTab] = useState(() => tabForPath(loc.pathname))
   const [view, setView] = useState('open')
   const [create, setCreate] = useState(null)   // 'payable' | 'receivable'
   const [pay, setPay] = useState(null)
+  const [editDebt, setEditDebt] = useState(null)
   const debts = useApi('/debts')
   const wallets = useApi('/wallets')
   // GET /api/wallets returns only this company's wallets (by business_id). A wallet labelled
@@ -92,6 +94,28 @@ export default function Bills() {
 
   const list = Array.isArray(debts.data) ? debts.data : []
   const sum = useMemo(() => billSummary(list), [list])
+
+  // Handle ?edit=<id> query parameter (e.g. from Radar "Set date")
+  useEffect(() => {
+    const editId = new URLSearchParams(loc.search).get('edit')
+    if (editId && list.length > 0) {
+      const target = list.find(d => String(d.id) === String(editId))
+      if (target) {
+        setEditDebt(target)
+      }
+    }
+  }, [loc.search, list])
+
+  const clearEditParam = () => {
+    const params = new URLSearchParams(loc.search)
+    if (params.has('edit')) {
+      params.delete('edit')
+      const newSearch = params.toString() ? `?${params.toString()}` : ''
+      navigate(`${loc.pathname}${newSearch}`, { replace: true })
+    }
+    setEditDebt(null)
+  }
+
   const head = (
     <PageHead title={t('nav.bills')} sub={t('bills.sub')}
       actions={<>
@@ -105,6 +129,8 @@ export default function Bills() {
         onClose={() => setCreate(null)} onSuccess={() => { setCreate(null); invalidate() }} />}
       {pay && <DebtPaymentModal debt={pay} accounts={bizWallets} token={token}
         onClose={() => setPay(null)} onSuccess={() => { setPay(null); invalidate() }} />}
+      {editDebt && <DebtFormModal mode={editDebt.type || 'payable'} initialDebt={editDebt} token={token} lockBusinessScope
+        onClose={clearEditParam} onSuccess={() => { clearEditParam(); invalidate() }} />}
     </>
   )
   if (debts.loading) return <>{head}<Card><Skeleton rows={6} /></Card>{modals}</>
