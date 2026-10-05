@@ -368,6 +368,12 @@ const id = {
     dailyAvg: 'Rata-rata harian',
     noForecast: 'Belum ada data untuk proyeksi',
     noBurnData: 'Belum ada data pengeluaran',
+    incompleteForecastTitle: 'Perkiraan Tidak Lengkap',
+    incompleteForecastSub: 'Beberapa kewajiban tidak memiliki mata uang atau kurs tidak diketahui dan dikecualikan dari perhitungan.',
+    assumptionsTitle: 'Asumsi Perkiraan',
+    overdueAssumedNow: 'Kewajiban lewat jatuh tempo ({n}) diasumsikan selesai segera.',
+    undatedAssumed30: 'Kewajiban tanpa tanggal ({n}) dimasukkan dalam proyeksi 30 hari.',
+    futureExcluded: 'Kewajiban di luar 30 hari ({n}) dikecualikan dari perkiraan ini.',
   },
   payables: {
     title: 'Kewajiban',

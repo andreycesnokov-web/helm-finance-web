@@ -96,5 +96,150 @@ t('a debt of an unknown type is counted in neither direction', () => {
   assert.strictEqual(f.proj30, 59015010, 'an unknown type moved the forecast');
 });
 
+t('debts with status paid, cancelled, or is_settled are strictly excluded', () => {
+  const f = radarFigures({
+    totalBalance: 100000000,
+    burnRate: 1000000,
+    debts: [
+      { id: '1', type: 'payable', amount: 10000000, status: 'paid' },
+      { id: '2', type: 'payable', amount: 5000000, status: 'cancelled' },
+      { id: '3', type: 'payable', amount: 7000000, is_settled: true },
+      { id: '4', type: 'payable', amount: 8000000, approval_status: 'rejected' },
+      { id: '5', type: 'payable', amount: 12000000, status: 'open' },
+    ],
+  });
+  assert.strictEqual(f.payables.length, 1);
+  assert.strictEqual(f.payables[0].id, '5');
+  assert.strictEqual(f.totalOut, 12000000);
+  assert.strictEqual(f.assumptions.excludedPaidOrCancelledCount, 4);
+});
+
+t('partially paid debts use remaining balance; confirmed zero never falls back to original amount', () => {
+  const f = radarFigures({
+    totalBalance: 100000000,
+    burnRate: 0,
+    debts: [
+      // Explicit remaining_amount = 0 should be treated as settled/paid, NOT fall back to original_amount
+      { id: '1', type: 'payable', original_amount: 50000000, paid_amount: 50000000, remaining_amount: 0 },
+      // Partial payment with explicit remaining_amount
+      { id: '2', type: 'payable', original_amount: 30000000, paid_amount: 10000000, remaining_amount: 20000000 },
+      // Partial payment calculated from original_amount - paid_amount
+      { id: '3', type: 'receivable', original_amount: 40000000, paid_amount: 15000000 },
+    ],
+  });
+  assert.strictEqual(f.payables.length, 1);
+  assert.strictEqual(f.payables[0].id, '2');
+  assert.strictEqual(f.payables[0].amount, 20000000);
+  assert.strictEqual(f.totalOut, 20000000);
+
+  assert.strictEqual(f.receivables.length, 1);
+  assert.strictEqual(f.receivables[0].id, '3');
+  assert.strictEqual(f.receivables[0].amount, 25000000);
+  assert.strictEqual(f.totalIn, 25000000);
+
+  assert.strictEqual(f.assumptions.excludedPaidOrCancelledCount, 1);
+});
+
+t('foreign currencies are converted to IDR via exchange rates, never summed 1:1', () => {
+  const f = radarFigures({
+    totalBalance: 50000000,
+    burnRate: 0,
+    rates: { USD: 16000, EUR: 18000 },
+    debts: [
+      { id: '1', type: 'receivable', amount: 1000, currency: 'USD' },
+      { id: '2', type: 'payable', amount: 500, currency: 'EUR' },
+      { id: '3', type: 'payable', amount: 2000000, currency: 'IDR' },
+    ],
+  });
+  // 1000 USD * 16000 = 16,000,000 IDR
+  assert.strictEqual(f.totalIn, 16000000);
+  assert.strictEqual(f.receivables[0].original_amount, 1000);
+  assert.strictEqual(f.receivables[0].original_currency, 'USD');
+  assert.strictEqual(f.receivables[0].amount, 16000000);
+
+  // 500 EUR * 18000 = 9,000,000 IDR + 2,000,000 IDR = 11,000,000 IDR
+  assert.strictEqual(f.totalOut, 11000000);
+  assert.strictEqual(f.hasIncompleteForecast, false);
+});
+
+t('missing currency or unknown FX rate flags incomplete forecast and excludes items', () => {
+  const f = radarFigures({
+    totalBalance: 50000000,
+    burnRate: 0,
+    debts: [
+      { id: '1', type: 'receivable', amount: 1000, currency: 'UNKNOWN_CURRENCY' },
+      { id: '2', type: 'payable', amount: 500, currency: null },
+      { id: '3', type: 'payable', amount: 5000000, currency: 'IDR' },
+    ],
+  });
+  assert.strictEqual(f.hasIncompleteForecast, true);
+  assert.strictEqual(f.unconvertedDebts.length, 2);
+  assert.strictEqual(f.unconvertedDebts[0].reason, 'unknown_rate');
+  assert.strictEqual(f.unconvertedDebts[1].reason, 'missing_currency');
+  // Unknown items must NOT leak into totalIn or totalOut
+  assert.strictEqual(f.totalIn, 0);
+  assert.strictEqual(f.totalOut, 5000000);
+});
+
+t('horizon filtering excludes debts due beyond 30 days', () => {
+  const today = '2026-10-01';
+  const f = radarFigures({
+    totalBalance: 100000000,
+    burnRate: 0,
+    debts: [
+      { id: '1', type: 'payable', amount: 10000000, due_date: '2026-10-15' }, // 14 days -> included
+      { id: '2', type: 'payable', amount: 20000000, due_date: '2026-10-31' }, // 30 days -> included
+      { id: '3', type: 'payable', amount: 30000000, due_date: '2026-11-15' }, // 45 days -> EXCLUDED
+    ],
+  }, { today });
+
+  assert.strictEqual(f.payables.length, 2);
+  assert.strictEqual(f.totalOut, 30000000);
+  assert.strictEqual(f.assumptions.futureExcludedCount, 1);
+  assert.strictEqual(f.assumptions.futureExcludedTotalIdr, 30000000);
+});
+
+t('assumptions track overdue and undated obligations explicitly', () => {
+  const today = '2026-10-01';
+  const f = radarFigures({
+    totalBalance: 100000000,
+    burnRate: 0,
+    debts: [
+      { id: '1', type: 'payable', amount: 5000000, due_date: '2026-09-20' }, // Overdue
+      { id: '2', type: 'receivable', amount: 8000000, due_date: null },        // Undated
+      { id: '3', type: 'payable', amount: 12000000, due_date: '2026-10-10' }, // Normal
+    ],
+  }, { today });
+
+  assert.strictEqual(f.totalIn, 8000000);
+  assert.strictEqual(f.totalOut, 17000000);
+  assert.strictEqual(f.assumptions.overdueCount, 1);
+  assert.strictEqual(f.assumptions.undatedCount, 1);
+  assert.strictEqual(f.payables.find(p => p.id === '1').is_overdue, true);
+  assert.strictEqual(f.receivables.find(r => r.id === '2').is_undated, true);
+});
+
+t('separation of scheduled discrete obligations from rolling operational burn rate', () => {
+  const f = radarFigures({
+    totalBalance: 200000000,
+    burnRate: 2000000, // 2M / day = 60M / month
+    debts: [
+      { id: '1', type: 'payable', amount: 40000000 },
+    ],
+  });
+  // totalOut is discrete scheduled payments = 40M
+  assert.strictEqual(f.totalOut, 40000000);
+  // monthlyBurn is operational burn = 60M
+  assert.strictEqual(f.monthlyBurn, 60000000);
+  // Expected balance proj30 = balance + totalIn - totalOut - burnRate * 30
+  // 200M + 0 - 40M - 60M = 100M
+  assert.strictEqual(f.proj30, 100000000);
+  // Worst case: balance - totalOut - burnRate * 30 = 200M - 40M - 60M = 100M
+  assert.strictEqual(f.projWorst, 100000000);
+  // Best case: balance + totalIn - totalOut * 0.5 = 200M + 0 - 20M = 180M
+  assert.strictEqual(f.projBest, 180000000);
+});
+
 console.log(fail ? `\n${pass} passed, ${fail} failed` : `\nALL PASS — ${pass} passed, 0 failed`);
 process.exit(fail ? 1 : 0);
+

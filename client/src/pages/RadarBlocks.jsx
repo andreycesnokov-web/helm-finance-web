@@ -11,7 +11,7 @@
 // GET /api/pulse?scope=business, same fmt/fmtFull formatting. Nothing about the
 // forecast, the burn rate or the runway changed in this migration.
 import {
-  PageHeader, SummaryCard, Card, Stat, DataList, EmptyState, StatusBadge,
+  PageHeader, SummaryCard, Card, Stat, DataList, EmptyState, StatusBadge, Icon,
 } from '../shell/ui'
 import { fmt, fmtFull, daysUntil } from '../lib/api'
 import { currencyPrefix } from '../lib/money'
@@ -77,11 +77,13 @@ export function RadarForecast({ figures: f, t, hasAdvanced = true }) {
 
   const keyDates = [
     ...f.receivables.map((x) => ({
-      id: `r${x.id}`, dir: 'in', label: x.counterparty, sub: dateLabel(x.due_date),
+      id: `r${x.id}`, dir: 'in', label: x.counterparty,
+      sub: `${dateLabel(x.due_date)}${x.original_currency && x.original_currency !== 'IDR' ? ` · ${x.original_currency} ${fmt(x.original_amount)}` : ''}`,
       amount: `+${fmt(Math.abs(x.amount))}`, amountTone: 'cfo-pos',
     })),
     ...f.payables.map((x) => ({
-      id: `p${x.id}`, dir: 'out', label: x.counterparty, sub: dateLabel(x.due_date),
+      id: `p${x.id}`, dir: 'out', label: x.counterparty,
+      sub: `${dateLabel(x.due_date)}${x.original_currency && x.original_currency !== 'IDR' ? ` · ${x.original_currency} ${fmt(x.original_amount)}` : ''}`,
       amount: `−${fmt(Math.abs(x.amount))}`, amountTone: 'cfo-neg',
     })),
   ]
@@ -105,6 +107,42 @@ export function RadarForecast({ figures: f, t, hasAdvanced = true }) {
           </div>
           <StatusBadge tone="info">{t('radar.founderPlus')}</StatusBadge>
         </Card>
+      )}
+
+      {/* Warning if any debts could not be converted due to missing currency/FX rate */}
+      {f.hasIncompleteForecast && (
+        <Card className="radar-upsell" style={{ borderColor: 'var(--cfo-warn, #f59e0b)', marginBottom: '16px' }}>
+          <div className="radar-upsell-text">
+            <span className="radar-upsell-title" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Icon.warn width="16" height="16" />
+              {t('radar.incompleteForecastTitle')}
+            </span>
+            <span className="radar-upsell-sub">
+              {t('radar.incompleteForecastSub')}
+            </span>
+          </div>
+          <StatusBadge tone="warn">{t('radar.atRisk')}</StatusBadge>
+        </Card>
+      )}
+
+      {/* Forecast assumptions for overdue, undated, and horizon-excluded items */}
+      {(f.assumptions?.overdueCount > 0 || f.assumptions?.undatedCount > 0 || f.assumptions?.futureExcludedCount > 0) && (
+        <div className="radar-assumptions" style={{ marginBottom: '16px', padding: '12px 16px', background: 'var(--surface-card-muted, rgba(255,255,255,0.03))', borderRadius: 'var(--radius-md, 8px)', border: '1px solid var(--border-subtle)', fontSize: '12.5px', color: 'var(--text-secondary)' }}>
+          <div style={{ fontWeight: '700', color: 'var(--text-primary)', marginBottom: '6px' }}>
+            {t('radar.assumptionsTitle')}
+          </div>
+          <ul style={{ margin: 0, paddingLeft: '18px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            {f.assumptions.overdueCount > 0 && (
+              <li>{t('radar.overdueAssumedNow').replace('{n}', f.assumptions.overdueCount)}</li>
+            )}
+            {f.assumptions.undatedCount > 0 && (
+              <li>{t('radar.undatedAssumed30').replace('{n}', f.assumptions.undatedCount)}</li>
+            )}
+            {f.assumptions.futureExcludedCount > 0 && (
+              <li>{t('radar.futureExcluded').replace('{n}', f.assumptions.futureExcludedCount)}</li>
+            )}
+          </ul>
+        </div>
       )}
 
       {/* The headline figure — the EXPECTED scenario. The same navy surface, the

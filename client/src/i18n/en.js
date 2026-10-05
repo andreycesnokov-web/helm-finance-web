@@ -329,6 +329,12 @@ const en = {
     perMonth: 'IDR / month',
     days: 'days',
     businessCashForecast: 'Business cash forecast',
+    incompleteForecastTitle: 'Incomplete Forecast',
+    incompleteForecastSub: 'Some obligations have missing currencies or unknown exchange rates and are excluded from calculations.',
+    assumptionsTitle: 'Forecast Assumptions',
+    overdueAssumedNow: 'Overdue obligations ({n}) are assumed to settle immediately.',
+    undatedAssumed30: 'Obligations without due date ({n}) are included in the 30-day projection.',
+    futureExcluded: 'Obligations beyond 30 days ({n}) are excluded from this forecast.',
   },
   payables: {
     title: 'Payables',
