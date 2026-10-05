@@ -10643,11 +10643,15 @@ app.post('/api/wallets/transfer', auth, async (req, res) => {
           const status = rpcRes.is_replay ? 200 : 201;
           return res.status(status).json(rpcRes);
         }
-        if (rpcErr && !rpcErr.message.includes('function') && !rpcErr.message.includes('does not exist')) {
-          return res.status(400).json({ error: rpcErr.message });
+        if (rpcErr) {
+          if (!rpcErr.message.includes('function') && !rpcErr.message.includes('does not exist')) {
+            return res.status(400).json({ error: rpcErr.message });
+          }
+          console.warn('[wallets/transfer] rpc_execute_wallet_transfer function not found in DB, using fallback');
         }
       } catch (rpcErr) {
-        console.warn('[wallets/transfer] RPC execution skipped, using multi-row insert:', rpcErr.message);
+        console.error('[wallets/transfer] Fatal RPC execution error:', rpcErr.message);
+        return res.status(500).json({ error: 'atomic_transfer_failed', message: rpcErr.message });
       }
     }
 
@@ -11995,8 +11999,15 @@ app.post('/api/debts/:id/pay', auth, async (req, res) => {
     }
   }
 
+  if (!payWallet) {
+    return res.status(400).json({
+      error: 'wallet_required',
+      message: 'A valid active business wallet is required to record a payment',
+    });
+  }
+
   // If wallet is present and RPC exists in Supabase, execute transactional RPC with FOR UPDATE locking
-  if (payWallet && typeof supabase.rpc === 'function') {
+  if (typeof supabase.rpc === 'function') {
     try {
       const { data: rpcRes, error: rpcErr } = await supabase.rpc('rpc_record_debt_payment', {
         p_business_id: biz.business.id,
@@ -12032,10 +12043,11 @@ app.post('/api/debts/:id/pay', auth, async (req, res) => {
         if (msg.includes('debt_not_found')) {
           return res.status(404).json({ error: 'debt_not_found', message: msg });
         }
-        if (!msg.includes('function') && !msg.includes('does not exist')) {
+        if (msg.includes('function') && msg.includes('does not exist')) {
+          console.warn('[debts:pay] rpc_record_debt_payment function not found in DB, using fallback');
+        } else {
           return res.status(500).json({ error: msg });
         }
-        // If function doesn't exist, proceed to JS fallback below
       } else if (rpcRes) {
         if (rpcRes.is_replay) {
           return res.status(rpcRes.status || 200).json({
@@ -12051,7 +12063,8 @@ app.post('/api/debts/:id/pay', auth, async (req, res) => {
         });
       }
     } catch (rpcErr) {
-      console.warn('[debts:pay] RPC execution failed, continuing with JS fallback:', rpcErr.message);
+      console.error('[debts:pay] Fatal RPC execution error:', rpcErr.message);
+      return res.status(500).json({ error: 'atomic_payment_failed', message: rpcErr.message });
     }
   }
 
