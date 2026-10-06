@@ -1,85 +1,86 @@
 // Integration & Unit Test: AI Accountant Multi-Mode Verification (PR 132)
 // Verifies:
-// 1. Real Model Response path (with mock provider/token)
-// 2. Deterministic Fallback Response path (when model is unavailable / offline)
+// 1. Real Model Response path: verifies real prompt builder (aiAccountantCore.buildAccountantPrompt)
+// 2. Deterministic Fallback Response path: executes real production function (aiAccountantCore.generateDeterministicFallbackAnswer)
 // 3. Company Switch while answer is in flight (race condition immunity)
 
 const { describe, it } = require('node:test');
 const assert = require('node:assert');
+const path = require('path');
+const aiAccountantCore = require(path.join(__dirname, '..', '..', 'server', 'lib', 'aiAccountantCore'));
 
 describe('PR 132: AI Accountant Three-Way Verification', () => {
   // Test company context
-  const mockCompanyData = {
-    company: {
-      name: 'Helm Care Indonesia',
-      counterparties: [
-        {
-          name: 'QA-7DAY-RUN01 Vendor Beta',
-          currency: 'IDR',
-          total_payable_original: 15000000,
-          total_payable_paid: 15000000,
-          total_payable_remaining: 0,
-          payments: [
-            { amount: 5000000, currency: 'IDR', date: '2026-10-05', transaction_id: 396 },
-            { amount: 10000000, currency: 'IDR', date: '2026-10-05', transaction_id: 398 }
-          ]
-        }
+  const mockCompany = { id: 'b949966a-3988-47cb-9e7c-afad1423f4f8', name: 'Helm Care Indonesia' };
+  const mockWallets = [
+    { id: 'w1', name: 'BCA IDR', currency: 'IDR', type: 'bank', is_active: true },
+    { id: 'w2', name: 'Mandiri USD', currency: 'USD', type: 'bank', is_active: true },
+  ];
+  const mockTxs = [
+    { id: 396, wallet_id: 'w1', type: 'expense', amount_original: 5000000, currency_original: 'IDR', counterparty: 'QA-7DAY-RUN01 Vendor Beta', transaction_date: '2026-10-05' },
+    { id: 398, wallet_id: 'w1', type: 'expense', amount_original: 10000000, currency_original: 'IDR', counterparty: 'QA-7DAY-RUN01 Vendor Beta', transaction_date: '2026-10-05' },
+  ];
+  const mockEnrichedDebts = [
+    {
+      id: 75,
+      type: 'payable',
+      counterparty: 'QA-7DAY-RUN01 Vendor Beta',
+      currency: 'IDR',
+      original_amount: 15000000,
+      paid_amount: 15000000,
+      remaining_amount: 0,
+      status: 'paid',
+      due_date: '2026-10-05',
+      payments: [
+        { transaction_id: 396, amount: 5000000, currency: 'IDR', date: '2026-10-05' },
+        { transaction_id: 398, amount: 10000000, currency: 'IDR', date: '2026-10-05' }
       ]
     }
-  };
+  ];
 
-  it('1. Model Response: Successfully handles LLM response when provider is available', async () => {
-    // Mock Anthropic client behavior
-    const mockAnthropic = {
-      messages: {
-        create: async ({ model, messages }) => {
-          assert.strictEqual(model, 'claude-sonnet-4-5');
-          const prompt = messages[0].content;
-          assert.ok(prompt.includes('QA-7DAY-RUN01 Vendor Beta'));
-          assert.ok(prompt.includes('15000000'));
-          return {
-            content: [{
-              type: 'text',
-              text: 'Поставщику QA-7DAY-RUN01 Vendor Beta выплачено 15 000 000 IDR двумя платежами (#396 и #398). Остаток долга составляет 0 IDR.'
-            }]
-          };
-        }
-      }
-    };
-
-    const resp = await mockAnthropic.messages.create({
-      model: 'claude-sonnet-4-5',
-      max_tokens: 700,
-      messages: [{ role: 'user', content: JSON.stringify(mockCompanyData) }]
+  it('1. Model Response Contract: Real production prompt builder formats company facts', () => {
+    const { company, counterpartiesMap, walletsWithBalance } = aiAccountantCore.buildAccountantCompanyFacts({
+      business: mockCompany,
+      rawWallets: mockWallets,
+      rawTxs: mockTxs,
+      enrichedDebts: mockEnrichedDebts,
     });
 
-    const answer = resp.content[0].text;
-    assert.ok(answer.includes('15 000 000 IDR'));
-    assert.ok(answer.includes('#396'));
-    assert.ok(answer.includes('#398'));
-    assert.ok(answer.includes('0 IDR'));
+    const prompt = aiAccountantCore.buildAccountantPrompt({
+      business: mockCompany,
+      facts: { company },
+      question: 'Сколько выплачено поставщику QA-7DAY-RUN01 Vendor Beta?',
+      language: 'ru',
+    });
+
+    assert.ok(prompt.includes('Helm Care Indonesia'));
+    assert.ok(prompt.includes('QA-7DAY-RUN01 Vendor Beta'));
+    assert.ok(prompt.includes('15000000'));
+    assert.ok(prompt.includes('396'));
+    assert.ok(prompt.includes('398'));
   });
 
-  it('2. Fallback Response: Deterministic calculation operates when provider is unavailable', () => {
-    // When anthropic is null or ANTHROPIC_API_KEY is missing, server executes deterministic engine:
-    const cp = mockCompanyData.company.counterparties[0];
-    const isRu = true;
-    const origStr = `${Number(cp.total_payable_original).toLocaleString('ru-RU')} ${cp.currency}`;
-    const paidStr = `${Number(cp.total_payable_paid).toLocaleString('ru-RU')} ${cp.currency}`;
-    const remStr = `${Number(cp.total_payable_remaining).toLocaleString('ru-RU')} ${cp.currency}`;
-    const statusStr = 'полностью оплачен (paid)';
+  it('2. Fallback Response: Real production generateDeterministicFallbackAnswer generates exact figures', () => {
+    const { counterpartiesMap, walletsWithBalance } = aiAccountantCore.buildAccountantCompanyFacts({
+      business: mockCompany,
+      rawWallets: mockWallets,
+      rawTxs: mockTxs,
+      enrichedDebts: mockEnrichedDebts,
+    });
 
-    const pmtLines = cp.payments.map(p =>
-      `• ${Number(p.amount).toLocaleString('ru-RU')} ${p.currency} (${p.date}${p.transaction_id ? `, #${p.transaction_id}` : ''})`
-    ).join('\n');
-    const pmtDetails = `\nИстория платежей:\n${pmtLines}`;
+    const fallbackAnswer = aiAccountantCore.generateDeterministicFallbackAnswer({
+      question: 'Сколько мы заплатили поставщику QA-7DAY-RUN01 Vendor Beta и сколько ещё должны?',
+      language: 'ru',
+      counterpartiesMap,
+      walletsWithBalance,
+      taxData: {},
+    });
 
-    const fallbackAnswer = `Поставщику «${cp.name}» (долг: ${origStr}) оплачено ${paidStr}. Текущий остаток долга: ${remStr}. Статус: ${statusStr}.${pmtDetails}`;
-
-    assert.ok(/15[\s\u00A0]000[\s\u00A0]000 IDR/.test(fallbackAnswer));
-    assert.ok(fallbackAnswer.includes('#396'));
-    assert.ok(fallbackAnswer.includes('#398'));
-    assert.ok(fallbackAnswer.includes('полностью оплачен (paid)'));
+    assert.ok(/15[\s\u00A0]000[\s\u00A0]000 IDR/.test(fallbackAnswer), 'Must contain exact 15M IDR paid amount');
+    assert.ok(fallbackAnswer.includes('#396'), 'Must reference payment transaction #396');
+    assert.ok(fallbackAnswer.includes('#398'), 'Must reference payment transaction #398');
+    assert.ok(fallbackAnswer.includes('полностью оплачен (paid)'), 'Must indicate paid status');
+    assert.ok(/0 IDR/.test(fallbackAnswer), 'Must report 0 remaining debt');
   });
 
   it('3. Company Switch In-Flight Race Condition: Delayed response from Company A is dropped when active company changes to B', async () => {
@@ -111,7 +112,7 @@ describe('PR 132: AI Accountant Three-Way Verification', () => {
     // Network request completes after company switch
     const response = await inFlightPromise;
     if (wsRefCurrent === askedScope) {
-      uiState = { busy: false, answer: response };
+      uiState.answer = response;
     }
 
     // Verify UI state never shows Company A's answer
