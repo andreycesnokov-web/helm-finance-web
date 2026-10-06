@@ -20,6 +20,12 @@
 //   Module._load = function (r) { return r === '@supabase/supabase-js' ? mem : orig.apply(this, arguments); };
 const crypto = require('crypto');
 
+const SCHEMAS = {};
+
+function setTableSchema(tableName, columns) {
+  SCHEMAS[tableName] = new Set(columns);
+}
+
 const DB = {};                       // table -> rows[]
 const seq = {};                      // table -> integer id counter
 const table = (t) => (DB[t] ||= []);
@@ -116,6 +122,14 @@ class Q {
     if (this.op === 'delete') {
       const hit = match(); DB[this.t] = rows.filter((r) => !hit.includes(r));
       return { data: hit, error: null };
+    }
+    if (SCHEMAS[this.t] && this.cols && this.cols !== '*') {
+      const requested = this.cols.split(',').map((c) => c.trim().split('(')[0].trim()).filter(Boolean);
+      for (const col of requested) {
+        if (!SCHEMAS[this.t].has(col)) {
+          return { data: null, error: { message: `column "${col}" does not exist` } };
+        }
+      }
     }
     let hit = match();
     if (this.opts.count === 'exact' && this.opts.head) return { data: null, error: null, count: hit.length };
@@ -232,4 +246,5 @@ module.exports = {
   __db: DB,
   __seed(t, rows) { table(t).push(...rows); return rows; },
   __uuid: () => crypto.randomUUID(),
+  __setSchema: setTableSchema,
 };

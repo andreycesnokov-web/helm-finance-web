@@ -220,6 +220,9 @@ function generateDeterministicFallbackAnswer({ question, language = 'en', counte
       ? 'Tidak ada data untuk pihak terkait yang dicari di perusahaan aktif. Periksa nama atau beralih ke perusahaan yang sesuai.'
       : 'No records found for the specified counterparty in the active company. Please check the name or switch to the correct company.';
   } else {
+    // Determine whether this is a company-specific determination question vs a general knowledge explanation
+    const isCompanySpecificTaxQuestion = /наш|сво|моей|налог.*компани|обязанност.*компани|должн.*платить|применяется ли к нам|применяется ли к компани|сколько.*нам.*платить|our company|we owe|must we pay|does our business|our tax obligations|perusahaan kami|apakah kami/i.test(qLower);
+
     // Check if the question is asking about a known tax knowledge card (e.g. PPh 26, PPh 21, etc.)
     let matchedTopic = null;
     if (/\bpph\s*26\b/i.test(qLower)) matchedTopic = 'pph26';
@@ -231,6 +234,37 @@ function generateDeterministicFallbackAnswer({ question, language = 'en', counte
     else if (/\bppn\b/i.test(qLower)) matchedTopic = 'ppn';
     else if (/\bpkp\b/i.test(qLower)) matchedTopic = 'pkp';
     else if (/\b(?:npwp|nik)\b/i.test(qLower)) matchedTopic = 'npwp_nik';
+
+    // If it's a company-specific tax question, do NOT substitute with a generic card explanation.
+    // Instead, state explicitly whether verified rules apply to the active company or state blockers/limitations.
+    if (isCompanySpecificTaxQuestion) {
+      const applicableRules = taxData.applicable_rules || [];
+      const overdue = taxData.overdue || [];
+      const missing = taxData.missing_profile_fields || [];
+      const relevantRule = matchedTopic
+        ? applicableRules.find(r => r.rule_code?.toLowerCase().includes(matchedTopic.replace(/_/g, '')) || r.title?.toLowerCase().includes(matchedTopic.replace(/_/g, ' ')))
+        : null;
+
+      if (relevantRule) {
+        return isRu
+          ? `Для активной компании действует подтверждённое правило: ${relevantRule.title} (${relevantRule.rule_code} v${relevantRule.version}). Расчёт точной суммы и применимости требует подтверждения лицензированным бухгалтером.`
+          : isId
+          ? `Untuk perusahaan aktif berlaku aturan terkonfirmasi: ${relevantRule.title} (${relevantRule.rule_code} v${relevantRule.version}). Perhitungan jumlah pasti memerlukan konfirmasi akuntan berlisensi.`
+          : `For the active company, confirmed rule applies: ${relevantRule.title} (${relevantRule.rule_code} v${relevantRule.version}). Exact calculation and applicability must be confirmed by a licensed accountant.`;
+      }
+
+      if (matchedTopic) {
+        return isRu
+          ? `Обязанности компании по ${matchedTopic.toUpperCase()} не подтверждены. Актуальность архивных норм и применение к компании заблокированы до индивидуальной проверки бухгалтером.${missing.length ? ` Незаполненные поля профиля: ${missing.join(', ')}.` : ''}`
+          : isId
+          ? `Kewajiban perusahaan untuk ${matchedTopic.toUpperCase()} belum terkonfirmasi. Penerapan pada perusahaan diblokir hingga peninjauan akuntan.${missing.length ? ` Kolom profil yang belum diisi: ${missing.join(', ')}.` : ''}`
+          : `Company obligations for ${matchedTopic.toUpperCase()} are not confirmed. Applicability to the company is blocked pending individual accountant review.${missing.length ? ` Missing profile fields: ${missing.join(', ')}.` : ''}`;
+      }
+
+      return applicableRules.length
+        ? `Applicable obligations: ${applicableRules.map(r => `${r.title} (${r.rule_code} v${r.version})`).join('; ')}. ${overdue.length ? `${overdue.length} overdue. ` : ''}Confirm with a licensed professional.`
+        : `No active verified tax rules apply yet${missing.length ? ` — missing profile fields: ${missing.join(', ')}` : ''}. Determination not possible.`;
+    }
 
     if (matchedTopic) {
       try {
@@ -256,8 +290,15 @@ function generateDeterministicFallbackAnswer({ question, language = 'en', counte
             parts.push(`${srcLabel}: ${sources}`);
           }
           if (notice) {
-            const limLabel = isRu ? 'Ограничения' : isId ? 'Batasan' : 'Limitations';
-            parts.push(`${limLabel}: ${notice}`);
+            const limLabel = isRu ? 'Ограничения и блокировки' : isId ? 'Batasan dan pemblokiran' : 'Limitations and blockers';
+            const blockerDetails = (card.blockers && card.blockers.length > 0)
+              ? (isRu
+                ? ` Применимость к компании заблокирована (${card.blockers.map(b => b.code).filter((v, i, a) => a.indexOf(v) === i).join(', ')}). Числовые расчёты заблокированы.`
+                : isId
+                ? ` Penerapan perusahaan diblokir (${card.blockers.map(b => b.code).filter((v, i, a) => a.indexOf(v) === i).join(', ')}). Perhitungan numerik diblokir.`
+                : ` Company applicability blocked (${card.blockers.map(b => b.code).filter((v, i, a) => a.indexOf(v) === i).join(', ')}). Numerical use blocked.`)
+              : '';
+            parts.push(`${limLabel}: ${notice}${blockerDetails}`);
           }
           return parts.join('\n\n');
         }
