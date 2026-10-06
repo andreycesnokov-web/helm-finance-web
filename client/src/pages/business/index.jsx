@@ -885,6 +885,28 @@ function DebtsView({ kind }) {
   }
   useEffect(() => { let on = true; if (token && active) { setData(d => ({ ...d, loading: true })); Promise.all([apiFetch('/debts', token), apiFetch('/wallets', token).catch(() => ({ wallets: [] }))]).then(([debts, w]) => on && setData({ loading: false, error: null, debts, wallets: w.wallets || [] })).catch(e => on && setData({ loading: false, error: e.message, debts: null, wallets: [] })) } return () => { on = false } }, [token, active?.id, scopeKey]) // eslint-disable-line
 
+  // Handle ?edit=<id> query parameter (e.g. from Radar "Set date")
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const editId = params.get('edit')
+    if (editId && Array.isArray(data.debts) && data.debts.length > 0) {
+      const target = data.debts.find(d => String(d.id) === String(editId))
+      if (target) {
+        setEditDebt(target)
+      }
+    }
+  }, [data.debts])
+
+  const handleCloseEdit = useCallback(() => {
+    setEditDebt(null)
+    const params = new URLSearchParams(window.location.search)
+    if (params.has('edit')) {
+      params.delete('edit')
+      const qs = params.toString() ? `?${params.toString()}` : ''
+      window.history.replaceState({}, '', `${window.location.pathname}${qs}`)
+    }
+  }, [])
+
   useEffect(() => {
     if (!token || !active) return
     let on = true
@@ -1120,9 +1142,9 @@ function DebtsView({ kind }) {
 
     {/* Real edit: the debt carries an id, so DebtFormModal takes the PATCH path. */}
     {editDebt && (
-      <DebtFormModal mode={kind} token={token} initialDebt={editDebt} lockBusinessScope
-        onClose={() => setEditDebt(null)}
-        onSuccess={() => { setEditDebt(null); refreshRecord(openRec?.debt) }} />
+      <DebtFormModal mode={editDebt.type || kind} token={token} initialDebt={editDebt} lockBusinessScope
+        onClose={handleCloseEdit}
+        onSuccess={() => { handleCloseEdit(); refreshRecord(openRec?.debt || editDebt) }} />
     )}
 
     {/* Upload scoped to THIS record — upload-complete links it in the same call. */}

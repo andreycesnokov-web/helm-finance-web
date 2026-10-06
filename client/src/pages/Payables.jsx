@@ -248,9 +248,26 @@ export default function Payables() {
   const [showForm, setShowForm] = useState(false)
   const [filter,   setFilter]   = useState('all')
 
+  const [editDebt, setEditDebt] = useState(null)
+
   useEffect(() => {
     if (searchParams.get('new') === '1') setShowForm(true)
-  }, [searchParams])
+    const editId = searchParams.get('edit')
+    if (editId && data?.debts?.length > 0) {
+      const target = data.debts.find(d => String(d.id) === String(editId))
+      if (target) setEditDebt(target)
+    }
+  }, [searchParams, data])
+
+  const clearEditParam = () => {
+    setEditDebt(null)
+    const params = new URLSearchParams(window.location.search)
+    if (params.has('edit')) {
+      params.delete('edit')
+      const qs = params.toString() ? `?${params.toString()}` : ''
+      window.history.replaceState({}, '', `${window.location.pathname}${qs}`)
+    }
+  }
 
   const [wallets, setWallets] = useState([])
 
@@ -408,6 +425,17 @@ export default function Payables() {
           token={token}
           onClose={() => setShowForm(false)}
           onSuccess={() => { setShowForm(false); load() }}
+        />
+      )}
+
+      {editDebt && (
+        <DebtFormModal
+          mode="payable"
+          initialDebt={editDebt}
+          token={token}
+          lockBusinessScope
+          onClose={clearEditParam}
+          onSuccess={() => { clearEditParam(); load() }}
         />
       )}
     </div>
