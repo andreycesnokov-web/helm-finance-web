@@ -29,7 +29,8 @@ function buildAccountantCompanyFacts({ business, rawWallets = [], rawTxs = [], e
     const dCounterparty = (d.counterparty || '').trim().toLowerCase();
     const debtPayments = (rawTxs || []).filter(t => {
       if (t.id === d.linked_transaction_id) return true;
-      if (t.counterparty && t.counterparty.trim().toLowerCase() === dCounterparty) return true;
+      const tCp = (t.counterparty_name || t.counterparty || '').trim().toLowerCase();
+      if (tCp && tCp === dCounterparty) return true;
       if (t.description && (
         t.description.toLowerCase().includes(`payment: ${dCounterparty}`) ||
         t.description.toLowerCase().includes(`debt #${d.id}`)
@@ -103,11 +104,11 @@ function buildAccountantCompanyFacts({ business, rawWallets = [], rawTxs = [], e
   // Recent 30 transactions
   const recentTransactions = (rawTxs || []).slice(0, 30).map(t => ({
     id: t.id,
-    date: (t.date || t.created_at || '').slice(0, 10),
+    date: (t.transaction_date || t.date || t.created_at || '').slice(0, 10),
     type: t.type,
     amount: Number(t.amount_original ?? t.amount_idr ?? 0),
     currency: (t.currency_original || 'IDR').toUpperCase(),
-    counterparty: t.counterparty || '',
+    counterparty: t.counterparty_name || t.counterparty || '',
     category: t.category || '',
     description: t.description || '',
     transfer_id: t.transfer_id || null,
@@ -219,6 +220,52 @@ function generateDeterministicFallbackAnswer({ question, language = 'en', counte
       ? 'Tidak ada data untuk pihak terkait yang dicari di perusahaan aktif. Periksa nama atau beralih ke perusahaan yang sesuai.'
       : 'No records found for the specified counterparty in the active company. Please check the name or switch to the correct company.';
   } else {
+    // Check if the question is asking about a known tax knowledge card (e.g. PPh 26, PPh 21, etc.)
+    let matchedTopic = null;
+    if (/\bpph\s*26\b/i.test(qLower)) matchedTopic = 'pph26';
+    else if (/\bpph\s*21\b/i.test(qLower)) matchedTopic = 'pph21';
+    else if (/\bpph\s*23\b/i.test(qLower)) matchedTopic = 'pph23';
+    else if (/\bpph\s*(?:final|sewa)\b/i.test(qLower)) matchedTopic = 'pph_final_rent';
+    else if (/\bpph\s*25\b/i.test(qLower)) matchedTopic = 'pph25';
+    else if (/\bpph\s*29\b/i.test(qLower)) matchedTopic = 'pph29';
+    else if (/\bppn\b/i.test(qLower)) matchedTopic = 'ppn';
+    else if (/\bpkp\b/i.test(qLower)) matchedTopic = 'pkp';
+    else if (/\b(?:npwp|nik)\b/i.test(qLower)) matchedTopic = 'npwp_nik';
+
+    if (matchedTopic) {
+      try {
+        const { getCard } = require('./indonesiaTaxKnowledgeCards.cjs');
+        const lang = isRu ? 'ru' : isId ? 'id' : 'en';
+        const card = getCard({ topic_id: matchedTopic, language: lang });
+        if (card) {
+          const what = (card.what_is || []).map(s => s.text).join(' ');
+          const how = (card.how_it_works || []).map(s => s.text).join(' ');
+          const cond = (card.main_condition || []).map(s => s.text).join(' ');
+          const sources = (card.claim_evidence || []).map(e => `${e.source_id}${e.article ? ` Pasal ${e.article}` : ''}`).join(', ');
+          const notice = card.required_notice || '';
+
+          const parts = [
+            `**${card.name}**`,
+            what,
+            how,
+            cond,
+          ].filter(Boolean);
+
+          if (sources) {
+            const srcLabel = isRu ? 'Источники' : isId ? 'Sumber' : 'Sources';
+            parts.push(`${srcLabel}: ${sources}`);
+          }
+          if (notice) {
+            const limLabel = isRu ? 'Ограничения' : isId ? 'Batasan' : 'Limitations';
+            parts.push(`${limLabel}: ${notice}`);
+          }
+          return parts.join('\n\n');
+        }
+      } catch (cardErr) {
+        // Fall through to general tax summary
+      }
+    }
+
     const applicableRules = taxData.applicable_rules || [];
     const overdue = taxData.overdue || [];
     const missing = taxData.missing_profile_fields || [];

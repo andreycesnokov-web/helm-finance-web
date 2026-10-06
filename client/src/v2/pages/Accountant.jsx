@@ -87,7 +87,14 @@ function AskBox({ externalQuery = '', onQueryChange }) {
     const asked = wsRef.current
     setQ(text); setSt({ busy: true, answer: null, err: null })
     try { const r = await askAccountant(token, text); if (wsRef.current === asked) setSt({ busy: false, answer: r, err: null }) }
-    catch (e) { if (wsRef.current === asked) setSt({ busy: false, answer: null, err: e?.status === 403 ? t('dec.forbidden') : e.message }) }
+    catch (e) {
+      if (wsRef.current === asked) {
+        const msg = e?.status === 403
+          ? t('dec.forbidden')
+          : (t('acct.askErr') || 'Не удалось получить ответ. Пожалуйста, повторите попытку.')
+        setSt({ busy: false, answer: null, err: msg })
+      }
+    }
   }
   return (
     <Card>
@@ -113,7 +120,19 @@ function AskBox({ externalQuery = '', onQueryChange }) {
         <Link className="v2-chip v2-chip-ask" to="/business/accountant/tax-profile">{t('acct.tab.profile')}</Link>
       </div>
       {st.busy && <Skeleton rows={2} />}
-      {st.err && <p className="v2-inline-err" role="alert">{st.err}</p>}
+      {st.err && (
+        <div className="v2-inline-err" role="alert" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap' }}>
+          <span>{st.err}</span>
+          <button
+            type="button"
+            className="v2-btn v2-btn-ghost v2-btn-sm"
+            onClick={() => ask(q)}
+            disabled={st.busy || !q.trim()}
+          >
+            {t('acct.askRetry') || 'Повторить'}
+          </button>
+        </div>
+      )}
       {st.answer && (
         <div className="v2-answer" aria-live="polite">
           <p>{st.answer.answer}</p>

@@ -273,6 +273,20 @@ const t = async (name, fn) => {
     assert.equal(res.body?.error, 'question required');
   });
 
+  // Test 7: PPh 26 tax knowledge card question returns grounded Russian answer with sources and limitations
+  await t('Answers PPh 26 tax card question in Russian with sources and limitations for Helm Care Indonesia', async () => {
+    const res = await askAccountant(USER_HCI, BIZ_HCI, {
+      question: 'Объясни PPh 26 — Pajak Penghasilan Pasal 26 по доступным источникам и укажи ограничения.',
+      language: 'ru',
+    });
+    assert.equal(res.status, 200);
+    const ans = res.body.answer;
+    assert.ok(ans.includes('PPh 26'), `Should mention PPh 26: ${ans}`);
+    assert.ok(ans.includes('нерезидентов'), `Should mention non-residents: ${ans}`);
+    assert.ok(ans.includes('Источники') && ans.includes('Pasal 26'), `Should cite sources: ${ans}`);
+    assert.ok(ans.includes('Ограничения') && ans.includes('Архивное пояснение'), `Should include limitations notice: ${ans}`);
+  });
+
   console.log(`\nAccountant Company Context Test Results: ${pass} passed, ${fail} failed.`);
   process.exitCode = fail === 0 ? 0 : 1;
   for (const h of process._getActiveHandles()) { try { h.unref?.(); } catch { /* ignore */ } }
