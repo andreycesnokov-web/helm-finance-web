@@ -111,7 +111,7 @@ function classifyTransaction(tx) {
     return { class: 'balance_correction', matched_on: 'type_or_keyword', needs_review: false };
   if (hit(RE.opening_balance, s) || /wallet_opening_balance/i.test(src))
     return { class: 'opening_balance', matched_on: 'keyword', needs_review: false };
-  if (type === 'transfer' || hit(RE.transfer, s))
+  if (type === 'transfer' || (tx && tx.transfer_id) || hit(RE.transfer, s))
     return { class: 'transfer', matched_on: 'type_or_keyword', needs_review: false };
 
   if (!s) return none;
