@@ -1007,8 +1007,11 @@ async function runAcceptancePass() {
     const activeStored = await testPage.evaluate(() => localStorage.getItem('activeWorkspaceId'));
     assert.strictEqual(activeStored, BIZ_B, 'Calling window.__cfoSwitchTo must switch active workspace to Company B');
 
-    // Verify cleanup upon unmount: navigating to /login (which renders outside WorkspaceProvider) unmounts WorkspaceProvider
-    await testPage.goto(`http://127.0.0.1:${TEST_PORT}/login`, { waitUntil: 'domcontentloaded' });
+    // Verify cleanup upon unmount: log out and navigate to /login (which renders Login outside WorkspaceProvider)
+    await testPage.evaluate(() => {
+      localStorage.removeItem('hf_token');
+    });
+    await testPage.goto(`http://127.0.0.1:${TEST_PORT}/login`, { waitUntil: 'networkidle' });
     await testPage.waitForTimeout(400);
     const afterUnmount = await testPage.evaluate(() => typeof window.__cfoSwitchTo);
     assert.strictEqual(afterUnmount, 'undefined', 'window.__cfoSwitchTo must be deleted when WorkspaceProvider unmounts');
