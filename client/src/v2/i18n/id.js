@@ -276,6 +276,7 @@ export default {
     taxNote: 'Tanggal dan jumlah berasal dari aturan pajak terverifikasi dan catatan Anda. Akuntan mengonfirmasi sebelum ada pembayaran.',
     stage: { done: 'Dibayar atau dilapor', overdue: 'Terlambat', calculated: 'Dihitung', todo: 'Disiapkan' },
     askLabel: 'Tanya soal pajak dan dokumen', askPh: 'mis. Apakah tagihan jasa hukum perlu dipotong pajak?', send: 'Kirim', sources: 'Aturan yang dipakai',
+    askErr: 'Gagal mendapatkan jawaban. Silakan coba lagi.', askRetry: 'Coba lagi',
     chip: { q1: 'Kapan saya menjadi PKP?', q2: 'Apa yang masih dibutuhkan akuntan?', q3: 'Pemasok mana yang perlu bukti potong?' },
     pk: { downloadFolder: 'Unduh folder', complete: 'Lengkap', ofN: 'dari {n} di bulan ini', missing: 'Kurang dokumen', nocat: 'Tanpa kategori', slips: 'Bukti potong dibuat', filter: 'Saring folder',
       f: { allN: 'Semua · {n}', incompleteN: 'Belum lengkap · {n}', out: 'Uang keluar', in: 'Uang masuk', payroll: 'Gaji' },

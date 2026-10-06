@@ -100,6 +100,21 @@ mem.__seed('debts', [
   },
 ]);
 
+// Enforce real schema columns so query validation catches nonexistent columns like "date" or "counterparty"
+mem.__setSchema('transactions', [
+  'id', 'user_id', 'business_id', 'wallet_id', 'source', 'type', 'amount_original', 'amount_idr',
+  'currency_original', 'category', 'counterparty_id', 'counterparty_name', 'description', 'scope',
+  'project', 'created_at', 'transaction_date', 'transfer_id', 'is_training', 'cashflow_category_id',
+  'business_direction_id', 'activity_type_id', 'booked_rate', 'rate_source', 'created_by_user_id',
+]);
+mem.__setSchema('wallets', [
+  'id', 'business_id', 'name', 'currency', 'type', 'scope', 'is_active', 'sort_order', 'created_at',
+]);
+mem.__setSchema('debts', [
+  'id', 'business_id', 'type', 'counterparty', 'currency', 'amount', 'original_amount', 'paid_amount',
+  'remaining_amount', 'status', 'is_settled', 'due_date', 'description', 'created_at', 'is_training',
+]);
+
 mem.__seed('transactions', [
   {
     id: 395,
@@ -111,7 +126,8 @@ mem.__seed('transactions', [
     amount_idr: 50000000,
     currency_original: 'IDR',
     category: 'Sales',
-    counterparty: 'Client Alpha',
+    counterparty_name: 'Client Alpha',
+    transaction_date: '2026-10-01',
     created_at: '2026-10-01T09:00:00Z',
   },
   {
@@ -124,7 +140,8 @@ mem.__seed('transactions', [
     amount_idr: 5000000,
     currency_original: 'IDR',
     category: 'Vendor Payment',
-    counterparty: 'QA-7DAY-RUN01 Vendor Beta',
+    counterparty_name: 'QA-7DAY-RUN01 Vendor Beta',
+    transaction_date: '2026-10-04',
     created_at: '2026-10-04T10:00:00Z',
   },
   {
@@ -137,7 +154,8 @@ mem.__seed('transactions', [
     amount_idr: 10000000,
     currency_original: 'IDR',
     category: 'Vendor Payment',
-    counterparty: 'QA-7DAY-RUN01 Vendor Beta',
+    counterparty_name: 'QA-7DAY-RUN01 Vendor Beta',
+    transaction_date: '2026-10-05',
     created_at: '2026-10-05T12:00:00Z',
   },
 ]);
@@ -271,6 +289,52 @@ const t = async (name, fn) => {
     const res = await askAccountant(USER_HCI, BIZ_HCI, { question: '' });
     assert.equal(res.status, 400);
     assert.equal(res.body?.error, 'question required');
+  });
+
+  // Test 7: PPh 26 tax knowledge card question returns grounded Russian answer with sources and limitations
+  await t('Answers PPh 26 tax card question in Russian with sources and limitations for Helm Care Indonesia', async () => {
+    const res = await askAccountant(USER_HCI, BIZ_HCI, {
+      question: 'Объясни PPh 26 — Pajak Penghasilan Pasal 26 по доступным источникам и укажи ограничения.',
+      language: 'ru',
+    });
+    assert.equal(res.status, 200);
+    const ans = res.body.answer;
+    assert.ok(ans.includes('PPh 26'), `Should mention PPh 26: ${ans}`);
+    assert.ok(ans.includes('нерезидентов'), `Should mention non-residents: ${ans}`);
+    assert.ok(ans.includes('Источники') && ans.includes('Pasal 26'), `Should cite sources: ${ans}`);
+    assert.ok(ans.includes('Ограничения и блокировки') && ans.includes('Архивное пояснение'), `Should include limitations notice: ${ans}`);
+    assert.ok(ans.includes('Применимость к компании заблокирована'), `Should include applicability blocker: ${ans}`);
+  });
+
+  // Test 8: Company-specific tax question is NOT substituted with general card explanation
+  await t('Company-specific tax question states unconfirmed obligations and blockers rather than substituting general card text', async () => {
+    const res = await askAccountant(USER_HCI, BIZ_HCI, {
+      question: 'Применяется ли к нашей компании PPh 26 и сколько нам нужно заплатить?',
+      language: 'ru',
+    });
+    assert.equal(res.status, 200);
+    const ans = res.body.answer;
+    assert.ok(!ans.includes('PPh26 — налог на определённые доходы'), `Must not substitute general card definition: ${ans}`);
+    assert.ok(ans.includes('Обязанности компании по PPH26 не подтверждены'), `Must state unconfirmed company obligations: ${ans}`);
+    assert.ok(ans.includes('заблокированы до индивидуальной проверки бухгалтером'), `Must indicate blockers: ${ans}`);
+  });
+
+  // Test 9: Negative test verifying that requesting nonexistent columns ('date', 'counterparty') is caught and rejected by schema validation
+  await t('Catches queries for nonexistent columns: schema validation rejects "date" and "counterparty" on transactions', async () => {
+    // Replicate previous flawed query from server/index.js before fix
+    const oldQuery = mem.createClient()
+      .from('transactions')
+      .select('id, wallet_id, source, type, amount_original, amount_idr, currency_original, category, counterparty, description, created_at, date, transaction_date, transfer_id');
+    const { error } = await oldQuery;
+    assert.ok(error, 'Old query with "date" and "counterparty" must fail schema validation');
+    assert.ok(error.message.includes('does not exist'), `Error message must cite missing column: ${error.message}`);
+
+    // Replicate fixed query from server/index.js
+    const fixedQuery = mem.createClient()
+      .from('transactions')
+      .select('id, wallet_id, source, type, amount_original, amount_idr, currency_original, category, counterparty_name, description, created_at, transaction_date, transfer_id');
+    const { error: fixedErr } = await fixedQuery;
+    assert.equal(fixedErr, null, 'Fixed query with counterparty_name and transaction_date must pass schema validation');
   });
 
   console.log(`\nAccountant Company Context Test Results: ${pass} passed, ${fail} failed.`);
