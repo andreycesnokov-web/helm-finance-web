@@ -18,6 +18,7 @@ const PNLMAP = require('./lib/pnlMapping');         // Design v2 P-10 (migration
 const DW = require('./lib/debtWithholding');        // remaining balance with withholdings (batch 10)
 const ASSETS = require('./lib/assetRegister');      // Design v2 P-11 (migration 063)
 const BFUND = require('./lib/businessFunding');     // Design v2 P-03 (migration 064)
+const aiAccountantCore = require('./lib/aiAccountantCore');
 // Telegram-created payables are IDR-only until multi-currency payables exist end to end.
 // See server/lib/telegramCurrency.js for why refusing beats recording a wrong row.
 const { isSupportedTelegramCurrency, currencyNotSupported, normalizeCurrency } = require('./lib/telegramCurrency');
@@ -81,6 +82,8 @@ const PERSONAL_WORKSPACE_ENABLED = process.env.PERSONAL_WORKSPACE_ENABLED === 't
 const PERSONAL_ACCOUNT_V1_ENABLED = process.env.PERSONAL_ACCOUNT_V1_ENABLED === 'true';
 const PW = require('./lib/personalWorkspace');
 const fx = require('./lib/fxProvider');
+const Anthropic = require('@anthropic-ai/sdk');
+const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 // Email-primary identity (Phase 1) is OFF by default. Endpoints 404 when disabled.
 // Requires migration 042 (user_email_identities / user_profiles / email_login_codes /
 // app_user_id_seq). Telegram auth is unaffected by this flag.
@@ -2888,8 +2891,8 @@ app.get('/api/accountant/summary', auth, async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// POST /api/accountant/ask — AI explains compliance using ONLY deterministic
-// data. It never invents a rate/deadline/requirement and always cites sources.
+// POST /api/accountant/ask — AI explains compliance and financial status using ONLY
+// deterministic data. It never invents a rate/deadline/requirement/figure and always cites sources.
 app.post('/api/accountant/ask', auth, async (req, res) => {
   try {
     const biz = await requireBusiness(req, res);
@@ -2897,12 +2900,60 @@ app.post('/api/accountant/ask', auth, async (req, res) => {
     if (!canViewBusinessFinance(biz.role)) return res.status(403).json({ error: 'Forbidden' });
     const question = String(req.body?.question || '').slice(0, 500);
     if (!question) return res.status(400).json({ error: 'question required' });
-    const language = normalizeLanguage(await getUserLanguage(req.user.userId));
+    const language = normalizeLanguage(req.body?.language || await getUserLanguage(req.user.userId));
     const disclaimer = AI_ACCOUNTANT_DISCLAIMER[language] || AI_ACCOUNTANT_DISCLAIMER.en;
     const data = await buildAccountantData(biz);
 
+    const bizOr = bizOrFilter(biz);
+
+    // Fetch wallets for financial context
+    const { data: rawWallets, error: wErr } = await supabase
+      .from('wallets')
+      .select('id, name, currency, type, is_active')
+      .or(bizOr)
+      .eq('is_active', true)
+      .order('sort_order', { ascending: true })
+      .order('created_at', { ascending: true });
+
+    // Fetch transactions for balances, counterparty summaries, and recent activity
+    const { data: rawTxs, error: tErr } = await supabase
+      .from('transactions')
+      .select('id, wallet_id, source, type, amount_original, amount_idr, currency_original, category, counterparty, description, created_at, date, transaction_date, transfer_id')
+      .or(bizOr)
+      .order('created_at', { ascending: false });
+
+    // Fetch and enrich debts / invoices (payable and receivable)
+    const { data: rawDebts, error: dErr } = await supabase
+      .from('debts')
+      .select('*')
+      .or(bizOr)
+      .or('is_training.is.null,is_training.eq.false')
+      .order('created_at', { ascending: false });
+
+    // Fail gracefully with 500 if database facts cannot be retrieved
+    if (wErr || tErr || dErr) {
+      const err = wErr || tErr || dErr;
+      console.error('[accountant/ask] Failed to load company financial facts:', err.message);
+      return res.status(500).json({ error: 'failed_to_load_financial_facts', message: err.message });
+    }
+
+    const enrichedDebts = await enrichDebtsFor(biz.business.id, rawDebts || []);
+
+    const {
+      walletsWithBalance,
+      debtsSummary,
+      counterpartiesMap,
+      company: companyFacts,
+    } = aiAccountantCore.buildAccountantCompanyFacts({
+      business: biz.business,
+      rawWallets,
+      rawTxs,
+      enrichedDebts,
+    });
+
     // Only safe deterministic facts go to the model.
     const facts = {
+      company: companyFacts,
       jurisdiction: data.jurisdiction,
       profile: data.profile ? { legal_entity_type: data.profile.legal_entity_type, tax_regime: data.profile.tax_regime, vat_status: data.profile.vat_status, employee_status: data.profile.employee_status, financial_year_start: data.profile.financial_year_start, financial_year_end: data.profile.financial_year_end } : null,
       profile_completeness_percent: data.completeness.percent,
@@ -2912,30 +2963,34 @@ app.post('/api/accountant/ask', auth, async (req, res) => {
       overdue_obligations: data.overdue.map(e => ({ title: e.title, due_date: e.due_date })),
       active_unverified_rules: data.active_unverified,
     };
-    const prompt = `You are the Helm Finance AI Accountant for ONE business. Answer in ${language === 'ru' ? 'Russian' : language === 'id' ? 'Indonesian' : 'English'}.
 
-STRICT RULES:
-- Use ONLY the deterministic facts below. NEVER invent a tax rate, deadline, filing frequency, threshold or legal interpretation.
-- If the facts do not contain an active rule needed to answer, say the determination is not possible yet and what is missing (e.g. missing profile fields, unverified rules).
-- When you state an obligation, cite its rule_code, version and official source title.
-- You explain and summarise; you do not calculate tax amounts (the deterministic engine does that later).
-- Do not present this as official advice.
-
-FACTS:
-${JSON.stringify(facts)}
-
-QUESTION: ${question}`;
+    const prompt = aiAccountantCore.buildAccountantPrompt({
+      business: biz.business,
+      facts,
+      question,
+      language,
+    });
 
     let answer;
-    try {
-      const resp = await anthropic.messages.create({ model: 'claude-sonnet-4-5', max_tokens: 700, messages: [{ role: 'user', content: prompt }] });
-      answer = (resp.content?.[0]?.text || '').trim();
-    } catch {
-      // Local fallback keeps the feature usable if the model is unavailable.
-      answer = data.applicable_rules.length
-        ? `Applicable obligations: ${data.applicable_rules.map(r => `${r.title} (${r.rule_code} v${r.version})`).join('; ')}. ${data.overdue.length ? `${data.overdue.length} overdue. ` : ''}Confirm with a licensed professional.`
-        : `No active verified tax rules apply yet${data.missing_profile_fields.length ? ` — missing profile fields: ${data.missing_profile_fields.join(', ')}` : ''}. Determination not possible.`;
+    if (anthropic && process.env.ANTHROPIC_API_KEY) {
+      try {
+        const resp = await anthropic.messages.create({ model: 'claude-sonnet-4-5', max_tokens: 700, messages: [{ role: 'user', content: prompt }] });
+        answer = (resp.content?.[0]?.text || '').trim();
+      } catch (aiErr) {
+        console.warn('[accountant/ask] Anthropic API call failed, falling back to deterministic answer:', aiErr.message);
+      }
     }
+
+    if (!answer) {
+      answer = aiAccountantCore.generateDeterministicFallbackAnswer({
+        question,
+        language,
+        counterpartiesMap,
+        walletsWithBalance,
+        taxData: data,
+      });
+    }
+
     res.json({ answer, disclaimer, used_rules: data.applicable_rules.map(r => ({ rule_code: r.rule_code, version: r.version })) });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -8142,9 +8197,6 @@ app.patch('/api/reminders/:id/snooze', auth, async (req, res) => {
 });
 
 // --- Parse API (AI) --------------------------------------------------------
-
-const Anthropic = require('@anthropic-ai/sdk');
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 app.post('/api/parse', auth, async (req, res) => {
   try {
