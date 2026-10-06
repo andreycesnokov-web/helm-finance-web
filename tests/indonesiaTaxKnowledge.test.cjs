@@ -36,7 +36,7 @@ for(const q of questions)test(q.id+' real retrieval, provision content and claim
   if(q.id==='Q07'){assert.equal(r.claims.length,0);assert.ok(r.historical_materials.length);}
   else assert.ok(r.claims.length>0,'refusal of all explanations cannot fix search');
   if(q.id==='Q19'||q.id==='Q20')assert.ok(r.blocked_claims.some(c=>c.blockers.some(b=>b.code==='TER_table_not_verified')));
-  if(q.id==='Q23'||q.id==='Q26')assert.ok(r.blockers.some(b=>b.source_id==='PMK1_2026'&&b.code==='amendment_text_unavailable'));
+  if(q.id==='Q23'||q.id==='Q26')assert.ok(r.blockers.some(b=>b.source_id==='PMK1_2026'&&['amendment_text_unavailable','amendment_review_incomplete'].includes(b.code)));
  }
  assert.deepEqual(results[0].retrieval?.matched_provision_ids.slice().sort(),results[1].retrieval?.matched_provision_ids.slice().sort());
  assert.deepEqual(results[1].retrieval?.matched_provision_ids.slice().sort(),results[2].retrieval?.matched_provision_ids.slice().sort());
@@ -78,7 +78,7 @@ test('unknown dates and open-ended dates cannot certify current applicability',(
  const r=retrieve({question:'PPh23',language:'en',period:'2099-01-01',company:{country:'ID'}});assert.ok(r.claims.length);assertProofs(r);assert.ok(r.blockers.some(b=>b.code==='current_provision_currency_unconfirmed'));assert.ok(r.reference_fragments.length);assert.equal(r.applicability.status,'blocked');
 });
 test('amendment gaps propagate to PPh25/29 even without deadline keywords',()=>{
- const r=retrieve({question:'PPh25 and PPh29',language:'id',period:'2026-10-01'});assert.ok(r.blockers.some(b=>b.code==='amendment_text_unavailable'&&b.source_id==='PMK1_2026'&&b.path.includes('PMK81_2024')));assert.ok(r.claims.length);assertProofs(r);
+ const r=retrieve({question:'PPh25 and PPh29',language:'id',period:'2026-10-01'});assert.ok(r.blockers.some(b=>['amendment_text_unavailable','amendment_review_incomplete'].includes(b.code)&&b.source_id==='PMK1_2026'&&b.path.includes('PMK81_2024')));assert.ok(r.claims.length);assertProofs(r);
 });
 test('all company data still cannot produce unverified numerical TER or tax applicability',()=>{
  const c=read('cards.json').find(c=>c.topic==='pph21');const company=Object.fromEntries(c.required_fields.map(f=>[f,'declared']));company.country='ID';

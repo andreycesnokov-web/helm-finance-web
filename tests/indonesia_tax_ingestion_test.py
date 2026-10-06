@@ -69,4 +69,15 @@ class IngestionTests(unittest.TestCase):
         self.assertEqual(table['status'],'needs_visual_review')
         self.assertTrue(table['cells']);self.assertEqual(len(table['bbox']),4)
 
+    def test_PMK1_instruction_map_matches_exact_archived_text(self):
+        kb=Path(__file__).resolve().parents[1]/'knowledge/indonesia_tax_kb'
+        data=json.loads((kb/'amendments/PMK1_2026.json').read_text(encoding='utf-8'))
+        extraction=json.loads((kb/'store/extracted'/(data['source_sha256']+'.json')).read_text(encoding='utf-8'))
+        self.assertEqual(len(data['changes']),8)
+        for change in data['changes']:
+            page=next(p for p in extraction['pages'] if p['page']==change['page'])
+            self.assertEqual(page['text'][change['start']:change['end']],change['official_text'])
+            self.assertFalse(change['currency_confirmed'])
+        self.assertEqual(data['consolidation_review'],'pending')
+
 if __name__=='__main__':unittest.main()

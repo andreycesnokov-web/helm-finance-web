@@ -2733,6 +2733,238 @@
       ],
       "binding_issues": [],
       "binding_status": "bound"
+    },
+    {
+      "id": "PAYROLL_SCOPE",
+      "topic": "pph21",
+      "kind": "document_explanation",
+      "translations": {
+        "ru": "Архивный PMK168 описывает удержание PPh21 с выплат за работу, услуги или участие в деятельности установленными плательщиками. Категории плательщиков и исключения перечислены отдельно; это не налог только на зарплату.",
+        "en": "Archived PMK168 describes PPh21 withholding on payments for work, services or activities by designated payers. Payer categories and exclusions are listed separately; this is not solely a salary tax.",
+        "id": "PMK168 yang diarsipkan menjelaskan pemotongan PPh21 atas pembayaran terkait pekerjaan, jasa atau kegiatan oleh pemotong yang ditentukan. Kategori pemotong dan pengecualian diatur tersendiri; cakupannya bukan hanya gaji."
+      },
+      "concepts": [
+        "base",
+        "salary"
+      ],
+      "period": {
+        "from": "2024-01-01"
+      },
+      "dependencies": [],
+      "professional_review": null,
+      "supports": [
+        {
+          "provision_id": "PMK168_2023:6b06a241f9cd6fc6:4796bf2d18e3:operative_text:2:1",
+          "fragment_ids": [
+            "PMK168_2023:079306052df2707a31737092",
+            "PMK168_2023:5d7769d0404bd1a073946d49"
+          ],
+          "source_id": "PMK168_2023",
+          "sha256": "6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858",
+          "article": "2",
+          "paragraphs": "(2)",
+          "role": "operative_text",
+          "use": "support",
+          "text_anchor": "pemberi kerja",
+          "related_explanation_provision_ids": [],
+          "pages": [
+            5,
+            6
+          ],
+          "links": [
+            "https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=5",
+            "https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=6"
+          ],
+          "period_restrictions": {
+            "from": "2024-01-01"
+          },
+          "text_review": "editorial_anchor_checked_not_professional_review",
+          "quality_limitations": [
+            "candidate_text_layer",
+            "paragraph_labels_may_contain_OCR_errors"
+          ],
+          "source_period": {
+            "from": "2024-01-01",
+            "to": null
+          }
+        }
+      ],
+      "binding_issues": [],
+      "binding_status": "bound"
+    },
+    {
+      "id": "PKP_SCOPE",
+      "topic": "ppn_pkp",
+      "kind": "document_explanation",
+      "translations": {
+        "ru": "В архивном PMK164 PKP — статус Pengusaha Kena Pajak: предусмотрены оформление статуса и обязанности по PPN. Превышение порога и начало обязанностей различаются; статус конкретной компании здесь не установлен.",
+        "en": "In archived PMK164, PKP is Pengusaha Kena Pajak status, with confirmation procedures and PPN obligations. Threshold crossing and commencement of obligations are distinct; this does not establish a particular company’s status.",
+        "id": "Dalam PMK164 yang diarsipkan, PKP adalah status Pengusaha Kena Pajak, dengan prosedur pengukuhan serta kewajiban PPN. Terlampauinya batas dan awal kewajiban dibedakan; status perusahaan tertentu belum ditetapkan."
+      },
+      "concepts": [
+        "pkp"
+      ],
+      "period": {
+        "from": "2023-12-29"
+      },
+      "dependencies": [],
+      "professional_review": null,
+      "supports": [
+        {
+          "provision_id": "PMK164_2023:b3786674c43db1ff:b7f66e12d491:operative_text:17:5",
+          "fragment_ids": [
+            "PMK164_2023:4958a8e50eb6047e53d878eb"
+          ],
+          "source_id": "PMK164_2023",
+          "sha256": "b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc",
+          "article": "17",
+          "paragraphs": "(1),(3)",
+          "role": "operative_text",
+          "use": "support",
+          "text_anchor": "melaporkan usahanya",
+          "related_explanation_provision_ids": [],
+          "pages": [
+            16
+          ],
+          "links": [
+            "https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=16"
+          ],
+          "period_restrictions": {
+            "from": "2023-12-29"
+          },
+          "text_review": "editorial_anchor_checked_not_professional_review",
+          "quality_limitations": [
+            "candidate_text_layer",
+            "paragraph_labels_may_contain_OCR_errors"
+          ],
+          "source_period": {
+            "from": "2023-12-29",
+            "to": null
+          }
+        },
+        {
+          "provision_id": "PMK164_2023:b3786674c43db1ff:b7f66e12d491:operative_text:18:6",
+          "fragment_ids": [
+            "PMK164_2023:0f579a087d156d4f15b529cc"
+          ],
+          "source_id": "PMK164_2023",
+          "sha256": "b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc",
+          "article": "18",
+          "paragraphs": "whole",
+          "role": "operative_text",
+          "use": "support",
+          "text_anchor": "Pengusaha Kena Pajak",
+          "related_explanation_provision_ids": [],
+          "pages": [
+            17
+          ],
+          "links": [
+            "https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=17"
+          ],
+          "period_restrictions": {
+            "from": "2023-12-29"
+          },
+          "text_review": "editorial_anchor_checked_not_professional_review",
+          "quality_limitations": [
+            "candidate_text_layer",
+            "paragraph_labels_may_contain_OCR_errors"
+          ],
+          "source_period": {
+            "from": "2023-12-29",
+            "to": null
+          }
+        }
+      ],
+      "binding_issues": [],
+      "binding_status": "bound"
+    },
+    {
+      "id": "VAT_SCOPE",
+      "topic": "ppn_pkp",
+      "kind": "document_explanation",
+      "translations": {
+        "ru": "Архивный PMK131 описывает PPN для указанных операций с облагаемыми товарами и услугами, включая импорт и использование из-за рубежа. Специальные базы исключены из общего механизма этой редакции; не любая операция автоматически облагается одинаково.",
+        "en": "Archived PMK131 describes PPN for specified transactions involving taxable goods and services, including imports and use from abroad. Special bases are excluded from this edition’s general mechanism; transactions cannot all be treated alike.",
+        "id": "PMK131 yang diarsipkan menjelaskan PPN atas transaksi tertentu Barang Kena Pajak dan Jasa Kena Pajak, termasuk impor serta pemanfaatan dari luar negeri. DPP khusus dikecualikan dari mekanisme umum edisi ini; semua transaksi tidak otomatis diperlakukan sama."
+      },
+      "concepts": [
+        "base",
+        "rate",
+        "scope"
+      ],
+      "period": {
+        "from": "2025-01-01"
+      },
+      "dependencies": [],
+      "professional_review": null,
+      "supports": [
+        {
+          "provision_id": "PMK131_2024:bd2b45907407c664:83d93b4ad40d:operative_text:3:2",
+          "fragment_ids": [
+            "PMK131_2024:c853ed3c496865218892cf3c"
+          ],
+          "source_id": "PMK131_2024",
+          "sha256": "bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd",
+          "article": "3",
+          "paragraphs": "(1)-(3)",
+          "role": "operative_text",
+          "use": "support",
+          "text_anchor": "nilai lain",
+          "related_explanation_provision_ids": [],
+          "pages": [
+            4
+          ],
+          "links": [
+            "https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4"
+          ],
+          "period_restrictions": {
+            "from": "2025-01-01"
+          },
+          "text_review": "editorial_anchor_checked_not_professional_review",
+          "quality_limitations": [
+            "candidate_text_layer",
+            "paragraph_labels_may_contain_OCR_errors"
+          ],
+          "source_period": {
+            "from": "2025-01-01",
+            "to": null
+          }
+        },
+        {
+          "provision_id": "PMK131_2024:bd2b45907407c664:83d93b4ad40d:operative_text:4:3",
+          "fragment_ids": [
+            "PMK131_2024:eb357e4b3237db5d08aa0e46"
+          ],
+          "source_id": "PMK131_2024",
+          "sha256": "bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd",
+          "article": "4",
+          "paragraphs": "(1)",
+          "role": "operative_text",
+          "use": "support",
+          "text_anchor": "dikecualikan",
+          "related_explanation_provision_ids": [],
+          "pages": [
+            4
+          ],
+          "links": [
+            "https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4"
+          ],
+          "period_restrictions": {
+            "from": "2025-01-01"
+          },
+          "text_review": "editorial_anchor_checked_not_professional_review",
+          "quality_limitations": [
+            "candidate_text_layer",
+            "paragraph_labels_may_contain_OCR_errors"
+          ],
+          "source_period": {
+            "from": "2025-01-01",
+            "to": null
+          }
+        }
+      ],
+      "binding_issues": [],
+      "binding_status": "bound"
     }
   ]
 }

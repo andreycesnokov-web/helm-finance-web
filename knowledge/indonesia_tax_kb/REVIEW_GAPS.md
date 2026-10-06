@@ -7,7 +7,7 @@ The legal, OCR and translation gaps below are unchanged; see REPAIR_REVIEW.md fo
 
 | Priority | Gap | Evidence and next check |
 |---|---|---|
-| High | PMK1/2026 unavailable after two timed-out downloads | Archive full primary text; trace changed provisions against PMK81/11/53/54; do not certify current deadlines meanwhile |
+| High | PMK1/2026 full text acquired; consolidated chain/currency not certified | See PMK1_REVIEW.md and exact instruction map; finish old/new and later-amendment review before current conclusions |
 | High | Current-law amendment sweep is not exhaustive | Recheck official JDIH/DJP relations through2026-10-06 for every selected instrument, including amendments not reflected in registry pages |
 | High | Original statutory amendment archive incomplete | DJP SDSN2023 provides statutory text; archive UU KUP/PPh/PPN amending instruments including UU7/2021 and UU6/2023, verify later amendments |
 | High | UMKM transitions and ownership aggregation | PP20 Pasal I56-58 and PasalII; legal form, registration history, prior elections/certificates, owner/spouse/group turnover and2025/2026 transitions |

@@ -567,9 +567,9 @@
       "original_url": "https://jdih.kemenkeu.go.id/dok/pmk-1-tahun-2026",
       "download_url": "https://jdih.kemenkeu.go.id/api/download/b5f99bff-f689-4e4f-ae3a-7c6a9a4cfe8a/2026pmkeuangan001.pdf",
       "publication_date": "2026-01-22",
-      "effective_from": null,
+      "effective_from": "2026-01-22",
       "effective_to": null,
-      "date_status": "provisional_until_article_check",
+      "date_status": "official_registry_date_PasalII2_promulgation_PDF_date_blank",
       "topics": [
         "deadlines",
         "ppn_pkp"
@@ -577,28 +577,53 @@
       "relationships": [
         {
           "type": "amends",
-          "target": "PMK81_2024"
+          "target": "PMK81_2024",
+          "verification": "primary_PasalI_p3"
         },
         {
-          "type": "amends",
-          "target": "PMK53_2025"
+          "type": "prior_amendment_cited",
+          "target": "PMK11_2025",
+          "verification": "primary_PasalI_p3"
         },
         {
-          "type": "amends",
-          "target": "PMK54_2025"
+          "type": "prior_amendment_cited",
+          "target": "PMK53_2025",
+          "verification": "primary_PasalI_p3"
+        },
+        {
+          "type": "prior_amendment_cited",
+          "target": "PMK54_2025",
+          "verification": "primary_PasalI_p3"
         }
       ],
-      "verification_status": "download_failed",
+      "verification_status": "downloaded_amendment_instructions_read",
       "checked_at": "2026-10-06",
       "professional_review": null,
       "unresolved_issues": [
         "current_amendment_chain_not_certified",
-        "two_download_timeouts; exact_current_amendment_text_not_read"
+        "consolidated_changes_require_tax_review",
+        "PDF_promulgation_date_and_BN_number_fields_blank_or_font_unrendered; official_registry_supplies_dates"
       ],
-      "downloaded_at": null,
-      "sha256": null,
-      "read_scope": [],
-      "selected_index_scope": []
+      "downloaded_at": "2026-10-06T04:25:08.930589+00:00",
+      "sha256": "d2a1ffe926a020c178e88348e974a9199e6fc746ef7884bb72e12a5cbc29a2af",
+      "read_scope": [
+        3,
+        17,
+        25,
+        26,
+        27,
+        28,
+        29,
+        30,
+        31,
+        32,
+        33,
+        34,
+        35
+      ],
+      "selected_index_scope": [],
+      "date_basis": "Pasal II(2) p34; JDIH overview publication 22Jan2026; PDF p35 missing promulgation date",
+      "archive_pages": 35
     },
     {
       "id": "PMK54_2025",

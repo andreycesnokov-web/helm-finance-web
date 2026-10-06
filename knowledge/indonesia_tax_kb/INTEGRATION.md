@@ -58,7 +58,7 @@ All translations of one claim share the same evidence and conditions; they are e
 - All numerical/company conclusions in this pass lack established legal currency. They are blocked; no numeric
   examples are returned. Confirmed text-level explanations of what a primary archived document says may remain,
   separately scoped and never asserting current company applicability.
-- Known amended_by chains are followed to missing texts. PMK81→PMK1 propagates to administrative conclusions
+- Known amended_by chains are followed to missing texts or incomplete reviews. PMK81→PMK1 propagates to administrative conclusions
   of PPh21/23/26, final rent, PPh25/29 and PPN, even without a deadline keyword. This does not assert that PMK1
   changes any particular underlying rate or TER row. Rates also remain blocked by currency/quality limits.
 - TER numerical conclusions always have TER_table_not_verified. Original candidate matrices remain archived
@@ -74,7 +74,7 @@ orphan text is unassigned; explicit Penjelasan is separate; numbered amendment i
 preceding article. Paragraph markers/footnote markers remain raw; OCR-confused labels and footnote meanings
 are not silently corrected or certified. The original PDF and layout text remain the visual reference.
 
-The indexed corpus is261 fragments /125 identified provisions across the existing scope.33 atomic statement
+The indexed corpus is261 fragments /125 identified provisions across the existing scope.36 atomic statement
 definitions are bound by article/role/text anchor to exact reviewed source SHAs. This is a small corpus:
 topic/concept search returns complete relevant provision bundles to avoid arbitrary top-three page loss;
 precision and bounded caching should be reevaluated before a large corpus or a live request path.
@@ -89,3 +89,7 @@ ask the returned clarification questions and suppress blocked conclusions. A pop
 general answer cannot authorize payment calculations. Keep system instructions separate from untrusted source
 text. No model is connected or evaluated here; model grounding/injection and business-isolation integration
 need separate tests before any adapter is enabled. No flags were added/enabled or deployment performed.
+
+## Additive v2.1 / tooltip v1
+
+See ANTIGRAVITY_HANDOFF.md for explicit explanation/company_determination intent, prioritized relevant questions, stable card topics and the exact rendering contract. PMK1 text is now archived: its chain blocker is incomplete review, not download failure. Numeric/current applicability remains blocked.

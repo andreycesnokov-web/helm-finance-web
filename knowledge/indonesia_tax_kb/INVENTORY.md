@@ -63,3 +63,7 @@ The new module uses local immutable JSON/PDF artifacts and has no database clien
 
 Legacy scan and archive metadata can be regenerated with report_inventory.py. A future inventory must
 update actual read-pages evidence explicitly; extraction alone must not be reported as reading.
+
+## Chat/tooltip handoff snapshot 2026-10-06
+
+14 exact PDF archives now available after successful PMK1 retry (see PMK1_REVIEW.md). Existing index scope remains261 fragments/125 provisions; no TER reconstruction or new tax topic.36 atomic statements are text-bound;9 tooltip IDs/27 localized live snapshots. Reproducible package includes runtime, tests, data and original bytes; Python installation still needs package access or a wheel cache.

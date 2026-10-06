@@ -150,6 +150,32 @@ Period limitations: {"from":"2025-01-01"}. Binding: bound. Professional review: 
 - [PMK131_2024 article3 / (2),(3) / pages4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, IDs PMK131_2024:c853ed3c496865218892cf3c, use=support.
 - [PMK131_2024 article4 / (1) / pages4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, IDs PMK131_2024:eb357e4b3237db5d08aa0e46, use=support.
 
+### PKP_SCOPE / document_explanation
+
+**RU:** В архивном PMK164 PKP — статус Pengusaha Kena Pajak: предусмотрены оформление статуса и обязанности по PPN. Превышение порога и начало обязанностей различаются; статус конкретной компании здесь не установлен.
+
+**EN:** In archived PMK164, PKP is Pengusaha Kena Pajak status, with confirmation procedures and PPN obligations. Threshold crossing and commencement of obligations are distinct; this does not establish a particular company’s status.
+
+**ID:** Dalam PMK164 yang diarsipkan, PKP adalah status Pengusaha Kena Pajak, dengan prosedur pengukuhan serta kewajiban PPN. Terlampauinya batas dan awal kewajiban dibedakan; status perusahaan tertentu belum ditetapkan.
+
+Period limitations: {"from":"2023-12-29"}. Binding: bound. Professional review: none.
+
+- [PMK164_2023 article17 / (1),(3) / pages16](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=16), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, IDs PMK164_2023:4958a8e50eb6047e53d878eb, use=support.
+- [PMK164_2023 article18 / whole / pages17](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=17), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, IDs PMK164_2023:0f579a087d156d4f15b529cc, use=support.
+
+### VAT_SCOPE / document_explanation
+
+**RU:** Архивный PMK131 описывает PPN для указанных операций с облагаемыми товарами и услугами, включая импорт и использование из-за рубежа. Специальные базы исключены из общего механизма этой редакции; не любая операция автоматически облагается одинаково.
+
+**EN:** Archived PMK131 describes PPN for specified transactions involving taxable goods and services, including imports and use from abroad. Special bases are excluded from this edition’s general mechanism; transactions cannot all be treated alike.
+
+**ID:** PMK131 yang diarsipkan menjelaskan PPN atas transaksi tertentu Barang Kena Pajak dan Jasa Kena Pajak, termasuk impor serta pemanfaatan dari luar negeri. DPP khusus dikecualikan dari mekanisme umum edisi ini; semua transaksi tidak otomatis diperlakukan sama.
+
+Period limitations: {"from":"2025-01-01"}. Binding: bound. Professional review: none.
+
+- [PMK131_2024 article3 / (1)-(3) / pages4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, IDs PMK131_2024:c853ed3c496865218892cf3c, use=support.
+- [PMK131_2024 article4 / (1) / pages4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, IDs PMK131_2024:eb357e4b3237db5d08aa0e46, use=support.
+
 ## ID_TAX_CARD_03 / pph21
 
 ### PAYROLL_METHOD / document_explanation
@@ -190,6 +216,18 @@ Period limitations: {"from":"2024-01-01"}. Binding: bound. Professional review: 
 
 - [PP58_2023 article2 / table A-D / pages3,4,5](https://jdih.kemenkeu.go.id/api/download/e47c3fc4-a912-4bf1-bcad-335fee3f71f8/2023pp058.pdf#page=3), SHA 69b2e76e54fceba8a49afe73fd5385e9d343c27012f6bda49f657f7fb722cf5f, IDs PP58_2023:3adcc4a0297b34d7e0f54eec,PP58_2023:0cf2349599ad62ad5f4b0904,PP58_2023:3e8dbd4d089f405b83797b81, use=support.
 - [PMK168_2023 article15 / (1)(a) / pages15,16](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=15), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, IDs PMK168_2023:3ba913a0416a5e3aa4ebea00,PMK168_2023:bea457a9e116ad7de2ac5bbc, use=support.
+
+### PAYROLL_SCOPE / document_explanation
+
+**RU:** Архивный PMK168 описывает удержание PPh21 с выплат за работу, услуги или участие в деятельности установленными плательщиками. Категории плательщиков и исключения перечислены отдельно; это не налог только на зарплату.
+
+**EN:** Archived PMK168 describes PPh21 withholding on payments for work, services or activities by designated payers. Payer categories and exclusions are listed separately; this is not solely a salary tax.
+
+**ID:** PMK168 yang diarsipkan menjelaskan pemotongan PPh21 atas pembayaran terkait pekerjaan, jasa atau kegiatan oleh pemotong yang ditentukan. Kategori pemotong dan pengecualian diatur tersendiri; cakupannya bukan hanya gaji.
+
+Period limitations: {"from":"2024-01-01"}. Binding: bound. Professional review: none.
+
+- [PMK168_2023 article2 / (2) / pages5,6](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=5), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, IDs PMK168_2023:079306052df2707a31737092,PMK168_2023:5d7769d0404bd1a073946d49, use=support.
 
 ## ID_TAX_CARD_04 / pph26
 

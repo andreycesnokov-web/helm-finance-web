@@ -15,6 +15,7 @@ function validate(x){
  if(!wording[x.language])throw new TypeError('unsupported_language');
  if(x.period!=null&&!validDate(x.period))throw new TypeError('period_must_be_iso_date');
  if(x.company!=null&&(typeof x.company!=='object'||Array.isArray(x.company)))throw new TypeError('invalid_company');
+ if(x.intent!=null&&!['explanation','company_determination'].includes(x.intent))throw new TypeError('invalid_intent');
  if(x.topics&&(!Array.isArray(x.topics)||x.topics.some(t=>!vocabulary.topics[t])))throw new TypeError('unsupported_topic');
 }
 function loadCheckedIndex(root=ROOT){
@@ -46,6 +47,8 @@ function dependencyBlockers(ids,registry,manifest){
   if(!source){out.push({code:'dependency_source_missing',source_id:item.id,path:item.path});continue;}
   if(source.verification_status==='download_failed'||!manifest.sources[item.id]?.current_sha256)
    out.push({code:'amendment_text_unavailable',source_id:item.id,path:item.path,content_unknown:true});
+  else if((source.unresolved_issues||[]).includes('current_amendment_chain_not_certified'))
+   out.push({code:'amendment_review_incomplete',source_id:item.id,path:item.path,content_unknown:false,currency_confirmed:false});
   for(const rel of source.relationships||[])if(rel.type==='amended_by')queue.push({id:rel.target,path:[...item.path,rel.target]});
  }
  return out;
@@ -140,8 +143,25 @@ function retrieve(input,root=ROOT){
  for(const card of cards.filter(c=>topics.includes(c.topic)))for(const field of card.required_fields){
   const value=field==='tax_period'?input.period:company[field];if(value==null||value===''||value==='unknown')missing.add(field);
  }
+ // v2 remains compatible when intent is omitted. Explicit explanation needs no company questionnaire.
+ if(input.intent==='explanation')missing.clear();
+ if(input.intent==='company_determination'){
+  const relevant=new Set(['country','tax_period']);
+  if(topics.includes('pph21'))['recipient_residency','employment_type','payroll_period','last_tax_period'].forEach(f=>relevant.add(f));
+  if(topics.includes('pph26'))['recipient_residency','recipient_country','income_type','permanent_establishment','treaty_documentation'].forEach(f=>relevant.add(f));
+  if(topics.includes('pph23'))['payer_withholder_status','recipient_residency','recipient_type','income_type','service_category'].forEach(f=>relevant.add(f));
+  if(topics.includes('pph_final_rent'))['rental_object','payer_withholder_status','transaction_date'].forEach(f=>relevant.add(f));
+  if(topics.includes('ppn_pkp'))['vat_status','taxable_supply_type','transaction_date'].forEach(f=>relevant.add(f));
+  if(topics.includes('pph25_29'))(concepts.includes('annual')&&!concepts.includes('installment')?['tax_year','financial_year_end']:['tax_year','special_installment_category']).forEach(f=>relevant.add(f));
+  if(topics.includes('business_regimes'))['legal_entity_type','annual_turnover','activity','prior_regime'].forEach(f=>relevant.add(f));
+  if(topics.includes('deadlines'))['tax_type','payer_role','return_type'].forEach(f=>relevant.add(f));
+  if(concepts.includes('rate'))for(const field of missing)relevant.add(field);
+  if(concepts.includes('npwp'))relevant.add('recipient_npwp');
+  if(concepts.includes('reimbursement'))relevant.add('reimbursement_evidence');
+  for(const field of missing)if(!relevant.has(field))missing.delete(field);
+ }
  out.missing_information=[...missing];
- out.clarifying_questions=[...missing].map(field=>({field,text:prompts[field][lang],purpose:'company_specific_determination_only'}));
+ out.clarifying_questions=[...missing].map(field=>({field,text:prompts[field][lang],purpose:'company_specific_determination_only',priority:['country','tax_period','rental_object','recipient_residency','income_type'].includes(field)?1:2}));
  if(missing.size)out.blockers.push({code:'company_information_missing',fields:[...missing]});
  if(!retrieved.length)out.blockers.push({code:'no_supporting_fragments'});
  out.applicability.status=out.blockers.some(b=>b.code!=='company_information_missing')?'blocked':missing.size?'needs_clarification':'not_established_professional_review_required';

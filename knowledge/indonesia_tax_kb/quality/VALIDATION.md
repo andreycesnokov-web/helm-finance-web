@@ -20,3 +20,9 @@ semantic equivalence of every translation, every future paraphrase, model behavi
 TER matrices remain unverified and never supply a numeric answer. Claims lose confirmation when support
 fragments disappear or current source versions change; a complete company profile still cannot remove legal
 currency/quality blockers. No tax rules, flags, migrations, environment or financial/UI/production data changed.
+
+## Current reproducible handoff validation
+
+53 Node /8 Python tests pass (node-tests-handoff.log, python-tests-handoff.log).12 additional Node tests execute live multilingual cards and chat parity, empty-index unavailable output, distinct topics/partial NPWP, and relevant prioritized clarification. The added Python test checks8 exact PMK1 instruction-map substrings against archived extraction offsets. The original41 Node/7 Python logs above are historical evidence of the preceding SHA, not current totals.
+
+All78 cases rerun through retrieve; scoring remains78 technical provision/claim/guard PASS,72 substantive explanations. Card export executes getCard27 times plus9 actual available/partial/unavailable examples. No model or tax review. The reproducible package includes exact original PDFs and source files. Verify PACKAGE_MANIFEST.json before running. Dependency installation needs PyPI or local wheels; the runtime/tests need no network once dependencies are installed. An extracted-package execution is performed separately before delivery.

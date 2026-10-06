@@ -35,7 +35,7 @@ Basis:
 
 - [DJP_SDSN_2023 article23 / (1a),(4) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
 
-Blocked claims: SERVICE_RATE (current_provision_currency_unconfirmed).
+Blocked claims: SERVICE_RATE (current_provision_currency_unconfirmed,amendment_review_incomplete).
 
 Clarifications:
 
@@ -84,7 +84,7 @@ Basis:
 
 - [DJP_SDSN_2023 article23 / (1a),(4) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
 
-Blocked claims: SERVICE_RATE (current_provision_currency_unconfirmed).
+Blocked claims: SERVICE_RATE (current_provision_currency_unconfirmed,amendment_review_incomplete).
 
 Clarifications:
 
@@ -133,7 +133,7 @@ Basis:
 
 - [DJP_SDSN_2023 article23 / (1a),(4) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
 
-Blocked claims: SERVICE_RATE (current_provision_currency_unconfirmed).
+Blocked claims: SERVICE_RATE (current_provision_currency_unconfirmed,amendment_review_incomplete).
 
 Clarifications:
 
@@ -183,7 +183,7 @@ Basis:
 
 - [PP34_2017 article2 / (1),(3) / PDF3](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=3), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:5440eda9fab50b4e47ee6570.
 
-Blocked claims: RENT_RATE (current_provision_currency_unconfirmed).
+Blocked claims: RENT_RATE (current_provision_currency_unconfirmed,amendment_review_incomplete).
 
 Clarifications:
 
@@ -233,7 +233,7 @@ Basis:
 
 - [PP34_2017 article2 / (1),(3) / PDF3](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=3), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:5440eda9fab50b4e47ee6570.
 
-Blocked claims: RENT_RATE (current_provision_currency_unconfirmed).
+Blocked claims: RENT_RATE (current_provision_currency_unconfirmed,amendment_review_incomplete).
 
 Clarifications:
 
@@ -283,7 +283,7 @@ Basis:
 
 - [PP34_2017 article2 / (1),(3) / PDF3](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=3), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:5440eda9fab50b4e47ee6570.
 
-Blocked claims: RENT_RATE (current_provision_currency_unconfirmed).
+Blocked claims: RENT_RATE (current_provision_currency_unconfirmed,amendment_review_incomplete).
 
 Clarifications:
 
@@ -333,7 +333,7 @@ Basis:
 
 - [PP34_2017 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=4), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:0e5db66988eacbc288b3d409,PP34_2017:748bf41bc376044c14aea2eb.
 
-Blocked claims: RENT_RATE (current_provision_currency_unconfirmed).
+Blocked claims: RENT_RATE (current_provision_currency_unconfirmed,amendment_review_incomplete).
 
 Clarifications:
 
@@ -383,7 +383,7 @@ Basis:
 
 - [PP34_2017 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=4), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:0e5db66988eacbc288b3d409,PP34_2017:748bf41bc376044c14aea2eb.
 
-Blocked claims: RENT_RATE (current_provision_currency_unconfirmed).
+Blocked claims: RENT_RATE (current_provision_currency_unconfirmed,amendment_review_incomplete).
 
 Clarifications:
 
@@ -433,7 +433,7 @@ Basis:
 
 - [PP34_2017 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=4), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:0e5db66988eacbc288b3d409,PP34_2017:748bf41bc376044c14aea2eb.
 
-Blocked claims: RENT_RATE (current_provision_currency_unconfirmed).
+Blocked claims: RENT_RATE (current_provision_currency_unconfirmed,amendment_review_incomplete).
 
 Clarifications:
 
@@ -508,7 +508,7 @@ Basis:
 
 - [DJP_SDSN_2023 article23 / (1a),(4) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
 
-Blocked claims: RENT_RATE (current_provision_currency_unconfirmed); SERVICE_RATE (current_provision_currency_unconfirmed).
+Blocked claims: RENT_RATE (current_provision_currency_unconfirmed,amendment_review_incomplete); SERVICE_RATE (current_provision_currency_unconfirmed,amendment_review_incomplete).
 
 Clarifications:
 
@@ -589,7 +589,7 @@ Basis:
 
 - [DJP_SDSN_2023 article23 / (1a),(4) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
 
-Blocked claims: RENT_RATE (current_provision_currency_unconfirmed); SERVICE_RATE (current_provision_currency_unconfirmed).
+Blocked claims: RENT_RATE (current_provision_currency_unconfirmed,amendment_review_incomplete); SERVICE_RATE (current_provision_currency_unconfirmed,amendment_review_incomplete).
 
 Clarifications:
 
@@ -670,7 +670,7 @@ Basis:
 
 - [DJP_SDSN_2023 article23 / (1a),(4) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
 
-Blocked claims: RENT_RATE (current_provision_currency_unconfirmed); SERVICE_RATE (current_provision_currency_unconfirmed).
+Blocked claims: RENT_RATE (current_provision_currency_unconfirmed,amendment_review_incomplete); SERVICE_RATE (current_provision_currency_unconfirmed,amendment_review_incomplete).
 
 Clarifications:
 
@@ -726,7 +726,7 @@ Basis:
 
 - [PP34_2017 article2 / (1),(3) / PDF3](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=3), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:5440eda9fab50b4e47ee6570.
 
-Blocked claims: RENT_RATE (current_provision_currency_unconfirmed).
+Blocked claims: RENT_RATE (current_provision_currency_unconfirmed,amendment_review_incomplete).
 
 Clarifications:
 
@@ -776,7 +776,7 @@ Basis:
 
 - [PP34_2017 article2 / (1),(3) / PDF3](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=3), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:5440eda9fab50b4e47ee6570.
 
-Blocked claims: RENT_RATE (current_provision_currency_unconfirmed).
+Blocked claims: RENT_RATE (current_provision_currency_unconfirmed,amendment_review_incomplete).
 
 Clarifications:
 
@@ -826,7 +826,7 @@ Basis:
 
 - [PP34_2017 article2 / (1),(3) / PDF3](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=3), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:5440eda9fab50b4e47ee6570.
 
-Blocked claims: RENT_RATE (current_provision_currency_unconfirmed).
+Blocked claims: RENT_RATE (current_provision_currency_unconfirmed,amendment_review_incomplete).
 
 Clarifications:
 
@@ -901,7 +901,7 @@ Basis:
 
 - [DJP_SDSN_2023 article23 / (1a),(4) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
 
-Blocked claims: RENT_RATE (current_provision_currency_unconfirmed); SERVICE_RATE (current_provision_currency_unconfirmed).
+Blocked claims: RENT_RATE (current_provision_currency_unconfirmed,amendment_review_incomplete); SERVICE_RATE (current_provision_currency_unconfirmed,amendment_review_incomplete).
 
 Clarifications:
 
@@ -982,7 +982,7 @@ Basis:
 
 - [DJP_SDSN_2023 article23 / (1a),(4) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
 
-Blocked claims: RENT_RATE (current_provision_currency_unconfirmed); SERVICE_RATE (current_provision_currency_unconfirmed).
+Blocked claims: RENT_RATE (current_provision_currency_unconfirmed,amendment_review_incomplete); SERVICE_RATE (current_provision_currency_unconfirmed,amendment_review_incomplete).
 
 Clarifications:
 
@@ -1063,7 +1063,7 @@ Basis:
 
 - [DJP_SDSN_2023 article23 / (1a),(4) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
 
-Blocked claims: RENT_RATE (current_provision_currency_unconfirmed); SERVICE_RATE (current_provision_currency_unconfirmed).
+Blocked claims: RENT_RATE (current_provision_currency_unconfirmed,amendment_review_incomplete); SERVICE_RATE (current_provision_currency_unconfirmed,amendment_review_incomplete).
 
 Clarifications:
 
@@ -1093,7 +1093,7 @@ Expected: Do not apply 2018 commencement backwards; request prior instruments.
 
 Недостаточно подтверждённых оснований для налогового вывода.
 
-Blocked claims: RENT_HISTORY (support_outside_requested_period,support_outside_requested_period,support_outside_requested_period,outside_requested_period); RENT_BASE (support_outside_requested_period,outside_requested_period); RENT_PAYER (support_outside_requested_period,outside_requested_period); RENT_RATE (support_outside_requested_period,outside_requested_period,current_provision_currency_unconfirmed); RENT_SCOPE (support_outside_requested_period,outside_requested_period).
+Blocked claims: RENT_HISTORY (support_outside_requested_period,support_outside_requested_period,support_outside_requested_period,outside_requested_period); RENT_BASE (support_outside_requested_period,outside_requested_period); RENT_PAYER (support_outside_requested_period,outside_requested_period); RENT_RATE (support_outside_requested_period,outside_requested_period,current_provision_currency_unconfirmed,amendment_review_incomplete); RENT_SCOPE (support_outside_requested_period,outside_requested_period).
 
 Clarifications:
 
@@ -1117,7 +1117,7 @@ Expected: Do not apply 2018 commencement backwards; request prior instruments.
 
 There is insufficient confirmed evidence for a tax determination.
 
-Blocked claims: RENT_HISTORY (support_outside_requested_period,support_outside_requested_period,support_outside_requested_period,outside_requested_period); RENT_BASE (support_outside_requested_period,outside_requested_period); RENT_PAYER (support_outside_requested_period,outside_requested_period); RENT_RATE (support_outside_requested_period,outside_requested_period,current_provision_currency_unconfirmed); RENT_SCOPE (support_outside_requested_period,outside_requested_period).
+Blocked claims: RENT_HISTORY (support_outside_requested_period,support_outside_requested_period,support_outside_requested_period,outside_requested_period); RENT_BASE (support_outside_requested_period,outside_requested_period); RENT_PAYER (support_outside_requested_period,outside_requested_period); RENT_RATE (support_outside_requested_period,outside_requested_period,current_provision_currency_unconfirmed,amendment_review_incomplete); RENT_SCOPE (support_outside_requested_period,outside_requested_period).
 
 Clarifications:
 
@@ -1141,7 +1141,7 @@ Expected: Do not apply 2018 commencement backwards; request prior instruments.
 
 Bukti terkonfirmasi belum cukup untuk menentukan pajak.
 
-Blocked claims: RENT_HISTORY (support_outside_requested_period,support_outside_requested_period,support_outside_requested_period,outside_requested_period); RENT_BASE (support_outside_requested_period,outside_requested_period); RENT_PAYER (support_outside_requested_period,outside_requested_period); RENT_RATE (support_outside_requested_period,outside_requested_period,current_provision_currency_unconfirmed); RENT_SCOPE (support_outside_requested_period,outside_requested_period).
+Blocked claims: RENT_HISTORY (support_outside_requested_period,support_outside_requested_period,support_outside_requested_period,outside_requested_period); RENT_BASE (support_outside_requested_period,outside_requested_period); RENT_PAYER (support_outside_requested_period,outside_requested_period); RENT_RATE (support_outside_requested_period,outside_requested_period,current_provision_currency_unconfirmed,amendment_review_incomplete); RENT_SCOPE (support_outside_requested_period,outside_requested_period).
 
 Clarifications:
 
@@ -1191,7 +1191,7 @@ Basis:
 
 - [PP34_2017 article2 / (1),(3) / PDF3](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=3), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:5440eda9fab50b4e47ee6570.
 
-Blocked claims: RENT_RATE (current_provision_currency_unconfirmed).
+Blocked claims: RENT_RATE (current_provision_currency_unconfirmed,amendment_review_incomplete).
 
 Clarifications:
 
@@ -1241,7 +1241,7 @@ Basis:
 
 - [PP34_2017 article2 / (1),(3) / PDF3](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=3), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:5440eda9fab50b4e47ee6570.
 
-Blocked claims: RENT_RATE (current_provision_currency_unconfirmed).
+Blocked claims: RENT_RATE (current_provision_currency_unconfirmed,amendment_review_incomplete).
 
 Clarifications:
 
@@ -1291,7 +1291,7 @@ Basis:
 
 - [PP34_2017 article2 / (1),(3) / PDF3](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=3), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:5440eda9fab50b4e47ee6570.
 
-Blocked claims: RENT_RATE (current_provision_currency_unconfirmed).
+Blocked claims: RENT_RATE (current_provision_currency_unconfirmed,amendment_review_incomplete).
 
 Clarifications:
 
@@ -1316,6 +1316,13 @@ Expected: Distinguish income tax and VAT; no turnover-only entitlement.
 Объяснения относятся к прочитанному архивному тексту; действующая применимость к компании не подтверждена.
 
 **VAT_MECHANISM** — Архивный PMK131 разделяет установленную ставку и DPP nilai lain. В той же редакции отдельно исключены специальные базы: механизм нельзя объявлять универсальным для всех поставок.
+
+Basis:
+
+- [PMK131_2024 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c853ed3c496865218892cf3c.
+- [PMK131_2024 article4 / (1) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:eb357e4b3237db5d08aa0e46.
+
+**VAT_SCOPE** — Архивный PMK131 описывает PPN для указанных операций с облагаемыми товарами и услугами, включая импорт и использование из-за рубежа. Специальные базы исключены из общего механизма этой редакции; не любая операция автоматически облагается одинаково.
 
 Basis:
 
@@ -1350,13 +1357,20 @@ Basis:
 - [PMK164_2023 article17 / (1),(3) / PDF16](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=16), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:4958a8e50eb6047e53d878eb.
 - [PMK164_2023 article18 / whole / PDF17](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=17), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:0f579a087d156d4f15b529cc.
 
+**PKP_SCOPE** — В архивном PMK164 PKP — статус Pengusaha Kena Pajak: предусмотрены оформление статуса и обязанности по PPN. Превышение порога и начало обязанностей различаются; статус конкретной компании здесь не установлен.
+
+Basis:
+
+- [PMK164_2023 article17 / (1),(3) / PDF16](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=16), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:4958a8e50eb6047e53d878eb.
+- [PMK164_2023 article18 / whole / PDF17](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=17), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:0f579a087d156d4f15b529cc.
+
 **VAT_CREDIT** — В архивном PMK131 право зачёта входного налога отсылает к условиям налогового законодательства. Статус PKP и наличие обычного инвойса сами по себе этих условий не доказывают; полный набор требований faktur пока не проверен.
 
 Basis:
 
 - [PMK131_2024 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c853ed3c496865218892cf3c.
 
-Blocked claims: BUSINESS_NEW_RATE (current_provision_currency_unconfirmed); BUSINESS_OLD_RATE (support_outside_requested_period,outside_requested_period,current_provision_currency_unconfirmed); VAT_RATE (current_provision_currency_unconfirmed,amendment_text_unavailable); BUSINESS_OLD_SCOPE (support_outside_requested_period,support_outside_requested_period,support_outside_requested_period,outside_requested_period); VAT_JAN_TRANSITION (outside_requested_period).
+Blocked claims: BUSINESS_NEW_RATE (current_provision_currency_unconfirmed,amendment_review_incomplete); BUSINESS_OLD_RATE (support_outside_requested_period,outside_requested_period,current_provision_currency_unconfirmed,amendment_review_incomplete,amendment_review_incomplete); VAT_RATE (current_provision_currency_unconfirmed,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete); BUSINESS_OLD_SCOPE (support_outside_requested_period,support_outside_requested_period,support_outside_requested_period,outside_requested_period); VAT_JAN_TRANSITION (outside_requested_period).
 
 Clarifications:
 
@@ -1384,6 +1398,13 @@ Expected: Distinguish income tax and VAT; no turnover-only entitlement.
 Explanations describe the read archived text; current company applicability is not established.
 
 **VAT_MECHANISM** — Archived PMK131 distinguishes the stated tax rate from DPP nilai lain. That edition separately excludes special bases; the mechanism cannot be treated as universal for all supplies.
+
+Basis:
+
+- [PMK131_2024 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c853ed3c496865218892cf3c.
+- [PMK131_2024 article4 / (1) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:eb357e4b3237db5d08aa0e46.
+
+**VAT_SCOPE** — Archived PMK131 describes PPN for specified transactions involving taxable goods and services, including imports and use from abroad. Special bases are excluded from this edition’s general mechanism; transactions cannot all be treated alike.
 
 Basis:
 
@@ -1418,13 +1439,20 @@ Basis:
 - [PMK164_2023 article17 / (1),(3) / PDF16](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=16), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:4958a8e50eb6047e53d878eb.
 - [PMK164_2023 article18 / whole / PDF17](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=17), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:0f579a087d156d4f15b529cc.
 
+**PKP_SCOPE** — In archived PMK164, PKP is Pengusaha Kena Pajak status, with confirmation procedures and PPN obligations. Threshold crossing and commencement of obligations are distinct; this does not establish a particular company’s status.
+
+Basis:
+
+- [PMK164_2023 article17 / (1),(3) / PDF16](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=16), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:4958a8e50eb6047e53d878eb.
+- [PMK164_2023 article18 / whole / PDF17](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=17), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:0f579a087d156d4f15b529cc.
+
 **VAT_CREDIT** — Archived PMK131 refers input credit to the conditions in tax legislation. PKP status and an ordinary invoice alone do not establish those conditions; the full faktur requirements remain unreviewed.
 
 Basis:
 
 - [PMK131_2024 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c853ed3c496865218892cf3c.
 
-Blocked claims: BUSINESS_NEW_RATE (current_provision_currency_unconfirmed); BUSINESS_OLD_RATE (support_outside_requested_period,outside_requested_period,current_provision_currency_unconfirmed); VAT_RATE (current_provision_currency_unconfirmed,amendment_text_unavailable); BUSINESS_OLD_SCOPE (support_outside_requested_period,support_outside_requested_period,support_outside_requested_period,outside_requested_period); VAT_JAN_TRANSITION (outside_requested_period).
+Blocked claims: BUSINESS_NEW_RATE (current_provision_currency_unconfirmed,amendment_review_incomplete); BUSINESS_OLD_RATE (support_outside_requested_period,outside_requested_period,current_provision_currency_unconfirmed,amendment_review_incomplete,amendment_review_incomplete); VAT_RATE (current_provision_currency_unconfirmed,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete); BUSINESS_OLD_SCOPE (support_outside_requested_period,support_outside_requested_period,support_outside_requested_period,outside_requested_period); VAT_JAN_TRANSITION (outside_requested_period).
 
 Clarifications:
 
@@ -1452,6 +1480,13 @@ Expected: Distinguish income tax and VAT; no turnover-only entitlement.
 Penjelasan menggambarkan teks arsip yang dibaca; penerapan terkini pada perusahaan belum ditetapkan.
 
 **VAT_MECHANISM** — PMK131 yang diarsipkan membedakan tarif pajak dari DPP nilai lain. Edisi tersebut mengecualikan DPP khusus secara terpisah; mekanismenya tidak universal untuk semua penyerahan.
+
+Basis:
+
+- [PMK131_2024 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c853ed3c496865218892cf3c.
+- [PMK131_2024 article4 / (1) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:eb357e4b3237db5d08aa0e46.
+
+**VAT_SCOPE** — PMK131 yang diarsipkan menjelaskan PPN atas transaksi tertentu Barang Kena Pajak dan Jasa Kena Pajak, termasuk impor serta pemanfaatan dari luar negeri. DPP khusus dikecualikan dari mekanisme umum edisi ini; semua transaksi tidak otomatis diperlakukan sama.
 
 Basis:
 
@@ -1486,13 +1521,20 @@ Basis:
 - [PMK164_2023 article17 / (1),(3) / PDF16](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=16), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:4958a8e50eb6047e53d878eb.
 - [PMK164_2023 article18 / whole / PDF17](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=17), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:0f579a087d156d4f15b529cc.
 
+**PKP_SCOPE** — Dalam PMK164 yang diarsipkan, PKP adalah status Pengusaha Kena Pajak, dengan prosedur pengukuhan serta kewajiban PPN. Terlampauinya batas dan awal kewajiban dibedakan; status perusahaan tertentu belum ditetapkan.
+
+Basis:
+
+- [PMK164_2023 article17 / (1),(3) / PDF16](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=16), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:4958a8e50eb6047e53d878eb.
+- [PMK164_2023 article18 / whole / PDF17](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=17), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:0f579a087d156d4f15b529cc.
+
 **VAT_CREDIT** — PMK131 yang diarsipkan merujuk kredit pajak masukan pada syarat dalam ketentuan perpajakan. Status PKP dan invoice biasa saja tidak membuktikan syarat tersebut; persyaratan faktur lengkap belum ditelaah.
 
 Basis:
 
 - [PMK131_2024 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c853ed3c496865218892cf3c.
 
-Blocked claims: BUSINESS_NEW_RATE (current_provision_currency_unconfirmed); BUSINESS_OLD_RATE (support_outside_requested_period,outside_requested_period,current_provision_currency_unconfirmed); VAT_RATE (current_provision_currency_unconfirmed,amendment_text_unavailable); BUSINESS_OLD_SCOPE (support_outside_requested_period,support_outside_requested_period,support_outside_requested_period,outside_requested_period); VAT_JAN_TRANSITION (outside_requested_period).
+Blocked claims: BUSINESS_NEW_RATE (current_provision_currency_unconfirmed,amendment_review_incomplete); BUSINESS_OLD_RATE (support_outside_requested_period,outside_requested_period,current_provision_currency_unconfirmed,amendment_review_incomplete,amendment_review_incomplete); VAT_RATE (current_provision_currency_unconfirmed,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete); BUSINESS_OLD_SCOPE (support_outside_requested_period,support_outside_requested_period,support_outside_requested_period,outside_requested_period); VAT_JAN_TRANSITION (outside_requested_period).
 
 Clarifications:
 
@@ -1540,7 +1582,7 @@ Basis:
 - [DJP_SDSN_2023 article17 / (1) / PDF213,214](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=213), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:b7444213593cb85c0287d192,DJP_SDSN_2023:a64b39fff8c7cf1e8191d10c.
 - [DJP_SDSN_2023 article31E / (1) / PDF252](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=252), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:c86901169df212206c320540.
 
-Blocked claims: BUSINESS_NEW_RATE (current_provision_currency_unconfirmed); BUSINESS_OLD_RATE (support_outside_requested_period,outside_requested_period,current_provision_currency_unconfirmed); BUSINESS_OLD_SCOPE (support_outside_requested_period,support_outside_requested_period,support_outside_requested_period,outside_requested_period).
+Blocked claims: BUSINESS_NEW_RATE (current_provision_currency_unconfirmed,amendment_review_incomplete); BUSINESS_OLD_RATE (support_outside_requested_period,outside_requested_period,current_provision_currency_unconfirmed,amendment_review_incomplete,amendment_review_incomplete); BUSINESS_OLD_SCOPE (support_outside_requested_period,support_outside_requested_period,support_outside_requested_period,outside_requested_period).
 
 Clarifications:
 
@@ -1583,7 +1625,7 @@ Basis:
 - [DJP_SDSN_2023 article17 / (1) / PDF213,214](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=213), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:b7444213593cb85c0287d192,DJP_SDSN_2023:a64b39fff8c7cf1e8191d10c.
 - [DJP_SDSN_2023 article31E / (1) / PDF252](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=252), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:c86901169df212206c320540.
 
-Blocked claims: BUSINESS_NEW_RATE (current_provision_currency_unconfirmed); BUSINESS_OLD_RATE (support_outside_requested_period,outside_requested_period,current_provision_currency_unconfirmed); BUSINESS_OLD_SCOPE (support_outside_requested_period,support_outside_requested_period,support_outside_requested_period,outside_requested_period).
+Blocked claims: BUSINESS_NEW_RATE (current_provision_currency_unconfirmed,amendment_review_incomplete); BUSINESS_OLD_RATE (support_outside_requested_period,outside_requested_period,current_provision_currency_unconfirmed,amendment_review_incomplete,amendment_review_incomplete); BUSINESS_OLD_SCOPE (support_outside_requested_period,support_outside_requested_period,support_outside_requested_period,outside_requested_period).
 
 Clarifications:
 
@@ -1626,7 +1668,7 @@ Basis:
 - [DJP_SDSN_2023 article17 / (1) / PDF213,214](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=213), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:b7444213593cb85c0287d192,DJP_SDSN_2023:a64b39fff8c7cf1e8191d10c.
 - [DJP_SDSN_2023 article31E / (1) / PDF252](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=252), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:c86901169df212206c320540.
 
-Blocked claims: BUSINESS_NEW_RATE (current_provision_currency_unconfirmed); BUSINESS_OLD_RATE (support_outside_requested_period,outside_requested_period,current_provision_currency_unconfirmed); BUSINESS_OLD_SCOPE (support_outside_requested_period,support_outside_requested_period,support_outside_requested_period,outside_requested_period).
+Blocked claims: BUSINESS_NEW_RATE (current_provision_currency_unconfirmed,amendment_review_incomplete); BUSINESS_OLD_RATE (support_outside_requested_period,outside_requested_period,current_provision_currency_unconfirmed,amendment_review_incomplete,amendment_review_incomplete); BUSINESS_OLD_SCOPE (support_outside_requested_period,support_outside_requested_period,support_outside_requested_period,outside_requested_period).
 
 Clarifications:
 
@@ -1669,7 +1711,7 @@ Basis:
 - [DJP_SDSN_2023 article17 / (1) / PDF213,214](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=213), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:b7444213593cb85c0287d192,DJP_SDSN_2023:a64b39fff8c7cf1e8191d10c.
 - [DJP_SDSN_2023 article31E / (1) / PDF252](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=252), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:c86901169df212206c320540.
 
-Blocked claims: BUSINESS_NEW_RATE (current_provision_currency_unconfirmed); BUSINESS_OLD_RATE (support_outside_requested_period,outside_requested_period,current_provision_currency_unconfirmed); BUSINESS_OLD_SCOPE (support_outside_requested_period,support_outside_requested_period,support_outside_requested_period,outside_requested_period).
+Blocked claims: BUSINESS_NEW_RATE (current_provision_currency_unconfirmed,amendment_review_incomplete); BUSINESS_OLD_RATE (support_outside_requested_period,outside_requested_period,current_provision_currency_unconfirmed,amendment_review_incomplete,amendment_review_incomplete); BUSINESS_OLD_SCOPE (support_outside_requested_period,support_outside_requested_period,support_outside_requested_period,outside_requested_period).
 
 Clarifications:
 
@@ -1712,7 +1754,7 @@ Basis:
 - [DJP_SDSN_2023 article17 / (1) / PDF213,214](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=213), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:b7444213593cb85c0287d192,DJP_SDSN_2023:a64b39fff8c7cf1e8191d10c.
 - [DJP_SDSN_2023 article31E / (1) / PDF252](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=252), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:c86901169df212206c320540.
 
-Blocked claims: BUSINESS_NEW_RATE (current_provision_currency_unconfirmed); BUSINESS_OLD_RATE (support_outside_requested_period,outside_requested_period,current_provision_currency_unconfirmed); BUSINESS_OLD_SCOPE (support_outside_requested_period,support_outside_requested_period,support_outside_requested_period,outside_requested_period).
+Blocked claims: BUSINESS_NEW_RATE (current_provision_currency_unconfirmed,amendment_review_incomplete); BUSINESS_OLD_RATE (support_outside_requested_period,outside_requested_period,current_provision_currency_unconfirmed,amendment_review_incomplete,amendment_review_incomplete); BUSINESS_OLD_SCOPE (support_outside_requested_period,support_outside_requested_period,support_outside_requested_period,outside_requested_period).
 
 Clarifications:
 
@@ -1755,7 +1797,7 @@ Basis:
 - [DJP_SDSN_2023 article17 / (1) / PDF213,214](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=213), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:b7444213593cb85c0287d192,DJP_SDSN_2023:a64b39fff8c7cf1e8191d10c.
 - [DJP_SDSN_2023 article31E / (1) / PDF252](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=252), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:c86901169df212206c320540.
 
-Blocked claims: BUSINESS_NEW_RATE (current_provision_currency_unconfirmed); BUSINESS_OLD_RATE (support_outside_requested_period,outside_requested_period,current_provision_currency_unconfirmed); BUSINESS_OLD_SCOPE (support_outside_requested_period,support_outside_requested_period,support_outside_requested_period,outside_requested_period).
+Blocked claims: BUSINESS_NEW_RATE (current_provision_currency_unconfirmed,amendment_review_incomplete); BUSINESS_OLD_RATE (support_outside_requested_period,outside_requested_period,current_provision_currency_unconfirmed,amendment_review_incomplete,amendment_review_incomplete); BUSINESS_OLD_SCOPE (support_outside_requested_period,support_outside_requested_period,support_outside_requested_period,outside_requested_period).
 
 Clarifications:
 
@@ -1792,7 +1834,7 @@ Basis:
 - [DJP_SDSN_2023 article17 / (1) / PDF213,214](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=213), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:b7444213593cb85c0287d192,DJP_SDSN_2023:a64b39fff8c7cf1e8191d10c.
 - [DJP_SDSN_2023 article31E / (1) / PDF252](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=252), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:c86901169df212206c320540.
 
-Blocked claims: BUSINESS_TRANSITION (support_outside_requested_period,support_outside_requested_period,outside_requested_period); BUSINESS_NEW_RATE (support_outside_requested_period,support_outside_requested_period,support_outside_requested_period,outside_requested_period,current_provision_currency_unconfirmed); BUSINESS_NEW_SCOPE (support_outside_requested_period,support_outside_requested_period,outside_requested_period); BUSINESS_OLD_RATE (current_provision_currency_unconfirmed).
+Blocked claims: BUSINESS_TRANSITION (support_outside_requested_period,support_outside_requested_period,outside_requested_period); BUSINESS_NEW_RATE (support_outside_requested_period,support_outside_requested_period,support_outside_requested_period,outside_requested_period,current_provision_currency_unconfirmed,amendment_review_incomplete); BUSINESS_NEW_SCOPE (support_outside_requested_period,support_outside_requested_period,outside_requested_period); BUSINESS_OLD_RATE (current_provision_currency_unconfirmed,amendment_review_incomplete,amendment_review_incomplete).
 
 Clarifications:
 
@@ -1829,7 +1871,7 @@ Basis:
 - [DJP_SDSN_2023 article17 / (1) / PDF213,214](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=213), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:b7444213593cb85c0287d192,DJP_SDSN_2023:a64b39fff8c7cf1e8191d10c.
 - [DJP_SDSN_2023 article31E / (1) / PDF252](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=252), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:c86901169df212206c320540.
 
-Blocked claims: BUSINESS_TRANSITION (support_outside_requested_period,support_outside_requested_period,outside_requested_period); BUSINESS_NEW_RATE (support_outside_requested_period,support_outside_requested_period,support_outside_requested_period,outside_requested_period,current_provision_currency_unconfirmed); BUSINESS_NEW_SCOPE (support_outside_requested_period,support_outside_requested_period,outside_requested_period); BUSINESS_OLD_RATE (current_provision_currency_unconfirmed).
+Blocked claims: BUSINESS_TRANSITION (support_outside_requested_period,support_outside_requested_period,outside_requested_period); BUSINESS_NEW_RATE (support_outside_requested_period,support_outside_requested_period,support_outside_requested_period,outside_requested_period,current_provision_currency_unconfirmed,amendment_review_incomplete); BUSINESS_NEW_SCOPE (support_outside_requested_period,support_outside_requested_period,outside_requested_period); BUSINESS_OLD_RATE (current_provision_currency_unconfirmed,amendment_review_incomplete,amendment_review_incomplete).
 
 Clarifications:
 
@@ -1866,7 +1908,7 @@ Basis:
 - [DJP_SDSN_2023 article17 / (1) / PDF213,214](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=213), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:b7444213593cb85c0287d192,DJP_SDSN_2023:a64b39fff8c7cf1e8191d10c.
 - [DJP_SDSN_2023 article31E / (1) / PDF252](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=252), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:c86901169df212206c320540.
 
-Blocked claims: BUSINESS_TRANSITION (support_outside_requested_period,support_outside_requested_period,outside_requested_period); BUSINESS_NEW_RATE (support_outside_requested_period,support_outside_requested_period,support_outside_requested_period,outside_requested_period,current_provision_currency_unconfirmed); BUSINESS_NEW_SCOPE (support_outside_requested_period,support_outside_requested_period,outside_requested_period); BUSINESS_OLD_RATE (current_provision_currency_unconfirmed).
+Blocked claims: BUSINESS_TRANSITION (support_outside_requested_period,support_outside_requested_period,outside_requested_period); BUSINESS_NEW_RATE (support_outside_requested_period,support_outside_requested_period,support_outside_requested_period,outside_requested_period,current_provision_currency_unconfirmed,amendment_review_incomplete); BUSINESS_NEW_SCOPE (support_outside_requested_period,support_outside_requested_period,outside_requested_period); BUSINESS_OLD_RATE (current_provision_currency_unconfirmed,amendment_review_incomplete,amendment_review_incomplete).
 
 Clarifications:
 
@@ -1909,6 +1951,12 @@ Basis:
 - [PMK168_2023 article13 / (1),(2) / PDF14,15](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=14), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:84cffa9db5a9573cbb4658a0,PMK168_2023:db9949c7c54fcf9fb9719e2a.
 - [PMK168_2023 article15 / (1)-(3) / PDF15,16](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=15), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:3ba913a0416a5e3aa4ebea00,PMK168_2023:bea457a9e116ad7de2ac5bbc.
 
+**PAYROLL_SCOPE** — Архивный PMK168 описывает удержание PPh21 с выплат за работу, услуги или участие в деятельности установленными плательщиками. Категории плательщиков и исключения перечислены отдельно; это не налог только на зарплату.
+
+Basis:
+
+- [PMK168_2023 article2 / (2)(d) / PDF5,6](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=5), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:079306052df2707a31737092,PMK168_2023:5d7769d0404bd1a073946d49.
+
 **SERVICE_NPWP** — Архивная статья23 содержит отдельную ветвь отсутствия NPWP и исключения из удержания. Нужно подтвердить идентификатор, категорию дохода и исключения; текущая трактовка NIK/NPWP не установлена этой подборкой.
 
 Basis:
@@ -1927,7 +1975,7 @@ Basis:
 
 - [DJP_SDSN_2023 article23 / (1a),(4) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
 
-Blocked claims: SERVICE_RATE (current_provision_currency_unconfirmed); TER_NUMERIC (current_provision_currency_unconfirmed,TER_table_not_verified).
+Blocked claims: SERVICE_RATE (current_provision_currency_unconfirmed,amendment_review_incomplete); TER_NUMERIC (current_provision_currency_unconfirmed,amendment_review_incomplete,amendment_review_incomplete,TER_table_not_verified).
 
 Clarifications:
 
@@ -1979,6 +2027,12 @@ Basis:
 - [PMK168_2023 article13 / (1),(2) / PDF14,15](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=14), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:84cffa9db5a9573cbb4658a0,PMK168_2023:db9949c7c54fcf9fb9719e2a.
 - [PMK168_2023 article15 / (1)-(3) / PDF15,16](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=15), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:3ba913a0416a5e3aa4ebea00,PMK168_2023:bea457a9e116ad7de2ac5bbc.
 
+**PAYROLL_SCOPE** — Archived PMK168 describes PPh21 withholding on payments for work, services or activities by designated payers. Payer categories and exclusions are listed separately; this is not solely a salary tax.
+
+Basis:
+
+- [PMK168_2023 article2 / (2)(d) / PDF5,6](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=5), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:079306052df2707a31737092,PMK168_2023:5d7769d0404bd1a073946d49.
+
 **SERVICE_NPWP** — Archived Article23 contains a no-NPWP branch and withholding exclusions. Verify identity, income category and exclusions; current NIK/NPWP treatment is not established by this collection.
 
 Basis:
@@ -1997,7 +2051,7 @@ Basis:
 
 - [DJP_SDSN_2023 article23 / (1a),(4) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
 
-Blocked claims: SERVICE_RATE (current_provision_currency_unconfirmed); TER_NUMERIC (current_provision_currency_unconfirmed,TER_table_not_verified).
+Blocked claims: SERVICE_RATE (current_provision_currency_unconfirmed,amendment_review_incomplete); TER_NUMERIC (current_provision_currency_unconfirmed,amendment_review_incomplete,amendment_review_incomplete,TER_table_not_verified).
 
 Clarifications:
 
@@ -2049,6 +2103,12 @@ Basis:
 - [PMK168_2023 article13 / (1),(2) / PDF14,15](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=14), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:84cffa9db5a9573cbb4658a0,PMK168_2023:db9949c7c54fcf9fb9719e2a.
 - [PMK168_2023 article15 / (1)-(3) / PDF15,16](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=15), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:3ba913a0416a5e3aa4ebea00,PMK168_2023:bea457a9e116ad7de2ac5bbc.
 
+**PAYROLL_SCOPE** — PMK168 yang diarsipkan menjelaskan pemotongan PPh21 atas pembayaran terkait pekerjaan, jasa atau kegiatan oleh pemotong yang ditentukan. Kategori pemotong dan pengecualian diatur tersendiri; cakupannya bukan hanya gaji.
+
+Basis:
+
+- [PMK168_2023 article2 / (2)(d) / PDF5,6](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=5), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:079306052df2707a31737092,PMK168_2023:5d7769d0404bd1a073946d49.
+
 **SERVICE_NPWP** — Pasal23 yang diarsipkan memuat cabang tanpa NPWP dan pengecualian pemotongan. Periksa identitas, kategori penghasilan dan pengecualian; perlakuan NIK/NPWP terkini belum ditetapkan oleh kumpulan ini.
 
 Basis:
@@ -2067,7 +2127,7 @@ Basis:
 
 - [DJP_SDSN_2023 article23 / (1a),(4) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
 
-Blocked claims: SERVICE_RATE (current_provision_currency_unconfirmed); TER_NUMERIC (current_provision_currency_unconfirmed,TER_table_not_verified).
+Blocked claims: SERVICE_RATE (current_provision_currency_unconfirmed,amendment_review_incomplete); TER_NUMERIC (current_provision_currency_unconfirmed,amendment_review_incomplete,amendment_review_incomplete,TER_table_not_verified).
 
 Clarifications:
 
@@ -2123,7 +2183,7 @@ Basis:
 
 - [DJP_SDSN_2023 article23 / (1a),(4) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
 
-Blocked claims: SERVICE_RATE (current_provision_currency_unconfirmed).
+Blocked claims: SERVICE_RATE (current_provision_currency_unconfirmed,amendment_review_incomplete).
 
 Clarifications:
 
@@ -2172,7 +2232,7 @@ Basis:
 
 - [DJP_SDSN_2023 article23 / (1a),(4) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
 
-Blocked claims: SERVICE_RATE (current_provision_currency_unconfirmed).
+Blocked claims: SERVICE_RATE (current_provision_currency_unconfirmed,amendment_review_incomplete).
 
 Clarifications:
 
@@ -2221,7 +2281,7 @@ Basis:
 
 - [DJP_SDSN_2023 article23 / (1a),(4) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
 
-Blocked claims: SERVICE_RATE (current_provision_currency_unconfirmed).
+Blocked claims: SERVICE_RATE (current_provision_currency_unconfirmed,amendment_review_incomplete).
 
 Clarifications:
 
@@ -2270,7 +2330,7 @@ Basis:
 
 - [DJP_SDSN_2023 article23 / (1a),(4) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
 
-Blocked claims: SERVICE_RATE (current_provision_currency_unconfirmed).
+Blocked claims: SERVICE_RATE (current_provision_currency_unconfirmed,amendment_review_incomplete).
 
 Clarifications:
 
@@ -2319,7 +2379,7 @@ Basis:
 
 - [DJP_SDSN_2023 article23 / (1a),(4) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
 
-Blocked claims: SERVICE_RATE (current_provision_currency_unconfirmed).
+Blocked claims: SERVICE_RATE (current_provision_currency_unconfirmed,amendment_review_incomplete).
 
 Clarifications:
 
@@ -2368,7 +2428,7 @@ Basis:
 
 - [DJP_SDSN_2023 article23 / (1a),(4) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
 
-Blocked claims: SERVICE_RATE (current_provision_currency_unconfirmed).
+Blocked claims: SERVICE_RATE (current_provision_currency_unconfirmed,amendment_review_incomplete).
 
 Clarifications:
 
@@ -2399,7 +2459,21 @@ Basis:
 - [PMK131_2024 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c853ed3c496865218892cf3c.
 - [PMK131_2024 article4 / (1) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:eb357e4b3237db5d08aa0e46.
 
+**VAT_SCOPE** — Архивный PMK131 описывает PPN для указанных операций с облагаемыми товарами и услугами, включая импорт и использование из-за рубежа. Специальные базы исключены из общего механизма этой редакции; не любая операция автоматически облагается одинаково.
+
+Basis:
+
+- [PMK131_2024 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c853ed3c496865218892cf3c.
+- [PMK131_2024 article4 / (1) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:eb357e4b3237db5d08aa0e46.
+
 **PKP_REGISTRATION** — Архивный PMK164 различает превышение порога, сообщение о деятельности и начало обязанностей PKP. Их нельзя свести к автоматическому действию в день выставления инвойса.
+
+Basis:
+
+- [PMK164_2023 article17 / (1),(3) / PDF16](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=16), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:4958a8e50eb6047e53d878eb.
+- [PMK164_2023 article18 / whole / PDF17](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=17), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:0f579a087d156d4f15b529cc.
+
+**PKP_SCOPE** — В архивном PMK164 PKP — статус Pengusaha Kena Pajak: предусмотрены оформление статуса и обязанности по PPN. Превышение порога и начало обязанностей различаются; статус конкретной компании здесь не установлен.
 
 Basis:
 
@@ -2412,7 +2486,7 @@ Basis:
 
 - [PMK131_2024 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c853ed3c496865218892cf3c.
 
-Blocked claims: VAT_RATE (current_provision_currency_unconfirmed,amendment_text_unavailable); VAT_JAN_TRANSITION (outside_requested_period).
+Blocked claims: VAT_RATE (current_provision_currency_unconfirmed,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete); VAT_JAN_TRANSITION (outside_requested_period).
 
 Clarifications:
 
@@ -2440,7 +2514,21 @@ Basis:
 - [PMK131_2024 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c853ed3c496865218892cf3c.
 - [PMK131_2024 article4 / (1) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:eb357e4b3237db5d08aa0e46.
 
+**VAT_SCOPE** — Archived PMK131 describes PPN for specified transactions involving taxable goods and services, including imports and use from abroad. Special bases are excluded from this edition’s general mechanism; transactions cannot all be treated alike.
+
+Basis:
+
+- [PMK131_2024 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c853ed3c496865218892cf3c.
+- [PMK131_2024 article4 / (1) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:eb357e4b3237db5d08aa0e46.
+
 **PKP_REGISTRATION** — Archived PMK164 distinguishes a threshold crossing, business reporting and commencement of PKP obligations. They cannot be reduced to automatic treatment on an invoice date.
+
+Basis:
+
+- [PMK164_2023 article17 / (1),(3) / PDF16](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=16), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:4958a8e50eb6047e53d878eb.
+- [PMK164_2023 article18 / whole / PDF17](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=17), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:0f579a087d156d4f15b529cc.
+
+**PKP_SCOPE** — In archived PMK164, PKP is Pengusaha Kena Pajak status, with confirmation procedures and PPN obligations. Threshold crossing and commencement of obligations are distinct; this does not establish a particular company’s status.
 
 Basis:
 
@@ -2453,7 +2541,7 @@ Basis:
 
 - [PMK131_2024 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c853ed3c496865218892cf3c.
 
-Blocked claims: VAT_RATE (current_provision_currency_unconfirmed,amendment_text_unavailable); VAT_JAN_TRANSITION (outside_requested_period).
+Blocked claims: VAT_RATE (current_provision_currency_unconfirmed,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete); VAT_JAN_TRANSITION (outside_requested_period).
 
 Clarifications:
 
@@ -2481,7 +2569,21 @@ Basis:
 - [PMK131_2024 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c853ed3c496865218892cf3c.
 - [PMK131_2024 article4 / (1) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:eb357e4b3237db5d08aa0e46.
 
+**VAT_SCOPE** — PMK131 yang diarsipkan menjelaskan PPN atas transaksi tertentu Barang Kena Pajak dan Jasa Kena Pajak, termasuk impor serta pemanfaatan dari luar negeri. DPP khusus dikecualikan dari mekanisme umum edisi ini; semua transaksi tidak otomatis diperlakukan sama.
+
+Basis:
+
+- [PMK131_2024 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c853ed3c496865218892cf3c.
+- [PMK131_2024 article4 / (1) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:eb357e4b3237db5d08aa0e46.
+
 **PKP_REGISTRATION** — PMK164 yang diarsipkan membedakan terlampauinya batas, pelaporan usaha, dan awal kewajiban PKP. Hal itu tidak otomatis ditentukan dari tanggal invoice.
+
+Basis:
+
+- [PMK164_2023 article17 / (1),(3) / PDF16](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=16), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:4958a8e50eb6047e53d878eb.
+- [PMK164_2023 article18 / whole / PDF17](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=17), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:0f579a087d156d4f15b529cc.
+
+**PKP_SCOPE** — Dalam PMK164 yang diarsipkan, PKP adalah status Pengusaha Kena Pajak, dengan prosedur pengukuhan serta kewajiban PPN. Terlampauinya batas dan awal kewajiban dibedakan; status perusahaan tertentu belum ditetapkan.
 
 Basis:
 
@@ -2494,7 +2596,7 @@ Basis:
 
 - [PMK131_2024 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c853ed3c496865218892cf3c.
 
-Blocked claims: VAT_RATE (current_provision_currency_unconfirmed,amendment_text_unavailable); VAT_JAN_TRANSITION (outside_requested_period).
+Blocked claims: VAT_RATE (current_provision_currency_unconfirmed,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete); VAT_JAN_TRANSITION (outside_requested_period).
 
 Clarifications:
 
@@ -2529,6 +2631,13 @@ Basis:
 - [PMK164_2023 article17 / (1),(3) / PDF16](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=16), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:4958a8e50eb6047e53d878eb.
 - [PMK164_2023 article18 / whole / PDF17](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=17), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:0f579a087d156d4f15b529cc.
 
+**PKP_SCOPE** — В архивном PMK164 PKP — статус Pengusaha Kena Pajak: предусмотрены оформление статуса и обязанности по PPN. Превышение порога и начало обязанностей различаются; статус конкретной компании здесь не установлен.
+
+Basis:
+
+- [PMK164_2023 article17 / (1),(3) / PDF16](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=16), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:4958a8e50eb6047e53d878eb.
+- [PMK164_2023 article18 / whole / PDF17](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=17), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:0f579a087d156d4f15b529cc.
+
 **VAT_CREDIT** — В архивном PMK131 право зачёта входного налога отсылает к условиям налогового законодательства. Статус PKP и наличие обычного инвойса сами по себе этих условий не доказывают; полный набор требований faktur пока не проверен.
 
 Basis:
@@ -2542,7 +2651,14 @@ Basis:
 - [PMK131_2024 article3 / (4) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c853ed3c496865218892cf3c.
 - [PMK131_2024 article4 / (1) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:eb357e4b3237db5d08aa0e46.
 
-Blocked claims: VAT_RATE (current_provision_currency_unconfirmed,amendment_text_unavailable).
+**VAT_SCOPE** — Архивный PMK131 описывает PPN для указанных операций с облагаемыми товарами и услугами, включая импорт и использование из-за рубежа. Специальные базы исключены из общего механизма этой редакции; не любая операция автоматически облагается одинаково.
+
+Basis:
+
+- [PMK131_2024 article3 / (4) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c853ed3c496865218892cf3c.
+- [PMK131_2024 article4 / (1) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:eb357e4b3237db5d08aa0e46.
+
+Blocked claims: VAT_RATE (current_provision_currency_unconfirmed,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete).
 
 Clarifications:
 
@@ -2577,6 +2693,13 @@ Basis:
 - [PMK164_2023 article17 / (1),(3) / PDF16](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=16), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:4958a8e50eb6047e53d878eb.
 - [PMK164_2023 article18 / whole / PDF17](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=17), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:0f579a087d156d4f15b529cc.
 
+**PKP_SCOPE** — In archived PMK164, PKP is Pengusaha Kena Pajak status, with confirmation procedures and PPN obligations. Threshold crossing and commencement of obligations are distinct; this does not establish a particular company’s status.
+
+Basis:
+
+- [PMK164_2023 article17 / (1),(3) / PDF16](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=16), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:4958a8e50eb6047e53d878eb.
+- [PMK164_2023 article18 / whole / PDF17](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=17), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:0f579a087d156d4f15b529cc.
+
 **VAT_CREDIT** — Archived PMK131 refers input credit to the conditions in tax legislation. PKP status and an ordinary invoice alone do not establish those conditions; the full faktur requirements remain unreviewed.
 
 Basis:
@@ -2590,7 +2713,14 @@ Basis:
 - [PMK131_2024 article3 / (4) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c853ed3c496865218892cf3c.
 - [PMK131_2024 article4 / (1) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:eb357e4b3237db5d08aa0e46.
 
-Blocked claims: VAT_RATE (current_provision_currency_unconfirmed,amendment_text_unavailable).
+**VAT_SCOPE** — Archived PMK131 describes PPN for specified transactions involving taxable goods and services, including imports and use from abroad. Special bases are excluded from this edition’s general mechanism; transactions cannot all be treated alike.
+
+Basis:
+
+- [PMK131_2024 article3 / (4) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c853ed3c496865218892cf3c.
+- [PMK131_2024 article4 / (1) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:eb357e4b3237db5d08aa0e46.
+
+Blocked claims: VAT_RATE (current_provision_currency_unconfirmed,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete).
 
 Clarifications:
 
@@ -2625,6 +2755,13 @@ Basis:
 - [PMK164_2023 article17 / (1),(3) / PDF16](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=16), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:4958a8e50eb6047e53d878eb.
 - [PMK164_2023 article18 / whole / PDF17](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=17), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:0f579a087d156d4f15b529cc.
 
+**PKP_SCOPE** — Dalam PMK164 yang diarsipkan, PKP adalah status Pengusaha Kena Pajak, dengan prosedur pengukuhan serta kewajiban PPN. Terlampauinya batas dan awal kewajiban dibedakan; status perusahaan tertentu belum ditetapkan.
+
+Basis:
+
+- [PMK164_2023 article17 / (1),(3) / PDF16](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=16), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:4958a8e50eb6047e53d878eb.
+- [PMK164_2023 article18 / whole / PDF17](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=17), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:0f579a087d156d4f15b529cc.
+
 **VAT_CREDIT** — PMK131 yang diarsipkan merujuk kredit pajak masukan pada syarat dalam ketentuan perpajakan. Status PKP dan invoice biasa saja tidak membuktikan syarat tersebut; persyaratan faktur lengkap belum ditelaah.
 
 Basis:
@@ -2638,7 +2775,14 @@ Basis:
 - [PMK131_2024 article3 / (4) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c853ed3c496865218892cf3c.
 - [PMK131_2024 article4 / (1) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:eb357e4b3237db5d08aa0e46.
 
-Blocked claims: VAT_RATE (current_provision_currency_unconfirmed,amendment_text_unavailable).
+**VAT_SCOPE** — PMK131 yang diarsipkan menjelaskan PPN atas transaksi tertentu Barang Kena Pajak dan Jasa Kena Pajak, termasuk impor serta pemanfaatan dari luar negeri. DPP khusus dikecualikan dari mekanisme umum edisi ini; semua transaksi tidak otomatis diperlakukan sama.
+
+Basis:
+
+- [PMK131_2024 article3 / (4) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c853ed3c496865218892cf3c.
+- [PMK131_2024 article4 / (1) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:eb357e4b3237db5d08aa0e46.
+
+Blocked claims: VAT_RATE (current_provision_currency_unconfirmed,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete).
 
 Clarifications:
 
@@ -2666,6 +2810,13 @@ Basis:
 - [PMK164_2023 article17 / (1),(3) / PDF16](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=16), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:4958a8e50eb6047e53d878eb.
 - [PMK164_2023 article18 / whole / PDF17](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=17), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:0f579a087d156d4f15b529cc.
 
+**PKP_SCOPE** — В архивном PMK164 PKP — статус Pengusaha Kena Pajak: предусмотрены оформление статуса и обязанности по PPN. Превышение порога и начало обязанностей различаются; статус конкретной компании здесь не установлен.
+
+Basis:
+
+- [PMK164_2023 article17 / (1),(3) / PDF16](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=16), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:4958a8e50eb6047e53d878eb.
+- [PMK164_2023 article18 / whole / PDF17](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=17), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:0f579a087d156d4f15b529cc.
+
 **VAT_CREDIT** — В архивном PMK131 право зачёта входного налога отсылает к условиям налогового законодательства. Статус PKP и наличие обычного инвойса сами по себе этих условий не доказывают; полный набор требований faktur пока не проверен.
 
 Basis:
@@ -2679,7 +2830,14 @@ Basis:
 - [PMK131_2024 article3 / (4) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c853ed3c496865218892cf3c.
 - [PMK131_2024 article4 / (1) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:eb357e4b3237db5d08aa0e46.
 
-Blocked claims: VAT_JAN_TRANSITION (outside_requested_period); VAT_RATE (current_provision_currency_unconfirmed,amendment_text_unavailable).
+**VAT_SCOPE** — Архивный PMK131 описывает PPN для указанных операций с облагаемыми товарами и услугами, включая импорт и использование из-за рубежа. Специальные базы исключены из общего механизма этой редакции; не любая операция автоматически облагается одинаково.
+
+Basis:
+
+- [PMK131_2024 article3 / (4) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c853ed3c496865218892cf3c.
+- [PMK131_2024 article4 / (1) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:eb357e4b3237db5d08aa0e46.
+
+Blocked claims: VAT_JAN_TRANSITION (outside_requested_period); VAT_RATE (current_provision_currency_unconfirmed,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete).
 
 Clarifications:
 
@@ -2707,6 +2865,13 @@ Basis:
 - [PMK164_2023 article17 / (1),(3) / PDF16](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=16), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:4958a8e50eb6047e53d878eb.
 - [PMK164_2023 article18 / whole / PDF17](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=17), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:0f579a087d156d4f15b529cc.
 
+**PKP_SCOPE** — In archived PMK164, PKP is Pengusaha Kena Pajak status, with confirmation procedures and PPN obligations. Threshold crossing and commencement of obligations are distinct; this does not establish a particular company’s status.
+
+Basis:
+
+- [PMK164_2023 article17 / (1),(3) / PDF16](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=16), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:4958a8e50eb6047e53d878eb.
+- [PMK164_2023 article18 / whole / PDF17](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=17), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:0f579a087d156d4f15b529cc.
+
 **VAT_CREDIT** — Archived PMK131 refers input credit to the conditions in tax legislation. PKP status and an ordinary invoice alone do not establish those conditions; the full faktur requirements remain unreviewed.
 
 Basis:
@@ -2720,7 +2885,14 @@ Basis:
 - [PMK131_2024 article3 / (4) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c853ed3c496865218892cf3c.
 - [PMK131_2024 article4 / (1) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:eb357e4b3237db5d08aa0e46.
 
-Blocked claims: VAT_JAN_TRANSITION (outside_requested_period); VAT_RATE (current_provision_currency_unconfirmed,amendment_text_unavailable).
+**VAT_SCOPE** — Archived PMK131 describes PPN for specified transactions involving taxable goods and services, including imports and use from abroad. Special bases are excluded from this edition’s general mechanism; transactions cannot all be treated alike.
+
+Basis:
+
+- [PMK131_2024 article3 / (4) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c853ed3c496865218892cf3c.
+- [PMK131_2024 article4 / (1) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:eb357e4b3237db5d08aa0e46.
+
+Blocked claims: VAT_JAN_TRANSITION (outside_requested_period); VAT_RATE (current_provision_currency_unconfirmed,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete).
 
 Clarifications:
 
@@ -2748,6 +2920,13 @@ Basis:
 - [PMK164_2023 article17 / (1),(3) / PDF16](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=16), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:4958a8e50eb6047e53d878eb.
 - [PMK164_2023 article18 / whole / PDF17](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=17), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:0f579a087d156d4f15b529cc.
 
+**PKP_SCOPE** — Dalam PMK164 yang diarsipkan, PKP adalah status Pengusaha Kena Pajak, dengan prosedur pengukuhan serta kewajiban PPN. Terlampauinya batas dan awal kewajiban dibedakan; status perusahaan tertentu belum ditetapkan.
+
+Basis:
+
+- [PMK164_2023 article17 / (1),(3) / PDF16](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=16), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:4958a8e50eb6047e53d878eb.
+- [PMK164_2023 article18 / whole / PDF17](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=17), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:0f579a087d156d4f15b529cc.
+
 **VAT_CREDIT** — PMK131 yang diarsipkan merujuk kredit pajak masukan pada syarat dalam ketentuan perpajakan. Status PKP dan invoice biasa saja tidak membuktikan syarat tersebut; persyaratan faktur lengkap belum ditelaah.
 
 Basis:
@@ -2761,7 +2940,14 @@ Basis:
 - [PMK131_2024 article3 / (4) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c853ed3c496865218892cf3c.
 - [PMK131_2024 article4 / (1) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:eb357e4b3237db5d08aa0e46.
 
-Blocked claims: VAT_JAN_TRANSITION (outside_requested_period); VAT_RATE (current_provision_currency_unconfirmed,amendment_text_unavailable).
+**VAT_SCOPE** — PMK131 yang diarsipkan menjelaskan PPN atas transaksi tertentu Barang Kena Pajak dan Jasa Kena Pajak, termasuk impor serta pemanfaatan dari luar negeri. DPP khusus dikecualikan dari mekanisme umum edisi ini; semua transaksi tidak otomatis diperlakukan sama.
+
+Basis:
+
+- [PMK131_2024 article3 / (4) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c853ed3c496865218892cf3c.
+- [PMK131_2024 article4 / (1) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:eb357e4b3237db5d08aa0e46.
+
+Blocked claims: VAT_JAN_TRANSITION (outside_requested_period); VAT_RATE (current_provision_currency_unconfirmed,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete).
 
 Clarifications:
 
@@ -2796,7 +2982,13 @@ Basis:
 - [PMK168_2023 article8 / (1) / PDF10,11](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=10), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:0190bbfd7037eba985d117db,PMK168_2023:8eb407100a11bd684b6b3648.
 - [PMK168_2023 article2 / (2) / PDF5,6](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=5), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:079306052df2707a31737092,PMK168_2023:5d7769d0404bd1a073946d49.
 
-Blocked claims: TER_NUMERIC (current_provision_currency_unconfirmed,TER_table_not_verified).
+**PAYROLL_SCOPE** — Архивный PMK168 описывает удержание PPh21 с выплат за работу, услуги или участие в деятельности установленными плательщиками. Категории плательщиков и исключения перечислены отдельно; это не налог только на зарплату.
+
+Basis:
+
+- [PMK168_2023 article2 / (2) / PDF5,6](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=5), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:079306052df2707a31737092,PMK168_2023:5d7769d0404bd1a073946d49.
+
+Blocked claims: TER_NUMERIC (current_provision_currency_unconfirmed,amendment_review_incomplete,amendment_review_incomplete,TER_table_not_verified).
 
 Clarifications:
 
@@ -2833,7 +3025,13 @@ Basis:
 - [PMK168_2023 article8 / (1) / PDF10,11](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=10), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:0190bbfd7037eba985d117db,PMK168_2023:8eb407100a11bd684b6b3648.
 - [PMK168_2023 article2 / (2) / PDF5,6](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=5), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:079306052df2707a31737092,PMK168_2023:5d7769d0404bd1a073946d49.
 
-Blocked claims: TER_NUMERIC (current_provision_currency_unconfirmed,TER_table_not_verified).
+**PAYROLL_SCOPE** — Archived PMK168 describes PPh21 withholding on payments for work, services or activities by designated payers. Payer categories and exclusions are listed separately; this is not solely a salary tax.
+
+Basis:
+
+- [PMK168_2023 article2 / (2) / PDF5,6](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=5), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:079306052df2707a31737092,PMK168_2023:5d7769d0404bd1a073946d49.
+
+Blocked claims: TER_NUMERIC (current_provision_currency_unconfirmed,amendment_review_incomplete,amendment_review_incomplete,TER_table_not_verified).
 
 Clarifications:
 
@@ -2870,7 +3068,13 @@ Basis:
 - [PMK168_2023 article8 / (1) / PDF10,11](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=10), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:0190bbfd7037eba985d117db,PMK168_2023:8eb407100a11bd684b6b3648.
 - [PMK168_2023 article2 / (2) / PDF5,6](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=5), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:079306052df2707a31737092,PMK168_2023:5d7769d0404bd1a073946d49.
 
-Blocked claims: TER_NUMERIC (current_provision_currency_unconfirmed,TER_table_not_verified).
+**PAYROLL_SCOPE** — PMK168 yang diarsipkan menjelaskan pemotongan PPh21 atas pembayaran terkait pekerjaan, jasa atau kegiatan oleh pemotong yang ditentukan. Kategori pemotong dan pengecualian diatur tersendiri; cakupannya bukan hanya gaji.
+
+Basis:
+
+- [PMK168_2023 article2 / (2) / PDF5,6](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=5), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:079306052df2707a31737092,PMK168_2023:5d7769d0404bd1a073946d49.
+
+Blocked claims: TER_NUMERIC (current_provision_currency_unconfirmed,amendment_review_incomplete,amendment_review_incomplete,TER_table_not_verified).
 
 Clarifications:
 
@@ -2900,6 +3104,12 @@ Basis:
 - [PMK168_2023 article8 / (1) / PDF10,11](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=10), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:0190bbfd7037eba985d117db,PMK168_2023:8eb407100a11bd684b6b3648.
 - [PMK168_2023 article2 / (2) / PDF5,6](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=5), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:079306052df2707a31737092,PMK168_2023:5d7769d0404bd1a073946d49.
 
+**PAYROLL_SCOPE** — Архивный PMK168 описывает удержание PPh21 с выплат за работу, услуги или участие в деятельности установленными плательщиками. Категории плательщиков и исключения перечислены отдельно; это не налог только на зарплату.
+
+Basis:
+
+- [PMK168_2023 article2 / (2) / PDF5,6](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=5), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:079306052df2707a31737092,PMK168_2023:5d7769d0404bd1a073946d49.
+
 **PAYROLL_METHOD** — Архивный PMK168 различает обычные периоды и последний налоговый период постоянного сотрудника/пенсионера. Последний предусматривает сверку за год или часть года, а не повторение обычного TER. Нужны категория работника и период.
 
 Basis:
@@ -2907,7 +3117,7 @@ Basis:
 - [PMK168_2023 article13 / (1),(2) / PDF14,15](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=14), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:84cffa9db5a9573cbb4658a0,PMK168_2023:db9949c7c54fcf9fb9719e2a.
 - [PMK168_2023 article15 / (1)-(3) / PDF15,16](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=15), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:3ba913a0416a5e3aa4ebea00,PMK168_2023:bea457a9e116ad7de2ac5bbc.
 
-Blocked claims: TER_NUMERIC (current_provision_currency_unconfirmed,TER_table_not_verified).
+Blocked claims: TER_NUMERIC (current_provision_currency_unconfirmed,amendment_review_incomplete,amendment_review_incomplete,TER_table_not_verified).
 
 Clarifications:
 
@@ -2937,6 +3147,12 @@ Basis:
 - [PMK168_2023 article8 / (1) / PDF10,11](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=10), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:0190bbfd7037eba985d117db,PMK168_2023:8eb407100a11bd684b6b3648.
 - [PMK168_2023 article2 / (2) / PDF5,6](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=5), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:079306052df2707a31737092,PMK168_2023:5d7769d0404bd1a073946d49.
 
+**PAYROLL_SCOPE** — Archived PMK168 describes PPh21 withholding on payments for work, services or activities by designated payers. Payer categories and exclusions are listed separately; this is not solely a salary tax.
+
+Basis:
+
+- [PMK168_2023 article2 / (2) / PDF5,6](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=5), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:079306052df2707a31737092,PMK168_2023:5d7769d0404bd1a073946d49.
+
 **PAYROLL_METHOD** — Archived PMK168 distinguishes ordinary periods from the last tax period for a permanent employee/pensioner. The last period reconciles annual or part-year liability rather than simply repeating ordinary TER. Worker category and period are needed.
 
 Basis:
@@ -2944,7 +3160,7 @@ Basis:
 - [PMK168_2023 article13 / (1),(2) / PDF14,15](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=14), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:84cffa9db5a9573cbb4658a0,PMK168_2023:db9949c7c54fcf9fb9719e2a.
 - [PMK168_2023 article15 / (1)-(3) / PDF15,16](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=15), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:3ba913a0416a5e3aa4ebea00,PMK168_2023:bea457a9e116ad7de2ac5bbc.
 
-Blocked claims: TER_NUMERIC (current_provision_currency_unconfirmed,TER_table_not_verified).
+Blocked claims: TER_NUMERIC (current_provision_currency_unconfirmed,amendment_review_incomplete,amendment_review_incomplete,TER_table_not_verified).
 
 Clarifications:
 
@@ -2974,6 +3190,12 @@ Basis:
 - [PMK168_2023 article8 / (1) / PDF10,11](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=10), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:0190bbfd7037eba985d117db,PMK168_2023:8eb407100a11bd684b6b3648.
 - [PMK168_2023 article2 / (2) / PDF5,6](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=5), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:079306052df2707a31737092,PMK168_2023:5d7769d0404bd1a073946d49.
 
+**PAYROLL_SCOPE** — PMK168 yang diarsipkan menjelaskan pemotongan PPh21 atas pembayaran terkait pekerjaan, jasa atau kegiatan oleh pemotong yang ditentukan. Kategori pemotong dan pengecualian diatur tersendiri; cakupannya bukan hanya gaji.
+
+Basis:
+
+- [PMK168_2023 article2 / (2) / PDF5,6](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=5), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:079306052df2707a31737092,PMK168_2023:5d7769d0404bd1a073946d49.
+
 **PAYROLL_METHOD** — PMK168 yang diarsipkan membedakan masa biasa dan Masa Pajak Terakhir pegawai tetap/pensiunan. Masa terakhir merekonsiliasi pajak tahunan atau bagian tahun, bukan mengulang TER biasa. Diperlukan kategori pekerja dan periode.
 
 Basis:
@@ -2981,7 +3203,7 @@ Basis:
 - [PMK168_2023 article13 / (1),(2) / PDF14,15](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=14), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:84cffa9db5a9573cbb4658a0,PMK168_2023:db9949c7c54fcf9fb9719e2a.
 - [PMK168_2023 article15 / (1)-(3) / PDF15,16](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=15), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:3ba913a0416a5e3aa4ebea00,PMK168_2023:bea457a9e116ad7de2ac5bbc.
 
-Blocked claims: TER_NUMERIC (current_provision_currency_unconfirmed,TER_table_not_verified).
+Blocked claims: TER_NUMERIC (current_provision_currency_unconfirmed,amendment_review_incomplete,amendment_review_incomplete,TER_table_not_verified).
 
 Clarifications:
 
@@ -3036,7 +3258,7 @@ Basis:
 
 - [DJP_SDSN_2023 article23 / (1a),(4) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
 
-Blocked claims: FOREIGN_RATE (provision_dates_unconfirmed,current_provision_currency_unconfirmed,dependency_source_missing); SERVICE_RATE (current_provision_currency_unconfirmed).
+Blocked claims: FOREIGN_RATE (provision_dates_unconfirmed,current_provision_currency_unconfirmed,dependency_source_missing); SERVICE_RATE (current_provision_currency_unconfirmed,amendment_review_incomplete).
 
 Clarifications:
 
@@ -3096,7 +3318,7 @@ Basis:
 
 - [DJP_SDSN_2023 article23 / (1a),(4) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
 
-Blocked claims: FOREIGN_RATE (provision_dates_unconfirmed,current_provision_currency_unconfirmed,dependency_source_missing); SERVICE_RATE (current_provision_currency_unconfirmed).
+Blocked claims: FOREIGN_RATE (provision_dates_unconfirmed,current_provision_currency_unconfirmed,dependency_source_missing); SERVICE_RATE (current_provision_currency_unconfirmed,amendment_review_incomplete).
 
 Clarifications:
 
@@ -3156,7 +3378,7 @@ Basis:
 
 - [DJP_SDSN_2023 article23 / (1a),(4) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
 
-Blocked claims: FOREIGN_RATE (provision_dates_unconfirmed,current_provision_currency_unconfirmed,dependency_source_missing); SERVICE_RATE (current_provision_currency_unconfirmed).
+Blocked claims: FOREIGN_RATE (provision_dates_unconfirmed,current_provision_currency_unconfirmed,dependency_source_missing); SERVICE_RATE (current_provision_currency_unconfirmed,amendment_review_incomplete).
 
 Clarifications:
 
@@ -3350,7 +3572,7 @@ Basis:
 
 - [PP34_2017 article2 / (1),(3) / PDF3](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=3), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:5440eda9fab50b4e47ee6570.
 
-Blocked claims: DEADLINE_PAYMENT_DATE (current_provision_currency_unconfirmed,amendment_text_unavailable); DEADLINE_FILING_DATE (current_provision_currency_unconfirmed,amendment_text_unavailable); RENT_RATE (current_provision_currency_unconfirmed).
+Blocked claims: DEADLINE_PAYMENT_DATE (current_provision_currency_unconfirmed,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete); DEADLINE_FILING_DATE (current_provision_currency_unconfirmed,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete); RENT_RATE (current_provision_currency_unconfirmed,amendment_review_incomplete).
 
 Clarifications:
 
@@ -3421,7 +3643,7 @@ Basis:
 
 - [PP34_2017 article2 / (1),(3) / PDF3](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=3), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:5440eda9fab50b4e47ee6570.
 
-Blocked claims: DEADLINE_FILING_DATE (current_provision_currency_unconfirmed,amendment_text_unavailable); DEADLINE_PAYMENT_DATE (current_provision_currency_unconfirmed,amendment_text_unavailable); RENT_RATE (current_provision_currency_unconfirmed).
+Blocked claims: DEADLINE_FILING_DATE (current_provision_currency_unconfirmed,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete); DEADLINE_PAYMENT_DATE (current_provision_currency_unconfirmed,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete); RENT_RATE (current_provision_currency_unconfirmed,amendment_review_incomplete).
 
 Clarifications:
 
@@ -3492,7 +3714,7 @@ Basis:
 
 - [PP34_2017 article2 / (1),(3) / PDF3](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=3), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:5440eda9fab50b4e47ee6570.
 
-Blocked claims: DEADLINE_PAYMENT_DATE (current_provision_currency_unconfirmed,amendment_text_unavailable); DEADLINE_FILING_DATE (current_provision_currency_unconfirmed,amendment_text_unavailable); RENT_RATE (current_provision_currency_unconfirmed).
+Blocked claims: DEADLINE_PAYMENT_DATE (current_provision_currency_unconfirmed,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete); DEADLINE_FILING_DATE (current_provision_currency_unconfirmed,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete); RENT_RATE (current_provision_currency_unconfirmed,amendment_review_incomplete).
 
 Clarifications:
 
@@ -3596,7 +3818,7 @@ Basis:
 
 - [DJP_SDSN_2023 article23 / (1a),(4) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
 
-Blocked claims: SERVICE_RATE (current_provision_currency_unconfirmed).
+Blocked claims: SERVICE_RATE (current_provision_currency_unconfirmed,amendment_review_incomplete).
 
 Clarifications:
 
@@ -3645,7 +3867,7 @@ Basis:
 
 - [DJP_SDSN_2023 article23 / (1a),(4) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
 
-Blocked claims: SERVICE_RATE (current_provision_currency_unconfirmed).
+Blocked claims: SERVICE_RATE (current_provision_currency_unconfirmed,amendment_review_incomplete).
 
 Clarifications:
 
@@ -3694,7 +3916,7 @@ Basis:
 
 - [DJP_SDSN_2023 article23 / (1a),(4) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
 
-Blocked claims: SERVICE_RATE (current_provision_currency_unconfirmed).
+Blocked claims: SERVICE_RATE (current_provision_currency_unconfirmed,amendment_review_incomplete).
 
 Clarifications:
 
@@ -3757,7 +3979,7 @@ Basis:
 
 - [DJP_SDSN_2023 article23 / (1a),(4) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
 
-Blocked claims: DEADLINE_FILING_DATE (tax_period_missing,current_provision_currency_unconfirmed,amendment_text_unavailable); DEADLINE_PAYMENT_DATE (tax_period_missing,current_provision_currency_unconfirmed,amendment_text_unavailable); SERVICE_RATE (tax_period_missing,current_provision_currency_unconfirmed).
+Blocked claims: DEADLINE_FILING_DATE (tax_period_missing,current_provision_currency_unconfirmed,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete); DEADLINE_PAYMENT_DATE (tax_period_missing,current_provision_currency_unconfirmed,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete); SERVICE_RATE (tax_period_missing,current_provision_currency_unconfirmed,amendment_review_incomplete).
 
 Clarifications:
 
@@ -3828,7 +4050,7 @@ Basis:
 
 - [DJP_SDSN_2023 article23 / (1a),(4) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
 
-Blocked claims: DEADLINE_FILING_DATE (tax_period_missing,current_provision_currency_unconfirmed,amendment_text_unavailable); DEADLINE_PAYMENT_DATE (tax_period_missing,current_provision_currency_unconfirmed,amendment_text_unavailable); SERVICE_RATE (tax_period_missing,current_provision_currency_unconfirmed).
+Blocked claims: DEADLINE_FILING_DATE (tax_period_missing,current_provision_currency_unconfirmed,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete); DEADLINE_PAYMENT_DATE (tax_period_missing,current_provision_currency_unconfirmed,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete); SERVICE_RATE (tax_period_missing,current_provision_currency_unconfirmed,amendment_review_incomplete).
 
 Clarifications:
 
@@ -3899,7 +4121,7 @@ Basis:
 
 - [DJP_SDSN_2023 article23 / (1a),(4) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
 
-Blocked claims: DEADLINE_FILING_DATE (tax_period_missing,current_provision_currency_unconfirmed,amendment_text_unavailable); DEADLINE_PAYMENT_DATE (tax_period_missing,current_provision_currency_unconfirmed,amendment_text_unavailable); SERVICE_RATE (tax_period_missing,current_provision_currency_unconfirmed).
+Blocked claims: DEADLINE_FILING_DATE (tax_period_missing,current_provision_currency_unconfirmed,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete); DEADLINE_PAYMENT_DATE (tax_period_missing,current_provision_currency_unconfirmed,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete); SERVICE_RATE (tax_period_missing,current_provision_currency_unconfirmed,amendment_review_incomplete).
 
 Clarifications:
 

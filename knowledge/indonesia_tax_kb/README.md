@@ -32,3 +32,7 @@ Automatic extraction is a candidate: table fidelity, scans and corrupted text mu
 Curated fragments only quote reviewed extraction ranges and carry precise locators.
 Retrieval never determines an amount payable or activates a tax rule.
 See INVENTORY.md, INTEGRATION.md, REVIEW_GAPS.md and quality/ for evidence and limits.
+
+## Reproducible handoff and cards
+
+Read ANTIGRAVITY_HANDOFF.md, TOOLTIPS_RU_EN_ID.md and PMK1_REVIEW.md. getCard uses the live retrieval gate; snapshots are review artifacts. package_reproducible.py builds an exact committed archive with source, tests, data and PDFs. REPRODUCE.md inside the package gives exact installation/run commands and checksum verification. Node uses no npm dependencies; Python requires pdfplumber0.11.9/pypdf6.10.0. No model/route/production activation.

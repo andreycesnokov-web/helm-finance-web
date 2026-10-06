@@ -631,7 +631,64 @@
       "current_sha256": "b8f385dee2a8684c24f718c5b2413910760d7273236f9d0d27d2da4cf2892574"
     },
     "PMK1_2026": {
-      "versions": [],
+      "versions": [
+        {
+          "sha256": "d2a1ffe926a020c178e88348e974a9199e6fc746ef7884bb72e12a5cbc29a2af",
+          "downloaded_at": "2026-10-06T04:25:08.930589+00:00",
+          "resolved_url": "https://jdih.kemenkeu.go.id/api/download/b5f99bff-f689-4e4f-ae3a-7c6a9a4cfe8a/2026pmkeuangan001.pdf",
+          "original_url": "https://jdih.kemenkeu.go.id/api/download/b5f99bff-f689-4e4f-ae3a-7c6a9a4cfe8a/2026pmkeuangan001.pdf",
+          "metadata": {
+            "id": "PMK1_2026",
+            "document_number": "PMK 1 Tahun 2026",
+            "title": "Perubahan Keempat atas PMK 81 Tahun 2024",
+            "authority": "Menteri Keuangan",
+            "publisher": "JDIH Kementerian Keuangan",
+            "language": "id",
+            "original_url": "https://jdih.kemenkeu.go.id/dok/pmk-1-tahun-2026",
+            "download_url": "https://jdih.kemenkeu.go.id/api/download/b5f99bff-f689-4e4f-ae3a-7c6a9a4cfe8a/2026pmkeuangan001.pdf",
+            "publication_date": "2026-01-22",
+            "effective_from": null,
+            "effective_to": null,
+            "date_status": "provisional_until_article_check",
+            "topics": [
+              "deadlines",
+              "ppn_pkp"
+            ],
+            "relationships": [
+              {
+                "type": "amends",
+                "target": "PMK81_2024"
+              },
+              {
+                "type": "amends",
+                "target": "PMK53_2025"
+              },
+              {
+                "type": "amends",
+                "target": "PMK54_2025"
+              }
+            ],
+            "verification_status": "download_failed",
+            "checked_at": "2026-10-06",
+            "professional_review": null,
+            "unresolved_issues": [
+              "current_amendment_chain_not_certified",
+              "two_download_timeouts; exact_current_amendment_text_not_read"
+            ],
+            "downloaded_at": null,
+            "sha256": null,
+            "read_scope": [],
+            "selected_index_scope": []
+          },
+          "blob": "blobs/d2a1ffe926a020c178e88348e974a9199e6fc746ef7884bb72e12a5cbc29a2af.pdf",
+          "extraction": "extracted/d2a1ffe926a020c178e88348e974a9199e6fc746ef7884bb72e12a5cbc29a2af.json",
+          "verification_status": "downloaded_unverified",
+          "checked_at": null,
+          "unresolved_issues": [
+            "amendment_chain_and_extraction_require_review"
+          ]
+        }
+      ],
       "attempts": [
         {
           "at": "2026-10-05T22:56:14.277336+00:00",
@@ -642,8 +699,14 @@
           "at": "2026-10-05T22:58:26.520999+00:00",
           "status": "failed",
           "issue": "TimeoutError: The read operation timed out"
+        },
+        {
+          "at": "2026-10-06T04:25:08.930589+00:00",
+          "status": "downloaded",
+          "sha256": "d2a1ffe926a020c178e88348e974a9199e6fc746ef7884bb72e12a5cbc29a2af"
         }
-      ]
+      ],
+      "current_sha256": "d2a1ffe926a020c178e88348e974a9199e6fc746ef7884bb72e12a5cbc29a2af"
     },
     "PMK54_2025": {
       "versions": [
