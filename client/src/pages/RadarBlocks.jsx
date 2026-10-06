@@ -16,6 +16,7 @@ import {
 import { fmt, fmtFull, daysUntil } from '../lib/api'
 import { currencyPrefix } from '../lib/money'
 import { WORKSPACE_DEFAULT_CURRENCY } from '../lib/walletBalanceContract'
+import InfoTooltip from '../components/InfoTooltip'
 // The arithmetic lives in a plain module so a unit test can pin every figure
 // without a JSX transform — which is how this migration proves it moved none.
 import { radarFigures } from '../lib/radarFigures'
@@ -146,8 +147,9 @@ export function RadarForecast({ figures: f, t, hasAdvanced = true }) {
       {/* Forecast assumptions for overdue, undated, horizon-excluded items and burn rate note */}
       {(f.assumptions?.overdueCount > 0 || f.assumptions?.undatedCount > 0 || f.assumptions?.futureExcludedCount > 0 || (f.payables?.length > 0 && f.monthlyBurn > 0)) && (
         <div className="radar-assumptions" style={{ marginBottom: '16px', padding: '12px 16px', background: 'var(--surface-card-muted, rgba(255,255,255,0.03))', borderRadius: 'var(--radius-md, 8px)', border: '1px solid var(--border-subtle)', fontSize: '12.5px', color: 'var(--text-secondary)' }}>
-          <div style={{ fontWeight: '700', color: 'var(--text-primary)', marginBottom: '6px' }}>
+          <div style={{ fontWeight: '700', color: 'var(--text-primary)', marginBottom: '6px', display: 'flex', alignItems: 'center' }}>
             {t('radar.assumptionsTitle')}
+            <InfoTooltip term="overdue_obligation" />
           </div>
           <ul style={{ margin: 0, paddingLeft: '18px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
             {f.assumptions?.overduePayablesCount > 0 && (
@@ -179,7 +181,7 @@ export function RadarForecast({ figures: f, t, hasAdvanced = true }) {
         /* The currency is named once, in the exact figure underneath — the
            radar.ifAllPlanned string already opens with "IDR ·", so putting it in
            the label too printed it twice. */
-        label={t('radar.projectedBalance30')}
+        label={<>{t('radar.projectedBalance30')}<InfoTooltip term="forecast_balance" /></>}
         value={<span className="fin">{signed(f.proj30)}</span>}
         meta={`${fmtFull(Math.round(f.proj30))} ${t('radar.ifAllPlanned')}`}
         metrics={[

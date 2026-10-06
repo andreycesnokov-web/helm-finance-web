@@ -259,6 +259,7 @@ const en = {
     scopeExplain: 'Business wallets count toward CFO Score and runway. Personal wallets are shown separately.',
     totalBusiness: 'Business total',
     totalPersonal: 'Personal total',
+    transferBetween: 'Transfer between accounts',
   },
   add: {
     title: 'Add',

@@ -306,6 +306,7 @@ export default function Add() {
         })
       }
 
+      if (unlinked.length > 0) {
         const payload = unlinked.map(tx => {
           if (tx.type === 'transfer' && !tx.transfer_id) {
             tx.transfer_id = (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : 'xfer-' + Date.now() + '-' + Math.random().toString(36).slice(2))

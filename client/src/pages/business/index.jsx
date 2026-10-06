@@ -3,11 +3,13 @@
 // to Pulse formulas, wallet-balance logic, classification, access, ledger or contracts.
 // Mounted at /business/* so the legacy /,/accounts routes stay untouched during migration.
 import { Navigate, Outlet, useNavigate } from 'react-router-dom'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { apiFetch } from '../../lib/api'
 import { useAuth } from '../../hooks/useAuth'
 import { formatAmount } from '../../lib/money'
+import { t } from '../../i18n'
 import { WorkspaceProvider, useWorkspace } from '../../shell/WorkspaceProvider'
+import { createRequestGuard } from '../../lib/requestGuard'
 import LiveShell from '../../shell/LiveShell'
 import {
   PageHeader, SummaryCard, MoneyCard, Card, Stat, DataList, StatusBadge, Btn,
@@ -15,6 +17,8 @@ import {
 } from '../../shell/ui'
 import DebtPaymentModal from '../../components/DebtPaymentModal' // reused VERBATIM — Pay Now / Mark Received logic unchanged
 import DebtFormModal from '../../components/DebtFormModal'       // create payable/receivable (business-scope locked)
+import BusinessWalletTransferModal from '../../components/BusinessWalletTransferModal'
+import InfoTooltip from '../../components/InfoTooltip'
 import { upcomingDeadlines } from './AccountantPremium'          // static statutory schedule (premium P1)
 // Financial Pulse Dashboard v1 blocks. Presentation only — every figure comes from
 // /api/pulse or /api/business/financial-counts; nothing is derived into a new metric.
@@ -63,12 +67,15 @@ function useScoped(path, deps = []) {
   const { token } = useAuth()
   const { scopeKey, active } = useWorkspace()
   const [s, setS] = useState({ loading: true, error: null, data: null })
+  const guard = useRef(createRequestGuard())
   useEffect(() => {
     if (!token || !active) return
-    let on = true; setS({ loading: true, error: null, data: null })
-    apiFetch(path, token).then(d => on && setS({ loading: false, error: null, data: d }))
-      .catch(e => on && setS({ loading: false, error: e.message || 'Request failed', data: null }))
-    return () => { on = false }
+    const req = guard.current.start()
+    setS({ loading: true, error: null, data: null })
+    apiFetch(path, token, { signal: req.signal })
+      .then(d => { if (!req.isStale()) setS({ loading: false, error: null, data: d }) })
+      .catch(e => { if (!req.isStale()) setS({ loading: false, error: e.message || 'Request failed', data: null }) })
+    return () => guard.current.abort()
   }, [path, token, scopeKey, active?.id, ...deps]) // eslint-disable-line
   return s
 }
@@ -638,13 +645,17 @@ function RadarStrip({ d, navigate }) {
   const chips = []
   const pendingAmt = Number(d.pendingPayables || 0) + Number(d.pendingReceivables || 0)
   if (pendingAmt > 0) chips.push({ tone: 'warning', icon: <Icon.warn width="13" height="13" />, text: `Pending approvals · ${idr(pendingAmt)}`, go: '/business/approvals' })
-  if (d.runway !== 999 && d.runway != null) {
+  if (d.runway != null && d.runway !== 999) {
     const r = Number(d.runway)
     chips.push(r < 30
       ? { tone: 'danger', icon: <Icon.warn width="13" height="13" />, text: `Low runway · ${r} days` }
       : r < 60
         ? { tone: 'warning', icon: <Icon.warn width="13" height="13" />, text: `Runway · ${r} days` }
         : { tone: 'success', icon: <Icon.check width="13" height="13" />, text: `Runway healthy · ${r} days` })
+  } else if (d.runway_reason === 'positive_cash_flow') {
+    chips.push({ tone: 'success', icon: <Icon.check width="13" height="13" />, text: 'Cash flow positive' })
+  } else if (d.runway_reason === 'break_even') {
+    chips.push({ tone: 'info', icon: <Icon.check width="13" height="13" />, text: 'Break-even' })
   }
   const next = upcomingDeadlines(1)[0]
   if (next) chips.push({ tone: 'info', icon: <Icon.doc width="13" height="13" />, text: `Next tax: ${next.title} · ${next.date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}`, go: '/business/accountant' })
@@ -724,12 +735,52 @@ function BusinessStarterActions({ navigate }) {
 
 // ── Business Accounts (premium presentation of /api/wallets — balances unchanged) ──
 export function BusinessAccounts() {
-  const w = useScoped('/wallets')
-  const head = <PageHeader eyebrow="Business Workspace" title="Accounts" />
+  const { token } = useAuth()
+  const { active, scopeKey } = useWorkspace()
+  const [reloadNonce, setReloadNonce] = useState(0)
+  const [showTransfer, setShowTransfer] = useState(false)
+  const w = useScoped('/wallets', [reloadNonce])
+
+  // Explicit safety against race conditions & switching workspaces:
+  // When active company switches, close any open transfer modal immediately.
+  useEffect(() => {
+    setShowTransfer(false)
+  }, [active?.id, scopeKey])
+
+  const reload = useCallback(() => {
+    setReloadNonce(n => n + 1)
+  }, [])
+
+  const transferBtn = (
+    <Btn
+      onClick={() => setShowTransfer(true)}
+      id="open-wallet-transfer-btn"
+      variant="secondary"
+      style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+    >
+      ⇄ {t('acc.transferBetween')}
+    </Btn>
+  )
+
+  const head = <PageHeader eyebrow="Business Workspace" title="Accounts" actions={transferBtn} />
   if (w.loading) return <>{head}<div className="cfo-grid cfo-grid-4">{[0, 1, 2, 3].map(i => <div key={i} className="cfo-money"><LoadingSkeleton rows={3} /></div>)}</div></>
-  if (w.error) return <>{head}<ErrorState description={w.error} onRetry={() => location.reload()} /></>
+  if (w.error) return <>{head}<ErrorState description={w.error} onRetry={reload} /></>
   const wallets = w.data?.wallets || []
-  if (!wallets.length) return <>{head}<EmptyState symbol={SYMBOL} title="No accounts yet" description="Business accounts and balances will appear here." /></>
+
+  const transferModal = showTransfer && (
+    <BusinessWalletTransferModal
+      token={token}
+      wallets={wallets}
+      userRole={active?.role}
+      onClose={() => setShowTransfer(false)}
+      onSuccess={() => {
+        setShowTransfer(false)
+        reload()
+      }}
+    />
+  )
+
+  if (!wallets.length) return <>{head}<EmptyState symbol={SYMBOL} title="No accounts yet" description="Business accounts and balances will appear here." />{transferModal}</>
 
   // Premium P1: navy hero total + per-wallet share bars. Same MoneyCard rule as ever:
   // NEVER sum across currencies — the hero totals IDR wallets only; other currencies
@@ -737,10 +788,10 @@ export function BusinessAccounts() {
   if (BUSINESS_PREMIUM) {
     const idrWallets = wallets.filter(x => (x.currency || 'IDR').toUpperCase() === 'IDR')
     const otherWallets = wallets.filter(x => (x.currency || 'IDR').toUpperCase() !== 'IDR')
-    const total = idrWallets.reduce((s, x) => s + Number(x.balance || 0), 0)
+    const total = idrWallets.reduce((acc, x) => acc + Number(x.balance || 0), 0)
     return <>{head}
       <div style={{ marginBottom: 22 }}>
-        <SummaryCard flagship label={otherWallets.length ? 'Total balance · IDR wallets' : 'Total balance · all wallets'}
+        <SummaryCard flagship label={<>{otherWallets.length ? 'Total balance · IDR wallets' : 'Total balance · all wallets'}<InfoTooltip term="total_current_balance" /></>}
           value={idr(total)}
           meta={<>{idrWallets.length} active wallet{idrWallets.length === 1 ? '' : 's'}{otherWallets.length ? ` · ${otherWallets.length} in other currencies (kept separate)` : ''}</>} />
       </div>
@@ -762,12 +813,19 @@ export function BusinessAccounts() {
         })}
       </div>
       {otherWallets.length > 0 && (
-        <div className="cfo-grid cfo-grid-4">
-          {otherWallets.map(x => (
-            <MoneyCard key={x.id} asset={x.asset_code || x.currency || 'IDR'} kind={x.asset_type === 'crypto' ? 'Crypto' : 'Fiat'} sub={x.name} native={formatAmount(String(x.balance ?? 0), x.currency || 'IDR') + ' ' + (x.currency || 'IDR')} />
-          ))}
+        <div style={{ marginTop: 14 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 8, display: 'flex', alignItems: 'center' }}>
+            Foreign currency accounts
+            <InfoTooltip term="fx_revaluation" />
+          </div>
+          <div className="cfo-grid cfo-grid-4">
+            {otherWallets.map(x => (
+              <MoneyCard key={x.id} asset={x.asset_code || x.currency || 'IDR'} kind={x.asset_type === 'crypto' ? 'Crypto' : 'Fiat'} sub={x.name} native={formatAmount(String(x.balance ?? 0), x.currency || 'IDR') + ' ' + (x.currency || 'IDR')} />
+            ))}
+          </div>
         </div>
       )}
+      {transferModal}
     </>
   }
 
@@ -777,6 +835,7 @@ export function BusinessAccounts() {
         <MoneyCard key={x.id} asset={x.asset_code || x.currency || 'IDR'} kind={x.asset_type === 'crypto' ? 'Crypto' : 'Fiat'} sub={x.name} native={idr(x.balance)} />
       ))}
     </div>
+    {transferModal}
   </>
 }
 
@@ -821,7 +880,7 @@ export function BusinessTransactions() {
         columns={[
           { key: 'date', label: 'Date', render: r => <span className="cfo-mono">{(r.transaction_date || r.created_at || '').slice(0, 10)}</span> },
           { key: 'description', label: 'Description', render: r => r.description || r.type },
-          { key: 'type', label: 'Type', render: r => <StatusBadge tone="neutral">{r.type}</StatusBadge> },
+          { key: 'type', label: <span>Type<InfoTooltip term="internal_transfer" /></span>, render: r => <StatusBadge tone="neutral">{r.type}</StatusBadge> },
           // /api/transactions returns no document link, so this states what the TYPE
           // normally needs — an expectation, never a claim about this row.
           { key: 'doc', label: 'Evidence expected', render: r => <TxPolicyChip type={r.type} /> },

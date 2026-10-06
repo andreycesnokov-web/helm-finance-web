@@ -35,7 +35,13 @@ export async function apiFetch(path, token, options = {}) {
     },
     body: options.body ? JSON.stringify(options.body) : undefined
   })
-  const data = await res.json()
+  let data = null
+  const text = await res.text()
+  try {
+    data = text ? JSON.parse(text) : {}
+  } catch {
+    data = { error: text || res.statusText || 'Request failed' }
+  }
   if (!res.ok) {
     // Stale/inaccessible workspace: clear the active id so the next load re-picks a
     // valid one (WorkspaceProvider refetches /api/workspaces). Only on explicit 403.
@@ -45,7 +51,7 @@ export async function apiFetch(path, token, options = {}) {
     // Keep the whole error payload: routes return actionable detail alongside the
     // code (e.g. upload-init 409 duplicate carries existing_document_id). Callers
     // that only read err.message/err.status are unaffected.
-    const err = new Error(data.error || 'Request failed')
+    const err = new Error(data?.error || `Request failed with status ${res.status}`)
     err.status = res.status; err.code = data?.error || null; err.data = data
     throw err
   }

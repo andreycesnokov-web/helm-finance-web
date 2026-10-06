@@ -6,6 +6,7 @@ import { useSwipeBack } from './hooks/useSwipeBack'
 import { useTranslation } from './hooks/useTranslation'
 import { getLang, setLang } from './i18n/index'
 import { apiFetch } from './lib/api'
+import { WorkspaceProvider } from './shell/WorkspaceProvider'
 
 // ── Localize text from backend (AI insight strings) ──────────────────────────
 const RU_TEXT_MAP = {
@@ -424,14 +425,14 @@ function Layout({ children, rightPanel }) {
   if (loading) return <div style={{ minHeight: '100dvh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-3)' }}>Loading...</div>
   if (!user) return <Navigate to="/login" replace />
   return (
-    <>
+    <WorkspaceProvider>
       <Sidebar />
       <div className="desktop-layout">
         <div className="desktop-main">{children}</div>
         {rightPanel}
       </div>
       <BottomNav />
-    </>
+    </WorkspaceProvider>
   )
 }
 

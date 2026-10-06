@@ -1,7 +1,12 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useAuth } from '../hooks/useAuth'
+import { useWorkspace } from '../shell/WorkspaceProvider'
 import { apiFetch } from '../lib/api'
 import { getLang } from '../i18n/index'
+import InfoTooltip from '../components/InfoTooltip'
+import TaxKnowledgeCard from '../components/TaxKnowledgeCard'
+import { listTaxCards, getTaxCard, matchTopicId } from '../lib/taxKnowledgeFixtures'
+import { createRequestGuard } from '../lib/requestGuard'
 
 const L = {
   en: { title: 'Compliance calendar', subtitle: 'Tax obligations & deadlines · Indonesia',
@@ -9,18 +14,48 @@ const L = {
     period: 'Period', due: 'Due', source: 'Official source', version: 'Rule version', verified: 'Last verified',
     amount: 'Amount', unknown: 'unknown', empty: 'No obligations yet. Complete and verify your tax profile and activate verified rules.',
     sourceReq: 'rules need source verification', open: 'Open source',
+    taxRef: 'Tax Knowledge Reference',
+    taxRefSub: 'Archived statutory definitions and citations across Indonesian taxes (PPh 21, 26, 23, Final rent, 25, 29, PPN, PKP, NPWP/NIK).',
+    taxDenied: 'Access denied: workspace not authorized for tax knowledge reference.',
+    taxOffline: 'Offline backup dictionary active (reviewed reference snapshot).',
+    taxServerErr: 'Tax knowledge service error. Please try again.',
+    taxRetry: 'Retry',
+    taxEmpty: 'No tax knowledge cards available.',
+    taxMalformed: 'Failed to display tax cards due to unexpected response format.',
+    taxLoading: 'Loading tax knowledge cards…',
+    dueUndetermined: 'Due date cannot be scheduled yet: official statutory calculation rule is pending verification.',
     disclaimer: 'This information is for guidance only and does not constitute legal, tax or accounting advice. Confirm calculations with a licensed professional before making a tax payment or filing a return.' },
   ru: { title: 'Календарь compliance', subtitle: 'Налоговые обязательства и сроки · Индонезия',
     all: 'Все', upcoming: 'Ближайшие 30д', overdue: 'Просрочено', review: 'Нужна проверка',
     period: 'Период', due: 'Срок', source: 'Официальный источник', version: 'Версия правила', verified: 'Проверено',
     amount: 'Сумма', unknown: 'неизвестна', empty: 'Обязательств пока нет. Заполните и подтвердите налоговый профиль и активируйте проверенные правила.',
     sourceReq: 'правил требуют проверки источника', open: 'Открыть источник',
+    taxRef: 'Справочник налоговой базы знаний',
+    taxRefSub: 'Архивные законодательные определения и ссылки по налогам Индонезии (PPh 21, 26, 23, Final rent, 25, 29, PPN, PKP, NPWP/NIK).',
+    taxDenied: 'Доступ запрещён: недостаточно прав для просмотра налогового справочника компании.',
+    taxOffline: 'Используется резервный офлайн-справочник (проверенный снапшот).',
+    taxServerErr: 'Ошибка сервиса налоговой базы знаний. Пожалуйста, повторите попытку.',
+    taxRetry: 'Повторить',
+    taxEmpty: 'Налоговые карточки отсутствуют.',
+    taxMalformed: 'Не удалось отобразить карточки: некорректный формат данных ответа.',
+    taxLoading: 'Загрузка проверенных налоговых карточек…',
+    dueUndetermined: 'Срок пока не определён: официальное правило расчёта даты ожидает подтверждения.',
     disclaimer: 'Информация носит рекомендательный характер и не является юридической, налоговой или бухгалтерской консультацией. Перед платежом или подачей отчётности подтвердите расчёты у лицензированного специалиста.' },
   id: { title: 'Kalender kepatuhan', subtitle: 'Kewajiban & tenggat pajak · Indonesia',
     all: 'Semua', upcoming: '30 hari ke depan', overdue: 'Terlambat', review: 'Perlu ditinjau',
     period: 'Periode', due: 'Jatuh tempo', source: 'Sumber resmi', version: 'Versi aturan', verified: 'Terverifikasi',
     amount: 'Jumlah', unknown: 'tidak diketahui', empty: 'Belum ada kewajiban. Lengkapi & verifikasi profil pajak dan aktifkan aturan terverifikasi.',
     sourceReq: 'aturan perlu verifikasi sumber', open: 'Buka sumber',
+    taxRef: 'Referensi Pengetahuan Pajak',
+    taxRefSub: 'Definisi undang-undang dan rujukan pajak Indonesia (PPh 21, 26, 23, Final rent, 25, 29, PPN, PKP, NPWP/NIK).',
+    taxDenied: 'Akses ditolak: ruang kerja tidak diizinkan untuk melihat referensi pengetahuan pajak.',
+    taxOffline: 'Kamus cadangan offline aktif (snapshot referensi terverifikasi).',
+    taxServerErr: 'Terjadi kesalahan pada layanan pengetahuan pajak. Silakan coba lagi.',
+    taxRetry: 'Coba lagi',
+    taxEmpty: 'Tidak ada kartu pengetahuan pajak yang tersedia.',
+    taxMalformed: 'Gagal menampilkan kartu pajak karena format data tidak sesuai.',
+    taxLoading: 'Memuat kartu pengetahuan pajak…',
+    dueUndetermined: 'Batas waktu belum dapat ditentukan: aturan penghitungan resmi menunggu verifikasi.',
     disclaimer: 'Informasi ini hanya bersifat panduan dan bukan merupakan nasihat hukum, pajak, atau akuntansi. Konfirmasikan perhitungan dengan profesional berlisensi sebelum melakukan pembayaran atau pelaporan pajak.' },
 }
 const STATUS = { overdue: ['#991B1B', '#FEE2E2'], due_soon: ['#92400E', '#FEF3C7'], upcoming: ['#1e40af', '#EFF6FF'] }
@@ -28,15 +63,92 @@ const fmt = (d) => d ? new Date(d).toLocaleDateString('en-US', { month: 'short',
 
 export default function ComplianceCalendar() {
   const { token } = useAuth()
+  const ws = useWorkspace()
+  const wsActive = ws?.active || null
+  const scopeKey = ws?.scopeKey || 0
+  const wsId = wsActive?.id || (typeof localStorage !== 'undefined' ? (localStorage.getItem('activeWorkspaceId') || localStorage.getItem('activeBusinessId')) : null)
   const lang = ['ru', 'id'].includes(getLang()) ? getLang() : 'en'
   const l = L[lang]
   const [data, setData] = useState(null)
   const [view, setView] = useState('all')
+  const [taxCardsState, setTaxCardsState] = useState({ loading: true, error: null, cards: [] })
+  const [retryNonce, setRetryNonce] = useState(0)
+  const calGuard = useRef(createRequestGuard())
+  const cardsGuard = useRef(createRequestGuard())
 
-  const load = useCallback(() => { apiFetch('/accountant/calendar', token).then(setData).catch(e => setData({ error: e.message })) }, [token])
-  useEffect(() => { if (token) load() }, [token, load])
+  const load = useCallback(() => {
+    if (!token || !wsId) { setData(null); return () => {} }
+    setData(null)
+    const req = calGuard.current.start()
+    apiFetch('/accountant/calendar', token, { signal: req.signal })
+      .then(d => { if (!req.isStale()) setData(d) })
+      .catch(e => { if (!req.isStale()) setData({ error: e.message }) })
+    return () => calGuard.current.abort()
+  }, [token, wsId])
+
+  useEffect(() => {
+    return load()
+  }, [load, scopeKey])
+
+  const loadCards = useCallback(() => {
+    setTaxCardsState({ loading: true, error: null, cards: [] })
+    if (!token || !wsId) {
+      setTaxCardsState({ loading: false, error: null, cards: [] })
+      return () => {}
+    }
+    const req = cardsGuard.current.start()
+    apiFetch(`/accountant/tax-knowledge/cards?lang=${lang}`, token, { signal: req.signal })
+      .then(res => {
+        if (req.isStale()) return
+        if (!res || typeof res !== 'object' || !Array.isArray(res.cards)) {
+          setTaxCardsState({ loading: false, error: 'malformed', cards: [] })
+          return
+        }
+        if (res.cards.length === 0) {
+          setTaxCardsState({ loading: false, error: null, cards: [] })
+          return
+        }
+        setTaxCardsState({ loading: false, error: null, cards: res.cards })
+      })
+      .catch(err => {
+        if (req.isStale()) return
+        const status = err?.status || (err?.data && err.data.status)
+        const isForbidden = status === 401 || status === 403 || /401|403|unauthorized|forbidden/i.test(err?.message || '')
+        const isNetworkOffline = !status && (
+          (typeof window !== 'undefined' && !window.navigator.onLine) ||
+          /Failed to fetch|NetworkError|network|offline/i.test(err?.message || '')
+        )
+        if (isForbidden) {
+          setTaxCardsState({ loading: false, error: 'forbidden', cards: [] })
+        } else if (isNetworkOffline) {
+          setTaxCardsState({ loading: false, error: 'offline', cards: listTaxCards(lang) })
+        } else {
+          setTaxCardsState({ loading: false, error: 'server', cards: [] })
+        }
+      })
+    return () => cardsGuard.current.abort()
+  }, [token, wsId, lang])
+
+  useEffect(() => {
+    return loadCards()
+  }, [loadCards, retryNonce, scopeKey])
 
   if (!data) return <div style={{ padding: 40, color: 'var(--text-3)' }}>Loading…</div>
+  if (data.error) {
+    return (
+      <div style={{ maxWidth: 860, margin: '0 auto', padding: 20 }}>
+        <h1 style={{ fontSize: 22, fontWeight: 800, margin: '0 0 16px', display: 'flex', alignItems: 'center', gap: 8 }}>
+          📅 {l.title}
+        </h1>
+        <div style={{ padding: '12px 16px', borderRadius: 8, background: '#FEE2E2', border: '1px solid #FCA5A5', color: '#DC2626', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span>{data.error}</span>
+          <button type="button" onClick={load} style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid #DC2626', background: '#fff', color: '#DC2626', cursor: 'pointer', fontWeight: 600, fontSize: 12 }}>
+            {l.taxRetry}
+          </button>
+        </div>
+      </div>
+    )
+  }
   const events = data.events || []
   const filtered = events.filter(e =>
     view === 'all' ? true
@@ -47,7 +159,10 @@ export default function ComplianceCalendar() {
 
   return (
     <div style={{ maxWidth: 860, margin: '0 auto' }}>
-      <h1 style={{ fontSize: 22, fontWeight: 800, margin: 0 }}>📅 {l.title}</h1>
+      <h1 style={{ fontSize: 22, fontWeight: 800, margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+        📅 {l.title}
+        <InfoTooltip term="tax_data_status" lang={lang} />
+      </h1>
       <div style={{ fontSize: 13, color: 'var(--text-3)', marginBottom: 16 }}>{l.subtitle}</div>
 
       {data.active_unverified > 0 && (
@@ -55,7 +170,16 @@ export default function ComplianceCalendar() {
           ⚠ {data.active_unverified} {l.sourceReq}
         </div>
       )}
-      {(data.warnings || []).map((w, i) => <div key={i} style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 4 }}>· {w}</div>)}
+      {(data.warnings || []).map((w, i) => {
+        let text = w;
+        if (typeof w === 'string' && w.includes('no structured due_date_rule_json')) {
+          console.debug('[ComplianceCalendar] Statutory calculation rule unconfirmed:', w);
+          const parts = w.split(':');
+          const code = parts.length > 1 ? parts[0].trim() : '';
+          text = code ? `${code}: ${l.dueUndetermined}` : l.dueUndetermined;
+        }
+        return <div key={i} style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 4 }}>· {text}</div>;
+      })}
 
       <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
         {['all', 'upcoming', 'overdue', 'review'].map(v => (
@@ -69,11 +193,31 @@ export default function ComplianceCalendar() {
       {filtered.map((e, i) => {
         const [fg, bg] = STATUS[e.status] || STATUS.upcoming
         const src = e.official_source
+        const topicId = matchTopicId(e.rule_code || e.title)
+        const matchedCard = topicId ? getTaxCard(topicId, lang) : null
+        const whatText = Array.isArray(matchedCard?.what_is) && matchedCard.what_is[0]?.text
+          ? matchedCard.what_is[0].text
+          : (Array.isArray(matchedCard?.summary) && matchedCard.summary[0]?.text ? matchedCard.summary[0].text : '')
+        const howText = Array.isArray(matchedCard?.how_it_works) && matchedCard.how_it_works[0]?.text
+          ? matchedCard.how_it_works[0].text
+          : (matchedCard?.section_status?.how_it_works === 'unavailable' ? 'Archived procedure under research review.' : '')
+
         return (
-          <div key={i} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, padding: 14, marginBottom: 10 }}>
+          <div key={i} className="compliance-event-card" style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, padding: 14, marginBottom: 10 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
               <div>
-                <div style={{ fontWeight: 700, fontSize: 14 }}>{e.title}</div>
+                <div style={{ fontWeight: 700, fontSize: 14, display: 'flex', alignItems: 'center', gap: 4 }}>
+                  {e.title}
+                  {matchedCard && (
+                    <InfoTooltip
+                      title={matchedCard.name}
+                      what={whatText}
+                      how={howText}
+                      interpret={matchedCard.required_notice}
+                      lang={lang}
+                    />
+                  )}
+                </div>
                 <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>{e.rule_code} · v{e.rule_version} · {l.period}: {e.period}</div>
               </div>
               <span style={{ background: bg, color: fg, borderRadius: 6, padding: '3px 9px', fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap' }}>{e.status}</span>
@@ -90,6 +234,55 @@ export default function ComplianceCalendar() {
           </div>
         )
       })}
+
+      <div style={{ marginTop: 28, borderTop: '1px solid var(--border-default, #d0d7de)', paddingTop: 20 }}>
+        <h3 style={{ fontSize: 17, fontWeight: 800, margin: '0 0 4px', display: 'flex', alignItems: 'center', gap: 6 }}>
+          {l.taxRef}
+          <InfoTooltip term="tax_data_status" lang={lang} />
+        </h3>
+        <p style={{ fontSize: 12.5, color: 'var(--text-secondary)', margin: '0 0 14px' }}>
+          {l.taxRefSub}
+        </p>
+
+        {taxCardsState.error === 'forbidden' && (
+          <div style={{ fontSize: 12, color: 'var(--crit, #dc2626)', background: '#FEE2E2', border: '1px solid #FCA5A5', borderRadius: 8, padding: '7px 10px', marginBottom: 12 }}>
+            {l.taxDenied}
+          </div>
+        )}
+        {taxCardsState.error === 'offline' && (
+          <div style={{ fontSize: 12, color: 'var(--amber-dark, #92400e)', background: '#FEF3C7', border: '1px solid #FDE68A', borderRadius: 8, padding: '7px 10px', marginBottom: 12 }}>
+            {l.taxOffline}
+          </div>
+        )}
+        {taxCardsState.error === 'server' && (
+          <div style={{ fontSize: 12, color: 'var(--crit, #dc2626)', background: '#FEE2E2', border: '1px solid #FCA5A5', borderRadius: 8, padding: '7px 10px', marginBottom: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span>{l.taxServerErr}</span>
+            <button type="button" onClick={() => setRetryNonce(n => n + 1)} style={{ padding: '3px 8px', borderRadius: 6, border: '1px solid #DC2626', background: '#fff', color: '#DC2626', cursor: 'pointer', fontWeight: 600, fontSize: 11 }}>
+              {l.taxRetry}
+            </button>
+          </div>
+        )}
+        {taxCardsState.error === 'malformed' && (
+          <div style={{ fontSize: 12, color: 'var(--crit, #dc2626)', background: '#FEE2E2', border: '1px solid #FCA5A5', borderRadius: 8, padding: '7px 10px', marginBottom: 12 }}>
+            {l.taxMalformed}
+          </div>
+        )}
+        {taxCardsState.loading && (
+          <div style={{ padding: '20px 0', color: 'var(--text-3)' }}>{l.taxLoading}</div>
+        )}
+        {!taxCardsState.loading && !taxCardsState.error && taxCardsState.cards.length === 0 && (
+          <div style={{ fontSize: 13, color: 'var(--text-3)', padding: '20px 0', textAlign: 'center' }}>
+            {l.taxEmpty}
+          </div>
+        )}
+        {!taxCardsState.loading && (taxCardsState.cards.length > 0 || taxCardsState.error === 'offline') && (
+          <div className="tax-cards-grid" id="compliance-calendar-tax-cards-grid" data-testid="calendar-tax-cards-grid">
+            {taxCardsState.cards.map(card => (
+              <TaxKnowledgeCard key={card.topic_id} card={card} lang={lang} />
+            ))}
+          </div>
+        )}
+      </div>
 
       <div style={{ fontSize: 11, color: 'var(--text-4)', marginTop: 14 }}>{l.disclaimer}</div>
     </div>

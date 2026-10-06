@@ -13,9 +13,13 @@ import { Link } from 'react-router-dom'
 import I from '../icons'
 import { PageHead, Card, Btn, Pill, Skeleton, ErrorBox, Empty } from '../ui'
 import { useT, useLang } from '../i18n'
-import { useApi } from '../data'
+import { useApi, useInvalidate } from '../data'
 import { money, shortDate, daysUntil } from '../lib/format'
 import { statementFreshness, txDate, unlinkedMoney } from '../lib/obligations'
+import BusinessWalletTransferModal from '../../components/BusinessWalletTransferModal'
+import { useAuth } from '../../hooks/useAuth'
+import { useWorkspace } from '../../shell/WorkspaceProvider'
+import { useState, useEffect } from 'react'
 
 const KIND = { bank: 'acc.kind.bank', cash: 'acc.kind.cash', ewallet: 'acc.kind.ewallet', card: 'acc.kind.card', gateway: 'acc.kind.gateway' }
 const SERIES = ['var(--chart-1)', 'var(--chart-2)', 'var(--chart-3)', 'var(--brand-navy)', 'var(--text-muted)']
@@ -23,13 +27,29 @@ const SERIES = ['var(--chart-1)', 'var(--chart-2)', 'var(--chart-3)', 'var(--bra
 export default function Accounts() {
   const t = useT()
   const lang = useLang()
+  const { token } = useAuth()
+  const { active, scopeKey } = useWorkspace()
+  const [showTransfer, setShowTransfer] = useState(false)
+  const invalidate = useInvalidate()
   const w = useApi('/wallets')
   const batches = useApi('/bank-import/batches')
   const transfers = useApi('/transactions?period=all&type=transfer')
   const allTx = useApi('/transactions?period=all')
+
+  // Company switch protection: close transfer modal immediately
+  useEffect(() => {
+    setShowTransfer(false)
+  }, [active?.id, scopeKey])
+
   const head = (
     <PageHead title={t('nav.accounts')} sub={t('acc.sub')}
-      actions={<><Btn to="/business/bank-import">{t('acc.import')}</Btn><Btn variant="primary" icon={<I.plus size={16} />} to="/business/accounts/manage">{t('acc.add')}</Btn></>} />
+      actions={<>
+        <Btn onClick={() => setShowTransfer(true)} id="open-wallet-transfer-btn" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+          ⇄ {t('acc.transferBetween')}
+        </Btn>
+        <Btn to="/business/bank-import">{t('acc.import')}</Btn>
+        <Btn variant="primary" icon={<I.plus size={16} />} to="/business/accounts/manage">{t('acc.add')}</Btn>
+      </>} />
   )
   if (w.loading) return <>{head}<Card><Skeleton rows={5} /></Card></>
   if (w.error) return <>{head}<ErrorBox error={w.error} onRetry={w.reload} /></>
@@ -47,8 +67,74 @@ export default function Accounts() {
   const posSum = positive.reduce((s, x) => s + Number(x.balance_idr ?? x.balance), 0)
   const fresh = statementFreshness(batches.data?.batches || [])
   const stale = idr.filter((x) => x.type === 'bank' && (!fresh[x.id] || daysUntil(fresh[x.id].date) < -7))
-  const moves = (Array.isArray(transfers.data) ? transfers.data : []).slice(0, 4)
+  
+  // Find transfers and group linked legs by transfer_id so exactly one transfer entry appears in UI
+  const allTransactions = Array.isArray(allTx.data) ? allTx.data : []
+  const transferTransactions = Array.isArray(transfers.data) ? transfers.data : []
+  const rawTransfers = [...transferTransactions]
+  allTransactions.forEach(t => {
+    if ((t.transfer_id || t.type === 'transfer' || t.category === 'Transfer') && !rawTransfers.some(c => c.id === t.id)) {
+      rawTransfers.push(t)
+    }
+  })
+
+  const transferMap = new Map()
+  const groupedMoves = []
+
+  rawTransfers.forEach(t => {
+    if (t.transfer_id) {
+      if (transferMap.has(t.transfer_id)) {
+        const item = transferMap.get(t.transfer_id)
+        if (t.type === 'expense' || t.direction === 'out') {
+          item.from = t.source || item.from
+          item.amount = t.amount_original || item.amount
+          item.currency = t.currency_original || item.currency
+        } else if (t.type === 'income' || t.direction === 'in') {
+          item.to = t.source || item.to
+        }
+        return
+      }
+      const entry = {
+        id: `xfer-${t.transfer_id}`,
+        transfer_id: t.transfer_id,
+        date: t.transaction_date || t.created_at,
+        amount: t.amount_original,
+        currency: t.currency_original || 'IDR',
+        description: t.description,
+        from: (t.type === 'expense' || t.direction === 'out') ? t.source : null,
+        to: (t.type === 'income' || t.direction === 'in') ? t.source : null,
+        scope: t.scope,
+      }
+      transferMap.set(t.transfer_id, entry)
+      groupedMoves.push(entry)
+    } else {
+      groupedMoves.push({
+        id: t.id,
+        date: t.transaction_date || t.created_at,
+        amount: t.amount_original,
+        currency: t.currency_original || 'IDR',
+        description: t.description,
+        from: t.source,
+        to: null,
+        scope: t.scope,
+      })
+    }
+  })
+
+  groupedMoves.sort((a, b) => new Date(b.date) - new Date(a.date))
+  const moves = groupedMoves.slice(0, 6)
   const shareLabel = positive.map((x) => `${x.name} ${Math.round((Number(x.balance_idr ?? x.balance) / posSum) * 100)}%`).join(', ')
+
+  const formatRateSource = (src) => {
+    if (!src || src === 'uninitialized') return null
+    if (src === 'bi_jisdor_hybrid') return 'Bank Indonesia JISDOR, ExchangeRate-API, CoinGecko'
+    if (src === 'exchangerate_api_hybrid') return 'ExchangeRate-API, CoinGecko'
+    if (src === 'bi_jisdor') return 'Bank Indonesia JISDOR'
+    if (src === 'exchangerate_api') return 'ExchangeRate-API'
+    if (src === 'coingecko') return 'CoinGecko'
+    if (src === 'fixed_accounting_table') return 'Fixed accounting table'
+    return src
+  }
 
   if (!wallets.length) {
     return <>{head}<Card><Empty icon={<I.accounts size={28} />} title={t('acc.emptyTitle')} text={t('acc.emptyText')}
@@ -68,16 +154,8 @@ export default function Accounts() {
                 {other.length > 0 && (
                   <span className="v2-muted v2-small">
                     {t('acc.asOfDate', { d: shortDate(w.data?.rates_metadata?.rate_effective_date || w.data?.as_of_date || new Date(), lang) })}
-                    {w.data?.rates_metadata?.source && (
-                      <> · {
-                        w.data.rates_metadata.source === 'bi_jisdor_hybrid' ? 'Bank Indonesia JISDOR, ExchangeRate-API, CoinGecko'
-                        : w.data.rates_metadata.source === 'exchangerate_api_hybrid' ? 'ExchangeRate-API, CoinGecko'
-                        : w.data.rates_metadata.source === 'bi_jisdor' ? 'Bank Indonesia JISDOR'
-                        : w.data.rates_metadata.source === 'exchangerate_api' ? 'ExchangeRate-API'
-                        : w.data.rates_metadata.source === 'coingecko' ? 'CoinGecko'
-                        : w.data.rates_metadata.source === 'fixed_accounting_table' ? 'Fixed accounting table'
-                        : w.data.rates_metadata.source
-                      }</>
+                    {formatRateSource(w.data?.rates_metadata?.source) && (
+                      <> · {formatRateSource(w.data?.rates_metadata?.source)}</>
                     )}
                     {w.data?.rates_metadata?.status === 'weekend_holding' && <> · <span className="v2-tag-info">Weekend holding</span></>}
                     {w.data?.rates_metadata?.status === 'degraded' && <> · <span className="v2-tag-warn">Fallback rates</span></>}
@@ -133,15 +211,7 @@ export default function Accounts() {
             {other.length > 0 && (
               <p className="v2-muted v2-small">
                 {t('acc.asOfDate', { d: shortDate(w.data?.rates_metadata?.rate_effective_date || w.data?.as_of_date || new Date(), lang) })}
-                {w.data?.rates_metadata?.source && ` · ${
-                  w.data.rates_metadata.source === 'bi_jisdor_hybrid' ? 'Bank Indonesia JISDOR, ExchangeRate-API, CoinGecko'
-                  : w.data.rates_metadata.source === 'exchangerate_api_hybrid' ? 'ExchangeRate-API, CoinGecko'
-                  : w.data.rates_metadata.source === 'bi_jisdor' ? 'Bank Indonesia JISDOR'
-                  : w.data.rates_metadata.source === 'exchangerate_api' ? 'ExchangeRate-API'
-                  : w.data.rates_metadata.source === 'coingecko' ? 'CoinGecko'
-                  : w.data.rates_metadata.source === 'fixed_accounting_table' ? 'Fixed accounting table'
-                  : w.data.rates_metadata.source
-                }`}
+                {formatRateSource(w.data?.rates_metadata?.source) && ` · ${formatRateSource(w.data?.rates_metadata?.source)}`}
               </p>
             )}
           </Card>
@@ -155,12 +225,35 @@ export default function Accounts() {
             <p className="v2-muted v2-small">{t('acc.movesNote')}</p>
             {moves.length === 0 ? <p className="v2-muted">{t('acc.noMoves')}</p> : (
               <ul className="v2-moves">
-                {moves.map((m) => <li key={m.id}><span>{shortDate(txDate(m), lang)} · {m.description || t('acc.transfer')}{m.scope === 'personal' && <> <Pill tone="warn">{t('acc.labelledPersonal')}</Pill></>}</span><span className="v2-num">{money(m.amount_original, { currency: m.currency_original || 'IDR' })}</span></li>)}
+                {moves.map((m) => (
+                  <li key={m.id}>
+                    <span>
+                      {shortDate(m.date, lang)} · {m.from && m.to ? `${m.from} → ${m.to}` : (m.description || t('acc.transfer'))}
+                      {m.scope === 'personal' && <> <Pill tone="warn">{t('acc.labelledPersonal')}</Pill></>}
+                    </span>
+                    <span className="v2-num">{money(m.amount, { currency: m.currency || 'IDR' })}</span>
+                  </li>
+                ))}
               </ul>
             )}
           </Card>
         </aside>
       </div>
+      {showTransfer && (
+        <BusinessWalletTransferModal
+          token={token}
+          wallets={wallets}
+          userRole={active?.role}
+          onClose={() => setShowTransfer(false)}
+          onSuccess={() => {
+            setShowTransfer(false)
+            invalidate()
+            w.reload()
+            transfers.reload()
+            allTx.reload()
+          }}
+        />
+      )}
     </div>
   )
 }

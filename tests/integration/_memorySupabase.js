@@ -26,9 +26,15 @@ const table = (t) => (DB[t] ||= []);
 const nextId = (t) => (seq[t] = (seq[t] || 0) + 1);
 
 function applyEmbeds(t, rows, cols) {
-  // Supports the one embed shape the real code uses: `businesses(*)` on business_members.
-  if (!cols || !/businesses\s*\(/.test(cols)) return rows;
-  return rows.map((r) => ({ ...r, businesses: table('businesses').find((b) => b.id === r.business_id) || null }));
+  // Supports `businesses(*)` on business_members and `official_sources(*)` on tax_rules.
+  if (!cols) return rows;
+  if (/businesses\s*\(/.test(cols)) {
+    return rows.map((r) => ({ ...r, businesses: table('businesses').find((b) => b.id === r.business_id) || null }));
+  }
+  if (/official_sources\s*\(/.test(cols)) {
+    return rows.map((r) => ({ ...r, official_sources: table('official_sources').find((s) => s.id === r.official_source_id) || null }));
+  }
+  return rows;
 }
 
 class Q {

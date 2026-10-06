@@ -942,57 +942,9 @@ async function requireBusiness(req, res) {
 //   a stable, representative daily burn rate.
 //
 // @param allTxs — all-time transactions array (must include `created_at`)
-// @param totalBalance — computed total cash balance (all-time income − expenses + corrections)
-// @returns { burn_rate_daily, runway_days, burn_window_days }
-function computeBurnAndRunway(allTxs, totalBalance) {
-  const CASH_OUT = TX.CASH_OUT_LEGACY;
-  const now      = new Date();
-  const cutoff30 = new Date(now.getTime() - 30 * 86400000);
+const burnRunway = require('./lib/burnRunway');
+const computeBurnAndRunway = burnRunway.computeBurnAndRunway;
 
-  // Burn is about when money MOVED, not when the row was typed. Using created_at made
-  // every back-dated entry land in the current window, so a bulk import of last
-  // quarter's spend read as if it had all been spent this month.
-  const eff = (t) => FININ.effectiveDate(t);
-  const isTransfer = (t) => t.type === 'transfer' || !!t.transfer_id || t.category === 'Transfer';
-  // All expense transactions with a valid date (excluding internal transfers)
-  const allExpTxs = (allTxs || []).filter(t => CASH_OUT.includes(t.type) && !isTransfer(t) && eff(t));
-
-  if (allExpTxs.length === 0) {
-    // No expense data — cannot compute burn rate
-    return { burn_rate_daily: 0, runway_days: null, burn_window_days: 0 };
-  }
-
-  // Days since oldest expense transaction (data window we actually have)
-  const oldestDate  = allExpTxs.reduce((oldest, t) => {
-    const d = new Date(eff(t));
-    return d < oldest ? d : oldest;
-  }, now);
-  const daysOfData  = Math.max(1, Math.round((now - oldestDate) / 86400000));
-
-  let dailyBurn, windowDays;
-
-  if (daysOfData >= 30) {
-    // ── Full rolling 30-day window ────────────────────────────────────────
-    const last30Exp = allExpTxs
-      .filter(t => new Date(eff(t)) >= cutoff30)
-      .reduce((s, t) => s + Number(t.amount_idr ?? t.amount_original ?? 0), 0);
-    dailyBurn  = last30Exp / 30;
-    windowDays = 30;
-  } else {
-    // ── Partial window — use all available data ───────────────────────────
-    const totalExp = allExpTxs.reduce((s, t) => s + Number(t.amount_idr ?? t.amount_original ?? 0), 0);
-    dailyBurn  = totalExp / daysOfData;
-    windowDays = daysOfData;
-  }
-
-  const runwayDays = dailyBurn > 0 ? Math.round(totalBalance / dailyBurn) : null;
-
-  return {
-    burn_rate_daily:  Math.round(dailyBurn),
-    runway_days:      runwayDays,
-    burn_window_days: windowDays,   // how many days of data used (for UI transparency)
-  };
-}
 
 // --- Pulse API -------------------------------------------------------------
 
@@ -1190,9 +1142,9 @@ app.get('/api/pulse', auth, async (req, res) => {
 
     // -- Burn rate & runway via rolling 30-day window ----------------------
     // allTxs has created_at (select('*')), so computeBurnAndRunway works here.
-    const burnMetrics = computeBurnAndRunway(allTxs, totalBalance);
+    const burnMetrics = computeBurnAndRunway(allTxs, totalBalance, asOfDate);
     const burnRate = burnMetrics.burn_rate_daily;
-    const runway   = burnMetrics.runway_days ?? 999;
+    const runway   = burnMetrics.runway_days; // null when cash flow positive, break-even or insufficient data
 
     // Use remaining_amount (not original amount) and exclude paid/cancelled
     // Only approved/confirmed debts count as real obligations/expected cash.
@@ -1213,18 +1165,27 @@ app.get('/api/pulse', auth, async (req, res) => {
     // -- AI status ----------------------------------------------------------
     let aiStatus = 'healthy';
     let aiText = '';
-    if (runway <= 7) {
+    if (runway !== null && runway <= 7) {
       aiStatus = 'critical';
       aiText = `Only ${runway} days of runway left. Incoming payment needed.`;
-    } else if (runway <= 14) {
+    } else if (runway !== null && runway <= 14) {
       aiStatus = 'attention';
       aiText = `Runway ${runway} days. Check receivables - some obligations may reduce the buffer.`;
     } else {
       aiStatus = 'healthy';
-      const runwayPart = language === 'ru' ? `Запас денег: ${runway} дней.` : language === 'id' ? `Cadangan kas: ${runway} hari.` : `Runway ${runway} days.`
-      const incomePart = cx(language, 'incomeCoversObligations')
-      const riskPart   = cx(language, 'noRisksDetected')
-      aiText = `${runwayPart} ${incomePart} ${riskPart}`;
+      let runwayPart = '';
+      if (runway !== null) {
+        runwayPart = language === 'ru' ? `Запас денег: ${runway} дней.` : language === 'id' ? `Cadangan kas: ${runway} hari.` : `Runway ${runway} days.`;
+      } else if (burnMetrics.runway_reason === 'positive_cash_flow') {
+        runwayPart = language === 'ru' ? 'Денежный поток положительный.' : language === 'id' ? 'Arus kas positif.' : 'Positive cash flow.';
+      } else if (burnMetrics.runway_reason === 'break_even') {
+        runwayPart = language === 'ru' ? 'Операционный баланс в равновесии.' : language === 'id' ? 'Arus kas seimbang.' : 'Cash flow balanced.';
+      } else {
+        runwayPart = language === 'ru' ? 'Недостаточно данных для расчёта запаса.' : language === 'id' ? 'Data transaksi belum cukup.' : 'Insufficient data for runway calculation.';
+      }
+      const incomePart = cx(language, 'incomeCoversObligations');
+      const riskPart   = cx(language, 'noRisksDetected');
+      aiText = `${runwayPart} ${incomePart} ${riskPart}`.trim();
     }
 
     // -- Today's focus ------------------------------------------------------
@@ -1234,7 +1195,7 @@ app.get('/api/pulse', auth, async (req, res) => {
       if (daysLeft <= 14) {
         todayFocus.push({
           id: d.id,
-         title: d.type === 'receivable' ? `Remind ${d.counterparty} to pay` : `Pay ${d.counterparty}`,
+          title: d.type === 'receivable' ? `Remind ${d.counterparty} to pay` : `Pay ${d.counterparty}`,
           meta: `${Number(d.amount).toLocaleString('en-US')} IDR · ${daysLeft > 0 ? daysLeft + ' days' : 'today'}`,
           type: d.type === 'receivable' ? 'receivable' : 'payable',
           done: false
@@ -1250,6 +1211,19 @@ app.get('/api/pulse', auth, async (req, res) => {
 
     res.json({
       scope, totalBalance, income, expenses, burnRate, runway,
+      daily_spend: burnMetrics.daily_spend,
+      daily_spend_window_days: burnMetrics.burn_window_days,
+      net_burn_daily: burnMetrics.net_burn_daily,
+      net_burn_monthly: burnMetrics.net_burn_monthly,
+      runway_days: burnMetrics.runway_days,
+      runway_reason: burnMetrics.runway_reason,
+      burn_rate_daily: burnMetrics.daily_spend,
+      window_start: burnMetrics.window_start,
+      window_end: burnMetrics.window_end,
+      operating_expenses: burnMetrics.operating_expenses,
+      operating_inflows: burnMetrics.operating_inflows,
+      has_unvalued_tx: burnMetrics.has_unvalued_tx,
+      unvalued_tx_count: burnMetrics.unvalued_tx_count,
       as_of_date: asOfDate,
       rates: serverRates,
       rates_metadata: ratesMetadata,
@@ -2939,12 +2913,7 @@ app.post('/api/accountant/ask', auth, async (req, res) => {
 
     const enrichedDebts = await enrichDebtsFor(biz.business.id, rawDebts || []);
 
-    const {
-      walletsWithBalance,
-      debtsSummary,
-      counterpartiesMap,
-      company: companyFacts,
-    } = aiAccountantCore.buildAccountantCompanyFacts({
+    const { company: companyFacts, counterpartiesMap, walletsWithBalance } = aiAccountantCore.buildAccountantCompanyFacts({
       business: biz.business,
       rawWallets,
       rawTxs,
@@ -3019,6 +2988,40 @@ app.get('/api/accountant/sources', auth, async (req, res) => {
     const { data } = await supabase.from('official_sources').select('*').order('jurisdiction');
     res.json({ sources: data || [] });
   } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// GET /api/accountant/tax-knowledge/cards — dynamic cards from PR #133 getCard()
+// Business research only; no calculations, no rule mutations, rates and TER blocked.
+app.get('/api/accountant/tax-knowledge/cards', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canViewBusinessFinance(biz.role)) return res.status(403).json({ error: 'Forbidden' });
+
+    const { getCard } = require('./lib/indonesiaTaxKnowledgeCards.cjs');
+    const lang = ['ru', 'en', 'id'].includes(req.query.language || req.query.lang)
+      ? (req.query.language || req.query.lang)
+      : 'ru';
+    const topicId = req.query.topic_id;
+
+    const TOPICS = [
+      'pph21', 'pph26', 'pph23', 'pph_final_rent',
+      'pph25', 'pph29', 'ppn', 'pkp', 'npwp_nik'
+    ];
+
+    if (topicId) {
+      if (!TOPICS.includes(topicId)) {
+        return res.status(400).json({ error: 'unsupported_topic', message: `Topic ${topicId} is not supported` });
+      }
+      const card = getCard({ topic_id: topicId, language: lang, intent: 'explanation' });
+      return res.json({ card });
+    }
+
+    const cards = TOPICS.map(t => getCard({ topic_id: t, language: lang, intent: 'explanation' }));
+    res.json({ cards });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 
@@ -8327,8 +8330,28 @@ app.post('/api/transactions/batch', auth, async (req, res) => {
       walletMap = Object.fromEntries((ownedWallets || []).map(w => [w.id, w]));
     }
 
+    // ── Check replay for transfers in batch ───────────────────────────────────
+    const transferIdsInBatch = [...new Set(transactions.map(t => t.transfer_id).filter(Boolean))];
+    let existingTransferIds = new Set();
+    if (transferIdsInBatch.length > 0) {
+      const { data: existingTransferTxs } = await supabase
+        .from('transactions')
+        .select('id, transfer_id')
+        .or(bizOrFilter(biz))
+        .in('transfer_id', transferIdsInBatch);
+      if (existingTransferTxs && existingTransferTxs.length > 0) {
+        existingTransferIds = new Set(existingTransferTxs.map(x => x.transfer_id));
+        if (transactions.every(t => t.transfer_id && existingTransferIds.has(t.transfer_id))) {
+          return res.status(200).json({ saved: existingTransferTxs.length, is_replay: true });
+        }
+      }
+    }
+
     // ── Build rows ───────────────────────────────────────────────────────────
     const rowBatches = await Promise.all(transactions.map(async t => {
+      if (t.transfer_id && existingTransferIds.has(t.transfer_id)) {
+        return []; // skip already recorded transfer leg
+      }
       const wallet   = t.wallet_id ? walletMap[t.wallet_id] : null;
       const toWallet = t.to_wallet_id ? walletMap[t.to_wallet_id] : null;
       const txDate   = t.transaction_date || new Date().toISOString().slice(0, 10);
@@ -10354,8 +10377,8 @@ app.post('/api/wallets/transfer', auth, async (req, res) => {
     const transferRef = `xfer:${transferId}`;
     const desc = (description && description.trim()) || `Transfer: ${fromWallet.name} → ${toWallet.name}`;
 
+    // Replay / idempotency check for existing transfer_id
     if (req.body.transfer_id) {
-      const bizOr = bizOrFilter(biz);
       const { data: existingTxs } = await supabase
         .from('transactions')
         .select('*')

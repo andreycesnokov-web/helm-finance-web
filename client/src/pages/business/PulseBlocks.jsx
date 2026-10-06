@@ -19,6 +19,8 @@
 // with what to do next instead of a grid of dashes.
 import { Card, StatusBadge, Btn, Icon, DataList, FlagshipMark } from '../../shell/ui'
 import { compactIdr } from '../../lib/money'
+import { t } from '../../i18n'
+import InfoTooltip from '../../components/InfoTooltip'
 import './Pulse.css'
 
 // compactIdr now lives in lib/money.js: Wallets shows the same headline figure,
@@ -33,7 +35,7 @@ export function ExecutiveHero({ d, idr, readiness, empty }) {
   const compact = compactIdr(cash)
   const exact = idr(cash)
   const negative = cash < 0
-  const runway = d.runway === 999 || d.runway == null ? null : Number(d.runway)
+  const runway = d.runway == null || d.runway === 999 ? null : Number(d.runway)
   const lowRunway = runway !== null && runway < 30
 
   // These two are OPERATING figures: the API classifies every transaction before
@@ -52,19 +54,100 @@ export function ExecutiveHero({ d, idr, readiness, empty }) {
   // news. Cash out is simply ink: large, important, not a failure.
   const income = Number(d.income || 0)
   const net = Number(d.netPosition || 0)
+
+  // Explicit Daily Spend vs Net Burn vs Runway definitions:
+  const hasUnvalued = Boolean(d.has_unvalued_tx)
+  const unvaluedCount = Number(d.unvalued_tx_count || 0)
+
+  // 1. Daily Spend: rolling average operating expenses over window (null if no expense data)
+  const dailySpendVal = d.daily_spend !== undefined && d.daily_spend !== null ? Number(d.daily_spend) : null
+  const dailySpendWindow = d.daily_spend_window_days || d.burnWindowDays || 30
+  const windowRangeStr = d.window_start && d.window_end ? `${d.window_start} – ${d.window_end}` : `${dailySpendWindow}d window`
+
+  // 2. Net Burn: excess of operating expenses over operating inflows
+  const netBurnVal = d.net_burn_daily !== undefined && d.net_burn_daily !== null ? Number(d.net_burn_daily) : null
+
+  // 3. Runway explanation
+  let runwayHint = ''
+  let runwayChip = null
+  if (hasUnvalued) {
+    runwayHint = t('pulse.blockedValuation') || 'Blocked: incomplete FX valuation'
+    runwayChip = t('pulse.partial') || 'Partial'
+  } else if (d.runway_reason === 'positive_cash_flow') {
+    runwayHint = t('pulse.cashFlowPositive') || 'Cash flow positive · receipts cover expenses'
+    runwayChip = 'Cash flow +'
+  } else if (d.runway_reason === 'break_even') {
+    runwayHint = t('pulse.breakEven') || 'Break-even · receipts equal expenses'
+    runwayChip = 'Break-even'
+  } else if (d.runway_reason === 'insufficient_data' || runway === null) {
+    runwayHint = t('pulse.requiresExpenseHistory') || 'Requires operating expense history'
+    runwayChip = null
+  } else {
+    runwayHint = `At ${idr(netBurnVal || 0)}/day net burn · ${dailySpendWindow}d window`
+    runwayChip = lowRunway ? 'Below 30 days' : null
+  }
+
   const kpis = [
-    { key: 'revenue', label: 'Operating revenue this month', value: '+ ' + idr(d.income),
+    {
+      key: 'revenue',
+      label: 'Operating revenue this month',
+      value: '+ ' + idr(d.income),
       tone: income > 0 ? 'pos' : undefined,
-      hint: 'Earned revenue only · excludes opening balances, funding and transfers' },
-    { key: 'outflow', label: 'Operating cash out this month', value: '− ' + idr(d.expenses),
-      hint: 'Direct costs and operating expenses · excludes CAPEX, tax and financing' },
-    { key: 'net', label: 'Net position', value: idr(d.netPosition),
-      tone: net < 0 ? 'neg' : net > 0 ? 'pos' : undefined,
-      hint: 'Balance sheet view: cash + receivables − payables. Not operating performance.' },
-    { key: 'runway', label: 'Runway', value: runway === null ? '—' : `${runway} days`,
+      hint: 'Earned revenue only · excludes opening balances, funding and transfers'
+    },
+    {
+      key: 'outflow',
+      label: 'Operating cash out this month',
+      value: '− ' + idr(d.expenses),
+      hint: 'Direct costs and operating expenses · excludes CAPEX, tax and financing'
+    },
+    {
+      key: 'daily_spend',
+      label: t('pulse.dailySpend') || 'Daily spend',
+      term: 'daily_spend',
+      value: dailySpendVal === null ? '—' : `${idr(dailySpendVal)} / day${hasUnvalued ? ` (${t('pulse.partial') || 'partial'})` : ''}`,
+      hint: hasUnvalued
+        ? `${t('pulse.unvaluedExcluded', { n: unvaluedCount }) || `Excluded unvalued: ${unvaluedCount}`} · ${windowRangeStr}`
+        : dailySpendVal === null
+        ? (t('pulse.requiresExpenseHistory') || 'No operating expense history yet')
+        : `Average over rolling ${dailySpendWindow} days (${windowRangeStr})`
+    },
+    {
+      key: 'net_burn',
+      label: t('pulse.netCashBurn') || 'Net cash burn',
+      term: 'gross_net_burn',
+      value: hasUnvalued
+        ? '—'
+        : netBurnVal === null
+        ? '—'
+        : idr(netBurnVal) + ' / day',
+      tone: netBurnVal > 0 ? 'warn' : undefined,
+      hint: hasUnvalued
+        ? (t('pulse.blockedValuation') || 'Blocked: incomplete FX valuation')
+        : d.runway_reason === 'positive_cash_flow'
+        ? (t('pulse.cashFlowPositive') || 'Operating inflows exceed outflows (0 net drain)')
+        : d.runway_reason === 'break_even'
+        ? (t('pulse.breakEven') || 'Operating inflows equal outflows (0 net drain)')
+        : netBurnVal === null
+        ? (t('pulse.requiresOperatingHistory') || 'Requires operating history')
+        : (t('pulse.dailyCashDrain') || 'Excess of cash outflows over inflows per day')
+    },
+    {
+      key: 'runway',
+      label: t('pulse.runway') || 'Runway',
+      term: 'runway',
+      value: hasUnvalued || runway === null ? '—' : `${runway} days`,
       tone: lowRunway ? 'warn' : undefined,
-      chip: lowRunway ? 'Below 30 days' : null,
-      hint: runway === null ? 'Needs expense history' : `At ${idr(d.burnRate)}/day · ${d.burnWindowDays || 30}d window` },
+      chip: runwayChip,
+      hint: runwayHint
+    },
+    {
+      key: 'net',
+      label: 'Net position',
+      value: idr(d.netPosition),
+      tone: net < 0 ? 'neg' : net > 0 ? 'pos' : undefined,
+      hint: 'Balance sheet view: cash + receivables − payables. Not operating performance.'
+    },
   ]
 
   return (
@@ -97,7 +180,10 @@ export function ExecutiveHero({ d, idr, readiness, empty }) {
       <div className="pulse-kpis">
         {kpis.map((k) => (
           <div key={k.key} className="pulse-kpi">
-            <span className="pulse-kpi-label">{k.label}</span>
+            <span className="pulse-kpi-label">
+              {k.label}
+              {k.term && <InfoTooltip term={k.term} />}
+            </span>
             <span className={`pulse-kpi-value ${empty ? 'is-muted' : (k.tone || '')}`}>{k.value}</span>
             {k.chip && !empty && <span className="pulse-kpi-chip">{k.chip}</span>}
             <span className="pulse-kpi-hint">{k.hint}</span>
@@ -624,7 +710,7 @@ function risksOf(d) {
   const out = []
   const cash = Number(d.totalBalance || 0)
   const pay = Number(d.payables || 0)
-  const runway = d.runway === 999 || d.runway == null ? null : Number(d.runway)
+  const runway = d.runway == null || d.runway === 999 ? null : Number(d.runway)
   if (runway !== null && runway < 30) out.push(`Runway is ${runway} days at the current burn rate.`)
   if (pay > cash && pay > 0) out.push('Payables exceed cash on hand — obligations are larger than the money available today.')
   if (Number(d.income || 0) === 0 && Number(d.expenses || 0) > 0) out.push('Spending is recorded this month but no income is.')

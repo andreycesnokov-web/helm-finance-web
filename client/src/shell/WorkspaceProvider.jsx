@@ -3,7 +3,7 @@
 // PATCH /api/workspace-preferences, and stamps x-business-id (setActiveBusinessId) so
 // every apiFetch is scoped to the active workspace. Switching clears workspace-scoped
 // state via a bumped `scopeKey` (pages key their fetches off it) and routes home.
-import { createContext, useContext, useEffect, useState, useCallback } from 'react'
+import { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react'
 import { apiFetch, setActiveBusinessId } from '../lib/api'
 import { useAuth } from '../hooks/useAuth'
 
@@ -30,6 +30,10 @@ export function WorkspaceProvider({ children }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [scopeKey, setScopeKey] = useState(0)   // bump = clear workspace-scoped caches
+
+  const wsRef = useRef(workspaces)
+  wsRef.current = workspaces
+  const switchToRef = useRef(null)
 
   const applyActive = useCallback((w) => {
     setActive(w)
@@ -64,6 +68,48 @@ export function WorkspaceProvider({ children }) {
     setScopeKey(k => k + 1)                                   // invalidate scoped data
     try { await apiFetch('/workspace-preferences', token, { method: 'PATCH', body: { last_active_workspace_id: w.id } }) } catch {}
   }, [active, applyActive, token])
+  switchToRef.current = switchTo
+
+  // Support custom 'workspace-switch' and storage events across tabs / test automation
+  useEffect(() => {
+    const handleSwitchEvent = (e) => {
+      const targetId = e?.detail?.id || e?.detail?.workspaceId
+      if (!targetId) return
+      const all = [...(workspaces.personal || []), ...(workspaces.business || [])]
+      const target = all.find(w => String(w.id) === String(targetId))
+      if (target) switchTo(target)
+    }
+    const handleStorageEvent = (e) => {
+      if (e.key === LS_ACTIVE || e.key === LS_LAST) {
+        const storedId = e.newValue
+        if (storedId) {
+          const all = [...(workspaces.personal || []), ...(workspaces.business || [])]
+          const target = all.find(w => String(w.id) === String(storedId))
+          if (target && (!active || String(target.id) !== String(active.id))) {
+            switchTo(target)
+          }
+        }
+      }
+    }
+    window.addEventListener('workspace-switch', handleSwitchEvent)
+    window.addEventListener('storage', handleStorageEvent)
+    // window.__cfoSwitchTo is strictly build-gated to test builds (import.meta.env.MODE === 'test').
+    // Runtime localStorage or window flags cannot bypass this restriction in production builds.
+    if (import.meta.env.MODE === 'test') {
+      window.__cfoSwitchTo = (id) => {
+        const all = [...(wsRef.current?.personal || []), ...(wsRef.current?.business || [])]
+        const target = all.find(w => String(w.id) === String(id))
+        if (target && switchToRef.current) switchToRef.current(target)
+      }
+    }
+    return () => {
+      window.removeEventListener('workspace-switch', handleSwitchEvent)
+      window.removeEventListener('storage', handleStorageEvent)
+      if (typeof window !== 'undefined' && window.__cfoSwitchTo) {
+        delete window.__cfoSwitchTo
+      }
+    }
+  }, [workspaces, active, switchTo])
 
   return (
     <Ctx.Provider value={{ workspaces, active, loading, error, scopeKey, switchTo, refresh: load, applyActive }}>

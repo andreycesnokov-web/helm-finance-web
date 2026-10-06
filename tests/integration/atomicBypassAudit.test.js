@@ -84,11 +84,8 @@ describe('Security & Atomicity Audit: Prevention of Atomic Write Bypass', () => 
     const m66 = fs.readFileSync(path.join(__dirname, '..', '..', 'migrations', '066_debt_payment_idempotency_and_atomic_rpc.sql'), 'utf8');
     await db.exec(m66);
 
-    const m67Path = path.join(__dirname, '..', '..', 'migrations', '067_business_wallet_transfers_atomic_task30.sql');
-    if (fs.existsSync(m67Path)) {
-      const m67 = fs.readFileSync(m67Path, 'utf8');
-      await db.exec(m67);
-    }
+    const m67 = fs.readFileSync(path.join(__dirname, '..', '..', 'migrations', '067_business_wallet_transfers_atomic_task30.sql'), 'utf8');
+    await db.exec(m67);
 
     // 3. Seed test data
     walletId = crypto.randomUUID();
