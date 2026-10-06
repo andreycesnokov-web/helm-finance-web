@@ -289,8 +289,12 @@ export default {
     billingCodes: 'Dapatkan kode billing', reminders: 'Pengingat', remindersText: 'Pengingat tenggat dikirim lewat pengingat Telegram yang sudah ada.', reminderSettings: 'Atur pengingat',
     taxReference: 'Referensi Pengetahuan Pajak',
     taxReferenceSub: 'Definisi undang-undang dan rujukan pajak Indonesia (PPh 21, 26, 23, Final rent, 25, 29, PPN, PKP, NPWP/NIK).',
-    taxOfflineNotice: 'Kamus cadangan offline aktif (layanan tidak tersedia).',
+    taxOfflineNotice: 'Kamus cadangan offline aktif (snapshot referensi terverifikasi).',
     taxAccessDenied: 'Akses ditolak. Anda tidak memiliki izin untuk melihat pengetahuan pajak bisnis.',
+    taxServerErr: 'Terjadi kesalahan pada layanan pengetahuan pajak. Silakan coba lagi.',
+    taxRetry: 'Coba lagi',
+    taxEmpty: 'Tidak ada kartu pengetahuan pajak yang tersedia.',
+    taxMalformed: 'Gagal menampilkan kartu pajak karena format data tidak sesuai.',
     taxLoading: 'Memuat kartu pajak terverifikasi...',
   },
   prof: {

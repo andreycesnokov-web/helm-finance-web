@@ -182,8 +182,13 @@ function CloseTab({ month }) {
   const summary = useApi('/accountant/summary')
   const taxCardsApi = useApi(`/accountant/tax-knowledge/cards?lang=${lang}`)
 
-  const isForbidden = taxCardsApi.error?.status === 403 || taxCardsApi.error?.status === 401
-  const isOffline = taxCardsApi.error && !isForbidden
+  const taxStatus = taxCardsApi.error?.status || (taxCardsApi.error?.data && taxCardsApi.error.data.status)
+  const isForbidden = taxStatus === 403 || taxStatus === 401 || /401|403|unauthorized|forbidden/i.test(taxCardsApi.error?.message || '')
+  const isServerError = taxStatus >= 500
+  const isOffline = taxCardsApi.error && !isForbidden && !isServerError
+  const isMalformed = !taxCardsApi.loading && !taxCardsApi.error && taxCardsApi.data != null && (typeof taxCardsApi.data !== 'object' || !Array.isArray(taxCardsApi.data.cards))
+  const isEmpty = !taxCardsApi.loading && !taxCardsApi.error && !isMalformed && Array.isArray(taxCardsApi.data?.cards) && taxCardsApi.data.cards.length === 0
+
   const taxCards = useMemo(() => {
     if (Array.isArray(taxCardsApi.data?.cards) && taxCardsApi.data.cards.length > 0) {
       return taxCardsApi.data.cards
@@ -271,8 +276,26 @@ function CloseTab({ month }) {
               <span className="v2-banner-text">{t('acct.taxOfflineNotice')}</span>
             </div>
           )}
+          {isServerError && (
+            <div className="v2-inline-err" role="alert" style={{ marginBottom: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span>{t('acct.taxServerErr')}</span>
+              <button type="button" className="v2-btn v2-btn-sm" onClick={taxCardsApi.reload}>
+                {t('acct.taxRetry')}
+              </button>
+            </div>
+          )}
+          {isMalformed && (
+            <div className="v2-inline-err" role="alert" style={{ marginBottom: 12 }}>
+              {t('acct.taxMalformed')}
+            </div>
+          )}
           {taxCardsApi.loading && <Skeleton rows={4} />}
-          {!taxCardsApi.loading && !isForbidden && (
+          {isEmpty && (
+            <p className="v2-muted" style={{ padding: '20px 0', textAlign: 'center' }}>
+              {t('acct.taxEmpty')}
+            </p>
+          )}
+          {!taxCardsApi.loading && !isForbidden && !isServerError && !isMalformed && !isEmpty && (
             <div className="tax-cards-grid">
               {taxCards.map(card => (
                 <TaxKnowledgeCard

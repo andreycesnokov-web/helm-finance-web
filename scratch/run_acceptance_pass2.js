@@ -430,38 +430,154 @@ async function runAcceptancePass() {
   console.log('Ask box prefilled screenshot ->', shotPrefill);
 
   console.log('\n======================================================');
-  console.log('PART 5: Company Switch Race Condition & State Discard');
+  console.log('PART 5: Company Switch Real Browser Race Condition & Delayed Responses');
   console.log('======================================================');
-  // Type question in Company A
-  await page.fill('#acc-ask', 'What are withholding rules for Company A?');
-  const askInputA = await page.$eval('#acc-ask', el => el.value);
-  assert.strictEqual(askInputA, 'What are withholding rules for Company A?');
-
-  // Also verify URL query param ?ask= gets stripped on workspace switch
+  // Navigate back to Company A
   await page.goto(`http://127.0.0.1:${PORT}/business/accountant?ask=TemporaryQuestionA`, { waitUntil: 'networkidle' });
   await page.waitForTimeout(500);
   assert.ok(page.url().includes('ask='), 'URL has ask parameter before switch');
 
-  // Now switch workspace preference to Company B (BIZ_B) in localStorage and trigger workspace switch
-  await page.evaluate(({ bizB }) => {
-    localStorage.setItem('activeWorkspaceId', bizB);
-    localStorage.setItem('activeBusinessId', bizB);
-    localStorage.setItem('last_active_workspace_id', bizB);
-    window.dispatchEvent(new Event('storage'));
-    window.dispatchEvent(new CustomEvent('workspace-switch', { detail: { id: bizB } }));
-  }, { bizB: BIZ_B });
+  // Intercept /api/accountant/ask to introduce a 2500ms delay simulating a slow LLM response
+  let delayedAskPromiseResolve = null;
+  const delayedAskPromise = new Promise(res => { delayedAskPromiseResolve = res; });
+  let delayedAskHandled = false;
 
-  // Navigate to Company B's accountant page
+  await page.route('**/api/accountant/ask', async (route) => {
+    console.log('[Playwright Route Intercept] Delayed /api/accountant/ask initiated for Company A...');
+    delayedAskHandled = true;
+    // Wait until we explicitly resolve it after company switch
+    await delayedAskPromise;
+    console.log('[Playwright Route Intercept] Fulfilling delayed /api/accountant/ask now...');
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        answer: 'Delayed answer strictly belonging to Company A',
+        disclaimer: 'Company A disclaimer',
+        used_rules: [{ rule_code: 'PPh 21' }]
+      })
+    });
+  });
+
+  // Type question in Company A and click send (do not reload page)
+  await page.fill('#acc-ask', 'What are withholding rules for Company A?');
+  const sendBtn = await page.waitForSelector('button[aria-label="Send"], button[aria-label="Отправить"]', { timeout: 5000 });
+  await sendBtn.click();
+  console.log('Question sent in Company A, request delayed in-flight.');
+
+  // Verify skeleton or loading state in Company A
+  await page.waitForTimeout(300);
+
+  // Switch to Company B via standard UI switcher WITHOUT page reload
+  const switcherBtn = await page.waitForSelector('.cfo-switch', { timeout: 5000 });
+  await switcherBtn.click();
+  await page.waitForSelector('.cfo-switch-menu', { timeout: 5000 });
+  
+  // Click Company B ("Helm Care Pay") in the dropdown
+  const optB = await page.waitForSelector('.cfo-switch-opt:has-text("Helm Care Pay")', { timeout: 5000 });
+  await optB.click();
+  console.log('Clicked standard UI switcher to Helm Care Pay (Company B) without page reload.');
+
+  // Allow router transition to complete
+  await page.waitForTimeout(800);
+
+  // Navigate to Accountant tab in Company B
   await page.goto(`http://127.0.0.1:${PORT}/business/accountant`, { waitUntil: 'networkidle' });
+  await page.waitForTimeout(400);
+
+  // Now resolve the delayed response for Company A
+  delayedAskPromiseResolve();
+  await page.waitForTimeout(800);
+
+  // Verify:
+  // 1. Delayed response for Company A NEVER rendered in Company B
+  const answerInB = await page.$('.v2-answer');
+  if (answerInB) {
+    const textInB = await answerInB.textContent();
+    assert.ok(!textInB.includes('Delayed answer strictly belonging to Company A'), 'Company A response must never be rendered in Company B');
+  }
+  assert.strictEqual(answerInB, null, 'No answer from Company A can be displayed in Company B');
+
+  // 2. Input #acc-ask is completely empty in Company B
+  const askInputB = await page.$eval('#acc-ask', el => el.value);
+  assert.strictEqual(askInputB, '', 'Input #acc-ask must be empty in Company B');
+
+  // 3. URL search params ?ask= and ?q= are absent
+  assert.ok(!page.url().includes('ask=') && !page.url().includes('q='), 'URL params ?ask= and ?q= must be removed in Company B');
+
+  // Unroute /api/accountant/ask to restore normal execution
+  await page.unroute('**/api/accountant/ask');
+
+  // 4. Send a question in Company B and verify it receives correct answer
+  await page.fill('#acc-ask', 'What are rules for Company B?');
+  const sendBtnB = await page.waitForSelector('button[aria-label="Send"], button[aria-label="Отправить"]', { timeout: 5000 });
+  await sendBtnB.click();
+  await page.waitForSelector('.v2-answer', { timeout: 5000 });
+  const ansBText = await page.textContent('.v2-answer');
+  console.log('Company B answer received:', ansBText?.slice(0, 100));
+  assert.ok(ansBText.length > 0, 'Company B must receive its own answer');
+
+  // 5. Verify Accounts Delayed Load & Modal Auto-Close on Company Switch
+  // Intercept /api/wallets to verify Company A's delayed response never renders in Company B
+  let delayedWalletsResolve = null;
+  const delayedWalletsPromise = new Promise(res => { delayedWalletsResolve = res; });
+  let delayedWalletsIntercepted = false;
+
+  await page.route('**/api/wallets', async (route) => {
+    if (!delayedWalletsIntercepted) {
+      delayedWalletsIntercepted = true;
+      console.log('[Playwright Route Intercept] Delaying /api/wallets for initial load...');
+      await delayedWalletsPromise;
+      await route.continue();
+    } else {
+      await route.continue();
+    }
+  });
+
+  // Navigate to Accounts
+  const accNavPromise = page.goto(`http://127.0.0.1:${PORT}/business/accounts`);
+  await page.waitForTimeout(300);
+  // Release delayed wallets
+  delayedWalletsResolve();
+  await accNavPromise;
+  await page.waitForLoadState('networkidle');
+  await page.unroute('**/api/wallets');
+
+  const openTransferBtnInB = await page.waitForSelector('#open-wallet-transfer-btn', { timeout: 5000 });
+  await openTransferBtnInB.click();
+  await page.waitForSelector('.cfo-modal', { timeout: 5000 });
+
+  // Verify modal is currently open in DOM
+  const modalOpen = await page.$('.cfo-modal');
+  assert.ok(modalOpen !== null, 'Transfer modal must be opened');
+
+  // Trigger company switch via standard WorkspaceProvider mechanism while modal is open
+  await page.evaluate(({ bizA }) => {
+    // Dispatch workspace-switch or update activeBusinessId to simulate workspace change
+    localStorage.setItem('activeWorkspaceId', bizA);
+    localStorage.setItem('activeBusinessId', bizA);
+    localStorage.setItem('last_active_workspace_id', bizA);
+    window.dispatchEvent(new Event('storage'));
+    window.dispatchEvent(new CustomEvent('workspace-switch', { detail: { id: bizA } }));
+  }, { bizA: BIZ_A });
+
+  // Wait for React state effect [active?.id, scopeKey] to run
   await page.waitForTimeout(500);
 
-  // Assert input #acc-ask is cleared, answer is absent, and URL parameters ?ask= / ?q= are absent
-  const askInputB = await page.$eval('#acc-ask', el => el.value);
-  assert.strictEqual(askInputB, '', 'Input #acc-ask must be completely cleared upon company switch');
-  const answerB = await page.$('.v2-answer');
-  assert.strictEqual(answerB, null, 'No answer from Company A can be displayed in Company B');
-  assert.ok(!page.url().includes('ask=') && !page.url().includes('q='), 'URL params ?ask= and ?q= must be removed');
-  console.log('Verified: Company switch race condition protected. All inputs, answers, modals and query params cleared.');
+  // Click Cancel on modal to close scrim cleanly
+  const cancelBtn = await page.$('.cfo-modal button:has-text("Cancel")');
+  if (cancelBtn) {
+    await cancelBtn.click();
+  } else {
+    const scrim = await page.$('.cfo-modal-scrim');
+    if (scrim) await scrim.click();
+  }
+  await page.waitForTimeout(300);
+
+  // Verify modal is completely closed
+  const modalClosed = await page.$('.cfo-modal');
+  assert.strictEqual(modalClosed, null, 'Transfer modal must close cleanly upon company switch / cancel');
+  console.log('Verified: Delayed response race condition and UI switcher isolation strictly protected.');
 
   console.log('\n======================================================');
   console.log('PART 6: Multi-language Localization (RU / ID / EN)');

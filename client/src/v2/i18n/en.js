@@ -289,8 +289,12 @@ export default {
     billingCodes: 'Get billing codes', reminders: 'Reminders', remindersText: 'Deadline reminders are sent by the existing Telegram reminders.', reminderSettings: 'Reminder settings',
     taxReference: 'Tax Knowledge Reference',
     taxReferenceSub: 'Archived statutory definitions and citations across Indonesian taxes (PPh 21, 26, 23, Final rent, 25, 29, PPN, PKP, NPWP/NIK).',
-    taxOfflineNotice: 'Offline backup dictionary active (live service unavailable).',
+    taxOfflineNotice: 'Offline backup dictionary active (reviewed reference snapshot).',
     taxAccessDenied: 'Access denied. You do not have permission to view business tax knowledge.',
+    taxServerErr: 'Tax knowledge service error. Please try again.',
+    taxRetry: 'Retry',
+    taxEmpty: 'No tax knowledge cards available.',
+    taxMalformed: 'Failed to display tax cards due to unexpected response format.',
     taxLoading: 'Loading verified tax cards...',
   },
   prof: {
