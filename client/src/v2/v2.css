@@ -884,3 +884,299 @@ button.v2-start-btn:focus-visible { outline: 2px solid var(--action-primary); ou
   .v2-addgrid .v2-start { padding: var(--space-3); gap: 2px; }
   .v2-addgrid .v2-start .v2-small { display: none; }
 }
+
+/* ── AI Accountant Chat Modal ────────────────────────────────────────────── */
+.v2-acct-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: var(--surface-overlay, rgba(15, 23, 42, 0.6));
+  backdrop-filter: blur(2px);
+}
+
+.v2-acct-modal-wrap {
+  position: fixed;
+  inset: 0;
+  z-index: 1001;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-4);
+  pointer-events: none;
+}
+
+.v2-acct-modal-panel {
+  pointer-events: auto;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: min(880px, 92vw);
+  height: min(85vh, 780px);
+  max-height: 85vh;
+  background: var(--surface-card);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-xl, 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04));
+  overflow: hidden;
+}
+
+.v2-acct-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--surface-card);
+  flex: none;
+}
+
+.v2-acct-modal-brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.v2-acct-modal-badge {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-control);
+  background: var(--info-soft);
+  color: var(--info);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+}
+
+.v2-acct-modal-titles {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.v2-acct-modal-name {
+  margin: 0;
+  font-size: var(--text-md);
+  font-weight: 800;
+  color: var(--text-primary);
+  line-height: 1.2;
+}
+
+.v2-acct-modal-company {
+  font-size: var(--text-xs, 12px);
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.v2-acct-close-btn {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border-radius: var(--radius-control);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.v2-acct-modal-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  background: var(--surface-page);
+}
+
+.v2-acct-empty-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-8) var(--space-4);
+  text-align: center;
+}
+
+.v2-acct-thread-turn {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.v2-acct-bubble-user {
+  align-self: flex-end;
+  max-width: min(80%, 600px);
+  background: var(--brand-navy);
+  color: var(--text-inverse);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-lg) var(--radius-lg) 2px var(--radius-lg);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.v2-acct-bubble-text {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  line-height: var(--line-relaxed, 1.5);
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.v2-acct-bubble-ai {
+  align-self: flex-start;
+  width: 100%;
+  max-width: 100%;
+  background: var(--surface-card);
+  border: 1px solid var(--border-subtle);
+  padding: var(--space-4);
+  border-radius: 2px var(--radius-lg) var(--radius-lg) var(--radius-lg);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.v2-acct-ai-loading {
+  background: var(--surface-card);
+  border-style: dashed;
+}
+
+.v2-acct-ai-error {
+  background: var(--danger-soft);
+  border-color: var(--danger);
+}
+
+.v2-acct-ai-content {
+  font-size: var(--text-sm);
+  line-height: 1.6;
+  color: var(--text-primary);
+}
+
+.v2-acct-sources {
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.v2-acct-disclaimer {
+  padding: var(--space-2) var(--space-3);
+  background: var(--surface-page);
+  border-radius: var(--radius-sm);
+  border-left: 3px solid var(--border-default);
+}
+
+.v2-acct-modal-foot {
+  padding: var(--space-3) var(--space-4);
+  border-top: 1px solid var(--border-subtle);
+  background: var(--surface-card);
+  flex: none;
+}
+
+.v2-acct-foot-form {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.v2-acct-foot-input {
+  flex: 1;
+  min-height: var(--touch-min);
+}
+
+.v2-acct-foot-btn {
+  height: var(--touch-min);
+  padding: 0 var(--space-4);
+  flex: none;
+}
+
+/* Safe Markdown Elements inside modal */
+.v2-acct-markdown {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.v2-acct-md-h1,
+.v2-acct-md-h2,
+.v2-acct-md-h3 {
+  margin: var(--space-2) 0 4px;
+  font-weight: 800;
+  color: var(--text-primary);
+  line-height: 1.3;
+}
+
+.v2-acct-md-h1 { font-size: 16px; }
+.v2-acct-md-h2 { font-size: 15px; }
+.v2-acct-md-h3 { font-size: 14px; }
+
+.v2-acct-md-p {
+  margin: 0 0 6px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
+.v2-acct-md-ul,
+.v2-acct-md-ol {
+  margin: 0 0 8px;
+  padding-left: 1.4em;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.v2-acct-md-ul li,
+.v2-acct-md-ol li {
+  line-height: 1.5;
+}
+
+.v2-acct-code {
+  font-family: var(--font-mono, monospace);
+  font-size: 0.9em;
+  background: var(--surface-page);
+  padding: 2px 5px;
+  border-radius: 4px;
+  border: 1px solid var(--border-subtle);
+}
+
+.v2-acct-link {
+  color: var(--text-link);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  word-break: break-all;
+}
+
+.v2-acct-link:hover {
+  color: var(--action-primary-hover);
+}
+
+/* Mobile responsive full-screen dialog */
+@media (max-width: 640px) {
+  .v2-acct-modal-wrap {
+    padding: 0;
+  }
+
+  .v2-acct-modal-panel {
+    width: 100vw;
+    height: 100vh;
+    max-height: 100vh;
+    border-radius: 0;
+    border: 0;
+  }
+
+  .v2-acct-modal-head {
+    padding: var(--space-3);
+  }
+
+  .v2-acct-bubble-user {
+    max-width: 90%;
+  }
+
+  .v2-acct-modal-body {
+    padding: var(--space-3);
+  }
+
+  .v2-acct-modal-foot {
+    padding: var(--space-2) var(--space-3);
+  }
+}
