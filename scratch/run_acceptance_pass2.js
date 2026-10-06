@@ -6,7 +6,8 @@ const jwt = require('jsonwebtoken');
 const assert = require('node:assert');
 
 const ROOT = path.join(__dirname, '..');
-const ARTIFACTS_DIR = 'C:\\Users\\HUAWEI\\.gemini\\antigravity\\brain\\b4b5605a-29c0-4e6a-9e39-7008b78589f3';
+const SCREENSHOTS_DIR = path.join(__dirname, 'screenshots');
+if (!fs.existsSync(SCREENSHOTS_DIR)) fs.mkdirSync(SCREENSHOTS_DIR, { recursive: true });
 const PORT = 5189;
 
 process.env.PORT = String(PORT);
@@ -197,6 +198,87 @@ mem.__seed('debts', [
     status: 'open',
     created_at: '2026-10-01T00:00:00Z',
   },
+  {
+    id: 88,
+    business_id: BIZ_B,
+    type: 'payable',
+    counterparty: 'QA Pay Partner Beta',
+    description: 'QA Pay Partner Beta processing services',
+    amount: 5000000,
+    original_amount: 5000000,
+    paid_amount: 2000000,
+    remaining_amount: 3000000,
+    currency: 'IDR',
+    due_date: null,
+    status: 'open',
+    created_at: '2026-10-01T00:00:00Z',
+  },
+]);
+
+// Seed official sources, tax rules and tax profiles for deterministic compliance calendar
+mem.__seed('official_sources', [
+  {
+    id: 1,
+    jurisdiction: 'ID',
+    title: 'UU HPP No. 7/2021 (Harmonisasi Peraturan Perpajakan)',
+    url: 'https://pajak.go.id/uu-hpp',
+    status: 'active',
+    last_verified_at: '2026-01-01T00:00:00Z',
+  },
+  {
+    id: 2,
+    jurisdiction: 'ID',
+    title: 'PMK 168/2023 (Petunjuk Pemotongan Pajak PPh 21)',
+    url: 'https://jdih.kemenkeu.go.id/pmk168',
+    status: 'active',
+    last_verified_at: '2026-01-01T00:00:00Z',
+  },
+]);
+
+mem.__seed('tax_rules', [
+  {
+    id: 1,
+    jurisdiction: 'ID',
+    rule_code: 'PPh 21',
+    title: 'PPh 21 Monthly Employee Withholding',
+    version: '2026.1',
+    obligation_type: 'withholding',
+    filing_frequency: 'monthly',
+    status: 'active',
+    last_verified_at: '2026-01-01T00:00:00Z',
+    official_source_id: 2,
+    due_date_rule_json: { day_of_month: 20, next_month: true },
+  },
+  {
+    id: 2,
+    jurisdiction: 'ID',
+    rule_code: 'PPN',
+    title: 'PPN (VAT) Monthly Return SPT Masa',
+    version: '2026.1',
+    obligation_type: 'filing',
+    filing_frequency: 'monthly',
+    status: 'active',
+    last_verified_at: '2026-01-01T00:00:00Z',
+    official_source_id: 1,
+    due_date_rule_json: { day_of_month: 30, next_month: true },
+  },
+]);
+
+mem.__seed('tax_profiles', [
+  {
+    business_id: BIZ_A,
+    jurisdiction: 'ID',
+    has_employees: true,
+    vat_registered: true,
+    reporting_currency: 'IDR',
+  },
+  {
+    business_id: BIZ_B,
+    jurisdiction: 'ID',
+    has_employees: true,
+    vat_registered: false,
+    reporting_currency: 'IDR',
+  },
 ]);
 
 // Load real server
@@ -209,7 +291,12 @@ const testToken = jwt.sign(
 );
 
 async function runAcceptancePass() {
-  const { chromium } = require(path.join(ARTIFACTS_DIR, 'scratch', 'node_modules', 'playwright-core'));
+  let chromium;
+  try {
+    chromium = require(path.join(__dirname, 'node_modules', 'playwright-core')).chromium;
+  } catch {
+    chromium = require('playwright-core').chromium;
+  }
 
   console.log('Starting Playwright automated browser verification...');
   const browser = await chromium.launch({ channel: 'chrome', headless: true });
@@ -234,7 +321,7 @@ async function runAcceptancePass() {
   await page.goto(`http://127.0.0.1:${PORT}/business/pulse`, { waitUntil: 'networkidle' });
   await page.waitForTimeout(1000);
 
-  const shotPulseDesktop = path.join(ARTIFACTS_DIR, 'proof_01_pulse_daily_spend_desktop.png');
+  const shotPulseDesktop = path.join(SCREENSHOTS_DIR, 'proof_01_pulse_daily_spend_desktop.png');
   await page.screenshot({ path: shotPulseDesktop, fullPage: true });
   console.log('Screenshot saved ->', shotPulseDesktop);
 
@@ -250,7 +337,7 @@ async function runAcceptancePass() {
   const dailySpendTooltipBtn = await page.waitForSelector('.v2-tile:has-text("Daily spend") .info-tooltip-btn, .v2-tile:has-text("Расходы в день") .info-tooltip-btn, .pulse-kpi:has-text("Daily spend") .info-tooltip-btn, .pulse-kpi:has-text("Расходы в день") .info-tooltip-btn', { timeout: 5000 });
   await dailySpendTooltipBtn.hover();
   await page.waitForSelector('.info-tooltip-popover', { timeout: 5000 });
-  const shotTooltipHover = path.join(ARTIFACTS_DIR, 'proof_02_daily_spend_tooltip_desktop.png');
+  const shotTooltipHover = path.join(SCREENSHOTS_DIR, 'proof_02_daily_spend_tooltip_desktop.png');
   await page.screenshot({ path: shotTooltipHover });
   console.log('Tooltip hover screenshot saved ->', shotTooltipHover);
 
@@ -266,7 +353,7 @@ async function runAcceptancePass() {
   await page.goto(`http://127.0.0.1:${PORT}/business/accounts`, { waitUntil: 'networkidle' });
   await page.waitForTimeout(1000);
 
-  const shotAccountsBefore = path.join(ARTIFACTS_DIR, 'proof_03_accounts_before_transfer.png');
+  const shotAccountsBefore = path.join(SCREENSHOTS_DIR, 'proof_03_accounts_before_transfer.png');
   await page.screenshot({ path: shotAccountsBefore, fullPage: true });
   console.log('Accounts before transfer ->', shotAccountsBefore);
 
@@ -276,7 +363,7 @@ async function runAcceptancePass() {
   await page.waitForSelector('.cfo-modal', { timeout: 5000 });
   await page.waitForTimeout(500);
 
-  const shotTransferModal = path.join(ARTIFACTS_DIR, 'proof_04_transfer_modal_opened.png');
+  const shotTransferModal = path.join(SCREENSHOTS_DIR, 'proof_04_transfer_modal_opened.png');
   await page.screenshot({ path: shotTransferModal });
   console.log('Transfer modal screenshot ->', shotTransferModal);
 
@@ -290,7 +377,7 @@ async function runAcceptancePass() {
   await page.fill('#transfer-desc-input', 'Transfer to payroll buffer');
   await page.waitForTimeout(300);
 
-  const shotTransferFilled = path.join(ARTIFACTS_DIR, 'proof_05_transfer_modal_filled.png');
+  const shotTransferFilled = path.join(SCREENSHOTS_DIR, 'proof_05_transfer_modal_filled.png');
   await page.screenshot({ path: shotTransferFilled });
   console.log('Transfer filled screenshot ->', shotTransferFilled);
 
@@ -299,7 +386,7 @@ async function runAcceptancePass() {
   await submitTransferBtn.click();
   await page.waitForTimeout(2000);
 
-  const shotAccountsAfter = path.join(ARTIFACTS_DIR, 'proof_06_accounts_after_transfer.png');
+  const shotAccountsAfter = path.join(SCREENSHOTS_DIR, 'proof_06_accounts_after_transfer.png');
   await page.screenshot({ path: shotAccountsAfter, fullPage: true });
   console.log('Accounts after transfer ->', shotAccountsAfter);
 
@@ -346,7 +433,7 @@ async function runAcceptancePass() {
   const hasHorizontalScroll390 = await page390.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
   assert.strictEqual(hasHorizontalScroll390, false, 'Page must have no horizontal overflow at 390px');
 
-  const shotMobile390 = path.join(ARTIFACTS_DIR, 'proof_07_pulse_mobile_390px.png');
+  const shotMobile390 = path.join(SCREENSHOTS_DIR, 'proof_07_pulse_mobile_390px.png');
   await page390.screenshot({ path: shotMobile390, fullPage: true });
   console.log('Mobile 390px screenshot ->', shotMobile390);
 
@@ -354,7 +441,7 @@ async function runAcceptancePass() {
   const mobile390Tooltip = await page390.waitForSelector('.v2-tile:has-text("Daily spend") .info-tooltip-btn, .v2-tile:has-text("Расходы в день") .info-tooltip-btn, .pulse-kpi:has-text("Daily spend") .info-tooltip-btn, .pulse-kpi:has-text("Расходы в день") .info-tooltip-btn', { timeout: 5000 });
   await mobile390Tooltip.click();
   await page390.waitForSelector('.info-tooltip-popover', { timeout: 5000 });
-  const shotMobile390Tooltip = path.join(ARTIFACTS_DIR, 'proof_08_tooltip_sheet_390px.png');
+  const shotMobile390Tooltip = path.join(SCREENSHOTS_DIR, 'proof_08_tooltip_sheet_390px.png');
   await page390.screenshot({ path: shotMobile390Tooltip });
   console.log('Mobile 390px tooltip sheet ->', shotMobile390Tooltip);
 
@@ -376,25 +463,52 @@ async function runAcceptancePass() {
   const hasHorizontalScroll320 = await page320.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
   assert.strictEqual(hasHorizontalScroll320, false, 'Page must have no horizontal overflow at 320px');
 
-  const shotMobile320 = path.join(ARTIFACTS_DIR, 'proof_09_pulse_mobile_320px.png');
+  const shotMobile320 = path.join(SCREENSHOTS_DIR, 'proof_09_pulse_mobile_320px.png');
   await page320.screenshot({ path: shotMobile320, fullPage: true });
   console.log('Mobile 320px screenshot ->', shotMobile320);
 
   console.log('\n======================================================');
   console.log('PART 4: Tax Knowledge Cards, Details Drawer & Ask Prefill');
   console.log('======================================================');
+  // Collect console errors and page errors to ensure clean render
+  const calendarErrors = [];
+  page.on('pageerror', err => calendarErrors.push(`[PAGEERROR] ${err.message}`));
+  page.on('console', msg => {
+    if (msg.type() === 'error') calendarErrors.push(`[CONSOLE_ERR] ${msg.text()}`);
+  });
+
   await page.goto(`http://127.0.0.1:${PORT}/accountant/calendar`, { waitUntil: 'networkidle' });
   await page.waitForTimeout(1000);
 
-  const shotCalendarTaxCards = path.join(ARTIFACTS_DIR, 'proof_10_calendar_tax_cards.png');
+  // Assert calendar header, compliance events, and tax knowledge cards are rendered and visible
+  const calHeader = await page.waitForSelector('h1:has-text("Compliance calendar"), h1:has-text("Календарь compliance"), h1:has-text("Kalender kepatuhan")', { timeout: 10000 });
+  assert.ok(calHeader, 'Compliance Calendar header must be visible');
+  
+  // Verify tax cards grid or compliance events are present before taking proof_10
+  const hasEventsOrCards = await page.evaluate(() => {
+    const events = document.querySelectorAll('div[style*="background: var(--surface)"], div[style*="background:var(--surface)"]');
+    const cards = document.querySelectorAll('.tax-card, .tax-cards-grid');
+    const headings = document.querySelectorAll('h1, h3');
+    return { eventsCount: events.length, cardsCount: cards.length, headingsCount: headings.length };
+  });
+  console.log('Compliance calendar DOM element counts:', hasEventsOrCards);
+  assert.ok(hasEventsOrCards.headingsCount >= 2, 'Calendar must display both main title and Tax Knowledge Reference title');
+  assert.ok(hasEventsOrCards.cardsCount >= 1, 'Tax Knowledge Cards grid must be populated');
+
+  const shotCalendarTaxCards = path.join(SCREENSHOTS_DIR, 'proof_10_calendar_tax_cards.png');
   await page.screenshot({ path: shotCalendarTaxCards, fullPage: true });
   console.log('Calendar Tax Cards screenshot ->', shotCalendarTaxCards);
+
+  // Assert screenshot file size is non-empty (> 20KB)
+  const shot10Stat = fs.statSync(shotCalendarTaxCards);
+  console.log('proof_10_calendar_tax_cards.png file size:', shot10Stat.size, 'bytes');
+  assert.ok(shot10Stat.size > 20000, 'Screenshot proof_10 must not be a blank image');
 
   // Visit /business/accountant and check drawer details and Ask button
   await page.goto(`http://127.0.0.1:${PORT}/business/accountant`, { waitUntil: 'networkidle' });
   await page.waitForTimeout(1000);
 
-  const shotAccountantCards = path.join(ARTIFACTS_DIR, 'proof_11_accountant_tax_cards.png');
+  const shotAccountantCards = path.join(SCREENSHOTS_DIR, 'proof_11_accountant_tax_cards.png');
   await page.screenshot({ path: shotAccountantCards, fullPage: true });
   console.log('Accountant Tax Cards screenshot ->', shotAccountantCards);
 
@@ -403,7 +517,7 @@ async function runAcceptancePass() {
   await detailsBtn.click();
   await page.waitForSelector('.tax-drawer', { timeout: 5000 });
   await page.waitForTimeout(500);
-  const shotDrawer = path.join(ARTIFACTS_DIR, 'proof_12_tax_card_details_drawer.png');
+  const shotDrawer = path.join(SCREENSHOTS_DIR, 'proof_12_tax_card_details_drawer.png');
   await page.screenshot({ path: shotDrawer });
   console.log('Tax Details Drawer screenshot ->', shotDrawer);
 
@@ -425,47 +539,48 @@ async function runAcceptancePass() {
   const answerBeforeSubmit = await page.$('.v2-answer');
   assert.strictEqual(answerBeforeSubmit, null, 'No automatic submission: assistant must not produce answer before user sends');
 
-  const shotPrefill = path.join(ARTIFACTS_DIR, 'proof_13_ask_box_prefilled.png');
+  const shotPrefill = path.join(SCREENSHOTS_DIR, 'proof_13_ask_box_prefilled.png');
   await page.screenshot({ path: shotPrefill });
   console.log('Ask box prefilled screenshot ->', shotPrefill);
 
   console.log('\n======================================================');
   console.log('PART 5: Company Switch Real Browser Race Condition & Delayed Responses');
   console.log('======================================================');
-  // Navigate back to Company A
+  // 5a. Intercept /api/accountant/ask to introduce a delayed response for Company A
+  let delayedAskPromiseResolve = null;
+  const delayedAskPromise = new Promise(res => { delayedAskPromiseResolve = res; });
+  let delayedAskIntercepted = false;
+
+  await page.route('**/api/accountant/ask', async (route) => {
+    if (!delayedAskIntercepted) {
+      delayedAskIntercepted = true;
+      console.log('[Playwright Route Intercept] Delayed /api/accountant/ask initiated for Company A...');
+      await delayedAskPromise;
+      console.log('[Playwright Route Intercept] Fulfilling delayed /api/accountant/ask for Company A now...');
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          answer: 'Delayed answer strictly belonging to Company A (Logistics Express PT)',
+          disclaimer: 'Company A disclaimer',
+          used_rules: [{ rule_code: 'PPh 21' }]
+        })
+      });
+    } else {
+      await route.continue();
+    }
+  });
+
+  // Navigate to Company A Accountant with search query in URL
   await page.goto(`http://127.0.0.1:${PORT}/business/accountant?ask=TemporaryQuestionA`, { waitUntil: 'networkidle' });
   await page.waitForTimeout(500);
   assert.ok(page.url().includes('ask='), 'URL has ask parameter before switch');
-
-  // Intercept /api/accountant/ask to introduce a 2500ms delay simulating a slow LLM response
-  let delayedAskPromiseResolve = null;
-  const delayedAskPromise = new Promise(res => { delayedAskPromiseResolve = res; });
-  let delayedAskHandled = false;
-
-  await page.route('**/api/accountant/ask', async (route) => {
-    console.log('[Playwright Route Intercept] Delayed /api/accountant/ask initiated for Company A...');
-    delayedAskHandled = true;
-    // Wait until we explicitly resolve it after company switch
-    await delayedAskPromise;
-    console.log('[Playwright Route Intercept] Fulfilling delayed /api/accountant/ask now...');
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        answer: 'Delayed answer strictly belonging to Company A',
-        disclaimer: 'Company A disclaimer',
-        used_rules: [{ rule_code: 'PPh 21' }]
-      })
-    });
-  });
 
   // Type question in Company A and click send (do not reload page)
   await page.fill('#acc-ask', 'What are withholding rules for Company A?');
   const sendBtn = await page.waitForSelector('button[aria-label="Send"], button[aria-label="Отправить"]', { timeout: 5000 });
   await sendBtn.click();
   console.log('Question sent in Company A, request delayed in-flight.');
-
-  // Verify skeleton or loading state in Company A
   await page.waitForTimeout(300);
 
   // Switch to Company B via standard UI switcher WITHOUT page reload
@@ -478,14 +593,23 @@ async function runAcceptancePass() {
   await optB.click();
   console.log('Clicked standard UI switcher to Helm Care Pay (Company B) without page reload.');
 
-  // Allow router transition to complete
+  // Allow workspace state and React effects to transition cleanly without page.goto
   await page.waitForTimeout(800);
 
-  // Navigate to Accountant tab in Company B
-  await page.goto(`http://127.0.0.1:${PORT}/business/accountant`, { waitUntil: 'networkidle' });
-  await page.waitForTimeout(400);
+  // Confirm Company B is active in UI
+  const activeWsText = await page.textContent('.cfo-switch');
+  console.log('Active workspace switcher text:', activeWsText);
+  assert.ok(activeWsText.includes('Helm Care Pay'), 'Company B (Helm Care Pay) must be the active workspace');
+
+  // Ensure route is at /business/accountant if switcher navigated to /business
+  if (!page.url().includes('/business/accountant')) {
+    const accTabLink = await page.waitForSelector('a[href="/business/accountant"], a[href="/accountant/calendar"]', { timeout: 5000 });
+    await accTabLink.click();
+    await page.waitForTimeout(500);
+  }
 
   // Now resolve the delayed response for Company A
+  assert.strictEqual(delayedAskIntercepted, true, 'Delayed ask route must have been intercepted in Company A');
   delayedAskPromiseResolve();
   await page.waitForTimeout(800);
 
@@ -505,20 +629,21 @@ async function runAcceptancePass() {
   // 3. URL search params ?ask= and ?q= are absent
   assert.ok(!page.url().includes('ask=') && !page.url().includes('q='), 'URL params ?ask= and ?q= must be removed in Company B');
 
-  // Unroute /api/accountant/ask to restore normal execution
+  // Unroute delayed /api/accountant/ask to restore normal execution
   await page.unroute('**/api/accountant/ask');
 
-  // 4. Send a question in Company B and verify it receives correct answer
-  await page.fill('#acc-ask', 'What are rules for Company B?');
+  // 4. Send question in Company B specifically referencing Company B's counterparty
+  await page.fill('#acc-ask', 'What did we pay QA Pay Partner Beta?');
   const sendBtnB = await page.waitForSelector('button[aria-label="Send"], button[aria-label="Отправить"]', { timeout: 5000 });
   await sendBtnB.click();
-  await page.waitForSelector('.v2-answer', { timeout: 5000 });
+  await page.waitForSelector('.v2-answer', { timeout: 8000 });
   const ansBText = await page.textContent('.v2-answer');
-  console.log('Company B answer received:', ansBText?.slice(0, 100));
-  assert.ok(ansBText.length > 0, 'Company B must receive its own answer');
+  console.log('Company B answer received:', ansBText);
+  assert.ok(ansBText.includes('QA Pay Partner Beta'), 'Company B answer must specifically cite Company B counterparty "QA Pay Partner Beta"');
+  assert.ok(ansBText.includes('2,000,000') || ansBText.includes('2M') || ansBText.includes('3,000,000'), 'Company B answer must cite Company B debt amounts');
 
-  // 5. Verify Accounts Delayed Load & Modal Auto-Close on Company Switch
-  // Intercept /api/wallets to verify Company A's delayed response never renders in Company B
+  // 5b. Verify Accounts Delayed Load Isolation
+  console.log('\n--- Checking Accounts Delayed Load Isolation (A -> B) ---');
   let delayedWalletsResolve = null;
   const delayedWalletsPromise = new Promise(res => { delayedWalletsResolve = res; });
   let delayedWalletsIntercepted = false;
@@ -526,58 +651,132 @@ async function runAcceptancePass() {
   await page.route('**/api/wallets', async (route) => {
     if (!delayedWalletsIntercepted) {
       delayedWalletsIntercepted = true;
-      console.log('[Playwright Route Intercept] Delaying /api/wallets for initial load...');
+      console.log('[Playwright Route Intercept] Delaying /api/wallets for Company A...');
       await delayedWalletsPromise;
-      await route.continue();
+      console.log('[Playwright Route Intercept] Releasing delayed /api/wallets for Company A...');
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          wallets: [
+            { id: 'w-stale-a', name: 'STALE Company A Secret Vault', currency: 'IDR', balance: 999999999, scope: 'business' }
+          ]
+        })
+      });
     } else {
       await route.continue();
     }
   });
 
-  // Navigate to Accounts
-  const accNavPromise = page.goto(`http://127.0.0.1:${PORT}/business/accounts`);
+  // Switch to Company A and start loading Accounts
+  await page.evaluate(({ bizA }) => {
+    window.__cfoSwitchTo(bizA);
+  }, { bizA: BIZ_A });
   await page.waitForTimeout(300);
-  // Release delayed wallets
+
+  // Switch immediately to Company B before releasing Company A's wallets
+  await page.evaluate(({ bizB }) => {
+    window.__cfoSwitchTo(bizB);
+  }, { bizB: BIZ_B });
+  await page.waitForTimeout(500);
+
+  // Release stale wallets from Company A
   delayedWalletsResolve();
-  await accNavPromise;
-  await page.waitForLoadState('networkidle');
+  await page.waitForTimeout(800);
   await page.unroute('**/api/wallets');
 
+  // Navigate to Accounts in Company B
+  await page.goto(`http://127.0.0.1:${PORT}/business/accounts`, { waitUntil: 'networkidle' });
+  await page.waitForTimeout(500);
+
+  // Verify stale Company A wallets NEVER rendered in Company B
+  const accountsTextB = await page.textContent('body');
+  assert.ok(!accountsTextB.includes('STALE Company A Secret Vault'), 'Company A stale wallets must NEVER render in Company B');
+  assert.ok(accountsTextB.includes('Helm Pay BCA') || accountsTextB.includes('w-pay-idr'), 'Company B must render its own wallet Helm Pay BCA');
+  console.log('Verified: Accounts delayed load race condition cleanly discarded.');
+
+  // 5c. Verify Modal Auto-Close on Company Switch without clicking Cancel
+  console.log('\n--- Checking Modal Auto-Close on Company Switch ---');
   const openTransferBtnInB = await page.waitForSelector('#open-wallet-transfer-btn', { timeout: 5000 });
   await openTransferBtnInB.click();
   await page.waitForSelector('.cfo-modal', { timeout: 5000 });
-
-  // Verify modal is currently open in DOM
-  const modalOpen = await page.$('.cfo-modal');
-  assert.ok(modalOpen !== null, 'Transfer modal must be opened');
+  
+  const modalOpenBeforeSwitch = await page.$('.cfo-modal');
+  assert.ok(modalOpenBeforeSwitch !== null, 'Transfer modal must be opened');
 
   // Trigger company switch via standard WorkspaceProvider mechanism while modal is open
   await page.evaluate(({ bizA }) => {
-    // Dispatch workspace-switch or update activeBusinessId to simulate workspace change
-    localStorage.setItem('activeWorkspaceId', bizA);
-    localStorage.setItem('activeBusinessId', bizA);
-    localStorage.setItem('last_active_workspace_id', bizA);
-    window.dispatchEvent(new Event('storage'));
-    window.dispatchEvent(new CustomEvent('workspace-switch', { detail: { id: bizA } }));
+    window.__cfoSwitchTo(bizA);
   }, { bizA: BIZ_A });
 
-  // Wait for React state effect [active?.id, scopeKey] to run
-  await page.waitForTimeout(500);
+  // Wait for React effect [active?.id, scopeKey] to automatically close the modal
+  await page.waitForTimeout(600);
 
-  // Click Cancel on modal to close scrim cleanly
-  const cancelBtn = await page.$('.cfo-modal button:has-text("Cancel")');
-  if (cancelBtn) {
-    await cancelBtn.click();
-  } else {
-    const scrim = await page.$('.cfo-modal-scrim');
-    if (scrim) await scrim.click();
-  }
-  await page.waitForTimeout(300);
+  // Assert modal is completely closed WITHOUT clicking Cancel button
+  const modalAfterSwitch = await page.$('.cfo-modal');
+  assert.strictEqual(modalAfterSwitch, null, 'Transfer modal must close automatically upon company switch without manual Cancel click');
+  console.log('Verified: Transfer modal auto-closes on company switch without Cancel click.');
 
-  // Verify modal is completely closed
-  const modalClosed = await page.$('.cfo-modal');
-  assert.strictEqual(modalClosed, null, 'Transfer modal must close cleanly upon company switch / cancel');
-  console.log('Verified: Delayed response race condition and UI switcher isolation strictly protected.');
+  // 5d. Verify Tax Knowledge Cards Error Edge Cases (Accountant & Calendar)
+  console.log('\n--- Checking Tax Cards Error States: 403, 500, Offline, Empty, Malformed ---');
+  
+  // Scenario 1: 403 Forbidden
+  await page.route('**/api/accountant/tax-knowledge/cards*', async (route) => {
+    await route.fulfill({ status: 403, contentType: 'application/json', body: JSON.stringify({ error: 'Forbidden' }) });
+  });
+  await page.goto(`http://127.0.0.1:${PORT}/business/accountant`, { waitUntil: 'networkidle' });
+  await page.waitForTimeout(600);
+  const forbiddenNotice = await page.textContent('body');
+  assert.ok(forbiddenNotice.includes('Access denied') || forbiddenNotice.includes('Доступ запрещён') || forbiddenNotice.includes('Akses ditolak'), 'Must display Access Denied banner on 403');
+  assert.ok(!forbiddenNotice.includes('Offline backup dictionary'), '403 must never masquerade as offline backup mode');
+
+  // Scenario 2: 500 Server Error with Retry
+  await page.unroute('**/api/accountant/tax-knowledge/cards*');
+  await page.route('**/api/accountant/tax-knowledge/cards*', async (route) => {
+    await route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: 'Internal Server Error' }) });
+  });
+  await page.goto(`http://127.0.0.1:${PORT}/business/accountant`, { waitUntil: 'networkidle' });
+  await page.waitForTimeout(600);
+  const serverErrNotice = await page.textContent('body');
+  assert.ok(serverErrNotice.includes('service error') || serverErrNotice.includes('Ошибка сервиса') || serverErrNotice.includes('kesalahan pada layanan'), 'Must display server error banner on 500');
+  const retryBtn = await page.$('button:has-text("Retry"), button:has-text("Повторить"), button:has-text("Coba lagi")');
+  assert.ok(retryBtn !== null, 'Retry button must be visible on 500 error');
+
+  // Scenario 3: Malformed Response
+  await page.unroute('**/api/accountant/tax-knowledge/cards*');
+  await page.route('**/api/accountant/tax-knowledge/cards*', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ corrupt: true }) });
+  });
+  await page.goto(`http://127.0.0.1:${PORT}/business/accountant`, { waitUntil: 'networkidle' });
+  await page.waitForTimeout(600);
+  const malformedNotice = await page.textContent('body');
+  assert.ok(malformedNotice.includes('unexpected response format') || malformedNotice.includes('некорректный формат') || malformedNotice.includes('format data tidak sesuai'), 'Must display malformed format notice');
+
+  // Scenario 4: Empty Successful Cards
+  await page.unroute('**/api/accountant/tax-knowledge/cards*');
+  await page.route('**/api/accountant/tax-knowledge/cards*', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ cards: [] }) });
+  });
+  await page.goto(`http://127.0.0.1:${PORT}/business/accountant`, { waitUntil: 'networkidle' });
+  await page.waitForTimeout(600);
+  const emptyNotice = await page.textContent('body');
+  assert.ok(emptyNotice.includes('No tax knowledge cards available') || emptyNotice.includes('Налоговые карточки отсутствуют') || emptyNotice.includes('Tidak ada kartu'), 'Must display empty state notice');
+
+  // Scenario 5: Offline Network Failure with Local Snapshot
+  await page.unroute('**/api/accountant/tax-knowledge/cards*');
+  await page.route('**/api/accountant/tax-knowledge/cards*', async (route) => {
+    await route.abort('failed');
+  });
+  await page.goto(`http://127.0.0.1:${PORT}/business/accountant`, { waitUntil: 'networkidle' });
+  await page.waitForTimeout(600);
+  const offlineNotice = await page.textContent('body');
+  assert.ok(offlineNotice.includes('Offline backup dictionary active') || offlineNotice.includes('Используется резервный офлайн-справочник') || offlineNotice.includes('Kamus cadangan offline aktif'), 'Must show offline dictionary banner on network failure');
+  const offlineCards = await page.$$('.tax-card');
+  assert.ok(offlineCards.length > 0, 'Local snapshot dictionary cards must render in offline mode');
+
+  // Restore normal routing
+  await page.unroute('**/api/accountant/tax-knowledge/cards*');
+  console.log('Verified: All 5 error and fallback scenarios for Tax Cards validated.');
 
   console.log('\n======================================================');
   console.log('PART 6: Multi-language Localization (RU / ID / EN)');

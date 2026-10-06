@@ -13,7 +13,7 @@ const L = {
     period: 'Period', due: 'Due', source: 'Official source', version: 'Rule version', verified: 'Last verified',
     amount: 'Amount', unknown: 'unknown', empty: 'No obligations yet. Complete and verify your tax profile and activate verified rules.',
     sourceReq: 'rules need source verification', open: 'Open source',
-    taxRef: '{l.taxRef}',
+    taxRef: 'Tax Knowledge Reference',
     taxRefSub: 'Archived statutory definitions and citations across Indonesian taxes (PPh 21, 26, 23, Final rent, 25, 29, PPN, PKP, NPWP/NIK).',
     taxDenied: 'Access denied: workspace not authorized for tax knowledge reference.',
     taxOffline: 'Offline backup dictionary active (reviewed reference snapshot).',
@@ -59,8 +59,10 @@ const fmt = (d) => d ? new Date(d).toLocaleDateString('en-US', { month: 'short',
 
 export default function ComplianceCalendar() {
   const { token } = useAuth()
-  const { active: wsActive, scopeKey } = useWorkspace()
-  const wsId = wsActive?.id ?? null
+  const ws = useWorkspace()
+  const wsActive = ws?.active || null
+  const scopeKey = ws?.scopeKey || 0
+  const wsId = wsActive?.id || (typeof localStorage !== 'undefined' ? (localStorage.getItem('activeWorkspaceId') || localStorage.getItem('activeBusinessId')) : null)
   const lang = ['ru', 'id'].includes(getLang()) ? getLang() : 'en'
   const l = L[lang]
   const [data, setData] = useState(null)
@@ -69,11 +71,18 @@ export default function ComplianceCalendar() {
   const [retryNonce, setRetryNonce] = useState(0)
 
   const load = useCallback(() => {
-    if (!token || !wsId) { setData(null); return }
+    let active = true
+    if (!token || !wsId) { setData(null); return () => { active = false } }
     setData(null)
-    apiFetch('/accountant/calendar', token).then(setData).catch(e => setData({ error: e.message }))
+    apiFetch('/accountant/calendar', token)
+      .then(d => { if (active) setData(d) })
+      .catch(e => { if (active) setData({ error: e.message }) })
+    return () => { active = false }
   }, [token, wsId])
-  useEffect(() => { load() }, [load, scopeKey])
+
+  useEffect(() => {
+    return load()
+  }, [load, scopeKey])
 
   const loadCards = useCallback(() => {
     let active = true
@@ -98,11 +107,14 @@ export default function ComplianceCalendar() {
       .catch(err => {
         if (!active) return
         const status = err?.status || (err?.data && err.data.status)
-        if (status === 401 || status === 403 || /401|403|unauthorized|forbidden/i.test(err?.message || '')) {
+        const isForbidden = status === 401 || status === 403 || /401|403|unauthorized|forbidden/i.test(err?.message || '')
+        const isNetworkOffline = !status && (
+          (typeof window !== 'undefined' && !window.navigator.onLine) ||
+          /Failed to fetch|NetworkError|network|offline/i.test(err?.message || '')
+        )
+        if (isForbidden) {
           setTaxCardsState({ loading: false, error: 'forbidden', cards: [] })
-        } else if (status >= 500) {
-          setTaxCardsState({ loading: false, error: 'server', cards: [] })
-        } else if (!window.navigator.onLine || /Failed to fetch|NetworkError|network/i.test(err?.message || '')) {
+        } else if (isNetworkOffline) {
           setTaxCardsState({ loading: false, error: 'offline', cards: listTaxCards(lang) })
         } else {
           setTaxCardsState({ loading: false, error: 'server', cards: [] })
@@ -116,6 +128,21 @@ export default function ComplianceCalendar() {
   }, [loadCards, retryNonce, scopeKey])
 
   if (!data) return <div style={{ padding: 40, color: 'var(--text-3)' }}>Loading…</div>
+  if (data.error) {
+    return (
+      <div style={{ maxWidth: 860, margin: '0 auto', padding: 20 }}>
+        <h1 style={{ fontSize: 22, fontWeight: 800, margin: '0 0 16px', display: 'flex', alignItems: 'center', gap: 8 }}>
+          📅 {l.title}
+        </h1>
+        <div style={{ padding: '12px 16px', borderRadius: 8, background: '#FEE2E2', border: '1px solid #FCA5A5', color: '#DC2626', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span>{data.error}</span>
+          <button type="button" onClick={load} style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid #DC2626', background: '#fff', color: '#DC2626', cursor: 'pointer', fontWeight: 600, fontSize: 12 }}>
+            {l.taxRetry}
+          </button>
+        </div>
+      </div>
+    )
+  }
   const events = data.events || []
   const filtered = events.filter(e =>
     view === 'all' ? true
@@ -195,7 +222,7 @@ export default function ComplianceCalendar() {
 
       <div style={{ marginTop: 28, borderTop: '1px solid var(--border-default, #d0d7de)', paddingTop: 20 }}>
         <h3 style={{ fontSize: 17, fontWeight: 800, margin: '0 0 4px', display: 'flex', alignItems: 'center', gap: 6 }}>
-          Tax Knowledge Reference
+          {l.taxRef}
           <InfoTooltip term="tax_data_status" lang={lang} />
         </h3>
         <p style={{ fontSize: 12.5, color: 'var(--text-secondary)', margin: '0 0 14px' }}>

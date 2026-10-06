@@ -65,6 +65,42 @@ export function WorkspaceProvider({ children }) {
     try { await apiFetch('/workspace-preferences', token, { method: 'PATCH', body: { last_active_workspace_id: w.id } }) } catch {}
   }, [active, applyActive, token])
 
+  // Support custom 'workspace-switch' and storage events across tabs / test automation
+  useEffect(() => {
+    const handleSwitchEvent = (e) => {
+      const targetId = e?.detail?.id || e?.detail?.workspaceId
+      if (!targetId) return
+      const all = [...(workspaces.personal || []), ...(workspaces.business || [])]
+      const target = all.find(w => String(w.id) === String(targetId))
+      if (target) switchTo(target)
+    }
+    const handleStorageEvent = (e) => {
+      if (e.key === LS_ACTIVE || e.key === LS_LAST) {
+        const storedId = e.newValue
+        if (storedId) {
+          const all = [...(workspaces.personal || []), ...(workspaces.business || [])]
+          const target = all.find(w => String(w.id) === String(storedId))
+          if (target && (!active || String(target.id) !== String(active.id))) {
+            switchTo(target)
+          }
+        }
+      }
+    }
+    window.addEventListener('workspace-switch', handleSwitchEvent)
+    window.addEventListener('storage', handleStorageEvent)
+    if (typeof window !== 'undefined') {
+      window.__cfoSwitchTo = (id) => {
+        const all = [...(workspaces.personal || []), ...(workspaces.business || [])]
+        const target = all.find(w => String(w.id) === String(id))
+        if (target) switchTo(target)
+      }
+    }
+    return () => {
+      window.removeEventListener('workspace-switch', handleSwitchEvent)
+      window.removeEventListener('storage', handleStorageEvent)
+    }
+  }, [workspaces, active, switchTo])
+
   return (
     <Ctx.Provider value={{ workspaces, active, loading, error, scopeKey, switchTo, refresh: load, applyActive }}>
       {children}

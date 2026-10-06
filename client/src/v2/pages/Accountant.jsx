@@ -184,8 +184,12 @@ function CloseTab({ month }) {
 
   const taxStatus = taxCardsApi.error?.status || (taxCardsApi.error?.data && taxCardsApi.error.data.status)
   const isForbidden = taxStatus === 403 || taxStatus === 401 || /401|403|unauthorized|forbidden/i.test(taxCardsApi.error?.message || '')
-  const isServerError = taxStatus >= 500
-  const isOffline = taxCardsApi.error && !isForbidden && !isServerError
+  const isNetworkOffline = !!taxCardsApi.error && !taxStatus && (
+    (typeof window !== 'undefined' && !window.navigator.onLine) ||
+    /Failed to fetch|NetworkError|network|offline/i.test(taxCardsApi.error?.message || '')
+  )
+  const isServerError = !!taxCardsApi.error && !isForbidden && !isNetworkOffline && (taxStatus >= 500 || !!taxStatus || true)
+  const isOffline = isNetworkOffline
   const isMalformed = !taxCardsApi.loading && !taxCardsApi.error && taxCardsApi.data != null && (typeof taxCardsApi.data !== 'object' || !Array.isArray(taxCardsApi.data.cards))
   const isEmpty = !taxCardsApi.loading && !taxCardsApi.error && !isMalformed && Array.isArray(taxCardsApi.data?.cards) && taxCardsApi.data.cards.length === 0
 
