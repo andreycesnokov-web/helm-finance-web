@@ -30,8 +30,9 @@ export function minCash(targets) {
   const n = Number(v)
   return Number.isFinite(n) && n >= 0 ? n : null
 }
-/** Runway in days, or null when cash flow is positive, break-even or unmeasured. */
+/** Runway in days, or null when cash flow is positive, break-even, unmeasured or valuation incomplete. */
 export function runwayDays(pulse) {
+  if (pulse?.has_unvalued_tx) return null
   if (pulse?.runway == null) return null
   const r = Number(pulse.runway)
   if (!Number.isFinite(r) || r >= 999 || r < 0) return null

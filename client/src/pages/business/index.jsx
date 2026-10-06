@@ -7,6 +7,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { apiFetch } from '../../lib/api'
 import { useAuth } from '../../hooks/useAuth'
 import { formatAmount } from '../../lib/money'
+import { t } from '../../i18n'
 import { WorkspaceProvider, useWorkspace } from '../../shell/WorkspaceProvider'
 import LiveShell from '../../shell/LiveShell'
 import {
@@ -731,6 +732,7 @@ function BusinessStarterActions({ navigate }) {
 // ── Business Accounts (premium presentation of /api/wallets — balances unchanged) ──
 export function BusinessAccounts() {
   const { token } = useAuth()
+  const { active, scopeKey } = useWorkspace()
   const [reloadNonce, setReloadNonce] = useState(0)
   const [showTransfer, setShowTransfer] = useState(false)
   const w = useScoped('/wallets', [reloadNonce])
@@ -752,7 +754,7 @@ export function BusinessAccounts() {
       variant="secondary"
       style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
     >
-      ⇄ Transfer between accounts
+      ⇄ {t('acc.transferBetween')}
     </Btn>
   )
 

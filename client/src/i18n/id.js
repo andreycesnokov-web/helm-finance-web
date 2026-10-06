@@ -259,6 +259,7 @@ const id = {
     scopeExplain: 'Dompet bisnis dihitung dalam CFO Score dan cadangan kas. Dompet pribadi ditampilkan secara terpisah.',
     totalBusiness: 'Total bisnis',
     totalPersonal: 'Total pribadi',
+    transferBetween: 'Transfer antar rekening',
     subtitle: 'Kelola rekening bank, kas, dan dompet pembayaran',
     addWalletTitle: 'Tambah dompet',
     editWalletTitle: 'Edit dompet',

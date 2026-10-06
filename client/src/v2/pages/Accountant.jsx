@@ -44,7 +44,7 @@ function MonthPicker({ value, onChange }) {
 function AskBox({ externalQuery = '', onQueryChange }) {
   const t = useT()
   const { token } = useAuth()
-  const [sp] = useSearchParams()
+  const [sp, setSp] = useSearchParams()
   const [q, setQ] = useState(() => externalQuery || sp.get('ask') || '')
   const [st, setSt] = useState({ busy: false, answer: null, err: null })
   // One business's answer never shows under another (review 8.2 #2).
@@ -59,14 +59,22 @@ function AskBox({ externalQuery = '', onQueryChange }) {
   }, [externalQuery])
 
   useEffect(() => {
-    wsRef.current = wsKey
-    setQ(sp.get('ask') || '')
-    setSt({ busy: false, answer: null, err: null })
-    if (onQueryChange) onQueryChange(sp.get('ask') || '')
+    if (wsRef.current !== wsKey) {
+      wsRef.current = wsKey
+      setQ('')
+      setSt({ busy: false, answer: null, err: null })
+      if (onQueryChange) onQueryChange('')
+      if (sp.has('ask') || sp.has('q')) {
+        const nextSp = new URLSearchParams(sp)
+        nextSp.delete('ask')
+        nextSp.delete('q')
+        setSp(nextSp, { replace: true })
+      }
+    }
   }, [wsKey]) // eslint-disable-line
 
   useEffect(() => {
-    const askParam = sp.get('ask')
+    const askParam = sp.get('ask') || sp.get('q')
     if (askParam) {
       setQ(askParam)
     }
@@ -172,6 +180,20 @@ function CloseTab({ month }) {
   const batches = useApi('/bank-import/batches')
   const wallets = useApi('/wallets')
   const summary = useApi('/accountant/summary')
+  const taxCardsApi = useApi(`/accountant/tax-knowledge/cards?lang=${lang}`)
+
+  const isForbidden = taxCardsApi.error?.status === 403 || taxCardsApi.error?.status === 401
+  const isOffline = taxCardsApi.error && !isForbidden
+  const taxCards = useMemo(() => {
+    if (Array.isArray(taxCardsApi.data?.cards) && taxCardsApi.data.cards.length > 0) {
+      return taxCardsApi.data.cards
+    }
+    if (isOffline) {
+      return listTaxCards(lang)
+    }
+    return []
+  }, [taxCardsApi.data, isOffline, lang])
+
   const r = useMemo(() => closeReadiness({ month, transactions: Array.isArray(tx.data) ? tx.data : [], debts: Array.isArray(debts.data) ? debts.data : [],
     batches: batches.data?.batches || [], wallets: wallets.data?.wallets || [] }), [month, tx.data, debts.data, batches.data, wallets.data])
   if (tx.loading || debts.loading) return <Card><Skeleton rows={6} /></Card>
@@ -231,29 +253,43 @@ function CloseTab({ month }) {
       <div style={{ gridColumn: '1 / -1', marginTop: 14 }}>
         <Card title={
           <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            Tax Knowledge Reference
+            {t('acct.taxReference')}
             <InfoTooltip term="tax_data_status" lang={lang} />
           </span>
         }>
           <p className="v2-muted v2-small" style={{ margin: '0 0 14px' }}>
-            Archived statutory definitions and citations across Indonesian taxes (PPh 21, 26, 23, Final rent, 25, 29, PPN, PKP, NPWP/NIK).
+            {t('acct.taxReferenceSub')}
           </p>
-          <div className="tax-cards-grid">
-            {listTaxCards(lang).map(card => (
-              <TaxKnowledgeCard
-                key={card.topic_id}
-                card={card}
-                lang={lang}
-                onAskAccountant={(qText) => {
-                  setAskQuery(qText)
-                  const input = document.getElementById('acc-ask')
-                  if (input) {
-                    input.focus()
-                  }
-                }}
-              />
-            ))}
-          </div>
+          {isForbidden && (
+            <div className="v2-inline-err" role="alert" style={{ marginBottom: 12 }}>
+              {t('acct.taxAccessDenied')}
+            </div>
+          )}
+          {isOffline && (
+            <div className="v2-banner v2-tone-warn" style={{ marginBottom: 12 }}>
+              <I.warn size={16} />
+              <span className="v2-banner-text">{t('acct.taxOfflineNotice')}</span>
+            </div>
+          )}
+          {taxCardsApi.loading && <Skeleton rows={4} />}
+          {!taxCardsApi.loading && !isForbidden && (
+            <div className="tax-cards-grid">
+              {taxCards.map(card => (
+                <TaxKnowledgeCard
+                  key={card.topic_id}
+                  card={card}
+                  lang={lang}
+                  onAskAccountant={(qText) => {
+                    setAskQuery(qText)
+                    const input = document.getElementById('acc-ask')
+                    if (input) {
+                      input.focus()
+                    }
+                  }}
+                />
+              ))}
+            </div>
+          )}
         </Card>
       </div>
     </div>

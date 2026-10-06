@@ -45,7 +45,7 @@ export default function Accounts() {
     <PageHead title={t('nav.accounts')} sub={t('acc.sub')}
       actions={<>
         <Btn onClick={() => setShowTransfer(true)} id="open-wallet-transfer-btn" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-          ⇄ Transfer between accounts
+          ⇄ {t('acc.transferBetween')}
         </Btn>
         <Btn to="/business/bank-import">{t('acc.import')}</Btn>
         <Btn variant="primary" icon={<I.plus size={16} />} to="/business/accounts/manage">{t('acc.add')}</Btn>

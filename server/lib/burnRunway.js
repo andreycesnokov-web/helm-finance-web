@@ -139,22 +139,28 @@ function computeBurnAndRunway(allTxs, totalBalance, asOfDate = null) {
     return !oldest || d < oldest ? d : oldest;
   }, null);
 
-  // Timezone-safe calendar days calculation
-  const dStart = new Date(oldestDateStr + 'T00:00:00.000Z');
+  // Timezone-safe calendar days calculation (UTC calendar dates)
+  const MS_PER_DAY = 86400000;
+  const dStartOldest = new Date(oldestDateStr + 'T00:00:00.000Z');
   const dEnd = new Date(asOfStr + 'T00:00:00.000Z');
-  const calendarDays = Math.max(1, Math.round((dEnd - dStart) / 86400000));
-  const windowDays = Math.min(30, calendarDays);
+  const totalSpanDaysInclusive = Math.round((dEnd - dStartOldest) / MS_PER_DAY) + 1;
 
-  // Window start date strictly matches windowDays (up to 30 days)
+  // Window bounds and days (calendar inclusive):
+  // Full window (>= 30 days): window_days = 30, window_start = asOfDate - 29 days
+  // Partial window (< 30 days): window_days = difference + 1, window_start = oldestDateStr
+  let windowDays;
   let windowStartStr;
-  if (calendarDays >= 30) {
-    const cutoffDate = new Date(dEnd.getTime() - 30 * 86400000);
+
+  if (totalSpanDaysInclusive >= 30) {
+    windowDays = 30;
+    const cutoffDate = new Date(dEnd.getTime() - 29 * MS_PER_DAY);
     windowStartStr = cutoffDate.toISOString().slice(0, 10);
   } else {
+    windowDays = Math.max(1, totalSpanDaysInclusive);
     windowStartStr = oldestDateStr;
   }
 
-  // Filter window transactions strictly in [windowStartStr, asOfStr]
+  // Filter window transactions strictly in [windowStartStr, asOfStr] (both boundaries inclusive)
   const windowExpTxs = allExpTxs.filter(t => {
     const d = eff(t);
     return d >= windowStartStr && d <= asOfStr;
@@ -200,7 +206,13 @@ function computeBurnAndRunway(allTxs, totalBalance, asOfDate = null) {
   let runwayDays = null;
   let runwayReason = 'insufficient_data';
 
-  if (dailySpend === null && totalInflows === 0) {
+  if (hasUnvaluedTx) {
+    // Incomplete FX valuation: unvalued foreign currency operations mean
+    // total outflow/inflow is incomplete. Block confident positive cash flow,
+    // break-even, or runway conclusions until all transactions have an IDR valuation.
+    runwayDays = null;
+    runwayReason = 'incomplete_valuation';
+  } else if (dailySpend === null && totalInflows === 0) {
     runwayDays = null;
     runwayReason = 'insufficient_data';
   } else if (netBurnDaily > 0) {
@@ -232,6 +244,8 @@ function computeBurnAndRunway(allTxs, totalBalance, asOfDate = null) {
     operating_inflows: totalInflows,
     has_unvalued_tx: hasUnvaluedTx,
     unvalued_tx_count: unvaluedTxCount,
+    is_partial: hasUnvaluedTx,
+    timezone: 'UTC',
   };
 }
 

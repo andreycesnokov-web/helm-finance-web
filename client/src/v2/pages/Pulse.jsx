@@ -168,16 +168,27 @@ export default function Pulse() {
           <div className="v2-hero-pair">
             <div className="v2-hero-cell">
               <span className="v2-hero-label">{t('pulse.runway')}</span>
-              <span className="v2-hero-mid v2-num">{runway == null ? t('pulse.runwayNone') : t('pulse.daysN', { n: runway })}</span>
+              <span className="v2-hero-mid v2-num">
+                {p.has_unvalued_tx
+                  ? t('pulse.blockedValuation')
+                  : (runway == null ? t('pulse.runwayNone') : t('pulse.daysN', { n: runway }))}
+              </span>
               <div className="v2-meter" role="meter" aria-valuemin={0} aria-valuemax={target} aria-valuenow={runway ?? 0}
                 aria-label={t('pulse.runwayVsTarget', { n: runway ?? 0, target })}>
                 <span className={`v2-meter-fill v2-meter-${status}`} style={{ width: `${runwayPct}%` }} />
               </div>
-              <span className="v2-hero-meta">{t('pulse.target', { n: target })}{floor != null && ` · ${t('pulse.minCash', { v: money(floor) })}`}</span>
+              <span className="v2-hero-meta">
+                {p.has_unvalued_tx
+                  ? t('pulse.blockedIncomplete')
+                  : <>{t('pulse.target', { n: target })}{floor != null && ` · ${t('pulse.minCash', { v: money(floor) })}`}</>}
+              </span>
             </div>
             <div className="v2-hero-cell">
               <span className="v2-hero-label">{t('pulse.net30')}</span>
-              <span className={`v2-hero-mid v2-num ${flow && flow.net < 0 ? 'v2-on-neg' : 'v2-on-pos'}`}>{flow ? money(flow.net, { sign: true }) : '—'}</span>
+              <span className={`v2-hero-mid v2-num ${flow && flow.net < 0 ? 'v2-on-neg' : 'v2-on-pos'}`}>
+                {flow ? money(flow.net, { sign: true }) : '—'}
+                {p.has_unvalued_tx && <span className="v2-muted v2-small" style={{ fontSize: '0.75rem', marginLeft: 4 }}>*</span>}
+              </span>
               {flow && <span className="v2-hero-meta">{t('pulse.inOut', { in: money(flow.moneyIn), out: money(flow.moneyOut) })}{flow.unclassified > 0 && ` · ${t('pulse.uncatN', { n: flow.unclassified })}`}</span>}
             </div>
           </div>
@@ -238,34 +249,41 @@ export default function Pulse() {
       <section className="v2-tiles" aria-label={t('pulse.tilesLabel')}>
         <div className="v2-tile">
           <span className="v2-tile-label">
-            Daily spend
+            {t('pulse.dailySpend')}
             <InfoTooltip term="daily_spend" lang={lang} />
           </span>
           <span className="v2-tile-val v2-num">
             {p.daily_spend != null ? money(p.daily_spend) : '—'}
+            {p.has_unvalued_tx && <span className="v2-muted v2-small" style={{ fontSize: '0.75rem', marginLeft: 4 }}>({t('pulse.partial')})</span>}
           </span>
           <span className="v2-tile-sub">
-            {p.daily_spend != null
-              ? (p.window_start && p.window_end ? `${p.window_start} – ${p.window_end}` : `Rolling ${p.daily_spend_window_days || 30}d`)
-              : 'Requires expense history'}
+            {p.has_unvalued_tx ? (
+              <span style={{ color: 'var(--text-warn, #b45309)' }}>
+                ⚠️ {t('pulse.unvaluedExcluded', { n: p.unvalued_tx_count || 1 })}
+              </span>
+            ) : p.daily_spend != null
+              ? (p.window_start && p.window_end ? `${p.window_start} – ${p.window_end}` : t('pulse.rollingN', { n: p.daily_spend_window_days || 30 }))
+              : t('pulse.requiresExpenseHistory')}
           </span>
         </div>
         <div className="v2-tile">
           <span className="v2-tile-label">
-            Net cash burn
+            {t('pulse.netCashBurn')}
             <InfoTooltip term="gross_net_burn" lang={lang} />
           </span>
           <span className="v2-tile-val v2-num">
-            {p.net_burn_daily != null ? money(p.net_burn_daily) : '—'}
+            {p.has_unvalued_tx ? '—' : (p.net_burn_daily != null ? money(p.net_burn_daily) : '—')}
           </span>
           <span className="v2-tile-sub">
-            {p.runway_reason === 'positive_cash_flow'
-              ? 'Cash flow positive (0 drain)'
+            {p.has_unvalued_tx
+              ? <span style={{ color: 'var(--text-warn, #b45309)' }}>⚠️ {t('pulse.blockedIncomplete')}</span>
+              : p.runway_reason === 'positive_cash_flow'
+              ? t('pulse.cashFlowPositive')
               : p.runway_reason === 'break_even'
-              ? 'Break-even (0 drain)'
+              ? t('pulse.breakEven')
               : p.net_burn_daily > 0
-              ? 'Daily cash drain'
-              : 'Requires operating history'}
+              ? t('pulse.dailyCashDrain')
+              : t('pulse.requiresOperatingHistory')}
           </span>
         </div>
         <div className="v2-tile">

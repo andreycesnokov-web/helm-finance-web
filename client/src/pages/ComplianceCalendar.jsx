@@ -35,9 +35,38 @@ export default function ComplianceCalendar() {
   const l = L[lang]
   const [data, setData] = useState(null)
   const [view, setView] = useState('all')
+  const [taxCardsState, setTaxCardsState] = useState({ loading: true, error: null, cards: [] })
 
   const load = useCallback(() => { apiFetch('/accountant/calendar', token).then(setData).catch(e => setData({ error: e.message })) }, [token])
   useEffect(() => { if (token) load() }, [token, load])
+
+  useEffect(() => {
+    let active = true
+    setTaxCardsState({ loading: true, error: null, cards: [] })
+    if (!token) {
+      setTaxCardsState({ loading: false, error: null, cards: listTaxCards(lang) })
+      return
+    }
+    apiFetch(`/accountant/tax-knowledge/cards?lang=${lang}`, token)
+      .then(res => {
+        if (!active) return
+        if (Array.isArray(res?.cards) && res.cards.length > 0) {
+          setTaxCardsState({ loading: false, error: null, cards: res.cards })
+        } else {
+          setTaxCardsState({ loading: false, error: null, cards: listTaxCards(lang) })
+        }
+      })
+      .catch(err => {
+        if (!active) return
+        const isAuthErr = err?.status === 401 || err?.status === 403 || /401|403|unauthorized|forbidden/i.test(err?.message || '')
+        if (isAuthErr) {
+          setTaxCardsState({ loading: false, error: 'forbidden', cards: [] })
+        } else {
+          setTaxCardsState({ loading: false, error: 'offline', cards: listTaxCards(lang) })
+        }
+      })
+    return () => { active = false }
+  }, [token, lang])
 
   if (!data) return <div style={{ padding: 40, color: 'var(--text-3)' }}>Loading…</div>
   const events = data.events || []
@@ -125,11 +154,27 @@ export default function ComplianceCalendar() {
         <p style={{ fontSize: 12.5, color: 'var(--text-secondary)', margin: '0 0 14px' }}>
           Archived statutory references for Indonesia tax rules (PPh 21, 26, 23, Final rent, 25, 29, PPN, PKP, NPWP/NIK).
         </p>
-        <div className="tax-cards-grid">
-          {listTaxCards(lang).map(card => (
-            <TaxKnowledgeCard key={card.topic_id} card={card} lang={lang} />
-          ))}
-        </div>
+
+        {taxCardsState.error === 'forbidden' && (
+          <div style={{ fontSize: 12, color: 'var(--crit, #dc2626)', background: '#FEE2E2', border: '1px solid #FCA5A5', borderRadius: 8, padding: '7px 10px', marginBottom: 12 }}>
+            Access denied: workspace not authorized for tax knowledge reference.
+          </div>
+        )}
+        {taxCardsState.error === 'offline' && (
+          <div style={{ fontSize: 12, color: 'var(--amber-dark, #92400e)', background: '#FEF3C7', border: '1px solid #FDE68A', borderRadius: 8, padding: '7px 10px', marginBottom: 12 }}>
+            Offline mode: displaying reviewed tax reference snapshot.
+          </div>
+        )}
+        {taxCardsState.loading && (
+          <div style={{ padding: '20px 0', color: 'var(--text-3)' }}>Loading tax knowledge cards…</div>
+        )}
+        {!taxCardsState.loading && taxCardsState.error !== 'forbidden' && (
+          <div className="tax-cards-grid">
+            {taxCardsState.cards.map(card => (
+              <TaxKnowledgeCard key={card.topic_id} card={card} lang={lang} />
+            ))}
+          </div>
+        )}
       </div>
 
       <div style={{ fontSize: 11, color: 'var(--text-4)', marginTop: 14 }}>{l.disclaimer}</div>

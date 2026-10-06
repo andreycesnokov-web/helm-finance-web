@@ -19,6 +19,7 @@
 // with what to do next instead of a grid of dashes.
 import { Card, StatusBadge, Btn, Icon, DataList, FlagshipMark } from '../../shell/ui'
 import { compactIdr } from '../../lib/money'
+import { t } from '../../i18n'
 import InfoTooltip from '../../components/InfoTooltip'
 import './Pulse.css'
 
@@ -55,6 +56,9 @@ export function ExecutiveHero({ d, idr, readiness, empty }) {
   const net = Number(d.netPosition || 0)
 
   // Explicit Daily Spend vs Net Burn vs Runway definitions:
+  const hasUnvalued = Boolean(d.has_unvalued_tx)
+  const unvaluedCount = Number(d.unvalued_tx_count || 0)
+
   // 1. Daily Spend: rolling average operating expenses over window (null if no expense data)
   const dailySpendVal = d.daily_spend !== undefined && d.daily_spend !== null ? Number(d.daily_spend) : null
   const dailySpendWindow = d.daily_spend_window_days || d.burnWindowDays || 30
@@ -66,14 +70,17 @@ export function ExecutiveHero({ d, idr, readiness, empty }) {
   // 3. Runway explanation
   let runwayHint = ''
   let runwayChip = null
-  if (d.runway_reason === 'positive_cash_flow') {
-    runwayHint = 'Cash flow positive · receipts cover expenses'
+  if (hasUnvalued) {
+    runwayHint = t('pulse.blockedValuation') || 'Blocked: incomplete FX valuation'
+    runwayChip = t('pulse.partial') || 'Partial'
+  } else if (d.runway_reason === 'positive_cash_flow') {
+    runwayHint = t('pulse.cashFlowPositive') || 'Cash flow positive · receipts cover expenses'
     runwayChip = 'Cash flow +'
   } else if (d.runway_reason === 'break_even') {
-    runwayHint = 'Break-even · receipts equal expenses'
+    runwayHint = t('pulse.breakEven') || 'Break-even · receipts equal expenses'
     runwayChip = 'Break-even'
   } else if (d.runway_reason === 'insufficient_data' || runway === null) {
-    runwayHint = 'Requires operating expense history'
+    runwayHint = t('pulse.requiresExpenseHistory') || 'Requires operating expense history'
     runwayChip = null
   } else {
     runwayHint = `At ${idr(netBurnVal || 0)}/day net burn · ${dailySpendWindow}d window`
@@ -96,32 +103,40 @@ export function ExecutiveHero({ d, idr, readiness, empty }) {
     },
     {
       key: 'daily_spend',
-      label: 'Daily spend',
+      label: t('pulse.dailySpend') || 'Daily spend',
       term: 'daily_spend',
-      value: dailySpendVal === null ? '—' : idr(dailySpendVal) + ' / day',
-      hint: dailySpendVal === null
-        ? 'No operating expense history yet'
+      value: dailySpendVal === null ? '—' : `${idr(dailySpendVal)} / day${hasUnvalued ? ` (${t('pulse.partial') || 'partial'})` : ''}`,
+      hint: hasUnvalued
+        ? `${t('pulse.unvaluedExcluded', { n: unvaluedCount }) || `Excluded unvalued: ${unvaluedCount}`} · ${windowRangeStr}`
+        : dailySpendVal === null
+        ? (t('pulse.requiresExpenseHistory') || 'No operating expense history yet')
         : `Average over rolling ${dailySpendWindow} days (${windowRangeStr})`
     },
     {
       key: 'net_burn',
-      label: 'Net cash burn',
+      label: t('pulse.netCashBurn') || 'Net cash burn',
       term: 'gross_net_burn',
-      value: netBurnVal === null ? '—' : idr(netBurnVal) + ' / day',
-      tone: netBurnVal > 0 ? 'warn' : undefined,
-      hint: d.runway_reason === 'positive_cash_flow'
-        ? 'Operating inflows exceed outflows (0 net drain)'
-        : d.runway_reason === 'break_even'
-        ? 'Operating inflows equal outflows (0 net drain)'
+      value: hasUnvalued
+        ? '—'
         : netBurnVal === null
-        ? 'Requires operating history'
-        : 'Excess of cash outflows over inflows per day'
+        ? '—'
+        : idr(netBurnVal) + ' / day',
+      tone: netBurnVal > 0 ? 'warn' : undefined,
+      hint: hasUnvalued
+        ? (t('pulse.blockedValuation') || 'Blocked: incomplete FX valuation')
+        : d.runway_reason === 'positive_cash_flow'
+        ? (t('pulse.cashFlowPositive') || 'Operating inflows exceed outflows (0 net drain)')
+        : d.runway_reason === 'break_even'
+        ? (t('pulse.breakEven') || 'Operating inflows equal outflows (0 net drain)')
+        : netBurnVal === null
+        ? (t('pulse.requiresOperatingHistory') || 'Requires operating history')
+        : (t('pulse.dailyCashDrain') || 'Excess of cash outflows over inflows per day')
     },
     {
       key: 'runway',
-      label: 'Runway',
+      label: t('pulse.runway') || 'Runway',
       term: 'runway',
-      value: runway === null ? '—' : `${runway} days`,
+      value: hasUnvalued || runway === null ? '—' : `${runway} days`,
       tone: lowRunway ? 'warn' : undefined,
       chip: runwayChip,
       hint: runwayHint
