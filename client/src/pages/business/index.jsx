@@ -3,12 +3,13 @@
 // to Pulse formulas, wallet-balance logic, classification, access, ledger or contracts.
 // Mounted at /business/* so the legacy /,/accounts routes stay untouched during migration.
 import { Navigate, Outlet, useNavigate } from 'react-router-dom'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { apiFetch } from '../../lib/api'
 import { useAuth } from '../../hooks/useAuth'
 import { formatAmount } from '../../lib/money'
 import { t } from '../../i18n'
 import { WorkspaceProvider, useWorkspace } from '../../shell/WorkspaceProvider'
+import { createRequestGuard } from '../../lib/requestGuard'
 import LiveShell from '../../shell/LiveShell'
 import {
   PageHeader, SummaryCard, MoneyCard, Card, Stat, DataList, StatusBadge, Btn,
@@ -66,12 +67,15 @@ function useScoped(path, deps = []) {
   const { token } = useAuth()
   const { scopeKey, active } = useWorkspace()
   const [s, setS] = useState({ loading: true, error: null, data: null })
+  const guard = useRef(createRequestGuard())
   useEffect(() => {
     if (!token || !active) return
-    let on = true; setS({ loading: true, error: null, data: null })
-    apiFetch(path, token).then(d => on && setS({ loading: false, error: null, data: d }))
-      .catch(e => on && setS({ loading: false, error: e.message || 'Request failed', data: null }))
-    return () => { on = false }
+    const req = guard.current.start()
+    setS({ loading: true, error: null, data: null })
+    apiFetch(path, token, { signal: req.signal })
+      .then(d => { if (!req.isStale()) setS({ loading: false, error: null, data: d }) })
+      .catch(e => { if (!req.isStale()) setS({ loading: false, error: e.message || 'Request failed', data: null }) })
+    return () => guard.current.abort()
   }, [path, token, scopeKey, active?.id, ...deps]) // eslint-disable-line
   return s
 }

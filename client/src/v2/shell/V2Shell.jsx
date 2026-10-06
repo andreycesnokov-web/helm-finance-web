@@ -36,6 +36,7 @@ export function useShellCounts() {
 export function useSwitchWorkspace() {
   const { switchTo } = useWorkspace()
   const navigate = useNavigate()
+  const location = useLocation()
   return async (w) => {
     await switchTo(w)
     if (w.type === 'personal') {
@@ -44,6 +45,11 @@ export function useSwitchWorkspace() {
         localStorage.setItem('last_active_workspace_id', 'personal')
       } catch { /* private mode */ }
       navigate('/account')
+      return
+    }
+    // If staying in business section, preserve current business route path (e.g. /business/accounts or /business/accountant)
+    if (location.pathname && location.pathname.startsWith('/business/')) {
+      navigate(location.pathname)
       return
     }
     navigate('/business/pulse')

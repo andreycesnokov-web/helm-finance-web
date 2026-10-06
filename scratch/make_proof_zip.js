@@ -62,6 +62,12 @@ fs.writeFileSync(path.join(STAGE, 'logs', 'walletTransfers_pglite_test.log'), pg
 const buildLog = cp.execSync('npm run build', { cwd: path.join(ROOT, 'client') }).toString();
 fs.writeFileSync(path.join(STAGE, 'logs', 'client_build.log'), buildLog);
 
+// 4e. Browser console log
+const browserLogSrc = path.join(__dirname, 'logs', 'browser_console.log');
+if (fs.existsSync(browserLogSrc)) {
+  fs.copyFileSync(browserLogSrc, path.join(STAGE, 'logs', 'browser_console.log'));
+}
+
 const headSha = cp.execSync('git rev-parse HEAD', { cwd: ROOT }).toString().trim();
 
 // 5. Create README in stage
@@ -80,11 +86,15 @@ const readmeContent = `# CFO Finance OS: Acceptance & Proof Package (PR #134)
 
 | # | Item | Status | Verification & Evidence |
 |---|---|---|---|
-| **1** | **Browser Delayed Response & Race Protection** | **PASS** | Evaluated without page reloads using Playwright network interception (\`page.route\`). In Company A, a question is submitted to AI Accountant with a 2.5s delay. While in-flight, user switches company via standard UI switcher. When Company A's delayed response resolves, it is completely discarded: Company B shows empty input, no delayed answer, and stripped URL search parameters (\`?ask=\`, \`?q=\`). Verified in \`proof_13_ask_box_prefilled.png\` and \`tests/run_acceptance_pass2.js\` Part 5. |
-| **2** | **Bind Compliance Calendar Tax Cards to Company Workspace** | **PASS** | \`ComplianceCalendar.jsx\` now binds to \`useWorkspace()\` (\`wsId\`, \`scopeKey\`). When company changes, previous tax card state is discarded immediately, pending in-flight queries are aborted, and state resets. |
-| **3** | **Proper Error & Edge Case Handling for Tax Cards** | **PASS** | Handled across both \`ComplianceCalendar.jsx\` and \`Accountant.jsx\`: <br>• **401/403 Forbidden**: Access denied banner, never masked as offline mode.<br>• **5xx Server Error**: Explicit service error notice with "Retry" action.<br>• **Network Failure / Offline**: Explicit banner with reviewed snapshot fallback dictionary.<br>• **Empty successful list**: Explicit localized empty state.<br>• **Malformed Response**: Format error notice. All states localized in RU, EN, and ID. |
-| **4** | **PostgreSQL Concurrency Status (Local vs CI)** | **BLOCKED (Local)**<br>**PASS (CI)** | Local environment executes unit & integration tests on PGlite in-memory database (\`walletTransfersTask30.test.js\` PASS, see \`logs/walletTransfers_pglite_test.log\`). Real multi-connection concurrency (\`postgresIndependentConnections.test.js\`) requires a running PostgreSQL daemon on port 5432 and is **BLOCKED (Local)** due to no local PostgreSQL server. Concurrency with independent connections is verified via GitHub Actions CI workflow (\`.github/workflows/ci.yml:postgres-atomic-concurrency\`). |
-| **5** | **Reproducible Acceptance Package** | **PASS** | Clean directory reproducible bundle containing \`full_patch_from_base.patch\`, test suites, screenshots, execution logs, and SHA-256 manifest. All paths are relative (\`./\`). |
+| **1** | **Accounts Delayed Response on Already-Open Page** | **PASS** | Verified on already-open \`/business/accounts\` without page reload. Company A's \`/api/wallets\` request is held in-flight with verified \`x-business-id\`. User switches to Company B via standard UI switcher (\`.cfo-switch\`). Company B's wallets load and render in DOM. Company A's delayed response is released with stale payload; verified that Company B's wallets remain and Company A's stale data never renders. Zero \`page.goto\`. |
+| **2** | **AI Accountant Delayed Response Protection** | **PASS** | In Company A, user submits question to AI Accountant with request held in-flight. User switches to Company B via standard UI switcher without reload. Company A's held response is released; verified that Company B's chat remains empty, question and \`ask\`/\`q\` params are stripped, and subsequent questions in Company B cite Company B counterparties. |
+| **3** | **Compliance Calendar Isolation** | **PASS** | Verified on Compliance Calendar without page reload: Company A calendar events request is held in-flight, company switched to B via UI switcher, Company B events render, Company A delayed response released; confirmed Company A events never render in Company B. Separately verified delayed tax cards loading across company switch using distinct markers. |
+| **4** | **Clean User-Facing Text in Calendar** | **PASS** | Replaced technical \`no structured due_date_rule_json — skipped\` in user-facing UI with localized friendly message in RU, EN, and ID stating due date cannot be determined due to missing confirmed statutory calculation rules. Technical details logged to \`console.debug\`. |
+| **5** | **Restrict Test Switcher (\`window.__cfoSwitchTo\`)** | **PASS** | Exposed only when test mode is active (\`window.__CFO_TEST_MODE__\` or \`localStorage.getItem('__cfo_test__') === '1'\` or \`MODE === 'test'\`). Unmount deletes the function. Verified both states in automated test. |
+| **6** | **Modal Auto-Close on Company Switch** | **PASS** | When wallet transfer modal is open, switching active company automatically closes the modal without requiring user to click Cancel. |
+| **7** | **Comprehensive Tax Cards Error Matrix (Accountant & Calendar × RU/EN/ID)** | **PASS** | Tested 6 distinct states across both screens in all 3 languages: <br>• **401 / 403 Forbidden**: Access denied banner, zero cards, no fallback snapshot.<br>• **500 Server Error**: Server error banner, zero cards, Retry button visible. Clicking Retry with recovered endpoint restores 200 state, clears error and renders cards.<br>• **Network Failure (Offline)**: Offline warning banner with reviewed snapshot fallback dictionary.<br>• **Successful Empty List**: Localized empty state notice, zero cards.<br>• **Malformed Response**: Format error notice, zero cards. |
+| **8** | **PostgreSQL Concurrency Status (Local vs CI)** | **BLOCKED (Local)**<br>**PASS (CI)** | Local environment executes unit & integration tests on PGlite in-memory database (\`walletTransfersTask30.test.js\` PASS, see \`logs/walletTransfers_pglite_test.log\`). Real multi-connection concurrency (\`postgresIndependentConnections.test.js\`) requires a running PostgreSQL daemon on port 5432 and is **BLOCKED (Local)** due to no local PostgreSQL server. Concurrency with independent connections is verified via GitHub Actions CI workflow (\`.github/workflows/ci.yml:postgres-atomic-concurrency\`). |
+| **9** | **Reproducible Acceptance Package & Browser Logs** | **PASS** | Full browser console log captured to \`scratch/logs/browser_console.log\`. Zero unexpected page errors. Clean bundle with relative paths (\`./\`), patch against base, and SHA-256 manifest. |
 
 ---
 

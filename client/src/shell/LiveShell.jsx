@@ -34,6 +34,10 @@ export default function LiveShell({ children }) {
       navigate('/account')
       return
     }
+    if (location.pathname && location.pathname.startsWith('/business/')) {
+      navigate(location.pathname)
+      return
+    }
     navigate('/business/pulse')
   }
 

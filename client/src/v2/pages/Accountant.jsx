@@ -71,9 +71,10 @@ function AskBox({ externalQuery = '', onQueryChange }) {
         setSp(nextSp, { replace: true })
       }
     }
-  }, [wsKey]) // eslint-disable-line
+  }, [wsKey, sp, setSp, onQueryChange])
 
   useEffect(() => {
+    // Only take search param if ws hasn't just switched away
     const askParam = sp.get('ask') || sp.get('q')
     if (askParam) {
       setQ(askParam)
@@ -188,7 +189,7 @@ function CloseTab({ month }) {
     (typeof window !== 'undefined' && !window.navigator.onLine) ||
     /Failed to fetch|NetworkError|network|offline/i.test(taxCardsApi.error?.message || '')
   )
-  const isServerError = !!taxCardsApi.error && !isForbidden && !isNetworkOffline && (taxStatus >= 500 || !!taxStatus || true)
+  const isServerError = !!taxCardsApi.error && !isForbidden && !isNetworkOffline
   const isOffline = isNetworkOffline
   const isMalformed = !taxCardsApi.loading && !taxCardsApi.error && taxCardsApi.data != null && (typeof taxCardsApi.data !== 'object' || !Array.isArray(taxCardsApi.data.cards))
   const isEmpty = !taxCardsApi.loading && !taxCardsApi.error && !isMalformed && Array.isArray(taxCardsApi.data?.cards) && taxCardsApi.data.cards.length === 0
@@ -299,7 +300,7 @@ function CloseTab({ month }) {
               {t('acct.taxEmpty')}
             </p>
           )}
-          {!taxCardsApi.loading && !isForbidden && !isServerError && !isMalformed && !isEmpty && (
+          {!taxCardsApi.loading && !isForbidden && !isServerError && !isMalformed && !isEmpty && (taxCards.length > 0 || isOffline) && (
             <div className="tax-cards-grid">
               {taxCards.map(card => (
                 <TaxKnowledgeCard

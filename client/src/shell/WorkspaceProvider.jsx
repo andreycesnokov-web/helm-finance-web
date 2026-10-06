@@ -3,7 +3,7 @@
 // PATCH /api/workspace-preferences, and stamps x-business-id (setActiveBusinessId) so
 // every apiFetch is scoped to the active workspace. Switching clears workspace-scoped
 // state via a bumped `scopeKey` (pages key their fetches off it) and routes home.
-import { createContext, useContext, useEffect, useState, useCallback } from 'react'
+import { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react'
 import { apiFetch, setActiveBusinessId } from '../lib/api'
 import { useAuth } from '../hooks/useAuth'
 
@@ -30,6 +30,10 @@ export function WorkspaceProvider({ children }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [scopeKey, setScopeKey] = useState(0)   // bump = clear workspace-scoped caches
+
+  const wsRef = useRef(workspaces)
+  wsRef.current = workspaces
+  const switchToRef = useRef(null)
 
   const applyActive = useCallback((w) => {
     setActive(w)
@@ -64,6 +68,7 @@ export function WorkspaceProvider({ children }) {
     setScopeKey(k => k + 1)                                   // invalidate scoped data
     try { await apiFetch('/workspace-preferences', token, { method: 'PATCH', body: { last_active_workspace_id: w.id } }) } catch {}
   }, [active, applyActive, token])
+  switchToRef.current = switchTo
 
   // Support custom 'workspace-switch' and storage events across tabs / test automation
   useEffect(() => {
@@ -88,16 +93,25 @@ export function WorkspaceProvider({ children }) {
     }
     window.addEventListener('workspace-switch', handleSwitchEvent)
     window.addEventListener('storage', handleStorageEvent)
-    if (typeof window !== 'undefined') {
+    const isTestMode = typeof window !== 'undefined' && (
+      window.__CFO_TEST_MODE__ === true ||
+      window.__PLAYWRIGHT_TEST__ === true ||
+      (typeof localStorage !== 'undefined' && localStorage.getItem('__cfo_test__') === '1') ||
+      import.meta.env.MODE === 'test'
+    )
+    if (isTestMode) {
       window.__cfoSwitchTo = (id) => {
-        const all = [...(workspaces.personal || []), ...(workspaces.business || [])]
+        const all = [...(wsRef.current?.personal || []), ...(wsRef.current?.business || [])]
         const target = all.find(w => String(w.id) === String(id))
-        if (target) switchTo(target)
+        if (target && switchToRef.current) switchToRef.current(target)
       }
     }
     return () => {
       window.removeEventListener('workspace-switch', handleSwitchEvent)
       window.removeEventListener('storage', handleStorageEvent)
+      if (typeof window !== 'undefined' && window.__cfoSwitchTo) {
+        delete window.__cfoSwitchTo
+      }
     }
   }, [workspaces, active, switchTo])
 

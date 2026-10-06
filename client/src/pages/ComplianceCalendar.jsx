@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useAuth } from '../hooks/useAuth'
 import { useWorkspace } from '../shell/WorkspaceProvider'
 import { apiFetch } from '../lib/api'
@@ -6,6 +6,7 @@ import { getLang } from '../i18n/index'
 import InfoTooltip from '../components/InfoTooltip'
 import TaxKnowledgeCard from '../components/TaxKnowledgeCard'
 import { listTaxCards, getTaxCard, matchTopicId } from '../lib/taxKnowledgeFixtures'
+import { createRequestGuard } from '../lib/requestGuard'
 
 const L = {
   en: { title: 'Compliance calendar', subtitle: 'Tax obligations & deadlines · Indonesia',
@@ -22,6 +23,7 @@ const L = {
     taxEmpty: 'No tax knowledge cards available.',
     taxMalformed: 'Failed to display tax cards due to unexpected response format.',
     taxLoading: 'Loading tax knowledge cards…',
+    dueUndetermined: 'Due date cannot be scheduled yet: official statutory calculation rule is pending verification.',
     disclaimer: 'This information is for guidance only and does not constitute legal, tax or accounting advice. Confirm calculations with a licensed professional before making a tax payment or filing a return.' },
   ru: { title: 'Календарь compliance', subtitle: 'Налоговые обязательства и сроки · Индонезия',
     all: 'Все', upcoming: 'Ближайшие 30д', overdue: 'Просрочено', review: 'Нужна проверка',
@@ -37,6 +39,7 @@ const L = {
     taxEmpty: 'Налоговые карточки отсутствуют.',
     taxMalformed: 'Не удалось отобразить карточки: некорректный формат данных ответа.',
     taxLoading: 'Загрузка проверенных налоговых карточек…',
+    dueUndetermined: 'Срок пока не определён: официальное правило расчёта даты ожидает подтверждения.',
     disclaimer: 'Информация носит рекомендательный характер и не является юридической, налоговой или бухгалтерской консультацией. Перед платежом или подачей отчётности подтвердите расчёты у лицензированного специалиста.' },
   id: { title: 'Kalender kepatuhan', subtitle: 'Kewajiban & tenggat pajak · Indonesia',
     all: 'Semua', upcoming: '30 hari ke depan', overdue: 'Terlambat', review: 'Perlu ditinjau',
@@ -52,6 +55,7 @@ const L = {
     taxEmpty: 'Tidak ada kartu pengetahuan pajak yang tersedia.',
     taxMalformed: 'Gagal menampilkan kartu pajak karena format data tidak sesuai.',
     taxLoading: 'Memuat kartu pengetahuan pajak…',
+    dueUndetermined: 'Batas waktu belum dapat ditentukan: aturan penghitungan resmi menunggu verifikasi.',
     disclaimer: 'Informasi ini hanya bersifat panduan dan bukan merupakan nasihat hukum, pajak, atau akuntansi. Konfirmasikan perhitungan dengan profesional berlisensi sebelum melakukan pembayaran atau pelaporan pajak.' },
 }
 const STATUS = { overdue: ['#991B1B', '#FEE2E2'], due_soon: ['#92400E', '#FEF3C7'], upcoming: ['#1e40af', '#EFF6FF'] }
@@ -69,15 +73,17 @@ export default function ComplianceCalendar() {
   const [view, setView] = useState('all')
   const [taxCardsState, setTaxCardsState] = useState({ loading: true, error: null, cards: [] })
   const [retryNonce, setRetryNonce] = useState(0)
+  const calGuard = useRef(createRequestGuard())
+  const cardsGuard = useRef(createRequestGuard())
 
   const load = useCallback(() => {
-    let active = true
-    if (!token || !wsId) { setData(null); return () => { active = false } }
+    if (!token || !wsId) { setData(null); return () => {} }
     setData(null)
-    apiFetch('/accountant/calendar', token)
-      .then(d => { if (active) setData(d) })
-      .catch(e => { if (active) setData({ error: e.message }) })
-    return () => { active = false }
+    const req = calGuard.current.start()
+    apiFetch('/accountant/calendar', token, { signal: req.signal })
+      .then(d => { if (!req.isStale()) setData(d) })
+      .catch(e => { if (!req.isStale()) setData({ error: e.message }) })
+    return () => calGuard.current.abort()
   }, [token, wsId])
 
   useEffect(() => {
@@ -85,15 +91,15 @@ export default function ComplianceCalendar() {
   }, [load, scopeKey])
 
   const loadCards = useCallback(() => {
-    let active = true
     setTaxCardsState({ loading: true, error: null, cards: [] })
     if (!token || !wsId) {
       setTaxCardsState({ loading: false, error: null, cards: [] })
-      return () => { active = false }
+      return () => {}
     }
-    apiFetch(`/accountant/tax-knowledge/cards?lang=${lang}`, token)
+    const req = cardsGuard.current.start()
+    apiFetch(`/accountant/tax-knowledge/cards?lang=${lang}`, token, { signal: req.signal })
       .then(res => {
-        if (!active) return
+        if (req.isStale()) return
         if (!res || typeof res !== 'object' || !Array.isArray(res.cards)) {
           setTaxCardsState({ loading: false, error: 'malformed', cards: [] })
           return
@@ -105,7 +111,7 @@ export default function ComplianceCalendar() {
         setTaxCardsState({ loading: false, error: null, cards: res.cards })
       })
       .catch(err => {
-        if (!active) return
+        if (req.isStale()) return
         const status = err?.status || (err?.data && err.data.status)
         const isForbidden = status === 401 || status === 403 || /401|403|unauthorized|forbidden/i.test(err?.message || '')
         const isNetworkOffline = !status && (
@@ -120,7 +126,7 @@ export default function ComplianceCalendar() {
           setTaxCardsState({ loading: false, error: 'server', cards: [] })
         }
       })
-    return () => { active = false }
+    return () => cardsGuard.current.abort()
   }, [token, wsId, lang])
 
   useEffect(() => {
@@ -164,7 +170,16 @@ export default function ComplianceCalendar() {
           ⚠ {data.active_unverified} {l.sourceReq}
         </div>
       )}
-      {(data.warnings || []).map((w, i) => <div key={i} style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 4 }}>· {w}</div>)}
+      {(data.warnings || []).map((w, i) => {
+        let text = w;
+        if (typeof w === 'string' && w.includes('no structured due_date_rule_json')) {
+          console.debug('[ComplianceCalendar] Statutory calculation rule unconfirmed:', w);
+          const parts = w.split(':');
+          const code = parts.length > 1 ? parts[0].trim() : '';
+          text = code ? `${code}: ${l.dueUndetermined}` : l.dueUndetermined;
+        }
+        return <div key={i} style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 4 }}>· {text}</div>;
+      })}
 
       <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
         {['all', 'upcoming', 'overdue', 'review'].map(v => (
@@ -188,7 +203,7 @@ export default function ComplianceCalendar() {
           : (matchedCard?.section_status?.how_it_works === 'unavailable' ? 'Archived procedure under research review.' : '')
 
         return (
-          <div key={i} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, padding: 14, marginBottom: 10 }}>
+          <div key={i} className="compliance-event-card" style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, padding: 14, marginBottom: 10 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
               <div>
                 <div style={{ fontWeight: 700, fontSize: 14, display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -261,7 +276,7 @@ export default function ComplianceCalendar() {
           </div>
         )}
         {!taxCardsState.loading && (taxCardsState.cards.length > 0 || taxCardsState.error === 'offline') && (
-          <div className="tax-cards-grid">
+          <div className="tax-cards-grid" id="compliance-calendar-tax-cards-grid" data-testid="calendar-tax-cards-grid">
             {taxCardsState.cards.map(card => (
               <TaxKnowledgeCard key={card.topic_id} card={card} lang={lang} />
             ))}

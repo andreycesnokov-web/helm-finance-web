@@ -304,6 +304,15 @@ async function runAcceptancePass() {
   // 1. Desktop Context (1440x900)
   const desktopCtx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
   const page = await desktopCtx.newPage();
+  const browserConsoleLogs = [];
+  const pageErrors = [];
+  page.on('console', msg => {
+    browserConsoleLogs.push(`[${msg.type().toUpperCase()}] ${msg.text()}`);
+  });
+  page.on('pageerror', err => {
+    pageErrors.push(err.message);
+    browserConsoleLogs.push(`[PAGEERROR] ${err.message}\n${err.stack || ''}`);
+  });
 
   // Set auth state
   await page.goto(`http://127.0.0.1:${PORT}/login`, { waitUntil: 'domcontentloaded' });
@@ -313,6 +322,8 @@ async function runAcceptancePass() {
     localStorage.setItem('activeWorkspaceId', bizA);
     localStorage.setItem('activeBusinessId', bizA);
     localStorage.setItem('last_active_workspace_id', bizA);
+    localStorage.setItem('__cfo_test__', '1');
+    window.__CFO_TEST_MODE__ = true;
   }, { token: testToken, bizA: BIZ_A });
 
   console.log('\n======================================================');
@@ -479,6 +490,7 @@ async function runAcceptancePass() {
 
   await page.goto(`http://127.0.0.1:${PORT}/accountant/calendar`, { waitUntil: 'networkidle' });
   await page.waitForTimeout(1000);
+  console.log('PART 4 CURRENT URL:', page.url());
 
   // Assert calendar header, compliance events, and tax knowledge cards are rendered and visible
   const calHeader = await page.waitForSelector('h1:has-text("Compliance calendar"), h1:has-text("Календарь compliance"), h1:has-text("Kalender kepatuhan")', { timeout: 10000 });
@@ -642,18 +654,28 @@ async function runAcceptancePass() {
   assert.ok(ansBText.includes('QA Pay Partner Beta'), 'Company B answer must specifically cite Company B counterparty "QA Pay Partner Beta"');
   assert.ok(ansBText.includes('2,000,000') || ansBText.includes('2M') || ansBText.includes('3,000,000'), 'Company B answer must cite Company B debt amounts');
 
-  // 5b. Verify Accounts Delayed Load Isolation
-  console.log('\n--- Checking Accounts Delayed Load Isolation (A -> B) ---');
-  let delayedWalletsResolve = null;
-  const delayedWalletsPromise = new Promise(res => { delayedWalletsResolve = res; });
-  let delayedWalletsIntercepted = false;
+  // 5b. Verify Accounts Delayed Load Isolation on already-open page (A -> B, zero reload)
+  console.log('\n--- Checking Accounts Delayed Load Isolation on already-open page (A -> B) ---');
+  // First, open /business/accounts while in Company B
+  if (!page.url().includes('/business/accounts')) {
+    await page.goto(`http://127.0.0.1:${PORT}/business/accounts`, { waitUntil: 'networkidle' });
+    await page.waitForTimeout(600);
+  }
+
+  // Intercept /api/wallets to hold Company A's request and verify headers
+  let heldWalletsResolveA = null;
+  const heldWalletsPromiseA = new Promise(res => { heldWalletsResolveA = res; });
+  let interceptedWalletsA = false;
+  let interceptedBizIdA = null;
 
   await page.route('**/api/wallets', async (route) => {
-    if (!delayedWalletsIntercepted) {
-      delayedWalletsIntercepted = true;
-      console.log('[Playwright Route Intercept] Delaying /api/wallets for Company A...');
-      await delayedWalletsPromise;
-      console.log('[Playwright Route Intercept] Releasing delayed /api/wallets for Company A...');
+    const bizHeader = route.request().headers()['x-business-id'];
+    if (bizHeader === BIZ_A && !interceptedWalletsA) {
+      interceptedWalletsA = true;
+      interceptedBizIdA = bizHeader;
+      console.log(`[Playwright Route Intercept] Intercepted and holding /api/wallets for Company A (x-business-id: ${bizHeader})...`);
+      await heldWalletsPromiseA;
+      console.log('[Playwright Route Intercept] Releasing held /api/wallets for Company A...');
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -668,115 +690,344 @@ async function runAcceptancePass() {
     }
   });
 
-  // Switch to Company A and start loading Accounts
-  await page.evaluate(({ bizA }) => {
-    window.__cfoSwitchTo(bizA);
-  }, { bizA: BIZ_A });
-  await page.waitForTimeout(300);
-
-  // Switch immediately to Company B before releasing Company A's wallets
-  await page.evaluate(({ bizB }) => {
-    window.__cfoSwitchTo(bizB);
-  }, { bizB: BIZ_B });
+  // Switch to Company A on the already-open page via standard UI switcher (zero reload)
+  const switcherBtnAccounts = await page.waitForSelector('.cfo-switch', { timeout: 5000 });
+  await switcherBtnAccounts.click();
+  await page.waitForSelector('.cfo-switch-menu', { timeout: 5000 });
+  const optA = await page.waitForSelector('.cfo-switch-opt:has-text("Helm Care Indonesia")', { timeout: 5000 });
+  await optA.click();
   await page.waitForTimeout(500);
 
-  // Release stale wallets from Company A
-  delayedWalletsResolve();
+  // Assert interception and x-business-id of Company A
+  assert.strictEqual(interceptedWalletsA, true, 'Company A /api/wallets request must be intercepted in-flight');
+  assert.strictEqual(interceptedBizIdA, BIZ_A, 'Intercepted request must carry Company A x-business-id');
+
+  // Now, while Company A's request is held in-flight, switch to Company B via UI switcher WITHOUT reload
+  const switcherBtnToB = await page.waitForSelector('.cfo-switch', { timeout: 5000 });
+  await switcherBtnToB.click();
+  await page.waitForSelector('.cfo-switch-menu', { timeout: 5000 });
+  const optBAccounts = await page.waitForSelector('.cfo-switch-opt:has-text("Helm Care Pay")', { timeout: 5000 });
+  await optBAccounts.click();
+
+  // Wait for Company B's wallets to load and render in DOM
+  await page.waitForSelector(':has-text("Helm Pay BCA"), :has-text("w-pay-idr")', { timeout: 8000 });
+  console.log('Company B wallets rendered in DOM while Company A request was still held.');
+
+  // Now release Company A's held response
+  heldWalletsResolveA();
   await page.waitForTimeout(800);
   await page.unroute('**/api/wallets');
 
-  // Navigate to Accounts in Company B
-  await page.goto(`http://127.0.0.1:${PORT}/business/accounts`, { waitUntil: 'networkidle' });
+  // Verify: DOM retains Company B wallets, and stale Company A wallet NEVER rendered
+  const accountsBodyB = await page.textContent('body');
+  assert.ok(!accountsBodyB.includes('STALE Company A Secret Vault'), 'Company A stale wallets must NEVER render in Company B');
+  assert.ok(accountsBodyB.includes('Helm Pay BCA') || accountsBodyB.includes('w-pay-idr'), 'Company B must retain its own wallet');
+  console.log('Verified: Accounts delayed load race condition cleanly discarded without reload.');
+
+  // 5c. Compliance Calendar Isolation (stale events & stale tax cards across company switch)
+  console.log('\n--- Checking Compliance Calendar Isolation (A -> B, zero reload) ---');
+  await page.goto(`http://127.0.0.1:${PORT}/business/accountant/calendar`, { waitUntil: 'networkidle' });
+  await page.waitForTimeout(600);
+
+  // 5c-1: Hold Company A calendar events request
+  let heldCalendarResolveA = null;
+  const heldCalendarPromiseA = new Promise(res => { heldCalendarResolveA = res; });
+  let interceptedCalendarA = false;
+  let interceptedCalBizIdA = null;
+  let interceptedCalendarB = false;
+
+  await page.route('**/api/accountant/calendar', async (route) => {
+    const bizHeader = route.request().headers()['x-business-id'];
+    if (bizHeader === BIZ_A && !interceptedCalendarA) {
+      interceptedCalendarA = true;
+      interceptedCalBizIdA = bizHeader;
+      console.log(`[Playwright Route Intercept] Intercepted and holding /api/accountant/calendar for Company A (x-business-id: ${bizHeader})...`);
+      await heldCalendarPromiseA;
+      console.log('[Playwright Route Intercept] Releasing held calendar for Company A...');
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          events: [
+            { id: 99999, rule_code: 'STALE-RULE-A', title: 'STALE Company A Calendar Event Marker', status: 'upcoming', due_date: '2026-12-31' }
+          ],
+          active_unverified: 0
+        })
+      });
+    } else if (bizHeader === BIZ_B) {
+      interceptedCalendarB = true;
+      console.log(`[Playwright Route Intercept] Intercepted /api/accountant/calendar for Company B (x-business-id: ${bizHeader})...`);
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          events: [
+            { id: 77777, rule_code: 'ACTIVE-RULE-B', title: 'CONFIRMED Company B Distinct Calendar Event', status: 'upcoming', due_date: '2026-11-20' }
+          ],
+          active_unverified: 0
+        })
+      });
+    } else {
+      await route.continue();
+    }
+  });
+
+  // Switch to Company A on calendar
+  const calSwitchA = await page.waitForSelector('.cfo-switch', { timeout: 5000 });
+  await calSwitchA.click();
+  await page.waitForSelector('.cfo-switch-menu', { timeout: 5000 });
+  await (await page.waitForSelector('.cfo-switch-opt:has-text("Helm Care Indonesia")', { timeout: 5000 })).click();
   await page.waitForTimeout(500);
 
-  // Verify stale Company A wallets NEVER rendered in Company B
-  const accountsTextB = await page.textContent('body');
-  assert.ok(!accountsTextB.includes('STALE Company A Secret Vault'), 'Company A stale wallets must NEVER render in Company B');
-  assert.ok(accountsTextB.includes('Helm Pay BCA') || accountsTextB.includes('w-pay-idr'), 'Company B must render its own wallet Helm Pay BCA');
-  console.log('Verified: Accounts delayed load race condition cleanly discarded.');
+  assert.strictEqual(interceptedCalendarA, true, 'Company A /api/accountant/calendar must be intercepted');
+  assert.strictEqual(interceptedCalBizIdA, BIZ_A, 'Intercepted calendar request must carry Company A x-business-id');
 
-  // 5c. Verify Modal Auto-Close on Company Switch without clicking Cancel
+  // Switch to Company B via UI switcher without reload
+  const calSwitchB = await page.waitForSelector('.cfo-switch', { timeout: 5000 });
+  await calSwitchB.click();
+  await page.waitForSelector('.cfo-switch-menu', { timeout: 5000 });
+  await (await page.waitForSelector('.cfo-switch-opt:has-text("Helm Care Pay")', { timeout: 5000 })).click();
+  
+  // Wait for Company B distinct event to render BEFORE releasing Company A
+  await page.waitForSelector(':has-text("CONFIRMED Company B Distinct Calendar Event")', { timeout: 8000 });
+  const calBodyBeforeRelease = await page.textContent('body');
+  assert.ok(calBodyBeforeRelease.includes('CONFIRMED Company B Distinct Calendar Event'), 'Company B distinct event must render BEFORE releasing A response');
+  assert.strictEqual(interceptedCalendarB, true, 'Company B calendar request must be received');
+
+  // Now release Company A calendar response
+  heldCalendarResolveA();
+  await page.waitForTimeout(800);
+  await page.unroute('**/api/accountant/calendar');
+
+  const calBodyB = await page.textContent('body');
+  assert.ok(calBodyB.includes('CONFIRMED Company B Distinct Calendar Event'), 'Company B events MUST remain preserved after releasing A');
+  assert.ok(!calBodyB.includes('STALE Company A Calendar Event Marker'), 'Company A stale calendar events must never render in Company B');
+  assert.ok(!calBodyB.includes('STALE-RULE-A'), 'Company A stale rule code must never render in Company B');
+  console.log('Verified: Calendar events isolation cleanly protected.');
+
+  // 5c-2: Hold Company A tax cards request across company switch
+  let heldCardsResolveA = null;
+  const heldCardsPromiseA = new Promise(res => { heldCardsResolveA = res; });
+  let interceptedCardsA = false;
+  let interceptedCardsBizIdA = null;
+  let interceptedCardsB = false;
+
+  await page.route('**/api/accountant/tax-knowledge/cards*', async (route) => {
+    const bizHeader = route.request().headers()['x-business-id'];
+    if (bizHeader === BIZ_A && !interceptedCardsA) {
+      interceptedCardsA = true;
+      interceptedCardsBizIdA = bizHeader;
+      console.log(`[Playwright Route Intercept] Intercepted and holding tax cards for Company A (x-business-id: ${bizHeader})...`);
+      await heldCardsPromiseA;
+      console.log('[Playwright Route Intercept] Releasing held tax cards for Company A...');
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          cards: [
+            { topic_id: 'stale-tax-a', rule_code: 'STALE_TAX_A', short_title: 'STALE TAX CARD A EXCLUSIVE', name: 'STALE TAX CARD A EXCLUSIVE', applicability: 'none' }
+          ]
+        })
+      });
+    } else if (bizHeader === BIZ_B) {
+      interceptedCardsB = true;
+      console.log(`[Playwright Route Intercept] Intercepted tax cards for Company B (x-business-id: ${bizHeader})...`);
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          cards: [
+            { topic_id: 'active-tax-b', rule_code: 'ACTIVE_TAX_B', short_title: 'CONFIRMED TAX CARD B DISTINCT MARKER', name: 'CONFIRMED TAX CARD B DISTINCT MARKER', applicability: 'mandatory', statutory_basis: 'PMK 168/2023', filing_deadline: '20th', rates_summary: 'TER 0% - 35%' }
+          ]
+        })
+      });
+    } else {
+      await route.continue();
+    }
+  });
+
+  // Switch to Company A on calendar
+  const cardsSwitchA = await page.waitForSelector('.cfo-switch', { timeout: 5000 });
+  await cardsSwitchA.click();
+  await page.waitForSelector('.cfo-switch-menu', { timeout: 5000 });
+  await (await page.waitForSelector('.cfo-switch-opt:has-text("Helm Care Indonesia")', { timeout: 5000 })).click();
+  await page.waitForTimeout(400);
+
+  // Assert interception and header for Company A tax cards
+  assert.strictEqual(interceptedCardsA, true, 'Company A /api/accountant/tax-knowledge/cards must be intercepted');
+  assert.strictEqual(interceptedCardsBizIdA, BIZ_A, 'Intercepted tax cards request must carry Company A x-business-id');
+
+  // Switch immediately to Company B without reload
+  const cardsSwitchB = await page.waitForSelector('.cfo-switch', { timeout: 5000 });
+  await cardsSwitchB.click();
+  await page.waitForSelector('.cfo-switch-menu', { timeout: 5000 });
+  await (await page.waitForSelector('.cfo-switch-opt:has-text("Helm Care Pay")', { timeout: 5000 })).click();
+  
+  // Wait for Company B distinct card marker to render BEFORE releasing Company A response
+  await page.waitForSelector(':has-text("CONFIRMED TAX CARD B DISTINCT MARKER")', { timeout: 8000 });
+  const calCardsBeforeRelease = await page.textContent('body');
+  assert.ok(calCardsBeforeRelease.includes('CONFIRMED TAX CARD B DISTINCT MARKER'), 'Company B distinct tax card must render BEFORE releasing A response');
+  assert.strictEqual(interceptedCardsB, true, 'Company B tax cards request must be received');
+
+  // Now release Company A's held tax cards response
+  heldCardsResolveA();
+  await page.waitForTimeout(800);
+  await page.unroute('**/api/accountant/tax-knowledge/cards*');
+
+  const calBodyAfterCards = await page.textContent('body');
+  assert.ok(calBodyAfterCards.includes('CONFIRMED TAX CARD B DISTINCT MARKER'), 'Company B distinct tax card MUST remain preserved after releasing A');
+  assert.ok(!calBodyAfterCards.includes('STALE TAX CARD A EXCLUSIVE'), 'Company A stale tax card must never render in Company B');
+  assert.ok(!calBodyAfterCards.includes('STALE_TAX_A'), 'Company A stale rule code must never render in Company B');
+  console.log('Verified: Tax cards isolation across company switch cleanly protected.');
+
+  // 5d. Verify Modal Auto-Close on Company Switch without clicking Cancel
   console.log('\n--- Checking Modal Auto-Close on Company Switch ---');
+  await page.goto(`http://127.0.0.1:${PORT}/business/accounts`, { waitUntil: 'networkidle' });
+  await page.waitForTimeout(600);
   const openTransferBtnInB = await page.waitForSelector('#open-wallet-transfer-btn', { timeout: 5000 });
   await openTransferBtnInB.click();
   await page.waitForSelector('.cfo-modal', { timeout: 5000 });
-  
-  const modalOpenBeforeSwitch = await page.$('.cfo-modal');
-  assert.ok(modalOpenBeforeSwitch !== null, 'Transfer modal must be opened');
+  assert.ok((await page.$('.cfo-modal')) !== null, 'Transfer modal must be opened');
 
-  // Trigger company switch via standard WorkspaceProvider mechanism while modal is open
+  // Trigger company switch via window.__cfoSwitchTo while modal is open
   await page.evaluate(({ bizA }) => {
     window.__cfoSwitchTo(bizA);
   }, { bizA: BIZ_A });
 
   // Wait for React effect [active?.id, scopeKey] to automatically close the modal
-  await page.waitForTimeout(600);
-
-  // Assert modal is completely closed WITHOUT clicking Cancel button
+  await page.waitForTimeout(800);
   const modalAfterSwitch = await page.$('.cfo-modal');
   assert.strictEqual(modalAfterSwitch, null, 'Transfer modal must close automatically upon company switch without manual Cancel click');
   console.log('Verified: Transfer modal auto-closes on company switch without Cancel click.');
 
-  // 5d. Verify Tax Knowledge Cards Error Edge Cases (Accountant & Calendar)
-  console.log('\n--- Checking Tax Cards Error States: 403, 500, Offline, Empty, Malformed ---');
-  
-  // Scenario 1: 403 Forbidden
-  await page.route('**/api/accountant/tax-knowledge/cards*', async (route) => {
-    await route.fulfill({ status: 403, contentType: 'application/json', body: JSON.stringify({ error: 'Forbidden' }) });
-  });
-  await page.goto(`http://127.0.0.1:${PORT}/business/accountant`, { waitUntil: 'networkidle' });
-  await page.waitForTimeout(600);
-  const forbiddenNotice = await page.textContent('body');
-  assert.ok(forbiddenNotice.includes('Access denied') || forbiddenNotice.includes('Доступ запрещён') || forbiddenNotice.includes('Akses ditolak'), 'Must display Access Denied banner on 403');
-  assert.ok(!forbiddenNotice.includes('Offline backup dictionary'), '403 must never masquerade as offline backup mode');
+  // 5e. Test Switcher window.__cfoSwitchTo restriction
+  console.log('\n--- Checking window.__cfoSwitchTo Restriction & Cleanup ---');
+  const freshCtx = await browser.newContext();
+  const freshPage = await freshCtx.newPage();
+  await freshPage.goto(`http://127.0.0.1:${PORT}/login`, { waitUntil: 'domcontentloaded' });
+  await freshPage.evaluate(({ token, bizA }) => {
+    localStorage.setItem('hf_token', token);
+    localStorage.setItem('activeWorkspaceId', bizA);
+    localStorage.setItem('activeBusinessId', bizA);
+    localStorage.removeItem('__cfo_test__');
+  }, { token: testToken, bizA: BIZ_A });
+  await freshPage.goto(`http://127.0.0.1:${PORT}/business/pulse`, { waitUntil: 'networkidle' });
+  const exposedWithoutFlag = await freshPage.evaluate(() => typeof window.__cfoSwitchTo);
+  assert.strictEqual(exposedWithoutFlag, 'undefined', 'window.__cfoSwitchTo must NOT be exposed in normal production mode without test flag');
 
-  // Scenario 2: 500 Server Error with Retry
-  await page.unroute('**/api/accountant/tax-knowledge/cards*');
-  await page.route('**/api/accountant/tax-knowledge/cards*', async (route) => {
-    await route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: 'Internal Server Error' }) });
+  await freshPage.evaluate(() => {
+    localStorage.setItem('__cfo_test__', '1');
   });
-  await page.goto(`http://127.0.0.1:${PORT}/business/accountant`, { waitUntil: 'networkidle' });
-  await page.waitForTimeout(600);
-  const serverErrNotice = await page.textContent('body');
-  assert.ok(serverErrNotice.includes('service error') || serverErrNotice.includes('Ошибка сервиса') || serverErrNotice.includes('kesalahan pada layanan'), 'Must display server error banner on 500');
-  const retryBtn = await page.$('button:has-text("Retry"), button:has-text("Повторить"), button:has-text("Coba lagi")');
-  assert.ok(retryBtn !== null, 'Retry button must be visible on 500 error');
+  await freshPage.reload({ waitUntil: 'networkidle' });
+  const exposedWithFlag = await freshPage.evaluate(() => typeof window.__cfoSwitchTo);
+  assert.strictEqual(exposedWithFlag, 'function', 'window.__cfoSwitchTo MUST be exposed when __cfo_test__ flag is active');
+  await freshPage.close();
+  await freshCtx.close();
+  console.log('Verified: window.__cfoSwitchTo properly restricted to test mode.');
 
-  // Scenario 3: Malformed Response
-  await page.unroute('**/api/accountant/tax-knowledge/cards*');
-  await page.route('**/api/accountant/tax-knowledge/cards*', async (route) => {
-    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ corrupt: true }) });
-  });
-  await page.goto(`http://127.0.0.1:${PORT}/business/accountant`, { waitUntil: 'networkidle' });
-  await page.waitForTimeout(600);
-  const malformedNotice = await page.textContent('body');
-  assert.ok(malformedNotice.includes('unexpected response format') || malformedNotice.includes('некорректный формат') || malformedNotice.includes('format data tidak sesuai'), 'Must display malformed format notice');
+  // 5f. Tax Knowledge Cards Error Matrix across Screens and Languages (Accountant & Calendar × RU/EN/ID)
+  console.log('\n--- Checking Comprehensive Tax Cards Error Matrix (Accountant & Calendar × RU/EN/ID) ---');
+  const screens = [
+    { name: 'Accountant', url: `http://127.0.0.1:${PORT}/business/accountant` },
+    { name: 'Calendar', url: `http://127.0.0.1:${PORT}/business/accountant/calendar` }
+  ];
+  const languages = ['en', 'ru', 'id'];
 
-  // Scenario 4: Empty Successful Cards
-  await page.unroute('**/api/accountant/tax-knowledge/cards*');
-  await page.route('**/api/accountant/tax-knowledge/cards*', async (route) => {
-    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ cards: [] }) });
-  });
-  await page.goto(`http://127.0.0.1:${PORT}/business/accountant`, { waitUntil: 'networkidle' });
-  await page.waitForTimeout(600);
-  const emptyNotice = await page.textContent('body');
-  assert.ok(emptyNotice.includes('No tax knowledge cards available') || emptyNotice.includes('Налоговые карточки отсутствуют') || emptyNotice.includes('Tidak ada kartu'), 'Must display empty state notice');
+  for (const sc of screens) {
+    for (const lang of languages) {
+      console.log(`Testing Error Matrix on ${sc.name} (${lang.toUpperCase()})...`);
+      await page.evaluate((l) => { localStorage.setItem('hf_lang', l); }, lang);
 
-  // Scenario 5: Offline Network Failure with Local Snapshot
-  await page.unroute('**/api/accountant/tax-knowledge/cards*');
-  await page.route('**/api/accountant/tax-knowledge/cards*', async (route) => {
-    await route.abort('failed');
-  });
-  await page.goto(`http://127.0.0.1:${PORT}/business/accountant`, { waitUntil: 'networkidle' });
-  await page.waitForTimeout(600);
-  const offlineNotice = await page.textContent('body');
-  assert.ok(offlineNotice.includes('Offline backup dictionary active') || offlineNotice.includes('Используется резервный офлайн-справочник') || offlineNotice.includes('Kamus cadangan offline aktif'), 'Must show offline dictionary banner on network failure');
-  const offlineCards = await page.$$('.tax-card');
-  assert.ok(offlineCards.length > 0, 'Local snapshot dictionary cards must render in offline mode');
+      // 1. 401 Unauthorized
+      await page.route('**/api/accountant/tax-knowledge/cards*', async route => {
+        await route.fulfill({ status: 401, contentType: 'application/json', body: JSON.stringify({ error: 'Unauthorized' }) });
+      });
+      await page.goto(sc.url, { waitUntil: 'networkidle' });
+      await page.waitForTimeout(400);
+      let content = await page.textContent('body');
+      assert.ok(content.includes(lang === 'ru' ? 'Доступ запрещён' : lang === 'id' ? 'Akses ditolak' : 'Access denied'), `${sc.name} (${lang}): 401 must show Access denied banner`);
+      let cardsCount = (await page.$$('.tax-card')).length;
+      assert.strictEqual(cardsCount, 0, `${sc.name} (${lang}): 401 must not display any cards or fallback snapshot`);
+      await page.unroute('**/api/accountant/tax-knowledge/cards*');
 
-  // Restore normal routing
-  await page.unroute('**/api/accountant/tax-knowledge/cards*');
-  console.log('Verified: All 5 error and fallback scenarios for Tax Cards validated.');
+      // 2. 403 Forbidden
+      await page.route('**/api/accountant/tax-knowledge/cards*', async route => {
+        await route.fulfill({ status: 403, contentType: 'application/json', body: JSON.stringify({ error: 'Forbidden' }) });
+      });
+      await page.goto(sc.url, { waitUntil: 'networkidle' });
+      await page.waitForTimeout(400);
+      content = await page.textContent('body');
+      assert.ok(content.includes(lang === 'ru' ? 'Доступ запрещён' : lang === 'id' ? 'Akses ditolak' : 'Access denied'), `${sc.name} (${lang}): 403 must show Access denied banner`);
+      cardsCount = (await page.$$('.tax-card')).length;
+      assert.strictEqual(cardsCount, 0, `${sc.name} (${lang}): 403 must not display any cards or fallback snapshot`);
+      await page.unroute('**/api/accountant/tax-knowledge/cards*');
+
+      // 3. 500 Server Error + Retry Click
+      let failServer = true;
+      await page.route('**/api/accountant/tax-knowledge/cards*', async route => {
+        if (failServer) {
+          await route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: 'Internal Server Error' }) });
+        } else {
+          await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ cards: [
+            { topic_id: 'pph21', rule_code: 'PPh 21', name: 'PPh 21 Retried', short_title: 'PPh 21 Retried', applicability: 'mandatory', statutory_basis: 'PMK 168/2023', filing_deadline: '20th', rates_summary: 'TER 0% - 35%' }
+          ] }) });
+        }
+      });
+      await page.goto(sc.url, { waitUntil: 'networkidle' });
+      await page.waitForTimeout(400);
+      content = await page.textContent('body');
+      assert.ok(content.includes(lang === 'ru' ? 'Ошибка сервиса' : lang === 'id' ? 'kesalahan pada layanan' : 'service error'), `${sc.name} (${lang}): 500 must show server error banner`);
+      cardsCount = (await page.$$('.tax-card')).length;
+      assert.strictEqual(cardsCount, 0, `${sc.name} (${lang}): 500 must not display cards before retry`);
+
+      failServer = false;
+      const retryBtn = await page.waitForSelector('button:has-text("Retry"), button:has-text("Повторить"), button:has-text("Coba lagi")', { timeout: 5000 });
+      await retryBtn.click();
+      await page.waitForTimeout(600);
+      content = await page.textContent('body');
+      assert.ok(!content.includes(lang === 'ru' ? 'Ошибка сервиса' : lang === 'id' ? 'kesalahan pada layanan' : 'service error'), `${sc.name} (${lang}): 500 error must clear after retry`);
+      cardsCount = (await page.$$('.tax-card')).length;
+      assert.ok(cardsCount >= 1, `${sc.name} (${lang}): Cards must render after successful retry`);
+      await page.unroute('**/api/accountant/tax-knowledge/cards*');
+
+      // 4. Offline Network Error
+      await page.route('**/api/accountant/tax-knowledge/cards*', async route => {
+        await route.abort('failed');
+      });
+      await page.goto(sc.url, { waitUntil: 'networkidle' });
+      await page.waitForTimeout(400);
+      content = await page.textContent('body');
+      assert.ok(content.includes(lang === 'ru' ? 'офлайн-справочник' : lang === 'id' ? 'cadangan offline' : 'Offline backup'), `${sc.name} (${lang}): Network failure must show offline backup dictionary banner`);
+      cardsCount = (await page.$$('.tax-card')).length;
+      assert.ok(cardsCount >= 1, `${sc.name} (${lang}): Offline mode must render backup dictionary cards`);
+      await page.unroute('**/api/accountant/tax-knowledge/cards*');
+
+      // 5. Successful Empty List
+      await page.route('**/api/accountant/tax-knowledge/cards*', async route => {
+        await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ cards: [] }) });
+      });
+      await page.goto(sc.url, { waitUntil: 'networkidle' });
+      await page.waitForTimeout(400);
+      content = await page.textContent('body');
+      assert.ok(content.includes(lang === 'ru' ? 'карточки отсутствуют' : lang === 'id' ? 'Tidak ada kartu' : 'No tax knowledge cards'), `${sc.name} (${lang}): Empty list must show empty state text`);
+      cardsCount = (await page.$$('.tax-card')).length;
+      assert.strictEqual(cardsCount, 0, `${sc.name} (${lang}): Empty list must render 0 cards`);
+      await page.unroute('**/api/accountant/tax-knowledge/cards*');
+
+      // 6. Malformed Response
+      await page.route('**/api/accountant/tax-knowledge/cards*', async route => {
+        await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ corrupt: true }) });
+      });
+      await page.goto(sc.url, { waitUntil: 'networkidle' });
+      await page.waitForTimeout(400);
+      content = await page.textContent('body');
+      assert.ok(content.includes(lang === 'ru' ? 'некорректный формат' : lang === 'id' ? 'format data tidak sesuai' : 'unexpected response format'), `${sc.name} (${lang}): Malformed response must show format notice`);
+      cardsCount = (await page.$$('.tax-card')).length;
+      assert.strictEqual(cardsCount, 0, `${sc.name} (${lang}): Malformed response must render 0 cards`);
+      await page.unroute('**/api/accountant/tax-knowledge/cards*');
+    }
+  }
+  console.log('Verified: Comprehensive Tax Cards Error Matrix successfully passed for both screens in RU, EN, and ID.');
 
   console.log('\n======================================================');
   console.log('PART 6: Multi-language Localization (RU / ID / EN)');
@@ -805,6 +1056,15 @@ async function runAcceptancePass() {
   await page.evaluate(() => {
     localStorage.setItem('hf_lang', 'en');
   });
+
+  // Save browser console logs to scratch/logs/browser_console.log
+  const logsDir = path.join(ROOT, 'scratch', 'logs');
+  if (!fs.existsSync(logsDir)) fs.mkdirSync(logsDir, { recursive: true });
+  fs.writeFileSync(path.join(logsDir, 'browser_console.log'), browserConsoleLogs.join('\n'));
+  console.log('Saved browser console logs to scratch/logs/browser_console.log');
+
+  const unexpectedErrors = pageErrors.filter(e => !e.includes('net::ERR_FAILED') && !e.includes('Failed to fetch'));
+  assert.strictEqual(unexpectedErrors.length, 0, `Zero unexpected page errors allowed, found: ${JSON.stringify(unexpectedErrors)}`);
 
   await browser.close();
   console.log('\n======================================================');
