@@ -1,6 +1,9 @@
 # Professional review queue
 
 No licensed review took place. Nothing is marked legally verified or active.
+Repair-pass machine gates now withhold numerical/company conclusions and unsupported claims;
+general archived-text explanations remain available only with exact version/fragment binding.
+The legal, OCR and translation gaps below are unchanged; see REPAIR_REVIEW.md for the program changes.
 
 | Priority | Gap | Evidence and next check |
 |---|---|---|

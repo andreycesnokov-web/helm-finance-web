@@ -35,6 +35,9 @@ file size and independently computed SHA-256; these local hashes are not archive
 14 sources selected, 13 downloaded PDF originals; PMK1/2026 failed twice with download timeouts.
 Content-addressed originals and page/layout/table extractions live under store/.
 188 semantic article/page fragments selected for the first index.
+The repair pass retains that baseline separately and now identifies261 fragments/125 provisions,
+with continuation/explanation/instruction roles and33 version-bound atomic statements. It does not
+download additional sources or certify the old registry's legal currency/read scope.
 Full automatic extraction is not full human reading. sources.json records the pages actually read,
 the broader selected index ranges, dates, SHA-256 and unresolved issues separately.
 PMK11/2025 was downloaded/extracted but its substantive provisions have not yet been read in full.

@@ -1,0 +1,1085 @@
+{
+  "schema_version": 2,
+  "editorial_review": "text_binding_only_not_professional_tax_review",
+  "claims": [
+    {
+      "id": "RENT_SCOPE",
+      "topic": "pph_final_rent",
+      "kind": "document_explanation",
+      "selectors": [
+        {
+          "source_id": "PP34_2017",
+          "article": "2",
+          "needle": "jasa pelayanan penginapan",
+          "paragraphs": "(1),(3)",
+          "role": "operative_text"
+        }
+      ],
+      "translations": {
+        "ru": "В архивном PP34 аренда земли/здания отделена от услуг проживания с размещением: гостиничный платёж нельзя автоматически считать арендой.",
+        "en": "The archived PP34 distinguishes land/building rental from lodging with accommodation; a hotel payment cannot automatically be classified as rental.",
+        "id": "PP34 yang diarsipkan membedakan sewa tanah/bangunan dari jasa penginapan beserta akomodasi; pembayaran hotel tidak otomatis dianggap sewa."
+      },
+      "concepts": [
+        "scope",
+        "lodging"
+      ],
+      "period": {
+        "from": "2018-01-02"
+      },
+      "dependencies": [],
+      "professional_review": null
+    },
+    {
+      "id": "RENT_PAYER",
+      "topic": "pph_final_rent",
+      "kind": "document_explanation",
+      "selectors": [
+        {
+          "source_id": "PP34_2017",
+          "article": "3",
+          "needle": "bukan sebagai pemotong",
+          "paragraphs": "(1)-(3)",
+          "role": "operative_text"
+        }
+      ],
+      "translations": {
+        "ru": "В архивной статье PP34 указанный арендатор удерживает налог, а при арендаторе, который не является pemotong, получатель платит сам. Это альтернативные роли, а не автоматическое двойное удержание обеими сторонами.",
+        "en": "In the archived PP34 provision the designated tenant withholds; if the tenant is not a withholder the recipient self-pays. These are alternative roles, not automatic double withholding by both parties.",
+        "id": "Dalam ketentuan PP34 yang diarsipkan penyewa pemotong melakukan pemotongan; jika penyewa bukan pemotong, penerima membayar sendiri. Ini peran alternatif, bukan otomatis pemotongan ganda."
+      },
+      "concepts": [
+        "payer"
+      ],
+      "period": {
+        "from": "2018-01-02"
+      },
+      "dependencies": [],
+      "professional_review": null
+    },
+    {
+      "id": "RENT_BASE",
+      "topic": "pph_final_rent",
+      "kind": "document_explanation",
+      "selectors": [
+        {
+          "source_id": "PP34_2017",
+          "article": "4",
+          "needle": "biaya layanan",
+          "paragraphs": "(2)",
+          "role": "operative_text"
+        }
+      ],
+      "translations": {
+        "ru": "Архивная статья PP34 описывает валовую аренду вместе со связанными обслуживанием, охраной и услугами, даже при отдельных соглашениях. Для инвойса надо уточнить связь расходов с объектом аренды; название строки само по себе недостаточно.",
+        "en": "The archived PP34 provision describes gross rent including related maintenance, security and service charges even under separate agreements. Clarify their relationship to the rented property; an invoice label alone is insufficient.",
+        "id": "Ketentuan PP34 yang diarsipkan menjelaskan bruto sewa termasuk pemeliharaan, keamanan dan layanan terkait meskipun perjanjiannya terpisah. Perjelas hubungan biaya dengan objek sewa; nama baris invoice saja tidak cukup."
+      },
+      "concepts": [
+        "base",
+        "service_charge"
+      ],
+      "period": {
+        "from": "2018-01-02"
+      },
+      "dependencies": [],
+      "professional_review": null
+    },
+    {
+      "id": "RENT_HISTORY",
+      "topic": "pph_final_rent",
+      "kind": "document_explanation",
+      "selectors": [
+        {
+          "source_id": "PP34_2017",
+          "article": "5",
+          "needle": "Pada saat",
+          "paragraphs": "transition",
+          "role": "operative_text"
+        },
+        {
+          "source_id": "PP34_2017",
+          "article": "6",
+          "needle": "dicabut",
+          "paragraphs": "whole",
+          "role": "operative_text"
+        },
+        {
+          "source_id": "PP34_2017",
+          "article": "7",
+          "needle": "2 Januari 2018",
+          "paragraphs": "whole",
+          "role": "operative_text"
+        }
+      ],
+      "translations": {
+        "ru": "Архив PP34 содержит переходные положения, отмену PP29 с поправкой PP5 и начало действия 2 января 2018. Старый договор требует отдельной проверки перехода; эти положения не устанавливают режим аренды за 2017 год.",
+        "en": "The PP34 archive contains transitions, repeal of PP29 as amended by PP5, and commencement on 2 January 2018. An old contract requires separate transition review; these provisions do not establish rental treatment for 2017.",
+        "id": "Arsip PP34 memuat transisi, pencabutan PP29 sebagaimana diubah PP5, dan mulai berlaku 2 Januari 2018. Kontrak lama memerlukan pemeriksaan transisi; ketentuan ini tidak menentukan pajak sewa tahun2017."
+      },
+      "concepts": [
+        "history",
+        "repeal"
+      ],
+      "period": {
+        "from": "2018-01-02"
+      },
+      "dependencies": [],
+      "professional_review": null
+    },
+    {
+      "id": "RENT_RATE",
+      "topic": "pph_final_rent",
+      "kind": "dependent_conclusion",
+      "selectors": [
+        {
+          "source_id": "PP34_2017",
+          "article": "4",
+          "needle": "sepuluh persen",
+          "paragraphs": "(1)",
+          "role": "operative_text"
+        }
+      ],
+      "translations": {
+        "ru": "Ставка аренды 10% валовой базы.",
+        "en": "Rental rate of10% of gross.",
+        "id": "Tarif sewa10% dari bruto."
+      },
+      "concepts": [
+        "rate"
+      ],
+      "period": {
+        "from": "2018-01-02"
+      },
+      "dependencies": [],
+      "professional_review": null
+    },
+    {
+      "id": "SERVICE_SCOPE",
+      "topic": "pph23",
+      "kind": "document_explanation",
+      "selectors": [
+        {
+          "source_id": "DJP_SDSN_2023",
+          "article": "23",
+          "needle": "sewa dan penghasilan",
+          "paragraphs": "(1)(a),(c)",
+          "role": "operative_text"
+        }
+      ],
+      "translations": {
+        "ru": "В архивной редакции UU PPh статья23 содержит разные категории доходов и отдельную ветвь аренды имущества с исключением финально облагаемой аренды. Нельзя переносить одну ставку на любой инвойс.",
+        "en": "In the archived PPh Law Article23 has different income categories and a property-rental branch excluding separately final-taxed rental. A single rate cannot be applied to every invoice.",
+        "id": "Dalam UU PPh yang diarsipkan Pasal23 memuat kategori penghasilan berbeda serta sewa harta dengan pengecualian sewa yang dikenai pajak final tersendiri. Satu tarif tidak boleh diterapkan pada semua invoice."
+      },
+      "concepts": [
+        "scope",
+        "equipment"
+      ],
+      "period": {},
+      "dependencies": [],
+      "professional_review": null
+    },
+    {
+      "id": "SERVICE_EXCEPTIONS",
+      "topic": "pph23",
+      "kind": "document_explanation",
+      "selectors": [
+        {
+          "source_id": "PMK141_2015",
+          "article": "1",
+          "needle": "selain jasa yang telah",
+          "paragraphs": "(1),(2)",
+          "role": "operative_text"
+        },
+        {
+          "source_id": "PMK168_2023",
+          "article": "2",
+          "needle": "orang pribadi",
+          "paragraphs": "(2)(d)",
+          "role": "operative_text"
+        }
+      ],
+      "translations": {
+        "ru": "Архивный PMK141 исключает из jasa lain услуги, уже подпадающие под PPh21, и отдельно финально облагаемые доходы. PMK168 отдельно описывает платежи физлицам за услуги; нужно выяснить тип и резидентство получателя, а не судить по названию инвойса.",
+        "en": "The archived PMK141 excludes services already subject to PPh21 and separately final-taxed income from its other-services branch. PMK168 separately describes payments for individual services; establish recipient type and residency rather than infer them from the invoice name.",
+        "id": "PMK141 yang diarsipkan mengecualikan jasa yang telah dipotong PPh21 dan penghasilan final tersendiri dari cabang jasa lain. PMK168 menjelaskan pembayaran jasa orang pribadi secara terpisah; pastikan jenis dan domisili penerima, bukan hanya nama invoice."
+      },
+      "concepts": [
+        "exception",
+        "individual"
+      ],
+      "period": {
+        "from": "2015-08-26"
+      },
+      "dependencies": [],
+      "professional_review": null
+    },
+    {
+      "id": "SERVICE_REIMBURSEMENT",
+      "topic": "pph23",
+      "kind": "document_explanation",
+      "selectors": [
+        {
+          "source_id": "PMK141_2015",
+          "article": "1",
+          "needle": "Dalam hal tidak terdapat bukti",
+          "paragraphs": "(3)-(5)",
+          "role": "operative_text"
+        }
+      ],
+      "translations": {
+        "ru": "По архивному PMK141 исключение некоторых выплат за материалы или третьим лицам из базы требует перечисленных доказательств. Без доказательств база охватывает весь соответствующий платёж без PPN; возмещение не вычитается автоматически.",
+        "en": "Under the archived PMK141, excluding specified material or third-party payments from the base requires listed evidence. Without it the relevant total payment excluding PPN is the base; reimbursement is not automatically deductible.",
+        "id": "Menurut PMK141 yang diarsipkan, pengecualian pembayaran material atau pihak ketiga tertentu dari dasar memerlukan bukti yang ditentukan. Tanpa bukti seluruh pembayaran terkait selain PPN menjadi dasar; reimbursement tidak otomatis dikecualikan."
+      },
+      "concepts": [
+        "reimbursement",
+        "base"
+      ],
+      "period": {
+        "from": "2015-08-26"
+      },
+      "dependencies": [],
+      "professional_review": null
+    },
+    {
+      "id": "SERVICE_NPWP",
+      "topic": "pph23",
+      "kind": "document_explanation",
+      "selectors": [
+        {
+          "source_id": "DJP_SDSN_2023",
+          "article": "23",
+          "needle": "tidak memiliki Nomor Pokok",
+          "paragraphs": "(1a),(4)",
+          "role": "operative_text"
+        }
+      ],
+      "translations": {
+        "ru": "Архивная статья23 содержит отдельную ветвь отсутствия NPWP и исключения из удержания. Нужно подтвердить идентификатор, категорию дохода и исключения; текущая трактовка NIK/NPWP не установлена этой подборкой.",
+        "en": "Archived Article23 contains a no-NPWP branch and withholding exclusions. Verify identity, income category and exclusions; current NIK/NPWP treatment is not established by this collection.",
+        "id": "Pasal23 yang diarsipkan memuat cabang tanpa NPWP dan pengecualian pemotongan. Periksa identitas, kategori penghasilan dan pengecualian; perlakuan NIK/NPWP terkini belum ditetapkan oleh kumpulan ini."
+      },
+      "concepts": [
+        "npwp",
+        "exception"
+      ],
+      "period": {},
+      "dependencies": [],
+      "professional_review": null
+    },
+    {
+      "id": "SERVICE_RATE",
+      "topic": "pph23",
+      "kind": "dependent_conclusion",
+      "selectors": [
+        {
+          "source_id": "DJP_SDSN_2023",
+          "article": "23",
+          "needle": "sebesar 2%",
+          "paragraphs": "(1)(c)",
+          "role": "operative_text"
+        },
+        {
+          "source_id": "PMK141_2015",
+          "article": "1",
+          "needle": "tidak termasuk Pajak Pertambahan Nilai",
+          "paragraphs": "(1)",
+          "role": "operative_text"
+        }
+      ],
+      "translations": {
+        "ru": "Ставка соответствующих услуг 2% без PPN.",
+        "en": "Covered-service rate2% excluding PPN.",
+        "id": "Tarif jasa yang dicakup2% selain PPN."
+      },
+      "concepts": [
+        "rate"
+      ],
+      "period": {
+        "from": "2015-08-26"
+      },
+      "dependencies": [],
+      "professional_review": null
+    },
+    {
+      "id": "VAT_MECHANISM",
+      "topic": "ppn_pkp",
+      "kind": "document_explanation",
+      "selectors": [
+        {
+          "source_id": "PMK131_2024",
+          "article": "3",
+          "needle": "nilai lain",
+          "paragraphs": "(1)-(3)",
+          "role": "operative_text"
+        },
+        {
+          "source_id": "PMK131_2024",
+          "article": "4",
+          "needle": "dikecualikan",
+          "paragraphs": "(1)",
+          "role": "operative_text"
+        }
+      ],
+      "translations": {
+        "ru": "Архивный PMK131 разделяет установленную ставку и DPP nilai lain. В той же редакции отдельно исключены специальные базы: механизм нельзя объявлять универсальным для всех поставок.",
+        "en": "Archived PMK131 distinguishes the stated tax rate from DPP nilai lain. That edition separately excludes special bases; the mechanism cannot be treated as universal for all supplies.",
+        "id": "PMK131 yang diarsipkan membedakan tarif pajak dari DPP nilai lain. Edisi tersebut mengecualikan DPP khusus secara terpisah; mekanismenya tidak universal untuk semua penyerahan."
+      },
+      "concepts": [
+        "base",
+        "rate",
+        "scope"
+      ],
+      "period": {
+        "from": "2025-01-01"
+      },
+      "dependencies": [],
+      "professional_review": null
+    },
+    {
+      "id": "VAT_JAN_TRANSITION",
+      "topic": "ppn_pkp",
+      "kind": "document_explanation",
+      "selectors": [
+        {
+          "source_id": "PMK131_2024",
+          "article": "5",
+          "needle": "31 Januari 2025",
+          "paragraphs": "(a),(b)",
+          "role": "operative_text"
+        },
+        {
+          "source_id": "PMK131_2024",
+          "article": "2",
+          "needle": "tergolong mewah",
+          "paragraphs": "(3)",
+          "role": "operative_text"
+        }
+      ],
+      "translations": {
+        "ru": "Архивная статья5 PMK131 отдельно описывает январь2025 для определённых luxury-поставок конечным покупателям и следующий этап с февраля. Нужны вид товара и статус покупателя; здесь не устанавливается налог вашей сделки.",
+        "en": "Archived PMK131 Article5 separately describes January2025 for specified luxury supplies to final consumers and the next stage from February. Goods classification and buyer status are needed; this does not determine tax on your transaction.",
+        "id": "Pasal5 PMK131 yang diarsipkan mengatur Januari2025 untuk penyerahan barang mewah tertentu kepada konsumen akhir serta tahap berikut mulai Februari. Diperlukan klasifikasi barang dan status pembeli; ini tidak menentukan pajak transaksi Anda."
+      },
+      "concepts": [
+        "luxury",
+        "history"
+      ],
+      "period": {
+        "from": "2025-01-01",
+        "to": "2025-01-31",
+        "to_confirmed": true,
+        "after_scope": "historical"
+      },
+      "dependencies": [],
+      "professional_review": null
+    },
+    {
+      "id": "VAT_CREDIT",
+      "topic": "ppn_pkp",
+      "kind": "document_explanation",
+      "selectors": [
+        {
+          "source_id": "PMK131_2024",
+          "article": "3",
+          "needle": "dapat dikreditkan sesuai",
+          "paragraphs": "(4)",
+          "role": "operative_text"
+        }
+      ],
+      "translations": {
+        "ru": "В архивном PMK131 право зачёта входного налога отсылает к условиям налогового законодательства. Статус PKP и наличие обычного инвойса сами по себе этих условий не доказывают; полный набор требований faktur пока не проверен.",
+        "en": "Archived PMK131 refers input credit to the conditions in tax legislation. PKP status and an ordinary invoice alone do not establish those conditions; the full faktur requirements remain unreviewed.",
+        "id": "PMK131 yang diarsipkan merujuk kredit pajak masukan pada syarat dalam ketentuan perpajakan. Status PKP dan invoice biasa saja tidak membuktikan syarat tersebut; persyaratan faktur lengkap belum ditelaah."
+      },
+      "concepts": [
+        "credit"
+      ],
+      "period": {
+        "from": "2025-01-01"
+      },
+      "dependencies": [],
+      "professional_review": null
+    },
+    {
+      "id": "PKP_REGISTRATION",
+      "topic": "ppn_pkp",
+      "kind": "document_explanation",
+      "selectors": [
+        {
+          "source_id": "PMK164_2023",
+          "article": "17",
+          "needle": "melaporkan usahanya",
+          "paragraphs": "(1),(3)",
+          "role": "operative_text"
+        },
+        {
+          "source_id": "PMK164_2023",
+          "article": "18",
+          "needle": "Pengusaha Kena Pajak",
+          "paragraphs": "whole",
+          "role": "operative_text"
+        }
+      ],
+      "translations": {
+        "ru": "Архивный PMK164 различает превышение порога, сообщение о деятельности и начало обязанностей PKP. Их нельзя свести к автоматическому действию в день выставления инвойса.",
+        "en": "Archived PMK164 distinguishes a threshold crossing, business reporting and commencement of PKP obligations. They cannot be reduced to automatic treatment on an invoice date.",
+        "id": "PMK164 yang diarsipkan membedakan terlampauinya batas, pelaporan usaha, dan awal kewajiban PKP. Hal itu tidak otomatis ditentukan dari tanggal invoice."
+      },
+      "concepts": [
+        "pkp"
+      ],
+      "period": {
+        "from": "2023-12-29"
+      },
+      "dependencies": [],
+      "professional_review": null
+    },
+    {
+      "id": "VAT_RATE",
+      "topic": "ppn_pkp",
+      "kind": "dependent_conclusion",
+      "selectors": [
+        {
+          "source_id": "PMK131_2024",
+          "article": "3",
+          "needle": "11/12",
+          "paragraphs": "(2),(3)",
+          "role": "operative_text"
+        },
+        {
+          "source_id": "PMK131_2024",
+          "article": "4",
+          "needle": "dikecualikan",
+          "paragraphs": "(1)",
+          "role": "operative_text"
+        }
+      ],
+      "translations": {
+        "ru": "Для соответствующей поставки 12% ×11/12 базы.",
+        "en": "For a covered supply12% ×11/12 of base.",
+        "id": "Untuk penyerahan yang dicakup12% ×11/12 dasar."
+      },
+      "concepts": [
+        "rate"
+      ],
+      "period": {
+        "from": "2025-01-01"
+      },
+      "dependencies": [
+        "PMK11_2025",
+        "PMK53_2025",
+        "PMK81_2024"
+      ],
+      "professional_review": null
+    },
+    {
+      "id": "PAYROLL_METHOD",
+      "topic": "pph21",
+      "kind": "document_explanation",
+      "selectors": [
+        {
+          "source_id": "PMK168_2023",
+          "article": "13",
+          "needle": "tarif efektif",
+          "paragraphs": "(1),(2)",
+          "role": "operative_text"
+        },
+        {
+          "source_id": "PMK168_2023",
+          "article": "15",
+          "needle": "Masa Pajak Terakhir",
+          "paragraphs": "(1)-(3)",
+          "role": "operative_text"
+        }
+      ],
+      "translations": {
+        "ru": "Архивный PMK168 различает обычные периоды и последний налоговый период постоянного сотрудника/пенсионера. Последний предусматривает сверку за год или часть года, а не повторение обычного TER. Нужны категория работника и период.",
+        "en": "Archived PMK168 distinguishes ordinary periods from the last tax period for a permanent employee/pensioner. The last period reconciles annual or part-year liability rather than simply repeating ordinary TER. Worker category and period are needed.",
+        "id": "PMK168 yang diarsipkan membedakan masa biasa dan Masa Pajak Terakhir pegawai tetap/pensiunan. Masa terakhir merekonsiliasi pajak tahunan atau bagian tahun, bukan mengulang TER biasa. Diperlukan kategori pekerja dan periode."
+      },
+      "concepts": [
+        "last_period",
+        "method"
+      ],
+      "period": {
+        "from": "2024-01-01"
+      },
+      "dependencies": [],
+      "professional_review": null
+    },
+    {
+      "id": "PAYROLL_BASE",
+      "topic": "pph21",
+      "kind": "document_explanation",
+      "selectors": [
+        {
+          "source_id": "PMK168_2023",
+          "article": "8",
+          "needle": "penghasilan bruto",
+          "paragraphs": "(1)",
+          "role": "operative_text"
+        },
+        {
+          "source_id": "PMK168_2023",
+          "article": "2",
+          "needle": "pemberi kerja",
+          "paragraphs": "(2)",
+          "role": "operative_text"
+        }
+      ],
+      "translations": {
+        "ru": "Архивный PMK168 связывает базу и удержание с категорией получателя и плательщика. Для объяснения нужны занятость, резидентство, валовой доход, PTKP и месяц; одной суммы зарплаты недостаточно для расчёта.",
+        "en": "Archived PMK168 ties the base and withholding to recipient and payer categories. Employment, residency, gross income, PTKP and month are needed; a salary amount alone is insufficient for calculation.",
+        "id": "PMK168 yang diarsipkan mengaitkan dasar dan pemotongan dengan kategori penerima serta pembayar. Diperlukan pekerjaan, domisili, bruto, PTKP dan bulan; angka gaji saja tidak cukup untuk menghitung."
+      },
+      "concepts": [
+        "base",
+        "salary"
+      ],
+      "period": {
+        "from": "2024-01-01"
+      },
+      "dependencies": [],
+      "professional_review": null
+    },
+    {
+      "id": "TER_NUMERIC",
+      "topic": "pph21",
+      "kind": "table_conclusion",
+      "selectors": [
+        {
+          "source_id": "PP58_2023",
+          "article": "2",
+          "needle": "Lampiran",
+          "paragraphs": "table A-D",
+          "role": "operative_text"
+        },
+        {
+          "source_id": "PMK168_2023",
+          "article": "15",
+          "needle": "tarif efektif bulanan",
+          "paragraphs": "(1)(a)",
+          "role": "operative_text"
+        }
+      ],
+      "translations": {
+        "ru": "Точная ставка/расчёт TER.",
+        "en": "Exact TER rate/calculation.",
+        "id": "Tarif/perhitungan TER tepat."
+      },
+      "concepts": [
+        "rate",
+        "salary"
+      ],
+      "period": {
+        "from": "2024-01-01"
+      },
+      "dependencies": [
+        "PP58_2023"
+      ],
+      "professional_review": null
+    },
+    {
+      "id": "FOREIGN_SCOPE",
+      "topic": "pph26",
+      "kind": "document_explanation",
+      "selectors": [
+        {
+          "source_id": "DJP_SDSN_2023",
+          "article": "26",
+          "needle": "beneficial owner",
+          "paragraphs": "(1),(1a)",
+          "role": "operative_text"
+        },
+        {
+          "source_id": "PMK168_2023",
+          "article": "14",
+          "needle": "persetujuan penghindaran",
+          "paragraphs": "(1)-(3)",
+          "role": "operative_text"
+        }
+      ],
+      "translations": {
+        "ru": "Архивные положения связывают PPh26 с налоговым нерезидентством, видами дохода и BUT; для отдельных доходов физлиц указан договорный порядок. Иностранное гражданство не доказывает нерезидентство или право на льготу договора; нужны страна и документы получателя.",
+        "en": "The archived provisions tie PPh26 to tax non-residency, income category and BUT; treaty treatment is referenced for specified individual income. Foreign citizenship does not establish tax non-residency or treaty entitlement; recipient country and documents are needed.",
+        "id": "Ketentuan yang diarsipkan mengaitkan PPh26 dengan status pajak luar negeri, jenis penghasilan dan BUT; penerapan P3B dirujuk untuk penghasilan orang pribadi tertentu. Kewarganegaraan asing tidak membuktikan status luar negeri atau hak P3B; diperlukan negara dan dokumen penerima."
+      },
+      "concepts": [
+        "residency",
+        "treaty"
+      ],
+      "period": {},
+      "dependencies": [],
+      "professional_review": null
+    },
+    {
+      "id": "FOREIGN_RATE",
+      "topic": "pph26",
+      "kind": "dependent_conclusion",
+      "selectors": [
+        {
+          "source_id": "DJP_SDSN_2023",
+          "article": "26",
+          "needle": "20%",
+          "paragraphs": "(1)",
+          "role": "operative_text"
+        }
+      ],
+      "translations": {
+        "ru": "Ставка соответствующего дохода 20% без подтверждённой договорной льготы.",
+        "en": "Covered-income rate20% absent established treaty relief.",
+        "id": "Tarif penghasilan yang dicakup20% tanpa hak P3B terkonfirmasi."
+      },
+      "concepts": [
+        "rate"
+      ],
+      "period": {},
+      "dependencies": [
+        "PMK112_2025"
+      ],
+      "professional_review": null
+    },
+    {
+      "id": "BUSINESS_OLD_SCOPE",
+      "topic": "business_regimes",
+      "kind": "document_explanation",
+      "selectors": [
+        {
+          "source_id": "PP55_2022",
+          "article": "56",
+          "needle": "pekerjaan bebas",
+          "paragraphs": "(1),(3)",
+          "role": "operative_text"
+        },
+        {
+          "source_id": "PP55_2022",
+          "article": "57",
+          "needle": "perseroan",
+          "paragraphs": "whole",
+          "role": "operative_text"
+        },
+        {
+          "source_id": "PP55_2022",
+          "article": "59",
+          "needle": "jangka waktu",
+          "paragraphs": "(1),(2)",
+          "role": "operative_text"
+        }
+      ],
+      "translations": {
+        "ru": "В архивной прежней редакции PP55 право на режим зависит от вида дохода, формы налогоплательщика и ограниченного периода применения. Оборот сам по себе не доказывает право; эта редакция требует проверки последующих поправок и перехода.",
+        "en": "In the archived earlier PP55 edition regime entitlement depends on income type, taxpayer form and a limited eligibility period. Turnover alone does not establish entitlement; later amendments and transitions require review.",
+        "id": "Dalam edisi lama PP55 yang diarsipkan kelayakan rezim bergantung pada jenis penghasilan, bentuk wajib pajak dan masa penggunaan terbatas. Omzet saja tidak membuktikan hak; perubahan berikut serta transisi perlu ditelaah."
+      },
+      "concepts": [
+        "scope",
+        "history"
+      ],
+      "period": {
+        "from": "2022-12-20",
+        "to": "2026-04-21",
+        "to_confirmed": true
+      },
+      "dependencies": [],
+      "professional_review": null
+    },
+    {
+      "id": "BUSINESS_NEW_SCOPE",
+      "topic": "business_regimes",
+      "kind": "document_explanation",
+      "selectors": [
+        {
+          "source_id": "PP20_2026",
+          "article": "56",
+          "needle": "pekerjaan bebas",
+          "paragraphs": "(1)-(4)",
+          "role": "operative_text"
+        },
+        {
+          "source_id": "PP20_2026",
+          "article": "57",
+          "needle": "perseroan perorangan",
+          "paragraphs": "(1),(2)",
+          "role": "operative_text"
+        }
+      ],
+      "translations": {
+        "ru": "Архивная поправка PP20 меняет круг получателей режима и сохраняет исключения для определённых доходов. Нужно различать обычную PT и perseroan perorangan, выбор режима и профессиональные услуги; низкий оборот не даёт автоматического права.",
+        "en": "The archived PP20 amendment changes eligible taxpayer categories and preserves specified income exclusions. Distinguish ordinary PT from a single-person company, elections and professional services; low turnover gives no automatic entitlement.",
+        "id": "Perubahan PP20 yang diarsipkan mengubah kelompok wajib pajak dan mempertahankan pengecualian penghasilan tertentu. Bedakan PT biasa dari perseroan perorangan, pilihan rezim dan jasa profesional; omzet kecil tidak otomatis memberi hak."
+      },
+      "concepts": [
+        "scope",
+        "amendment"
+      ],
+      "period": {
+        "from": "2026-04-22"
+      },
+      "dependencies": [],
+      "professional_review": null
+    },
+    {
+      "id": "BUSINESS_TRANSITION",
+      "topic": "business_regimes",
+      "kind": "document_explanation",
+      "selectors": [
+        {
+          "source_id": "PP20_2026",
+          "article": "II",
+          "needle": "jangka waktu tertentu",
+          "paragraphs": "angka1; especially e",
+          "role": "operative_text"
+        },
+        {
+          "source_id": "PP55_2022",
+          "article": "59",
+          "needle": "perseroan terbatas",
+          "paragraphs": "(1)(c)",
+          "role": "operative_text",
+          "use": "reading_reference"
+        },
+        {
+          "source_id": "PP20_2026",
+          "article": "59",
+          "needle": "dihapus",
+          "paragraphs": "Pasal I angka6",
+          "role": "amendment_instruction"
+        }
+      ],
+      "translations": {
+        "ru": "Архивная статьяII PP20 содержит переходные условия, в том числе для обычных PT/CV с незавершённым прежним сроком. Удаление прежней статьи59 нельзя читать без этого перехода и истории регистрации; применять его автоматически к компании нельзя.",
+        "en": "Archived PP20 ArticleII contains transitions, including ordinary PT/CV with an unexpired former eligibility period. Deletion of former Article59 cannot be read without that transition and registration history; it cannot be applied automatically to a company.",
+        "id": "PasalII PP20 yang diarsipkan memuat transisi, termasuk PT/CV biasa dengan jangka waktu lama belum berakhir. Penghapusan Pasal59 lama harus dibaca bersama transisi serta riwayat pendaftaran; tidak boleh diterapkan otomatis pada perusahaan."
+      },
+      "concepts": [
+        "amendment",
+        "history"
+      ],
+      "period": {
+        "from": "2026-04-22"
+      },
+      "dependencies": [],
+      "professional_review": null
+    },
+    {
+      "id": "BUSINESS_OLD_RATE",
+      "topic": "business_regimes",
+      "kind": "dependent_conclusion",
+      "selectors": [
+        {
+          "source_id": "PP55_2022",
+          "article": "56",
+          "needle": "nol koma lima",
+          "paragraphs": "(2)",
+          "role": "operative_text"
+        }
+      ],
+      "translations": {
+        "ru": "Прежний режим 0,5%.",
+        "en": "Earlier regime0.5%.",
+        "id": "Rezim lama0,5%."
+      },
+      "concepts": [
+        "rate"
+      ],
+      "period": {
+        "from": "2022-12-20",
+        "to": "2026-04-21",
+        "to_confirmed": true
+      },
+      "dependencies": [],
+      "professional_review": null
+    },
+    {
+      "id": "BUSINESS_NEW_RATE",
+      "topic": "business_regimes",
+      "kind": "dependent_conclusion",
+      "selectors": [
+        {
+          "source_id": "PP20_2026",
+          "article": "56",
+          "needle": "0,5%",
+          "paragraphs": "(2)",
+          "role": "operative_text"
+        },
+        {
+          "source_id": "PP20_2026",
+          "article": "57",
+          "needle": "perseroan perorangan",
+          "paragraphs": "(1)",
+          "role": "operative_text"
+        },
+        {
+          "source_id": "PP20_2026",
+          "article": "II",
+          "needle": "jangka waktu",
+          "paragraphs": "transition",
+          "role": "operative_text"
+        }
+      ],
+      "translations": {
+        "ru": "Соответствующий новый режим 0,5%.",
+        "en": "Covered amended regime0.5%.",
+        "id": "Rezim perubahan yang dicakup0,5%."
+      },
+      "concepts": [
+        "rate"
+      ],
+      "period": {
+        "from": "2026-04-22"
+      },
+      "dependencies": [],
+      "professional_review": null
+    },
+    {
+      "id": "CORPORATE_BASE",
+      "topic": "business_regimes",
+      "kind": "document_explanation",
+      "selectors": [
+        {
+          "source_id": "DJP_SDSN_2023",
+          "article": "17",
+          "needle": "Penghasilan Kena Pajak",
+          "paragraphs": "(1)",
+          "role": "operative_text"
+        },
+        {
+          "source_id": "DJP_SDSN_2023",
+          "article": "31E",
+          "needle": "Penghasilan Kena Pajak",
+          "paragraphs": "(1)",
+          "role": "operative_text"
+        }
+      ],
+      "translations": {
+        "ru": "Архивный UU PPh отделяет налог с налогооблагаемой прибыли компании от оборотного режима и предусматривает отдельную льготу. Эти базы нельзя смешивать с PPN или назначать льготу без её условий.",
+        "en": "The archived PPh Law distinguishes corporate taxable-income tax from a turnover regime and provides a separate facility. Those bases must not be conflated with PPN or a facility granted without checking conditions.",
+        "id": "UU PPh yang diarsipkan membedakan pajak penghasilan kena pajak badan dari rezim omzet dan memuat fasilitas tersendiri. Dasar ini tidak boleh dicampur dengan PPN atau fasilitas diberikan tanpa memeriksa syarat."
+      },
+      "concepts": [
+        "base",
+        "scope"
+      ],
+      "period": {
+        "from": "2022-01-01"
+      },
+      "dependencies": [],
+      "professional_review": null
+    },
+    {
+      "id": "INSTALLMENT_METHOD",
+      "topic": "pph25_29",
+      "kind": "document_explanation",
+      "selectors": [
+        {
+          "source_id": "DJP_SDSN_2023",
+          "article": "25",
+          "needle": "angsuran pajak",
+          "paragraphs": "(1),(6),(7)",
+          "role": "operative_text"
+        }
+      ],
+      "translations": {
+        "ru": "Архивная статья25 описывает авансы на основе прошлогоднего SPT и допустимых кредитов, а также особые случаи. Это не произвольно выбранный процент оборота.",
+        "en": "Archived Article25 describes instalments based on the prior SPT and allowable credits, with special cases. This is not an arbitrarily selected turnover percentage.",
+        "id": "Pasal25 yang diarsipkan menjelaskan angsuran berdasarkan SPT sebelumnya dan kredit yang diperbolehkan, dengan kasus khusus. Ini bukan persentase omzet yang dipilih bebas."
+      },
+      "concepts": [
+        "installment",
+        "base"
+      ],
+      "period": {},
+      "dependencies": [],
+      "professional_review": null
+    },
+    {
+      "id": "ANNUAL_UNDERPAYMENT",
+      "topic": "pph25_29",
+      "kind": "document_explanation",
+      "selectors": [
+        {
+          "source_id": "DJP_SDSN_2023",
+          "article": "29",
+          "needle": "sebelum Surat Pemberitahuan",
+          "paragraphs": "whole",
+          "role": "operative_text"
+        },
+        {
+          "source_id": "PMK81_2024",
+          "article": "95",
+          "needle": "sebelum Surat Pemberitahuan",
+          "paragraphs": "(1)",
+          "role": "operative_text"
+        }
+      ],
+      "translations": {
+        "ru": "Архивные положения отличают годовую недоплату PPh29 от авансов PPh25: недоплата связана с годовым налогом после допустимых кредитов и подачей SPT. Действующий срок и сумма для компании требуют отдельного подтверждения.",
+        "en": "The archived provisions distinguish annual PPh29 underpayment from PPh25 instalments: underpayment relates to annual tax after allowable credits and SPT submission. Current company deadline and amount require separate confirmation.",
+        "id": "Ketentuan yang diarsipkan membedakan kurang bayar PPh29 tahunan dari angsuran PPh25: kurang bayar berkaitan dengan pajak tahunan setelah kredit yang diperbolehkan dan penyampaian SPT. Tenggat serta jumlah perusahaan terkini perlu konfirmasi terpisah."
+      },
+      "concepts": [
+        "annual",
+        "deadline"
+      ],
+      "period": {},
+      "dependencies": [],
+      "professional_review": null
+    },
+    {
+      "id": "INSTALLMENT_REPORTING",
+      "topic": "pph25_29",
+      "kind": "document_explanation",
+      "selectors": [
+        {
+          "source_id": "PMK81_2024",
+          "article": "171",
+          "needle": "mendapatkan validasi",
+          "paragraphs": "(10),(11)",
+          "role": "operative_text"
+        }
+      ],
+      "translations": {
+        "ru": "Архивная статья171 содержит особое правило для валидированного платежа PPh25 и отдельное исключение при нулевом авансе. Нельзя автоматически требовать тот же отчётный поток для всех авансов.",
+        "en": "Archived Article171 contains a special rule for a validated PPh25 payment and a separate zero-instalment exclusion. The same reporting flow cannot automatically be required for every instalment.",
+        "id": "Pasal171 yang diarsipkan memuat aturan khusus pembayaran PPh25 tervalidasi serta pengecualian angsuran nihil. Alur pelaporan yang sama tidak otomatis wajib untuk setiap angsuran."
+      },
+      "concepts": [
+        "reporting"
+      ],
+      "period": {
+        "from": "2025-01-01"
+      },
+      "dependencies": [],
+      "professional_review": null
+    },
+    {
+      "id": "DEADLINE_SEPARATION",
+      "topic": "deadlines",
+      "kind": "document_explanation",
+      "selectors": [
+        {
+          "source_id": "PMK81_2024",
+          "article": "94",
+          "needle": "Pembayaran dan penyetoran",
+          "paragraphs": "(1),(2)",
+          "role": "operative_text"
+        },
+        {
+          "source_id": "PMK81_2024",
+          "article": "171",
+          "needle": "wajib melaporkan",
+          "paragraphs": "(1),(2)",
+          "role": "operative_text"
+        }
+      ],
+      "translations": {
+        "ru": "Архив PMK81 регулирует уплату и отчётность разными положениями; вид налога, роль плательщика и период нужны для выбора обязанности. В настоящем ответе конкретная действующая дата не установлена.",
+        "en": "The PMK81 archive regulates payment and filing in separate provisions; tax type, payer role and period are needed to identify the obligation. This answer does not establish a specific current due date.",
+        "id": "Arsip PMK81 mengatur pembayaran dan pelaporan dalam ketentuan terpisah; jenis pajak, peran pembayar serta periode diperlukan. Jawaban ini tidak menetapkan tanggal jatuh tempo terkini."
+      },
+      "concepts": [
+        "payment",
+        "filing"
+      ],
+      "period": {},
+      "dependencies": [],
+      "professional_review": null
+    },
+    {
+      "id": "DEADLINE_HOLIDAYS",
+      "topic": "deadlines",
+      "kind": "document_explanation",
+      "selectors": [
+        {
+          "source_id": "PMK81_2024",
+          "article": "100",
+          "needle": "hari libur",
+          "paragraphs": "(1),(2)",
+          "role": "operative_text"
+        },
+        {
+          "source_id": "PMK81_2024",
+          "article": "173",
+          "needle": "hari",
+          "paragraphs": "(1)",
+          "role": "operative_text"
+        }
+      ],
+      "translations": {
+        "ru": "Архивные статьи отдельно регулируют нерабочие дни. Без официального календаря и проверки особых послаблений нельзя превратить базовый срок в подтверждённую дату для компании.",
+        "en": "The archived articles separately regulate holidays. Without an official calendar and checks for specific relief a baseline deadline cannot become a confirmed company date.",
+        "id": "Pasal yang diarsipkan mengatur hari libur secara terpisah. Tanpa kalender resmi serta pemeriksaan relaksasi khusus, tenggat dasar tidak menjadi tanggal perusahaan yang terkonfirmasi."
+      },
+      "concepts": [
+        "holiday"
+      ],
+      "period": {
+        "from": "2025-01-01"
+      },
+      "dependencies": [],
+      "professional_review": null
+    },
+    {
+      "id": "DEADLINE_PAYMENT_DATE",
+      "topic": "deadlines",
+      "kind": "dependent_conclusion",
+      "selectors": [
+        {
+          "source_id": "PMK81_2024",
+          "article": "94",
+          "needle": "tanggal 15",
+          "paragraphs": "(2)",
+          "role": "operative_text"
+        }
+      ],
+      "translations": {
+        "ru": "Уплата перечисленных налогов до15-го следующего месяца.",
+        "en": "Listed taxes paid by next-month day15.",
+        "id": "Pajak yang tercantum dibayar tanggal15 bulan berikut."
+      },
+      "concepts": [
+        "payment"
+      ],
+      "period": {
+        "from": "2025-01-01"
+      },
+      "dependencies": [
+        "PMK81_2024"
+      ],
+      "professional_review": null
+    },
+    {
+      "id": "DEADLINE_FILING_DATE",
+      "topic": "deadlines",
+      "kind": "dependent_conclusion",
+      "selectors": [
+        {
+          "source_id": "PMK81_2024",
+          "article": "171",
+          "needle": "20 (dua puluh) hari",
+          "paragraphs": "(1)",
+          "role": "operative_text"
+        }
+      ],
+      "translations": {
+        "ru": "Месячная отчётность перечисленных налогов20 дней.",
+        "en": "Listed monthly returns20 days.",
+        "id": "SPT Masa yang tercantum20 hari."
+      },
+      "concepts": [
+        "filing"
+      ],
+      "period": {
+        "from": "2025-01-01"
+      },
+      "dependencies": [
+        "PMK81_2024"
+      ],
+      "professional_review": null
+    }
+  ]
+}
