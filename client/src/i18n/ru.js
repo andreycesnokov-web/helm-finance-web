@@ -257,6 +257,7 @@ const ru = {
     scopeExplain: 'Бизнес-кошельки учитываются в CFO Score и запасе дней. Личные кошельки отображаются отдельно.',
     totalBusiness: 'Бизнес-итого',
     totalPersonal: 'Личное итого',
+    transferBetween: 'Перевод между счетами',
   },
   add: {
     title: 'Добавить',

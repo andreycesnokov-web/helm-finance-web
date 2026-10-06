@@ -23,6 +23,7 @@ import BusinessOnboarding from '../pages/business/Onboarding'
 import TaxSplit from '../pages/business/TaxSplit'
 import InvoiceSettlement from '../pages/business/InvoiceSettlement'
 import Counterparties from '../pages/business/Counterparties'
+import ComplianceCalendar from '../pages/ComplianceCalendar'
 import Accounts from '../pages/Accounts'
 import AICFO from '../pages/AICFO'
 import Payroll from '../pages/Payroll'
@@ -122,6 +123,7 @@ export default function BusinessApp() {
           <Route path="documents/classic" element={<BusinessDocuments />} />
           <Route path="accountant" element={<V2Accountant />} />
           <Route path="accountant/classic" element={<BusinessAccountantHub />} />
+          <Route path="accountant/calendar" element={<ComplianceCalendar />} />
           <Route path="accountant/tax-profile" element={<CompanyProfile />} />
           <Route path="accountant/tax-split" element={<TaxSplit />} />
           <Route path="accountant/settlement" element={<InvoiceSettlement />} />

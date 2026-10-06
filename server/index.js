@@ -18,6 +18,7 @@ const PNLMAP = require('./lib/pnlMapping');         // Design v2 P-10 (migration
 const DW = require('./lib/debtWithholding');        // remaining balance with withholdings (batch 10)
 const ASSETS = require('./lib/assetRegister');      // Design v2 P-11 (migration 063)
 const BFUND = require('./lib/businessFunding');     // Design v2 P-03 (migration 064)
+const aiAccountantCore = require('./lib/aiAccountantCore');
 // Telegram-created payables are IDR-only until multi-currency payables exist end to end.
 // See server/lib/telegramCurrency.js for why refusing beats recording a wrong row.
 const { isSupportedTelegramCurrency, currencyNotSupported, normalizeCurrency } = require('./lib/telegramCurrency');
@@ -81,6 +82,8 @@ const PERSONAL_WORKSPACE_ENABLED = process.env.PERSONAL_WORKSPACE_ENABLED === 't
 const PERSONAL_ACCOUNT_V1_ENABLED = process.env.PERSONAL_ACCOUNT_V1_ENABLED === 'true';
 const PW = require('./lib/personalWorkspace');
 const fx = require('./lib/fxProvider');
+const Anthropic = require('@anthropic-ai/sdk');
+const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 // Email-primary identity (Phase 1) is OFF by default. Endpoints 404 when disabled.
 // Requires migration 042 (user_email_identities / user_profiles / email_login_codes /
 // app_user_id_seq). Telegram auth is unaffected by this flag.
@@ -939,56 +942,9 @@ async function requireBusiness(req, res) {
 //   a stable, representative daily burn rate.
 //
 // @param allTxs — all-time transactions array (must include `created_at`)
-// @param totalBalance — computed total cash balance (all-time income − expenses + corrections)
-// @returns { burn_rate_daily, runway_days, burn_window_days }
-function computeBurnAndRunway(allTxs, totalBalance) {
-  const CASH_OUT = TX.CASH_OUT_LEGACY;
-  const now      = new Date();
-  const cutoff30 = new Date(now.getTime() - 30 * 86400000);
+const burnRunway = require('./lib/burnRunway');
+const computeBurnAndRunway = burnRunway.computeBurnAndRunway;
 
-  // Burn is about when money MOVED, not when the row was typed. Using created_at made
-  // every back-dated entry land in the current window, so a bulk import of last
-  // quarter's spend read as if it had all been spent this month.
-  const eff = (t) => FININ.effectiveDate(t);
-  // All expense transactions with a valid date
-  const allExpTxs = (allTxs || []).filter(t => CASH_OUT.includes(t.type) && eff(t));
-
-  if (allExpTxs.length === 0) {
-    // No expense data — cannot compute burn rate
-    return { burn_rate_daily: 0, runway_days: null, burn_window_days: 0 };
-  }
-
-  // Days since oldest expense transaction (data window we actually have)
-  const oldestDate  = allExpTxs.reduce((oldest, t) => {
-    const d = new Date(eff(t));
-    return d < oldest ? d : oldest;
-  }, now);
-  const daysOfData  = Math.max(1, Math.round((now - oldestDate) / 86400000));
-
-  let dailyBurn, windowDays;
-
-  if (daysOfData >= 30) {
-    // ── Full rolling 30-day window ────────────────────────────────────────
-    const last30Exp = allExpTxs
-      .filter(t => new Date(eff(t)) >= cutoff30)
-      .reduce((s, t) => s + Number(t.amount_idr ?? t.amount_original ?? 0), 0);
-    dailyBurn  = last30Exp / 30;
-    windowDays = 30;
-  } else {
-    // ── Partial window — use all available data ───────────────────────────
-    const totalExp = allExpTxs.reduce((s, t) => s + Number(t.amount_idr ?? t.amount_original ?? 0), 0);
-    dailyBurn  = totalExp / daysOfData;
-    windowDays = daysOfData;
-  }
-
-  const runwayDays = dailyBurn > 0 ? Math.round(totalBalance / dailyBurn) : null;
-
-  return {
-    burn_rate_daily:  Math.round(dailyBurn),
-    runway_days:      runwayDays,
-    burn_window_days: windowDays,   // how many days of data used (for UI transparency)
-  };
-}
 
 // --- Pulse API -------------------------------------------------------------
 
@@ -1186,9 +1142,9 @@ app.get('/api/pulse', auth, async (req, res) => {
 
     // -- Burn rate & runway via rolling 30-day window ----------------------
     // allTxs has created_at (select('*')), so computeBurnAndRunway works here.
-    const burnMetrics = computeBurnAndRunway(allTxs, totalBalance);
+    const burnMetrics = computeBurnAndRunway(allTxs, totalBalance, asOfDate);
     const burnRate = burnMetrics.burn_rate_daily;
-    const runway   = burnMetrics.runway_days ?? 999;
+    const runway   = burnMetrics.runway_days; // null when cash flow positive, break-even or insufficient data
 
     // Use remaining_amount (not original amount) and exclude paid/cancelled
     // Only approved/confirmed debts count as real obligations/expected cash.
@@ -1209,18 +1165,27 @@ app.get('/api/pulse', auth, async (req, res) => {
     // -- AI status ----------------------------------------------------------
     let aiStatus = 'healthy';
     let aiText = '';
-    if (runway <= 7) {
+    if (runway !== null && runway <= 7) {
       aiStatus = 'critical';
       aiText = `Only ${runway} days of runway left. Incoming payment needed.`;
-    } else if (runway <= 14) {
+    } else if (runway !== null && runway <= 14) {
       aiStatus = 'attention';
       aiText = `Runway ${runway} days. Check receivables - some obligations may reduce the buffer.`;
     } else {
       aiStatus = 'healthy';
-      const runwayPart = language === 'ru' ? `Запас денег: ${runway} дней.` : language === 'id' ? `Cadangan kas: ${runway} hari.` : `Runway ${runway} days.`
-      const incomePart = cx(language, 'incomeCoversObligations')
-      const riskPart   = cx(language, 'noRisksDetected')
-      aiText = `${runwayPart} ${incomePart} ${riskPart}`;
+      let runwayPart = '';
+      if (runway !== null) {
+        runwayPart = language === 'ru' ? `Запас денег: ${runway} дней.` : language === 'id' ? `Cadangan kas: ${runway} hari.` : `Runway ${runway} days.`;
+      } else if (burnMetrics.runway_reason === 'positive_cash_flow') {
+        runwayPart = language === 'ru' ? 'Денежный поток положительный.' : language === 'id' ? 'Arus kas positif.' : 'Positive cash flow.';
+      } else if (burnMetrics.runway_reason === 'break_even') {
+        runwayPart = language === 'ru' ? 'Операционный баланс в равновесии.' : language === 'id' ? 'Arus kas seimbang.' : 'Cash flow balanced.';
+      } else {
+        runwayPart = language === 'ru' ? 'Недостаточно данных для расчёта запаса.' : language === 'id' ? 'Data transaksi belum cukup.' : 'Insufficient data for runway calculation.';
+      }
+      const incomePart = cx(language, 'incomeCoversObligations');
+      const riskPart   = cx(language, 'noRisksDetected');
+      aiText = `${runwayPart} ${incomePart} ${riskPart}`.trim();
     }
 
     // -- Today's focus ------------------------------------------------------
@@ -1230,7 +1195,7 @@ app.get('/api/pulse', auth, async (req, res) => {
       if (daysLeft <= 14) {
         todayFocus.push({
           id: d.id,
-         title: d.type === 'receivable' ? `Remind ${d.counterparty} to pay` : `Pay ${d.counterparty}`,
+          title: d.type === 'receivable' ? `Remind ${d.counterparty} to pay` : `Pay ${d.counterparty}`,
           meta: `${Number(d.amount).toLocaleString('en-US')} IDR · ${daysLeft > 0 ? daysLeft + ' days' : 'today'}`,
           type: d.type === 'receivable' ? 'receivable' : 'payable',
           done: false
@@ -1246,6 +1211,19 @@ app.get('/api/pulse', auth, async (req, res) => {
 
     res.json({
       scope, totalBalance, income, expenses, burnRate, runway,
+      daily_spend: burnMetrics.daily_spend,
+      daily_spend_window_days: burnMetrics.burn_window_days,
+      net_burn_daily: burnMetrics.net_burn_daily,
+      net_burn_monthly: burnMetrics.net_burn_monthly,
+      runway_days: burnMetrics.runway_days,
+      runway_reason: burnMetrics.runway_reason,
+      burn_rate_daily: burnMetrics.daily_spend,
+      window_start: burnMetrics.window_start,
+      window_end: burnMetrics.window_end,
+      operating_expenses: burnMetrics.operating_expenses,
+      operating_inflows: burnMetrics.operating_inflows,
+      has_unvalued_tx: burnMetrics.has_unvalued_tx,
+      unvalued_tx_count: burnMetrics.unvalued_tx_count,
       as_of_date: asOfDate,
       rates: serverRates,
       rates_metadata: ratesMetadata,
@@ -2887,8 +2865,8 @@ app.get('/api/accountant/summary', auth, async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// POST /api/accountant/ask — AI explains compliance using ONLY deterministic
-// data. It never invents a rate/deadline/requirement and always cites sources.
+// POST /api/accountant/ask — AI explains compliance and financial status using ONLY
+// deterministic data. It never invents a rate/deadline/requirement/figure and always cites sources.
 app.post('/api/accountant/ask', auth, async (req, res) => {
   try {
     const biz = await requireBusiness(req, res);
@@ -2896,12 +2874,55 @@ app.post('/api/accountant/ask', auth, async (req, res) => {
     if (!canViewBusinessFinance(biz.role)) return res.status(403).json({ error: 'Forbidden' });
     const question = String(req.body?.question || '').slice(0, 500);
     if (!question) return res.status(400).json({ error: 'question required' });
-    const language = normalizeLanguage(await getUserLanguage(req.user.userId));
+    const language = normalizeLanguage(req.body?.language || await getUserLanguage(req.user.userId));
     const disclaimer = AI_ACCOUNTANT_DISCLAIMER[language] || AI_ACCOUNTANT_DISCLAIMER.en;
     const data = await buildAccountantData(biz);
 
+    const bizOr = bizOrFilter(biz);
+
+    // Fetch wallets for financial context
+    const { data: rawWallets, error: wErr } = await supabase
+      .from('wallets')
+      .select('id, name, currency, type, is_active')
+      .or(bizOr)
+      .eq('is_active', true)
+      .order('sort_order', { ascending: true })
+      .order('created_at', { ascending: true });
+
+    // Fetch transactions for balances, counterparty summaries, and recent activity
+    const { data: rawTxs, error: tErr } = await supabase
+      .from('transactions')
+      .select('id, wallet_id, source, type, amount_original, amount_idr, currency_original, category, counterparty, description, created_at, date, transaction_date, transfer_id')
+      .or(bizOr)
+      .order('created_at', { ascending: false });
+
+    // Fetch and enrich debts / invoices (payable and receivable)
+    const { data: rawDebts, error: dErr } = await supabase
+      .from('debts')
+      .select('*')
+      .or(bizOr)
+      .or('is_training.is.null,is_training.eq.false')
+      .order('created_at', { ascending: false });
+
+    // Fail gracefully with 500 if database facts cannot be retrieved
+    if (wErr || tErr || dErr) {
+      const err = wErr || tErr || dErr;
+      console.error('[accountant/ask] Failed to load company financial facts:', err.message);
+      return res.status(500).json({ error: 'failed_to_load_financial_facts', message: err.message });
+    }
+
+    const enrichedDebts = await enrichDebtsFor(biz.business.id, rawDebts || []);
+
+    const { company: companyFacts, counterpartiesMap, walletsWithBalance } = aiAccountantCore.buildAccountantCompanyFacts({
+      business: biz.business,
+      rawWallets,
+      rawTxs,
+      enrichedDebts,
+    });
+
     // Only safe deterministic facts go to the model.
     const facts = {
+      company: companyFacts,
       jurisdiction: data.jurisdiction,
       profile: data.profile ? { legal_entity_type: data.profile.legal_entity_type, tax_regime: data.profile.tax_regime, vat_status: data.profile.vat_status, employee_status: data.profile.employee_status, financial_year_start: data.profile.financial_year_start, financial_year_end: data.profile.financial_year_end } : null,
       profile_completeness_percent: data.completeness.percent,
@@ -2911,30 +2932,34 @@ app.post('/api/accountant/ask', auth, async (req, res) => {
       overdue_obligations: data.overdue.map(e => ({ title: e.title, due_date: e.due_date })),
       active_unverified_rules: data.active_unverified,
     };
-    const prompt = `You are the Helm Finance AI Accountant for ONE business. Answer in ${language === 'ru' ? 'Russian' : language === 'id' ? 'Indonesian' : 'English'}.
 
-STRICT RULES:
-- Use ONLY the deterministic facts below. NEVER invent a tax rate, deadline, filing frequency, threshold or legal interpretation.
-- If the facts do not contain an active rule needed to answer, say the determination is not possible yet and what is missing (e.g. missing profile fields, unverified rules).
-- When you state an obligation, cite its rule_code, version and official source title.
-- You explain and summarise; you do not calculate tax amounts (the deterministic engine does that later).
-- Do not present this as official advice.
-
-FACTS:
-${JSON.stringify(facts)}
-
-QUESTION: ${question}`;
+    const prompt = aiAccountantCore.buildAccountantPrompt({
+      business: biz.business,
+      facts,
+      question,
+      language,
+    });
 
     let answer;
-    try {
-      const resp = await anthropic.messages.create({ model: 'claude-sonnet-4-5', max_tokens: 700, messages: [{ role: 'user', content: prompt }] });
-      answer = (resp.content?.[0]?.text || '').trim();
-    } catch {
-      // Local fallback keeps the feature usable if the model is unavailable.
-      answer = data.applicable_rules.length
-        ? `Applicable obligations: ${data.applicable_rules.map(r => `${r.title} (${r.rule_code} v${r.version})`).join('; ')}. ${data.overdue.length ? `${data.overdue.length} overdue. ` : ''}Confirm with a licensed professional.`
-        : `No active verified tax rules apply yet${data.missing_profile_fields.length ? ` — missing profile fields: ${data.missing_profile_fields.join(', ')}` : ''}. Determination not possible.`;
+    if (anthropic && process.env.ANTHROPIC_API_KEY) {
+      try {
+        const resp = await anthropic.messages.create({ model: 'claude-sonnet-4-5', max_tokens: 700, messages: [{ role: 'user', content: prompt }] });
+        answer = (resp.content?.[0]?.text || '').trim();
+      } catch (aiErr) {
+        console.warn('[accountant/ask] Anthropic API call failed, falling back to deterministic answer:', aiErr.message);
+      }
     }
+
+    if (!answer) {
+      answer = aiAccountantCore.generateDeterministicFallbackAnswer({
+        question,
+        language,
+        counterpartiesMap,
+        walletsWithBalance,
+        taxData: data,
+      });
+    }
+
     res.json({ answer, disclaimer, used_rules: data.applicable_rules.map(r => ({ rule_code: r.rule_code, version: r.version })) });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -2963,6 +2988,40 @@ app.get('/api/accountant/sources', auth, async (req, res) => {
     const { data } = await supabase.from('official_sources').select('*').order('jurisdiction');
     res.json({ sources: data || [] });
   } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// GET /api/accountant/tax-knowledge/cards — dynamic cards from PR #133 getCard()
+// Business research only; no calculations, no rule mutations, rates and TER blocked.
+app.get('/api/accountant/tax-knowledge/cards', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canViewBusinessFinance(biz.role)) return res.status(403).json({ error: 'Forbidden' });
+
+    const { getCard } = require('./lib/indonesiaTaxKnowledgeCards.cjs');
+    const lang = ['ru', 'en', 'id'].includes(req.query.language || req.query.lang)
+      ? (req.query.language || req.query.lang)
+      : 'ru';
+    const topicId = req.query.topic_id;
+
+    const TOPICS = [
+      'pph21', 'pph26', 'pph23', 'pph_final_rent',
+      'pph25', 'pph29', 'ppn', 'pkp', 'npwp_nik'
+    ];
+
+    if (topicId) {
+      if (!TOPICS.includes(topicId)) {
+        return res.status(400).json({ error: 'unsupported_topic', message: `Topic ${topicId} is not supported` });
+      }
+      const card = getCard({ topic_id: topicId, language: lang, intent: 'explanation' });
+      return res.json({ card });
+    }
+
+    const cards = TOPICS.map(t => getCard({ topic_id: t, language: lang, intent: 'explanation' }));
+    res.json({ cards });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 
@@ -8142,9 +8201,6 @@ app.patch('/api/reminders/:id/snooze', auth, async (req, res) => {
 
 // --- Parse API (AI) --------------------------------------------------------
 
-const Anthropic = require('@anthropic-ai/sdk');
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-
 app.post('/api/parse', auth, async (req, res) => {
   try {
     const { text } = req.body;
@@ -8250,9 +8306,9 @@ app.post('/api/transactions/batch', auth, async (req, res) => {
     }
 
     // ── Wallet validation ────────────────────────────────────────────────────
-    // Collect distinct wallet_ids supplied in this batch
+    // Collect distinct wallet_ids supplied in this batch (including transfer targets)
     const requestedWalletIds = [...new Set(
-      transactions.map(t => t.wallet_id).filter(Boolean)
+      transactions.flatMap(t => [t.wallet_id, t.to_wallet_id]).filter(Boolean)
     )];
 
     let walletMap = {}; // id → { id, name, currency }
@@ -8274,13 +8330,118 @@ app.post('/api/transactions/batch', auth, async (req, res) => {
       walletMap = Object.fromEntries((ownedWallets || []).map(w => [w.id, w]));
     }
 
+    // ── Check replay for transfers in batch ───────────────────────────────────
+    const transferIdsInBatch = [...new Set(transactions.map(t => t.transfer_id).filter(Boolean))];
+    let existingTransferIds = new Set();
+    if (transferIdsInBatch.length > 0) {
+      const { data: existingTransferTxs } = await supabase
+        .from('transactions')
+        .select('id, transfer_id')
+        .or(bizOrFilter(biz))
+        .in('transfer_id', transferIdsInBatch);
+      if (existingTransferTxs && existingTransferTxs.length > 0) {
+        existingTransferIds = new Set(existingTransferTxs.map(x => x.transfer_id));
+        if (transactions.every(t => t.transfer_id && existingTransferIds.has(t.transfer_id))) {
+          return res.status(200).json({ saved: existingTransferTxs.length, is_replay: true });
+        }
+      }
+    }
+
     // ── Build rows ───────────────────────────────────────────────────────────
-    const rows = await Promise.all(transactions.map(async t => {
-      // Auto-fill source from wallet name if wallet_id provided but source is empty
-      const wallet        = t.wallet_id ? walletMap[t.wallet_id] : null;
+    const rowBatches = await Promise.all(transactions.map(async t => {
+      if (t.transfer_id && existingTransferIds.has(t.transfer_id)) {
+        return []; // skip already recorded transfer leg
+      }
+      const wallet   = t.wallet_id ? walletMap[t.wallet_id] : null;
+      const toWallet = t.to_wallet_id ? walletMap[t.to_wallet_id] : null;
+      const txDate   = t.transaction_date || new Date().toISOString().slice(0, 10);
+
+      // Complete atomic double-entry transfer (TASK 30)
+      if (t.type === 'transfer' && toWallet && wallet) {
+        const transferId = t.transfer_id || crypto.randomUUID();
+        const transferRef = `xfer:${transferId}`;
+        const fromCur = String(wallet.currency || t.currency || 'IDR').toUpperCase().trim();
+        const toCur   = String(toWallet.currency || 'IDR').toUpperCase().trim();
+        const sourceAmt = Number(t.amount);
+        const desc = t.description || `Transfer: ${wallet.name} → ${toWallet.name}`;
+
+        const fxFrom = await fx.toIdr(sourceAmt, fromCur, txDate);
+        let targetAmt;
+        let fxTo;
+
+        if (fromCur === toCur) {
+          targetAmt = sourceAmt;
+          fxTo = fxFrom;
+        } else {
+          if (t.target_amount && Number(t.target_amount) > 0) {
+            targetAmt = Number(t.target_amount);
+          } else if (t.booked_rate || t.rate) {
+            targetAmt = Math.round(sourceAmt * Number(t.booked_rate || t.rate) * 100) / 100;
+          } else {
+            if (fromCur === 'IDR') {
+              const qTo = await fx.toIdr(1, toCur, txDate);
+              targetAmt = Math.round((sourceAmt / (qTo.booked_rate || 1)) * 100) / 100;
+            } else if (toCur === 'IDR') {
+              targetAmt = fxFrom.amount_idr;
+            } else {
+              const qTo = await fx.toIdr(1, toCur, txDate);
+              targetAmt = Math.round((fxFrom.amount_idr / (qTo.booked_rate || 1)) * 100) / 100;
+            }
+          }
+
+          if (toCur === 'IDR') {
+            fxTo = { amount_idr: targetAmt, booked_rate: 1, rate_source: 'base_currency' };
+          } else {
+            fxTo = await fx.toIdr(targetAmt, toCur, txDate, {
+              rate: t.booked_rate || t.rate,
+              source: t.rate_source || 'transfer_cross_currency',
+              actor: userId,
+            });
+          }
+        }
+
+        const debitLeg = {
+          ...bizWriteFields(biz, userId),
+          type: 'expense',
+          amount_original: sourceAmt,
+          currency_original: fromCur,
+          amount_idr: fxFrom.amount_idr,
+          booked_rate: fxFrom.booked_rate,
+          rate_source: fxFrom.rate_source,
+          description: desc,
+          source: transferRef,
+          scope: t.scope || 'business',
+          project: t.project || null,
+          category: 'Transfer',
+          transaction_date: txDate,
+          wallet_id: wallet.id,
+          transfer_id: transferId,
+        };
+
+        const creditLeg = {
+          ...bizWriteFields(biz, userId),
+          type: 'income',
+          amount_original: targetAmt,
+          currency_original: toCur,
+          amount_idr: fxTo.amount_idr,
+          booked_rate: fxTo.booked_rate,
+          rate_source: fxTo.rate_source,
+          description: desc,
+          source: transferRef,
+          scope: t.scope || 'business',
+          project: t.project || null,
+          category: 'Transfer',
+          transaction_date: txDate,
+          wallet_id: toWallet.id,
+          transfer_id: transferId,
+        };
+
+        return [debitLeg, creditLeg];
+      }
+
+      // Standard non-transfer transaction (or transfer without to_wallet)
       const resolvedSource = t.source || (wallet ? wallet.name : null);
       const cur = String(t.currency || wallet?.currency || 'IDR').toUpperCase().trim();
-      const txDate = t.transaction_date || new Date().toISOString().slice(0, 10);
 
       let fxRes;
       if (t.booked_rate || t.rate || (t.amount_idr && cur !== 'IDR')) {
@@ -8295,7 +8456,7 @@ app.post('/api/transactions/batch', auth, async (req, res) => {
         fxRes = await fx.toIdr(t.amount, cur, txDate);
       }
 
-      return {
+      return [{
         ...bizWriteFields(biz, userId),
         type:                   t.type,
         amount_original:        t.amount,
@@ -8318,8 +8479,11 @@ app.post('/api/transactions/batch', auth, async (req, res) => {
         activity_type_id:       t.activity_type_id         || null,
         // Wallet (TASK 29B — nullable, backward compatible)
         wallet_id:              t.wallet_id                || null,
-      };
+        transfer_id:            t.transfer_id              || null,
+      }];
     }));
+
+    const rows = rowBatches.flat();
 
     const { error } = await supabase.from('transactions').insert(rows);
     if (error) throw error;
@@ -10160,6 +10324,176 @@ app.post('/api/wallets/:id/adjust-balance', auth, async (req, res) => {
   }
 });
 
+// POST /api/wallets/transfer — atomic double-entry transfer between business wallets (TASK 30)
+app.post('/api/wallets/transfer', auth, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canCreateConfirmedFinancialRecord(biz.role)) {
+      return res.status(403).json({ error: 'Your role does not allow creating wallet transfers' });
+    }
+
+    const {
+      from_wallet_id,
+      to_wallet_id,
+      amount,
+      target_amount,
+      rate,
+      rate_source,
+      date,
+      description,
+    } = req.body;
+
+    const sourceAmount = Number(amount);
+    if (isNaN(sourceAmount) || sourceAmount <= 0) {
+      return res.status(400).json({ error: 'invalid_amount', message: 'Transfer amount must be greater than zero' });
+    }
+
+    if (!from_wallet_id || !to_wallet_id || from_wallet_id === to_wallet_id) {
+      return res.status(400).json({ error: 'invalid_transfer_wallets', message: 'Source and destination wallets must be different' });
+    }
+
+    const bizOr = bizOrFilter(biz);
+    const { data: wallets, error: wErr } = await supabase
+      .from('wallets')
+      .select('id, name, currency, scope, is_active')
+      .or(bizOr)
+      .in('id', [from_wallet_id, to_wallet_id]);
+
+    if (wErr) throw wErr;
+
+    const fromWallet = (wallets || []).find(w => w.id === from_wallet_id && w.is_active);
+    const toWallet = (wallets || []).find(w => w.id === to_wallet_id && w.is_active);
+
+    if (!fromWallet || !toWallet) {
+      return res.status(404).json({ error: 'wallet_not_found', message: 'One or both wallets not found or inactive' });
+    }
+
+    const fromCur = (fromWallet.currency || 'IDR').toUpperCase();
+    const toCur   = (toWallet.currency || 'IDR').toUpperCase();
+    const txDate  = date ? new Date(date).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10);
+    const transferId = req.body.transfer_id || crypto.randomUUID();
+    const transferRef = `xfer:${transferId}`;
+    const desc = (description && description.trim()) || `Transfer: ${fromWallet.name} → ${toWallet.name}`;
+
+    // Replay / idempotency check for existing transfer_id
+    if (req.body.transfer_id) {
+      const { data: existingTxs } = await supabase
+        .from('transactions')
+        .select('*')
+        .or(bizOr)
+        .eq('transfer_id', req.body.transfer_id);
+
+      if (existingTxs && existingTxs.length > 0) {
+        return res.status(200).json({
+          ok: true,
+          is_replay: true,
+          transfer_id: req.body.transfer_id,
+          transactions: existingTxs,
+          from_wallet_id: fromWallet.id,
+          to_wallet_id: toWallet.id,
+          source_amount: sourceAmount,
+          source_currency: fromCur,
+          target_amount: Number(target_amount || sourceAmount),
+          target_currency: toCur,
+        });
+      }
+    }
+
+    let fxResFrom;
+    let fxResTo;
+    let finalTargetAmount;
+
+    // 1. Calculate source FX in IDR
+    fxResFrom = await fx.toIdr(sourceAmount, fromCur, txDate);
+
+    // 2. Multi-currency calculation
+    if (fromCur === toCur) {
+      finalTargetAmount = sourceAmount;
+      fxResTo = fxResFrom;
+    } else {
+      if (target_amount && Number(target_amount) > 0) {
+        finalTargetAmount = Number(target_amount);
+      } else if (rate && Number(rate) > 0) {
+        finalTargetAmount = Math.round(sourceAmount * Number(rate) * 100) / 100;
+      } else {
+        // Compute from quote
+        if (fromCur === 'IDR') {
+          const qTo = await fx.toIdr(1, toCur, txDate);
+          finalTargetAmount = Math.round((sourceAmount / (qTo.booked_rate || 1)) * 100) / 100;
+        } else if (toCur === 'IDR') {
+          finalTargetAmount = fxResFrom.amount_idr;
+        } else {
+          const qTo = await fx.toIdr(1, toCur, txDate);
+          finalTargetAmount = Math.round((fxResFrom.amount_idr / (qTo.booked_rate || 1)) * 100) / 100;
+        }
+      }
+
+      if (toCur === 'IDR') {
+        fxResTo = { amount_idr: finalTargetAmount, booked_rate: 1, rate_source: 'base_currency' };
+      } else {
+        fxResTo = await fx.toIdr(finalTargetAmount, toCur, txDate, {
+          rate: rate || (sourceAmount > 0 ? fxResFrom.amount_idr / finalTargetAmount : null),
+          source: rate_source || 'transfer_cross_currency',
+          actor: userId,
+        });
+      }
+    }
+
+    // Strict atomic RPC execution: row-locking and single DB transaction
+    if (typeof supabase.rpc !== 'function') {
+      return res.status(500).json({
+        error: 'rpc_not_available',
+        message: 'Atomic RPC functions are not supported or available on client',
+      });
+    }
+
+    try {
+      const { data: rpcRes, error: rpcErr } = await supabase.rpc('rpc_execute_wallet_transfer', {
+        p_business_id: biz.business.id,
+        p_user_id: userId,
+        p_from_wallet_id: fromWallet.id,
+        p_to_wallet_id: toWallet.id,
+        p_source_amount: sourceAmount,
+        p_source_currency: fromCur,
+        p_source_amount_idr: fxResFrom.amount_idr,
+        p_source_booked_rate: fxResFrom.booked_rate,
+        p_target_amount: finalTargetAmount,
+        p_target_currency: toCur,
+        p_target_amount_idr: fxResTo.amount_idr,
+        p_target_booked_rate: fxResTo.booked_rate,
+        p_rate_source: rate_source || fxResFrom.rate_source || 'system',
+        p_description: desc,
+        p_transaction_date: txDate,
+        p_transfer_id: transferId,
+        p_scope: 'business',
+      });
+
+      if (!rpcErr && rpcRes && rpcRes.ok) {
+        const status = rpcRes.is_replay ? 200 : 201;
+        return res.status(status).json(rpcRes);
+      }
+      if (rpcErr) {
+        const msg = rpcErr.message || '';
+        if (msg.includes('function') && msg.includes('does not exist')) {
+          return res.status(500).json({
+            error: 'rpc_function_missing',
+            message: 'rpc_execute_wallet_transfer function does not exist in database',
+          });
+        }
+        return res.status(400).json({ error: rpcErr.message });
+      }
+      return res.status(500).json({ error: 'atomic_transfer_failed', message: 'No response from transfer RPC' });
+    } catch (rpcErr) {
+      console.error('[wallets/transfer] Fatal RPC execution error:', rpcErr.message);
+      return res.status(500).json({ error: 'atomic_transfer_failed', message: rpcErr.message });
+    }
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // --- Admin endpoints -------------------------------------------------------
 
 app.get('/api/admin/users', auth, requireAdmin, async (req, res) => {
@@ -11412,47 +11746,122 @@ app.post('/api/debts/:id/pay', auth, async (req, res) => {
     });
   }
 
-  const { data: tx, error: txErr } = await supabase.from('transactions').insert({
-    ...bizWriteFields(biz, req.user.userId),
-    type:              txType,
-    amount_original:   paymentAmount,
-    currency_original: cur,
-    amount_idr:        fxRes.amount_idr,
-    booked_rate:       fxRes.booked_rate,
-    rate_source:       fxRes.rate_source,
-    description:       `Payment: ${debt.counterparty}`,
-    source:            account || (payWallet ? payWallet.name : null),
-    wallet_id:         wallet_id || (payWallet ? payWallet.id : null),
-    scope:             debt.scope || (payWallet ? payWallet.scope : null) || 'business',
-    transaction_date:  txDate,
-    created_at:        date ? new Date(date).toISOString() : new Date().toISOString(),
-  }).select('id').single();
-  if (txErr) return res.status(500).json({ error: txErr.message });
+  // Idempotency key handling
+  const idempotencyKey = (req.headers['idempotency-key'] || req.body?.idempotency_key || '').toString().trim();
+  const requestHash = crypto.createHash('sha256').update(JSON.stringify({
+    debt_id: String(debt.id),
+    amount: paymentAmount,
+    wallet_id: payWallet ? String(payWallet.id) : (wallet_id ? String(wallet_id) : null),
+    currency: cur,
+    date: txDate,
+  })).digest('hex');
 
-  // 2. Update debt — track paid_amount; NEVER modify original amount
-  // Note: last_payment_at and linked_transaction_id require migration 015
-  const debtUpdates = {
-    paid_amount:            newPaidAmount,
-    status:                 newStatus,
-    last_payment_at:        new Date().toISOString(),
-    linked_transaction_id:  tx?.id || null,
-  };
-  if (isFullyPaid) {
-    debtUpdates.is_settled = true;
-    debtUpdates.settled_at = new Date().toISOString();
+  if (idempotencyKey) {
+    try {
+      const { data: idempRow } = await supabase.from('debt_payment_idempotency')
+        .select('*')
+        .eq('business_id', biz.business.id)
+        .eq('key', idempotencyKey)
+        .maybeSingle();
+
+      if (idempRow) {
+        if (idempRow.request_hash === requestHash) {
+          return res.status(idempRow.response_status || 200).json({
+            ...idempRow.response_body,
+            is_replay: true,
+          });
+        } else {
+          return res.status(409).json({
+            error: 'idempotency_key_mismatch',
+            message: 'Idempotency key already used with different payment parameters',
+          });
+        }
+      }
+    } catch (idempErr) {
+      console.warn('[debts:pay] Idempotency lookup skipped:', idempErr.message);
+    }
   }
 
-  const { data: updatedDebt, error: updateErr } = await supabase.from('debts')
-    .update(debtUpdates).eq('id', debt.id).select().single();
-  if (updateErr) return res.status(500).json({ error: updateErr.message });
+  if (!payWallet) {
+    return res.status(400).json({
+      error: 'wallet_required',
+      message: 'A valid active business wallet is required to record a payment',
+    });
+  }
 
-  res.json({
-    ok:           true,
-    isFullyPaid,
-    remaining:    Math.max(0, effectiveTotal - newPaidAmount - withheld),
-    debt:         computeDebtStatus({ ...updatedDebt, withholding_allocated: withheld }),
-  });
-})
+  // Strict atomic RPC execution with FOR UPDATE locking and single DB transaction
+  if (typeof supabase.rpc !== 'function') {
+    return res.status(500).json({
+      error: 'rpc_not_available',
+      message: 'Atomic RPC functions are not supported or available on client',
+    });
+  }
+
+  try {
+    const { data: rpcRes, error: rpcErr } = await supabase.rpc('rpc_record_debt_payment', {
+      p_business_id: biz.business.id,
+      p_user_id: req.user.userId,
+      p_debt_id: debt.id,
+      p_wallet_id: payWallet.id,
+      p_amount: paymentAmount,
+      p_currency: cur,
+      p_amount_idr: fxRes.amount_idr,
+      p_booked_rate: fxRes.booked_rate,
+      p_rate_source: fxRes.rate_source,
+      p_payment_date: txDate,
+      p_idempotency_key: idempotencyKey || null,
+      p_request_hash: requestHash,
+      p_account_name: payWallet.name,
+      p_created_at: date ? new Date(date).toISOString() : new Date().toISOString(),
+    });
+
+    if (rpcErr) {
+      const msg = rpcErr.message || '';
+      if (msg.includes('idempotency_key_mismatch')) {
+        return res.status(409).json({ error: 'idempotency_key_mismatch', message: msg });
+      }
+      if (msg.includes('payment_exceeds_remaining')) {
+        return res.status(400).json({ error: 'payment_exceeds_remaining', message: msg });
+      }
+      if (msg.includes('debt_already_closed')) {
+        return res.status(400).json({ error: 'debt_already_closed', message: msg });
+      }
+      if (msg.includes('cross_currency_not_supported') || msg.includes('debt_currency_mismatch')) {
+        return res.status(400).json({ error: 'cross_currency_not_supported', message: msg });
+      }
+      if (msg.includes('debt_not_found')) {
+        return res.status(404).json({ error: 'debt_not_found', message: msg });
+      }
+      if (msg.includes('function') && msg.includes('does not exist')) {
+        return res.status(500).json({
+          error: 'rpc_function_missing',
+          message: 'rpc_record_debt_payment function does not exist in database',
+        });
+      }
+      return res.status(500).json({ error: msg });
+    }
+
+    if (rpcRes) {
+      if (rpcRes.is_replay) {
+        return res.status(rpcRes.status || 200).json({
+          ...rpcRes.data,
+          is_replay: true,
+        });
+      }
+      return res.json({
+        ok: true,
+        isFullyPaid: rpcRes.data.is_fully_paid,
+        remaining: Math.max(0, Number(rpcRes.data.remaining)),
+        debt: computeDebtStatus({ ...rpcRes.data.debt, withholding_allocated: withheld }),
+      });
+    }
+
+    return res.status(500).json({ error: 'atomic_payment_failed', message: 'No response from payment RPC' });
+  } catch (rpcErr) {
+    console.error('[debts:pay] Fatal RPC execution error:', rpcErr.message);
+    return res.status(500).json({ error: 'atomic_payment_failed', message: rpcErr.message });
+  }
+});
 
 // ── Business Settings Endpoint ───────────────────────────────────────────────
 // PATCH /api/business/current — owner/admin can update safe fields
@@ -11810,10 +12219,11 @@ async function buildAiCfoContext(userId, language = 'en', biz = null) {
     - persTxs.filter(t => CASH_OUT.includes(t.type)).reduce((s,t) => s + Number(t.amount_idr ?? t.amount_original ?? 0), 0)
     + persTxs.filter(t => t.type === 'correction').reduce((s,t) => s + Number(t.amount_idr ?? t.amount_original ?? 0), 0);
 
-  // ── This month (business wallets only) ────────────────────────────────────
+  // ── This month (business wallets only, transfers excluded) ─────────────────
   const bizMonthTxs   = (monthTxs || []).filter(t => txBelongsToWallets(t, businessWallets, businessWalletIds, 'business'));
-  const monthIncome   = bizMonthTxs.filter(t => CASH_IN.includes(t.type)).reduce((s,t) => s + Number(t.amount_idr ?? t.amount_original ?? 0), 0);
-  const monthExpenses = bizMonthTxs.filter(t => CASH_OUT.includes(t.type)).reduce((s,t) => s + Number(t.amount_idr ?? t.amount_original ?? 0), 0);
+  const isXfer = (t) => t.type === 'transfer' || !!t.transfer_id || t.category === 'Transfer';
+  const monthIncome   = bizMonthTxs.filter(t => CASH_IN.includes(t.type) && !isXfer(t)).reduce((s,t) => s + Number(t.amount_idr ?? t.amount_original ?? 0), 0);
+  const monthExpenses = bizMonthTxs.filter(t => CASH_OUT.includes(t.type) && !isXfer(t)).reduce((s,t) => s + Number(t.amount_idr ?? t.amount_original ?? 0), 0);
 
   // ── Burn rate & runway — rolling 30-day window (business wallets only) ────
   const bizTxs      = (allTxs || []).filter(t => txBelongsToWallets(t, businessWallets, businessWalletIds, 'business'));

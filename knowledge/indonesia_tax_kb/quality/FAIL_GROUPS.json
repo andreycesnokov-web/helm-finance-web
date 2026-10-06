@@ -1,0 +1,13 @@
+{
+  "baseline_sha": "749937d1df368302e4f05480504445db0eea08d1",
+  "source": "baseline_749937d/results_78.csv and runtime_results_78.json",
+  "baseline_failures": 40,
+  "groups": [
+    {"cause":"Indonesian body lexical ties and arbitrary three-fragment truncation","affected_examples":["Q17 EN","Q19 RU","Q23 RU/EN/ID","Q09","Q10","Q11","Q12","Q14","Q16","Q22","Q26"],"repair":"multilingual topic/concept routing to complete provision bundles"},
+    {"cause":"registry source presence conflated with actual evidence","affected_examples":["Q23","Q19","Q17 EN","Q14"],"repair":"separate registry/retrieval/claim proof/reading links; suppress unbound claims"},
+    {"cause":"page-only gold and lost article/continuation roles","affected_examples":["Q07","Q11","Q18","Q19","Q22"],"repair":"operative article identity, explicit continuations, Penjelasan and amendment-instruction roles; explained gold corrections"},
+    {"cause":"old warnings had no per-claim numerical/application gate","affected_examples":["Q07","Q12","Q20","Q23","Q26"],"repair":"period/version/text/TER gates, missing-amendment paths, localized clarifications"}
+  ],
+  "overlap":"Groups overlap; their sizes are not summed. Full per-run before/after rows are in results_78.csv.",
+  "remaining_literal_old_gold_failures":"Q07 on three languages: signature page8 is no longer mislabeled as commencement. Corrected gold requires article7 on page7 as historical material."
+}

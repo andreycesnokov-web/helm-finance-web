@@ -97,7 +97,10 @@
 .pulse-cash-meta { margin: 0; font-size: 12.5px; line-height: 1.5; opacity: .74; }
 
 /* ── KPI cards (white) ──────────────────────────────────────────────────── */
-.pulse-kpis { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; min-width: 0; }
+.pulse-kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; min-width: 0; }
+@media (max-width: 1400px) {
+  .pulse-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
 .pulse-kpi {
   display: flex;
   flex-direction: column;

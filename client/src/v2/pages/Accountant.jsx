@@ -21,6 +21,9 @@ import { monthOptions, accountantMonth, closeReadiness, packages, packageSummary
 import { askAccountant } from '../lib/ask'
 import AccountantTabs from '../components/AccountantTabs'
 import { findWithholdingRule } from '../../pages/business/InvoiceReviewDrawer'
+import TaxKnowledgeCard from '../../components/TaxKnowledgeCard'
+import { listTaxCards, getTaxCard, matchTopicId } from '../../lib/taxKnowledgeFixtures'
+import InfoTooltip from '../../components/InfoTooltip'
 
 const monthLabel = (key, lang) => {
   const [y, m] = key.split('-').map(Number)
@@ -38,16 +41,46 @@ function MonthPicker({ value, onChange }) {
   )
 }
 
-function AskBox() {
+function AskBox({ externalQuery = '', onQueryChange }) {
   const t = useT()
   const { token } = useAuth()
-  const [q, setQ] = useState('')
+  const [sp, setSp] = useSearchParams()
+  const [q, setQ] = useState(() => externalQuery || sp.get('ask') || '')
   const [st, setSt] = useState({ busy: false, answer: null, err: null })
   // One business's answer never shows under another (review 8.2 #2).
   const { active, scopeKey } = useWorkspace()
   const wsKey = `${active?.id ?? ''}|${scopeKey ?? ''}`
   const wsRef = useRef(wsKey)
-  useEffect(() => { wsRef.current = wsKey; setQ(''); setSt({ busy: false, answer: null, err: null }) }, [wsKey])
+
+  useEffect(() => {
+    if (externalQuery !== undefined && externalQuery !== null && externalQuery !== '') {
+      setQ(externalQuery)
+    }
+  }, [externalQuery])
+
+  useEffect(() => {
+    if (wsRef.current !== wsKey) {
+      wsRef.current = wsKey
+      setQ('')
+      setSt({ busy: false, answer: null, err: null })
+      if (onQueryChange) onQueryChange('')
+      if (sp.has('ask') || sp.has('q')) {
+        const nextSp = new URLSearchParams(sp)
+        nextSp.delete('ask')
+        nextSp.delete('q')
+        setSp(nextSp, { replace: true })
+      }
+    }
+  }, [wsKey, sp, setSp, onQueryChange])
+
+  useEffect(() => {
+    // Only take search param if ws hasn't just switched away
+    const askParam = sp.get('ask') || sp.get('q')
+    if (askParam) {
+      setQ(askParam)
+    }
+  }, [sp])
+
   const ask = async (question) => {
     const text = (question ?? q).trim()
     if (!text) return
@@ -61,7 +94,17 @@ function AskBox() {
       <form className="v2-askbox" onSubmit={(e) => { e.preventDefault(); ask() }}>
         <label htmlFor="acc-ask" className="v2-field-label">{t('acct.askLabel')}</label>
         <div className="v2-askrow">
-          <input id="acc-ask" className="v2-input" value={q} onChange={(e) => setQ(e.target.value)} placeholder={t('acct.askPh')} maxLength={500} />
+          <input
+            id="acc-ask"
+            className="v2-input"
+            value={q}
+            onChange={(e) => {
+              setQ(e.target.value)
+              if (onQueryChange) onQueryChange(e.target.value)
+            }}
+            placeholder={t('acct.askPh')}
+            maxLength={500}
+          />
           <button type="submit" className="v2-btn v2-btn-primary" aria-label={t('acct.send')} title={q.trim() ? undefined : t('ask.typeFirst')} disabled={st.busy || !q.trim()}><I.send size={16} /></button>
         </div>
       </form>
@@ -90,10 +133,31 @@ function TaxList({ events, lang, t, limit, empty = 'acct.noEvents' }) {
     <ul className="v2-taxlist">
       {events.slice(0, limit).map((e) => {
         const stage = eventStage(e)
+        const topicId = matchTopicId(e.rule_code || e.title)
+        const matchedCard = topicId ? getTaxCard(topicId, lang) : null
+        const whatText = Array.isArray(matchedCard?.what_is) && matchedCard.what_is[0]?.text
+          ? matchedCard.what_is[0].text
+          : (Array.isArray(matchedCard?.summary) && matchedCard.summary[0]?.text ? matchedCard.summary[0].text : '')
+        const howText = Array.isArray(matchedCard?.how_it_works) && matchedCard.how_it_works[0]?.text
+          ? matchedCard.how_it_works[0].text
+          : (matchedCard?.section_status?.how_it_works === 'unavailable' ? 'Archived procedure under research review.' : '')
+
         return (
           <li key={e.id || e.rule_code + e.period}>
             <span className="v2-num v2-taxlist-date">{shortDate(e.due_date, lang)}</span>
-            <span className="v2-taxlist-what"><strong>{e.title || e.rule_code}</strong>{e.period && <span className="v2-muted"> · {e.period}</span>}</span>
+            <span className="v2-taxlist-what" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <strong>{e.title || e.rule_code}</strong>
+              {matchedCard && (
+                <InfoTooltip
+                  title={matchedCard.name}
+                  what={whatText}
+                  how={howText}
+                  interpret={matchedCard.required_notice}
+                  lang={lang}
+                />
+              )}
+              {e.period && <span className="v2-muted"> · {e.period}</span>}
+            </span>
             <span className="v2-num v2-r">{e.estimated_amount != null ? money(e.estimated_amount) : '—'}</span>
             <Pill tone={STAGE_TONE[stage]}>{t(`acct.stage.${stage}`)}</Pill>
           </li>
@@ -106,11 +170,40 @@ function TaxList({ events, lang, t, limit, empty = 'acct.noEvents' }) {
 function CloseTab({ month }) {
   const t = useT()
   const lang = useLang()
+  const { active, scopeKey } = useWorkspace()
+  const [askQuery, setAskQuery] = useState('')
+
+  useEffect(() => {
+    setAskQuery('')
+  }, [active?.id, scopeKey])
   const tx = useApi('/transactions?period=all')
   const debts = useApi('/debts')
   const batches = useApi('/bank-import/batches')
   const wallets = useApi('/wallets')
   const summary = useApi('/accountant/summary')
+  const taxCardsApi = useApi(`/accountant/tax-knowledge/cards?lang=${lang}`)
+
+  const taxStatus = taxCardsApi.error?.status || (taxCardsApi.error?.data && taxCardsApi.error.data.status)
+  const isForbidden = taxStatus === 403 || taxStatus === 401 || /401|403|unauthorized|forbidden/i.test(taxCardsApi.error?.message || '')
+  const isNetworkOffline = !!taxCardsApi.error && !taxStatus && (
+    (typeof window !== 'undefined' && !window.navigator.onLine) ||
+    /Failed to fetch|NetworkError|network|offline/i.test(taxCardsApi.error?.message || '')
+  )
+  const isServerError = !!taxCardsApi.error && !isForbidden && !isNetworkOffline
+  const isOffline = isNetworkOffline
+  const isMalformed = !taxCardsApi.loading && !taxCardsApi.error && taxCardsApi.data != null && (typeof taxCardsApi.data !== 'object' || !Array.isArray(taxCardsApi.data.cards))
+  const isEmpty = !taxCardsApi.loading && !taxCardsApi.error && !isMalformed && Array.isArray(taxCardsApi.data?.cards) && taxCardsApi.data.cards.length === 0
+
+  const taxCards = useMemo(() => {
+    if (Array.isArray(taxCardsApi.data?.cards) && taxCardsApi.data.cards.length > 0) {
+      return taxCardsApi.data.cards
+    }
+    if (isOffline) {
+      return listTaxCards(lang)
+    }
+    return []
+  }, [taxCardsApi.data, isOffline, lang])
+
   const r = useMemo(() => closeReadiness({ month, transactions: Array.isArray(tx.data) ? tx.data : [], debts: Array.isArray(debts.data) ? debts.data : [],
     batches: batches.data?.batches || [], wallets: wallets.data?.wallets || [] }), [month, tx.data, debts.data, batches.data, wallets.data])
   if (tx.loading || debts.loading) return <Card><Skeleton rows={6} /></Card>
@@ -164,7 +257,68 @@ function CloseTab({ month }) {
           <TaxList events={due} lang={lang} t={t} limit={8} />
           <p className="v2-muted v2-small">{t('acct.taxNote')}</p>
         </Card>
-        <AskBox />
+        <AskBox externalQuery={askQuery} onQueryChange={setAskQuery} />
+      </div>
+
+      <div style={{ gridColumn: '1 / -1', marginTop: 14 }}>
+        <Card title={
+          <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            {t('acct.taxReference')}
+            <InfoTooltip term="tax_data_status" lang={lang} />
+          </span>
+        }>
+          <p className="v2-muted v2-small" style={{ margin: '0 0 14px' }}>
+            {t('acct.taxReferenceSub')}
+          </p>
+          {isForbidden && (
+            <div className="v2-inline-err" role="alert" style={{ marginBottom: 12 }}>
+              {t('acct.taxAccessDenied')}
+            </div>
+          )}
+          {isOffline && (
+            <div className="v2-banner v2-tone-warn" style={{ marginBottom: 12 }}>
+              <I.warn size={16} />
+              <span className="v2-banner-text">{t('acct.taxOfflineNotice')}</span>
+            </div>
+          )}
+          {isServerError && (
+            <div className="v2-inline-err" role="alert" style={{ marginBottom: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span>{t('acct.taxServerErr')}</span>
+              <button type="button" className="v2-btn v2-btn-sm" onClick={taxCardsApi.reload}>
+                {t('acct.taxRetry')}
+              </button>
+            </div>
+          )}
+          {isMalformed && (
+            <div className="v2-inline-err" role="alert" style={{ marginBottom: 12 }}>
+              {t('acct.taxMalformed')}
+            </div>
+          )}
+          {taxCardsApi.loading && <Skeleton rows={4} />}
+          {isEmpty && (
+            <p className="v2-muted" style={{ padding: '20px 0', textAlign: 'center' }}>
+              {t('acct.taxEmpty')}
+            </p>
+          )}
+          {!taxCardsApi.loading && !isForbidden && !isServerError && !isMalformed && !isEmpty && (taxCards.length > 0 || isOffline) && (
+            <div className="tax-cards-grid">
+              {taxCards.map(card => (
+                <TaxKnowledgeCard
+                  key={card.topic_id}
+                  card={card}
+                  lang={lang}
+                  onAskAccountant={(qText) => {
+                    setAskQuery(qText)
+                    const input = document.getElementById('acc-ask')
+                    if (input) {
+                      input.focus()
+                    }
+                  }}
+                />
+              ))}
+            </div>
+          )}
+        </Card>
       </div>
     </div>
   )

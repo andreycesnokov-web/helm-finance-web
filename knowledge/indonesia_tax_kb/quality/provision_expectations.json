@@ -1,0 +1,311 @@
+{
+  "Q01": [
+    {
+      "source_id": "DJP_SDSN_2023",
+      "article": "23",
+      "text_anchor": "sebesar 15%",
+      "role": "operative_text"
+    },
+    {
+      "source_id": "PMK141_2015",
+      "article": "1",
+      "text_anchor": "tidak termasuk Pajak Pertambahan Nilai",
+      "role": "operative_text"
+    }
+  ],
+  "Q02": [
+    {
+      "source_id": "PP34_2017",
+      "article": "3",
+      "text_anchor": "bukan sebagai pemotong",
+      "role": "operative_text"
+    },
+    {
+      "source_id": "PP34_2017",
+      "article": "4",
+      "text_anchor": "sepuluh persen",
+      "role": "operative_text"
+    }
+  ],
+  "Q03": [
+    {
+      "source_id": "PP34_2017",
+      "article": "2",
+      "text_anchor": "jasa pelayanan penginapan",
+      "role": "operative_text"
+    }
+  ],
+  "Q04": [
+    {
+      "source_id": "DJP_SDSN_2023",
+      "article": "23",
+      "text_anchor": "sewa dan penghasilan",
+      "role": "operative_text"
+    },
+    {
+      "source_id": "PP34_2017",
+      "article": "2",
+      "text_anchor": "jasa pelayanan penginapan",
+      "role": "operative_text"
+    }
+  ],
+  "Q05": [
+    {
+      "source_id": "PP34_2017",
+      "article": "3",
+      "text_anchor": "bukan sebagai pemotong",
+      "role": "operative_text"
+    }
+  ],
+  "Q06": [
+    {
+      "source_id": "PP34_2017",
+      "article": "4",
+      "text_anchor": "biaya layanan",
+      "role": "operative_text"
+    }
+  ],
+  "Q07": [
+    {
+      "source_id": "PP34_2017",
+      "article": "7",
+      "text_anchor": "2 Januari 2018",
+      "role": "operative_text"
+    }
+  ],
+  "Q08": [
+    {
+      "source_id": "PP34_2017",
+      "article": "6",
+      "text_anchor": "dicabut",
+      "role": "operative_text"
+    },
+    {
+      "source_id": "PP34_2017",
+      "article": "5",
+      "text_anchor": "Pada saat",
+      "role": "operative_text"
+    }
+  ],
+  "Q09": [
+    {
+      "source_id": "PP20_2026",
+      "article": "56",
+      "text_anchor": "nol koma lima",
+      "role": "operative_text"
+    },
+    {
+      "source_id": "PMK131_2024",
+      "article": "3",
+      "text_anchor": "11/12",
+      "role": "operative_text"
+    },
+    {
+      "source_id": "PMK131_2024",
+      "article": "4",
+      "text_anchor": "dikecualikan",
+      "role": "operative_text"
+    }
+  ],
+  "Q10": [
+    {
+      "source_id": "PP20_2026",
+      "article": "57",
+      "text_anchor": "perseroan perorangan",
+      "role": "operative_text"
+    },
+    {
+      "source_id": "PP20_2026",
+      "article": "II",
+      "text_anchor": "perseroan terbatas",
+      "role": "operative_text"
+    }
+  ],
+  "Q11": [
+    {
+      "source_id": "PP20_2026",
+      "article": "57",
+      "text_anchor": "perseroan perorangan",
+      "role": "operative_text"
+    },
+    {
+      "source_id": "PP20_2026",
+      "article": "II",
+      "text_anchor": "jangka waktu",
+      "role": "operative_text"
+    },
+    {
+      "source_id": "PP20_2026",
+      "article": "59",
+      "text_anchor": "dihapus",
+      "role": "amendment_instruction"
+    }
+  ],
+  "Q12": [
+    {
+      "source_id": "PP55_2022",
+      "article": "56",
+      "text_anchor": "jangka waktu",
+      "role": "operative_text"
+    },
+    {
+      "source_id": "PP55_2022",
+      "article": "59",
+      "text_anchor": "perseroan terbatas",
+      "role": "operative_text"
+    }
+  ],
+  "Q13": [
+    {
+      "source_id": "PMK141_2015",
+      "article": "1",
+      "text_anchor": "selain jasa yang telah",
+      "role": "operative_text"
+    },
+    {
+      "source_id": "PMK168_2023",
+      "article": "2",
+      "text_anchor": "orang pribadi",
+      "role": "operative_text"
+    }
+  ],
+  "Q14": [
+    {
+      "source_id": "PMK141_2015",
+      "article": "1",
+      "text_anchor": "Dalam hal tidak terdapat bukti",
+      "role": "operative_text"
+    }
+  ],
+  "Q15": [
+    {
+      "source_id": "DJP_SDSN_2023",
+      "article": "23",
+      "text_anchor": "tidak memiliki Nomor Pokok",
+      "role": "operative_text"
+    }
+  ],
+  "Q16": [
+    {
+      "source_id": "PMK131_2024",
+      "article": "3",
+      "text_anchor": "11/12",
+      "role": "operative_text"
+    },
+    {
+      "source_id": "PMK131_2024",
+      "article": "4",
+      "text_anchor": "dikecualikan",
+      "role": "operative_text"
+    }
+  ],
+  "Q17": [
+    {
+      "source_id": "PMK131_2024",
+      "article": "5",
+      "text_anchor": "31 Januari 2025",
+      "role": "operative_text"
+    },
+    {
+      "source_id": "PMK131_2024",
+      "article": "2",
+      "text_anchor": "tergolong mewah",
+      "role": "operative_text"
+    }
+  ],
+  "Q18": [
+    {
+      "source_id": "PMK131_2024",
+      "article": "3",
+      "text_anchor": "dapat dikreditkan sesuai",
+      "role": "operative_text"
+    }
+  ],
+  "Q19": [
+    {
+      "source_id": "PMK168_2023",
+      "article": "15",
+      "text_anchor": "Masa Pajak Terakhir",
+      "role": "operative_text"
+    },
+    {
+      "source_id": "PMK168_2023",
+      "article": "13",
+      "text_anchor": "tarif efektif",
+      "role": "operative_text"
+    }
+  ],
+  "Q20": [
+    {
+      "source_id": "PMK168_2023",
+      "article": "8",
+      "text_anchor": "penghasilan bruto",
+      "role": "operative_text"
+    },
+    {
+      "source_id": "PMK168_2023",
+      "article": "15",
+      "text_anchor": "tarif efektif bulanan",
+      "role": "operative_text"
+    }
+  ],
+  "Q21": [
+    {
+      "source_id": "DJP_SDSN_2023",
+      "article": "26",
+      "text_anchor": "beneficial owner",
+      "role": "operative_text"
+    },
+    {
+      "source_id": "PMK168_2023",
+      "article": "14",
+      "text_anchor": "persetujuan penghindaran",
+      "role": "operative_text"
+    }
+  ],
+  "Q22": [
+    {
+      "source_id": "DJP_SDSN_2023",
+      "article": "25",
+      "text_anchor": "angsuran pajak",
+      "role": "operative_text"
+    },
+    {
+      "source_id": "DJP_SDSN_2023",
+      "article": "29",
+      "text_anchor": "sebelum Surat Pemberitahuan",
+      "role": "operative_text"
+    }
+  ],
+  "Q23": [
+    {
+      "source_id": "PMK81_2024",
+      "article": "94",
+      "text_anchor": "tanggal 15",
+      "role": "operative_text"
+    },
+    {
+      "source_id": "PMK81_2024",
+      "article": "171",
+      "text_anchor": "20 (dua puluh) hari",
+      "role": "operative_text"
+    }
+  ],
+  "Q24": [],
+  "Q25": [
+    {
+      "source_id": "DJP_SDSN_2023",
+      "article": "23",
+      "text_anchor": "sewa dan penghasilan",
+      "role": "operative_text"
+    }
+  ],
+  "Q26": [
+    {
+      "source_id": "PMK81_2024",
+      "article": "171",
+      "text_anchor": "20 (dua puluh) hari",
+      "role": "operative_text"
+    }
+  ]
+}
