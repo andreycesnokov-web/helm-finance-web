@@ -156,10 +156,10 @@ function getAllFiles(dir, fileList = []) {
 const allStageFiles = getAllFiles(STAGE);
 const manifestLines = [];
 for (const f of allStageFiles) {
-  const relPath = path.relative(STAGE, f).replace(/\\\\/g, '/');
+  const relPath = path.relative(STAGE, f).replace(/\\/g, '/');
   const fileBuf = fs.readFileSync(f);
   const hash = crypto.createHash('sha256').update(fileBuf).digest('hex');
-  manifestLines.push(`${hash}  ${relPath}`);
+  manifestLines.push(`${hash}  ./${relPath}`);
 }
 manifestLines.sort((a, b) => a.localeCompare(b));
 fs.writeFileSync(path.join(STAGE, 'manifest.sha256'), manifestLines.join('\n') + '\n');
