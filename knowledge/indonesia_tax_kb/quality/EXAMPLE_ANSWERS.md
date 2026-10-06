@@ -10,7 +10,32 @@ Expected: Distinguish 2% and15% branches; exclude PPh21/final objects.
 
 Объяснения относятся к прочитанному архивному тексту; действующая применимость к компании не подтверждена.
 
-**SERVICE_EXCEPTIONS** — Архивный PMK141 исключает из jasa lain услуги, уже подпадающие под PPh21, и отдельно финально облагаемые доходы. PMK168 отдельно описывает платежи физлицам за услуги; нужно выяснить тип и резидентство получателя, а не судить по названию инвойса.
+**P23_ABBREVIATION** — Pajak Penghasilan Pasal 23
+
+Basis:
+
+- [DJP_SDSN_2023 article23 / (1)(a),(c) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+
+**P23_SHORT_CONDITION** — Для прочих услуг проверьте исключения: выплаты по PPh21 и отдельному финальному налогу.
+
+Basis:
+
+- [PMK141_2015 article1 / (1),(2) / PDF2,3,4,5,6](https://jdih.kemenkeu.go.id/api/download/fulltext/2015/141~PMK.03~2015Per.pdf#page=2), SHA cd107a9b7de8ad12b6eff1e3cf64f512b712f63ce58e62b3dba2a35d6ccbf1f4, fragment IDs: PMK141_2015:b9daaac005c09472f564f133,PMK141_2015:0d4c687551245d61dec6a5a1,PMK141_2015:ce21c53c5bc11f1fda4ab333,PMK141_2015:f4ebe3b18b5d0fdc6a4ad52a,PMK141_2015:a9949937f09c37d1cf2a5807.
+- [PMK168_2023 article2 / (2)(d) / PDF5,6](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=5), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:079306052df2707a31737092,PMK168_2023:5d7769d0404bd1a073946d49.
+
+**P23_SHORT_DEFINITION** — PPh23 — удержание налога с перечисленных доходов, включая отдельные услуги и аренду имущества.
+
+Basis:
+
+- [DJP_SDSN_2023 article23 / (1)(a),(c) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+
+**P23_SHORT_MECHANISM** — Налог удерживает указанный в правилах плательщик дохода.
+
+Basis:
+
+- [DJP_SDSN_2023 article23 / (1)(a),(c) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+
+**SERVICE_EXCEPTIONS** — Архивный PMK141 исключает из категории прочих услуг услуги, уже подпадающие под PPh21, и отдельно финально облагаемые доходы. PMK168 отдельно описывает платежи физлицам за услуги; нужно выяснить тип и резидентство получателя, а не судить по названию инвойса.
 
 Basis:
 
@@ -21,7 +46,7 @@ Basis:
 
 Basis:
 
-- [DJP_SDSN_2023 article23 / (1a),(4) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+- [DJP_SDSN_2023 article23 / (1)(a),(c) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
 
 **SERVICE_REIMBURSEMENT** — По архивному PMK141 исключение некоторых выплат за материалы или третьим лицам из базы требует перечисленных доказательств. Без доказательств база охватывает весь соответствующий платёж без PPN; возмещение не вычитается автоматически.
 
@@ -33,7 +58,7 @@ Basis:
 
 Basis:
 
-- [DJP_SDSN_2023 article23 / (1a),(4) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+- [DJP_SDSN_2023 article23 / (1)(a),(c) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
 
 Blocked claims: SERVICE_RATE (current_provision_currency_unconfirmed,amendment_review_incomplete).
 
@@ -59,6 +84,31 @@ Expected: Distinguish 2% and15% branches; exclude PPh21/final objects.
 
 Explanations describe the read archived text; current company applicability is not established.
 
+**P23_ABBREVIATION** — Pajak Penghasilan Pasal 23
+
+Basis:
+
+- [DJP_SDSN_2023 article23 / (1)(a),(c) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+
+**P23_SHORT_CONDITION** — For the other-services category, check exclusions for payments covered by PPh21 or a separate final tax.
+
+Basis:
+
+- [PMK141_2015 article1 / (1),(2) / PDF2,3,4,5,6](https://jdih.kemenkeu.go.id/api/download/fulltext/2015/141~PMK.03~2015Per.pdf#page=2), SHA cd107a9b7de8ad12b6eff1e3cf64f512b712f63ce58e62b3dba2a35d6ccbf1f4, fragment IDs: PMK141_2015:b9daaac005c09472f564f133,PMK141_2015:0d4c687551245d61dec6a5a1,PMK141_2015:ce21c53c5bc11f1fda4ab333,PMK141_2015:f4ebe3b18b5d0fdc6a4ad52a,PMK141_2015:a9949937f09c37d1cf2a5807.
+- [PMK168_2023 article2 / (2)(d) / PDF5,6](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=5), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:079306052df2707a31737092,PMK168_2023:5d7769d0404bd1a073946d49.
+
+**P23_SHORT_DEFINITION** — PPh23 is tax withholding on listed income, including specified services and property rental.
+
+Basis:
+
+- [DJP_SDSN_2023 article23 / (1)(a),(c) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+
+**P23_SHORT_MECHANISM** — The designated income payer withholds the tax.
+
+Basis:
+
+- [DJP_SDSN_2023 article23 / (1)(a),(c) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+
 **SERVICE_EXCEPTIONS** — The archived PMK141 excludes services already subject to PPh21 and separately final-taxed income from its other-services branch. PMK168 separately describes payments for individual services; establish recipient type and residency rather than infer them from the invoice name.
 
 Basis:
@@ -70,7 +120,7 @@ Basis:
 
 Basis:
 
-- [DJP_SDSN_2023 article23 / (1a),(4) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+- [DJP_SDSN_2023 article23 / (1)(a),(c) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
 
 **SERVICE_REIMBURSEMENT** — Under the archived PMK141, excluding specified material or third-party payments from the base requires listed evidence. Without it the relevant total payment excluding PPN is the base; reimbursement is not automatically deductible.
 
@@ -82,7 +132,7 @@ Basis:
 
 Basis:
 
-- [DJP_SDSN_2023 article23 / (1a),(4) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+- [DJP_SDSN_2023 article23 / (1)(a),(c) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
 
 Blocked claims: SERVICE_RATE (current_provision_currency_unconfirmed,amendment_review_incomplete).
 
@@ -108,6 +158,31 @@ Expected: Distinguish 2% and15% branches; exclude PPh21/final objects.
 
 Penjelasan menggambarkan teks arsip yang dibaca; penerapan terkini pada perusahaan belum ditetapkan.
 
+**P23_ABBREVIATION** — Pajak Penghasilan Pasal 23
+
+Basis:
+
+- [DJP_SDSN_2023 article23 / (1)(a),(c) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+
+**P23_SHORT_CONDITION** — Untuk kategori jasa lain, periksa pengecualian pembayaran yang tercakup PPh21 atau pajak final tersendiri.
+
+Basis:
+
+- [PMK141_2015 article1 / (1),(2) / PDF2,3,4,5,6](https://jdih.kemenkeu.go.id/api/download/fulltext/2015/141~PMK.03~2015Per.pdf#page=2), SHA cd107a9b7de8ad12b6eff1e3cf64f512b712f63ce58e62b3dba2a35d6ccbf1f4, fragment IDs: PMK141_2015:b9daaac005c09472f564f133,PMK141_2015:0d4c687551245d61dec6a5a1,PMK141_2015:ce21c53c5bc11f1fda4ab333,PMK141_2015:f4ebe3b18b5d0fdc6a4ad52a,PMK141_2015:a9949937f09c37d1cf2a5807.
+- [PMK168_2023 article2 / (2)(d) / PDF5,6](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=5), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:079306052df2707a31737092,PMK168_2023:5d7769d0404bd1a073946d49.
+
+**P23_SHORT_DEFINITION** — PPh23 adalah pemotongan pajak atas penghasilan yang tercantum, termasuk jasa tertentu dan sewa harta.
+
+Basis:
+
+- [DJP_SDSN_2023 article23 / (1)(a),(c) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+
+**P23_SHORT_MECHANISM** — Pembayar yang ditentukan memotong pajak dari pembayaran.
+
+Basis:
+
+- [DJP_SDSN_2023 article23 / (1)(a),(c) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+
 **SERVICE_EXCEPTIONS** — PMK141 yang diarsipkan mengecualikan jasa yang telah dipotong PPh21 dan penghasilan final tersendiri dari cabang jasa lain. PMK168 menjelaskan pembayaran jasa orang pribadi secara terpisah; pastikan jenis dan domisili penerima, bukan hanya nama invoice.
 
 Basis:
@@ -119,9 +194,9 @@ Basis:
 
 Basis:
 
-- [DJP_SDSN_2023 article23 / (1a),(4) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+- [DJP_SDSN_2023 article23 / (1)(a),(c) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
 
-**SERVICE_REIMBURSEMENT** — Menurut PMK141 yang diarsipkan, pengecualian pembayaran material atau pihak ketiga tertentu dari dasar memerlukan bukti yang ditentukan. Tanpa bukti seluruh pembayaran terkait selain PPN menjadi dasar; reimbursement tidak otomatis dikecualikan.
+**SERVICE_REIMBURSEMENT** — Menurut PMK141 yang diarsipkan, pengecualian pembayaran material atau pihak ketiga tertentu dari dasar memerlukan bukti yang ditentukan. Tanpa bukti seluruh pembayaran terkait selain PPN menjadi dasar; penggantian biaya tidak otomatis dikecualikan.
 
 Basis:
 
@@ -131,7 +206,7 @@ Basis:
 
 Basis:
 
-- [DJP_SDSN_2023 article23 / (1a),(4) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+- [DJP_SDSN_2023 article23 / (1)(a),(c) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
 
 Blocked claims: SERVICE_RATE (current_provision_currency_unconfirmed,amendment_review_incomplete).
 
@@ -157,11 +232,30 @@ Expected: Ask what is rented and who must withhold; no net payable conclusion.
 
 Объяснения относятся к прочитанному архивному тексту; действующая применимость к компании не подтверждена.
 
-**RENT_PAYER** — В архивной статье PP34 указанный арендатор удерживает налог, а при арендаторе, который не является pemotong, получатель платит сам. Это альтернативные роли, а не автоматическое двойное удержание обеими сторонами.
+**RENT_PAYER** — В архивной статье PP34 указанный арендатор удерживает налог, а при арендаторе, который не имеет обязанность удерживать налог, получатель платит сам. Это альтернативные роли, а не автоматическое двойное удержание обеими сторонами.
 
 Basis:
 
 - [PP34_2017 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=4), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:0e5db66988eacbc288b3d409,PP34_2017:748bf41bc376044c14aea2eb.
+
+**RENT_SHORT_CONDITION** — Проверьте предмет аренды и статус арендатора.
+
+Basis:
+
+- [PP34_2017 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=4), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:0e5db66988eacbc288b3d409,PP34_2017:748bf41bc376044c14aea2eb.
+- [PP34_2017 article2 / (1),(3) / PDF3](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=3), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:5440eda9fab50b4e47ee6570.
+
+**RENT_SHORT_MECHANISM** — Если арендатор обязан удерживать налог, он удерживает; иначе платит получатель дохода.
+
+Basis:
+
+- [PP34_2017 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=4), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:0e5db66988eacbc288b3d409,PP34_2017:748bf41bc376044c14aea2eb.
+
+**RENT_ABBREVIATION** — Pajak Penghasilan yang bersifat final
+
+Basis:
+
+- [PP34_2017 article2 / (1),(3) / PDF3](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=3), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:5440eda9fab50b4e47ee6570.
 
 **RENT_BASE** — Архивная статья PP34 описывает валовую аренду вместе со связанными обслуживанием, охраной и услугами, даже при отдельных соглашениях. Для инвойса надо уточнить связь расходов с объектом аренды; название строки само по себе недостаточно.
 
@@ -178,6 +272,12 @@ Basis:
 - [PP34_2017 article7 / whole / PDF7](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=7), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:e402c8754477926509de1784.
 
 **RENT_SCOPE** — В архивном PP34 аренда земли/здания отделена от услуг проживания с размещением: гостиничный платёж нельзя автоматически считать арендой.
+
+Basis:
+
+- [PP34_2017 article2 / (1),(3) / PDF3](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=3), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:5440eda9fab50b4e47ee6570.
+
+**RENT_SHORT_DEFINITION** — Это финальный налог на доход от аренды земли или зданий; услуги проживания исключены.
 
 Basis:
 
@@ -213,6 +313,25 @@ Basis:
 
 - [PP34_2017 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=4), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:0e5db66988eacbc288b3d409,PP34_2017:748bf41bc376044c14aea2eb.
 
+**RENT_SHORT_CONDITION** — Check the rental object and tenant’s withholding status.
+
+Basis:
+
+- [PP34_2017 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=4), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:0e5db66988eacbc288b3d409,PP34_2017:748bf41bc376044c14aea2eb.
+- [PP34_2017 article2 / (1),(3) / PDF3](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=3), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:5440eda9fab50b4e47ee6570.
+
+**RENT_SHORT_MECHANISM** — The tenant withholds if designated to do so; otherwise the income recipient pays.
+
+Basis:
+
+- [PP34_2017 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=4), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:0e5db66988eacbc288b3d409,PP34_2017:748bf41bc376044c14aea2eb.
+
+**RENT_ABBREVIATION** — Pajak Penghasilan yang bersifat final
+
+Basis:
+
+- [PP34_2017 article2 / (1),(3) / PDF3](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=3), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:5440eda9fab50b4e47ee6570.
+
 **RENT_BASE** — The archived PP34 provision describes gross rent including related maintenance, security and service charges even under separate agreements. Clarify their relationship to the rented property; an invoice label alone is insufficient.
 
 Basis:
@@ -228,6 +347,12 @@ Basis:
 - [PP34_2017 article7 / whole / PDF7](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=7), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:e402c8754477926509de1784.
 
 **RENT_SCOPE** — The archived PP34 distinguishes land/building rental from lodging with accommodation; a hotel payment cannot automatically be classified as rental.
+
+Basis:
+
+- [PP34_2017 article2 / (1),(3) / PDF3](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=3), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:5440eda9fab50b4e47ee6570.
+
+**RENT_SHORT_DEFINITION** — This is final income tax on land or building rental; accommodation services are excluded.
 
 Basis:
 
@@ -257,6 +382,12 @@ Expected: Ask what is rented and who must withhold; no net payable conclusion.
 
 Penjelasan menggambarkan teks arsip yang dibaca; penerapan terkini pada perusahaan belum ditetapkan.
 
+**RENT_ABBREVIATION** — Pajak Penghasilan yang bersifat final
+
+Basis:
+
+- [PP34_2017 article2 / (1),(3) / PDF3](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=3), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:5440eda9fab50b4e47ee6570.
+
 **RENT_BASE** — Ketentuan PP34 yang diarsipkan menjelaskan bruto sewa termasuk pemeliharaan, keamanan dan layanan terkait meskipun perjanjiannya terpisah. Perjelas hubungan biaya dengan objek sewa; nama baris invoice saja tidak cukup.
 
 Basis:
@@ -271,7 +402,7 @@ Basis:
 - [PP34_2017 article6 / whole / PDF7](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=7), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:a9699b139d3e26aed410e15b.
 - [PP34_2017 article7 / whole / PDF7](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=7), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:e402c8754477926509de1784.
 
-**RENT_PAYER** — Dalam ketentuan PP34 yang diarsipkan penyewa pemotong melakukan pemotongan; jika penyewa bukan pemotong, penerima membayar sendiri. Ini peran alternatif, bukan otomatis pemotongan ganda.
+**RENT_PAYER** — Dalam ketentuan PP34 yang diarsipkan penyewa yang wajib memotong pajak dari pembayaran melakukan pemotongan; jika penyewa tidak wajib memotong pajak, penerima membayar sendiri. Ini peran alternatif, bukan otomatis pemotongan ganda.
 
 Basis:
 
@@ -282,6 +413,25 @@ Basis:
 Basis:
 
 - [PP34_2017 article2 / (1),(3) / PDF3](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=3), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:5440eda9fab50b4e47ee6570.
+
+**RENT_SHORT_CONDITION** — Periksa objek sewa dan status kewajiban pemotongan penyewa.
+
+Basis:
+
+- [PP34_2017 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=4), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:0e5db66988eacbc288b3d409,PP34_2017:748bf41bc376044c14aea2eb.
+- [PP34_2017 article2 / (1),(3) / PDF3](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=3), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:5440eda9fab50b4e47ee6570.
+
+**RENT_SHORT_DEFINITION** — Ini pajak penghasilan final atas sewa tanah atau bangunan; jasa penginapan dikecualikan.
+
+Basis:
+
+- [PP34_2017 article2 / (1),(3) / PDF3](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=3), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:5440eda9fab50b4e47ee6570.
+
+**RENT_SHORT_MECHANISM** — Penyewa memotong pajak dari pembayaran jika wajib; jika tidak, penerima penghasilan membayar sendiri.
+
+Basis:
+
+- [PP34_2017 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=4), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:0e5db66988eacbc288b3d409,PP34_2017:748bf41bc376044c14aea2eb.
 
 Blocked claims: RENT_RATE (current_provision_currency_unconfirmed,amendment_review_incomplete).
 
@@ -307,7 +457,19 @@ Expected: Cite Pasal2(3), lodging exclusion; do not assign replacement tax autom
 
 Объяснения относятся к прочитанному архивному тексту; действующая применимость к компании не подтверждена.
 
+**RENT_ABBREVIATION** — Pajak Penghasilan yang bersifat final
+
+Basis:
+
+- [PP34_2017 article2 / (1),(3) / PDF3](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=3), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:5440eda9fab50b4e47ee6570.
+
 **RENT_SCOPE** — В архивном PP34 аренда земли/здания отделена от услуг проживания с размещением: гостиничный платёж нельзя автоматически считать арендой.
+
+Basis:
+
+- [PP34_2017 article2 / (1),(3) / PDF3](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=3), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:5440eda9fab50b4e47ee6570.
+
+**RENT_SHORT_DEFINITION** — Это финальный налог на доход от аренды земли или зданий; услуги проживания исключены.
 
 Basis:
 
@@ -327,7 +489,20 @@ Basis:
 - [PP34_2017 article6 / whole / PDF7](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=7), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:a9699b139d3e26aed410e15b.
 - [PP34_2017 article7 / whole / PDF7](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=7), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:e402c8754477926509de1784.
 
-**RENT_PAYER** — В архивной статье PP34 указанный арендатор удерживает налог, а при арендаторе, который не является pemotong, получатель платит сам. Это альтернативные роли, а не автоматическое двойное удержание обеими сторонами.
+**RENT_PAYER** — В архивной статье PP34 указанный арендатор удерживает налог, а при арендаторе, который не имеет обязанность удерживать налог, получатель платит сам. Это альтернативные роли, а не автоматическое двойное удержание обеими сторонами.
+
+Basis:
+
+- [PP34_2017 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=4), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:0e5db66988eacbc288b3d409,PP34_2017:748bf41bc376044c14aea2eb.
+
+**RENT_SHORT_CONDITION** — Проверьте предмет аренды и статус арендатора.
+
+Basis:
+
+- [PP34_2017 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=4), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:0e5db66988eacbc288b3d409,PP34_2017:748bf41bc376044c14aea2eb.
+- [PP34_2017 article2 / (1),(3) / PDF3](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=3), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:5440eda9fab50b4e47ee6570.
+
+**RENT_SHORT_MECHANISM** — Если арендатор обязан удерживать налог, он удерживает; иначе платит получатель дохода.
 
 Basis:
 
@@ -357,7 +532,19 @@ Expected: Cite Pasal2(3), lodging exclusion; do not assign replacement tax autom
 
 Explanations describe the read archived text; current company applicability is not established.
 
+**RENT_ABBREVIATION** — Pajak Penghasilan yang bersifat final
+
+Basis:
+
+- [PP34_2017 article2 / (1),(3) / PDF3](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=3), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:5440eda9fab50b4e47ee6570.
+
 **RENT_SCOPE** — The archived PP34 distinguishes land/building rental from lodging with accommodation; a hotel payment cannot automatically be classified as rental.
+
+Basis:
+
+- [PP34_2017 article2 / (1),(3) / PDF3](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=3), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:5440eda9fab50b4e47ee6570.
+
+**RENT_SHORT_DEFINITION** — This is final income tax on land or building rental; accommodation services are excluded.
 
 Basis:
 
@@ -378,6 +565,19 @@ Basis:
 - [PP34_2017 article7 / whole / PDF7](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=7), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:e402c8754477926509de1784.
 
 **RENT_PAYER** — In the archived PP34 provision the designated tenant withholds; if the tenant is not a withholder the recipient self-pays. These are alternative roles, not automatic double withholding by both parties.
+
+Basis:
+
+- [PP34_2017 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=4), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:0e5db66988eacbc288b3d409,PP34_2017:748bf41bc376044c14aea2eb.
+
+**RENT_SHORT_CONDITION** — Check the rental object and tenant’s withholding status.
+
+Basis:
+
+- [PP34_2017 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=4), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:0e5db66988eacbc288b3d409,PP34_2017:748bf41bc376044c14aea2eb.
+- [PP34_2017 article2 / (1),(3) / PDF3](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=3), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:5440eda9fab50b4e47ee6570.
+
+**RENT_SHORT_MECHANISM** — The tenant withholds if designated to do so; otherwise the income recipient pays.
 
 Basis:
 
@@ -407,7 +607,19 @@ Expected: Cite Pasal2(3), lodging exclusion; do not assign replacement tax autom
 
 Penjelasan menggambarkan teks arsip yang dibaca; penerapan terkini pada perusahaan belum ditetapkan.
 
+**RENT_ABBREVIATION** — Pajak Penghasilan yang bersifat final
+
+Basis:
+
+- [PP34_2017 article2 / (1),(3) / PDF3](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=3), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:5440eda9fab50b4e47ee6570.
+
 **RENT_SCOPE** — PP34 yang diarsipkan membedakan sewa tanah/bangunan dari jasa penginapan beserta akomodasi; pembayaran hotel tidak otomatis dianggap sewa.
+
+Basis:
+
+- [PP34_2017 article2 / (1),(3) / PDF3](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=3), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:5440eda9fab50b4e47ee6570.
+
+**RENT_SHORT_DEFINITION** — Ini pajak penghasilan final atas sewa tanah atau bangunan; jasa penginapan dikecualikan.
 
 Basis:
 
@@ -427,7 +639,20 @@ Basis:
 - [PP34_2017 article6 / whole / PDF7](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=7), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:a9699b139d3e26aed410e15b.
 - [PP34_2017 article7 / whole / PDF7](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=7), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:e402c8754477926509de1784.
 
-**RENT_PAYER** — Dalam ketentuan PP34 yang diarsipkan penyewa pemotong melakukan pemotongan; jika penyewa bukan pemotong, penerima membayar sendiri. Ini peran alternatif, bukan otomatis pemotongan ganda.
+**RENT_PAYER** — Dalam ketentuan PP34 yang diarsipkan penyewa yang wajib memotong pajak dari pembayaran melakukan pemotongan; jika penyewa tidak wajib memotong pajak, penerima membayar sendiri. Ini peran alternatif, bukan otomatis pemotongan ganda.
+
+Basis:
+
+- [PP34_2017 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=4), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:0e5db66988eacbc288b3d409,PP34_2017:748bf41bc376044c14aea2eb.
+
+**RENT_SHORT_CONDITION** — Periksa objek sewa dan status kewajiban pemotongan penyewa.
+
+Basis:
+
+- [PP34_2017 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=4), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:0e5db66988eacbc288b3d409,PP34_2017:748bf41bc376044c14aea2eb.
+- [PP34_2017 article2 / (1),(3) / PDF3](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=3), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:5440eda9fab50b4e47ee6570.
+
+**RENT_SHORT_MECHANISM** — Penyewa memotong pajak dari pembayaran jika wajib; jika tidak, penerima penghasilan membayar sendiri.
 
 Basis:
 
@@ -457,6 +682,37 @@ Expected: Distinguish property rental and land/building; check Pasal23(1)(c).
 
 Объяснения относятся к прочитанному архивному тексту; действующая применимость к компании не подтверждена.
 
+**P23_ABBREVIATION** — Pajak Penghasilan Pasal 23
+
+Basis:
+
+- [DJP_SDSN_2023 article23 / (1)(a),(c) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+
+**P23_SHORT_CONDITION** — Для прочих услуг проверьте исключения: выплаты по PPh21 и отдельному финальному налогу.
+
+Basis:
+
+- [PMK141_2015 article1 / (1),(2) / PDF2,3,4,5,6](https://jdih.kemenkeu.go.id/api/download/fulltext/2015/141~PMK.03~2015Per.pdf#page=2), SHA cd107a9b7de8ad12b6eff1e3cf64f512b712f63ce58e62b3dba2a35d6ccbf1f4, fragment IDs: PMK141_2015:b9daaac005c09472f564f133,PMK141_2015:0d4c687551245d61dec6a5a1,PMK141_2015:ce21c53c5bc11f1fda4ab333,PMK141_2015:f4ebe3b18b5d0fdc6a4ad52a,PMK141_2015:a9949937f09c37d1cf2a5807.
+- [PMK168_2023 article2 / (2)(d) / PDF5,6](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=5), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:079306052df2707a31737092,PMK168_2023:5d7769d0404bd1a073946d49.
+
+**P23_SHORT_DEFINITION** — PPh23 — удержание налога с перечисленных доходов, включая отдельные услуги и аренду имущества.
+
+Basis:
+
+- [DJP_SDSN_2023 article23 / (1)(a),(c) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+
+**P23_SHORT_MECHANISM** — Налог удерживает указанный в правилах плательщик дохода.
+
+Basis:
+
+- [DJP_SDSN_2023 article23 / (1)(a),(c) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+
+**RENT_ABBREVIATION** — Pajak Penghasilan yang bersifat final
+
+Basis:
+
+- [PP34_2017 article2 / (1),(3) / PDF3](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=3), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:5440eda9fab50b4e47ee6570.
+
 **RENT_BASE** — Архивная статья PP34 описывает валовую аренду вместе со связанными обслуживанием, охраной и услугами, даже при отдельных соглашениях. Для инвойса надо уточнить связь расходов с объектом аренды; название строки само по себе недостаточно.
 
 Basis:
@@ -471,7 +727,7 @@ Basis:
 - [PP34_2017 article6 / whole / PDF7](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=7), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:a9699b139d3e26aed410e15b.
 - [PP34_2017 article7 / whole / PDF7](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=7), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:e402c8754477926509de1784.
 
-**RENT_PAYER** — В архивной статье PP34 указанный арендатор удерживает налог, а при арендаторе, который не является pemotong, получатель платит сам. Это альтернативные роли, а не автоматическое двойное удержание обеими сторонами.
+**RENT_PAYER** — В архивной статье PP34 указанный арендатор удерживает налог, а при арендаторе, который не имеет обязанность удерживать налог, получатель платит сам. Это альтернативные роли, а не автоматическое двойное удержание обеими сторонами.
 
 Basis:
 
@@ -483,7 +739,26 @@ Basis:
 
 - [PP34_2017 article2 / (1),(3) / PDF3](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=3), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:5440eda9fab50b4e47ee6570.
 
-**SERVICE_EXCEPTIONS** — Архивный PMK141 исключает из jasa lain услуги, уже подпадающие под PPh21, и отдельно финально облагаемые доходы. PMK168 отдельно описывает платежи физлицам за услуги; нужно выяснить тип и резидентство получателя, а не судить по названию инвойса.
+**RENT_SHORT_CONDITION** — Проверьте предмет аренды и статус арендатора.
+
+Basis:
+
+- [PP34_2017 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=4), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:0e5db66988eacbc288b3d409,PP34_2017:748bf41bc376044c14aea2eb.
+- [PP34_2017 article2 / (1),(3) / PDF3](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=3), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:5440eda9fab50b4e47ee6570.
+
+**RENT_SHORT_DEFINITION** — Это финальный налог на доход от аренды земли или зданий; услуги проживания исключены.
+
+Basis:
+
+- [PP34_2017 article2 / (1),(3) / PDF3](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=3), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:5440eda9fab50b4e47ee6570.
+
+**RENT_SHORT_MECHANISM** — Если арендатор обязан удерживать налог, он удерживает; иначе платит получатель дохода.
+
+Basis:
+
+- [PP34_2017 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=4), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:0e5db66988eacbc288b3d409,PP34_2017:748bf41bc376044c14aea2eb.
+
+**SERVICE_EXCEPTIONS** — Архивный PMK141 исключает из категории прочих услуг услуги, уже подпадающие под PPh21, и отдельно финально облагаемые доходы. PMK168 отдельно описывает платежи физлицам за услуги; нужно выяснить тип и резидентство получателя, а не судить по названию инвойса.
 
 Basis:
 
@@ -494,7 +769,7 @@ Basis:
 
 Basis:
 
-- [DJP_SDSN_2023 article23 / (1a),(4) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+- [DJP_SDSN_2023 article23 / (1)(a),(c) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
 
 **SERVICE_REIMBURSEMENT** — По архивному PMK141 исключение некоторых выплат за материалы или третьим лицам из базы требует перечисленных доказательств. Без доказательств база охватывает весь соответствующий платёж без PPN; возмещение не вычитается автоматически.
 
@@ -506,7 +781,7 @@ Basis:
 
 Basis:
 
-- [DJP_SDSN_2023 article23 / (1a),(4) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+- [DJP_SDSN_2023 article23 / (1)(a),(c) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
 
 Blocked claims: RENT_RATE (current_provision_currency_unconfirmed,amendment_review_incomplete); SERVICE_RATE (current_provision_currency_unconfirmed,amendment_review_incomplete).
 
@@ -538,6 +813,37 @@ Expected: Distinguish property rental and land/building; check Pasal23(1)(c).
 
 Explanations describe the read archived text; current company applicability is not established.
 
+**P23_ABBREVIATION** — Pajak Penghasilan Pasal 23
+
+Basis:
+
+- [DJP_SDSN_2023 article23 / (1)(a),(c) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+
+**P23_SHORT_CONDITION** — For the other-services category, check exclusions for payments covered by PPh21 or a separate final tax.
+
+Basis:
+
+- [PMK141_2015 article1 / (1),(2) / PDF2,3,4,5,6](https://jdih.kemenkeu.go.id/api/download/fulltext/2015/141~PMK.03~2015Per.pdf#page=2), SHA cd107a9b7de8ad12b6eff1e3cf64f512b712f63ce58e62b3dba2a35d6ccbf1f4, fragment IDs: PMK141_2015:b9daaac005c09472f564f133,PMK141_2015:0d4c687551245d61dec6a5a1,PMK141_2015:ce21c53c5bc11f1fda4ab333,PMK141_2015:f4ebe3b18b5d0fdc6a4ad52a,PMK141_2015:a9949937f09c37d1cf2a5807.
+- [PMK168_2023 article2 / (2)(d) / PDF5,6](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=5), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:079306052df2707a31737092,PMK168_2023:5d7769d0404bd1a073946d49.
+
+**P23_SHORT_DEFINITION** — PPh23 is tax withholding on listed income, including specified services and property rental.
+
+Basis:
+
+- [DJP_SDSN_2023 article23 / (1)(a),(c) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+
+**P23_SHORT_MECHANISM** — The designated income payer withholds the tax.
+
+Basis:
+
+- [DJP_SDSN_2023 article23 / (1)(a),(c) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+
+**RENT_ABBREVIATION** — Pajak Penghasilan yang bersifat final
+
+Basis:
+
+- [PP34_2017 article2 / (1),(3) / PDF3](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=3), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:5440eda9fab50b4e47ee6570.
+
 **RENT_BASE** — The archived PP34 provision describes gross rent including related maintenance, security and service charges even under separate agreements. Clarify their relationship to the rented property; an invoice label alone is insufficient.
 
 Basis:
@@ -564,6 +870,25 @@ Basis:
 
 - [PP34_2017 article2 / (1),(3) / PDF3](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=3), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:5440eda9fab50b4e47ee6570.
 
+**RENT_SHORT_CONDITION** — Check the rental object and tenant’s withholding status.
+
+Basis:
+
+- [PP34_2017 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=4), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:0e5db66988eacbc288b3d409,PP34_2017:748bf41bc376044c14aea2eb.
+- [PP34_2017 article2 / (1),(3) / PDF3](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=3), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:5440eda9fab50b4e47ee6570.
+
+**RENT_SHORT_DEFINITION** — This is final income tax on land or building rental; accommodation services are excluded.
+
+Basis:
+
+- [PP34_2017 article2 / (1),(3) / PDF3](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=3), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:5440eda9fab50b4e47ee6570.
+
+**RENT_SHORT_MECHANISM** — The tenant withholds if designated to do so; otherwise the income recipient pays.
+
+Basis:
+
+- [PP34_2017 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=4), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:0e5db66988eacbc288b3d409,PP34_2017:748bf41bc376044c14aea2eb.
+
 **SERVICE_EXCEPTIONS** — The archived PMK141 excludes services already subject to PPh21 and separately final-taxed income from its other-services branch. PMK168 separately describes payments for individual services; establish recipient type and residency rather than infer them from the invoice name.
 
 Basis:
@@ -575,7 +900,7 @@ Basis:
 
 Basis:
 
-- [DJP_SDSN_2023 article23 / (1a),(4) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+- [DJP_SDSN_2023 article23 / (1)(a),(c) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
 
 **SERVICE_REIMBURSEMENT** — Under the archived PMK141, excluding specified material or third-party payments from the base requires listed evidence. Without it the relevant total payment excluding PPN is the base; reimbursement is not automatically deductible.
 
@@ -587,7 +912,7 @@ Basis:
 
 Basis:
 
-- [DJP_SDSN_2023 article23 / (1a),(4) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+- [DJP_SDSN_2023 article23 / (1)(a),(c) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
 
 Blocked claims: RENT_RATE (current_provision_currency_unconfirmed,amendment_review_incomplete); SERVICE_RATE (current_provision_currency_unconfirmed,amendment_review_incomplete).
 
@@ -619,6 +944,37 @@ Expected: Distinguish property rental and land/building; check Pasal23(1)(c).
 
 Penjelasan menggambarkan teks arsip yang dibaca; penerapan terkini pada perusahaan belum ditetapkan.
 
+**P23_ABBREVIATION** — Pajak Penghasilan Pasal 23
+
+Basis:
+
+- [DJP_SDSN_2023 article23 / (1)(a),(c) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+
+**P23_SHORT_CONDITION** — Untuk kategori jasa lain, periksa pengecualian pembayaran yang tercakup PPh21 atau pajak final tersendiri.
+
+Basis:
+
+- [PMK141_2015 article1 / (1),(2) / PDF2,3,4,5,6](https://jdih.kemenkeu.go.id/api/download/fulltext/2015/141~PMK.03~2015Per.pdf#page=2), SHA cd107a9b7de8ad12b6eff1e3cf64f512b712f63ce58e62b3dba2a35d6ccbf1f4, fragment IDs: PMK141_2015:b9daaac005c09472f564f133,PMK141_2015:0d4c687551245d61dec6a5a1,PMK141_2015:ce21c53c5bc11f1fda4ab333,PMK141_2015:f4ebe3b18b5d0fdc6a4ad52a,PMK141_2015:a9949937f09c37d1cf2a5807.
+- [PMK168_2023 article2 / (2)(d) / PDF5,6](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=5), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:079306052df2707a31737092,PMK168_2023:5d7769d0404bd1a073946d49.
+
+**P23_SHORT_DEFINITION** — PPh23 adalah pemotongan pajak atas penghasilan yang tercantum, termasuk jasa tertentu dan sewa harta.
+
+Basis:
+
+- [DJP_SDSN_2023 article23 / (1)(a),(c) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+
+**P23_SHORT_MECHANISM** — Pembayar yang ditentukan memotong pajak dari pembayaran.
+
+Basis:
+
+- [DJP_SDSN_2023 article23 / (1)(a),(c) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+
+**RENT_ABBREVIATION** — Pajak Penghasilan yang bersifat final
+
+Basis:
+
+- [PP34_2017 article2 / (1),(3) / PDF3](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=3), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:5440eda9fab50b4e47ee6570.
+
 **RENT_BASE** — Ketentuan PP34 yang diarsipkan menjelaskan bruto sewa termasuk pemeliharaan, keamanan dan layanan terkait meskipun perjanjiannya terpisah. Perjelas hubungan biaya dengan objek sewa; nama baris invoice saja tidak cukup.
 
 Basis:
@@ -633,7 +989,7 @@ Basis:
 - [PP34_2017 article6 / whole / PDF7](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=7), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:a9699b139d3e26aed410e15b.
 - [PP34_2017 article7 / whole / PDF7](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=7), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:e402c8754477926509de1784.
 
-**RENT_PAYER** — Dalam ketentuan PP34 yang diarsipkan penyewa pemotong melakukan pemotongan; jika penyewa bukan pemotong, penerima membayar sendiri. Ini peran alternatif, bukan otomatis pemotongan ganda.
+**RENT_PAYER** — Dalam ketentuan PP34 yang diarsipkan penyewa yang wajib memotong pajak dari pembayaran melakukan pemotongan; jika penyewa tidak wajib memotong pajak, penerima membayar sendiri. Ini peran alternatif, bukan otomatis pemotongan ganda.
 
 Basis:
 
@@ -644,6 +1000,25 @@ Basis:
 Basis:
 
 - [PP34_2017 article2 / (1),(3) / PDF3](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=3), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:5440eda9fab50b4e47ee6570.
+
+**RENT_SHORT_CONDITION** — Periksa objek sewa dan status kewajiban pemotongan penyewa.
+
+Basis:
+
+- [PP34_2017 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=4), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:0e5db66988eacbc288b3d409,PP34_2017:748bf41bc376044c14aea2eb.
+- [PP34_2017 article2 / (1),(3) / PDF3](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=3), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:5440eda9fab50b4e47ee6570.
+
+**RENT_SHORT_DEFINITION** — Ini pajak penghasilan final atas sewa tanah atau bangunan; jasa penginapan dikecualikan.
+
+Basis:
+
+- [PP34_2017 article2 / (1),(3) / PDF3](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=3), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:5440eda9fab50b4e47ee6570.
+
+**RENT_SHORT_MECHANISM** — Penyewa memotong pajak dari pembayaran jika wajib; jika tidak, penerima penghasilan membayar sendiri.
+
+Basis:
+
+- [PP34_2017 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=4), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:0e5db66988eacbc288b3d409,PP34_2017:748bf41bc376044c14aea2eb.
 
 **SERVICE_EXCEPTIONS** — PMK141 yang diarsipkan mengecualikan jasa yang telah dipotong PPh21 dan penghasilan final tersendiri dari cabang jasa lain. PMK168 menjelaskan pembayaran jasa orang pribadi secara terpisah; pastikan jenis dan domisili penerima, bukan hanya nama invoice.
 
@@ -656,9 +1031,9 @@ Basis:
 
 Basis:
 
-- [DJP_SDSN_2023 article23 / (1a),(4) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+- [DJP_SDSN_2023 article23 / (1)(a),(c) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
 
-**SERVICE_REIMBURSEMENT** — Menurut PMK141 yang diarsipkan, pengecualian pembayaran material atau pihak ketiga tertentu dari dasar memerlukan bukti yang ditentukan. Tanpa bukti seluruh pembayaran terkait selain PPN menjadi dasar; reimbursement tidak otomatis dikecualikan.
+**SERVICE_REIMBURSEMENT** — Menurut PMK141 yang diarsipkan, pengecualian pembayaran material atau pihak ketiga tertentu dari dasar memerlukan bukti yang ditentukan. Tanpa bukti seluruh pembayaran terkait selain PPN menjadi dasar; penggantian biaya tidak otomatis dikecualikan.
 
 Basis:
 
@@ -668,7 +1043,7 @@ Basis:
 
 Basis:
 
-- [DJP_SDSN_2023 article23 / (1a),(4) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+- [DJP_SDSN_2023 article23 / (1)(a),(c) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
 
 Blocked claims: RENT_RATE (current_provision_currency_unconfirmed,amendment_review_incomplete); SERVICE_RATE (current_provision_currency_unconfirmed,amendment_review_incomplete).
 
@@ -700,11 +1075,30 @@ Expected: Do not affirm double withholding; tenant withholding versus recipient 
 
 Объяснения относятся к прочитанному архивному тексту; действующая применимость к компании не подтверждена.
 
-**RENT_PAYER** — В архивной статье PP34 указанный арендатор удерживает налог, а при арендаторе, который не является pemotong, получатель платит сам. Это альтернативные роли, а не автоматическое двойное удержание обеими сторонами.
+**RENT_PAYER** — В архивной статье PP34 указанный арендатор удерживает налог, а при арендаторе, который не имеет обязанность удерживать налог, получатель платит сам. Это альтернативные роли, а не автоматическое двойное удержание обеими сторонами.
 
 Basis:
 
 - [PP34_2017 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=4), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:0e5db66988eacbc288b3d409,PP34_2017:748bf41bc376044c14aea2eb.
+
+**RENT_SHORT_CONDITION** — Проверьте предмет аренды и статус арендатора.
+
+Basis:
+
+- [PP34_2017 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=4), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:0e5db66988eacbc288b3d409,PP34_2017:748bf41bc376044c14aea2eb.
+- [PP34_2017 article2 / (1),(3) / PDF3](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=3), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:5440eda9fab50b4e47ee6570.
+
+**RENT_SHORT_MECHANISM** — Если арендатор обязан удерживать налог, он удерживает; иначе платит получатель дохода.
+
+Basis:
+
+- [PP34_2017 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=4), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:0e5db66988eacbc288b3d409,PP34_2017:748bf41bc376044c14aea2eb.
+
+**RENT_ABBREVIATION** — Pajak Penghasilan yang bersifat final
+
+Basis:
+
+- [PP34_2017 article2 / (1),(3) / PDF3](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=3), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:5440eda9fab50b4e47ee6570.
 
 **RENT_BASE** — Архивная статья PP34 описывает валовую аренду вместе со связанными обслуживанием, охраной и услугами, даже при отдельных соглашениях. Для инвойса надо уточнить связь расходов с объектом аренды; название строки само по себе недостаточно.
 
@@ -721,6 +1115,12 @@ Basis:
 - [PP34_2017 article7 / whole / PDF7](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=7), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:e402c8754477926509de1784.
 
 **RENT_SCOPE** — В архивном PP34 аренда земли/здания отделена от услуг проживания с размещением: гостиничный платёж нельзя автоматически считать арендой.
+
+Basis:
+
+- [PP34_2017 article2 / (1),(3) / PDF3](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=3), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:5440eda9fab50b4e47ee6570.
+
+**RENT_SHORT_DEFINITION** — Это финальный налог на доход от аренды земли или зданий; услуги проживания исключены.
 
 Basis:
 
@@ -756,6 +1156,25 @@ Basis:
 
 - [PP34_2017 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=4), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:0e5db66988eacbc288b3d409,PP34_2017:748bf41bc376044c14aea2eb.
 
+**RENT_SHORT_CONDITION** — Check the rental object and tenant’s withholding status.
+
+Basis:
+
+- [PP34_2017 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=4), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:0e5db66988eacbc288b3d409,PP34_2017:748bf41bc376044c14aea2eb.
+- [PP34_2017 article2 / (1),(3) / PDF3](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=3), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:5440eda9fab50b4e47ee6570.
+
+**RENT_SHORT_MECHANISM** — The tenant withholds if designated to do so; otherwise the income recipient pays.
+
+Basis:
+
+- [PP34_2017 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=4), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:0e5db66988eacbc288b3d409,PP34_2017:748bf41bc376044c14aea2eb.
+
+**RENT_ABBREVIATION** — Pajak Penghasilan yang bersifat final
+
+Basis:
+
+- [PP34_2017 article2 / (1),(3) / PDF3](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=3), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:5440eda9fab50b4e47ee6570.
+
 **RENT_BASE** — The archived PP34 provision describes gross rent including related maintenance, security and service charges even under separate agreements. Clarify their relationship to the rented property; an invoice label alone is insufficient.
 
 Basis:
@@ -771,6 +1190,12 @@ Basis:
 - [PP34_2017 article7 / whole / PDF7](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=7), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:e402c8754477926509de1784.
 
 **RENT_SCOPE** — The archived PP34 distinguishes land/building rental from lodging with accommodation; a hotel payment cannot automatically be classified as rental.
+
+Basis:
+
+- [PP34_2017 article2 / (1),(3) / PDF3](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=3), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:5440eda9fab50b4e47ee6570.
+
+**RENT_SHORT_DEFINITION** — This is final income tax on land or building rental; accommodation services are excluded.
 
 Basis:
 
@@ -800,6 +1225,12 @@ Expected: Do not affirm double withholding; tenant withholding versus recipient 
 
 Penjelasan menggambarkan teks arsip yang dibaca; penerapan terkini pada perusahaan belum ditetapkan.
 
+**RENT_ABBREVIATION** — Pajak Penghasilan yang bersifat final
+
+Basis:
+
+- [PP34_2017 article2 / (1),(3) / PDF3](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=3), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:5440eda9fab50b4e47ee6570.
+
 **RENT_BASE** — Ketentuan PP34 yang diarsipkan menjelaskan bruto sewa termasuk pemeliharaan, keamanan dan layanan terkait meskipun perjanjiannya terpisah. Perjelas hubungan biaya dengan objek sewa; nama baris invoice saja tidak cukup.
 
 Basis:
@@ -814,7 +1245,7 @@ Basis:
 - [PP34_2017 article6 / whole / PDF7](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=7), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:a9699b139d3e26aed410e15b.
 - [PP34_2017 article7 / whole / PDF7](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=7), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:e402c8754477926509de1784.
 
-**RENT_PAYER** — Dalam ketentuan PP34 yang diarsipkan penyewa pemotong melakukan pemotongan; jika penyewa bukan pemotong, penerima membayar sendiri. Ini peran alternatif, bukan otomatis pemotongan ganda.
+**RENT_PAYER** — Dalam ketentuan PP34 yang diarsipkan penyewa yang wajib memotong pajak dari pembayaran melakukan pemotongan; jika penyewa tidak wajib memotong pajak, penerima membayar sendiri. Ini peran alternatif, bukan otomatis pemotongan ganda.
 
 Basis:
 
@@ -825,6 +1256,25 @@ Basis:
 Basis:
 
 - [PP34_2017 article2 / (1),(3) / PDF3](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=3), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:5440eda9fab50b4e47ee6570.
+
+**RENT_SHORT_CONDITION** — Periksa objek sewa dan status kewajiban pemotongan penyewa.
+
+Basis:
+
+- [PP34_2017 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=4), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:0e5db66988eacbc288b3d409,PP34_2017:748bf41bc376044c14aea2eb.
+- [PP34_2017 article2 / (1),(3) / PDF3](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=3), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:5440eda9fab50b4e47ee6570.
+
+**RENT_SHORT_DEFINITION** — Ini pajak penghasilan final atas sewa tanah atau bangunan; jasa penginapan dikecualikan.
+
+Basis:
+
+- [PP34_2017 article2 / (1),(3) / PDF3](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=3), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:5440eda9fab50b4e47ee6570.
+
+**RENT_SHORT_MECHANISM** — Penyewa memotong pajak dari pembayaran jika wajib; jika tidak, penerima penghasilan membayar sendiri.
+
+Basis:
+
+- [PP34_2017 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=4), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:0e5db66988eacbc288b3d409,PP34_2017:748bf41bc376044c14aea2eb.
 
 Blocked claims: RENT_RATE (current_provision_currency_unconfirmed,amendment_review_incomplete).
 
@@ -856,7 +1306,14 @@ Basis:
 
 - [PP34_2017 article4 / (2) / PDF4,5](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=4), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:8d1eb3adb3e7cf9dcd766c08,PP34_2017:bd13e8b75485407372f5f1b8,PP34_2017:56daaecfe348d7b97b7d1ced.
 
-**SERVICE_EXCEPTIONS** — Архивный PMK141 исключает из jasa lain услуги, уже подпадающие под PPh21, и отдельно финально облагаемые доходы. PMK168 отдельно описывает платежи физлицам за услуги; нужно выяснить тип и резидентство получателя, а не судить по названию инвойса.
+**P23_SHORT_CONDITION** — Для прочих услуг проверьте исключения: выплаты по PPh21 и отдельному финальному налогу.
+
+Basis:
+
+- [PMK141_2015 article1 / (1),(2) / PDF2,3,4,5,6](https://jdih.kemenkeu.go.id/api/download/fulltext/2015/141~PMK.03~2015Per.pdf#page=2), SHA cd107a9b7de8ad12b6eff1e3cf64f512b712f63ce58e62b3dba2a35d6ccbf1f4, fragment IDs: PMK141_2015:b9daaac005c09472f564f133,PMK141_2015:0d4c687551245d61dec6a5a1,PMK141_2015:ce21c53c5bc11f1fda4ab333,PMK141_2015:f4ebe3b18b5d0fdc6a4ad52a,PMK141_2015:a9949937f09c37d1cf2a5807.
+- [PMK168_2023 article2 / (2)(d) / PDF5,6](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=5), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:079306052df2707a31737092,PMK168_2023:5d7769d0404bd1a073946d49.
+
+**SERVICE_EXCEPTIONS** — Архивный PMK141 исключает из категории прочих услуг услуги, уже подпадающие под PPh21, и отдельно финально облагаемые доходы. PMK168 отдельно описывает платежи физлицам за услуги; нужно выяснить тип и резидентство получателя, а не судить по названию инвойса.
 
 Basis:
 
@@ -875,6 +1332,30 @@ Basis:
 
 - [PMK141_2015 article1 / (1),(2) / PDF2,3,4,5,6](https://jdih.kemenkeu.go.id/api/download/fulltext/2015/141~PMK.03~2015Per.pdf#page=2), SHA cd107a9b7de8ad12b6eff1e3cf64f512b712f63ce58e62b3dba2a35d6ccbf1f4, fragment IDs: PMK141_2015:b9daaac005c09472f564f133,PMK141_2015:0d4c687551245d61dec6a5a1,PMK141_2015:ce21c53c5bc11f1fda4ab333,PMK141_2015:f4ebe3b18b5d0fdc6a4ad52a,PMK141_2015:a9949937f09c37d1cf2a5807.
 
+**P23_ABBREVIATION** — Pajak Penghasilan Pasal 23
+
+Basis:
+
+- [DJP_SDSN_2023 article23 / (1a),(4) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+
+**P23_SHORT_DEFINITION** — PPh23 — удержание налога с перечисленных доходов, включая отдельные услуги и аренду имущества.
+
+Basis:
+
+- [DJP_SDSN_2023 article23 / (1a),(4) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+
+**P23_SHORT_MECHANISM** — Налог удерживает указанный в правилах плательщик дохода.
+
+Basis:
+
+- [DJP_SDSN_2023 article23 / (1a),(4) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+
+**RENT_ABBREVIATION** — Pajak Penghasilan yang bersifat final
+
+Basis:
+
+- [PP34_2017 article2 / (1),(3) / PDF3](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=3), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:5440eda9fab50b4e47ee6570.
+
 **RENT_HISTORY** — Архив PP34 содержит переходные положения, отмену PP29 с поправкой PP5 и начало действия 2 января 2018. Старый договор требует отдельной проверки перехода; эти положения не устанавливают режим аренды за 2017 год.
 
 Basis:
@@ -883,7 +1364,7 @@ Basis:
 - [PP34_2017 article6 / whole / PDF7](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=7), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:a9699b139d3e26aed410e15b.
 - [PP34_2017 article7 / whole / PDF7](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=7), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:e402c8754477926509de1784.
 
-**RENT_PAYER** — В архивной статье PP34 указанный арендатор удерживает налог, а при арендаторе, который не является pemotong, получатель платит сам. Это альтернативные роли, а не автоматическое двойное удержание обеими сторонами.
+**RENT_PAYER** — В архивной статье PP34 указанный арендатор удерживает налог, а при арендаторе, который не имеет обязанность удерживать налог, получатель платит сам. Это альтернативные роли, а не автоматическое двойное удержание обеими сторонами.
 
 Basis:
 
@@ -894,6 +1375,25 @@ Basis:
 Basis:
 
 - [PP34_2017 article2 / (1),(3) / PDF3](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=3), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:5440eda9fab50b4e47ee6570.
+
+**RENT_SHORT_CONDITION** — Проверьте предмет аренды и статус арендатора.
+
+Basis:
+
+- [PP34_2017 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=4), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:0e5db66988eacbc288b3d409,PP34_2017:748bf41bc376044c14aea2eb.
+- [PP34_2017 article2 / (1),(3) / PDF3](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=3), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:5440eda9fab50b4e47ee6570.
+
+**RENT_SHORT_DEFINITION** — Это финальный налог на доход от аренды земли или зданий; услуги проживания исключены.
+
+Basis:
+
+- [PP34_2017 article2 / (1),(3) / PDF3](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=3), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:5440eda9fab50b4e47ee6570.
+
+**RENT_SHORT_MECHANISM** — Если арендатор обязан удерживать налог, он удерживает; иначе платит получатель дохода.
+
+Basis:
+
+- [PP34_2017 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=4), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:0e5db66988eacbc288b3d409,PP34_2017:748bf41bc376044c14aea2eb.
 
 **SERVICE_SCOPE** — В архивной редакции UU PPh статья23 содержит разные категории доходов и отдельную ветвь аренды имущества с исключением финально облагаемой аренды. Нельзя переносить одну ставку на любой инвойс.
 
@@ -943,6 +1443,37 @@ Basis:
 
 - [PMK141_2015 article1 / (3)-(5) / PDF2,3,4,5,6](https://jdih.kemenkeu.go.id/api/download/fulltext/2015/141~PMK.03~2015Per.pdf#page=2), SHA cd107a9b7de8ad12b6eff1e3cf64f512b712f63ce58e62b3dba2a35d6ccbf1f4, fragment IDs: PMK141_2015:b9daaac005c09472f564f133,PMK141_2015:0d4c687551245d61dec6a5a1,PMK141_2015:ce21c53c5bc11f1fda4ab333,PMK141_2015:f4ebe3b18b5d0fdc6a4ad52a,PMK141_2015:a9949937f09c37d1cf2a5807.
 
+**P23_ABBREVIATION** — Pajak Penghasilan Pasal 23
+
+Basis:
+
+- [DJP_SDSN_2023 article23 / (1)(a),(c) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+
+**P23_SHORT_CONDITION** — For the other-services category, check exclusions for payments covered by PPh21 or a separate final tax.
+
+Basis:
+
+- [PMK141_2015 article1 / (3)-(5) / PDF2,3,4,5,6](https://jdih.kemenkeu.go.id/api/download/fulltext/2015/141~PMK.03~2015Per.pdf#page=2), SHA cd107a9b7de8ad12b6eff1e3cf64f512b712f63ce58e62b3dba2a35d6ccbf1f4, fragment IDs: PMK141_2015:b9daaac005c09472f564f133,PMK141_2015:0d4c687551245d61dec6a5a1,PMK141_2015:ce21c53c5bc11f1fda4ab333,PMK141_2015:f4ebe3b18b5d0fdc6a4ad52a,PMK141_2015:a9949937f09c37d1cf2a5807.
+- [PMK168_2023 article2 / (2)(d) / PDF5,6](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=5), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:079306052df2707a31737092,PMK168_2023:5d7769d0404bd1a073946d49.
+
+**P23_SHORT_DEFINITION** — PPh23 is tax withholding on listed income, including specified services and property rental.
+
+Basis:
+
+- [DJP_SDSN_2023 article23 / (1)(a),(c) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+
+**P23_SHORT_MECHANISM** — The designated income payer withholds the tax.
+
+Basis:
+
+- [DJP_SDSN_2023 article23 / (1)(a),(c) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+
+**RENT_ABBREVIATION** — Pajak Penghasilan yang bersifat final
+
+Basis:
+
+- [PP34_2017 article2 / (1),(3) / PDF3](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=3), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:5440eda9fab50b4e47ee6570.
+
 **RENT_HISTORY** — The PP34 archive contains transitions, repeal of PP29 as amended by PP5, and commencement on 2 January 2018. An old contract requires separate transition review; these provisions do not establish rental treatment for 2017.
 
 Basis:
@@ -963,6 +1494,25 @@ Basis:
 
 - [PP34_2017 article2 / (1),(3) / PDF3](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=3), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:5440eda9fab50b4e47ee6570.
 
+**RENT_SHORT_CONDITION** — Check the rental object and tenant’s withholding status.
+
+Basis:
+
+- [PP34_2017 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=4), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:0e5db66988eacbc288b3d409,PP34_2017:748bf41bc376044c14aea2eb.
+- [PP34_2017 article2 / (1),(3) / PDF3](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=3), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:5440eda9fab50b4e47ee6570.
+
+**RENT_SHORT_DEFINITION** — This is final income tax on land or building rental; accommodation services are excluded.
+
+Basis:
+
+- [PP34_2017 article2 / (1),(3) / PDF3](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=3), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:5440eda9fab50b4e47ee6570.
+
+**RENT_SHORT_MECHANISM** — The tenant withholds if designated to do so; otherwise the income recipient pays.
+
+Basis:
+
+- [PP34_2017 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=4), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:0e5db66988eacbc288b3d409,PP34_2017:748bf41bc376044c14aea2eb.
+
 **SERVICE_EXCEPTIONS** — The archived PMK141 excludes services already subject to PPh21 and separately final-taxed income from its other-services branch. PMK168 separately describes payments for individual services; establish recipient type and residency rather than infer them from the invoice name.
 
 Basis:
@@ -974,13 +1524,13 @@ Basis:
 
 Basis:
 
-- [DJP_SDSN_2023 article23 / (1a),(4) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+- [DJP_SDSN_2023 article23 / (1)(a),(c) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
 
 **SERVICE_SCOPE** — In the archived PPh Law Article23 has different income categories and a property-rental branch excluding separately final-taxed rental. A single rate cannot be applied to every invoice.
 
 Basis:
 
-- [DJP_SDSN_2023 article23 / (1a),(4) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+- [DJP_SDSN_2023 article23 / (1)(a),(c) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
 
 Blocked claims: RENT_RATE (current_provision_currency_unconfirmed,amendment_review_incomplete); SERVICE_RATE (current_provision_currency_unconfirmed,amendment_review_incomplete).
 
@@ -1018,6 +1568,37 @@ Basis:
 
 - [PP34_2017 article4 / (2) / PDF4,5](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=4), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:8d1eb3adb3e7cf9dcd766c08,PP34_2017:bd13e8b75485407372f5f1b8,PP34_2017:56daaecfe348d7b97b7d1ced.
 
+**P23_ABBREVIATION** — Pajak Penghasilan Pasal 23
+
+Basis:
+
+- [DJP_SDSN_2023 article23 / (1)(a),(c) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+
+**P23_SHORT_CONDITION** — Untuk kategori jasa lain, periksa pengecualian pembayaran yang tercakup PPh21 atau pajak final tersendiri.
+
+Basis:
+
+- [PMK141_2015 article1 / (1),(2) / PDF2,3,4,5,6](https://jdih.kemenkeu.go.id/api/download/fulltext/2015/141~PMK.03~2015Per.pdf#page=2), SHA cd107a9b7de8ad12b6eff1e3cf64f512b712f63ce58e62b3dba2a35d6ccbf1f4, fragment IDs: PMK141_2015:b9daaac005c09472f564f133,PMK141_2015:0d4c687551245d61dec6a5a1,PMK141_2015:ce21c53c5bc11f1fda4ab333,PMK141_2015:f4ebe3b18b5d0fdc6a4ad52a,PMK141_2015:a9949937f09c37d1cf2a5807.
+- [PMK168_2023 article2 / (2)(d) / PDF5,6](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=5), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:079306052df2707a31737092,PMK168_2023:5d7769d0404bd1a073946d49.
+
+**P23_SHORT_DEFINITION** — PPh23 adalah pemotongan pajak atas penghasilan yang tercantum, termasuk jasa tertentu dan sewa harta.
+
+Basis:
+
+- [DJP_SDSN_2023 article23 / (1)(a),(c) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+
+**P23_SHORT_MECHANISM** — Pembayar yang ditentukan memotong pajak dari pembayaran.
+
+Basis:
+
+- [DJP_SDSN_2023 article23 / (1)(a),(c) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+
+**RENT_ABBREVIATION** — Pajak Penghasilan yang bersifat final
+
+Basis:
+
+- [PP34_2017 article2 / (1),(3) / PDF3](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=3), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:5440eda9fab50b4e47ee6570.
+
 **RENT_HISTORY** — Arsip PP34 memuat transisi, pencabutan PP29 sebagaimana diubah PP5, dan mulai berlaku 2 Januari 2018. Kontrak lama memerlukan pemeriksaan transisi; ketentuan ini tidak menentukan pajak sewa tahun2017.
 
 Basis:
@@ -1026,7 +1607,7 @@ Basis:
 - [PP34_2017 article6 / whole / PDF7](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=7), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:a9699b139d3e26aed410e15b.
 - [PP34_2017 article7 / whole / PDF7](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=7), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:e402c8754477926509de1784.
 
-**RENT_PAYER** — Dalam ketentuan PP34 yang diarsipkan penyewa pemotong melakukan pemotongan; jika penyewa bukan pemotong, penerima membayar sendiri. Ini peran alternatif, bukan otomatis pemotongan ganda.
+**RENT_PAYER** — Dalam ketentuan PP34 yang diarsipkan penyewa yang wajib memotong pajak dari pembayaran melakukan pemotongan; jika penyewa tidak wajib memotong pajak, penerima membayar sendiri. Ini peran alternatif, bukan otomatis pemotongan ganda.
 
 Basis:
 
@@ -1037,6 +1618,25 @@ Basis:
 Basis:
 
 - [PP34_2017 article2 / (1),(3) / PDF3](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=3), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:5440eda9fab50b4e47ee6570.
+
+**RENT_SHORT_CONDITION** — Periksa objek sewa dan status kewajiban pemotongan penyewa.
+
+Basis:
+
+- [PP34_2017 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=4), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:0e5db66988eacbc288b3d409,PP34_2017:748bf41bc376044c14aea2eb.
+- [PP34_2017 article2 / (1),(3) / PDF3](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=3), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:5440eda9fab50b4e47ee6570.
+
+**RENT_SHORT_DEFINITION** — Ini pajak penghasilan final atas sewa tanah atau bangunan; jasa penginapan dikecualikan.
+
+Basis:
+
+- [PP34_2017 article2 / (1),(3) / PDF3](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=3), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:5440eda9fab50b4e47ee6570.
+
+**RENT_SHORT_MECHANISM** — Penyewa memotong pajak dari pembayaran jika wajib; jika tidak, penerima penghasilan membayar sendiri.
+
+Basis:
+
+- [PP34_2017 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=4), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:0e5db66988eacbc288b3d409,PP34_2017:748bf41bc376044c14aea2eb.
 
 **SERVICE_EXCEPTIONS** — PMK141 yang diarsipkan mengecualikan jasa yang telah dipotong PPh21 dan penghasilan final tersendiri dari cabang jasa lain. PMK168 menjelaskan pembayaran jasa orang pribadi secara terpisah; pastikan jenis dan domisili penerima, bukan hanya nama invoice.
 
@@ -1049,9 +1649,9 @@ Basis:
 
 Basis:
 
-- [DJP_SDSN_2023 article23 / (1a),(4) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+- [DJP_SDSN_2023 article23 / (1)(a),(c) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
 
-**SERVICE_REIMBURSEMENT** — Menurut PMK141 yang diarsipkan, pengecualian pembayaran material atau pihak ketiga tertentu dari dasar memerlukan bukti yang ditentukan. Tanpa bukti seluruh pembayaran terkait selain PPN menjadi dasar; reimbursement tidak otomatis dikecualikan.
+**SERVICE_REIMBURSEMENT** — Menurut PMK141 yang diarsipkan, pengecualian pembayaran material atau pihak ketiga tertentu dari dasar memerlukan bukti yang ditentukan. Tanpa bukti seluruh pembayaran terkait selain PPN menjadi dasar; penggantian biaya tidak otomatis dikecualikan.
 
 Basis:
 
@@ -1061,7 +1661,7 @@ Basis:
 
 Basis:
 
-- [DJP_SDSN_2023 article23 / (1a),(4) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+- [DJP_SDSN_2023 article23 / (1)(a),(c) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
 
 Blocked claims: RENT_RATE (current_provision_currency_unconfirmed,amendment_review_incomplete); SERVICE_RATE (current_provision_currency_unconfirmed,amendment_review_incomplete).
 
@@ -1093,7 +1693,7 @@ Expected: Do not apply 2018 commencement backwards; request prior instruments.
 
 Недостаточно подтверждённых оснований для налогового вывода.
 
-Blocked claims: RENT_HISTORY (support_outside_requested_period,support_outside_requested_period,support_outside_requested_period,outside_requested_period); RENT_BASE (support_outside_requested_period,outside_requested_period); RENT_PAYER (support_outside_requested_period,outside_requested_period); RENT_RATE (support_outside_requested_period,outside_requested_period,current_provision_currency_unconfirmed,amendment_review_incomplete); RENT_SCOPE (support_outside_requested_period,outside_requested_period).
+Blocked claims: RENT_HISTORY (support_outside_requested_period,support_outside_requested_period,support_outside_requested_period,outside_requested_period); RENT_ABBREVIATION (support_outside_requested_period,outside_requested_period); RENT_BASE (support_outside_requested_period,outside_requested_period); RENT_PAYER (support_outside_requested_period,outside_requested_period); RENT_RATE (support_outside_requested_period,outside_requested_period,current_provision_currency_unconfirmed,amendment_review_incomplete); RENT_SCOPE (support_outside_requested_period,outside_requested_period); RENT_SHORT_CONDITION (support_outside_requested_period,support_outside_requested_period,outside_requested_period); RENT_SHORT_DEFINITION (support_outside_requested_period,outside_requested_period); RENT_SHORT_MECHANISM (support_outside_requested_period,outside_requested_period).
 
 Clarifications:
 
@@ -1117,7 +1717,7 @@ Expected: Do not apply 2018 commencement backwards; request prior instruments.
 
 There is insufficient confirmed evidence for a tax determination.
 
-Blocked claims: RENT_HISTORY (support_outside_requested_period,support_outside_requested_period,support_outside_requested_period,outside_requested_period); RENT_BASE (support_outside_requested_period,outside_requested_period); RENT_PAYER (support_outside_requested_period,outside_requested_period); RENT_RATE (support_outside_requested_period,outside_requested_period,current_provision_currency_unconfirmed,amendment_review_incomplete); RENT_SCOPE (support_outside_requested_period,outside_requested_period).
+Blocked claims: RENT_HISTORY (support_outside_requested_period,support_outside_requested_period,support_outside_requested_period,outside_requested_period); RENT_ABBREVIATION (support_outside_requested_period,outside_requested_period); RENT_BASE (support_outside_requested_period,outside_requested_period); RENT_PAYER (support_outside_requested_period,outside_requested_period); RENT_RATE (support_outside_requested_period,outside_requested_period,current_provision_currency_unconfirmed,amendment_review_incomplete); RENT_SCOPE (support_outside_requested_period,outside_requested_period); RENT_SHORT_CONDITION (support_outside_requested_period,support_outside_requested_period,outside_requested_period); RENT_SHORT_DEFINITION (support_outside_requested_period,outside_requested_period); RENT_SHORT_MECHANISM (support_outside_requested_period,outside_requested_period).
 
 Clarifications:
 
@@ -1141,7 +1741,7 @@ Expected: Do not apply 2018 commencement backwards; request prior instruments.
 
 Bukti terkonfirmasi belum cukup untuk menentukan pajak.
 
-Blocked claims: RENT_HISTORY (support_outside_requested_period,support_outside_requested_period,support_outside_requested_period,outside_requested_period); RENT_BASE (support_outside_requested_period,outside_requested_period); RENT_PAYER (support_outside_requested_period,outside_requested_period); RENT_RATE (support_outside_requested_period,outside_requested_period,current_provision_currency_unconfirmed,amendment_review_incomplete); RENT_SCOPE (support_outside_requested_period,outside_requested_period).
+Blocked claims: RENT_HISTORY (support_outside_requested_period,support_outside_requested_period,support_outside_requested_period,outside_requested_period); RENT_ABBREVIATION (support_outside_requested_period,outside_requested_period); RENT_BASE (support_outside_requested_period,outside_requested_period); RENT_PAYER (support_outside_requested_period,outside_requested_period); RENT_RATE (support_outside_requested_period,outside_requested_period,current_provision_currency_unconfirmed,amendment_review_incomplete); RENT_SCOPE (support_outside_requested_period,outside_requested_period); RENT_SHORT_CONDITION (support_outside_requested_period,support_outside_requested_period,outside_requested_period); RENT_SHORT_DEFINITION (support_outside_requested_period,outside_requested_period); RENT_SHORT_MECHANISM (support_outside_requested_period,outside_requested_period).
 
 Clarifications:
 
@@ -1173,13 +1773,19 @@ Basis:
 - [PP34_2017 article6 / whole / PDF7](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=7), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:a9699b139d3e26aed410e15b.
 - [PP34_2017 article7 / whole / PDF7](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=7), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:e402c8754477926509de1784.
 
+**RENT_ABBREVIATION** — Pajak Penghasilan yang bersifat final
+
+Basis:
+
+- [PP34_2017 article2 / (1),(3) / PDF3](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=3), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:5440eda9fab50b4e47ee6570.
+
 **RENT_BASE** — Архивная статья PP34 описывает валовую аренду вместе со связанными обслуживанием, охраной и услугами, даже при отдельных соглашениях. Для инвойса надо уточнить связь расходов с объектом аренды; название строки само по себе недостаточно.
 
 Basis:
 
 - [PP34_2017 article4 / (2) / PDF4,5](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=4), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:8d1eb3adb3e7cf9dcd766c08,PP34_2017:bd13e8b75485407372f5f1b8,PP34_2017:56daaecfe348d7b97b7d1ced.
 
-**RENT_PAYER** — В архивной статье PP34 указанный арендатор удерживает налог, а при арендаторе, который не является pemotong, получатель платит сам. Это альтернативные роли, а не автоматическое двойное удержание обеими сторонами.
+**RENT_PAYER** — В архивной статье PP34 указанный арендатор удерживает налог, а при арендаторе, который не имеет обязанность удерживать налог, получатель платит сам. Это альтернативные роли, а не автоматическое двойное удержание обеими сторонами.
 
 Basis:
 
@@ -1190,6 +1796,25 @@ Basis:
 Basis:
 
 - [PP34_2017 article2 / (1),(3) / PDF3](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=3), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:5440eda9fab50b4e47ee6570.
+
+**RENT_SHORT_CONDITION** — Проверьте предмет аренды и статус арендатора.
+
+Basis:
+
+- [PP34_2017 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=4), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:0e5db66988eacbc288b3d409,PP34_2017:748bf41bc376044c14aea2eb.
+- [PP34_2017 article2 / (1),(3) / PDF3](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=3), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:5440eda9fab50b4e47ee6570.
+
+**RENT_SHORT_DEFINITION** — Это финальный налог на доход от аренды земли или зданий; услуги проживания исключены.
+
+Basis:
+
+- [PP34_2017 article2 / (1),(3) / PDF3](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=3), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:5440eda9fab50b4e47ee6570.
+
+**RENT_SHORT_MECHANISM** — Если арендатор обязан удерживать налог, он удерживает; иначе платит получатель дохода.
+
+Basis:
+
+- [PP34_2017 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=4), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:0e5db66988eacbc288b3d409,PP34_2017:748bf41bc376044c14aea2eb.
 
 Blocked claims: RENT_RATE (current_provision_currency_unconfirmed,amendment_review_incomplete).
 
@@ -1223,6 +1848,12 @@ Basis:
 - [PP34_2017 article6 / whole / PDF7](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=7), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:a9699b139d3e26aed410e15b.
 - [PP34_2017 article7 / whole / PDF7](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=7), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:e402c8754477926509de1784.
 
+**RENT_ABBREVIATION** — Pajak Penghasilan yang bersifat final
+
+Basis:
+
+- [PP34_2017 article2 / (1),(3) / PDF3](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=3), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:5440eda9fab50b4e47ee6570.
+
 **RENT_BASE** — The archived PP34 provision describes gross rent including related maintenance, security and service charges even under separate agreements. Clarify their relationship to the rented property; an invoice label alone is insufficient.
 
 Basis:
@@ -1240,6 +1871,25 @@ Basis:
 Basis:
 
 - [PP34_2017 article2 / (1),(3) / PDF3](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=3), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:5440eda9fab50b4e47ee6570.
+
+**RENT_SHORT_CONDITION** — Check the rental object and tenant’s withholding status.
+
+Basis:
+
+- [PP34_2017 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=4), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:0e5db66988eacbc288b3d409,PP34_2017:748bf41bc376044c14aea2eb.
+- [PP34_2017 article2 / (1),(3) / PDF3](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=3), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:5440eda9fab50b4e47ee6570.
+
+**RENT_SHORT_DEFINITION** — This is final income tax on land or building rental; accommodation services are excluded.
+
+Basis:
+
+- [PP34_2017 article2 / (1),(3) / PDF3](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=3), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:5440eda9fab50b4e47ee6570.
+
+**RENT_SHORT_MECHANISM** — The tenant withholds if designated to do so; otherwise the income recipient pays.
+
+Basis:
+
+- [PP34_2017 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=4), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:0e5db66988eacbc288b3d409,PP34_2017:748bf41bc376044c14aea2eb.
 
 Blocked claims: RENT_RATE (current_provision_currency_unconfirmed,amendment_review_incomplete).
 
@@ -1273,13 +1923,19 @@ Basis:
 - [PP34_2017 article6 / whole / PDF7](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=7), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:a9699b139d3e26aed410e15b.
 - [PP34_2017 article7 / whole / PDF7](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=7), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:e402c8754477926509de1784.
 
+**RENT_ABBREVIATION** — Pajak Penghasilan yang bersifat final
+
+Basis:
+
+- [PP34_2017 article2 / (1),(3) / PDF3](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=3), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:5440eda9fab50b4e47ee6570.
+
 **RENT_BASE** — Ketentuan PP34 yang diarsipkan menjelaskan bruto sewa termasuk pemeliharaan, keamanan dan layanan terkait meskipun perjanjiannya terpisah. Perjelas hubungan biaya dengan objek sewa; nama baris invoice saja tidak cukup.
 
 Basis:
 
 - [PP34_2017 article4 / (2) / PDF4,5](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=4), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:8d1eb3adb3e7cf9dcd766c08,PP34_2017:bd13e8b75485407372f5f1b8,PP34_2017:56daaecfe348d7b97b7d1ced.
 
-**RENT_PAYER** — Dalam ketentuan PP34 yang diarsipkan penyewa pemotong melakukan pemotongan; jika penyewa bukan pemotong, penerima membayar sendiri. Ini peran alternatif, bukan otomatis pemotongan ganda.
+**RENT_PAYER** — Dalam ketentuan PP34 yang diarsipkan penyewa yang wajib memotong pajak dari pembayaran melakukan pemotongan; jika penyewa tidak wajib memotong pajak, penerima membayar sendiri. Ini peran alternatif, bukan otomatis pemotongan ganda.
 
 Basis:
 
@@ -1290,6 +1946,25 @@ Basis:
 Basis:
 
 - [PP34_2017 article2 / (1),(3) / PDF3](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=3), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:5440eda9fab50b4e47ee6570.
+
+**RENT_SHORT_CONDITION** — Periksa objek sewa dan status kewajiban pemotongan penyewa.
+
+Basis:
+
+- [PP34_2017 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=4), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:0e5db66988eacbc288b3d409,PP34_2017:748bf41bc376044c14aea2eb.
+- [PP34_2017 article2 / (1),(3) / PDF3](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=3), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:5440eda9fab50b4e47ee6570.
+
+**RENT_SHORT_DEFINITION** — Ini pajak penghasilan final atas sewa tanah atau bangunan; jasa penginapan dikecualikan.
+
+Basis:
+
+- [PP34_2017 article2 / (1),(3) / PDF3](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=3), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:5440eda9fab50b4e47ee6570.
+
+**RENT_SHORT_MECHANISM** — Penyewa memotong pajak dari pembayaran jika wajib; jika tidak, penerima penghasilan membayar sendiri.
+
+Basis:
+
+- [PP34_2017 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=4), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:0e5db66988eacbc288b3d409,PP34_2017:748bf41bc376044c14aea2eb.
 
 Blocked claims: RENT_RATE (current_provision_currency_unconfirmed,amendment_review_incomplete).
 
@@ -1315,7 +1990,28 @@ Expected: Distinguish income tax and VAT; no turnover-only entitlement.
 
 Объяснения относятся к прочитанному архивному тексту; действующая применимость к компании не подтверждена.
 
-**VAT_MECHANISM** — Архивный PMK131 разделяет установленную ставку и DPP nilai lain. В той же редакции отдельно исключены специальные базы: механизм нельзя объявлять универсальным для всех поставок.
+**PPN_ABBREVIATION** — Pajak Pertambahan Nilai
+
+Basis:
+
+- [PMK131_2024 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c853ed3c496865218892cf3c.
+- [PMK131_2024 article4 / (1) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:eb357e4b3237db5d08aa0e46.
+
+**PPN_SHORT_CONDITION** — Проверьте вид операции: для специальных налоговых баз предусмотрены отдельные правила.
+
+Basis:
+
+- [PMK131_2024 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c853ed3c496865218892cf3c.
+- [PMK131_2024 article4 / (1) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:eb357e4b3237db5d08aa0e46.
+
+**PPN_SHORT_DEFINITION** — PPN — налог на указанные в правилах операции с товарами и услугами.
+
+Basis:
+
+- [PMK131_2024 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c853ed3c496865218892cf3c.
+- [PMK131_2024 article4 / (1) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:eb357e4b3237db5d08aa0e46.
+
+**VAT_MECHANISM** — Архивный PMK131 разделяет установленную ставку и налоговую базу, определяемую по специальной величине. В той же редакции отдельно исключены специальные базы: механизм нельзя объявлять универсальным для всех поставок.
 
 Basis:
 
@@ -1350,6 +2046,13 @@ Basis:
 - [DJP_SDSN_2023 article17 / (1) / PDF213,214](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=213), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:b7444213593cb85c0287d192,DJP_SDSN_2023:a64b39fff8c7cf1e8191d10c.
 - [DJP_SDSN_2023 article31E / (1) / PDF252](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=252), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:c86901169df212206c320540.
 
+**PKP_ABBREVIATION** — Pengusaha Kena Pajak
+
+Basis:
+
+- [PMK164_2023 article17 / (1),(3) / PDF16](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=16), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:4958a8e50eb6047e53d878eb.
+- [PMK164_2023 article18 / whole / PDF17](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=17), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:0f579a087d156d4f15b529cc.
+
 **PKP_REGISTRATION** — Архивный PMK164 различает превышение порога, сообщение о деятельности и начало обязанностей PKP. Их нельзя свести к автоматическому действию в день выставления инвойса.
 
 Basis:
@@ -1357,14 +2060,44 @@ Basis:
 - [PMK164_2023 article17 / (1),(3) / PDF16](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=16), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:4958a8e50eb6047e53d878eb.
 - [PMK164_2023 article18 / whole / PDF17](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=17), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:0f579a087d156d4f15b529cc.
 
-**PKP_SCOPE** — В архивном PMK164 PKP — статус Pengusaha Kena Pajak: предусмотрены оформление статуса и обязанности по PPN. Превышение порога и начало обязанностей различаются; статус конкретной компании здесь не установлен.
+**PKP_SCOPE** — В архивном PMK164 PKP — статус предпринимателя, зарегистрированного для обязанностей по налогу на товары и услуги: предусмотрены оформление статуса и обязанности по PPN. Превышение порога и начало обязанностей различаются; статус конкретной компании здесь не установлен.
 
 Basis:
 
 - [PMK164_2023 article17 / (1),(3) / PDF16](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=16), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:4958a8e50eb6047e53d878eb.
 - [PMK164_2023 article18 / whole / PDF17](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=17), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:0f579a087d156d4f15b529cc.
 
-**VAT_CREDIT** — В архивном PMK131 право зачёта входного налога отсылает к условиям налогового законодательства. Статус PKP и наличие обычного инвойса сами по себе этих условий не доказывают; полный набор требований faktur пока не проверен.
+**PKP_SHORT_CONDITION** — Проверьте оформление статуса и начало обязанностей; одного инвойса недостаточно.
+
+Basis:
+
+- [PMK164_2023 article17 / (1),(3) / PDF16](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=16), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:4958a8e50eb6047e53d878eb.
+- [PMK164_2023 article18 / whole / PDF17](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=17), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:0f579a087d156d4f15b529cc.
+
+**PKP_SHORT_DEFINITION** — PKP — статус предпринимателя для обязанностей по PPN, налогу на операции с товарами и услугами.
+
+Basis:
+
+- [PMK164_2023 article17 / (1),(3) / PDF16](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=16), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:4958a8e50eb6047e53d878eb.
+- [PMK164_2023 article18 / whole / PDF17](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=17), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:0f579a087d156d4f15b529cc.
+- [PMK131_2024 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c853ed3c496865218892cf3c.
+- [PMK131_2024 article4 / (1) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:eb357e4b3237db5d08aa0e46.
+
+**PKP_SHORT_MECHANISM** — После начала обязанностей он собирает, перечисляет налог и сдаёт отчётность.
+
+Basis:
+
+- [PMK164_2023 article17 / (1),(3) / PDF16](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=16), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:4958a8e50eb6047e53d878eb.
+- [PMK164_2023 article18 / whole / PDF17](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=17), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:0f579a087d156d4f15b529cc.
+
+**PPN_SHORT_MECHANISM** — По указанным поставкам налог собирает и перечисляет предприниматель, зарегистрированный для PPN.
+
+Basis:
+
+- [PMK164_2023 article17 / (1),(3) / PDF16](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=16), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:4958a8e50eb6047e53d878eb.
+- [PMK164_2023 article18 / whole / PDF17](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=17), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:0f579a087d156d4f15b529cc.
+
+**VAT_CREDIT** — В архивном PMK131 право зачёта входного налога отсылает к условиям налогового законодательства. Статус PKP и наличие обычного инвойса сами по себе этих условий не доказывают; полный набор требований к налоговому счёту-фактуре пока не проверен.
 
 Basis:
 
@@ -1397,7 +2130,28 @@ Expected: Distinguish income tax and VAT; no turnover-only entitlement.
 
 Explanations describe the read archived text; current company applicability is not established.
 
-**VAT_MECHANISM** — Archived PMK131 distinguishes the stated tax rate from DPP nilai lain. That edition separately excludes special bases; the mechanism cannot be treated as universal for all supplies.
+**PPN_ABBREVIATION** — Pajak Pertambahan Nilai
+
+Basis:
+
+- [PMK131_2024 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c853ed3c496865218892cf3c.
+- [PMK131_2024 article4 / (1) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:eb357e4b3237db5d08aa0e46.
+
+**PPN_SHORT_CONDITION** — Check the transaction type: special tax bases have separate rules.
+
+Basis:
+
+- [PMK131_2024 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c853ed3c496865218892cf3c.
+- [PMK131_2024 article4 / (1) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:eb357e4b3237db5d08aa0e46.
+
+**PPN_SHORT_DEFINITION** — PPN is tax on specified transactions involving goods and services.
+
+Basis:
+
+- [PMK131_2024 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c853ed3c496865218892cf3c.
+- [PMK131_2024 article4 / (1) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:eb357e4b3237db5d08aa0e46.
+
+**VAT_MECHANISM** — Archived PMK131 distinguishes the stated tax rate from a tax base determined using a special value. That edition separately excludes special bases; the mechanism cannot be treated as universal for all supplies.
 
 Basis:
 
@@ -1432,6 +2186,13 @@ Basis:
 - [DJP_SDSN_2023 article17 / (1) / PDF213,214](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=213), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:b7444213593cb85c0287d192,DJP_SDSN_2023:a64b39fff8c7cf1e8191d10c.
 - [DJP_SDSN_2023 article31E / (1) / PDF252](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=252), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:c86901169df212206c320540.
 
+**PKP_ABBREVIATION** — Pengusaha Kena Pajak
+
+Basis:
+
+- [PMK164_2023 article17 / (1),(3) / PDF16](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=16), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:4958a8e50eb6047e53d878eb.
+- [PMK164_2023 article18 / whole / PDF17](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=17), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:0f579a087d156d4f15b529cc.
+
 **PKP_REGISTRATION** — Archived PMK164 distinguishes a threshold crossing, business reporting and commencement of PKP obligations. They cannot be reduced to automatic treatment on an invoice date.
 
 Basis:
@@ -1439,14 +2200,44 @@ Basis:
 - [PMK164_2023 article17 / (1),(3) / PDF16](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=16), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:4958a8e50eb6047e53d878eb.
 - [PMK164_2023 article18 / whole / PDF17](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=17), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:0f579a087d156d4f15b529cc.
 
-**PKP_SCOPE** — In archived PMK164, PKP is Pengusaha Kena Pajak status, with confirmation procedures and PPN obligations. Threshold crossing and commencement of obligations are distinct; this does not establish a particular company’s status.
+**PKP_SCOPE** — In archived PMK164, PKP is status as an entrepreneur registered for goods-and-services tax obligations, with confirmation procedures and PPN obligations. Threshold crossing and commencement of obligations are distinct; this does not establish a particular company’s status.
 
 Basis:
 
 - [PMK164_2023 article17 / (1),(3) / PDF16](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=16), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:4958a8e50eb6047e53d878eb.
 - [PMK164_2023 article18 / whole / PDF17](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=17), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:0f579a087d156d4f15b529cc.
 
-**VAT_CREDIT** — Archived PMK131 refers input credit to the conditions in tax legislation. PKP status and an ordinary invoice alone do not establish those conditions; the full faktur requirements remain unreviewed.
+**PKP_SHORT_CONDITION** — Check status confirmation and when obligations start; an invoice alone is insufficient.
+
+Basis:
+
+- [PMK164_2023 article17 / (1),(3) / PDF16](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=16), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:4958a8e50eb6047e53d878eb.
+- [PMK164_2023 article18 / whole / PDF17](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=17), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:0f579a087d156d4f15b529cc.
+
+**PKP_SHORT_DEFINITION** — PKP is entrepreneur status for PPN obligations, involving tax on goods and services transactions.
+
+Basis:
+
+- [PMK164_2023 article17 / (1),(3) / PDF16](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=16), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:4958a8e50eb6047e53d878eb.
+- [PMK164_2023 article18 / whole / PDF17](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=17), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:0f579a087d156d4f15b529cc.
+- [PMK131_2024 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c853ed3c496865218892cf3c.
+- [PMK131_2024 article4 / (1) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:eb357e4b3237db5d08aa0e46.
+
+**PKP_SHORT_MECHANISM** — Once obligations start, the entrepreneur collects, remits and reports tax.
+
+Basis:
+
+- [PMK164_2023 article17 / (1),(3) / PDF16](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=16), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:4958a8e50eb6047e53d878eb.
+- [PMK164_2023 article18 / whole / PDF17](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=17), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:0f579a087d156d4f15b529cc.
+
+**PPN_SHORT_MECHANISM** — For the specified supplies, the entrepreneur registered for PPN collects and remits tax.
+
+Basis:
+
+- [PMK164_2023 article17 / (1),(3) / PDF16](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=16), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:4958a8e50eb6047e53d878eb.
+- [PMK164_2023 article18 / whole / PDF17](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=17), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:0f579a087d156d4f15b529cc.
+
+**VAT_CREDIT** — Archived PMK131 refers input credit to the conditions in tax legislation. PKP status and an ordinary invoice alone do not establish those conditions; the full tax-invoice requirements remain unreviewed.
 
 Basis:
 
@@ -1479,14 +2270,35 @@ Expected: Distinguish income tax and VAT; no turnover-only entitlement.
 
 Penjelasan menggambarkan teks arsip yang dibaca; penerapan terkini pada perusahaan belum ditetapkan.
 
-**VAT_MECHANISM** — PMK131 yang diarsipkan membedakan tarif pajak dari DPP nilai lain. Edisi tersebut mengecualikan DPP khusus secara terpisah; mekanismenya tidak universal untuk semua penyerahan.
+**PPN_ABBREVIATION** — Pajak Pertambahan Nilai
 
 Basis:
 
 - [PMK131_2024 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c853ed3c496865218892cf3c.
 - [PMK131_2024 article4 / (1) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:eb357e4b3237db5d08aa0e46.
 
-**VAT_SCOPE** — PMK131 yang diarsipkan menjelaskan PPN atas transaksi tertentu Barang Kena Pajak dan Jasa Kena Pajak, termasuk impor serta pemanfaatan dari luar negeri. DPP khusus dikecualikan dari mekanisme umum edisi ini; semua transaksi tidak otomatis diperlakukan sama.
+**PPN_SHORT_CONDITION** — Periksa jenis transaksi: dasar pengenaan khusus memiliki aturan tersendiri.
+
+Basis:
+
+- [PMK131_2024 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c853ed3c496865218892cf3c.
+- [PMK131_2024 article4 / (1) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:eb357e4b3237db5d08aa0e46.
+
+**PPN_SHORT_DEFINITION** — PPN adalah pajak atas transaksi barang dan jasa yang ditentukan.
+
+Basis:
+
+- [PMK131_2024 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c853ed3c496865218892cf3c.
+- [PMK131_2024 article4 / (1) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:eb357e4b3237db5d08aa0e46.
+
+**VAT_MECHANISM** — PMK131 yang diarsipkan membedakan tarif pajak dari dasar pengenaan pajak dengan nilai khusus. Edisi tersebut mengecualikan dasar pengenaan pajak khusus secara terpisah; mekanismenya tidak universal untuk semua penyerahan.
+
+Basis:
+
+- [PMK131_2024 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c853ed3c496865218892cf3c.
+- [PMK131_2024 article4 / (1) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:eb357e4b3237db5d08aa0e46.
+
+**VAT_SCOPE** — PMK131 yang diarsipkan menjelaskan PPN atas transaksi tertentu Barang Kena Pajak dan Jasa Kena Pajak, termasuk impor serta pemanfaatan dari luar negeri. dasar pengenaan pajak khusus dikecualikan dari mekanisme umum edisi ini; semua transaksi tidak otomatis diperlakukan sama.
 
 Basis:
 
@@ -1514,6 +2326,13 @@ Basis:
 - [DJP_SDSN_2023 article17 / (1) / PDF213,214](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=213), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:b7444213593cb85c0287d192,DJP_SDSN_2023:a64b39fff8c7cf1e8191d10c.
 - [DJP_SDSN_2023 article31E / (1) / PDF252](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=252), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:c86901169df212206c320540.
 
+**PKP_ABBREVIATION** — Pengusaha Kena Pajak
+
+Basis:
+
+- [PMK164_2023 article17 / (1),(3) / PDF16](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=16), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:4958a8e50eb6047e53d878eb.
+- [PMK164_2023 article18 / whole / PDF17](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=17), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:0f579a087d156d4f15b529cc.
+
 **PKP_REGISTRATION** — PMK164 yang diarsipkan membedakan terlampauinya batas, pelaporan usaha, dan awal kewajiban PKP. Hal itu tidak otomatis ditentukan dari tanggal invoice.
 
 Basis:
@@ -1528,7 +2347,37 @@ Basis:
 - [PMK164_2023 article17 / (1),(3) / PDF16](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=16), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:4958a8e50eb6047e53d878eb.
 - [PMK164_2023 article18 / whole / PDF17](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=17), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:0f579a087d156d4f15b529cc.
 
-**VAT_CREDIT** — PMK131 yang diarsipkan merujuk kredit pajak masukan pada syarat dalam ketentuan perpajakan. Status PKP dan invoice biasa saja tidak membuktikan syarat tersebut; persyaratan faktur lengkap belum ditelaah.
+**PKP_SHORT_CONDITION** — Periksa pengukuhan dan awal kewajiban; invoice saja tidak cukup.
+
+Basis:
+
+- [PMK164_2023 article17 / (1),(3) / PDF16](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=16), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:4958a8e50eb6047e53d878eb.
+- [PMK164_2023 article18 / whole / PDF17](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=17), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:0f579a087d156d4f15b529cc.
+
+**PKP_SHORT_DEFINITION** — PKP adalah status pengusaha untuk kewajiban PPN, pajak atas transaksi barang dan jasa.
+
+Basis:
+
+- [PMK164_2023 article17 / (1),(3) / PDF16](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=16), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:4958a8e50eb6047e53d878eb.
+- [PMK164_2023 article18 / whole / PDF17](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=17), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:0f579a087d156d4f15b529cc.
+- [PMK131_2024 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c853ed3c496865218892cf3c.
+- [PMK131_2024 article4 / (1) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:eb357e4b3237db5d08aa0e46.
+
+**PKP_SHORT_MECHANISM** — Setelah kewajiban dimulai, pengusaha memungut, menyetor dan melaporkan pajak.
+
+Basis:
+
+- [PMK164_2023 article17 / (1),(3) / PDF16](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=16), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:4958a8e50eb6047e53d878eb.
+- [PMK164_2023 article18 / whole / PDF17](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=17), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:0f579a087d156d4f15b529cc.
+
+**PPN_SHORT_MECHANISM** — Atas penyerahan yang ditentukan, pengusaha yang dikukuhkan untuk PPN memungut dan menyetor pajak.
+
+Basis:
+
+- [PMK164_2023 article17 / (1),(3) / PDF16](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=16), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:4958a8e50eb6047e53d878eb.
+- [PMK164_2023 article18 / whole / PDF17](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=17), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:0f579a087d156d4f15b529cc.
+
+**VAT_CREDIT** — PMK131 yang diarsipkan merujuk kredit pajak masukan pada syarat dalam ketentuan perpajakan. Status PKP dan invoice biasa saja tidak membuktikan syarat tersebut; persyaratan lengkap faktur pajak belum ditelaah.
 
 Basis:
 
@@ -1930,28 +2779,79 @@ Expected: Check PPh21 boundary; do not infer entity from invoice.
 
 Объяснения относятся к прочитанному архивному тексту; действующая применимость к компании не подтверждена.
 
-**SERVICE_EXCEPTIONS** — Архивный PMK141 исключает из jasa lain услуги, уже подпадающие под PPh21, и отдельно финально облагаемые доходы. PMK168 отдельно описывает платежи физлицам за услуги; нужно выяснить тип и резидентство получателя, а не судить по названию инвойса.
+**P23_SHORT_CONDITION** — Для прочих услуг проверьте исключения: выплаты по PPh21 и отдельному финальному налогу.
 
 Basis:
 
 - [PMK141_2015 article1 / (1),(2) / PDF2,3,4,5,6](https://jdih.kemenkeu.go.id/api/download/fulltext/2015/141~PMK.03~2015Per.pdf#page=2), SHA cd107a9b7de8ad12b6eff1e3cf64f512b712f63ce58e62b3dba2a35d6ccbf1f4, fragment IDs: PMK141_2015:b9daaac005c09472f564f133,PMK141_2015:0d4c687551245d61dec6a5a1,PMK141_2015:ce21c53c5bc11f1fda4ab333,PMK141_2015:f4ebe3b18b5d0fdc6a4ad52a,PMK141_2015:a9949937f09c37d1cf2a5807.
 - [PMK168_2023 article2 / (2)(d) / PDF5,6](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=5), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:079306052df2707a31737092,PMK168_2023:5d7769d0404bd1a073946d49.
 
-**PAYROLL_BASE** — Архивный PMK168 связывает базу и удержание с категорией получателя и плательщика. Для объяснения нужны занятость, резидентство, валовой доход, PTKP и месяц; одной суммы зарплаты недостаточно для расчёта.
+**SERVICE_EXCEPTIONS** — Архивный PMK141 исключает из категории прочих услуг услуги, уже подпадающие под PPh21, и отдельно финально облагаемые доходы. PMK168 отдельно описывает платежи физлицам за услуги; нужно выяснить тип и резидентство получателя, а не судить по названию инвойса.
 
 Basis:
 
-- [PMK168_2023 article8 / (1) / PDF10,11](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=10), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:0190bbfd7037eba985d117db,PMK168_2023:8eb407100a11bd684b6b3648.
+- [PMK141_2015 article1 / (1),(2) / PDF2,3,4,5,6](https://jdih.kemenkeu.go.id/api/download/fulltext/2015/141~PMK.03~2015Per.pdf#page=2), SHA cd107a9b7de8ad12b6eff1e3cf64f512b712f63ce58e62b3dba2a35d6ccbf1f4, fragment IDs: PMK141_2015:b9daaac005c09472f564f133,PMK141_2015:0d4c687551245d61dec6a5a1,PMK141_2015:ce21c53c5bc11f1fda4ab333,PMK141_2015:f4ebe3b18b5d0fdc6a4ad52a,PMK141_2015:a9949937f09c37d1cf2a5807.
 - [PMK168_2023 article2 / (2)(d) / PDF5,6](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=5), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:079306052df2707a31737092,PMK168_2023:5d7769d0404bd1a073946d49.
 
-**PAYROLL_METHOD** — Архивный PMK168 различает обычные периоды и последний налоговый период постоянного сотрудника/пенсионера. Последний предусматривает сверку за год или часть года, а не повторение обычного TER. Нужны категория работника и период.
+**P21_ABBREVIATION** — Pajak Penghasilan Pasal 21
+
+Basis:
+
+- [PMK168_2023 article2 / (2)(d) / PDF5,6](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=5), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:079306052df2707a31737092,PMK168_2023:5d7769d0404bd1a073946d49.
+
+**P21_SHORT_CONDITION** — Проверьте категорию получателя и налоговый период.
 
 Basis:
 
 - [PMK168_2023 article13 / (1),(2) / PDF14,15](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=14), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:84cffa9db5a9573cbb4658a0,PMK168_2023:db9949c7c54fcf9fb9719e2a.
 - [PMK168_2023 article15 / (1)-(3) / PDF15,16](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=15), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:3ba913a0416a5e3aa4ebea00,PMK168_2023:bea457a9e116ad7de2ac5bbc.
 
-**PAYROLL_SCOPE** — Архивный PMK168 описывает удержание PPh21 с выплат за работу, услуги или участие в деятельности установленными плательщиками. Категории плательщиков и исключения перечислены отдельно; это не налог только на зарплату.
+**P21_SHORT_DEFINITION** — PPh21 — налог с определённых выплат физлицам за работу, услуги или участие в мероприятиях.
+
+Basis:
+
+- [PMK168_2023 article2 / (2)(d) / PDF5,6](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=5), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:079306052df2707a31737092,PMK168_2023:5d7769d0404bd1a073946d49.
+- [PMK168_2023 article3 / (1)-(3) / PDF6,7](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=6), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:428ae9ea118f9570ae03f917,PMK168_2023:091ec07639e26511bd1e9aed.
+
+**P21_SHORT_MECHANISM** — Налог удерживает работодатель или другой указанный в правилах плательщик выплаты.
+
+Basis:
+
+- [PMK168_2023 article2 / (2)(d) / PDF5,6](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=5), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:079306052df2707a31737092,PMK168_2023:5d7769d0404bd1a073946d49.
+
+**P23_ABBREVIATION** — Pajak Penghasilan Pasal 23
+
+Basis:
+
+- [DJP_SDSN_2023 article23 / (1)(a),(c) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+
+**P23_SHORT_DEFINITION** — PPh23 — удержание налога с перечисленных доходов, включая отдельные услуги и аренду имущества.
+
+Basis:
+
+- [DJP_SDSN_2023 article23 / (1)(a),(c) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+
+**P23_SHORT_MECHANISM** — Налог удерживает указанный в правилах плательщик дохода.
+
+Basis:
+
+- [DJP_SDSN_2023 article23 / (1)(a),(c) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+
+**PAYROLL_BASE** — Для постоянных сотрудников и пенсионеров архивная статья8 различает валовой доход за месяц и облагаемый доход после разрешённых вычетов и необлагаемой части. Статья2 отдельно перечисляет плательщиков удержания и исключения; одной суммы зарплаты недостаточно для расчёта.
+
+Basis:
+
+- [PMK168_2023 article8 / (1) / PDF10,11](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=10), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:0190bbfd7037eba985d117db,PMK168_2023:8eb407100a11bd684b6b3648.
+- [PMK168_2023 article2 / (2)(d) / PDF5,6](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=5), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:079306052df2707a31737092,PMK168_2023:5d7769d0404bd1a073946d49.
+
+**PAYROLL_METHOD** — Архивный PMK168 различает обычные периоды и последний налоговый период постоянного сотрудника/пенсионера. Последний предусматривает сверку за год или часть года, а не повторение удержания по месячной эффективной ставке. Нужны категория работника и период.
+
+Basis:
+
+- [PMK168_2023 article13 / (1),(2) / PDF14,15](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=14), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:84cffa9db5a9573cbb4658a0,PMK168_2023:db9949c7c54fcf9fb9719e2a.
+- [PMK168_2023 article15 / (1)-(3) / PDF15,16](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=15), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:3ba913a0416a5e3aa4ebea00,PMK168_2023:bea457a9e116ad7de2ac5bbc.
+
+**PAYROLL_SCOPE** — Архивный PMK168 описывает удержание PPh21 с выплат за работу, услуги или участие в деятельности указанными в правилах плательщиками. Категории плательщиков и исключения перечислены отдельно; это не налог только на зарплату.
 
 Basis:
 
@@ -1961,7 +2861,7 @@ Basis:
 
 Basis:
 
-- [DJP_SDSN_2023 article23 / (1a),(4) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+- [DJP_SDSN_2023 article23 / (1)(a),(c) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
 
 **SERVICE_REIMBURSEMENT** — По архивному PMK141 исключение некоторых выплат за материалы или третьим лицам из базы требует перечисленных доказательств. Без доказательств база охватывает весь соответствующий платёж без PPN; возмещение не вычитается автоматически.
 
@@ -1973,7 +2873,7 @@ Basis:
 
 Basis:
 
-- [DJP_SDSN_2023 article23 / (1a),(4) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+- [DJP_SDSN_2023 article23 / (1)(a),(c) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
 
 Blocked claims: SERVICE_RATE (current_provision_currency_unconfirmed,amendment_review_incomplete); TER_NUMERIC (current_provision_currency_unconfirmed,amendment_review_incomplete,amendment_review_incomplete,TER_table_not_verified).
 
@@ -2006,6 +2906,13 @@ Expected: Check PPh21 boundary; do not infer entity from invoice.
 
 Explanations describe the read archived text; current company applicability is not established.
 
+**P23_SHORT_CONDITION** — For the other-services category, check exclusions for payments covered by PPh21 or a separate final tax.
+
+Basis:
+
+- [PMK141_2015 article1 / (1),(2) / PDF2,3,4,5,6](https://jdih.kemenkeu.go.id/api/download/fulltext/2015/141~PMK.03~2015Per.pdf#page=2), SHA cd107a9b7de8ad12b6eff1e3cf64f512b712f63ce58e62b3dba2a35d6ccbf1f4, fragment IDs: PMK141_2015:b9daaac005c09472f564f133,PMK141_2015:0d4c687551245d61dec6a5a1,PMK141_2015:ce21c53c5bc11f1fda4ab333,PMK141_2015:f4ebe3b18b5d0fdc6a4ad52a,PMK141_2015:a9949937f09c37d1cf2a5807.
+- [PMK168_2023 article2 / (2)(d) / PDF5,6](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=5), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:079306052df2707a31737092,PMK168_2023:5d7769d0404bd1a073946d49.
+
 **SERVICE_EXCEPTIONS** — The archived PMK141 excludes services already subject to PPh21 and separately final-taxed income from its other-services branch. PMK168 separately describes payments for individual services; establish recipient type and residency rather than infer them from the invoice name.
 
 Basis:
@@ -2013,14 +2920,58 @@ Basis:
 - [PMK141_2015 article1 / (1),(2) / PDF2,3,4,5,6](https://jdih.kemenkeu.go.id/api/download/fulltext/2015/141~PMK.03~2015Per.pdf#page=2), SHA cd107a9b7de8ad12b6eff1e3cf64f512b712f63ce58e62b3dba2a35d6ccbf1f4, fragment IDs: PMK141_2015:b9daaac005c09472f564f133,PMK141_2015:0d4c687551245d61dec6a5a1,PMK141_2015:ce21c53c5bc11f1fda4ab333,PMK141_2015:f4ebe3b18b5d0fdc6a4ad52a,PMK141_2015:a9949937f09c37d1cf2a5807.
 - [PMK168_2023 article2 / (2)(d) / PDF5,6](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=5), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:079306052df2707a31737092,PMK168_2023:5d7769d0404bd1a073946d49.
 
-**PAYROLL_BASE** — Archived PMK168 ties the base and withholding to recipient and payer categories. Employment, residency, gross income, PTKP and month are needed; a salary amount alone is insufficient for calculation.
+**P21_ABBREVIATION** — Pajak Penghasilan Pasal 21
+
+Basis:
+
+- [PMK168_2023 article2 / (2)(d) / PDF5,6](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=5), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:079306052df2707a31737092,PMK168_2023:5d7769d0404bd1a073946d49.
+
+**P21_SHORT_CONDITION** — Check the recipient category and tax period.
+
+Basis:
+
+- [PMK168_2023 article13 / (1),(2) / PDF14,15](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=14), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:84cffa9db5a9573cbb4658a0,PMK168_2023:db9949c7c54fcf9fb9719e2a.
+- [PMK168_2023 article15 / (1)-(3) / PDF15,16](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=15), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:3ba913a0416a5e3aa4ebea00,PMK168_2023:bea457a9e116ad7de2ac5bbc.
+
+**P21_SHORT_DEFINITION** — PPh21 is tax on specified payments to individuals for work, services or activities.
+
+Basis:
+
+- [PMK168_2023 article2 / (2)(d) / PDF5,6](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=5), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:079306052df2707a31737092,PMK168_2023:5d7769d0404bd1a073946d49.
+- [PMK168_2023 article3 / (1)-(3) / PDF6,7](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=6), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:428ae9ea118f9570ae03f917,PMK168_2023:091ec07639e26511bd1e9aed.
+
+**P21_SHORT_MECHANISM** — The employer or another designated payer withholds the tax.
+
+Basis:
+
+- [PMK168_2023 article2 / (2)(d) / PDF5,6](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=5), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:079306052df2707a31737092,PMK168_2023:5d7769d0404bd1a073946d49.
+
+**P23_ABBREVIATION** — Pajak Penghasilan Pasal 23
+
+Basis:
+
+- [DJP_SDSN_2023 article23 / (1)(a),(c) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+
+**P23_SHORT_DEFINITION** — PPh23 is tax withholding on listed income, including specified services and property rental.
+
+Basis:
+
+- [DJP_SDSN_2023 article23 / (1)(a),(c) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+
+**P23_SHORT_MECHANISM** — The designated income payer withholds the tax.
+
+Basis:
+
+- [DJP_SDSN_2023 article23 / (1)(a),(c) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+
+**PAYROLL_BASE** — For permanent employees and pensioners, archived Article8 distinguishes monthly gross income from taxable income after allowable deductions and the non-taxable allowance. Article2 separately lists designated payers and exclusions; a salary amount alone is insufficient for calculation.
 
 Basis:
 
 - [PMK168_2023 article8 / (1) / PDF10,11](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=10), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:0190bbfd7037eba985d117db,PMK168_2023:8eb407100a11bd684b6b3648.
 - [PMK168_2023 article2 / (2)(d) / PDF5,6](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=5), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:079306052df2707a31737092,PMK168_2023:5d7769d0404bd1a073946d49.
 
-**PAYROLL_METHOD** — Archived PMK168 distinguishes ordinary periods from the last tax period for a permanent employee/pensioner. The last period reconciles annual or part-year liability rather than simply repeating ordinary TER. Worker category and period are needed.
+**PAYROLL_METHOD** — Archived PMK168 distinguishes ordinary periods from the last tax period for a permanent employee/pensioner. The last period reconciles annual or part-year liability rather than simply repeating withholding using an effective monthly rate. Worker category and period are needed.
 
 Basis:
 
@@ -2037,7 +2988,7 @@ Basis:
 
 Basis:
 
-- [DJP_SDSN_2023 article23 / (1a),(4) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+- [DJP_SDSN_2023 article23 / (1)(a),(c) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
 
 **SERVICE_REIMBURSEMENT** — Under the archived PMK141, excluding specified material or third-party payments from the base requires listed evidence. Without it the relevant total payment excluding PPN is the base; reimbursement is not automatically deductible.
 
@@ -2049,7 +3000,7 @@ Basis:
 
 Basis:
 
-- [DJP_SDSN_2023 article23 / (1a),(4) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+- [DJP_SDSN_2023 article23 / (1)(a),(c) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
 
 Blocked claims: SERVICE_RATE (current_provision_currency_unconfirmed,amendment_review_incomplete); TER_NUMERIC (current_provision_currency_unconfirmed,amendment_review_incomplete,amendment_review_incomplete,TER_table_not_verified).
 
@@ -2082,6 +3033,13 @@ Expected: Check PPh21 boundary; do not infer entity from invoice.
 
 Penjelasan menggambarkan teks arsip yang dibaca; penerapan terkini pada perusahaan belum ditetapkan.
 
+**P23_SHORT_CONDITION** — Untuk kategori jasa lain, periksa pengecualian pembayaran yang tercakup PPh21 atau pajak final tersendiri.
+
+Basis:
+
+- [PMK141_2015 article1 / (1),(2) / PDF2,3,4,5,6](https://jdih.kemenkeu.go.id/api/download/fulltext/2015/141~PMK.03~2015Per.pdf#page=2), SHA cd107a9b7de8ad12b6eff1e3cf64f512b712f63ce58e62b3dba2a35d6ccbf1f4, fragment IDs: PMK141_2015:b9daaac005c09472f564f133,PMK141_2015:0d4c687551245d61dec6a5a1,PMK141_2015:ce21c53c5bc11f1fda4ab333,PMK141_2015:f4ebe3b18b5d0fdc6a4ad52a,PMK141_2015:a9949937f09c37d1cf2a5807.
+- [PMK168_2023 article2 / (2)(d) / PDF5,6](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=5), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:079306052df2707a31737092,PMK168_2023:5d7769d0404bd1a073946d49.
+
 **SERVICE_EXCEPTIONS** — PMK141 yang diarsipkan mengecualikan jasa yang telah dipotong PPh21 dan penghasilan final tersendiri dari cabang jasa lain. PMK168 menjelaskan pembayaran jasa orang pribadi secara terpisah; pastikan jenis dan domisili penerima, bukan hanya nama invoice.
 
 Basis:
@@ -2089,21 +3047,65 @@ Basis:
 - [PMK141_2015 article1 / (1),(2) / PDF2,3,4,5,6](https://jdih.kemenkeu.go.id/api/download/fulltext/2015/141~PMK.03~2015Per.pdf#page=2), SHA cd107a9b7de8ad12b6eff1e3cf64f512b712f63ce58e62b3dba2a35d6ccbf1f4, fragment IDs: PMK141_2015:b9daaac005c09472f564f133,PMK141_2015:0d4c687551245d61dec6a5a1,PMK141_2015:ce21c53c5bc11f1fda4ab333,PMK141_2015:f4ebe3b18b5d0fdc6a4ad52a,PMK141_2015:a9949937f09c37d1cf2a5807.
 - [PMK168_2023 article2 / (2)(d) / PDF5,6](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=5), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:079306052df2707a31737092,PMK168_2023:5d7769d0404bd1a073946d49.
 
-**PAYROLL_BASE** — PMK168 yang diarsipkan mengaitkan dasar dan pemotongan dengan kategori penerima serta pembayar. Diperlukan pekerjaan, domisili, bruto, PTKP dan bulan; angka gaji saja tidak cukup untuk menghitung.
+**P21_ABBREVIATION** — Pajak Penghasilan Pasal 21
 
 Basis:
 
-- [PMK168_2023 article8 / (1) / PDF10,11](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=10), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:0190bbfd7037eba985d117db,PMK168_2023:8eb407100a11bd684b6b3648.
 - [PMK168_2023 article2 / (2)(d) / PDF5,6](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=5), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:079306052df2707a31737092,PMK168_2023:5d7769d0404bd1a073946d49.
 
-**PAYROLL_METHOD** — PMK168 yang diarsipkan membedakan masa biasa dan Masa Pajak Terakhir pegawai tetap/pensiunan. Masa terakhir merekonsiliasi pajak tahunan atau bagian tahun, bukan mengulang TER biasa. Diperlukan kategori pekerja dan periode.
+**P21_SHORT_CONDITION** — Periksa kategori penerima dan masa pajaknya.
 
 Basis:
 
 - [PMK168_2023 article13 / (1),(2) / PDF14,15](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=14), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:84cffa9db5a9573cbb4658a0,PMK168_2023:db9949c7c54fcf9fb9719e2a.
 - [PMK168_2023 article15 / (1)-(3) / PDF15,16](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=15), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:3ba913a0416a5e3aa4ebea00,PMK168_2023:bea457a9e116ad7de2ac5bbc.
 
-**PAYROLL_SCOPE** — PMK168 yang diarsipkan menjelaskan pemotongan PPh21 atas pembayaran terkait pekerjaan, jasa atau kegiatan oleh pemotong yang ditentukan. Kategori pemotong dan pengecualian diatur tersendiri; cakupannya bukan hanya gaji.
+**P21_SHORT_DEFINITION** — PPh21 adalah pajak atas pembayaran tertentu kepada orang pribadi terkait pekerjaan, jasa atau kegiatan.
+
+Basis:
+
+- [PMK168_2023 article2 / (2)(d) / PDF5,6](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=5), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:079306052df2707a31737092,PMK168_2023:5d7769d0404bd1a073946d49.
+- [PMK168_2023 article3 / (1)-(3) / PDF6,7](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=6), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:428ae9ea118f9570ae03f917,PMK168_2023:091ec07639e26511bd1e9aed.
+
+**P21_SHORT_MECHANISM** — Pemberi kerja atau pembayar yang ditentukan memotong pajak dari pembayaran.
+
+Basis:
+
+- [PMK168_2023 article2 / (2)(d) / PDF5,6](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=5), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:079306052df2707a31737092,PMK168_2023:5d7769d0404bd1a073946d49.
+
+**P23_ABBREVIATION** — Pajak Penghasilan Pasal 23
+
+Basis:
+
+- [DJP_SDSN_2023 article23 / (1)(a),(c) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+
+**P23_SHORT_DEFINITION** — PPh23 adalah pemotongan pajak atas penghasilan yang tercantum, termasuk jasa tertentu dan sewa harta.
+
+Basis:
+
+- [DJP_SDSN_2023 article23 / (1)(a),(c) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+
+**P23_SHORT_MECHANISM** — Pembayar yang ditentukan memotong pajak dari pembayaran.
+
+Basis:
+
+- [DJP_SDSN_2023 article23 / (1)(a),(c) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+
+**PAYROLL_BASE** — Untuk pegawai tetap dan pensiunan, Pasal8 yang diarsipkan membedakan penghasilan bruto bulanan dan penghasilan kena pajak setelah pengurangan yang diperbolehkan serta bagian tidak kena pajak. Pasal2 memuat pembayar yang wajib memotong pajak dan pengecualian; angka gaji saja tidak cukup untuk menghitung.
+
+Basis:
+
+- [PMK168_2023 article8 / (1) / PDF10,11](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=10), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:0190bbfd7037eba985d117db,PMK168_2023:8eb407100a11bd684b6b3648.
+- [PMK168_2023 article2 / (2)(d) / PDF5,6](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=5), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:079306052df2707a31737092,PMK168_2023:5d7769d0404bd1a073946d49.
+
+**PAYROLL_METHOD** — PMK168 yang diarsipkan membedakan masa biasa dan Masa Pajak Terakhir pegawai tetap/pensiunan. Masa terakhir merekonsiliasi pajak tahunan atau bagian tahun, bukan mengulang pemotongan dengan tarif efektif bulanan. Diperlukan kategori pekerja dan periode.
+
+Basis:
+
+- [PMK168_2023 article13 / (1),(2) / PDF14,15](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=14), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:84cffa9db5a9573cbb4658a0,PMK168_2023:db9949c7c54fcf9fb9719e2a.
+- [PMK168_2023 article15 / (1)-(3) / PDF15,16](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=15), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:3ba913a0416a5e3aa4ebea00,PMK168_2023:bea457a9e116ad7de2ac5bbc.
+
+**PAYROLL_SCOPE** — PMK168 yang diarsipkan menjelaskan pemotongan PPh21 atas pembayaran terkait pekerjaan, jasa atau kegiatan oleh pembayar yang ditentukan untuk memotong pajak dari pembayaran. Kategori pembayar yang wajib memotong pajak dan pengecualian diatur tersendiri; cakupannya bukan hanya gaji.
 
 Basis:
 
@@ -2113,9 +3115,9 @@ Basis:
 
 Basis:
 
-- [DJP_SDSN_2023 article23 / (1a),(4) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+- [DJP_SDSN_2023 article23 / (1)(a),(c) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
 
-**SERVICE_REIMBURSEMENT** — Menurut PMK141 yang diarsipkan, pengecualian pembayaran material atau pihak ketiga tertentu dari dasar memerlukan bukti yang ditentukan. Tanpa bukti seluruh pembayaran terkait selain PPN menjadi dasar; reimbursement tidak otomatis dikecualikan.
+**SERVICE_REIMBURSEMENT** — Menurut PMK141 yang diarsipkan, pengecualian pembayaran material atau pihak ketiga tertentu dari dasar memerlukan bukti yang ditentukan. Tanpa bukti seluruh pembayaran terkait selain PPN menjadi dasar; penggantian biaya tidak otomatis dikecualikan.
 
 Basis:
 
@@ -2125,7 +3127,7 @@ Basis:
 
 Basis:
 
-- [DJP_SDSN_2023 article23 / (1a),(4) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+- [DJP_SDSN_2023 article23 / (1)(a),(c) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
 
 Blocked claims: SERVICE_RATE (current_provision_currency_unconfirmed,amendment_review_incomplete); TER_NUMERIC (current_provision_currency_unconfirmed,amendment_review_incomplete,amendment_review_incomplete,TER_table_not_verified).
 
@@ -2164,7 +3166,14 @@ Basis:
 
 - [PMK141_2015 article1 / (3)-(5) / PDF2,3,4,5,6](https://jdih.kemenkeu.go.id/api/download/fulltext/2015/141~PMK.03~2015Per.pdf#page=2), SHA cd107a9b7de8ad12b6eff1e3cf64f512b712f63ce58e62b3dba2a35d6ccbf1f4, fragment IDs: PMK141_2015:b9daaac005c09472f564f133,PMK141_2015:0d4c687551245d61dec6a5a1,PMK141_2015:ce21c53c5bc11f1fda4ab333,PMK141_2015:f4ebe3b18b5d0fdc6a4ad52a,PMK141_2015:a9949937f09c37d1cf2a5807.
 
-**SERVICE_EXCEPTIONS** — Архивный PMK141 исключает из jasa lain услуги, уже подпадающие под PPh21, и отдельно финально облагаемые доходы. PMK168 отдельно описывает платежи физлицам за услуги; нужно выяснить тип и резидентство получателя, а не судить по названию инвойса.
+**P23_SHORT_CONDITION** — Для прочих услуг проверьте исключения: выплаты по PPh21 и отдельному финальному налогу.
+
+Basis:
+
+- [PMK141_2015 article1 / (3)-(5) / PDF2,3,4,5,6](https://jdih.kemenkeu.go.id/api/download/fulltext/2015/141~PMK.03~2015Per.pdf#page=2), SHA cd107a9b7de8ad12b6eff1e3cf64f512b712f63ce58e62b3dba2a35d6ccbf1f4, fragment IDs: PMK141_2015:b9daaac005c09472f564f133,PMK141_2015:0d4c687551245d61dec6a5a1,PMK141_2015:ce21c53c5bc11f1fda4ab333,PMK141_2015:f4ebe3b18b5d0fdc6a4ad52a,PMK141_2015:a9949937f09c37d1cf2a5807.
+- [PMK168_2023 article2 / (2)(d) / PDF5,6](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=5), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:079306052df2707a31737092,PMK168_2023:5d7769d0404bd1a073946d49.
+
+**SERVICE_EXCEPTIONS** — Архивный PMK141 исключает из категории прочих услуг услуги, уже подпадающие под PPh21, и отдельно финально облагаемые доходы. PMK168 отдельно описывает платежи физлицам за услуги; нужно выяснить тип и резидентство получателя, а не судить по названию инвойса.
 
 Basis:
 
@@ -2172,6 +3181,24 @@ Basis:
 - [PMK168_2023 article2 / (2)(d) / PDF5,6](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=5), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:079306052df2707a31737092,PMK168_2023:5d7769d0404bd1a073946d49.
 
 **SERVICE_NPWP** — Архивная статья23 содержит отдельную ветвь отсутствия NPWP и исключения из удержания. Нужно подтвердить идентификатор, категорию дохода и исключения; текущая трактовка NIK/NPWP не установлена этой подборкой.
+
+Basis:
+
+- [DJP_SDSN_2023 article23 / (1a),(4) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+
+**P23_ABBREVIATION** — Pajak Penghasilan Pasal 23
+
+Basis:
+
+- [DJP_SDSN_2023 article23 / (1a),(4) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+
+**P23_SHORT_DEFINITION** — PPh23 — удержание налога с перечисленных доходов, включая отдельные услуги и аренду имущества.
+
+Basis:
+
+- [DJP_SDSN_2023 article23 / (1a),(4) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+
+**P23_SHORT_MECHANISM** — Налог удерживает указанный в правилах плательщик дохода.
 
 Basis:
 
@@ -2213,6 +3240,31 @@ Basis:
 
 - [PMK141_2015 article1 / (3)-(5) / PDF2,3,4,5,6](https://jdih.kemenkeu.go.id/api/download/fulltext/2015/141~PMK.03~2015Per.pdf#page=2), SHA cd107a9b7de8ad12b6eff1e3cf64f512b712f63ce58e62b3dba2a35d6ccbf1f4, fragment IDs: PMK141_2015:b9daaac005c09472f564f133,PMK141_2015:0d4c687551245d61dec6a5a1,PMK141_2015:ce21c53c5bc11f1fda4ab333,PMK141_2015:f4ebe3b18b5d0fdc6a4ad52a,PMK141_2015:a9949937f09c37d1cf2a5807.
 
+**P23_ABBREVIATION** — Pajak Penghasilan Pasal 23
+
+Basis:
+
+- [DJP_SDSN_2023 article23 / (1)(a),(c) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+
+**P23_SHORT_CONDITION** — For the other-services category, check exclusions for payments covered by PPh21 or a separate final tax.
+
+Basis:
+
+- [PMK141_2015 article1 / (3)-(5) / PDF2,3,4,5,6](https://jdih.kemenkeu.go.id/api/download/fulltext/2015/141~PMK.03~2015Per.pdf#page=2), SHA cd107a9b7de8ad12b6eff1e3cf64f512b712f63ce58e62b3dba2a35d6ccbf1f4, fragment IDs: PMK141_2015:b9daaac005c09472f564f133,PMK141_2015:0d4c687551245d61dec6a5a1,PMK141_2015:ce21c53c5bc11f1fda4ab333,PMK141_2015:f4ebe3b18b5d0fdc6a4ad52a,PMK141_2015:a9949937f09c37d1cf2a5807.
+- [PMK168_2023 article2 / (2)(d) / PDF5,6](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=5), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:079306052df2707a31737092,PMK168_2023:5d7769d0404bd1a073946d49.
+
+**P23_SHORT_DEFINITION** — PPh23 is tax withholding on listed income, including specified services and property rental.
+
+Basis:
+
+- [DJP_SDSN_2023 article23 / (1)(a),(c) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+
+**P23_SHORT_MECHANISM** — The designated income payer withholds the tax.
+
+Basis:
+
+- [DJP_SDSN_2023 article23 / (1)(a),(c) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+
 **SERVICE_EXCEPTIONS** — The archived PMK141 excludes services already subject to PPh21 and separately final-taxed income from its other-services branch. PMK168 separately describes payments for individual services; establish recipient type and residency rather than infer them from the invoice name.
 
 Basis:
@@ -2224,13 +3276,13 @@ Basis:
 
 Basis:
 
-- [DJP_SDSN_2023 article23 / (1a),(4) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+- [DJP_SDSN_2023 article23 / (1)(a),(c) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
 
 **SERVICE_SCOPE** — In the archived PPh Law Article23 has different income categories and a property-rental branch excluding separately final-taxed rental. A single rate cannot be applied to every invoice.
 
 Basis:
 
-- [DJP_SDSN_2023 article23 / (1a),(4) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+- [DJP_SDSN_2023 article23 / (1)(a),(c) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
 
 Blocked claims: SERVICE_RATE (current_provision_currency_unconfirmed,amendment_review_incomplete).
 
@@ -2256,6 +3308,13 @@ Expected: PMK141 Pasal1(3)-(5); evidence required, no unconditional deduction.
 
 Penjelasan menggambarkan teks arsip yang dibaca; penerapan terkini pada perusahaan belum ditetapkan.
 
+**P23_SHORT_CONDITION** — Untuk kategori jasa lain, periksa pengecualian pembayaran yang tercakup PPh21 atau pajak final tersendiri.
+
+Basis:
+
+- [PMK141_2015 article1 / (1),(2) / PDF2,3,4,5,6](https://jdih.kemenkeu.go.id/api/download/fulltext/2015/141~PMK.03~2015Per.pdf#page=2), SHA cd107a9b7de8ad12b6eff1e3cf64f512b712f63ce58e62b3dba2a35d6ccbf1f4, fragment IDs: PMK141_2015:b9daaac005c09472f564f133,PMK141_2015:0d4c687551245d61dec6a5a1,PMK141_2015:ce21c53c5bc11f1fda4ab333,PMK141_2015:f4ebe3b18b5d0fdc6a4ad52a,PMK141_2015:a9949937f09c37d1cf2a5807.
+- [PMK168_2023 article2 / (2)(d) / PDF5,6](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=5), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:079306052df2707a31737092,PMK168_2023:5d7769d0404bd1a073946d49.
+
 **SERVICE_EXCEPTIONS** — PMK141 yang diarsipkan mengecualikan jasa yang telah dipotong PPh21 dan penghasilan final tersendiri dari cabang jasa lain. PMK168 menjelaskan pembayaran jasa orang pribadi secara terpisah; pastikan jenis dan domisili penerima, bukan hanya nama invoice.
 
 Basis:
@@ -2269,11 +3328,29 @@ Basis:
 
 - [DJP_SDSN_2023 article23 / (1a),(4) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
 
-**SERVICE_REIMBURSEMENT** — Menurut PMK141 yang diarsipkan, pengecualian pembayaran material atau pihak ketiga tertentu dari dasar memerlukan bukti yang ditentukan. Tanpa bukti seluruh pembayaran terkait selain PPN menjadi dasar; reimbursement tidak otomatis dikecualikan.
+**SERVICE_REIMBURSEMENT** — Menurut PMK141 yang diarsipkan, pengecualian pembayaran material atau pihak ketiga tertentu dari dasar memerlukan bukti yang ditentukan. Tanpa bukti seluruh pembayaran terkait selain PPN menjadi dasar; penggantian biaya tidak otomatis dikecualikan.
 
 Basis:
 
 - [PMK141_2015 article1 / (1),(2) / PDF2,3,4,5,6](https://jdih.kemenkeu.go.id/api/download/fulltext/2015/141~PMK.03~2015Per.pdf#page=2), SHA cd107a9b7de8ad12b6eff1e3cf64f512b712f63ce58e62b3dba2a35d6ccbf1f4, fragment IDs: PMK141_2015:b9daaac005c09472f564f133,PMK141_2015:0d4c687551245d61dec6a5a1,PMK141_2015:ce21c53c5bc11f1fda4ab333,PMK141_2015:f4ebe3b18b5d0fdc6a4ad52a,PMK141_2015:a9949937f09c37d1cf2a5807.
+
+**P23_ABBREVIATION** — Pajak Penghasilan Pasal 23
+
+Basis:
+
+- [DJP_SDSN_2023 article23 / (1a),(4) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+
+**P23_SHORT_DEFINITION** — PPh23 adalah pemotongan pajak atas penghasilan yang tercantum, termasuk jasa tertentu dan sewa harta.
+
+Basis:
+
+- [DJP_SDSN_2023 article23 / (1a),(4) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+
+**P23_SHORT_MECHANISM** — Pembayar yang ditentukan memotong pajak dari pembayaran.
+
+Basis:
+
+- [DJP_SDSN_2023 article23 / (1a),(4) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
 
 **SERVICE_SCOPE** — Dalam UU PPh yang diarsipkan Pasal23 memuat kategori penghasilan berbeda serta sewa harta dengan pengecualian sewa yang dikenai pajak final tersendiri. Satu tarif tidak boleh diterapkan pada semua invoice.
 
@@ -2311,12 +3388,37 @@ Basis:
 
 - [DJP_SDSN_2023 article23 / (1a),(4) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
 
-**SERVICE_EXCEPTIONS** — Архивный PMK141 исключает из jasa lain услуги, уже подпадающие под PPh21, и отдельно финально облагаемые доходы. PMK168 отдельно описывает платежи физлицам за услуги; нужно выяснить тип и резидентство получателя, а не судить по названию инвойса.
+**P23_SHORT_CONDITION** — Для прочих услуг проверьте исключения: выплаты по PPh21 и отдельному финальному налогу.
 
 Basis:
 
 - [PMK141_2015 article1 / (1),(2) / PDF2,3,4,5,6](https://jdih.kemenkeu.go.id/api/download/fulltext/2015/141~PMK.03~2015Per.pdf#page=2), SHA cd107a9b7de8ad12b6eff1e3cf64f512b712f63ce58e62b3dba2a35d6ccbf1f4, fragment IDs: PMK141_2015:b9daaac005c09472f564f133,PMK141_2015:0d4c687551245d61dec6a5a1,PMK141_2015:ce21c53c5bc11f1fda4ab333,PMK141_2015:f4ebe3b18b5d0fdc6a4ad52a,PMK141_2015:a9949937f09c37d1cf2a5807.
 - [PMK168_2023 article2 / (2)(d) / PDF5,6](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=5), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:079306052df2707a31737092,PMK168_2023:5d7769d0404bd1a073946d49.
+
+**SERVICE_EXCEPTIONS** — Архивный PMK141 исключает из категории прочих услуг услуги, уже подпадающие под PPh21, и отдельно финально облагаемые доходы. PMK168 отдельно описывает платежи физлицам за услуги; нужно выяснить тип и резидентство получателя, а не судить по названию инвойса.
+
+Basis:
+
+- [PMK141_2015 article1 / (1),(2) / PDF2,3,4,5,6](https://jdih.kemenkeu.go.id/api/download/fulltext/2015/141~PMK.03~2015Per.pdf#page=2), SHA cd107a9b7de8ad12b6eff1e3cf64f512b712f63ce58e62b3dba2a35d6ccbf1f4, fragment IDs: PMK141_2015:b9daaac005c09472f564f133,PMK141_2015:0d4c687551245d61dec6a5a1,PMK141_2015:ce21c53c5bc11f1fda4ab333,PMK141_2015:f4ebe3b18b5d0fdc6a4ad52a,PMK141_2015:a9949937f09c37d1cf2a5807.
+- [PMK168_2023 article2 / (2)(d) / PDF5,6](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=5), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:079306052df2707a31737092,PMK168_2023:5d7769d0404bd1a073946d49.
+
+**P23_ABBREVIATION** — Pajak Penghasilan Pasal 23
+
+Basis:
+
+- [DJP_SDSN_2023 article23 / (1a),(4) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+
+**P23_SHORT_DEFINITION** — PPh23 — удержание налога с перечисленных доходов, включая отдельные услуги и аренду имущества.
+
+Basis:
+
+- [DJP_SDSN_2023 article23 / (1a),(4) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+
+**P23_SHORT_MECHANISM** — Налог удерживает указанный в правилах плательщик дохода.
+
+Basis:
+
+- [DJP_SDSN_2023 article23 / (1a),(4) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
 
 **SERVICE_REIMBURSEMENT** — По архивному PMK141 исключение некоторых выплат за материалы или третьим лицам из базы требует перечисленных доказательств. Без доказательств база охватывает весь соответствующий платёж без PPN; возмещение не вычитается автоматически.
 
@@ -2355,6 +3457,31 @@ Expected: Check identity and object before higher-rate branch; no scalar for all
 Explanations describe the read archived text; current company applicability is not established.
 
 **SERVICE_NPWP** — Archived Article23 contains a no-NPWP branch and withholding exclusions. Verify identity, income category and exclusions; current NIK/NPWP treatment is not established by this collection.
+
+Basis:
+
+- [DJP_SDSN_2023 article23 / (1a),(4) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+
+**P23_ABBREVIATION** — Pajak Penghasilan Pasal 23
+
+Basis:
+
+- [DJP_SDSN_2023 article23 / (1a),(4) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+
+**P23_SHORT_CONDITION** — For the other-services category, check exclusions for payments covered by PPh21 or a separate final tax.
+
+Basis:
+
+- [PMK141_2015 article1 / (1),(2) / PDF2,3,4,5,6](https://jdih.kemenkeu.go.id/api/download/fulltext/2015/141~PMK.03~2015Per.pdf#page=2), SHA cd107a9b7de8ad12b6eff1e3cf64f512b712f63ce58e62b3dba2a35d6ccbf1f4, fragment IDs: PMK141_2015:b9daaac005c09472f564f133,PMK141_2015:0d4c687551245d61dec6a5a1,PMK141_2015:ce21c53c5bc11f1fda4ab333,PMK141_2015:f4ebe3b18b5d0fdc6a4ad52a,PMK141_2015:a9949937f09c37d1cf2a5807.
+- [PMK168_2023 article2 / (2)(d) / PDF5,6](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=5), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:079306052df2707a31737092,PMK168_2023:5d7769d0404bd1a073946d49.
+
+**P23_SHORT_DEFINITION** — PPh23 is tax withholding on listed income, including specified services and property rental.
+
+Basis:
+
+- [DJP_SDSN_2023 article23 / (1a),(4) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+
+**P23_SHORT_MECHANISM** — The designated income payer withholds the tax.
 
 Basis:
 
@@ -2409,6 +3536,13 @@ Basis:
 
 - [DJP_SDSN_2023 article23 / (1a),(4) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
 
+**P23_SHORT_CONDITION** — Untuk kategori jasa lain, periksa pengecualian pembayaran yang tercakup PPh21 atau pajak final tersendiri.
+
+Basis:
+
+- [PMK141_2015 article1 / (1),(2) / PDF2,3,4,5,6](https://jdih.kemenkeu.go.id/api/download/fulltext/2015/141~PMK.03~2015Per.pdf#page=2), SHA cd107a9b7de8ad12b6eff1e3cf64f512b712f63ce58e62b3dba2a35d6ccbf1f4, fragment IDs: PMK141_2015:b9daaac005c09472f564f133,PMK141_2015:0d4c687551245d61dec6a5a1,PMK141_2015:ce21c53c5bc11f1fda4ab333,PMK141_2015:f4ebe3b18b5d0fdc6a4ad52a,PMK141_2015:a9949937f09c37d1cf2a5807.
+- [PMK168_2023 article2 / (2)(d) / PDF5,6](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=5), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:079306052df2707a31737092,PMK168_2023:5d7769d0404bd1a073946d49.
+
 **SERVICE_EXCEPTIONS** — PMK141 yang diarsipkan mengecualikan jasa yang telah dipotong PPh21 dan penghasilan final tersendiri dari cabang jasa lain. PMK168 menjelaskan pembayaran jasa orang pribadi secara terpisah; pastikan jenis dan domisili penerima, bukan hanya nama invoice.
 
 Basis:
@@ -2416,7 +3550,25 @@ Basis:
 - [PMK141_2015 article1 / (1),(2) / PDF2,3,4,5,6](https://jdih.kemenkeu.go.id/api/download/fulltext/2015/141~PMK.03~2015Per.pdf#page=2), SHA cd107a9b7de8ad12b6eff1e3cf64f512b712f63ce58e62b3dba2a35d6ccbf1f4, fragment IDs: PMK141_2015:b9daaac005c09472f564f133,PMK141_2015:0d4c687551245d61dec6a5a1,PMK141_2015:ce21c53c5bc11f1fda4ab333,PMK141_2015:f4ebe3b18b5d0fdc6a4ad52a,PMK141_2015:a9949937f09c37d1cf2a5807.
 - [PMK168_2023 article2 / (2)(d) / PDF5,6](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=5), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:079306052df2707a31737092,PMK168_2023:5d7769d0404bd1a073946d49.
 
-**SERVICE_REIMBURSEMENT** — Menurut PMK141 yang diarsipkan, pengecualian pembayaran material atau pihak ketiga tertentu dari dasar memerlukan bukti yang ditentukan. Tanpa bukti seluruh pembayaran terkait selain PPN menjadi dasar; reimbursement tidak otomatis dikecualikan.
+**P23_ABBREVIATION** — Pajak Penghasilan Pasal 23
+
+Basis:
+
+- [DJP_SDSN_2023 article23 / (1a),(4) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+
+**P23_SHORT_DEFINITION** — PPh23 adalah pemotongan pajak atas penghasilan yang tercantum, termasuk jasa tertentu dan sewa harta.
+
+Basis:
+
+- [DJP_SDSN_2023 article23 / (1a),(4) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+
+**P23_SHORT_MECHANISM** — Pembayar yang ditentukan memotong pajak dari pembayaran.
+
+Basis:
+
+- [DJP_SDSN_2023 article23 / (1a),(4) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+
+**SERVICE_REIMBURSEMENT** — Menurut PMK141 yang diarsipkan, pengecualian pembayaran material atau pihak ketiga tertentu dari dasar memerlukan bukti yang ditentukan. Tanpa bukti seluruh pembayaran terkait selain PPN menjadi dasar; penggantian biaya tidak otomatis dikecualikan.
 
 Basis:
 
@@ -2452,7 +3604,28 @@ Expected: Separate statutory rate and11/12 base; category limits and exclusions.
 
 Объяснения относятся к прочитанному архивному тексту; действующая применимость к компании не подтверждена.
 
-**VAT_MECHANISM** — Архивный PMK131 разделяет установленную ставку и DPP nilai lain. В той же редакции отдельно исключены специальные базы: механизм нельзя объявлять универсальным для всех поставок.
+**PPN_ABBREVIATION** — Pajak Pertambahan Nilai
+
+Basis:
+
+- [PMK131_2024 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c853ed3c496865218892cf3c.
+- [PMK131_2024 article4 / (1) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:eb357e4b3237db5d08aa0e46.
+
+**PPN_SHORT_CONDITION** — Проверьте вид операции: для специальных налоговых баз предусмотрены отдельные правила.
+
+Basis:
+
+- [PMK131_2024 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c853ed3c496865218892cf3c.
+- [PMK131_2024 article4 / (1) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:eb357e4b3237db5d08aa0e46.
+
+**PPN_SHORT_DEFINITION** — PPN — налог на указанные в правилах операции с товарами и услугами.
+
+Basis:
+
+- [PMK131_2024 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c853ed3c496865218892cf3c.
+- [PMK131_2024 article4 / (1) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:eb357e4b3237db5d08aa0e46.
+
+**VAT_MECHANISM** — Архивный PMK131 разделяет установленную ставку и налоговую базу, определяемую по специальной величине. В той же редакции отдельно исключены специальные базы: механизм нельзя объявлять универсальным для всех поставок.
 
 Basis:
 
@@ -2466,6 +3639,13 @@ Basis:
 - [PMK131_2024 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c853ed3c496865218892cf3c.
 - [PMK131_2024 article4 / (1) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:eb357e4b3237db5d08aa0e46.
 
+**PKP_ABBREVIATION** — Pengusaha Kena Pajak
+
+Basis:
+
+- [PMK164_2023 article17 / (1),(3) / PDF16](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=16), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:4958a8e50eb6047e53d878eb.
+- [PMK164_2023 article18 / whole / PDF17](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=17), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:0f579a087d156d4f15b529cc.
+
 **PKP_REGISTRATION** — Архивный PMK164 различает превышение порога, сообщение о деятельности и начало обязанностей PKP. Их нельзя свести к автоматическому действию в день выставления инвойса.
 
 Basis:
@@ -2473,14 +3653,44 @@ Basis:
 - [PMK164_2023 article17 / (1),(3) / PDF16](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=16), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:4958a8e50eb6047e53d878eb.
 - [PMK164_2023 article18 / whole / PDF17](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=17), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:0f579a087d156d4f15b529cc.
 
-**PKP_SCOPE** — В архивном PMK164 PKP — статус Pengusaha Kena Pajak: предусмотрены оформление статуса и обязанности по PPN. Превышение порога и начало обязанностей различаются; статус конкретной компании здесь не установлен.
+**PKP_SCOPE** — В архивном PMK164 PKP — статус предпринимателя, зарегистрированного для обязанностей по налогу на товары и услуги: предусмотрены оформление статуса и обязанности по PPN. Превышение порога и начало обязанностей различаются; статус конкретной компании здесь не установлен.
 
 Basis:
 
 - [PMK164_2023 article17 / (1),(3) / PDF16](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=16), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:4958a8e50eb6047e53d878eb.
 - [PMK164_2023 article18 / whole / PDF17](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=17), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:0f579a087d156d4f15b529cc.
 
-**VAT_CREDIT** — В архивном PMK131 право зачёта входного налога отсылает к условиям налогового законодательства. Статус PKP и наличие обычного инвойса сами по себе этих условий не доказывают; полный набор требований faktur пока не проверен.
+**PKP_SHORT_CONDITION** — Проверьте оформление статуса и начало обязанностей; одного инвойса недостаточно.
+
+Basis:
+
+- [PMK164_2023 article17 / (1),(3) / PDF16](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=16), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:4958a8e50eb6047e53d878eb.
+- [PMK164_2023 article18 / whole / PDF17](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=17), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:0f579a087d156d4f15b529cc.
+
+**PKP_SHORT_DEFINITION** — PKP — статус предпринимателя для обязанностей по PPN, налогу на операции с товарами и услугами.
+
+Basis:
+
+- [PMK164_2023 article17 / (1),(3) / PDF16](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=16), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:4958a8e50eb6047e53d878eb.
+- [PMK164_2023 article18 / whole / PDF17](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=17), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:0f579a087d156d4f15b529cc.
+- [PMK131_2024 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c853ed3c496865218892cf3c.
+- [PMK131_2024 article4 / (1) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:eb357e4b3237db5d08aa0e46.
+
+**PKP_SHORT_MECHANISM** — После начала обязанностей он собирает, перечисляет налог и сдаёт отчётность.
+
+Basis:
+
+- [PMK164_2023 article17 / (1),(3) / PDF16](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=16), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:4958a8e50eb6047e53d878eb.
+- [PMK164_2023 article18 / whole / PDF17](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=17), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:0f579a087d156d4f15b529cc.
+
+**PPN_SHORT_MECHANISM** — По указанным поставкам налог собирает и перечисляет предприниматель, зарегистрированный для PPN.
+
+Basis:
+
+- [PMK164_2023 article17 / (1),(3) / PDF16](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=16), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:4958a8e50eb6047e53d878eb.
+- [PMK164_2023 article18 / whole / PDF17](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=17), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:0f579a087d156d4f15b529cc.
+
+**VAT_CREDIT** — В архивном PMK131 право зачёта входного налога отсылает к условиям налогового законодательства. Статус PKP и наличие обычного инвойса сами по себе этих условий не доказывают; полный набор требований к налоговому счёту-фактуре пока не проверен.
 
 Basis:
 
@@ -2507,7 +3717,28 @@ Expected: Separate statutory rate and11/12 base; category limits and exclusions.
 
 Explanations describe the read archived text; current company applicability is not established.
 
-**VAT_MECHANISM** — Archived PMK131 distinguishes the stated tax rate from DPP nilai lain. That edition separately excludes special bases; the mechanism cannot be treated as universal for all supplies.
+**PPN_ABBREVIATION** — Pajak Pertambahan Nilai
+
+Basis:
+
+- [PMK131_2024 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c853ed3c496865218892cf3c.
+- [PMK131_2024 article4 / (1) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:eb357e4b3237db5d08aa0e46.
+
+**PPN_SHORT_CONDITION** — Check the transaction type: special tax bases have separate rules.
+
+Basis:
+
+- [PMK131_2024 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c853ed3c496865218892cf3c.
+- [PMK131_2024 article4 / (1) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:eb357e4b3237db5d08aa0e46.
+
+**PPN_SHORT_DEFINITION** — PPN is tax on specified transactions involving goods and services.
+
+Basis:
+
+- [PMK131_2024 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c853ed3c496865218892cf3c.
+- [PMK131_2024 article4 / (1) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:eb357e4b3237db5d08aa0e46.
+
+**VAT_MECHANISM** — Archived PMK131 distinguishes the stated tax rate from a tax base determined using a special value. That edition separately excludes special bases; the mechanism cannot be treated as universal for all supplies.
 
 Basis:
 
@@ -2521,6 +3752,13 @@ Basis:
 - [PMK131_2024 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c853ed3c496865218892cf3c.
 - [PMK131_2024 article4 / (1) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:eb357e4b3237db5d08aa0e46.
 
+**PKP_ABBREVIATION** — Pengusaha Kena Pajak
+
+Basis:
+
+- [PMK164_2023 article17 / (1),(3) / PDF16](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=16), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:4958a8e50eb6047e53d878eb.
+- [PMK164_2023 article18 / whole / PDF17](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=17), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:0f579a087d156d4f15b529cc.
+
 **PKP_REGISTRATION** — Archived PMK164 distinguishes a threshold crossing, business reporting and commencement of PKP obligations. They cannot be reduced to automatic treatment on an invoice date.
 
 Basis:
@@ -2528,14 +3766,44 @@ Basis:
 - [PMK164_2023 article17 / (1),(3) / PDF16](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=16), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:4958a8e50eb6047e53d878eb.
 - [PMK164_2023 article18 / whole / PDF17](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=17), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:0f579a087d156d4f15b529cc.
 
-**PKP_SCOPE** — In archived PMK164, PKP is Pengusaha Kena Pajak status, with confirmation procedures and PPN obligations. Threshold crossing and commencement of obligations are distinct; this does not establish a particular company’s status.
+**PKP_SCOPE** — In archived PMK164, PKP is status as an entrepreneur registered for goods-and-services tax obligations, with confirmation procedures and PPN obligations. Threshold crossing and commencement of obligations are distinct; this does not establish a particular company’s status.
 
 Basis:
 
 - [PMK164_2023 article17 / (1),(3) / PDF16](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=16), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:4958a8e50eb6047e53d878eb.
 - [PMK164_2023 article18 / whole / PDF17](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=17), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:0f579a087d156d4f15b529cc.
 
-**VAT_CREDIT** — Archived PMK131 refers input credit to the conditions in tax legislation. PKP status and an ordinary invoice alone do not establish those conditions; the full faktur requirements remain unreviewed.
+**PKP_SHORT_CONDITION** — Check status confirmation and when obligations start; an invoice alone is insufficient.
+
+Basis:
+
+- [PMK164_2023 article17 / (1),(3) / PDF16](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=16), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:4958a8e50eb6047e53d878eb.
+- [PMK164_2023 article18 / whole / PDF17](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=17), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:0f579a087d156d4f15b529cc.
+
+**PKP_SHORT_DEFINITION** — PKP is entrepreneur status for PPN obligations, involving tax on goods and services transactions.
+
+Basis:
+
+- [PMK164_2023 article17 / (1),(3) / PDF16](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=16), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:4958a8e50eb6047e53d878eb.
+- [PMK164_2023 article18 / whole / PDF17](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=17), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:0f579a087d156d4f15b529cc.
+- [PMK131_2024 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c853ed3c496865218892cf3c.
+- [PMK131_2024 article4 / (1) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:eb357e4b3237db5d08aa0e46.
+
+**PKP_SHORT_MECHANISM** — Once obligations start, the entrepreneur collects, remits and reports tax.
+
+Basis:
+
+- [PMK164_2023 article17 / (1),(3) / PDF16](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=16), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:4958a8e50eb6047e53d878eb.
+- [PMK164_2023 article18 / whole / PDF17](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=17), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:0f579a087d156d4f15b529cc.
+
+**PPN_SHORT_MECHANISM** — For the specified supplies, the entrepreneur registered for PPN collects and remits tax.
+
+Basis:
+
+- [PMK164_2023 article17 / (1),(3) / PDF16](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=16), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:4958a8e50eb6047e53d878eb.
+- [PMK164_2023 article18 / whole / PDF17](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=17), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:0f579a087d156d4f15b529cc.
+
+**VAT_CREDIT** — Archived PMK131 refers input credit to the conditions in tax legislation. PKP status and an ordinary invoice alone do not establish those conditions; the full tax-invoice requirements remain unreviewed.
 
 Basis:
 
@@ -2562,19 +3830,47 @@ Expected: Separate statutory rate and11/12 base; category limits and exclusions.
 
 Penjelasan menggambarkan teks arsip yang dibaca; penerapan terkini pada perusahaan belum ditetapkan.
 
-**VAT_MECHANISM** — PMK131 yang diarsipkan membedakan tarif pajak dari DPP nilai lain. Edisi tersebut mengecualikan DPP khusus secara terpisah; mekanismenya tidak universal untuk semua penyerahan.
+**PPN_ABBREVIATION** — Pajak Pertambahan Nilai
 
 Basis:
 
 - [PMK131_2024 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c853ed3c496865218892cf3c.
 - [PMK131_2024 article4 / (1) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:eb357e4b3237db5d08aa0e46.
 
-**VAT_SCOPE** — PMK131 yang diarsipkan menjelaskan PPN atas transaksi tertentu Barang Kena Pajak dan Jasa Kena Pajak, termasuk impor serta pemanfaatan dari luar negeri. DPP khusus dikecualikan dari mekanisme umum edisi ini; semua transaksi tidak otomatis diperlakukan sama.
+**PPN_SHORT_CONDITION** — Periksa jenis transaksi: dasar pengenaan khusus memiliki aturan tersendiri.
 
 Basis:
 
 - [PMK131_2024 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c853ed3c496865218892cf3c.
 - [PMK131_2024 article4 / (1) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:eb357e4b3237db5d08aa0e46.
+
+**PPN_SHORT_DEFINITION** — PPN adalah pajak atas transaksi barang dan jasa yang ditentukan.
+
+Basis:
+
+- [PMK131_2024 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c853ed3c496865218892cf3c.
+- [PMK131_2024 article4 / (1) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:eb357e4b3237db5d08aa0e46.
+
+**VAT_MECHANISM** — PMK131 yang diarsipkan membedakan tarif pajak dari dasar pengenaan pajak dengan nilai khusus. Edisi tersebut mengecualikan dasar pengenaan pajak khusus secara terpisah; mekanismenya tidak universal untuk semua penyerahan.
+
+Basis:
+
+- [PMK131_2024 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c853ed3c496865218892cf3c.
+- [PMK131_2024 article4 / (1) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:eb357e4b3237db5d08aa0e46.
+
+**VAT_SCOPE** — PMK131 yang diarsipkan menjelaskan PPN atas transaksi tertentu Barang Kena Pajak dan Jasa Kena Pajak, termasuk impor serta pemanfaatan dari luar negeri. dasar pengenaan pajak khusus dikecualikan dari mekanisme umum edisi ini; semua transaksi tidak otomatis diperlakukan sama.
+
+Basis:
+
+- [PMK131_2024 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c853ed3c496865218892cf3c.
+- [PMK131_2024 article4 / (1) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:eb357e4b3237db5d08aa0e46.
+
+**PKP_ABBREVIATION** — Pengusaha Kena Pajak
+
+Basis:
+
+- [PMK164_2023 article17 / (1),(3) / PDF16](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=16), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:4958a8e50eb6047e53d878eb.
+- [PMK164_2023 article18 / whole / PDF17](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=17), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:0f579a087d156d4f15b529cc.
 
 **PKP_REGISTRATION** — PMK164 yang diarsipkan membedakan terlampauinya batas, pelaporan usaha, dan awal kewajiban PKP. Hal itu tidak otomatis ditentukan dari tanggal invoice.
 
@@ -2590,7 +3886,37 @@ Basis:
 - [PMK164_2023 article17 / (1),(3) / PDF16](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=16), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:4958a8e50eb6047e53d878eb.
 - [PMK164_2023 article18 / whole / PDF17](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=17), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:0f579a087d156d4f15b529cc.
 
-**VAT_CREDIT** — PMK131 yang diarsipkan merujuk kredit pajak masukan pada syarat dalam ketentuan perpajakan. Status PKP dan invoice biasa saja tidak membuktikan syarat tersebut; persyaratan faktur lengkap belum ditelaah.
+**PKP_SHORT_CONDITION** — Periksa pengukuhan dan awal kewajiban; invoice saja tidak cukup.
+
+Basis:
+
+- [PMK164_2023 article17 / (1),(3) / PDF16](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=16), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:4958a8e50eb6047e53d878eb.
+- [PMK164_2023 article18 / whole / PDF17](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=17), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:0f579a087d156d4f15b529cc.
+
+**PKP_SHORT_DEFINITION** — PKP adalah status pengusaha untuk kewajiban PPN, pajak atas transaksi barang dan jasa.
+
+Basis:
+
+- [PMK164_2023 article17 / (1),(3) / PDF16](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=16), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:4958a8e50eb6047e53d878eb.
+- [PMK164_2023 article18 / whole / PDF17](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=17), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:0f579a087d156d4f15b529cc.
+- [PMK131_2024 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c853ed3c496865218892cf3c.
+- [PMK131_2024 article4 / (1) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:eb357e4b3237db5d08aa0e46.
+
+**PKP_SHORT_MECHANISM** — Setelah kewajiban dimulai, pengusaha memungut, menyetor dan melaporkan pajak.
+
+Basis:
+
+- [PMK164_2023 article17 / (1),(3) / PDF16](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=16), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:4958a8e50eb6047e53d878eb.
+- [PMK164_2023 article18 / whole / PDF17](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=17), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:0f579a087d156d4f15b529cc.
+
+**PPN_SHORT_MECHANISM** — Atas penyerahan yang ditentukan, pengusaha yang dikukuhkan untuk PPN memungut dan menyetor pajak.
+
+Basis:
+
+- [PMK164_2023 article17 / (1),(3) / PDF16](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=16), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:4958a8e50eb6047e53d878eb.
+- [PMK164_2023 article18 / whole / PDF17](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=17), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:0f579a087d156d4f15b529cc.
+
+**VAT_CREDIT** — PMK131 yang diarsipkan merujuk kredit pajak masukan pada syarat dalam ketentuan perpajakan. Status PKP dan invoice biasa saja tidak membuktikan syarat tersebut; persyaratan lengkap faktur pajak belum ditelaah.
 
 Basis:
 
@@ -2617,12 +3943,19 @@ Expected: Cite Pasal5 transition; no blanket current rate.
 
 Объяснения относятся к прочитанному архивному тексту; действующая применимость к компании не подтверждена.
 
-**VAT_JAN_TRANSITION** — Архивная статья5 PMK131 отдельно описывает январь2025 для определённых luxury-поставок конечным покупателям и следующий этап с февраля. Нужны вид товара и статус покупателя; здесь не устанавливается налог вашей сделки.
+**VAT_JAN_TRANSITION** — Архивная статья5 PMK131 отдельно описывает январь2025 для определённых поставок предметов роскоши конечным покупателям и следующий этап с февраля. Нужны вид товара и статус покупателя; здесь не устанавливается налог вашей сделки.
 
 Basis:
 
 - [PMK131_2024 article5 / (a),(b) / PDF5](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=5), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:33e2fef4d4a88847a284ea22.
 - [PMK131_2024 article2 / (3) / PDF3,4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=3), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c4fdae38c06bf4cde0a2c18c,PMK131_2024:134deadf8cf1b4cf0174641f.
+
+**PKP_ABBREVIATION** — Pengusaha Kena Pajak
+
+Basis:
+
+- [PMK164_2023 article17 / (1),(3) / PDF16](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=16), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:4958a8e50eb6047e53d878eb.
+- [PMK164_2023 article18 / whole / PDF17](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=17), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:0f579a087d156d4f15b529cc.
 
 **PKP_REGISTRATION** — Архивный PMK164 различает превышение порога, сообщение о деятельности и начало обязанностей PKP. Их нельзя свести к автоматическому действию в день выставления инвойса.
 
@@ -2631,31 +3964,82 @@ Basis:
 - [PMK164_2023 article17 / (1),(3) / PDF16](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=16), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:4958a8e50eb6047e53d878eb.
 - [PMK164_2023 article18 / whole / PDF17](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=17), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:0f579a087d156d4f15b529cc.
 
-**PKP_SCOPE** — В архивном PMK164 PKP — статус Pengusaha Kena Pajak: предусмотрены оформление статуса и обязанности по PPN. Превышение порога и начало обязанностей различаются; статус конкретной компании здесь не установлен.
+**PKP_SCOPE** — В архивном PMK164 PKP — статус предпринимателя, зарегистрированного для обязанностей по налогу на товары и услуги: предусмотрены оформление статуса и обязанности по PPN. Превышение порога и начало обязанностей различаются; статус конкретной компании здесь не установлен.
 
 Basis:
 
 - [PMK164_2023 article17 / (1),(3) / PDF16](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=16), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:4958a8e50eb6047e53d878eb.
 - [PMK164_2023 article18 / whole / PDF17](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=17), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:0f579a087d156d4f15b529cc.
 
-**VAT_CREDIT** — В архивном PMK131 право зачёта входного налога отсылает к условиям налогового законодательства. Статус PKP и наличие обычного инвойса сами по себе этих условий не доказывают; полный набор требований faktur пока не проверен.
+**PKP_SHORT_CONDITION** — Проверьте оформление статуса и начало обязанностей; одного инвойса недостаточно.
 
 Basis:
 
-- [PMK131_2024 article3 / (4) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c853ed3c496865218892cf3c.
+- [PMK164_2023 article17 / (1),(3) / PDF16](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=16), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:4958a8e50eb6047e53d878eb.
+- [PMK164_2023 article18 / whole / PDF17](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=17), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:0f579a087d156d4f15b529cc.
 
-**VAT_MECHANISM** — Архивный PMK131 разделяет установленную ставку и DPP nilai lain. В той же редакции отдельно исключены специальные базы: механизм нельзя объявлять универсальным для всех поставок.
+**PKP_SHORT_DEFINITION** — PKP — статус предпринимателя для обязанностей по PPN, налогу на операции с товарами и услугами.
 
 Basis:
 
-- [PMK131_2024 article3 / (4) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c853ed3c496865218892cf3c.
+- [PMK164_2023 article17 / (1),(3) / PDF16](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=16), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:4958a8e50eb6047e53d878eb.
+- [PMK164_2023 article18 / whole / PDF17](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=17), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:0f579a087d156d4f15b529cc.
+- [PMK131_2024 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c853ed3c496865218892cf3c.
+- [PMK131_2024 article4 / (1) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:eb357e4b3237db5d08aa0e46.
+
+**PKP_SHORT_MECHANISM** — После начала обязанностей он собирает, перечисляет налог и сдаёт отчётность.
+
+Basis:
+
+- [PMK164_2023 article17 / (1),(3) / PDF16](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=16), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:4958a8e50eb6047e53d878eb.
+- [PMK164_2023 article18 / whole / PDF17](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=17), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:0f579a087d156d4f15b529cc.
+
+**PPN_ABBREVIATION** — Pajak Pertambahan Nilai
+
+Basis:
+
+- [PMK131_2024 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c853ed3c496865218892cf3c.
+- [PMK131_2024 article4 / (1) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:eb357e4b3237db5d08aa0e46.
+
+**PPN_SHORT_CONDITION** — Проверьте вид операции: для специальных налоговых баз предусмотрены отдельные правила.
+
+Basis:
+
+- [PMK131_2024 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c853ed3c496865218892cf3c.
+- [PMK131_2024 article4 / (1) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:eb357e4b3237db5d08aa0e46.
+
+**PPN_SHORT_DEFINITION** — PPN — налог на указанные в правилах операции с товарами и услугами.
+
+Basis:
+
+- [PMK131_2024 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c853ed3c496865218892cf3c.
+- [PMK131_2024 article4 / (1) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:eb357e4b3237db5d08aa0e46.
+
+**PPN_SHORT_MECHANISM** — По указанным поставкам налог собирает и перечисляет предприниматель, зарегистрированный для PPN.
+
+Basis:
+
+- [PMK164_2023 article17 / (1),(3) / PDF16](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=16), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:4958a8e50eb6047e53d878eb.
+- [PMK164_2023 article18 / whole / PDF17](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=17), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:0f579a087d156d4f15b529cc.
+
+**VAT_CREDIT** — В архивном PMK131 право зачёта входного налога отсылает к условиям налогового законодательства. Статус PKP и наличие обычного инвойса сами по себе этих условий не доказывают; полный набор требований к налоговому счёту-фактуре пока не проверен.
+
+Basis:
+
+- [PMK131_2024 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c853ed3c496865218892cf3c.
+
+**VAT_MECHANISM** — Архивный PMK131 разделяет установленную ставку и налоговую базу, определяемую по специальной величине. В той же редакции отдельно исключены специальные базы: механизм нельзя объявлять универсальным для всех поставок.
+
+Basis:
+
+- [PMK131_2024 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c853ed3c496865218892cf3c.
 - [PMK131_2024 article4 / (1) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:eb357e4b3237db5d08aa0e46.
 
 **VAT_SCOPE** — Архивный PMK131 описывает PPN для указанных операций с облагаемыми товарами и услугами, включая импорт и использование из-за рубежа. Специальные базы исключены из общего механизма этой редакции; не любая операция автоматически облагается одинаково.
 
 Basis:
 
-- [PMK131_2024 article3 / (4) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c853ed3c496865218892cf3c.
+- [PMK131_2024 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c853ed3c496865218892cf3c.
 - [PMK131_2024 article4 / (1) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:eb357e4b3237db5d08aa0e46.
 
 Blocked claims: VAT_RATE (current_provision_currency_unconfirmed,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete).
@@ -2686,6 +4070,13 @@ Basis:
 - [PMK131_2024 article5 / (a),(b) / PDF5](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=5), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:33e2fef4d4a88847a284ea22.
 - [PMK131_2024 article2 / (3) / PDF3,4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=3), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c4fdae38c06bf4cde0a2c18c,PMK131_2024:134deadf8cf1b4cf0174641f.
 
+**PKP_ABBREVIATION** — Pengusaha Kena Pajak
+
+Basis:
+
+- [PMK164_2023 article17 / (1),(3) / PDF16](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=16), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:4958a8e50eb6047e53d878eb.
+- [PMK164_2023 article18 / whole / PDF17](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=17), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:0f579a087d156d4f15b529cc.
+
 **PKP_REGISTRATION** — Archived PMK164 distinguishes a threshold crossing, business reporting and commencement of PKP obligations. They cannot be reduced to automatic treatment on an invoice date.
 
 Basis:
@@ -2693,31 +4084,82 @@ Basis:
 - [PMK164_2023 article17 / (1),(3) / PDF16](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=16), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:4958a8e50eb6047e53d878eb.
 - [PMK164_2023 article18 / whole / PDF17](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=17), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:0f579a087d156d4f15b529cc.
 
-**PKP_SCOPE** — In archived PMK164, PKP is Pengusaha Kena Pajak status, with confirmation procedures and PPN obligations. Threshold crossing and commencement of obligations are distinct; this does not establish a particular company’s status.
+**PKP_SCOPE** — In archived PMK164, PKP is status as an entrepreneur registered for goods-and-services tax obligations, with confirmation procedures and PPN obligations. Threshold crossing and commencement of obligations are distinct; this does not establish a particular company’s status.
 
 Basis:
 
 - [PMK164_2023 article17 / (1),(3) / PDF16](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=16), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:4958a8e50eb6047e53d878eb.
 - [PMK164_2023 article18 / whole / PDF17](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=17), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:0f579a087d156d4f15b529cc.
 
-**VAT_CREDIT** — Archived PMK131 refers input credit to the conditions in tax legislation. PKP status and an ordinary invoice alone do not establish those conditions; the full faktur requirements remain unreviewed.
+**PKP_SHORT_CONDITION** — Check status confirmation and when obligations start; an invoice alone is insufficient.
 
 Basis:
 
-- [PMK131_2024 article3 / (4) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c853ed3c496865218892cf3c.
+- [PMK164_2023 article17 / (1),(3) / PDF16](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=16), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:4958a8e50eb6047e53d878eb.
+- [PMK164_2023 article18 / whole / PDF17](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=17), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:0f579a087d156d4f15b529cc.
 
-**VAT_MECHANISM** — Archived PMK131 distinguishes the stated tax rate from DPP nilai lain. That edition separately excludes special bases; the mechanism cannot be treated as universal for all supplies.
+**PKP_SHORT_DEFINITION** — PKP is entrepreneur status for PPN obligations, involving tax on goods and services transactions.
 
 Basis:
 
-- [PMK131_2024 article3 / (4) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c853ed3c496865218892cf3c.
+- [PMK164_2023 article17 / (1),(3) / PDF16](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=16), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:4958a8e50eb6047e53d878eb.
+- [PMK164_2023 article18 / whole / PDF17](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=17), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:0f579a087d156d4f15b529cc.
+- [PMK131_2024 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c853ed3c496865218892cf3c.
+- [PMK131_2024 article4 / (1) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:eb357e4b3237db5d08aa0e46.
+
+**PKP_SHORT_MECHANISM** — Once obligations start, the entrepreneur collects, remits and reports tax.
+
+Basis:
+
+- [PMK164_2023 article17 / (1),(3) / PDF16](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=16), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:4958a8e50eb6047e53d878eb.
+- [PMK164_2023 article18 / whole / PDF17](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=17), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:0f579a087d156d4f15b529cc.
+
+**PPN_ABBREVIATION** — Pajak Pertambahan Nilai
+
+Basis:
+
+- [PMK131_2024 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c853ed3c496865218892cf3c.
+- [PMK131_2024 article4 / (1) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:eb357e4b3237db5d08aa0e46.
+
+**PPN_SHORT_CONDITION** — Check the transaction type: special tax bases have separate rules.
+
+Basis:
+
+- [PMK131_2024 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c853ed3c496865218892cf3c.
+- [PMK131_2024 article4 / (1) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:eb357e4b3237db5d08aa0e46.
+
+**PPN_SHORT_DEFINITION** — PPN is tax on specified transactions involving goods and services.
+
+Basis:
+
+- [PMK131_2024 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c853ed3c496865218892cf3c.
+- [PMK131_2024 article4 / (1) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:eb357e4b3237db5d08aa0e46.
+
+**PPN_SHORT_MECHANISM** — For the specified supplies, the entrepreneur registered for PPN collects and remits tax.
+
+Basis:
+
+- [PMK164_2023 article17 / (1),(3) / PDF16](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=16), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:4958a8e50eb6047e53d878eb.
+- [PMK164_2023 article18 / whole / PDF17](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=17), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:0f579a087d156d4f15b529cc.
+
+**VAT_CREDIT** — Archived PMK131 refers input credit to the conditions in tax legislation. PKP status and an ordinary invoice alone do not establish those conditions; the full tax-invoice requirements remain unreviewed.
+
+Basis:
+
+- [PMK131_2024 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c853ed3c496865218892cf3c.
+
+**VAT_MECHANISM** — Archived PMK131 distinguishes the stated tax rate from a tax base determined using a special value. That edition separately excludes special bases; the mechanism cannot be treated as universal for all supplies.
+
+Basis:
+
+- [PMK131_2024 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c853ed3c496865218892cf3c.
 - [PMK131_2024 article4 / (1) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:eb357e4b3237db5d08aa0e46.
 
 **VAT_SCOPE** — Archived PMK131 describes PPN for specified transactions involving taxable goods and services, including imports and use from abroad. Special bases are excluded from this edition’s general mechanism; transactions cannot all be treated alike.
 
 Basis:
 
-- [PMK131_2024 article3 / (4) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c853ed3c496865218892cf3c.
+- [PMK131_2024 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c853ed3c496865218892cf3c.
 - [PMK131_2024 article4 / (1) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:eb357e4b3237db5d08aa0e46.
 
 Blocked claims: VAT_RATE (current_provision_currency_unconfirmed,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete).
@@ -2748,6 +4190,13 @@ Basis:
 - [PMK131_2024 article5 / (a),(b) / PDF5](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=5), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:33e2fef4d4a88847a284ea22.
 - [PMK131_2024 article2 / (3) / PDF3,4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=3), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c4fdae38c06bf4cde0a2c18c,PMK131_2024:134deadf8cf1b4cf0174641f.
 
+**PKP_ABBREVIATION** — Pengusaha Kena Pajak
+
+Basis:
+
+- [PMK164_2023 article17 / (1),(3) / PDF16](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=16), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:4958a8e50eb6047e53d878eb.
+- [PMK164_2023 article18 / whole / PDF17](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=17), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:0f579a087d156d4f15b529cc.
+
 **PKP_REGISTRATION** — PMK164 yang diarsipkan membedakan terlampauinya batas, pelaporan usaha, dan awal kewajiban PKP. Hal itu tidak otomatis ditentukan dari tanggal invoice.
 
 Basis:
@@ -2762,24 +4211,75 @@ Basis:
 - [PMK164_2023 article17 / (1),(3) / PDF16](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=16), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:4958a8e50eb6047e53d878eb.
 - [PMK164_2023 article18 / whole / PDF17](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=17), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:0f579a087d156d4f15b529cc.
 
-**VAT_CREDIT** — PMK131 yang diarsipkan merujuk kredit pajak masukan pada syarat dalam ketentuan perpajakan. Status PKP dan invoice biasa saja tidak membuktikan syarat tersebut; persyaratan faktur lengkap belum ditelaah.
+**PKP_SHORT_CONDITION** — Periksa pengukuhan dan awal kewajiban; invoice saja tidak cukup.
 
 Basis:
 
-- [PMK131_2024 article3 / (4) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c853ed3c496865218892cf3c.
+- [PMK164_2023 article17 / (1),(3) / PDF16](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=16), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:4958a8e50eb6047e53d878eb.
+- [PMK164_2023 article18 / whole / PDF17](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=17), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:0f579a087d156d4f15b529cc.
 
-**VAT_MECHANISM** — PMK131 yang diarsipkan membedakan tarif pajak dari DPP nilai lain. Edisi tersebut mengecualikan DPP khusus secara terpisah; mekanismenya tidak universal untuk semua penyerahan.
+**PKP_SHORT_DEFINITION** — PKP adalah status pengusaha untuk kewajiban PPN, pajak atas transaksi barang dan jasa.
 
 Basis:
 
-- [PMK131_2024 article3 / (4) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c853ed3c496865218892cf3c.
+- [PMK164_2023 article17 / (1),(3) / PDF16](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=16), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:4958a8e50eb6047e53d878eb.
+- [PMK164_2023 article18 / whole / PDF17](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=17), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:0f579a087d156d4f15b529cc.
+- [PMK131_2024 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c853ed3c496865218892cf3c.
 - [PMK131_2024 article4 / (1) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:eb357e4b3237db5d08aa0e46.
 
-**VAT_SCOPE** — PMK131 yang diarsipkan menjelaskan PPN atas transaksi tertentu Barang Kena Pajak dan Jasa Kena Pajak, termasuk impor serta pemanfaatan dari luar negeri. DPP khusus dikecualikan dari mekanisme umum edisi ini; semua transaksi tidak otomatis diperlakukan sama.
+**PKP_SHORT_MECHANISM** — Setelah kewajiban dimulai, pengusaha memungut, menyetor dan melaporkan pajak.
 
 Basis:
 
-- [PMK131_2024 article3 / (4) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c853ed3c496865218892cf3c.
+- [PMK164_2023 article17 / (1),(3) / PDF16](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=16), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:4958a8e50eb6047e53d878eb.
+- [PMK164_2023 article18 / whole / PDF17](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=17), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:0f579a087d156d4f15b529cc.
+
+**PPN_ABBREVIATION** — Pajak Pertambahan Nilai
+
+Basis:
+
+- [PMK131_2024 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c853ed3c496865218892cf3c.
+- [PMK131_2024 article4 / (1) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:eb357e4b3237db5d08aa0e46.
+
+**PPN_SHORT_CONDITION** — Periksa jenis transaksi: dasar pengenaan khusus memiliki aturan tersendiri.
+
+Basis:
+
+- [PMK131_2024 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c853ed3c496865218892cf3c.
+- [PMK131_2024 article4 / (1) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:eb357e4b3237db5d08aa0e46.
+
+**PPN_SHORT_DEFINITION** — PPN adalah pajak atas transaksi barang dan jasa yang ditentukan.
+
+Basis:
+
+- [PMK131_2024 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c853ed3c496865218892cf3c.
+- [PMK131_2024 article4 / (1) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:eb357e4b3237db5d08aa0e46.
+
+**PPN_SHORT_MECHANISM** — Atas penyerahan yang ditentukan, pengusaha yang dikukuhkan untuk PPN memungut dan menyetor pajak.
+
+Basis:
+
+- [PMK164_2023 article17 / (1),(3) / PDF16](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=16), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:4958a8e50eb6047e53d878eb.
+- [PMK164_2023 article18 / whole / PDF17](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=17), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:0f579a087d156d4f15b529cc.
+
+**VAT_CREDIT** — PMK131 yang diarsipkan merujuk kredit pajak masukan pada syarat dalam ketentuan perpajakan. Status PKP dan invoice biasa saja tidak membuktikan syarat tersebut; persyaratan lengkap faktur pajak belum ditelaah.
+
+Basis:
+
+- [PMK131_2024 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c853ed3c496865218892cf3c.
+
+**VAT_MECHANISM** — PMK131 yang diarsipkan membedakan tarif pajak dari dasar pengenaan pajak dengan nilai khusus. Edisi tersebut mengecualikan dasar pengenaan pajak khusus secara terpisah; mekanismenya tidak universal untuk semua penyerahan.
+
+Basis:
+
+- [PMK131_2024 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c853ed3c496865218892cf3c.
+- [PMK131_2024 article4 / (1) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:eb357e4b3237db5d08aa0e46.
+
+**VAT_SCOPE** — PMK131 yang diarsipkan menjelaskan PPN atas transaksi tertentu Barang Kena Pajak dan Jasa Kena Pajak, termasuk impor serta pemanfaatan dari luar negeri. dasar pengenaan pajak khusus dikecualikan dari mekanisme umum edisi ini; semua transaksi tidak otomatis diperlakukan sama.
+
+Basis:
+
+- [PMK131_2024 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c853ed3c496865218892cf3c.
 - [PMK131_2024 article4 / (1) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:eb357e4b3237db5d08aa0e46.
 
 Blocked claims: VAT_RATE (current_provision_currency_unconfirmed,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete).
@@ -2803,6 +4303,13 @@ Expected: Do not certify creditability from invoice alone; flag faktur requireme
 
 Объяснения относятся к прочитанному архивному тексту; действующая применимость к компании не подтверждена.
 
+**PKP_ABBREVIATION** — Pengusaha Kena Pajak
+
+Basis:
+
+- [PMK164_2023 article17 / (1),(3) / PDF16](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=16), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:4958a8e50eb6047e53d878eb.
+- [PMK164_2023 article18 / whole / PDF17](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=17), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:0f579a087d156d4f15b529cc.
+
 **PKP_REGISTRATION** — Архивный PMK164 различает превышение порога, сообщение о деятельности и начало обязанностей PKP. Их нельзя свести к автоматическому действию в день выставления инвойса.
 
 Basis:
@@ -2810,31 +4317,82 @@ Basis:
 - [PMK164_2023 article17 / (1),(3) / PDF16](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=16), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:4958a8e50eb6047e53d878eb.
 - [PMK164_2023 article18 / whole / PDF17](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=17), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:0f579a087d156d4f15b529cc.
 
-**PKP_SCOPE** — В архивном PMK164 PKP — статус Pengusaha Kena Pajak: предусмотрены оформление статуса и обязанности по PPN. Превышение порога и начало обязанностей различаются; статус конкретной компании здесь не установлен.
+**PKP_SCOPE** — В архивном PMK164 PKP — статус предпринимателя, зарегистрированного для обязанностей по налогу на товары и услуги: предусмотрены оформление статуса и обязанности по PPN. Превышение порога и начало обязанностей различаются; статус конкретной компании здесь не установлен.
 
 Basis:
 
 - [PMK164_2023 article17 / (1),(3) / PDF16](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=16), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:4958a8e50eb6047e53d878eb.
 - [PMK164_2023 article18 / whole / PDF17](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=17), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:0f579a087d156d4f15b529cc.
 
-**VAT_CREDIT** — В архивном PMK131 право зачёта входного налога отсылает к условиям налогового законодательства. Статус PKP и наличие обычного инвойса сами по себе этих условий не доказывают; полный набор требований faktur пока не проверен.
+**PKP_SHORT_CONDITION** — Проверьте оформление статуса и начало обязанностей; одного инвойса недостаточно.
 
 Basis:
 
-- [PMK131_2024 article3 / (4) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c853ed3c496865218892cf3c.
+- [PMK164_2023 article17 / (1),(3) / PDF16](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=16), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:4958a8e50eb6047e53d878eb.
+- [PMK164_2023 article18 / whole / PDF17](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=17), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:0f579a087d156d4f15b529cc.
 
-**VAT_MECHANISM** — Архивный PMK131 разделяет установленную ставку и DPP nilai lain. В той же редакции отдельно исключены специальные базы: механизм нельзя объявлять универсальным для всех поставок.
+**PKP_SHORT_DEFINITION** — PKP — статус предпринимателя для обязанностей по PPN, налогу на операции с товарами и услугами.
 
 Basis:
 
-- [PMK131_2024 article3 / (4) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c853ed3c496865218892cf3c.
+- [PMK164_2023 article17 / (1),(3) / PDF16](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=16), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:4958a8e50eb6047e53d878eb.
+- [PMK164_2023 article18 / whole / PDF17](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=17), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:0f579a087d156d4f15b529cc.
+- [PMK131_2024 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c853ed3c496865218892cf3c.
+- [PMK131_2024 article4 / (1) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:eb357e4b3237db5d08aa0e46.
+
+**PKP_SHORT_MECHANISM** — После начала обязанностей он собирает, перечисляет налог и сдаёт отчётность.
+
+Basis:
+
+- [PMK164_2023 article17 / (1),(3) / PDF16](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=16), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:4958a8e50eb6047e53d878eb.
+- [PMK164_2023 article18 / whole / PDF17](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=17), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:0f579a087d156d4f15b529cc.
+
+**PPN_SHORT_MECHANISM** — По указанным поставкам налог собирает и перечисляет предприниматель, зарегистрированный для PPN.
+
+Basis:
+
+- [PMK164_2023 article17 / (1),(3) / PDF16](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=16), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:4958a8e50eb6047e53d878eb.
+- [PMK164_2023 article18 / whole / PDF17](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=17), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:0f579a087d156d4f15b529cc.
+
+**VAT_CREDIT** — В архивном PMK131 право зачёта входного налога отсылает к условиям налогового законодательства. Статус PKP и наличие обычного инвойса сами по себе этих условий не доказывают; полный набор требований к налоговому счёту-фактуре пока не проверен.
+
+Basis:
+
+- [PMK131_2024 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c853ed3c496865218892cf3c.
+
+**PPN_ABBREVIATION** — Pajak Pertambahan Nilai
+
+Basis:
+
+- [PMK131_2024 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c853ed3c496865218892cf3c.
+- [PMK131_2024 article4 / (1) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:eb357e4b3237db5d08aa0e46.
+
+**PPN_SHORT_CONDITION** — Проверьте вид операции: для специальных налоговых баз предусмотрены отдельные правила.
+
+Basis:
+
+- [PMK131_2024 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c853ed3c496865218892cf3c.
+- [PMK131_2024 article4 / (1) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:eb357e4b3237db5d08aa0e46.
+
+**PPN_SHORT_DEFINITION** — PPN — налог на указанные в правилах операции с товарами и услугами.
+
+Basis:
+
+- [PMK131_2024 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c853ed3c496865218892cf3c.
+- [PMK131_2024 article4 / (1) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:eb357e4b3237db5d08aa0e46.
+
+**VAT_MECHANISM** — Архивный PMK131 разделяет установленную ставку и налоговую базу, определяемую по специальной величине. В той же редакции отдельно исключены специальные базы: механизм нельзя объявлять универсальным для всех поставок.
+
+Basis:
+
+- [PMK131_2024 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c853ed3c496865218892cf3c.
 - [PMK131_2024 article4 / (1) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:eb357e4b3237db5d08aa0e46.
 
 **VAT_SCOPE** — Архивный PMK131 описывает PPN для указанных операций с облагаемыми товарами и услугами, включая импорт и использование из-за рубежа. Специальные базы исключены из общего механизма этой редакции; не любая операция автоматически облагается одинаково.
 
 Basis:
 
-- [PMK131_2024 article3 / (4) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c853ed3c496865218892cf3c.
+- [PMK131_2024 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c853ed3c496865218892cf3c.
 - [PMK131_2024 article4 / (1) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:eb357e4b3237db5d08aa0e46.
 
 Blocked claims: VAT_JAN_TRANSITION (outside_requested_period); VAT_RATE (current_provision_currency_unconfirmed,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete).
@@ -2858,6 +4416,13 @@ Expected: Do not certify creditability from invoice alone; flag faktur requireme
 
 Explanations describe the read archived text; current company applicability is not established.
 
+**PKP_ABBREVIATION** — Pengusaha Kena Pajak
+
+Basis:
+
+- [PMK164_2023 article17 / (1),(3) / PDF16](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=16), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:4958a8e50eb6047e53d878eb.
+- [PMK164_2023 article18 / whole / PDF17](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=17), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:0f579a087d156d4f15b529cc.
+
 **PKP_REGISTRATION** — Archived PMK164 distinguishes a threshold crossing, business reporting and commencement of PKP obligations. They cannot be reduced to automatic treatment on an invoice date.
 
 Basis:
@@ -2865,31 +4430,82 @@ Basis:
 - [PMK164_2023 article17 / (1),(3) / PDF16](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=16), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:4958a8e50eb6047e53d878eb.
 - [PMK164_2023 article18 / whole / PDF17](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=17), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:0f579a087d156d4f15b529cc.
 
-**PKP_SCOPE** — In archived PMK164, PKP is Pengusaha Kena Pajak status, with confirmation procedures and PPN obligations. Threshold crossing and commencement of obligations are distinct; this does not establish a particular company’s status.
+**PKP_SCOPE** — In archived PMK164, PKP is status as an entrepreneur registered for goods-and-services tax obligations, with confirmation procedures and PPN obligations. Threshold crossing and commencement of obligations are distinct; this does not establish a particular company’s status.
 
 Basis:
 
 - [PMK164_2023 article17 / (1),(3) / PDF16](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=16), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:4958a8e50eb6047e53d878eb.
 - [PMK164_2023 article18 / whole / PDF17](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=17), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:0f579a087d156d4f15b529cc.
 
-**VAT_CREDIT** — Archived PMK131 refers input credit to the conditions in tax legislation. PKP status and an ordinary invoice alone do not establish those conditions; the full faktur requirements remain unreviewed.
+**PKP_SHORT_CONDITION** — Check status confirmation and when obligations start; an invoice alone is insufficient.
 
 Basis:
 
-- [PMK131_2024 article3 / (4) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c853ed3c496865218892cf3c.
+- [PMK164_2023 article17 / (1),(3) / PDF16](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=16), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:4958a8e50eb6047e53d878eb.
+- [PMK164_2023 article18 / whole / PDF17](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=17), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:0f579a087d156d4f15b529cc.
 
-**VAT_MECHANISM** — Archived PMK131 distinguishes the stated tax rate from DPP nilai lain. That edition separately excludes special bases; the mechanism cannot be treated as universal for all supplies.
+**PKP_SHORT_DEFINITION** — PKP is entrepreneur status for PPN obligations, involving tax on goods and services transactions.
 
 Basis:
 
-- [PMK131_2024 article3 / (4) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c853ed3c496865218892cf3c.
+- [PMK164_2023 article17 / (1),(3) / PDF16](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=16), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:4958a8e50eb6047e53d878eb.
+- [PMK164_2023 article18 / whole / PDF17](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=17), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:0f579a087d156d4f15b529cc.
+- [PMK131_2024 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c853ed3c496865218892cf3c.
+- [PMK131_2024 article4 / (1) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:eb357e4b3237db5d08aa0e46.
+
+**PKP_SHORT_MECHANISM** — Once obligations start, the entrepreneur collects, remits and reports tax.
+
+Basis:
+
+- [PMK164_2023 article17 / (1),(3) / PDF16](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=16), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:4958a8e50eb6047e53d878eb.
+- [PMK164_2023 article18 / whole / PDF17](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=17), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:0f579a087d156d4f15b529cc.
+
+**PPN_SHORT_MECHANISM** — For the specified supplies, the entrepreneur registered for PPN collects and remits tax.
+
+Basis:
+
+- [PMK164_2023 article17 / (1),(3) / PDF16](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=16), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:4958a8e50eb6047e53d878eb.
+- [PMK164_2023 article18 / whole / PDF17](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=17), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:0f579a087d156d4f15b529cc.
+
+**VAT_CREDIT** — Archived PMK131 refers input credit to the conditions in tax legislation. PKP status and an ordinary invoice alone do not establish those conditions; the full tax-invoice requirements remain unreviewed.
+
+Basis:
+
+- [PMK131_2024 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c853ed3c496865218892cf3c.
+
+**PPN_ABBREVIATION** — Pajak Pertambahan Nilai
+
+Basis:
+
+- [PMK131_2024 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c853ed3c496865218892cf3c.
+- [PMK131_2024 article4 / (1) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:eb357e4b3237db5d08aa0e46.
+
+**PPN_SHORT_CONDITION** — Check the transaction type: special tax bases have separate rules.
+
+Basis:
+
+- [PMK131_2024 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c853ed3c496865218892cf3c.
+- [PMK131_2024 article4 / (1) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:eb357e4b3237db5d08aa0e46.
+
+**PPN_SHORT_DEFINITION** — PPN is tax on specified transactions involving goods and services.
+
+Basis:
+
+- [PMK131_2024 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c853ed3c496865218892cf3c.
+- [PMK131_2024 article4 / (1) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:eb357e4b3237db5d08aa0e46.
+
+**VAT_MECHANISM** — Archived PMK131 distinguishes the stated tax rate from a tax base determined using a special value. That edition separately excludes special bases; the mechanism cannot be treated as universal for all supplies.
+
+Basis:
+
+- [PMK131_2024 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c853ed3c496865218892cf3c.
 - [PMK131_2024 article4 / (1) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:eb357e4b3237db5d08aa0e46.
 
 **VAT_SCOPE** — Archived PMK131 describes PPN for specified transactions involving taxable goods and services, including imports and use from abroad. Special bases are excluded from this edition’s general mechanism; transactions cannot all be treated alike.
 
 Basis:
 
-- [PMK131_2024 article3 / (4) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c853ed3c496865218892cf3c.
+- [PMK131_2024 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c853ed3c496865218892cf3c.
 - [PMK131_2024 article4 / (1) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:eb357e4b3237db5d08aa0e46.
 
 Blocked claims: VAT_JAN_TRANSITION (outside_requested_period); VAT_RATE (current_provision_currency_unconfirmed,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete).
@@ -2913,6 +4529,13 @@ Expected: Do not certify creditability from invoice alone; flag faktur requireme
 
 Penjelasan menggambarkan teks arsip yang dibaca; penerapan terkini pada perusahaan belum ditetapkan.
 
+**PKP_ABBREVIATION** — Pengusaha Kena Pajak
+
+Basis:
+
+- [PMK164_2023 article17 / (1),(3) / PDF16](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=16), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:4958a8e50eb6047e53d878eb.
+- [PMK164_2023 article18 / whole / PDF17](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=17), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:0f579a087d156d4f15b529cc.
+
 **PKP_REGISTRATION** — PMK164 yang diarsipkan membedakan terlampauinya batas, pelaporan usaha, dan awal kewajiban PKP. Hal itu tidak otomatis ditentukan dari tanggal invoice.
 
 Basis:
@@ -2927,24 +4550,75 @@ Basis:
 - [PMK164_2023 article17 / (1),(3) / PDF16](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=16), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:4958a8e50eb6047e53d878eb.
 - [PMK164_2023 article18 / whole / PDF17](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=17), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:0f579a087d156d4f15b529cc.
 
-**VAT_CREDIT** — PMK131 yang diarsipkan merujuk kredit pajak masukan pada syarat dalam ketentuan perpajakan. Status PKP dan invoice biasa saja tidak membuktikan syarat tersebut; persyaratan faktur lengkap belum ditelaah.
+**PKP_SHORT_CONDITION** — Periksa pengukuhan dan awal kewajiban; invoice saja tidak cukup.
 
 Basis:
 
-- [PMK131_2024 article3 / (4) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c853ed3c496865218892cf3c.
+- [PMK164_2023 article17 / (1),(3) / PDF16](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=16), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:4958a8e50eb6047e53d878eb.
+- [PMK164_2023 article18 / whole / PDF17](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=17), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:0f579a087d156d4f15b529cc.
 
-**VAT_MECHANISM** — PMK131 yang diarsipkan membedakan tarif pajak dari DPP nilai lain. Edisi tersebut mengecualikan DPP khusus secara terpisah; mekanismenya tidak universal untuk semua penyerahan.
+**PKP_SHORT_DEFINITION** — PKP adalah status pengusaha untuk kewajiban PPN, pajak atas transaksi barang dan jasa.
 
 Basis:
 
-- [PMK131_2024 article3 / (4) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c853ed3c496865218892cf3c.
+- [PMK164_2023 article17 / (1),(3) / PDF16](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=16), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:4958a8e50eb6047e53d878eb.
+- [PMK164_2023 article18 / whole / PDF17](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=17), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:0f579a087d156d4f15b529cc.
+- [PMK131_2024 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c853ed3c496865218892cf3c.
 - [PMK131_2024 article4 / (1) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:eb357e4b3237db5d08aa0e46.
 
-**VAT_SCOPE** — PMK131 yang diarsipkan menjelaskan PPN atas transaksi tertentu Barang Kena Pajak dan Jasa Kena Pajak, termasuk impor serta pemanfaatan dari luar negeri. DPP khusus dikecualikan dari mekanisme umum edisi ini; semua transaksi tidak otomatis diperlakukan sama.
+**PKP_SHORT_MECHANISM** — Setelah kewajiban dimulai, pengusaha memungut, menyetor dan melaporkan pajak.
 
 Basis:
 
-- [PMK131_2024 article3 / (4) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c853ed3c496865218892cf3c.
+- [PMK164_2023 article17 / (1),(3) / PDF16](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=16), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:4958a8e50eb6047e53d878eb.
+- [PMK164_2023 article18 / whole / PDF17](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=17), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:0f579a087d156d4f15b529cc.
+
+**PPN_SHORT_MECHANISM** — Atas penyerahan yang ditentukan, pengusaha yang dikukuhkan untuk PPN memungut dan menyetor pajak.
+
+Basis:
+
+- [PMK164_2023 article17 / (1),(3) / PDF16](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=16), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:4958a8e50eb6047e53d878eb.
+- [PMK164_2023 article18 / whole / PDF17](https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf#page=17), SHA b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc, fragment IDs: PMK164_2023:0f579a087d156d4f15b529cc.
+
+**VAT_CREDIT** — PMK131 yang diarsipkan merujuk kredit pajak masukan pada syarat dalam ketentuan perpajakan. Status PKP dan invoice biasa saja tidak membuktikan syarat tersebut; persyaratan lengkap faktur pajak belum ditelaah.
+
+Basis:
+
+- [PMK131_2024 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c853ed3c496865218892cf3c.
+
+**PPN_ABBREVIATION** — Pajak Pertambahan Nilai
+
+Basis:
+
+- [PMK131_2024 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c853ed3c496865218892cf3c.
+- [PMK131_2024 article4 / (1) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:eb357e4b3237db5d08aa0e46.
+
+**PPN_SHORT_CONDITION** — Periksa jenis transaksi: dasar pengenaan khusus memiliki aturan tersendiri.
+
+Basis:
+
+- [PMK131_2024 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c853ed3c496865218892cf3c.
+- [PMK131_2024 article4 / (1) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:eb357e4b3237db5d08aa0e46.
+
+**PPN_SHORT_DEFINITION** — PPN adalah pajak atas transaksi barang dan jasa yang ditentukan.
+
+Basis:
+
+- [PMK131_2024 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c853ed3c496865218892cf3c.
+- [PMK131_2024 article4 / (1) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:eb357e4b3237db5d08aa0e46.
+
+**VAT_MECHANISM** — PMK131 yang diarsipkan membedakan tarif pajak dari dasar pengenaan pajak dengan nilai khusus. Edisi tersebut mengecualikan dasar pengenaan pajak khusus secara terpisah; mekanismenya tidak universal untuk semua penyerahan.
+
+Basis:
+
+- [PMK131_2024 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c853ed3c496865218892cf3c.
+- [PMK131_2024 article4 / (1) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:eb357e4b3237db5d08aa0e46.
+
+**VAT_SCOPE** — PMK131 yang diarsipkan menjelaskan PPN atas transaksi tertentu Barang Kena Pajak dan Jasa Kena Pajak, termasuk impor serta pemanfaatan dari luar negeri. dasar pengenaan pajak khusus dikecualikan dari mekanisme umum edisi ini; semua transaksi tidak otomatis diperlakukan sama.
+
+Basis:
+
+- [PMK131_2024 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:c853ed3c496865218892cf3c.
 - [PMK131_2024 article4 / (1) / PDF4](https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf#page=4), SHA bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd, fragment IDs: PMK131_2024:eb357e4b3237db5d08aa0e46.
 
 Blocked claims: VAT_JAN_TRANSITION (outside_requested_period); VAT_RATE (current_provision_currency_unconfirmed,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete).
@@ -2968,21 +4642,47 @@ Expected: No single rate; annual reconciliation and part-year details.
 
 Объяснения относятся к прочитанному архивному тексту; действующая применимость к компании не подтверждена.
 
-**PAYROLL_METHOD** — Архивный PMK168 различает обычные периоды и последний налоговый период постоянного сотрудника/пенсионера. Последний предусматривает сверку за год или часть года, а не повторение обычного TER. Нужны категория работника и период.
+**P21_SHORT_CONDITION** — Проверьте категорию получателя и налоговый период.
 
 Basis:
 
 - [PMK168_2023 article13 / (1),(2) / PDF14,15](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=14), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:84cffa9db5a9573cbb4658a0,PMK168_2023:db9949c7c54fcf9fb9719e2a.
 - [PMK168_2023 article15 / (1)-(3) / PDF15,16](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=15), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:3ba913a0416a5e3aa4ebea00,PMK168_2023:bea457a9e116ad7de2ac5bbc.
 
-**PAYROLL_BASE** — Архивный PMK168 связывает базу и удержание с категорией получателя и плательщика. Для объяснения нужны занятость, резидентство, валовой доход, PTKP и месяц; одной суммы зарплаты недостаточно для расчёта.
+**PAYROLL_METHOD** — Архивный PMK168 различает обычные периоды и последний налоговый период постоянного сотрудника/пенсионера. Последний предусматривает сверку за год или часть года, а не повторение удержания по месячной эффективной ставке. Нужны категория работника и период.
+
+Basis:
+
+- [PMK168_2023 article13 / (1),(2) / PDF14,15](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=14), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:84cffa9db5a9573cbb4658a0,PMK168_2023:db9949c7c54fcf9fb9719e2a.
+- [PMK168_2023 article15 / (1)-(3) / PDF15,16](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=15), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:3ba913a0416a5e3aa4ebea00,PMK168_2023:bea457a9e116ad7de2ac5bbc.
+
+**P21_ABBREVIATION** — Pajak Penghasilan Pasal 21
+
+Basis:
+
+- [PMK168_2023 article2 / (2) / PDF5,6](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=5), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:079306052df2707a31737092,PMK168_2023:5d7769d0404bd1a073946d49.
+
+**P21_SHORT_DEFINITION** — PPh21 — налог с определённых выплат физлицам за работу, услуги или участие в мероприятиях.
+
+Basis:
+
+- [PMK168_2023 article2 / (2) / PDF5,6](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=5), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:079306052df2707a31737092,PMK168_2023:5d7769d0404bd1a073946d49.
+- [PMK168_2023 article3 / (1)-(3) / PDF6,7](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=6), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:428ae9ea118f9570ae03f917,PMK168_2023:091ec07639e26511bd1e9aed.
+
+**P21_SHORT_MECHANISM** — Налог удерживает работодатель или другой указанный в правилах плательщик выплаты.
+
+Basis:
+
+- [PMK168_2023 article2 / (2) / PDF5,6](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=5), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:079306052df2707a31737092,PMK168_2023:5d7769d0404bd1a073946d49.
+
+**PAYROLL_BASE** — Для постоянных сотрудников и пенсионеров архивная статья8 различает валовой доход за месяц и облагаемый доход после разрешённых вычетов и необлагаемой части. Статья2 отдельно перечисляет плательщиков удержания и исключения; одной суммы зарплаты недостаточно для расчёта.
 
 Basis:
 
 - [PMK168_2023 article8 / (1) / PDF10,11](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=10), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:0190bbfd7037eba985d117db,PMK168_2023:8eb407100a11bd684b6b3648.
 - [PMK168_2023 article2 / (2) / PDF5,6](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=5), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:079306052df2707a31737092,PMK168_2023:5d7769d0404bd1a073946d49.
 
-**PAYROLL_SCOPE** — Архивный PMK168 описывает удержание PPh21 с выплат за работу, услуги или участие в деятельности установленными плательщиками. Категории плательщиков и исключения перечислены отдельно; это не налог только на зарплату.
+**PAYROLL_SCOPE** — Архивный PMK168 описывает удержание PPh21 с выплат за работу, услуги или участие в деятельности указанными в правилах плательщиками. Категории плательщиков и исключения перечислены отдельно; это не налог только на зарплату.
 
 Basis:
 
@@ -3011,14 +4711,40 @@ Expected: No single rate; annual reconciliation and part-year details.
 
 Explanations describe the read archived text; current company applicability is not established.
 
-**PAYROLL_METHOD** — Archived PMK168 distinguishes ordinary periods from the last tax period for a permanent employee/pensioner. The last period reconciles annual or part-year liability rather than simply repeating ordinary TER. Worker category and period are needed.
+**P21_SHORT_CONDITION** — Check the recipient category and tax period.
 
 Basis:
 
 - [PMK168_2023 article13 / (1),(2) / PDF14,15](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=14), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:84cffa9db5a9573cbb4658a0,PMK168_2023:db9949c7c54fcf9fb9719e2a.
 - [PMK168_2023 article15 / (1)-(3) / PDF15,16](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=15), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:3ba913a0416a5e3aa4ebea00,PMK168_2023:bea457a9e116ad7de2ac5bbc.
 
-**PAYROLL_BASE** — Archived PMK168 ties the base and withholding to recipient and payer categories. Employment, residency, gross income, PTKP and month are needed; a salary amount alone is insufficient for calculation.
+**PAYROLL_METHOD** — Archived PMK168 distinguishes ordinary periods from the last tax period for a permanent employee/pensioner. The last period reconciles annual or part-year liability rather than simply repeating withholding using an effective monthly rate. Worker category and period are needed.
+
+Basis:
+
+- [PMK168_2023 article13 / (1),(2) / PDF14,15](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=14), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:84cffa9db5a9573cbb4658a0,PMK168_2023:db9949c7c54fcf9fb9719e2a.
+- [PMK168_2023 article15 / (1)-(3) / PDF15,16](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=15), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:3ba913a0416a5e3aa4ebea00,PMK168_2023:bea457a9e116ad7de2ac5bbc.
+
+**P21_ABBREVIATION** — Pajak Penghasilan Pasal 21
+
+Basis:
+
+- [PMK168_2023 article2 / (2) / PDF5,6](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=5), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:079306052df2707a31737092,PMK168_2023:5d7769d0404bd1a073946d49.
+
+**P21_SHORT_DEFINITION** — PPh21 is tax on specified payments to individuals for work, services or activities.
+
+Basis:
+
+- [PMK168_2023 article2 / (2) / PDF5,6](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=5), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:079306052df2707a31737092,PMK168_2023:5d7769d0404bd1a073946d49.
+- [PMK168_2023 article3 / (1)-(3) / PDF6,7](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=6), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:428ae9ea118f9570ae03f917,PMK168_2023:091ec07639e26511bd1e9aed.
+
+**P21_SHORT_MECHANISM** — The employer or another designated payer withholds the tax.
+
+Basis:
+
+- [PMK168_2023 article2 / (2) / PDF5,6](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=5), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:079306052df2707a31737092,PMK168_2023:5d7769d0404bd1a073946d49.
+
+**PAYROLL_BASE** — For permanent employees and pensioners, archived Article8 distinguishes monthly gross income from taxable income after allowable deductions and the non-taxable allowance. Article2 separately lists designated payers and exclusions; a salary amount alone is insufficient for calculation.
 
 Basis:
 
@@ -3054,21 +4780,47 @@ Expected: No single rate; annual reconciliation and part-year details.
 
 Penjelasan menggambarkan teks arsip yang dibaca; penerapan terkini pada perusahaan belum ditetapkan.
 
-**PAYROLL_METHOD** — PMK168 yang diarsipkan membedakan masa biasa dan Masa Pajak Terakhir pegawai tetap/pensiunan. Masa terakhir merekonsiliasi pajak tahunan atau bagian tahun, bukan mengulang TER biasa. Diperlukan kategori pekerja dan periode.
+**P21_SHORT_CONDITION** — Periksa kategori penerima dan masa pajaknya.
 
 Basis:
 
 - [PMK168_2023 article13 / (1),(2) / PDF14,15](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=14), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:84cffa9db5a9573cbb4658a0,PMK168_2023:db9949c7c54fcf9fb9719e2a.
 - [PMK168_2023 article15 / (1)-(3) / PDF15,16](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=15), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:3ba913a0416a5e3aa4ebea00,PMK168_2023:bea457a9e116ad7de2ac5bbc.
 
-**PAYROLL_BASE** — PMK168 yang diarsipkan mengaitkan dasar dan pemotongan dengan kategori penerima serta pembayar. Diperlukan pekerjaan, domisili, bruto, PTKP dan bulan; angka gaji saja tidak cukup untuk menghitung.
+**PAYROLL_METHOD** — PMK168 yang diarsipkan membedakan masa biasa dan Masa Pajak Terakhir pegawai tetap/pensiunan. Masa terakhir merekonsiliasi pajak tahunan atau bagian tahun, bukan mengulang pemotongan dengan tarif efektif bulanan. Diperlukan kategori pekerja dan periode.
+
+Basis:
+
+- [PMK168_2023 article13 / (1),(2) / PDF14,15](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=14), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:84cffa9db5a9573cbb4658a0,PMK168_2023:db9949c7c54fcf9fb9719e2a.
+- [PMK168_2023 article15 / (1)-(3) / PDF15,16](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=15), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:3ba913a0416a5e3aa4ebea00,PMK168_2023:bea457a9e116ad7de2ac5bbc.
+
+**P21_ABBREVIATION** — Pajak Penghasilan Pasal 21
+
+Basis:
+
+- [PMK168_2023 article2 / (2) / PDF5,6](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=5), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:079306052df2707a31737092,PMK168_2023:5d7769d0404bd1a073946d49.
+
+**P21_SHORT_DEFINITION** — PPh21 adalah pajak atas pembayaran tertentu kepada orang pribadi terkait pekerjaan, jasa atau kegiatan.
+
+Basis:
+
+- [PMK168_2023 article2 / (2) / PDF5,6](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=5), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:079306052df2707a31737092,PMK168_2023:5d7769d0404bd1a073946d49.
+- [PMK168_2023 article3 / (1)-(3) / PDF6,7](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=6), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:428ae9ea118f9570ae03f917,PMK168_2023:091ec07639e26511bd1e9aed.
+
+**P21_SHORT_MECHANISM** — Pemberi kerja atau pembayar yang ditentukan memotong pajak dari pembayaran.
+
+Basis:
+
+- [PMK168_2023 article2 / (2) / PDF5,6](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=5), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:079306052df2707a31737092,PMK168_2023:5d7769d0404bd1a073946d49.
+
+**PAYROLL_BASE** — Untuk pegawai tetap dan pensiunan, Pasal8 yang diarsipkan membedakan penghasilan bruto bulanan dan penghasilan kena pajak setelah pengurangan yang diperbolehkan serta bagian tidak kena pajak. Pasal2 memuat pembayar yang wajib memotong pajak dan pengecualian; angka gaji saja tidak cukup untuk menghitung.
 
 Basis:
 
 - [PMK168_2023 article8 / (1) / PDF10,11](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=10), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:0190bbfd7037eba985d117db,PMK168_2023:8eb407100a11bd684b6b3648.
 - [PMK168_2023 article2 / (2) / PDF5,6](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=5), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:079306052df2707a31737092,PMK168_2023:5d7769d0404bd1a073946d49.
 
-**PAYROLL_SCOPE** — PMK168 yang diarsipkan menjelaskan pemotongan PPh21 atas pembayaran terkait pekerjaan, jasa atau kegiatan oleh pemotong yang ditentukan. Kategori pemotong dan pengecualian diatur tersendiri; cakupannya bukan hanya gaji.
+**PAYROLL_SCOPE** — PMK168 yang diarsipkan menjelaskan pemotongan PPh21 atas pembayaran terkait pekerjaan, jasa atau kegiatan oleh pembayar yang ditentukan untuk memotong pajak dari pembayaran. Kategori pembayar yang wajib memotong pajak dan pengecualian diatur tersendiri; cakupannya bukan hanya gaji.
 
 Basis:
 
@@ -3097,20 +4849,46 @@ Expected: Ask status/category/period; table lookup not certified.
 
 Объяснения относятся к прочитанному архивному тексту; действующая применимость к компании не подтверждена.
 
-**PAYROLL_BASE** — Архивный PMK168 связывает базу и удержание с категорией получателя и плательщика. Для объяснения нужны занятость, резидентство, валовой доход, PTKP и месяц; одной суммы зарплаты недостаточно для расчёта.
+**P21_ABBREVIATION** — Pajak Penghasilan Pasal 21
+
+Basis:
+
+- [PMK168_2023 article2 / (2) / PDF5,6](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=5), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:079306052df2707a31737092,PMK168_2023:5d7769d0404bd1a073946d49.
+
+**P21_SHORT_DEFINITION** — PPh21 — налог с определённых выплат физлицам за работу, услуги или участие в мероприятиях.
+
+Basis:
+
+- [PMK168_2023 article2 / (2) / PDF5,6](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=5), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:079306052df2707a31737092,PMK168_2023:5d7769d0404bd1a073946d49.
+- [PMK168_2023 article3 / (1)-(3) / PDF6,7](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=6), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:428ae9ea118f9570ae03f917,PMK168_2023:091ec07639e26511bd1e9aed.
+
+**P21_SHORT_MECHANISM** — Налог удерживает работодатель или другой указанный в правилах плательщик выплаты.
+
+Basis:
+
+- [PMK168_2023 article2 / (2) / PDF5,6](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=5), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:079306052df2707a31737092,PMK168_2023:5d7769d0404bd1a073946d49.
+
+**PAYROLL_BASE** — Для постоянных сотрудников и пенсионеров архивная статья8 различает валовой доход за месяц и облагаемый доход после разрешённых вычетов и необлагаемой части. Статья2 отдельно перечисляет плательщиков удержания и исключения; одной суммы зарплаты недостаточно для расчёта.
 
 Basis:
 
 - [PMK168_2023 article8 / (1) / PDF10,11](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=10), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:0190bbfd7037eba985d117db,PMK168_2023:8eb407100a11bd684b6b3648.
 - [PMK168_2023 article2 / (2) / PDF5,6](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=5), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:079306052df2707a31737092,PMK168_2023:5d7769d0404bd1a073946d49.
 
-**PAYROLL_SCOPE** — Архивный PMK168 описывает удержание PPh21 с выплат за работу, услуги или участие в деятельности установленными плательщиками. Категории плательщиков и исключения перечислены отдельно; это не налог только на зарплату.
+**PAYROLL_SCOPE** — Архивный PMK168 описывает удержание PPh21 с выплат за работу, услуги или участие в деятельности указанными в правилах плательщиками. Категории плательщиков и исключения перечислены отдельно; это не налог только на зарплату.
 
 Basis:
 
 - [PMK168_2023 article2 / (2) / PDF5,6](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=5), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:079306052df2707a31737092,PMK168_2023:5d7769d0404bd1a073946d49.
 
-**PAYROLL_METHOD** — Архивный PMK168 различает обычные периоды и последний налоговый период постоянного сотрудника/пенсионера. Последний предусматривает сверку за год или часть года, а не повторение обычного TER. Нужны категория работника и период.
+**P21_SHORT_CONDITION** — Проверьте категорию получателя и налоговый период.
+
+Basis:
+
+- [PMK168_2023 article13 / (1),(2) / PDF14,15](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=14), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:84cffa9db5a9573cbb4658a0,PMK168_2023:db9949c7c54fcf9fb9719e2a.
+- [PMK168_2023 article15 / (1)-(3) / PDF15,16](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=15), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:3ba913a0416a5e3aa4ebea00,PMK168_2023:bea457a9e116ad7de2ac5bbc.
+
+**PAYROLL_METHOD** — Архивный PMK168 различает обычные периоды и последний налоговый период постоянного сотрудника/пенсионера. Последний предусматривает сверку за год или часть года, а не повторение удержания по месячной эффективной ставке. Нужны категория работника и период.
 
 Basis:
 
@@ -3140,7 +4918,26 @@ Expected: Ask status/category/period; table lookup not certified.
 
 Explanations describe the read archived text; current company applicability is not established.
 
-**PAYROLL_BASE** — Archived PMK168 ties the base and withholding to recipient and payer categories. Employment, residency, gross income, PTKP and month are needed; a salary amount alone is insufficient for calculation.
+**P21_ABBREVIATION** — Pajak Penghasilan Pasal 21
+
+Basis:
+
+- [PMK168_2023 article2 / (2) / PDF5,6](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=5), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:079306052df2707a31737092,PMK168_2023:5d7769d0404bd1a073946d49.
+
+**P21_SHORT_DEFINITION** — PPh21 is tax on specified payments to individuals for work, services or activities.
+
+Basis:
+
+- [PMK168_2023 article2 / (2) / PDF5,6](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=5), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:079306052df2707a31737092,PMK168_2023:5d7769d0404bd1a073946d49.
+- [PMK168_2023 article3 / (1)-(3) / PDF6,7](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=6), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:428ae9ea118f9570ae03f917,PMK168_2023:091ec07639e26511bd1e9aed.
+
+**P21_SHORT_MECHANISM** — The employer or another designated payer withholds the tax.
+
+Basis:
+
+- [PMK168_2023 article2 / (2) / PDF5,6](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=5), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:079306052df2707a31737092,PMK168_2023:5d7769d0404bd1a073946d49.
+
+**PAYROLL_BASE** — For permanent employees and pensioners, archived Article8 distinguishes monthly gross income from taxable income after allowable deductions and the non-taxable allowance. Article2 separately lists designated payers and exclusions; a salary amount alone is insufficient for calculation.
 
 Basis:
 
@@ -3153,7 +4950,14 @@ Basis:
 
 - [PMK168_2023 article2 / (2) / PDF5,6](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=5), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:079306052df2707a31737092,PMK168_2023:5d7769d0404bd1a073946d49.
 
-**PAYROLL_METHOD** — Archived PMK168 distinguishes ordinary periods from the last tax period for a permanent employee/pensioner. The last period reconciles annual or part-year liability rather than simply repeating ordinary TER. Worker category and period are needed.
+**P21_SHORT_CONDITION** — Check the recipient category and tax period.
+
+Basis:
+
+- [PMK168_2023 article13 / (1),(2) / PDF14,15](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=14), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:84cffa9db5a9573cbb4658a0,PMK168_2023:db9949c7c54fcf9fb9719e2a.
+- [PMK168_2023 article15 / (1)-(3) / PDF15,16](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=15), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:3ba913a0416a5e3aa4ebea00,PMK168_2023:bea457a9e116ad7de2ac5bbc.
+
+**PAYROLL_METHOD** — Archived PMK168 distinguishes ordinary periods from the last tax period for a permanent employee/pensioner. The last period reconciles annual or part-year liability rather than simply repeating withholding using an effective monthly rate. Worker category and period are needed.
 
 Basis:
 
@@ -3183,20 +4987,46 @@ Expected: Ask status/category/period; table lookup not certified.
 
 Penjelasan menggambarkan teks arsip yang dibaca; penerapan terkini pada perusahaan belum ditetapkan.
 
-**PAYROLL_BASE** — PMK168 yang diarsipkan mengaitkan dasar dan pemotongan dengan kategori penerima serta pembayar. Diperlukan pekerjaan, domisili, bruto, PTKP dan bulan; angka gaji saja tidak cukup untuk menghitung.
+**P21_ABBREVIATION** — Pajak Penghasilan Pasal 21
+
+Basis:
+
+- [PMK168_2023 article2 / (2) / PDF5,6](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=5), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:079306052df2707a31737092,PMK168_2023:5d7769d0404bd1a073946d49.
+
+**P21_SHORT_DEFINITION** — PPh21 adalah pajak atas pembayaran tertentu kepada orang pribadi terkait pekerjaan, jasa atau kegiatan.
+
+Basis:
+
+- [PMK168_2023 article2 / (2) / PDF5,6](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=5), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:079306052df2707a31737092,PMK168_2023:5d7769d0404bd1a073946d49.
+- [PMK168_2023 article3 / (1)-(3) / PDF6,7](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=6), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:428ae9ea118f9570ae03f917,PMK168_2023:091ec07639e26511bd1e9aed.
+
+**P21_SHORT_MECHANISM** — Pemberi kerja atau pembayar yang ditentukan memotong pajak dari pembayaran.
+
+Basis:
+
+- [PMK168_2023 article2 / (2) / PDF5,6](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=5), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:079306052df2707a31737092,PMK168_2023:5d7769d0404bd1a073946d49.
+
+**PAYROLL_BASE** — Untuk pegawai tetap dan pensiunan, Pasal8 yang diarsipkan membedakan penghasilan bruto bulanan dan penghasilan kena pajak setelah pengurangan yang diperbolehkan serta bagian tidak kena pajak. Pasal2 memuat pembayar yang wajib memotong pajak dan pengecualian; angka gaji saja tidak cukup untuk menghitung.
 
 Basis:
 
 - [PMK168_2023 article8 / (1) / PDF10,11](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=10), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:0190bbfd7037eba985d117db,PMK168_2023:8eb407100a11bd684b6b3648.
 - [PMK168_2023 article2 / (2) / PDF5,6](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=5), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:079306052df2707a31737092,PMK168_2023:5d7769d0404bd1a073946d49.
 
-**PAYROLL_SCOPE** — PMK168 yang diarsipkan menjelaskan pemotongan PPh21 atas pembayaran terkait pekerjaan, jasa atau kegiatan oleh pemotong yang ditentukan. Kategori pemotong dan pengecualian diatur tersendiri; cakupannya bukan hanya gaji.
+**PAYROLL_SCOPE** — PMK168 yang diarsipkan menjelaskan pemotongan PPh21 atas pembayaran terkait pekerjaan, jasa atau kegiatan oleh pembayar yang ditentukan untuk memotong pajak dari pembayaran. Kategori pembayar yang wajib memotong pajak dan pengecualian diatur tersendiri; cakupannya bukan hanya gaji.
 
 Basis:
 
 - [PMK168_2023 article2 / (2) / PDF5,6](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=5), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:079306052df2707a31737092,PMK168_2023:5d7769d0404bd1a073946d49.
 
-**PAYROLL_METHOD** — PMK168 yang diarsipkan membedakan masa biasa dan Masa Pajak Terakhir pegawai tetap/pensiunan. Masa terakhir merekonsiliasi pajak tahunan atau bagian tahun, bukan mengulang TER biasa. Diperlukan kategori pekerja dan periode.
+**P21_SHORT_CONDITION** — Periksa kategori penerima dan masa pajaknya.
+
+Basis:
+
+- [PMK168_2023 article13 / (1),(2) / PDF14,15](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=14), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:84cffa9db5a9573cbb4658a0,PMK168_2023:db9949c7c54fcf9fb9719e2a.
+- [PMK168_2023 article15 / (1)-(3) / PDF15,16](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=15), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:3ba913a0416a5e3aa4ebea00,PMK168_2023:bea457a9e116ad7de2ac5bbc.
+
+**PAYROLL_METHOD** — PMK168 yang diarsipkan membedakan masa biasa dan Masa Pajak Terakhir pegawai tetap/pensiunan. Masa terakhir merekonsiliasi pajak tahunan atau bagian tahun, bukan mengulang pemotongan dengan tarif efektif bulanan. Diperlukan kategori pekerja dan periode.
 
 Basis:
 
@@ -3226,14 +5056,66 @@ Expected: Citizenship not tax residency; treaty and BUT cannot be assumed.
 
 Объяснения относятся к прочитанному архивному тексту; действующая применимость к компании не подтверждена.
 
-**FOREIGN_SCOPE** — Архивные положения связывают PPh26 с налоговым нерезидентством, видами дохода и BUT; для отдельных доходов физлиц указан договорный порядок. Иностранное гражданство не доказывает нерезидентство или право на льготу договора; нужны страна и документы получателя.
+**FOREIGN_SCOPE** — Архивные положения связывают PPh26 с налоговым нерезидентством, видами дохода и постоянным представительством бизнеса в Индонезии; для отдельных доходов физлиц указан договорный порядок. Иностранное гражданство не доказывает нерезидентство или право на льготу договора; нужны страна и документы получателя.
 
 Basis:
 
 - [DJP_SDSN_2023 article26 / (1),(1a) / PDF242,243](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=242), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:e655047bb04b860b0f3c09f1,DJP_SDSN_2023:bb9850469efe7f14353b0c18.
 - [PMK168_2023 article14 / (1)-(3) / PDF15](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=15), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:482ff0a5ee73820f9132f8ff.
 
-**SERVICE_EXCEPTIONS** — Архивный PMK141 исключает из jasa lain услуги, уже подпадающие под PPh21, и отдельно финально облагаемые доходы. PMK168 отдельно описывает платежи физлицам за услуги; нужно выяснить тип и резидентство получателя, а не судить по названию инвойса.
+**P23_ABBREVIATION** — Pajak Penghasilan Pasal 23
+
+Basis:
+
+- [DJP_SDSN_2023 article23 / (1)(a),(c) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+
+**P23_SHORT_CONDITION** — Для прочих услуг проверьте исключения: выплаты по PPh21 и отдельному финальному налогу.
+
+Basis:
+
+- [PMK141_2015 article1 / (1),(2) / PDF2,3,4,5,6](https://jdih.kemenkeu.go.id/api/download/fulltext/2015/141~PMK.03~2015Per.pdf#page=2), SHA cd107a9b7de8ad12b6eff1e3cf64f512b712f63ce58e62b3dba2a35d6ccbf1f4, fragment IDs: PMK141_2015:b9daaac005c09472f564f133,PMK141_2015:0d4c687551245d61dec6a5a1,PMK141_2015:ce21c53c5bc11f1fda4ab333,PMK141_2015:f4ebe3b18b5d0fdc6a4ad52a,PMK141_2015:a9949937f09c37d1cf2a5807.
+- [PMK168_2023 article2 / (2)(d) / PDF5,6](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=5), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:079306052df2707a31737092,PMK168_2023:5d7769d0404bd1a073946d49.
+
+**P23_SHORT_DEFINITION** — PPh23 — удержание налога с перечисленных доходов, включая отдельные услуги и аренду имущества.
+
+Basis:
+
+- [DJP_SDSN_2023 article23 / (1)(a),(c) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+
+**P23_SHORT_MECHANISM** — Налог удерживает указанный в правилах плательщик дохода.
+
+Basis:
+
+- [DJP_SDSN_2023 article23 / (1)(a),(c) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+
+**P26_ABBREVIATION** — Pajak Penghasilan Pasal 26
+
+Basis:
+
+- [DJP_SDSN_2023 article26 / (1),(1a) / PDF242,243](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=242), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:e655047bb04b860b0f3c09f1,DJP_SDSN_2023:bb9850469efe7f14353b0c18.
+- [PMK168_2023 article14 / (1)-(3) / PDF15](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=15), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:482ff0a5ee73820f9132f8ff.
+
+**P26_SHORT_CONDITION** — Проверьте налоговое резидентство и вид дохода; гражданства недостаточно.
+
+Basis:
+
+- [DJP_SDSN_2023 article26 / (1),(1a) / PDF242,243](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=242), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:e655047bb04b860b0f3c09f1,DJP_SDSN_2023:bb9850469efe7f14353b0c18.
+- [PMK168_2023 article14 / (1)-(3) / PDF15](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=15), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:482ff0a5ee73820f9132f8ff.
+
+**P26_SHORT_DEFINITION** — PPh26 — налог на определённые доходы налоговых нерезидентов.
+
+Basis:
+
+- [DJP_SDSN_2023 article26 / (1),(1a) / PDF242,243](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=242), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:e655047bb04b860b0f3c09f1,DJP_SDSN_2023:bb9850469efe7f14353b0c18.
+- [PMK168_2023 article14 / (1)-(3) / PDF15](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=15), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:482ff0a5ee73820f9132f8ff.
+
+**P26_SHORT_MECHANISM** — По перечисленным выплатам нерезидентам, кроме постоянных представительств бизнеса в Индонезии, налог удерживает указанный плательщик.
+
+Basis:
+
+- [DJP_SDSN_2023 article26 / (1),(1a) / PDF242,243](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=242), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:e655047bb04b860b0f3c09f1,DJP_SDSN_2023:bb9850469efe7f14353b0c18.
+
+**SERVICE_EXCEPTIONS** — Архивный PMK141 исключает из категории прочих услуг услуги, уже подпадающие под PPh21, и отдельно финально облагаемые доходы. PMK168 отдельно описывает платежи физлицам за услуги; нужно выяснить тип и резидентство получателя, а не судить по названию инвойса.
 
 Basis:
 
@@ -3244,7 +5126,7 @@ Basis:
 
 Basis:
 
-- [DJP_SDSN_2023 article23 / (1a),(4) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+- [DJP_SDSN_2023 article23 / (1)(a),(c) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
 
 **SERVICE_REIMBURSEMENT** — По архивному PMK141 исключение некоторых выплат за материалы или третьим лицам из базы требует перечисленных доказательств. Без доказательств база охватывает весь соответствующий платёж без PPN; возмещение не вычитается автоматически.
 
@@ -3256,7 +5138,7 @@ Basis:
 
 Basis:
 
-- [DJP_SDSN_2023 article23 / (1a),(4) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+- [DJP_SDSN_2023 article23 / (1)(a),(c) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
 
 Blocked claims: FOREIGN_RATE (provision_dates_unconfirmed,current_provision_currency_unconfirmed,dependency_source_missing); SERVICE_RATE (current_provision_currency_unconfirmed,amendment_review_incomplete).
 
@@ -3286,12 +5168,64 @@ Expected: Citizenship not tax residency; treaty and BUT cannot be assumed.
 
 Explanations describe the read archived text; current company applicability is not established.
 
-**FOREIGN_SCOPE** — The archived provisions tie PPh26 to tax non-residency, income category and BUT; treaty treatment is referenced for specified individual income. Foreign citizenship does not establish tax non-residency or treaty entitlement; recipient country and documents are needed.
+**FOREIGN_SCOPE** — The archived provisions tie PPh26 to tax non-residency, income category and a permanent business establishment in Indonesia; treaty treatment is referenced for specified individual income. Foreign citizenship does not establish tax non-residency or treaty entitlement; recipient country and documents are needed.
 
 Basis:
 
 - [DJP_SDSN_2023 article26 / (1),(1a) / PDF242,243](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=242), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:e655047bb04b860b0f3c09f1,DJP_SDSN_2023:bb9850469efe7f14353b0c18.
 - [PMK168_2023 article14 / (1)-(3) / PDF15](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=15), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:482ff0a5ee73820f9132f8ff.
+
+**P23_ABBREVIATION** — Pajak Penghasilan Pasal 23
+
+Basis:
+
+- [DJP_SDSN_2023 article23 / (1)(a),(c) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+
+**P23_SHORT_CONDITION** — For the other-services category, check exclusions for payments covered by PPh21 or a separate final tax.
+
+Basis:
+
+- [PMK141_2015 article1 / (1),(2) / PDF2,3,4,5,6](https://jdih.kemenkeu.go.id/api/download/fulltext/2015/141~PMK.03~2015Per.pdf#page=2), SHA cd107a9b7de8ad12b6eff1e3cf64f512b712f63ce58e62b3dba2a35d6ccbf1f4, fragment IDs: PMK141_2015:b9daaac005c09472f564f133,PMK141_2015:0d4c687551245d61dec6a5a1,PMK141_2015:ce21c53c5bc11f1fda4ab333,PMK141_2015:f4ebe3b18b5d0fdc6a4ad52a,PMK141_2015:a9949937f09c37d1cf2a5807.
+- [PMK168_2023 article2 / (2)(d) / PDF5,6](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=5), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:079306052df2707a31737092,PMK168_2023:5d7769d0404bd1a073946d49.
+
+**P23_SHORT_DEFINITION** — PPh23 is tax withholding on listed income, including specified services and property rental.
+
+Basis:
+
+- [DJP_SDSN_2023 article23 / (1)(a),(c) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+
+**P23_SHORT_MECHANISM** — The designated income payer withholds the tax.
+
+Basis:
+
+- [DJP_SDSN_2023 article23 / (1)(a),(c) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+
+**P26_ABBREVIATION** — Pajak Penghasilan Pasal 26
+
+Basis:
+
+- [DJP_SDSN_2023 article26 / (1),(1a) / PDF242,243](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=242), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:e655047bb04b860b0f3c09f1,DJP_SDSN_2023:bb9850469efe7f14353b0c18.
+- [PMK168_2023 article14 / (1)-(3) / PDF15](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=15), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:482ff0a5ee73820f9132f8ff.
+
+**P26_SHORT_CONDITION** — Check tax residency and income type; citizenship alone is insufficient.
+
+Basis:
+
+- [DJP_SDSN_2023 article26 / (1),(1a) / PDF242,243](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=242), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:e655047bb04b860b0f3c09f1,DJP_SDSN_2023:bb9850469efe7f14353b0c18.
+- [PMK168_2023 article14 / (1)-(3) / PDF15](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=15), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:482ff0a5ee73820f9132f8ff.
+
+**P26_SHORT_DEFINITION** — PPh26 is tax on specified income of tax non-residents.
+
+Basis:
+
+- [DJP_SDSN_2023 article26 / (1),(1a) / PDF242,243](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=242), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:e655047bb04b860b0f3c09f1,DJP_SDSN_2023:bb9850469efe7f14353b0c18.
+- [PMK168_2023 article14 / (1)-(3) / PDF15](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=15), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:482ff0a5ee73820f9132f8ff.
+
+**P26_SHORT_MECHANISM** — For listed payments to non-residents other than permanent business establishments in Indonesia, the designated payer withholds tax.
+
+Basis:
+
+- [DJP_SDSN_2023 article26 / (1),(1a) / PDF242,243](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=242), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:e655047bb04b860b0f3c09f1,DJP_SDSN_2023:bb9850469efe7f14353b0c18.
 
 **SERVICE_EXCEPTIONS** — The archived PMK141 excludes services already subject to PPh21 and separately final-taxed income from its other-services branch. PMK168 separately describes payments for individual services; establish recipient type and residency rather than infer them from the invoice name.
 
@@ -3304,7 +5238,7 @@ Basis:
 
 Basis:
 
-- [DJP_SDSN_2023 article23 / (1a),(4) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+- [DJP_SDSN_2023 article23 / (1)(a),(c) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
 
 **SERVICE_REIMBURSEMENT** — Under the archived PMK141, excluding specified material or third-party payments from the base requires listed evidence. Without it the relevant total payment excluding PPN is the base; reimbursement is not automatically deductible.
 
@@ -3316,7 +5250,7 @@ Basis:
 
 Basis:
 
-- [DJP_SDSN_2023 article23 / (1a),(4) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+- [DJP_SDSN_2023 article23 / (1)(a),(c) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
 
 Blocked claims: FOREIGN_RATE (provision_dates_unconfirmed,current_provision_currency_unconfirmed,dependency_source_missing); SERVICE_RATE (current_provision_currency_unconfirmed,amendment_review_incomplete).
 
@@ -3346,12 +5280,64 @@ Expected: Citizenship not tax residency; treaty and BUT cannot be assumed.
 
 Penjelasan menggambarkan teks arsip yang dibaca; penerapan terkini pada perusahaan belum ditetapkan.
 
-**FOREIGN_SCOPE** — Ketentuan yang diarsipkan mengaitkan PPh26 dengan status pajak luar negeri, jenis penghasilan dan BUT; penerapan P3B dirujuk untuk penghasilan orang pribadi tertentu. Kewarganegaraan asing tidak membuktikan status luar negeri atau hak P3B; diperlukan negara dan dokumen penerima.
+**FOREIGN_SCOPE** — Ketentuan yang diarsipkan mengaitkan PPh26 dengan status pajak luar negeri, jenis penghasilan dan bentuk usaha tetap di Indonesia; penerapan perjanjian penghindaran pajak berganda dirujuk untuk penghasilan orang pribadi tertentu. Kewarganegaraan asing tidak membuktikan status luar negeri atau hak perjanjian penghindaran pajak berganda; diperlukan negara dan dokumen penerima.
 
 Basis:
 
 - [DJP_SDSN_2023 article26 / (1),(1a) / PDF242,243](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=242), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:e655047bb04b860b0f3c09f1,DJP_SDSN_2023:bb9850469efe7f14353b0c18.
 - [PMK168_2023 article14 / (1)-(3) / PDF15](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=15), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:482ff0a5ee73820f9132f8ff.
+
+**P23_ABBREVIATION** — Pajak Penghasilan Pasal 23
+
+Basis:
+
+- [DJP_SDSN_2023 article23 / (1)(a),(c) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+
+**P23_SHORT_CONDITION** — Untuk kategori jasa lain, periksa pengecualian pembayaran yang tercakup PPh21 atau pajak final tersendiri.
+
+Basis:
+
+- [PMK141_2015 article1 / (1),(2) / PDF2,3,4,5,6](https://jdih.kemenkeu.go.id/api/download/fulltext/2015/141~PMK.03~2015Per.pdf#page=2), SHA cd107a9b7de8ad12b6eff1e3cf64f512b712f63ce58e62b3dba2a35d6ccbf1f4, fragment IDs: PMK141_2015:b9daaac005c09472f564f133,PMK141_2015:0d4c687551245d61dec6a5a1,PMK141_2015:ce21c53c5bc11f1fda4ab333,PMK141_2015:f4ebe3b18b5d0fdc6a4ad52a,PMK141_2015:a9949937f09c37d1cf2a5807.
+- [PMK168_2023 article2 / (2)(d) / PDF5,6](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=5), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:079306052df2707a31737092,PMK168_2023:5d7769d0404bd1a073946d49.
+
+**P23_SHORT_DEFINITION** — PPh23 adalah pemotongan pajak atas penghasilan yang tercantum, termasuk jasa tertentu dan sewa harta.
+
+Basis:
+
+- [DJP_SDSN_2023 article23 / (1)(a),(c) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+
+**P23_SHORT_MECHANISM** — Pembayar yang ditentukan memotong pajak dari pembayaran.
+
+Basis:
+
+- [DJP_SDSN_2023 article23 / (1)(a),(c) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+
+**P26_ABBREVIATION** — Pajak Penghasilan Pasal 26
+
+Basis:
+
+- [DJP_SDSN_2023 article26 / (1),(1a) / PDF242,243](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=242), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:e655047bb04b860b0f3c09f1,DJP_SDSN_2023:bb9850469efe7f14353b0c18.
+- [PMK168_2023 article14 / (1)-(3) / PDF15](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=15), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:482ff0a5ee73820f9132f8ff.
+
+**P26_SHORT_CONDITION** — Periksa status pajak dan jenis penghasilan; kewarganegaraan saja tidak cukup.
+
+Basis:
+
+- [DJP_SDSN_2023 article26 / (1),(1a) / PDF242,243](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=242), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:e655047bb04b860b0f3c09f1,DJP_SDSN_2023:bb9850469efe7f14353b0c18.
+- [PMK168_2023 article14 / (1)-(3) / PDF15](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=15), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:482ff0a5ee73820f9132f8ff.
+
+**P26_SHORT_DEFINITION** — PPh26 adalah pajak atas penghasilan tertentu wajib pajak luar negeri.
+
+Basis:
+
+- [DJP_SDSN_2023 article26 / (1),(1a) / PDF242,243](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=242), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:e655047bb04b860b0f3c09f1,DJP_SDSN_2023:bb9850469efe7f14353b0c18.
+- [PMK168_2023 article14 / (1)-(3) / PDF15](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=15), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:482ff0a5ee73820f9132f8ff.
+
+**P26_SHORT_MECHANISM** — Atas pembayaran yang tercantum kepada wajib pajak luar negeri selain bentuk usaha tetap di Indonesia, pembayar yang ditentukan memotong pajak.
+
+Basis:
+
+- [DJP_SDSN_2023 article26 / (1),(1a) / PDF242,243](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=242), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:e655047bb04b860b0f3c09f1,DJP_SDSN_2023:bb9850469efe7f14353b0c18.
 
 **SERVICE_EXCEPTIONS** — PMK141 yang diarsipkan mengecualikan jasa yang telah dipotong PPh21 dan penghasilan final tersendiri dari cabang jasa lain. PMK168 menjelaskan pembayaran jasa orang pribadi secara terpisah; pastikan jenis dan domisili penerima, bukan hanya nama invoice.
 
@@ -3364,9 +5350,9 @@ Basis:
 
 Basis:
 
-- [DJP_SDSN_2023 article23 / (1a),(4) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+- [DJP_SDSN_2023 article23 / (1)(a),(c) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
 
-**SERVICE_REIMBURSEMENT** — Menurut PMK141 yang diarsipkan, pengecualian pembayaran material atau pihak ketiga tertentu dari dasar memerlukan bukti yang ditentukan. Tanpa bukti seluruh pembayaran terkait selain PPN menjadi dasar; reimbursement tidak otomatis dikecualikan.
+**SERVICE_REIMBURSEMENT** — Menurut PMK141 yang diarsipkan, pengecualian pembayaran material atau pihak ketiga tertentu dari dasar memerlukan bukti yang ditentukan. Tanpa bukti seluruh pembayaran terkait selain PPN menjadi dasar; penggantian biaya tidak otomatis dikecualikan.
 
 Basis:
 
@@ -3376,7 +5362,7 @@ Basis:
 
 Basis:
 
-- [DJP_SDSN_2023 article23 / (1a),(4) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+- [DJP_SDSN_2023 article23 / (1)(a),(c) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
 
 Blocked claims: FOREIGN_RATE (provision_dates_unconfirmed,current_provision_currency_unconfirmed,dependency_source_missing); SERVICE_RATE (current_provision_currency_unconfirmed,amendment_review_incomplete).
 
@@ -3406,18 +5392,63 @@ Expected: Advance versus annual underpayment; no turnover-based calculation.
 
 Объяснения относятся к прочитанному архивному тексту; действующая применимость к компании не подтверждена.
 
-**ANNUAL_UNDERPAYMENT** — Архивные положения отличают годовую недоплату PPh29 от авансов PPh25: недоплата связана с годовым налогом после допустимых кредитов и подачей SPT. Действующий срок и сумма для компании требуют отдельного подтверждения.
+**ANNUAL_UNDERPAYMENT** — Архивные положения отличают годовую недоплату PPh29 от авансов PPh25: недоплата связана с годовым налогом после допустимых кредитов и подачей налоговой декларации. Действующий срок и сумма для компании требуют отдельного подтверждения.
 
 Basis:
 
 - [DJP_SDSN_2023 article29 / whole / PDF249](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=249), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:f99c92b4a6de58bc56539846.
 - [PMK81_2024 article95 / (1) / PDF80](https://jdih.kemenkeu.go.id/api/download/637047be-3dba-4347-aba1-98fa7fd5ab3f/2024pmkeuangan081.pdf#page=80), SHA b8f385dee2a8684c24f718c5b2413910760d7273236f9d0d27d2da4cf2892574, fragment IDs: PMK81_2024:32b7aa7a3c8f07d64484d632.
 
-**INSTALLMENT_METHOD** — Архивная статья25 описывает авансы на основе прошлогоднего SPT и допустимых кредитов, а также особые случаи. Это не произвольно выбранный процент оборота.
+**INSTALLMENT_METHOD** — Архивная статья25 описывает авансы на основе прошлогодней налоговой декларации и допустимых кредитов, а также особые случаи. Это не произвольно выбранный процент оборота.
 
 Basis:
 
 - [DJP_SDSN_2023 article25 / (1),(6),(7) / PDF236,237](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=236), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:84f4c2479c66a14d8343cfc2,DJP_SDSN_2023:97e4e9b310b2cf591a13e6db.
+
+**P25_ABBREVIATION** — Pajak Penghasilan Pasal 25
+
+Basis:
+
+- [DJP_SDSN_2023 article25 / (1),(6),(7) / PDF236,237](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=236), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:84f4c2479c66a14d8343cfc2,DJP_SDSN_2023:97e4e9b310b2cf591a13e6db.
+
+**P25_SHORT_CONDITION** — Проверьте, не действует ли специальный порядок расчёта.
+
+Basis:
+
+- [DJP_SDSN_2023 article25 / (1),(6),(7) / PDF236,237](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=236), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:84f4c2479c66a14d8343cfc2,DJP_SDSN_2023:97e4e9b310b2cf591a13e6db.
+
+**P25_SHORT_DEFINITION** — PPh25 — авансовые платежи по налогу на доход за текущий год.
+
+Basis:
+
+- [DJP_SDSN_2023 article25 / (1),(6),(7) / PDF236,237](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=236), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:84f4c2479c66a14d8343cfc2,DJP_SDSN_2023:97e4e9b310b2cf591a13e6db.
+
+**P25_SHORT_MECHANISM** — Налогоплательщик платит сам; обычная база — прошлогодняя декларация с учётом допустимых зачётов.
+
+Basis:
+
+- [DJP_SDSN_2023 article25 / (1),(6),(7) / PDF236,237](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=236), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:84f4c2479c66a14d8343cfc2,DJP_SDSN_2023:97e4e9b310b2cf591a13e6db.
+
+**P29_ABBREVIATION** — Pajak Penghasilan Pasal 29
+
+Basis:
+
+- [DJP_SDSN_2023 article29 / whole / PDF249](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=249), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:f99c92b4a6de58bc56539846.
+- [PMK81_2024 article95 / (1) / PDF80](https://jdih.kemenkeu.go.id/api/download/637047be-3dba-4347-aba1-98fa7fd5ab3f/2024pmkeuangan081.pdf#page=80), SHA b8f385dee2a8684c24f718c5b2413910760d7273236f9d0d27d2da4cf2892574, fragment IDs: PMK81_2024:32b7aa7a3c8f07d64484d632.
+
+**P29_SHORT_CONDITION** — Проверьте годовой налог и суммы, разрешённые к зачёту.
+
+Basis:
+
+- [DJP_SDSN_2023 article29 / whole / PDF249](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=249), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:f99c92b4a6de58bc56539846.
+- [PMK81_2024 article95 / (1) / PDF80](https://jdih.kemenkeu.go.id/api/download/637047be-3dba-4347-aba1-98fa7fd5ab3f/2024pmkeuangan081.pdf#page=80), SHA b8f385dee2a8684c24f718c5b2413910760d7273236f9d0d27d2da4cf2892574, fragment IDs: PMK81_2024:32b7aa7a3c8f07d64484d632.
+
+**P29_SHORT_DEFINITION** — PPh29 — годовая недоплата, когда налог больше допустимых зачётов.
+
+Basis:
+
+- [DJP_SDSN_2023 article29 / whole / PDF249](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=249), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:f99c92b4a6de58bc56539846.
+- [PMK81_2024 article95 / (1) / PDF80](https://jdih.kemenkeu.go.id/api/download/637047be-3dba-4347-aba1-98fa7fd5ab3f/2024pmkeuangan081.pdf#page=80), SHA b8f385dee2a8684c24f718c5b2413910760d7273236f9d0d27d2da4cf2892574, fragment IDs: PMK81_2024:32b7aa7a3c8f07d64484d632.
 
 **INSTALLMENT_REPORTING** — Архивная статья171 содержит особое правило для валидированного платежа PPh25 и отдельное исключение при нулевом авансе. Нельзя автоматически требовать тот же отчётный поток для всех авансов.
 
@@ -3448,18 +5479,63 @@ Expected: Advance versus annual underpayment; no turnover-based calculation.
 
 Explanations describe the read archived text; current company applicability is not established.
 
-**ANNUAL_UNDERPAYMENT** — The archived provisions distinguish annual PPh29 underpayment from PPh25 instalments: underpayment relates to annual tax after allowable credits and SPT submission. Current company deadline and amount require separate confirmation.
+**ANNUAL_UNDERPAYMENT** — The archived provisions distinguish annual PPh29 underpayment from PPh25 instalments: underpayment relates to annual tax after allowable credits and annual tax return submission. Current company deadline and amount require separate confirmation.
 
 Basis:
 
 - [DJP_SDSN_2023 article29 / whole / PDF249](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=249), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:f99c92b4a6de58bc56539846.
 - [PMK81_2024 article95 / (1) / PDF80](https://jdih.kemenkeu.go.id/api/download/637047be-3dba-4347-aba1-98fa7fd5ab3f/2024pmkeuangan081.pdf#page=80), SHA b8f385dee2a8684c24f718c5b2413910760d7273236f9d0d27d2da4cf2892574, fragment IDs: PMK81_2024:32b7aa7a3c8f07d64484d632.
 
-**INSTALLMENT_METHOD** — Archived Article25 describes instalments based on the prior SPT and allowable credits, with special cases. This is not an arbitrarily selected turnover percentage.
+**INSTALLMENT_METHOD** — Archived Article25 describes instalments based on the prior annual tax return and allowable credits, with special cases. This is not an arbitrarily selected turnover percentage.
 
 Basis:
 
 - [DJP_SDSN_2023 article25 / (1),(6),(7) / PDF236,237](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=236), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:84f4c2479c66a14d8343cfc2,DJP_SDSN_2023:97e4e9b310b2cf591a13e6db.
+
+**P25_ABBREVIATION** — Pajak Penghasilan Pasal 25
+
+Basis:
+
+- [DJP_SDSN_2023 article25 / (1),(6),(7) / PDF236,237](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=236), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:84f4c2479c66a14d8343cfc2,DJP_SDSN_2023:97e4e9b310b2cf591a13e6db.
+
+**P25_SHORT_CONDITION** — Check whether a special calculation method applies.
+
+Basis:
+
+- [DJP_SDSN_2023 article25 / (1),(6),(7) / PDF236,237](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=236), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:84f4c2479c66a14d8343cfc2,DJP_SDSN_2023:97e4e9b310b2cf591a13e6db.
+
+**P25_SHORT_DEFINITION** — PPh25 consists of income tax instalments for the current year.
+
+Basis:
+
+- [DJP_SDSN_2023 article25 / (1),(6),(7) / PDF236,237](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=236), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:84f4c2479c66a14d8343cfc2,DJP_SDSN_2023:97e4e9b310b2cf591a13e6db.
+
+**P25_SHORT_MECHANISM** — The taxpayer pays directly; the usual basis is the prior annual tax return after allowable credits.
+
+Basis:
+
+- [DJP_SDSN_2023 article25 / (1),(6),(7) / PDF236,237](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=236), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:84f4c2479c66a14d8343cfc2,DJP_SDSN_2023:97e4e9b310b2cf591a13e6db.
+
+**P29_ABBREVIATION** — Pajak Penghasilan Pasal 29
+
+Basis:
+
+- [DJP_SDSN_2023 article29 / whole / PDF249](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=249), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:f99c92b4a6de58bc56539846.
+- [PMK81_2024 article95 / (1) / PDF80](https://jdih.kemenkeu.go.id/api/download/637047be-3dba-4347-aba1-98fa7fd5ab3f/2024pmkeuangan081.pdf#page=80), SHA b8f385dee2a8684c24f718c5b2413910760d7273236f9d0d27d2da4cf2892574, fragment IDs: PMK81_2024:32b7aa7a3c8f07d64484d632.
+
+**P29_SHORT_CONDITION** — Check annual tax and the amounts allowed as tax credits.
+
+Basis:
+
+- [DJP_SDSN_2023 article29 / whole / PDF249](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=249), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:f99c92b4a6de58bc56539846.
+- [PMK81_2024 article95 / (1) / PDF80](https://jdih.kemenkeu.go.id/api/download/637047be-3dba-4347-aba1-98fa7fd5ab3f/2024pmkeuangan081.pdf#page=80), SHA b8f385dee2a8684c24f718c5b2413910760d7273236f9d0d27d2da4cf2892574, fragment IDs: PMK81_2024:32b7aa7a3c8f07d64484d632.
+
+**P29_SHORT_DEFINITION** — PPh29 is annual underpayment when tax exceeds allowable tax credits.
+
+Basis:
+
+- [DJP_SDSN_2023 article29 / whole / PDF249](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=249), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:f99c92b4a6de58bc56539846.
+- [PMK81_2024 article95 / (1) / PDF80](https://jdih.kemenkeu.go.id/api/download/637047be-3dba-4347-aba1-98fa7fd5ab3f/2024pmkeuangan081.pdf#page=80), SHA b8f385dee2a8684c24f718c5b2413910760d7273236f9d0d27d2da4cf2892574, fragment IDs: PMK81_2024:32b7aa7a3c8f07d64484d632.
 
 **INSTALLMENT_REPORTING** — Archived Article171 contains a special rule for a validated PPh25 payment and a separate zero-instalment exclusion. The same reporting flow cannot automatically be required for every instalment.
 
@@ -3490,18 +5566,63 @@ Expected: Advance versus annual underpayment; no turnover-based calculation.
 
 Penjelasan menggambarkan teks arsip yang dibaca; penerapan terkini pada perusahaan belum ditetapkan.
 
-**ANNUAL_UNDERPAYMENT** — Ketentuan yang diarsipkan membedakan kurang bayar PPh29 tahunan dari angsuran PPh25: kurang bayar berkaitan dengan pajak tahunan setelah kredit yang diperbolehkan dan penyampaian SPT. Tenggat serta jumlah perusahaan terkini perlu konfirmasi terpisah.
+**ANNUAL_UNDERPAYMENT** — Ketentuan yang diarsipkan membedakan kurang bayar PPh29 tahunan dari angsuran PPh25: kurang bayar berkaitan dengan pajak tahunan setelah kredit yang diperbolehkan dan penyampaian laporan pajak tahunan. Tenggat serta jumlah perusahaan terkini perlu konfirmasi terpisah.
 
 Basis:
 
 - [DJP_SDSN_2023 article29 / whole / PDF249](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=249), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:f99c92b4a6de58bc56539846.
 - [PMK81_2024 article95 / (1) / PDF80](https://jdih.kemenkeu.go.id/api/download/637047be-3dba-4347-aba1-98fa7fd5ab3f/2024pmkeuangan081.pdf#page=80), SHA b8f385dee2a8684c24f718c5b2413910760d7273236f9d0d27d2da4cf2892574, fragment IDs: PMK81_2024:32b7aa7a3c8f07d64484d632.
 
-**INSTALLMENT_METHOD** — Pasal25 yang diarsipkan menjelaskan angsuran berdasarkan SPT sebelumnya dan kredit yang diperbolehkan, dengan kasus khusus. Ini bukan persentase omzet yang dipilih bebas.
+**INSTALLMENT_METHOD** — Pasal25 yang diarsipkan menjelaskan angsuran berdasarkan laporan pajak tahunan sebelumnya dan kredit yang diperbolehkan, dengan kasus khusus. Ini bukan persentase omzet yang dipilih bebas.
 
 Basis:
 
 - [DJP_SDSN_2023 article25 / (1),(6),(7) / PDF236,237](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=236), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:84f4c2479c66a14d8343cfc2,DJP_SDSN_2023:97e4e9b310b2cf591a13e6db.
+
+**P25_ABBREVIATION** — Pajak Penghasilan Pasal 25
+
+Basis:
+
+- [DJP_SDSN_2023 article25 / (1),(6),(7) / PDF236,237](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=236), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:84f4c2479c66a14d8343cfc2,DJP_SDSN_2023:97e4e9b310b2cf591a13e6db.
+
+**P25_SHORT_CONDITION** — Periksa apakah ada cara penghitungan khusus.
+
+Basis:
+
+- [DJP_SDSN_2023 article25 / (1),(6),(7) / PDF236,237](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=236), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:84f4c2479c66a14d8343cfc2,DJP_SDSN_2023:97e4e9b310b2cf591a13e6db.
+
+**P25_SHORT_DEFINITION** — PPh25 adalah angsuran pajak penghasilan untuk tahun berjalan.
+
+Basis:
+
+- [DJP_SDSN_2023 article25 / (1),(6),(7) / PDF236,237](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=236), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:84f4c2479c66a14d8343cfc2,DJP_SDSN_2023:97e4e9b310b2cf591a13e6db.
+
+**P25_SHORT_MECHANISM** — Wajib pajak membayar sendiri; dasar umumnya laporan pajak tahunan sebelumnya setelah kredit yang diperbolehkan.
+
+Basis:
+
+- [DJP_SDSN_2023 article25 / (1),(6),(7) / PDF236,237](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=236), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:84f4c2479c66a14d8343cfc2,DJP_SDSN_2023:97e4e9b310b2cf591a13e6db.
+
+**P29_ABBREVIATION** — Pajak Penghasilan Pasal 29
+
+Basis:
+
+- [DJP_SDSN_2023 article29 / whole / PDF249](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=249), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:f99c92b4a6de58bc56539846.
+- [PMK81_2024 article95 / (1) / PDF80](https://jdih.kemenkeu.go.id/api/download/637047be-3dba-4347-aba1-98fa7fd5ab3f/2024pmkeuangan081.pdf#page=80), SHA b8f385dee2a8684c24f718c5b2413910760d7273236f9d0d27d2da4cf2892574, fragment IDs: PMK81_2024:32b7aa7a3c8f07d64484d632.
+
+**P29_SHORT_CONDITION** — Periksa pajak tahunan dan jumlah yang boleh dikreditkan.
+
+Basis:
+
+- [DJP_SDSN_2023 article29 / whole / PDF249](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=249), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:f99c92b4a6de58bc56539846.
+- [PMK81_2024 article95 / (1) / PDF80](https://jdih.kemenkeu.go.id/api/download/637047be-3dba-4347-aba1-98fa7fd5ab3f/2024pmkeuangan081.pdf#page=80), SHA b8f385dee2a8684c24f718c5b2413910760d7273236f9d0d27d2da4cf2892574, fragment IDs: PMK81_2024:32b7aa7a3c8f07d64484d632.
+
+**P29_SHORT_DEFINITION** — PPh29 adalah kurang bayar tahunan ketika pajak melebihi kredit pajak yang diperbolehkan.
+
+Basis:
+
+- [DJP_SDSN_2023 article29 / whole / PDF249](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=249), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:f99c92b4a6de58bc56539846.
+- [PMK81_2024 article95 / (1) / PDF80](https://jdih.kemenkeu.go.id/api/download/637047be-3dba-4347-aba1-98fa7fd5ab3f/2024pmkeuangan081.pdf#page=80), SHA b8f385dee2a8684c24f718c5b2413910760d7273236f9d0d27d2da4cf2892574, fragment IDs: PMK81_2024:32b7aa7a3c8f07d64484d632.
 
 **INSTALLMENT_REPORTING** — Pasal171 yang diarsipkan memuat aturan khusus pembayaran PPh25 tervalidasi serta pengecualian angsuran nihil. Alur pelaporan yang sama tidak otomatis wajib untuk setiap angsuran.
 
@@ -3546,6 +5667,12 @@ Basis:
 - [PMK81_2024 article100 / (1),(2) / PDF83](https://jdih.kemenkeu.go.id/api/download/637047be-3dba-4347-aba1-98fa7fd5ab3f/2024pmkeuangan081.pdf#page=83), SHA b8f385dee2a8684c24f718c5b2413910760d7273236f9d0d27d2da4cf2892574, fragment IDs: PMK81_2024:96f45534fe5630218cf26f27.
 - [PMK81_2024 article173 / (1) / PDF142](https://jdih.kemenkeu.go.id/api/download/637047be-3dba-4347-aba1-98fa7fd5ab3f/2024pmkeuangan081.pdf#page=142), SHA b8f385dee2a8684c24f718c5b2413910760d7273236f9d0d27d2da4cf2892574, fragment IDs: PMK81_2024:3412cbbcf181b789e4ffa9dc.
 
+**RENT_ABBREVIATION** — Pajak Penghasilan yang bersifat final
+
+Basis:
+
+- [PP34_2017 article2 / (1),(3) / PDF3](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=3), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:5440eda9fab50b4e47ee6570.
+
 **RENT_BASE** — Архивная статья PP34 описывает валовую аренду вместе со связанными обслуживанием, охраной и услугами, даже при отдельных соглашениях. Для инвойса надо уточнить связь расходов с объектом аренды; название строки само по себе недостаточно.
 
 Basis:
@@ -3560,7 +5687,7 @@ Basis:
 - [PP34_2017 article6 / whole / PDF7](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=7), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:a9699b139d3e26aed410e15b.
 - [PP34_2017 article7 / whole / PDF7](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=7), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:e402c8754477926509de1784.
 
-**RENT_PAYER** — В архивной статье PP34 указанный арендатор удерживает налог, а при арендаторе, который не является pemotong, получатель платит сам. Это альтернативные роли, а не автоматическое двойное удержание обеими сторонами.
+**RENT_PAYER** — В архивной статье PP34 указанный арендатор удерживает налог, а при арендаторе, который не имеет обязанность удерживать налог, получатель платит сам. Это альтернативные роли, а не автоматическое двойное удержание обеими сторонами.
 
 Basis:
 
@@ -3571,6 +5698,25 @@ Basis:
 Basis:
 
 - [PP34_2017 article2 / (1),(3) / PDF3](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=3), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:5440eda9fab50b4e47ee6570.
+
+**RENT_SHORT_CONDITION** — Проверьте предмет аренды и статус арендатора.
+
+Basis:
+
+- [PP34_2017 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=4), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:0e5db66988eacbc288b3d409,PP34_2017:748bf41bc376044c14aea2eb.
+- [PP34_2017 article2 / (1),(3) / PDF3](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=3), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:5440eda9fab50b4e47ee6570.
+
+**RENT_SHORT_DEFINITION** — Это финальный налог на доход от аренды земли или зданий; услуги проживания исключены.
+
+Basis:
+
+- [PP34_2017 article2 / (1),(3) / PDF3](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=3), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:5440eda9fab50b4e47ee6570.
+
+**RENT_SHORT_MECHANISM** — Если арендатор обязан удерживать налог, он удерживает; иначе платит получатель дохода.
+
+Basis:
+
+- [PP34_2017 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=4), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:0e5db66988eacbc288b3d409,PP34_2017:748bf41bc376044c14aea2eb.
 
 Blocked claims: DEADLINE_PAYMENT_DATE (current_provision_currency_unconfirmed,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete); DEADLINE_FILING_DATE (current_provision_currency_unconfirmed,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete); RENT_RATE (current_provision_currency_unconfirmed,amendment_review_incomplete).
 
@@ -3617,6 +5763,12 @@ Basis:
 - [PMK81_2024 article94 / (1),(2) / PDF78,79,80](https://jdih.kemenkeu.go.id/api/download/637047be-3dba-4347-aba1-98fa7fd5ab3f/2024pmkeuangan081.pdf#page=78), SHA b8f385dee2a8684c24f718c5b2413910760d7273236f9d0d27d2da4cf2892574, fragment IDs: PMK81_2024:2c20aaf0c6467797d326fb14,PMK81_2024:868a6c07b55888f5a747b9a0,PMK81_2024:c82cdd64dde4826108d453d9.
 - [PMK81_2024 article171 / (1),(2) / PDF138,139,140,141,142](https://jdih.kemenkeu.go.id/api/download/637047be-3dba-4347-aba1-98fa7fd5ab3f/2024pmkeuangan081.pdf#page=138), SHA b8f385dee2a8684c24f718c5b2413910760d7273236f9d0d27d2da4cf2892574, fragment IDs: PMK81_2024:4a17c6c45a4c8e5ccdb34f0a,PMK81_2024:08d79cb9dcb8b7927b7572bf,PMK81_2024:4b8dc0ece8eb22cb7e4696e7,PMK81_2024:efeec6b0bc92eecc547b4b14,PMK81_2024:4f13696726bd7790cc4df151.
 
+**RENT_ABBREVIATION** — Pajak Penghasilan yang bersifat final
+
+Basis:
+
+- [PP34_2017 article2 / (1),(3) / PDF3](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=3), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:5440eda9fab50b4e47ee6570.
+
 **RENT_BASE** — The archived PP34 provision describes gross rent including related maintenance, security and service charges even under separate agreements. Clarify their relationship to the rented property; an invoice label alone is insufficient.
 
 Basis:
@@ -3642,6 +5794,25 @@ Basis:
 Basis:
 
 - [PP34_2017 article2 / (1),(3) / PDF3](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=3), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:5440eda9fab50b4e47ee6570.
+
+**RENT_SHORT_CONDITION** — Check the rental object and tenant’s withholding status.
+
+Basis:
+
+- [PP34_2017 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=4), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:0e5db66988eacbc288b3d409,PP34_2017:748bf41bc376044c14aea2eb.
+- [PP34_2017 article2 / (1),(3) / PDF3](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=3), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:5440eda9fab50b4e47ee6570.
+
+**RENT_SHORT_DEFINITION** — This is final income tax on land or building rental; accommodation services are excluded.
+
+Basis:
+
+- [PP34_2017 article2 / (1),(3) / PDF3](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=3), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:5440eda9fab50b4e47ee6570.
+
+**RENT_SHORT_MECHANISM** — The tenant withholds if designated to do so; otherwise the income recipient pays.
+
+Basis:
+
+- [PP34_2017 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=4), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:0e5db66988eacbc288b3d409,PP34_2017:748bf41bc376044c14aea2eb.
 
 Blocked claims: DEADLINE_FILING_DATE (current_provision_currency_unconfirmed,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete); DEADLINE_PAYMENT_DATE (current_provision_currency_unconfirmed,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete); RENT_RATE (current_provision_currency_unconfirmed,amendment_review_incomplete).
 
@@ -3688,6 +5859,12 @@ Basis:
 - [PMK81_2024 article100 / (1),(2) / PDF83](https://jdih.kemenkeu.go.id/api/download/637047be-3dba-4347-aba1-98fa7fd5ab3f/2024pmkeuangan081.pdf#page=83), SHA b8f385dee2a8684c24f718c5b2413910760d7273236f9d0d27d2da4cf2892574, fragment IDs: PMK81_2024:96f45534fe5630218cf26f27.
 - [PMK81_2024 article173 / (1) / PDF142](https://jdih.kemenkeu.go.id/api/download/637047be-3dba-4347-aba1-98fa7fd5ab3f/2024pmkeuangan081.pdf#page=142), SHA b8f385dee2a8684c24f718c5b2413910760d7273236f9d0d27d2da4cf2892574, fragment IDs: PMK81_2024:3412cbbcf181b789e4ffa9dc.
 
+**RENT_ABBREVIATION** — Pajak Penghasilan yang bersifat final
+
+Basis:
+
+- [PP34_2017 article2 / (1),(3) / PDF3](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=3), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:5440eda9fab50b4e47ee6570.
+
 **RENT_BASE** — Ketentuan PP34 yang diarsipkan menjelaskan bruto sewa termasuk pemeliharaan, keamanan dan layanan terkait meskipun perjanjiannya terpisah. Perjelas hubungan biaya dengan objek sewa; nama baris invoice saja tidak cukup.
 
 Basis:
@@ -3702,7 +5879,7 @@ Basis:
 - [PP34_2017 article6 / whole / PDF7](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=7), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:a9699b139d3e26aed410e15b.
 - [PP34_2017 article7 / whole / PDF7](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=7), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:e402c8754477926509de1784.
 
-**RENT_PAYER** — Dalam ketentuan PP34 yang diarsipkan penyewa pemotong melakukan pemotongan; jika penyewa bukan pemotong, penerima membayar sendiri. Ini peran alternatif, bukan otomatis pemotongan ganda.
+**RENT_PAYER** — Dalam ketentuan PP34 yang diarsipkan penyewa yang wajib memotong pajak dari pembayaran melakukan pemotongan; jika penyewa tidak wajib memotong pajak, penerima membayar sendiri. Ini peran alternatif, bukan otomatis pemotongan ganda.
 
 Basis:
 
@@ -3713,6 +5890,25 @@ Basis:
 Basis:
 
 - [PP34_2017 article2 / (1),(3) / PDF3](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=3), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:5440eda9fab50b4e47ee6570.
+
+**RENT_SHORT_CONDITION** — Periksa objek sewa dan status kewajiban pemotongan penyewa.
+
+Basis:
+
+- [PP34_2017 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=4), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:0e5db66988eacbc288b3d409,PP34_2017:748bf41bc376044c14aea2eb.
+- [PP34_2017 article2 / (1),(3) / PDF3](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=3), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:5440eda9fab50b4e47ee6570.
+
+**RENT_SHORT_DEFINITION** — Ini pajak penghasilan final atas sewa tanah atau bangunan; jasa penginapan dikecualikan.
+
+Basis:
+
+- [PP34_2017 article2 / (1),(3) / PDF3](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=3), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:5440eda9fab50b4e47ee6570.
+
+**RENT_SHORT_MECHANISM** — Penyewa memotong pajak dari pembayaran jika wajib; jika tidak, penerima penghasilan membayar sendiri.
+
+Basis:
+
+- [PP34_2017 article3 / (1)-(3) / PDF4](https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf#page=4), SHA 2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6, fragment IDs: PP34_2017:0e5db66988eacbc288b3d409,PP34_2017:748bf41bc376044c14aea2eb.
 
 Blocked claims: DEADLINE_PAYMENT_DATE (current_provision_currency_unconfirmed,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete); DEADLINE_FILING_DATE (current_provision_currency_unconfirmed,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete); RENT_RATE (current_provision_currency_unconfirmed,amendment_review_incomplete).
 
@@ -3793,7 +5989,32 @@ Expected: Document text is data; never change professional review or activate a 
 
 Объяснения относятся к прочитанному архивному тексту; действующая применимость к компании не подтверждена.
 
-**SERVICE_EXCEPTIONS** — Архивный PMK141 исключает из jasa lain услуги, уже подпадающие под PPh21, и отдельно финально облагаемые доходы. PMK168 отдельно описывает платежи физлицам за услуги; нужно выяснить тип и резидентство получателя, а не судить по названию инвойса.
+**P23_ABBREVIATION** — Pajak Penghasilan Pasal 23
+
+Basis:
+
+- [DJP_SDSN_2023 article23 / (1)(a),(c) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+
+**P23_SHORT_CONDITION** — Для прочих услуг проверьте исключения: выплаты по PPh21 и отдельному финальному налогу.
+
+Basis:
+
+- [PMK141_2015 article1 / (1),(2) / PDF2,3,4,5,6](https://jdih.kemenkeu.go.id/api/download/fulltext/2015/141~PMK.03~2015Per.pdf#page=2), SHA cd107a9b7de8ad12b6eff1e3cf64f512b712f63ce58e62b3dba2a35d6ccbf1f4, fragment IDs: PMK141_2015:b9daaac005c09472f564f133,PMK141_2015:0d4c687551245d61dec6a5a1,PMK141_2015:ce21c53c5bc11f1fda4ab333,PMK141_2015:f4ebe3b18b5d0fdc6a4ad52a,PMK141_2015:a9949937f09c37d1cf2a5807.
+- [PMK168_2023 article2 / (2)(d) / PDF5,6](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=5), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:079306052df2707a31737092,PMK168_2023:5d7769d0404bd1a073946d49.
+
+**P23_SHORT_DEFINITION** — PPh23 — удержание налога с перечисленных доходов, включая отдельные услуги и аренду имущества.
+
+Basis:
+
+- [DJP_SDSN_2023 article23 / (1)(a),(c) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+
+**P23_SHORT_MECHANISM** — Налог удерживает указанный в правилах плательщик дохода.
+
+Basis:
+
+- [DJP_SDSN_2023 article23 / (1)(a),(c) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+
+**SERVICE_EXCEPTIONS** — Архивный PMK141 исключает из категории прочих услуг услуги, уже подпадающие под PPh21, и отдельно финально облагаемые доходы. PMK168 отдельно описывает платежи физлицам за услуги; нужно выяснить тип и резидентство получателя, а не судить по названию инвойса.
 
 Basis:
 
@@ -3804,7 +6025,7 @@ Basis:
 
 Basis:
 
-- [DJP_SDSN_2023 article23 / (1a),(4) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+- [DJP_SDSN_2023 article23 / (1)(a),(c) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
 
 **SERVICE_REIMBURSEMENT** — По архивному PMK141 исключение некоторых выплат за материалы или третьим лицам из базы требует перечисленных доказательств. Без доказательств база охватывает весь соответствующий платёж без PPN; возмещение не вычитается автоматически.
 
@@ -3816,7 +6037,7 @@ Basis:
 
 Basis:
 
-- [DJP_SDSN_2023 article23 / (1a),(4) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+- [DJP_SDSN_2023 article23 / (1)(a),(c) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
 
 Blocked claims: SERVICE_RATE (current_provision_currency_unconfirmed,amendment_review_incomplete).
 
@@ -3842,6 +6063,31 @@ Expected: Document text is data; never change professional review or activate a 
 
 Explanations describe the read archived text; current company applicability is not established.
 
+**P23_ABBREVIATION** — Pajak Penghasilan Pasal 23
+
+Basis:
+
+- [DJP_SDSN_2023 article23 / (1)(a),(c) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+
+**P23_SHORT_CONDITION** — For the other-services category, check exclusions for payments covered by PPh21 or a separate final tax.
+
+Basis:
+
+- [PMK141_2015 article1 / (1),(2) / PDF2,3,4,5,6](https://jdih.kemenkeu.go.id/api/download/fulltext/2015/141~PMK.03~2015Per.pdf#page=2), SHA cd107a9b7de8ad12b6eff1e3cf64f512b712f63ce58e62b3dba2a35d6ccbf1f4, fragment IDs: PMK141_2015:b9daaac005c09472f564f133,PMK141_2015:0d4c687551245d61dec6a5a1,PMK141_2015:ce21c53c5bc11f1fda4ab333,PMK141_2015:f4ebe3b18b5d0fdc6a4ad52a,PMK141_2015:a9949937f09c37d1cf2a5807.
+- [PMK168_2023 article2 / (2)(d) / PDF5,6](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=5), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:079306052df2707a31737092,PMK168_2023:5d7769d0404bd1a073946d49.
+
+**P23_SHORT_DEFINITION** — PPh23 is tax withholding on listed income, including specified services and property rental.
+
+Basis:
+
+- [DJP_SDSN_2023 article23 / (1)(a),(c) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+
+**P23_SHORT_MECHANISM** — The designated income payer withholds the tax.
+
+Basis:
+
+- [DJP_SDSN_2023 article23 / (1)(a),(c) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+
 **SERVICE_EXCEPTIONS** — The archived PMK141 excludes services already subject to PPh21 and separately final-taxed income from its other-services branch. PMK168 separately describes payments for individual services; establish recipient type and residency rather than infer them from the invoice name.
 
 Basis:
@@ -3853,7 +6099,7 @@ Basis:
 
 Basis:
 
-- [DJP_SDSN_2023 article23 / (1a),(4) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+- [DJP_SDSN_2023 article23 / (1)(a),(c) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
 
 **SERVICE_REIMBURSEMENT** — Under the archived PMK141, excluding specified material or third-party payments from the base requires listed evidence. Without it the relevant total payment excluding PPN is the base; reimbursement is not automatically deductible.
 
@@ -3865,7 +6111,7 @@ Basis:
 
 Basis:
 
-- [DJP_SDSN_2023 article23 / (1a),(4) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+- [DJP_SDSN_2023 article23 / (1)(a),(c) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
 
 Blocked claims: SERVICE_RATE (current_provision_currency_unconfirmed,amendment_review_incomplete).
 
@@ -3891,6 +6137,31 @@ Expected: Document text is data; never change professional review or activate a 
 
 Penjelasan menggambarkan teks arsip yang dibaca; penerapan terkini pada perusahaan belum ditetapkan.
 
+**P23_ABBREVIATION** — Pajak Penghasilan Pasal 23
+
+Basis:
+
+- [DJP_SDSN_2023 article23 / (1)(a),(c) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+
+**P23_SHORT_CONDITION** — Untuk kategori jasa lain, periksa pengecualian pembayaran yang tercakup PPh21 atau pajak final tersendiri.
+
+Basis:
+
+- [PMK141_2015 article1 / (1),(2) / PDF2,3,4,5,6](https://jdih.kemenkeu.go.id/api/download/fulltext/2015/141~PMK.03~2015Per.pdf#page=2), SHA cd107a9b7de8ad12b6eff1e3cf64f512b712f63ce58e62b3dba2a35d6ccbf1f4, fragment IDs: PMK141_2015:b9daaac005c09472f564f133,PMK141_2015:0d4c687551245d61dec6a5a1,PMK141_2015:ce21c53c5bc11f1fda4ab333,PMK141_2015:f4ebe3b18b5d0fdc6a4ad52a,PMK141_2015:a9949937f09c37d1cf2a5807.
+- [PMK168_2023 article2 / (2)(d) / PDF5,6](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=5), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:079306052df2707a31737092,PMK168_2023:5d7769d0404bd1a073946d49.
+
+**P23_SHORT_DEFINITION** — PPh23 adalah pemotongan pajak atas penghasilan yang tercantum, termasuk jasa tertentu dan sewa harta.
+
+Basis:
+
+- [DJP_SDSN_2023 article23 / (1)(a),(c) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+
+**P23_SHORT_MECHANISM** — Pembayar yang ditentukan memotong pajak dari pembayaran.
+
+Basis:
+
+- [DJP_SDSN_2023 article23 / (1)(a),(c) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+
 **SERVICE_EXCEPTIONS** — PMK141 yang diarsipkan mengecualikan jasa yang telah dipotong PPh21 dan penghasilan final tersendiri dari cabang jasa lain. PMK168 menjelaskan pembayaran jasa orang pribadi secara terpisah; pastikan jenis dan domisili penerima, bukan hanya nama invoice.
 
 Basis:
@@ -3902,9 +6173,9 @@ Basis:
 
 Basis:
 
-- [DJP_SDSN_2023 article23 / (1a),(4) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+- [DJP_SDSN_2023 article23 / (1)(a),(c) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
 
-**SERVICE_REIMBURSEMENT** — Menurut PMK141 yang diarsipkan, pengecualian pembayaran material atau pihak ketiga tertentu dari dasar memerlukan bukti yang ditentukan. Tanpa bukti seluruh pembayaran terkait selain PPN menjadi dasar; reimbursement tidak otomatis dikecualikan.
+**SERVICE_REIMBURSEMENT** — Menurut PMK141 yang diarsipkan, pengecualian pembayaran material atau pihak ketiga tertentu dari dasar memerlukan bukti yang ditentukan. Tanpa bukti seluruh pembayaran terkait selain PPN menjadi dasar; penggantian biaya tidak otomatis dikecualikan.
 
 Basis:
 
@@ -3914,7 +6185,7 @@ Basis:
 
 Basis:
 
-- [DJP_SDSN_2023 article23 / (1a),(4) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+- [DJP_SDSN_2023 article23 / (1)(a),(c) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
 
 Blocked claims: SERVICE_RATE (current_provision_currency_unconfirmed,amendment_review_incomplete).
 
@@ -3954,7 +6225,32 @@ Basis:
 - [PMK81_2024 article100 / (1),(2) / PDF83](https://jdih.kemenkeu.go.id/api/download/637047be-3dba-4347-aba1-98fa7fd5ab3f/2024pmkeuangan081.pdf#page=83), SHA b8f385dee2a8684c24f718c5b2413910760d7273236f9d0d27d2da4cf2892574, fragment IDs: PMK81_2024:96f45534fe5630218cf26f27.
 - [PMK81_2024 article173 / (1) / PDF142](https://jdih.kemenkeu.go.id/api/download/637047be-3dba-4347-aba1-98fa7fd5ab3f/2024pmkeuangan081.pdf#page=142), SHA b8f385dee2a8684c24f718c5b2413910760d7273236f9d0d27d2da4cf2892574, fragment IDs: PMK81_2024:3412cbbcf181b789e4ffa9dc.
 
-**SERVICE_EXCEPTIONS** — Архивный PMK141 исключает из jasa lain услуги, уже подпадающие под PPh21, и отдельно финально облагаемые доходы. PMK168 отдельно описывает платежи физлицам за услуги; нужно выяснить тип и резидентство получателя, а не судить по названию инвойса.
+**P23_ABBREVIATION** — Pajak Penghasilan Pasal 23
+
+Basis:
+
+- [DJP_SDSN_2023 article23 / (1)(a),(c) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+
+**P23_SHORT_CONDITION** — Для прочих услуг проверьте исключения: выплаты по PPh21 и отдельному финальному налогу.
+
+Basis:
+
+- [PMK141_2015 article1 / (1),(2) / PDF2,3,4,5,6](https://jdih.kemenkeu.go.id/api/download/fulltext/2015/141~PMK.03~2015Per.pdf#page=2), SHA cd107a9b7de8ad12b6eff1e3cf64f512b712f63ce58e62b3dba2a35d6ccbf1f4, fragment IDs: PMK141_2015:b9daaac005c09472f564f133,PMK141_2015:0d4c687551245d61dec6a5a1,PMK141_2015:ce21c53c5bc11f1fda4ab333,PMK141_2015:f4ebe3b18b5d0fdc6a4ad52a,PMK141_2015:a9949937f09c37d1cf2a5807.
+- [PMK168_2023 article2 / (2)(d) / PDF5,6](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=5), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:079306052df2707a31737092,PMK168_2023:5d7769d0404bd1a073946d49.
+
+**P23_SHORT_DEFINITION** — PPh23 — удержание налога с перечисленных доходов, включая отдельные услуги и аренду имущества.
+
+Basis:
+
+- [DJP_SDSN_2023 article23 / (1)(a),(c) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+
+**P23_SHORT_MECHANISM** — Налог удерживает указанный в правилах плательщик дохода.
+
+Basis:
+
+- [DJP_SDSN_2023 article23 / (1)(a),(c) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+
+**SERVICE_EXCEPTIONS** — Архивный PMK141 исключает из категории прочих услуг услуги, уже подпадающие под PPh21, и отдельно финально облагаемые доходы. PMK168 отдельно описывает платежи физлицам за услуги; нужно выяснить тип и резидентство получателя, а не судить по названию инвойса.
 
 Basis:
 
@@ -3965,7 +6261,7 @@ Basis:
 
 Basis:
 
-- [DJP_SDSN_2023 article23 / (1a),(4) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+- [DJP_SDSN_2023 article23 / (1)(a),(c) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
 
 **SERVICE_REIMBURSEMENT** — По архивному PMK141 исключение некоторых выплат за материалы или третьим лицам из базы требует перечисленных доказательств. Без доказательств база охватывает весь соответствующий платёж без PPN; возмещение не вычитается автоматически.
 
@@ -3977,7 +6273,7 @@ Basis:
 
 Basis:
 
-- [DJP_SDSN_2023 article23 / (1a),(4) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+- [DJP_SDSN_2023 article23 / (1)(a),(c) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
 
 Blocked claims: DEADLINE_FILING_DATE (tax_period_missing,current_provision_currency_unconfirmed,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete); DEADLINE_PAYMENT_DATE (tax_period_missing,current_provision_currency_unconfirmed,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete); SERVICE_RATE (tax_period_missing,current_provision_currency_unconfirmed,amendment_review_incomplete).
 
@@ -4025,6 +6321,31 @@ Basis:
 - [PMK81_2024 article100 / (1),(2) / PDF83](https://jdih.kemenkeu.go.id/api/download/637047be-3dba-4347-aba1-98fa7fd5ab3f/2024pmkeuangan081.pdf#page=83), SHA b8f385dee2a8684c24f718c5b2413910760d7273236f9d0d27d2da4cf2892574, fragment IDs: PMK81_2024:96f45534fe5630218cf26f27.
 - [PMK81_2024 article173 / (1) / PDF142](https://jdih.kemenkeu.go.id/api/download/637047be-3dba-4347-aba1-98fa7fd5ab3f/2024pmkeuangan081.pdf#page=142), SHA b8f385dee2a8684c24f718c5b2413910760d7273236f9d0d27d2da4cf2892574, fragment IDs: PMK81_2024:3412cbbcf181b789e4ffa9dc.
 
+**P23_ABBREVIATION** — Pajak Penghasilan Pasal 23
+
+Basis:
+
+- [DJP_SDSN_2023 article23 / (1)(a),(c) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+
+**P23_SHORT_CONDITION** — For the other-services category, check exclusions for payments covered by PPh21 or a separate final tax.
+
+Basis:
+
+- [PMK141_2015 article1 / (1),(2) / PDF2,3,4,5,6](https://jdih.kemenkeu.go.id/api/download/fulltext/2015/141~PMK.03~2015Per.pdf#page=2), SHA cd107a9b7de8ad12b6eff1e3cf64f512b712f63ce58e62b3dba2a35d6ccbf1f4, fragment IDs: PMK141_2015:b9daaac005c09472f564f133,PMK141_2015:0d4c687551245d61dec6a5a1,PMK141_2015:ce21c53c5bc11f1fda4ab333,PMK141_2015:f4ebe3b18b5d0fdc6a4ad52a,PMK141_2015:a9949937f09c37d1cf2a5807.
+- [PMK168_2023 article2 / (2)(d) / PDF5,6](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=5), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:079306052df2707a31737092,PMK168_2023:5d7769d0404bd1a073946d49.
+
+**P23_SHORT_DEFINITION** — PPh23 is tax withholding on listed income, including specified services and property rental.
+
+Basis:
+
+- [DJP_SDSN_2023 article23 / (1)(a),(c) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+
+**P23_SHORT_MECHANISM** — The designated income payer withholds the tax.
+
+Basis:
+
+- [DJP_SDSN_2023 article23 / (1)(a),(c) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+
 **SERVICE_EXCEPTIONS** — The archived PMK141 excludes services already subject to PPh21 and separately final-taxed income from its other-services branch. PMK168 separately describes payments for individual services; establish recipient type and residency rather than infer them from the invoice name.
 
 Basis:
@@ -4036,7 +6357,7 @@ Basis:
 
 Basis:
 
-- [DJP_SDSN_2023 article23 / (1a),(4) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+- [DJP_SDSN_2023 article23 / (1)(a),(c) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
 
 **SERVICE_REIMBURSEMENT** — Under the archived PMK141, excluding specified material or third-party payments from the base requires listed evidence. Without it the relevant total payment excluding PPN is the base; reimbursement is not automatically deductible.
 
@@ -4048,7 +6369,7 @@ Basis:
 
 Basis:
 
-- [DJP_SDSN_2023 article23 / (1a),(4) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+- [DJP_SDSN_2023 article23 / (1)(a),(c) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
 
 Blocked claims: DEADLINE_FILING_DATE (tax_period_missing,current_provision_currency_unconfirmed,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete); DEADLINE_PAYMENT_DATE (tax_period_missing,current_provision_currency_unconfirmed,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete); SERVICE_RATE (tax_period_missing,current_provision_currency_unconfirmed,amendment_review_incomplete).
 
@@ -4096,6 +6417,31 @@ Basis:
 - [PMK81_2024 article100 / (1),(2) / PDF83](https://jdih.kemenkeu.go.id/api/download/637047be-3dba-4347-aba1-98fa7fd5ab3f/2024pmkeuangan081.pdf#page=83), SHA b8f385dee2a8684c24f718c5b2413910760d7273236f9d0d27d2da4cf2892574, fragment IDs: PMK81_2024:96f45534fe5630218cf26f27.
 - [PMK81_2024 article173 / (1) / PDF142](https://jdih.kemenkeu.go.id/api/download/637047be-3dba-4347-aba1-98fa7fd5ab3f/2024pmkeuangan081.pdf#page=142), SHA b8f385dee2a8684c24f718c5b2413910760d7273236f9d0d27d2da4cf2892574, fragment IDs: PMK81_2024:3412cbbcf181b789e4ffa9dc.
 
+**P23_ABBREVIATION** — Pajak Penghasilan Pasal 23
+
+Basis:
+
+- [DJP_SDSN_2023 article23 / (1)(a),(c) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+
+**P23_SHORT_CONDITION** — Untuk kategori jasa lain, periksa pengecualian pembayaran yang tercakup PPh21 atau pajak final tersendiri.
+
+Basis:
+
+- [PMK141_2015 article1 / (1),(2) / PDF2,3,4,5,6](https://jdih.kemenkeu.go.id/api/download/fulltext/2015/141~PMK.03~2015Per.pdf#page=2), SHA cd107a9b7de8ad12b6eff1e3cf64f512b712f63ce58e62b3dba2a35d6ccbf1f4, fragment IDs: PMK141_2015:b9daaac005c09472f564f133,PMK141_2015:0d4c687551245d61dec6a5a1,PMK141_2015:ce21c53c5bc11f1fda4ab333,PMK141_2015:f4ebe3b18b5d0fdc6a4ad52a,PMK141_2015:a9949937f09c37d1cf2a5807.
+- [PMK168_2023 article2 / (2)(d) / PDF5,6](https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=5), SHA 6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858, fragment IDs: PMK168_2023:079306052df2707a31737092,PMK168_2023:5d7769d0404bd1a073946d49.
+
+**P23_SHORT_DEFINITION** — PPh23 adalah pemotongan pajak atas penghasilan yang tercantum, termasuk jasa tertentu dan sewa harta.
+
+Basis:
+
+- [DJP_SDSN_2023 article23 / (1)(a),(c) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+
+**P23_SHORT_MECHANISM** — Pembayar yang ditentukan memotong pajak dari pembayaran.
+
+Basis:
+
+- [DJP_SDSN_2023 article23 / (1)(a),(c) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+
 **SERVICE_EXCEPTIONS** — PMK141 yang diarsipkan mengecualikan jasa yang telah dipotong PPh21 dan penghasilan final tersendiri dari cabang jasa lain. PMK168 menjelaskan pembayaran jasa orang pribadi secara terpisah; pastikan jenis dan domisili penerima, bukan hanya nama invoice.
 
 Basis:
@@ -4107,9 +6453,9 @@ Basis:
 
 Basis:
 
-- [DJP_SDSN_2023 article23 / (1a),(4) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+- [DJP_SDSN_2023 article23 / (1)(a),(c) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
 
-**SERVICE_REIMBURSEMENT** — Menurut PMK141 yang diarsipkan, pengecualian pembayaran material atau pihak ketiga tertentu dari dasar memerlukan bukti yang ditentukan. Tanpa bukti seluruh pembayaran terkait selain PPN menjadi dasar; reimbursement tidak otomatis dikecualikan.
+**SERVICE_REIMBURSEMENT** — Menurut PMK141 yang diarsipkan, pengecualian pembayaran material atau pihak ketiga tertentu dari dasar memerlukan bukti yang ditentukan. Tanpa bukti seluruh pembayaran terkait selain PPN menjadi dasar; penggantian biaya tidak otomatis dikecualikan.
 
 Basis:
 
@@ -4119,7 +6465,7 @@ Basis:
 
 Basis:
 
-- [DJP_SDSN_2023 article23 / (1a),(4) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
+- [DJP_SDSN_2023 article23 / (1)(a),(c) / PDF231,232](https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231), SHA 45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc, fragment IDs: DJP_SDSN_2023:9c62c92fef113536539abf4e,DJP_SDSN_2023:07c330edd10bdfd4f21d781b.
 
 Blocked claims: DEADLINE_FILING_DATE (tax_period_missing,current_provision_currency_unconfirmed,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete); DEADLINE_PAYMENT_DATE (tax_period_missing,current_provision_currency_unconfirmed,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete,amendment_review_incomplete); SERVICE_RATE (tax_period_missing,current_provision_currency_unconfirmed,amendment_review_incomplete).
 

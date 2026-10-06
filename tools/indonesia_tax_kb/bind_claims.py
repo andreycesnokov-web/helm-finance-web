@@ -18,7 +18,7 @@ def bind(root):
             matches=[]
             for g in options:
                 text='\n'.join(by_id[fid]['text'] for fid in g['fragment_ids'])
-                if norm(selector['needle']) in norm(text):matches.append(g)
+                if all(norm(anchor) in norm(text) for anchor in [selector['needle'],*selector.get('passages',[])]):matches.append(g)
             if len(matches)!=1:
                 c['binding_issues'].append({'code':'provision_not_uniquely_bound','selector':selector,'matches':len(matches)})
                 continue
@@ -28,6 +28,7 @@ def bind(root):
             c['supports'].append({'provision_id':g['id'],'fragment_ids':g['fragment_ids'],
               'source_id':sid,'sha256':expected,'article':g['article'],'paragraphs':selector['paragraphs'],
               'role':g['role'],'use':use,'text_anchor':selector['needle'],
+              'text_anchors':[selector['needle'],*selector.get('passages',[])],
               'related_explanation_provision_ids':g['related_explanation_ids'],
               'pages':sorted(set(by_id[i]['locator']['page'] for i in g['fragment_ids'])),
               'links':[by_id[i]['source_link'] for i in g['fragment_ids']],

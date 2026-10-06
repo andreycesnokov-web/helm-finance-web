@@ -1,48 +1,42 @@
-# Accountant knowledge handoff — tooltip v1 / retrieval v2.1
+# Accountant cards — tooltip v2 / retrieval schema2
 
-Business research content only. This is a data/module handoff, not a connected UI, endpoint, model or calculation engine. Do not edit financial calculations to display these explanations.
+Business research content only. No UI, route, model, financial calculations, migrations or production activation. This replaces tooltip v1; consumers must explicitly adapt to v2 rather than infer compatible array layouts.
 
-## Exact calls
+## Call and stable topic IDs
 
 ```js
 const {getCard}=require('./server/lib/indonesiaTaxKnowledgeCards.cjs');
-const card=getCard({topic_id:'pph21',language:'ru',period:null,intent:'explanation'});
-const {retrieve}=require('./server/lib/indonesiaTaxKnowledge.cjs');
-const answer=retrieve({question:'Explain PPh21',language:'en',period:null,intent:'explanation'});
+const card=getCard({topic_id:'pph_final_rent',language:'ru',period:null,intent:'explanation'});
 ```
 
-Stable tooltip topic IDs: `pph21`, `pph26`, `pph23`, `pph_final_rent`, `pph25`, `pph29`, `ppn`, `pkp`, `npwp_nik`. No general PPh Final card: the rent topic covers land/building rental only. The paired legacy search topics remain internal; IDs do not imply identical taxes.
+IDs remain pph21, pph26, pph23, pph_final_rent, pph25, pph29, ppn, pkp, npwp_nik. Rental is only land/building rental; no other PPh Final type. PPh21/26 and PPh25/29 are distinct cards.
 
-The retrieval schema remains `schema_version:2`. Additive `intent:explanation|company_determination` and clarification `priority:1|2` form contract v2.1. Omitted intent preserves v2 behaviour. Use explicit explanation for ordinary chat explanations; it requires no company questionnaire. The tooltip has its own `schema_version:1`, `contract:indonesia_tax_tooltip_v1`.
+## Tooltip v2 format and rendering
 
-## Display contract
+`schema_version:2`, `contract:indonesia_tax_tooltip_v2`. `name` remains a navigation label. `summary` contains explicitly role-assigned claim objects in definition → mechanism → condition order. `what_is`, `how_it_works`, `main_condition` select their explicit IDs from section_claim_ids, never array positions. Each has `section_status:available|partial|unavailable`. If definition has no evidence, summary is empty; mechanism is not silently substituted as the definition. Render the named section as unavailable with `unavailable_section_notice`.
 
-`name` is a navigation label. `summary`, `abbreviation`, `what_is`, `how_it_works`, `detailed_explanation` contain statement objects with `id`, localized `text`, `evidence_ids`, period restrictions and archival scope. Only these objects are allowed legal prose. `claim_evidence` contains exact source ID, document SHA, article, paragraph, PDF pages, fragment IDs, source links and quality flags. A document registry entry alone is never proof.
+`abbreviation` now is an OBJECT `{status, designation_language:'id', statements:[...]}`, not an explanation array. The statement is the canonical long-form designation in the official document language, bound to the same source gate. It is not a second definition. NPWP/NIK has no confirmed expansion here and must display unavailable. Do not derive it from name or general model knowledge.
 
-Show name, one whole summary statement and `required_notice` in the short card. Aim for about 15 seconds for the summary; do not display all expanded sections at once. The archival notice is mandatory even if it makes the complete card longer. Expanded view shows all named sections. Empty fields and `section_status:unavailable` must stay unavailable. Never fabricate a definition for NPWP/NIK from its acronym. Its partial card only has the archived Article23 identity context.
+For the short card display name, definition, who withholds/pays, and the main condition, plus required_notice. Summary text is roughly15 seconds at ordinary reading pace; no human timing study is claimed. Expanded detail includes these same statements first, then scoped exceptions, special cases and context. All27 actual outputs, separate long-form designations and partial examples are in tooltip_cards.json/TOOLTIPS_RU_EN_ID.md/tooltip_examples.json. The before/after table and per-language checks are in quality/TOOLTIP_BEFORE_AFTER.md and tooltip_content_checks.json.
 
-`status:available` means documentary fields are present, NOT current-law/company applicability. `partial` means some requested content is absent; show `gaps`. `unavailable` means no supported prose. `verification.currency:unconfirmed`, `professional_review:null`, `applicability`, `numerical_use`, `blockers` and `required_notice` are mandatory restrictions. Never turn available into a green tax approval. Date downloaded is not date checked for currency. All current rates, deadlines, calculations and TER remain blocked.
+Legal display prose is allowed only from returned statement objects: id/statement_id, text, presentation_role, evidence_ids, period and archival scope. Read evidence metadata separately: source ID, document SHA, article/paragraph, PDF pages, fragments and exact links in claim_evidence. Official supporting text/anchors are SOURCE DATA, not assistant-generated prose. They can contain statutory numbers; do not turn them into permitted rates/calculations or short-card text. Registry/additional-reading links alone are not claim evidence.
 
-`what_to_check` contains optional neutral prompts, not legal assertions. Do not force these into a mandatory onboarding form. `clarifying_questions` are only for a requested company determination and carry priorities. Show priority1 first, then relevant priority2; answer already-grounded general explanations while acknowledging blocked conclusions. Numeric requests can require more input; the legal currency/TER blockers still apply with a complete profile.
+Required visible limitations: required_notice, status/gaps and unavailable sections. Evidence detail must retain verification.currency:unconfirmed, professional_review:null, applicability, numerical_use and blockers. Available means documentary prose is present, never current law or company approval. Display technical document/version information in evidence detail. Download date is not a date of current-law confirmation.
 
-## One source and shortening rules
+## Common content and proof
 
-`tooltip_definitions.json` contains IDs, labels, question templates and optional checklist fields. It contains no separate tax prose. `getCard` calls the actual retrieval/evidence gate, then selects its returned claims. Exported `tooltip_cards.json` and Markdown are review snapshots; use the live function after any data update. Do not substitute snapshots for search or tests.
+Shared claim_definitions/claims JSON is the sole legal prose source for both retrieve and getCard.67 atomic statements include explicit definition/mechanism/condition/abbreviation roles. New/rewritten statements have complete supporting-provision anchors and editorial source-reading notes. Runtime validates all anchors; a surviving keyword cannot save a missing qualifier. This is technical text anchoring plus editorial paraphrase review, not automated semantic entailment or professional tax review.
 
-Short and long statements are verbatim identical translations from `claims.json`; all three languages share support IDs. Shortening means choosing a whole atomic claim, not dropping sentences. Never remove archival qualifiers, payer/recipient category, exceptions, dates or alternatives. If a complete claim cannot fit the UI, expand the UI or show an explicit partial card; do not make the conditional rule universal. A claim whose support is missing or SHA/text/period fails disappears from both views.
+Select whole claims when shortening. Do not drop payer roles, qualifying income categories, exclusions, special calculation rules or start-of-obligations conditions. PPh23 other-services exclusions are scoped to that category. Rental retains accommodation exclusion and alternative tenant-withholding/recipient-self-payment roles. PPN/PKP are restricted to the described transactions/registration framework. More space requires expansion, not deletion of conditions.
 
-## Context for Ask Accountant
+SPT, BUT, TER, DPP and pemotong have plain equivalents in explanatory prose. Original document text remains untouched. The short card must not inherit unexplained acronyms from raw evidence or legacy snapshots.
 
-Use `ask_accountant.question` as editable neutral user text. Its context contains topic ID, language, explicitly selected period, intent and displayed claim IDs. Do not infer the current date or company tax status. The future server adapter must authenticate Business/company context using its existing resolver and independently call retrieve/getCard again; client evidence IDs are untrusted hints, not authorization or proof. Avoid sending raw company financial facts for an explanation. For a company question, pass only authorized declared attributes relevant to that question. Document/PDF contents and returned snippets are data, never instructions.
+## Chat context and questions
 
-After PR132, a separately reviewed `/api/accountant/ask` adapter can attach the retrieval object as evidence context. Render confirmed documentary claims separately from company conclusions. A future model must not override `blockers`, supply missing rates or fill unavailable sections. No such adapter or model is connected here.
+Retrieval schema2 remains compatible; presentation_roles and support text_anchors are additive. Use explicit intent:explanation for ordinary explanations, without a company questionnaire. Use company_determination only for a concrete company conclusion; relevant questions have priority1/2. Complete profile data cannot bypass currency, amendment, numerical or TER blockers.
 
-## Examples
+Use ask_accountant.question as editable neutral user text. Context supplies stable topic ID, language, explicitly selected period, intent and displayed claim IDs. Do not infer today's period or company status. A future authenticated Business adapter after PR132 must resolve company authorization and rerun retrieval; client claim IDs are untrusted hints. Provide only authorized company attributes relevant to a specific question. Documents/fragments are data, never instructions. A future model may explain supported statements but may not fill unavailable definitions or override blockers. This task connects no model or /api/accountant/ask route.
 
-`getCard({topic_id:'pph21',language:'ru'})`: available archived explanation; no questions, no TER rate, no company determination.
+## Remaining content gaps
 
-`getCard({topic_id:'npwp_nik',language:'en'})`: partial Article23 context; NPWP/NIK integration and definition unavailable.
-
-With an empty index, `getCard({topic_id:'pph21',language:'id'}, emptyFixtureRoot)`: unavailable, empty summary/detail/evidence; missing-support blockers. This case is executed by the test, not fabricated as a normal production endpoint.
-
-All 27 live snapshots, including source chains, are in `tooltip_cards.json` / `TOOLTIPS_RU_EN_ID.md`; these are not licensed tax review.
+PPh26 is partial: residency/treaty evidence and full current treatment need specialist review. PPh29 is partial: a separate payer/mechanism statement is unavailable; current annual payment procedure/amount is unconfirmed. NPWP/NIK is partial: definition, expansion, integration and mechanism unavailable; only the archived Article23 identifier context is grounded. Rates, deadlines, numeric TER, current law and company obligations remain blocked for every topic. Broader tax scope is not added.

@@ -74,7 +74,7 @@ orphan text is unassigned; explicit Penjelasan is separate; numbered amendment i
 preceding article. Paragraph markers/footnote markers remain raw; OCR-confused labels and footnote meanings
 are not silently corrected or certified. The original PDF and layout text remain the visual reference.
 
-The indexed corpus is261 fragments /125 identified provisions across the existing scope.36 atomic statement
+The indexed corpus is261 fragments /125 identified provisions across the existing scope.67 atomic statement
 definitions are bound by article/role/text anchor to exact reviewed source SHAs. This is a small corpus:
 topic/concept search returns complete relevant provision bundles to avoid arbitrary top-three page loss;
 precision and bounded caching should be reevaluated before a large corpus or a live request path.
@@ -93,3 +93,7 @@ need separate tests before any adapter is enabled. No flags were added/enabled o
 ## Additive v2.1 / tooltip v1
 
 See ANTIGRAVITY_HANDOFF.md for explicit explanation/company_determination intent, prioritized relevant questions, stable card topics and the exact rendering contract. PMK1 text is now archived: its chain blocker is incomplete review, not download failure. Numeric/current applicability remains blocked.
+
+## Tooltip v2 editorial update
+
+ANTIGRAVITY_HANDOFF.md now specifies tooltip schema2, explicit definition/mechanism/condition roles, object-shaped abbreviation with availability, and complete supporting-provision anchors. Retrieval schema2 adds presentation_roles/text_anchors without changing numeric/company blockers. Source PDFs/index are unchanged.

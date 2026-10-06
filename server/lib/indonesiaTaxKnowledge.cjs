@@ -91,7 +91,7 @@ function retrieve(input,root=ROOT){
    if(!sourceIsCurrent(s.source_id,s.sha256))problems.push({code:'source_version_changed',source_id:s.source_id,expected_sha256:s.sha256,current_sha256:manifest.sources[s.source_id]?.current_sha256||null});
    if(fs_.filter(Boolean).some(f=>f.sha256!==s.sha256||f.provision_id!==s.provision_id||f.locator.article!==s.article||f.role!==s.role))problems.push({code:'support_identity_mismatch',provision_id:s.provision_id});
    const text=fs_.filter(Boolean).map(f=>f.text).join('\n');
-   if(!normalized(text).includes(normalized(s.text_anchor)))problems.push({code:'text_anchor_missing',provision_id:s.provision_id});
+   if([s.text_anchor,...s.text_anchors||[]].some(anchor=>!normalized(text).includes(normalized(anchor))))problems.push({code:'text_anchor_missing',provision_id:s.provision_id});
    const st=temporal(input.period,s.source_period.from,s.source_period.to);
    if(st==='outside_period')problems.push({code:'support_outside_requested_period',provision_id:s.provision_id,recorded_window:s.source_period});
    for(const original of fs_.filter(Boolean)){
@@ -118,7 +118,7 @@ function retrieve(input,root=ROOT){
    out.blockers.push(...problems.map(p=>({...p,claim_id:c.id})));continue;}
   // General explanation is explicitly documentary, not a period/company tax determination.
   const scope=tc==='undated_reference'||tc==='period_missing'?'archived_document_reference':'archived_document_explanation';
-  out.claims.push({id:c.id,topic:c.topic,kind:c.kind,scope,text:c.translations[lang],evidence_ids:evidence.map(s=>s.provision_id),
+  out.claims.push({id:c.id,topic:c.topic,kind:c.kind,scope,text:c.translations[lang],presentation_roles:c.presentation_roles||[],evidence_ids:evidence.map(s=>s.provision_id),
    applicability:'not_established',period:c.period,evidence_quality:'text_grounded_not_professionally_reviewed',translations_share_evidence:true});
   for(const e of evidence)if(!seenEvidence.has(e.provision_id)){seenEvidence.add(e.provision_id);out.claim_evidence.push(e);}
  }
