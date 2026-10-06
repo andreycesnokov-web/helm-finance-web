@@ -1,0 +1,252 @@
+{
+  "country": {
+    "ru": "Уточните: страна налоговой регистрации.",
+    "en": "Please specify country of tax registration.",
+    "id": "Mohon jelaskan negara pendaftaran pajak."
+  },
+  "legal_entity_type": {
+    "ru": "Уточните: точная правовая форма (PT, perseroan perorangan, CV и т.д.).",
+    "en": "Please specify exact legal form (PT, single-person company, CV, etc.).",
+    "id": "Mohon jelaskan bentuk badan yang tepat (PT, perseroan perorangan, CV, dll.)."
+  },
+  "tax_registration_date": {
+    "ru": "Уточните: дата налоговой регистрации.",
+    "en": "Please specify tax registration date.",
+    "id": "Mohon jelaskan tanggal pendaftaran pajak."
+  },
+  "annual_turnover": {
+    "ru": "Уточните: годовой оборот и относящийся к нему год.",
+    "en": "Please specify annual turnover and its year.",
+    "id": "Mohon jelaskan omzet tahunan dan tahunnya."
+  },
+  "activity": {
+    "ru": "Уточните: фактическая деятельность и виды дохода.",
+    "en": "Please specify actual activities and income types.",
+    "id": "Mohon jelaskan kegiatan aktual dan jenis penghasilan."
+  },
+  "prior_regime": {
+    "ru": "Уточните: история прежнего налогового режима и срок его применения.",
+    "en": "Please specify prior tax regime history and its eligibility period.",
+    "id": "Mohon jelaskan riwayat rezim sebelumnya dan masa penggunaannya."
+  },
+  "regime_election": {
+    "ru": "Уточните: выбор общего или специального режима и документы выбора.",
+    "en": "Please specify ordinary or special regime election and evidence.",
+    "id": "Mohon jelaskan pilihan ketentuan umum atau rezim khusus serta buktinya."
+  },
+  "owner_group_turnover": {
+    "ru": "Уточните: оборот собственника, связанных perseroan perorangan и применимых членов семьи.",
+    "en": "Please specify turnover of the owner, associated single-person companies and applicable family members.",
+    "id": "Mohon jelaskan omzet pemilik, perseroan perorangan terkait dan anggota keluarga yang relevan."
+  },
+  "vat_status": {
+    "ru": "Уточните: подтверждённый статус PKP на дату сделки.",
+    "en": "Please specify confirmed PKP status on the transaction date.",
+    "id": "Mohon jelaskan status PKP terkonfirmasi pada tanggal transaksi."
+  },
+  "taxable_supply_type": {
+    "ru": "Уточните: вид товара или услуги и статус покупателя.",
+    "en": "Please specify goods/service classification and buyer status.",
+    "id": "Mohon jelaskan klasifikasi barang/jasa dan status pembeli."
+  },
+  "transaction_date": {
+    "ru": "Уточните: дата сделки и возникновения обязанности.",
+    "en": "Please specify transaction date and obligation trigger.",
+    "id": "Mohon jelaskan tanggal transaksi dan saat timbulnya kewajiban."
+  },
+  "special_vat_base": {
+    "ru": "Уточните: применяется ли специальная база PPN и на каком основании.",
+    "en": "Please specify whether a special PPN base applies and its basis.",
+    "id": "Mohon jelaskan apakah DPP PPN khusus berlaku serta dasarnya."
+  },
+  "financial_year_end": {
+    "ru": "Уточните: дата окончания финансового года.",
+    "en": "Please specify financial-year end date.",
+    "id": "Mohon jelaskan tanggal akhir tahun buku."
+  },
+  "recipient_residency": {
+    "ru": "Уточните: налоговое резидентство получателя в нужном периоде.",
+    "en": "Please specify recipient tax residency for the relevant period.",
+    "id": "Mohon jelaskan domisili pajak penerima pada periode terkait."
+  },
+  "employment_type": {
+    "ru": "Уточните: категория занятости (постоянный сотрудник, непостоянный или подрядчик).",
+    "en": "Please specify employment category (permanent, non-permanent, or non-employee).",
+    "id": "Mohon jelaskan kategori pekerja (pegawai tetap, tidak tetap atau bukan pegawai)."
+  },
+  "gross_pay": {
+    "ru": "Уточните: валовой доход и состав его компонентов.",
+    "en": "Please specify gross pay and its components.",
+    "id": "Mohon jelaskan penghasilan bruto dan komponennya."
+  },
+  "ptkp_category": {
+    "ru": "Уточните: подтверждённая категория PTKP.",
+    "en": "Please specify confirmed PTKP category.",
+    "id": "Mohon jelaskan kategori PTKP terkonfirmasi."
+  },
+  "payroll_period": {
+    "ru": "Уточните: месяц зарплаты.",
+    "en": "Please specify payroll month.",
+    "id": "Mohon jelaskan bulan penggajian."
+  },
+  "last_tax_period": {
+    "ru": "Уточните: является ли месяц последним налоговым периодом работника.",
+    "en": "Please specify whether this is the worker's last tax period.",
+    "id": "Mohon jelaskan apakah ini Masa Pajak Terakhir pekerja."
+  },
+  "annual_payroll": {
+    "ru": "Уточните: доход за год или часть года.",
+    "en": "Please specify annual or part-year income.",
+    "id": "Mohon jelaskan penghasilan tahunan atau bagian tahun."
+  },
+  "prior_withholding": {
+    "ru": "Уточните: ранее удержанные суммы и подтверждающие документы.",
+    "en": "Please specify earlier withholding amounts and supporting records.",
+    "id": "Mohon jelaskan jumlah pemotongan sebelumnya serta buktinya."
+  },
+  "recipient_country": {
+    "ru": "Уточните: страна налогового резидентства получателя.",
+    "en": "Please specify recipient tax-residence country.",
+    "id": "Mohon jelaskan negara domisili pajak penerima."
+  },
+  "recipient_type": {
+    "ru": "Уточните: получатель — физлицо, компания или BUT.",
+    "en": "Please specify whether the recipient is an individual, entity or BUT.",
+    "id": "Mohon jelaskan apakah penerima orang pribadi, badan atau BUT."
+  },
+  "income_type": {
+    "ru": "Уточните: точный вид дохода или платежа.",
+    "en": "Please specify exact income/payment category.",
+    "id": "Mohon jelaskan jenis penghasilan/pembayaran yang tepat."
+  },
+  "permanent_establishment": {
+    "ru": "Уточните: наличие BUT в Индонезии.",
+    "en": "Please specify presence of a BUT in Indonesia.",
+    "id": "Mohon jelaskan keberadaan BUT di Indonesia."
+  },
+  "treaty_documentation": {
+    "ru": "Уточните: документы резидентства и основания применения договора.",
+    "en": "Please specify residency documents and treaty-entitlement evidence.",
+    "id": "Mohon jelaskan dokumen domisili dan bukti hak P3B."
+  },
+  "beneficial_owner": {
+    "ru": "Уточните: фактический получатель дохода.",
+    "en": "Please specify beneficial recipient of the income.",
+    "id": "Mohon jelaskan penerima manfaat penghasilan."
+  },
+  "payer_withholder_status": {
+    "ru": "Уточните: правовой статус плательщика как pemotong.",
+    "en": "Please specify payer's legal withholding status.",
+    "id": "Mohon jelaskan status hukum pembayar sebagai pemotong."
+  },
+  "service_category": {
+    "ru": "Уточните: вид услуги по договору.",
+    "en": "Please specify service category in the contract.",
+    "id": "Mohon jelaskan kategori jasa dalam kontrak."
+  },
+  "recipient_npwp": {
+    "ru": "Уточните: подтверждённый NPWP/NIK получателя.",
+    "en": "Please specify confirmed recipient NPWP/NIK.",
+    "id": "Mohon jelaskan NPWP/NIK penerima terkonfirmasi."
+  },
+  "final_tax_certificate": {
+    "ru": "Уточните: документы об отдельном финальном налоге или освобождении.",
+    "en": "Please specify separate final-tax or exemption documentation.",
+    "id": "Mohon jelaskan dokumen pajak final tersendiri atau pengecualian."
+  },
+  "reimbursement_evidence": {
+    "ru": "Уточните: договоры и доказательства расходов третьих лиц/материалов.",
+    "en": "Please specify contracts and third-party/material cost evidence.",
+    "id": "Mohon jelaskan kontrak dan bukti biaya pihak ketiga/material."
+  },
+  "rental_object": {
+    "ru": "Уточните: что арендуется: земля/здание, оборудование или размещение.",
+    "en": "Please specify rental object: land/building, equipment or accommodation.",
+    "id": "Mohon jelaskan objek sewa: tanah/bangunan, peralatan atau penginapan."
+  },
+  "contract_date": {
+    "ru": "Уточните: дата заключения договора.",
+    "en": "Please specify contract date.",
+    "id": "Mohon jelaskan tanggal kontrak."
+  },
+  "rental_start_date": {
+    "ru": "Уточните: дата начала аренды.",
+    "en": "Please specify rental commencement date.",
+    "id": "Mohon jelaskan tanggal mulai sewa."
+  },
+  "gross_rent": {
+    "ru": "Уточните: валовая сумма аренды и её состав.",
+    "en": "Please specify gross rent and its composition.",
+    "id": "Mohon jelaskan nilai bruto sewa dan komponennya."
+  },
+  "service_charges": {
+    "ru": "Уточните: связанные услуги, охрана и обслуживание и их договоры.",
+    "en": "Please specify related service, security and maintenance charges and contracts.",
+    "id": "Mohon jelaskan biaya layanan, keamanan, pemeliharaan terkait serta kontraknya."
+  },
+  "prior_year_tax": {
+    "ru": "Уточните: налог по прошлогоднему SPT.",
+    "en": "Please specify tax in the previous-year SPT.",
+    "id": "Mohon jelaskan pajak dalam SPT tahun sebelumnya."
+  },
+  "creditable_withholding": {
+    "ru": "Уточните: допустимые налоговые кредиты и доказательства.",
+    "en": "Please specify allowable tax credits and evidence.",
+    "id": "Mohon jelaskan kredit pajak yang diperbolehkan dan buktinya."
+  },
+  "prior_installments": {
+    "ru": "Уточните: уплаченные авансы.",
+    "en": "Please specify instalments already paid.",
+    "id": "Mohon jelaskan angsuran yang sudah dibayar."
+  },
+  "tax_year": {
+    "ru": "Уточните: налоговый год.",
+    "en": "Please specify tax year.",
+    "id": "Mohon jelaskan tahun pajak."
+  },
+  "annual_taxable_income": {
+    "ru": "Уточните: налогооблагаемый годовой доход.",
+    "en": "Please specify annual taxable income.",
+    "id": "Mohon jelaskan penghasilan kena pajak tahunan."
+  },
+  "special_installment_category": {
+    "ru": "Уточните: относится ли налогоплательщик к особой категории авансов.",
+    "en": "Please specify whether a special instalment category applies.",
+    "id": "Mohon jelaskan apakah kategori angsuran khusus berlaku."
+  },
+  "tax_type": {
+    "ru": "Уточните: конкретный налог.",
+    "en": "Please specify specific tax type.",
+    "id": "Mohon jelaskan jenis pajak tertentu."
+  },
+  "tax_period": {
+    "ru": "Уточните: точный налоговый период.",
+    "en": "Please specify exact tax period.",
+    "id": "Mohon jelaskan periode pajak yang tepat."
+  },
+  "payer_role": {
+    "ru": "Уточните: роль плательщика: удерживающий или платящий за себя.",
+    "en": "Please specify payer role: withholder or self-payer.",
+    "id": "Mohon jelaskan peran pembayar: pemotong atau pembayar sendiri."
+  },
+  "return_type": {
+    "ru": "Уточните: вид отчёта SPT.",
+    "en": "Please specify SPT return type.",
+    "id": "Mohon jelaskan jenis SPT."
+  },
+  "filing_extension": {
+    "ru": "Уточните: есть ли подтверждённое продление срока подачи.",
+    "en": "Please specify whether a filing extension is approved.",
+    "id": "Mohon jelaskan apakah perpanjangan pelaporan disetujui."
+  },
+  "holiday_calendar": {
+    "ru": "Уточните: официальный календарь нерабочих дней нужного года.",
+    "en": "Please specify official holiday calendar for the relevant year.",
+    "id": "Mohon jelaskan kalender hari libur resmi tahun terkait."
+  },
+  "special_deadline_relief": {
+    "ru": "Уточните: есть ли специальное послабление для периода.",
+    "en": "Please specify whether period-specific deadline relief applies.",
+    "id": "Mohon jelaskan apakah relaksasi tenggat khusus periode berlaku."
+  }
+}

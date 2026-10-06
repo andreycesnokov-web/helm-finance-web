@@ -1,0 +1,902 @@
+[
+  {
+    "topic_id": "pph21",
+    "language": "ru",
+    "status": "available",
+    "short_words": 30,
+    "summary_roles": [
+      "definition",
+      "mechanism",
+      "condition"
+    ],
+    "section_status": {
+      "what_is": "available",
+      "how_it_works": "available",
+      "main_condition": "available",
+      "summary": "available",
+      "detailed_explanation": "available"
+    },
+    "abbreviation_status": "available",
+    "claim_ids": [
+      "PAYROLL_SCOPE",
+      "PAYROLL_METHOD",
+      "PAYROLL_BASE",
+      "P21_SHORT_DEFINITION",
+      "P21_SHORT_MECHANISM",
+      "P21_SHORT_CONDITION",
+      "P21_ABBREVIATION"
+    ],
+    "evidence_ids": [
+      "PMK168_2023:6b06a241f9cd6fc6:4796bf2d18e3:operative_text:2:1",
+      "PMK168_2023:6b06a241f9cd6fc6:4796bf2d18e3:operative_text:13:12",
+      "PMK168_2023:6b06a241f9cd6fc6:4796bf2d18e3:operative_text:15:14",
+      "PMK168_2023:6b06a241f9cd6fc6:4796bf2d18e3:operative_text:3:2",
+      "PMK168_2023:6b06a241f9cd6fc6:4796bf2d18e3:operative_text:8:7"
+    ],
+    "currency_confirmed": false,
+    "professional_review": null
+  },
+  {
+    "topic_id": "pph21",
+    "language": "en",
+    "status": "available",
+    "short_words": 29,
+    "summary_roles": [
+      "definition",
+      "mechanism",
+      "condition"
+    ],
+    "section_status": {
+      "what_is": "available",
+      "how_it_works": "available",
+      "main_condition": "available",
+      "summary": "available",
+      "detailed_explanation": "available"
+    },
+    "abbreviation_status": "available",
+    "claim_ids": [
+      "PAYROLL_SCOPE",
+      "PAYROLL_METHOD",
+      "PAYROLL_BASE",
+      "P21_SHORT_DEFINITION",
+      "P21_SHORT_MECHANISM",
+      "P21_SHORT_CONDITION",
+      "P21_ABBREVIATION"
+    ],
+    "evidence_ids": [
+      "PMK168_2023:6b06a241f9cd6fc6:4796bf2d18e3:operative_text:2:1",
+      "PMK168_2023:6b06a241f9cd6fc6:4796bf2d18e3:operative_text:13:12",
+      "PMK168_2023:6b06a241f9cd6fc6:4796bf2d18e3:operative_text:15:14",
+      "PMK168_2023:6b06a241f9cd6fc6:4796bf2d18e3:operative_text:3:2",
+      "PMK168_2023:6b06a241f9cd6fc6:4796bf2d18e3:operative_text:8:7"
+    ],
+    "currency_confirmed": false,
+    "professional_review": null
+  },
+  {
+    "topic_id": "pph21",
+    "language": "id",
+    "status": "available",
+    "short_words": 30,
+    "summary_roles": [
+      "definition",
+      "mechanism",
+      "condition"
+    ],
+    "section_status": {
+      "what_is": "available",
+      "how_it_works": "available",
+      "main_condition": "available",
+      "summary": "available",
+      "detailed_explanation": "available"
+    },
+    "abbreviation_status": "available",
+    "claim_ids": [
+      "PAYROLL_SCOPE",
+      "PAYROLL_METHOD",
+      "PAYROLL_BASE",
+      "P21_SHORT_DEFINITION",
+      "P21_SHORT_MECHANISM",
+      "P21_SHORT_CONDITION",
+      "P21_ABBREVIATION"
+    ],
+    "evidence_ids": [
+      "PMK168_2023:6b06a241f9cd6fc6:4796bf2d18e3:operative_text:2:1",
+      "PMK168_2023:6b06a241f9cd6fc6:4796bf2d18e3:operative_text:13:12",
+      "PMK168_2023:6b06a241f9cd6fc6:4796bf2d18e3:operative_text:15:14",
+      "PMK168_2023:6b06a241f9cd6fc6:4796bf2d18e3:operative_text:3:2",
+      "PMK168_2023:6b06a241f9cd6fc6:4796bf2d18e3:operative_text:8:7"
+    ],
+    "currency_confirmed": false,
+    "professional_review": null
+  },
+  {
+    "topic_id": "pph26",
+    "language": "ru",
+    "status": "partial",
+    "short_words": 30,
+    "summary_roles": [
+      "definition",
+      "mechanism",
+      "condition"
+    ],
+    "section_status": {
+      "what_is": "available",
+      "how_it_works": "available",
+      "main_condition": "available",
+      "summary": "available",
+      "detailed_explanation": "available"
+    },
+    "abbreviation_status": "available",
+    "claim_ids": [
+      "FOREIGN_SCOPE",
+      "P26_SHORT_DEFINITION",
+      "P26_SHORT_MECHANISM",
+      "P26_SHORT_CONDITION",
+      "P26_ABBREVIATION"
+    ],
+    "evidence_ids": [
+      "DJP_SDSN_2023:45716e25368d0218:3eb90a3caba1:operative_text:26:1",
+      "PMK168_2023:6b06a241f9cd6fc6:4796bf2d18e3:operative_text:14:13"
+    ],
+    "currency_confirmed": false,
+    "professional_review": null
+  },
+  {
+    "topic_id": "pph26",
+    "language": "en",
+    "status": "partial",
+    "short_words": 36,
+    "summary_roles": [
+      "definition",
+      "mechanism",
+      "condition"
+    ],
+    "section_status": {
+      "what_is": "available",
+      "how_it_works": "available",
+      "main_condition": "available",
+      "summary": "available",
+      "detailed_explanation": "available"
+    },
+    "abbreviation_status": "available",
+    "claim_ids": [
+      "FOREIGN_SCOPE",
+      "P26_SHORT_DEFINITION",
+      "P26_SHORT_MECHANISM",
+      "P26_SHORT_CONDITION",
+      "P26_ABBREVIATION"
+    ],
+    "evidence_ids": [
+      "DJP_SDSN_2023:45716e25368d0218:3eb90a3caba1:operative_text:26:1",
+      "PMK168_2023:6b06a241f9cd6fc6:4796bf2d18e3:operative_text:14:13"
+    ],
+    "currency_confirmed": false,
+    "professional_review": null
+  },
+  {
+    "topic_id": "pph26",
+    "language": "id",
+    "status": "partial",
+    "short_words": 40,
+    "summary_roles": [
+      "definition",
+      "mechanism",
+      "condition"
+    ],
+    "section_status": {
+      "what_is": "available",
+      "how_it_works": "available",
+      "main_condition": "available",
+      "summary": "available",
+      "detailed_explanation": "available"
+    },
+    "abbreviation_status": "available",
+    "claim_ids": [
+      "FOREIGN_SCOPE",
+      "P26_SHORT_DEFINITION",
+      "P26_SHORT_MECHANISM",
+      "P26_SHORT_CONDITION",
+      "P26_ABBREVIATION"
+    ],
+    "evidence_ids": [
+      "DJP_SDSN_2023:45716e25368d0218:3eb90a3caba1:operative_text:26:1",
+      "PMK168_2023:6b06a241f9cd6fc6:4796bf2d18e3:operative_text:14:13"
+    ],
+    "currency_confirmed": false,
+    "professional_review": null
+  },
+  {
+    "topic_id": "pph23",
+    "language": "ru",
+    "status": "available",
+    "short_words": 32,
+    "summary_roles": [
+      "definition",
+      "mechanism",
+      "condition"
+    ],
+    "section_status": {
+      "what_is": "available",
+      "how_it_works": "available",
+      "main_condition": "available",
+      "summary": "available",
+      "detailed_explanation": "available"
+    },
+    "abbreviation_status": "available",
+    "claim_ids": [
+      "SERVICE_SCOPE",
+      "SERVICE_EXCEPTIONS",
+      "SERVICE_REIMBURSEMENT",
+      "SERVICE_NPWP",
+      "P23_SHORT_DEFINITION",
+      "P23_SHORT_MECHANISM",
+      "P23_SHORT_CONDITION",
+      "P23_ABBREVIATION"
+    ],
+    "evidence_ids": [
+      "DJP_SDSN_2023:45716e25368d0218:d01e95f3e43d:operative_text:23:1",
+      "PMK141_2015:cd107a9b7de8ad12:dd640c93573f:operative_text:1:1",
+      "PMK168_2023:6b06a241f9cd6fc6:4796bf2d18e3:operative_text:2:1"
+    ],
+    "currency_confirmed": false,
+    "professional_review": null
+  },
+  {
+    "topic_id": "pph23",
+    "language": "en",
+    "status": "available",
+    "short_words": 36,
+    "summary_roles": [
+      "definition",
+      "mechanism",
+      "condition"
+    ],
+    "section_status": {
+      "what_is": "available",
+      "how_it_works": "available",
+      "main_condition": "available",
+      "summary": "available",
+      "detailed_explanation": "available"
+    },
+    "abbreviation_status": "available",
+    "claim_ids": [
+      "SERVICE_SCOPE",
+      "SERVICE_EXCEPTIONS",
+      "SERVICE_REIMBURSEMENT",
+      "SERVICE_NPWP",
+      "P23_SHORT_DEFINITION",
+      "P23_SHORT_MECHANISM",
+      "P23_SHORT_CONDITION",
+      "P23_ABBREVIATION"
+    ],
+    "evidence_ids": [
+      "DJP_SDSN_2023:45716e25368d0218:d01e95f3e43d:operative_text:23:1",
+      "PMK141_2015:cd107a9b7de8ad12:dd640c93573f:operative_text:1:1",
+      "PMK168_2023:6b06a241f9cd6fc6:4796bf2d18e3:operative_text:2:1"
+    ],
+    "currency_confirmed": false,
+    "professional_review": null
+  },
+  {
+    "topic_id": "pph23",
+    "language": "id",
+    "status": "available",
+    "short_words": 35,
+    "summary_roles": [
+      "definition",
+      "mechanism",
+      "condition"
+    ],
+    "section_status": {
+      "what_is": "available",
+      "how_it_works": "available",
+      "main_condition": "available",
+      "summary": "available",
+      "detailed_explanation": "available"
+    },
+    "abbreviation_status": "available",
+    "claim_ids": [
+      "SERVICE_SCOPE",
+      "SERVICE_EXCEPTIONS",
+      "SERVICE_REIMBURSEMENT",
+      "SERVICE_NPWP",
+      "P23_SHORT_DEFINITION",
+      "P23_SHORT_MECHANISM",
+      "P23_SHORT_CONDITION",
+      "P23_ABBREVIATION"
+    ],
+    "evidence_ids": [
+      "DJP_SDSN_2023:45716e25368d0218:d01e95f3e43d:operative_text:23:1",
+      "PMK141_2015:cd107a9b7de8ad12:dd640c93573f:operative_text:1:1",
+      "PMK168_2023:6b06a241f9cd6fc6:4796bf2d18e3:operative_text:2:1"
+    ],
+    "currency_confirmed": false,
+    "professional_review": null
+  },
+  {
+    "topic_id": "pph_final_rent",
+    "language": "ru",
+    "status": "available",
+    "short_words": 30,
+    "summary_roles": [
+      "definition",
+      "mechanism",
+      "condition"
+    ],
+    "section_status": {
+      "what_is": "available",
+      "how_it_works": "available",
+      "main_condition": "available",
+      "summary": "available",
+      "detailed_explanation": "available"
+    },
+    "abbreviation_status": "available",
+    "claim_ids": [
+      "RENT_SCOPE",
+      "RENT_PAYER",
+      "RENT_BASE",
+      "RENT_SHORT_DEFINITION",
+      "RENT_SHORT_MECHANISM",
+      "RENT_SHORT_CONDITION",
+      "RENT_ABBREVIATION"
+    ],
+    "evidence_ids": [
+      "PP34_2017:2f5af8d0c92628fa:0df7d0c2a792:operative_text:2:1",
+      "PP34_2017:2f5af8d0c92628fa:0df7d0c2a792:operative_text:4:3",
+      "PP34_2017:2f5af8d0c92628fa:0df7d0c2a792:operative_text:3:2"
+    ],
+    "currency_confirmed": false,
+    "professional_review": null
+  },
+  {
+    "topic_id": "pph_final_rent",
+    "language": "en",
+    "status": "available",
+    "short_words": 35,
+    "summary_roles": [
+      "definition",
+      "mechanism",
+      "condition"
+    ],
+    "section_status": {
+      "what_is": "available",
+      "how_it_works": "available",
+      "main_condition": "available",
+      "summary": "available",
+      "detailed_explanation": "available"
+    },
+    "abbreviation_status": "available",
+    "claim_ids": [
+      "RENT_SCOPE",
+      "RENT_PAYER",
+      "RENT_BASE",
+      "RENT_SHORT_DEFINITION",
+      "RENT_SHORT_MECHANISM",
+      "RENT_SHORT_CONDITION",
+      "RENT_ABBREVIATION"
+    ],
+    "evidence_ids": [
+      "PP34_2017:2f5af8d0c92628fa:0df7d0c2a792:operative_text:2:1",
+      "PP34_2017:2f5af8d0c92628fa:0df7d0c2a792:operative_text:4:3",
+      "PP34_2017:2f5af8d0c92628fa:0df7d0c2a792:operative_text:3:2"
+    ],
+    "currency_confirmed": false,
+    "professional_review": null
+  },
+  {
+    "topic_id": "pph_final_rent",
+    "language": "id",
+    "status": "available",
+    "short_words": 33,
+    "summary_roles": [
+      "definition",
+      "mechanism",
+      "condition"
+    ],
+    "section_status": {
+      "what_is": "available",
+      "how_it_works": "available",
+      "main_condition": "available",
+      "summary": "available",
+      "detailed_explanation": "available"
+    },
+    "abbreviation_status": "available",
+    "claim_ids": [
+      "RENT_SCOPE",
+      "RENT_PAYER",
+      "RENT_BASE",
+      "RENT_SHORT_DEFINITION",
+      "RENT_SHORT_MECHANISM",
+      "RENT_SHORT_CONDITION",
+      "RENT_ABBREVIATION"
+    ],
+    "evidence_ids": [
+      "PP34_2017:2f5af8d0c92628fa:0df7d0c2a792:operative_text:2:1",
+      "PP34_2017:2f5af8d0c92628fa:0df7d0c2a792:operative_text:4:3",
+      "PP34_2017:2f5af8d0c92628fa:0df7d0c2a792:operative_text:3:2"
+    ],
+    "currency_confirmed": false,
+    "professional_review": null
+  },
+  {
+    "topic_id": "pph25",
+    "language": "ru",
+    "status": "available",
+    "short_words": 30,
+    "summary_roles": [
+      "definition",
+      "mechanism",
+      "condition"
+    ],
+    "section_status": {
+      "what_is": "available",
+      "how_it_works": "available",
+      "main_condition": "available",
+      "summary": "available",
+      "detailed_explanation": "available"
+    },
+    "abbreviation_status": "available",
+    "claim_ids": [
+      "INSTALLMENT_METHOD",
+      "INSTALLMENT_REPORTING",
+      "P25_SHORT_DEFINITION",
+      "P25_SHORT_MECHANISM",
+      "P25_SHORT_CONDITION",
+      "P25_ABBREVIATION"
+    ],
+    "evidence_ids": [
+      "DJP_SDSN_2023:45716e25368d0218:0909e9f52302:operative_text:25:1",
+      "PMK81_2024:b8f385dee2a8684c:4a850d775bb2:operative_text:171:3"
+    ],
+    "currency_confirmed": false,
+    "professional_review": null
+  },
+  {
+    "topic_id": "pph25",
+    "language": "en",
+    "status": "available",
+    "short_words": 33,
+    "summary_roles": [
+      "definition",
+      "mechanism",
+      "condition"
+    ],
+    "section_status": {
+      "what_is": "available",
+      "how_it_works": "available",
+      "main_condition": "available",
+      "summary": "available",
+      "detailed_explanation": "available"
+    },
+    "abbreviation_status": "available",
+    "claim_ids": [
+      "INSTALLMENT_METHOD",
+      "INSTALLMENT_REPORTING",
+      "P25_SHORT_DEFINITION",
+      "P25_SHORT_MECHANISM",
+      "P25_SHORT_CONDITION",
+      "P25_ABBREVIATION"
+    ],
+    "evidence_ids": [
+      "DJP_SDSN_2023:45716e25368d0218:0909e9f52302:operative_text:25:1",
+      "PMK81_2024:b8f385dee2a8684c:4a850d775bb2:operative_text:171:3"
+    ],
+    "currency_confirmed": false,
+    "professional_review": null
+  },
+  {
+    "topic_id": "pph25",
+    "language": "id",
+    "status": "available",
+    "short_words": 28,
+    "summary_roles": [
+      "definition",
+      "mechanism",
+      "condition"
+    ],
+    "section_status": {
+      "what_is": "available",
+      "how_it_works": "available",
+      "main_condition": "available",
+      "summary": "available",
+      "detailed_explanation": "available"
+    },
+    "abbreviation_status": "available",
+    "claim_ids": [
+      "INSTALLMENT_METHOD",
+      "INSTALLMENT_REPORTING",
+      "P25_SHORT_DEFINITION",
+      "P25_SHORT_MECHANISM",
+      "P25_SHORT_CONDITION",
+      "P25_ABBREVIATION"
+    ],
+    "evidence_ids": [
+      "DJP_SDSN_2023:45716e25368d0218:0909e9f52302:operative_text:25:1",
+      "PMK81_2024:b8f385dee2a8684c:4a850d775bb2:operative_text:171:3"
+    ],
+    "currency_confirmed": false,
+    "professional_review": null
+  },
+  {
+    "topic_id": "pph29",
+    "language": "ru",
+    "status": "partial",
+    "short_words": 17,
+    "summary_roles": [
+      "definition",
+      "condition"
+    ],
+    "section_status": {
+      "what_is": "available",
+      "how_it_works": "unavailable",
+      "main_condition": "available",
+      "summary": "available",
+      "detailed_explanation": "available"
+    },
+    "abbreviation_status": "available",
+    "claim_ids": [
+      "ANNUAL_UNDERPAYMENT",
+      "P29_SHORT_DEFINITION",
+      "P29_SHORT_CONDITION",
+      "P29_ABBREVIATION"
+    ],
+    "evidence_ids": [
+      "DJP_SDSN_2023:45716e25368d0218:6dba12aa9312:operative_text:29:2",
+      "PMK81_2024:b8f385dee2a8684c:ca1451055dbc:operative_text:95:3"
+    ],
+    "currency_confirmed": false,
+    "professional_review": null
+  },
+  {
+    "topic_id": "pph29",
+    "language": "en",
+    "status": "partial",
+    "short_words": 20,
+    "summary_roles": [
+      "definition",
+      "condition"
+    ],
+    "section_status": {
+      "what_is": "available",
+      "how_it_works": "unavailable",
+      "main_condition": "available",
+      "summary": "available",
+      "detailed_explanation": "available"
+    },
+    "abbreviation_status": "available",
+    "claim_ids": [
+      "ANNUAL_UNDERPAYMENT",
+      "P29_SHORT_DEFINITION",
+      "P29_SHORT_CONDITION",
+      "P29_ABBREVIATION"
+    ],
+    "evidence_ids": [
+      "DJP_SDSN_2023:45716e25368d0218:6dba12aa9312:operative_text:29:2",
+      "PMK81_2024:b8f385dee2a8684c:ca1451055dbc:operative_text:95:3"
+    ],
+    "currency_confirmed": false,
+    "professional_review": null
+  },
+  {
+    "topic_id": "pph29",
+    "language": "id",
+    "status": "partial",
+    "short_words": 20,
+    "summary_roles": [
+      "definition",
+      "condition"
+    ],
+    "section_status": {
+      "what_is": "available",
+      "how_it_works": "unavailable",
+      "main_condition": "available",
+      "summary": "available",
+      "detailed_explanation": "available"
+    },
+    "abbreviation_status": "available",
+    "claim_ids": [
+      "ANNUAL_UNDERPAYMENT",
+      "P29_SHORT_DEFINITION",
+      "P29_SHORT_CONDITION",
+      "P29_ABBREVIATION"
+    ],
+    "evidence_ids": [
+      "DJP_SDSN_2023:45716e25368d0218:6dba12aa9312:operative_text:29:2",
+      "PMK81_2024:b8f385dee2a8684c:ca1451055dbc:operative_text:95:3"
+    ],
+    "currency_confirmed": false,
+    "professional_review": null
+  },
+  {
+    "topic_id": "ppn",
+    "language": "ru",
+    "status": "available",
+    "short_words": 33,
+    "summary_roles": [
+      "definition",
+      "mechanism",
+      "condition"
+    ],
+    "section_status": {
+      "what_is": "available",
+      "how_it_works": "available",
+      "main_condition": "available",
+      "summary": "available",
+      "detailed_explanation": "available"
+    },
+    "abbreviation_status": "available",
+    "claim_ids": [
+      "VAT_SCOPE",
+      "VAT_MECHANISM",
+      "VAT_CREDIT",
+      "VAT_JAN_TRANSITION",
+      "PPN_SHORT_DEFINITION",
+      "PPN_SHORT_MECHANISM",
+      "PPN_SHORT_CONDITION",
+      "PPN_ABBREVIATION"
+    ],
+    "evidence_ids": [
+      "PMK164_2023:b3786674c43db1ff:b7f66e12d491:operative_text:17:5",
+      "PMK164_2023:b3786674c43db1ff:b7f66e12d491:operative_text:18:6",
+      "PMK131_2024:bd2b45907407c664:83d93b4ad40d:operative_text:3:2",
+      "PMK131_2024:bd2b45907407c664:83d93b4ad40d:operative_text:4:3",
+      "PMK131_2024:bd2b45907407c664:83d93b4ad40d:operative_text:5:4",
+      "PMK131_2024:bd2b45907407c664:83d93b4ad40d:operative_text:2:1"
+    ],
+    "currency_confirmed": false,
+    "professional_review": null
+  },
+  {
+    "topic_id": "ppn",
+    "language": "en",
+    "status": "available",
+    "short_words": 33,
+    "summary_roles": [
+      "definition",
+      "mechanism",
+      "condition"
+    ],
+    "section_status": {
+      "what_is": "available",
+      "how_it_works": "available",
+      "main_condition": "available",
+      "summary": "available",
+      "detailed_explanation": "available"
+    },
+    "abbreviation_status": "available",
+    "claim_ids": [
+      "VAT_SCOPE",
+      "VAT_MECHANISM",
+      "VAT_CREDIT",
+      "VAT_JAN_TRANSITION",
+      "PPN_SHORT_DEFINITION",
+      "PPN_SHORT_MECHANISM",
+      "PPN_SHORT_CONDITION",
+      "PPN_ABBREVIATION"
+    ],
+    "evidence_ids": [
+      "PMK164_2023:b3786674c43db1ff:b7f66e12d491:operative_text:17:5",
+      "PMK164_2023:b3786674c43db1ff:b7f66e12d491:operative_text:18:6",
+      "PMK131_2024:bd2b45907407c664:83d93b4ad40d:operative_text:3:2",
+      "PMK131_2024:bd2b45907407c664:83d93b4ad40d:operative_text:4:3",
+      "PMK131_2024:bd2b45907407c664:83d93b4ad40d:operative_text:5:4",
+      "PMK131_2024:bd2b45907407c664:83d93b4ad40d:operative_text:2:1"
+    ],
+    "currency_confirmed": false,
+    "professional_review": null
+  },
+  {
+    "topic_id": "ppn",
+    "language": "id",
+    "status": "available",
+    "short_words": 32,
+    "summary_roles": [
+      "definition",
+      "mechanism",
+      "condition"
+    ],
+    "section_status": {
+      "what_is": "available",
+      "how_it_works": "available",
+      "main_condition": "available",
+      "summary": "available",
+      "detailed_explanation": "available"
+    },
+    "abbreviation_status": "available",
+    "claim_ids": [
+      "VAT_SCOPE",
+      "VAT_MECHANISM",
+      "VAT_CREDIT",
+      "VAT_JAN_TRANSITION",
+      "PPN_SHORT_DEFINITION",
+      "PPN_SHORT_MECHANISM",
+      "PPN_SHORT_CONDITION",
+      "PPN_ABBREVIATION"
+    ],
+    "evidence_ids": [
+      "PMK164_2023:b3786674c43db1ff:b7f66e12d491:operative_text:17:5",
+      "PMK164_2023:b3786674c43db1ff:b7f66e12d491:operative_text:18:6",
+      "PMK131_2024:bd2b45907407c664:83d93b4ad40d:operative_text:3:2",
+      "PMK131_2024:bd2b45907407c664:83d93b4ad40d:operative_text:4:3",
+      "PMK131_2024:bd2b45907407c664:83d93b4ad40d:operative_text:5:4",
+      "PMK131_2024:bd2b45907407c664:83d93b4ad40d:operative_text:2:1"
+    ],
+    "currency_confirmed": false,
+    "professional_review": null
+  },
+  {
+    "topic_id": "pkp",
+    "language": "ru",
+    "status": "available",
+    "short_words": 34,
+    "summary_roles": [
+      "definition",
+      "mechanism",
+      "condition"
+    ],
+    "section_status": {
+      "what_is": "available",
+      "how_it_works": "available",
+      "main_condition": "available",
+      "summary": "available",
+      "detailed_explanation": "available"
+    },
+    "abbreviation_status": "available",
+    "claim_ids": [
+      "PKP_SCOPE",
+      "PKP_REGISTRATION",
+      "PKP_SHORT_DEFINITION",
+      "PKP_SHORT_MECHANISM",
+      "PKP_SHORT_CONDITION",
+      "PKP_ABBREVIATION"
+    ],
+    "evidence_ids": [
+      "PMK164_2023:b3786674c43db1ff:b7f66e12d491:operative_text:17:5",
+      "PMK164_2023:b3786674c43db1ff:b7f66e12d491:operative_text:18:6",
+      "PMK131_2024:bd2b45907407c664:83d93b4ad40d:operative_text:3:2",
+      "PMK131_2024:bd2b45907407c664:83d93b4ad40d:operative_text:4:3"
+    ],
+    "currency_confirmed": false,
+    "professional_review": null
+  },
+  {
+    "topic_id": "pkp",
+    "language": "en",
+    "status": "available",
+    "short_words": 36,
+    "summary_roles": [
+      "definition",
+      "mechanism",
+      "condition"
+    ],
+    "section_status": {
+      "what_is": "available",
+      "how_it_works": "available",
+      "main_condition": "available",
+      "summary": "available",
+      "detailed_explanation": "available"
+    },
+    "abbreviation_status": "available",
+    "claim_ids": [
+      "PKP_SCOPE",
+      "PKP_REGISTRATION",
+      "PKP_SHORT_DEFINITION",
+      "PKP_SHORT_MECHANISM",
+      "PKP_SHORT_CONDITION",
+      "PKP_ABBREVIATION"
+    ],
+    "evidence_ids": [
+      "PMK164_2023:b3786674c43db1ff:b7f66e12d491:operative_text:17:5",
+      "PMK164_2023:b3786674c43db1ff:b7f66e12d491:operative_text:18:6",
+      "PMK131_2024:bd2b45907407c664:83d93b4ad40d:operative_text:3:2",
+      "PMK131_2024:bd2b45907407c664:83d93b4ad40d:operative_text:4:3"
+    ],
+    "currency_confirmed": false,
+    "professional_review": null
+  },
+  {
+    "topic_id": "pkp",
+    "language": "id",
+    "status": "available",
+    "short_words": 31,
+    "summary_roles": [
+      "definition",
+      "mechanism",
+      "condition"
+    ],
+    "section_status": {
+      "what_is": "available",
+      "how_it_works": "available",
+      "main_condition": "available",
+      "summary": "available",
+      "detailed_explanation": "available"
+    },
+    "abbreviation_status": "available",
+    "claim_ids": [
+      "PKP_SCOPE",
+      "PKP_REGISTRATION",
+      "PKP_SHORT_DEFINITION",
+      "PKP_SHORT_MECHANISM",
+      "PKP_SHORT_CONDITION",
+      "PKP_ABBREVIATION"
+    ],
+    "evidence_ids": [
+      "PMK164_2023:b3786674c43db1ff:b7f66e12d491:operative_text:17:5",
+      "PMK164_2023:b3786674c43db1ff:b7f66e12d491:operative_text:18:6",
+      "PMK131_2024:bd2b45907407c664:83d93b4ad40d:operative_text:3:2",
+      "PMK131_2024:bd2b45907407c664:83d93b4ad40d:operative_text:4:3"
+    ],
+    "currency_confirmed": false,
+    "professional_review": null
+  },
+  {
+    "topic_id": "npwp_nik",
+    "language": "ru",
+    "status": "partial",
+    "short_words": 0,
+    "summary_roles": [],
+    "section_status": {
+      "what_is": "unavailable",
+      "how_it_works": "unavailable",
+      "main_condition": "unavailable",
+      "summary": "unavailable",
+      "detailed_explanation": "available"
+    },
+    "abbreviation_status": "unavailable",
+    "claim_ids": [
+      "SERVICE_NPWP"
+    ],
+    "evidence_ids": [
+      "DJP_SDSN_2023:45716e25368d0218:d01e95f3e43d:operative_text:23:1"
+    ],
+    "currency_confirmed": false,
+    "professional_review": null
+  },
+  {
+    "topic_id": "npwp_nik",
+    "language": "en",
+    "status": "partial",
+    "short_words": 0,
+    "summary_roles": [],
+    "section_status": {
+      "what_is": "unavailable",
+      "how_it_works": "unavailable",
+      "main_condition": "unavailable",
+      "summary": "unavailable",
+      "detailed_explanation": "available"
+    },
+    "abbreviation_status": "unavailable",
+    "claim_ids": [
+      "SERVICE_NPWP"
+    ],
+    "evidence_ids": [
+      "DJP_SDSN_2023:45716e25368d0218:d01e95f3e43d:operative_text:23:1"
+    ],
+    "currency_confirmed": false,
+    "professional_review": null
+  },
+  {
+    "topic_id": "npwp_nik",
+    "language": "id",
+    "status": "partial",
+    "short_words": 0,
+    "summary_roles": [],
+    "section_status": {
+      "what_is": "unavailable",
+      "how_it_works": "unavailable",
+      "main_condition": "unavailable",
+      "summary": "unavailable",
+      "detailed_explanation": "available"
+    },
+    "abbreviation_status": "unavailable",
+    "claim_ids": [
+      "SERVICE_NPWP"
+    ],
+    "evidence_ids": [
+      "DJP_SDSN_2023:45716e25368d0218:d01e95f3e43d:operative_text:23:1"
+    ],
+    "currency_confirmed": false,
+    "professional_review": null
+  }
+]
