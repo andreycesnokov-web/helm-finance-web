@@ -17,6 +17,7 @@ import {
   runwayTarget, minCash, runwayDays, pulseStatus, headlineKey, decisions, nextDays, cashFlow, pctChange, obligationTiles,
 } from '../lib/pulseModel'
 import { useAskContext } from '../ai/AskContext'
+import InfoTooltip from '../../components/InfoTooltip'
 
 const iso = (d) => d.toISOString().slice(0, 10)
 const daysAgo = (n) => { const d = new Date(); d.setDate(d.getDate() - n); return iso(d) }
@@ -143,7 +144,7 @@ export default function Pulse() {
             <span className="v2-hero-big v2-num">{money(p.totalBalance)}</span>
             <span className="v2-hero-meta">
               {t('pulse.accounts', { n: m.accounts.length, cur: currencies.join(', ') || 'IDR' })}
-              {currencies.some((c) => c !== 'IDR') && p.rates_metadata && (
+              {currencies.some((c) => c !== 'IDR') && p.rates_metadata && p.rates_metadata.source !== 'uninitialized' && (
                 <> · {
                   p.rates_metadata.source === 'bi_jisdor' ? 'JISDOR'
                   : p.rates_metadata.source === 'bi_jisdor_hybrid' ? 'JISDOR + Market'
@@ -235,6 +236,38 @@ export default function Pulse() {
       </div>
 
       <section className="v2-tiles" aria-label={t('pulse.tilesLabel')}>
+        <div className="v2-tile">
+          <span className="v2-tile-label">
+            Daily spend
+            <InfoTooltip term="daily_spend" lang={lang} />
+          </span>
+          <span className="v2-tile-val v2-num">
+            {p.daily_spend != null ? money(p.daily_spend) : '—'}
+          </span>
+          <span className="v2-tile-sub">
+            {p.daily_spend != null
+              ? (p.window_start && p.window_end ? `${p.window_start} – ${p.window_end}` : `Rolling ${p.daily_spend_window_days || 30}d`)
+              : 'Requires expense history'}
+          </span>
+        </div>
+        <div className="v2-tile">
+          <span className="v2-tile-label">
+            Net cash burn
+            <InfoTooltip term="gross_net_burn" lang={lang} />
+          </span>
+          <span className="v2-tile-val v2-num">
+            {p.net_burn_daily != null ? money(p.net_burn_daily) : '—'}
+          </span>
+          <span className="v2-tile-sub">
+            {p.runway_reason === 'positive_cash_flow'
+              ? 'Cash flow positive (0 drain)'
+              : p.runway_reason === 'break_even'
+              ? 'Break-even (0 drain)'
+              : p.net_burn_daily > 0
+              ? 'Daily cash drain'
+              : 'Requires operating history'}
+          </span>
+        </div>
         <div className="v2-tile">
           <span className="v2-tile-label">{t('pulse.moneyIn')}</span>
           <span className="v2-tile-val v2-num">{flow ? money(flow.moneyIn) : '—'}</span>

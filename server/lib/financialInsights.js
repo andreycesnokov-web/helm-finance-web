@@ -76,17 +76,23 @@ const RE = {
         /withholding/i, /\bbukti\s+potong\b/i, /\btax\b/i],
   interest: [/\binterest\b/i, /\bbunga\b/i, /loan\s+interest/i],
   financing: [/loan\s+(repayment|principal|proceeds)/i, /owner\s+(funding|withdrawal|draw)/i,
-              /capital\s+(injection|contribution)/i, /\bfinancing\b/i, /\bmodal\b/i,
-              /shareholder\s+loan/i, /\bfunding\b/i, /\bdividend\b/i],
+              /capital\s+(injection|contribution|funding)/i, /\bfinancing\b/i, /\bmodal\s+(disetor|usaha)\b/i,
+              /shareholder\s+loan/i, /\bfunding\b/i, /\bdividend\b/i,
+              /liquidity\s+reserve/i, /capital\s+reserve/i, /treasury\s+reserve/i],
   revenue: [/\brevenue\b/i, /\bsales\b/i, /\bpenjualan\b/i, /wash\s+revenue/i,
             /advertising\s+slot/i, /co-?branding/i, /partner\s+settlement/i,
-            /xendit\s+settlement/i, /\bsettlement\b/i, /\bincome\b/i],
+            /xendit\s+settlement/i, /\bsettlement\b/i, /\bincome\b/i,
+            /(client|customer)\s+payment/i, /payment\s+(from|by)\s+(client|customer)/i,
+            /pembayaran\s+(dari\s+)?(klien|pelanggan)/i, /pelunasan\s+piutang/i,
+            /client\s+(fee|retainer|project|contract)/i, /customer\s+(invoice|fee|billing)/i],
   direct_cost: [/refill/i, /liquid\s+supplies/i, /\bsupplies\b/i, /\bmaintenance\b/i,
                 /\belectricity\b/i, /\blistrik\b/i, /\blogistics\b/i, /\bcogs\b/i,
                 /direct\s+cost/i, /\bconsumables?\b/i],
   operating_expense: [/\brent\b/i, /\bsewa\b/i, /\bsalary\b/i, /\bpayroll\b/i, /\bgaji\b/i,
                       /\bmarketing\b/i, /\bsoftware\b/i, /subscription/i, /\bbank\b.*\bfee\b/i,
-                      /admin\s+fee/i, /\butilit(y|ies)\b/i, /\binsurance\b/i, /\boffice\b/i],
+                      /admin\s+fee/i, /\butilit(y|ies)\b/i, /\binsurance\b/i, /\boffice\b/i,
+                      /(vendor|supplier)\s+invoice/i, /invoice\s+(pembelian|vendor|supplier)/i,
+                      /pembayaran\s+(ke\s+|kepada\s+)?(vendor|supplier)/i, /tagihan\s+vendor/i],
 };
 const NOT_CAPEX = [/maintenance/i, /\brepair/i, /\bservicing\b/i, /\brental\b/i, /\brent\b/i];
 
@@ -121,6 +127,12 @@ function classifyTransaction(tx) {
   if (hit(RE.tax, s)) return { class: 'tax', matched_on: 'keyword', needs_review: false };
   if (hit(RE.interest, s)) return { class: 'interest', matched_on: 'keyword', needs_review: false };
   if (hit(RE.financing, s)) return { class: 'financing', matched_on: 'keyword', needs_review: false };
+
+  // Category explicit check for confirmed operating revenue
+  const cat = String((tx && tx.category) || '').trim();
+  if (/^(revenue|sales|operating revenue)$/i.test(cat) && type === 'income') {
+    return { class: 'revenue', matched_on: 'category', needs_review: false };
+  }
 
   // Money direction is a strong signal, so revenue is only claimed for inbound rows.
   if (type === 'income') {

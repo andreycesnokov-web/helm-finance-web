@@ -4,6 +4,7 @@ import { useAuth } from '../hooks/useAuth'
 import { useTranslation } from '../hooks/useTranslation'
 import { apiFetch, fmt, fmtFull } from '../lib/api'
 import DocumentsPanel from '../components/DocumentsPanel'
+import InfoTooltip from '../components/InfoTooltip'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -648,8 +649,8 @@ export default function Transactions() {
       <div className="summary-grid">
         <SummaryCard label={tr('transactions.totalIncome')}   value={fmt(totalIncome)}   sub={`${filtered.filter(tx => tx.type === 'income').length} ${tr('transactions.transactionsLabel')}`}  color="var(--green)" />
         <SummaryCard label={tr('transactions.totalExpenses')} value={fmt(totalExpenses)} sub={`${filtered.filter(tx => tx.type === 'expense').length} ${tr('transactions.transactionsLabel')}`} color="var(--red)"   />
-        <SummaryCard label={tr('transactions.netFlow')}       value={(netFlow >= 0 ? '+' : '') + fmt(netFlow)} sub={tr('transactions.incomeExpenses')} color={netFlow >= 0 ? 'var(--green)' : 'var(--red)'} />
-        <SummaryCard label={tr('transactions.showing')}        value={filtered.length}    sub={tr('transactions.transactionsLabel')}    color="var(--text)" />
+        <SummaryCard label={<>{tr('transactions.netFlow')}<InfoTooltip term="gross_net_burn" /></>} value={(netFlow >= 0 ? '+' : '') + fmt(netFlow)} sub={tr('transactions.incomeExpenses')} color={netFlow >= 0 ? 'var(--green)' : 'var(--red)'} />
+        <SummaryCard label={<>{tr('transactions.showing')}<InfoTooltip term="internal_transfer" /></>} value={filtered.length}    sub={tr('transactions.transactionsLabel')}    color="var(--text)" />
       </div>
 
       {/* ── Filter bar ─── */}

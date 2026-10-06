@@ -1,0 +1,16 @@
+{
+  "baseline_sha": "749937d1df368302e4f05480504445db0eea08d1",
+  "runs": 78,
+  "before_page_pass": 38,
+  "before_page_fail": 40,
+  "after_same_page_pass": 75,
+  "after_same_page_fail": 3,
+  "after_provision_pass": 78,
+  "after_claim_binding_pass": 78,
+  "after_guards_pass": 78,
+  "substantive_explanations": 72,
+  "nonempty_scope_runs": 75,
+  "model_calls": 0,
+  "professional_review": null,
+  "semantic_tax_review": "NOT_PERFORMED"
+}

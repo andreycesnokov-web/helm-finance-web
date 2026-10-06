@@ -1,0 +1,3818 @@
+[
+  {
+    "example_kind": "available",
+    "input": {
+      "topic_id": "pph21",
+      "language": "ru",
+      "period": null
+    },
+    "actual_card": {
+      "schema_version": 2,
+      "contract": "indonesia_tax_tooltip_v2",
+      "topic_id": "pph21",
+      "language": "ru",
+      "name": "PPh 21 — Pajak Penghasilan Pasal 21",
+      "designation_role": "navigation_label_not_legal_determination",
+      "status": "available",
+      "coverage": "archived_document_explanation_only",
+      "summary": [
+        {
+          "id": "P21_SHORT_DEFINITION",
+          "topic": "pph21",
+          "kind": "document_explanation",
+          "scope": "archived_document_reference",
+          "text": "PPh21 — налог с определённых выплат физлицам за работу, услуги или участие в мероприятиях.",
+          "presentation_roles": [
+            "definition"
+          ],
+          "evidence_ids": [
+            "PMK168_2023:6b06a241f9cd6fc6:4796bf2d18e3:operative_text:2:1",
+            "PMK168_2023:6b06a241f9cd6fc6:4796bf2d18e3:operative_text:3:2"
+          ],
+          "applicability": "not_established",
+          "period": {
+            "from": "2024-01-01"
+          },
+          "evidence_quality": "text_grounded_not_professionally_reviewed",
+          "translations_share_evidence": true,
+          "statement_id": "P21_SHORT_DEFINITION",
+          "presentation_role": "definition"
+        },
+        {
+          "id": "P21_SHORT_MECHANISM",
+          "topic": "pph21",
+          "kind": "document_explanation",
+          "scope": "archived_document_reference",
+          "text": "Налог удерживает работодатель или другой указанный в правилах плательщик выплаты.",
+          "presentation_roles": [
+            "mechanism"
+          ],
+          "evidence_ids": [
+            "PMK168_2023:6b06a241f9cd6fc6:4796bf2d18e3:operative_text:2:1"
+          ],
+          "applicability": "not_established",
+          "period": {
+            "from": "2024-01-01"
+          },
+          "evidence_quality": "text_grounded_not_professionally_reviewed",
+          "translations_share_evidence": true,
+          "statement_id": "P21_SHORT_MECHANISM",
+          "presentation_role": "mechanism"
+        },
+        {
+          "id": "P21_SHORT_CONDITION",
+          "topic": "pph21",
+          "kind": "document_explanation",
+          "scope": "archived_document_reference",
+          "text": "Проверьте категорию получателя и налоговый период.",
+          "presentation_roles": [
+            "condition"
+          ],
+          "evidence_ids": [
+            "PMK168_2023:6b06a241f9cd6fc6:4796bf2d18e3:operative_text:13:12",
+            "PMK168_2023:6b06a241f9cd6fc6:4796bf2d18e3:operative_text:15:14"
+          ],
+          "applicability": "not_established",
+          "period": {
+            "from": "2024-01-01"
+          },
+          "evidence_quality": "text_grounded_not_professionally_reviewed",
+          "translations_share_evidence": true,
+          "statement_id": "P21_SHORT_CONDITION",
+          "presentation_role": "condition"
+        }
+      ],
+      "abbreviation": {
+        "status": "available",
+        "designation_language": "id",
+        "statements": [
+          {
+            "id": "P21_ABBREVIATION",
+            "topic": "pph21",
+            "kind": "document_explanation",
+            "scope": "archived_document_reference",
+            "text": "Pajak Penghasilan Pasal 21",
+            "presentation_roles": [
+              "abbreviation"
+            ],
+            "evidence_ids": [
+              "PMK168_2023:6b06a241f9cd6fc6:4796bf2d18e3:operative_text:2:1"
+            ],
+            "applicability": "not_established",
+            "period": {
+              "from": "2024-01-01"
+            },
+            "evidence_quality": "text_grounded_not_professionally_reviewed",
+            "translations_share_evidence": true,
+            "statement_id": "P21_ABBREVIATION",
+            "presentation_role": "abbreviation"
+          }
+        ]
+      },
+      "what_is": [
+        {
+          "id": "P21_SHORT_DEFINITION",
+          "topic": "pph21",
+          "kind": "document_explanation",
+          "scope": "archived_document_reference",
+          "text": "PPh21 — налог с определённых выплат физлицам за работу, услуги или участие в мероприятиях.",
+          "presentation_roles": [
+            "definition"
+          ],
+          "evidence_ids": [
+            "PMK168_2023:6b06a241f9cd6fc6:4796bf2d18e3:operative_text:2:1",
+            "PMK168_2023:6b06a241f9cd6fc6:4796bf2d18e3:operative_text:3:2"
+          ],
+          "applicability": "not_established",
+          "period": {
+            "from": "2024-01-01"
+          },
+          "evidence_quality": "text_grounded_not_professionally_reviewed",
+          "translations_share_evidence": true,
+          "statement_id": "P21_SHORT_DEFINITION",
+          "presentation_role": "definition"
+        }
+      ],
+      "how_it_works": [
+        {
+          "id": "P21_SHORT_MECHANISM",
+          "topic": "pph21",
+          "kind": "document_explanation",
+          "scope": "archived_document_reference",
+          "text": "Налог удерживает работодатель или другой указанный в правилах плательщик выплаты.",
+          "presentation_roles": [
+            "mechanism"
+          ],
+          "evidence_ids": [
+            "PMK168_2023:6b06a241f9cd6fc6:4796bf2d18e3:operative_text:2:1"
+          ],
+          "applicability": "not_established",
+          "period": {
+            "from": "2024-01-01"
+          },
+          "evidence_quality": "text_grounded_not_professionally_reviewed",
+          "translations_share_evidence": true,
+          "statement_id": "P21_SHORT_MECHANISM",
+          "presentation_role": "mechanism"
+        }
+      ],
+      "main_condition": [
+        {
+          "id": "P21_SHORT_CONDITION",
+          "topic": "pph21",
+          "kind": "document_explanation",
+          "scope": "archived_document_reference",
+          "text": "Проверьте категорию получателя и налоговый период.",
+          "presentation_roles": [
+            "condition"
+          ],
+          "evidence_ids": [
+            "PMK168_2023:6b06a241f9cd6fc6:4796bf2d18e3:operative_text:13:12",
+            "PMK168_2023:6b06a241f9cd6fc6:4796bf2d18e3:operative_text:15:14"
+          ],
+          "applicability": "not_established",
+          "period": {
+            "from": "2024-01-01"
+          },
+          "evidence_quality": "text_grounded_not_professionally_reviewed",
+          "translations_share_evidence": true,
+          "statement_id": "P21_SHORT_CONDITION",
+          "presentation_role": "condition"
+        }
+      ],
+      "section_status": {
+        "what_is": "available",
+        "how_it_works": "available",
+        "main_condition": "available",
+        "summary": "available",
+        "detailed_explanation": "available"
+      },
+      "unavailable_section_notice": "Для этого раздела недостаточно подтверждённых оснований.",
+      "what_to_check": [
+        {
+          "field": "employment_type",
+          "text": "Уточните: категория занятости (постоянный сотрудник, непостоянный или подрядчик).",
+          "role": "optional_check_not_assertion"
+        },
+        {
+          "field": "payroll_period",
+          "text": "Уточните: месяц зарплаты.",
+          "role": "optional_check_not_assertion"
+        }
+      ],
+      "detailed_explanation": [
+        {
+          "id": "P21_SHORT_DEFINITION",
+          "topic": "pph21",
+          "kind": "document_explanation",
+          "scope": "archived_document_reference",
+          "text": "PPh21 — налог с определённых выплат физлицам за работу, услуги или участие в мероприятиях.",
+          "presentation_roles": [
+            "definition"
+          ],
+          "evidence_ids": [
+            "PMK168_2023:6b06a241f9cd6fc6:4796bf2d18e3:operative_text:2:1",
+            "PMK168_2023:6b06a241f9cd6fc6:4796bf2d18e3:operative_text:3:2"
+          ],
+          "applicability": "not_established",
+          "period": {
+            "from": "2024-01-01"
+          },
+          "evidence_quality": "text_grounded_not_professionally_reviewed",
+          "translations_share_evidence": true,
+          "statement_id": "P21_SHORT_DEFINITION",
+          "presentation_role": "definition"
+        },
+        {
+          "id": "P21_SHORT_MECHANISM",
+          "topic": "pph21",
+          "kind": "document_explanation",
+          "scope": "archived_document_reference",
+          "text": "Налог удерживает работодатель или другой указанный в правилах плательщик выплаты.",
+          "presentation_roles": [
+            "mechanism"
+          ],
+          "evidence_ids": [
+            "PMK168_2023:6b06a241f9cd6fc6:4796bf2d18e3:operative_text:2:1"
+          ],
+          "applicability": "not_established",
+          "period": {
+            "from": "2024-01-01"
+          },
+          "evidence_quality": "text_grounded_not_professionally_reviewed",
+          "translations_share_evidence": true,
+          "statement_id": "P21_SHORT_MECHANISM",
+          "presentation_role": "mechanism"
+        },
+        {
+          "id": "P21_SHORT_CONDITION",
+          "topic": "pph21",
+          "kind": "document_explanation",
+          "scope": "archived_document_reference",
+          "text": "Проверьте категорию получателя и налоговый период.",
+          "presentation_roles": [
+            "condition"
+          ],
+          "evidence_ids": [
+            "PMK168_2023:6b06a241f9cd6fc6:4796bf2d18e3:operative_text:13:12",
+            "PMK168_2023:6b06a241f9cd6fc6:4796bf2d18e3:operative_text:15:14"
+          ],
+          "applicability": "not_established",
+          "period": {
+            "from": "2024-01-01"
+          },
+          "evidence_quality": "text_grounded_not_professionally_reviewed",
+          "translations_share_evidence": true,
+          "statement_id": "P21_SHORT_CONDITION",
+          "presentation_role": "condition"
+        },
+        {
+          "id": "PAYROLL_SCOPE",
+          "topic": "pph21",
+          "kind": "document_explanation",
+          "scope": "archived_document_reference",
+          "text": "Архивный PMK168 описывает удержание PPh21 с выплат за работу, услуги или участие в деятельности указанными в правилах плательщиками. Категории плательщиков и исключения перечислены отдельно; это не налог только на зарплату.",
+          "presentation_roles": [],
+          "evidence_ids": [
+            "PMK168_2023:6b06a241f9cd6fc6:4796bf2d18e3:operative_text:2:1"
+          ],
+          "applicability": "not_established",
+          "period": {
+            "from": "2024-01-01"
+          },
+          "evidence_quality": "text_grounded_not_professionally_reviewed",
+          "translations_share_evidence": true,
+          "statement_id": "PAYROLL_SCOPE",
+          "presentation_role": "expanded_explanation"
+        },
+        {
+          "id": "PAYROLL_METHOD",
+          "topic": "pph21",
+          "kind": "document_explanation",
+          "scope": "archived_document_reference",
+          "text": "Архивный PMK168 различает обычные периоды и последний налоговый период постоянного сотрудника/пенсионера. Последний предусматривает сверку за год или часть года, а не повторение удержания по месячной эффективной ставке. Нужны категория работника и период.",
+          "presentation_roles": [],
+          "evidence_ids": [
+            "PMK168_2023:6b06a241f9cd6fc6:4796bf2d18e3:operative_text:13:12",
+            "PMK168_2023:6b06a241f9cd6fc6:4796bf2d18e3:operative_text:15:14"
+          ],
+          "applicability": "not_established",
+          "period": {
+            "from": "2024-01-01"
+          },
+          "evidence_quality": "text_grounded_not_professionally_reviewed",
+          "translations_share_evidence": true,
+          "statement_id": "PAYROLL_METHOD",
+          "presentation_role": "expanded_explanation"
+        },
+        {
+          "id": "PAYROLL_BASE",
+          "topic": "pph21",
+          "kind": "document_explanation",
+          "scope": "archived_document_reference",
+          "text": "Для постоянных сотрудников и пенсионеров архивная статья8 различает валовой доход за месяц и облагаемый доход после разрешённых вычетов и необлагаемой части. Статья2 отдельно перечисляет плательщиков удержания и исключения; одной суммы зарплаты недостаточно для расчёта.",
+          "presentation_roles": [],
+          "evidence_ids": [
+            "PMK168_2023:6b06a241f9cd6fc6:4796bf2d18e3:operative_text:8:7",
+            "PMK168_2023:6b06a241f9cd6fc6:4796bf2d18e3:operative_text:2:1"
+          ],
+          "applicability": "not_established",
+          "period": {
+            "from": "2024-01-01"
+          },
+          "evidence_quality": "text_grounded_not_professionally_reviewed",
+          "translations_share_evidence": true,
+          "statement_id": "PAYROLL_BASE",
+          "presentation_role": "expanded_explanation"
+        }
+      ],
+      "related_topic_ids": [
+        "pph26"
+      ],
+      "claim_ids": [
+        "PAYROLL_SCOPE",
+        "PAYROLL_METHOD",
+        "PAYROLL_BASE",
+        "P21_SHORT_DEFINITION",
+        "P21_SHORT_MECHANISM",
+        "P21_SHORT_CONDITION",
+        "P21_ABBREVIATION"
+      ],
+      "claim_evidence": [
+        {
+          "provision_id": "PMK168_2023:6b06a241f9cd6fc6:4796bf2d18e3:operative_text:2:1",
+          "fragment_ids": [
+            "PMK168_2023:079306052df2707a31737092",
+            "PMK168_2023:5d7769d0404bd1a073946d49"
+          ],
+          "source_id": "PMK168_2023",
+          "sha256": "6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858",
+          "article": "2",
+          "paragraphs": "(2)",
+          "role": "operative_text",
+          "use": "support",
+          "text_anchor": "pemberi kerja",
+          "text_anchors": [
+            "pemberi kerja",
+            "Pasal 2\n(1) Pemotongan Pajak Penghasilan Pasal 21 dan/ atau Pajak\nPenghasilan Pasal 26 Sehubungan dengan Pekerjaan,\nJasa, atau Kegiatan wajib dilakukan oleh Pemotong Pajak.\n(2) Pemotong Pajak sebagaimana dimaksud pada ayat (1)\nterdiri atas:\na. pemberi kerja yaitu orang pribadi clan Badan, baik\nmerupakan pusat maupun cabang, perwakilan atau\nunit, yang membayar gaji, upah, honorarium,\ntunjangan, dan pembayaran lain dengan nama clan\ndalam bentuk apa pun, termasuk imbalan dalam\nbentuk natura dan/atau kenikmatan, sebagai\nimbalan sehubungan dengan pekerjaan;\nb. Instansi Pemerintah, termasuk lembaga pemerintah\nnonkementerian, kesekretariatan lembaga negara,\nkesekretariatan lembaga nonstruktural, dan\nperwakilan Republik Indonesia di luar negeri, yang\nmembayarkan gaji, upah, honorarium, tunjangan,\ndan pembayaran lain dengan nama dan dalam bentuk\napa pun sehubungan dengan pekerjaan, jasa, atau\nkegiatan;\nc. dana pensiun, badan penyelenggara jaminan sosial\ntenaga kerja, dan badan-badan lain yang membayar\nuang pensiun, tunjangan hari tua, jaminan hari tua,\ndan/ atau pembayaran lain dengan nama apa pun\nyang terkait dengan program pensiun, yang\npendiriannya sesuai dengan ketentuan peraturan\nperundang-undangan;\nd. orang pribadi dan Badan, yang membayar\nhonorarium atau pembayaran lain sebagai imbalan\nsehubungan dengan jasa yang dilakukan oleh orang\npribadi, termasuk jasa tenaga ahli yang melakukan\nPekerjaan Bebas dan bertindak untuk dan atas\nnamanya sendiri, bukan untuk dan atas nama\npersekutuannya; dan\ne. Penyelenggara Kegiatan, termasuk Badan, Instansi\nPemerintah, organisasi yang bersifat nasional dan\ninternasional, perkumpulan, orang pribadi serta\nlembaga lainnya yang menyelenggarakan kegiatan,\nyang membayar honorarium, hadiah, atau\npenghargaan dalam bentuk apa pun berkenaan\ndengan suatu kegiatan.\n(3) Tidak termasuk sebagai pemberi kerja yang mempunyai\nkewajiban untuk melakukan pemotongan pajak\nsebagaimana dimaksud pada ayat (2) huruf a, meliputi:\na. kantor perwakilan negara asing;\nb. organisasi internasional:\n1. sebagaimana dimaksud dalam Pasal 3 ayat (1)\nhuruf c Undang-Undang Pajak Penghasilan\ndengan syarat:\na) Indonesia menjadi anggota organisasi\ntersebut; dan\nb) tidak menjalankan usaha atau kegiatan lain\nuntuk memperoleh penghasilan dari\nIndonesia selain memberikan pinjaman\nkepada pemerintah yang dananya berasal\ndari iuran para anggota; dan\n2. yang diatur khusus berdasarkan perjanjian\ninternasional sebagaimana dimaksud dalam\nperaturan Menteri yang mengatur mengenai\npelaksanaan perlakuan pajak penghasilan yang\ndidasarkan pada ketentuan dalam perJanJian\ninternasional,\nyang telah ditetapkan oleh Menteri; dan\nc. orang pribadi yang:\n1. tidak melakukan kegiatan usaha atau Pekerjaan\nBebas; atau\n2. melakukan kegiatan usaha atau Pekerjaan\nBebas dan mempekerjakan orang pribadi yang:\na) semata-mata melakukan pekerjaan rumah\ntangga; atau\nb) melakukan pekerjaan atau jasa yang tidak\nterkait dengan kegiatan usaha atau\nPekerjaan Bebas pemberi kerja."
+          ],
+          "related_explanation_provision_ids": [],
+          "pages": [
+            5,
+            6
+          ],
+          "links": [
+            "https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=5",
+            "https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=6"
+          ],
+          "period_restrictions": {
+            "from": "2024-01-01"
+          },
+          "text_review": "editorial_anchor_checked_not_professional_review",
+          "quality_limitations": [
+            "candidate_text_layer",
+            "paragraph_labels_may_contain_OCR_errors"
+          ],
+          "source_period": {
+            "from": "2024-01-01",
+            "to": null
+          },
+          "evidence_status": "text_grounded_archival_not_legal_currency_reviewed",
+          "temporal_status": "period_missing"
+        },
+        {
+          "provision_id": "PMK168_2023:6b06a241f9cd6fc6:4796bf2d18e3:operative_text:13:12",
+          "fragment_ids": [
+            "PMK168_2023:84cffa9db5a9573cbb4658a0",
+            "PMK168_2023:db9949c7c54fcf9fb9719e2a"
+          ],
+          "source_id": "PMK168_2023",
+          "sha256": "6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858",
+          "article": "13",
+          "paragraphs": "(1),(2)",
+          "role": "operative_text",
+          "use": "support",
+          "text_anchor": "tarif efektif",
+          "text_anchors": [
+            "tarif efektif",
+            "Pasal 13\n(1) Tarif pemotongan Pajak Penghasilan Pasal 21 terdiri atas:\na. tarif efektif pemotongan Pajak Penghasilan Pasal 21;\ndan\nb. tarif berdasarkan Pasal 17 ayat (1) huruf a Undang-\nUndang Pajak Penghasilan.\n(2) Tarif efektif pemotongan Pajak Penghasilan Pasal 21\nsebagaimana dimaksud pada ayat (1) huruf a terdiri atas:\na. tarif efektif bulanan; atau\nb. tarif efektif harian,\nIt\nsebagaimana diatur dalam peraturan pemerintah yang\nmengatur mengenai tarif pemotongan Pajak Penghasilan\nPasal 21 atas penghasilan sehubungan dengan pekerjaan,\njasa, atau kegiatan wajib pajak orang pribadi.\n(3) Tarif pemotongan Pajak Penghasilan Pasal 21 berdasarkan\ntarif Pasal 17 ayat (1) huruf a Undang-Undang Pajak\nPenghasilan sebagaimana dimaksud pada ayat (1) huruf b\ndigunakan atas penghasilan dari pekerjaan, jasa, atau\nkegiatan wajib pajak orang pribadi."
+          ],
+          "related_explanation_provision_ids": [],
+          "pages": [
+            14,
+            15
+          ],
+          "links": [
+            "https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=14",
+            "https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=15"
+          ],
+          "period_restrictions": {
+            "from": "2024-01-01"
+          },
+          "text_review": "editorial_anchor_checked_not_professional_review",
+          "quality_limitations": [
+            "candidate_text_layer",
+            "paragraph_labels_may_contain_OCR_errors"
+          ],
+          "source_period": {
+            "from": "2024-01-01",
+            "to": null
+          },
+          "evidence_status": "text_grounded_archival_not_legal_currency_reviewed",
+          "temporal_status": "period_missing"
+        },
+        {
+          "provision_id": "PMK168_2023:6b06a241f9cd6fc6:4796bf2d18e3:operative_text:15:14",
+          "fragment_ids": [
+            "PMK168_2023:3ba913a0416a5e3aa4ebea00",
+            "PMK168_2023:bea457a9e116ad7de2ac5bbc"
+          ],
+          "source_id": "PMK168_2023",
+          "sha256": "6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858",
+          "article": "15",
+          "paragraphs": "(1)-(3)",
+          "role": "operative_text",
+          "use": "support",
+          "text_anchor": "Masa Pajak Terakhir",
+          "text_anchors": [
+            "Masa Pajak Terakhir",
+            "Pasal 15\n(1) Pajak Penghasilan Pasal 21 yang wajib dipotong bagi\nPegawai Tetap sebagaimana dimaksud dalam Pasal 3 ayat\n( 1) huruf a dan Pensiunan se bagaimana dimaksud dalam\nPasal 3 ayat (1) huruf b pada:\na. setiap Masa Pajak selain Masa Pajak Terakhir\ndihitung menggunakan tarif efektif bulanan\nsebagaimana dimaksud dalam Pasal 13 ayat (2) huruf\na dikalikan dengan dasar pengenaan dan pemotongan\nsebagaimana dimaksud dalam Pasal 8 ayat (1) huruf\na;dan\nb. Masa Pajak Terakhir yaitu sebesar selisih antara Pajak\nPenghasilan Pasal 21 yang terutang selama 1 (satu) Tahun\nPajak atau bagian Tahun Pajak dengan Pajak Penghasilan\nPasal 21 yang telah dipotong pada Masa Pajak selain Masa\nPajak Terakhir sebagaimana dimaksud dalam huruf a.\n(2) Pajak Penghasilan Pasal 21 yang terutang selama 1 (satu)\nTahun Pajak atau bagian Tahun Pajak sebagaimana\ndimaksud pada ayat (1) huruf b dihitung menggunakan\ntarif Pasal 17 ayat (1) huruf a Undang-Undang Pajak\nPenghasilan dikalikan dengan dasar pengenaan dan\npemotongan sebagaimana dimaksud dalam Pasal 8 ayat\n(1) huruf b dalam 1 (satu) Tahun Pajak atau bagian Tahun\nPajak.\n(3) Dalam hal kewajiban pajak subjektif Pegawai Tetap\ndan/ atau Pensiunan baru dimulai setelah bulan Januari\natau berakhir sebelum bulan Desember, penghitungan\nPajak Penghasilan Pasal 21 yang terutang dilakukan\nberdasarkan penghasilan neto yang disetahunkan dan\npajaknya dihitung secara proporsional terhadap jumlah\nbulan dalam bagian Tahun Pajak yang bersangkutan."
+          ],
+          "related_explanation_provision_ids": [],
+          "pages": [
+            15,
+            16
+          ],
+          "links": [
+            "https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=15",
+            "https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=16"
+          ],
+          "period_restrictions": {
+            "from": "2024-01-01"
+          },
+          "text_review": "editorial_anchor_checked_not_professional_review",
+          "quality_limitations": [
+            "candidate_text_layer",
+            "paragraph_labels_may_contain_OCR_errors"
+          ],
+          "source_period": {
+            "from": "2024-01-01",
+            "to": null
+          },
+          "evidence_status": "text_grounded_archival_not_legal_currency_reviewed",
+          "temporal_status": "period_missing"
+        },
+        {
+          "provision_id": "PMK168_2023:6b06a241f9cd6fc6:4796bf2d18e3:operative_text:3:2",
+          "fragment_ids": [
+            "PMK168_2023:428ae9ea118f9570ae03f917",
+            "PMK168_2023:091ec07639e26511bd1e9aed"
+          ],
+          "source_id": "PMK168_2023",
+          "sha256": "6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858",
+          "article": "3",
+          "paragraphs": "(1)-(3)",
+          "role": "operative_text",
+          "use": "support",
+          "text_anchor": "merupakan wajib pajak orang pribadi",
+          "text_anchors": [
+            "merupakan wajib pajak orang pribadi",
+            "Pasal 3\n(1) Penerima penghasilan yang dipotong Pajak Penghasilan\nPasal 21 dan/atau Pajak Penghasilan Pasal 26\nSehubungan dengan Pekerjaan, Jasa, atau Kegiatan\nmerupakan wajib pajak orang pribadi, meliputi:\na. Pegawai Tetap;\nb. Pensiunan;\nc. anggota dewan komisaris atau anggota dewan\npengawas yang menerima imbalan secara tidak\nteratur;\nd. Pegawai Tidak Tetap;\ne. Bukan Pegawai;\nf. Peserta Kegiatan;\ng. peserta program pens1un yang masih berstatus\nPegawai; dan\nh. Mantan Pegawai.\n(2) Bukan Pegawai sebagaimana dimaksud pada ayat (1)\nhuruf e, meliputi:\na. tenaga ahli yang melakukan Pekerjaan Bebas, yang\nterdiri dari pengacara, akuntan, arsitek, dokter,\nkonsultan, notaris, pejabat pembuat akta tanah,\npenilai, dan aktuaris;\nb. pemain musik, pembawa acara, penyanyi, pelawak,\nbintang film, bintang sinetron, bintang iklan,\nsutradara, kru film, foto model,\nperagawan/peragawati, pemain drama, penari,\npemahat, pelukis, pembuat/ pencipta konten pada\nmedia yang dibagikan secara daring (influencer,\nselebgram, blogger, vlogger, dan sejenis lainnya), dan\nseniman lainnya;\nc. olahragawan;\nd. penasihat, pengajar, pelatih, penceramah, penyuluh,\ndan moderator;\ne. pengarang, peneliti, dan penerjemah;\nf. pemberi jasa dalam segala bidang;\ng. agen iklan;\nh. pengawas atau pengelola proyek;\npembawa pesanan atau yang menemukan langganan\n1.\natau yang menjadi perantara;\nJ. petugas penjaja barang dagangan;\nk. agen asuransi; dan\n1. distributor perusahaan pemasaran berjenjang atau\npenjualan langsung dan kegiatan sejenis lainnya.\n(3) Peserta Kegiatan sebagaimana dimaksud pada ayat (1)\nhuruf f, meliputi:\na. peserta perlombaan dalam segala bidang, antara lain\nperlombaan olahraga, keagamaan, kesenian,\nketangkasan, ilmu pengetahuan, teknologi, dan\nperlombaan lainnya;\nb. peserta rapat, konferensi, sidang, pertemuan,\nkunjungan kerja, seminar, lokakarya, atau\npertunjukan, atau kegiatan tertentu lainnya;\nc. peserta atau anggota dalam suatu kepanitiaan\nsebagai Penyelenggara Kegiatan tertentu; atau\nd. peserta pendidikan, pelatihan, dan magang."
+          ],
+          "related_explanation_provision_ids": [],
+          "pages": [
+            6,
+            7
+          ],
+          "links": [
+            "https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=6",
+            "https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=7"
+          ],
+          "period_restrictions": {
+            "from": "2024-01-01"
+          },
+          "text_review": "editorial_anchor_checked_not_professional_review",
+          "quality_limitations": [
+            "candidate_text_layer",
+            "paragraph_labels_may_contain_OCR_errors"
+          ],
+          "source_period": {
+            "from": "2024-01-01",
+            "to": null
+          },
+          "evidence_status": "text_grounded_archival_not_legal_currency_reviewed",
+          "temporal_status": "period_missing"
+        },
+        {
+          "provision_id": "PMK168_2023:6b06a241f9cd6fc6:4796bf2d18e3:operative_text:8:7",
+          "fragment_ids": [
+            "PMK168_2023:0190bbfd7037eba985d117db",
+            "PMK168_2023:8eb407100a11bd684b6b3648"
+          ],
+          "source_id": "PMK168_2023",
+          "sha256": "6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858",
+          "article": "8",
+          "paragraphs": "(1)",
+          "role": "operative_text",
+          "use": "support",
+          "text_anchor": "penghasilan bruto",
+          "text_anchors": [
+            "penghasilan bruto",
+            "Pasal 8\n(1) Dasar pengenaan dan pemotongan Pajak Penghasilan\nPasal 21 untuk Pegawai Tetap dan Pensiunan, yaitu:\na. penghasilan bruto dalam 1 (satu) Masa Pajak; atau\nb. penghasilan kena pajak.\n(2) Penghasilan bruto sebagaimana dimaksud pada ayat (1)\nhuruf a sebagai berikut:\na. bagi Pegawai Tetap meliputi seluruh penghasilan\nsebagaimana dimaksud dalam Pasal 5 ayat (1) huruf a\nyang diterima atau diperoleh dari pemberi kerja; dan\nb. bagi Pensiunan meliputi seluruh penghasilan\nsebagaimana dimaksud dalam Pasal 5 ayat (1) huruf b.\n(3) Penghasilan kena pajak sebagaimana dimaksud pada ayat\n(1) huruf b sebesar penghasilan neto dikurangi\nPenghasilan Tidak Kena Pajak.\n(4) Jumlah penghasilan kena pajak sebagaimana dimaksud\npada ayat (3) dibulatkan ke bawah hingga ribuan rupiah\npenuh.\n(5) Penghasilan neto sebagaimana dimaksud pada ayat (3)\nmerupakan seluruh jumlah penghasilan bruto\nsebagaimana dimaksud pada ayat (2) dalam 1 (satu) Tahun\nPajak atau bagian Tahun Pajak dikurangi dengan\npengurangan yang diperbolehkan."
+          ],
+          "related_explanation_provision_ids": [],
+          "pages": [
+            10,
+            11
+          ],
+          "links": [
+            "https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=10",
+            "https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=11"
+          ],
+          "period_restrictions": {
+            "from": "2024-01-01"
+          },
+          "text_review": "editorial_anchor_checked_not_professional_review",
+          "quality_limitations": [
+            "candidate_text_layer",
+            "paragraph_labels_may_contain_OCR_errors"
+          ],
+          "source_period": {
+            "from": "2024-01-01",
+            "to": null
+          },
+          "evidence_status": "text_grounded_archival_not_legal_currency_reviewed",
+          "temporal_status": "period_missing"
+        }
+      ],
+      "gaps": [],
+      "required_notice": "Архивное пояснение. Актуальность и обязанности компании не подтверждены.",
+      "verification": {
+        "text": "runtime_checked_archival_binding",
+        "currency": "unconfirmed",
+        "professional_review": null
+      },
+      "applicability": {
+        "status": "blocked",
+        "eligible_basis_claim_ids": [],
+        "professional_review": null
+      },
+      "numerical_use": {
+        "status": "blocked",
+        "calculations": [],
+        "TER": "blocked_unverified_table"
+      },
+      "blockers": [
+        {
+          "code": "tax_period_missing",
+          "claim_id": "TER_NUMERIC"
+        },
+        {
+          "code": "current_provision_currency_unconfirmed",
+          "claim_id": "TER_NUMERIC"
+        },
+        {
+          "code": "amendment_review_incomplete",
+          "source_id": "PP58_2023",
+          "path": [
+            "PP58_2023"
+          ],
+          "content_unknown": false,
+          "currency_confirmed": false,
+          "claim_id": "TER_NUMERIC"
+        },
+        {
+          "code": "amendment_review_incomplete",
+          "source_id": "PMK168_2023",
+          "path": [
+            "PMK168_2023"
+          ],
+          "content_unknown": false,
+          "currency_confirmed": false,
+          "claim_id": "TER_NUMERIC"
+        },
+        {
+          "code": "TER_table_not_verified",
+          "claim_id": "TER_NUMERIC"
+        },
+        {
+          "code": "amendment_review_incomplete",
+          "source_id": "PMK81_2024",
+          "path": [
+            "PMK81_2024"
+          ],
+          "content_unknown": false,
+          "currency_confirmed": false,
+          "scope": "administrative_conclusions_only",
+          "affected_topics": [
+            "pph21"
+          ]
+        },
+        {
+          "code": "amendment_review_incomplete",
+          "source_id": "PMK1_2026",
+          "path": [
+            "PMK81_2024",
+            "PMK1_2026"
+          ],
+          "content_unknown": false,
+          "currency_confirmed": false,
+          "scope": "administrative_conclusions_only",
+          "affected_topics": [
+            "pph21"
+          ]
+        },
+        {
+          "code": "amendment_review_incomplete",
+          "source_id": "PMK54_2025",
+          "path": [
+            "PMK81_2024",
+            "PMK54_2025"
+          ],
+          "content_unknown": false,
+          "currency_confirmed": false,
+          "scope": "administrative_conclusions_only",
+          "affected_topics": [
+            "pph21"
+          ]
+        },
+        {
+          "code": "amendment_review_incomplete",
+          "source_id": "PMK53_2025",
+          "path": [
+            "PMK81_2024",
+            "PMK53_2025"
+          ],
+          "content_unknown": false,
+          "currency_confirmed": false,
+          "scope": "administrative_conclusions_only",
+          "affected_topics": [
+            "pph21"
+          ]
+        },
+        {
+          "code": "amendment_review_incomplete",
+          "source_id": "PMK11_2025",
+          "path": [
+            "PMK81_2024",
+            "PMK11_2025"
+          ],
+          "content_unknown": false,
+          "currency_confirmed": false,
+          "scope": "administrative_conclusions_only",
+          "affected_topics": [
+            "pph21"
+          ]
+        }
+      ],
+      "clarifying_questions": [],
+      "ask_accountant": {
+        "question": "Объясни PPh 21 — Pajak Penghasilan Pasal 21 по доступным источникам и укажи ограничения.",
+        "context": {
+          "topic_id": "pph21",
+          "language": "ru",
+          "period": null,
+          "intent": "explanation",
+          "claim_ids": [
+            "PAYROLL_SCOPE",
+            "PAYROLL_METHOD",
+            "PAYROLL_BASE",
+            "P21_SHORT_DEFINITION",
+            "P21_SHORT_MECHANISM",
+            "P21_SHORT_CONDITION",
+            "P21_ABBREVIATION"
+          ]
+        },
+        "role": "user_question_not_instruction"
+      },
+      "production_rule_activation": false
+    }
+  },
+  {
+    "example_kind": "partial",
+    "input": {
+      "topic_id": "npwp_nik",
+      "language": "ru",
+      "period": null
+    },
+    "actual_card": {
+      "schema_version": 2,
+      "contract": "indonesia_tax_tooltip_v2",
+      "topic_id": "npwp_nik",
+      "language": "ru",
+      "name": "NPWP / NIK",
+      "designation_role": "navigation_label_not_legal_determination",
+      "status": "partial",
+      "coverage": "archived_document_explanation_only",
+      "summary": [],
+      "abbreviation": {
+        "status": "unavailable",
+        "designation_language": "id",
+        "statements": []
+      },
+      "what_is": [],
+      "how_it_works": [],
+      "main_condition": [],
+      "section_status": {
+        "what_is": "unavailable",
+        "how_it_works": "unavailable",
+        "main_condition": "unavailable",
+        "summary": "unavailable",
+        "detailed_explanation": "available"
+      },
+      "unavailable_section_notice": "Для этого раздела недостаточно подтверждённых оснований.",
+      "what_to_check": [
+        {
+          "field": "recipient_npwp",
+          "text": "Уточните: подтверждённый NPWP/NIK получателя.",
+          "role": "optional_check_not_assertion"
+        }
+      ],
+      "detailed_explanation": [
+        {
+          "id": "SERVICE_NPWP",
+          "topic": "pph23",
+          "kind": "document_explanation",
+          "scope": "archived_document_reference",
+          "text": "Архивная статья23 содержит отдельную ветвь отсутствия NPWP и исключения из удержания. Нужно подтвердить идентификатор, категорию дохода и исключения; текущая трактовка NIK/NPWP не установлена этой подборкой.",
+          "presentation_roles": [],
+          "evidence_ids": [
+            "DJP_SDSN_2023:45716e25368d0218:d01e95f3e43d:operative_text:23:1"
+          ],
+          "applicability": "not_established",
+          "period": {},
+          "evidence_quality": "text_grounded_not_professionally_reviewed",
+          "translations_share_evidence": true,
+          "statement_id": "SERVICE_NPWP",
+          "presentation_role": "expanded_explanation"
+        }
+      ],
+      "related_topic_ids": [
+        "pkp",
+        "pph23"
+      ],
+      "claim_ids": [
+        "SERVICE_NPWP"
+      ],
+      "claim_evidence": [
+        {
+          "provision_id": "DJP_SDSN_2023:45716e25368d0218:d01e95f3e43d:operative_text:23:1",
+          "fragment_ids": [
+            "DJP_SDSN_2023:9c62c92fef113536539abf4e",
+            "DJP_SDSN_2023:07c330edd10bdfd4f21d781b"
+          ],
+          "source_id": "DJP_SDSN_2023",
+          "sha256": "45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc",
+          "article": "23",
+          "paragraphs": "(1a),(4)",
+          "role": "operative_text",
+          "use": "support",
+          "text_anchor": "tidak memiliki Nomor Pokok",
+          "text_anchors": [
+            "tidak memiliki Nomor Pokok",
+            "PASAL 23\n(1) Atas penghasilan tersebut di bawah ini dengan nama dan dalam bentuk apa pun yang\ndibayarkan, disediakan untuk dibayarkan, atau telah jatuh tempo pembayarannya oleh\nbadan pemerintah, subjek pajak badan dalam negeri, penyelenggara kegiatan, bentuk\nusaha tetap, atau perwakilan perusahaan luar negeri lainnya kepada Wajib Pajak\ndalam negeri atau bentuk usaha tetap, dipotong pajak oleh pihak yang wajib\nmembayarkan:\na. sebesar 15% (lima belas persen) dari jumlah bruto atas: ***)\n1. dividen sebagaimana dimaksud dalam Pasal 4 ayat (1) huruf g; ***)\n2. bunga sebagaimana dimaksud dalam Pasal 4 ayat (1) huruf f; ***)\n3. royalti; dan\n4. hadiah, penghargaan, bonus, dan sejenisnya selain yang telah dipotong Pajak\nPenghasilan sebagaimana dimaksud dalam Pasal 21 ayat (1) huruf e;\nb. dihapus;\nc. sebesar 2% (dua persen) dari jumlah bruto atas:\n1. sewa dan penghasilan lain sehubungan dengan penggunaan harta, kecuali\nsewa dan penghasilan lain sehubungan dengan penggunaan harta yang telah\ndikenai Pajak Penghasilan sebagaimana dimaksud dalam Pasal 4 ayat\n(2) ; dan\n2. imbalan sehubungan dengan jasa teknik, jasa manajemen, jasa konstruksi, jasa\nkonsultan, dan jasa lain selain jasa yang telah dipotong Pajak Penghasilan\nsebagaimana dimaksud dalam Pasal 21. i*****)\n226\n(1a) Dalam hal Wajib Pajak yang menerima atau memperoleh penghasilan sebagaimana\ndimaksud pada ayat (1) tidak memiliki Nomor Pokok Wajib Pajak, besarnya tarif\npemotongan adalah lebih tinggi 100% (seratus persen) daripada tarif sebagaimana\ndimaksud pada ayat (1). i*****)\n(2) Ketentuan lebih lanjut mengenai jenis jasa lain sebagaimana dimaksud pada ayat\n(1)huruf c angka 2 diatur dengan atau berdasarkan Peraturan Menteri Keuangan. i*****)\n(3) Orang pribadi sebagai Wajib Pajak dalam negeri dapat ditunjuk oleh Direktur\nJenderal Pajak untuk memotong pajak sebagaimana dimaksud pada ayat (1). **)\n(4) Pemotongan pajak sebagaimana dimaksud pada ayat (1) tidak dilakukan atas:\na. penghasilan yang dibayar atau terutang kepada bank;\nb. sewa yang dibayarkan atau terutang sehubungan dengan sewa guna usaha\ndengan hak opsi;\nc. dividen sebagaimana dimaksud dalam Pasal 4 ayat (3) huruf f dan dividen yang\nditerima oleh orang pribadi sebagaimana dimaksud dalam Pasal 17 ayat (2c);\nd. dihapus;\ne. bagian laba sebagaimana dimaksud dalam Pasal 4 ayat (3) huruf i;\nf. sisa hasil usaha koperasi yang dibayarkan oleh koperasi kepada anggotanya;\ng. dihapus; dan\nh. penghasilan yang dibayar atau terutang kepada badan usaha atas jasa keuangan\nyang berfungsi sebagai penyalur pinjaman dan/atau pembiayaan yang diatur\ndengan Peraturan Menteri Keuangan. i*****)"
+          ],
+          "related_explanation_provision_ids": [
+            "DJP_SDSN_2023:45716e25368d0218:d01e95f3e43d:explanation:23:2"
+          ],
+          "pages": [
+            231,
+            232
+          ],
+          "links": [
+            "https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231",
+            "https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=232"
+          ],
+          "period_restrictions": {},
+          "text_review": "editorial_anchor_checked_not_professional_review",
+          "quality_limitations": [
+            "candidate_text_layer",
+            "paragraph_labels_may_contain_OCR_errors"
+          ],
+          "source_period": {
+            "from": null,
+            "to": null
+          },
+          "evidence_status": "text_grounded_archival_not_legal_currency_reviewed",
+          "temporal_status": "period_missing"
+        }
+      ],
+      "gaps": [
+        "definition_and_abbreviation_unconfirmed",
+        "NPWP_NIK_identity_integration_primary_text_not_reviewed",
+        "only_PPh23_context_available"
+      ],
+      "required_notice": "Архивное пояснение. Актуальность и обязанности компании не подтверждены.",
+      "verification": {
+        "text": "runtime_checked_archival_binding",
+        "currency": "unconfirmed",
+        "professional_review": null
+      },
+      "applicability": {
+        "status": "blocked",
+        "eligible_basis_claim_ids": [],
+        "professional_review": null
+      },
+      "numerical_use": {
+        "status": "blocked",
+        "calculations": [],
+        "TER": "blocked_unverified_table"
+      },
+      "blockers": [
+        {
+          "code": "tax_period_missing",
+          "claim_id": "SERVICE_RATE"
+        },
+        {
+          "code": "current_provision_currency_unconfirmed",
+          "claim_id": "SERVICE_RATE"
+        },
+        {
+          "code": "amendment_review_incomplete",
+          "source_id": "PMK141_2015",
+          "path": [
+            "PMK141_2015"
+          ],
+          "content_unknown": false,
+          "currency_confirmed": false,
+          "claim_id": "SERVICE_RATE"
+        },
+        {
+          "code": "amendment_review_incomplete",
+          "source_id": "PMK81_2024",
+          "path": [
+            "PMK81_2024"
+          ],
+          "content_unknown": false,
+          "currency_confirmed": false,
+          "scope": "administrative_conclusions_only",
+          "affected_topics": [
+            "pph23"
+          ]
+        },
+        {
+          "code": "amendment_review_incomplete",
+          "source_id": "PMK1_2026",
+          "path": [
+            "PMK81_2024",
+            "PMK1_2026"
+          ],
+          "content_unknown": false,
+          "currency_confirmed": false,
+          "scope": "administrative_conclusions_only",
+          "affected_topics": [
+            "pph23"
+          ]
+        },
+        {
+          "code": "amendment_review_incomplete",
+          "source_id": "PMK54_2025",
+          "path": [
+            "PMK81_2024",
+            "PMK54_2025"
+          ],
+          "content_unknown": false,
+          "currency_confirmed": false,
+          "scope": "administrative_conclusions_only",
+          "affected_topics": [
+            "pph23"
+          ]
+        },
+        {
+          "code": "amendment_review_incomplete",
+          "source_id": "PMK53_2025",
+          "path": [
+            "PMK81_2024",
+            "PMK53_2025"
+          ],
+          "content_unknown": false,
+          "currency_confirmed": false,
+          "scope": "administrative_conclusions_only",
+          "affected_topics": [
+            "pph23"
+          ]
+        },
+        {
+          "code": "amendment_review_incomplete",
+          "source_id": "PMK11_2025",
+          "path": [
+            "PMK81_2024",
+            "PMK11_2025"
+          ],
+          "content_unknown": false,
+          "currency_confirmed": false,
+          "scope": "administrative_conclusions_only",
+          "affected_topics": [
+            "pph23"
+          ]
+        }
+      ],
+      "clarifying_questions": [],
+      "ask_accountant": {
+        "question": "Объясни NPWP / NIK по доступным источникам и укажи ограничения.",
+        "context": {
+          "topic_id": "npwp_nik",
+          "language": "ru",
+          "period": null,
+          "intent": "explanation",
+          "claim_ids": [
+            "SERVICE_NPWP"
+          ]
+        },
+        "role": "user_question_not_instruction"
+      },
+      "production_rule_activation": false
+    }
+  },
+  {
+    "example_kind": "unavailable",
+    "input": {
+      "topic_id": "pph_final_rent",
+      "language": "ru",
+      "period": "2017-06-01"
+    },
+    "actual_card": {
+      "schema_version": 2,
+      "contract": "indonesia_tax_tooltip_v2",
+      "topic_id": "pph_final_rent",
+      "language": "ru",
+      "name": "PPh Final — sewa tanah/bangunan",
+      "designation_role": "navigation_label_not_legal_determination",
+      "status": "unavailable",
+      "coverage": "archived_document_explanation_only",
+      "summary": [],
+      "abbreviation": {
+        "status": "unavailable",
+        "designation_language": "id",
+        "statements": []
+      },
+      "what_is": [],
+      "how_it_works": [],
+      "main_condition": [],
+      "section_status": {
+        "what_is": "unavailable",
+        "how_it_works": "unavailable",
+        "main_condition": "unavailable",
+        "summary": "unavailable",
+        "detailed_explanation": "unavailable"
+      },
+      "unavailable_section_notice": "Для этого раздела недостаточно подтверждённых оснований.",
+      "what_to_check": [
+        {
+          "field": "rental_object",
+          "text": "Уточните: что арендуется: земля/здание, оборудование или размещение.",
+          "role": "optional_check_not_assertion"
+        },
+        {
+          "field": "payer_withholder_status",
+          "text": "Уточните: правовой статус плательщика как pemotong.",
+          "role": "optional_check_not_assertion"
+        }
+      ],
+      "detailed_explanation": [],
+      "related_topic_ids": [
+        "pph23"
+      ],
+      "claim_ids": [],
+      "claim_evidence": [],
+      "gaps": [
+        "claim_unavailable:RENT_SCOPE",
+        "claim_unavailable:RENT_PAYER",
+        "claim_unavailable:RENT_BASE",
+        "claim_unavailable:RENT_SHORT_DEFINITION",
+        "claim_unavailable:RENT_SHORT_MECHANISM",
+        "claim_unavailable:RENT_SHORT_CONDITION",
+        "claim_unavailable:RENT_ABBREVIATION"
+      ],
+      "required_notice": "Недостаточно подтверждённых оснований для налогового вывода.",
+      "verification": {
+        "text": "no_supported_statements",
+        "currency": "unconfirmed",
+        "professional_review": null
+      },
+      "applicability": {
+        "status": "blocked",
+        "eligible_basis_claim_ids": [],
+        "professional_review": null
+      },
+      "numerical_use": {
+        "status": "blocked",
+        "calculations": [],
+        "TER": "blocked_unverified_table"
+      },
+      "blockers": [
+        {
+          "code": "support_outside_requested_period",
+          "provision_id": "PP34_2017:2f5af8d0c92628fa:0df7d0c2a792:operative_text:2:1",
+          "recorded_window": {
+            "from": "2018-01-02",
+            "to": null
+          },
+          "claim_id": "RENT_ABBREVIATION"
+        },
+        {
+          "code": "outside_requested_period",
+          "recorded_window": {
+            "from": "2018-01-02"
+          },
+          "claim_id": "RENT_ABBREVIATION"
+        },
+        {
+          "code": "support_outside_requested_period",
+          "provision_id": "PP34_2017:2f5af8d0c92628fa:0df7d0c2a792:operative_text:4:3",
+          "recorded_window": {
+            "from": "2018-01-02",
+            "to": null
+          },
+          "claim_id": "RENT_BASE"
+        },
+        {
+          "code": "outside_requested_period",
+          "recorded_window": {
+            "from": "2018-01-02"
+          },
+          "claim_id": "RENT_BASE"
+        },
+        {
+          "code": "support_outside_requested_period",
+          "provision_id": "PP34_2017:2f5af8d0c92628fa:0df7d0c2a792:operative_text:5:4",
+          "recorded_window": {
+            "from": "2018-01-02",
+            "to": null
+          },
+          "claim_id": "RENT_HISTORY"
+        },
+        {
+          "code": "support_outside_requested_period",
+          "provision_id": "PP34_2017:2f5af8d0c92628fa:0df7d0c2a792:operative_text:6:5",
+          "recorded_window": {
+            "from": "2018-01-02",
+            "to": null
+          },
+          "claim_id": "RENT_HISTORY"
+        },
+        {
+          "code": "support_outside_requested_period",
+          "provision_id": "PP34_2017:2f5af8d0c92628fa:0df7d0c2a792:operative_text:7:6",
+          "recorded_window": {
+            "from": "2018-01-02",
+            "to": null
+          },
+          "claim_id": "RENT_HISTORY"
+        },
+        {
+          "code": "outside_requested_period",
+          "recorded_window": {
+            "from": "2018-01-02"
+          },
+          "claim_id": "RENT_HISTORY"
+        },
+        {
+          "code": "support_outside_requested_period",
+          "provision_id": "PP34_2017:2f5af8d0c92628fa:0df7d0c2a792:operative_text:3:2",
+          "recorded_window": {
+            "from": "2018-01-02",
+            "to": null
+          },
+          "claim_id": "RENT_PAYER"
+        },
+        {
+          "code": "outside_requested_period",
+          "recorded_window": {
+            "from": "2018-01-02"
+          },
+          "claim_id": "RENT_PAYER"
+        },
+        {
+          "code": "support_outside_requested_period",
+          "provision_id": "PP34_2017:2f5af8d0c92628fa:0df7d0c2a792:operative_text:4:3",
+          "recorded_window": {
+            "from": "2018-01-02",
+            "to": null
+          },
+          "claim_id": "RENT_RATE"
+        },
+        {
+          "code": "outside_requested_period",
+          "recorded_window": {
+            "from": "2018-01-02"
+          },
+          "claim_id": "RENT_RATE"
+        },
+        {
+          "code": "current_provision_currency_unconfirmed",
+          "claim_id": "RENT_RATE"
+        },
+        {
+          "code": "amendment_review_incomplete",
+          "source_id": "PP34_2017",
+          "path": [
+            "PP34_2017"
+          ],
+          "content_unknown": false,
+          "currency_confirmed": false,
+          "claim_id": "RENT_RATE"
+        },
+        {
+          "code": "support_outside_requested_period",
+          "provision_id": "PP34_2017:2f5af8d0c92628fa:0df7d0c2a792:operative_text:2:1",
+          "recorded_window": {
+            "from": "2018-01-02",
+            "to": null
+          },
+          "claim_id": "RENT_SCOPE"
+        },
+        {
+          "code": "outside_requested_period",
+          "recorded_window": {
+            "from": "2018-01-02"
+          },
+          "claim_id": "RENT_SCOPE"
+        },
+        {
+          "code": "support_outside_requested_period",
+          "provision_id": "PP34_2017:2f5af8d0c92628fa:0df7d0c2a792:operative_text:3:2",
+          "recorded_window": {
+            "from": "2018-01-02",
+            "to": null
+          },
+          "claim_id": "RENT_SHORT_CONDITION"
+        },
+        {
+          "code": "support_outside_requested_period",
+          "provision_id": "PP34_2017:2f5af8d0c92628fa:0df7d0c2a792:operative_text:2:1",
+          "recorded_window": {
+            "from": "2018-01-02",
+            "to": null
+          },
+          "claim_id": "RENT_SHORT_CONDITION"
+        },
+        {
+          "code": "outside_requested_period",
+          "recorded_window": {
+            "from": "2018-01-02"
+          },
+          "claim_id": "RENT_SHORT_CONDITION"
+        },
+        {
+          "code": "support_outside_requested_period",
+          "provision_id": "PP34_2017:2f5af8d0c92628fa:0df7d0c2a792:operative_text:2:1",
+          "recorded_window": {
+            "from": "2018-01-02",
+            "to": null
+          },
+          "claim_id": "RENT_SHORT_DEFINITION"
+        },
+        {
+          "code": "outside_requested_period",
+          "recorded_window": {
+            "from": "2018-01-02"
+          },
+          "claim_id": "RENT_SHORT_DEFINITION"
+        },
+        {
+          "code": "support_outside_requested_period",
+          "provision_id": "PP34_2017:2f5af8d0c92628fa:0df7d0c2a792:operative_text:3:2",
+          "recorded_window": {
+            "from": "2018-01-02",
+            "to": null
+          },
+          "claim_id": "RENT_SHORT_MECHANISM"
+        },
+        {
+          "code": "outside_requested_period",
+          "recorded_window": {
+            "from": "2018-01-02"
+          },
+          "claim_id": "RENT_SHORT_MECHANISM"
+        },
+        {
+          "code": "amendment_review_incomplete",
+          "source_id": "PMK81_2024",
+          "path": [
+            "PMK81_2024"
+          ],
+          "content_unknown": false,
+          "currency_confirmed": false,
+          "scope": "administrative_conclusions_only",
+          "affected_topics": [
+            "pph_final_rent"
+          ]
+        },
+        {
+          "code": "amendment_review_incomplete",
+          "source_id": "PMK1_2026",
+          "path": [
+            "PMK81_2024",
+            "PMK1_2026"
+          ],
+          "content_unknown": false,
+          "currency_confirmed": false,
+          "scope": "administrative_conclusions_only",
+          "affected_topics": [
+            "pph_final_rent"
+          ]
+        },
+        {
+          "code": "amendment_review_incomplete",
+          "source_id": "PMK54_2025",
+          "path": [
+            "PMK81_2024",
+            "PMK54_2025"
+          ],
+          "content_unknown": false,
+          "currency_confirmed": false,
+          "scope": "administrative_conclusions_only",
+          "affected_topics": [
+            "pph_final_rent"
+          ]
+        },
+        {
+          "code": "amendment_review_incomplete",
+          "source_id": "PMK53_2025",
+          "path": [
+            "PMK81_2024",
+            "PMK53_2025"
+          ],
+          "content_unknown": false,
+          "currency_confirmed": false,
+          "scope": "administrative_conclusions_only",
+          "affected_topics": [
+            "pph_final_rent"
+          ]
+        },
+        {
+          "code": "amendment_review_incomplete",
+          "source_id": "PMK11_2025",
+          "path": [
+            "PMK81_2024",
+            "PMK11_2025"
+          ],
+          "content_unknown": false,
+          "currency_confirmed": false,
+          "scope": "administrative_conclusions_only",
+          "affected_topics": [
+            "pph_final_rent"
+          ]
+        }
+      ],
+      "clarifying_questions": [],
+      "ask_accountant": {
+        "question": "Объясни PPh Final — sewa tanah/bangunan по доступным источникам и укажи ограничения.",
+        "context": {
+          "topic_id": "pph_final_rent",
+          "language": "ru",
+          "period": "2017-06-01",
+          "intent": "explanation",
+          "claim_ids": []
+        },
+        "role": "user_question_not_instruction"
+      },
+      "production_rule_activation": false
+    }
+  },
+  {
+    "example_kind": "available",
+    "input": {
+      "topic_id": "pph21",
+      "language": "en",
+      "period": null
+    },
+    "actual_card": {
+      "schema_version": 2,
+      "contract": "indonesia_tax_tooltip_v2",
+      "topic_id": "pph21",
+      "language": "en",
+      "name": "PPh 21 — Pajak Penghasilan Pasal 21",
+      "designation_role": "navigation_label_not_legal_determination",
+      "status": "available",
+      "coverage": "archived_document_explanation_only",
+      "summary": [
+        {
+          "id": "P21_SHORT_DEFINITION",
+          "topic": "pph21",
+          "kind": "document_explanation",
+          "scope": "archived_document_reference",
+          "text": "PPh21 is tax on specified payments to individuals for work, services or activities.",
+          "presentation_roles": [
+            "definition"
+          ],
+          "evidence_ids": [
+            "PMK168_2023:6b06a241f9cd6fc6:4796bf2d18e3:operative_text:2:1",
+            "PMK168_2023:6b06a241f9cd6fc6:4796bf2d18e3:operative_text:3:2"
+          ],
+          "applicability": "not_established",
+          "period": {
+            "from": "2024-01-01"
+          },
+          "evidence_quality": "text_grounded_not_professionally_reviewed",
+          "translations_share_evidence": true,
+          "statement_id": "P21_SHORT_DEFINITION",
+          "presentation_role": "definition"
+        },
+        {
+          "id": "P21_SHORT_MECHANISM",
+          "topic": "pph21",
+          "kind": "document_explanation",
+          "scope": "archived_document_reference",
+          "text": "The employer or another designated payer withholds the tax.",
+          "presentation_roles": [
+            "mechanism"
+          ],
+          "evidence_ids": [
+            "PMK168_2023:6b06a241f9cd6fc6:4796bf2d18e3:operative_text:2:1"
+          ],
+          "applicability": "not_established",
+          "period": {
+            "from": "2024-01-01"
+          },
+          "evidence_quality": "text_grounded_not_professionally_reviewed",
+          "translations_share_evidence": true,
+          "statement_id": "P21_SHORT_MECHANISM",
+          "presentation_role": "mechanism"
+        },
+        {
+          "id": "P21_SHORT_CONDITION",
+          "topic": "pph21",
+          "kind": "document_explanation",
+          "scope": "archived_document_reference",
+          "text": "Check the recipient category and tax period.",
+          "presentation_roles": [
+            "condition"
+          ],
+          "evidence_ids": [
+            "PMK168_2023:6b06a241f9cd6fc6:4796bf2d18e3:operative_text:13:12",
+            "PMK168_2023:6b06a241f9cd6fc6:4796bf2d18e3:operative_text:15:14"
+          ],
+          "applicability": "not_established",
+          "period": {
+            "from": "2024-01-01"
+          },
+          "evidence_quality": "text_grounded_not_professionally_reviewed",
+          "translations_share_evidence": true,
+          "statement_id": "P21_SHORT_CONDITION",
+          "presentation_role": "condition"
+        }
+      ],
+      "abbreviation": {
+        "status": "available",
+        "designation_language": "id",
+        "statements": [
+          {
+            "id": "P21_ABBREVIATION",
+            "topic": "pph21",
+            "kind": "document_explanation",
+            "scope": "archived_document_reference",
+            "text": "Pajak Penghasilan Pasal 21",
+            "presentation_roles": [
+              "abbreviation"
+            ],
+            "evidence_ids": [
+              "PMK168_2023:6b06a241f9cd6fc6:4796bf2d18e3:operative_text:2:1"
+            ],
+            "applicability": "not_established",
+            "period": {
+              "from": "2024-01-01"
+            },
+            "evidence_quality": "text_grounded_not_professionally_reviewed",
+            "translations_share_evidence": true,
+            "statement_id": "P21_ABBREVIATION",
+            "presentation_role": "abbreviation"
+          }
+        ]
+      },
+      "what_is": [
+        {
+          "id": "P21_SHORT_DEFINITION",
+          "topic": "pph21",
+          "kind": "document_explanation",
+          "scope": "archived_document_reference",
+          "text": "PPh21 is tax on specified payments to individuals for work, services or activities.",
+          "presentation_roles": [
+            "definition"
+          ],
+          "evidence_ids": [
+            "PMK168_2023:6b06a241f9cd6fc6:4796bf2d18e3:operative_text:2:1",
+            "PMK168_2023:6b06a241f9cd6fc6:4796bf2d18e3:operative_text:3:2"
+          ],
+          "applicability": "not_established",
+          "period": {
+            "from": "2024-01-01"
+          },
+          "evidence_quality": "text_grounded_not_professionally_reviewed",
+          "translations_share_evidence": true,
+          "statement_id": "P21_SHORT_DEFINITION",
+          "presentation_role": "definition"
+        }
+      ],
+      "how_it_works": [
+        {
+          "id": "P21_SHORT_MECHANISM",
+          "topic": "pph21",
+          "kind": "document_explanation",
+          "scope": "archived_document_reference",
+          "text": "The employer or another designated payer withholds the tax.",
+          "presentation_roles": [
+            "mechanism"
+          ],
+          "evidence_ids": [
+            "PMK168_2023:6b06a241f9cd6fc6:4796bf2d18e3:operative_text:2:1"
+          ],
+          "applicability": "not_established",
+          "period": {
+            "from": "2024-01-01"
+          },
+          "evidence_quality": "text_grounded_not_professionally_reviewed",
+          "translations_share_evidence": true,
+          "statement_id": "P21_SHORT_MECHANISM",
+          "presentation_role": "mechanism"
+        }
+      ],
+      "main_condition": [
+        {
+          "id": "P21_SHORT_CONDITION",
+          "topic": "pph21",
+          "kind": "document_explanation",
+          "scope": "archived_document_reference",
+          "text": "Check the recipient category and tax period.",
+          "presentation_roles": [
+            "condition"
+          ],
+          "evidence_ids": [
+            "PMK168_2023:6b06a241f9cd6fc6:4796bf2d18e3:operative_text:13:12",
+            "PMK168_2023:6b06a241f9cd6fc6:4796bf2d18e3:operative_text:15:14"
+          ],
+          "applicability": "not_established",
+          "period": {
+            "from": "2024-01-01"
+          },
+          "evidence_quality": "text_grounded_not_professionally_reviewed",
+          "translations_share_evidence": true,
+          "statement_id": "P21_SHORT_CONDITION",
+          "presentation_role": "condition"
+        }
+      ],
+      "section_status": {
+        "what_is": "available",
+        "how_it_works": "available",
+        "main_condition": "available",
+        "summary": "available",
+        "detailed_explanation": "available"
+      },
+      "unavailable_section_notice": "There is insufficient confirmed evidence for this section.",
+      "what_to_check": [
+        {
+          "field": "employment_type",
+          "text": "Please specify employment category (permanent, non-permanent, or non-employee).",
+          "role": "optional_check_not_assertion"
+        },
+        {
+          "field": "payroll_period",
+          "text": "Please specify payroll month.",
+          "role": "optional_check_not_assertion"
+        }
+      ],
+      "detailed_explanation": [
+        {
+          "id": "P21_SHORT_DEFINITION",
+          "topic": "pph21",
+          "kind": "document_explanation",
+          "scope": "archived_document_reference",
+          "text": "PPh21 is tax on specified payments to individuals for work, services or activities.",
+          "presentation_roles": [
+            "definition"
+          ],
+          "evidence_ids": [
+            "PMK168_2023:6b06a241f9cd6fc6:4796bf2d18e3:operative_text:2:1",
+            "PMK168_2023:6b06a241f9cd6fc6:4796bf2d18e3:operative_text:3:2"
+          ],
+          "applicability": "not_established",
+          "period": {
+            "from": "2024-01-01"
+          },
+          "evidence_quality": "text_grounded_not_professionally_reviewed",
+          "translations_share_evidence": true,
+          "statement_id": "P21_SHORT_DEFINITION",
+          "presentation_role": "definition"
+        },
+        {
+          "id": "P21_SHORT_MECHANISM",
+          "topic": "pph21",
+          "kind": "document_explanation",
+          "scope": "archived_document_reference",
+          "text": "The employer or another designated payer withholds the tax.",
+          "presentation_roles": [
+            "mechanism"
+          ],
+          "evidence_ids": [
+            "PMK168_2023:6b06a241f9cd6fc6:4796bf2d18e3:operative_text:2:1"
+          ],
+          "applicability": "not_established",
+          "period": {
+            "from": "2024-01-01"
+          },
+          "evidence_quality": "text_grounded_not_professionally_reviewed",
+          "translations_share_evidence": true,
+          "statement_id": "P21_SHORT_MECHANISM",
+          "presentation_role": "mechanism"
+        },
+        {
+          "id": "P21_SHORT_CONDITION",
+          "topic": "pph21",
+          "kind": "document_explanation",
+          "scope": "archived_document_reference",
+          "text": "Check the recipient category and tax period.",
+          "presentation_roles": [
+            "condition"
+          ],
+          "evidence_ids": [
+            "PMK168_2023:6b06a241f9cd6fc6:4796bf2d18e3:operative_text:13:12",
+            "PMK168_2023:6b06a241f9cd6fc6:4796bf2d18e3:operative_text:15:14"
+          ],
+          "applicability": "not_established",
+          "period": {
+            "from": "2024-01-01"
+          },
+          "evidence_quality": "text_grounded_not_professionally_reviewed",
+          "translations_share_evidence": true,
+          "statement_id": "P21_SHORT_CONDITION",
+          "presentation_role": "condition"
+        },
+        {
+          "id": "PAYROLL_SCOPE",
+          "topic": "pph21",
+          "kind": "document_explanation",
+          "scope": "archived_document_reference",
+          "text": "Archived PMK168 describes PPh21 withholding on payments for work, services or activities by designated payers. Payer categories and exclusions are listed separately; this is not solely a salary tax.",
+          "presentation_roles": [],
+          "evidence_ids": [
+            "PMK168_2023:6b06a241f9cd6fc6:4796bf2d18e3:operative_text:2:1"
+          ],
+          "applicability": "not_established",
+          "period": {
+            "from": "2024-01-01"
+          },
+          "evidence_quality": "text_grounded_not_professionally_reviewed",
+          "translations_share_evidence": true,
+          "statement_id": "PAYROLL_SCOPE",
+          "presentation_role": "expanded_explanation"
+        },
+        {
+          "id": "PAYROLL_METHOD",
+          "topic": "pph21",
+          "kind": "document_explanation",
+          "scope": "archived_document_reference",
+          "text": "Archived PMK168 distinguishes ordinary periods from the last tax period for a permanent employee/pensioner. The last period reconciles annual or part-year liability rather than simply repeating withholding using an effective monthly rate. Worker category and period are needed.",
+          "presentation_roles": [],
+          "evidence_ids": [
+            "PMK168_2023:6b06a241f9cd6fc6:4796bf2d18e3:operative_text:13:12",
+            "PMK168_2023:6b06a241f9cd6fc6:4796bf2d18e3:operative_text:15:14"
+          ],
+          "applicability": "not_established",
+          "period": {
+            "from": "2024-01-01"
+          },
+          "evidence_quality": "text_grounded_not_professionally_reviewed",
+          "translations_share_evidence": true,
+          "statement_id": "PAYROLL_METHOD",
+          "presentation_role": "expanded_explanation"
+        },
+        {
+          "id": "PAYROLL_BASE",
+          "topic": "pph21",
+          "kind": "document_explanation",
+          "scope": "archived_document_reference",
+          "text": "For permanent employees and pensioners, archived Article8 distinguishes monthly gross income from taxable income after allowable deductions and the non-taxable allowance. Article2 separately lists designated payers and exclusions; a salary amount alone is insufficient for calculation.",
+          "presentation_roles": [],
+          "evidence_ids": [
+            "PMK168_2023:6b06a241f9cd6fc6:4796bf2d18e3:operative_text:8:7",
+            "PMK168_2023:6b06a241f9cd6fc6:4796bf2d18e3:operative_text:2:1"
+          ],
+          "applicability": "not_established",
+          "period": {
+            "from": "2024-01-01"
+          },
+          "evidence_quality": "text_grounded_not_professionally_reviewed",
+          "translations_share_evidence": true,
+          "statement_id": "PAYROLL_BASE",
+          "presentation_role": "expanded_explanation"
+        }
+      ],
+      "related_topic_ids": [
+        "pph26"
+      ],
+      "claim_ids": [
+        "PAYROLL_SCOPE",
+        "PAYROLL_METHOD",
+        "PAYROLL_BASE",
+        "P21_SHORT_DEFINITION",
+        "P21_SHORT_MECHANISM",
+        "P21_SHORT_CONDITION",
+        "P21_ABBREVIATION"
+      ],
+      "claim_evidence": [
+        {
+          "provision_id": "PMK168_2023:6b06a241f9cd6fc6:4796bf2d18e3:operative_text:2:1",
+          "fragment_ids": [
+            "PMK168_2023:079306052df2707a31737092",
+            "PMK168_2023:5d7769d0404bd1a073946d49"
+          ],
+          "source_id": "PMK168_2023",
+          "sha256": "6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858",
+          "article": "2",
+          "paragraphs": "(2)",
+          "role": "operative_text",
+          "use": "support",
+          "text_anchor": "pemberi kerja",
+          "text_anchors": [
+            "pemberi kerja",
+            "Pasal 2\n(1) Pemotongan Pajak Penghasilan Pasal 21 dan/ atau Pajak\nPenghasilan Pasal 26 Sehubungan dengan Pekerjaan,\nJasa, atau Kegiatan wajib dilakukan oleh Pemotong Pajak.\n(2) Pemotong Pajak sebagaimana dimaksud pada ayat (1)\nterdiri atas:\na. pemberi kerja yaitu orang pribadi clan Badan, baik\nmerupakan pusat maupun cabang, perwakilan atau\nunit, yang membayar gaji, upah, honorarium,\ntunjangan, dan pembayaran lain dengan nama clan\ndalam bentuk apa pun, termasuk imbalan dalam\nbentuk natura dan/atau kenikmatan, sebagai\nimbalan sehubungan dengan pekerjaan;\nb. Instansi Pemerintah, termasuk lembaga pemerintah\nnonkementerian, kesekretariatan lembaga negara,\nkesekretariatan lembaga nonstruktural, dan\nperwakilan Republik Indonesia di luar negeri, yang\nmembayarkan gaji, upah, honorarium, tunjangan,\ndan pembayaran lain dengan nama dan dalam bentuk\napa pun sehubungan dengan pekerjaan, jasa, atau\nkegiatan;\nc. dana pensiun, badan penyelenggara jaminan sosial\ntenaga kerja, dan badan-badan lain yang membayar\nuang pensiun, tunjangan hari tua, jaminan hari tua,\ndan/ atau pembayaran lain dengan nama apa pun\nyang terkait dengan program pensiun, yang\npendiriannya sesuai dengan ketentuan peraturan\nperundang-undangan;\nd. orang pribadi dan Badan, yang membayar\nhonorarium atau pembayaran lain sebagai imbalan\nsehubungan dengan jasa yang dilakukan oleh orang\npribadi, termasuk jasa tenaga ahli yang melakukan\nPekerjaan Bebas dan bertindak untuk dan atas\nnamanya sendiri, bukan untuk dan atas nama\npersekutuannya; dan\ne. Penyelenggara Kegiatan, termasuk Badan, Instansi\nPemerintah, organisasi yang bersifat nasional dan\ninternasional, perkumpulan, orang pribadi serta\nlembaga lainnya yang menyelenggarakan kegiatan,\nyang membayar honorarium, hadiah, atau\npenghargaan dalam bentuk apa pun berkenaan\ndengan suatu kegiatan.\n(3) Tidak termasuk sebagai pemberi kerja yang mempunyai\nkewajiban untuk melakukan pemotongan pajak\nsebagaimana dimaksud pada ayat (2) huruf a, meliputi:\na. kantor perwakilan negara asing;\nb. organisasi internasional:\n1. sebagaimana dimaksud dalam Pasal 3 ayat (1)\nhuruf c Undang-Undang Pajak Penghasilan\ndengan syarat:\na) Indonesia menjadi anggota organisasi\ntersebut; dan\nb) tidak menjalankan usaha atau kegiatan lain\nuntuk memperoleh penghasilan dari\nIndonesia selain memberikan pinjaman\nkepada pemerintah yang dananya berasal\ndari iuran para anggota; dan\n2. yang diatur khusus berdasarkan perjanjian\ninternasional sebagaimana dimaksud dalam\nperaturan Menteri yang mengatur mengenai\npelaksanaan perlakuan pajak penghasilan yang\ndidasarkan pada ketentuan dalam perJanJian\ninternasional,\nyang telah ditetapkan oleh Menteri; dan\nc. orang pribadi yang:\n1. tidak melakukan kegiatan usaha atau Pekerjaan\nBebas; atau\n2. melakukan kegiatan usaha atau Pekerjaan\nBebas dan mempekerjakan orang pribadi yang:\na) semata-mata melakukan pekerjaan rumah\ntangga; atau\nb) melakukan pekerjaan atau jasa yang tidak\nterkait dengan kegiatan usaha atau\nPekerjaan Bebas pemberi kerja."
+          ],
+          "related_explanation_provision_ids": [],
+          "pages": [
+            5,
+            6
+          ],
+          "links": [
+            "https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=5",
+            "https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=6"
+          ],
+          "period_restrictions": {
+            "from": "2024-01-01"
+          },
+          "text_review": "editorial_anchor_checked_not_professional_review",
+          "quality_limitations": [
+            "candidate_text_layer",
+            "paragraph_labels_may_contain_OCR_errors"
+          ],
+          "source_period": {
+            "from": "2024-01-01",
+            "to": null
+          },
+          "evidence_status": "text_grounded_archival_not_legal_currency_reviewed",
+          "temporal_status": "period_missing"
+        },
+        {
+          "provision_id": "PMK168_2023:6b06a241f9cd6fc6:4796bf2d18e3:operative_text:13:12",
+          "fragment_ids": [
+            "PMK168_2023:84cffa9db5a9573cbb4658a0",
+            "PMK168_2023:db9949c7c54fcf9fb9719e2a"
+          ],
+          "source_id": "PMK168_2023",
+          "sha256": "6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858",
+          "article": "13",
+          "paragraphs": "(1),(2)",
+          "role": "operative_text",
+          "use": "support",
+          "text_anchor": "tarif efektif",
+          "text_anchors": [
+            "tarif efektif",
+            "Pasal 13\n(1) Tarif pemotongan Pajak Penghasilan Pasal 21 terdiri atas:\na. tarif efektif pemotongan Pajak Penghasilan Pasal 21;\ndan\nb. tarif berdasarkan Pasal 17 ayat (1) huruf a Undang-\nUndang Pajak Penghasilan.\n(2) Tarif efektif pemotongan Pajak Penghasilan Pasal 21\nsebagaimana dimaksud pada ayat (1) huruf a terdiri atas:\na. tarif efektif bulanan; atau\nb. tarif efektif harian,\nIt\nsebagaimana diatur dalam peraturan pemerintah yang\nmengatur mengenai tarif pemotongan Pajak Penghasilan\nPasal 21 atas penghasilan sehubungan dengan pekerjaan,\njasa, atau kegiatan wajib pajak orang pribadi.\n(3) Tarif pemotongan Pajak Penghasilan Pasal 21 berdasarkan\ntarif Pasal 17 ayat (1) huruf a Undang-Undang Pajak\nPenghasilan sebagaimana dimaksud pada ayat (1) huruf b\ndigunakan atas penghasilan dari pekerjaan, jasa, atau\nkegiatan wajib pajak orang pribadi."
+          ],
+          "related_explanation_provision_ids": [],
+          "pages": [
+            14,
+            15
+          ],
+          "links": [
+            "https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=14",
+            "https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=15"
+          ],
+          "period_restrictions": {
+            "from": "2024-01-01"
+          },
+          "text_review": "editorial_anchor_checked_not_professional_review",
+          "quality_limitations": [
+            "candidate_text_layer",
+            "paragraph_labels_may_contain_OCR_errors"
+          ],
+          "source_period": {
+            "from": "2024-01-01",
+            "to": null
+          },
+          "evidence_status": "text_grounded_archival_not_legal_currency_reviewed",
+          "temporal_status": "period_missing"
+        },
+        {
+          "provision_id": "PMK168_2023:6b06a241f9cd6fc6:4796bf2d18e3:operative_text:15:14",
+          "fragment_ids": [
+            "PMK168_2023:3ba913a0416a5e3aa4ebea00",
+            "PMK168_2023:bea457a9e116ad7de2ac5bbc"
+          ],
+          "source_id": "PMK168_2023",
+          "sha256": "6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858",
+          "article": "15",
+          "paragraphs": "(1)-(3)",
+          "role": "operative_text",
+          "use": "support",
+          "text_anchor": "Masa Pajak Terakhir",
+          "text_anchors": [
+            "Masa Pajak Terakhir",
+            "Pasal 15\n(1) Pajak Penghasilan Pasal 21 yang wajib dipotong bagi\nPegawai Tetap sebagaimana dimaksud dalam Pasal 3 ayat\n( 1) huruf a dan Pensiunan se bagaimana dimaksud dalam\nPasal 3 ayat (1) huruf b pada:\na. setiap Masa Pajak selain Masa Pajak Terakhir\ndihitung menggunakan tarif efektif bulanan\nsebagaimana dimaksud dalam Pasal 13 ayat (2) huruf\na dikalikan dengan dasar pengenaan dan pemotongan\nsebagaimana dimaksud dalam Pasal 8 ayat (1) huruf\na;dan\nb. Masa Pajak Terakhir yaitu sebesar selisih antara Pajak\nPenghasilan Pasal 21 yang terutang selama 1 (satu) Tahun\nPajak atau bagian Tahun Pajak dengan Pajak Penghasilan\nPasal 21 yang telah dipotong pada Masa Pajak selain Masa\nPajak Terakhir sebagaimana dimaksud dalam huruf a.\n(2) Pajak Penghasilan Pasal 21 yang terutang selama 1 (satu)\nTahun Pajak atau bagian Tahun Pajak sebagaimana\ndimaksud pada ayat (1) huruf b dihitung menggunakan\ntarif Pasal 17 ayat (1) huruf a Undang-Undang Pajak\nPenghasilan dikalikan dengan dasar pengenaan dan\npemotongan sebagaimana dimaksud dalam Pasal 8 ayat\n(1) huruf b dalam 1 (satu) Tahun Pajak atau bagian Tahun\nPajak.\n(3) Dalam hal kewajiban pajak subjektif Pegawai Tetap\ndan/ atau Pensiunan baru dimulai setelah bulan Januari\natau berakhir sebelum bulan Desember, penghitungan\nPajak Penghasilan Pasal 21 yang terutang dilakukan\nberdasarkan penghasilan neto yang disetahunkan dan\npajaknya dihitung secara proporsional terhadap jumlah\nbulan dalam bagian Tahun Pajak yang bersangkutan."
+          ],
+          "related_explanation_provision_ids": [],
+          "pages": [
+            15,
+            16
+          ],
+          "links": [
+            "https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=15",
+            "https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=16"
+          ],
+          "period_restrictions": {
+            "from": "2024-01-01"
+          },
+          "text_review": "editorial_anchor_checked_not_professional_review",
+          "quality_limitations": [
+            "candidate_text_layer",
+            "paragraph_labels_may_contain_OCR_errors"
+          ],
+          "source_period": {
+            "from": "2024-01-01",
+            "to": null
+          },
+          "evidence_status": "text_grounded_archival_not_legal_currency_reviewed",
+          "temporal_status": "period_missing"
+        },
+        {
+          "provision_id": "PMK168_2023:6b06a241f9cd6fc6:4796bf2d18e3:operative_text:3:2",
+          "fragment_ids": [
+            "PMK168_2023:428ae9ea118f9570ae03f917",
+            "PMK168_2023:091ec07639e26511bd1e9aed"
+          ],
+          "source_id": "PMK168_2023",
+          "sha256": "6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858",
+          "article": "3",
+          "paragraphs": "(1)-(3)",
+          "role": "operative_text",
+          "use": "support",
+          "text_anchor": "merupakan wajib pajak orang pribadi",
+          "text_anchors": [
+            "merupakan wajib pajak orang pribadi",
+            "Pasal 3\n(1) Penerima penghasilan yang dipotong Pajak Penghasilan\nPasal 21 dan/atau Pajak Penghasilan Pasal 26\nSehubungan dengan Pekerjaan, Jasa, atau Kegiatan\nmerupakan wajib pajak orang pribadi, meliputi:\na. Pegawai Tetap;\nb. Pensiunan;\nc. anggota dewan komisaris atau anggota dewan\npengawas yang menerima imbalan secara tidak\nteratur;\nd. Pegawai Tidak Tetap;\ne. Bukan Pegawai;\nf. Peserta Kegiatan;\ng. peserta program pens1un yang masih berstatus\nPegawai; dan\nh. Mantan Pegawai.\n(2) Bukan Pegawai sebagaimana dimaksud pada ayat (1)\nhuruf e, meliputi:\na. tenaga ahli yang melakukan Pekerjaan Bebas, yang\nterdiri dari pengacara, akuntan, arsitek, dokter,\nkonsultan, notaris, pejabat pembuat akta tanah,\npenilai, dan aktuaris;\nb. pemain musik, pembawa acara, penyanyi, pelawak,\nbintang film, bintang sinetron, bintang iklan,\nsutradara, kru film, foto model,\nperagawan/peragawati, pemain drama, penari,\npemahat, pelukis, pembuat/ pencipta konten pada\nmedia yang dibagikan secara daring (influencer,\nselebgram, blogger, vlogger, dan sejenis lainnya), dan\nseniman lainnya;\nc. olahragawan;\nd. penasihat, pengajar, pelatih, penceramah, penyuluh,\ndan moderator;\ne. pengarang, peneliti, dan penerjemah;\nf. pemberi jasa dalam segala bidang;\ng. agen iklan;\nh. pengawas atau pengelola proyek;\npembawa pesanan atau yang menemukan langganan\n1.\natau yang menjadi perantara;\nJ. petugas penjaja barang dagangan;\nk. agen asuransi; dan\n1. distributor perusahaan pemasaran berjenjang atau\npenjualan langsung dan kegiatan sejenis lainnya.\n(3) Peserta Kegiatan sebagaimana dimaksud pada ayat (1)\nhuruf f, meliputi:\na. peserta perlombaan dalam segala bidang, antara lain\nperlombaan olahraga, keagamaan, kesenian,\nketangkasan, ilmu pengetahuan, teknologi, dan\nperlombaan lainnya;\nb. peserta rapat, konferensi, sidang, pertemuan,\nkunjungan kerja, seminar, lokakarya, atau\npertunjukan, atau kegiatan tertentu lainnya;\nc. peserta atau anggota dalam suatu kepanitiaan\nsebagai Penyelenggara Kegiatan tertentu; atau\nd. peserta pendidikan, pelatihan, dan magang."
+          ],
+          "related_explanation_provision_ids": [],
+          "pages": [
+            6,
+            7
+          ],
+          "links": [
+            "https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=6",
+            "https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=7"
+          ],
+          "period_restrictions": {
+            "from": "2024-01-01"
+          },
+          "text_review": "editorial_anchor_checked_not_professional_review",
+          "quality_limitations": [
+            "candidate_text_layer",
+            "paragraph_labels_may_contain_OCR_errors"
+          ],
+          "source_period": {
+            "from": "2024-01-01",
+            "to": null
+          },
+          "evidence_status": "text_grounded_archival_not_legal_currency_reviewed",
+          "temporal_status": "period_missing"
+        },
+        {
+          "provision_id": "PMK168_2023:6b06a241f9cd6fc6:4796bf2d18e3:operative_text:8:7",
+          "fragment_ids": [
+            "PMK168_2023:0190bbfd7037eba985d117db",
+            "PMK168_2023:8eb407100a11bd684b6b3648"
+          ],
+          "source_id": "PMK168_2023",
+          "sha256": "6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858",
+          "article": "8",
+          "paragraphs": "(1)",
+          "role": "operative_text",
+          "use": "support",
+          "text_anchor": "penghasilan bruto",
+          "text_anchors": [
+            "penghasilan bruto",
+            "Pasal 8\n(1) Dasar pengenaan dan pemotongan Pajak Penghasilan\nPasal 21 untuk Pegawai Tetap dan Pensiunan, yaitu:\na. penghasilan bruto dalam 1 (satu) Masa Pajak; atau\nb. penghasilan kena pajak.\n(2) Penghasilan bruto sebagaimana dimaksud pada ayat (1)\nhuruf a sebagai berikut:\na. bagi Pegawai Tetap meliputi seluruh penghasilan\nsebagaimana dimaksud dalam Pasal 5 ayat (1) huruf a\nyang diterima atau diperoleh dari pemberi kerja; dan\nb. bagi Pensiunan meliputi seluruh penghasilan\nsebagaimana dimaksud dalam Pasal 5 ayat (1) huruf b.\n(3) Penghasilan kena pajak sebagaimana dimaksud pada ayat\n(1) huruf b sebesar penghasilan neto dikurangi\nPenghasilan Tidak Kena Pajak.\n(4) Jumlah penghasilan kena pajak sebagaimana dimaksud\npada ayat (3) dibulatkan ke bawah hingga ribuan rupiah\npenuh.\n(5) Penghasilan neto sebagaimana dimaksud pada ayat (3)\nmerupakan seluruh jumlah penghasilan bruto\nsebagaimana dimaksud pada ayat (2) dalam 1 (satu) Tahun\nPajak atau bagian Tahun Pajak dikurangi dengan\npengurangan yang diperbolehkan."
+          ],
+          "related_explanation_provision_ids": [],
+          "pages": [
+            10,
+            11
+          ],
+          "links": [
+            "https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=10",
+            "https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=11"
+          ],
+          "period_restrictions": {
+            "from": "2024-01-01"
+          },
+          "text_review": "editorial_anchor_checked_not_professional_review",
+          "quality_limitations": [
+            "candidate_text_layer",
+            "paragraph_labels_may_contain_OCR_errors"
+          ],
+          "source_period": {
+            "from": "2024-01-01",
+            "to": null
+          },
+          "evidence_status": "text_grounded_archival_not_legal_currency_reviewed",
+          "temporal_status": "period_missing"
+        }
+      ],
+      "gaps": [],
+      "required_notice": "Archived explanation; current rules and company applicability are unconfirmed.",
+      "verification": {
+        "text": "runtime_checked_archival_binding",
+        "currency": "unconfirmed",
+        "professional_review": null
+      },
+      "applicability": {
+        "status": "blocked",
+        "eligible_basis_claim_ids": [],
+        "professional_review": null
+      },
+      "numerical_use": {
+        "status": "blocked",
+        "calculations": [],
+        "TER": "blocked_unverified_table"
+      },
+      "blockers": [
+        {
+          "code": "tax_period_missing",
+          "claim_id": "TER_NUMERIC"
+        },
+        {
+          "code": "current_provision_currency_unconfirmed",
+          "claim_id": "TER_NUMERIC"
+        },
+        {
+          "code": "amendment_review_incomplete",
+          "source_id": "PP58_2023",
+          "path": [
+            "PP58_2023"
+          ],
+          "content_unknown": false,
+          "currency_confirmed": false,
+          "claim_id": "TER_NUMERIC"
+        },
+        {
+          "code": "amendment_review_incomplete",
+          "source_id": "PMK168_2023",
+          "path": [
+            "PMK168_2023"
+          ],
+          "content_unknown": false,
+          "currency_confirmed": false,
+          "claim_id": "TER_NUMERIC"
+        },
+        {
+          "code": "TER_table_not_verified",
+          "claim_id": "TER_NUMERIC"
+        },
+        {
+          "code": "amendment_review_incomplete",
+          "source_id": "PMK81_2024",
+          "path": [
+            "PMK81_2024"
+          ],
+          "content_unknown": false,
+          "currency_confirmed": false,
+          "scope": "administrative_conclusions_only",
+          "affected_topics": [
+            "pph21"
+          ]
+        },
+        {
+          "code": "amendment_review_incomplete",
+          "source_id": "PMK1_2026",
+          "path": [
+            "PMK81_2024",
+            "PMK1_2026"
+          ],
+          "content_unknown": false,
+          "currency_confirmed": false,
+          "scope": "administrative_conclusions_only",
+          "affected_topics": [
+            "pph21"
+          ]
+        },
+        {
+          "code": "amendment_review_incomplete",
+          "source_id": "PMK54_2025",
+          "path": [
+            "PMK81_2024",
+            "PMK54_2025"
+          ],
+          "content_unknown": false,
+          "currency_confirmed": false,
+          "scope": "administrative_conclusions_only",
+          "affected_topics": [
+            "pph21"
+          ]
+        },
+        {
+          "code": "amendment_review_incomplete",
+          "source_id": "PMK53_2025",
+          "path": [
+            "PMK81_2024",
+            "PMK53_2025"
+          ],
+          "content_unknown": false,
+          "currency_confirmed": false,
+          "scope": "administrative_conclusions_only",
+          "affected_topics": [
+            "pph21"
+          ]
+        },
+        {
+          "code": "amendment_review_incomplete",
+          "source_id": "PMK11_2025",
+          "path": [
+            "PMK81_2024",
+            "PMK11_2025"
+          ],
+          "content_unknown": false,
+          "currency_confirmed": false,
+          "scope": "administrative_conclusions_only",
+          "affected_topics": [
+            "pph21"
+          ]
+        }
+      ],
+      "clarifying_questions": [],
+      "ask_accountant": {
+        "question": "Explain PPh 21 — Pajak Penghasilan Pasal 21 using available sources and state the limitations.",
+        "context": {
+          "topic_id": "pph21",
+          "language": "en",
+          "period": null,
+          "intent": "explanation",
+          "claim_ids": [
+            "PAYROLL_SCOPE",
+            "PAYROLL_METHOD",
+            "PAYROLL_BASE",
+            "P21_SHORT_DEFINITION",
+            "P21_SHORT_MECHANISM",
+            "P21_SHORT_CONDITION",
+            "P21_ABBREVIATION"
+          ]
+        },
+        "role": "user_question_not_instruction"
+      },
+      "production_rule_activation": false
+    }
+  },
+  {
+    "example_kind": "partial",
+    "input": {
+      "topic_id": "npwp_nik",
+      "language": "en",
+      "period": null
+    },
+    "actual_card": {
+      "schema_version": 2,
+      "contract": "indonesia_tax_tooltip_v2",
+      "topic_id": "npwp_nik",
+      "language": "en",
+      "name": "NPWP / NIK",
+      "designation_role": "navigation_label_not_legal_determination",
+      "status": "partial",
+      "coverage": "archived_document_explanation_only",
+      "summary": [],
+      "abbreviation": {
+        "status": "unavailable",
+        "designation_language": "id",
+        "statements": []
+      },
+      "what_is": [],
+      "how_it_works": [],
+      "main_condition": [],
+      "section_status": {
+        "what_is": "unavailable",
+        "how_it_works": "unavailable",
+        "main_condition": "unavailable",
+        "summary": "unavailable",
+        "detailed_explanation": "available"
+      },
+      "unavailable_section_notice": "There is insufficient confirmed evidence for this section.",
+      "what_to_check": [
+        {
+          "field": "recipient_npwp",
+          "text": "Please specify confirmed recipient NPWP/NIK.",
+          "role": "optional_check_not_assertion"
+        }
+      ],
+      "detailed_explanation": [
+        {
+          "id": "SERVICE_NPWP",
+          "topic": "pph23",
+          "kind": "document_explanation",
+          "scope": "archived_document_reference",
+          "text": "Archived Article23 contains a no-NPWP branch and withholding exclusions. Verify identity, income category and exclusions; current NIK/NPWP treatment is not established by this collection.",
+          "presentation_roles": [],
+          "evidence_ids": [
+            "DJP_SDSN_2023:45716e25368d0218:d01e95f3e43d:operative_text:23:1"
+          ],
+          "applicability": "not_established",
+          "period": {},
+          "evidence_quality": "text_grounded_not_professionally_reviewed",
+          "translations_share_evidence": true,
+          "statement_id": "SERVICE_NPWP",
+          "presentation_role": "expanded_explanation"
+        }
+      ],
+      "related_topic_ids": [
+        "pkp",
+        "pph23"
+      ],
+      "claim_ids": [
+        "SERVICE_NPWP"
+      ],
+      "claim_evidence": [
+        {
+          "provision_id": "DJP_SDSN_2023:45716e25368d0218:d01e95f3e43d:operative_text:23:1",
+          "fragment_ids": [
+            "DJP_SDSN_2023:9c62c92fef113536539abf4e",
+            "DJP_SDSN_2023:07c330edd10bdfd4f21d781b"
+          ],
+          "source_id": "DJP_SDSN_2023",
+          "sha256": "45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc",
+          "article": "23",
+          "paragraphs": "(1a),(4)",
+          "role": "operative_text",
+          "use": "support",
+          "text_anchor": "tidak memiliki Nomor Pokok",
+          "text_anchors": [
+            "tidak memiliki Nomor Pokok",
+            "PASAL 23\n(1) Atas penghasilan tersebut di bawah ini dengan nama dan dalam bentuk apa pun yang\ndibayarkan, disediakan untuk dibayarkan, atau telah jatuh tempo pembayarannya oleh\nbadan pemerintah, subjek pajak badan dalam negeri, penyelenggara kegiatan, bentuk\nusaha tetap, atau perwakilan perusahaan luar negeri lainnya kepada Wajib Pajak\ndalam negeri atau bentuk usaha tetap, dipotong pajak oleh pihak yang wajib\nmembayarkan:\na. sebesar 15% (lima belas persen) dari jumlah bruto atas: ***)\n1. dividen sebagaimana dimaksud dalam Pasal 4 ayat (1) huruf g; ***)\n2. bunga sebagaimana dimaksud dalam Pasal 4 ayat (1) huruf f; ***)\n3. royalti; dan\n4. hadiah, penghargaan, bonus, dan sejenisnya selain yang telah dipotong Pajak\nPenghasilan sebagaimana dimaksud dalam Pasal 21 ayat (1) huruf e;\nb. dihapus;\nc. sebesar 2% (dua persen) dari jumlah bruto atas:\n1. sewa dan penghasilan lain sehubungan dengan penggunaan harta, kecuali\nsewa dan penghasilan lain sehubungan dengan penggunaan harta yang telah\ndikenai Pajak Penghasilan sebagaimana dimaksud dalam Pasal 4 ayat\n(2) ; dan\n2. imbalan sehubungan dengan jasa teknik, jasa manajemen, jasa konstruksi, jasa\nkonsultan, dan jasa lain selain jasa yang telah dipotong Pajak Penghasilan\nsebagaimana dimaksud dalam Pasal 21. i*****)\n226\n(1a) Dalam hal Wajib Pajak yang menerima atau memperoleh penghasilan sebagaimana\ndimaksud pada ayat (1) tidak memiliki Nomor Pokok Wajib Pajak, besarnya tarif\npemotongan adalah lebih tinggi 100% (seratus persen) daripada tarif sebagaimana\ndimaksud pada ayat (1). i*****)\n(2) Ketentuan lebih lanjut mengenai jenis jasa lain sebagaimana dimaksud pada ayat\n(1)huruf c angka 2 diatur dengan atau berdasarkan Peraturan Menteri Keuangan. i*****)\n(3) Orang pribadi sebagai Wajib Pajak dalam negeri dapat ditunjuk oleh Direktur\nJenderal Pajak untuk memotong pajak sebagaimana dimaksud pada ayat (1). **)\n(4) Pemotongan pajak sebagaimana dimaksud pada ayat (1) tidak dilakukan atas:\na. penghasilan yang dibayar atau terutang kepada bank;\nb. sewa yang dibayarkan atau terutang sehubungan dengan sewa guna usaha\ndengan hak opsi;\nc. dividen sebagaimana dimaksud dalam Pasal 4 ayat (3) huruf f dan dividen yang\nditerima oleh orang pribadi sebagaimana dimaksud dalam Pasal 17 ayat (2c);\nd. dihapus;\ne. bagian laba sebagaimana dimaksud dalam Pasal 4 ayat (3) huruf i;\nf. sisa hasil usaha koperasi yang dibayarkan oleh koperasi kepada anggotanya;\ng. dihapus; dan\nh. penghasilan yang dibayar atau terutang kepada badan usaha atas jasa keuangan\nyang berfungsi sebagai penyalur pinjaman dan/atau pembiayaan yang diatur\ndengan Peraturan Menteri Keuangan. i*****)"
+          ],
+          "related_explanation_provision_ids": [
+            "DJP_SDSN_2023:45716e25368d0218:d01e95f3e43d:explanation:23:2"
+          ],
+          "pages": [
+            231,
+            232
+          ],
+          "links": [
+            "https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231",
+            "https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=232"
+          ],
+          "period_restrictions": {},
+          "text_review": "editorial_anchor_checked_not_professional_review",
+          "quality_limitations": [
+            "candidate_text_layer",
+            "paragraph_labels_may_contain_OCR_errors"
+          ],
+          "source_period": {
+            "from": null,
+            "to": null
+          },
+          "evidence_status": "text_grounded_archival_not_legal_currency_reviewed",
+          "temporal_status": "period_missing"
+        }
+      ],
+      "gaps": [
+        "definition_and_abbreviation_unconfirmed",
+        "NPWP_NIK_identity_integration_primary_text_not_reviewed",
+        "only_PPh23_context_available"
+      ],
+      "required_notice": "Archived explanation; current rules and company applicability are unconfirmed.",
+      "verification": {
+        "text": "runtime_checked_archival_binding",
+        "currency": "unconfirmed",
+        "professional_review": null
+      },
+      "applicability": {
+        "status": "blocked",
+        "eligible_basis_claim_ids": [],
+        "professional_review": null
+      },
+      "numerical_use": {
+        "status": "blocked",
+        "calculations": [],
+        "TER": "blocked_unverified_table"
+      },
+      "blockers": [
+        {
+          "code": "tax_period_missing",
+          "claim_id": "SERVICE_RATE"
+        },
+        {
+          "code": "current_provision_currency_unconfirmed",
+          "claim_id": "SERVICE_RATE"
+        },
+        {
+          "code": "amendment_review_incomplete",
+          "source_id": "PMK141_2015",
+          "path": [
+            "PMK141_2015"
+          ],
+          "content_unknown": false,
+          "currency_confirmed": false,
+          "claim_id": "SERVICE_RATE"
+        },
+        {
+          "code": "amendment_review_incomplete",
+          "source_id": "PMK81_2024",
+          "path": [
+            "PMK81_2024"
+          ],
+          "content_unknown": false,
+          "currency_confirmed": false,
+          "scope": "administrative_conclusions_only",
+          "affected_topics": [
+            "pph23"
+          ]
+        },
+        {
+          "code": "amendment_review_incomplete",
+          "source_id": "PMK1_2026",
+          "path": [
+            "PMK81_2024",
+            "PMK1_2026"
+          ],
+          "content_unknown": false,
+          "currency_confirmed": false,
+          "scope": "administrative_conclusions_only",
+          "affected_topics": [
+            "pph23"
+          ]
+        },
+        {
+          "code": "amendment_review_incomplete",
+          "source_id": "PMK54_2025",
+          "path": [
+            "PMK81_2024",
+            "PMK54_2025"
+          ],
+          "content_unknown": false,
+          "currency_confirmed": false,
+          "scope": "administrative_conclusions_only",
+          "affected_topics": [
+            "pph23"
+          ]
+        },
+        {
+          "code": "amendment_review_incomplete",
+          "source_id": "PMK53_2025",
+          "path": [
+            "PMK81_2024",
+            "PMK53_2025"
+          ],
+          "content_unknown": false,
+          "currency_confirmed": false,
+          "scope": "administrative_conclusions_only",
+          "affected_topics": [
+            "pph23"
+          ]
+        },
+        {
+          "code": "amendment_review_incomplete",
+          "source_id": "PMK11_2025",
+          "path": [
+            "PMK81_2024",
+            "PMK11_2025"
+          ],
+          "content_unknown": false,
+          "currency_confirmed": false,
+          "scope": "administrative_conclusions_only",
+          "affected_topics": [
+            "pph23"
+          ]
+        }
+      ],
+      "clarifying_questions": [],
+      "ask_accountant": {
+        "question": "Explain NPWP / NIK using available sources and state the limitations.",
+        "context": {
+          "topic_id": "npwp_nik",
+          "language": "en",
+          "period": null,
+          "intent": "explanation",
+          "claim_ids": [
+            "SERVICE_NPWP"
+          ]
+        },
+        "role": "user_question_not_instruction"
+      },
+      "production_rule_activation": false
+    }
+  },
+  {
+    "example_kind": "unavailable",
+    "input": {
+      "topic_id": "pph_final_rent",
+      "language": "en",
+      "period": "2017-06-01"
+    },
+    "actual_card": {
+      "schema_version": 2,
+      "contract": "indonesia_tax_tooltip_v2",
+      "topic_id": "pph_final_rent",
+      "language": "en",
+      "name": "PPh Final — sewa tanah/bangunan",
+      "designation_role": "navigation_label_not_legal_determination",
+      "status": "unavailable",
+      "coverage": "archived_document_explanation_only",
+      "summary": [],
+      "abbreviation": {
+        "status": "unavailable",
+        "designation_language": "id",
+        "statements": []
+      },
+      "what_is": [],
+      "how_it_works": [],
+      "main_condition": [],
+      "section_status": {
+        "what_is": "unavailable",
+        "how_it_works": "unavailable",
+        "main_condition": "unavailable",
+        "summary": "unavailable",
+        "detailed_explanation": "unavailable"
+      },
+      "unavailable_section_notice": "There is insufficient confirmed evidence for this section.",
+      "what_to_check": [
+        {
+          "field": "rental_object",
+          "text": "Please specify rental object: land/building, equipment or accommodation.",
+          "role": "optional_check_not_assertion"
+        },
+        {
+          "field": "payer_withholder_status",
+          "text": "Please specify payer's legal withholding status.",
+          "role": "optional_check_not_assertion"
+        }
+      ],
+      "detailed_explanation": [],
+      "related_topic_ids": [
+        "pph23"
+      ],
+      "claim_ids": [],
+      "claim_evidence": [],
+      "gaps": [
+        "claim_unavailable:RENT_SCOPE",
+        "claim_unavailable:RENT_PAYER",
+        "claim_unavailable:RENT_BASE",
+        "claim_unavailable:RENT_SHORT_DEFINITION",
+        "claim_unavailable:RENT_SHORT_MECHANISM",
+        "claim_unavailable:RENT_SHORT_CONDITION",
+        "claim_unavailable:RENT_ABBREVIATION"
+      ],
+      "required_notice": "There is insufficient confirmed evidence for a tax determination.",
+      "verification": {
+        "text": "no_supported_statements",
+        "currency": "unconfirmed",
+        "professional_review": null
+      },
+      "applicability": {
+        "status": "blocked",
+        "eligible_basis_claim_ids": [],
+        "professional_review": null
+      },
+      "numerical_use": {
+        "status": "blocked",
+        "calculations": [],
+        "TER": "blocked_unverified_table"
+      },
+      "blockers": [
+        {
+          "code": "support_outside_requested_period",
+          "provision_id": "PP34_2017:2f5af8d0c92628fa:0df7d0c2a792:operative_text:2:1",
+          "recorded_window": {
+            "from": "2018-01-02",
+            "to": null
+          },
+          "claim_id": "RENT_ABBREVIATION"
+        },
+        {
+          "code": "outside_requested_period",
+          "recorded_window": {
+            "from": "2018-01-02"
+          },
+          "claim_id": "RENT_ABBREVIATION"
+        },
+        {
+          "code": "support_outside_requested_period",
+          "provision_id": "PP34_2017:2f5af8d0c92628fa:0df7d0c2a792:operative_text:4:3",
+          "recorded_window": {
+            "from": "2018-01-02",
+            "to": null
+          },
+          "claim_id": "RENT_BASE"
+        },
+        {
+          "code": "outside_requested_period",
+          "recorded_window": {
+            "from": "2018-01-02"
+          },
+          "claim_id": "RENT_BASE"
+        },
+        {
+          "code": "support_outside_requested_period",
+          "provision_id": "PP34_2017:2f5af8d0c92628fa:0df7d0c2a792:operative_text:5:4",
+          "recorded_window": {
+            "from": "2018-01-02",
+            "to": null
+          },
+          "claim_id": "RENT_HISTORY"
+        },
+        {
+          "code": "support_outside_requested_period",
+          "provision_id": "PP34_2017:2f5af8d0c92628fa:0df7d0c2a792:operative_text:6:5",
+          "recorded_window": {
+            "from": "2018-01-02",
+            "to": null
+          },
+          "claim_id": "RENT_HISTORY"
+        },
+        {
+          "code": "support_outside_requested_period",
+          "provision_id": "PP34_2017:2f5af8d0c92628fa:0df7d0c2a792:operative_text:7:6",
+          "recorded_window": {
+            "from": "2018-01-02",
+            "to": null
+          },
+          "claim_id": "RENT_HISTORY"
+        },
+        {
+          "code": "outside_requested_period",
+          "recorded_window": {
+            "from": "2018-01-02"
+          },
+          "claim_id": "RENT_HISTORY"
+        },
+        {
+          "code": "support_outside_requested_period",
+          "provision_id": "PP34_2017:2f5af8d0c92628fa:0df7d0c2a792:operative_text:3:2",
+          "recorded_window": {
+            "from": "2018-01-02",
+            "to": null
+          },
+          "claim_id": "RENT_PAYER"
+        },
+        {
+          "code": "outside_requested_period",
+          "recorded_window": {
+            "from": "2018-01-02"
+          },
+          "claim_id": "RENT_PAYER"
+        },
+        {
+          "code": "support_outside_requested_period",
+          "provision_id": "PP34_2017:2f5af8d0c92628fa:0df7d0c2a792:operative_text:4:3",
+          "recorded_window": {
+            "from": "2018-01-02",
+            "to": null
+          },
+          "claim_id": "RENT_RATE"
+        },
+        {
+          "code": "outside_requested_period",
+          "recorded_window": {
+            "from": "2018-01-02"
+          },
+          "claim_id": "RENT_RATE"
+        },
+        {
+          "code": "current_provision_currency_unconfirmed",
+          "claim_id": "RENT_RATE"
+        },
+        {
+          "code": "amendment_review_incomplete",
+          "source_id": "PP34_2017",
+          "path": [
+            "PP34_2017"
+          ],
+          "content_unknown": false,
+          "currency_confirmed": false,
+          "claim_id": "RENT_RATE"
+        },
+        {
+          "code": "support_outside_requested_period",
+          "provision_id": "PP34_2017:2f5af8d0c92628fa:0df7d0c2a792:operative_text:2:1",
+          "recorded_window": {
+            "from": "2018-01-02",
+            "to": null
+          },
+          "claim_id": "RENT_SCOPE"
+        },
+        {
+          "code": "outside_requested_period",
+          "recorded_window": {
+            "from": "2018-01-02"
+          },
+          "claim_id": "RENT_SCOPE"
+        },
+        {
+          "code": "support_outside_requested_period",
+          "provision_id": "PP34_2017:2f5af8d0c92628fa:0df7d0c2a792:operative_text:3:2",
+          "recorded_window": {
+            "from": "2018-01-02",
+            "to": null
+          },
+          "claim_id": "RENT_SHORT_CONDITION"
+        },
+        {
+          "code": "support_outside_requested_period",
+          "provision_id": "PP34_2017:2f5af8d0c92628fa:0df7d0c2a792:operative_text:2:1",
+          "recorded_window": {
+            "from": "2018-01-02",
+            "to": null
+          },
+          "claim_id": "RENT_SHORT_CONDITION"
+        },
+        {
+          "code": "outside_requested_period",
+          "recorded_window": {
+            "from": "2018-01-02"
+          },
+          "claim_id": "RENT_SHORT_CONDITION"
+        },
+        {
+          "code": "support_outside_requested_period",
+          "provision_id": "PP34_2017:2f5af8d0c92628fa:0df7d0c2a792:operative_text:2:1",
+          "recorded_window": {
+            "from": "2018-01-02",
+            "to": null
+          },
+          "claim_id": "RENT_SHORT_DEFINITION"
+        },
+        {
+          "code": "outside_requested_period",
+          "recorded_window": {
+            "from": "2018-01-02"
+          },
+          "claim_id": "RENT_SHORT_DEFINITION"
+        },
+        {
+          "code": "support_outside_requested_period",
+          "provision_id": "PP34_2017:2f5af8d0c92628fa:0df7d0c2a792:operative_text:3:2",
+          "recorded_window": {
+            "from": "2018-01-02",
+            "to": null
+          },
+          "claim_id": "RENT_SHORT_MECHANISM"
+        },
+        {
+          "code": "outside_requested_period",
+          "recorded_window": {
+            "from": "2018-01-02"
+          },
+          "claim_id": "RENT_SHORT_MECHANISM"
+        },
+        {
+          "code": "amendment_review_incomplete",
+          "source_id": "PMK81_2024",
+          "path": [
+            "PMK81_2024"
+          ],
+          "content_unknown": false,
+          "currency_confirmed": false,
+          "scope": "administrative_conclusions_only",
+          "affected_topics": [
+            "pph_final_rent"
+          ]
+        },
+        {
+          "code": "amendment_review_incomplete",
+          "source_id": "PMK1_2026",
+          "path": [
+            "PMK81_2024",
+            "PMK1_2026"
+          ],
+          "content_unknown": false,
+          "currency_confirmed": false,
+          "scope": "administrative_conclusions_only",
+          "affected_topics": [
+            "pph_final_rent"
+          ]
+        },
+        {
+          "code": "amendment_review_incomplete",
+          "source_id": "PMK54_2025",
+          "path": [
+            "PMK81_2024",
+            "PMK54_2025"
+          ],
+          "content_unknown": false,
+          "currency_confirmed": false,
+          "scope": "administrative_conclusions_only",
+          "affected_topics": [
+            "pph_final_rent"
+          ]
+        },
+        {
+          "code": "amendment_review_incomplete",
+          "source_id": "PMK53_2025",
+          "path": [
+            "PMK81_2024",
+            "PMK53_2025"
+          ],
+          "content_unknown": false,
+          "currency_confirmed": false,
+          "scope": "administrative_conclusions_only",
+          "affected_topics": [
+            "pph_final_rent"
+          ]
+        },
+        {
+          "code": "amendment_review_incomplete",
+          "source_id": "PMK11_2025",
+          "path": [
+            "PMK81_2024",
+            "PMK11_2025"
+          ],
+          "content_unknown": false,
+          "currency_confirmed": false,
+          "scope": "administrative_conclusions_only",
+          "affected_topics": [
+            "pph_final_rent"
+          ]
+        }
+      ],
+      "clarifying_questions": [],
+      "ask_accountant": {
+        "question": "Explain PPh Final — sewa tanah/bangunan using available sources and state the limitations.",
+        "context": {
+          "topic_id": "pph_final_rent",
+          "language": "en",
+          "period": "2017-06-01",
+          "intent": "explanation",
+          "claim_ids": []
+        },
+        "role": "user_question_not_instruction"
+      },
+      "production_rule_activation": false
+    }
+  },
+  {
+    "example_kind": "available",
+    "input": {
+      "topic_id": "pph21",
+      "language": "id",
+      "period": null
+    },
+    "actual_card": {
+      "schema_version": 2,
+      "contract": "indonesia_tax_tooltip_v2",
+      "topic_id": "pph21",
+      "language": "id",
+      "name": "PPh 21 — Pajak Penghasilan Pasal 21",
+      "designation_role": "navigation_label_not_legal_determination",
+      "status": "available",
+      "coverage": "archived_document_explanation_only",
+      "summary": [
+        {
+          "id": "P21_SHORT_DEFINITION",
+          "topic": "pph21",
+          "kind": "document_explanation",
+          "scope": "archived_document_reference",
+          "text": "PPh21 adalah pajak atas pembayaran tertentu kepada orang pribadi terkait pekerjaan, jasa atau kegiatan.",
+          "presentation_roles": [
+            "definition"
+          ],
+          "evidence_ids": [
+            "PMK168_2023:6b06a241f9cd6fc6:4796bf2d18e3:operative_text:2:1",
+            "PMK168_2023:6b06a241f9cd6fc6:4796bf2d18e3:operative_text:3:2"
+          ],
+          "applicability": "not_established",
+          "period": {
+            "from": "2024-01-01"
+          },
+          "evidence_quality": "text_grounded_not_professionally_reviewed",
+          "translations_share_evidence": true,
+          "statement_id": "P21_SHORT_DEFINITION",
+          "presentation_role": "definition"
+        },
+        {
+          "id": "P21_SHORT_MECHANISM",
+          "topic": "pph21",
+          "kind": "document_explanation",
+          "scope": "archived_document_reference",
+          "text": "Pemberi kerja atau pembayar yang ditentukan memotong pajak dari pembayaran.",
+          "presentation_roles": [
+            "mechanism"
+          ],
+          "evidence_ids": [
+            "PMK168_2023:6b06a241f9cd6fc6:4796bf2d18e3:operative_text:2:1"
+          ],
+          "applicability": "not_established",
+          "period": {
+            "from": "2024-01-01"
+          },
+          "evidence_quality": "text_grounded_not_professionally_reviewed",
+          "translations_share_evidence": true,
+          "statement_id": "P21_SHORT_MECHANISM",
+          "presentation_role": "mechanism"
+        },
+        {
+          "id": "P21_SHORT_CONDITION",
+          "topic": "pph21",
+          "kind": "document_explanation",
+          "scope": "archived_document_reference",
+          "text": "Periksa kategori penerima dan masa pajaknya.",
+          "presentation_roles": [
+            "condition"
+          ],
+          "evidence_ids": [
+            "PMK168_2023:6b06a241f9cd6fc6:4796bf2d18e3:operative_text:13:12",
+            "PMK168_2023:6b06a241f9cd6fc6:4796bf2d18e3:operative_text:15:14"
+          ],
+          "applicability": "not_established",
+          "period": {
+            "from": "2024-01-01"
+          },
+          "evidence_quality": "text_grounded_not_professionally_reviewed",
+          "translations_share_evidence": true,
+          "statement_id": "P21_SHORT_CONDITION",
+          "presentation_role": "condition"
+        }
+      ],
+      "abbreviation": {
+        "status": "available",
+        "designation_language": "id",
+        "statements": [
+          {
+            "id": "P21_ABBREVIATION",
+            "topic": "pph21",
+            "kind": "document_explanation",
+            "scope": "archived_document_reference",
+            "text": "Pajak Penghasilan Pasal 21",
+            "presentation_roles": [
+              "abbreviation"
+            ],
+            "evidence_ids": [
+              "PMK168_2023:6b06a241f9cd6fc6:4796bf2d18e3:operative_text:2:1"
+            ],
+            "applicability": "not_established",
+            "period": {
+              "from": "2024-01-01"
+            },
+            "evidence_quality": "text_grounded_not_professionally_reviewed",
+            "translations_share_evidence": true,
+            "statement_id": "P21_ABBREVIATION",
+            "presentation_role": "abbreviation"
+          }
+        ]
+      },
+      "what_is": [
+        {
+          "id": "P21_SHORT_DEFINITION",
+          "topic": "pph21",
+          "kind": "document_explanation",
+          "scope": "archived_document_reference",
+          "text": "PPh21 adalah pajak atas pembayaran tertentu kepada orang pribadi terkait pekerjaan, jasa atau kegiatan.",
+          "presentation_roles": [
+            "definition"
+          ],
+          "evidence_ids": [
+            "PMK168_2023:6b06a241f9cd6fc6:4796bf2d18e3:operative_text:2:1",
+            "PMK168_2023:6b06a241f9cd6fc6:4796bf2d18e3:operative_text:3:2"
+          ],
+          "applicability": "not_established",
+          "period": {
+            "from": "2024-01-01"
+          },
+          "evidence_quality": "text_grounded_not_professionally_reviewed",
+          "translations_share_evidence": true,
+          "statement_id": "P21_SHORT_DEFINITION",
+          "presentation_role": "definition"
+        }
+      ],
+      "how_it_works": [
+        {
+          "id": "P21_SHORT_MECHANISM",
+          "topic": "pph21",
+          "kind": "document_explanation",
+          "scope": "archived_document_reference",
+          "text": "Pemberi kerja atau pembayar yang ditentukan memotong pajak dari pembayaran.",
+          "presentation_roles": [
+            "mechanism"
+          ],
+          "evidence_ids": [
+            "PMK168_2023:6b06a241f9cd6fc6:4796bf2d18e3:operative_text:2:1"
+          ],
+          "applicability": "not_established",
+          "period": {
+            "from": "2024-01-01"
+          },
+          "evidence_quality": "text_grounded_not_professionally_reviewed",
+          "translations_share_evidence": true,
+          "statement_id": "P21_SHORT_MECHANISM",
+          "presentation_role": "mechanism"
+        }
+      ],
+      "main_condition": [
+        {
+          "id": "P21_SHORT_CONDITION",
+          "topic": "pph21",
+          "kind": "document_explanation",
+          "scope": "archived_document_reference",
+          "text": "Periksa kategori penerima dan masa pajaknya.",
+          "presentation_roles": [
+            "condition"
+          ],
+          "evidence_ids": [
+            "PMK168_2023:6b06a241f9cd6fc6:4796bf2d18e3:operative_text:13:12",
+            "PMK168_2023:6b06a241f9cd6fc6:4796bf2d18e3:operative_text:15:14"
+          ],
+          "applicability": "not_established",
+          "period": {
+            "from": "2024-01-01"
+          },
+          "evidence_quality": "text_grounded_not_professionally_reviewed",
+          "translations_share_evidence": true,
+          "statement_id": "P21_SHORT_CONDITION",
+          "presentation_role": "condition"
+        }
+      ],
+      "section_status": {
+        "what_is": "available",
+        "how_it_works": "available",
+        "main_condition": "available",
+        "summary": "available",
+        "detailed_explanation": "available"
+      },
+      "unavailable_section_notice": "Bukti terkonfirmasi belum cukup untuk bagian ini.",
+      "what_to_check": [
+        {
+          "field": "employment_type",
+          "text": "Mohon jelaskan kategori pekerja (pegawai tetap, tidak tetap atau bukan pegawai).",
+          "role": "optional_check_not_assertion"
+        },
+        {
+          "field": "payroll_period",
+          "text": "Mohon jelaskan bulan penggajian.",
+          "role": "optional_check_not_assertion"
+        }
+      ],
+      "detailed_explanation": [
+        {
+          "id": "P21_SHORT_DEFINITION",
+          "topic": "pph21",
+          "kind": "document_explanation",
+          "scope": "archived_document_reference",
+          "text": "PPh21 adalah pajak atas pembayaran tertentu kepada orang pribadi terkait pekerjaan, jasa atau kegiatan.",
+          "presentation_roles": [
+            "definition"
+          ],
+          "evidence_ids": [
+            "PMK168_2023:6b06a241f9cd6fc6:4796bf2d18e3:operative_text:2:1",
+            "PMK168_2023:6b06a241f9cd6fc6:4796bf2d18e3:operative_text:3:2"
+          ],
+          "applicability": "not_established",
+          "period": {
+            "from": "2024-01-01"
+          },
+          "evidence_quality": "text_grounded_not_professionally_reviewed",
+          "translations_share_evidence": true,
+          "statement_id": "P21_SHORT_DEFINITION",
+          "presentation_role": "definition"
+        },
+        {
+          "id": "P21_SHORT_MECHANISM",
+          "topic": "pph21",
+          "kind": "document_explanation",
+          "scope": "archived_document_reference",
+          "text": "Pemberi kerja atau pembayar yang ditentukan memotong pajak dari pembayaran.",
+          "presentation_roles": [
+            "mechanism"
+          ],
+          "evidence_ids": [
+            "PMK168_2023:6b06a241f9cd6fc6:4796bf2d18e3:operative_text:2:1"
+          ],
+          "applicability": "not_established",
+          "period": {
+            "from": "2024-01-01"
+          },
+          "evidence_quality": "text_grounded_not_professionally_reviewed",
+          "translations_share_evidence": true,
+          "statement_id": "P21_SHORT_MECHANISM",
+          "presentation_role": "mechanism"
+        },
+        {
+          "id": "P21_SHORT_CONDITION",
+          "topic": "pph21",
+          "kind": "document_explanation",
+          "scope": "archived_document_reference",
+          "text": "Periksa kategori penerima dan masa pajaknya.",
+          "presentation_roles": [
+            "condition"
+          ],
+          "evidence_ids": [
+            "PMK168_2023:6b06a241f9cd6fc6:4796bf2d18e3:operative_text:13:12",
+            "PMK168_2023:6b06a241f9cd6fc6:4796bf2d18e3:operative_text:15:14"
+          ],
+          "applicability": "not_established",
+          "period": {
+            "from": "2024-01-01"
+          },
+          "evidence_quality": "text_grounded_not_professionally_reviewed",
+          "translations_share_evidence": true,
+          "statement_id": "P21_SHORT_CONDITION",
+          "presentation_role": "condition"
+        },
+        {
+          "id": "PAYROLL_SCOPE",
+          "topic": "pph21",
+          "kind": "document_explanation",
+          "scope": "archived_document_reference",
+          "text": "PMK168 yang diarsipkan menjelaskan pemotongan PPh21 atas pembayaran terkait pekerjaan, jasa atau kegiatan oleh pembayar yang ditentukan untuk memotong pajak dari pembayaran. Kategori pembayar yang wajib memotong pajak dan pengecualian diatur tersendiri; cakupannya bukan hanya gaji.",
+          "presentation_roles": [],
+          "evidence_ids": [
+            "PMK168_2023:6b06a241f9cd6fc6:4796bf2d18e3:operative_text:2:1"
+          ],
+          "applicability": "not_established",
+          "period": {
+            "from": "2024-01-01"
+          },
+          "evidence_quality": "text_grounded_not_professionally_reviewed",
+          "translations_share_evidence": true,
+          "statement_id": "PAYROLL_SCOPE",
+          "presentation_role": "expanded_explanation"
+        },
+        {
+          "id": "PAYROLL_METHOD",
+          "topic": "pph21",
+          "kind": "document_explanation",
+          "scope": "archived_document_reference",
+          "text": "PMK168 yang diarsipkan membedakan masa biasa dan Masa Pajak Terakhir pegawai tetap/pensiunan. Masa terakhir merekonsiliasi pajak tahunan atau bagian tahun, bukan mengulang pemotongan dengan tarif efektif bulanan. Diperlukan kategori pekerja dan periode.",
+          "presentation_roles": [],
+          "evidence_ids": [
+            "PMK168_2023:6b06a241f9cd6fc6:4796bf2d18e3:operative_text:13:12",
+            "PMK168_2023:6b06a241f9cd6fc6:4796bf2d18e3:operative_text:15:14"
+          ],
+          "applicability": "not_established",
+          "period": {
+            "from": "2024-01-01"
+          },
+          "evidence_quality": "text_grounded_not_professionally_reviewed",
+          "translations_share_evidence": true,
+          "statement_id": "PAYROLL_METHOD",
+          "presentation_role": "expanded_explanation"
+        },
+        {
+          "id": "PAYROLL_BASE",
+          "topic": "pph21",
+          "kind": "document_explanation",
+          "scope": "archived_document_reference",
+          "text": "Untuk pegawai tetap dan pensiunan, Pasal8 yang diarsipkan membedakan penghasilan bruto bulanan dan penghasilan kena pajak setelah pengurangan yang diperbolehkan serta bagian tidak kena pajak. Pasal2 memuat pembayar yang wajib memotong pajak dan pengecualian; angka gaji saja tidak cukup untuk menghitung.",
+          "presentation_roles": [],
+          "evidence_ids": [
+            "PMK168_2023:6b06a241f9cd6fc6:4796bf2d18e3:operative_text:8:7",
+            "PMK168_2023:6b06a241f9cd6fc6:4796bf2d18e3:operative_text:2:1"
+          ],
+          "applicability": "not_established",
+          "period": {
+            "from": "2024-01-01"
+          },
+          "evidence_quality": "text_grounded_not_professionally_reviewed",
+          "translations_share_evidence": true,
+          "statement_id": "PAYROLL_BASE",
+          "presentation_role": "expanded_explanation"
+        }
+      ],
+      "related_topic_ids": [
+        "pph26"
+      ],
+      "claim_ids": [
+        "PAYROLL_SCOPE",
+        "PAYROLL_METHOD",
+        "PAYROLL_BASE",
+        "P21_SHORT_DEFINITION",
+        "P21_SHORT_MECHANISM",
+        "P21_SHORT_CONDITION",
+        "P21_ABBREVIATION"
+      ],
+      "claim_evidence": [
+        {
+          "provision_id": "PMK168_2023:6b06a241f9cd6fc6:4796bf2d18e3:operative_text:2:1",
+          "fragment_ids": [
+            "PMK168_2023:079306052df2707a31737092",
+            "PMK168_2023:5d7769d0404bd1a073946d49"
+          ],
+          "source_id": "PMK168_2023",
+          "sha256": "6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858",
+          "article": "2",
+          "paragraphs": "(2)",
+          "role": "operative_text",
+          "use": "support",
+          "text_anchor": "pemberi kerja",
+          "text_anchors": [
+            "pemberi kerja",
+            "Pasal 2\n(1) Pemotongan Pajak Penghasilan Pasal 21 dan/ atau Pajak\nPenghasilan Pasal 26 Sehubungan dengan Pekerjaan,\nJasa, atau Kegiatan wajib dilakukan oleh Pemotong Pajak.\n(2) Pemotong Pajak sebagaimana dimaksud pada ayat (1)\nterdiri atas:\na. pemberi kerja yaitu orang pribadi clan Badan, baik\nmerupakan pusat maupun cabang, perwakilan atau\nunit, yang membayar gaji, upah, honorarium,\ntunjangan, dan pembayaran lain dengan nama clan\ndalam bentuk apa pun, termasuk imbalan dalam\nbentuk natura dan/atau kenikmatan, sebagai\nimbalan sehubungan dengan pekerjaan;\nb. Instansi Pemerintah, termasuk lembaga pemerintah\nnonkementerian, kesekretariatan lembaga negara,\nkesekretariatan lembaga nonstruktural, dan\nperwakilan Republik Indonesia di luar negeri, yang\nmembayarkan gaji, upah, honorarium, tunjangan,\ndan pembayaran lain dengan nama dan dalam bentuk\napa pun sehubungan dengan pekerjaan, jasa, atau\nkegiatan;\nc. dana pensiun, badan penyelenggara jaminan sosial\ntenaga kerja, dan badan-badan lain yang membayar\nuang pensiun, tunjangan hari tua, jaminan hari tua,\ndan/ atau pembayaran lain dengan nama apa pun\nyang terkait dengan program pensiun, yang\npendiriannya sesuai dengan ketentuan peraturan\nperundang-undangan;\nd. orang pribadi dan Badan, yang membayar\nhonorarium atau pembayaran lain sebagai imbalan\nsehubungan dengan jasa yang dilakukan oleh orang\npribadi, termasuk jasa tenaga ahli yang melakukan\nPekerjaan Bebas dan bertindak untuk dan atas\nnamanya sendiri, bukan untuk dan atas nama\npersekutuannya; dan\ne. Penyelenggara Kegiatan, termasuk Badan, Instansi\nPemerintah, organisasi yang bersifat nasional dan\ninternasional, perkumpulan, orang pribadi serta\nlembaga lainnya yang menyelenggarakan kegiatan,\nyang membayar honorarium, hadiah, atau\npenghargaan dalam bentuk apa pun berkenaan\ndengan suatu kegiatan.\n(3) Tidak termasuk sebagai pemberi kerja yang mempunyai\nkewajiban untuk melakukan pemotongan pajak\nsebagaimana dimaksud pada ayat (2) huruf a, meliputi:\na. kantor perwakilan negara asing;\nb. organisasi internasional:\n1. sebagaimana dimaksud dalam Pasal 3 ayat (1)\nhuruf c Undang-Undang Pajak Penghasilan\ndengan syarat:\na) Indonesia menjadi anggota organisasi\ntersebut; dan\nb) tidak menjalankan usaha atau kegiatan lain\nuntuk memperoleh penghasilan dari\nIndonesia selain memberikan pinjaman\nkepada pemerintah yang dananya berasal\ndari iuran para anggota; dan\n2. yang diatur khusus berdasarkan perjanjian\ninternasional sebagaimana dimaksud dalam\nperaturan Menteri yang mengatur mengenai\npelaksanaan perlakuan pajak penghasilan yang\ndidasarkan pada ketentuan dalam perJanJian\ninternasional,\nyang telah ditetapkan oleh Menteri; dan\nc. orang pribadi yang:\n1. tidak melakukan kegiatan usaha atau Pekerjaan\nBebas; atau\n2. melakukan kegiatan usaha atau Pekerjaan\nBebas dan mempekerjakan orang pribadi yang:\na) semata-mata melakukan pekerjaan rumah\ntangga; atau\nb) melakukan pekerjaan atau jasa yang tidak\nterkait dengan kegiatan usaha atau\nPekerjaan Bebas pemberi kerja."
+          ],
+          "related_explanation_provision_ids": [],
+          "pages": [
+            5,
+            6
+          ],
+          "links": [
+            "https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=5",
+            "https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=6"
+          ],
+          "period_restrictions": {
+            "from": "2024-01-01"
+          },
+          "text_review": "editorial_anchor_checked_not_professional_review",
+          "quality_limitations": [
+            "candidate_text_layer",
+            "paragraph_labels_may_contain_OCR_errors"
+          ],
+          "source_period": {
+            "from": "2024-01-01",
+            "to": null
+          },
+          "evidence_status": "text_grounded_archival_not_legal_currency_reviewed",
+          "temporal_status": "period_missing"
+        },
+        {
+          "provision_id": "PMK168_2023:6b06a241f9cd6fc6:4796bf2d18e3:operative_text:13:12",
+          "fragment_ids": [
+            "PMK168_2023:84cffa9db5a9573cbb4658a0",
+            "PMK168_2023:db9949c7c54fcf9fb9719e2a"
+          ],
+          "source_id": "PMK168_2023",
+          "sha256": "6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858",
+          "article": "13",
+          "paragraphs": "(1),(2)",
+          "role": "operative_text",
+          "use": "support",
+          "text_anchor": "tarif efektif",
+          "text_anchors": [
+            "tarif efektif",
+            "Pasal 13\n(1) Tarif pemotongan Pajak Penghasilan Pasal 21 terdiri atas:\na. tarif efektif pemotongan Pajak Penghasilan Pasal 21;\ndan\nb. tarif berdasarkan Pasal 17 ayat (1) huruf a Undang-\nUndang Pajak Penghasilan.\n(2) Tarif efektif pemotongan Pajak Penghasilan Pasal 21\nsebagaimana dimaksud pada ayat (1) huruf a terdiri atas:\na. tarif efektif bulanan; atau\nb. tarif efektif harian,\nIt\nsebagaimana diatur dalam peraturan pemerintah yang\nmengatur mengenai tarif pemotongan Pajak Penghasilan\nPasal 21 atas penghasilan sehubungan dengan pekerjaan,\njasa, atau kegiatan wajib pajak orang pribadi.\n(3) Tarif pemotongan Pajak Penghasilan Pasal 21 berdasarkan\ntarif Pasal 17 ayat (1) huruf a Undang-Undang Pajak\nPenghasilan sebagaimana dimaksud pada ayat (1) huruf b\ndigunakan atas penghasilan dari pekerjaan, jasa, atau\nkegiatan wajib pajak orang pribadi."
+          ],
+          "related_explanation_provision_ids": [],
+          "pages": [
+            14,
+            15
+          ],
+          "links": [
+            "https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=14",
+            "https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=15"
+          ],
+          "period_restrictions": {
+            "from": "2024-01-01"
+          },
+          "text_review": "editorial_anchor_checked_not_professional_review",
+          "quality_limitations": [
+            "candidate_text_layer",
+            "paragraph_labels_may_contain_OCR_errors"
+          ],
+          "source_period": {
+            "from": "2024-01-01",
+            "to": null
+          },
+          "evidence_status": "text_grounded_archival_not_legal_currency_reviewed",
+          "temporal_status": "period_missing"
+        },
+        {
+          "provision_id": "PMK168_2023:6b06a241f9cd6fc6:4796bf2d18e3:operative_text:15:14",
+          "fragment_ids": [
+            "PMK168_2023:3ba913a0416a5e3aa4ebea00",
+            "PMK168_2023:bea457a9e116ad7de2ac5bbc"
+          ],
+          "source_id": "PMK168_2023",
+          "sha256": "6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858",
+          "article": "15",
+          "paragraphs": "(1)-(3)",
+          "role": "operative_text",
+          "use": "support",
+          "text_anchor": "Masa Pajak Terakhir",
+          "text_anchors": [
+            "Masa Pajak Terakhir",
+            "Pasal 15\n(1) Pajak Penghasilan Pasal 21 yang wajib dipotong bagi\nPegawai Tetap sebagaimana dimaksud dalam Pasal 3 ayat\n( 1) huruf a dan Pensiunan se bagaimana dimaksud dalam\nPasal 3 ayat (1) huruf b pada:\na. setiap Masa Pajak selain Masa Pajak Terakhir\ndihitung menggunakan tarif efektif bulanan\nsebagaimana dimaksud dalam Pasal 13 ayat (2) huruf\na dikalikan dengan dasar pengenaan dan pemotongan\nsebagaimana dimaksud dalam Pasal 8 ayat (1) huruf\na;dan\nb. Masa Pajak Terakhir yaitu sebesar selisih antara Pajak\nPenghasilan Pasal 21 yang terutang selama 1 (satu) Tahun\nPajak atau bagian Tahun Pajak dengan Pajak Penghasilan\nPasal 21 yang telah dipotong pada Masa Pajak selain Masa\nPajak Terakhir sebagaimana dimaksud dalam huruf a.\n(2) Pajak Penghasilan Pasal 21 yang terutang selama 1 (satu)\nTahun Pajak atau bagian Tahun Pajak sebagaimana\ndimaksud pada ayat (1) huruf b dihitung menggunakan\ntarif Pasal 17 ayat (1) huruf a Undang-Undang Pajak\nPenghasilan dikalikan dengan dasar pengenaan dan\npemotongan sebagaimana dimaksud dalam Pasal 8 ayat\n(1) huruf b dalam 1 (satu) Tahun Pajak atau bagian Tahun\nPajak.\n(3) Dalam hal kewajiban pajak subjektif Pegawai Tetap\ndan/ atau Pensiunan baru dimulai setelah bulan Januari\natau berakhir sebelum bulan Desember, penghitungan\nPajak Penghasilan Pasal 21 yang terutang dilakukan\nberdasarkan penghasilan neto yang disetahunkan dan\npajaknya dihitung secara proporsional terhadap jumlah\nbulan dalam bagian Tahun Pajak yang bersangkutan."
+          ],
+          "related_explanation_provision_ids": [],
+          "pages": [
+            15,
+            16
+          ],
+          "links": [
+            "https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=15",
+            "https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=16"
+          ],
+          "period_restrictions": {
+            "from": "2024-01-01"
+          },
+          "text_review": "editorial_anchor_checked_not_professional_review",
+          "quality_limitations": [
+            "candidate_text_layer",
+            "paragraph_labels_may_contain_OCR_errors"
+          ],
+          "source_period": {
+            "from": "2024-01-01",
+            "to": null
+          },
+          "evidence_status": "text_grounded_archival_not_legal_currency_reviewed",
+          "temporal_status": "period_missing"
+        },
+        {
+          "provision_id": "PMK168_2023:6b06a241f9cd6fc6:4796bf2d18e3:operative_text:3:2",
+          "fragment_ids": [
+            "PMK168_2023:428ae9ea118f9570ae03f917",
+            "PMK168_2023:091ec07639e26511bd1e9aed"
+          ],
+          "source_id": "PMK168_2023",
+          "sha256": "6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858",
+          "article": "3",
+          "paragraphs": "(1)-(3)",
+          "role": "operative_text",
+          "use": "support",
+          "text_anchor": "merupakan wajib pajak orang pribadi",
+          "text_anchors": [
+            "merupakan wajib pajak orang pribadi",
+            "Pasal 3\n(1) Penerima penghasilan yang dipotong Pajak Penghasilan\nPasal 21 dan/atau Pajak Penghasilan Pasal 26\nSehubungan dengan Pekerjaan, Jasa, atau Kegiatan\nmerupakan wajib pajak orang pribadi, meliputi:\na. Pegawai Tetap;\nb. Pensiunan;\nc. anggota dewan komisaris atau anggota dewan\npengawas yang menerima imbalan secara tidak\nteratur;\nd. Pegawai Tidak Tetap;\ne. Bukan Pegawai;\nf. Peserta Kegiatan;\ng. peserta program pens1un yang masih berstatus\nPegawai; dan\nh. Mantan Pegawai.\n(2) Bukan Pegawai sebagaimana dimaksud pada ayat (1)\nhuruf e, meliputi:\na. tenaga ahli yang melakukan Pekerjaan Bebas, yang\nterdiri dari pengacara, akuntan, arsitek, dokter,\nkonsultan, notaris, pejabat pembuat akta tanah,\npenilai, dan aktuaris;\nb. pemain musik, pembawa acara, penyanyi, pelawak,\nbintang film, bintang sinetron, bintang iklan,\nsutradara, kru film, foto model,\nperagawan/peragawati, pemain drama, penari,\npemahat, pelukis, pembuat/ pencipta konten pada\nmedia yang dibagikan secara daring (influencer,\nselebgram, blogger, vlogger, dan sejenis lainnya), dan\nseniman lainnya;\nc. olahragawan;\nd. penasihat, pengajar, pelatih, penceramah, penyuluh,\ndan moderator;\ne. pengarang, peneliti, dan penerjemah;\nf. pemberi jasa dalam segala bidang;\ng. agen iklan;\nh. pengawas atau pengelola proyek;\npembawa pesanan atau yang menemukan langganan\n1.\natau yang menjadi perantara;\nJ. petugas penjaja barang dagangan;\nk. agen asuransi; dan\n1. distributor perusahaan pemasaran berjenjang atau\npenjualan langsung dan kegiatan sejenis lainnya.\n(3) Peserta Kegiatan sebagaimana dimaksud pada ayat (1)\nhuruf f, meliputi:\na. peserta perlombaan dalam segala bidang, antara lain\nperlombaan olahraga, keagamaan, kesenian,\nketangkasan, ilmu pengetahuan, teknologi, dan\nperlombaan lainnya;\nb. peserta rapat, konferensi, sidang, pertemuan,\nkunjungan kerja, seminar, lokakarya, atau\npertunjukan, atau kegiatan tertentu lainnya;\nc. peserta atau anggota dalam suatu kepanitiaan\nsebagai Penyelenggara Kegiatan tertentu; atau\nd. peserta pendidikan, pelatihan, dan magang."
+          ],
+          "related_explanation_provision_ids": [],
+          "pages": [
+            6,
+            7
+          ],
+          "links": [
+            "https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=6",
+            "https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=7"
+          ],
+          "period_restrictions": {
+            "from": "2024-01-01"
+          },
+          "text_review": "editorial_anchor_checked_not_professional_review",
+          "quality_limitations": [
+            "candidate_text_layer",
+            "paragraph_labels_may_contain_OCR_errors"
+          ],
+          "source_period": {
+            "from": "2024-01-01",
+            "to": null
+          },
+          "evidence_status": "text_grounded_archival_not_legal_currency_reviewed",
+          "temporal_status": "period_missing"
+        },
+        {
+          "provision_id": "PMK168_2023:6b06a241f9cd6fc6:4796bf2d18e3:operative_text:8:7",
+          "fragment_ids": [
+            "PMK168_2023:0190bbfd7037eba985d117db",
+            "PMK168_2023:8eb407100a11bd684b6b3648"
+          ],
+          "source_id": "PMK168_2023",
+          "sha256": "6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858",
+          "article": "8",
+          "paragraphs": "(1)",
+          "role": "operative_text",
+          "use": "support",
+          "text_anchor": "penghasilan bruto",
+          "text_anchors": [
+            "penghasilan bruto",
+            "Pasal 8\n(1) Dasar pengenaan dan pemotongan Pajak Penghasilan\nPasal 21 untuk Pegawai Tetap dan Pensiunan, yaitu:\na. penghasilan bruto dalam 1 (satu) Masa Pajak; atau\nb. penghasilan kena pajak.\n(2) Penghasilan bruto sebagaimana dimaksud pada ayat (1)\nhuruf a sebagai berikut:\na. bagi Pegawai Tetap meliputi seluruh penghasilan\nsebagaimana dimaksud dalam Pasal 5 ayat (1) huruf a\nyang diterima atau diperoleh dari pemberi kerja; dan\nb. bagi Pensiunan meliputi seluruh penghasilan\nsebagaimana dimaksud dalam Pasal 5 ayat (1) huruf b.\n(3) Penghasilan kena pajak sebagaimana dimaksud pada ayat\n(1) huruf b sebesar penghasilan neto dikurangi\nPenghasilan Tidak Kena Pajak.\n(4) Jumlah penghasilan kena pajak sebagaimana dimaksud\npada ayat (3) dibulatkan ke bawah hingga ribuan rupiah\npenuh.\n(5) Penghasilan neto sebagaimana dimaksud pada ayat (3)\nmerupakan seluruh jumlah penghasilan bruto\nsebagaimana dimaksud pada ayat (2) dalam 1 (satu) Tahun\nPajak atau bagian Tahun Pajak dikurangi dengan\npengurangan yang diperbolehkan."
+          ],
+          "related_explanation_provision_ids": [],
+          "pages": [
+            10,
+            11
+          ],
+          "links": [
+            "https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=10",
+            "https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf#page=11"
+          ],
+          "period_restrictions": {
+            "from": "2024-01-01"
+          },
+          "text_review": "editorial_anchor_checked_not_professional_review",
+          "quality_limitations": [
+            "candidate_text_layer",
+            "paragraph_labels_may_contain_OCR_errors"
+          ],
+          "source_period": {
+            "from": "2024-01-01",
+            "to": null
+          },
+          "evidence_status": "text_grounded_archival_not_legal_currency_reviewed",
+          "temporal_status": "period_missing"
+        }
+      ],
+      "gaps": [],
+      "required_notice": "Penjelasan arsip; aturan terkini dan penerapan perusahaan belum dikonfirmasi.",
+      "verification": {
+        "text": "runtime_checked_archival_binding",
+        "currency": "unconfirmed",
+        "professional_review": null
+      },
+      "applicability": {
+        "status": "blocked",
+        "eligible_basis_claim_ids": [],
+        "professional_review": null
+      },
+      "numerical_use": {
+        "status": "blocked",
+        "calculations": [],
+        "TER": "blocked_unverified_table"
+      },
+      "blockers": [
+        {
+          "code": "tax_period_missing",
+          "claim_id": "TER_NUMERIC"
+        },
+        {
+          "code": "current_provision_currency_unconfirmed",
+          "claim_id": "TER_NUMERIC"
+        },
+        {
+          "code": "amendment_review_incomplete",
+          "source_id": "PP58_2023",
+          "path": [
+            "PP58_2023"
+          ],
+          "content_unknown": false,
+          "currency_confirmed": false,
+          "claim_id": "TER_NUMERIC"
+        },
+        {
+          "code": "amendment_review_incomplete",
+          "source_id": "PMK168_2023",
+          "path": [
+            "PMK168_2023"
+          ],
+          "content_unknown": false,
+          "currency_confirmed": false,
+          "claim_id": "TER_NUMERIC"
+        },
+        {
+          "code": "TER_table_not_verified",
+          "claim_id": "TER_NUMERIC"
+        },
+        {
+          "code": "amendment_review_incomplete",
+          "source_id": "PMK81_2024",
+          "path": [
+            "PMK81_2024"
+          ],
+          "content_unknown": false,
+          "currency_confirmed": false,
+          "scope": "administrative_conclusions_only",
+          "affected_topics": [
+            "pph21"
+          ]
+        },
+        {
+          "code": "amendment_review_incomplete",
+          "source_id": "PMK1_2026",
+          "path": [
+            "PMK81_2024",
+            "PMK1_2026"
+          ],
+          "content_unknown": false,
+          "currency_confirmed": false,
+          "scope": "administrative_conclusions_only",
+          "affected_topics": [
+            "pph21"
+          ]
+        },
+        {
+          "code": "amendment_review_incomplete",
+          "source_id": "PMK54_2025",
+          "path": [
+            "PMK81_2024",
+            "PMK54_2025"
+          ],
+          "content_unknown": false,
+          "currency_confirmed": false,
+          "scope": "administrative_conclusions_only",
+          "affected_topics": [
+            "pph21"
+          ]
+        },
+        {
+          "code": "amendment_review_incomplete",
+          "source_id": "PMK53_2025",
+          "path": [
+            "PMK81_2024",
+            "PMK53_2025"
+          ],
+          "content_unknown": false,
+          "currency_confirmed": false,
+          "scope": "administrative_conclusions_only",
+          "affected_topics": [
+            "pph21"
+          ]
+        },
+        {
+          "code": "amendment_review_incomplete",
+          "source_id": "PMK11_2025",
+          "path": [
+            "PMK81_2024",
+            "PMK11_2025"
+          ],
+          "content_unknown": false,
+          "currency_confirmed": false,
+          "scope": "administrative_conclusions_only",
+          "affected_topics": [
+            "pph21"
+          ]
+        }
+      ],
+      "clarifying_questions": [],
+      "ask_accountant": {
+        "question": "Jelaskan PPh 21 — Pajak Penghasilan Pasal 21 berdasarkan sumber yang tersedia dan sebutkan keterbatasannya.",
+        "context": {
+          "topic_id": "pph21",
+          "language": "id",
+          "period": null,
+          "intent": "explanation",
+          "claim_ids": [
+            "PAYROLL_SCOPE",
+            "PAYROLL_METHOD",
+            "PAYROLL_BASE",
+            "P21_SHORT_DEFINITION",
+            "P21_SHORT_MECHANISM",
+            "P21_SHORT_CONDITION",
+            "P21_ABBREVIATION"
+          ]
+        },
+        "role": "user_question_not_instruction"
+      },
+      "production_rule_activation": false
+    }
+  },
+  {
+    "example_kind": "partial",
+    "input": {
+      "topic_id": "npwp_nik",
+      "language": "id",
+      "period": null
+    },
+    "actual_card": {
+      "schema_version": 2,
+      "contract": "indonesia_tax_tooltip_v2",
+      "topic_id": "npwp_nik",
+      "language": "id",
+      "name": "NPWP / NIK",
+      "designation_role": "navigation_label_not_legal_determination",
+      "status": "partial",
+      "coverage": "archived_document_explanation_only",
+      "summary": [],
+      "abbreviation": {
+        "status": "unavailable",
+        "designation_language": "id",
+        "statements": []
+      },
+      "what_is": [],
+      "how_it_works": [],
+      "main_condition": [],
+      "section_status": {
+        "what_is": "unavailable",
+        "how_it_works": "unavailable",
+        "main_condition": "unavailable",
+        "summary": "unavailable",
+        "detailed_explanation": "available"
+      },
+      "unavailable_section_notice": "Bukti terkonfirmasi belum cukup untuk bagian ini.",
+      "what_to_check": [
+        {
+          "field": "recipient_npwp",
+          "text": "Mohon jelaskan NPWP/NIK penerima terkonfirmasi.",
+          "role": "optional_check_not_assertion"
+        }
+      ],
+      "detailed_explanation": [
+        {
+          "id": "SERVICE_NPWP",
+          "topic": "pph23",
+          "kind": "document_explanation",
+          "scope": "archived_document_reference",
+          "text": "Pasal23 yang diarsipkan memuat cabang tanpa NPWP dan pengecualian pemotongan. Periksa identitas, kategori penghasilan dan pengecualian; perlakuan NIK/NPWP terkini belum ditetapkan oleh kumpulan ini.",
+          "presentation_roles": [],
+          "evidence_ids": [
+            "DJP_SDSN_2023:45716e25368d0218:d01e95f3e43d:operative_text:23:1"
+          ],
+          "applicability": "not_established",
+          "period": {},
+          "evidence_quality": "text_grounded_not_professionally_reviewed",
+          "translations_share_evidence": true,
+          "statement_id": "SERVICE_NPWP",
+          "presentation_role": "expanded_explanation"
+        }
+      ],
+      "related_topic_ids": [
+        "pkp",
+        "pph23"
+      ],
+      "claim_ids": [
+        "SERVICE_NPWP"
+      ],
+      "claim_evidence": [
+        {
+          "provision_id": "DJP_SDSN_2023:45716e25368d0218:d01e95f3e43d:operative_text:23:1",
+          "fragment_ids": [
+            "DJP_SDSN_2023:9c62c92fef113536539abf4e",
+            "DJP_SDSN_2023:07c330edd10bdfd4f21d781b"
+          ],
+          "source_id": "DJP_SDSN_2023",
+          "sha256": "45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc",
+          "article": "23",
+          "paragraphs": "(1a),(4)",
+          "role": "operative_text",
+          "use": "support",
+          "text_anchor": "tidak memiliki Nomor Pokok",
+          "text_anchors": [
+            "tidak memiliki Nomor Pokok",
+            "PASAL 23\n(1) Atas penghasilan tersebut di bawah ini dengan nama dan dalam bentuk apa pun yang\ndibayarkan, disediakan untuk dibayarkan, atau telah jatuh tempo pembayarannya oleh\nbadan pemerintah, subjek pajak badan dalam negeri, penyelenggara kegiatan, bentuk\nusaha tetap, atau perwakilan perusahaan luar negeri lainnya kepada Wajib Pajak\ndalam negeri atau bentuk usaha tetap, dipotong pajak oleh pihak yang wajib\nmembayarkan:\na. sebesar 15% (lima belas persen) dari jumlah bruto atas: ***)\n1. dividen sebagaimana dimaksud dalam Pasal 4 ayat (1) huruf g; ***)\n2. bunga sebagaimana dimaksud dalam Pasal 4 ayat (1) huruf f; ***)\n3. royalti; dan\n4. hadiah, penghargaan, bonus, dan sejenisnya selain yang telah dipotong Pajak\nPenghasilan sebagaimana dimaksud dalam Pasal 21 ayat (1) huruf e;\nb. dihapus;\nc. sebesar 2% (dua persen) dari jumlah bruto atas:\n1. sewa dan penghasilan lain sehubungan dengan penggunaan harta, kecuali\nsewa dan penghasilan lain sehubungan dengan penggunaan harta yang telah\ndikenai Pajak Penghasilan sebagaimana dimaksud dalam Pasal 4 ayat\n(2) ; dan\n2. imbalan sehubungan dengan jasa teknik, jasa manajemen, jasa konstruksi, jasa\nkonsultan, dan jasa lain selain jasa yang telah dipotong Pajak Penghasilan\nsebagaimana dimaksud dalam Pasal 21. i*****)\n226\n(1a) Dalam hal Wajib Pajak yang menerima atau memperoleh penghasilan sebagaimana\ndimaksud pada ayat (1) tidak memiliki Nomor Pokok Wajib Pajak, besarnya tarif\npemotongan adalah lebih tinggi 100% (seratus persen) daripada tarif sebagaimana\ndimaksud pada ayat (1). i*****)\n(2) Ketentuan lebih lanjut mengenai jenis jasa lain sebagaimana dimaksud pada ayat\n(1)huruf c angka 2 diatur dengan atau berdasarkan Peraturan Menteri Keuangan. i*****)\n(3) Orang pribadi sebagai Wajib Pajak dalam negeri dapat ditunjuk oleh Direktur\nJenderal Pajak untuk memotong pajak sebagaimana dimaksud pada ayat (1). **)\n(4) Pemotongan pajak sebagaimana dimaksud pada ayat (1) tidak dilakukan atas:\na. penghasilan yang dibayar atau terutang kepada bank;\nb. sewa yang dibayarkan atau terutang sehubungan dengan sewa guna usaha\ndengan hak opsi;\nc. dividen sebagaimana dimaksud dalam Pasal 4 ayat (3) huruf f dan dividen yang\nditerima oleh orang pribadi sebagaimana dimaksud dalam Pasal 17 ayat (2c);\nd. dihapus;\ne. bagian laba sebagaimana dimaksud dalam Pasal 4 ayat (3) huruf i;\nf. sisa hasil usaha koperasi yang dibayarkan oleh koperasi kepada anggotanya;\ng. dihapus; dan\nh. penghasilan yang dibayar atau terutang kepada badan usaha atas jasa keuangan\nyang berfungsi sebagai penyalur pinjaman dan/atau pembiayaan yang diatur\ndengan Peraturan Menteri Keuangan. i*****)"
+          ],
+          "related_explanation_provision_ids": [
+            "DJP_SDSN_2023:45716e25368d0218:d01e95f3e43d:explanation:23:2"
+          ],
+          "pages": [
+            231,
+            232
+          ],
+          "links": [
+            "https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=231",
+            "https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf#page=232"
+          ],
+          "period_restrictions": {},
+          "text_review": "editorial_anchor_checked_not_professional_review",
+          "quality_limitations": [
+            "candidate_text_layer",
+            "paragraph_labels_may_contain_OCR_errors"
+          ],
+          "source_period": {
+            "from": null,
+            "to": null
+          },
+          "evidence_status": "text_grounded_archival_not_legal_currency_reviewed",
+          "temporal_status": "period_missing"
+        }
+      ],
+      "gaps": [
+        "definition_and_abbreviation_unconfirmed",
+        "NPWP_NIK_identity_integration_primary_text_not_reviewed",
+        "only_PPh23_context_available"
+      ],
+      "required_notice": "Penjelasan arsip; aturan terkini dan penerapan perusahaan belum dikonfirmasi.",
+      "verification": {
+        "text": "runtime_checked_archival_binding",
+        "currency": "unconfirmed",
+        "professional_review": null
+      },
+      "applicability": {
+        "status": "blocked",
+        "eligible_basis_claim_ids": [],
+        "professional_review": null
+      },
+      "numerical_use": {
+        "status": "blocked",
+        "calculations": [],
+        "TER": "blocked_unverified_table"
+      },
+      "blockers": [
+        {
+          "code": "tax_period_missing",
+          "claim_id": "SERVICE_RATE"
+        },
+        {
+          "code": "current_provision_currency_unconfirmed",
+          "claim_id": "SERVICE_RATE"
+        },
+        {
+          "code": "amendment_review_incomplete",
+          "source_id": "PMK141_2015",
+          "path": [
+            "PMK141_2015"
+          ],
+          "content_unknown": false,
+          "currency_confirmed": false,
+          "claim_id": "SERVICE_RATE"
+        },
+        {
+          "code": "amendment_review_incomplete",
+          "source_id": "PMK81_2024",
+          "path": [
+            "PMK81_2024"
+          ],
+          "content_unknown": false,
+          "currency_confirmed": false,
+          "scope": "administrative_conclusions_only",
+          "affected_topics": [
+            "pph23"
+          ]
+        },
+        {
+          "code": "amendment_review_incomplete",
+          "source_id": "PMK1_2026",
+          "path": [
+            "PMK81_2024",
+            "PMK1_2026"
+          ],
+          "content_unknown": false,
+          "currency_confirmed": false,
+          "scope": "administrative_conclusions_only",
+          "affected_topics": [
+            "pph23"
+          ]
+        },
+        {
+          "code": "amendment_review_incomplete",
+          "source_id": "PMK54_2025",
+          "path": [
+            "PMK81_2024",
+            "PMK54_2025"
+          ],
+          "content_unknown": false,
+          "currency_confirmed": false,
+          "scope": "administrative_conclusions_only",
+          "affected_topics": [
+            "pph23"
+          ]
+        },
+        {
+          "code": "amendment_review_incomplete",
+          "source_id": "PMK53_2025",
+          "path": [
+            "PMK81_2024",
+            "PMK53_2025"
+          ],
+          "content_unknown": false,
+          "currency_confirmed": false,
+          "scope": "administrative_conclusions_only",
+          "affected_topics": [
+            "pph23"
+          ]
+        },
+        {
+          "code": "amendment_review_incomplete",
+          "source_id": "PMK11_2025",
+          "path": [
+            "PMK81_2024",
+            "PMK11_2025"
+          ],
+          "content_unknown": false,
+          "currency_confirmed": false,
+          "scope": "administrative_conclusions_only",
+          "affected_topics": [
+            "pph23"
+          ]
+        }
+      ],
+      "clarifying_questions": [],
+      "ask_accountant": {
+        "question": "Jelaskan NPWP / NIK berdasarkan sumber yang tersedia dan sebutkan keterbatasannya.",
+        "context": {
+          "topic_id": "npwp_nik",
+          "language": "id",
+          "period": null,
+          "intent": "explanation",
+          "claim_ids": [
+            "SERVICE_NPWP"
+          ]
+        },
+        "role": "user_question_not_instruction"
+      },
+      "production_rule_activation": false
+    }
+  },
+  {
+    "example_kind": "unavailable",
+    "input": {
+      "topic_id": "pph_final_rent",
+      "language": "id",
+      "period": "2017-06-01"
+    },
+    "actual_card": {
+      "schema_version": 2,
+      "contract": "indonesia_tax_tooltip_v2",
+      "topic_id": "pph_final_rent",
+      "language": "id",
+      "name": "PPh Final — sewa tanah/bangunan",
+      "designation_role": "navigation_label_not_legal_determination",
+      "status": "unavailable",
+      "coverage": "archived_document_explanation_only",
+      "summary": [],
+      "abbreviation": {
+        "status": "unavailable",
+        "designation_language": "id",
+        "statements": []
+      },
+      "what_is": [],
+      "how_it_works": [],
+      "main_condition": [],
+      "section_status": {
+        "what_is": "unavailable",
+        "how_it_works": "unavailable",
+        "main_condition": "unavailable",
+        "summary": "unavailable",
+        "detailed_explanation": "unavailable"
+      },
+      "unavailable_section_notice": "Bukti terkonfirmasi belum cukup untuk bagian ini.",
+      "what_to_check": [
+        {
+          "field": "rental_object",
+          "text": "Mohon jelaskan objek sewa: tanah/bangunan, peralatan atau penginapan.",
+          "role": "optional_check_not_assertion"
+        },
+        {
+          "field": "payer_withholder_status",
+          "text": "Mohon jelaskan status hukum pembayar sebagai pemotong.",
+          "role": "optional_check_not_assertion"
+        }
+      ],
+      "detailed_explanation": [],
+      "related_topic_ids": [
+        "pph23"
+      ],
+      "claim_ids": [],
+      "claim_evidence": [],
+      "gaps": [
+        "claim_unavailable:RENT_SCOPE",
+        "claim_unavailable:RENT_PAYER",
+        "claim_unavailable:RENT_BASE",
+        "claim_unavailable:RENT_SHORT_DEFINITION",
+        "claim_unavailable:RENT_SHORT_MECHANISM",
+        "claim_unavailable:RENT_SHORT_CONDITION",
+        "claim_unavailable:RENT_ABBREVIATION"
+      ],
+      "required_notice": "Bukti terkonfirmasi belum cukup untuk menentukan pajak.",
+      "verification": {
+        "text": "no_supported_statements",
+        "currency": "unconfirmed",
+        "professional_review": null
+      },
+      "applicability": {
+        "status": "blocked",
+        "eligible_basis_claim_ids": [],
+        "professional_review": null
+      },
+      "numerical_use": {
+        "status": "blocked",
+        "calculations": [],
+        "TER": "blocked_unverified_table"
+      },
+      "blockers": [
+        {
+          "code": "support_outside_requested_period",
+          "provision_id": "PP34_2017:2f5af8d0c92628fa:0df7d0c2a792:operative_text:2:1",
+          "recorded_window": {
+            "from": "2018-01-02",
+            "to": null
+          },
+          "claim_id": "RENT_ABBREVIATION"
+        },
+        {
+          "code": "outside_requested_period",
+          "recorded_window": {
+            "from": "2018-01-02"
+          },
+          "claim_id": "RENT_ABBREVIATION"
+        },
+        {
+          "code": "support_outside_requested_period",
+          "provision_id": "PP34_2017:2f5af8d0c92628fa:0df7d0c2a792:operative_text:4:3",
+          "recorded_window": {
+            "from": "2018-01-02",
+            "to": null
+          },
+          "claim_id": "RENT_BASE"
+        },
+        {
+          "code": "outside_requested_period",
+          "recorded_window": {
+            "from": "2018-01-02"
+          },
+          "claim_id": "RENT_BASE"
+        },
+        {
+          "code": "support_outside_requested_period",
+          "provision_id": "PP34_2017:2f5af8d0c92628fa:0df7d0c2a792:operative_text:5:4",
+          "recorded_window": {
+            "from": "2018-01-02",
+            "to": null
+          },
+          "claim_id": "RENT_HISTORY"
+        },
+        {
+          "code": "support_outside_requested_period",
+          "provision_id": "PP34_2017:2f5af8d0c92628fa:0df7d0c2a792:operative_text:6:5",
+          "recorded_window": {
+            "from": "2018-01-02",
+            "to": null
+          },
+          "claim_id": "RENT_HISTORY"
+        },
+        {
+          "code": "support_outside_requested_period",
+          "provision_id": "PP34_2017:2f5af8d0c92628fa:0df7d0c2a792:operative_text:7:6",
+          "recorded_window": {
+            "from": "2018-01-02",
+            "to": null
+          },
+          "claim_id": "RENT_HISTORY"
+        },
+        {
+          "code": "outside_requested_period",
+          "recorded_window": {
+            "from": "2018-01-02"
+          },
+          "claim_id": "RENT_HISTORY"
+        },
+        {
+          "code": "support_outside_requested_period",
+          "provision_id": "PP34_2017:2f5af8d0c92628fa:0df7d0c2a792:operative_text:3:2",
+          "recorded_window": {
+            "from": "2018-01-02",
+            "to": null
+          },
+          "claim_id": "RENT_PAYER"
+        },
+        {
+          "code": "outside_requested_period",
+          "recorded_window": {
+            "from": "2018-01-02"
+          },
+          "claim_id": "RENT_PAYER"
+        },
+        {
+          "code": "support_outside_requested_period",
+          "provision_id": "PP34_2017:2f5af8d0c92628fa:0df7d0c2a792:operative_text:4:3",
+          "recorded_window": {
+            "from": "2018-01-02",
+            "to": null
+          },
+          "claim_id": "RENT_RATE"
+        },
+        {
+          "code": "outside_requested_period",
+          "recorded_window": {
+            "from": "2018-01-02"
+          },
+          "claim_id": "RENT_RATE"
+        },
+        {
+          "code": "current_provision_currency_unconfirmed",
+          "claim_id": "RENT_RATE"
+        },
+        {
+          "code": "amendment_review_incomplete",
+          "source_id": "PP34_2017",
+          "path": [
+            "PP34_2017"
+          ],
+          "content_unknown": false,
+          "currency_confirmed": false,
+          "claim_id": "RENT_RATE"
+        },
+        {
+          "code": "support_outside_requested_period",
+          "provision_id": "PP34_2017:2f5af8d0c92628fa:0df7d0c2a792:operative_text:2:1",
+          "recorded_window": {
+            "from": "2018-01-02",
+            "to": null
+          },
+          "claim_id": "RENT_SCOPE"
+        },
+        {
+          "code": "outside_requested_period",
+          "recorded_window": {
+            "from": "2018-01-02"
+          },
+          "claim_id": "RENT_SCOPE"
+        },
+        {
+          "code": "support_outside_requested_period",
+          "provision_id": "PP34_2017:2f5af8d0c92628fa:0df7d0c2a792:operative_text:3:2",
+          "recorded_window": {
+            "from": "2018-01-02",
+            "to": null
+          },
+          "claim_id": "RENT_SHORT_CONDITION"
+        },
+        {
+          "code": "support_outside_requested_period",
+          "provision_id": "PP34_2017:2f5af8d0c92628fa:0df7d0c2a792:operative_text:2:1",
+          "recorded_window": {
+            "from": "2018-01-02",
+            "to": null
+          },
+          "claim_id": "RENT_SHORT_CONDITION"
+        },
+        {
+          "code": "outside_requested_period",
+          "recorded_window": {
+            "from": "2018-01-02"
+          },
+          "claim_id": "RENT_SHORT_CONDITION"
+        },
+        {
+          "code": "support_outside_requested_period",
+          "provision_id": "PP34_2017:2f5af8d0c92628fa:0df7d0c2a792:operative_text:2:1",
+          "recorded_window": {
+            "from": "2018-01-02",
+            "to": null
+          },
+          "claim_id": "RENT_SHORT_DEFINITION"
+        },
+        {
+          "code": "outside_requested_period",
+          "recorded_window": {
+            "from": "2018-01-02"
+          },
+          "claim_id": "RENT_SHORT_DEFINITION"
+        },
+        {
+          "code": "support_outside_requested_period",
+          "provision_id": "PP34_2017:2f5af8d0c92628fa:0df7d0c2a792:operative_text:3:2",
+          "recorded_window": {
+            "from": "2018-01-02",
+            "to": null
+          },
+          "claim_id": "RENT_SHORT_MECHANISM"
+        },
+        {
+          "code": "outside_requested_period",
+          "recorded_window": {
+            "from": "2018-01-02"
+          },
+          "claim_id": "RENT_SHORT_MECHANISM"
+        },
+        {
+          "code": "amendment_review_incomplete",
+          "source_id": "PMK81_2024",
+          "path": [
+            "PMK81_2024"
+          ],
+          "content_unknown": false,
+          "currency_confirmed": false,
+          "scope": "administrative_conclusions_only",
+          "affected_topics": [
+            "pph_final_rent"
+          ]
+        },
+        {
+          "code": "amendment_review_incomplete",
+          "source_id": "PMK1_2026",
+          "path": [
+            "PMK81_2024",
+            "PMK1_2026"
+          ],
+          "content_unknown": false,
+          "currency_confirmed": false,
+          "scope": "administrative_conclusions_only",
+          "affected_topics": [
+            "pph_final_rent"
+          ]
+        },
+        {
+          "code": "amendment_review_incomplete",
+          "source_id": "PMK54_2025",
+          "path": [
+            "PMK81_2024",
+            "PMK54_2025"
+          ],
+          "content_unknown": false,
+          "currency_confirmed": false,
+          "scope": "administrative_conclusions_only",
+          "affected_topics": [
+            "pph_final_rent"
+          ]
+        },
+        {
+          "code": "amendment_review_incomplete",
+          "source_id": "PMK53_2025",
+          "path": [
+            "PMK81_2024",
+            "PMK53_2025"
+          ],
+          "content_unknown": false,
+          "currency_confirmed": false,
+          "scope": "administrative_conclusions_only",
+          "affected_topics": [
+            "pph_final_rent"
+          ]
+        },
+        {
+          "code": "amendment_review_incomplete",
+          "source_id": "PMK11_2025",
+          "path": [
+            "PMK81_2024",
+            "PMK11_2025"
+          ],
+          "content_unknown": false,
+          "currency_confirmed": false,
+          "scope": "administrative_conclusions_only",
+          "affected_topics": [
+            "pph_final_rent"
+          ]
+        }
+      ],
+      "clarifying_questions": [],
+      "ask_accountant": {
+        "question": "Jelaskan PPh Final — sewa tanah/bangunan berdasarkan sumber yang tersedia dan sebutkan keterbatasannya.",
+        "context": {
+          "topic_id": "pph_final_rent",
+          "language": "id",
+          "period": "2017-06-01",
+          "intent": "explanation",
+          "claim_ids": []
+        },
+        "role": "user_question_not_instruction"
+      },
+      "production_rule_activation": false
+    }
+  }
+]

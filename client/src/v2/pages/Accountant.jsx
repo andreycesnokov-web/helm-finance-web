@@ -21,6 +21,9 @@ import { monthOptions, accountantMonth, closeReadiness, packages, packageSummary
 import { askAccountant } from '../lib/ask'
 import AccountantTabs from '../components/AccountantTabs'
 import { findWithholdingRule } from '../../pages/business/InvoiceReviewDrawer'
+import TaxKnowledgeCard from '../../components/TaxKnowledgeCard'
+import { listTaxCards, getTaxCard, matchTopicId } from '../../lib/taxKnowledgeFixtures'
+import InfoTooltip from '../../components/InfoTooltip'
 
 const monthLabel = (key, lang) => {
   const [y, m] = key.split('-').map(Number)
@@ -38,16 +41,37 @@ function MonthPicker({ value, onChange }) {
   )
 }
 
-function AskBox() {
+function AskBox({ externalQuery = '', onQueryChange }) {
   const t = useT()
   const { token } = useAuth()
-  const [q, setQ] = useState('')
+  const [sp] = useSearchParams()
+  const [q, setQ] = useState(() => externalQuery || sp.get('ask') || '')
   const [st, setSt] = useState({ busy: false, answer: null, err: null })
   // One business's answer never shows under another (review 8.2 #2).
   const { active, scopeKey } = useWorkspace()
   const wsKey = `${active?.id ?? ''}|${scopeKey ?? ''}`
   const wsRef = useRef(wsKey)
-  useEffect(() => { wsRef.current = wsKey; setQ(''); setSt({ busy: false, answer: null, err: null }) }, [wsKey])
+
+  useEffect(() => {
+    if (externalQuery !== undefined && externalQuery !== null && externalQuery !== '') {
+      setQ(externalQuery)
+    }
+  }, [externalQuery])
+
+  useEffect(() => {
+    wsRef.current = wsKey
+    setQ(sp.get('ask') || '')
+    setSt({ busy: false, answer: null, err: null })
+    if (onQueryChange) onQueryChange(sp.get('ask') || '')
+  }, [wsKey]) // eslint-disable-line
+
+  useEffect(() => {
+    const askParam = sp.get('ask')
+    if (askParam) {
+      setQ(askParam)
+    }
+  }, [sp])
+
   const ask = async (question) => {
     const text = (question ?? q).trim()
     if (!text) return
@@ -61,7 +85,17 @@ function AskBox() {
       <form className="v2-askbox" onSubmit={(e) => { e.preventDefault(); ask() }}>
         <label htmlFor="acc-ask" className="v2-field-label">{t('acct.askLabel')}</label>
         <div className="v2-askrow">
-          <input id="acc-ask" className="v2-input" value={q} onChange={(e) => setQ(e.target.value)} placeholder={t('acct.askPh')} maxLength={500} />
+          <input
+            id="acc-ask"
+            className="v2-input"
+            value={q}
+            onChange={(e) => {
+              setQ(e.target.value)
+              if (onQueryChange) onQueryChange(e.target.value)
+            }}
+            placeholder={t('acct.askPh')}
+            maxLength={500}
+          />
           <button type="submit" className="v2-btn v2-btn-primary" aria-label={t('acct.send')} title={q.trim() ? undefined : t('ask.typeFirst')} disabled={st.busy || !q.trim()}><I.send size={16} /></button>
         </div>
       </form>
@@ -90,10 +124,31 @@ function TaxList({ events, lang, t, limit, empty = 'acct.noEvents' }) {
     <ul className="v2-taxlist">
       {events.slice(0, limit).map((e) => {
         const stage = eventStage(e)
+        const topicId = matchTopicId(e.rule_code || e.title)
+        const matchedCard = topicId ? getTaxCard(topicId, lang) : null
+        const whatText = Array.isArray(matchedCard?.what_is) && matchedCard.what_is[0]?.text
+          ? matchedCard.what_is[0].text
+          : (Array.isArray(matchedCard?.summary) && matchedCard.summary[0]?.text ? matchedCard.summary[0].text : '')
+        const howText = Array.isArray(matchedCard?.how_it_works) && matchedCard.how_it_works[0]?.text
+          ? matchedCard.how_it_works[0].text
+          : (matchedCard?.section_status?.how_it_works === 'unavailable' ? 'Archived procedure under research review.' : '')
+
         return (
           <li key={e.id || e.rule_code + e.period}>
             <span className="v2-num v2-taxlist-date">{shortDate(e.due_date, lang)}</span>
-            <span className="v2-taxlist-what"><strong>{e.title || e.rule_code}</strong>{e.period && <span className="v2-muted"> · {e.period}</span>}</span>
+            <span className="v2-taxlist-what" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <strong>{e.title || e.rule_code}</strong>
+              {matchedCard && (
+                <InfoTooltip
+                  title={matchedCard.name}
+                  what={whatText}
+                  how={howText}
+                  interpret={matchedCard.required_notice}
+                  lang={lang}
+                />
+              )}
+              {e.period && <span className="v2-muted"> · {e.period}</span>}
+            </span>
             <span className="v2-num v2-r">{e.estimated_amount != null ? money(e.estimated_amount) : '—'}</span>
             <Pill tone={STAGE_TONE[stage]}>{t(`acct.stage.${stage}`)}</Pill>
           </li>
@@ -106,6 +161,12 @@ function TaxList({ events, lang, t, limit, empty = 'acct.noEvents' }) {
 function CloseTab({ month }) {
   const t = useT()
   const lang = useLang()
+  const { active, scopeKey } = useWorkspace()
+  const [askQuery, setAskQuery] = useState('')
+
+  useEffect(() => {
+    setAskQuery('')
+  }, [active?.id, scopeKey])
   const tx = useApi('/transactions?period=all')
   const debts = useApi('/debts')
   const batches = useApi('/bank-import/batches')
@@ -164,7 +225,36 @@ function CloseTab({ month }) {
           <TaxList events={due} lang={lang} t={t} limit={8} />
           <p className="v2-muted v2-small">{t('acct.taxNote')}</p>
         </Card>
-        <AskBox />
+        <AskBox externalQuery={askQuery} onQueryChange={setAskQuery} />
+      </div>
+
+      <div style={{ gridColumn: '1 / -1', marginTop: 14 }}>
+        <Card title={
+          <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            Tax Knowledge Reference
+            <InfoTooltip term="tax_data_status" lang={lang} />
+          </span>
+        }>
+          <p className="v2-muted v2-small" style={{ margin: '0 0 14px' }}>
+            Archived statutory definitions and citations across Indonesian taxes (PPh 21, 26, 23, Final rent, 25, 29, PPN, PKP, NPWP/NIK).
+          </p>
+          <div className="tax-cards-grid">
+            {listTaxCards(lang).map(card => (
+              <TaxKnowledgeCard
+                key={card.topic_id}
+                card={card}
+                lang={lang}
+                onAskAccountant={(qText) => {
+                  setAskQuery(qText)
+                  const input = document.getElementById('acc-ask')
+                  if (input) {
+                    input.focus()
+                  }
+                }}
+              />
+            ))}
+          </div>
+        </Card>
       </div>
     </div>
   )

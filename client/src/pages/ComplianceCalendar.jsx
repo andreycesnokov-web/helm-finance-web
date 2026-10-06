@@ -2,6 +2,9 @@ import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '../hooks/useAuth'
 import { apiFetch } from '../lib/api'
 import { getLang } from '../i18n/index'
+import InfoTooltip from '../components/InfoTooltip'
+import TaxKnowledgeCard from '../components/TaxKnowledgeCard'
+import { listTaxCards, getTaxCard, matchTopicId } from '../lib/taxKnowledgeFixtures'
 
 const L = {
   en: { title: 'Compliance calendar', subtitle: 'Tax obligations & deadlines · Indonesia',
@@ -47,7 +50,10 @@ export default function ComplianceCalendar() {
 
   return (
     <div style={{ maxWidth: 860, margin: '0 auto' }}>
-      <h1 style={{ fontSize: 22, fontWeight: 800, margin: 0 }}>📅 {l.title}</h1>
+      <h1 style={{ fontSize: 22, fontWeight: 800, margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+        📅 {l.title}
+        <InfoTooltip term="tax_data_status" lang={lang} />
+      </h1>
       <div style={{ fontSize: 13, color: 'var(--text-3)', marginBottom: 16 }}>{l.subtitle}</div>
 
       {data.active_unverified > 0 && (
@@ -69,11 +75,31 @@ export default function ComplianceCalendar() {
       {filtered.map((e, i) => {
         const [fg, bg] = STATUS[e.status] || STATUS.upcoming
         const src = e.official_source
+        const topicId = matchTopicId(e.rule_code || e.title)
+        const matchedCard = topicId ? getTaxCard(topicId, lang) : null
+        const whatText = Array.isArray(matchedCard?.what_is) && matchedCard.what_is[0]?.text
+          ? matchedCard.what_is[0].text
+          : (Array.isArray(matchedCard?.summary) && matchedCard.summary[0]?.text ? matchedCard.summary[0].text : '')
+        const howText = Array.isArray(matchedCard?.how_it_works) && matchedCard.how_it_works[0]?.text
+          ? matchedCard.how_it_works[0].text
+          : (matchedCard?.section_status?.how_it_works === 'unavailable' ? 'Archived procedure under research review.' : '')
+
         return (
           <div key={i} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, padding: 14, marginBottom: 10 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
               <div>
-                <div style={{ fontWeight: 700, fontSize: 14 }}>{e.title}</div>
+                <div style={{ fontWeight: 700, fontSize: 14, display: 'flex', alignItems: 'center', gap: 4 }}>
+                  {e.title}
+                  {matchedCard && (
+                    <InfoTooltip
+                      title={matchedCard.name}
+                      what={whatText}
+                      how={howText}
+                      interpret={matchedCard.required_notice}
+                      lang={lang}
+                    />
+                  )}
+                </div>
                 <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>{e.rule_code} · v{e.rule_version} · {l.period}: {e.period}</div>
               </div>
               <span style={{ background: bg, color: fg, borderRadius: 6, padding: '3px 9px', fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap' }}>{e.status}</span>
@@ -90,6 +116,21 @@ export default function ComplianceCalendar() {
           </div>
         )
       })}
+
+      <div style={{ marginTop: 28, borderTop: '1px solid var(--border-default, #d0d7de)', paddingTop: 20 }}>
+        <h3 style={{ fontSize: 17, fontWeight: 800, margin: '0 0 4px', display: 'flex', alignItems: 'center', gap: 6 }}>
+          Tax Knowledge Reference
+          <InfoTooltip term="tax_data_status" lang={lang} />
+        </h3>
+        <p style={{ fontSize: 12.5, color: 'var(--text-secondary)', margin: '0 0 14px' }}>
+          Archived statutory references for Indonesia tax rules (PPh 21, 26, 23, Final rent, 25, 29, PPN, PKP, NPWP/NIK).
+        </p>
+        <div className="tax-cards-grid">
+          {listTaxCards(lang).map(card => (
+            <TaxKnowledgeCard key={card.topic_id} card={card} lang={lang} />
+          ))}
+        </div>
+      </div>
 
       <div style={{ fontSize: 11, color: 'var(--text-4)', marginTop: 14 }}>{l.disclaimer}</div>
     </div>

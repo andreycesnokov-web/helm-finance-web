@@ -1,0 +1,170 @@
+[
+  {
+    "id": "ID_TAX_CARD_01",
+    "topic": "business_regimes",
+    "required_fields": [
+      "legal_entity_type",
+      "tax_registration_date",
+      "annual_turnover",
+      "activity",
+      "prior_regime",
+      "regime_election",
+      "owner_group_turnover"
+    ],
+    "claim_ids": [
+      "BUSINESS_OLD_SCOPE",
+      "BUSINESS_NEW_SCOPE",
+      "BUSINESS_TRANSITION",
+      "BUSINESS_OLD_RATE",
+      "BUSINESS_NEW_RATE",
+      "CORPORATE_BASE"
+    ],
+    "professional_review": null
+  },
+  {
+    "id": "ID_TAX_CARD_02",
+    "topic": "ppn_pkp",
+    "required_fields": [
+      "vat_status",
+      "annual_turnover",
+      "taxable_supply_type",
+      "transaction_date",
+      "special_vat_base",
+      "financial_year_end"
+    ],
+    "claim_ids": [
+      "VAT_MECHANISM",
+      "VAT_JAN_TRANSITION",
+      "VAT_CREDIT",
+      "PKP_REGISTRATION",
+      "VAT_RATE"
+    ],
+    "professional_review": null
+  },
+  {
+    "id": "ID_TAX_CARD_03",
+    "topic": "pph21",
+    "required_fields": [
+      "recipient_residency",
+      "employment_type",
+      "gross_pay",
+      "ptkp_category",
+      "payroll_period",
+      "last_tax_period",
+      "annual_payroll",
+      "prior_withholding"
+    ],
+    "claim_ids": [
+      "PAYROLL_METHOD",
+      "PAYROLL_BASE",
+      "TER_NUMERIC"
+    ],
+    "professional_review": null
+  },
+  {
+    "id": "ID_TAX_CARD_04",
+    "topic": "pph26",
+    "required_fields": [
+      "recipient_residency",
+      "recipient_country",
+      "recipient_type",
+      "income_type",
+      "permanent_establishment",
+      "treaty_documentation",
+      "beneficial_owner",
+      "transaction_date"
+    ],
+    "claim_ids": [
+      "FOREIGN_SCOPE",
+      "FOREIGN_RATE"
+    ],
+    "professional_review": null
+  },
+  {
+    "id": "ID_TAX_CARD_05",
+    "topic": "pph23",
+    "required_fields": [
+      "payer_withholder_status",
+      "recipient_residency",
+      "recipient_type",
+      "income_type",
+      "service_category",
+      "recipient_npwp",
+      "final_tax_certificate",
+      "reimbursement_evidence",
+      "transaction_date"
+    ],
+    "claim_ids": [
+      "SERVICE_SCOPE",
+      "SERVICE_EXCEPTIONS",
+      "SERVICE_REIMBURSEMENT",
+      "SERVICE_NPWP",
+      "SERVICE_RATE"
+    ],
+    "professional_review": null
+  },
+  {
+    "id": "ID_TAX_CARD_06",
+    "topic": "pph_final_rent",
+    "required_fields": [
+      "rental_object",
+      "payer_withholder_status",
+      "recipient_residency",
+      "contract_date",
+      "rental_start_date",
+      "gross_rent",
+      "service_charges",
+      "vat_status",
+      "transaction_date"
+    ],
+    "claim_ids": [
+      "RENT_SCOPE",
+      "RENT_PAYER",
+      "RENT_BASE",
+      "RENT_HISTORY",
+      "RENT_RATE"
+    ],
+    "professional_review": null
+  },
+  {
+    "id": "ID_TAX_CARD_07",
+    "topic": "pph25_29",
+    "required_fields": [
+      "legal_entity_type",
+      "prior_year_tax",
+      "creditable_withholding",
+      "prior_installments",
+      "tax_year",
+      "financial_year_end",
+      "annual_taxable_income",
+      "special_installment_category"
+    ],
+    "claim_ids": [
+      "INSTALLMENT_METHOD",
+      "ANNUAL_UNDERPAYMENT",
+      "INSTALLMENT_REPORTING"
+    ],
+    "professional_review": null
+  },
+  {
+    "id": "ID_TAX_CARD_08",
+    "topic": "deadlines",
+    "required_fields": [
+      "tax_type",
+      "tax_period",
+      "payer_role",
+      "return_type",
+      "financial_year_end",
+      "filing_extension",
+      "holiday_calendar",
+      "special_deadline_relief"
+    ],
+    "claim_ids": [
+      "DEADLINE_SEPARATION",
+      "DEADLINE_HOLIDAYS",
+      "DEADLINE_PAYMENT_DATE",
+      "DEADLINE_FILING_DATE"
+    ],
+    "professional_review": null
+  }
+]

@@ -30,13 +30,11 @@ export function minCash(targets) {
   const n = Number(v)
   return Number.isFinite(n) && n >= 0 ? n : null
 }
-// The server returns 999 when there is no burn to measure runway against.
-export const RUNWAY_UNKNOWN = 999
-
-/** Runway in days, or null when the server could not measure it. */
+/** Runway in days, or null when cash flow is positive, break-even or unmeasured. */
 export function runwayDays(pulse) {
-  const r = Number(pulse?.runway)
-  if (!Number.isFinite(r) || r >= RUNWAY_UNKNOWN || r < 0) return null
+  if (pulse?.runway == null) return null
+  const r = Number(pulse.runway)
+  if (!Number.isFinite(r) || r >= 999 || r < 0) return null
   return Math.round(r)
 }
 
