@@ -8,6 +8,24 @@ const assert = require('node:assert');
 const ROOT = path.join(__dirname, '..');
 const SCREENSHOTS_DIR = path.join(__dirname, 'screenshots');
 if (!fs.existsSync(SCREENSHOTS_DIR)) fs.mkdirSync(SCREENSHOTS_DIR, { recursive: true });
+const LOGS_DIR = path.join(ROOT, 'scratch', 'logs');
+if (!fs.existsSync(LOGS_DIR)) fs.mkdirSync(LOGS_DIR, { recursive: true });
+const ACCEPTANCE_LOG = path.join(LOGS_DIR, 'browser_acceptance.log');
+const acceptanceLogStream = fs.createWriteStream(ACCEPTANCE_LOG, { flags: 'w' });
+
+const origStdoutWrite = process.stdout.write.bind(process.stdout);
+const origStderrWrite = process.stderr.write.bind(process.stderr);
+
+process.stdout.write = function (chunk, encoding, callback) {
+  try { acceptanceLogStream.write(chunk); } catch {}
+  return origStdoutWrite(chunk, encoding, callback);
+};
+
+process.stderr.write = function (chunk, encoding, callback) {
+  try { acceptanceLogStream.write(chunk); } catch {}
+  return origStderrWrite(chunk, encoding, callback);
+};
+
 const PORT = 5189;
 
 process.env.PORT = String(PORT);
@@ -889,9 +907,9 @@ async function runAcceptancePass() {
   await page.waitForSelector('.cfo-modal', { timeout: 5000 });
   assert.ok((await page.$('.cfo-modal')) !== null, 'Transfer modal must be opened');
 
-  // Trigger company switch via window.__cfoSwitchTo while modal is open
+  // Trigger company switch while modal is open via workspace-switch event
   await page.evaluate(({ bizA }) => {
-    window.__cfoSwitchTo(bizA);
+    window.dispatchEvent(new CustomEvent('workspace-switch', { detail: { id: bizA } }));
   }, { bizA: BIZ_A });
 
   // Wait for React effect [active?.id, scopeKey] to automatically close the modal
@@ -900,30 +918,111 @@ async function runAcceptancePass() {
   assert.strictEqual(modalAfterSwitch, null, 'Transfer modal must close automatically upon company switch without manual Cancel click');
   console.log('Verified: Transfer modal auto-closes on company switch without Cancel click.');
 
-  // 5e. Test Switcher window.__cfoSwitchTo restriction
-  console.log('\n--- Checking window.__cfoSwitchTo Restriction & Cleanup ---');
-  const freshCtx = await browser.newContext();
-  const freshPage = await freshCtx.newPage();
-  await freshPage.goto(`http://127.0.0.1:${PORT}/login`, { waitUntil: 'domcontentloaded' });
-  await freshPage.evaluate(({ token, bizA }) => {
+  // 5e. Test Switcher window.__cfoSwitchTo Build-Gating Restriction
+  console.log('\n--- Checking window.__cfoSwitchTo Build-Gating Restriction & Cleanup ---');
+  // 5e-1: Normal Production Build Verification
+  const prodCtx = await browser.newContext();
+  const prodPage = await prodCtx.newPage();
+  await prodPage.goto(`http://127.0.0.1:${PORT}/login`, { waitUntil: 'domcontentloaded' });
+  await prodPage.evaluate(({ token, bizA }) => {
     localStorage.setItem('hf_token', token);
     localStorage.setItem('activeWorkspaceId', bizA);
     localStorage.setItem('activeBusinessId', bizA);
-    localStorage.removeItem('__cfo_test__');
-  }, { token: testToken, bizA: BIZ_A });
-  await freshPage.goto(`http://127.0.0.1:${PORT}/business/pulse`, { waitUntil: 'networkidle' });
-  const exposedWithoutFlag = await freshPage.evaluate(() => typeof window.__cfoSwitchTo);
-  assert.strictEqual(exposedWithoutFlag, 'undefined', 'window.__cfoSwitchTo must NOT be exposed in normal production mode without test flag');
-
-  await freshPage.evaluate(() => {
     localStorage.setItem('__cfo_test__', '1');
+    window.__CFO_TEST_MODE__ = true;
+    window.__PLAYWRIGHT_TEST__ = true;
+  }, { token: testToken, bizA: BIZ_A });
+  await prodPage.goto(`http://127.0.0.1:${PORT}/business/pulse`, { waitUntil: 'networkidle' });
+
+  // In production build, window.__cfoSwitchTo must remain undefined despite flags
+  const prodInitial = await prodPage.evaluate(() => typeof window.__cfoSwitchTo);
+  assert.strictEqual(prodInitial, 'undefined', 'window.__cfoSwitchTo must NOT exist in production build initially');
+
+  // Reload page to verify persistence with flags
+  await prodPage.reload({ waitUntil: 'networkidle' });
+  const prodAfterReload = await prodPage.evaluate(() => typeof window.__cfoSwitchTo);
+  assert.strictEqual(prodAfterReload, 'undefined', 'window.__cfoSwitchTo must NOT exist in production build even after reload with test flags in localStorage/window');
+  await prodPage.close();
+  await prodCtx.close();
+  console.log('Verified: Production build strictly omits window.__cfoSwitchTo (runtime flags cannot bypass).');
+
+  // 5e-2: Test Build Verification (built with MODE === "test")
+  console.log('Building temporary test-mode client (vite build --mode test)...');
+  const cp = require('child_process');
+  const distTestDir = path.join(ROOT, 'client', 'dist-test');
+  if (fs.existsSync(distTestDir)) fs.rmSync(distTestDir, { recursive: true, force: true });
+  cp.execSync('node client/node_modules/vite/bin/vite.js build client --mode test --outDir dist-test', { cwd: ROOT });
+
+  const TEST_PORT = 5192;
+  const testServer = http.createServer((req, res) => {
+    if (req.url.startsWith('/api/')) {
+      const proxyReq = http.request(`http://127.0.0.1:${PORT}${req.url}`, {
+        method: req.method,
+        headers: req.headers
+      }, (proxyRes) => {
+        res.writeHead(proxyRes.statusCode, proxyRes.headers);
+        proxyRes.pipe(res);
+      });
+      req.pipe(proxyReq);
+      return;
+    }
+    let reqPath = req.url.split('?')[0];
+    if (reqPath === '/' || !reqPath.includes('.')) reqPath = '/index.html';
+    const filePath = path.join(distTestDir, reqPath);
+    if (fs.existsSync(filePath)) {
+      const ext = path.extname(filePath);
+      const ct = ext === '.html' ? 'text/html' : ext === '.js' ? 'application/javascript' : ext === '.css' ? 'text/css' : 'application/octet-stream';
+      res.writeHead(200, { 'Content-Type': ct });
+      res.end(fs.readFileSync(filePath));
+    } else {
+      const indexPath = path.join(distTestDir, 'index.html');
+      res.writeHead(200, { 'Content-Type': 'text/html' });
+      res.end(fs.readFileSync(indexPath));
+    }
   });
-  await freshPage.reload({ waitUntil: 'networkidle' });
-  const exposedWithFlag = await freshPage.evaluate(() => typeof window.__cfoSwitchTo);
-  assert.strictEqual(exposedWithFlag, 'function', 'window.__cfoSwitchTo MUST be exposed when __cfo_test__ flag is active');
-  await freshPage.close();
-  await freshCtx.close();
-  console.log('Verified: window.__cfoSwitchTo properly restricted to test mode.');
+
+  await new Promise(res => testServer.listen(TEST_PORT, '127.0.0.1', res));
+  console.log(`Test-build server listening on http://127.0.0.1:${TEST_PORT}`);
+
+  try {
+    const testCtx = await browser.newContext();
+    const testPage = await testCtx.newPage();
+    await testPage.goto(`http://127.0.0.1:${TEST_PORT}/login`, { waitUntil: 'domcontentloaded' });
+    await testPage.evaluate(({ token, bizA }) => {
+      localStorage.setItem('hf_token', token);
+      localStorage.setItem('activeWorkspaceId', bizA);
+      localStorage.setItem('activeBusinessId', bizA);
+      localStorage.setItem('last_active_workspace_id', bizA);
+    }, { token: testToken, bizA: BIZ_A });
+
+    await testPage.goto(`http://127.0.0.1:${TEST_PORT}/business/pulse`, { waitUntil: 'networkidle' });
+    const testExposed = await testPage.evaluate(() => typeof window.__cfoSwitchTo);
+    assert.strictEqual(testExposed, 'function', 'window.__cfoSwitchTo MUST be exposed in test build (import.meta.env.MODE === "test")');
+
+    // Verify it actually invokes WorkspaceProvider.switchTo
+    await testPage.evaluate(({ bizB }) => {
+      window.__cfoSwitchTo(bizB);
+    }, { bizB: BIZ_B });
+    await testPage.waitForTimeout(600);
+    const activeStored = await testPage.evaluate(() => localStorage.getItem('activeWorkspaceId'));
+    assert.strictEqual(activeStored, BIZ_B, 'Calling window.__cfoSwitchTo must switch active workspace to Company B');
+
+    // Verify cleanup upon unmount: navigating to /login (which renders outside WorkspaceProvider) unmounts WorkspaceProvider
+    await testPage.goto(`http://127.0.0.1:${TEST_PORT}/login`, { waitUntil: 'domcontentloaded' });
+    await testPage.waitForTimeout(400);
+    const afterUnmount = await testPage.evaluate(() => typeof window.__cfoSwitchTo);
+    assert.strictEqual(afterUnmount, 'undefined', 'window.__cfoSwitchTo must be deleted when WorkspaceProvider unmounts');
+
+    await testPage.close();
+    await testCtx.close();
+    console.log('Verified: Test build successfully exposes window.__cfoSwitchTo, invokes WorkspaceProvider, and cleans up on unmount.');
+  } finally {
+    testServer.close();
+    if (fs.existsSync(distTestDir)) {
+      fs.rmSync(distTestDir, { recursive: true, force: true });
+    }
+    console.log('Cleaned up temporary test-build artifacts.');
+  }
 
   // 5f. Tax Knowledge Cards Error Matrix across Screens and Languages (Accountant & Calendar × RU/EN/ID)
   console.log('\n--- Checking Comprehensive Tax Cards Error Matrix (Accountant & Calendar × RU/EN/ID) ---');
@@ -1078,9 +1177,15 @@ setTimeout(async () => {
   try {
     await runAcceptancePass();
     console.log('Acceptance run complete.');
-    process.exit(0);
+    console.log('\nProcess finished with exit code: 0');
+    acceptanceLogStream.end(() => {
+      process.exit(0);
+    });
   } catch (err) {
     console.error('Acceptance run FAILED:', err);
-    process.exit(1);
+    console.error('\nProcess finished with exit code: 1');
+    acceptanceLogStream.end(() => {
+      process.exit(1);
+    });
   }
 }, 1000);

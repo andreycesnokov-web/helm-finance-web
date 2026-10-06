@@ -62,7 +62,11 @@ fs.writeFileSync(path.join(STAGE, 'logs', 'walletTransfers_pglite_test.log'), pg
 const buildLog = cp.execSync('npm run build', { cwd: path.join(ROOT, 'client') }).toString();
 fs.writeFileSync(path.join(STAGE, 'logs', 'client_build.log'), buildLog);
 
-// 4e. Browser console log
+// 4e. Browser logs
+const acceptanceLogSrc = path.join(__dirname, 'logs', 'browser_acceptance.log');
+if (fs.existsSync(acceptanceLogSrc)) {
+  fs.copyFileSync(acceptanceLogSrc, path.join(STAGE, 'logs', 'browser_acceptance.log'));
+}
 const browserLogSrc = path.join(__dirname, 'logs', 'browser_console.log');
 if (fs.existsSync(browserLogSrc)) {
   fs.copyFileSync(browserLogSrc, path.join(STAGE, 'logs', 'browser_console.log'));
@@ -90,11 +94,11 @@ const readmeContent = `# CFO Finance OS: Acceptance & Proof Package (PR #134)
 | **2** | **AI Accountant Delayed Response Protection** | **PASS** | In Company A, user submits question to AI Accountant with request held in-flight. User switches to Company B via standard UI switcher without reload. Company A's held response is released; verified that Company B's chat remains empty, question and \`ask\`/\`q\` params are stripped, and subsequent questions in Company B cite Company B counterparties. |
 | **3** | **Compliance Calendar Isolation** | **PASS** | Verified on Compliance Calendar without page reload: Company A calendar events request is held in-flight, company switched to B via UI switcher, Company B events render, Company A delayed response released; confirmed Company A events never render in Company B. Separately verified delayed tax cards loading across company switch using distinct markers. |
 | **4** | **Clean User-Facing Text in Calendar** | **PASS** | Replaced technical \`no structured due_date_rule_json — skipped\` in user-facing UI with localized friendly message in RU, EN, and ID stating due date cannot be determined due to missing confirmed statutory calculation rules. Technical details logged to \`console.debug\`. |
-| **5** | **Restrict Test Switcher (\`window.__cfoSwitchTo\`)** | **PASS** | Exposed only when test mode is active (\`window.__CFO_TEST_MODE__\` or \`localStorage.getItem('__cfo_test__') === '1'\` or \`MODE === 'test'\`). Unmount deletes the function. Verified both states in automated test. |
+| **5** | **Build-Gated Test Switcher (\`window.__cfoSwitchTo\`)** | **PASS** | Strictly build-gated to test mode (\`import.meta.env.MODE === 'test'\`). In production build, helper is completely omitted by compile-time DCE; setting runtime localStorage/window test flags leaves helper \`undefined\` both initially and after page reload. In test build, helper is present, successfully switches active workspace, and is cleaned up on unmount. |
 | **6** | **Modal Auto-Close on Company Switch** | **PASS** | When wallet transfer modal is open, switching active company automatically closes the modal without requiring user to click Cancel. |
 | **7** | **Comprehensive Tax Cards Error Matrix (Accountant & Calendar × RU/EN/ID)** | **PASS** | Tested 6 distinct states across both screens in all 3 languages: <br>• **401 / 403 Forbidden**: Access denied banner, zero cards, no fallback snapshot.<br>• **500 Server Error**: Server error banner, zero cards, Retry button visible. Clicking Retry with recovered endpoint restores 200 state, clears error and renders cards.<br>• **Network Failure (Offline)**: Offline warning banner with reviewed snapshot fallback dictionary.<br>• **Successful Empty List**: Localized empty state notice, zero cards.<br>• **Malformed Response**: Format error notice, zero cards. |
 | **8** | **PostgreSQL Concurrency Status (Local vs CI)** | **BLOCKED (Local)**<br>**PASS (CI)** | Local environment executes unit & integration tests on PGlite in-memory database (\`walletTransfersTask30.test.js\` PASS, see \`logs/walletTransfers_pglite_test.log\`). Real multi-connection concurrency (\`postgresIndependentConnections.test.js\`) requires a running PostgreSQL daemon on port 5432 and is **BLOCKED (Local)** due to no local PostgreSQL server. Concurrency with independent connections is verified via GitHub Actions CI workflow (\`.github/workflows/ci.yml:postgres-atomic-concurrency\`). |
-| **9** | **Reproducible Acceptance Package & Browser Logs** | **PASS** | Full browser console log captured to \`scratch/logs/browser_console.log\`. Zero unexpected page errors. Clean bundle with relative paths (\`./\`), patch against base, and SHA-256 manifest. |
+| **9** | **Reproducible Acceptance Package & Browser Logs** | **PASS** | Full browser runner stdout/stderr log captured in \`scratch/logs/browser_acceptance.log\` (scenarios, results, exit code 0). Browser page console log captured in \`scratch/logs/browser_console.log\` (zero unexpected page errors). Clean bundle with relative paths (\`./\`), patch against base, and SHA-256 manifest. |
 
 ---
 
@@ -130,7 +134,9 @@ DATABASE_URL=postgresql://postgres:postgrespassword@localhost:5432/testdb node -
 
 - \`diffs/full_patch_from_base.patch\`: Complete unified diff against base SHA \`d14e05faf45b949d76e582ae26324a31c533ac7b\`.
 - \`diffs/diffstat.txt\`: Summary of modified lines and files.
-- \`logs/\`: Actual test execution output logs.
+- \`logs/browser_acceptance.log\`: Complete stdout/stderr execution log of Playwright runner (all scenarios, results, exit code).
+- \`logs/browser_console.log\`: Browser page console output log.
+- \`logs/\`: Unit, integration and build execution output logs.
 - \`tests/\`: Standalone runnable test scripts.
 - \`screenshots/\`: 13 browser proof screenshots (\`proof_01\` through \`proof_13\`).
 - \`manifest.sha256\`: SHA-256 checksums for every file in this package.

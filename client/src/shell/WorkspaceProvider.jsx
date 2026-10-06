@@ -93,13 +93,9 @@ export function WorkspaceProvider({ children }) {
     }
     window.addEventListener('workspace-switch', handleSwitchEvent)
     window.addEventListener('storage', handleStorageEvent)
-    const isTestMode = typeof window !== 'undefined' && (
-      window.__CFO_TEST_MODE__ === true ||
-      window.__PLAYWRIGHT_TEST__ === true ||
-      (typeof localStorage !== 'undefined' && localStorage.getItem('__cfo_test__') === '1') ||
-      import.meta.env.MODE === 'test'
-    )
-    if (isTestMode) {
+    // window.__cfoSwitchTo is strictly build-gated to test builds (import.meta.env.MODE === 'test').
+    // Runtime localStorage or window flags cannot bypass this restriction in production builds.
+    if (import.meta.env.MODE === 'test') {
       window.__cfoSwitchTo = (id) => {
         const all = [...(wsRef.current?.personal || []), ...(wsRef.current?.business || [])]
         const target = all.find(w => String(w.id) === String(id))
