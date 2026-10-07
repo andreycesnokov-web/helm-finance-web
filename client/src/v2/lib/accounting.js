@@ -72,13 +72,22 @@ export function closeReadiness({ month, transactions = [], debts = [], batches =
     )
   )
   const reconciled = banks.filter((w) =>
-    batches.some((b) =>
-      String(b.wallet_id) === String(w.id) &&
-      !['cancelled', 'failed', 'review_required'].includes(b.status) &&
-      b.closing_balance != null &&
-      (b.status === 'imported' || b.status === 'reconciled') &&
-      String(b.statement_end || '') >= end
-    )
+    batches.some((b) => {
+      if (String(b.wallet_id) !== String(w.id)) return false
+      if (['cancelled', 'failed', 'review_required'].includes(b.status)) return false
+      if (b.closing_balance == null) return false
+      if (b.status !== 'imported' && b.status !== 'reconciled') return false
+      if (String(b.statement_end || '') < end) return false
+
+      // Check difference / reconciliation status if present on batch or nested recon
+      const recon = b.reconciliation || b.bank_reconciliations?.[0] || null
+      const diff = b.difference != null ? Number(b.difference) : recon?.difference != null ? Number(recon.difference) : null
+      const recStatus = b.reconciliation_status || recon?.status || null
+      if (recStatus === 'unbalanced') return false
+      if (diff != null && Math.abs(diff) >= 1) return false
+
+      return true
+    })
   )
   const records = tx.length + bills.length
   const complete = records - noCat.length - noDoc.length

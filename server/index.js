@@ -6075,7 +6075,24 @@ app.get('/api/bank-import/batches', auth, async (req, res) => {
     if (!biz) return;
     if (!canViewBusinessFinance(biz.role)) return res.status(403).json({ error: 'Forbidden' });
     const { data } = await supabase.from('bank_import_batches').select('*').eq('business_id', biz.business.id).order('created_at', { ascending: false }).limit(50);
-    res.json({ batches: data || [] });
+    const batches = data || [];
+    if (batches.length > 0) {
+      const batchIds = batches.map(b => b.id);
+      const { data: recons } = await supabase.from('bank_reconciliations').select('*').in('batch_id', batchIds);
+      const reconByBatch = new Map();
+      for (const r of (recons || [])) {
+        if (!reconByBatch.has(String(r.batch_id))) reconByBatch.set(String(r.batch_id), r);
+      }
+      for (const b of batches) {
+        const r = reconByBatch.get(String(b.id));
+        if (r) {
+          b.reconciliation = r;
+          b.reconciliation_status = r.status;
+          b.difference = r.difference;
+        }
+      }
+    }
+    res.json({ batches });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
