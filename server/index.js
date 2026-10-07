@@ -6214,7 +6214,7 @@ app.post('/api/bank-import/batches/:id/confirm', auth, async (req, res) => {
       await supabase.from('bank_import_rows').update({
         linked_transaction_id: tx.id, match_status: 'confirmed', review_status: 'imported',
       }).eq('id', r.id);
-      imported++; signedSum += isIncome ? r.amount : -r.amount;
+      imported++; signedSum += isIncome ? Number(r.amount) : -Number(r.amount);
     }
 
     // Reconciliation (if opening/closing provided)
@@ -6748,7 +6748,7 @@ app.post('/api/bank-imports/:batchId/confirm', auth, async (req, res) => {
           linked_transaction_id: Number(matchTxId),
         }).eq('id', row.id);
         linked++;
-        signedSum += type === 'income' ? row.amount : -row.amount;
+        signedSum += type === 'income' ? Number(row.amount) : -Number(row.amount);
         continue;
       }
       if (p.match_action === 'exclude') {
@@ -6776,7 +6776,7 @@ app.post('/api/bank-imports/:batchId/confirm', auth, async (req, res) => {
       }).select('id').single();
       if (error) continue;
       await supabase.from('bank_import_rows').update({ linked_transaction_id: tx.id, review_status: 'imported' }).eq('id', row.id);
-      imported++; signedSum += type === 'income' ? row.amount : -row.amount;
+      imported++; signedSum += type === 'income' ? Number(row.amount) : -Number(row.amount);
     }
 
     // Reconciliation snapshot
