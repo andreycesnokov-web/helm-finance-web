@@ -134,6 +134,21 @@ describe('HTTP API End-to-End: POST /api/bank-import/batches over Real PostgreSQ
         created_at timestamptz DEFAULT now()
       );
 
+      ALTER TABLE public.bank_import_rows ADD COLUMN IF NOT EXISTS row_index int DEFAULT 0;
+      ALTER TABLE public.bank_import_rows ADD COLUMN IF NOT EXISTS tx_date date NULL;
+      ALTER TABLE public.bank_import_rows ADD COLUMN IF NOT EXISTS description text NULL;
+      ALTER TABLE public.bank_import_rows ADD COLUMN IF NOT EXISTS amount numeric NULL;
+      ALTER TABLE public.bank_import_rows ADD COLUMN IF NOT EXISTS direction text NULL;
+      ALTER TABLE public.bank_import_rows ADD COLUMN IF NOT EXISTS bank_reference text NULL;
+      ALTER TABLE public.bank_import_rows ADD COLUMN IF NOT EXISTS balance_after numeric NULL;
+      ALTER TABLE public.bank_import_rows ADD COLUMN IF NOT EXISTS dedup_hash text NULL;
+      ALTER TABLE public.bank_import_rows ADD COLUMN IF NOT EXISTS suggested_type text NULL;
+      ALTER TABLE public.bank_import_rows ADD COLUMN IF NOT EXISTS suggested_category text NULL;
+      ALTER TABLE public.bank_import_rows ADD COLUMN IF NOT EXISTS suggested_counterparty text NULL;
+      ALTER TABLE public.bank_import_rows ADD COLUMN IF NOT EXISTS match_status text DEFAULT 'review_required';
+      ALTER TABLE public.bank_import_rows ADD COLUMN IF NOT EXISTS matched_transaction_id bigint NULL;
+      ALTER TABLE public.bank_import_rows ADD COLUMN IF NOT EXISTS linked_transaction_id bigint NULL;
+
       CREATE TABLE IF NOT EXISTS public.transactions (
         id bigserial PRIMARY KEY,
         business_id uuid NOT NULL REFERENCES public.businesses(id) ON DELETE CASCADE,
