@@ -158,6 +158,7 @@ function CloseTab({ month, onOpenChatModal }) {
   const t = useT()
   const lang = useLang()
   const { active, scopeKey } = useWorkspace()
+  const { token } = useAuth()
   const [askQuery, setAskQuery] = useState('')
 
   useEffect(() => {
@@ -259,6 +260,7 @@ function CloseTab({ month, onOpenChatModal }) {
                     batches: batches.data?.batches || [],
                     wallets: wallets.data?.wallets || [],
                     documents: rawDocs,
+                    token,
                   })
                   const blob = new Blob([zipBytes], { type: 'application/zip' })
                   const url = URL.createObjectURL(blob)

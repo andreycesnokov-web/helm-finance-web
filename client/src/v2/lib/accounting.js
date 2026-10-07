@@ -62,49 +62,74 @@ export function closeReadiness({ month, transactions = [], debts = [], batches =
   const noCat = tx.filter(needsCategory)
   const bills = debts.filter((d) => d.is_training !== true && d.status !== 'cancelled' && inMonth(d.due_date || d.created_at, month))
   const noDoc = bills.filter((d) => !hasDocs(d))
-  const end = monthOptions(24).find((m) => m.key === month)?.end || `${month}-28`
+  const mOpt = monthOptions(24).find((m) => m.key === month)
+  const start = mOpt?.start || `${month}-01`
+  const end = mOpt?.end || `${month}-28`
   const banks = wallets.filter(isBankWallet)
+
+  const isFiniteNumber = (val) => val != null && val !== '' && typeof val !== 'boolean' && Number.isFinite(Number(val)) && !Number.isNaN(Number(val))
+
   const withStatements = banks.filter((w) =>
     batches.some((b) =>
       String(b.wallet_id) === String(w.id) &&
       !['cancelled', 'failed'].includes(b.status) &&
-      String(b.statement_end || '') >= end
+      b.statement_start && b.statement_end &&
+      String(b.statement_start) <= start &&
+      String(b.statement_end) >= end
     )
   )
   const reconciled = banks.filter((w) =>
     batches.some((b) => {
       if (String(b.wallet_id) !== String(w.id)) return false
       if (['cancelled', 'failed', 'review_required'].includes(b.status)) return false
-      if (b.closing_balance == null) return false
       if (b.status !== 'imported' && b.status !== 'reconciled') return false
-      if (String(b.statement_end || '') < end) return false
 
-      // Check difference / reconciliation status if present on batch or nested recon
+      // Statement must cover the selected month
+      if (!b.statement_start || !b.statement_end) return false
+      if (String(b.statement_start) > start || String(b.statement_end) < end) return false
+
+      // Closing balance must be a finite number
+      if (!isFiniteNumber(b.closing_balance)) return false
+
+      // Reconciliation outcome must be valid and confirmed
       const recon = b.reconciliation || b.bank_reconciliations?.[0] || null
-      const diff = b.difference != null ? Number(b.difference) : recon?.difference != null ? Number(recon.difference) : null
+      const rawDiff = b.difference != null ? b.difference : recon?.difference
+      if (!isFiniteNumber(rawDiff)) return false
+      const diff = Number(rawDiff)
+
       const recStatus = b.reconciliation_status || recon?.status || null
-      if (recStatus === 'unbalanced') return false
-      if (diff != null && Math.abs(diff) >= 1) return false
+      const confirmedStatus = ['balanced', 'reconciled', 'matched'].includes(recStatus)
+      if (!confirmedStatus) return false
+
+      // Explicit currency precision: IDR integer (tolerance 1), foreign currency (tolerance 0.01)
+      const currency = (b.currency || w.currency || 'IDR').toUpperCase()
+      const tol = currency === 'IDR' ? 1 : 0.01
+      if (Math.abs(diff) >= tol) return false
 
       return true
     })
   )
   const records = tx.length + bills.length
   const complete = records - noCat.length - noDoc.length
+  const percent = records ? Math.round((Math.max(0, complete) / records) * 100) : null
+  const checks = [
+    { key: 'statements', done: banks.length > 0 && withStatements.length === banks.length, total: banks.length, ok: withStatements.length, missing: banks.filter((w) => !withStatements.includes(w)).map((w) => w.name) },
+    { key: 'reconciliation', done: banks.length > 0 && reconciled.length === banks.length, total: banks.length, ok: reconciled.length, missing: banks.filter((w) => !reconciled.includes(w)).map((w) => w.name) },
+    { key: 'bills', done: noDoc.length === 0 && bills.length > 0, total: bills.length, ok: bills.length - noDoc.length, missing: noDoc.map((d) => d.counterparty).filter(Boolean) },
+    { key: 'categories', done: noCat.length === 0, total: tx.length, ok: tx.length - noCat.length, missing: noCat.map((t) => t.description).filter(Boolean) },
+  ]
+  const is_closed = percent === 100 && checks.every((c) => c.done)
+
   return {
     month, records, complete: Math.max(0, complete),
-    percent: records ? Math.round((Math.max(0, complete) / records) * 100) : null,
+    percent,
+    is_closed,
     banks: {
       total: banks.length,
       with_statement: withStatements.length,
       reconciled: reconciled.length,
     },
-    checks: [
-      { key: 'statements', done: banks.length > 0 && withStatements.length === banks.length, total: banks.length, ok: withStatements.length, missing: banks.filter((w) => !withStatements.includes(w)).map((w) => w.name) },
-      { key: 'reconciliation', done: banks.length > 0 && reconciled.length === banks.length, total: banks.length, ok: reconciled.length, missing: banks.filter((w) => !reconciled.includes(w)).map((w) => w.name) },
-      { key: 'bills', done: noDoc.length === 0 && bills.length > 0, total: bills.length, ok: bills.length - noDoc.length, missing: noDoc.map((d) => d.counterparty).filter(Boolean) },
-      { key: 'categories', done: noCat.length === 0, total: tx.length, ok: tx.length - noCat.length, missing: noCat.map((t) => t.description).filter(Boolean) },
-    ],
+    checks,
   }
 }
 
@@ -299,10 +324,22 @@ export function createZip(files) {
  * - registry: list of transactions, debts, and their linked document status
  */
 export function packageExportData({ month, companyName = '', businessId = '', transactions = [], debts = [], batches = [], wallets = [] }) {
-  const readiness = closeReadiness({ month, transactions, debts, batches, wallets })
+  const matchBiz = (item) => !businessId || !item.business_id || String(item.business_id) === String(businessId)
+  const scopedTx = transactions.filter(matchBiz)
+  const scopedDebts = debts.filter(matchBiz)
+  const scopedBatches = batches.filter(matchBiz)
+  const scopedWallets = wallets.filter(matchBiz)
+
+  const readiness = closeReadiness({
+    month,
+    transactions: scopedTx,
+    debts: scopedDebts,
+    batches: scopedBatches,
+    wallets: scopedWallets,
+  })
   const inM = (iso) => inMonth(iso, month)
-  const monthTx = transactions.filter((t) => inM(txDate(t)))
-  const monthDebts = debts.filter((d) => d.is_training !== true && d.status !== 'cancelled' && inM(d.due_date || d.created_at))
+  const monthTx = scopedTx.filter((t) => inM(txDate(t)))
+  const monthDebts = scopedDebts.filter((d) => d.is_training !== true && d.status !== 'cancelled' && inM(d.due_date || d.created_at))
 
   const missingStatements = readiness.checks.find((c) => c.key === 'statements')?.missing || []
   const unreconciledStatements = readiness.checks.find((c) => c.key === 'reconciliation')?.missing || []
@@ -346,13 +383,13 @@ export function packageExportData({ month, companyName = '', businessId = '', tr
       percent: readiness.percent,
       complete_records: readiness.complete,
       total_records: readiness.records,
-      is_closed: readiness.percent === 100,
+      is_closed: readiness.is_closed,
     },
     bank_accounts: {
       total_banks: readiness.banks.total,
       statements_uploaded: readiness.banks.with_statement,
       balances_reconciled: readiness.banks.reconciled,
-      cash_accounts_excluded: wallets.filter((w) => !isBankWallet(w)).map((w) => ({ id: w.id, name: w.name, type: w.type })),
+      cash_accounts_excluded: scopedWallets.filter((w) => !isBankWallet(w)).map((w) => ({ id: w.id, name: w.name, type: w.type })),
     },
     discrepancies: {
       missing_bank_statements: missingStatements,
@@ -380,6 +417,8 @@ export async function createAccountantZipPackage({
   batches = [],
   wallets = [],
   documents = [],
+  token = null,
+  fetchSignedUrl = null,
 }) {
   const exportData = packageExportData({ month, companyName, businessId, transactions, debts, batches, wallets })
   const unavailableFiles = []
@@ -387,7 +426,32 @@ export async function createAccountantZipPackage({
     { name: 'documents/README.txt', data: `Financial documents for ${month} month close.\nUnavailable files are listed in discrepancies.json.\n` },
   ]
 
-  for (const doc of documents) {
+  const inM = (iso) => inMonth(iso, month)
+  const monthDebtIds = new Set(exportData.records_registry.filter((r) => r.type === 'bill_or_invoice').map((r) => String(r.id)))
+  const monthTxIds = new Set(exportData.records_registry.filter((r) => r.type === 'transaction').map((r) => String(r.id)))
+
+  // Scope documents to selected company and month
+  const matchBiz = (item) => !businessId || !item.business_id || String(item.business_id) === String(businessId)
+  const isDocInMonth = (doc) => {
+    if (!matchBiz(doc)) return false
+    if (inM(doc.document_date || doc.created_at)) return true
+    if (doc.debt_id && monthDebtIds.has(String(doc.debt_id))) return true
+    if (doc.transaction_id && monthTxIds.has(String(doc.transaction_id))) return true
+    if (Array.isArray(doc.links) && doc.links.some((l) =>
+      (l.target_type === 'debt' && monthDebtIds.has(String(l.target_id))) ||
+      (l.target_type === 'transaction' && monthTxIds.has(String(l.target_id)))
+    )) return true
+    if (Array.isArray(doc.debt_links) && doc.debt_links.some((l) => monthDebtIds.has(String(l.debt_id || l)))) return true
+    const inRegistry = exportData.records_registry.some((r) =>
+      Array.isArray(r.document_links) && r.document_links.some((dl) => String(dl.document_id || dl.id) === String(doc.id))
+    )
+    if (inRegistry) return true
+    return false
+  }
+
+  const targetDocs = documents.filter(isDocInMonth)
+
+  for (const doc of targetDocs) {
     const fileName = doc.file?.file_name || doc.file_name || `${doc.id}.bin`
     const rawContent = doc.file_content || doc.content
     const base64Content = doc.content_base64 || (typeof rawContent === 'string' && rawContent.startsWith('data:') ? rawContent.split(',')[1] : null)
@@ -408,26 +472,69 @@ export async function createAccountantZipPackage({
     } else if (rawContent instanceof Uint8Array) {
       filesToZip.push({ name: `documents/${fileName}`, data: rawContent })
     } else {
-      unavailableFiles.push({
-        document_id: doc.id,
-        file_name: fileName,
-        reason: 'Original binary file storage not embedded in memory or inaccessible without signed storage URL',
-      })
+      let downloaded = false
+      if (typeof fetchSignedUrl === 'function') {
+        try {
+          const url = await fetchSignedUrl(doc.id, 'download')
+          if (url && typeof fetch === 'function') {
+            const resp = await fetch(url)
+            if (resp.ok) {
+              const buf = await resp.arrayBuffer()
+              filesToZip.push({ name: `documents/${fileName}`, data: new Uint8Array(buf) })
+              downloaded = true
+            }
+          }
+        } catch { /* proceed to unavailable */ }
+      } else if (token && typeof fetch === 'function') {
+        try {
+          const sResp = await fetch(`/api/documents/${doc.id}/signed-url`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ mode: 'download' }),
+          })
+          if (sResp.ok) {
+            const sData = await sResp.json()
+            if (sData?.url) {
+              const fileResp = await fetch(sData.url)
+              if (fileResp.ok) {
+                const buf = await fileResp.arrayBuffer()
+                filesToZip.push({ name: `documents/${fileName}`, data: new Uint8Array(buf) })
+                downloaded = true
+              }
+            }
+          }
+        } catch { /* proceed to unavailable */ }
+      }
+
+      if (!downloaded) {
+        unavailableFiles.push({
+          document_id: doc.id,
+          file_name: fileName,
+          reason: 'Original file could not be retrieved from authorized storage or signed URL was unavailable',
+        })
+      }
     }
   }
+
+  const isComplete = unavailableFiles.length === 0 && exportData.readiness.is_closed === true
 
   const summary = {
     package_version: exportData.package_version,
     generated_at: exportData.generated_at,
     month: exportData.month,
     company: exportData.company,
-    readiness: exportData.readiness,
+    is_complete: isComplete,
+    readiness: {
+      ...exportData.readiness,
+      is_complete: isComplete,
+    },
     bank_accounts: exportData.bank_accounts,
   }
 
   const discrepancies = {
     company_name: exportData.company.name,
     month: exportData.month,
+    is_complete: unavailableFiles.length === 0,
     ...exportData.discrepancies,
     unavailable_files: unavailableFiles,
   }
@@ -447,6 +554,7 @@ export async function createAccountantZipPackage({
     discrepancies,
     recordsRegistry: exportData.records_registry,
     unavailableFiles,
+    isComplete,
   }
 }
 
