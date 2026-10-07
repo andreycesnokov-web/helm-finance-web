@@ -144,7 +144,7 @@ const SIDEBAR_GROUPS = [
         icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg> },
       { path: '/team',      labelKey: 'nav.team',      label: 'Team',      active: true,
         icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg> },
-      { path: '/accountant', labelKey: 'nav.accountant', label: 'AI Accountant', active: true,
+      { path: '/business/accountant', labelKey: 'nav.accountant', label: 'AI Accountant', active: true,
         icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="8" y1="10" x2="16" y2="10"/><line x1="8" y1="14" x2="12" y2="14"/></svg> },
       { path: '/documents', labelKey: 'nav.documents', label: 'Documents', active: true,
         icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg> },
@@ -566,6 +566,12 @@ const V2BusinessApp = DESIGN_V2 ? lazy(() => import('./v2/BusinessApp')) : null
 // every other /admin route stays the existing page.
 const V2AdminApp = DESIGN_V2 ? lazy(() => import('./v2/AdminApp')) : null
 
+// Redirect legacy /accountant addresses to /business/accountant with search query preservation (e.g. ?ask=... / ?q=...).
+function AccountantRedirect({ to = '/business/accountant' }) {
+  const location = useLocation()
+  return <Navigate to={`${to}${location.search || ''}`} replace />
+}
+
 export default function App() {
   return (
     <BrowserRouter>
@@ -602,10 +608,11 @@ export default function App() {
           <Route path="/tasks"        element={<Layout><Tasks /></Layout>} />
           <Route path="/approvals"    element={<Layout><Approvals /></Layout>} />
           <Route path="/team"         element={<Layout><Team /></Layout>} />
-          <Route path="/accountant"   element={<Layout><Accountant /></Layout>} />
+          <Route path="/accountant/tax-profile" element={<AccountantRedirect to="/business/accountant/tax-profile" />} />
+          <Route path="/accountant/calendar" element={<AccountantRedirect to="/business/accountant?tab=taxes" />} />
+          <Route path="/accountant"   element={<AccountantRedirect to="/business/accountant" />} />
+          <Route path="/accountant/*" element={<AccountantRedirect to="/business/accountant" />} />
           <Route path="/documents"    element={<Layout><Documents /></Layout>} />
-          <Route path="/accountant/tax-profile" element={<Layout><TaxProfile /></Layout>} />
-          <Route path="/accountant/calendar" element={<Layout><ComplianceCalendar /></Layout>} />
           <Route path="/bank-import"  element={<Layout><BankImport /></Layout>} />
           <Route path="/team-onboarding" element={<Layout><TeamOnboarding /></Layout>} />
           {/* Premium UI preview — standalone, synthetic only, gated by VITE_PREMIUM_UI_PREVIEW.
