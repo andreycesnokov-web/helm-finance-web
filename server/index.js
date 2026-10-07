@@ -6026,6 +6026,18 @@ app.post('/api/bank-import/batches', auth, async (req, res) => {
       .not('linked_transaction_id', 'is', null);
     const priorHashes = new Set((priorRows || []).map(r => r.dedup_hash));
 
+    // If document_id is provided, verify it exists and strictly belongs to the current business
+    if (document_id) {
+      const { data: docRow, error: docErr } = await supabase.from('financial_documents')
+        .select('id, business_id').eq('id', document_id).limit(1);
+      if (docErr || !docRow?.length) {
+        return res.status(404).json({ error: 'Original document not found' });
+      }
+      if (String(docRow[0].business_id) !== String(biz.business.id)) {
+        return res.status(403).json({ error: 'Document belongs to another business' });
+      }
+    }
+
     // Create batch
     const batchPayload = {
       business_id: biz.business.id, wallet_id: wallet_id || null,
@@ -6037,14 +6049,19 @@ app.post('/api/bank-import/batches', auth, async (req, res) => {
       opening_balance: opening_balance ?? null, closing_balance: closing_balance ?? null,
       row_count: rows.length, status: 'review_required',
     };
-    let { data: batch, error: bErr } = await supabase.from('bank_import_batches').insert(batchPayload).select().single();
-    if (bErr && /column "document_id" of relation "bank_import_batches" does not exist/i.test(bErr.message)) {
-      delete batchPayload.document_id;
-      const fallback = await supabase.from('bank_import_batches').insert(batchPayload).select().single();
-      batch = fallback.data;
-      bErr = fallback.error;
+    const { data: batch, error: bErr } = await supabase.from('bank_import_batches').insert(batchPayload).select().single();
+    if (bErr) {
+      if (/column "document_id" of relation "bank_import_batches" does not exist/i.test(bErr.message)) {
+        return res.status(500).json({
+          error: 'database_schema_mismatch',
+          message: 'Database schema is missing bank_import_batches.document_id. Migration 068 required.',
+        });
+      }
+      if (/isolation: bank_import_batches document_id belongs to another business/i.test(bErr.message)) {
+        return res.status(403).json({ error: 'isolation_violation', message: 'Document belongs to another business' });
+      }
+      return res.status(500).json({ error: bErr.message });
     }
-    if (bErr) return res.status(500).json({ error: bErr.message });
 
     // Build rows with dedup + matching + suggestions
     let matched = 0, dup = 0;

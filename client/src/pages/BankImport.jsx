@@ -308,8 +308,12 @@ export default function BankImport() {
           if (upErr?.data?.duplicate && upErr?.data?.existing_document_id) {
             documentId = upErr.data.existing_document_id
           } else {
-            console.warn('Bank statement upload to documents storage failed:', upErr)
+            console.error('Bank statement upload to documents storage failed:', upErr)
+            throw new Error(`Не удалось сохранить оригинальный файл выписки: ${upErr.message || 'Ошибка загрузки в хранилище'}`)
           }
+        }
+        if (!documentId) {
+          throw new Error('Не удалось получить идентификатор сохранённого документа выписки')
         }
       }
       const built = buildRows()
