@@ -140,7 +140,7 @@ describe('Real PostgreSQL: Migration 068 & Bank Import Batch Document Linking', 
           VALUES ($1, $2, 'fail.csv', $3, 'review_required')
         `, [batchId, BIZ_A, nonExistentDocId]);
       },
-      /foreign key/i
+      /(foreign key|isolation: bank_import_batches document_id belongs to another business)/i
     );
   });
 
