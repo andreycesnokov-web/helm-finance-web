@@ -294,6 +294,7 @@ function CloseTab({ month, onOpenChatModal }) {
                       wallets: wallets.data?.wallets || [],
                       documents: rawDocs,
                       token,
+                      lang,
                       signal: controller.signal,
                       fetchSignedUrl: async (docId, mode = 'download', bizId, sig) => {
                         const resp = await apiFetch(`/documents/${docId}/signed-url`, token, {

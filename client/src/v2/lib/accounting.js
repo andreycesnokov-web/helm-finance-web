@@ -4,6 +4,9 @@
 // compliance events from /api/accountant/summary (read-only). Nothing here computes a tax
 // amount or a deadline: dates and amounts come from the verified rule engine's events.
 import { txDate, needsCategory } from './obligations.js'
+import { generateAccountantSummaryPdf } from './accountantSummaryPdf.js'
+
+export { generateAccountantSummaryPdf }
 
 const pad = (n) => String(n).padStart(2, '0')
 export const monthKey = (d) => { const x = new Date(d); return `${x.getFullYear()}-${pad(x.getMonth() + 1)}` }
@@ -473,6 +476,7 @@ export function packageExportData({ month, companyName = '', businessId = '', tr
       automated_checks_passed: readiness.automated_checks_passed,
       status: readiness.status,
       bank_reconciliation_status: readiness.banks.reconciled === readiness.banks.total && readiness.banks.total > 0 ? 'reconciled' : 'unreconciled',
+      checks: readiness.checks,
     },
     bank_accounts: {
       total_banks: readiness.banks.total,
@@ -518,6 +522,7 @@ export async function createAccountantZipPackage({
   token = null,
   fetchSignedUrl = null,
   signal = null,
+  lang = 'ru',
 }) {
   if (signal?.aborted) {
     const err = new Error('Export aborted')
@@ -830,6 +835,16 @@ export async function createAccountantZipPackage({
   filesToZip.push({ name: 'discrepancies.json', data: JSON.stringify(discrepancies, null, 2) })
   filesToZip.push({ name: 'records_registry.json', data: JSON.stringify(exportData.records_registry, null, 2) })
 
+  // Generate accountant-summary.pdf from the exact same snapshot
+  const summaryPdfBytes = await generateAccountantSummaryPdf({
+    summary,
+    discrepancies,
+    recordsRegistry: exportData.records_registry,
+    attachedFiles: filesToZip,
+    lang,
+  })
+  filesToZip.push({ name: 'accountant-summary.pdf', data: summaryPdfBytes })
+
   const zipBytes = createZip(filesToZip)
   const safeComp = (companyName || 'company').replace(/[^a-zA-Z0-9_-]/g, '_')
   const filename = `accountant-package-${safeComp}-${month}.zip`
@@ -843,6 +858,7 @@ export async function createAccountantZipPackage({
     unavailableFiles,
     filesAvailable,
     isComplete,
+    summaryPdfBytes,
   }
 }
 

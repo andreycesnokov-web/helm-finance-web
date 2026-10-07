@@ -99,8 +99,14 @@ const MONTH = '2026-09';
 
   // Parse zip bytes text to verify filenames are in archive
   const zipText = new TextDecoder('latin1').decode(pkg.zipBytes);
+  ok('ZIP includes accountant-summary.pdf', zipText.includes('accountant-summary.pdf'));
+  ok('ZIP includes summary.json', zipText.includes('summary.json'));
+  ok('ZIP includes discrepancies.json', zipText.includes('discrepancies.json'));
   ok('ZIP includes invoice file documents/invoice-alpha.pdf', zipText.includes('documents/invoice-alpha.pdf'));
   ok('ZIP includes bank statement file documents/bca_september_2026.csv', zipText.includes('documents/bca_september_2026.csv'));
+  ok('pkg returns summaryPdfBytes', pkg.summaryPdfBytes instanceof Uint8Array && pkg.summaryPdfBytes.length > 0);
+  const pdfHeader = new TextDecoder('latin1').decode(pkg.summaryPdfBytes.slice(0, 5));
+  ok('summaryPdfBytes has valid PDF header %PDF-', pdfHeader.startsWith('%PDF-'));
 }
 
 // ── Test 3: Package with Unavailable Bank Statement Original (files_available: false) ─
@@ -261,6 +267,111 @@ const MONTH = '2026-09';
 
   ok('Bank statement WITH document_id link is matched and included: unavailableFiles is 0', pkgLinked.unavailableFiles.length === 0);
   ok('filesAvailable is true when bank statement is explicitly linked by document_id', pkgLinked.filesAvailable === true);
+}
+
+// ── Test 7: Verification of Two States (Incomplete vs Ready for Review) ──────
+// Both states MUST NOT mark month as closed (is_closed: false) without accountant sign-off!
+{
+  // State A: Incomplete package (unlinked transactions, missing statement)
+  const incompleteWallets = [
+    { id: 'w-bca', business_id: BIZ_ID, name: 'BCA Operasional', currency: 'IDR', type: 'bank', is_active: true },
+    { id: 'w-mandiri', business_id: BIZ_ID, name: 'Mandiri USD', currency: 'USD', type: 'bank', is_active: true },
+  ];
+  const incompleteBatches = [
+    {
+      id: 'b-bca',
+      business_id: BIZ_ID,
+      wallet_id: 'w-bca',
+      file_name: 'bca_sept.csv',
+      statement_start: '2026-09-01',
+      statement_end: '2026-09-30',
+      status: 'imported',
+      closing_balance: 1000000,
+      reconciliation_status: 'unbalanced',
+      difference: 500000,
+      content: 'date,amount\n2026-09-01,1000000\n',
+    },
+    // Mandiri has NO batch!
+  ];
+  const incompleteTx = [
+    { id: 101, business_id: BIZ_ID, transaction_date: '2026-09-05', category: 'Supplies', amount_original: 500000, wallet_id: 'w-bca', linked_statement_row_id: null },
+  ];
+
+  const pkgIncomplete = await createAccountantZipPackage({
+    month: MONTH,
+    companyName: 'PT Demo Incomplete',
+    businessId: BIZ_ID,
+    transactions: incompleteTx,
+    batches: incompleteBatches,
+    wallets: incompleteWallets,
+    lang: 'ru',
+  });
+
+  ok('State A (Incomplete): is_closed is strictly false', pkgIncomplete.summary.readiness.is_closed === false);
+  ok('State A (Incomplete): status is in_progress', pkgIncomplete.summary.readiness.status === 'in_progress');
+  ok('State A (Incomplete): automated_checks_passed is false', pkgIncomplete.summary.readiness.automated_checks_passed === false);
+  ok('State A (Incomplete): unlinked_transactions contains unlinked tx 101', pkgIncomplete.discrepancies.unlinked_transactions.some((t) => t.id === 101));
+  ok('State A (Incomplete): accountant-summary.pdf is generated and included', pkgIncomplete.summaryPdfBytes instanceof Uint8Array && pkgIncomplete.summaryPdfBytes.length > 0);
+
+  // State B: Ready-for-review package (all checks pass, but accountant sign-off pending)
+  const readyWallets = [
+    { id: 'w-bca', business_id: BIZ_ID, name: 'BCA Operasional', currency: 'IDR', type: 'bank', is_active: true },
+  ];
+  const readyBatches = [
+    {
+      id: 'b-bca',
+      business_id: BIZ_ID,
+      wallet_id: 'w-bca',
+      file_name: 'bca_sept.csv',
+      statement_start: '2026-09-01',
+      statement_end: '2026-09-30',
+      status: 'imported',
+      closing_balance: 10000000,
+      reconciliation_status: 'balanced',
+      difference: 0,
+      content: 'date,amount\n2026-09-01,10000000\n',
+    },
+  ];
+  const readyTx = [
+    { id: 201, business_id: BIZ_ID, transaction_date: '2026-09-01', category: 'Sales', amount_original: 10000000, wallet_id: 'w-bca', linked_statement_row_id: 1 },
+  ];
+  const readyDebts = [
+    { id: 'd-1', business_id: BIZ_ID, due_date: '2026-09-10', amount: 2000000, document_links: [{ document_id: 'doc-1' }] },
+  ];
+  const readyDocs = [
+    { id: 'doc-1', business_id: BIZ_ID, document_date: '2026-09-10', file_name: 'inv-1.pdf', content: 'mock' },
+  ];
+
+  const pkgReady = await createAccountantZipPackage({
+    month: MONTH,
+    companyName: 'PT Demo Ready',
+    businessId: BIZ_ID,
+    transactions: readyTx,
+    debts: readyDebts,
+    batches: readyBatches,
+    wallets: readyWallets,
+    documents: readyDocs,
+    lang: 'ru',
+  });
+
+  ok('State B (Ready for Review): automated_checks_passed is true', pkgReady.summary.readiness.automated_checks_passed === true);
+  ok('State B (Ready for Review): readiness status is prepared_for_review', pkgReady.summary.readiness.status === 'prepared_for_review');
+  ok('State B (Ready for Review): is_closed is STILL FALSE without accountant sign-off', pkgReady.summary.readiness.is_closed === false);
+  ok('State B (Ready for Review): unlinked_transactions is empty', pkgReady.discrepancies.unlinked_transactions.length === 0);
+  ok('State B (Ready for Review): accountant-summary.pdf generated', pkgReady.summaryPdfBytes instanceof Uint8Array && pkgReady.summaryPdfBytes.length > 0);
+}
+
+// ── Test 8: Multilingual PDF Generation (RU, EN, ID) ─────────────────────────
+{
+  for (const lang of ['ru', 'en', 'id']) {
+    const pkgLang = await createAccountantZipPackage({
+      month: MONTH,
+      companyName: 'PT Multilingual Test',
+      businessId: BIZ_ID,
+      lang,
+    });
+    ok(`Multilingual PDF generation (${lang}): generates valid PDF bytes`, pkgLang.summaryPdfBytes instanceof Uint8Array && pkgLang.summaryPdfBytes.length > 1000);
+  }
 }
 
 console.log(`\nACCOUNTANT EXPORT TESTS: ${pass} passed, ${fail} failed`);
