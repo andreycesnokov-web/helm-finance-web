@@ -1150,6 +1150,46 @@ button.v2-start-btn:focus-visible { outline: 2px solid var(--action-primary); ou
   color: var(--action-primary-hover);
 }
 
+/* Unconfirmed limitations callout card */
+.v2-acct-callout {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  background: #f0f7ff;
+  border-radius: var(--radius-md, 12px);
+  padding: 14px 16px;
+  margin: 10px 0 6px;
+  color: var(--text-primary, #0f172a);
+}
+
+.v2-acct-callout-icon {
+  flex: none;
+  margin-top: 1px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.v2-acct-callout-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.v2-acct-callout-title {
+  font-weight: 700;
+  font-size: 14px;
+  line-height: 1.35;
+  color: #034694;
+  margin-bottom: 6px;
+}
+
+.v2-acct-callout-text {
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: #334155;
+  margin: 0;
+}
+
 /* Mobile responsive full-screen dialog */
 @media (max-width: 640px) {
   .v2-acct-modal-wrap {

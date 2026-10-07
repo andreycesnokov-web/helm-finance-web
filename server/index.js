@@ -2933,6 +2933,40 @@ app.post('/api/accountant/ask', auth, async (req, res) => {
       active_unverified_rules: data.active_unverified,
     };
 
+    // Attach deterministic tax card facts if question asks about a supported topic
+    const qLower = question.toLowerCase();
+    let matchedTopic = null;
+    if (/\bpph\s*26\b/i.test(qLower)) matchedTopic = 'pph26';
+    else if (/\bpph\s*21\b/i.test(qLower)) matchedTopic = 'pph21';
+    else if (/\bpph\s*23\b/i.test(qLower)) matchedTopic = 'pph23';
+    else if (/\bpph\s*(?:final|sewa)\b/i.test(qLower)) matchedTopic = 'pph_final_rent';
+    else if (/\bpph\s*25\b/i.test(qLower)) matchedTopic = 'pph25';
+    else if (/\bpph\s*29\b/i.test(qLower)) matchedTopic = 'pph29';
+    else if (/\bppn\b/i.test(qLower)) matchedTopic = 'ppn';
+    else if (/\bpkp\b/i.test(qLower)) matchedTopic = 'pkp';
+    else if (/\b(?:npwp|nik)\b/i.test(qLower)) matchedTopic = 'npwp_nik';
+
+    let cardData = null;
+    if (matchedTopic) {
+      try {
+        const { getCard } = require('./lib/indonesiaTaxKnowledgeCards.cjs');
+        cardData = getCard({ topic_id: matchedTopic, language });
+        if (cardData) {
+          facts.tax_knowledge_card = {
+            topic_id: matchedTopic,
+            name: cardData.name,
+            what_is: (cardData.what_is || []).map(s => s.text).join(' '),
+            how_it_works: (cardData.how_it_works || []).map(s => s.text).join(' '),
+            main_condition: (cardData.main_condition || []).map(s => s.text).join(' '),
+            sources: aiAccountantCore.formatHumanSources(cardData, language),
+            unconfirmed_section: aiAccountantCore.formatUnconfirmedSection({ card: cardData, language }),
+          };
+        }
+      } catch (cErr) {
+        // Ignored
+      }
+    }
+
     const prompt = aiAccountantCore.buildAccountantPrompt({
       business: biz.business,
       facts,
@@ -2960,7 +2994,17 @@ app.post('/api/accountant/ask', auth, async (req, res) => {
       });
     }
 
-    res.json({ answer, disclaimer, used_rules: data.applicable_rules.map(r => ({ rule_code: r.rule_code, version: r.version })) });
+    const diagnostics = cardData ? {
+      unconfirmed_reasons: aiAccountantCore.getBlockerReasons({ blockers: cardData.blockers, language }).reasons,
+      raw_blocker_codes: Array.from(new Set((cardData.blockers || []).map(b => b.code))),
+    } : null;
+
+    res.json({
+      answer,
+      disclaimer,
+      used_rules: data.applicable_rules.map(r => ({ rule_code: r.rule_code, version: r.version })),
+      diagnostics,
+    });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
