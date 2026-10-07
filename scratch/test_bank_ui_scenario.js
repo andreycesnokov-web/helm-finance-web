@@ -628,6 +628,8 @@ async function run() {
     console.log('Current export successfully downloaded:', currentDlName);
     assert.ok(currentDlName.includes('DEMO_PT_Solusi_Utama'), 'Downloaded package belongs to current company');
     assert.ok(currentDlName.includes('2026-09'), 'Downloaded package belongs to current month');
+    await currentDl.saveAs(targetZipPath);
+    console.log('Saved final fresh downloaded ZIP to:', targetZipPath);
 
 
     // ──────────────────────────────────────────────────────────────────────────
