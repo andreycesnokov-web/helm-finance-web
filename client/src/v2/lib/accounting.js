@@ -120,9 +120,20 @@ export function closeReadiness({ month, transactions = [], debts = [], batches =
       const tol = currency === 'IDR' ? 1 : 0.01
       if (Math.abs(diff) >= tol) return false
 
+      // Ledger completeness: if transactions are supplied and statement period covers the month,
+      // all ledger transactions for this bank account in this month must be linked/reconciled to statement rows.
+      const walletMonthTx = tx.filter((t) => String(t.wallet_id) === String(w.id))
+      const hasUnlinkedTx = walletMonthTx.some((t) => !t.linked_statement_row_id && !t.statement_row_id && t.is_reconciled === false)
+      if (hasUnlinkedTx) return false
+
       return true
     })
   )
+  const unlinkedBankTx = tx.filter((t) => {
+    const isBank = banks.some((w) => String(w.id) === String(t.wallet_id))
+    if (!isBank) return false
+    return !t.linked_statement_row_id && !t.statement_row_id && t.is_reconciled === false
+  })
   const records = tx.length + bills.length
   const complete = Math.max(0, records - noCat.length - noDoc.length)
   const percent = records ? Math.round((complete / records) * 100) : null
@@ -150,6 +161,15 @@ export function closeReadiness({ month, transactions = [], debts = [], batches =
       with_statement: withStatements.length,
       reconciled: reconciled.length,
     },
+    unlinked_transactions: unlinkedBankTx.map((t) => ({
+      id: t.id,
+      date: txDate(t),
+      amount: Number(t.amount_original || 0),
+      currency: t.currency_original || 'IDR',
+      type: t.type,
+      description: t.description || '',
+      wallet_id: t.wallet_id || null,
+    })),
     checks,
   }
 }
@@ -438,6 +458,7 @@ export function packageExportData({ month, companyName = '', businessId = '', tr
     discrepancies: {
       missing_bank_statements: missingStatements,
       unreconciled_bank_statements: unreconciledStatements,
+      unlinked_transactions: readiness.unlinked_transactions || [],
       bills_without_documents: missingBills,
       uncategorised_transactions: missingCategories,
     },
@@ -445,6 +466,7 @@ export function packageExportData({ month, companyName = '', businessId = '', tr
       ...(!readiness.is_closed ? ['Month is not closed: awaiting accountant sign-off and verification.'] : []),
       ...(missingStatements.length ? [`Missing bank statements for: ${missingStatements.join(', ')}`] : []),
       ...(unreconciledStatements.length ? [`Unreconciled bank statements for: ${unreconciledStatements.join(', ')}`] : []),
+      ...(readiness.unlinked_transactions?.length ? [`Unreconciled ledger transactions not present in bank statement: ${readiness.unlinked_transactions.length}`] : []),
       ...(missingBills.length ? [`Bills without original documents: ${missingBills.length}`] : []),
       ...(missingCategories.length ? [`Transactions without category: ${missingCategories.length}`] : []),
     ],

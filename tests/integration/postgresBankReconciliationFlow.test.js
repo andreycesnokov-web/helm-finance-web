@@ -16,6 +16,8 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { Client } = require('pg');
 
+let closeReadinessFn, packageExportDataFn;
+
 const connectionString = process.env.DATABASE_URL || process.env.POSTGRES_URL || 'postgresql://postgres:postgrespassword@localhost:5432/testdb';
 const JWT_SECRET = 'http-bank-flow-test-secret-jwt-key-32c!';
 
@@ -501,6 +503,10 @@ describe('Real PostgreSQL Integration: Bank Reconciliation & Transaction Linking
     }
     BASE = `http://127.0.0.1:${server.address().port}`;
     jwt = require('jsonwebtoken');
+
+    const acctMod = await import('../../client/src/v2/lib/accounting.js');
+    closeReadinessFn = acctMod.closeReadiness;
+    packageExportDataFn = acctMod.packageExportData;
   });
 
   after(async () => {
@@ -700,6 +706,75 @@ describe('Real PostgreSQL Integration: Bank Reconciliation & Transaction Linking
     // When bank reconciliation is computed solely on the batch, the batch difference is 0,
     // but the full reconciliation state detects the unlinked transactions gap and prevents complete sign-off.
     assert.strictEqual(unlinkedRows.rows.length >= 2, true, 'Symmetric transaction gap is detected in ledger');
+
+    // 2. Fetch live data via real HTTP API as the application does
+    const txApiRes = await fetch(`${BASE}/api/transactions`, {
+      headers: { authorization: `Bearer ${token}`, 'x-business-id': BIZ_A },
+    });
+    assert.strictEqual(txApiRes.status, 200, 'Transactions API must return 200');
+    const txApiData = await txApiRes.json();
+    const liveTxs = Array.isArray(txApiData) ? txApiData : (txApiData.transactions || []);
+
+    const batchesApiRes = await fetch(`${BASE}/api/bank-import/batches`, {
+      headers: { authorization: `Bearer ${token}`, 'x-business-id': BIZ_A },
+    });
+    assert.strictEqual(batchesApiRes.status, 200, 'Batches API must return 200');
+    const batchesApiData = await batchesApiRes.json();
+    const liveBatches = batchesApiData.batches || [];
+
+    const walletsApiRes = await fetch(`${BASE}/api/wallets`, {
+      headers: { authorization: `Bearer ${token}`, 'x-business-id': BIZ_A },
+    });
+    assert.strictEqual(walletsApiRes.status, 200, 'Wallets API must return 200');
+    const walletsApiData = await walletsApiRes.json();
+    const liveWallets = walletsApiData.wallets || [];
+
+    // Map unlinked status into transaction records for reconciliation analysis
+    const unlinkedIdSet = new Set(unlinkedIds.map(String));
+    const analyzedTxs = liveTxs.map(t => ({
+      ...t,
+      is_reconciled: !unlinkedIdSet.has(String(t.id)),
+      linked_statement_row_id: unlinkedIdSet.has(String(t.id)) ? null : (t.linked_statement_row_id || 1),
+    }));
+
+    // 3. Verify application logic (closeReadiness)
+    const readiness = closeReadinessFn({
+      month: '2026-09',
+      transactions: analyzedTxs,
+      debts: [],
+      batches: liveBatches,
+      wallets: liveWallets,
+    });
+
+    // Both un-reconciled operations must be detected
+    assert.ok(readiness.unlinked_transactions.length >= 2, 'Application must detect un-reconciled operations');
+    const unrecIds = readiness.unlinked_transactions.map(t => t.id);
+    assert.ok(unrecIds.includes(symIn.rows[0].id), 'Income unlinked operation detected');
+    assert.ok(unrecIds.includes(symOut.rows[0].id), 'Expense unlinked operation detected');
+
+    // Reconciliation check is NOT confirmed / successful
+    const reconCheck = readiness.checks.find(c => c.key === 'reconciliation');
+    assert.strictEqual(reconCheck.done, false, 'Reconciliation check must be false when unlinked transactions exist');
+    assert.strictEqual(readiness.automated_checks_passed, false, 'Automated checks must not pass');
+    assert.strictEqual(readiness.status, 'in_progress', 'Package must NOT get status prepared_for_review');
+    assert.strictEqual(readiness.is_closed, false, 'is_closed must remain false');
+
+    // 4. Verify exported package data (packageExportData)
+    const exportData = packageExportDataFn({
+      month: '2026-09',
+      companyName: 'Test Business A',
+      businessId: BIZ_A,
+      transactions: analyzedTxs,
+      debts: [],
+      batches: liveBatches,
+      wallets: liveWallets,
+    });
+
+    assert.strictEqual(exportData.readiness.status, 'in_progress', 'Exported package status must be in_progress');
+    assert.strictEqual(exportData.readiness.automated_checks_passed, false, 'Exported automated_checks_passed must be false');
+    assert.strictEqual(exportData.readiness.bank_reconciliation_status, 'unreconciled', 'Exported bank_reconciliation_status must be unreconciled');
+    assert.ok(exportData.discrepancies.unlinked_transactions.length >= 2, 'Exported discrepancies must list un-reconciled transactions');
+    assert.ok(exportData.limitations.some(l => l.includes('Unreconciled ledger transactions')), 'Exported limitations must explicitly state un-reconciled transactions');
   });
 
   it('Scenario D: Cross-tenant and cross-wallet link attempts are strictly rejected without data mutation', async (t) => {

@@ -429,6 +429,42 @@ const debts = [
   ok('Case 2 (Automated checks passed): limitations explicitly states awaiting accountant sign-off', expBal.limitations.some(l => l.includes('awaiting accountant sign-off')));
 }
 
+// 15. Symmetric missing transactions (+1M, -1M) in ledger: batch is balanced (diff = 0) but unlinked ledger transactions keep reconciliation incomplete
+{
+  const txWithSymmetricUnlinked = [
+    { id: 1, wallet_id: 'w-bca', transaction_date: '2026-09-10', category: 'Operations', amount_original: 1000, linked_statement_row_id: 101 },
+    { id: 2, wallet_id: 'w-bca', transaction_date: '2026-09-25', category: 'Revenue', amount_original: 1000000, type: 'income', is_reconciled: false },
+    { id: 3, wallet_id: 'w-bca', transaction_date: '2026-09-26', category: 'Supplies', amount_original: 1000000, type: 'expense', is_reconciled: false },
+  ];
+  const balancedBatch = [{
+    id: 'b-bal-sym',
+    wallet_id: 'w-bca',
+    status: 'imported',
+    closing_balance: 50000,
+    statement_start: '2026-09-01',
+    statement_end: '2026-09-30',
+    difference: 0,
+    reconciliation_status: 'balanced',
+    file_content: 'Date,Amount,Description\n2026-09-10,1000,Operations\n',
+  }];
+
+  const rSym = closeReadiness({ month, transactions: txWithSymmetricUnlinked, debts, batches: balancedBatch, wallets });
+  const reconCheck = rSym.checks.find((c) => c.key === 'reconciliation');
+
+  ok('Symmetric unlinked transactions: reconciliation check is false', reconCheck.done === false);
+  ok('Symmetric unlinked transactions: reconciled banks count is 0', rSym.banks.reconciled === 0);
+  ok('Symmetric unlinked transactions: automated_checks_passed is false', rSym.automated_checks_passed === false);
+  ok('Symmetric unlinked transactions: status is in_progress', rSym.status === 'in_progress');
+  ok('Symmetric unlinked transactions: unlinked_transactions contains 2 records', rSym.unlinked_transactions.length === 2);
+
+  const expSym = packageExportData({ month, companyName: 'Test Co', businessId: 'b1', transactions: txWithSymmetricUnlinked, debts, batches: balancedBatch, wallets });
+  ok('Symmetric unlinked export: discrepancies.unlinked_transactions has 2 records', expSym.discrepancies.unlinked_transactions.length === 2);
+  ok('Symmetric unlinked export: limitations mentions unreconciled ledger transactions', expSym.limitations.some(l => l.includes('Unreconciled ledger transactions')));
+  ok('Symmetric unlinked export: status is in_progress (not prepared_for_review)', expSym.readiness.status === 'in_progress');
+  ok('Symmetric unlinked export: bank_reconciliation_status is unreconciled', expSym.readiness.bank_reconciliation_status === 'unreconciled');
+}
+
 console.log(`\nALL PASS — ${pass} passed, ${fail} failed`);
 if (fail > 0) process.exit(1);
+
 
