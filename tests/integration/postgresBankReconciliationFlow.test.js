@@ -83,8 +83,13 @@ describe('Real PostgreSQL Integration: Bank Reconciliation & Transaction Linking
         name text NOT NULL,
         currency text NOT NULL DEFAULT 'IDR',
         is_active boolean NOT NULL DEFAULT true,
-        scope text NOT NULL DEFAULT 'business'
+        scope text NOT NULL DEFAULT 'business',
+        sort_order int DEFAULT 0,
+        created_at timestamptz DEFAULT now()
       );
+
+      ALTER TABLE public.wallets ADD COLUMN IF NOT EXISTS sort_order int DEFAULT 0;
+      ALTER TABLE public.wallets ADD COLUMN IF NOT EXISTS created_at timestamptz DEFAULT now();
 
       CREATE TABLE IF NOT EXISTS public.financial_documents (
         id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -408,7 +413,9 @@ describe('Real PostgreSQL Integration: Bank Reconciliation & Transaction Linking
         return this;
       }
       order(col, opts = {}) {
-        this._order = `${ident(col)} ${opts.ascending === false ? 'DESC' : 'ASC'}`;
+        const clause = `${ident(col)} ${opts.ascending === false ? 'DESC' : 'ASC'}`;
+        this._orders = this._orders || [];
+        this._orders.push(clause);
         return this;
       }
       limit(n) { this._limit = n; return this; }
@@ -438,7 +445,7 @@ describe('Real PostgreSQL Integration: Bank Reconciliation & Transaction Linking
           }
           // select
           let whereClause = this._filters.length ? ' WHERE ' + this._filters.join(' AND ') : '';
-          let orderClause = this._order ? ' ORDER BY ' + this._order : '';
+          let orderClause = (this._orders && this._orders.length) ? ' ORDER BY ' + this._orders.join(', ') : (this._order ? ' ORDER BY ' + this._order : '');
           let limitClause = this._limit ? ' LIMIT ' + this._limit : '';
           const sql = `SELECT * FROM ${ident(this.table)}${whereClause}${orderClause}${limitClause}`;
           const r = await this.client.query(sql);
@@ -452,7 +459,7 @@ describe('Real PostgreSQL Integration: Bank Reconciliation & Transaction Linking
           const data = (this._single || this._maybeSingle) ? (rows[0] || null) : rows;
           return { data, error: null };
         } catch (err) {
-          console.error(`[RealPgQuery Error in ${this.table} op=${this._op}]:`, err.message);
+          console.error(`[RealPgQuery Error in ${this.table} op=${this._op}]:`, err.message, err.stack);
           return { data: null, error: { message: err.message, code: err.code } };
         }
       }
@@ -729,8 +736,11 @@ describe('Real PostgreSQL Integration: Bank Reconciliation & Transaction Linking
     const walletsApiRes = await fetch(`${BASE}/api/wallets`, {
       headers: { authorization: `Bearer ${token}`, 'x-business-id': BIZ_A },
     });
-    assert.strictEqual(walletsApiRes.status, 200, 'Wallets API must return 200');
     const walletsApiData = await walletsApiRes.json();
+    if (walletsApiRes.status !== 200) {
+      console.error('[Wallets API Error in Scenario C]:', walletsApiRes.status, walletsApiData);
+    }
+    assert.strictEqual(walletsApiRes.status, 200, `Wallets API must return 200, got ${walletsApiRes.status}: ${JSON.stringify(walletsApiData)}`);
     const liveWallets = walletsApiData.wallets || [];
 
     // Map unlinked status into transaction records for reconciliation analysis
