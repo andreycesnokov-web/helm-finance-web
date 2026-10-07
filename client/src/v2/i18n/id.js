@@ -270,7 +270,7 @@ export default {
     ready: '{n}% siap. Semua yang bisa dicek sistem sudah lengkap.', almost: '{n}% siap. Tinggal {k} hal lagi untuk menutup bulan.',
     recordsComplete: '{n} dari {m} catatan lengkap', sendToAccountant: 'Kirim ke akuntan untuk ditinjau', reviewSoon: 'Alur tinjauan akuntan belum tersedia',
     download: 'Unduh paket (PDF + berkas)', packageSoon: 'Belum tersedia', toFinish: 'Untuk menutup {m}',
-    check: { statements: 'Mutasi bank · {ok} dari {n} rekening mencakup akhir bulan', bills: 'Tagihan dan faktur dengan dokumen · {ok} dari {n}', categories: 'Transaksi berkategori · {ok} dari {n}', review: 'Tinjauan akuntan' },
+    check: { statements: 'Mutasi bank · {ok} dari {n} rekening terunggah', reconciliation: 'Rekonsiliasi · {ok} dari {n} rekening tersinkron', bills: 'Tagihan dan faktur dengan dokumen · {ok} dari {n}', categories: 'Transaksi berkategori · {ok} dari {n}', review: 'Tinjauan akuntan' },
     done: 'Selesai', notDone: 'belum selesai', seePackages: 'Lihat folder',
     taxesDue: 'Pajak jatuh tempo di {m}', fullCalendar: 'Kalender lengkap', noEvents: 'Belum ada tenggat pajak tersimpan untuk bisnis ini. Akuntan Anda menambahkannya; layar ini tidak membuat apa pun.',
     taxNote: 'Tanggal dan jumlah berasal dari aturan pajak terverifikasi dan catatan Anda. Akuntan mengonfirmasi sebelum ada pembayaran.',

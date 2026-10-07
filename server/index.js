@@ -1311,9 +1311,39 @@ async function loadWithholdings(businessId) {
   } catch { return {}; }
 }
 
-/** enrichDebts with this business's withholding allocations taken into account. */
+async function loadDocumentDebtLinks(businessId) {
+  if (!businessId) return new Map();
+  try {
+    const { data } = await supabase.from('document_debt_links')
+      .select('id, debt_id, document_id')
+      .eq('business_id', businessId);
+    const map = new Map();
+    for (const row of (data || [])) {
+      const k = String(row.debt_id);
+      if (!map.has(k)) map.set(k, []);
+      map.get(k).push({ link_id: row.id, document_id: row.document_id });
+    }
+    return map;
+  } catch {
+    return new Map();
+  }
+}
+
+/** enrichDebts with this business's withholding allocations and document links taken into account. */
 async function enrichDebtsFor(businessId, debts) {
-  return enrichDebts(DW.attachWithholdings(debts || [], await loadWithholdings(businessId)));
+  const [withholdings, docLinksMap] = await Promise.all([
+    loadWithholdings(businessId),
+    loadDocumentDebtLinks(businessId),
+  ]);
+  const enriched = enrichDebts(DW.attachWithholdings(debts || [], withholdings));
+  return enriched.map((d) => {
+    const links = docLinksMap.get(String(d.id)) || [];
+    return {
+      ...d,
+      document_links: links,
+      linked_documents_count: links.length,
+    };
+  });
 }
 
 app.get('/api/debts', auth, async (req, res) => {

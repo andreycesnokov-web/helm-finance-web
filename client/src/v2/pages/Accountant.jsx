@@ -17,7 +17,7 @@ import { PageHead, Card, Pill, Btn, NotYet, Skeleton, ErrorBox, Empty } from '..
 import { useT, useLang } from '../i18n'
 import { useApi } from '../data'
 import { money, shortDate } from '../lib/format'
-import { monthOptions, accountantMonth, closeReadiness, packages, packageSummary, monthGrid, complianceEvents, eventStage, packageExportData } from '../lib/accounting'
+import { monthOptions, accountantMonth, closeReadiness, packages, packageSummary, monthGrid, complianceEvents, eventStage, packageExportData, createAccountantZipPackage } from '../lib/accounting'
 import { askAccountant } from '../lib/ask'
 import AccountantTabs from '../components/AccountantTabs'
 import { findWithholdingRule } from '../../pages/business/InvoiceReviewDrawer'
@@ -167,6 +167,7 @@ function CloseTab({ month, onOpenChatModal }) {
   const debts = useApi('/debts')
   const batches = useApi('/bank-import/batches')
   const wallets = useApi('/wallets')
+  const docs = useApi('/documents')
   const summary = useApi('/accountant/summary')
   const taxCardsApi = useApi(`/accountant/tax-knowledge/cards?lang=${lang}`)
 
@@ -191,8 +192,39 @@ function CloseTab({ month, onOpenChatModal }) {
     return []
   }, [taxCardsApi.data, isOffline, lang])
 
-  const r = useMemo(() => closeReadiness({ month, transactions: Array.isArray(tx.data) ? tx.data : [], debts: Array.isArray(debts.data) ? debts.data : [],
-    batches: batches.data?.batches || [], wallets: wallets.data?.wallets || [] }), [month, tx.data, debts.data, batches.data, wallets.data])
+  const enrichedDebts = useMemo(() => {
+    const rawDebts = Array.isArray(debts.data) ? debts.data : []
+    const rawDocs = Array.isArray(docs.data?.documents) ? docs.data.documents : []
+    const linkedMap = new Map()
+    for (const d of rawDocs) {
+      for (const l of d.links || []) {
+        if (l.target_type === 'debt' && l.target_id != null) {
+          const k = String(l.target_id)
+          if (!linkedMap.has(k)) linkedMap.set(k, [])
+          linkedMap.get(k).push({ ...l, document_id: d.id, file_name: d.file_name })
+        }
+      }
+    }
+    return rawDebts.map((b) => {
+      const docLinks = linkedMap.get(String(b.id)) || []
+      const existingLinks = Array.isArray(b.document_links) ? b.document_links : []
+      const mergedLinks = [...existingLinks, ...docLinks]
+      return {
+        ...b,
+        document_links: mergedLinks,
+        linked_documents_count: mergedLinks.length,
+        _hasLinkedDocs: mergedLinks.length > 0,
+      }
+    })
+  }, [debts.data, docs.data])
+
+  const r = useMemo(() => closeReadiness({
+    month,
+    transactions: Array.isArray(tx.data) ? tx.data : [],
+    debts: enrichedDebts,
+    batches: batches.data?.batches || [],
+    wallets: wallets.data?.wallets || [],
+  }), [month, tx.data, enrichedDebts, batches.data, wallets.data])
   if (tx.loading || debts.loading) return <Card><Skeleton rows={6} /></Card>
   if (tx.error) return <ErrorBox error={tx.error} onRetry={tx.reload} />
   const events = complianceEvents(summary.data)
@@ -215,19 +247,24 @@ function CloseTab({ month, onOpenChatModal }) {
               <button
                 type="button"
                 className="v2-btn v2-btn-secondary"
-                onClick={() => {
-                  const pkg = packageExportData({
+                onClick={async () => {
+                  const rawDocs = Array.isArray(docs.data?.documents) ? docs.data.documents : []
+                  const companyName = active?.name || 'Company'
+                  const { zipBytes, filename } = await createAccountantZipPackage({
                     month,
+                    companyName,
+                    businessId: active?.id,
                     transactions: Array.isArray(tx.data) ? tx.data : [],
-                    debts: Array.isArray(debts.data) ? debts.data : [],
+                    debts: enrichedDebts,
                     batches: batches.data?.batches || [],
                     wallets: wallets.data?.wallets || [],
+                    documents: rawDocs,
                   })
-                  const blob = new Blob([JSON.stringify(pkg, null, 2)], { type: 'application/json' })
+                  const blob = new Blob([zipBytes], { type: 'application/zip' })
                   const url = URL.createObjectURL(blob)
                   const a = document.createElement('a')
                   a.href = url
-                  a.download = `accountant-package-${month}.json`
+                  a.download = filename
                   document.body.appendChild(a)
                   a.click()
                   document.body.removeChild(a)

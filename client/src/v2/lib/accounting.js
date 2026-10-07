@@ -35,7 +35,19 @@ export function accountantMonth(param, tab, today = new Date()) {
 }
 
 const inMonth = (iso, key) => String(iso || '').slice(0, 7) === key
-const hasDocs = (d) => (Array.isArray(d?.attachments) && d.attachments.length > 0) || !!d?.attachment_url
+export const hasDocs = (d) =>
+  (Array.isArray(d?.attachments) && d.attachments.length > 0) ||
+  !!d?.attachment_url ||
+  (Array.isArray(d?.document_links) && d.document_links.length > 0) ||
+  (Array.isArray(d?.linked_documents) && d.linked_documents.length > 0) ||
+  (Number(d?.linked_documents_count) > 0) ||
+  d?._hasLinkedDocs === true
+
+export const isBankWallet = (w) =>
+  (w?.type === 'bank' || (!w?.type && !/cash/i.test(w?.name || ''))) &&
+  w?.type !== 'cash' &&
+  !/cash/i.test(w?.name || '') &&
+  w?.is_active !== false
 
 /**
  * Month-close readiness from what the system can actually check:
@@ -51,15 +63,36 @@ export function closeReadiness({ month, transactions = [], debts = [], batches =
   const bills = debts.filter((d) => d.is_training !== true && d.status !== 'cancelled' && inMonth(d.due_date || d.created_at, month))
   const noDoc = bills.filter((d) => !hasDocs(d))
   const end = monthOptions(24).find((m) => m.key === month)?.end || `${month}-28`
-  const banks = wallets.filter((w) => w.type === 'bank' && w.is_active !== false)
-  const covered = banks.filter((w) => batches.some((b) => String(b.wallet_id) === String(w.id) && !['cancelled', 'failed'].includes(b.status) && String(b.statement_end || '') >= end))
+  const banks = wallets.filter(isBankWallet)
+  const withStatements = banks.filter((w) =>
+    batches.some((b) =>
+      String(b.wallet_id) === String(w.id) &&
+      !['cancelled', 'failed'].includes(b.status) &&
+      String(b.statement_end || '') >= end
+    )
+  )
+  const reconciled = banks.filter((w) =>
+    batches.some((b) =>
+      String(b.wallet_id) === String(w.id) &&
+      !['cancelled', 'failed', 'review_required'].includes(b.status) &&
+      b.closing_balance != null &&
+      (b.status === 'imported' || b.status === 'reconciled') &&
+      String(b.statement_end || '') >= end
+    )
+  )
   const records = tx.length + bills.length
   const complete = records - noCat.length - noDoc.length
   return {
     month, records, complete: Math.max(0, complete),
     percent: records ? Math.round((Math.max(0, complete) / records) * 100) : null,
+    banks: {
+      total: banks.length,
+      with_statement: withStatements.length,
+      reconciled: reconciled.length,
+    },
     checks: [
-      { key: 'statements', done: banks.length > 0 && covered.length === banks.length, total: banks.length, ok: covered.length, missing: banks.filter((w) => !covered.includes(w)).map((w) => w.name) },
+      { key: 'statements', done: banks.length > 0 && withStatements.length === banks.length, total: banks.length, ok: withStatements.length, missing: banks.filter((w) => !withStatements.includes(w)).map((w) => w.name) },
+      { key: 'reconciliation', done: banks.length > 0 && reconciled.length === banks.length, total: banks.length, ok: reconciled.length, missing: banks.filter((w) => !reconciled.includes(w)).map((w) => w.name) },
       { key: 'bills', done: noDoc.length === 0 && bills.length > 0, total: bills.length, ok: bills.length - noDoc.length, missing: noDoc.map((d) => d.counterparty).filter(Boolean) },
       { key: 'categories', done: noCat.length === 0, total: tx.length, ok: tx.length - noCat.length, missing: noCat.map((t) => t.description).filter(Boolean) },
     ],
@@ -155,19 +188,115 @@ export function eventStage(e) {
   return 'todo'
 }
 
+/** Zero-dependency ZIP generator creating valid STORE archives (CRC-32 + local headers + central directory + EOCD) */
+export function createZip(files) {
+  const CRC_TABLE = new Uint32Array(256)
+  for (let i = 0; i < 256; i++) {
+    let c = i
+    for (let k = 0; k < 8; k++) c = (c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1)
+    CRC_TABLE[i] = c >>> 0
+  }
+  function crc32(buf) {
+    let crc = 0xffffffff
+    for (let i = 0; i < buf.length; i++) crc = CRC_TABLE[(crc ^ buf[i]) & 0xff] ^ (crc >>> 8)
+    return (crc ^ 0xffffffff) >>> 0
+  }
+  const encoder = new TextEncoder()
+  const fileEntries = files.map((f) => {
+    const dataBuf = typeof f.data === 'string' ? encoder.encode(f.data) : f.data instanceof Uint8Array ? f.data : new Uint8Array(f.data)
+    const nameBuf = encoder.encode(f.name)
+    return { name: f.name, nameBuf, dataBuf, crc: crc32(dataBuf), size: dataBuf.length }
+  })
+
+  const parts = []
+  let offset = 0
+  const centralDirHeaders = []
+
+  for (const f of fileEntries) {
+    const local = new Uint8Array(30 + f.nameBuf.length)
+    const dv = new DataView(local.buffer)
+    dv.setUint32(0, 0x04034b50, true)
+    dv.setUint16(4, 20, true)
+    dv.setUint16(6, 0, true)
+    dv.setUint16(8, 0, true)
+    dv.setUint16(10, 0, true)
+    dv.setUint16(12, 0, true)
+    dv.setUint32(14, f.crc, true)
+    dv.setUint32(18, f.size, true)
+    dv.setUint32(22, f.size, true)
+    dv.setUint16(26, f.nameBuf.length, true)
+    dv.setUint16(28, 0, true)
+    local.set(f.nameBuf, 30)
+    parts.push(local, f.dataBuf)
+
+    const cd = new Uint8Array(46 + f.nameBuf.length)
+    const cdv = new DataView(cd.buffer)
+    cdv.setUint32(0, 0x02014b50, true)
+    cdv.setUint16(4, 20, true)
+    cdv.setUint16(6, 20, true)
+    cdv.setUint16(8, 0, true)
+    cdv.setUint16(10, 0, true)
+    cdv.setUint16(12, 0, true)
+    cdv.setUint16(14, 0, true)
+    cdv.setUint32(16, f.crc, true)
+    cdv.setUint32(20, f.size, true)
+    cdv.setUint32(24, f.size, true)
+    cdv.setUint16(28, f.nameBuf.length, true)
+    cdv.setUint16(30, 0, true)
+    cdv.setUint16(32, 0, true)
+    cdv.setUint16(34, 0, true)
+    cdv.setUint16(36, 0, true)
+    cdv.setUint32(38, 0, true)
+    cdv.setUint32(42, offset, true)
+    cd.set(f.nameBuf, 46)
+    centralDirHeaders.push(cd)
+
+    offset += local.length + f.dataBuf.length
+  }
+
+  const cdOffset = offset
+  let cdSize = 0
+  for (const cd of centralDirHeaders) {
+    parts.push(cd)
+    cdSize += cd.length
+  }
+
+  const eocd = new Uint8Array(22)
+  const edv = new DataView(eocd.buffer)
+  edv.setUint32(0, 0x06054b50, true)
+  edv.setUint16(4, 0, true)
+  edv.setUint16(6, 0, true)
+  edv.setUint16(8, fileEntries.length, true)
+  edv.setUint16(10, fileEntries.length, true)
+  edv.setUint32(12, cdSize, true)
+  edv.setUint32(16, cdOffset, true)
+  edv.setUint16(20, 0, true)
+  parts.push(eocd)
+
+  const totalLen = parts.reduce((s, p) => s + p.length, 0)
+  const out = new Uint8Array(totalLen)
+  let p = 0
+  for (const part of parts) {
+    out.set(part, p)
+    p += part.length
+  }
+  return out
+}
+
 /**
- * Builds minimal structured accountant package for export:
- * - summary: readiness %, complete/total records, reconciliation status
- * - discrepancies: missing bank statements, bills without docs, uncategorised transactions
+ * Builds structured accountant export data:
+ * - summary: readiness %, complete/total records, reconciliation status, bank breakdown
+ * - discrepancies: missing bank statements, unreconciled accounts, bills without docs, uncategorised transactions, unavailable files
  * - registry: list of transactions, debts, and their linked document status
  */
-export function packageExportData({ month, transactions = [], debts = [], batches = [], wallets = [] }) {
+export function packageExportData({ month, companyName = '', businessId = '', transactions = [], debts = [], batches = [], wallets = [] }) {
   const readiness = closeReadiness({ month, transactions, debts, batches, wallets })
   const inM = (iso) => inMonth(iso, month)
   const monthTx = transactions.filter((t) => inM(txDate(t)))
   const monthDebts = debts.filter((d) => d.is_training !== true && d.status !== 'cancelled' && inM(d.due_date || d.created_at))
 
   const missingStatements = readiness.checks.find((c) => c.key === 'statements')?.missing || []
+  const unreconciledStatements = readiness.checks.find((c) => c.key === 'reconciliation')?.missing || []
   const missingBills = readiness.checks.find((c) => c.key === 'bills')?.missing || []
   const missingCategories = readiness.checks.find((c) => c.key === 'categories')?.missing || []
 
@@ -181,6 +310,7 @@ export function packageExportData({ month, transactions = [], debts = [], batche
       currency: d.currency || 'IDR',
       status: d.status,
       has_documents: hasDocs(d),
+      document_links: d.document_links || [],
       accountant_checked: !!d.accountant_checked_at,
     })),
     ...monthTx.map((t) => ({
@@ -199,18 +329,116 @@ export function packageExportData({ month, transactions = [], debts = [], batche
     package_version: '1.0',
     generated_at: new Date().toISOString(),
     month,
+    company: {
+      name: companyName,
+      business_id: businessId,
+    },
     readiness: {
       percent: readiness.percent,
       complete_records: readiness.complete,
       total_records: readiness.records,
       is_closed: readiness.percent === 100,
     },
+    bank_accounts: {
+      total_banks: readiness.banks.total,
+      statements_uploaded: readiness.banks.with_statement,
+      balances_reconciled: readiness.banks.reconciled,
+      cash_accounts_excluded: wallets.filter((w) => !isBankWallet(w)).map((w) => ({ id: w.id, name: w.name, type: w.type })),
+    },
     discrepancies: {
       missing_bank_statements: missingStatements,
+      unreconciled_bank_statements: unreconciledStatements,
       bills_without_documents: missingBills,
       uncategorised_transactions: missingCategories,
     },
     records_registry: registry,
   }
 }
+
+/**
+ * Creates downloadable ZIP accountant package with:
+ * - summary.json
+ * - discrepancies.json (including unavailable_files)
+ * - records_registry.json
+ * - documents/ folder with available original files
+ */
+export async function createAccountantZipPackage({
+  month,
+  companyName = '',
+  businessId = '',
+  transactions = [],
+  debts = [],
+  batches = [],
+  wallets = [],
+  documents = [],
+}) {
+  const exportData = packageExportData({ month, companyName, businessId, transactions, debts, batches, wallets })
+  const unavailableFiles = []
+  const filesToZip = [
+    { name: 'documents/README.txt', data: `Financial documents for ${month} month close.\nUnavailable files are listed in discrepancies.json.\n` },
+  ]
+
+  for (const doc of documents) {
+    const fileName = doc.file?.file_name || doc.file_name || `${doc.id}.bin`
+    const rawContent = doc.file_content || doc.content
+    const base64Content = doc.content_base64 || (typeof rawContent === 'string' && rawContent.startsWith('data:') ? rawContent.split(',')[1] : null)
+
+    if (base64Content) {
+      try {
+        const binStr = atob(base64Content)
+        const bytes = new Uint8Array(binStr.length)
+        for (let i = 0; i < binStr.length; i++) bytes[i] = binStr.charCodeAt(i)
+        filesToZip.push({ name: `documents/${fileName}`, data: bytes })
+      } catch {
+        unavailableFiles.push({ document_id: doc.id, file_name: fileName, reason: 'Failed to decode base64 file content' })
+      }
+    } else if (rawContent?.data && Array.isArray(rawContent.data)) {
+      filesToZip.push({ name: `documents/${fileName}`, data: new Uint8Array(rawContent.data) })
+    } else if (typeof rawContent === 'string') {
+      filesToZip.push({ name: `documents/${fileName}`, data: rawContent })
+    } else if (rawContent instanceof Uint8Array) {
+      filesToZip.push({ name: `documents/${fileName}`, data: rawContent })
+    } else {
+      unavailableFiles.push({
+        document_id: doc.id,
+        file_name: fileName,
+        reason: 'Original binary file storage not embedded in memory or inaccessible without signed storage URL',
+      })
+    }
+  }
+
+  const summary = {
+    package_version: exportData.package_version,
+    generated_at: exportData.generated_at,
+    month: exportData.month,
+    company: exportData.company,
+    readiness: exportData.readiness,
+    bank_accounts: exportData.bank_accounts,
+  }
+
+  const discrepancies = {
+    company_name: exportData.company.name,
+    month: exportData.month,
+    ...exportData.discrepancies,
+    unavailable_files: unavailableFiles,
+  }
+
+  filesToZip.push({ name: 'summary.json', data: JSON.stringify(summary, null, 2) })
+  filesToZip.push({ name: 'discrepancies.json', data: JSON.stringify(discrepancies, null, 2) })
+  filesToZip.push({ name: 'records_registry.json', data: JSON.stringify(exportData.records_registry, null, 2) })
+
+  const zipBytes = createZip(filesToZip)
+  const safeComp = (companyName || 'company').replace(/[^a-zA-Z0-9_-]/g, '_')
+  const filename = `accountant-package-${safeComp}-${month}.zip`
+
+  return {
+    zipBytes,
+    filename,
+    summary,
+    discrepancies,
+    recordsRegistry: exportData.records_registry,
+    unavailableFiles,
+  }
+}
+
 
