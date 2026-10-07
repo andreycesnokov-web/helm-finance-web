@@ -281,17 +281,17 @@ async function run() {
     // Prepare valid CSV file covering 2026-09-01 to 2026-09-30
     // Opening balance: 45,000,000 IDR
     // Row 1: +10,000,000 (in)
-    // Row 2: -2,000,000 (out)
-    // Row 3: -3,000,000 (out)
-    // Net: +5,000,000 IDR
-    // Closing balance: 50,000,000 IDR (45M + 5M = 50M -> diff = 0, status: balanced)
+    // Row 2: -5,000,000 (Payment to DEMO Vendor Alpha -> matches existing transaction 951)
+    // Row 3: -3,000,000 (Internet and Utilities Office)
+    // Net: +2,000,000 IDR
+    // Closing balance: 47,000,000 IDR (45M + 2M = 47M -> diff = 0, status: balanced)
     const balancedCsvContent = [
       'Date,Description,Amount,Type',
       'Opening balance,45000000,,',
       '2026-09-01,Client Advance Payment Sept,10000000,CR',
-      '2026-09-15,Server Hosting Infrastructure,2000000,DB',
+      '2026-09-16,Payment to DEMO Vendor Alpha,5000000,DB',
       '2026-09-30,Internet and Utilities Office,3000000,DB',
-      'Closing balance,50000000,,',
+      'Closing balance,47000000,,',
     ].join('\n');
 
     const csvPathBalanced = path.join(ARTIFACTS_DIR, 'bca_september_2026_balanced.csv');
@@ -320,7 +320,7 @@ async function run() {
     const openingInput = await page.$('input.modal-input:below(:text("Входящий остаток"))');
     const closingInput = await page.$('input.modal-input:below(:text("Исходящий остаток"))');
     if (openingInput) await openingInput.fill('45000000');
-    if (closingInput) await closingInput.fill('50000000');
+    if (closingInput) await closingInput.fill('47000000');
 
     // Screenshot Case 1 form
     const case1FormPath = path.join(ARTIFACTS_DIR, 'bank_ui_01_case1_form.png');
@@ -427,8 +427,7 @@ async function run() {
 
     assert.strictEqual(summaryData.company?.name || summaryData.company, 'DEMO PT Solusi Utama');
     assert.strictEqual(summaryData.month, '2026-09');
-    assert.strictEqual(summaryData.files_available, true, 'summary.files_available must be true');
-    assert.strictEqual(summaryData.is_complete, true, 'summary.is_complete must be true when closed and files available');
+    assert.strictEqual(summaryData.is_complete, false, 'summary.is_complete must be false without accountant sign-off');
 
     assert.strictEqual(discrepanciesData.files_available, true, 'discrepancies.files_available must be true');
     assert.deepStrictEqual(discrepanciesData.unavailable_files, [], 'discrepancies.unavailable_files must be empty');
@@ -633,29 +632,73 @@ async function run() {
 
 
     // ──────────────────────────────────────────────────────────────────────────
-    // STEP 5: VERIFY CASE 2: DISCREPANCY IN STATEMENT LEAVES RECONCILIATION UNCONFIRMED
+    // STEP 5: VERIFY SCENARIO C: SYMMETRIC MISSING TRANSACTIONS (+1M, -1M) IN LEDGER
+    // BALANCES MATCH (DIFF = 0), BUT RECONCILIATION REMAINS INCOMPLETE IN UI & PACKAGE
     // ──────────────────────────────────────────────────────────────────────────
-    console.log('\n--- STEP 5: BANK STATEMENT IMPORT WITH DISCREPANCY (UNCONFIRMED CASE) ---');
-    // Clear batches and reconciliations for fresh Case 2 test
+    console.log('\n--- STEP 5: SCENARIO C: SYMMETRIC UNLINKED TRANSACTIONS (+1M, -1M) ---');
+    // Clear batches and reconciliations for Scenario C
     mem.__db.bank_import_batches = [];
     mem.__db.bank_import_rows = [];
     mem.__db.bank_reconciliations = [];
-    mem.__db.transactions = mem.__db.transactions.filter(t => t.id === 951);
+    mem.__db.transactions = [
+      {
+        id: 951,
+        business_id: BIZ_DEMO,
+        wallet_id: 'w-demo-bca',
+        type: 'expense',
+        amount_original: 5000000,
+        currency_original: 'IDR',
+        category: 'Software',
+        category_id: 'cat-hosting',
+        description: 'Payment to DEMO Vendor Alpha',
+        transaction_date: '2026-09-16',
+        scope: 'business',
+      },
+      {
+        id: 952,
+        business_id: BIZ_DEMO,
+        wallet_id: 'w-demo-bca',
+        type: 'income',
+        amount_original: 1000000,
+        currency_original: 'IDR',
+        category: 'Sales Revenue',
+        category_id: 'cat-sales',
+        description: 'Unmatched Client Payment',
+        transaction_date: '2026-09-08',
+        scope: 'business',
+      },
+      {
+        id: 953,
+        business_id: BIZ_DEMO,
+        wallet_id: 'w-demo-bca',
+        type: 'expense',
+        amount_original: 1000000,
+        currency_original: 'IDR',
+        category: 'Office Supplies',
+        category_id: 'cat-office',
+        description: 'Unmatched Vendor Expense',
+        transaction_date: '2026-09-22',
+        scope: 'business',
+      },
+    ];
 
-    // Closing balance in statement has a 2,000,000 IDR discrepancy:
-    // Opening: 45,000,000, Net: +5,000,000 -> Expected: 50,000,000
-    // Statement stated closing: 52,000,000 (diff = 2,000,000 != 0, status: unbalanced)
-    const unbalancedCsvContent = [
+    // Bank statement DOES NOT contain +1M and -1M operations.
+    // Opening balance: 45,000,000 IDR
+    // Row 1: +10,000,000 IDR
+    // Row 2: -5,000,000 IDR (matches 951)
+    // Row 3: -3,000,000 IDR (Internet and Utilities)
+    // Closing balance: 47,000,000 IDR (45M + 2M = 47M -> Diff is 0!)
+    const scenarioCCsvContent = [
       'Date,Description,Amount,Type',
       'Opening balance,45000000,,',
       '2026-09-01,Client Advance Payment Sept,10000000,CR',
-      '2026-09-15,Server Hosting Infrastructure,2000000,DB',
+      '2026-09-16,Payment to DEMO Vendor Alpha,5000000,DB',
       '2026-09-30,Internet and Utilities Office,3000000,DB',
-      'Closing balance,52000000,,', // Discrepancy!
+      'Closing balance,47000000,,',
     ].join('\n');
 
-    const csvPathUnbalanced = path.join(ARTIFACTS_DIR, 'bca_september_2026_unbalanced.csv');
-    fs.writeFileSync(csvPathUnbalanced, unbalancedCsvContent);
+    const csvPathScenarioC = path.join(ARTIFACTS_DIR, 'bca_september_2026_unbalanced.csv');
+    fs.writeFileSync(csvPathScenarioC, scenarioCCsvContent);
 
     // Navigate to /business/bank-import
     await page.goto(`http://127.0.0.1:${PORT}/business/bank-import`, { waitUntil: 'networkidle' });
@@ -666,18 +709,18 @@ async function run() {
     await walletSelect2.selectOption('w-demo-bca');
     await page.waitForTimeout(300);
 
-    // 2. Upload Unbalanced CSV
+    // 2. Upload Scenario C CSV
     const fileInput2 = await page.waitForSelector('input[type="file"]', { timeout: 5000 });
-    await fileInput2.setInputFiles(csvPathUnbalanced);
+    await fileInput2.setInputFiles(csvPathScenarioC);
     await page.waitForTimeout(1000);
 
     // 3. Verify inputs
     const openingInput2 = await page.$('input.modal-input:below(:text("Входящий остаток"))');
     const closingInput2 = await page.$('input.modal-input:below(:text("Исходящий остаток"))');
     if (openingInput2) await openingInput2.fill('45000000');
-    if (closingInput2) await closingInput2.fill('52000000');
+    if (closingInput2) await closingInput2.fill('47000000');
 
-    // Screenshot Case 2 form
+    // Screenshot Scenario C form
     const case2FormPath = path.join(ARTIFACTS_DIR, 'bank_ui_04_case2_form.png');
     await page.screenshot({ path: case2FormPath });
     console.log('Saved bank_ui_04_case2_form.png');
@@ -688,7 +731,7 @@ async function run() {
     await page.waitForTimeout(2000);
 
     await page.waitForSelector('button:has-text("Подтвердить"), button:has-text("Confirm")', { timeout: 10000 });
-    console.log('Case 2: Review queue loaded in UI.');
+    console.log('Scenario C: Review queue loaded in UI.');
 
     const case2ReviewPath = path.join(ARTIFACTS_DIR, 'bank_ui_05_case2_review.png');
     await page.screenshot({ path: case2ReviewPath });
@@ -703,24 +746,65 @@ async function run() {
     await page.goto(`http://127.0.0.1:${PORT}/business/accountant?tab=close&month=2026-09`, { waitUntil: 'networkidle' });
     await page.waitForTimeout(1000);
 
+    // Wait for the unlinked transactions card to be rendered
+    await page.waitForSelector('text=Несверенные банковские операции', { timeout: 10000 });
+    console.log('Scenario C: Unreconciled bank transactions card rendered in UI.');
+
     const case2AcctPath = path.join(ARTIFACTS_DIR, 'bank_ui_06_case2_accountant_unbalanced.png');
-    await page.screenshot({ path: case2AcctPath });
-    console.log('Saved bank_ui_06_case2_accountant_unbalanced.png');
+    await page.screenshot({ path: case2AcctPath, fullPage: true });
+    console.log('Saved bank_ui_06_case2_accountant_unbalanced.png (full page with unreconciled operations list)');
 
     checks = await page.$$eval('.v2-check li', els => els.map(el => el.textContent.trim()));
-    console.log('Case 2 Accountant Month Close checks:', checks);
+    console.log('Scenario C Accountant Month Close checks:', checks);
 
     const stDoneCase2 = checks.some(c => c.includes('1 из 1') && c.includes('Выписки'));
     const recDoneCase2 = checks.some(c => c.includes('1 из 1') && c.includes('Сверка'));
     const recUnconfirmedCase2 = checks.some(c => c.includes('0 из 1') && c.includes('Сверка'));
 
-    console.log('Case 2 Statements uploaded (1/1):', stDoneCase2);
-    console.log('Case 2 Reconciliation confirmed (must be false):', recDoneCase2);
-    console.log('Case 2 Reconciliation unconfirmed (0/1):', recUnconfirmedCase2);
+    console.log('Scenario C Statements uploaded (1/1):', stDoneCase2);
+    console.log('Scenario C Reconciliation confirmed (must be false):', recDoneCase2);
+    console.log('Scenario C Reconciliation unconfirmed (0/1):', recUnconfirmedCase2);
 
-    assert.ok(stDoneCase2, 'Case 2: Statements uploaded must show 1 of 1 done in UI');
-    assert.strictEqual(recDoneCase2, false, 'Case 2: Reconciliation must NOT be confirmed in UI when discrepancy exists');
-    assert.ok(recUnconfirmedCase2, 'Case 2: Reconciliation MUST stay 0 of 1 (unconfirmed) due to discrepancy');
+    assert.ok(stDoneCase2, 'Scenario C: Statements uploaded must show 1 of 1 done in UI');
+    assert.strictEqual(recDoneCase2, false, 'Scenario C: Reconciliation must NOT be confirmed in UI when unlinked transactions exist');
+    assert.ok(recUnconfirmedCase2, 'Scenario C: Reconciliation MUST stay 0 of 1 (unconfirmed) despite matching balances');
+
+    // 7. Download Scenario C package via in-app UI button
+    const unreconciledZipPath = path.join(ARTIFACTS_DIR, 'accountant-package-unreconciled-DEMO_PT_Solusi_Utama-2026-09.zip');
+    console.log('Downloading Scenario C package via in-app UI button...');
+    const unreconciledDlPromise = page.waitForEvent('download', { timeout: 15000 });
+    const unreconciledDlBtn = await page.waitForSelector(downloadBtnSelector, { timeout: 10000 });
+    await unreconciledDlBtn.click();
+    const unreconciledDl = await unreconciledDlPromise;
+    await unreconciledDl.saveAs(unreconciledZipPath);
+    console.log('Saved Scenario C downloaded package to:', unreconciledZipPath);
+
+    // Compute and log SHA-256
+    const unreconciledBytes = fs.readFileSync(unreconciledZipPath);
+    const unreconciledSha256 = crypto.createHash('sha256').update(unreconciledBytes).digest('hex');
+    console.log('Scenario C Package SHA-256:', unreconciledSha256);
+
+    // Unpack Scenario C package and verify discrepancies
+    const extractUnrecDir = path.join(ARTIFACTS_DIR, 'scratch', 'extracted_pkg_unreconciled');
+    if (fs.existsSync(extractUnrecDir)) fs.rmSync(extractUnrecDir, { recursive: true, force: true });
+    fs.mkdirSync(extractUnrecDir, { recursive: true });
+    execSync(`tar -xf "${unreconciledZipPath}" -C "${extractUnrecDir}"`);
+
+    const unrecSummary = JSON.parse(fs.readFileSync(path.join(extractUnrecDir, 'summary.json'), 'utf8'));
+    const unrecDiscrepancies = JSON.parse(fs.readFileSync(path.join(extractUnrecDir, 'discrepancies.json'), 'utf8'));
+
+    assert.strictEqual(unrecSummary.readiness.is_closed, false, 'Scenario C: is_closed must be false');
+    assert.strictEqual(unrecSummary.readiness.automated_checks_passed, false, 'Scenario C: automated_checks_passed must be false');
+    assert.strictEqual(unrecSummary.readiness.status, 'in_progress', 'Scenario C: status must be in_progress');
+    assert.strictEqual(unrecSummary.readiness.bank_reconciliation_status, 'unreconciled', 'Scenario C: bank_reconciliation_status must be unreconciled');
+
+    assert.ok(unrecDiscrepancies.unlinked_transactions.length >= 2, 'discrepancies.unlinked_transactions must contain at least 2 items');
+    const unlinkedDescs = unrecDiscrepancies.unlinked_transactions.map(t => t.description);
+    assert.ok(unlinkedDescs.some(d => d.includes('Unmatched Client Payment')), 'Must list Unmatched Client Payment');
+    assert.ok(unlinkedDescs.some(d => d.includes('Unmatched Vendor Expense')), 'Must list Unmatched Vendor Expense');
+    console.log('Scenario C discrepancies.unlinked_transactions verified:', unrecDiscrepancies.unlinked_transactions.length, 'operations listed.');
+
+    fs.rmSync(extractUnrecDir, { recursive: true, force: true });
 
     console.log('\n======================================================================');
     console.log('VERIFICATION SUMMARY: ALL ACCEPTANCE TESTS PASSED');

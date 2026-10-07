@@ -18,6 +18,7 @@ import { useT, useLang } from '../i18n'
 import { useApi } from '../data'
 import { monthOptions, accountantMonth, closeReadiness, packages, packageSummary, monthGrid, complianceEvents, eventStage, packageExportData, createAccountantZipPackage, dedupeDocumentLinks } from '../lib/accounting'
 import { apiFetch } from '../../lib/api'
+import { money } from '../lib/format'
 import { askAccountant } from '../lib/ask'
 import AccountantTabs from '../components/AccountantTabs'
 import { findWithholdingRule } from '../../pages/business/InvoiceReviewDrawer'
@@ -360,6 +361,42 @@ function CloseTab({ month, onOpenChatModal }) {
             </li>
           </ul>
         </Card>
+        {r.unlinked_transactions?.length > 0 && (
+          <Card
+            title={
+              <span style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#DC2626' }}>
+                <I.warn size={16} />
+                <span>{lang === 'ru' ? 'Несверенные банковские операции' : lang === 'id' ? 'Transaksi Bank Belum Terekonsiliasi' : 'Unreconciled Bank Transactions'} ({r.unlinked_transactions.length})</span>
+              </span>
+            }
+          >
+            <p className="v2-muted v2-small" style={{ margin: '0 0 10px' }}>
+              {lang === 'ru' ? 'Операции присутствуют в учёте, но отсутствуют в подтверждённой банковской выписке за этот период:'
+                : lang === 'id' ? 'Transaksi ada di pembukuan tetapi tidak tercantum dalam mutasi rekening periode ini:'
+                : 'Transactions exist in the ledger but are missing from the confirmed bank statement for this period:'}
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {r.unlinked_transactions.map((ut) => {
+                const wName = (wallets.data?.wallets || []).find((w) => String(w.id) === String(ut.wallet_id))?.name || 'Bank'
+                const isIncome = ut.type === 'income' || ut.type === 'cash_in'
+                return (
+                  <div key={ut.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', background: '#FEF2F2', border: '1px solid #FCA5A5', borderRadius: 6, fontSize: 13 }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ fontWeight: 600 }}>{ut.description || (isIncome ? 'Доход' : 'Расход')}</span>
+                        <Pill tone={isIncome ? 'good' : 'warn'}>{isIncome ? (lang === 'ru' ? 'Приход' : 'Income') : (lang === 'ru' ? 'Расход' : 'Expense')}</Pill>
+                      </div>
+                      <span className="v2-muted v2-small">{ut.date} · {wName}</span>
+                    </div>
+                    <span style={{ fontWeight: 600, color: isIncome ? '#059669' : '#DC2626' }}>
+                      {isIncome ? '+' : '−'}{money(ut.amount, ut.currency)}
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
+          </Card>
+        )}
       </div>
       <div className="v2-col">
         <Card title={t('acct.taxesDue', { m: monthLabel(next, lang) })} aside={<Link to="/business/accountant?tab=taxes">{t('acct.fullCalendar')}</Link>}>
