@@ -252,8 +252,18 @@ function CloseTab({ month, onOpenChatModal }) {
         <section className="v2-hero v2-hero-plain">
           <div className="v2-hero-text">
             <span className="v2-hero-label">{t('acct.closeOf', { m: monthLabel(month, lang) })}</span>
-            <h2 className="v2-hero-title">{r.percent == null ? t('acct.noRecords') : left.length === 0 ? t('acct.ready', { n: r.percent }) : t('acct.almost', { n: r.percent, k: left.length })}</h2>
-            <p className="v2-hero-p v2-show">{t('acct.recordsComplete', { n: r.complete, m: r.records })}</p>
+            <h2 className="v2-hero-title">
+              {r.percent == null
+                ? t('acct.noRecords')
+                : left.length === 0
+                ? (r.is_closed ? t('acct.closed') : t('acct.preparedForReview'))
+                : t('acct.almost', { n: r.percent, k: left.length })}
+            </h2>
+            <p className="v2-hero-p v2-show">
+              {left.length === 0 && !r.is_closed
+                ? t('acct.awaitingAccountantSignoff', { n: r.complete, m: r.records })
+                : t('acct.recordsComplete', { n: r.complete, m: r.records })}
+            </p>
             <div className="v2-row-gap v2-row-start">
               <NotYet note={t('acct.reviewSoon')}>{t('acct.sendToAccountant')}</NotYet>
               <button
@@ -322,6 +332,11 @@ function CloseTab({ month, onOpenChatModal }) {
                 {exporting ? '…' : t('acct.download')}
               </button>
             </div>
+            {left.length > 0 && (
+              <div style={{ marginTop: 12, padding: '8px 12px', background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: 8, fontSize: 12, color: '#92400E' }}>
+                ⚠️ {t('acct.incompleteDownloadWarning', { k: left.length })}
+              </div>
+            )}
           </div>
         </section>
         <Card title={t('acct.toFinish', { m: monthLabel(month, lang) })}>

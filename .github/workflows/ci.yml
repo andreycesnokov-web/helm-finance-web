@@ -71,3 +71,8 @@ jobs:
         env:
           DATABASE_URL: postgresql://postgres:postgrespassword@localhost:5432/testdb
         run: node --test tests/integration/postgresBankImportBatchHttpApi.test.js
+
+      - name: Run PostgreSQL Real Bank Reconciliation & Transaction Linking Flow Tests
+        env:
+          DATABASE_URL: postgresql://postgres:postgrespassword@localhost:5432/testdb
+        run: node --test tests/integration/postgresBankReconciliationFlow.test.js

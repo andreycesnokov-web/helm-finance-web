@@ -6073,7 +6073,7 @@ app.post('/api/bank-import/batches', auth, async (req, res) => {
       const matchId = existingIndex.get(txKey(r.tx_date, amount, suggestedType)) || null;
       let status = 'review_required';
       if (priorHashes.has(hash)) { status = 'duplicate'; dup++; }
-      else if (matchId) { status = 'duplicate'; matched++; }  // already in ledger
+      else if (matchId) { status = 'matched'; matched++; }  // already in ledger
       return {
         batch_id: batch.id, business_id: biz.business.id, row_index: r.row_index ?? i,
         raw: r.raw || {}, tx_date: r.tx_date || null, description: r.description || null,
@@ -6695,12 +6695,43 @@ app.post('/api/bank-imports/:batchId/confirm', auth, async (req, res) => {
       });
 
       // Link to an existing record (no new transaction, no double cash impact).
-      if (p.match_action === 'link' && row.suggested_match_id) {
+      const matchTxId = p.matched_transaction_id || (p.match_action === 'link' ? (row.suggested_match_type === 'existing_tx' ? Number(row.suggested_match_id) : row.matched_transaction_id) : null);
+      if (p.match_action === 'link' && matchTxId) {
+        // Strict ownership and match validation
+        const { data: txList, error: txErr } = await supabase.from('transactions')
+          .select('id, business_id, wallet_id, amount_original, type, currency_original')
+          .eq('id', matchTxId).limit(1);
+        const txObj = txList?.[0] || null;
+        if (txErr || !txObj) {
+          return res.status(400).json({ error: 'Matched transaction not found' });
+        }
+        if (String(txObj.business_id) !== String(biz.business.id)) {
+          return res.status(403).json({ error: 'isolation_violation', message: 'Matched transaction belongs to another business' });
+        }
+        if (batch.wallet_id && txObj.wallet_id && String(txObj.wallet_id) !== String(batch.wallet_id)) {
+          return res.status(400).json({ error: 'Matched transaction belongs to a different wallet' });
+        }
+        if (txObj.type && txObj.type !== type) {
+          return res.status(400).json({ error: `Matched transaction type (${txObj.type}) does not match row type (${type})` });
+        }
+        if (Math.abs(Number(txObj.amount_original) - Number(row.amount)) >= 0.01) {
+          return res.status(400).json({ error: 'Matched transaction amount does not match statement row amount' });
+        }
+        // Verify not already linked to another statement row
+        const { data: alreadyLinked } = await supabase.from('bank_import_rows')
+          .select('id').eq('linked_transaction_id', matchTxId).neq('id', row.id).limit(1);
+        if (alreadyLinked?.length) {
+          return res.status(400).json({ error: 'Matched transaction is already linked to another statement row' });
+        }
+
         await supabase.from('bank_import_rows').update({
           review_status: 'matched_existing',
-          matched_transaction_id: row.suggested_match_type === 'existing_tx' ? Number(row.suggested_match_id) : row.matched_transaction_id,
+          matched_transaction_id: Number(matchTxId),
+          linked_transaction_id: Number(matchTxId),
         }).eq('id', row.id);
-        linked++; continue;
+        linked++;
+        signedSum += type === 'income' ? row.amount : -row.amount;
+        continue;
       }
       if (p.match_action === 'exclude') {
         await supabase.from('bank_import_rows').update({ review_status: 'excluded' }).eq('id', row.id);

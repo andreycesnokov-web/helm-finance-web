@@ -289,6 +289,121 @@ const client = {
         error: null,
       };
     }
+    if (name === 'rpc_record_debt_payment') {
+      const {
+        p_business_id,
+        p_user_id,
+        p_debt_id,
+        p_wallet_id,
+        p_amount,
+        p_currency,
+        p_amount_idr,
+        p_booked_rate,
+        p_rate_source,
+        p_payment_date,
+        p_idempotency_key,
+        p_request_hash,
+        p_account_name,
+        p_created_at,
+      } = args;
+
+      const idempotencyKey = p_idempotency_key ? String(p_idempotency_key).trim() : null;
+      if (idempotencyKey) {
+        const existing = table('debt_payment_idempotency').find(
+          (rec) => rec.business_id === p_business_id && rec.key === idempotencyKey
+        );
+        if (existing) {
+          if (existing.request_hash === p_request_hash) {
+            return {
+              data: {
+                ok: true,
+                is_replay: true,
+                status: existing.response_status,
+                data: existing.response_body,
+              },
+              error: null,
+            };
+          }
+          return {
+            data: null,
+            error: { message: 'idempotency_key_mismatch: Key already used with different payment parameters' },
+          };
+        }
+      }
+
+      const debt = table('debts').find((d) => d.id === p_debt_id && d.business_id === p_business_id);
+      if (!debt) return { data: null, error: { message: 'debt_not_found' } };
+      const wallet = table('wallets').find((w) => w.id === p_wallet_id && w.business_id === p_business_id);
+      if (!wallet) return { data: null, error: { message: 'wallet_not_found' } };
+
+      const total = Number(debt.original_amount || debt.amount || 0);
+      const newPaid = Number(debt.paid_amount || 0) + Number(p_amount);
+      const isFullyPaid = newPaid >= (total - 0.01);
+      const newStatus = isFullyPaid ? 'paid' : 'partial';
+
+      const txId = nextId('transactions');
+      const now = new Date().toISOString();
+      const tx = {
+        id: txId,
+        business_id: p_business_id,
+        created_by_user_id: p_user_id,
+        wallet_id: p_wallet_id,
+        source: p_account_name || wallet.name,
+        type: debt.type === 'payable' ? 'expense' : 'income',
+        amount_original: Number(p_amount),
+        currency_original: p_currency,
+        amount_idr: Number(p_amount_idr),
+        booked_rate: Number(p_booked_rate),
+        category: debt.category || 'Software',
+        description: `Payment: ${debt.counterparty || 'Debt #' + debt.id}${debt.description ? ' · ' + debt.description : ''}`,
+        transaction_date: p_payment_date || now.slice(0, 10),
+        created_at: p_created_at || now,
+        scope: debt.scope || wallet.scope || 'business',
+      };
+      table('transactions').push(tx);
+
+      debt.paid_amount = newPaid;
+      debt.status = newStatus;
+      debt.is_settled = isFullyPaid;
+      debt.settled_at = isFullyPaid ? now : null;
+      debt.linked_transaction_id = txId;
+
+      const resultData = {
+        ok: true,
+        is_fully_paid: isFullyPaid,
+        remaining: Math.max(0, total - newPaid),
+        paid_amount: newPaid,
+        status: newStatus,
+        transaction_id: txId,
+        debt_id: debt.id,
+        debt: { ...debt },
+      };
+
+      if (idempotencyKey) {
+        table('debt_payment_idempotency').push({
+          id: crypto.randomUUID(),
+          business_id: p_business_id,
+          debt_id: debt.id,
+          user_id: p_user_id,
+          key: idempotencyKey,
+          request_hash: p_request_hash,
+          transaction_id: txId,
+          response_status: 200,
+          response_body: resultData,
+          created_at: now,
+        });
+      }
+
+      return {
+        data: {
+          ok: true,
+          is_replay: false,
+          status: 200,
+          data: resultData,
+        },
+        error: null,
+      };
+    }
     if (name === 'rpc_document_link') {
       const { p_document_id, p_business_id, p_target_type, p_target_id, p_actor, p_channel } = args;
       const linkId = crypto.randomUUID();

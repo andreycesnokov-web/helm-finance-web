@@ -277,14 +277,19 @@ export default function BankImport() {
   }
 
   // Map a /review row into local editable state (final decision defaults to suggestion).
-  const toLocal = (r) => ({
-    ...r,
-    _include: r.match_status !== 'duplicate' && r.review_status !== 'excluded',
-    _type: r.final_transaction_type || r.suggested_transaction_type || r.suggested_type || (r.direction === 'in' ? 'income' : 'expense'),
-    _categoryId: r.final_category_id || r.suggested_category_id || '',
-    _counterpartyId: r.final_counterparty_id || r.suggested_counterparty_id || '',
-    _scope: r.final_scope || r.suggested_scope || 'business',
-  })
+  const toLocal = (r) => {
+    const isMatched = r.match_status === 'matched' || !!r.matched_transaction_id || r.suggested_match_type === 'existing_tx'
+    const isFileDup = r.match_status === 'duplicate'
+    return {
+      ...r,
+      _action: isMatched ? 'link' : 'create_transaction',
+      _include: !isFileDup && r.review_status !== 'excluded',
+      _type: r.final_transaction_type || r.suggested_transaction_type || r.suggested_type || (r.direction === 'in' ? 'income' : 'expense'),
+      _categoryId: r.final_category_id || r.suggested_category_id || '',
+      _counterpartyId: r.final_counterparty_id || r.suggested_counterparty_id || '',
+      _scope: r.final_scope || r.suggested_scope || 'business',
+    }
+  }
 
   const loadReview = async (batchId) => {
     const d = await apiFetch(`/bank-imports/${batchId}/review`, token)
@@ -342,14 +347,20 @@ export default function BankImport() {
     if (!target.length) return
     setBusy(true)
     try {
-      const payload = target.map(r => ({
-        row_id: r.id, transaction_type: r._type,
-        category_id: r._categoryId || null, counterparty_id: r._counterpartyId || null,
-        scope: r._scope, match_action: r.suggested_match_type && r._action === 'link' ? 'link' : 'create_transaction',
-      }))
+      const payload = target.map(r => {
+        const isLink = r._action === 'link' || (r.suggested_match_type && r._action === 'link') || (!r._action && !!r.matched_transaction_id)
+        const matchTxId = r.matched_transaction_id || (r.suggested_match_type === 'existing_tx' ? Number(r.suggested_match_id) : null)
+        return {
+          row_id: r.id, transaction_type: r._type,
+          category_id: r._categoryId || null, counterparty_id: r._counterpartyId || null,
+          scope: r._scope,
+          match_action: isLink ? 'link' : 'create_transaction',
+          matched_transaction_id: isLink ? matchTxId : null,
+        }
+      })
       const res = await apiFetch(`/bank-imports/${batch.id}/confirm`, token, { method: 'POST', body: { rows: payload } })
       setRecon(res.reconciliation || null)
-      alert(`${l.imported}: ${res.imported}`)
+      alert(`${l.imported}: ${res.imported}${res.linked ? ` · ${l.matchedExisting}: ${res.linked}` : ''}`)
       await offerRulePromotion()
       setBatch(null); setRows([]); setHeaders([]); setRawRows([]); setSummary(null); setFileObj(null); setFileName(''); loadHistory()
     } catch (e) { alert(e.message) } finally { setBusy(false) }
@@ -524,12 +535,19 @@ export default function BankImport() {
                         {r._type === 'income' ? '+' : '−'}{fmt(r.amount)}
                       </td>
                       <td style={{ padding: 6, textAlign: 'center' }}>
-                        <select value={r._type} onChange={e => setRow({ _type: e.target.value })} style={{ fontSize: 11 }}>
-                          <option value="income">{l.income}</option><option value="expense">{l.expense}</option>
-                          <option value="transfer">transfer</option><option value="payroll">payroll</option>
-                          <option value="owner_injection">owner in</option><option value="owner_withdrawal">owner out</option>
-                          <option value="correction">correction</option>
-                        </select>
+                        {r.matched_transaction_id || r.suggested_match_type === 'existing_tx' ? (
+                          <select value={r._action || 'link'} onChange={e => setRow({ _action: e.target.value })} style={{ fontSize: 11, background: '#EEF2FF', fontWeight: 600 }}>
+                            <option value="link">🔗 {l.matchedExisting || 'Link'}</option>
+                            <option value="create_transaction">➕ {l.createTx || 'Create'}</option>
+                          </select>
+                        ) : (
+                          <select value={r._type} onChange={e => setRow({ _type: e.target.value })} style={{ fontSize: 11 }}>
+                            <option value="income">{l.income}</option><option value="expense">{l.expense}</option>
+                            <option value="transfer">transfer</option><option value="payroll">payroll</option>
+                            <option value="owner_injection">owner in</option><option value="owner_withdrawal">owner out</option>
+                            <option value="correction">correction</option>
+                          </select>
+                        )}
                       </td>
                       <td style={{ padding: 6 }}>
                         <select value={r._categoryId || ''} onChange={e => setRow({ _categoryId: e.target.value })}
