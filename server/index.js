@@ -5985,7 +5985,7 @@ app.post('/api/bank-import/batches', auth, async (req, res) => {
     if (!canCreateConfirmedFinancialRecord(biz.role))
       return res.status(403).json({ error: 'Your role cannot import bank statements' });
 
-    const { wallet_id, file_name, file_type, currency, opening_balance, closing_balance, rows, document_id } = req.body || {};
+    const { wallet_id, file_name, file_type, currency, opening_balance, closing_balance, rows, document_id, statement_start, statement_end } = req.body || {};
     if (!Array.isArray(rows) || rows.length === 0) return res.status(400).json({ error: 'rows required' });
     if (rows.length > 2000) return res.status(400).json({ error: 'Too many rows (max 2000 per import)' });
 
@@ -5999,8 +5999,8 @@ app.post('/api/bank-import/batches', auth, async (req, res) => {
 
     // Date range of the statement
     const dates = rows.map(r => r.tx_date).filter(Boolean).sort();
-    const statementStart = dates[0] || null;
-    const statementEnd = dates[dates.length - 1] || null;
+    const statementStart = statement_start || dates[0] || null;
+    const statementEnd = statement_end || dates[dates.length - 1] || null;
 
     // Existing transactions for the wallet in range — for duplicate/matching.
     let existing = [];

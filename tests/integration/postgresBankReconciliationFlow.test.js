@@ -14,7 +14,8 @@ const http = require('node:http');
 const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
-const { Client } = require('pg');
+const { Client, types } = require('pg');
+types.setTypeParser(1082, (val) => val);
 
 let closeReadinessFn, packageExportDataFn;
 

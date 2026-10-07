@@ -68,9 +68,21 @@ export function closeReadiness({ month, transactions = [], debts = [], batches =
   const banks = wallets.filter(isBankWallet)
 
   const isFiniteNumber = (val) => val != null && val !== '' && typeof val !== 'boolean' && Number.isFinite(Number(val)) && !Number.isNaN(Number(val))
-  const isValidIsoDate = (str) => {
-    if (!str || typeof str !== 'string') return false
-    const match = str.trim().slice(0, 10).match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  const toIsoDateStr = (val) => {
+    if (!val) return null
+    if (typeof val === 'string') return val.trim().slice(0, 10)
+    if (val instanceof Date && !Number.isNaN(val.getTime())) {
+      const y = val.getUTCFullYear()
+      const m = String(val.getUTCMonth() + 1).padStart(2, '0')
+      const d = String(val.getUTCDate()).padStart(2, '0')
+      return `${y}-${m}-${d}`
+    }
+    return null
+  }
+  const isValidIsoDate = (val) => {
+    const str = toIsoDateStr(val)
+    if (!str) return false
+    const match = str.match(/^(\d{4})-(\d{2})-(\d{2})$/)
     if (!match) return false
     const [_, y, m, d] = match
     const dt = new Date(`${y}-${m}-${d}T00:00:00Z`)
@@ -83,8 +95,8 @@ export function closeReadiness({ month, transactions = [], debts = [], batches =
       if (String(b.wallet_id) !== String(w.id)) return false
       if (['cancelled', 'failed'].includes(b.status)) return false
       if (!isValidIsoDate(b.statement_start) || !isValidIsoDate(b.statement_end)) return false
-      const bStart = b.statement_start.trim().slice(0, 10)
-      const bEnd = b.statement_end.trim().slice(0, 10)
+      const bStart = toIsoDateStr(b.statement_start)
+      const bEnd = toIsoDateStr(b.statement_end)
       if (bStart > bEnd) return false
       return bStart <= start && bEnd >= end
     })
@@ -97,8 +109,8 @@ export function closeReadiness({ month, transactions = [], debts = [], batches =
 
       // Statement dates must be valid and cover the selected month
       if (!isValidIsoDate(b.statement_start) || !isValidIsoDate(b.statement_end)) return false
-      const bStart = b.statement_start.trim().slice(0, 10)
-      const bEnd = b.statement_end.trim().slice(0, 10)
+      const bStart = toIsoDateStr(b.statement_start)
+      const bEnd = toIsoDateStr(b.statement_end)
       if (bStart > bEnd) return false
       if (bStart > start || bEnd < end) return false
 
