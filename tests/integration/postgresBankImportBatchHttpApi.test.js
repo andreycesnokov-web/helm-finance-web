@@ -149,15 +149,19 @@ describe('HTTP API End-to-End: POST /api/bank-import/batches over Real PostgreSQ
         ($1, 'Company Alpha', 'business', $3),
         ($2, 'Company Beta', 'business', 9999)
       ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, owner_user_id = EXCLUDED.owner_user_id;
+    `, [BIZ_A, BIZ_B, USER_A]);
 
+    await pgClient.query(`
       INSERT INTO public.business_members (business_id, user_id, role, status) VALUES
-        ($1, $3, 'owner', 'active')
+        ($1, $2, 'owner', 'active')
       ON CONFLICT DO NOTHING;
+    `, [BIZ_A, USER_A]);
 
+    await pgClient.query(`
       INSERT INTO public.wallets (id, business_id, name, currency, is_active) VALUES
-        ($4, $1, 'BCA Checking', 'IDR', true)
+        ($1, $2, 'BCA Checking', 'IDR', true)
       ON CONFLICT (id) DO NOTHING;
-    `, [BIZ_A, BIZ_B, USER_A, WALLET_A]);
+    `, [WALLET_A, BIZ_A]);
 
     docAId = crypto.randomUUID();
     await pgClient.query(`
