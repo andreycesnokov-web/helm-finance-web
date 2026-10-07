@@ -217,6 +217,11 @@ describe('Real PostgreSQL Integration: Bank Reconciliation & Transaction Linking
       ALTER TABLE public.bank_import_rows ADD COLUMN IF NOT EXISTS reviewed_by_user_id bigint NULL;
       ALTER TABLE public.bank_import_rows ADD COLUMN IF NOT EXISTS reviewed_at timestamptz NULL;
 
+      ALTER TABLE public.bank_import_batches ADD COLUMN IF NOT EXISTS document_id uuid NULL;
+      ALTER TABLE public.bank_import_batches ADD COLUMN IF NOT EXISTS imported_count int DEFAULT 0;
+      ALTER TABLE public.bank_import_batches ADD COLUMN IF NOT EXISTS matched_count int DEFAULT 0;
+      ALTER TABLE public.bank_import_batches ADD COLUMN IF NOT EXISTS duplicate_count int DEFAULT 0;
+
       CREATE TABLE IF NOT EXISTS public.bank_reconciliations (
         id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
         batch_id uuid NOT NULL REFERENCES public.bank_import_batches(id) ON DELETE CASCADE,
@@ -441,6 +446,7 @@ describe('Real PostgreSQL Integration: Bank Reconciliation & Transaction Linking
           const data = (this._single || this._maybeSingle) ? (rows[0] || null) : rows;
           return { data, error: null };
         } catch (err) {
+          console.error(`[RealPgQuery Error in ${this.table} op=${this._op}]:`, err.message);
           return { data: null, error: { message: err.message, code: err.code } };
         }
       }
@@ -572,6 +578,9 @@ describe('Real PostgreSQL Integration: Bank Reconciliation & Transaction Linking
     assert.strictEqual(confirmBody.status, 'imported', 'Batch status must be imported');
 
     // Assert reconciliation outcome is balanced
+    if (!confirmBody.reconciliation) {
+      console.error('[confirmBody without reconciliation]:', JSON.stringify(confirmBody));
+    }
     assert.ok(confirmBody.reconciliation, 'Reconciliation record must exist');
     assert.strictEqual(confirmBody.reconciliation.status, 'balanced');
     assert.strictEqual(Number(confirmBody.reconciliation.difference), 0);
