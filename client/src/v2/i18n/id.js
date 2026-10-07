@@ -304,7 +304,7 @@ export default {
   },
   prof: {
     regimeV: { normal: 'Umum (tarif normal)', pp23_final: 'Final 0,5% (PP 23/2018)', pph_final_umkm: 'Final 0,5% UMKM' }, sub: 'CFO AI memakai ini untuk menentukan pajak, laporan, dan tenggat Anda', edit: 'Ubah profil', notFilled: 'Belum diisi', from: 'dari {s}', confirmed: 'dikonfirmasi',
-    pct: 'Profil {n}% lengkap', unknownPct: 'Kelengkapan tidak diketahui', uploadHint: 'Unggah dokumen perusahaan — AI mengisi kolom, Anda mengonfirmasi',
+    pct: 'Kelengkapan data pajak {n}%', unknownPct: 'Kelengkapan data pajak tidak diketahui', uploadHint: 'Unggah dokumen perusahaan — AI mengisi kolom, Anda mengonfirmasi',
     doc: { akta: 'Akta pendirian', sk_kemenkumham: 'SK Kemenkumham', nib: 'NIB dari OSS', npwp: 'Kartu NPWP' },
     docSt: { needs_review: 'perlu ditinjau', missing: 'belum ada', optional: 'opsional', not_required: 'tidak wajib' },
     legal: 'Badan usaha', legalName: 'Nama resmi', form: 'Bentuk usaha', capital: 'Status modal', country: 'Negara', fiscalYear: 'Tahun buku',
