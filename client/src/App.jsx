@@ -568,7 +568,12 @@ const V2AdminApp = DESIGN_V2 ? lazy(() => import('./v2/AdminApp')) : null
 // Redirect legacy /accountant addresses to /business/accountant with search query preservation (e.g. ?ask=... / ?q=...).
 function AccountantRedirect({ to = '/business/accountant' }) {
   const location = useLocation()
-  return <Navigate to={`${to}${location.search || ''}`} replace />
+  const [targetPath, targetSearch] = to.split('?')
+  const mergedParams = new URLSearchParams(targetSearch || '')
+  const incomingParams = new URLSearchParams(location.search || '')
+  incomingParams.forEach((val, key) => mergedParams.set(key, val))
+  const searchStr = mergedParams.toString()
+  return <Navigate to={`${targetPath}${searchStr ? '?' + searchStr : ''}`} replace />
 }
 
 export default function App() {

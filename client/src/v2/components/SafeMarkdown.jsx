@@ -133,6 +133,23 @@ export default function SafeMarkdown({ content, className = '' }) {
       continue
     }
 
+    // Horizontal rule / divider: ---, ***, ___
+    if (/^(?:---|\*\*\*|___)$/.test(trimmed)) {
+      flushList()
+      flushCallout()
+      blocks.push({ type: 'hr' })
+      continue
+    }
+
+    // Blockquote: > text
+    const quoteMatch = trimmed.match(/^>\s*(.+)$/)
+    if (quoteMatch) {
+      flushList()
+      flushCallout()
+      blocks.push({ type: 'blockquote', text: quoteMatch[1] })
+      continue
+    }
+
     // Unordered bullet list: *, -, •
     const bulletMatch = trimmed.match(/^([-*•])\s+(.+)$/)
     if (bulletMatch) {
@@ -212,6 +229,14 @@ export default function SafeMarkdown({ content, className = '' }) {
                   <li key={`${key}-item-${itemIdx}`}>{renderInline(itemText, `${key}-item-${itemIdx}`)}</li>
                 ))}
               </ol>
+            )
+          case 'hr':
+            return <hr key={key} className="v2-acct-hr" />
+          case 'blockquote':
+            return (
+              <blockquote key={key} className="v2-acct-quote">
+                {renderInline(block.text, key)}
+              </blockquote>
             )
           case 'p':
           default:

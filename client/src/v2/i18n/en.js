@@ -304,7 +304,7 @@ export default {
   },
   prof: {
     regimeV: { normal: 'General (standard rates)', pp23_final: 'Final 0.5% (PP 23/2018)', pph_final_umkm: 'Final 0.5% for small business (UMKM)' }, sub: 'CFO AI uses this to work out your taxes, reports and deadlines', edit: 'Edit profile', notFilled: 'Not filled in', from: 'from {s}', confirmed: 'confirmed',
-    pct: 'Profile {n}% complete', unknownPct: 'Completeness unknown', uploadHint: 'Upload your company documents — AI fills the fields, you confirm',
+    pct: 'Tax data {n}% complete', unknownPct: 'Tax data completeness unknown', uploadHint: 'Upload your company documents — AI fills the fields, you confirm',
     doc: { akta: 'Deed of establishment', sk_kemenkumham: 'SK Kemenkumham', nib: 'NIB from OSS', npwp: 'NPWP card' },
     docSt: { needs_review: 'needs review', missing: 'missing', optional: 'optional', not_required: 'not required' },
     legal: 'Legal entity', legalName: 'Legal name', form: 'Legal form', capital: 'Capital status', country: 'Country', fiscalYear: 'Fiscal year',
