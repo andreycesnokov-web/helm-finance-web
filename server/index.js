@@ -6689,30 +6689,17 @@ app.post('/api/bank-imports/:batchId/confirm', auth, async (req, res) => {
       if (counterpartyId && !cpNameById.has(counterpartyId)) return res.status(400).json({ error: 'counterparty_id does not belong to this business' });
       const scope = p.scope || row.suggested_scope || wallet?.scope || 'business';
 
-      // Persist final decision + audit feedback (suggestion vs final)
-      await supabase.from('bank_import_rows').update({
-        final_transaction_type: type, final_category_id: categoryId,
-        final_counterparty_id: counterpartyId, final_scope: scope,
-        review_status: 'confirmed', reviewed_by_user_id: req.user.userId, reviewed_at: now,
-      }).eq('id', row.id);
-      await supabase.from('classification_feedback').insert({
-        business_id: biz.business.id, bank_import_row_id: row.id,
-        normalized_desc: normalizeDesc(row.description),
-        suggested_category_id: row.suggested_category_id || null, final_category_id: categoryId,
-        suggested_transaction_type: row.suggested_transaction_type || null, final_transaction_type: type,
-        confidence: row.suggestion_confidence || null,
-        accepted: (row.suggested_category_id || null) === categoryId && (row.suggested_transaction_type || null) === type,
-        source: 'bank_review', reviewed_by_user_id: req.user.userId,
-      });
-
-      // Link to an existing record (no new transaction, no double cash impact).
+      // Link validation (validate match before writing confirmed review status)
       const matchTxId = p.matched_transaction_id || (p.match_action === 'link' ? (row.suggested_match_type === 'existing_tx' ? Number(row.suggested_match_id) : row.matched_transaction_id) : null);
-      if (p.match_action === 'link' && matchTxId) {
-        // Strict ownership and match validation
+      let txObj = null;
+      if (p.match_action === 'link') {
+        if (!matchTxId) {
+          return res.status(400).json({ error: 'Matched transaction ID required for linking' });
+        }
         const { data: txList, error: txErr } = await supabase.from('transactions')
           .select('id, business_id, wallet_id, amount_original, type, currency_original')
           .eq('id', matchTxId).limit(1);
-        const txObj = txList?.[0] || null;
+        txObj = txList?.[0] || null;
         if (txErr || !txObj) {
           return res.status(400).json({ error: 'Matched transaction not found' });
         }
@@ -6734,7 +6721,27 @@ app.post('/api/bank-imports/:batchId/confirm', auth, async (req, res) => {
         if (alreadyLinked?.length) {
           return res.status(400).json({ error: 'Matched transaction is already linked to another statement row' });
         }
+      }
 
+      // Persist final decision + audit feedback (suggestion vs final)
+      await supabase.from('bank_import_rows').update({
+        final_transaction_type: type, final_category_id: categoryId,
+        final_counterparty_id: counterpartyId, final_scope: scope,
+        review_status: p.match_action === 'link' ? 'matched_existing' : 'confirmed',
+        reviewed_by_user_id: req.user.userId, reviewed_at: now,
+      }).eq('id', row.id);
+      await supabase.from('classification_feedback').insert({
+        business_id: biz.business.id, bank_import_row_id: row.id,
+        normalized_desc: normalizeDesc(row.description),
+        suggested_category_id: row.suggested_category_id || null, final_category_id: categoryId,
+        suggested_transaction_type: row.suggested_transaction_type || null, final_transaction_type: type,
+        confidence: row.suggestion_confidence || null,
+        accepted: (row.suggested_category_id || null) === categoryId && (row.suggested_transaction_type || null) === type,
+        source: 'bank_review', reviewed_by_user_id: req.user.userId,
+      });
+
+      // Link to an existing record (no new transaction, no double cash impact).
+      if (p.match_action === 'link' && txObj) {
         await supabase.from('bank_import_rows').update({
           review_status: 'matched_existing',
           matched_transaction_id: Number(matchTxId),
