@@ -56,6 +56,12 @@ class Q {
   lte(c, v) { this.filters.push((r) => r[c] <= v); return this; }
   in(c, vs) { this.filters.push((r) => vs.map(String).includes(String(r[c]))); return this; }
   is(c, v) { this.filters.push((r) => (v === null ? r[c] == null : r[c] === v)); return this; }
+  not(c, op, v) {
+    if (op === 'is') this.filters.push((r) => (v === null ? r[c] != null : r[c] !== v));
+    else if (op === 'in') this.filters.push((r) => !v.map(String).includes(String(r[c])));
+    else this.filters.push((r) => String(r[c]) !== String(v));
+    return this;
+  }
   // PostgREST LIKE: % is the wildcard. Used by the entitlement/addon lookups.
   // Split on % first, escape each literal segment, then rejoin with .* so a % in the
   // pattern can never be mistaken for a regex metacharacter.

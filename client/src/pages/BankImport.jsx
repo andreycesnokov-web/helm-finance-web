@@ -134,7 +134,18 @@ const toISO = (v) => {
   if (v instanceof Date) return v.toISOString().slice(0, 10)
   const s = String(v).trim()
   let m = s.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/); if (m) return `${m[1]}-${m[2].padStart(2,'0')}-${m[3].padStart(2,'0')}`
-  m = s.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{2,4})/); if (m) { const y = m[3].length===2?'20'+m[3]:m[3]; return `${y}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}` }
+  m = s.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{2,4})/)
+  if (m) {
+    const y = m[3].length === 2 ? '20' + m[3] : m[3]
+    const p1 = Number(m[1]), p2 = Number(m[2])
+    if (p2 > 12 && p1 <= 12) {
+      return `${y}-${String(p1).padStart(2, '0')}-${String(p2).padStart(2, '0')}`
+    }
+    if (p1 > 12 && p2 <= 12) {
+      return `${y}-${String(p2).padStart(2, '0')}-${String(p1).padStart(2, '0')}`
+    }
+    return `${y}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`
+  }
   const d = new Date(s); return isNaN(d) ? null : d.toISOString().slice(0, 10)
 }
 
@@ -179,10 +190,10 @@ export default function BankImport() {
     setFileName(file.name)
     const buf = await file.arrayBuffer()
     // raw:false + no cellDates → cells come as their displayed text, so a
-    // DD/MM/YY date is NOT misread by XLSX as US MM/DD. Our toISO parses it.
-    const wb = XLSX.read(buf, { type: 'array', cellDates: false })
+    const isCsv = String(file.name || '').toLowerCase().endsWith('.csv')
+    const wb = XLSX.read(buf, { type: 'array', cellDates: false, raw: isCsv })
     const sheet = wb.Sheets[wb.SheetNames[0]]
-    const arr = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false, defval: '' })
+    const arr = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: isCsv, defval: '' })
     const firstNonEmpty = arr.findIndex(r => r.some(c => String(c).trim() !== ''))
     const row1 = (arr[firstNonEmpty] || []).map(h => String(h).trim())
     const row2 = (arr[firstNonEmpty + 1] || []).map(h => String(h).trim())

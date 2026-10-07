@@ -16,8 +16,8 @@ import I from '../icons'
 import { PageHead, Card, Pill, Btn, NotYet, Skeleton, ErrorBox, Empty } from '../ui'
 import { useT, useLang } from '../i18n'
 import { useApi } from '../data'
-import { money, shortDate } from '../lib/format'
-import { monthOptions, accountantMonth, closeReadiness, packages, packageSummary, monthGrid, complianceEvents, eventStage, packageExportData, createAccountantZipPackage } from '../lib/accounting'
+import { monthOptions, accountantMonth, closeReadiness, packages, packageSummary, monthGrid, complianceEvents, eventStage, packageExportData, createAccountantZipPackage, dedupeDocumentLinks } from '../lib/accounting'
+import { apiFetch } from '../../lib/api'
 import { askAccountant } from '../lib/ask'
 import AccountantTabs from '../components/AccountantTabs'
 import { findWithholdingRule } from '../../pages/business/InvoiceReviewDrawer'
@@ -160,10 +160,20 @@ function CloseTab({ month, onOpenChatModal }) {
   const { active, scopeKey } = useWorkspace()
   const { token } = useAuth()
   const [askQuery, setAskQuery] = useState('')
+  const [exporting, setExporting] = useState(false)
+  const exportControllerRef = useRef(null)
 
   useEffect(() => {
     setAskQuery('')
   }, [active?.id, scopeKey])
+
+  useEffect(() => {
+    if (exportControllerRef.current) {
+      exportControllerRef.current.abort()
+      exportControllerRef.current = null
+    }
+    setExporting(false)
+  }, [active?.id, month])
   const tx = useApi('/transactions?period=all')
   const debts = useApi('/debts')
   const batches = useApi('/bank-import/batches')
@@ -209,7 +219,7 @@ function CloseTab({ month, onOpenChatModal }) {
     return rawDebts.map((b) => {
       const docLinks = linkedMap.get(String(b.id)) || []
       const existingLinks = Array.isArray(b.document_links) ? b.document_links : []
-      const mergedLinks = [...existingLinks, ...docLinks]
+      const mergedLinks = dedupeDocumentLinks([...existingLinks, ...docLinks])
       return {
         ...b,
         document_links: mergedLinks,
@@ -235,6 +245,7 @@ function CloseTab({ month, onOpenChatModal }) {
   const dueSum = due.reduce((s, e) => s + (e.estimated_amount != null ? Number(e.estimated_amount) : 0), 0)
   const left = r.checks.filter((c) => !c.done)
 
+
   return (
     <div className="v2-grid-detail">
       <div className="v2-col">
@@ -248,32 +259,67 @@ function CloseTab({ month, onOpenChatModal }) {
               <button
                 type="button"
                 className="v2-btn v2-btn-secondary"
+                disabled={exporting}
                 onClick={async () => {
-                  const rawDocs = Array.isArray(docs.data?.documents) ? docs.data.documents : []
-                  const companyName = active?.name || 'Company'
-                  const { zipBytes, filename } = await createAccountantZipPackage({
-                    month,
-                    companyName,
-                    businessId: active?.id,
-                    transactions: Array.isArray(tx.data) ? tx.data : [],
-                    debts: enrichedDebts,
-                    batches: batches.data?.batches || [],
-                    wallets: wallets.data?.wallets || [],
-                    documents: rawDocs,
-                    token,
-                  })
-                  const blob = new Blob([zipBytes], { type: 'application/zip' })
-                  const url = URL.createObjectURL(blob)
-                  const a = document.createElement('a')
-                  a.href = url
-                  a.download = filename
-                  document.body.appendChild(a)
-                  a.click()
-                  document.body.removeChild(a)
-                  URL.revokeObjectURL(url)
+                  if (exportControllerRef.current) {
+                    exportControllerRef.current.abort()
+                  }
+                  const controller = new AbortController()
+                  exportControllerRef.current = controller
+                  const currentBizId = active?.id
+                  const currentMonth = month
+
+                  setExporting(true)
+                  try {
+                    const rawDocs = Array.isArray(docs.data?.documents) ? docs.data.documents : []
+                    const companyName = active?.name || 'Company'
+                    const res = await createAccountantZipPackage({
+                      month: currentMonth,
+                      companyName,
+                      businessId: currentBizId,
+                      transactions: Array.isArray(tx.data) ? tx.data : [],
+                      debts: enrichedDebts,
+                      batches: batches.data?.batches || [],
+                      wallets: wallets.data?.wallets || [],
+                      documents: rawDocs,
+                      token,
+                      signal: controller.signal,
+                      fetchSignedUrl: async (docId, mode = 'download', bizId, sig) => {
+                        const resp = await apiFetch(`/documents/${docId}/signed-url`, token, {
+                          method: 'POST',
+                          headers: (bizId || currentBizId) ? { 'x-business-id': String(bizId || currentBizId) } : {},
+                          body: { mode },
+                          signal: sig || controller.signal,
+                        })
+                        return resp?.url || null
+                      },
+                    })
+
+                    if (controller.signal.aborted) return
+                    if (active?.id !== currentBizId || month !== currentMonth) return
+                    if (!res?.zipBytes) return
+
+                    const blob = new Blob([res.zipBytes], { type: 'application/zip' })
+                    const url = URL.createObjectURL(blob)
+                    const a = document.createElement('a')
+                    a.href = url
+                    a.download = res.filename
+                    document.body.appendChild(a)
+                    a.click()
+                    document.body.removeChild(a)
+                    URL.revokeObjectURL(url)
+                  } catch (err) {
+                    if (err.name === 'AbortError' || controller.signal.aborted) return
+                    console.error('Accountant export failed:', err)
+                  } finally {
+                    if (exportControllerRef.current === controller) {
+                      exportControllerRef.current = null
+                      setExporting(false)
+                    }
+                  }
                 }}
               >
-                {t('acct.download')}
+                {exporting ? '…' : t('acct.download')}
               </button>
             </div>
           </div>

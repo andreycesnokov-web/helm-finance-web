@@ -334,6 +334,26 @@ export function createZip(files) {
 }
 
 /**
+ * Deduplicates an array of document link references by document_id or unique link identifier.
+ */
+export function dedupeDocumentLinks(links) {
+  if (!Array.isArray(links)) return []
+  const seen = new Set()
+  const result = []
+  for (const l of links) {
+    if (!l) continue
+    const docId = String(l.document_id || l.id || l.file_id || '')
+    const linkId = String(l.link_id || l._link_id || '')
+    const key = docId ? `doc:${docId}` : (linkId ? `link:${linkId}` : JSON.stringify(l))
+    if (!seen.has(key)) {
+      seen.add(key)
+      result.push(l)
+    }
+  }
+  return result
+}
+
+/**
  * Builds structured accountant export data:
  * - summary: readiness %, complete/total records, reconciliation status, bank breakdown
  * - discrepancies: missing bank statements, unreconciled accounts, bills without docs, uncategorised transactions, unavailable files
@@ -372,7 +392,7 @@ export function packageExportData({ month, companyName = '', businessId = '', tr
       currency: d.currency || 'IDR',
       status: d.status,
       has_documents: hasDocs(d),
-      document_links: d.document_links || [],
+      document_links: dedupeDocumentLinks(d.document_links || []),
       accountant_checked: !!d.accountant_checked_at,
     })),
     ...monthTx.map((t) => ({
@@ -435,12 +455,20 @@ export async function createAccountantZipPackage({
   documents = [],
   token = null,
   fetchSignedUrl = null,
+  signal = null,
 }) {
+  if (signal?.aborted) {
+    const err = new Error('Export aborted')
+    err.name = 'AbortError'
+    throw err
+  }
+
   const exportData = packageExportData({ month, companyName, businessId, transactions, debts, batches, wallets })
   const unavailableFiles = []
   const filesToZip = [
     { name: 'documents/README.txt', data: `Financial documents for ${month} month close.\nUnavailable files are listed in discrepancies.json.\n` },
   ]
+  const addedZipPaths = new Set(['documents/README.txt'])
 
   const inM = (iso) => inMonth(iso, month)
   const monthDebtIds = new Set(exportData.records_registry.filter((r) => r.type === 'bill_or_invoice').map((r) => String(r.id)))
@@ -467,8 +495,15 @@ export async function createAccountantZipPackage({
 
   const targetDocs = documents.filter(isDocInMonth)
 
+  // 1. Process Financial Documents (Invoices, Receipts, etc.)
   for (const doc of targetDocs) {
+    if (signal?.aborted) {
+      const err = new Error('Export aborted')
+      err.name = 'AbortError'
+      throw err
+    }
     const fileName = doc.file?.file_name || doc.file_name || `${doc.id}.bin`
+    const zipPath = `documents/${fileName}`
     const rawContent = doc.file_content || doc.content
     const base64Content = doc.content_base64 || (typeof rawContent === 'string' && rawContent.startsWith('data:') ? rawContent.split(',')[1] : null)
 
@@ -477,49 +512,64 @@ export async function createAccountantZipPackage({
         const binStr = atob(base64Content)
         const bytes = new Uint8Array(binStr.length)
         for (let i = 0; i < binStr.length; i++) bytes[i] = binStr.charCodeAt(i)
-        filesToZip.push({ name: `documents/${fileName}`, data: bytes })
+        filesToZip.push({ name: zipPath, data: bytes })
+        addedZipPaths.add(zipPath)
       } catch {
         unavailableFiles.push({ document_id: doc.id, file_name: fileName, reason: 'Failed to decode base64 file content' })
       }
     } else if (rawContent?.data && Array.isArray(rawContent.data)) {
-      filesToZip.push({ name: `documents/${fileName}`, data: new Uint8Array(rawContent.data) })
+      filesToZip.push({ name: zipPath, data: new Uint8Array(rawContent.data) })
+      addedZipPaths.add(zipPath)
     } else if (typeof rawContent === 'string') {
-      filesToZip.push({ name: `documents/${fileName}`, data: rawContent })
+      filesToZip.push({ name: zipPath, data: rawContent })
+      addedZipPaths.add(zipPath)
     } else if (rawContent instanceof Uint8Array) {
-      filesToZip.push({ name: `documents/${fileName}`, data: rawContent })
+      filesToZip.push({ name: zipPath, data: rawContent })
+      addedZipPaths.add(zipPath)
     } else {
       let downloaded = false
       if (typeof fetchSignedUrl === 'function') {
         try {
-          const url = await fetchSignedUrl(doc.id, 'download')
+          const url = await fetchSignedUrl(doc.id, 'download', businessId, signal)
           if (url && typeof fetch === 'function') {
-            const resp = await fetch(url)
+            const resp = await fetch(url, { signal })
             if (resp.ok) {
               const buf = await resp.arrayBuffer()
-              filesToZip.push({ name: `documents/${fileName}`, data: new Uint8Array(buf) })
+              filesToZip.push({ name: zipPath, data: new Uint8Array(buf) })
+              addedZipPaths.add(zipPath)
               downloaded = true
             }
           }
-        } catch { /* proceed to unavailable */ }
+        } catch (fetchErr) {
+          if (signal?.aborted || fetchErr?.name === 'AbortError') throw fetchErr
+        }
       } else if (token && typeof fetch === 'function') {
         try {
           const sResp = await fetch(`/api/documents/${doc.id}/signed-url`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+              ...(businessId ? { 'x-business-id': String(businessId) } : {}),
+            },
             body: JSON.stringify({ mode: 'download' }),
+            signal,
           })
           if (sResp.ok) {
             const sData = await sResp.json()
             if (sData?.url) {
-              const fileResp = await fetch(sData.url)
+              const fileResp = await fetch(sData.url, { signal })
               if (fileResp.ok) {
                 const buf = await fileResp.arrayBuffer()
-                filesToZip.push({ name: `documents/${fileName}`, data: new Uint8Array(buf) })
+                filesToZip.push({ name: zipPath, data: new Uint8Array(buf) })
+                addedZipPaths.add(zipPath)
                 downloaded = true
               }
             }
           }
-        } catch { /* proceed to unavailable */ }
+        } catch (fetchErr) {
+          if (signal?.aborted || fetchErr?.name === 'AbortError') throw fetchErr
+        }
       }
 
       if (!downloaded) {
@@ -527,6 +577,125 @@ export async function createAccountantZipPackage({
           document_id: doc.id,
           file_name: fileName,
           reason: 'Original file could not be retrieved from authorized storage or signed URL was unavailable',
+        })
+      }
+    }
+  }
+
+  // 2. Process Bank Statements (Originals of selected company and period)
+  const isBatchInMonth = (b) => {
+    if (!b) return false
+    if (!matchBiz(b)) return false
+    if (['cancelled', 'failed'].includes(b.status)) return false
+    if (b.month && b.month === month) return true
+    const bStart = b.statement_start ? String(b.statement_start).slice(0, 7) : null
+    const bEnd = b.statement_end ? String(b.statement_end).slice(0, 7) : null
+    if (bStart && bEnd) {
+      if (bStart <= month && bEnd >= month) return true
+    } else if (bStart && bStart === month) {
+      return true
+    } else if (bEnd && bEnd === month) {
+      return true
+    }
+    if (b.created_at && inM(b.created_at)) return true
+    return false
+  }
+
+  const targetBatches = batches.filter(isBatchInMonth)
+
+  for (const b of targetBatches) {
+    if (signal?.aborted) {
+      const err = new Error('Export aborted')
+      err.name = 'AbortError'
+      throw err
+    }
+    const batchFileName = b.file?.file_name || b.file_name || `bank_statement_${b.id}.${b.file_type || 'csv'}`
+    const zipPath = `documents/${batchFileName}`
+
+    if (addedZipPaths.has(zipPath)) {
+      // Already packed via documents intake
+      continue
+    }
+
+    const rawBatchContent = b.file_content || b.content || b.raw_csv
+    const base64Batch = b.content_base64 || (typeof rawBatchContent === 'string' && rawBatchContent.startsWith('data:') ? rawBatchContent.split(',')[1] : null)
+
+    if (base64Batch) {
+      try {
+        const binStr = atob(base64Batch)
+        const bytes = new Uint8Array(binStr.length)
+        for (let i = 0; i < binStr.length; i++) bytes[i] = binStr.charCodeAt(i)
+        filesToZip.push({ name: zipPath, data: bytes })
+        addedZipPaths.add(zipPath)
+      } catch {
+        unavailableFiles.push({ batch_id: b.id, file_name: batchFileName, reason: 'Failed to decode base64 statement file content' })
+      }
+    } else if (rawBatchContent?.data && Array.isArray(rawBatchContent.data)) {
+      filesToZip.push({ name: zipPath, data: new Uint8Array(rawBatchContent.data) })
+      addedZipPaths.add(zipPath)
+    } else if (typeof rawBatchContent === 'string') {
+      filesToZip.push({ name: zipPath, data: rawBatchContent })
+      addedZipPaths.add(zipPath)
+    } else if (rawBatchContent instanceof Uint8Array) {
+      filesToZip.push({ name: zipPath, data: rawBatchContent })
+      addedZipPaths.add(zipPath)
+    } else {
+      let downloaded = false
+      const docMatch = documents.find((d) => (b.document_id && String(d.id) === String(b.document_id)) || (d.file_name && d.file_name === batchFileName))
+
+      if (docMatch) {
+        if (typeof fetchSignedUrl === 'function') {
+          try {
+            const url = await fetchSignedUrl(docMatch.id, 'download', businessId, signal)
+            if (url && typeof fetch === 'function') {
+              const resp = await fetch(url, { signal })
+              if (resp.ok) {
+                const buf = await resp.arrayBuffer()
+                filesToZip.push({ name: zipPath, data: new Uint8Array(buf) })
+                addedZipPaths.add(zipPath)
+                downloaded = true
+              }
+            }
+          } catch (fetchErr) {
+            if (signal?.aborted || fetchErr?.name === 'AbortError') throw fetchErr
+          }
+        } else if (token && typeof fetch === 'function') {
+          try {
+            const sResp = await fetch(`/api/documents/${docMatch.id}/signed-url`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`,
+                ...(businessId ? { 'x-business-id': String(businessId) } : {}),
+              },
+              body: JSON.stringify({ mode: 'download' }),
+              signal,
+            })
+            if (sResp.ok) {
+              const sData = await sResp.json()
+              if (sData?.url) {
+                const fileResp = await fetch(sData.url, { signal })
+                if (fileResp.ok) {
+                  const buf = await fileResp.arrayBuffer()
+                  filesToZip.push({ name: zipPath, data: new Uint8Array(buf) })
+                  addedZipPaths.add(zipPath)
+                  downloaded = true
+                }
+              }
+            }
+          } catch (fetchErr) {
+            if (signal?.aborted || fetchErr?.name === 'AbortError') throw fetchErr
+          }
+        }
+      }
+
+      if (!downloaded) {
+        unavailableFiles.push({
+          batch_id: b.id,
+          file_name: batchFileName,
+          wallet_id: b.wallet_id || null,
+          statement_period: `${b.statement_start || ''}..${b.statement_end || ''}`,
+          reason: 'Original bank statement file is unavailable or could not be retrieved from storage',
         })
       }
     }
