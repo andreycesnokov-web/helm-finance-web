@@ -17,7 +17,7 @@ import { PageHead, Card, Pill, Btn, NotYet, Skeleton, ErrorBox, Empty } from '..
 import { useT, useLang } from '../i18n'
 import { useApi } from '../data'
 import { money, shortDate } from '../lib/format'
-import { monthOptions, accountantMonth, closeReadiness, packages, packageSummary, monthGrid, complianceEvents, eventStage } from '../lib/accounting'
+import { monthOptions, accountantMonth, closeReadiness, packages, packageSummary, monthGrid, complianceEvents, eventStage, packageExportData } from '../lib/accounting'
 import { askAccountant } from '../lib/ask'
 import AccountantTabs from '../components/AccountantTabs'
 import { findWithholdingRule } from '../../pages/business/InvoiceReviewDrawer'
@@ -212,7 +212,30 @@ function CloseTab({ month, onOpenChatModal }) {
             <p className="v2-hero-p v2-show">{t('acct.recordsComplete', { n: r.complete, m: r.records })}</p>
             <div className="v2-row-gap v2-row-start">
               <NotYet note={t('acct.reviewSoon')}>{t('acct.sendToAccountant')}</NotYet>
-              <NotYet note={t('acct.packageSoon')}>{t('acct.download')}</NotYet>
+              <button
+                type="button"
+                className="v2-btn v2-btn-secondary"
+                onClick={() => {
+                  const pkg = packageExportData({
+                    month,
+                    transactions: Array.isArray(tx.data) ? tx.data : [],
+                    debts: Array.isArray(debts.data) ? debts.data : [],
+                    batches: batches.data?.batches || [],
+                    wallets: wallets.data?.wallets || [],
+                  })
+                  const blob = new Blob([JSON.stringify(pkg, null, 2)], { type: 'application/json' })
+                  const url = URL.createObjectURL(blob)
+                  const a = document.createElement('a')
+                  a.href = url
+                  a.download = `accountant-package-${month}.json`
+                  document.body.appendChild(a)
+                  a.click()
+                  document.body.removeChild(a)
+                  URL.revokeObjectURL(url)
+                }}
+              >
+                {t('acct.download')}
+              </button>
             </div>
           </div>
         </section>

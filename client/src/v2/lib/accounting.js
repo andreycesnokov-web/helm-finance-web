@@ -154,3 +154,63 @@ export function eventStage(e) {
   if (e?.amount_status === 'calculated' || e?.estimated_amount != null) return 'calculated'
   return 'todo'
 }
+
+/**
+ * Builds minimal structured accountant package for export:
+ * - summary: readiness %, complete/total records, reconciliation status
+ * - discrepancies: missing bank statements, bills without docs, uncategorised transactions
+ * - registry: list of transactions, debts, and their linked document status
+ */
+export function packageExportData({ month, transactions = [], debts = [], batches = [], wallets = [] }) {
+  const readiness = closeReadiness({ month, transactions, debts, batches, wallets })
+  const inM = (iso) => inMonth(iso, month)
+  const monthTx = transactions.filter((t) => inM(txDate(t)))
+  const monthDebts = debts.filter((d) => d.is_training !== true && d.status !== 'cancelled' && inM(d.due_date || d.created_at))
+
+  const missingStatements = readiness.checks.find((c) => c.key === 'statements')?.missing || []
+  const missingBills = readiness.checks.find((c) => c.key === 'bills')?.missing || []
+  const missingCategories = readiness.checks.find((c) => c.key === 'categories')?.missing || []
+
+  const registry = [
+    ...monthDebts.map((d) => ({
+      type: 'bill_or_invoice',
+      id: d.id,
+      counterparty: d.counterparty || '',
+      date: d.due_date || String(d.created_at || '').slice(0, 10),
+      amount: Number(d.original_amount ?? d.amount ?? 0),
+      currency: d.currency || 'IDR',
+      status: d.status,
+      has_documents: hasDocs(d),
+      accountant_checked: !!d.accountant_checked_at,
+    })),
+    ...monthTx.map((t) => ({
+      type: 'transaction',
+      id: t.id,
+      description: t.description || '',
+      date: txDate(t),
+      amount: Number(t.amount_original || 0),
+      currency: t.currency_original || 'IDR',
+      category: t.category || null,
+      has_category: !needsCategory(t),
+    })),
+  ]
+
+  return {
+    package_version: '1.0',
+    generated_at: new Date().toISOString(),
+    month,
+    readiness: {
+      percent: readiness.percent,
+      complete_records: readiness.complete,
+      total_records: readiness.records,
+      is_closed: readiness.percent === 100,
+    },
+    discrepancies: {
+      missing_bank_statements: missingStatements,
+      bills_without_documents: missingBills,
+      uncategorised_transactions: missingCategories,
+    },
+    records_registry: registry,
+  }
+}
+
