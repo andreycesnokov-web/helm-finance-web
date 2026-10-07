@@ -190,6 +190,33 @@ describe('Real PostgreSQL Integration: Bank Reconciliation & Transaction Linking
         created_at timestamptz DEFAULT now()
       );
 
+      ALTER TABLE public.bank_import_rows ADD COLUMN IF NOT EXISTS row_index int DEFAULT 0;
+      ALTER TABLE public.bank_import_rows ADD COLUMN IF NOT EXISTS tx_date date NULL;
+      ALTER TABLE public.bank_import_rows ADD COLUMN IF NOT EXISTS description text NULL;
+      ALTER TABLE public.bank_import_rows ADD COLUMN IF NOT EXISTS amount numeric NULL;
+      ALTER TABLE public.bank_import_rows ADD COLUMN IF NOT EXISTS direction text NULL;
+      ALTER TABLE public.bank_import_rows ADD COLUMN IF NOT EXISTS bank_reference text NULL;
+      ALTER TABLE public.bank_import_rows ADD COLUMN IF NOT EXISTS balance_after numeric NULL;
+      ALTER TABLE public.bank_import_rows ADD COLUMN IF NOT EXISTS dedup_hash text NULL;
+      ALTER TABLE public.bank_import_rows ADD COLUMN IF NOT EXISTS suggested_type text NULL;
+      ALTER TABLE public.bank_import_rows ADD COLUMN IF NOT EXISTS suggested_category text NULL;
+      ALTER TABLE public.bank_import_rows ADD COLUMN IF NOT EXISTS suggested_counterparty text NULL;
+      ALTER TABLE public.bank_import_rows ADD COLUMN IF NOT EXISTS suggested_transaction_type text NULL;
+      ALTER TABLE public.bank_import_rows ADD COLUMN IF NOT EXISTS suggested_match_type text NULL;
+      ALTER TABLE public.bank_import_rows ADD COLUMN IF NOT EXISTS suggested_match_id text NULL;
+      ALTER TABLE public.bank_import_rows ADD COLUMN IF NOT EXISTS suggested_confidence numeric NULL;
+      ALTER TABLE public.bank_import_rows ADD COLUMN IF NOT EXISTS suggested_scope text NULL;
+      ALTER TABLE public.bank_import_rows ADD COLUMN IF NOT EXISTS final_transaction_type text NULL;
+      ALTER TABLE public.bank_import_rows ADD COLUMN IF NOT EXISTS final_category_id uuid NULL;
+      ALTER TABLE public.bank_import_rows ADD COLUMN IF NOT EXISTS final_counterparty_id uuid NULL;
+      ALTER TABLE public.bank_import_rows ADD COLUMN IF NOT EXISTS final_scope text NULL;
+      ALTER TABLE public.bank_import_rows ADD COLUMN IF NOT EXISTS match_status text DEFAULT 'review_required';
+      ALTER TABLE public.bank_import_rows ADD COLUMN IF NOT EXISTS matched_transaction_id bigint NULL;
+      ALTER TABLE public.bank_import_rows ADD COLUMN IF NOT EXISTS linked_transaction_id bigint NULL;
+      ALTER TABLE public.bank_import_rows ADD COLUMN IF NOT EXISTS review_status text DEFAULT 'needs_review';
+      ALTER TABLE public.bank_import_rows ADD COLUMN IF NOT EXISTS reviewed_by_user_id bigint NULL;
+      ALTER TABLE public.bank_import_rows ADD COLUMN IF NOT EXISTS reviewed_at timestamptz NULL;
+
       CREATE TABLE IF NOT EXISTS public.bank_reconciliations (
         id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
         batch_id uuid NOT NULL REFERENCES public.bank_import_batches(id) ON DELETE CASCADE,
