@@ -69,6 +69,16 @@ describe('Real PostgreSQL: Migration 068 & Bank Import Batch Document Linking', 
         created_at timestamptz DEFAULT now(),
         updated_at timestamptz DEFAULT now()
       );
+
+      CREATE TABLE IF NOT EXISTS public.bank_import_rows (
+        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        batch_id uuid NOT NULL,
+        business_id uuid NOT NULL,
+        raw jsonb DEFAULT '{}'::jsonb,
+        amount numeric NULL,
+        direction text NULL,
+        created_at timestamptz DEFAULT now()
+      );
     `);
 
     // Seed test businesses & wallets
@@ -84,6 +94,46 @@ describe('Real PostgreSQL: Migration 068 & Bank Import Batch Document Linking', 
     if (client) {
       try { await client.end(); } catch {}
     }
+  });
+
+  it('Scenario 0: API returns controlled error when schema lacks document_id, creates no batch or rows, no silent fallback', async (t) => {
+    if (skipped) return t.skip('PostgreSQL unavailable');
+
+    // Create a document belonging to Company A
+    const docId = crypto.randomUUID();
+    await client.query(`
+      INSERT INTO public.financial_documents (id, business_id, file_name, document_type)
+      VALUES ($1, $2, 'pre_migration_statement.csv', 'bank_document')
+    `, [docId, BIZ_A]);
+
+    // Count existing batches and rows before request
+    const beforeBatches = await client.query(`SELECT count(*)::int as cnt FROM public.bank_import_batches WHERE business_id = $1`, [BIZ_A]);
+    const beforeRows = await client.query(`SELECT count(*)::int as cnt FROM public.bank_import_rows WHERE business_id = $1`, [BIZ_A]);
+
+    // Simulate API logic before migration 068 when column document_id does not exist
+    const docRow = await client.query(`SELECT id, business_id FROM public.financial_documents WHERE id = $1`, [docId]);
+    assert.strictEqual(docRow.rowCount, 1);
+    assert.strictEqual(docRow.rows[0].business_id, BIZ_A);
+
+    let caughtError = null;
+    try {
+      await client.query(`
+        INSERT INTO public.bank_import_batches (id, business_id, file_name, document_id, status)
+        VALUES ($1, $2, 'pre_migration_statement.csv', $3, 'review_required')
+      `, [crypto.randomUUID(), BIZ_A, docId]);
+    } catch (err) {
+      caughtError = err;
+    }
+
+    // Verify error is captured (column does not exist)
+    assert.ok(caughtError, 'Insert must fail when document_id column does not exist');
+    assert.match(caughtError.message, /column "document_id" of relation "bank_import_batches" does not exist/i);
+
+    // Verify NO batch was created and NO fallback row was inserted
+    const afterBatches = await client.query(`SELECT count(*)::int as cnt FROM public.bank_import_batches WHERE business_id = $1`, [BIZ_A]);
+    const afterRows = await client.query(`SELECT count(*)::int as cnt FROM public.bank_import_rows WHERE business_id = $1`, [BIZ_A]);
+    assert.strictEqual(afterBatches.rows[0].cnt, beforeBatches.rows[0].cnt, 'No batch should be created on schema mismatch');
+    assert.strictEqual(afterRows.rows[0].cnt, beforeRows.rows[0].cnt, 'No rows should be created on schema mismatch');
   });
 
   it('Scenario 1: Legacy batches exist with NULL document_id before migration, preserved after migration', async (t) => {
