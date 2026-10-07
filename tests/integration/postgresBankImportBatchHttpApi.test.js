@@ -57,6 +57,10 @@ describe('HTTP API End-to-End: POST /api/bank-import/batches over Real PostgreSQ
         created_at timestamptz DEFAULT now()
       );
 
+      ALTER TABLE public.businesses ADD COLUMN IF NOT EXISTS type text NOT NULL DEFAULT 'business';
+      ALTER TABLE public.businesses ADD COLUMN IF NOT EXISTS owner_user_id bigint NULL;
+      ALTER TABLE public.businesses ADD COLUMN IF NOT EXISTS created_at timestamptz DEFAULT now();
+
       CREATE TABLE IF NOT EXISTS public.business_members (
         id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
         business_id uuid NOT NULL REFERENCES public.businesses(id) ON DELETE CASCADE,
