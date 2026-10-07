@@ -24,6 +24,7 @@ import { findWithholdingRule } from '../../pages/business/InvoiceReviewDrawer'
 import TaxKnowledgeCard from '../../components/TaxKnowledgeCard'
 import { listTaxCards, getTaxCard, matchTopicId } from '../../lib/taxKnowledgeFixtures'
 import InfoTooltip from '../../components/InfoTooltip'
+import AccountantChatModal from '../components/AccountantChatModal'
 
 const monthLabel = (key, lang) => {
   const [y, m] = key.split('-').map(Number)
@@ -41,12 +42,10 @@ function MonthPicker({ value, onChange }) {
   )
 }
 
-function AskBox({ externalQuery = '', onQueryChange }) {
+function AskBox({ externalQuery = '', onQueryChange, onOpenModal }) {
   const t = useT()
-  const { token } = useAuth()
   const [sp, setSp] = useSearchParams()
   const [q, setQ] = useState(() => externalQuery || sp.get('ask') || '')
-  const [st, setSt] = useState({ busy: false, answer: null, err: null })
   // One business's answer never shows under another (review 8.2 #2).
   const { active, scopeKey } = useWorkspace()
   const wsKey = `${active?.id ?? ''}|${scopeKey ?? ''}`
@@ -62,7 +61,6 @@ function AskBox({ externalQuery = '', onQueryChange }) {
     if (wsRef.current !== wsKey) {
       wsRef.current = wsKey
       setQ('')
-      setSt({ busy: false, answer: null, err: null })
       if (onQueryChange) onQueryChange('')
       if (sp.has('ask') || sp.has('q')) {
         const nextSp = new URLSearchParams(sp)
@@ -81,24 +79,17 @@ function AskBox({ externalQuery = '', onQueryChange }) {
     }
   }, [sp])
 
-  const ask = async (question) => {
+  const submitAsk = (question) => {
     const text = (question ?? q).trim()
     if (!text) return
-    const asked = wsRef.current
-    setQ(text); setSt({ busy: true, answer: null, err: null })
-    try { const r = await askAccountant(token, text); if (wsRef.current === asked) setSt({ busy: false, answer: r, err: null }) }
-    catch (e) {
-      if (wsRef.current === asked) {
-        const msg = e?.status === 403
-          ? t('dec.forbidden')
-          : (t('acct.askErr') || 'Не удалось получить ответ. Пожалуйста, повторите попытку.')
-        setSt({ busy: false, answer: null, err: msg })
-      }
+    if (onOpenModal) {
+      onOpenModal(text)
     }
   }
+
   return (
     <Card>
-      <form className="v2-askbox" onSubmit={(e) => { e.preventDefault(); ask() }}>
+      <form className="v2-askbox" onSubmit={(e) => { e.preventDefault(); submitAsk() }}>
         <label htmlFor="acc-ask" className="v2-field-label">{t('acct.askLabel')}</label>
         <div className="v2-askrow">
           <input
@@ -112,36 +103,13 @@ function AskBox({ externalQuery = '', onQueryChange }) {
             placeholder={t('acct.askPh')}
             maxLength={500}
           />
-          <button type="submit" className="v2-btn v2-btn-primary" aria-label={t('acct.send')} title={q.trim() ? undefined : t('ask.typeFirst')} disabled={st.busy || !q.trim()}><I.send size={16} /></button>
+          <button type="submit" className="v2-btn v2-btn-primary" aria-label={t('acct.send')} title={q.trim() ? undefined : t('ask.typeFirst')} disabled={!q.trim()}><I.send size={16} /></button>
         </div>
       </form>
       <div className="v2-chips">
-        {['q1', 'q2', 'q3'].map((k) => <button key={k} type="button" className="v2-chip" onClick={() => ask(t(`acct.chip.${k}`))}>{t(`acct.chip.${k}`)}</button>)}
+        {['q1', 'q2', 'q3'].map((k) => <button key={k} type="button" className="v2-chip" onClick={() => submitAsk(t(`acct.chip.${k}`))}>{t(`acct.chip.${k}`)}</button>)}
         <Link className="v2-chip v2-chip-ask" to="/business/accountant/tax-profile">{t('acct.tab.profile')}</Link>
       </div>
-      {st.busy && <Skeleton rows={2} />}
-      {st.err && (
-        <div className="v2-inline-err" role="alert" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap' }}>
-          <span>{st.err}</span>
-          <button
-            type="button"
-            className="v2-btn v2-btn-ghost v2-btn-sm"
-            onClick={() => ask(q)}
-            disabled={st.busy || !q.trim()}
-          >
-            {t('acct.askRetry') || 'Повторить'}
-          </button>
-        </div>
-      )}
-      {st.answer && (
-        <div className="v2-answer" aria-live="polite">
-          <p>{st.answer.answer}</p>
-          {st.answer.disclaimer && <p className="v2-muted v2-small">{st.answer.disclaimer}</p>}
-          {Array.isArray(st.answer.used_rules) && st.answer.used_rules.length > 0 && (
-            <p className="v2-muted v2-small">{t('acct.sources')}: {st.answer.used_rules.map((r) => r.rule_code).join(', ')}</p>
-          )}
-        </div>
-      )}
     </Card>
   )
 }
@@ -186,7 +154,7 @@ function TaxList({ events, lang, t, limit, empty = 'acct.noEvents' }) {
   )
 }
 
-function CloseTab({ month }) {
+function CloseTab({ month, onOpenChatModal }) {
   const t = useT()
   const lang = useLang()
   const { active, scopeKey } = useWorkspace()
@@ -276,7 +244,11 @@ function CloseTab({ month }) {
           <TaxList events={due} lang={lang} t={t} limit={8} />
           <p className="v2-muted v2-small">{t('acct.taxNote')}</p>
         </Card>
-        <AskBox externalQuery={askQuery} onQueryChange={setAskQuery} />
+        <AskBox
+          externalQuery={askQuery}
+          onQueryChange={setAskQuery}
+          onOpenModal={onOpenChatModal}
+        />
       </div>
 
       <div style={{ gridColumn: '1 / -1', marginTop: 14 }}>
@@ -328,9 +300,8 @@ function CloseTab({ month }) {
                   lang={lang}
                   onAskAccountant={(qText) => {
                     setAskQuery(qText)
-                    const input = document.getElementById('acc-ask')
-                    if (input) {
-                      input.focus()
+                    if (onOpenChatModal) {
+                      onOpenChatModal(qText)
                     }
                   }}
                 />
@@ -497,6 +468,8 @@ function TaxesTab({ month }) {
 
 export default function Accountant() {
   const t = useT()
+  const { token } = useAuth()
+  const { active, scopeKey } = useWorkspace()
   const [sp, setSp] = useSearchParams()
   const tab = ['packages', 'taxes'].includes(sp.get('tab')) ? sp.get('tab') : 'close'
   // Read from the URL on every render: validated, and reset to the tab's default on a tab
@@ -504,13 +477,55 @@ export default function Accountant() {
   const month = accountantMonth(sp.get('month'), tab)
   const pickMonth = (m) => { const n = new URLSearchParams(sp); n.set('month', m); setSp(n, { replace: true }) }
   const sub = t(`acct.sub.${tab}`)
+
+  const [chatModalOpen, setChatModalOpen] = useState(false)
+  const [chatInitialQuery, setChatInitialQuery] = useState('')
+
+  // Clean initial query and close modal whenever active company or scope changes
+  useEffect(() => {
+    setChatInitialQuery('')
+    setChatModalOpen(false)
+  }, [active?.id, scopeKey])
+
+  useEffect(() => {
+    const askParam = sp.get('ask') || sp.get('q')
+    if (askParam) {
+      setChatInitialQuery(askParam)
+      setChatModalOpen(true)
+      const nextSp = new URLSearchParams(sp)
+      nextSp.delete('ask')
+      nextSp.delete('q')
+      setSp(nextSp, { replace: true })
+    }
+  }, [sp, setSp])
+
+  const handleOpenChat = (queryText) => {
+    setChatInitialQuery(queryText || '')
+    setChatModalOpen(true)
+  }
+
+  const handleCloseChat = () => {
+    setChatModalOpen(false)
+    setChatInitialQuery('')
+  }
+
   return (
     <div className="v2-page">
       <PageHead title={t('nav.accountant')} sub={sub} actions={<><MonthPicker value={month} onChange={pickMonth} /><Btn to="/business/accountant/classic">{t('bills.classic')}</Btn></>} />
       <AccountantTabs active={tab} />
-      {tab === 'close' && <CloseTab month={month} />}
+      {tab === 'close' && <CloseTab month={month} onOpenChatModal={handleOpenChat} />}
       {tab === 'packages' && <PackagesTab month={month} />}
       {tab === 'taxes' && <TaxesTab month={month} />}
+      <AccountantChatModal
+        open={chatModalOpen}
+        onClose={handleCloseChat}
+        companyName={active?.name || ''}
+        token={token}
+        activeBusinessId={active?.id}
+        scopeKey={scopeKey}
+        initialQuery={chatInitialQuery}
+      />
     </div>
   )
 }
+
