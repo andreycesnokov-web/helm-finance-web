@@ -322,5 +322,60 @@ const debts = [
   ok('Bills without docs: is_closed MUST be false', rMissingDocs.is_closed === false);
 }
 
+// 11. Missing or invalid statement dates leave month coverage unconfirmed
+{
+  // Missing statement_start
+  const bMissingStart = [{
+    id: 'b-ms', wallet_id: 'w-bca', status: 'imported', closing_balance: 50000,
+    statement_end: '2026-09-30', difference: 0, reconciliation_status: 'balanced',
+  }];
+  const rMS = closeReadiness({ month, transactions, debts, batches: bMissingStart, wallets });
+  ok('Missing statement_start: statements is false', rMS.checks.find((c) => c.key === 'statements').done === false);
+  ok('Missing statement_start: reconciliation is false', rMS.checks.find((c) => c.key === 'reconciliation').done === false);
+
+  // Missing statement_end
+  const bMissingEnd = [{
+    id: 'b-me', wallet_id: 'w-bca', status: 'imported', closing_balance: 50000,
+    statement_start: '2026-09-01', difference: 0, reconciliation_status: 'balanced',
+  }];
+  const rME = closeReadiness({ month, transactions, debts, batches: bMissingEnd, wallets });
+  ok('Missing statement_end: statements is false', rME.checks.find((c) => c.key === 'statements').done === false);
+  ok('Missing statement_end: reconciliation is false', rME.checks.find((c) => c.key === 'reconciliation').done === false);
+
+  // Invalid date string
+  const bInvalidDate = [{
+    id: 'b-inv', wallet_id: 'w-bca', status: 'imported', closing_balance: 50000,
+    statement_start: 'not-a-date', statement_end: '2026-09-30', difference: 0, reconciliation_status: 'balanced',
+  }];
+  const rInv = closeReadiness({ month, transactions, debts, batches: bInvalidDate, wallets });
+  ok('Invalid date string: statements is false', rInv.checks.find((c) => c.key === 'statements').done === false);
+  ok('Invalid date string: reconciliation is false', rInv.checks.find((c) => c.key === 'reconciliation').done === false);
+
+  // Inverted date range (start > end)
+  const bInverted = [{
+    id: 'b-inv2', wallet_id: 'w-bca', status: 'imported', closing_balance: 50000,
+    statement_start: '2026-09-30', statement_end: '2026-09-01', difference: 0, reconciliation_status: 'balanced',
+  }];
+  const rInv2 = closeReadiness({ month, transactions, debts, batches: bInverted, wallets });
+  ok('Inverted dates (start > end): statements is false', rInv2.checks.find((c) => c.key === 'statements').done === false);
+  ok('Inverted dates (start > end): reconciliation is false', rInv2.checks.find((c) => c.key === 'reconciliation').done === false);
+}
+
+// 12. Preservation of records and complete in closeReadiness
+{
+  const r = closeReadiness({ month, transactions, debts, batches: [], wallets });
+  ok('records is present and a number', typeof r.records === 'number' && Number.isFinite(r.records));
+  ok('complete is present and a number', typeof r.complete === 'number' && Number.isFinite(r.complete));
+  ok('records matches transactions + bills', r.records === 2);
+  ok('complete matches categorized + documented records', r.complete === 2);
+}
+
+// 13. Consistency of is_complete and presence of files_available flag across package
+{
+  const pkgData = packageExportData({ month, companyName: 'Test Co', businessId: 'b1', transactions, debts, batches: [], wallets });
+  ok('packageExportData readiness preserves records and complete', pkgData.readiness.total_records === 2 && pkgData.readiness.complete_records === 2);
+}
+
 console.log(`\nALL PASS — ${pass} passed, ${fail} failed`);
 if (fail > 0) process.exit(1);
+

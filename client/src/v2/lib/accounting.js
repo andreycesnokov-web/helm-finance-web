@@ -68,15 +68,26 @@ export function closeReadiness({ month, transactions = [], debts = [], batches =
   const banks = wallets.filter(isBankWallet)
 
   const isFiniteNumber = (val) => val != null && val !== '' && typeof val !== 'boolean' && Number.isFinite(Number(val)) && !Number.isNaN(Number(val))
+  const isValidIsoDate = (str) => {
+    if (!str || typeof str !== 'string') return false
+    const match = str.trim().slice(0, 10).match(/^(\d{4})-(\d{2})-(\d{2})$/)
+    if (!match) return false
+    const [_, y, m, d] = match
+    const dt = new Date(`${y}-${m}-${d}T00:00:00Z`)
+    if (Number.isNaN(dt.getTime())) return false
+    return dt.getUTCFullYear() === Number(y) && dt.getUTCMonth() + 1 === Number(m) && dt.getUTCDate() === Number(d)
+  }
 
   const withStatements = banks.filter((w) =>
-    batches.some((b) =>
-      String(b.wallet_id) === String(w.id) &&
-      !['cancelled', 'failed'].includes(b.status) &&
-      b.statement_start && b.statement_end &&
-      String(b.statement_start) <= start &&
-      String(b.statement_end) >= end
-    )
+    batches.some((b) => {
+      if (String(b.wallet_id) !== String(w.id)) return false
+      if (['cancelled', 'failed'].includes(b.status)) return false
+      if (!isValidIsoDate(b.statement_start) || !isValidIsoDate(b.statement_end)) return false
+      const bStart = b.statement_start.trim().slice(0, 10)
+      const bEnd = b.statement_end.trim().slice(0, 10)
+      if (bStart > bEnd) return false
+      return bStart <= start && bEnd >= end
+    })
   )
   const reconciled = banks.filter((w) =>
     batches.some((b) => {
@@ -84,9 +95,12 @@ export function closeReadiness({ month, transactions = [], debts = [], batches =
       if (['cancelled', 'failed', 'review_required'].includes(b.status)) return false
       if (b.status !== 'imported' && b.status !== 'reconciled') return false
 
-      // Statement must cover the selected month
-      if (!b.statement_start || !b.statement_end) return false
-      if (String(b.statement_start) > start || String(b.statement_end) < end) return false
+      // Statement dates must be valid and cover the selected month
+      if (!isValidIsoDate(b.statement_start) || !isValidIsoDate(b.statement_end)) return false
+      const bStart = b.statement_start.trim().slice(0, 10)
+      const bEnd = b.statement_end.trim().slice(0, 10)
+      if (bStart > bEnd) return false
+      if (bStart > start || bEnd < end) return false
 
       // Closing balance must be a finite number
       if (!isFiniteNumber(b.closing_balance)) return false
@@ -110,8 +124,8 @@ export function closeReadiness({ month, transactions = [], debts = [], batches =
     })
   )
   const records = tx.length + bills.length
-  const complete = records - noCat.length - noDoc.length
-  const percent = records ? Math.round((Math.max(0, complete) / records) * 100) : null
+  const complete = Math.max(0, records - noCat.length - noDoc.length)
+  const percent = records ? Math.round((complete / records) * 100) : null
   const checks = [
     { key: 'statements', done: banks.length > 0 && withStatements.length === banks.length, total: banks.length, ok: withStatements.length, missing: banks.filter((w) => !withStatements.includes(w)).map((w) => w.name) },
     { key: 'reconciliation', done: banks.length > 0 && reconciled.length === banks.length, total: banks.length, ok: reconciled.length, missing: banks.filter((w) => !reconciled.includes(w)).map((w) => w.name) },
@@ -121,7 +135,9 @@ export function closeReadiness({ month, transactions = [], debts = [], batches =
   const is_closed = percent === 100 && checks.every((c) => c.done)
 
   return {
-    month, records, complete: Math.max(0, complete),
+    month,
+    records,
+    complete,
     percent,
     is_closed,
     banks: {
@@ -516,7 +532,8 @@ export async function createAccountantZipPackage({
     }
   }
 
-  const isComplete = unavailableFiles.length === 0 && exportData.readiness.is_closed === true
+  const filesAvailable = unavailableFiles.length === 0
+  const isComplete = filesAvailable && exportData.readiness.is_closed === true
 
   const summary = {
     package_version: exportData.package_version,
@@ -524,9 +541,11 @@ export async function createAccountantZipPackage({
     month: exportData.month,
     company: exportData.company,
     is_complete: isComplete,
+    files_available: filesAvailable,
     readiness: {
       ...exportData.readiness,
       is_complete: isComplete,
+      files_available: filesAvailable,
     },
     bank_accounts: exportData.bank_accounts,
   }
@@ -534,7 +553,8 @@ export async function createAccountantZipPackage({
   const discrepancies = {
     company_name: exportData.company.name,
     month: exportData.month,
-    is_complete: unavailableFiles.length === 0,
+    is_complete: isComplete,
+    files_available: filesAvailable,
     ...exportData.discrepancies,
     unavailable_files: unavailableFiles,
   }
@@ -554,6 +574,7 @@ export async function createAccountantZipPackage({
     discrepancies,
     recordsRegistry: exportData.records_registry,
     unavailableFiles,
+    filesAvailable,
     isComplete,
   }
 }
