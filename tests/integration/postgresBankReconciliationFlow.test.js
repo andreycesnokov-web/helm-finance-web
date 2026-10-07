@@ -605,6 +605,62 @@ describe('Real PostgreSQL Integration: Bank Reconciliation & Transaction Linking
     // Verify ZERO duplicate transactions were created in PostgreSQL
     const txCountAfter = (await pgClient.query(`SELECT count(*)::int as cnt FROM public.transactions WHERE business_id = $1`, [BIZ_A])).rows[0].cnt;
     assert.strictEqual(txCountAfter, txCountBefore, 'Linking existing transactions MUST not insert new transactions');
+
+    // Verify application month-close readiness directly from API for Scenario A
+    const txApiRes = await fetch(`${BASE}/api/transactions`, {
+      headers: { authorization: `Bearer ${token}`, 'x-business-id': BIZ_A },
+    });
+    assert.strictEqual(txApiRes.status, 200);
+    const liveTxsA = await txApiRes.json();
+
+    const batchesApiRes = await fetch(`${BASE}/api/bank-import/batches`, {
+      headers: { authorization: `Bearer ${token}`, 'x-business-id': BIZ_A },
+    });
+    assert.strictEqual(batchesApiRes.status, 200);
+    const liveBatchesA = (await batchesApiRes.json()).batches || [];
+
+    const walletsApiRes = await fetch(`${BASE}/api/wallets`, {
+      headers: { authorization: `Bearer ${token}`, 'x-business-id': BIZ_A },
+    });
+    assert.strictEqual(walletsApiRes.status, 200);
+    const liveWalletsA = (await walletsApiRes.json()).wallets || [];
+
+    const debtsApiRes = await fetch(`${BASE}/api/debts`, {
+      headers: { authorization: `Bearer ${token}`, 'x-business-id': BIZ_A },
+    });
+    assert.strictEqual(debtsApiRes.status, 200);
+    const liveDebtsA = await debtsApiRes.json();
+
+    // In Scenario A, all bank transactions are linked to the balanced statement
+    assert.ok(liveTxsA.length >= 3, 'Scenario A has at least 3 transactions');
+    const bcaTxs = liveTxsA.filter(t => t.wallet_id === WALLET_A);
+    assert.ok(bcaTxs.every(t => t.linked_statement_row_id != null), 'All BCA transactions in Scenario A must carry linked_statement_row_id from bank_import_rows');
+
+    const readinessA = closeReadinessFn({
+      month: '2026-09',
+      transactions: liveTxsA,
+      debts: liveDebtsA,
+      batches: liveBatchesA,
+      wallets: liveWalletsA,
+    });
+
+    assert.strictEqual(readinessA.unlinked_transactions.length, 0, 'Scenario A must have 0 unlinked transactions');
+    const reconCheckA = readinessA.checks.find(c => c.key === 'reconciliation');
+    assert.strictEqual(reconCheckA.done, true, 'Reconciliation check must be done in balanced Scenario A');
+    assert.strictEqual(readinessA.banks.reconciled, 1, 'Reconciled bank count must be 1');
+    assert.strictEqual(readinessA.is_closed, false, 'is_closed must remain false without accountant confirmation');
+
+    const exportDataA = packageExportDataFn({
+      month: '2026-09',
+      companyName: 'PT Solusi Utama',
+      businessId: BIZ_A,
+      transactions: liveTxsA,
+      debts: liveDebtsA,
+      batches: liveBatchesA,
+      wallets: liveWalletsA,
+    });
+    assert.strictEqual(exportDataA.readiness.bank_reconciliation_status, 'reconciled');
+    assert.strictEqual(exportDataA.discrepancies.unlinked_transactions.length, 0);
   });
 
   it('Scenario B: Repeated confirmation and repeated import do not create duplicate transactions or duplicate links', async (t) => {
@@ -743,18 +799,12 @@ describe('Real PostgreSQL Integration: Bank Reconciliation & Transaction Linking
     assert.strictEqual(walletsApiRes.status, 200, `Wallets API must return 200, got ${walletsApiRes.status}: ${JSON.stringify(walletsApiData)}`);
     const liveWallets = walletsApiData.wallets || [];
 
-    // Map unlinked status into transaction records for reconciliation analysis
-    const unlinkedIdSet = new Set(unlinkedIds.map(String));
-    const analyzedTxs = liveTxs.map(t => ({
-      ...t,
-      is_reconciled: !unlinkedIdSet.has(String(t.id)),
-      linked_statement_row_id: unlinkedIdSet.has(String(t.id)) ? null : (t.linked_statement_row_id || 1),
-    }));
-
-    // 3. Verify application logic (closeReadiness)
+    // 3. Verify application logic (closeReadiness) using REAL transactions fetched directly from API
+    // Transactions API automatically enriches linked_statement_row_id from bank_import_rows.
+    // Unlinked transactions naturally have linked_statement_row_id = null.
     const readiness = closeReadinessFn({
       month: '2026-09',
-      transactions: analyzedTxs,
+      transactions: liveTxs,
       debts: [],
       batches: liveBatches,
       wallets: liveWallets,
@@ -773,12 +823,12 @@ describe('Real PostgreSQL Integration: Bank Reconciliation & Transaction Linking
     assert.strictEqual(readiness.status, 'in_progress', 'Package must NOT get status prepared_for_review');
     assert.strictEqual(readiness.is_closed, false, 'is_closed must remain false');
 
-    // 4. Verify exported package data (packageExportData)
+    // 4. Verify exported package data (packageExportData) using live API transactions
     const exportData = packageExportDataFn({
       month: '2026-09',
       companyName: 'Test Business A',
       businessId: BIZ_A,
-      transactions: analyzedTxs,
+      transactions: liveTxs,
       debts: [],
       batches: liveBatches,
       wallets: liveWallets,

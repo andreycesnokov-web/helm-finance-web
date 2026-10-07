@@ -464,6 +464,33 @@ const debts = [
   ok('Symmetric unlinked export: bank_reconciliation_status is unreconciled', expSym.readiness.bank_reconciliation_status === 'unreconciled');
 }
 
+// 16. Missing/null linked_statement_row_id (without is_reconciled field) strictly treated as unreconciled
+{
+  const txWithNullLinks = [
+    { id: 1, wallet_id: 'w-bca', transaction_date: '2026-09-10', category: 'Operations', amount_original: 1000, linked_statement_row_id: 101 },
+    { id: 2, wallet_id: 'w-bca', transaction_date: '2026-09-25', category: 'Revenue', amount_original: 1000000, type: 'income', linked_statement_row_id: null },
+    { id: 3, wallet_id: 'w-bca', transaction_date: '2026-09-26', category: 'Supplies', amount_original: 1000000, type: 'expense' }, // completely absent
+    { id: 4, wallet_id: 'w-bca', transaction_date: '2026-09-01', category: 'Opening', amount_original: 45000000, source: 'wallet_opening_balance' }, // opening balance exempted
+  ];
+  const balancedBatch = [{
+    id: 'b-bal-null',
+    wallet_id: 'w-bca',
+    status: 'imported',
+    closing_balance: 50000,
+    statement_start: '2026-09-01',
+    statement_end: '2026-09-30',
+    difference: 0,
+    reconciliation_status: 'balanced',
+    file_content: 'Date,Amount,Description\n2026-09-10,1000,Operations\n',
+  }];
+
+  const rNull = closeReadiness({ month, transactions: txWithNullLinks, debts, batches: balancedBatch, wallets });
+  ok('Null/absent link is unreconciled: unlinked_transactions count is 2', rNull.unlinked_transactions.length === 2);
+  ok('Null/absent link is unreconciled: opening balance not marked unlinked', !rNull.unlinked_transactions.some(t => t.id === 4));
+  ok('Null/absent link is unreconciled: status is in_progress', rNull.status === 'in_progress');
+  ok('Null/absent link is unreconciled: reconciliation check is false', rNull.checks.find(c => c.key === 'reconciliation').done === false);
+}
+
 console.log(`\nALL PASS — ${pass} passed, ${fail} failed`);
 if (fail > 0) process.exit(1);
 

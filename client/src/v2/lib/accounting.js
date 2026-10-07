@@ -121,18 +121,31 @@ export function closeReadiness({ month, transactions = [], debts = [], batches =
       if (Math.abs(diff) >= tol) return false
 
       // Ledger completeness: if transactions are supplied and statement period covers the month,
-      // all ledger transactions for this bank account in this month must be linked/reconciled to statement rows.
+      // all ledger transactions for this bank account in this month must be linked to statement rows.
+      // An absent, null, or false statement link strictly means unreconciled.
+      const isReconciledTx = (t) => {
+        if (t?.source === 'wallet_opening_balance' || t?.type === 'opening') return true
+        if (t?.linked_statement_row_id || t?.statement_row_id) return true
+        if (t?.is_reconciled === true) return true
+        return false
+      }
       const walletMonthTx = tx.filter((t) => String(t.wallet_id) === String(w.id))
-      const hasUnlinkedTx = walletMonthTx.some((t) => !t.linked_statement_row_id && !t.statement_row_id && t.is_reconciled === false)
+      const hasUnlinkedTx = walletMonthTx.some((t) => !isReconciledTx(t))
       if (hasUnlinkedTx) return false
 
       return true
     })
   )
+  const isReconciledBankTx = (t) => {
+    if (t?.source === 'wallet_opening_balance' || t?.type === 'opening') return true
+    if (t?.linked_statement_row_id || t?.statement_row_id) return true
+    if (t?.is_reconciled === true) return true
+    return false
+  }
   const unlinkedBankTx = tx.filter((t) => {
     const isBank = banks.some((w) => String(w.id) === String(t.wallet_id))
     if (!isBank) return false
-    return !t.linked_statement_row_id && !t.statement_row_id && t.is_reconciled === false
+    return !isReconciledBankTx(t)
   })
   const records = tx.length + bills.length
   const complete = Math.max(0, records - noCat.length - noDoc.length)

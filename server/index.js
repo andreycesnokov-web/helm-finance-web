@@ -8239,6 +8239,45 @@ app.get('/api/transactions', auth, async (req, res) => {
 
   const { data, error } = await query;
   if (error) return res.status(500).json({ error: error.message });
+
+  // Enrich bank-statement linking metadata for returned transactions
+  if (Array.isArray(data) && data.length > 0) {
+    const txIds = data.map(t => t.id).filter(Boolean);
+    if (txIds.length > 0) {
+      try {
+        const { data: linkRows } = await supabase.from('bank_import_rows')
+          .select('id, batch_id, linked_transaction_id')
+          .eq('business_id', biz.business.id)
+          .in('linked_transaction_id', txIds);
+        if (Array.isArray(linkRows) && linkRows.length > 0) {
+          const linkMap = new Map();
+          for (const lr of linkRows) {
+            if (lr.linked_transaction_id != null) {
+              linkMap.set(String(lr.linked_transaction_id), lr);
+            }
+          }
+          for (const t of data) {
+            const lr = linkMap.get(String(t.id));
+            if (lr) {
+              t.linked_statement_row_id = lr.id;
+              t.statement_batch_id = lr.batch_id;
+            } else {
+              t.linked_statement_row_id = null;
+              t.statement_batch_id = null;
+            }
+          }
+        } else {
+          for (const t of data) {
+            t.linked_statement_row_id = null;
+            t.statement_batch_id = null;
+          }
+        }
+      } catch (e) {
+        // Fallback gracefully without breaking transactions retrieval
+      }
+    }
+  }
+
   res.json(data);
 });
 
