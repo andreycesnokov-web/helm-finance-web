@@ -617,33 +617,36 @@ export async function createAccountantZipPackage({
       continue
     }
 
-    const rawBatchContent = b.file_content || b.content || b.raw_csv
-    const base64Batch = b.content_base64 || (typeof rawBatchContent === 'string' && rawBatchContent.startsWith('data:') ? rawBatchContent.split(',')[1] : null)
+    let downloaded = false
+    const docMatch = documents.find((d) => b.document_id && String(d.id) === String(b.document_id))
 
-    if (base64Batch) {
-      try {
-        const binStr = atob(base64Batch)
-        const bytes = new Uint8Array(binStr.length)
-        for (let i = 0; i < binStr.length; i++) bytes[i] = binStr.charCodeAt(i)
-        filesToZip.push({ name: zipPath, data: bytes })
+    if (docMatch) {
+      const rawDocContent = docMatch.file_content || docMatch.content
+      const base64Doc = docMatch.content_base64 || (typeof rawDocContent === 'string' && rawDocContent.startsWith('data:') ? rawDocContent.split(',')[1] : null)
+      if (base64Doc) {
+        try {
+          const binStr = atob(base64Doc)
+          const bytes = new Uint8Array(binStr.length)
+          for (let i = 0; i < binStr.length; i++) bytes[i] = binStr.charCodeAt(i)
+          filesToZip.push({ name: zipPath, data: bytes })
+          addedZipPaths.add(zipPath)
+          downloaded = true
+        } catch {}
+      } else if (rawDocContent?.data && Array.isArray(rawDocContent.data)) {
+        filesToZip.push({ name: zipPath, data: new Uint8Array(rawDocContent.data) })
         addedZipPaths.add(zipPath)
-      } catch {
-        unavailableFiles.push({ batch_id: b.id, file_name: batchFileName, reason: 'Failed to decode base64 statement file content' })
+        downloaded = true
+      } else if (typeof rawDocContent === 'string') {
+        filesToZip.push({ name: zipPath, data: rawDocContent })
+        addedZipPaths.add(zipPath)
+        downloaded = true
+      } else if (rawDocContent instanceof Uint8Array) {
+        filesToZip.push({ name: zipPath, data: rawDocContent })
+        addedZipPaths.add(zipPath)
+        downloaded = true
       }
-    } else if (rawBatchContent?.data && Array.isArray(rawBatchContent.data)) {
-      filesToZip.push({ name: zipPath, data: new Uint8Array(rawBatchContent.data) })
-      addedZipPaths.add(zipPath)
-    } else if (typeof rawBatchContent === 'string') {
-      filesToZip.push({ name: zipPath, data: rawBatchContent })
-      addedZipPaths.add(zipPath)
-    } else if (rawBatchContent instanceof Uint8Array) {
-      filesToZip.push({ name: zipPath, data: rawBatchContent })
-      addedZipPaths.add(zipPath)
-    } else {
-      let downloaded = false
-      const docMatch = documents.find((d) => (b.document_id && String(d.id) === String(b.document_id)) || (d.file_name && d.file_name === batchFileName))
 
-      if (docMatch) {
+      if (!downloaded) {
         if (typeof fetchSignedUrl === 'function') {
           try {
             const url = await fetchSignedUrl(docMatch.id, 'download', businessId, signal)
@@ -688,16 +691,47 @@ export async function createAccountantZipPackage({
           }
         }
       }
+    }
 
-      if (!downloaded) {
-        unavailableFiles.push({
-          batch_id: b.id,
-          file_name: batchFileName,
-          wallet_id: b.wallet_id || null,
-          statement_period: `${b.statement_start || ''}..${b.statement_end || ''}`,
-          reason: 'Original bank statement file is unavailable or could not be retrieved from storage',
-        })
+    if (!downloaded) {
+      // Fallback for tests providing inline raw content directly on batch
+      const rawBatchContent = b.file_content || b.content || b.raw_csv
+      const base64Batch = b.content_base64 || (typeof rawBatchContent === 'string' && rawBatchContent.startsWith('data:') ? rawBatchContent.split(',')[1] : null)
+
+      if (base64Batch) {
+        try {
+          const binStr = atob(base64Batch)
+          const bytes = new Uint8Array(binStr.length)
+          for (let i = 0; i < binStr.length; i++) bytes[i] = binStr.charCodeAt(i)
+          filesToZip.push({ name: zipPath, data: bytes })
+          addedZipPaths.add(zipPath)
+          downloaded = true
+        } catch {
+          unavailableFiles.push({ batch_id: b.id, file_name: batchFileName, reason: 'Failed to decode base64 statement file content' })
+        }
+      } else if (rawBatchContent?.data && Array.isArray(rawBatchContent.data)) {
+        filesToZip.push({ name: zipPath, data: new Uint8Array(rawBatchContent.data) })
+        addedZipPaths.add(zipPath)
+        downloaded = true
+      } else if (typeof rawBatchContent === 'string') {
+        filesToZip.push({ name: zipPath, data: rawBatchContent })
+        addedZipPaths.add(zipPath)
+        downloaded = true
+      } else if (rawBatchContent instanceof Uint8Array) {
+        filesToZip.push({ name: zipPath, data: rawBatchContent })
+        addedZipPaths.add(zipPath)
+        downloaded = true
       }
+    }
+
+    if (!downloaded) {
+      unavailableFiles.push({
+        batch_id: b.id,
+        file_name: batchFileName,
+        wallet_id: b.wallet_id || null,
+        statement_period: `${b.statement_start || ''}..${b.statement_end || ''}`,
+        reason: 'Original bank statement file is unavailable or could not be retrieved from storage',
+      })
     }
   }
 

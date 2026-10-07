@@ -210,5 +210,58 @@ const MONTH = '2026-09';
   ok('fetchSignedUrl is called with explicit company context businessId', passedBizId === BIZ_ID);
 }
 
+// ── Test 6: Bank statement is matched strictly by document_id, not filename alone
+{
+  const documents = [
+    { id: 'doc-loose', business_id: BIZ_ID, file_name: 'bca_loose.csv', content: 'Date,Amount\n' },
+  ];
+  const batchesWithoutDocId = [
+    {
+      id: 'b-loose',
+      business_id: BIZ_ID,
+      file_name: 'bca_loose.csv',
+      statement_start: '2026-09-01',
+      statement_end: '2026-09-30',
+      status: 'imported',
+      document_id: null, // No document_id link!
+    },
+  ];
+
+  const pkgLoose = await createAccountantZipPackage({
+    month: MONTH,
+    companyName: 'PT Solusi Utama',
+    businessId: BIZ_ID,
+    batches: batchesWithoutDocId,
+    documents,
+  });
+
+  ok('Bank statement without document_id is NOT matched by filename alone: unavailableFiles has 1 item', pkgLoose.unavailableFiles.length === 1);
+  ok('filesAvailable is false when bank statement has no document_id link', pkgLoose.filesAvailable === false);
+
+  // Now with explicit document_id link:
+  const batchesWithDocId = [
+    {
+      id: 'b-linked',
+      business_id: BIZ_ID,
+      file_name: 'bca_loose.csv',
+      statement_start: '2026-09-01',
+      statement_end: '2026-09-30',
+      status: 'imported',
+      document_id: 'doc-loose', // Explicit document_id link!
+    },
+  ];
+
+  const pkgLinked = await createAccountantZipPackage({
+    month: MONTH,
+    companyName: 'PT Solusi Utama',
+    businessId: BIZ_ID,
+    batches: batchesWithDocId,
+    documents,
+  });
+
+  ok('Bank statement WITH document_id link is matched and included: unavailableFiles is 0', pkgLinked.unavailableFiles.length === 0);
+  ok('filesAvailable is true when bank statement is explicitly linked by document_id', pkgLinked.filesAvailable === true);
+}
+
 console.log(`\nACCOUNTANT EXPORT TESTS: ${pass} passed, ${fail} failed`);
 if (fail > 0) process.exit(1);

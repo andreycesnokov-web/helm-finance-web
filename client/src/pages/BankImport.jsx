@@ -3,6 +3,7 @@ import * as XLSX from 'xlsx'
 import { useAuth } from '../hooks/useAuth'
 import { useTranslation } from '../hooks/useTranslation'
 import { apiFetch, fmt } from '../lib/api'
+import { uploadDocument } from '../lib/documents'
 import { getLang } from '../i18n/index'
 
 const L = {
@@ -160,6 +161,7 @@ export default function BankImport() {
   const [headers, setHeaders] = useState([])
   const [rawRows, setRawRows] = useState([])
   const [fileName, setFileName] = useState('')
+  const [fileObj, setFileObj] = useState(null)
   const [map, setMap] = useState({ date: '', amount: '', debit: '', credit: '', description: '', direction: '', reference: '' })
   const [opening, setOpening] = useState('')
   const [closing, setClosing] = useState('')
@@ -187,6 +189,7 @@ export default function BankImport() {
 
   const onFile = async (e) => {
     const file = e.target.files?.[0]; if (!file) return
+    setFileObj(file)
     setFileName(file.name)
     const buf = await file.arrayBuffer()
     // raw:false + no cellDates → cells come as their displayed text, so a
@@ -294,10 +297,26 @@ export default function BankImport() {
     if (!walletId) { alert(l.noWallet); return }
     setBusy(true)
     try {
+      let documentId = null
+      if (fileObj) {
+        try {
+          const upRes = await uploadDocument(token, fileObj, { document_type: 'bank_document' })
+          if (upRes?.document?.id) {
+            documentId = upRes.document.id
+          }
+        } catch (upErr) {
+          if (upErr?.data?.duplicate && upErr?.data?.existing_document_id) {
+            documentId = upErr.data.existing_document_id
+          } else {
+            console.warn('Bank statement upload to documents storage failed:', upErr)
+          }
+        }
+      }
       const built = buildRows()
       const d = await apiFetch('/bank-import/batches', token, { method: 'POST', body: {
         wallet_id: walletId, file_name: fileName, file_type: fileName.split('.').pop(),
         currency: 'IDR', opening_balance: num(opening), closing_balance: num(closing), rows: built,
+        document_id: documentId,
       } })
       setBatch(d.batch)
       setSuggesting(true)
@@ -328,7 +347,7 @@ export default function BankImport() {
       setRecon(res.reconciliation || null)
       alert(`${l.imported}: ${res.imported}`)
       await offerRulePromotion()
-      setBatch(null); setRows([]); setHeaders([]); setRawRows([]); setSummary(null); loadHistory()
+      setBatch(null); setRows([]); setHeaders([]); setRawRows([]); setSummary(null); setFileObj(null); setFileName(''); loadHistory()
     } catch (e) { alert(e.message) } finally { setBusy(false) }
   }
 

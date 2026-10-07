@@ -5985,7 +5985,7 @@ app.post('/api/bank-import/batches', auth, async (req, res) => {
     if (!canCreateConfirmedFinancialRecord(biz.role))
       return res.status(403).json({ error: 'Your role cannot import bank statements' });
 
-    const { wallet_id, file_name, file_type, currency, opening_balance, closing_balance, rows } = req.body || {};
+    const { wallet_id, file_name, file_type, currency, opening_balance, closing_balance, rows, document_id } = req.body || {};
     if (!Array.isArray(rows) || rows.length === 0) return res.status(400).json({ error: 'rows required' });
     if (rows.length > 2000) return res.status(400).json({ error: 'Too many rows (max 2000 per import)' });
 
@@ -6027,15 +6027,23 @@ app.post('/api/bank-import/batches', auth, async (req, res) => {
     const priorHashes = new Set((priorRows || []).map(r => r.dedup_hash));
 
     // Create batch
-    const { data: batch, error: bErr } = await supabase.from('bank_import_batches').insert({
+    const batchPayload = {
       business_id: biz.business.id, wallet_id: wallet_id || null,
       uploaded_by_user_id: req.user.userId, source_channel: 'web',
       file_name: file_name || null, file_type: file_type || null,
+      document_id: document_id || null,
       currency: currency || 'IDR',
       statement_start: statementStart, statement_end: statementEnd,
       opening_balance: opening_balance ?? null, closing_balance: closing_balance ?? null,
       row_count: rows.length, status: 'review_required',
-    }).select().single();
+    };
+    let { data: batch, error: bErr } = await supabase.from('bank_import_batches').insert(batchPayload).select().single();
+    if (bErr && /column "document_id" of relation "bank_import_batches" does not exist/i.test(bErr.message)) {
+      delete batchPayload.document_id;
+      const fallback = await supabase.from('bank_import_batches').insert(batchPayload).select().single();
+      batch = fallback.data;
+      bErr = fallback.error;
+    }
     if (bErr) return res.status(500).json({ error: bErr.message });
 
     // Build rows with dedup + matching + suggestions

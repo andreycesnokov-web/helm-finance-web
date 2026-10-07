@@ -26,9 +26,21 @@ async function sha256Hex(file) {
  * The promise resolves with the upload-complete body, whose `document.id` is the ONLY
  * evidence that the upload actually succeeded. A stored object alone is not.
  */
+const MIME_BY_EXT = {
+  csv: 'text/csv',
+  xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  xls: 'application/vnd.ms-excel',
+  pdf: 'application/pdf',
+  png: 'image/png',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+}
+
 export async function uploadDocument(token, file, meta = {}, link = null, onStage = null, opts = {}) {
+  const ext = String(file.name || '').toLowerCase().split('.').pop()
+  const mimeType = file.type || MIME_BY_EXT[ext] || 'application/octet-stream'
   const payload = {
-    file_name: file.name, mime_type: file.type || 'application/octet-stream',
+    file_name: file.name, mime_type: mimeType,
     file_size: file.size, document_type: meta.document_type || null,
   }
   // opts.businessId: upload into a specific company instead of the active workspace (the
