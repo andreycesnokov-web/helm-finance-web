@@ -5,6 +5,8 @@ import { Skeleton } from '../ui'
 import SafeMarkdown from './SafeMarkdown'
 import { askAccountant } from '../lib/ask'
 
+import { createRequestGuard } from '../../lib/requestGuard'
+
 /**
  * AccountantChatModal:
  * Convenient, focused chat dialog for AI Accountant.
@@ -18,7 +20,7 @@ import { askAccountant } from '../lib/ask'
  * - Safe Markdown rendering: headers, lists, bold, links without HTML execution.
  * - Transparent sources (used_rules) and limitations/disclaimers.
  * - State management: conversation persisted across close/reopen within same company;
- *   switching company (businessId/scopeKey) clears history and drops in-flight answers.
+ *   generation guard invalidates stale requests on company switch (even A -> B -> A).
  * - Accessibility: Escape key, body scroll lock, focus trap, and return focus on close.
  */
 export default function AccountantChatModal({
@@ -44,10 +46,17 @@ export default function AccountantChatModal({
   const currentScope = `${activeBusinessId ?? ''}|${scopeKey ?? ''}`
   const scopeRef = useRef(currentScope)
 
-  // 1. Company switch guard: wipe thread, draft, and cancel in-flight state
+  // Generation guard: aborts and invalidates in-flight requests across workspace changes
+  const guardRef = useRef(createRequestGuard())
+  const initialTriggerRef = useRef(null)
+
+  // 1. Company switch guard: bump generation, wipe thread, draft, and reset initialTriggerRef
   useEffect(() => {
     if (scopeRef.current !== currentScope) {
       scopeRef.current = currentScope
+      // Invalidate any in-flight requests from earlier generation
+      guardRef.current.abort()
+      initialTriggerRef.current = null
       setThread([])
       setDraft('')
       setIsBusy(false)
@@ -63,7 +72,8 @@ export default function AccountantChatModal({
     if (!text) return
 
     const turnId = Date.now() + Math.random().toString(36).slice(2, 6)
-    const turnScope = scopeRef.current
+    // Start new guarded request generation
+    const { gen, signal, isStale } = guardRef.current.start()
 
     // Add user turn immediately and loading indicator
     const newTurn = {
@@ -81,9 +91,9 @@ export default function AccountantChatModal({
     setIsBusy(true)
 
     try {
-      const resp = await askAccountant(token, text)
-      // Check if user switched company during request
-      if (scopeRef.current === turnScope) {
+      const resp = await askAccountant(token, text, { signal })
+      // Verify generation has not been superseded or invalidated (even across A -> B -> A)
+      if (!isStale() && !guardRef.current.isStale(gen)) {
         setThread((prev) =>
           prev.map((turn) =>
             turn.id === turnId
@@ -101,7 +111,11 @@ export default function AccountantChatModal({
         setIsBusy(false)
       }
     } catch (err) {
-      if (scopeRef.current === turnScope) {
+      // Ignore aborted requests and superseded generations
+      if (err?.name === 'AbortError' || err?.code === 20) {
+        return
+      }
+      if (!isStale() && !guardRef.current.isStale(gen)) {
         const errorMsg =
           err?.status === 403
             ? t('dec.forbidden')
@@ -123,7 +137,6 @@ export default function AccountantChatModal({
   }, [token, t])
 
   // 3. Handle initialQuery trigger when opening
-  const initialTriggerRef = useRef(null)
   useEffect(() => {
     if (open && initialQuery && initialQuery.trim() && initialTriggerRef.current !== initialQuery) {
       initialTriggerRef.current = initialQuery

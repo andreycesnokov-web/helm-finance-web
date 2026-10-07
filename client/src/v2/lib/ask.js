@@ -6,8 +6,8 @@
 import { apiFetch } from '../../lib/api'
 import { getLang } from '../../i18n/index'
 
-export const askAccountant = (token, question) =>
-  apiFetch('/accountant/ask', token, { method: 'POST', body: { question: String(question).slice(0, 500), language: getLang() } })
+export const askAccountant = (token, question, options = {}) =>
+  apiFetch('/accountant/ask', token, { method: 'POST', body: { question: String(question).slice(0, 500), language: getLang() }, ...options })
 
-export const askCfo = (token, question) =>
-  apiFetch('/ai-cfo/ask', token, { method: 'POST', body: { question: String(question).slice(0, 2000), language: getLang() } })
+export const askCfo = (token, question, options = {}) =>
+  apiFetch('/ai-cfo/ask', token, { method: 'POST', body: { question: String(question).slice(0, 2000), language: getLang() }, ...options })

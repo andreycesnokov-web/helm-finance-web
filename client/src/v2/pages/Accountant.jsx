@@ -481,6 +481,12 @@ export default function Accountant() {
   const [chatModalOpen, setChatModalOpen] = useState(false)
   const [chatInitialQuery, setChatInitialQuery] = useState('')
 
+  // Clean initial query and close modal whenever active company or scope changes
+  useEffect(() => {
+    setChatInitialQuery('')
+    setChatModalOpen(false)
+  }, [active?.id, scopeKey])
+
   useEffect(() => {
     const askParam = sp.get('ask') || sp.get('q')
     if (askParam) {
