@@ -76,7 +76,8 @@ const debts = [
   ok('Zero difference: reconciliation check is true', recon.done === true);
   ok('Zero difference: reconciled banks count is 1', r.banks.reconciled === 1);
   ok('Zero difference: missing reconciliation is empty', recon.missing.length === 0);
-  ok('Zero difference: is_closed is true when percent is 100 and all checks pass', r.is_closed === true);
+  ok('Zero difference: automated_checks_passed is true', r.automated_checks_passed === true);
+  ok('Zero difference: is_closed remains false without accountant sign-off', r.is_closed === false);
 }
 
 // 3. Nested reconciliation object with non-zero difference leaves reconciliation unconfirmed
@@ -307,19 +308,29 @@ const debts = [
       reconciliation_status: 'balanced',
     },
   ];
+  // Case A: All automated checks pass (percent 100, statements & recon ok)
+  // Hard rule: Without explicit accountant confirmation, is_closed MUST be false,
+  // automated_checks_passed MUST be true, status MUST be 'prepared_for_review'.
   const rAllDone = closeReadiness({ month, transactions, debts, batches: validBatch, wallets });
-  ok('All checks done and percent 100: is_closed is true', rAllDone.is_closed === true);
+  ok('All automated checks done: automated_checks_passed is true', rAllDone.automated_checks_passed === true);
+  ok('Without accountant signoff: is_closed MUST remain false', rAllDone.is_closed === false);
+  ok('Status reflects prepared_for_review', rAllDone.status === 'prepared_for_review');
 
   const expAllDone = packageExportData({ month, transactions, debts, batches: validBatch, wallets });
-  ok('packageExportData reflects is_closed: true when all checks pass', expAllDone.readiness.is_closed === true);
+  ok('packageExportData reflects is_closed: false', expAllDone.readiness.is_closed === false);
+  ok('packageExportData reflects automated_checks_passed: true', expAllDone.readiness.automated_checks_passed === true);
+  ok('packageExportData reflects bank_reconciliation_status: reconciled', expAllDone.readiness.bank_reconciliation_status === 'reconciled');
+  ok('packageExportData contains awaiting accountant signoff limitation', expAllDone.limitations.some(l => l.includes('awaiting accountant sign-off')));
 
-  // When bank recon is done, but bills lack docs (percent < 100)
+  // Case B: When bank recon is done, but bills lack docs (percent < 100)
   const undocDebts = [
     { id: 20, due_date: '2026-09-15', counterparty: 'Supplier Y', amount: 500, attachments: [] },
   ];
   const rMissingDocs = closeReadiness({ month, transactions, debts: undocDebts, batches: validBatch, wallets });
   ok('Bills without docs: percent < 100', rMissingDocs.percent < 100);
+  ok('Bills without docs: automated_checks_passed is false', rMissingDocs.automated_checks_passed === false);
   ok('Bills without docs: is_closed MUST be false', rMissingDocs.is_closed === false);
+  ok('Bills without docs: status is in_progress', rMissingDocs.status === 'in_progress');
 }
 
 // 11. Missing or invalid statement dates leave month coverage unconfirmed
@@ -374,6 +385,48 @@ const debts = [
 {
   const pkgData = packageExportData({ month, companyName: 'Test Co', businessId: 'b1', transactions, debts, batches: [], wallets });
   ok('packageExportData readiness preserves records and complete', pkgData.readiness.total_records === 2 && pkgData.readiness.complete_records === 2);
+}
+
+// 14. Validation of exported summary.json for the two key states:
+// - Case 1: Unreconciled bank statement (is_closed: false, is_complete: false, limitations include unreconciled statements)
+// - Case 2: Automated checks passed without accountant sign-off (is_closed: false, is_complete: false, status: 'prepared_for_review')
+{
+  // Case 1: Unreconciled
+  const unrecBatch = [{
+    id: 'b-unrec',
+    wallet_id: 'w-bca',
+    status: 'imported',
+    closing_balance: 50000,
+    statement_start: '2026-09-01',
+    statement_end: '2026-09-30',
+    difference: 5000,
+    reconciliation_status: 'unbalanced',
+    file_content: 'Date,Amount,Description\n2026-09-10,1000,Operations\n',
+  }];
+  const expUnrec = packageExportData({ month, companyName: 'Test Co', businessId: 'b1', transactions, debts, batches: unrecBatch, wallets });
+  ok('Case 1 (Unreconciled): is_closed is false', expUnrec.readiness.is_closed === false);
+  ok('Case 1 (Unreconciled): automated_checks_passed is false', expUnrec.readiness.automated_checks_passed === false);
+  ok('Case 1 (Unreconciled): bank_reconciliation_status is unreconciled', expUnrec.readiness.bank_reconciliation_status === 'unreconciled');
+  ok('Case 1 (Unreconciled): limitations contains unreconciled statement', expUnrec.limitations.some(l => l.includes('Unreconciled bank statements')));
+
+  // Case 2: Automated checks passed, no accountant confirmation
+  const balancedBatch = [{
+    id: 'b-bal',
+    wallet_id: 'w-bca',
+    status: 'imported',
+    closing_balance: 50000,
+    statement_start: '2026-09-01',
+    statement_end: '2026-09-30',
+    difference: 0,
+    reconciliation_status: 'balanced',
+    file_content: 'Date,Amount,Description\n2026-09-10,1000,Operations\n',
+  }];
+  const expBal = packageExportData({ month, companyName: 'Test Co', businessId: 'b1', transactions, debts, batches: balancedBatch, wallets });
+  ok('Case 2 (Automated checks passed): is_closed is false', expBal.readiness.is_closed === false);
+  ok('Case 2 (Automated checks passed): automated_checks_passed is true', expBal.readiness.automated_checks_passed === true);
+  ok('Case 2 (Automated checks passed): status is prepared_for_review', expBal.readiness.status === 'prepared_for_review');
+  ok('Case 2 (Automated checks passed): bank_reconciliation_status is reconciled', expBal.readiness.bank_reconciliation_status === 'reconciled');
+  ok('Case 2 (Automated checks passed): limitations explicitly states awaiting accountant sign-off', expBal.limitations.some(l => l.includes('awaiting accountant sign-off')));
 }
 
 console.log(`\nALL PASS — ${pass} passed, ${fail} failed`);

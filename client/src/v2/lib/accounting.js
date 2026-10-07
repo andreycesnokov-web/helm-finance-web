@@ -132,7 +132,10 @@ export function closeReadiness({ month, transactions = [], debts = [], batches =
     { key: 'bills', done: noDoc.length === 0 && bills.length > 0, total: bills.length, ok: bills.length - noDoc.length, missing: noDoc.map((d) => d.counterparty).filter(Boolean) },
     { key: 'categories', done: noCat.length === 0, total: tx.length, ok: tx.length - noCat.length, missing: noCat.map((t) => t.description).filter(Boolean) },
   ]
-  const is_closed = percent === 100 && checks.every((c) => c.done)
+  const automated_checks_passed = percent === 100 && checks.every((c) => c.done)
+  // Hard rule: Without explicit accountant confirmation, is_closed remains false.
+  // When all automated checks pass, status is 'prepared_for_review'.
+  const is_closed = false
 
   return {
     month,
@@ -140,6 +143,8 @@ export function closeReadiness({ month, transactions = [], debts = [], batches =
     complete,
     percent,
     is_closed,
+    automated_checks_passed,
+    status: is_closed ? 'closed' : automated_checks_passed ? 'prepared_for_review' : 'in_progress',
     banks: {
       total: banks.length,
       with_statement: withStatements.length,
@@ -420,6 +425,9 @@ export function packageExportData({ month, companyName = '', businessId = '', tr
       complete_records: readiness.complete,
       total_records: readiness.records,
       is_closed: readiness.is_closed,
+      automated_checks_passed: readiness.automated_checks_passed,
+      status: readiness.status,
+      bank_reconciliation_status: readiness.banks.reconciled === readiness.banks.total && readiness.banks.total > 0 ? 'reconciled' : 'unreconciled',
     },
     bank_accounts: {
       total_banks: readiness.banks.total,
@@ -433,6 +441,13 @@ export function packageExportData({ month, companyName = '', businessId = '', tr
       bills_without_documents: missingBills,
       uncategorised_transactions: missingCategories,
     },
+    limitations: [
+      ...(!readiness.is_closed ? ['Month is not closed: awaiting accountant sign-off and verification.'] : []),
+      ...(missingStatements.length ? [`Missing bank statements for: ${missingStatements.join(', ')}`] : []),
+      ...(unreconciledStatements.length ? [`Unreconciled bank statements for: ${unreconciledStatements.join(', ')}`] : []),
+      ...(missingBills.length ? [`Bills without original documents: ${missingBills.length}`] : []),
+      ...(missingCategories.length ? [`Transactions without category: ${missingCategories.length}`] : []),
+    ],
     records_registry: registry,
   }
 }
@@ -751,6 +766,7 @@ export async function createAccountantZipPackage({
       files_available: filesAvailable,
     },
     bank_accounts: exportData.bank_accounts,
+    limitations: exportData.limitations || [],
   }
 
   const discrepancies = {
@@ -758,6 +774,7 @@ export async function createAccountantZipPackage({
     month: exportData.month,
     is_complete: isComplete,
     files_available: filesAvailable,
+    limitations: exportData.limitations || [],
     ...exportData.discrepancies,
     unavailable_files: unavailableFiles,
   }

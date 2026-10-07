@@ -6643,6 +6643,7 @@ app.post('/api/bank-imports/:batchId/confirm', auth, async (req, res) => {
     const { data: batch } = await supabase.from('bank_import_batches')
       .select('*').eq('id', req.params.batchId).eq('business_id', biz.business.id).single();
     if (!batch) return res.status(404).json({ error: 'Batch not found' });
+    if (batch.status === 'imported') return res.status(400).json({ error: 'Batch already imported' });
 
     const payloadRows = Array.isArray(req.body?.rows) ? req.body.rows : [];
     if (!payloadRows.length) return res.status(400).json({ error: 'rows required' });
