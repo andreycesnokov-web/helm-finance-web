@@ -6011,10 +6011,15 @@ app.post('/api/bank-import/batches', auth, async (req, res) => {
         .or(`wallet_id.eq.${wallet_id},source.eq.${JSON.stringify(wallet.name)}`);
       existing = txs || [];
     }
-    const txKey = (d, amt, type) => `${(d || '').slice(0, 10)}|${Math.abs(Number(amt) || 0).toFixed(2)}|${type}`;
+    const toIsoDate = (v) => {
+      if (!v) return '';
+      if (v instanceof Date) return v.toISOString().slice(0, 10);
+      return String(v).slice(0, 10);
+    };
+    const txKey = (d, amt, type) => `${toIsoDate(d)}|${Math.abs(Number(amt) || 0).toFixed(2)}|${type}`;
     const existingIndex = new Map();
     for (const t of existing) {
-      const d = t.transaction_date || (t.created_at ? t.created_at.slice(0, 10) : null);
+      const d = t.transaction_date || (t.created_at ? toIsoDate(t.created_at) : null);
       existingIndex.set(txKey(d, t.amount_original, t.type), t.id);
     }
 
@@ -6500,10 +6505,15 @@ app.post('/api/bank-imports/:batchId/suggest', auth, async (req, res) => {
         .or(bizOrFilter(biz)).eq('wallet_id', batch.wallet_id);
       existing = txs || [];
     }
-    const exKey = (d, amt, type) => `${(d || '').slice(0, 10)}|${Math.abs(Number(amt) || 0).toFixed(2)}|${type}`;
+    const toIsoDate = (v) => {
+      if (!v) return '';
+      if (v instanceof Date) return v.toISOString().slice(0, 10);
+      return String(v).slice(0, 10);
+    };
+    const exKey = (d, amt, type) => `${toIsoDate(d)}|${Math.abs(Number(amt) || 0).toFixed(2)}|${type}`;
     const exIndex = new Map();
     for (const t of existing) {
-      const d = t.transaction_date || (t.created_at ? t.created_at.slice(0, 10) : null);
+      const d = t.transaction_date || (t.created_at ? toIsoDate(t.created_at) : null);
       exIndex.set(exKey(d, t.amount_original, t.type), t.id);
     }
     const findExistingTx = (date, amt, type) => {
