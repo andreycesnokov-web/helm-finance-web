@@ -96,7 +96,7 @@ describe('Real PostgreSQL: Migration 068 & Bank Import Batch Document Linking', 
     }
   });
 
-  it('Scenario 0: API returns controlled error when schema lacks document_id, creates no batch or rows, no silent fallback', async (t) => {
+  it('Scenario 0: Direct SQL returns controlled error when schema lacks document_id, creates no batch or rows, no silent fallback', async (t) => {
     if (skipped) return t.skip('PostgreSQL unavailable');
 
     // Create a document belonging to Company A
