@@ -4,9 +4,6 @@
 // compliance events from /api/accountant/summary (read-only). Nothing here computes a tax
 // amount or a deadline: dates and amounts come from the verified rule engine's events.
 import { txDate, needsCategory } from './obligations.js'
-import { generateAccountantSummaryPdf } from './accountantSummaryPdf.js'
-
-export { generateAccountantSummaryPdf }
 
 const pad = (n) => String(n).padStart(2, '0')
 export const monthKey = (d) => { const x = new Date(d); return `${x.getFullYear()}-${pad(x.getMonth() + 1)}` }
@@ -835,12 +832,16 @@ export async function createAccountantZipPackage({
   filesToZip.push({ name: 'discrepancies.json', data: JSON.stringify(discrepancies, null, 2) })
   filesToZip.push({ name: 'records_registry.json', data: JSON.stringify(exportData.records_registry, null, 2) })
 
+  // Dynamically import PDF generator on demand (code-splitting)
+  const { generateAccountantSummaryPdf } = await import('./accountantSummaryPdf.js')
+
   // Generate accountant-summary.pdf from the exact same snapshot
   const summaryPdfBytes = await generateAccountantSummaryPdf({
     summary,
     discrepancies,
     recordsRegistry: exportData.records_registry,
     attachedFiles: filesToZip,
+    wallets,
     lang,
   })
   filesToZip.push({ name: 'accountant-summary.pdf', data: summaryPdfBytes })

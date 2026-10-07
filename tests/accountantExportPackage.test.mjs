@@ -374,5 +374,30 @@ const MONTH = '2026-09';
   }
 }
 
+// ── Test 9: Wallet Resolution and Status in PDF Generation ──────────────────
+{
+  const testWallets = [
+    { id: 'w-bca-001', name: 'BCA Operasional', type: 'bank', is_active: true },
+    { id: 'w-bca-002', name: 'BCA Secondary', type: 'bank', is_active: true },
+  ];
+  const unlinkedTransactions = [
+    { id: 952, business_id: BIZ_ID, transaction_date: '2026-09-15', amount_original: 1000000, type: 'income', description: 'Bank transfer in', wallet_id: 'w-bca-001', linked_statement_row_id: null },
+    { id: 953, business_id: BIZ_ID, transaction_date: '2026-09-16', amount_original: 1000000, type: 'expense', description: 'Bank charge fee', wallet_id: 'w-bca-002', linked_statement_row_id: null },
+  ];
+
+  const pkg = await createAccountantZipPackage({
+    month: MONTH,
+    companyName: 'PT Verification Test',
+    businessId: BIZ_ID,
+    transactions: unlinkedTransactions,
+    wallets: testWallets,
+    lang: 'ru',
+  });
+
+  ok('Package with unlinked transactions generated PDF', pkg.summaryPdfBytes instanceof Uint8Array && pkg.summaryPdfBytes.length > 1000);
+  ok('Package maintains is_closed: false', pkg.summary.readiness.is_closed === false);
+  ok('Discrepancies contains 2 unlinked transactions', pkg.discrepancies.unlinked_transactions.length === 2);
+}
+
 console.log(`\nACCOUNTANT EXPORT TESTS: ${pass} passed, ${fail} failed`);
 if (fail > 0) process.exit(1);

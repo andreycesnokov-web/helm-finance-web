@@ -28,11 +28,12 @@ const I18N = {
     lblMonth: 'Отчётный месяц:',
     lblGeneratedAt: 'Время формирования:',
     lblStatus: 'Статус готовности:',
-    lblReadiness: 'Степень готовности:',
+    lblReadiness: 'Полнота записей:',
     lblClosed: 'Статус закрытия:',
     lblFilesAvailable: 'Доступность файлов:',
     lblReconStatus: 'Статус сверки банка:',
     statusReady: 'Готов к проверке бухгалтером (все автоматические проверки пройдены)',
+    statusReconRequired: 'Требуется сверка (полнота записей 100%, сверка не завершена)',
     statusInProgress: 'В процессе подготовки (требуется доработка сверок/документов)',
     statusNeedsAttention: 'Требует внимания',
     closedNo: 'НЕ ЗАКРЫТ (ожидает проверки бухгалтера)',
@@ -63,7 +64,12 @@ const I18N = {
     colAmount: 'Сумма',
     colType: 'Тип',
     colDesc: 'Описание / Назначение платежа',
-    colWallet: 'Счёт / Кошелёк',
+    colWallet: 'Счёт компании',
+    walletUnknown: 'Счёт не указан',
+    typeIncome: 'Приход',
+    typeExpense: 'Расход',
+    typeOpening: 'Начальный остаток',
+    typeTransfer: 'Перевод',
     noUnlinked: 'Несверенные банковские операции отсутствуют. Все операции периода сопоставлены со строками выписок.',
     unlinkedCount: (n) => `Обнаружено несверенных банковских операций: ${n}. Данные операции отражены в учёте, но отсутствуют в подтверждённых выписках:`,
     missingStatementsTitle: 'Отсутствующие банковские выписки:',
@@ -101,11 +107,12 @@ const I18N = {
     lblMonth: 'Reporting Month:',
     lblGeneratedAt: 'Generated At:',
     lblStatus: 'Readiness Status:',
-    lblReadiness: 'Record Completion:',
+    lblReadiness: 'Record Completeness:',
     lblClosed: 'Month Closed State:',
     lblFilesAvailable: 'Originals Availability:',
     lblReconStatus: 'Bank Reconciliation:',
     statusReady: 'Ready for accountant review (all automated checks passed)',
+    statusReconRequired: 'Reconciliation required (100% record completeness, reconciliation pending)',
     statusInProgress: 'In progress (reconciliations or documents required)',
     statusNeedsAttention: 'Needs attention',
     closedNo: 'NOT CLOSED (awaiting accountant verification)',
@@ -136,7 +143,12 @@ const I18N = {
     colAmount: 'Amount',
     colType: 'Type',
     colDesc: 'Description / Purpose',
-    colWallet: 'Account / Wallet',
+    colWallet: 'Company Account',
+    walletUnknown: 'Account not specified',
+    typeIncome: 'Income',
+    typeExpense: 'Expense',
+    typeOpening: 'Opening balance',
+    typeTransfer: 'Transfer',
     noUnlinked: 'No unreconciled bank transactions. All ledger transactions in this period are linked to bank statement rows.',
     unlinkedCount: (n) => `Found ${n} unreconciled bank transactions not present in bank statements:`,
     missingStatementsTitle: 'Missing Bank Statements:',
@@ -174,11 +186,12 @@ const I18N = {
     lblMonth: 'Bulan Laporan:',
     lblGeneratedAt: 'Waktu Dibuat:',
     lblStatus: 'Status Kesiapan:',
-    lblReadiness: 'Kesiapan Catatan:',
+    lblReadiness: 'Kelengkapan Catatan:',
     lblClosed: 'Status Tutup Buku:',
     lblFilesAvailable: 'Ketersediaan Berkas Asli:',
     lblReconStatus: 'Status Rekonsiliasi Bank:',
     statusReady: 'Siap untuk peninjauan akuntan (semua pemeriksaan otomatis lolos)',
+    statusReconRequired: 'Rekonsiliasi diperlukan (kelengkapan catatan 100%, rekonsiliasi belum selesai)',
     statusInProgress: 'Sedang berlangsung (rekonsiliasi atau dokumen diperlukan)',
     statusNeedsAttention: 'Perlu perhatian',
     closedNo: 'BELUM DITUTUP (menunggu verifikasi akuntan)',
@@ -209,7 +222,12 @@ const I18N = {
     colAmount: 'Jumlah',
     colType: 'Jenis',
     colDesc: 'Keterangan',
-    colWallet: 'Rekening / Dompet',
+    colWallet: 'Rekening Perusahaan',
+    walletUnknown: 'Rekening tidak ditentukan',
+    typeIncome: 'Pemasukan',
+    typeExpense: 'Pengeluaran',
+    typeOpening: 'Saldo awal',
+    typeTransfer: 'Transfer',
     noUnlinked: 'Tidak ada transaksi bank yang belum terekonsiliasi. Semua transaksi terhubung dengan rekening koran.',
     unlinkedCount: (n) => `Ditemukan ${n} transaksi belum terekonsiliasi di luar rekening koran:`,
     missingStatementsTitle: 'Rekening Koran Hilang:',
@@ -250,25 +268,109 @@ export async function generateAccountantSummaryPdf({
   discrepancies,
   recordsRegistry = [],
   attachedFiles = [],
+  wallets = [],
   lang = 'ru',
 }) {
   const t = I18N[lang] || I18N.ru
   const readiness = summary?.readiness || {}
   const bankAccounts = summary?.bank_accounts || {}
-  const limitations = summary?.limitations || discrepancies?.limitations || []
+  const rawLimitations = summary?.limitations || discrepancies?.limitations || []
   const unlinkedTx = discrepancies?.unlinked_transactions || readiness?.unlinked_transactions || []
   const missingStatements = discrepancies?.missing_bank_statements || []
   const unreconciledStatements = discrepancies?.unreconciled_bank_statements || []
   const billsWithoutDocs = discrepancies?.bills_without_documents || []
   const unavailableFiles = discrepancies?.unavailable_files || []
 
+  // Build wallet lookup map from current company data
+  const walletMap = new Map()
+  if (Array.isArray(wallets)) {
+    for (const w of wallets) {
+      if (!w) continue
+      const name = w.name || w.account_name || w.wallet_name || ''
+      if (w.id != null) walletMap.set(String(w.id), name)
+      if (w.account_number != null) walletMap.set(String(w.account_number), name)
+    }
+  }
+
+  // Type localization helper
+  const formatType = (rawType) => {
+    const k = String(rawType || '').toLowerCase()
+    if (k === 'income') return t.typeIncome
+    if (k === 'expense') return t.typeExpense
+    if (k === 'opening' || k === 'opening_balance') return t.typeOpening
+    if (k === 'transfer') return t.typeTransfer
+    return rawType || '—'
+  }
+
+  // Limitations localization helper
+  const localizeLimitation = (lim) => {
+    const s = String(lim || '')
+    if (s.startsWith('Month is not closed')) {
+      return lang === 'ru'
+        ? 'Месяц не закрыт: ожидает проверки и подтверждения бухгалтером.'
+        : lang === 'id'
+          ? 'Bulan belum ditutup: menunggu verifikasi dan persetujuan akuntan.'
+          : 'Month is not closed: awaiting accountant sign-off and verification.'
+    }
+    const missingStmtMatch = s.match(/^Missing bank statements for:\s*(.*)$/)
+    if (missingStmtMatch) {
+      return lang === 'ru'
+        ? `Отсутствуют банковские выписки для: ${missingStmtMatch[1]}`
+        : lang === 'id'
+          ? `Rekening koran hilang untuk: ${missingStmtMatch[1]}`
+          : `Missing bank statements for: ${missingStmtMatch[1]}`
+    }
+    const unrecStmtMatch = s.match(/^Unreconciled bank statements for:\s*(.*)$/)
+    if (unrecStmtMatch) {
+      return lang === 'ru'
+        ? `Несверенные банковские счета: ${unrecStmtMatch[1]}`
+        : lang === 'id'
+          ? `Rekening bank belum terekonsiliasi: ${unrecStmtMatch[1]}`
+          : `Unreconciled bank statements for: ${unrecStmtMatch[1]}`
+    }
+    const unrecLedgerMatch = s.match(/^Unreconciled ledger transactions not present in bank statement:\s*(\d+)$/)
+    if (unrecLedgerMatch) {
+      return lang === 'ru'
+        ? `Несверенных банковских операций, отсутствующих в выписке: ${unrecLedgerMatch[1]}`
+        : lang === 'id'
+          ? `Transaksi belum terekonsiliasi di luar rekening koran: ${unrecLedgerMatch[1]}`
+          : `Unreconciled ledger transactions not present in bank statement: ${unrecLedgerMatch[1]}`
+    }
+    const missingBillsMatch = s.match(/^Bills without original documents:\s*(\d+)$/)
+    if (missingBillsMatch) {
+      return lang === 'ru'
+        ? `Счетов без подтверждающих документов: ${missingBillsMatch[1]}`
+        : lang === 'id'
+          ? `Tagihan tanpa dokumen asli: ${missingBillsMatch[1]}`
+          : `Bills without original documents: ${missingBillsMatch[1]}`
+    }
+    const missingCatsMatch = s.match(/^Transactions without category:\s*(\d+)$/)
+    if (missingCatsMatch) {
+      return lang === 'ru'
+        ? `Операций без категории: ${missingCatsMatch[1]}`
+        : lang === 'id'
+          ? `Transaksi tanpa kategori: ${missingCatsMatch[1]}`
+          : `Transactions without category: ${missingCatsMatch[1]}`
+    }
+    return s
+  }
+
+  const limitations = rawLimitations.map(localizeLimitation)
+
   // Month readiness status label
+  const checksList = readiness?.checks || []
+  const stmtCheck = checksList.find((c) => c.key === 'statements')
+  const reconCheck = checksList.find((c) => c.key === 'reconciliation')
+  const bankReconPending = (reconCheck && !reconCheck.done) || (stmtCheck && !stmtCheck.done)
+
   const isReady = readiness.status === 'ready_for_review' || readiness.status === 'prepared_for_review' || readiness.automated_checks_passed === true
   const statusLabel = isReady
     ? t.statusReady
-    : readiness.status === 'needs_attention'
-      ? t.statusNeedsAttention
-      : t.statusInProgress
+    : (readiness.percent === 100 && bankReconPending)
+      ? t.statusReconRequired
+      : readiness.status === 'needs_attention'
+        ? t.statusNeedsAttention
+        : t.statusInProgress
 
   // Bank reconciliation status label
   const reconStatus = readiness.bank_reconciliation_status === 'reconciled'
@@ -277,9 +379,6 @@ export async function generateAccountantSummaryPdf({
       ? t.reconUnreconciled
       : t.reconNone
 
-  const checksList = readiness?.checks || []
-  const stmtCheck = checksList.find((c) => c.key === 'statements')
-  const reconCheck = checksList.find((c) => c.key === 'reconciliation')
   const billCheck = checksList.find((c) => c.key === 'bills')
   const catCheck = checksList.find((c) => c.key === 'categories')
 
@@ -355,6 +454,9 @@ export async function generateAccountantSummaryPdf({
     const sign = isExp ? '-' : '+'
     const formattedAmount = `${sign}${Math.abs(rawNum).toLocaleString('ru-RU')} ${row.currency || 'IDR'}`
 
+    // Resolve wallet name from current company data without technical IDs
+    const resolvedWalletName = row.wallet_name || (row.wallet_id ? walletMap.get(String(row.wallet_id)) : null) || t.walletUnknown
+
     unlinkedRows.push([
       String(row.id ?? ''),
       String(row.date ?? ''),
@@ -363,9 +465,9 @@ export async function generateAccountantSummaryPdf({
         color: isExp ? '#991b1b' : '#166534',
         bold: true,
       },
-      String(row.type ?? ''),
+      formatType(row.type),
       String(row.description ?? row.name ?? ''),
-      String(row.wallet_id ?? row.wallet_name ?? ''),
+      resolvedWalletName,
     ])
   }
 
