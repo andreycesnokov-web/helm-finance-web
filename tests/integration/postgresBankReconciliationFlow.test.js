@@ -385,6 +385,10 @@ describe('Real PostgreSQL Integration: Bank Reconciliation & Transaction Linking
       update(values) { this._op = 'update'; this._values = values; return this; }
       eq(col, val) { this._filters.push(`${ident(col)} = ${lit(val)}`); return this; }
       neq(col, val) { this._filters.push(`${ident(col)} <> ${lit(val)}`); return this; }
+      gte(col, val) { this._filters.push(`${ident(col)} >= ${lit(val)}`); return this; }
+      lte(col, val) { this._filters.push(`${ident(col)} <= ${lit(val)}`); return this; }
+      gt(col, val) { this._filters.push(`${ident(col)} > ${lit(val)}`); return this; }
+      lt(col, val) { this._filters.push(`${ident(col)} < ${lit(val)}`); return this; }
       in(col, arr) {
         const list = (arr && arr.length) ? arr.map(lit).join(',') : 'NULL';
         this._filters.push(`${ident(col)} IN (${list})`);
