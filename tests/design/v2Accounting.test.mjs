@@ -24,7 +24,7 @@ t('readiness counts only what the system can check', () => {
     ],
     debts: [{ type: 'payable', due_date: '2026-09-10', attachments: [{}] }, { type: 'payable', due_date: '2026-09-12', counterparty: 'Y' }, { type: 'payable', due_date: '2026-09-12', status: 'cancelled' }],
     wallets: [{ id: 'a', type: 'bank', name: 'A' }, { id: 'b', type: 'bank', name: 'B' }, { id: 'c', type: 'cash', name: 'C' }],
-    batches: [{ wallet_id: 'a', statement_end: '2026-09-30', status: 'imported' }, { wallet_id: 'b', statement_end: '2026-09-29', status: 'imported' }],
+    batches: [{ wallet_id: 'a', statement_start: '2026-09-01', statement_end: '2026-09-30', status: 'imported' }, { wallet_id: 'b', statement_start: '2026-09-01', statement_end: '2026-09-29', status: 'imported' }],
   })
   assert.strictEqual(r.records, 5)
   assert.strictEqual(r.complete, 3)

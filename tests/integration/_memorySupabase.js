@@ -56,6 +56,12 @@ class Q {
   lte(c, v) { this.filters.push((r) => r[c] <= v); return this; }
   in(c, vs) { this.filters.push((r) => vs.map(String).includes(String(r[c]))); return this; }
   is(c, v) { this.filters.push((r) => (v === null ? r[c] == null : r[c] === v)); return this; }
+  not(c, op, v) {
+    if (op === 'is') this.filters.push((r) => (v === null ? r[c] != null : r[c] !== v));
+    else if (op === 'in') this.filters.push((r) => !v.map(String).includes(String(r[c])));
+    else this.filters.push((r) => String(r[c]) !== String(v));
+    return this;
+  }
   // PostgREST LIKE: % is the wildcard. Used by the entitlement/addon lookups.
   // Split on % first, escape each literal segment, then rejoin with .* so a % in the
   // pattern can never be mistaken for a regex metacharacter.
@@ -144,10 +150,56 @@ class Q {
   then(res, rej) { try { return Promise.resolve(this._run()).then(res, rej); } catch (e) { return Promise.resolve({ data: null, error: { message: e.message } }).then(res, rej); } }
 }
 
+const storageStore = new Map();
+
 const client = {
   from: (t) => new Q(t),
-  storage: { from: () => ({ upload: async () => ({ data: null, error: null }), createSignedUrl: async () => ({ data: null, error: null }), remove: async () => ({ data: null, error: null }) }) },
+  storage: {
+    getBucket: async (b) => ({ data: { id: b, name: b, public: false }, error: null }),
+    from: () => ({
+      upload: async (p, b) => { storageStore.set(String(p), Buffer.from(b)); return { data: { path: p }, error: null }; },
+      createSignedUrl: async (p) => ({ data: { signedUrl: `http://localhost:${process.env.PORT || 3000}/fake-storage/${p}` }, error: null }),
+      createSignedUploadUrl: async (p) => ({ data: { token: 'mem-upload-token' }, error: null }),
+      download: async (p) => {
+        const buf = storageStore.get(String(p));
+        if (!buf) return { data: null, error: { message: 'not found' } };
+        return {
+          data: {
+            arrayBuffer: async () => buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength),
+          },
+          error: null,
+        };
+      },
+      remove: async (paths) => { (paths || []).forEach((p) => storageStore.delete(String(p))); return { data: null, error: null }; },
+    }),
+  },
   rpc: async (name, args = {}) => {
+    if (name === 'rpc_document_finalize_upload') {
+      const { p_file, p_doc, p_actor, p_channel } = args;
+      const df = table('document_files');
+      if (df.some((f) => f.business_id === p_file.business_id && f.sha256_hash === p_file.sha256_hash)) {
+        return { data: null, error: { message: 'duplicate key value violates unique constraint' } };
+      }
+      df.push({ ...p_file, created_at: new Date().toISOString() });
+      const doc = {
+        ...p_doc,
+        file_id: p_file.id,
+        created_by_user_id: p_actor,
+        archived_at: null,
+        review_status: 'needs_review',
+        created_at: new Date().toISOString(),
+      };
+      table('financial_documents').push(doc);
+      table('document_audit').push({ id: crypto.randomUUID(), document_id: doc.id, action: 'uploaded' });
+      return { data: doc, error: null };
+    }
+    if (name === 'rpc_document_archive') {
+      const doc = table('financial_documents').find((d) => d.id === args?.p_document_id && d.business_id === args?.p_business_id);
+      if (!doc) return { data: { message: 'probe' }, error: null };
+      doc.archived_at = new Date().toISOString();
+      table('document_audit').push({ id: crypto.randomUUID(), document_id: doc.id, action: 'archived' });
+      return { data: { id: doc.id, archived_at: doc.archived_at }, error: null };
+    }
     if (name === 'rpc_execute_wallet_transfer') {
       const {
         p_business_id,
@@ -237,6 +289,153 @@ const client = {
         error: null,
       };
     }
+    if (name === 'rpc_record_debt_payment') {
+      const {
+        p_business_id,
+        p_user_id,
+        p_debt_id,
+        p_wallet_id,
+        p_amount,
+        p_currency,
+        p_amount_idr,
+        p_booked_rate,
+        p_rate_source,
+        p_payment_date,
+        p_idempotency_key,
+        p_request_hash,
+        p_account_name,
+        p_created_at,
+      } = args;
+
+      const idempotencyKey = p_idempotency_key ? String(p_idempotency_key).trim() : null;
+      if (idempotencyKey) {
+        const existing = table('debt_payment_idempotency').find(
+          (rec) => rec.business_id === p_business_id && rec.key === idempotencyKey
+        );
+        if (existing) {
+          if (existing.request_hash === p_request_hash) {
+            return {
+              data: {
+                ok: true,
+                is_replay: true,
+                status: existing.response_status,
+                data: existing.response_body,
+              },
+              error: null,
+            };
+          }
+          return {
+            data: null,
+            error: { message: 'idempotency_key_mismatch: Key already used with different payment parameters' },
+          };
+        }
+      }
+
+      const debt = table('debts').find((d) => d.id === p_debt_id && d.business_id === p_business_id);
+      if (!debt) return { data: null, error: { message: 'debt_not_found' } };
+      const wallet = table('wallets').find((w) => w.id === p_wallet_id && w.business_id === p_business_id);
+      if (!wallet) return { data: null, error: { message: 'wallet_not_found' } };
+
+      const total = Number(debt.original_amount || debt.amount || 0);
+      const newPaid = Number(debt.paid_amount || 0) + Number(p_amount);
+      const isFullyPaid = newPaid >= (total - 0.01);
+      const newStatus = isFullyPaid ? 'paid' : 'partial';
+
+      const txId = nextId('transactions');
+      const now = new Date().toISOString();
+      const tx = {
+        id: txId,
+        business_id: p_business_id,
+        created_by_user_id: p_user_id,
+        wallet_id: p_wallet_id,
+        source: p_account_name || wallet.name,
+        type: debt.type === 'payable' ? 'expense' : 'income',
+        amount_original: Number(p_amount),
+        currency_original: p_currency,
+        amount_idr: Number(p_amount_idr),
+        booked_rate: Number(p_booked_rate),
+        category: debt.category || 'Software',
+        description: `Payment: ${debt.counterparty || 'Debt #' + debt.id}${debt.description ? ' · ' + debt.description : ''}`,
+        transaction_date: p_payment_date || now.slice(0, 10),
+        created_at: p_created_at || now,
+        scope: debt.scope || wallet.scope || 'business',
+      };
+      table('transactions').push(tx);
+
+      debt.paid_amount = newPaid;
+      debt.status = newStatus;
+      debt.is_settled = isFullyPaid;
+      debt.settled_at = isFullyPaid ? now : null;
+      debt.linked_transaction_id = txId;
+
+      const resultData = {
+        ok: true,
+        is_fully_paid: isFullyPaid,
+        remaining: Math.max(0, total - newPaid),
+        paid_amount: newPaid,
+        status: newStatus,
+        transaction_id: txId,
+        debt_id: debt.id,
+        debt: { ...debt },
+      };
+
+      if (idempotencyKey) {
+        table('debt_payment_idempotency').push({
+          id: crypto.randomUUID(),
+          business_id: p_business_id,
+          debt_id: debt.id,
+          user_id: p_user_id,
+          key: idempotencyKey,
+          request_hash: p_request_hash,
+          transaction_id: txId,
+          response_status: 200,
+          response_body: resultData,
+          created_at: now,
+        });
+      }
+
+      return {
+        data: {
+          ok: true,
+          is_replay: false,
+          status: 200,
+          data: resultData,
+        },
+        error: null,
+      };
+    }
+    if (name === 'rpc_document_link') {
+      const { p_document_id, p_business_id, p_target_type, p_target_id, p_actor, p_channel } = args;
+      const linkId = crypto.randomUUID();
+      if (p_target_type === 'debt') {
+        table('document_debt_links').push({
+          id: linkId,
+          business_id: p_business_id,
+          document_id: p_document_id,
+          debt_id: Number(p_target_id),
+          created_by_user_id: p_actor,
+          channel: p_channel || 'web',
+          created_at: new Date().toISOString(),
+        });
+      } else if (p_target_type === 'transaction') {
+        table('document_transaction_links').push({
+          id: linkId,
+          business_id: p_business_id,
+          document_id: p_document_id,
+          transaction_id: Number(p_target_id),
+          created_by_user_id: p_actor,
+          channel: p_channel || 'web',
+          created_at: new Date().toISOString(),
+        });
+      }
+      return { data: linkId, error: null };
+    }
+    if (name === 'rpc_document_unlink') {
+      const { p_link_id } = args;
+      DB.document_debt_links = (DB.document_debt_links || []).filter(l => l.id !== p_link_id);
+      DB.document_transaction_links = (DB.document_transaction_links || []).filter(l => l.id !== p_link_id);
+      return { data: true, error: null };
+    }
     return { data: null, error: null };
   },
 };
@@ -245,6 +444,7 @@ module.exports = {
   createClient: () => client,
   __db: DB,
   __seed(t, rows) { table(t).push(...rows); return rows; },
+  __storage: storageStore,
   __uuid: () => crypto.randomUUID(),
   __setSchema: setTableSchema,
 };

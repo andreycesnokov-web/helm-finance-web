@@ -3,6 +3,7 @@ import * as XLSX from 'xlsx'
 import { useAuth } from '../hooks/useAuth'
 import { useTranslation } from '../hooks/useTranslation'
 import { apiFetch, fmt } from '../lib/api'
+import { uploadDocument } from '../lib/documents'
 import { getLang } from '../i18n/index'
 
 const L = {
@@ -134,7 +135,18 @@ const toISO = (v) => {
   if (v instanceof Date) return v.toISOString().slice(0, 10)
   const s = String(v).trim()
   let m = s.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/); if (m) return `${m[1]}-${m[2].padStart(2,'0')}-${m[3].padStart(2,'0')}`
-  m = s.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{2,4})/); if (m) { const y = m[3].length===2?'20'+m[3]:m[3]; return `${y}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}` }
+  m = s.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{2,4})/)
+  if (m) {
+    const y = m[3].length === 2 ? '20' + m[3] : m[3]
+    const p1 = Number(m[1]), p2 = Number(m[2])
+    if (p2 > 12 && p1 <= 12) {
+      return `${y}-${String(p1).padStart(2, '0')}-${String(p2).padStart(2, '0')}`
+    }
+    if (p1 > 12 && p2 <= 12) {
+      return `${y}-${String(p2).padStart(2, '0')}-${String(p1).padStart(2, '0')}`
+    }
+    return `${y}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`
+  }
   const d = new Date(s); return isNaN(d) ? null : d.toISOString().slice(0, 10)
 }
 
@@ -149,6 +161,7 @@ export default function BankImport() {
   const [headers, setHeaders] = useState([])
   const [rawRows, setRawRows] = useState([])
   const [fileName, setFileName] = useState('')
+  const [fileObj, setFileObj] = useState(null)
   const [map, setMap] = useState({ date: '', amount: '', debit: '', credit: '', description: '', direction: '', reference: '' })
   const [opening, setOpening] = useState('')
   const [closing, setClosing] = useState('')
@@ -176,13 +189,14 @@ export default function BankImport() {
 
   const onFile = async (e) => {
     const file = e.target.files?.[0]; if (!file) return
+    setFileObj(file)
     setFileName(file.name)
     const buf = await file.arrayBuffer()
     // raw:false + no cellDates → cells come as their displayed text, so a
-    // DD/MM/YY date is NOT misread by XLSX as US MM/DD. Our toISO parses it.
-    const wb = XLSX.read(buf, { type: 'array', cellDates: false })
+    const isCsv = String(file.name || '').toLowerCase().endsWith('.csv')
+    const wb = XLSX.read(buf, { type: 'array', cellDates: false, raw: isCsv })
     const sheet = wb.Sheets[wb.SheetNames[0]]
-    const arr = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false, defval: '' })
+    const arr = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: isCsv, defval: '' })
     const firstNonEmpty = arr.findIndex(r => r.some(c => String(c).trim() !== ''))
     const row1 = (arr[firstNonEmpty] || []).map(h => String(h).trim())
     const row2 = (arr[firstNonEmpty + 1] || []).map(h => String(h).trim())
@@ -263,14 +277,19 @@ export default function BankImport() {
   }
 
   // Map a /review row into local editable state (final decision defaults to suggestion).
-  const toLocal = (r) => ({
-    ...r,
-    _include: r.match_status !== 'duplicate' && r.review_status !== 'excluded',
-    _type: r.final_transaction_type || r.suggested_transaction_type || r.suggested_type || (r.direction === 'in' ? 'income' : 'expense'),
-    _categoryId: r.final_category_id || r.suggested_category_id || '',
-    _counterpartyId: r.final_counterparty_id || r.suggested_counterparty_id || '',
-    _scope: r.final_scope || r.suggested_scope || 'business',
-  })
+  const toLocal = (r) => {
+    const isMatched = r.match_status === 'matched' || !!r.matched_transaction_id || r.suggested_match_type === 'existing_tx'
+    const isFileDup = r.match_status === 'duplicate'
+    return {
+      ...r,
+      _action: isMatched ? 'link' : 'create_transaction',
+      _include: !isFileDup && r.review_status !== 'excluded',
+      _type: r.final_transaction_type || r.suggested_transaction_type || r.suggested_type || (r.direction === 'in' ? 'income' : 'expense'),
+      _categoryId: r.final_category_id || r.suggested_category_id || '',
+      _counterpartyId: r.final_counterparty_id || r.suggested_counterparty_id || '',
+      _scope: r.final_scope || r.suggested_scope || 'business',
+    }
+  }
 
   const loadReview = async (batchId) => {
     const d = await apiFetch(`/bank-imports/${batchId}/review`, token)
@@ -283,10 +302,30 @@ export default function BankImport() {
     if (!walletId) { alert(l.noWallet); return }
     setBusy(true)
     try {
+      let documentId = null
+      if (fileObj) {
+        try {
+          const upRes = await uploadDocument(token, fileObj, { document_type: 'bank_document' })
+          if (upRes?.document?.id) {
+            documentId = upRes.document.id
+          }
+        } catch (upErr) {
+          if (upErr?.data?.duplicate && upErr?.data?.existing_document_id) {
+            documentId = upErr.data.existing_document_id
+          } else {
+            console.error('Bank statement upload to documents storage failed:', upErr)
+            throw new Error(`Не удалось сохранить оригинальный файл выписки: ${upErr.message || 'Ошибка загрузки в хранилище'}`)
+          }
+        }
+        if (!documentId) {
+          throw new Error('Не удалось получить идентификатор сохранённого документа выписки')
+        }
+      }
       const built = buildRows()
       const d = await apiFetch('/bank-import/batches', token, { method: 'POST', body: {
         wallet_id: walletId, file_name: fileName, file_type: fileName.split('.').pop(),
         currency: 'IDR', opening_balance: num(opening), closing_balance: num(closing), rows: built,
+        document_id: documentId,
       } })
       setBatch(d.batch)
       setSuggesting(true)
@@ -308,16 +347,22 @@ export default function BankImport() {
     if (!target.length) return
     setBusy(true)
     try {
-      const payload = target.map(r => ({
-        row_id: r.id, transaction_type: r._type,
-        category_id: r._categoryId || null, counterparty_id: r._counterpartyId || null,
-        scope: r._scope, match_action: r.suggested_match_type && r._action === 'link' ? 'link' : 'create_transaction',
-      }))
+      const payload = target.map(r => {
+        const isLink = r._action === 'link' || (r.suggested_match_type && r._action === 'link') || (!r._action && !!r.matched_transaction_id)
+        const matchTxId = r.matched_transaction_id || (r.suggested_match_type === 'existing_tx' ? Number(r.suggested_match_id) : null)
+        return {
+          row_id: r.id, transaction_type: r._type,
+          category_id: r._categoryId || null, counterparty_id: r._counterpartyId || null,
+          scope: r._scope,
+          match_action: isLink ? 'link' : 'create_transaction',
+          matched_transaction_id: isLink ? matchTxId : null,
+        }
+      })
       const res = await apiFetch(`/bank-imports/${batch.id}/confirm`, token, { method: 'POST', body: { rows: payload } })
       setRecon(res.reconciliation || null)
-      alert(`${l.imported}: ${res.imported}`)
+      alert(`${l.imported}: ${res.imported}${res.linked ? ` · ${l.matchedExisting}: ${res.linked}` : ''}`)
       await offerRulePromotion()
-      setBatch(null); setRows([]); setHeaders([]); setRawRows([]); setSummary(null); loadHistory()
+      setBatch(null); setRows([]); setHeaders([]); setRawRows([]); setSummary(null); setFileObj(null); setFileName(''); loadHistory()
     } catch (e) { alert(e.message) } finally { setBusy(false) }
   }
 
@@ -490,12 +535,19 @@ export default function BankImport() {
                         {r._type === 'income' ? '+' : '−'}{fmt(r.amount)}
                       </td>
                       <td style={{ padding: 6, textAlign: 'center' }}>
-                        <select value={r._type} onChange={e => setRow({ _type: e.target.value })} style={{ fontSize: 11 }}>
-                          <option value="income">{l.income}</option><option value="expense">{l.expense}</option>
-                          <option value="transfer">transfer</option><option value="payroll">payroll</option>
-                          <option value="owner_injection">owner in</option><option value="owner_withdrawal">owner out</option>
-                          <option value="correction">correction</option>
-                        </select>
+                        {r.matched_transaction_id || r.suggested_match_type === 'existing_tx' ? (
+                          <select value={r._action || 'link'} onChange={e => setRow({ _action: e.target.value })} style={{ fontSize: 11, background: '#EEF2FF', fontWeight: 600 }}>
+                            <option value="link">🔗 {l.matchedExisting || 'Link'}</option>
+                            <option value="create_transaction">➕ {l.createTx || 'Create'}</option>
+                          </select>
+                        ) : (
+                          <select value={r._type} onChange={e => setRow({ _type: e.target.value })} style={{ fontSize: 11 }}>
+                            <option value="income">{l.income}</option><option value="expense">{l.expense}</option>
+                            <option value="transfer">transfer</option><option value="payroll">payroll</option>
+                            <option value="owner_injection">owner in</option><option value="owner_withdrawal">owner out</option>
+                            <option value="correction">correction</option>
+                          </select>
+                        )}
                       </td>
                       <td style={{ padding: 6 }}>
                         <select value={r._categoryId || ''} onChange={e => setRow({ _categoryId: e.target.value })}

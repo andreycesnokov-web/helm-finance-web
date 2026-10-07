@@ -1155,11 +1155,11 @@ button.v2-start-btn:focus-visible { outline: 2px solid var(--action-primary); ou
   display: flex;
   align-items: flex-start;
   gap: 12px;
-  background: #f0f7ff;
-  border-radius: var(--radius-md, 12px);
+  background: var(--info-soft);
+  border-radius: var(--radius-md);
   padding: 14px 16px;
   margin: 10px 0 6px;
-  color: var(--text-primary, #0f172a);
+  color: var(--text-primary);
 }
 
 .v2-acct-callout-icon {
@@ -1179,15 +1179,41 @@ button.v2-start-btn:focus-visible { outline: 2px solid var(--action-primary); ou
   font-weight: 700;
   font-size: 14px;
   line-height: 1.35;
-  color: #034694;
+  color: var(--text-primary);
   margin-bottom: 6px;
 }
 
 .v2-acct-callout-text {
   font-size: 13.5px;
   line-height: 1.55;
-  color: #334155;
+  color: var(--text-secondary);
   margin: 0;
+}
+
+/* Horizontal rule divider & blockquote */
+.v2-acct-hr {
+  border: 0;
+  border-top: 1px solid var(--border-subtle);
+  margin: 12px 0;
+}
+
+.v2-acct-quote {
+  border-left: 3px solid var(--action-primary);
+  background: var(--surface-card-muted);
+  margin: 10px 0;
+  padding: 8px 12px;
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  color: var(--text-secondary);
+  font-size: 13.5px;
+  line-height: 1.55;
+}
+
+.v2-acct-quote > :first-child {
+  margin-top: 0;
+}
+
+.v2-acct-quote > :last-child {
+  margin-bottom: 0;
 }
 
 /* Mobile responsive full-screen dialog */

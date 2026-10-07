@@ -16,8 +16,9 @@ import I from '../icons'
 import { PageHead, Card, Pill, Btn, NotYet, Skeleton, ErrorBox, Empty } from '../ui'
 import { useT, useLang } from '../i18n'
 import { useApi } from '../data'
-import { money, shortDate } from '../lib/format'
-import { monthOptions, accountantMonth, closeReadiness, packages, packageSummary, monthGrid, complianceEvents, eventStage } from '../lib/accounting'
+import { monthOptions, accountantMonth, closeReadiness, packages, packageSummary, monthGrid, complianceEvents, eventStage, packageExportData, createAccountantZipPackage, dedupeDocumentLinks } from '../lib/accounting'
+import { apiFetch } from '../../lib/api'
+import { money } from '../lib/format'
 import { askAccountant } from '../lib/ask'
 import AccountantTabs from '../components/AccountantTabs'
 import { findWithholdingRule } from '../../pages/business/InvoiceReviewDrawer'
@@ -158,15 +159,27 @@ function CloseTab({ month, onOpenChatModal }) {
   const t = useT()
   const lang = useLang()
   const { active, scopeKey } = useWorkspace()
+  const { token } = useAuth()
   const [askQuery, setAskQuery] = useState('')
+  const [exporting, setExporting] = useState(false)
+  const exportControllerRef = useRef(null)
 
   useEffect(() => {
     setAskQuery('')
   }, [active?.id, scopeKey])
+
+  useEffect(() => {
+    if (exportControllerRef.current) {
+      exportControllerRef.current.abort()
+      exportControllerRef.current = null
+    }
+    setExporting(false)
+  }, [active?.id, month])
   const tx = useApi('/transactions?period=all')
   const debts = useApi('/debts')
   const batches = useApi('/bank-import/batches')
   const wallets = useApi('/wallets')
+  const docs = useApi('/documents')
   const summary = useApi('/accountant/summary')
   const taxCardsApi = useApi(`/accountant/tax-knowledge/cards?lang=${lang}`)
 
@@ -191,8 +204,39 @@ function CloseTab({ month, onOpenChatModal }) {
     return []
   }, [taxCardsApi.data, isOffline, lang])
 
-  const r = useMemo(() => closeReadiness({ month, transactions: Array.isArray(tx.data) ? tx.data : [], debts: Array.isArray(debts.data) ? debts.data : [],
-    batches: batches.data?.batches || [], wallets: wallets.data?.wallets || [] }), [month, tx.data, debts.data, batches.data, wallets.data])
+  const enrichedDebts = useMemo(() => {
+    const rawDebts = Array.isArray(debts.data) ? debts.data : []
+    const rawDocs = Array.isArray(docs.data?.documents) ? docs.data.documents : []
+    const linkedMap = new Map()
+    for (const d of rawDocs) {
+      for (const l of d.links || []) {
+        if (l.target_type === 'debt' && l.target_id != null) {
+          const k = String(l.target_id)
+          if (!linkedMap.has(k)) linkedMap.set(k, [])
+          linkedMap.get(k).push({ ...l, document_id: d.id, file_name: d.file_name })
+        }
+      }
+    }
+    return rawDebts.map((b) => {
+      const docLinks = linkedMap.get(String(b.id)) || []
+      const existingLinks = Array.isArray(b.document_links) ? b.document_links : []
+      const mergedLinks = dedupeDocumentLinks([...existingLinks, ...docLinks])
+      return {
+        ...b,
+        document_links: mergedLinks,
+        linked_documents_count: mergedLinks.length,
+        _hasLinkedDocs: mergedLinks.length > 0,
+      }
+    })
+  }, [debts.data, docs.data])
+
+  const r = useMemo(() => closeReadiness({
+    month,
+    transactions: Array.isArray(tx.data) ? tx.data : [],
+    debts: enrichedDebts,
+    batches: batches.data?.batches || [],
+    wallets: wallets.data?.wallets || [],
+  }), [month, tx.data, enrichedDebts, batches.data, wallets.data])
   if (tx.loading || debts.loading) return <Card><Skeleton rows={6} /></Card>
   if (tx.error) return <ErrorBox error={tx.error} onRetry={tx.reload} />
   const events = complianceEvents(summary.data)
@@ -202,18 +246,98 @@ function CloseTab({ month, onOpenChatModal }) {
   const dueSum = due.reduce((s, e) => s + (e.estimated_amount != null ? Number(e.estimated_amount) : 0), 0)
   const left = r.checks.filter((c) => !c.done)
 
+
   return (
     <div className="v2-grid-detail">
       <div className="v2-col">
         <section className="v2-hero v2-hero-plain">
           <div className="v2-hero-text">
             <span className="v2-hero-label">{t('acct.closeOf', { m: monthLabel(month, lang) })}</span>
-            <h2 className="v2-hero-title">{r.percent == null ? t('acct.noRecords') : left.length === 0 ? t('acct.ready', { n: r.percent }) : t('acct.almost', { n: r.percent, k: left.length })}</h2>
-            <p className="v2-hero-p v2-show">{t('acct.recordsComplete', { n: r.complete, m: r.records })}</p>
+            <h2 className="v2-hero-title">
+              {r.percent == null
+                ? t('acct.noRecords')
+                : left.length === 0
+                ? (r.is_closed ? t('acct.closed') : t('acct.preparedForReview'))
+                : t('acct.almost', { n: r.percent, k: left.length })}
+            </h2>
+            <p className="v2-hero-p v2-show">
+              {left.length === 0 && !r.is_closed
+                ? t('acct.awaitingAccountantSignoff', { n: r.complete, m: r.records })
+                : t('acct.recordsComplete', { n: r.complete, m: r.records })}
+            </p>
             <div className="v2-row-gap v2-row-start">
               <NotYet note={t('acct.reviewSoon')}>{t('acct.sendToAccountant')}</NotYet>
-              <NotYet note={t('acct.packageSoon')}>{t('acct.download')}</NotYet>
+              <button
+                type="button"
+                className="v2-btn v2-btn-secondary"
+                disabled={exporting}
+                onClick={async () => {
+                  if (exportControllerRef.current) {
+                    exportControllerRef.current.abort()
+                  }
+                  const controller = new AbortController()
+                  exportControllerRef.current = controller
+                  const currentBizId = active?.id
+                  const currentMonth = month
+
+                  setExporting(true)
+                  try {
+                    const rawDocs = Array.isArray(docs.data?.documents) ? docs.data.documents : []
+                    const companyName = active?.name || 'Company'
+                    const res = await createAccountantZipPackage({
+                      month: currentMonth,
+                      companyName,
+                      businessId: currentBizId,
+                      transactions: Array.isArray(tx.data) ? tx.data : [],
+                      debts: enrichedDebts,
+                      batches: batches.data?.batches || [],
+                      wallets: wallets.data?.wallets || [],
+                      documents: rawDocs,
+                      token,
+                      signal: controller.signal,
+                      fetchSignedUrl: async (docId, mode = 'download', bizId, sig) => {
+                        const resp = await apiFetch(`/documents/${docId}/signed-url`, token, {
+                          method: 'POST',
+                          headers: (bizId || currentBizId) ? { 'x-business-id': String(bizId || currentBizId) } : {},
+                          body: { mode },
+                          signal: sig || controller.signal,
+                        })
+                        return resp?.url || null
+                      },
+                    })
+
+                    if (controller.signal.aborted) return
+                    if (active?.id !== currentBizId || month !== currentMonth) return
+                    if (!res?.zipBytes) return
+
+                    const blob = new Blob([res.zipBytes], { type: 'application/zip' })
+                    const url = URL.createObjectURL(blob)
+                    const a = document.createElement('a')
+                    a.href = url
+                    a.download = res.filename
+                    document.body.appendChild(a)
+                    a.click()
+                    document.body.removeChild(a)
+                    URL.revokeObjectURL(url)
+                  } catch (err) {
+                    if (err.name === 'AbortError' || controller.signal.aborted) return
+                    console.error('Accountant export failed:', err)
+                  } finally {
+                    if (exportControllerRef.current === controller) {
+                      exportControllerRef.current = null
+                      setExporting(false)
+                    }
+                  }
+                }}
+              >
+                {exporting ? '…' : t('acct.download')}
+              </button>
             </div>
+            {left.length > 0 && (
+              <div style={{ marginTop: 12, padding: '8px 12px', background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: 8, fontSize: 12, color: '#92400E' }}>
+                ⚠️ {t('acct.incompleteDownloadWarning', { k: left.length })}
+              </div>
+            )}
           </div>
         </section>
         <Card title={t('acct.toFinish', { m: monthLabel(month, lang) })}>
@@ -237,6 +361,42 @@ function CloseTab({ month, onOpenChatModal }) {
             </li>
           </ul>
         </Card>
+        {r.unlinked_transactions?.length > 0 && (
+          <Card
+            title={
+              <span style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#DC2626' }}>
+                <I.warn size={16} />
+                <span>{lang === 'ru' ? 'Несверенные банковские операции' : lang === 'id' ? 'Transaksi Bank Belum Terekonsiliasi' : 'Unreconciled Bank Transactions'} ({r.unlinked_transactions.length})</span>
+              </span>
+            }
+          >
+            <p className="v2-muted v2-small" style={{ margin: '0 0 10px' }}>
+              {lang === 'ru' ? 'Операции присутствуют в учёте, но отсутствуют в подтверждённой банковской выписке за этот период:'
+                : lang === 'id' ? 'Transaksi ada di pembukuan tetapi tidak tercantum dalam mutasi rekening periode ini:'
+                : 'Transactions exist in the ledger but are missing from the confirmed bank statement for this period:'}
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {r.unlinked_transactions.map((ut) => {
+                const wName = (wallets.data?.wallets || []).find((w) => String(w.id) === String(ut.wallet_id))?.name || 'Bank'
+                const isIncome = ut.type === 'income' || ut.type === 'cash_in'
+                return (
+                  <div key={ut.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', background: '#FEF2F2', border: '1px solid #FCA5A5', borderRadius: 6, fontSize: 13 }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ fontWeight: 600 }}>{ut.description || (isIncome ? 'Доход' : 'Расход')}</span>
+                        <Pill tone={isIncome ? 'good' : 'warn'}>{isIncome ? (lang === 'ru' ? 'Приход' : 'Income') : (lang === 'ru' ? 'Расход' : 'Expense')}</Pill>
+                      </div>
+                      <span className="v2-muted v2-small">{ut.date} · {wName}</span>
+                    </div>
+                    <span style={{ fontWeight: 600, color: isIncome ? '#059669' : '#DC2626' }}>
+                      {isIncome ? '+' : '−'}{money(ut.amount, ut.currency)}
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
+          </Card>
+        )}
       </div>
       <div className="v2-col">
         <Card title={t('acct.taxesDue', { m: monthLabel(next, lang) })} aside={<Link to="/business/accountant?tab=taxes">{t('acct.fullCalendar')}</Link>}>
