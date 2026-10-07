@@ -282,8 +282,8 @@ describe('Real PostgreSQL Integration: Bank Reconciliation & Transaction Linking
     // 4. Record transactions in ledger:
     // a. Income +20,000,000 IDR
     const txIn = await pgClient.query(`
-      INSERT INTO public.transactions (business_id, wallet_id, type, amount_original, amount_idr, transaction_date, description)
-      VALUES ($1, $2, 'income', 20000000, 20000000, '2026-09-05', 'Client Retainer Payment')
+      INSERT INTO public.transactions (business_id, wallet_id, type, amount_original, amount_idr, currency_original, transaction_date, description)
+      VALUES ($1, $2, 'income', 20000000, 20000000, 'IDR', '2026-09-05', 'Client Retainer Payment')
       RETURNING id
     `, [BIZ_A, WALLET_A]);
     txIncomeId = txIn.rows[0].id;
@@ -303,16 +303,16 @@ describe('Real PostgreSQL Integration: Bank Reconciliation & Transaction Linking
 
     // c. Expense -3,000,000 IDR
     const txExp = await pgClient.query(`
-      INSERT INTO public.transactions (business_id, wallet_id, type, amount_original, amount_idr, transaction_date, description)
-      VALUES ($1, $2, 'expense', 3000000, 3000000, '2026-09-20', 'Office Supplies')
+      INSERT INTO public.transactions (business_id, wallet_id, type, amount_original, amount_idr, currency_original, transaction_date, description)
+      VALUES ($1, $2, 'expense', 3000000, 3000000, 'IDR', '2026-09-20', 'Office Supplies')
       RETURNING id
     `, [BIZ_A, WALLET_A]);
     txExpenseId = txExp.rows[0].id;
 
     // d. Unrelated transaction in Business B
     const txB = await pgClient.query(`
-      INSERT INTO public.transactions (business_id, wallet_id, type, amount_original, amount_idr, transaction_date, description)
-      VALUES ($1, $2, 'expense', 3000000, 3000000, '2026-09-20', 'Competitor Expense')
+      INSERT INTO public.transactions (business_id, wallet_id, type, amount_original, amount_idr, currency_original, transaction_date, description)
+      VALUES ($1, $2, 'expense', 3000000, 3000000, 'IDR', '2026-09-20', 'Competitor Expense')
       RETURNING id
     `, [BIZ_B, WALLET_B]);
     txBizBId = txB.rows[0].id;
@@ -631,13 +631,13 @@ describe('Real PostgreSQL Integration: Bank Reconciliation & Transaction Linking
 
     // 1. Seed symmetric un-reconciled transactions in ledger (+1M income, -1M expense)
     const symIn = await pgClient.query(`
-      INSERT INTO public.transactions (business_id, wallet_id, type, amount_original, amount_idr, transaction_date, description)
-      VALUES ($1, $2, 'income', 1000000, 1000000, '2026-09-25', 'Extra Cash Receipt')
+      INSERT INTO public.transactions (business_id, wallet_id, type, amount_original, amount_idr, currency_original, transaction_date, description)
+      VALUES ($1, $2, 'income', 1000000, 1000000, 'IDR', '2026-09-25', 'Extra Cash Receipt')
       RETURNING id
     `, [BIZ_A, WALLET_A]);
     const symOut = await pgClient.query(`
-      INSERT INTO public.transactions (business_id, wallet_id, type, amount_original, amount_idr, transaction_date, description)
-      VALUES ($1, $2, 'expense', 1000000, 1000000, '2026-09-26', 'Extra Cash Disbursal')
+      INSERT INTO public.transactions (business_id, wallet_id, type, amount_original, amount_idr, currency_original, transaction_date, description)
+      VALUES ($1, $2, 'expense', 1000000, 1000000, 'IDR', '2026-09-26', 'Extra Cash Disbursal')
       RETURNING id
     `, [BIZ_A, WALLET_A]);
 
