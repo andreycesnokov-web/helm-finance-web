@@ -448,6 +448,9 @@ describe('Real PostgreSQL Integration: Bank Reconciliation & Transaction Linking
       TELEGRAM_WEBHOOK_SECRET: 'fake_tg_secret'
     });
 
+    const serverPath = require.resolve('../../server/index.js');
+    delete require.cache[serverPath];
+
     const realListen = http.Server.prototype.listen;
     http.Server.prototype.listen = function patched(...a) {
       server = this;
@@ -507,8 +510,12 @@ describe('Real PostgreSQL Integration: Bank Reconciliation & Transaction Linking
       })
     });
 
-    assert.strictEqual(uploadRes.status, 200, 'Batch upload must succeed');
-    const uploadBody = await uploadRes.json();
+    let uploadBody = {};
+    try { uploadBody = await uploadRes.json(); } catch {}
+    if (uploadRes.status !== 200) {
+      console.error('[Upload Failed in Scenario A]', uploadRes.status, uploadBody);
+    }
+    assert.strictEqual(uploadRes.status, 200, `Batch upload must succeed, got ${uploadRes.status}: ${JSON.stringify(uploadBody)}`);
     const batchId = uploadBody.batch.id;
     const rows = uploadBody.rows;
     assert.strictEqual(rows.length, 3, 'Must create 3 statement rows');
@@ -683,8 +690,12 @@ describe('Real PostgreSQL Integration: Bank Reconciliation & Transaction Linking
         ]
       })
     });
-    assert.strictEqual(bRes.status, 200);
-    const bData = await bRes.json();
+    let bData = {};
+    try { bData = await bRes.json(); } catch {}
+    if (bRes.status !== 200) {
+      console.error('[Upload Failed in Scenario D]', bRes.status, bData);
+    }
+    assert.strictEqual(bRes.status, 200, `Scenario D batch upload must succeed, got ${bRes.status}: ${JSON.stringify(bData)}`);
     const rowId = bData.rows[0].id;
 
     // 1. Attempt to link txBizBId (belongs to BIZ_B) -> must return 403 isolation_violation
