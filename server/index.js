@@ -6658,6 +6658,40 @@ app.post('/api/bank-imports/:batchId/confirm', auth, async (req, res) => {
     const payloadRows = Array.isArray(req.body?.rows) ? req.body.rows : [];
     if (!payloadRows.length) return res.status(400).json({ error: 'rows required' });
 
+    // Helper for strict calendar date validation (rejects invalid strings, impossible calendar dates like Feb 30 or Apr 31)
+    const isValidCalendarDate = (val) => {
+      if (!val) return false;
+      const str = typeof val === 'string' ? val.trim().slice(0, 10) : '';
+      const match = str.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      if (!match) return false;
+      const y = Number(match[1]);
+      const m = Number(match[2]);
+      const d = Number(match[3]);
+      if (y < 1990 || y > 2099 || m < 1 || m > 12 || d < 1 || d > 31) return false;
+      const dt = new Date(`${match[1]}-${match[2]}-${match[3]}T00:00:00Z`);
+      if (Number.isNaN(dt.getTime())) return false;
+      return dt.getUTCFullYear() === y && (dt.getUTCMonth() + 1) === m && dt.getUTCDate() === d;
+    };
+
+    // Server-side batch integrity check: reject batches with corrupted periods (start > end, multi-decade spans, invalid calendar dates)
+    if (batch.statement_start && !isValidCalendarDate(batch.statement_start)) {
+      return res.status(400).json({ error: 'corrupt_statement_period', message: `Invalid statement start calendar date: ${batch.statement_start}` });
+    }
+    if (batch.statement_end && !isValidCalendarDate(batch.statement_end)) {
+      return res.status(400).json({ error: 'corrupt_statement_period', message: `Invalid statement end calendar date: ${batch.statement_end}` });
+    }
+    if (batch.statement_start && batch.statement_end) {
+      const s = new Date(`${String(batch.statement_start).slice(0, 10)}T00:00:00Z`).getTime();
+      const e = new Date(`${String(batch.statement_end).slice(0, 10)}T00:00:00Z`).getTime();
+      if (s > e) {
+        return res.status(400).json({ error: 'corrupt_statement_period', message: 'Statement start date is after end date' });
+      }
+      const diffDays = Math.round((e - s) / 86400000);
+      if (diffDays > 365 * 5) {
+        return res.status(400).json({ error: 'corrupt_statement_period', message: 'Statement spans more than 5 years and cannot be confirmed' });
+      }
+    }
+
     // Ownership validation sets (category / counterparty must belong to business).
     const [{ data: cats }, { data: cps }] = await Promise.all([
       supabase.from('cashflow_categories').select('id, name').or(bizOrFilter(biz)),
@@ -6679,6 +6713,18 @@ app.post('/api/bank-imports/:batchId/confirm', auth, async (req, res) => {
       const { data: row } = await supabase.from('bank_import_rows')
         .select('*').eq('id', p.row_id).eq('batch_id', batch.id).single();
       if (!row || row.linked_transaction_id) continue;
+
+      // Row integrity check: reject corrupt dates or amounts
+      if (row.tx_date && !isValidCalendarDate(row.tx_date)) {
+        return res.status(400).json({ error: 'corrupt_row_date', message: `Row transaction date is impossible or invalid: ${row.tx_date}` });
+      }
+      if (row.amount === null || row.amount === undefined || String(row.amount).trim() === '') {
+        return res.status(400).json({ error: 'corrupt_row_amount', message: 'Row amount cannot be empty' });
+      }
+      const numAmount = Number(row.amount);
+      if (!Number.isFinite(numAmount)) {
+        return res.status(400).json({ error: 'corrupt_row_amount', message: 'Row amount is not a finite number' });
+      }
 
       // Validate final decision
       let type = p.transaction_type || row.suggested_transaction_type || row.suggested_type || (row.direction === 'in' ? 'income' : 'expense');

@@ -1,7 +1,7 @@
 // Test unreconciled bank transactions workbench & diagnosis logic
 // Run: node tests/unreconciledTxWorkbench.test.mjs
 import assert from 'node:assert';
-import { closeReadiness, determineUnreconciledReason } from '../client/src/v2/lib/accounting.js';
+import { closeReadiness, determineUnreconciledReason, isBatchPeriodValid, hasCorruptRows } from '../client/src/v2/lib/accounting.js';
 
 let pass = 0;
 let fail = 0;
@@ -129,6 +129,71 @@ console.log('\n--- 3. Case: Statement exists and confirmed balanced, but transac
   ok('Case 3 actionRoute includes batchId=b-confirmed', diag.actionRoute.includes('batchId=b-confirmed'));
   ok('Case 3 actionRoute contains wallet_id=w-bca', diag.actionRoute.includes('wallet_id=w-bca'));
   ok('Case 3 actionLabelKey is acct.reason.actionMatchTransactions', diag.actionLabelKey === 'acct.reason.actionMatchTransactions');
+}
+
+console.log('\n--- 3b. Case: Erroneous multi-year batch (2000-2032) must NOT cover 2026-09 ---');
+{
+  const tx = {
+    id: 103,
+    transaction_date: '2026-09-18',
+    date: '2026-09-18',
+    amount: 500000,
+    wallet_id: 'w-bca',
+    description: 'Vendor payment',
+    source: 'manual',
+    is_reconciled: false,
+  };
+  const batches = [
+    {
+      id: 'b-corrupt-years',
+      wallet_id: 'w-bca',
+      statement_start: '2000-12-31',
+      statement_end: '2032-12-31', // Multi-decade corrupted range
+      status: 'confirmed',
+      reconciliation_status: 'balanced',
+      difference: 0,
+    },
+  ];
+
+  const diag = determineUnreconciledReason({
+    tx,
+    month,
+    wallet: wallets[0],
+    batches,
+  });
+
+  // Because the batch spans 32 years (> 45 days), it must be rejected as covering batch
+  // Diagnosis should safely fall back to no_statement
+  ok('Corrupted multi-year batch is excluded from covering batches', diag.reason === 'no_statement');
+  ok('Diagnosis actionRoute points to uploading statement for month', diag.actionRoute.includes('month=2026-09'));
+
+  const readiness = closeReadiness({
+    month: '2026-09',
+    transactions: [tx],
+    debts: [],
+    batches,
+    wallets,
+  });
+  ok('closeReadiness does not consider corrupted batch as with_statement', readiness.banks.with_statement === 0);
+  ok('closeReadiness does not consider corrupted batch as reconciled', readiness.banks.reconciled === 0);
+
+  // Test BankImport validation helpers
+  ok('isBatchPeriodValid returns false for 2000-2032 batch', isBatchPeriodValid(batches[0]) === false);
+  ok('isBatchPeriodValid returns true for normal 30-day batch', isBatchPeriodValid({ statement_start: '2026-05-02', statement_end: '2026-05-31' }) === true);
+  ok('isBatchPeriodValid returns true for 90-day quarterly statement', isBatchPeriodValid({ statement_start: '2026-01-01', statement_end: '2026-03-31' }) === true);
+  ok('hasCorruptRows detects year 1900', hasCorruptRows([{ tx_date: '1900-05-02', amount: 500 }]) === true);
+  ok('hasCorruptRows detects year 2150', hasCorruptRows([{ tx_date: '2150-05-02', amount: 500 }]) === true);
+  ok('hasCorruptRows detects impossible date Feb 30', hasCorruptRows([{ tx_date: '2026-02-30', amount: 500 }]) === true);
+  ok('hasCorruptRows detects impossible date Apr 31', hasCorruptRows([{ tx_date: '2026-04-31', amount: 500 }]) === true);
+  ok('hasCorruptRows detects impossible date Feb 29 non-leap', hasCorruptRows([{ tx_date: '2026-02-29', amount: 500 }]) === true);
+  ok('hasCorruptRows allows valid leap day Feb 29 2024', hasCorruptRows([{ tx_date: '2024-02-29', amount: 500 }]) === false);
+  ok('isBatchPeriodValid detects impossible batch date Feb 30', isBatchPeriodValid({ statement_start: '2026-02-01', statement_end: '2026-02-30' }) === false);
+  ok('hasCorruptRows detects NaN amount', hasCorruptRows([{ tx_date: '2026-05-02', amount: NaN }]) === true);
+  ok('hasCorruptRows detects empty string amount', hasCorruptRows([{ tx_date: '2026-05-02', amount: '' }]) === true);
+  ok('hasCorruptRows detects Infinity amount', hasCorruptRows([{ tx_date: '2026-05-02', amount: Infinity }]) === true);
+  ok('hasCorruptRows detects null amount', hasCorruptRows([{ tx_date: '2026-05-02', amount: null }]) === true);
+  ok('hasCorruptRows allows negative amount for debit/refund', hasCorruptRows([{ tx_date: '2026-05-02', amount: -500 }]) === false);
+  ok('hasCorruptRows returns false for valid rows', hasCorruptRows([{ tx_date: '2026-05-02', amount: 500 }]) === false);
 }
 
 console.log('\n--- 4. Case: Insufficient data / requires clarification ---');
@@ -362,6 +427,107 @@ console.log('\n--- 6. Server PATCH /api/transactions/:id boundary guard HTTP end
   ok('Updating description preserves 200 without currency mutation', r3Desc.status === 200 && r3Desc.data?.id === 303);
   const tx303 = (mem.__db['transactions'] || []).find((t) => t.id === 303);
   ok('Transaction currency_original remains IDR', tx303 && tx303.currency_original === 'IDR');
+
+  // Test 7: Server POST /api/bank-imports/:batchId/confirm integrity guard against corrupt 2000-2032 batch
+  mem.__seed('bank_import_batches', [
+    {
+      id: 'b-corrupt-2000-2032',
+      business_id: BIZ_A,
+      wallet_id: 'w-idr-main',
+      statement_start: '2000-12-31',
+      statement_end: '2032-12-31',
+      status: 'review_required',
+    },
+    {
+      id: 'b-corrupt-inverted',
+      business_id: BIZ_A,
+      wallet_id: 'w-idr-main',
+      statement_start: '2026-05-31',
+      statement_end: '2026-05-01',
+      status: 'review_required',
+    },
+    {
+      id: 'b-valid-range',
+      business_id: BIZ_A,
+      wallet_id: 'w-idr-main',
+      statement_start: '2026-05-02',
+      statement_end: '2026-05-31',
+      status: 'review_required',
+    }
+  ]);
+  mem.__seed('bank_import_rows', [
+    {
+      id: 'row-corrupt-year',
+      batch_id: 'b-valid-range',
+      business_id: BIZ_A,
+      tx_date: '1900-12-31',
+      amount: 100000,
+      direction: 'out',
+    },
+    {
+      id: 'row-corrupt-empty-amount',
+      batch_id: 'b-valid-range',
+      business_id: BIZ_A,
+      tx_date: '2026-05-10',
+      amount: '',
+      direction: 'out',
+    },
+    {
+      id: 'row-corrupt-inf-amount',
+      batch_id: 'b-valid-range',
+      business_id: BIZ_A,
+      tx_date: '2026-05-10',
+      amount: Infinity,
+      direction: 'out',
+    },
+    {
+      id: 'row-corrupt-feb30',
+      batch_id: 'b-valid-range',
+      business_id: BIZ_A,
+      tx_date: '2026-02-30',
+      amount: 100000,
+      direction: 'out',
+    }
+  ]);
+
+  const confirmApi = async (batchId, body) => {
+    const res = await fetch(`http://127.0.0.1:${PORT}/api/bank-imports/${batchId}/confirm`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        authorization: 'Bearer ' + token,
+        'x-business-id': BIZ_A,
+      },
+      body: JSON.stringify(body),
+    });
+    let data = null;
+    try { data = await res.json(); } catch {}
+    return { status: res.status, data };
+  };
+
+  const rCorruptMultiYear = await confirmApi('b-corrupt-2000-2032', { rows: [{ row_id: 'any' }] });
+  ok('Confirming 2000-2032 multi-decade batch returns 400 corrupt_statement_period',
+    rCorruptMultiYear.status === 400 && rCorruptMultiYear.data?.error === 'corrupt_statement_period');
+
+  const rCorruptInverted = await confirmApi('b-corrupt-inverted', { rows: [{ row_id: 'any' }] });
+  ok('Confirming inverted start > end batch returns 400 corrupt_statement_period',
+    rCorruptInverted.status === 400 && rCorruptInverted.data?.error === 'corrupt_statement_period');
+
+  const rCorruptRow = await confirmApi('b-valid-range', { rows: [{ row_id: 'row-corrupt-year' }] });
+  ok('Confirming batch with corrupt row tx_date returns 400 corrupt_row_date',
+    rCorruptRow.status === 400 && rCorruptRow.data?.error === 'corrupt_row_date');
+
+  const rCorruptFeb30 = await confirmApi('b-valid-range', { rows: [{ row_id: 'row-corrupt-feb30' }] });
+  ok('Confirming batch with impossible calendar date Feb 30 returns 400 corrupt_row_date',
+    rCorruptFeb30.status === 400 && rCorruptFeb30.data?.error === 'corrupt_row_date');
+
+  const rCorruptEmptyAmount = await confirmApi('b-valid-range', { rows: [{ row_id: 'row-corrupt-empty-amount' }] });
+  ok('Confirming batch with empty string amount returns 400 corrupt_row_amount',
+    rCorruptEmptyAmount.status === 400 && rCorruptEmptyAmount.data?.error === 'corrupt_row_amount');
+
+  const rCorruptInfAmount = await confirmApi('b-valid-range', { rows: [{ row_id: 'row-corrupt-inf-amount' }] });
+  ok('Confirming batch with Infinity amount returns 400 corrupt_row_amount',
+    rCorruptInfAmount.status === 400 && rCorruptInfAmount.data?.error === 'corrupt_row_amount');
 }
 
 console.log('\n--- 7. Real component UnreconciledTxDrawer: delayed response after close & company switch ---');
