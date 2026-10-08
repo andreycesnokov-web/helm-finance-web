@@ -179,9 +179,9 @@ setTimeout(async () => {
       const inner = await page.evaluate(() => {
         const el = document.querySelector('.v2-main-inner');
         const cs = getComputedStyle(el);
-        return { wide: el.classList.contains('v2-main-wide'), maxWidth: cs.maxWidth, padL: parseFloat(cs.paddingLeft), padR: parseFloat(cs.paddingRight), w: el.getBoundingClientRect().width };
+        return { maxWidth: cs.maxWidth, padL: parseFloat(cs.paddingLeft), padR: parseFloat(cs.paddingRight), w: el.getBoundingClientRect().width };
       });
-      check(`${width}: wide workspace (no 1120 cap)`, inner.wide && inner.maxWidth === 'none', inner);
+      check(`${width}: wide workspace (no 1120 cap)`, inner.maxWidth === 'none', inner);
       check(`${width}: gutters ${phone ? '16' : '32'} px`, phone ? inner.padL === 16 && inner.padR === 16 : inner.padL === 32 && inner.padR === 32, inner);
       if (width === 1920) check('1920: content wider than the old 1120 px', inner.w > 1400, inner.w);
 

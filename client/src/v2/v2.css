@@ -135,8 +135,11 @@
 }
 
 .v2-main { min-width: 0; outline: none; }
+/* One standard for every v2 screen (owner, 2026-10): the workspace uses the full width
+   next to the sidebar — 16 px gutters on phone/tablet, 32 px on desktop. No reading-width
+   cap: screens lay their own content out inside it. */
 .v2-main-inner {
-  max-width: var(--v2-content-max); margin: 0 auto;
+  width: 100%; min-width: 0;
   padding: var(--space-5) var(--space-4) calc(96px + env(safe-area-inset-bottom, 0px));
 }
 /* Legacy pages rendered inside the v2 frame keep the normalisation they get in the
@@ -152,7 +155,7 @@
   .v2-sidebar { display: flex; height: 100%; }
   .v2-topbar, .v2-tabbar { display: none; }
   .v2-main { height: 100%; overflow-y: auto; overscroll-behavior: contain; }
-  .v2-main-inner { padding: var(--space-8) var(--space-10); }
+  .v2-main-inner { padding: var(--space-8); }
   body:has(.v2-shell) { overflow: hidden; }
   .v2-shell { position: relative; }
   .v2-sidebar-resizer {
@@ -161,9 +164,7 @@
   }
   .v2-sidebar-resizer::after { content: ''; position: absolute; top: 0; bottom: 0; left: 3px; width: 2px; background: transparent; }
   .v2-sidebar-resizer:hover::after, .v2-sidebar-resizer.is-dragging::after, .v2-sidebar-resizer:focus-visible::after { background: var(--brand-electric-blue); }
-  .v2-main-inner.v2-main-wide { padding: var(--space-8); }
 }
-.v2-main-inner.v2-main-wide { max-width: none; }
 
 /* ── Page header ─────────────────────────────────────────────────────────── */
 .v2-pagehead { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: var(--space-3) var(--space-4); margin-bottom: var(--space-6); }
@@ -183,6 +184,8 @@
 @media (min-width: 1025px) { .v2-card { padding: var(--space-6); } }
 .v2-card-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); margin-bottom: var(--space-4); }
 .v2-card-aside { font-size: 13px; font-weight: 700; color: var(--text-secondary); white-space: nowrap; }
+/* On a phone the aside wraps under the title instead of pushing the card sideways. */
+@media (max-width: 600px) { .v2-card-head { flex-wrap: wrap; } .v2-card-aside { white-space: normal; min-width: 0; } }
 .v2-h2 { margin: 0; font-size: 18px; font-weight: 800; color: var(--text-primary); }
 .v2-h3 { margin: 0; font-size: 15px; font-weight: 800; color: var(--text-primary); }
 

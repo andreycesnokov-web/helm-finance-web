@@ -152,9 +152,6 @@ export default function V2Shell({ children }) {
   const personal = (workspaces?.personal || [])[0]
   const [sideW, setSideW] = useState(readSidebarWidth)
   const setSidebar = (w, persist) => { setSideW(w); if (persist) saveSidebarWidth(w) }
-  // The AI Accountant month close uses the full width of the workspace (owner design
-  // 2026-10); every other screen keeps the reading width.
-  const wide = loc.pathname.replace(/\/+$/, '') === '/business/accountant'
 
   return (
     <div className="v2-root v2-shell" data-v2="shell" style={{ '--v2-sidebar-width': `${sideW}px` }}>
@@ -216,7 +213,7 @@ export default function V2Shell({ children }) {
       </header>
 
       <main id="v2-main" className="v2-main cfo-main" tabIndex={-1}>
-        <div className={`v2-main-inner${wide ? ' v2-main-wide' : ''}`}><ErrorBoundary>{children}</ErrorBoundary></div>
+        <div className="v2-main-inner"><ErrorBoundary>{children}</ErrorBoundary></div>
       </main>
 
       <ErrorBoundary compact><AskPanel /></ErrorBoundary>
