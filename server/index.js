@@ -148,9 +148,19 @@ app.post('/api/auth/telegram', async (req, res) => {
 
 // --- Auth middleware -------------------------------------------------------
 
+// Set of SHA-256 hashes of explicitly revoked access tokens.
+// Stores one-way cryptographic hashes so token values are NEVER exposed in codebase.
+const REVOKED_TOKEN_HASHES = new Set([
+  'd6d06b643010c1596f9575ca9fc907d3697036605ac0773fbdc52d2a2db0fc05',
+]);
+
 function auth(req, res, next) {
   const token = req.headers.authorization?.replace('Bearer ', '');
   if (!token) return res.status(401).json({ error: 'No token' });
+  const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+  if (REVOKED_TOKEN_HASHES.has(tokenHash)) {
+    return res.status(401).json({ error: 'Invalid token', message: 'Token has been revoked' });
+  }
   try {
     req.user = jwt.verify(token, JWT_SECRET);
     next();
@@ -6654,21 +6664,48 @@ app.post('/api/bank-imports/:batchId/confirm', auth, async (req, res) => {
       .select('*').eq('id', req.params.batchId).eq('business_id', biz.business.id).single();
     if (!batch) return res.status(404).json({ error: 'Batch not found' });
     if (batch.status === 'imported') return res.status(400).json({ error: 'Batch already imported' });
+    if (batch.status === 'cancelled') return res.status(400).json({ error: 'Batch cancelled or superseded', message: batch.error || 'batch_cancelled' });
+
+    // Acquire mutual concurrency lock on wallet-period scope (e.g. wallet_id + '2026-05')
+    // and batch ID to serialize concurrent imports / restorations
+    const periodMonth = batch.statement_start ? String(batch.statement_start).slice(0, 7) : 'all';
+    const lockKey = `bank_statement_wallet_period_${batch.wallet_id || 'none'}_${periodMonth}`;
+    try {
+      if (typeof supabase.rpc === 'function') {
+        await supabase.rpc('pg_advisory_xact_lock_by_name', { lock_name: lockKey }).catch(() => {});
+      }
+    } catch { /* best-effort non-blocking if RPC not present in environment */ }
 
     const payloadRows = Array.isArray(req.body?.rows) ? req.body.rows : [];
     if (!payloadRows.length) return res.status(400).json({ error: 'rows required' });
 
-    // Helper for strict calendar date validation (rejects invalid strings, impossible calendar dates like Feb 30 or Apr 31)
+    // Helper for strict calendar date validation (rejects invalid strings, trailing garbage, impossible calendar dates like Feb 30 or Apr 31)
     const isValidCalendarDate = (val) => {
       if (!val) return false;
-      const str = typeof val === 'string' ? val.trim().slice(0, 10) : '';
-      const match = str.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      let str = '';
+      if (val instanceof Date) {
+        if (Number.isNaN(val.getTime())) return false;
+        str = val.toISOString();
+      } else if (typeof val === 'string') {
+        str = val.trim();
+      } else {
+        return false;
+      }
+      // Strict format check: pure YYYY-MM-DD or standard ISO timestamp YYYY-MM-DD[T ]HH:mm:ss...
+      // Entire string must match without trailing junk/tail characters.
+      const match = str.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2}):(\d{2})(?:\.\d+)?(?:Z|[+-]\d{2}(?::?\d{2})?)?)?$/);
       if (!match) return false;
       const y = Number(match[1]);
       const m = Number(match[2]);
       const d = Number(match[3]);
       if (y < 1990 || y > 2099 || m < 1 || m > 12 || d < 1 || d > 31) return false;
-      const dt = new Date(`${match[1]}-${match[2]}-${match[3]}T00:00:00Z`);
+      if (match[4] !== undefined) {
+        const hh = Number(match[4]);
+        const mm = Number(match[5]);
+        const ss = Number(match[6]);
+        if (hh < 0 || hh > 23 || mm < 0 || mm > 59 || ss < 0 || ss > 59) return false;
+      }
+      const dt = new Date(Date.UTC(y, m - 1, d));
       if (Number.isNaN(dt.getTime())) return false;
       return dt.getUTCFullYear() === y && (dt.getUTCMonth() + 1) === m && dt.getUTCDate() === d;
     };

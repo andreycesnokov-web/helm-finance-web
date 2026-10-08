@@ -56,14 +56,30 @@ export const isBankWallet = (w) =>
  */
 export function isValidCalendarDate(val) {
   if (!val) return false
-  const str = typeof val === 'string' ? val.trim().slice(0, 10) : ''
-  const match = str.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  let str = ''
+  if (val instanceof Date) {
+    if (Number.isNaN(val.getTime())) return false
+    str = val.toISOString()
+  } else if (typeof val === 'string') {
+    str = val.trim()
+  } else {
+    return false
+  }
+  // Strict format check: pure YYYY-MM-DD or standard ISO timestamp YYYY-MM-DD[T ]HH:mm:ss...
+  // Entire string must match without trailing junk/tail characters.
+  const match = str.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2}):(\d{2})(?:\.\d+)?(?:Z|[+-]\d{2}(?::?\d{2})?)?)?$/)
   if (!match) return false
   const y = Number(match[1])
   const m = Number(match[2])
   const d = Number(match[3])
   if (y < 1990 || y > 2099 || m < 1 || m > 12 || d < 1 || d > 31) return false
-  const dt = new Date(`${match[1]}-${match[2]}-${match[3]}T00:00:00Z`)
+  if (match[4] !== undefined) {
+    const hh = Number(match[4])
+    const mm = Number(match[5])
+    const ss = Number(match[6])
+    if (hh < 0 || hh > 23 || mm < 0 || mm > 59 || ss < 0 || ss > 59) return false
+  }
+  const dt = new Date(Date.UTC(y, m - 1, d))
   if (Number.isNaN(dt.getTime())) return false
   return dt.getUTCFullYear() === y && (dt.getUTCMonth() + 1) === m && dt.getUTCDate() === d
 }

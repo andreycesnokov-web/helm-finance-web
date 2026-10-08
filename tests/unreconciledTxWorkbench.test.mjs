@@ -1,7 +1,7 @@
 // Test unreconciled bank transactions workbench & diagnosis logic
 // Run: node tests/unreconciledTxWorkbench.test.mjs
 import assert from 'node:assert';
-import { closeReadiness, determineUnreconciledReason, isBatchPeriodValid, hasCorruptRows } from '../client/src/v2/lib/accounting.js';
+import { closeReadiness, determineUnreconciledReason, isBatchPeriodValid, hasCorruptRows, isValidCalendarDate } from '../client/src/v2/lib/accounting.js';
 
 let pass = 0;
 let fail = 0;
@@ -194,6 +194,16 @@ console.log('\n--- 3b. Case: Erroneous multi-year batch (2000-2032) must NOT cov
   ok('hasCorruptRows detects null amount', hasCorruptRows([{ tx_date: '2026-05-02', amount: null }]) === true);
   ok('hasCorruptRows allows negative amount for debit/refund', hasCorruptRows([{ tx_date: '2026-05-02', amount: -500 }]) === false);
   ok('hasCorruptRows returns false for valid rows', hasCorruptRows([{ tx_date: '2026-05-02', amount: 500 }]) === false);
+  ok('isValidCalendarDate accepts valid standard date YYYY-MM-DD', isValidCalendarDate('2026-05-15') === true);
+  ok('isValidCalendarDate accepts ISO timestamp with T and Z', isValidCalendarDate('2026-05-15T08:30:00.000Z') === true);
+  ok('isValidCalendarDate accepts ISO timestamp with space and timezone', isValidCalendarDate('2026-05-15 08:30:00+07:00') === true);
+  ok('isValidCalendarDate rejects string with trailing garbage (e.g. 2026-05-15garbage)', isValidCalendarDate('2026-05-15garbage') === false);
+  ok('isValidCalendarDate rejects string with trailing extra text (e.g. 2026-05-15foobar)', isValidCalendarDate('2026-05-15foobar') === false);
+  ok('isValidCalendarDate rejects timestamp with trailing junk', isValidCalendarDate('2026-05-15 08:30:00junk') === false);
+  ok('isValidCalendarDate rejects impossible calendar date Feb 30', isValidCalendarDate('2026-02-30') === false);
+  ok('isValidCalendarDate rejects non-leap Feb 29', isValidCalendarDate('2026-02-29') === false);
+  ok('isValidCalendarDate accepts valid leap year Feb 29 2024', isValidCalendarDate('2024-02-29') === true);
+  ok('hasCorruptRows detects row with trailing junk in date', hasCorruptRows([{ tx_date: '2026-05-15garbage', amount: 100 }]) === true);
 }
 
 console.log('\n--- 4. Case: Insufficient data / requires clarification ---');
@@ -487,6 +497,14 @@ console.log('\n--- 6. Server PATCH /api/transactions/:id boundary guard HTTP end
       tx_date: '2026-02-30',
       amount: 100000,
       direction: 'out',
+    },
+    {
+      id: 'row-corrupt-tail',
+      batch_id: 'b-valid-range',
+      business_id: BIZ_A,
+      tx_date: '2026-05-15garbage',
+      amount: 100000,
+      direction: 'out',
     }
   ]);
 
@@ -520,6 +538,10 @@ console.log('\n--- 6. Server PATCH /api/transactions/:id boundary guard HTTP end
   const rCorruptFeb30 = await confirmApi('b-valid-range', { rows: [{ row_id: 'row-corrupt-feb30' }] });
   ok('Confirming batch with impossible calendar date Feb 30 returns 400 corrupt_row_date',
     rCorruptFeb30.status === 400 && rCorruptFeb30.data?.error === 'corrupt_row_date');
+
+  const rCorruptTail = await confirmApi('b-valid-range', { rows: [{ row_id: 'row-corrupt-tail' }] });
+  ok('Confirming batch with trailing garbage in date returns 400 corrupt_row_date',
+    rCorruptTail.status === 400 && rCorruptTail.data?.error === 'corrupt_row_date');
 
   const rCorruptEmptyAmount = await confirmApi('b-valid-range', { rows: [{ row_id: 'row-corrupt-empty-amount' }] });
   ok('Confirming batch with empty string amount returns 400 corrupt_row_amount',
