@@ -193,9 +193,179 @@ export function closeReadiness({ month, transactions = [], debts = [], batches =
       currency: t.currency_original || 'IDR',
       type: t.type,
       description: t.description || '',
+      category: t.category || null,
+      counterparty: t.counterparty || null,
+      source: t.source || null,
       wallet_id: t.wallet_id || null,
+      document_id: t.document_id || null,
+      linked_statement_row_id: t.linked_statement_row_id || null,
+      statement_batch_id: t.statement_batch_id || null,
+      raw: t,
     })),
     checks,
+  }
+}
+
+/**
+ * Diagnoses the exact factual reason why a bank transaction is unreconciled for a given month.
+ * Returns: { code, key, walletName, walletId, month, batch, diff }
+ * Codes:
+ *   - 'no_statement': statement for account not uploaded covering the month
+ *   - 'statement_unconfirmed': statement uploaded, but processing/reconciliation unconfirmed (unbalanced/review_required)
+ *   - 'no_match': statement uploaded and confirmed/imported, but transaction not matched to statement rows
+ *   - 'requires_clarification': insufficient data to determine
+ */
+export function determineUnreconciledReason({ tx, month, wallet, batches = [] }) {
+  if (!wallet || !tx) {
+    return {
+      code: 'requires_clarification',
+      reason: 'requires_clarification',
+      key: 'clarification',
+      reasonKey: 'acct.reason.clarification',
+      walletName: wallet?.name || null,
+      walletId: wallet?.id || null,
+      month,
+      params: {
+        wallet: wallet?.name || 'Bank',
+        month: month || '',
+      },
+      actionRoute: null,
+      actionLabelKey: null,
+    }
+  }
+
+  const mOpt = monthOptions(24).find((m) => m.key === month)
+  const start = mOpt?.start || `${month}-01`
+  const end = mOpt?.end || `${month}-28`
+
+  const isFiniteNumber = (val) => val != null && val !== '' && typeof val !== 'boolean' && Number.isFinite(Number(val)) && !Number.isNaN(Number(val))
+  const toIsoDateStr = (val) => {
+    if (!val) return null
+    if (typeof val === 'string') return val.trim().slice(0, 10)
+    if (val instanceof Date && !Number.isNaN(val.getTime())) {
+      const y = val.getUTCFullYear()
+      const m = String(val.getUTCMonth() + 1).padStart(2, '0')
+      const d = String(val.getUTCDate()).padStart(2, '0')
+      return `${y}-${m}-${d}`
+    }
+    return null
+  }
+  const isValidIsoDate = (val) => {
+    const str = toIsoDateStr(val)
+    if (!str) return false
+    const match = str.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+    if (!match) return false
+    const [_, y, m, d] = match
+    const dt = new Date(`${y}-${m}-${d}T00:00:00Z`)
+    if (Number.isNaN(dt.getTime())) return false
+    return dt.getUTCFullYear() === Number(y) && dt.getUTCMonth() + 1 === Number(m) && dt.getUTCDate() === Number(d)
+  }
+
+  const walletBatches = (batches || []).filter((b) =>
+    String(b.wallet_id) === String(wallet.id) &&
+    !['cancelled', 'failed'].includes(b.status)
+  )
+
+  const coveringBatches = walletBatches.filter((b) => {
+    if (!isValidIsoDate(b.statement_start) || !isValidIsoDate(b.statement_end)) return false
+    const bStart = toIsoDateStr(b.statement_start)
+    const bEnd = toIsoDateStr(b.statement_end)
+    if (bStart > bEnd) return false
+    return bStart <= start && bEnd >= end
+  })
+
+  // 1. No statement uploaded for this account covering the period
+  if (coveringBatches.length === 0) {
+    return {
+      code: 'no_statement',
+      reason: 'no_statement',
+      key: 'noStatement',
+      reasonKey: 'acct.reason.noStatement',
+      walletName: wallet.name,
+      walletId: wallet.id,
+      month,
+      params: {
+        wallet: wallet.name || 'Bank',
+        month: month || '',
+      },
+      actionRoute: '/business/bank-import',
+      actionLabelKey: 'acct.reason.actionUploadStatement',
+    }
+  }
+
+  // 2. Statement exists, but processing or reconciliation confirmation is incomplete
+  const unconfirmedBatch = coveringBatches.find((b) => {
+    if (['review_required', 'unbalanced'].includes(b.status)) return true
+    const recon = b.reconciliation || b.bank_reconciliations?.[0] || null
+    const recStatus = b.reconciliation_status || recon?.status || null
+    if (recStatus === 'unbalanced' || recStatus === 'review_required') return true
+
+    const rawDiff = b.difference != null ? b.difference : recon?.difference
+    if (rawDiff != null && isFiniteNumber(rawDiff)) {
+      const currency = (b.currency || wallet.currency || 'IDR').toUpperCase()
+      const tol = currency === 'IDR' ? 1 : 0.01
+      if (Math.abs(Number(rawDiff)) >= tol) return true
+    }
+    if (b.status !== 'imported' && b.status !== 'reconciled' && b.status !== 'confirmed') return true
+    return false
+  })
+
+  if (unconfirmedBatch) {
+    const recon = unconfirmedBatch.reconciliation || unconfirmedBatch.bank_reconciliations?.[0]
+    const diff = unconfirmedBatch.difference != null ? unconfirmedBatch.difference : recon?.difference
+    return {
+      code: 'statement_unconfirmed',
+      reason: 'statement_unconfirmed',
+      key: 'unconfirmed',
+      reasonKey: 'acct.reason.unconfirmed',
+      batch: unconfirmedBatch,
+      diff: diff != null ? Number(diff) : null,
+      walletName: wallet.name,
+      walletId: wallet.id,
+      month,
+      params: {
+        wallet: wallet.name || 'Bank',
+        month: month || '',
+      },
+      actionRoute: '/business/bank-import',
+      actionLabelKey: 'acct.reason.actionReviewStatement',
+    }
+  }
+
+  // 3. Statement is uploaded and processed/confirmed, but this transaction is unlinked
+  const isLinked = !!(tx.linked_statement_row_id || tx.statement_row_id || tx.is_reconciled)
+  if (!isLinked) {
+    return {
+      code: 'no_match',
+      reason: 'no_match',
+      key: 'noMatch',
+      reasonKey: 'acct.reason.noMatch',
+      walletName: wallet.name,
+      walletId: wallet.id,
+      month,
+      params: {
+        wallet: wallet.name || 'Bank',
+        month: month || '',
+      },
+      actionRoute: '/business/bank-import',
+      actionLabelKey: 'acct.reason.actionMatchTransactions',
+    }
+  }
+
+  return {
+    code: 'requires_clarification',
+    reason: 'requires_clarification',
+    key: 'clarification',
+    reasonKey: 'acct.reason.clarification',
+    walletName: wallet.name,
+    walletId: wallet.id,
+    month,
+    params: {
+      wallet: wallet.name || 'Bank',
+      month: month || '',
+    },
+    actionRoute: null,
+    actionLabelKey: null,
   }
 }
 

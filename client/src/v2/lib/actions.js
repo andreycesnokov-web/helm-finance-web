@@ -35,8 +35,11 @@ export const rejectDebt = (token, id, reason) =>
 export const requestDebtInfo = (token, id, note) =>
   apiFetch(`/debts/${encodeURIComponent(id)}/request-info`, token, { method: 'POST', body: { note, channel: 'web' } })
 
+export const updateTransaction = (token, id, body) =>
+  apiFetch(`/transactions/${encodeURIComponent(id)}`, token, { method: 'PATCH', body })
+
 export const setTransactionCategory = (token, id, category) =>
-  apiFetch(`/transactions/${encodeURIComponent(id)}`, token, { method: 'PATCH', body: { category } })
+  updateTransaction(token, id, { category })
 
 export const createCounterparty = (token, body) =>
   apiFetch('/counterparties', token, { method: 'POST', body })
