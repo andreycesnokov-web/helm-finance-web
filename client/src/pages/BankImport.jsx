@@ -229,12 +229,23 @@ export default function BankImport() {
         })
     } else if (!qBatchId && qMonth && history.length > 0 && token && !batch) {
       // If navigated with wallet_id and month but without explicit batchId,
-      // auto-open matching batch for this wallet and period if one exists
+      // auto-open matching batch for this wallet and period ONLY if statement_start / statement_end are known.
+      // Never use created_at (upload month may differ from statement month) and never auto-open if period is unknown.
       const matchBatch = history.find(b => {
         const matchWallet = !qWalletId || String(b.wallet_id) === String(qWalletId)
-        const bStart = b.statement_start ? String(b.statement_start).slice(0, 7) : null
-        const bCreated = b.created_at ? String(b.created_at).slice(0, 7) : null
-        return matchWallet && (bStart === qMonth || bCreated === qMonth)
+        if (!matchWallet) return false
+        if (!b.statement_start && !b.statement_end) return false
+        const bStartMonth = b.statement_start ? String(b.statement_start).slice(0, 7) : null
+        const bEndMonth = b.statement_end ? String(b.statement_end).slice(0, 7) : null
+        const bStart = b.statement_start ? String(b.statement_start).slice(0, 10) : null
+        const bEnd = b.statement_end ? String(b.statement_end).slice(0, 10) : null
+        const qStart = `${qMonth}-01`
+        const qEnd = `${qMonth}-31`
+        return (
+          bStartMonth === qMonth ||
+          bEndMonth === qMonth ||
+          (bStart && bEnd && bStart <= qStart && bEnd >= qEnd)
+        )
       })
       if (matchBatch) {
         openHistoryBatch(matchBatch)
@@ -697,9 +708,18 @@ export default function BankImport() {
       {history.length > 0 && (() => {
         const filteredHistory = activeMonthFilter
           ? history.filter(b => {
-              const bStart = b.statement_start ? String(b.statement_start).slice(0, 7) : null
-              const bCreated = b.created_at ? String(b.created_at).slice(0, 7) : null
-              return bStart === activeMonthFilter || bCreated === activeMonthFilter
+              if (!b.statement_start && !b.statement_end) return false
+              const bStartMonth = b.statement_start ? String(b.statement_start).slice(0, 7) : null
+              const bEndMonth = b.statement_end ? String(b.statement_end).slice(0, 7) : null
+              const bStart = b.statement_start ? String(b.statement_start).slice(0, 10) : null
+              const bEnd = b.statement_end ? String(b.statement_end).slice(0, 10) : null
+              const qStart = `${activeMonthFilter}-01`
+              const qEnd = `${activeMonthFilter}-31`
+              return (
+                bStartMonth === activeMonthFilter ||
+                bEndMonth === activeMonthFilter ||
+                (bStart && bEnd && bStart <= qStart && bEnd >= qEnd)
+              )
             })
           : history
 

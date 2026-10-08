@@ -368,14 +368,18 @@ console.log('\n--- 7. Real component UnreconciledTxDrawer: delayed response afte
 {
   const { execFileSync } = await import('node:child_process');
   const path = (await import('node:path')).default;
-  const scriptPath = path.resolve('scratch/test_complete_browser_verification.js');
+  const scriptPath = path.resolve('tests/unreconciledTxDrawerBrowser.test.js');
   
   try {
     const res = execFileSync('node', [scriptPath], { encoding: 'utf8' });
     ok('Real UnreconciledTxDrawer mounts and opens in browser', res.includes('PASS: Drawer opened: true'));
     ok('Real UnreconciledTxDrawer handles in-flight delayed PATCH and closes via Escape without crash', res.includes('PASS: Drawer closed immediately without waiting for late response: true'));
-    ok('Real transaction update commits to database', res.includes('PASS: Transaction updated in DB: true'));
+    ok('No stale callbacks executed after drawer close in real UI', res.includes('PASS: No stale callbacks executed after drawer close: true'));
+    ok('Real UnreconciledTxDrawer drops in-flight save on company switch', res.includes('PASS: Drawer unmounted and dropped after company switch: true'));
+    ok('No stale callbacks executed across company boundary', res.includes('PASS: No stale callbacks executed across company boundary: true'));
+    ok('Company workspace isolation preserved without transaction leak', res.includes('PASS: Beta workspace has isolated empty state (no leak from Alpha): true'));
     ok('Navigation to BankImport preserves wallet and month', res.includes('PASS: BankImport shows target period banner: true') && res.includes('PASS: BankImport has selected wallet id w-alpha-bca: true'));
+    ok('Statement period matching uses statement_start/statement_end and ignores upload month', res.includes('PASS: September statement uploaded in October matches September period: true') && res.includes('PASS: Batch with unknown statement dates does not auto-open: true'));
     ok('Zero console errors in real React component execution', res.includes('Total console errors during full run: 0'));
   } catch (err) {
     console.error('Real component browser verification failed:', err.stdout || err.message);
