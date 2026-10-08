@@ -276,6 +276,10 @@ export function determineUnreconciledReason({ tx, month, wallet, batches = [] })
 
   // 1. No statement uploaded for this account covering the period
   if (coveringBatches.length === 0) {
+    const routeParams = new URLSearchParams()
+    if (wallet?.id) routeParams.set('wallet_id', String(wallet.id))
+    if (month) routeParams.set('month', String(month))
+    const qStr = routeParams.toString()
     return {
       code: 'no_statement',
       reason: 'no_statement',
@@ -288,7 +292,7 @@ export function determineUnreconciledReason({ tx, month, wallet, batches = [] })
         wallet: wallet.name || 'Bank',
         month: month || '',
       },
-      actionRoute: '/business/bank-import',
+      actionRoute: `/business/bank-import${qStr ? `?${qStr}` : ''}`,
       actionLabelKey: 'acct.reason.actionUploadStatement',
     }
   }
@@ -313,6 +317,11 @@ export function determineUnreconciledReason({ tx, month, wallet, batches = [] })
   if (unconfirmedBatch) {
     const recon = unconfirmedBatch.reconciliation || unconfirmedBatch.bank_reconciliations?.[0]
     const diff = unconfirmedBatch.difference != null ? unconfirmedBatch.difference : recon?.difference
+    const routeParams = new URLSearchParams()
+    if (unconfirmedBatch.id) routeParams.set('batchId', String(unconfirmedBatch.id))
+    if (wallet?.id) routeParams.set('wallet_id', String(wallet.id))
+    if (month) routeParams.set('month', String(month))
+    const qStr = routeParams.toString()
     return {
       code: 'statement_unconfirmed',
       reason: 'statement_unconfirmed',
@@ -327,7 +336,7 @@ export function determineUnreconciledReason({ tx, month, wallet, batches = [] })
         wallet: wallet.name || 'Bank',
         month: month || '',
       },
-      actionRoute: '/business/bank-import',
+      actionRoute: `/business/bank-import${qStr ? `?${qStr}` : ''}`,
       actionLabelKey: 'acct.reason.actionReviewStatement',
     }
   }
@@ -335,6 +344,12 @@ export function determineUnreconciledReason({ tx, month, wallet, batches = [] })
   // 3. Statement is uploaded and processed/confirmed, but this transaction is unlinked
   const isLinked = !!(tx.linked_statement_row_id || tx.statement_row_id || tx.is_reconciled)
   if (!isLinked) {
+    const latestBatch = coveringBatches[0]
+    const routeParams = new URLSearchParams()
+    if (latestBatch?.id) routeParams.set('batchId', String(latestBatch.id))
+    if (wallet?.id) routeParams.set('wallet_id', String(wallet.id))
+    if (month) routeParams.set('month', String(month))
+    const qStr = routeParams.toString()
     return {
       code: 'no_match',
       reason: 'no_match',
@@ -347,7 +362,7 @@ export function determineUnreconciledReason({ tx, month, wallet, batches = [] })
         wallet: wallet.name || 'Bank',
         month: month || '',
       },
-      actionRoute: '/business/bank-import',
+      actionRoute: `/business/bank-import${qStr ? `?${qStr}` : ''}`,
       actionLabelKey: 'acct.reason.actionMatchTransactions',
     }
   }

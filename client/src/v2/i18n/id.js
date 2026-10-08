@@ -329,6 +329,8 @@ export default {
       docLimitation: 'Penautan langsung dokumen ke transaksi bank tersedia melalui Pusat Dokumen. Unggah file dan pilih transaksi ini dalam tautan.',
       docWarning: 'Perhatian: melampirkan kuitansi atau faktur mengonfirmasi keberadaan dokumen, tetapi tidak menyelesaikan rekonsiliasi bank dengan sendirinya.',
       unreconciledNotice: 'Mengubah deskripsi atau kategori memperbarui catatan pembukuan, namun tidak secara otomatis merekonsiliasi transaksi. Rekonsiliasi memerlukan konfirmasi mutasi bank.',
+      currencyMismatch: 'Memindahkan transaksi antar rekening dengan mata uang berbeda ({from} → {to}) dilarang tanpa konversi.',
+      currencyMismatchNotice: 'Pemindahan transaksi hanya dapat dilakukan ke rekening dalam mata uang {cur}. Rekening bermata uang lain dinonaktifkan.',
       saveSuccess: 'Perubahan disimpan',
       saveError: 'Gagal menyimpan perubahan: {msg}',
     },

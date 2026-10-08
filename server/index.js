@@ -8296,9 +8296,9 @@ app.patch('/api/transactions/:id', auth, async (req, res) => {
 
   if (existingErr || !existing) return res.status(404).json({ error: 'Transaction not found' });
 
-  // Boundary check: opening balance financial treatment is protected
+  // Boundary check: opening balance financial treatment is protected against any modification of amount, wallet, date, or currency
   if (existing.source === 'wallet_opening_balance') {
-    if ('amount' in req.body || 'wallet_id' in req.body) {
+    if ('amount' in req.body || 'wallet_id' in req.body || 'transaction_date' in req.body || 'date' in req.body || 'currency' in req.body) {
       return res.status(400).json({
         error: 'opening_balance_cannot_be_modified',
         message: 'Opening balance transactions cannot be modified directly',
@@ -8306,17 +8306,17 @@ app.patch('/api/transactions/:id', auth, async (req, res) => {
     }
   }
 
-  // Boundary check: if transaction is created by debt payment, amount must be edited via original bill
+  // Boundary check: if transaction is created by debt payment, financial fields (amount, wallet, date, currency) must be edited via original bill
   const { data: linkedDebts } = await supabase.from('debts')
     .select('id, invoice_number, counterparty')
     .eq('linked_transaction_id', existing.id)
     .or(bizOrFilter(biz))
     .limit(1);
   if (Array.isArray(linkedDebts) && linkedDebts.length > 0) {
-    if ('amount' in req.body) {
+    if ('amount' in req.body || 'wallet_id' in req.body || 'transaction_date' in req.body || 'date' in req.body || 'currency' in req.body) {
       return res.status(400).json({
         error: 'debt_payment_amount_immutable',
-        message: 'Payment amount must be edited through the linked invoice or debt record',
+        message: 'Payment financial fields (amount, wallet, date) must be edited through the linked invoice or debt record',
       });
     }
   }
@@ -8344,10 +8344,15 @@ app.patch('/api/transactions/:id', auth, async (req, res) => {
       .limit(1);
     if (!w || w.length === 0)
       return res.status(404).json({ error: 'wallet_not_found', message: 'Target wallet not found in business' });
-    updates.wallet_id = wid;
-    if (!('currency' in req.body) && w[0].currency) {
-      updates.currency_original = w[0].currency;
+    const targetWalletCurrency = (w[0].currency || 'IDR').toUpperCase();
+    const existingCurrency = (existing.currency_original || 'IDR').toUpperCase();
+    if (targetWalletCurrency !== existingCurrency) {
+      return res.status(400).json({
+        error: 'currency_mismatch',
+        message: `Moving transactions between accounts with different currencies (${existingCurrency} -> ${targetWalletCurrency}) is not permitted without conversion`,
+      });
     }
+    updates.wallet_id = wid;
   }
   const dVal = req.body.transaction_date || req.body.date;
   if (dVal) {

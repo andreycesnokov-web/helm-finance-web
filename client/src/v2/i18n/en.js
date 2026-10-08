@@ -329,6 +329,8 @@ export default {
       docWarning: 'Notice: attaching a receipt or invoice confirms document presence, but does not in itself complete bank reconciliation.',
       docLimitation: 'Direct linking of documents to bank transactions is available via Document Center. Upload the file and select this transaction in links.',
       unreconciledNotice: 'Editing description or category updates accounting records, but does not automatically reconcile the transaction. Reconciliation requires confirmation via bank statement.',
+      currencyMismatch: 'Moving transactions between accounts with different currencies ({from} → {to}) is not permitted without conversion.',
+      currencyMismatchNotice: 'Transaction can only be moved to accounts denominated in {cur}. Accounts with other currencies are disabled.',
       saveSuccess: 'Changes saved',
       saveError: 'Error saving changes: {msg}',
     },

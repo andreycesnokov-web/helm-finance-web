@@ -505,7 +505,10 @@ function CloseTab({ month, onOpenChatModal }) {
                       {allNoStatement && (
                         <div className="v2-unlinked-banner">
                           <span>⚠️ {t('acct.unlinked.allNoStatement', { n: groupTxs.length })}</span>
-                          <Link to="/business/bank-import" className="v2-btn v2-btn-sm v2-btn-primary">
+                          <Link
+                            to={`/business/bank-import?wallet_id=${encodeURIComponent(walletId)}&month=${encodeURIComponent(selectedMonth)}`}
+                            className="v2-btn v2-btn-sm v2-btn-primary"
+                          >
                             {t('acct.unlinked.uploadStatement')}
                           </Link>
                         </div>
@@ -514,7 +517,10 @@ function CloseTab({ month, onOpenChatModal }) {
                       {!allNoStatement && allUnconfirmed && (
                         <div className="v2-unlinked-banner">
                           <span>⚠️ {t('acct.unlinked.allUnconfirmed', { n: groupTxs.length })}</span>
-                          <Link to="/business/bank-import" className="v2-btn v2-btn-sm v2-btn-secondary">
+                          <Link
+                            to={`/business/bank-import?wallet_id=${encodeURIComponent(walletId)}&month=${encodeURIComponent(selectedMonth)}${diagnosedGroup[0]?.diagnosis?.batch?.id ? `&batchId=${encodeURIComponent(diagnosedGroup[0].diagnosis.batch.id)}` : ''}`}
+                            className="v2-btn v2-btn-sm v2-btn-secondary"
+                          >
                             {t('acct.unlinked.reviewStatement')}
                           </Link>
                         </div>

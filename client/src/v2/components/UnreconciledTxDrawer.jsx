@@ -33,11 +33,18 @@ export default function UnreconciledTxDrawer({
   const closeBtnRef = useRef(null)
   const lastFocus = useRef(null)
 
-  // Scope protection: capture identity of the company workspace and month when rendered
-  const currentScope = `${activeBusinessId ?? ''}|${scopeKey ?? ''}|${month ?? ''}`
+  // Scope protection: capture identity of the company workspace, month, and transaction id
+  const currentScope = `${activeBusinessId ?? ''}|${scopeKey ?? ''}|${month ?? ''}|${tx?.id ?? ''}`
   const scopeRef = useRef(currentScope)
+  const isMountedRef = useRef(true)
+
   useEffect(() => {
+    isMountedRef.current = true
     scopeRef.current = currentScope
+    return () => {
+      isMountedRef.current = false
+      scopeRef.current = null // Invalidate on unmount so late in-flight responses are strictly dropped
+    }
   }, [currentScope])
 
   // Reason diagnosis
@@ -173,7 +180,7 @@ export default function UnreconciledTxDrawer({
 
   const isIncome = tx.type === 'income' || tx.type === 'cash_in'
   const amount = Number(tx.amount_original || tx.amount || 0)
-  const currency = tx.currency_original || tx.currency || 'IDR'
+  const currency = (tx.currency_original || tx.currency || 'IDR').toUpperCase()
 
   // Source type label
   let sourceLabel = t('acct.drawer.sourceManual')
@@ -194,7 +201,7 @@ export default function UnreconciledTxDrawer({
       month,
     })
     reasonAction = (
-      <Link to="/business/bank-import" className="v2-btn v2-btn-sm v2-btn-primary" onClick={onClose}>
+      <Link to={reason.actionRoute || '/business/bank-import'} className="v2-btn v2-btn-sm v2-btn-primary" onClick={onClose}>
         {t('acct.unlinked.uploadStatement')}
       </Link>
     )
@@ -202,7 +209,7 @@ export default function UnreconciledTxDrawer({
     reasonBadgeText = t('acct.unlinked.badgeUnconfirmed')
     reasonDetail = t('acct.reason.unconfirmed')
     reasonAction = (
-      <Link to="/business/bank-import" className="v2-btn v2-btn-sm v2-btn-secondary" onClick={onClose}>
+      <Link to={reason.actionRoute || '/business/bank-import'} className="v2-btn v2-btn-sm v2-btn-secondary" onClick={onClose}>
         {t('acct.unlinked.reviewStatement')}
       </Link>
     )
@@ -210,7 +217,7 @@ export default function UnreconciledTxDrawer({
     reasonBadgeText = t('acct.unlinked.badgeNoMatch')
     reasonDetail = t('acct.reason.noMatch')
     reasonAction = (
-      <Link to="/business/bank-import" className="v2-btn v2-btn-sm v2-btn-secondary" onClick={onClose}>
+      <Link to={reason.actionRoute || '/business/bank-import'} className="v2-btn v2-btn-sm v2-btn-secondary" onClick={onClose}>
         {t('acct.unlinked.reviewStatement')}
       </Link>
     )
@@ -223,10 +230,20 @@ export default function UnreconciledTxDrawer({
     setSaveSuccess(false)
 
     // Stale check before in-flight mutation
-    if (scopeRef.current !== currentScope) {
+    if (!isMountedRef.current || scopeRef.current !== currentScope) {
       setSaving(false)
-      onClose?.()
       return
+    }
+
+    // Client-side currency boundary check
+    if (draft.wallet_id && draft.wallet_id !== String(tx.wallet_id)) {
+      const targetWallet = wallets.find((w) => String(w.id) === String(draft.wallet_id))
+      const targetCur = (targetWallet?.currency || 'IDR').toUpperCase()
+      if (targetCur !== currency) {
+        setSaving(false)
+        setSaveError(t('acct.drawer.currencyMismatch', { from: currency, to: targetCur }))
+        return
+      }
     }
 
     try {
@@ -234,19 +251,18 @@ export default function UnreconciledTxDrawer({
         description: draft.description,
         category: draft.category || null,
       }
+      // Linked debt payments and opening balance cannot have wallet or date modified
       if (draft.wallet_id && !isOpening && !linkedDebt) {
         payload.wallet_id = draft.wallet_id
       }
-      if (draft.date && !isOpening) {
+      if (draft.date && !isOpening && !linkedDebt) {
         payload.date = draft.date
       }
 
       const updated = await updateTransaction(token, tx.id, payload)
 
-      // Stale check after in-flight response arrives: do not commit state if workspace changed
-      if (scopeRef.current !== currentScope) {
-        setSaving(false)
-        onClose?.()
+      // Stale check after in-flight response arrives: do not commit state or trigger callbacks if unmounted or scope changed
+      if (!isMountedRef.current || scopeRef.current !== currentScope) {
         return
       }
 
@@ -255,14 +271,14 @@ export default function UnreconciledTxDrawer({
       onSaved?.(updated)
       onTxUpdated?.(updated)
     } catch (err) {
-      if (scopeRef.current !== currentScope) {
-        setSaving(false)
-        onClose?.()
+      if (!isMountedRef.current || scopeRef.current !== currentScope) {
         return
       }
       setSaveError(err?.message || err?.data?.message || 'Update failed')
     } finally {
-      setSaving(false)
+      if (isMountedRef.current && scopeRef.current === currentScope) {
+        setSaving(false)
+      }
     }
   }
 
@@ -549,12 +565,18 @@ export default function UnreconciledTxDrawer({
                     style={{ fontSize: 13, height: 34 }}
                   >
                     <option value="">{t('acct.unlinked.unknownAccount')}</option>
-                    {wallets.map((w) => (
-                      <option key={w.id} value={w.id}>
-                        {w.name} ({w.currency})
-                      </option>
-                    ))}
+                    {wallets.map((w) => {
+                      const isSameCur = (w.currency || 'IDR').toUpperCase() === currency
+                      return (
+                        <option key={w.id} value={w.id} disabled={!isSameCur}>
+                          {w.name} ({w.currency}){isSameCur ? '' : ' — недоступно (другая валюта)'}
+                        </option>
+                      )
+                    })}
                   </select>
+                  <span style={{ fontSize: 11, color: 'var(--text-muted, #64748b)' }}>
+                    ℹ️ {t('acct.drawer.currencyMismatchNotice', { cur: currency })}
+                  </span>
                 </label>
 
                 {/* Category */}

@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { useSearchParams, useLocation } from 'react-router-dom'
 import * as XLSX from 'xlsx'
 import { useAuth } from '../hooks/useAuth'
 import { useTranslation } from '../hooks/useTranslation'
@@ -175,16 +176,59 @@ export default function BankImport() {
   const [cps, setCps] = useState([])                // [{id,name}]
   const [summary, setSummary] = useState(null)
   const [filter, setFilter] = useState('fAll')
-  const [canMakeCat, setCanMakeCat] = useState(false)
+  const [searchParams] = useSearchParams()
+  const qBatchId = searchParams.get('batchId') || searchParams.get('batch_id')
+  const qWalletId = searchParams.get('wallet_id') || searchParams.get('walletId')
+  const qMonth = searchParams.get('month') || searchParams.get('period')
 
   const loadHistory = useCallback(() => {
     apiFetch('/bank-import/batches', token).then(d => setHistory(d.batches || [])).catch(() => {})
   }, [token])
+
   useEffect(() => {
-    apiFetch('/wallets', token).then(d => setWallets(d.wallets || [])).catch(() => {})
+    apiFetch('/wallets', token).then(d => {
+      const list = d.wallets || []
+      setWallets(list)
+      if (qWalletId && list.some(w => String(w.id) === String(qWalletId))) {
+        setWalletId(String(qWalletId))
+      }
+    }).catch(() => {})
     apiFetch('/cashflow-categories', token).then(d => setCats(d.categories || [])).catch(() => {})
     loadHistory()
-  }, [token, loadHistory])
+  }, [token, loadHistory, qWalletId])
+
+  useEffect(() => {
+    if (qBatchId && token) {
+      apiFetch(`/bank-imports/${qBatchId}/review`, token)
+        .then(d => {
+          if (d?.batch) {
+            setBatch(d.batch)
+            if (d.batch.wallet_id) setWalletId(String(d.batch.wallet_id))
+            setCats(d.categories || []); setCps(d.counterparties || [])
+            setSummary(d.summary || null); setCanMakeCat(!!d.canManageCategories)
+            setRows((d.rows || []).map(toLocal))
+          }
+        })
+        .catch(err => {
+          console.error('Failed to load batch from URL param:', err)
+        })
+    }
+  }, [qBatchId, token])
+
+  const openHistoryBatch = async (b) => {
+    if (!b?.id) return
+    setBusy(true)
+    try {
+      setBatch(b)
+      if (b.wallet_id) setWalletId(String(b.wallet_id))
+      await loadReview(b.id)
+    } catch (e) {
+      alert(e.message || 'Failed to load batch')
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const catName = useCallback((id) => cats.find(c => c.id === id)?.name || '', [cats])
 
   const onFile = async (e) => {
@@ -587,9 +631,29 @@ export default function BankImport() {
         <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, padding: 16 }}>
           <div style={{ fontWeight: 700, marginBottom: 8 }}>{l.history}</div>
           {history.map(b => (
-            <div key={b.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '6px 0', borderBottom: '0.5px solid var(--border)' }}>
-              <span>{b.file_name || '—'} · {b.row_count} {l.rows}</span>
-              <span style={{ color: 'var(--text-3)' }}>{b.status} · {b.imported_count} {l.imported.toLowerCase()}</span>
+            <div
+              key={b.id}
+              onClick={() => openHistoryBatch(b)}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openHistoryBatch(b); } }}
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                fontSize: 12,
+                padding: '8px 6px',
+                borderBottom: '0.5px solid var(--border)',
+                cursor: 'pointer',
+                borderRadius: 6,
+              }}
+              title="Нажмите, чтобы открыть выписку"
+            >
+              <span>
+                <strong>{b.file_name || '—'}</strong> · {b.row_count} {l.rows}
+              </span>
+              <span style={{ color: 'var(--text-3)' }}>
+                {b.status} · {b.imported_count} {l.imported.toLowerCase()} →
+              </span>
             </div>
           ))}
         </div>
