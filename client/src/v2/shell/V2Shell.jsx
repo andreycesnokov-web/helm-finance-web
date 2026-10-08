@@ -1,6 +1,6 @@
 // Design v2 app frame (designs/Sidebar.dc.html, PulseMobile.dc.html, MobileMore.dc.html).
 //
-// Desktop (≥1024px): 248px sidebar — workspace card, + Add, four groups, then Settings,
+// Desktop (≥1024px): resizable sidebar (220–320 px, default 264) — workspace card, + Add, four groups, then Settings,
 // Platform admin (platform owner only) and Switch to Personal at the bottom.
 // Phone (<1024px): sticky top bar (company → More, bell → Approvals) and a sticky bottom
 // tab bar: Pulse · Radar · + Add · AI CFO · More.
@@ -8,6 +8,7 @@
 // Workspace boundary: this shell only ever renders for a BUSINESS workspace. Switching to
 // Personal goes through the existing WorkspaceProvider.switchTo and leaves the business
 // area (same behaviour as LiveShell); no personal data is read here.
+import { useRef, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useWorkspace } from '../../shell/WorkspaceProvider'
 import WorkspaceSwitcher from '../../shell/WorkspaceSwitcher'
@@ -59,7 +60,12 @@ export function useSwitchWorkspace() {
 function Badge({ kind, counts, t }) {
   const n = counts?.[kind]
   if (n == null || n <= 0) return null
-  if (kind === 'late') return <span className="v2-navbadge v2-tone-crit">{t('badge.late', { n })}</span>
+  // A compact counter; the full phrase ("13 overdue") is the accessible name and the tooltip,
+  // so the label next to it never wraps.
+  if (kind === 'late') {
+    const full = t('badge.lateFull', { n })
+    return <span className="v2-navbadge v2-tone-crit" role="img" aria-label={full} title={full}>{n}</span>
+  }
   if (kind === 'approvals') return <span className="v2-navbadge v2-tone-info">{n}</span>
   return <span className="v2-navbadge v2-tone-warn">{n}</span>
 }
@@ -70,9 +76,67 @@ function NavItem({ it, activeKey, counts, t }) {
   return (
     <Link to={it.to} className={`v2-nav${on ? ' is-active' : ''}`} aria-current={on ? 'page' : undefined}>
       <Ic />
-      <span className="v2-nav-label">{t(it.labelKey)}</span>
+      <span className="v2-nav-label" title={t(it.labelKey)}>{t(it.labelKey)}</span>
       {it.badge && <Badge kind={it.badge} counts={counts} t={t} />}
     </Link>
+  )
+}
+
+// Desktop sidebar width: dragged on its right edge (220–320 px, default 264), double-click
+// resets, arrow keys step 8 px. Remembered per browser; without storage it is 264.
+export const SIDEBAR_MIN = 220
+export const SIDEBAR_MAX = 320
+export const SIDEBAR_DEFAULT = 264
+const SIDEBAR_KEY = 'v2.sidebarWidth'
+export const clampSidebar = (w) => Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_MIN, Math.round(Number(w) || SIDEBAR_DEFAULT)))
+function readSidebarWidth() {
+  try {
+    const v = Number(localStorage.getItem(SIDEBAR_KEY))
+    return v > 0 ? clampSidebar(v) : SIDEBAR_DEFAULT
+  } catch { return SIDEBAR_DEFAULT }
+}
+function saveSidebarWidth(w) {
+  try { localStorage.setItem(SIDEBAR_KEY, String(w)) } catch { /* private mode */ }
+}
+
+function SidebarResizer({ width, onChange, label }) {
+  const dragging = useRef(false)
+  const [active, setActive] = useState(false)
+  const stop = (e, persist) => {
+    if (!dragging.current) return
+    dragging.current = false
+    setActive(false)
+    onChange(clampSidebar(e.clientX), persist)
+  }
+  return (
+    <div
+      className={`v2-sidebar-resizer${active ? ' is-dragging' : ''}`}
+      role="separator"
+      aria-orientation="vertical"
+      aria-valuemin={SIDEBAR_MIN}
+      aria-valuemax={SIDEBAR_MAX}
+      aria-valuenow={width}
+      aria-label={label}
+      title={label}
+      tabIndex={0}
+      onPointerDown={(e) => {
+        if (e.button !== 0) return
+        e.preventDefault()
+        try { e.currentTarget.setPointerCapture(e.pointerId) } catch { /* old browsers */ }
+        dragging.current = true
+        setActive(true)
+      }}
+      onPointerMove={(e) => { if (dragging.current) onChange(clampSidebar(e.clientX), false) }}
+      onPointerUp={(e) => stop(e, true)}
+      onPointerCancel={(e) => stop(e, true)}
+      onDoubleClick={() => onChange(SIDEBAR_DEFAULT, true)}
+      onKeyDown={(e) => {
+        const step = { ArrowLeft: -8, ArrowRight: 8 }[e.key]
+        if (step) { e.preventDefault(); onChange(clampSidebar(width + step), true) }
+        else if (e.key === 'Home') { e.preventDefault(); onChange(SIDEBAR_MIN, true) }
+        else if (e.key === 'End') { e.preventDefault(); onChange(SIDEBAR_MAX, true) }
+      }}
+    />
   )
 }
 
@@ -86,9 +150,14 @@ export default function V2Shell({ children }) {
   const activeKey = activeNavKey(loc.pathname)
   const tabKey = activeTabKey(loc.pathname)
   const personal = (workspaces?.personal || [])[0]
+  const [sideW, setSideW] = useState(readSidebarWidth)
+  const setSidebar = (w, persist) => { setSideW(w); if (persist) saveSidebarWidth(w) }
+  // The AI Accountant month close uses the full width of the workspace (owner design
+  // 2026-10); every other screen keeps the reading width.
+  const wide = loc.pathname.replace(/\/+$/, '') === '/business/accountant'
 
   return (
-    <div className="v2-root v2-shell" data-v2="shell">
+    <div className="v2-root v2-shell" data-v2="shell" style={{ '--v2-sidebar-width': `${sideW}px` }}>
       <a className="v2-skip" href="#v2-main">{t('shell.skip')}</a>
 
       <aside className="v2-sidebar" aria-label={t('nav.main')}>
@@ -120,18 +189,19 @@ export default function V2Shell({ children }) {
           {isAdmin && (
             <Link to="/admin/dashboard" className="v2-nav v2-nav-admin">
               <I.admin />
-              <span className="v2-nav-label">{t('nav.admin')}</span>
-              <span className="v2-navbadge v2-tone-warn">{t('nav.adminBadge')}</span>
+              <span className="v2-nav-label" title={t('nav.admin')}>{t('nav.admin')}</span>
+              <span className="v2-nav-lock" role="img" aria-label={t('nav.adminOnlyYou')} title={t('nav.adminOnlyYou')}><I.lock size={16} /></span>
             </Link>
           )}
           {personal && (
             <button type="button" className="v2-nav v2-nav-muted" onClick={() => select(personal)}>
               <I.person />
-              <span className="v2-nav-label">{t('nav.switchPersonal')}</span>
+              <span className="v2-nav-label" title={t('nav.switchPersonal')}>{t('nav.switchPersonal')}</span>
             </button>
           )}
         </div>
       </aside>
+      <SidebarResizer width={sideW} onChange={setSidebar} label={t('nav.resize')} />
 
       <header className="v2-topbar">
         <Link to="/business/more" className="v2-topbar-ws" aria-label={`${active?.name || ''} — ${t('shell.openMore')}`}>
@@ -146,7 +216,7 @@ export default function V2Shell({ children }) {
       </header>
 
       <main id="v2-main" className="v2-main cfo-main" tabIndex={-1}>
-        <div className="v2-main-inner"><ErrorBoundary>{children}</ErrorBoundary></div>
+        <div className={`v2-main-inner${wide ? ' v2-main-wide' : ''}`}><ErrorBoundary>{children}</ErrorBoundary></div>
       </main>
 
       <ErrorBoundary compact><AskPanel /></ErrorBoundary>

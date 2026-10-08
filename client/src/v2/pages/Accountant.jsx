@@ -16,9 +16,9 @@ import I from '../icons'
 import { PageHead, Card, Pill, Btn, NotYet, Skeleton, ErrorBox, Empty } from '../ui'
 import { useT, useLang } from '../i18n'
 import { useApi } from '../data'
-import { monthOptions, accountantMonth, closeReadiness, packages, packageSummary, monthGrid, complianceEvents, eventStage, packageExportData, createAccountantZipPackage, dedupeDocumentLinks, determineUnreconciledReason } from '../lib/accounting'
+import { monthOptions, accountantMonth, closeReadiness, packages, packageSummary, monthGrid, complianceEvents, eventStage, packageExportData, createAccountantZipPackage, dedupeDocumentLinks, determineUnreconciledReason, UNRECONCILED_REASONS, reasonMeta } from '../lib/accounting'
 import { apiFetch } from '../../lib/api'
-import { money } from '../lib/format'
+import { money, shortDate } from '../lib/format'
 import { askAccountant } from '../lib/ask'
 import AccountantTabs from '../components/AccountantTabs'
 import UnreconciledTxDrawer from '../components/UnreconciledTxDrawer'
@@ -153,6 +153,159 @@ function TaxList({ events, lang, t, limit, empty = 'acct.noEvents' }) {
         )
       })}
     </ul>
+  )
+}
+
+const REASON_ICON = { no_statement: 'upload', statement_unconfirmed: 'clock', no_match: 'search', requires_clarification: 'info' }
+
+// "Unreconciled bank transactions": counters by reason, groups by account, one row per
+// transaction. Only the "Investigate" button opens the drawer; the reason pill toggles the
+// explanation block under the row (the row itself is not a button).
+function UnreconciledCard({ items, month, lang, wallets, batches, expanded, onToggle, onOpen }) {
+  const t = useT()
+  const groups = new Map()
+  for (const ut of items) {
+    const wId = String(ut.wallet_id || 'unassigned')
+    if (!groups.has(wId)) groups.set(wId, [])
+    groups.get(wId).push(ut)
+  }
+  const diagnosed = Array.from(groups.entries()).map(([wId, groupTxs]) => {
+    const walletObj = wallets.find((w) => String(w.id) === String(wId))
+    return {
+      wId, walletObj,
+      rows: groupTxs.map((gt) => ({ tx: gt, diagnosis: determineUnreconciledReason({ tx: gt, month, wallet: walletObj, batches }) })),
+    }
+  })
+  const counts = Object.fromEntries(UNRECONCILED_REASONS.map((x) => [x.code, 0]))
+  for (const g of diagnosed) for (const { diagnosis } of g.rows) counts[reasonMeta(diagnosis.reason).code] += 1
+
+  return (
+    <section className="v2-card v2-acct-unrec" aria-labelledby="acct-unrec-title">
+      <div className="v2-acct-unrec-head">
+        <h2 className="v2-h2 v2-acct-unrec-title" id="acct-unrec-title">
+          <I.warn size={18} />
+          <span>{t('acct.unlinked.title')} <span className="v2-num">({items.length})</span></span>
+        </h2>
+        <ul className="v2-acct-reasons" aria-label={t('acct.unlinked.countsLabel')}>
+          {UNRECONCILED_REASONS.filter((x) => counts[x.code] > 0).map((x) => {
+            const Ic = I[REASON_ICON[x.code]]
+            return (
+              <li key={x.code} className={`v2-acct-reason v2-tone-${x.tone}`}>
+                <Ic size={14} />
+                <span>{t(x.countKey)}</span>
+                <span className="v2-num">{counts[x.code]}</span>
+              </li>
+            )
+          })}
+        </ul>
+      </div>
+      <p className="v2-muted v2-small v2-acct-unrec-sub">{t('acct.unlinked.sub')}</p>
+
+      <div className="v2-acct-groups">
+        {diagnosed.map(({ wId, walletObj, rows }) => {
+          const wName = walletObj?.name || (wId === 'unassigned' ? t('acct.unlinked.unknownAccount') : 'Bank')
+          const wCurrency = walletObj?.currency || rows[0]?.tx?.currency || 'IDR'
+          const kindLabel = walletObj?.type ? (() => { const k = t(`acc.kind.${walletObj.type}`); return k === `acc.kind.${walletObj.type}` ? walletObj.type : k })() : null
+          const allNoStatement = rows.length > 0 && rows.every((d) => d.diagnosis.reason === 'no_statement')
+          const allUnconfirmed = rows.length > 0 && rows.every((d) => d.diagnosis.reason === 'statement_unconfirmed')
+          const firstBatchId = rows[0]?.diagnosis?.batch?.id
+          return (
+            <div key={wId} className="v2-unlinked-group">
+              <div className="v2-unlinked-group-head">
+                <span className="v2-unlinked-group-title">{wName}</span>
+                <span className="v2-unlinked-group-meta">
+                  <span>{t('acct.unlinked.opsCount', { n: rows.length })}</span>
+                  <span aria-hidden="true">·</span>
+                  <span className="v2-num">{wCurrency}</span>
+                  {kindLabel && <><span aria-hidden="true">·</span><span>{kindLabel}</span></>}
+                </span>
+              </div>
+
+              {allNoStatement && (
+                <div className="v2-unlinked-banner">
+                  <span className="v2-unlinked-banner-text"><I.upload size={16} />{t('acct.unlinked.allNoStatement', { n: rows.length })}</span>
+                  <Link
+                    to={`/business/bank-import?wallet_id=${encodeURIComponent(wId)}&month=${encodeURIComponent(month)}`}
+                    className="v2-btn v2-btn-sm v2-btn-primary"
+                  >
+                    {t('acct.unlinked.uploadStatement')}
+                  </Link>
+                </div>
+              )}
+              {!allNoStatement && allUnconfirmed && (
+                <div className="v2-unlinked-banner">
+                  <span className="v2-unlinked-banner-text"><I.clock size={16} />{t('acct.unlinked.allUnconfirmed', { n: rows.length })}</span>
+                  <Link
+                    to={`/business/bank-import?wallet_id=${encodeURIComponent(wId)}&month=${encodeURIComponent(month)}${firstBatchId ? `&batchId=${encodeURIComponent(firstBatchId)}` : ''}`}
+                    className="v2-btn v2-btn-sm v2-btn-secondary"
+                  >
+                    {t('acct.unlinked.reviewStatement')}
+                  </Link>
+                </div>
+              )}
+
+              <ul className="v2-unlinked-list">
+                {rows.map(({ tx: ut, diagnosis }) => {
+                  const isIncome = ut.type === 'income' || ut.type === 'cash_in'
+                  const isExpanded = !!expanded[ut.id]
+                  const meta = reasonMeta(diagnosis.reason)
+                  const Ic = I[REASON_ICON[meta.code]]
+                  const detailId = `acct-reason-${String(ut.id).replace(/[^A-Za-z0-9_-]/g, '_')}`
+                  const title = ut.description || (isIncome ? t('tx.k.in') : t('tx.k.out'))
+                  return (
+                    <li key={ut.id} className={`v2-unlinked-item${isExpanded ? ' is-open' : ''}`}>
+                      <div className="v2-urow-main">
+                        <span className="v2-urow-title">{title}</span>
+                        <span className="v2-urow-meta">
+                          {ut.date && <span className="v2-num">{ut.date}</span>}
+                          {ut.category && <><span aria-hidden="true">·</span><span>{ut.category}</span></>}
+                          <span aria-hidden="true">·</span>
+                          <span className={`v2-urow-kind ${isIncome ? 'is-in' : 'is-out'}`}>{isIncome ? t('tx.k.in') : t('tx.k.out')}</span>
+                        </span>
+                      </div>
+                      <div className="v2-urow-status">
+                        <button
+                          type="button"
+                          className={`v2-reason-toggle v2-tone-${meta.tone}`}
+                          aria-expanded={isExpanded}
+                          aria-controls={detailId}
+                          onClick={() => onToggle(ut.id)}
+                        >
+                          <Ic size={14} />
+                          <span className="v2-reason-toggle-text">{t(meta.badgeKey)}</span>
+                          <I.chevDown size={14} className={isExpanded ? 'v2-reason-chev is-open' : 'v2-reason-chev'} />
+                        </button>
+                      </div>
+                      <span className={`v2-urow-amount v2-num ${isIncome ? 'is-in' : 'is-out'}`}>
+                        {isIncome ? '+' : '−'}{money(ut.amount, ut.currency)}
+                      </span>
+                      <div className="v2-urow-action">
+                        <Btn variant="secondary" className="v2-btn-sm v2-urow-review" onClick={() => onOpen(ut.id)} aria-label={`${t('acct.unlinked.reviewBtn')}: ${title}`}>
+                          {t('acct.unlinked.reviewBtn')}
+                        </Btn>
+                      </div>
+                      {isExpanded && (
+                        <div className="v2-reason-detail-box" id={detailId}>
+                          <div className="v2-reason-detail-text">
+                            <span className="v2-reason-detail-label">{t('acct.unlinked.whyLabel')}</span>
+                            <p>{t(diagnosis.reasonKey, diagnosis.params)}</p>
+                          </div>
+                          {diagnosis.actionRoute && diagnosis.actionLabelKey && (
+                            <Link to={diagnosis.actionRoute} className="v2-btn v2-btn-sm v2-btn-primary v2-reason-detail-action">
+                              {t(diagnosis.actionLabelKey)}
+                            </Link>
+                          )}
+                        </div>
+                      )}
+                    </li>
+                  )
+                })}
+              </ul>
+            </div>
+          )
+        })}
+      </div>
+    </section>
   )
 }
 
@@ -331,77 +484,69 @@ function CloseTab({ month, onOpenChatModal }) {
     }
   }
 
+  const statusTitle = r.percent == null
+    ? t('acct.noRecords')
+    : left.length === 0
+    ? (r.is_closed ? t('acct.closed') : t('acct.preparedForReview'))
+    : (r.percent === 100 && bankReconPending)
+    ? t('acct.reconciliationRequired')
+    : t('acct.almost', { n: r.percent, k: left.length })
+  const statusSub = left.length === 0 && !r.is_closed
+    ? t('acct.awaitingAccountantSignoff', { n: r.complete, m: r.records })
+    : (r.percent === 100 && bankReconPending)
+    ? t('acct.recordCompletenessDetails', { pct: 100, done: r.checks.length - left.length, total: r.checks.length })
+    : t('acct.recordsComplete', { n: r.complete, m: r.records })
+
   return (
-    <div className="v2-grid-detail">
-      <div className="v2-col">
-        <section className="v2-hero v2-hero-plain">
-          <div className="v2-hero-text">
-            <span className="v2-hero-label">{t('acct.closeOf', { m: monthLabel(month, lang) })}</span>
-            <h2 className="v2-hero-title">
-              {r.percent == null
-                ? t('acct.noRecords')
-                : left.length === 0
-                ? (r.is_closed ? t('acct.closed') : t('acct.preparedForReview'))
-                : (r.percent === 100 && bankReconPending)
-                ? t('acct.reconciliationRequired')
-                : t('acct.almost', { n: r.percent, k: left.length })}
-            </h2>
-            <p className="v2-hero-p v2-show">
-              {left.length === 0 && !r.is_closed
-                ? t('acct.awaitingAccountantSignoff', { n: r.complete, m: r.records })
-                : (r.percent === 100 && bankReconPending)
-                ? t('acct.recordCompletenessDetails', { pct: 100, done: r.checks.length - left.length, total: r.checks.length })
-                : t('acct.recordsComplete', { n: r.complete, m: r.records })}
-            </p>
-            <div className="v2-row-gap v2-row-start" style={{ alignItems: 'center', flexWrap: 'wrap' }}>
-              <NotYet note={t('acct.reviewSoon')}>{t('acct.sendToAccountant')}</NotYet>
-              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                <label htmlFor="accountant-export-lang" style={{ fontSize: 13, color: 'var(--text-muted, #64748b)', whiteSpace: 'nowrap' }}>
-                  {t('acct.exportLang')}:
-                </label>
-                <select
-                  id="accountant-export-lang"
-                  className="v2-select"
-                  style={{ width: 'auto', minWidth: 150, height: 36, padding: '0 8px', fontSize: 13 }}
-                  value={exportLang}
-                  disabled={exporting}
-                  onChange={(e) => setExportLang(e.target.value)}
-                  aria-label={t('acct.exportLang')}
-                >
-                  <option value="id">Bahasa Indonesia</option>
-                  <option value="en">English</option>
-                </select>
-              </div>
-              <button
-                type="button"
-                className="v2-btn v2-btn-secondary"
+    <div className="v2-acct-close">
+      {/* Top row: readiness + checklist (left), taxes + ask (right). One column below 1180px. */}
+      <div className="v2-acct-top">
+        <Card className="v2-acct-status">
+          <div className="v2-acct-status-head">
+            <span className="v2-acct-status-label">{t('acct.closeOf', { m: monthLabel(month, lang) })}</span>
+            <h2 className="v2-acct-status-title">{statusTitle}</h2>
+            <p className="v2-acct-status-sub">{statusSub}</p>
+          </div>
+          <div className="v2-acct-actions">
+            <NotYet note={t('acct.reviewSoon')}>{t('acct.sendToAccountant')}</NotYet>
+            <div className="v2-acct-lang">
+              <label htmlFor="accountant-export-lang">{t('acct.exportLang')}</label>
+              <select
+                id="accountant-export-lang"
+                className="v2-select"
+                value={exportLang}
                 disabled={exporting}
-                onClick={handleDownload}
+                onChange={(e) => setExportLang(e.target.value)}
               >
-                {exporting ? '…' : t('acct.download')}
+                <option value="id">Bahasa Indonesia</option>
+                <option value="en">English</option>
+              </select>
+            </div>
+            <button
+              type="button"
+              className="v2-btn v2-btn-secondary"
+              disabled={exporting}
+              onClick={handleDownload}
+            >
+              {exporting ? '…' : t('acct.download')}
+            </button>
+          </div>
+          {exportError && (
+            <div className="v2-acct-note v2-acct-note-crit" role="alert">
+              <I.warn size={16} />
+              <span>{t('acct.exportError')}</span>
+              <button type="button" className="v2-btn v2-btn-ghost v2-btn-sm" onClick={handleDownload}>
+                {t('acct.exportRetry')}
               </button>
             </div>
-            {exportError && (
-              <div style={{ marginTop: 12, padding: '8px 12px', background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 8, fontSize: 13, color: '#991B1B', display: 'flex', alignItems: 'center', gap: 10 }}>
-                <span>⚠️ {t('acct.exportError')}</span>
-                <button
-                  type="button"
-                  className="v2-btn v2-btn-ghost v2-btn-sm"
-                  style={{ textDecoration: 'underline', cursor: 'pointer', padding: 0 }}
-                  onClick={handleDownload}
-                >
-                  {t('acct.exportRetry')}
-                </button>
-              </div>
-            )}
-            {left.length > 0 && (
-              <div style={{ marginTop: 12, padding: '8px 12px', background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: 8, fontSize: 12, color: '#92400E' }}>
-                ⚠️ {t('acct.incompleteDownloadWarning', { k: left.length })}
-              </div>
-            )}
-          </div>
-        </section>
-        <Card title={t('acct.toFinish', { m: monthLabel(month, lang) })}>
+          )}
+          {left.length > 0 && (
+            <div className="v2-acct-note v2-acct-note-warn">
+              <I.warn size={16} />
+              <span>{t('acct.incompleteDownloadWarning', { k: left.length })}</span>
+            </div>
+          )}
+          <h3 className="v2-h3 v2-acct-checktitle">{t('acct.toFinish', { m: monthLabel(month, lang) })}</h3>
           <ul className="v2-check">
             {r.checks.map((c) => (
               <li key={c.key} className={c.done ? 'is-done' : ''}>
@@ -422,219 +567,34 @@ function CloseTab({ month, onOpenChatModal }) {
             </li>
           </ul>
         </Card>
-        {r.unlinked_transactions?.length > 0 && (() => {
-          // Group unreconciled transactions by wallet
-          const walletGroupsMap = new Map()
-          for (const ut of r.unlinked_transactions) {
-            const wId = String(ut.wallet_id || 'unassigned')
-            if (!walletGroupsMap.has(wId)) {
-              walletGroupsMap.set(wId, [])
-            }
-            walletGroupsMap.get(wId).push(ut)
-          }
-
-          const toggleReason = (txId) => {
-            setExpandedReasons((prev) => ({
-              ...prev,
-              [txId]: !prev[txId],
-            }))
-          }
-
-          const badgeKeyForReason = (code) => {
-            switch (code) {
-              case 'no_statement': return 'acct.unlinked.badgeNoStatement'
-              case 'statement_unconfirmed': return 'acct.unlinked.badgeUnconfirmed'
-              case 'no_match': return 'acct.unlinked.badgeNoMatch'
-              default: return 'acct.unlinked.badgeClarification'
-            }
-          }
-
-          const badgeToneForReason = (code) => {
-            switch (code) {
-              case 'no_statement': return 'crit'
-              case 'statement_unconfirmed': return 'warn'
-              case 'no_match': return 'warn'
-              default: return 'neutral'
-            }
-          }
-
-          return (
-            <Card
-              title={
-                <span style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#DC2626' }}>
-                  <I.warn size={16} />
-                  <span>{t('acct.unlinked.title')} ({r.unlinked_transactions.length})</span>
-                </span>
-              }
-            >
-              <p className="v2-muted v2-small" style={{ margin: '0 0 12px' }}>
-                {t('acct.unlinked.sub')}
-              </p>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                {Array.from(walletGroupsMap.entries()).map(([wId, groupTxs]) => {
-                  const walletObj = (wallets.data?.wallets || []).find((w) => String(w.id) === String(wId))
-                  const wName = walletObj?.name || (wId === 'unassigned' ? t('acct.unlinked.unknownAccount') : 'Bank')
-                  const wCurrency = walletObj?.currency || groupTxs[0]?.currency || 'IDR'
-
-                  // Check if all in group share no_statement or statement_unconfirmed
-                  const diagnosedGroup = groupTxs.map((gt) => ({
-                    tx: gt,
-                    diagnosis: determineUnreconciledReason({
-                      tx: gt,
-                      month,
-                      wallet: walletObj,
-                      batches: batches.data?.batches || [],
-                    }),
-                  }))
-
-                  const allNoStatement = diagnosedGroup.length > 0 && diagnosedGroup.every((d) => d.diagnosis.reason === 'no_statement')
-                  const allUnconfirmed = diagnosedGroup.length > 0 && diagnosedGroup.every((d) => d.diagnosis.reason === 'statement_unconfirmed')
-
-                  return (
-                    <div key={wId} className="v2-unlinked-group">
-                      <div className="v2-unlinked-group-head">
-                        <span className="v2-unlinked-group-title">
-                          🏦 {wName} <span className="v2-muted v2-small">({groupTxs.length})</span>
-                        </span>
-                        {walletObj?.type && (
-                          <Pill tone="neutral">{walletObj.type}</Pill>
-                        )}
-                      </div>
-
-                      {allNoStatement && (
-                        <div className="v2-unlinked-banner">
-                          <span>⚠️ {t('acct.unlinked.allNoStatement', { n: groupTxs.length })}</span>
-                          <Link
-                            to={`/business/bank-import?wallet_id=${encodeURIComponent(wId)}&month=${encodeURIComponent(month)}`}
-                            className="v2-btn v2-btn-sm v2-btn-primary"
-                          >
-                            {t('acct.unlinked.uploadStatement')}
-                          </Link>
-                        </div>
-                      )}
-
-                      {!allNoStatement && allUnconfirmed && (
-                        <div className="v2-unlinked-banner">
-                          <span>⚠️ {t('acct.unlinked.allUnconfirmed', { n: groupTxs.length })}</span>
-                          <Link
-                            to={`/business/bank-import?wallet_id=${encodeURIComponent(wId)}&month=${encodeURIComponent(month)}${diagnosedGroup[0]?.diagnosis?.batch?.id ? `&batchId=${encodeURIComponent(diagnosedGroup[0].diagnosis.batch.id)}` : ''}`}
-                            className="v2-btn v2-btn-sm v2-btn-secondary"
-                          >
-                            {t('acct.unlinked.reviewStatement')}
-                          </Link>
-                        </div>
-                      )}
-
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                        {diagnosedGroup.map(({ tx: ut, diagnosis }) => {
-                          const isIncome = ut.type === 'income' || ut.type === 'cash_in'
-                          const isExpanded = !!expandedReasons[ut.id]
-                          const reasonText = t(diagnosis.reasonKey, diagnosis.params)
-
-                          return (
-                            <div
-                              key={ut.id}
-                              className="v2-unlinked-item"
-                              role="button"
-                              tabIndex={0}
-                              onClick={(e) => {
-                                // Don't trigger drawer if clicking reason toggle or button
-                                if (e.target.closest('.v2-reason-toggle') || e.target.closest('button') || e.target.closest('a')) return
-                                setSelectedTxId(ut.id)
-                              }}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter' || e.key === ' ') {
-                                  if (e.target.closest('.v2-reason-toggle') || e.target.closest('button') || e.target.closest('a')) return
-                                  e.preventDefault()
-                                  setSelectedTxId(ut.id)
-                                }
-                              }}
-                              aria-label={`${ut.description || (isIncome ? 'Income' : 'Expense')}, ${money(ut.amount, ut.currency)}`}
-                            >
-                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                                    <span style={{ fontWeight: 600 }}>{ut.description || (isIncome ? t('tx.k.in') : t('tx.k.out'))}</span>
-                                    <Pill tone={isIncome ? 'good' : 'warn'}>
-                                      {isIncome ? t('tx.k.in') : t('tx.k.out')}
-                                    </Pill>
-                                    <button
-                                      type="button"
-                                      className="v2-reason-toggle"
-                                      onClick={(e) => {
-                                        e.stopPropagation()
-                                        toggleReason(ut.id)
-                                      }}
-                                      aria-expanded={isExpanded}
-                                      aria-label={t('acct.unlinked.toggleExplanation')}
-                                    >
-                                      <span>⚠️</span>
-                                      <Pill tone={badgeToneForReason(diagnosis.reason)}>
-                                        {t(badgeKeyForReason(diagnosis.reason))}
-                                      </Pill>
-                                    </button>
-                                  </div>
-                                  <span className="v2-muted v2-small">
-                                    {ut.date} {ut.category ? `· ${ut.category}` : ''}
-                                  </span>
-                                </div>
-
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
-                                  <span style={{ fontWeight: 700, fontSize: 14, color: isIncome ? '#059669' : '#DC2626' }}>
-                                    {isIncome ? '+' : '−'}{money(ut.amount, ut.currency)}
-                                  </span>
-                                  <Btn
-                                    size="sm"
-                                    tone="secondary"
-                                    onClick={(e) => {
-                                      e.stopPropagation()
-                                      setSelectedTxId(ut.id)
-                                    }}
-                                  >
-                                    {t('acct.unlinked.reviewBtn')}
-                                  </Btn>
-                                </div>
-                              </div>
-
-                              {isExpanded && (
-                                <div className="v2-reason-detail-box" onClick={(e) => e.stopPropagation()}>
-                                  <p style={{ margin: 0, fontWeight: 500 }}>{reasonText}</p>
-                                  {diagnosis.actionRoute && (
-                                    <div style={{ marginTop: 8 }}>
-                                      <Link to={diagnosis.actionRoute} className="v2-btn v2-btn-sm v2-btn-primary">
-                                        {t(diagnosis.actionLabelKey)}
-                                      </Link>
-                                    </div>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-                          )
-                        })}
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            </Card>
-          )
-        })()}
+        <div className="v2-col v2-acct-side">
+          <Card title={t('acct.taxesDue', { m: monthLabel(next, lang) })} aside={<Link to="/business/accountant?tab=taxes">{t('acct.fullCalendar')}</Link>}>
+            {dueSum > 0 && <p className="v2-stat-mid v2-num">{money(dueSum)}</p>}
+            <TaxList events={due} lang={lang} t={t} limit={8} />
+            <p className="v2-muted v2-small">{t('acct.taxNote')}</p>
+          </Card>
+          <AskBox
+            externalQuery={askQuery}
+            onQueryChange={setAskQuery}
+            onOpenModal={onOpenChatModal}
+          />
+        </div>
       </div>
-      <div className="v2-col">
-        <Card title={t('acct.taxesDue', { m: monthLabel(next, lang) })} aside={<Link to="/business/accountant?tab=taxes">{t('acct.fullCalendar')}</Link>}>
-          {dueSum > 0 && <p className="v2-stat-mid v2-num">{money(dueSum)}</p>}
-          <TaxList events={due} lang={lang} t={t} limit={8} />
-          <p className="v2-muted v2-small">{t('acct.taxNote')}</p>
-        </Card>
-        <AskBox
-          externalQuery={askQuery}
-          onQueryChange={setAskQuery}
-          onOpenModal={onOpenChatModal}
+
+      {r.unlinked_transactions?.length > 0 && (
+        <UnreconciledCard
+          items={r.unlinked_transactions}
+          month={month}
+          lang={lang}
+          wallets={wallets.data?.wallets || []}
+          batches={batches.data?.batches || []}
+          expanded={expandedReasons}
+          onToggle={(txId) => setExpandedReasons((prev) => ({ ...prev, [txId]: !prev[txId] }))}
+          onOpen={(txId) => setSelectedTxId(txId)}
         />
-      </div>
+      )}
 
-      <div style={{ gridColumn: '1 / -1', marginTop: 14 }}>
+      <div className="v2-acct-wide">
         <Card title={
           <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             {t('acct.taxReference')}

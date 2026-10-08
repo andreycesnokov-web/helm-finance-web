@@ -154,7 +154,7 @@
   --on-navy-pos:   #7FE3B6;
   --on-navy-neg:   #FFB4A8;
   /* Layout. */
-  --v2-sidebar-width: 248px;
+  --v2-sidebar-width: 264px;  /* default; the user can drag it 220–320 px (V2Shell) */
   --v2-content-max:   1120px;
   --touch-min:        44px;
 }
