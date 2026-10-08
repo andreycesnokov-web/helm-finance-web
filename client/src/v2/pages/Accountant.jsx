@@ -161,6 +161,7 @@ function CloseTab({ month, onOpenChatModal }) {
   const { active, scopeKey } = useWorkspace()
   const { token } = useAuth()
   const [askQuery, setAskQuery] = useState('')
+  const [exportLang, setExportLang] = useState('id')
   const [exporting, setExporting] = useState(false)
   const [exportError, setExportError] = useState(null)
   const exportControllerRef = useRef(null)
@@ -261,6 +262,7 @@ function CloseTab({ month, onOpenChatModal }) {
     exportControllerRef.current = controller
     const currentBizId = active?.id
     const currentMonth = month
+    const packageLang = exportLang || 'id'
 
     setExporting(true)
     setExportError(null)
@@ -277,7 +279,7 @@ function CloseTab({ month, onOpenChatModal }) {
         wallets: wallets.data?.wallets || [],
         documents: rawDocs,
         token,
-        lang,
+        lang: packageLang,
         signal: controller.signal,
         fetchSignedUrl: async (docId, mode = 'download', bizId, sig) => {
           const resp = await apiFetch(`/documents/${docId}/signed-url`, token, {
@@ -337,8 +339,25 @@ function CloseTab({ month, onOpenChatModal }) {
                 ? t('acct.recordCompletenessDetails', { pct: 100, done: r.checks.length - left.length, total: r.checks.length })
                 : t('acct.recordsComplete', { n: r.complete, m: r.records })}
             </p>
-            <div className="v2-row-gap v2-row-start">
+            <div className="v2-row-gap v2-row-start" style={{ alignItems: 'center', flexWrap: 'wrap' }}>
               <NotYet note={t('acct.reviewSoon')}>{t('acct.sendToAccountant')}</NotYet>
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                <label htmlFor="accountant-export-lang" style={{ fontSize: 13, color: 'var(--text-muted, #64748b)', whiteSpace: 'nowrap' }}>
+                  {t('acct.exportLang')}:
+                </label>
+                <select
+                  id="accountant-export-lang"
+                  className="v2-select"
+                  style={{ width: 'auto', minWidth: 150, height: 36, padding: '0 8px', fontSize: 13 }}
+                  value={exportLang}
+                  disabled={exporting}
+                  onChange={(e) => setExportLang(e.target.value)}
+                  aria-label={t('acct.exportLang')}
+                >
+                  <option value="id">Bahasa Indonesia</option>
+                  <option value="en">English</option>
+                </select>
+              </div>
               <button
                 type="button"
                 className="v2-btn v2-btn-secondary"
