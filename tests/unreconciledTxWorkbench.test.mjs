@@ -419,6 +419,71 @@ console.log('\n--- 6. Server PATCH /api/transactions/:id boundary guard HTTP end
   ok('Updating description preserves 200 without currency mutation', r3Desc.status === 200 && r3Desc.data?.id === 303);
   const tx303 = (mem.__db['transactions'] || []).find((t) => t.id === 303);
   ok('Transaction currency_original remains IDR', tx303 && tx303.currency_original === 'IDR');
+
+  // Test 7: Server POST /api/bank-imports/:batchId/confirm integrity guard against corrupt 2000-2032 batch
+  mem.__seed('bank_import_batches', [
+    {
+      id: 'b-corrupt-2000-2032',
+      business_id: BIZ_A,
+      wallet_id: 'w-idr-main',
+      statement_start: '2000-12-31',
+      statement_end: '2032-12-31',
+      status: 'review_required',
+    },
+    {
+      id: 'b-corrupt-inverted',
+      business_id: BIZ_A,
+      wallet_id: 'w-idr-main',
+      statement_start: '2026-05-31',
+      statement_end: '2026-05-01',
+      status: 'review_required',
+    },
+    {
+      id: 'b-valid-range',
+      business_id: BIZ_A,
+      wallet_id: 'w-idr-main',
+      statement_start: '2026-05-02',
+      statement_end: '2026-05-31',
+      status: 'review_required',
+    }
+  ]);
+  mem.__seed('bank_import_rows', [
+    {
+      id: 'row-corrupt-year',
+      batch_id: 'b-valid-range',
+      business_id: BIZ_A,
+      tx_date: '1900-12-31',
+      amount: 100000,
+      direction: 'out',
+    }
+  ]);
+
+  const confirmApi = async (batchId, body) => {
+    const res = await fetch(`http://127.0.0.1:${PORT}/api/bank-imports/${batchId}/confirm`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        authorization: 'Bearer ' + token,
+        'x-business-id': BIZ_A,
+      },
+      body: JSON.stringify(body),
+    });
+    let data = null;
+    try { data = await res.json(); } catch {}
+    return { status: res.status, data };
+  };
+
+  const rCorruptMultiYear = await confirmApi('b-corrupt-2000-2032', { rows: [{ row_id: 'any' }] });
+  ok('Confirming 2000-2032 multi-decade batch returns 400 corrupt_statement_period',
+    rCorruptMultiYear.status === 400 && rCorruptMultiYear.data?.error === 'corrupt_statement_period');
+
+  const rCorruptInverted = await confirmApi('b-corrupt-inverted', { rows: [{ row_id: 'any' }] });
+  ok('Confirming inverted start > end batch returns 400 corrupt_statement_period',
+    rCorruptInverted.status === 400 && rCorruptInverted.data?.error === 'corrupt_statement_period');
+
+  const rCorruptRow = await confirmApi('b-valid-range', { rows: [{ row_id: 'row-corrupt-year' }] });
+  ok('Confirming batch with corrupt row tx_date returns 400 corrupt_row_date',
+    rCorruptRow.status === 400 && rCorruptRow.data?.error === 'corrupt_row_date');
 }
 
 console.log('\n--- 7. Real component UnreconciledTxDrawer: delayed response after close & company switch ---');

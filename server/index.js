@@ -6658,12 +6658,24 @@ app.post('/api/bank-imports/:batchId/confirm', auth, async (req, res) => {
     const payloadRows = Array.isArray(req.body?.rows) ? req.body.rows : [];
     if (!payloadRows.length) return res.status(400).json({ error: 'rows required' });
 
-    // Server-side batch integrity check: reject batches with corrupted multi-decade spans (e.g. 2000-2032)
+    // Server-side batch integrity check: reject batches with corrupted periods (start > end, multi-decade spans, invalid years)
     if (batch.statement_start && batch.statement_end) {
       const s = new Date(batch.statement_start).getTime();
       const e = new Date(batch.statement_end).getTime();
-      if (!isNaN(s) && !isNaN(e) && s > e) {
+      if (isNaN(s) || isNaN(e)) {
+        return res.status(400).json({ error: 'corrupt_statement_period', message: 'Invalid statement period dates' });
+      }
+      if (s > e) {
         return res.status(400).json({ error: 'corrupt_statement_period', message: 'Statement start date is after end date' });
+      }
+      const diffDays = Math.round((e - s) / 86400000);
+      if (diffDays > 365 * 5) {
+        return res.status(400).json({ error: 'corrupt_statement_period', message: 'Statement spans more than 5 years and cannot be confirmed' });
+      }
+      const sYear = new Date(batch.statement_start).getUTCFullYear();
+      const eYear = new Date(batch.statement_end).getUTCFullYear();
+      if (sYear < 1990 || sYear > 2099 || eYear < 1990 || eYear > 2099) {
+        return res.status(400).json({ error: 'corrupt_statement_period', message: 'Statement period year outside supported range' });
       }
     }
 
@@ -6688,6 +6700,17 @@ app.post('/api/bank-imports/:batchId/confirm', auth, async (req, res) => {
       const { data: row } = await supabase.from('bank_import_rows')
         .select('*').eq('id', p.row_id).eq('batch_id', batch.id).single();
       if (!row || row.linked_transaction_id) continue;
+
+      // Row integrity check: reject corrupt dates or amounts
+      if (row.tx_date) {
+        const rowYear = new Date(row.tx_date).getUTCFullYear();
+        if (isNaN(rowYear) || rowYear < 1990 || rowYear > 2099) {
+          return res.status(400).json({ error: 'corrupt_row_date', message: `Row transaction date outside supported range: ${row.tx_date}` });
+        }
+      }
+      if (row.amount != null && isNaN(Number(row.amount))) {
+        return res.status(400).json({ error: 'corrupt_row_amount', message: 'Row amount is not a valid number' });
+      }
 
       // Validate final decision
       let type = p.transaction_type || row.suggested_transaction_type || row.suggested_type || (row.direction === 'in' ? 'income' : 'expense');
