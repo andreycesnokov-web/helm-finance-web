@@ -6708,8 +6708,12 @@ app.post('/api/bank-imports/:batchId/confirm', auth, async (req, res) => {
           return res.status(400).json({ error: 'corrupt_row_date', message: `Row transaction date outside supported range: ${row.tx_date}` });
         }
       }
-      if (row.amount != null && isNaN(Number(row.amount))) {
-        return res.status(400).json({ error: 'corrupt_row_amount', message: 'Row amount is not a valid number' });
+      if (row.amount === null || row.amount === undefined || String(row.amount).trim() === '') {
+        return res.status(400).json({ error: 'corrupt_row_amount', message: 'Row amount cannot be empty' });
+      }
+      const numAmount = Number(row.amount);
+      if (!Number.isFinite(numAmount)) {
+        return res.status(400).json({ error: 'corrupt_row_amount', message: 'Row amount is not a finite number' });
       }
 
       // Validate final decision

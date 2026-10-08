@@ -184,6 +184,9 @@ console.log('\n--- 3b. Case: Erroneous multi-year batch (2000-2032) must NOT cov
   ok('hasCorruptRows detects year 1900', hasCorruptRows([{ tx_date: '1900-05-02', amount: 500 }]) === true);
   ok('hasCorruptRows detects year 2150', hasCorruptRows([{ tx_date: '2150-05-02', amount: 500 }]) === true);
   ok('hasCorruptRows detects NaN amount', hasCorruptRows([{ tx_date: '2026-05-02', amount: NaN }]) === true);
+  ok('hasCorruptRows detects empty string amount', hasCorruptRows([{ tx_date: '2026-05-02', amount: '' }]) === true);
+  ok('hasCorruptRows detects Infinity amount', hasCorruptRows([{ tx_date: '2026-05-02', amount: Infinity }]) === true);
+  ok('hasCorruptRows detects null amount', hasCorruptRows([{ tx_date: '2026-05-02', amount: null }]) === true);
   ok('hasCorruptRows allows negative amount for debit/refund', hasCorruptRows([{ tx_date: '2026-05-02', amount: -500 }]) === false);
   ok('hasCorruptRows returns false for valid rows', hasCorruptRows([{ tx_date: '2026-05-02', amount: 500 }]) === false);
 }
@@ -455,6 +458,22 @@ console.log('\n--- 6. Server PATCH /api/transactions/:id boundary guard HTTP end
       tx_date: '1900-12-31',
       amount: 100000,
       direction: 'out',
+    },
+    {
+      id: 'row-corrupt-empty-amount',
+      batch_id: 'b-valid-range',
+      business_id: BIZ_A,
+      tx_date: '2026-05-10',
+      amount: '',
+      direction: 'out',
+    },
+    {
+      id: 'row-corrupt-inf-amount',
+      batch_id: 'b-valid-range',
+      business_id: BIZ_A,
+      tx_date: '2026-05-10',
+      amount: Infinity,
+      direction: 'out',
     }
   ]);
 
@@ -484,6 +503,14 @@ console.log('\n--- 6. Server PATCH /api/transactions/:id boundary guard HTTP end
   const rCorruptRow = await confirmApi('b-valid-range', { rows: [{ row_id: 'row-corrupt-year' }] });
   ok('Confirming batch with corrupt row tx_date returns 400 corrupt_row_date',
     rCorruptRow.status === 400 && rCorruptRow.data?.error === 'corrupt_row_date');
+
+  const rCorruptEmptyAmount = await confirmApi('b-valid-range', { rows: [{ row_id: 'row-corrupt-empty-amount' }] });
+  ok('Confirming batch with empty string amount returns 400 corrupt_row_amount',
+    rCorruptEmptyAmount.status === 400 && rCorruptEmptyAmount.data?.error === 'corrupt_row_amount');
+
+  const rCorruptInfAmount = await confirmApi('b-valid-range', { rows: [{ row_id: 'row-corrupt-inf-amount' }] });
+  ok('Confirming batch with Infinity amount returns 400 corrupt_row_amount',
+    rCorruptInfAmount.status === 400 && rCorruptInfAmount.data?.error === 'corrupt_row_amount');
 }
 
 console.log('\n--- 7. Real component UnreconciledTxDrawer: delayed response after close & company switch ---');

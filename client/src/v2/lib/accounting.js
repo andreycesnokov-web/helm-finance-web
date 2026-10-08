@@ -65,13 +65,14 @@ export const isBatchPeriodValid = (b) => {
   return true
 }
 
-/** Check whether statement rows contain corrupted dates (invalid date strings, year < 1990 or > 2099) */
+/** Check whether statement rows contain corrupted dates (invalid date strings, year outside 1990..2099 heuristic range) or invalid amounts */
 export const hasCorruptRows = (rows = []) => {
   return (rows || []).some(r => {
     if (!r.tx_date) return true
     const year = parseInt(String(r.tx_date).slice(0, 4), 10)
     if (isNaN(year) || year < 1990 || year > 2099) return true
-    if (r.amount != null && isNaN(Number(r.amount))) return true
+    if (r.amount === null || r.amount === undefined || String(r.amount).trim() === '') return true
+    if (!Number.isFinite(Number(r.amount))) return true
     return false
   })
 }
