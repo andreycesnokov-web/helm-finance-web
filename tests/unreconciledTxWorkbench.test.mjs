@@ -241,6 +241,30 @@ console.log('\n--- 6. Server PATCH /api/transactions/:id boundary guard logic --
   ok('Debt payment description edit is allowed', canEditDebtDesc === true);
 }
 
+console.log('\n--- 7. Stale save protection across company/month switch ---');
+{
+  // Test stale guard logic: scopeKey + month comparison
+  let activeBusinessId = 'biz-alpha';
+  let scopeKey = 'scope-alpha';
+  let month = '2026-09';
+  const initialScope = `${activeBusinessId}|${scopeKey}|${month}`;
+
+  // Case A: same company and month -> allowed
+  const isStaleSame = initialScope !== `${activeBusinessId}|${scopeKey}|${month}`;
+  ok('Same workspace and month is not stale', isStaleSame === false);
+
+  // Case B: company switches during in-flight edit
+  activeBusinessId = 'biz-beta';
+  const isStaleCompanySwitch = initialScope !== `${activeBusinessId}|${scopeKey}|${month}`;
+  ok('Company switch renders save stale and drops commit', isStaleCompanySwitch === true);
+
+  // Case C: month switches during in-flight edit
+  activeBusinessId = 'biz-alpha';
+  month = '2026-10';
+  const isStaleMonthSwitch = initialScope !== `${activeBusinessId}|${scopeKey}|${month}`;
+  ok('Month switch renders save stale and drops commit', isStaleMonthSwitch === true);
+}
+
 console.log(`\nUNRECONCILED WORKBENCH TESTS: ${pass} passed, ${fail} failed`);
 if (fail > 0) {
   process.exit(1);

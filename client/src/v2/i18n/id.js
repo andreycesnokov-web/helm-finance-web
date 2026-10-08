@@ -326,6 +326,7 @@ export default {
       docsTitle: 'Dokumen terlampir',
       noDocs: 'Belum ada dokumen terlampir',
       attachDoc: 'Lampirkan dokumen',
+      docLimitation: 'Penautan langsung dokumen ke transaksi bank tersedia melalui Pusat Dokumen. Unggah file dan pilih transaksi ini dalam tautan.',
       docWarning: 'Perhatian: melampirkan kuitansi atau faktur mengonfirmasi keberadaan dokumen, tetapi tidak menyelesaikan rekonsiliasi bank dengan sendirinya.',
       unreconciledNotice: 'Mengubah deskripsi atau kategori memperbarui catatan pembukuan, namun tidak secara otomatis merekonsiliasi transaksi. Rekonsiliasi memerlukan konfirmasi mutasi bank.',
       saveSuccess: 'Perubahan disimpan',

@@ -327,6 +327,7 @@ export default {
       noDocs: 'No attached documents',
       attachDoc: 'Attach document',
       docWarning: 'Notice: attaching a receipt or invoice confirms document presence, but does not in itself complete bank reconciliation.',
+      docLimitation: 'Direct linking of documents to bank transactions is available via Document Center. Upload the file and select this transaction in links.',
       unreconciledNotice: 'Editing description or category updates accounting records, but does not automatically reconcile the transaction. Reconciliation requires confirmation via bank statement.',
       saveSuccess: 'Changes saved',
       saveError: 'Error saving changes: {msg}',

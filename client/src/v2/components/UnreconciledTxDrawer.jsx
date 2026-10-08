@@ -14,6 +14,8 @@ import { detailPath } from '../pages/Bills'
 export default function UnreconciledTxDrawer({
   tx,
   month,
+  activeBusinessId,
+  scopeKey,
   wallets = [],
   batches = [],
   debts = [],
@@ -28,7 +30,15 @@ export default function UnreconciledTxDrawer({
   const lang = useLang()
   const { token } = useAuth()
   const drawerRef = useRef(null)
+  const closeBtnRef = useRef(null)
   const lastFocus = useRef(null)
+
+  // Scope protection: capture identity of the company workspace and month when rendered
+  const currentScope = `${activeBusinessId ?? ''}|${scopeKey ?? ''}|${month ?? ''}`
+  const scopeRef = useRef(currentScope)
+  useEffect(() => {
+    scopeRef.current = currentScope
+  }, [currentScope])
 
   // Reason diagnosis
   const wallet = useMemo(
@@ -104,16 +114,58 @@ export default function UnreconciledTxDrawer({
     }
   }, [tx])
 
-  // Accessibility: trap focus and handle Escape
+  // Accessibility: Focus trap, Initial focus, Escape key, Return focus on unmount
   useEffect(() => {
     lastFocus.current = document.activeElement
+
+    // Initial focus on close button or drawer container
+    const timer = setTimeout(() => {
+      if (closeBtnRef.current) {
+        closeBtnRef.current.focus()
+      } else if (drawerRef.current) {
+        drawerRef.current.focus()
+      }
+    }, 40)
+
     const onKey = (e) => {
-      if (e.key === 'Escape') onClose?.()
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        onClose?.()
+        return
+      }
+
+      // Tab trap
+      if (e.key === 'Tab' && drawerRef.current) {
+        const focusableSelectors = 'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        const focusables = Array.from(drawerRef.current.querySelectorAll(focusableSelectors)).filter(
+          (el) => !el.hasAttribute('disabled') && el.offsetParent !== null
+        )
+        if (focusables.length === 0) return
+
+        const firstElement = focusables[0]
+        const lastElement = focusables[focusables.length - 1]
+
+        if (e.shiftKey) {
+          if (document.activeElement === firstElement) {
+            e.preventDefault()
+            lastElement.focus()
+          }
+        } else {
+          if (document.activeElement === lastElement) {
+            e.preventDefault()
+            firstElement.focus()
+          }
+        }
+      }
     }
+
     document.addEventListener('keydown', onKey)
     return () => {
+      clearTimeout(timer)
       document.removeEventListener('keydown', onKey)
-      lastFocus.current?.focus?.()
+      if (lastFocus.current && typeof lastFocus.current.focus === 'function') {
+        lastFocus.current.focus()
+      }
     }
   }, [onClose])
 
@@ -170,6 +222,13 @@ export default function UnreconciledTxDrawer({
     setSaveError(null)
     setSaveSuccess(false)
 
+    // Stale check before in-flight mutation
+    if (scopeRef.current !== currentScope) {
+      setSaving(false)
+      onClose?.()
+      return
+    }
+
     try {
       const payload = {
         description: draft.description,
@@ -183,11 +242,24 @@ export default function UnreconciledTxDrawer({
       }
 
       const updated = await updateTransaction(token, tx.id, payload)
+
+      // Stale check after in-flight response arrives: do not commit state if workspace changed
+      if (scopeRef.current !== currentScope) {
+        setSaving(false)
+        onClose?.()
+        return
+      }
+
       setSaveSuccess(true)
       setIsEditing(false)
       onSaved?.(updated)
       onTxUpdated?.(updated)
     } catch (err) {
+      if (scopeRef.current !== currentScope) {
+        setSaving(false)
+        onClose?.()
+        return
+      }
       setSaveError(err?.message || err?.data?.message || 'Update failed')
     } finally {
       setSaving(false)
@@ -203,6 +275,7 @@ export default function UnreconciledTxDrawer({
         role="dialog"
         aria-modal="true"
         aria-labelledby="v2-unreconciled-title"
+        tabIndex={-1}
       >
         <span className="v2-sheet-grip" aria-hidden="true" />
         <header className="v2-workbench-head">
@@ -216,6 +289,7 @@ export default function UnreconciledTxDrawer({
             </div>
           </div>
           <button
+            ref={closeBtnRef}
             type="button"
             className="v2-iconbtn"
             onClick={onClose}
@@ -569,7 +643,10 @@ export default function UnreconciledTxDrawer({
               </ul>
             )}
             <p style={{ margin: '4px 0 0', fontSize: 11, color: 'var(--text-muted, #64748b)' }}>
-              {t('acct.drawer.docWarning')}
+              ⚠️ {t('acct.drawer.docWarning')}
+            </p>
+            <p style={{ margin: '4px 0 0', fontSize: 11, color: 'var(--text-muted, #64748b)', fontStyle: 'italic' }}>
+              ℹ️ {t('acct.drawer.docLimitation')}
             </p>
           </div>
         </div>

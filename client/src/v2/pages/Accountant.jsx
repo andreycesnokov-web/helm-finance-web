@@ -692,6 +692,8 @@ function CloseTab({ month, onOpenChatModal }) {
         <UnreconciledTxDrawer
           tx={selectedTx}
           month={month}
+          activeBusinessId={active?.id}
+          scopeKey={scopeKey}
           wallets={wallets.data?.wallets || []}
           batches={batches.data?.batches || []}
           debts={enrichedDebts}
