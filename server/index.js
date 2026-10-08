@@ -6658,6 +6658,15 @@ app.post('/api/bank-imports/:batchId/confirm', auth, async (req, res) => {
     const payloadRows = Array.isArray(req.body?.rows) ? req.body.rows : [];
     if (!payloadRows.length) return res.status(400).json({ error: 'rows required' });
 
+    // Server-side batch integrity check: reject batches with corrupted multi-decade spans (e.g. 2000-2032)
+    if (batch.statement_start && batch.statement_end) {
+      const s = new Date(batch.statement_start).getTime();
+      const e = new Date(batch.statement_end).getTime();
+      if (!isNaN(s) && !isNaN(e) && s > e) {
+        return res.status(400).json({ error: 'corrupt_statement_period', message: 'Statement start date is after end date' });
+      }
+    }
+
     // Ownership validation sets (category / counterparty must belong to business).
     const [{ data: cats }, { data: cps }] = await Promise.all([
       supabase.from('cashflow_categories').select('id, name').or(bizOrFilter(biz)),

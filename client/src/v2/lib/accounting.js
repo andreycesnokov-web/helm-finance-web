@@ -49,6 +49,33 @@ export const isBankWallet = (w) =>
   !/cash/i.test(w?.name || '') &&
   w?.is_active !== false
 
+/** Check whether a batch has a valid, non-corrupted date range (start <= end and not spanning multiple decades) */
+export const isBatchPeriodValid = (b) => {
+  if (!b) return false
+  if (!b.statement_start && !b.statement_end) return true // Batch with unspecified period is not invalid
+  if (b.statement_start && b.statement_end) {
+    const s = new Date(b.statement_start)
+    const e = new Date(b.statement_end)
+    if (isNaN(s.getTime()) || isNaN(e.getTime())) return false
+    if (s > e) return false
+    const diffDays = Math.round((e.getTime() - s.getTime()) / (1000 * 60 * 60 * 24))
+    // A corrupted multi-decade span (e.g. 2000-2032 spans > 10,000 days / ~30 years) is blocked
+    if (diffDays > 365 * 5) return false
+  }
+  return true
+}
+
+/** Check whether statement rows contain corrupted dates (invalid date strings, year < 1990 or > 2099) */
+export const hasCorruptRows = (rows = []) => {
+  return (rows || []).some(r => {
+    if (!r.tx_date) return true
+    const year = parseInt(String(r.tx_date).slice(0, 4), 10)
+    if (isNaN(year) || year < 1990 || year > 2099) return true
+    if (r.amount != null && isNaN(Number(r.amount))) return true
+    return false
+  })
+}
+
 /**
  * Month-close readiness from what the system can actually check:
  *   categories   every money-in/out transaction of the month has a category
@@ -90,6 +117,15 @@ export function closeReadiness({ month, transactions = [], debts = [], batches =
     return dt.getUTCFullYear() === Number(y) && dt.getUTCMonth() + 1 === Number(m) && dt.getUTCDate() === Number(d)
   }
 
+  const isBatchDurationValid = (bStart, bEnd) => {
+    if (!bStart || !bEnd) return false
+    const s = new Date(`${bStart}T00:00:00Z`).getTime()
+    const e = new Date(`${bEnd}T00:00:00Z`).getTime()
+    if (isNaN(s) || isNaN(e)) return false
+    const diffDays = Math.round((e - s) / 86400000)
+    return diffDays >= 0 && diffDays <= 365 * 5 // Reject corrupted multi-decade spans like 2000-2032
+  }
+
   const withStatements = banks.filter((w) =>
     batches.some((b) => {
       if (String(b.wallet_id) !== String(w.id)) return false
@@ -98,6 +134,7 @@ export function closeReadiness({ month, transactions = [], debts = [], batches =
       const bStart = toIsoDateStr(b.statement_start)
       const bEnd = toIsoDateStr(b.statement_end)
       if (bStart > bEnd) return false
+      if (!isBatchDurationValid(bStart, bEnd)) return false
       return bStart <= start && bEnd >= end
     })
   )
@@ -112,6 +149,7 @@ export function closeReadiness({ month, transactions = [], debts = [], batches =
       const bStart = toIsoDateStr(b.statement_start)
       const bEnd = toIsoDateStr(b.statement_end)
       if (bStart > bEnd) return false
+      if (!isBatchDurationValid(bStart, bEnd)) return false
       if (bStart > start || bEnd < end) return false
 
       // Closing balance must be a finite number
@@ -266,11 +304,21 @@ export function determineUnreconciledReason({ tx, month, wallet, batches = [] })
     !['cancelled', 'failed'].includes(b.status)
   )
 
+  const isBatchDurationValid = (bStart, bEnd) => {
+    if (!bStart || !bEnd) return false
+    const s = new Date(`${bStart}T00:00:00Z`).getTime()
+    const e = new Date(`${bEnd}T00:00:00Z`).getTime()
+    if (isNaN(s) || isNaN(e)) return false
+    const diffDays = Math.round((e - s) / 86400000)
+    return diffDays >= 0 && diffDays <= 365 * 5 // Reject corrupted multi-decade spans like 2000-2032
+  }
+
   const coveringBatches = walletBatches.filter((b) => {
     if (!isValidIsoDate(b.statement_start) || !isValidIsoDate(b.statement_end)) return false
     const bStart = toIsoDateStr(b.statement_start)
     const bEnd = toIsoDateStr(b.statement_end)
     if (bStart > bEnd) return false
+    if (!isBatchDurationValid(bStart, bEnd)) return false
     return bStart <= start && bEnd >= end
   })
 

@@ -6,6 +6,7 @@ import { useTranslation } from '../hooks/useTranslation'
 import { apiFetch, fmt } from '../lib/api'
 import { uploadDocument } from '../lib/documents'
 import { getLang } from '../i18n/index'
+import { isBatchPeriodValid, hasCorruptRows } from '../v2/lib/accounting'
 
 const L = {
   en: { title: 'Bank import', subtitle: 'Import a CSV/XLSX statement — review, then create transactions',
@@ -28,7 +29,9 @@ const L = {
     createRuleAsk: 'Always categorize similar transactions this way?',
     targetPeriod: 'Period',
     forPeriod: 'for period',
-    clearPeriod: 'Show all' },
+    clearPeriod: 'Show all',
+    corruptedBatchTitle: 'Statement has corrupt or invalid dates / period',
+    corruptedBatchDesc: 'This statement spans an invalid date range or contains corrupt row data. Confirming transactions is blocked to prevent ledger corruption.' },
   ru: { title: 'Импорт из банка', subtitle: 'Загрузи выписку CSV/XLSX — проверь, затем создадим транзакции',
     upload: 'Загрузить выписку (CSV / XLSX)', wallet: 'Счёт назначения', map: 'Сопоставь колонки', date: 'Дата', amount: 'Сумма',
     desc: 'Описание', direction: 'Направление (необязательно)', ref: 'Референс (необязательно)', preview: 'Превью и проверка',
@@ -49,7 +52,9 @@ const L = {
     createRuleAsk: 'Всегда категоризировать похожие операции так же?',
     targetPeriod: 'Период',
     forPeriod: 'за период',
-    clearPeriod: 'Показать все' },
+    clearPeriod: 'Показать все',
+    corruptedBatchTitle: 'Выписка содержит некорректные даты или период',
+    corruptedBatchDesc: 'Данная пачка охватывает недопустимый диапазон дат либо содержит повреждённые данные строк. Подтверждение операций заблокировано во избежание повреждения главной книги.' },
   id: { title: 'Impor bank', subtitle: 'Impor rekening koran CSV/XLSX — tinjau, lalu buat transaksi',
     upload: 'Unggah rekening (CSV / XLSX)', wallet: 'Akun tujuan', map: 'Petakan kolom', date: 'Tanggal', amount: 'Jumlah',
     desc: 'Deskripsi', direction: 'Arah (opsional)', ref: 'Referensi (opsional)', preview: 'Pratinjau & tinjau',
@@ -70,7 +75,9 @@ const L = {
     createRuleAsk: 'Selalu kategorikan transaksi serupa seperti ini?',
     targetPeriod: 'Periode',
     forPeriod: 'untuk periode',
-    clearPeriod: 'Tampilkan semua' },
+    clearPeriod: 'Tampilkan semua',
+    corruptedBatchTitle: 'Rekening koran memiliki rentang tanggal tidak valid',
+    corruptedBatchDesc: 'Batch rekening koran ini mencakup rentang tanggal tidak valid atau memiliki baris yang rusak. Konfirmasi transaksi diblokir untuk mencegah kerusakan buku besar.' },
 }
 
 // Premium P2 (business-premium-redesign spec): stepper + AI summary strip over the
@@ -229,12 +236,14 @@ export default function BankImport() {
         })
     } else if (!qBatchId && qMonth && history.length > 0 && token && !batch) {
       // If navigated with wallet_id and month but without explicit batchId,
-      // auto-open matching batch for this wallet and period ONLY if statement_start / statement_end are known.
+      // auto-open matching batch for this wallet and period ONLY if statement_start / statement_end are known
+      // AND within valid monthly statement duration (<= 45 days, not corrupted multi-year ranges).
       // Never use created_at (upload month may differ from statement month) and never auto-open if period is unknown.
       const matchBatch = history.find(b => {
         const matchWallet = !qWalletId || String(b.wallet_id) === String(qWalletId)
         if (!matchWallet) return false
         if (!b.statement_start && !b.statement_end) return false
+        if (!isBatchPeriodValid(b)) return false
         const bStartMonth = b.statement_start ? String(b.statement_start).slice(0, 7) : null
         const bEndMonth = b.statement_end ? String(b.statement_end).slice(0, 7) : null
         const bStart = b.statement_start ? String(b.statement_start).slice(0, 10) : null
@@ -623,12 +632,59 @@ export default function BankImport() {
             </div>
           )}
 
+          {/* Corrupted batch warning banner */}
+          {(() => {
+            const periodInvalid = !isBatchPeriodValid(batch)
+            const corruptRows = hasCorruptRows(rows)
+            const isCorrupted = periodInvalid || corruptRows
+            if (!isCorrupted) return null
+            return (
+              <div style={{
+                background: '#FEF3F2',
+                border: '1.5px solid #F04438',
+                borderRadius: 8,
+                padding: '10px 14px',
+                marginBottom: 12,
+                color: '#B42318',
+                fontSize: 12.5,
+                lineHeight: 1.45,
+              }}>
+                <div style={{ fontWeight: 700, marginBottom: 2 }}>⚠️ {l.corruptedBatchTitle}</div>
+                <div>{l.corruptedBatchDesc}</div>
+                {periodInvalid && batch?.statement_start && batch?.statement_end && (
+                  <div style={{ fontSize: 11.5, marginTop: 4, color: '#7A271A' }}>
+                    Период выписки: {String(batch.statement_start).slice(0, 10)} — {String(batch.statement_end).slice(0, 10)} (недопустимый многолетний интервал)
+                  </div>
+                )}
+              </div>
+            )
+          })()}
+
           {/* Bulk actions */}
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
-            <button className="btn btn-primary btn-sm" disabled={busy || includeCount === 0} onClick={() => confirm()}>{busy ? '…' : `${l.confirmSelected} · ${includeCount}`}</button>
-            <button className="btn btn-ghost btn-sm" disabled={busy || highRows.length === 0} onClick={() => confirm(highRows)}>{l.confirmHigh} · {highRows.length}</button>
-            {canMakeCat && <button className="btn btn-ghost btn-sm" onClick={createCategory}>{l.createNewCategory}</button>}
-          </div>
+          {(() => {
+            const isCorrupted = !isBatchPeriodValid(batch) || hasCorruptRows(rows)
+            return (
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
+                <button
+                  className="btn btn-primary btn-sm"
+                  disabled={busy || includeCount === 0 || isCorrupted}
+                  onClick={() => confirm()}
+                  title={isCorrupted ? l.corruptedBatchTitle : undefined}
+                >
+                  {busy ? '…' : `${l.confirmSelected} · ${includeCount}`}
+                </button>
+                <button
+                  className="btn btn-ghost btn-sm"
+                  disabled={busy || highRows.length === 0 || isCorrupted}
+                  onClick={() => confirm(highRows)}
+                  title={isCorrupted ? l.corruptedBatchTitle : undefined}
+                >
+                  {l.confirmHigh} · {highRows.length}
+                </button>
+                {canMakeCat && <button className="btn btn-ghost btn-sm" onClick={createCategory}>{l.createNewCategory}</button>}
+              </div>
+            )
+          })()}
 
           <div style={{ maxHeight: 460, overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 10 }}>
             <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
@@ -693,7 +749,13 @@ export default function BankImport() {
               </tbody>
             </table>
           </div>
-          <button className="btn btn-primary btn-md" disabled={busy || includeCount === 0} onClick={() => confirm()} style={{ marginTop: 12 }}>
+          <button
+            className="btn btn-primary btn-md"
+            disabled={busy || includeCount === 0 || !isBatchPeriodValid(batch) || hasCorruptRows(rows)}
+            onClick={() => confirm()}
+            title={(!isBatchPeriodValid(batch) || hasCorruptRows(rows)) ? l.corruptedBatchTitle : undefined}
+            style={{ marginTop: 12 }}
+          >
             {busy ? '…' : `${l.confirmImport} · ${includeCount}`}
           </button>
         </div>
@@ -709,6 +771,7 @@ export default function BankImport() {
         const filteredHistory = activeMonthFilter
           ? history.filter(b => {
               if (!b.statement_start && !b.statement_end) return false
+              if (!isBatchPeriodValid(b)) return false
               const bStartMonth = b.statement_start ? String(b.statement_start).slice(0, 7) : null
               const bEndMonth = b.statement_end ? String(b.statement_end).slice(0, 7) : null
               const bStart = b.statement_start ? String(b.statement_start).slice(0, 10) : null

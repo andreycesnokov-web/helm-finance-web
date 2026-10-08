@@ -1,7 +1,7 @@
 // Test unreconciled bank transactions workbench & diagnosis logic
 // Run: node tests/unreconciledTxWorkbench.test.mjs
 import assert from 'node:assert';
-import { closeReadiness, determineUnreconciledReason } from '../client/src/v2/lib/accounting.js';
+import { closeReadiness, determineUnreconciledReason, isBatchPeriodValid, hasCorruptRows } from '../client/src/v2/lib/accounting.js';
 
 let pass = 0;
 let fail = 0;
@@ -129,6 +129,63 @@ console.log('\n--- 3. Case: Statement exists and confirmed balanced, but transac
   ok('Case 3 actionRoute includes batchId=b-confirmed', diag.actionRoute.includes('batchId=b-confirmed'));
   ok('Case 3 actionRoute contains wallet_id=w-bca', diag.actionRoute.includes('wallet_id=w-bca'));
   ok('Case 3 actionLabelKey is acct.reason.actionMatchTransactions', diag.actionLabelKey === 'acct.reason.actionMatchTransactions');
+}
+
+console.log('\n--- 3b. Case: Erroneous multi-year batch (2000-2032) must NOT cover 2026-09 ---');
+{
+  const tx = {
+    id: 103,
+    transaction_date: '2026-09-18',
+    date: '2026-09-18',
+    amount: 500000,
+    wallet_id: 'w-bca',
+    description: 'Vendor payment',
+    source: 'manual',
+    is_reconciled: false,
+  };
+  const batches = [
+    {
+      id: 'b-corrupt-years',
+      wallet_id: 'w-bca',
+      statement_start: '2000-12-31',
+      statement_end: '2032-12-31', // Multi-decade corrupted range
+      status: 'confirmed',
+      reconciliation_status: 'balanced',
+      difference: 0,
+    },
+  ];
+
+  const diag = determineUnreconciledReason({
+    tx,
+    month,
+    wallet: wallets[0],
+    batches,
+  });
+
+  // Because the batch spans 32 years (> 45 days), it must be rejected as covering batch
+  // Diagnosis should safely fall back to no_statement
+  ok('Corrupted multi-year batch is excluded from covering batches', diag.reason === 'no_statement');
+  ok('Diagnosis actionRoute points to uploading statement for month', diag.actionRoute.includes('month=2026-09'));
+
+  const readiness = closeReadiness({
+    month: '2026-09',
+    transactions: [tx],
+    debts: [],
+    batches,
+    wallets,
+  });
+  ok('closeReadiness does not consider corrupted batch as with_statement', readiness.banks.with_statement === 0);
+  ok('closeReadiness does not consider corrupted batch as reconciled', readiness.banks.reconciled === 0);
+
+  // Test BankImport validation helpers
+  ok('isBatchPeriodValid returns false for 2000-2032 batch', isBatchPeriodValid(batches[0]) === false);
+  ok('isBatchPeriodValid returns true for normal 30-day batch', isBatchPeriodValid({ statement_start: '2026-05-02', statement_end: '2026-05-31' }) === true);
+  ok('isBatchPeriodValid returns true for 90-day quarterly statement', isBatchPeriodValid({ statement_start: '2026-01-01', statement_end: '2026-03-31' }) === true);
+  ok('hasCorruptRows detects year 1900', hasCorruptRows([{ tx_date: '1900-05-02', amount: 500 }]) === true);
+  ok('hasCorruptRows detects year 2150', hasCorruptRows([{ tx_date: '2150-05-02', amount: 500 }]) === true);
+  ok('hasCorruptRows detects NaN amount', hasCorruptRows([{ tx_date: '2026-05-02', amount: NaN }]) === true);
+  ok('hasCorruptRows allows negative amount for debit/refund', hasCorruptRows([{ tx_date: '2026-05-02', amount: -500 }]) === false);
+  ok('hasCorruptRows returns false for valid rows', hasCorruptRows([{ tx_date: '2026-05-02', amount: 500 }]) === false);
 }
 
 console.log('\n--- 4. Case: Insufficient data / requires clarification ---');
