@@ -183,6 +183,11 @@ console.log('\n--- 3b. Case: Erroneous multi-year batch (2000-2032) must NOT cov
   ok('isBatchPeriodValid returns true for 90-day quarterly statement', isBatchPeriodValid({ statement_start: '2026-01-01', statement_end: '2026-03-31' }) === true);
   ok('hasCorruptRows detects year 1900', hasCorruptRows([{ tx_date: '1900-05-02', amount: 500 }]) === true);
   ok('hasCorruptRows detects year 2150', hasCorruptRows([{ tx_date: '2150-05-02', amount: 500 }]) === true);
+  ok('hasCorruptRows detects impossible date Feb 30', hasCorruptRows([{ tx_date: '2026-02-30', amount: 500 }]) === true);
+  ok('hasCorruptRows detects impossible date Apr 31', hasCorruptRows([{ tx_date: '2026-04-31', amount: 500 }]) === true);
+  ok('hasCorruptRows detects impossible date Feb 29 non-leap', hasCorruptRows([{ tx_date: '2026-02-29', amount: 500 }]) === true);
+  ok('hasCorruptRows allows valid leap day Feb 29 2024', hasCorruptRows([{ tx_date: '2024-02-29', amount: 500 }]) === false);
+  ok('isBatchPeriodValid detects impossible batch date Feb 30', isBatchPeriodValid({ statement_start: '2026-02-01', statement_end: '2026-02-30' }) === false);
   ok('hasCorruptRows detects NaN amount', hasCorruptRows([{ tx_date: '2026-05-02', amount: NaN }]) === true);
   ok('hasCorruptRows detects empty string amount', hasCorruptRows([{ tx_date: '2026-05-02', amount: '' }]) === true);
   ok('hasCorruptRows detects Infinity amount', hasCorruptRows([{ tx_date: '2026-05-02', amount: Infinity }]) === true);
@@ -474,6 +479,14 @@ console.log('\n--- 6. Server PATCH /api/transactions/:id boundary guard HTTP end
       tx_date: '2026-05-10',
       amount: Infinity,
       direction: 'out',
+    },
+    {
+      id: 'row-corrupt-feb30',
+      batch_id: 'b-valid-range',
+      business_id: BIZ_A,
+      tx_date: '2026-02-30',
+      amount: 100000,
+      direction: 'out',
     }
   ]);
 
@@ -503,6 +516,10 @@ console.log('\n--- 6. Server PATCH /api/transactions/:id boundary guard HTTP end
   const rCorruptRow = await confirmApi('b-valid-range', { rows: [{ row_id: 'row-corrupt-year' }] });
   ok('Confirming batch with corrupt row tx_date returns 400 corrupt_row_date',
     rCorruptRow.status === 400 && rCorruptRow.data?.error === 'corrupt_row_date');
+
+  const rCorruptFeb30 = await confirmApi('b-valid-range', { rows: [{ row_id: 'row-corrupt-feb30' }] });
+  ok('Confirming batch with impossible calendar date Feb 30 returns 400 corrupt_row_date',
+    rCorruptFeb30.status === 400 && rCorruptFeb30.data?.error === 'corrupt_row_date');
 
   const rCorruptEmptyAmount = await confirmApi('b-valid-range', { rows: [{ row_id: 'row-corrupt-empty-amount' }] });
   ok('Confirming batch with empty string amount returns 400 corrupt_row_amount',

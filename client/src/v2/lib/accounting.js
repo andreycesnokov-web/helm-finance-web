@@ -49,28 +49,46 @@ export const isBankWallet = (w) =>
   !/cash/i.test(w?.name || '') &&
   w?.is_active !== false
 
+/**
+ * Strict calendar date verification:
+ * Checks standard YYYY-MM-DD pattern, realistic bounds (1990..2099),
+ * and verifies that day/month actually exist on the calendar (rejects Feb 30, April 31, Feb 29 on non-leap years).
+ */
+export function isValidCalendarDate(val) {
+  if (!val) return false
+  const str = typeof val === 'string' ? val.trim().slice(0, 10) : ''
+  const match = str.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  if (!match) return false
+  const y = Number(match[1])
+  const m = Number(match[2])
+  const d = Number(match[3])
+  if (y < 1990 || y > 2099 || m < 1 || m > 12 || d < 1 || d > 31) return false
+  const dt = new Date(`${match[1]}-${match[2]}-${match[3]}T00:00:00Z`)
+  if (Number.isNaN(dt.getTime())) return false
+  return dt.getUTCFullYear() === y && (dt.getUTCMonth() + 1) === m && dt.getUTCDate() === d
+}
+
 /** Check whether a batch has a valid, non-corrupted date range (start <= end and not spanning multiple decades) */
 export const isBatchPeriodValid = (b) => {
   if (!b) return false
   if (!b.statement_start && !b.statement_end) return true // Batch with unspecified period is not invalid
+  if (b.statement_start && !isValidCalendarDate(b.statement_start)) return false
+  if (b.statement_end && !isValidCalendarDate(b.statement_end)) return false
   if (b.statement_start && b.statement_end) {
-    const s = new Date(b.statement_start)
-    const e = new Date(b.statement_end)
-    if (isNaN(s.getTime()) || isNaN(e.getTime())) return false
-    if (s > e) return false
-    const diffDays = Math.round((e.getTime() - s.getTime()) / (1000 * 60 * 60 * 24))
+    const s = new Date(`${String(b.statement_start).slice(0, 10)}T00:00:00Z`).getTime()
+    const e = new Date(`${String(b.statement_end).slice(0, 10)}T00:00:00Z`).getTime()
+    if (isNaN(s) || isNaN(e) || s > e) return false
+    const diffDays = Math.round((e - s) / (1000 * 60 * 60 * 24))
     // A corrupted multi-decade span (e.g. 2000-2032 spans > 10,000 days / ~30 years) is blocked
     if (diffDays > 365 * 5) return false
   }
   return true
 }
 
-/** Check whether statement rows contain corrupted dates (invalid date strings, year outside 1990..2099 heuristic range) or invalid amounts */
+/** Check whether statement rows contain corrupted dates (impossible calendar dates, invalid strings) or invalid amounts */
 export const hasCorruptRows = (rows = []) => {
   return (rows || []).some(r => {
-    if (!r.tx_date) return true
-    const year = parseInt(String(r.tx_date).slice(0, 4), 10)
-    if (isNaN(year) || year < 1990 || year > 2099) return true
+    if (!isValidCalendarDate(r.tx_date)) return true
     if (r.amount === null || r.amount === undefined || String(r.amount).trim() === '') return true
     if (!Number.isFinite(Number(r.amount))) return true
     return false
