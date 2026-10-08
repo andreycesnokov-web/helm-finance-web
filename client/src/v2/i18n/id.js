@@ -279,7 +279,7 @@ export default {
     closed: 'Bulan ditutup oleh akuntan',
     incompleteDownloadWarning: 'Perhatian: Berkas memuat data yang belum lengkap (tersisa {k} pemeriksaan). Diunduh dengan batasan untuk verifikasi awal.',
     recordsComplete: '{n} dari {m} catatan lengkap', sendToAccountant: 'Kirim ke akuntan untuk ditinjau', reviewSoon: 'Alur tinjauan akuntan belum tersedia',
-    download: 'Unduh paket (PDF + berkas)', packageSoon: 'Belum tersedia', toFinish: 'Untuk menutup {m}',
+    download: 'Unduh paket (PDF + berkas)', exportLang: 'Bahasa paket', packageSoon: 'Belum tersedia', toFinish: 'Untuk menutup {m}',
     check: { statements: 'Mutasi bank · {ok} dari {n} rekening terunggah', reconciliation: 'Rekonsiliasi · {ok} dari {n} rekening tersinkron', bills: 'Tagihan dan faktur dengan dokumen · {ok} dari {n}', categories: 'Transaksi berkategori · {ok} dari {n}', review: 'Tinjauan akuntan' },
     done: 'Selesai', notDone: 'belum selesai', seePackages: 'Lihat folder',
     taxesDue: 'Pajak jatuh tempo di {m}', fullCalendar: 'Kalender lengkap', noEvents: 'Belum ada tenggat pajak tersimpan untuk bisnis ini. Akuntan Anda menambahkannya; layar ini tidak membuat apa pun.',

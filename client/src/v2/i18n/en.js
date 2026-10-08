@@ -279,7 +279,7 @@ export default {
     closed: 'Month closed by accountant',
     incompleteDownloadWarning: 'Notice: Package contains incomplete data ({k} check(s) remaining). Exported with limitations for preliminary verification.',
     recordsComplete: '{n} of {m} records complete', sendToAccountant: 'Send to your accountant for review', reviewSoon: 'Review workflow not available yet',
-    download: 'Download package (PDF + files)', packageSoon: 'Not available yet', toFinish: 'To finish {m}',
+    download: 'Download package (PDF + files)', exportLang: 'Package language', packageSoon: 'Not available yet', toFinish: 'To finish {m}',
     check: { statements: 'Bank statements · {ok} of {n} accounts uploaded', reconciliation: 'Reconciliation · {ok} of {n} accounts reconciled', bills: 'Bills and invoices with a document · {ok} of {n}', categories: 'Transactions with a category · {ok} of {n}', review: 'Accountant review' },
     done: 'Done', notDone: 'not done', seePackages: 'See folders',
     taxesDue: 'Taxes due in {m}', fullCalendar: 'Full calendar', noEvents: 'No tax deadlines are stored for this business yet. Your accountant adds them; nothing is generated from this screen.',
