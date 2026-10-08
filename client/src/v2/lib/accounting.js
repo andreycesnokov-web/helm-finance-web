@@ -215,6 +215,17 @@ export function closeReadiness({ month, transactions = [], debts = [], batches =
  *   - 'no_match': statement uploaded and confirmed/imported, but transaction not matched to statement rows
  *   - 'requires_clarification': insufficient data to determine
  */
+// Every reason code determineUnreconciledReason can return, in the order the month-close
+// screen counts them, with the i18n keys for its badge, its short counter label and its tone.
+// Kept here (not in the page) so a test can assert every key exists in EN, RU and ID.
+export const UNRECONCILED_REASONS = [
+  { code: 'no_statement', badgeKey: 'acct.unlinked.badgeNoStatement', countKey: 'acct.unlinked.count.noStatement', tone: 'crit' },
+  { code: 'statement_unconfirmed', badgeKey: 'acct.unlinked.badgeUnconfirmed', countKey: 'acct.unlinked.count.unconfirmed', tone: 'warn' },
+  { code: 'no_match', badgeKey: 'acct.unlinked.badgeNoMatch', countKey: 'acct.unlinked.count.noMatch', tone: 'warn' },
+  { code: 'requires_clarification', badgeKey: 'acct.unlinked.badgeClarification', countKey: 'acct.unlinked.count.clarification', tone: 'neutral' },
+]
+export const reasonMeta = (code) => UNRECONCILED_REASONS.find((r) => r.code === code) || UNRECONCILED_REASONS[3]
+
 export function determineUnreconciledReason({ tx, month, wallet, batches = [] }) {
   if (!wallet || !tx) {
     return {
