@@ -173,8 +173,18 @@ setTimeout(async () => {
       localStorage.setItem('last_active_workspace_id', biz);
       localStorage.setItem('hf_lang', 'ru');
       localStorage.setItem('lang', 'ru');
-      // Setup spy array to track stale callback execution in browser window
-      window.__drawerCallbacksExecuted = [];
+      // Setup spy counters and history for real onSaved and onTxUpdated callbacks
+      window.__drawerSavedCount = 0;
+      window.__drawerTxUpdatedCount = 0;
+      window.__drawerSavedEvents = [];
+      window.__onDrawerSaved = (updated) => {
+        window.__drawerSavedCount += 1;
+        window.__drawerSavedEvents.push({ type: 'onSaved', tx: updated, time: Date.now() });
+      };
+      window.__onDrawerTxUpdated = (updated) => {
+        window.__drawerTxUpdatedCount += 1;
+        window.__drawerSavedEvents.push({ type: 'onTxUpdated', tx: updated, time: Date.now() });
+      };
     }, { tok: token, biz: BIZ_ALPHA });
 
     console.log('1. Navigating to /business/accountant?tab=close ...');
@@ -220,34 +230,71 @@ setTimeout(async () => {
     const undatedBatchAutoOpened = await page.$(':text("raw_undated_export.csv")');
     console.log('PASS: Batch with unknown statement dates does not auto-open:', undatedBatchAutoOpened === null);
 
-    // Test 5: Return to Accountant Close tab and test Drawer with in-flight response after Close
-    console.log('4. Returning to Accountant Close tab to test delayed PATCH after Drawer Close...');
+    // Test 5: Return to Accountant Close tab and test NORMAL SAVE to prove callback counters work
+    console.log('4. Testing NORMAL SAVE in Drawer (proves callback counters increase)...');
     await page.goto('http://127.0.0.1:' + PORT + '/business/accountant?tab=close', { waitUntil: 'networkidle' });
     await page.waitForTimeout(1500);
 
-    // Instrument window to record any onTxUpdated / onSaved invocations
-    await page.evaluate(() => {
-      window.__drawerCallbacksExecuted = [];
-    });
+    const initialCounters = await page.evaluate(() => ({
+      saved: window.__drawerSavedCount || 0,
+      updated: window.__drawerTxUpdatedCount || 0,
+    }));
+    console.log('Initial counters before normal save:', initialCounters);
 
-    const reviewBtn = await page.waitForSelector('.v2-unlinked-item button:has-text("Разобрать")', { timeout: 5000 });
-    await reviewBtn.click();
-    const drawer = await page.waitForSelector('.v2-workbench-drawer', { timeout: 5000 });
-    console.log('PASS: Drawer opened:', !!drawer);
+    const reviewBtnNormal = await page.waitForSelector('.v2-unlinked-item button:has-text("Разобрать")', { timeout: 5000 });
+    await reviewBtnNormal.click();
+    const drawerNormal = await page.waitForSelector('.v2-workbench-drawer', { timeout: 5000 });
+    console.log('PASS: Drawer opened:', !!drawerNormal);
 
-    // Intercept PATCH with 800ms synthetic delay
+    const editBtnNormal = await page.waitForSelector('button:has-text("Редактировать")', { timeout: 5000 });
+    await editBtnNormal.click();
+    const descInputNormal = await page.waitForSelector('input[value="Sewa Server Cloud Alpha"], textarea', { timeout: 5000 });
+    await descInputNormal.fill('Sewa Server Cloud Alpha (Normal Save Verified)');
+    const saveBtnNormal = await page.waitForSelector('button:has-text("Сохранить изменения")', { timeout: 5000 });
+    await saveBtnNormal.click();
+
+    // Wait for save callbacks to execute and counters to increment
+    await page.waitForFunction(() => (window.__drawerSavedCount || 0) > 0, { timeout: 5000 });
+    const countersAfterNormalSave = await page.evaluate(() => ({
+      saved: window.__drawerSavedCount || 0,
+      updated: window.__drawerTxUpdatedCount || 0,
+    }));
+    console.log('Counters after normal save:', countersAfterNormalSave);
+
+    const normalSaveIncremented =
+      countersAfterNormalSave.saved === initialCounters.saved + 1 &&
+      countersAfterNormalSave.updated === initialCounters.updated + 1;
+    console.log('PASS: Normal save successfully incremented callback counters (intercept verified):', normalSaveIncremented);
+
+    // Close the normal save drawer
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(500);
+
+    // Test 6: In-flight delayed PATCH with Drawer Close via Escape (counters MUST NOT increment)
+    console.log('5. Testing delayed PATCH after Drawer Close via Escape (counters must NOT increment)...');
+    const countersBeforeDelayedClose = await page.evaluate(() => ({
+      saved: window.__drawerSavedCount,
+      updated: window.__drawerTxUpdatedCount,
+    }));
+
+    const reviewBtnDelayed = await page.waitForSelector('.v2-unlinked-item button:has-text("Разобрать")', { timeout: 5000 });
+    await reviewBtnDelayed.click();
+    const drawerDelayed = await page.waitForSelector('.v2-workbench-drawer', { timeout: 5000 });
+    console.log('PASS: Drawer opened for delayed close check:', !!drawerDelayed);
+
+    // Intercept PATCH with 900ms synthetic delay
     await page.route('**/api/transactions/501', async (route) => {
-      console.log('Intercepted PATCH /api/transactions/501 in-flight, delaying response by 800ms...');
-      await new Promise((r) => setTimeout(r, 800));
+      console.log('Intercepted PATCH /api/transactions/501 in-flight, delaying response by 900ms...');
+      await new Promise((r) => setTimeout(r, 900));
       await route.continue();
     });
 
-    const editBtn = await page.waitForSelector('button:has-text("Редактировать")', { timeout: 5000 });
-    await editBtn.click();
-    const descInput = await page.$('input[value="Sewa Server Cloud Alpha"], textarea');
-    await descInput.fill('Sewa Server Cloud Alpha (Verified In-Flight)');
-    const saveBtn = await page.waitForSelector('button:has-text("Сохранить изменения")', { timeout: 5000 });
-    await saveBtn.click();
+    const editBtnDelayed = await page.waitForSelector('button:has-text("Редактировать")', { timeout: 5000 });
+    await editBtnDelayed.click();
+    const descInputDelayed = await page.$('input[value*="Sewa Server Cloud Alpha"], textarea');
+    await descInputDelayed.fill('Sewa Server Cloud Alpha (Delayed Close In-Flight)');
+    const saveBtnDelayed = await page.waitForSelector('button:has-text("Сохранить изменения")', { timeout: 5000 });
+    await saveBtnDelayed.click();
 
     // Close drawer via Escape while PATCH is in-flight
     await page.waitForTimeout(50);
@@ -259,23 +306,35 @@ setTimeout(async () => {
     console.log('PASS: Drawer closed immediately without waiting for late response:', drawerClosedInFlight === null);
 
     // Wait for late response to arrive
-    await page.waitForTimeout(1100);
+    await page.waitForTimeout(1200);
 
-    // Verify callbacks were NOT called after unmount
-    const callbacksAfterClose = await page.evaluate(() => window.__drawerCallbacksExecuted || []);
-    console.log('PASS: No stale callbacks executed after drawer close:', callbacksAfterClose.length === 0);
+    // Verify counters DID NOT increment after close
+    const countersAfterDelayedClose = await page.evaluate(() => ({
+      saved: window.__drawerSavedCount,
+      updated: window.__drawerTxUpdatedCount,
+    }));
+    console.log('Counters after delayed close arrived:', countersAfterDelayedClose);
+    const noIncrementAfterClose =
+      countersAfterDelayedClose.saved === countersBeforeDelayedClose.saved &&
+      countersAfterDelayedClose.updated === countersBeforeDelayedClose.updated;
+    console.log('PASS: Callback counters did NOT increment after drawer close:', noIncrementAfterClose);
 
-    // Test 6: In-flight PATCH with Company Switch
-    console.log('5. Testing delayed PATCH with Company Switch in-flight...');
-    const reviewBtn2 = await page.waitForSelector('.v2-unlinked-item button:has-text("Разобрать")', { timeout: 5000 });
-    await reviewBtn2.click();
+    // Test 7: In-flight delayed PATCH with Company Switch (counters MUST NOT increment)
+    console.log('6. Testing delayed PATCH with Company Switch in-flight (counters must NOT increment)...');
+    const countersBeforeCompanySwitch = await page.evaluate(() => ({
+      saved: window.__drawerSavedCount,
+      updated: window.__drawerTxUpdatedCount,
+    }));
+
+    const reviewBtnSwitch = await page.waitForSelector('.v2-unlinked-item button:has-text("Разобрать")', { timeout: 5000 });
+    await reviewBtnSwitch.click();
     await page.waitForSelector('.v2-workbench-drawer', { timeout: 5000 });
-    const editBtn2 = await page.waitForSelector('button:has-text("Редактировать")', { timeout: 5000 });
-    await editBtn2.click();
-    const descInput2 = await page.waitForSelector('input[value="Sewa Server Cloud Alpha"], textarea', { timeout: 5000 });
-    await descInput2.fill('Sewa Server Cloud Alpha (Company Switch In-Flight)');
-    const saveBtn2 = await page.waitForSelector('button:has-text("Сохранить изменения")', { timeout: 5000 });
-    await saveBtn2.click();
+    const editBtnSwitch = await page.waitForSelector('button:has-text("Редактировать")', { timeout: 5000 });
+    await editBtnSwitch.click();
+    const descInputSwitch = await page.waitForSelector('input[value*="Sewa Server Cloud Alpha"], textarea', { timeout: 5000 });
+    await descInputSwitch.fill('Sewa Server Cloud Alpha (Company Switch In-Flight)');
+    const saveBtnSwitch = await page.waitForSelector('button:has-text("Сохранить изменения")', { timeout: 5000 });
+    await saveBtnSwitch.click();
 
     // Switch company while PATCH is in-flight
     await page.waitForTimeout(50);
@@ -287,13 +346,20 @@ setTimeout(async () => {
       window.dispatchEvent(new CustomEvent('workspace-switch', { detail: { id: bizB } }));
     }, { bizB: BIZ_BETA });
 
-    await page.waitForTimeout(1000);
+    await page.waitForTimeout(1200);
 
     const drawerInBeta = await page.$('.v2-workbench-drawer');
     console.log('PASS: Drawer unmounted and dropped after company switch:', drawerInBeta === null);
 
-    const callbacksAfterCompanySwitch = await page.evaluate(() => window.__drawerCallbacksExecuted || []);
-    console.log('PASS: No stale callbacks executed across company boundary:', callbacksAfterCompanySwitch.length === 0);
+    const countersAfterCompanySwitch = await page.evaluate(() => ({
+      saved: window.__drawerSavedCount,
+      updated: window.__drawerTxUpdatedCount,
+    }));
+    console.log('Counters after company switch arrived:', countersAfterCompanySwitch);
+    const noIncrementAfterCompanySwitch =
+      countersAfterCompanySwitch.saved === countersBeforeCompanySwitch.saved &&
+      countersAfterCompanySwitch.updated === countersBeforeCompanySwitch.updated;
+    console.log('PASS: Callback counters did NOT increment across company switch:', noIncrementAfterCompanySwitch);
 
     // Verify company isolation: Beta has 0 transactions
     const unlinkedInBeta = await page.$('.v2-unlinked-group');

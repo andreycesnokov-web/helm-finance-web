@@ -707,7 +707,15 @@ function CloseTab({ month, onOpenChatModal }) {
           categories={Array.isArray(categories.data) ? categories.data : []}
           token={token}
           onClose={() => setSelectedTxId(null)}
-          onTxUpdated={() => {
+          onSaved={(updated) => {
+            if (typeof window !== 'undefined' && typeof window.__onDrawerSaved === 'function') {
+              window.__onDrawerSaved(updated)
+            }
+          }}
+          onTxUpdated={(updated) => {
+            if (typeof window !== 'undefined' && typeof window.__onDrawerTxUpdated === 'function') {
+              window.__onDrawerTxUpdated(updated)
+            }
             tx.reload()
             summary.reload()
           }}

@@ -373,10 +373,11 @@ console.log('\n--- 7. Real component UnreconciledTxDrawer: delayed response afte
   try {
     const res = execFileSync('node', [scriptPath], { encoding: 'utf8' });
     ok('Real UnreconciledTxDrawer mounts and opens in browser', res.includes('PASS: Drawer opened: true'));
+    ok('Normal save in Drawer increments callback counters (intercept verified)', res.includes('PASS: Normal save successfully incremented callback counters (intercept verified): true'));
     ok('Real UnreconciledTxDrawer handles in-flight delayed PATCH and closes via Escape without crash', res.includes('PASS: Drawer closed immediately without waiting for late response: true'));
-    ok('No stale callbacks executed after drawer close in real UI', res.includes('PASS: No stale callbacks executed after drawer close: true'));
+    ok('Callback counters did NOT increment after drawer close', res.includes('PASS: Callback counters did NOT increment after drawer close: true'));
     ok('Real UnreconciledTxDrawer drops in-flight save on company switch', res.includes('PASS: Drawer unmounted and dropped after company switch: true'));
-    ok('No stale callbacks executed across company boundary', res.includes('PASS: No stale callbacks executed across company boundary: true'));
+    ok('Callback counters did NOT increment across company switch', res.includes('PASS: Callback counters did NOT increment across company switch: true'));
     ok('Company workspace isolation preserved without transaction leak', res.includes('PASS: Beta workspace has isolated empty state (no leak from Alpha): true'));
     ok('Navigation to BankImport preserves wallet and month', res.includes('PASS: BankImport shows target period banner: true') && res.includes('PASS: BankImport has selected wallet id w-alpha-bca: true'));
     ok('Statement period matching uses statement_start/statement_end and ignores upload month', res.includes('PASS: September statement uploaded in October matches September period: true') && res.includes('PASS: Batch with unknown statement dates does not auto-open: true'));
