@@ -76,6 +76,9 @@ const I18N = {
     unreconciledStatementsTitle: 'Несверенные банковские счета:',
     billsWithoutDocsTitle: 'Счета и инвойсы без подтверждающих документов:',
     unavailableFilesTitle: 'Недоступные оригиналы файлов (не удалось выгрузить из хранилища):',
+    reasonStatementUnavailable: 'Оригинал банковской выписки недоступен или не удалось скачать его из хранилища',
+    reasonDocumentUnavailable: 'Оригинал документа недоступен или не удалось скачать его из хранилища',
+    reasonDecodeFailed: 'Не удалось прочитать содержимое файла выписки',
     limitationsTitle: 'Ограничения и системные предупреждения:',
     noDiscrepancies: 'Расхождений и замечаний не зафиксировано.',
     colFileName: 'Файл / Путь в архиве',
@@ -155,6 +158,9 @@ const I18N = {
     unreconciledStatementsTitle: 'Unreconciled Bank Accounts:',
     billsWithoutDocsTitle: 'Bills Without Original Documents:',
     unavailableFilesTitle: 'Unavailable Original Files (storage fetch error):',
+    reasonStatementUnavailable: 'Original bank statement file is unavailable or could not be retrieved from storage',
+    reasonDocumentUnavailable: 'Original file could not be retrieved from authorized storage or signed URL was unavailable',
+    reasonDecodeFailed: 'Failed to decode statement file content',
     limitationsTitle: 'Limitations & System Warnings:',
     noDiscrepancies: 'No discrepancies or warnings recorded.',
     colFileName: 'File / Archive Path',
@@ -234,6 +240,9 @@ const I18N = {
     unreconciledStatementsTitle: 'Rekening Bank Belum Rekonsiliasi:',
     billsWithoutDocsTitle: 'Tagihan Tanpa Dokumen Asli:',
     unavailableFilesTitle: 'Berkas Asli Tidak Tersedia:',
+    reasonStatementUnavailable: 'Berkas asli rekening koran tidak tersedia atau gagal diunduh dari penyimpanan',
+    reasonDocumentUnavailable: 'Berkas asli tidak dapat diambil dari penyimpanan resmi atau tautan unduhan tidak tersedia',
+    reasonDecodeFailed: 'Gagal membaca isi berkas rekening koran',
     limitationsTitle: 'Batasan & Catatan Sistem:',
     noDiscrepancies: 'Tidak ada ketidaksesuaian atau peringatan yang tercatat.',
     colFileName: 'Berkas / Jalur Arsip',
@@ -645,7 +654,22 @@ export async function generateAccountantSummaryPdf({
             ? {
                 stack: [
                   { text: t.unavailableFilesTitle, bold: true, fontSize: 9, color: '#991b1b', margin: [0, 2, 0, 2] },
-                  { ul: unavailableFiles.map((uf) => ({ text: `${uf.file_name || uf.document_id || uf.batch_id}: ${uf.reason || 'Not available'}`, fontSize: 8.5, color: '#1e293b' })), margin: [0, 0, 0, 6] },
+                  {
+                    ul: unavailableFiles.map((uf) => {
+                      const rawReason = String(uf.reason || '')
+                      let localizedReason = rawReason
+                      if (rawReason.includes('Original bank statement file is unavailable') || rawReason.includes('bank statement file is unavailable')) {
+                        localizedReason = t.reasonStatementUnavailable
+                      } else if (rawReason.includes('Original file could not be retrieved') || rawReason.includes('authorized storage')) {
+                        localizedReason = t.reasonDocumentUnavailable
+                      } else if (rawReason.includes('decode') || rawReason.includes('base64')) {
+                        localizedReason = t.reasonDecodeFailed
+                      }
+                      const name = uf.file_name || String(uf.document_id || uf.batch_id || 'document')
+                      return { text: `${name}: ${localizedReason}`, fontSize: 8.5, color: '#1e293b' }
+                    }),
+                    margin: [0, 0, 0, 6],
+                  },
                 ],
               }
             : null,

@@ -399,5 +399,74 @@ const MONTH = '2026-09';
   ok('Discrepancies contains 2 unlinked transactions', pkg.discrepancies.unlinked_transactions.length === 2);
 }
 
+// ── Test 10: Localization of Unavailable File Reasons in accountantSummaryPdf (RU, EN, ID) ─
+{
+  const { generateAccountantSummaryPdf } = await import('../client/src/v2/lib/accountantSummaryPdf.js');
+
+  const testUnavailableFiles = [
+    {
+      file_name: 'bca_september_2026_missing.csv',
+      batch_id: 'b-missing',
+      reason: 'Original bank statement file is unavailable or could not be retrieved from storage',
+    },
+    {
+      file_name: 'invoice_unreachable.pdf',
+      document_id: 'doc-unreachable',
+      reason: 'Original file could not be retrieved from authorized storage or signed URL was unavailable',
+    },
+  ];
+
+  // Test RU
+  const pdfBytesRu = await generateAccountantSummaryPdf({
+    summary: { company_name: 'PT Test RU', month: '2026-09', business_id: BIZ_ID, readiness: { status: 'in_progress', is_closed: false, score: 50, checks: [] } },
+    discrepancies: { unavailable_files: testUnavailableFiles, unlinked_transactions: [], unreconciled_statements: [], bills_without_documents: [], limitations: [] },
+    registry: [],
+    lang: 'ru',
+  });
+  ok('Unavailable reasons RU: generates PDF bytes', pdfBytesRu instanceof Uint8Array && pdfBytesRu.length > 1000);
+
+  // Test EN
+  const pdfBytesEn = await generateAccountantSummaryPdf({
+    summary: { company_name: 'PT Test EN', month: '2026-09', business_id: BIZ_ID, readiness: { status: 'in_progress', is_closed: false, score: 50, checks: [] } },
+    discrepancies: { unavailable_files: testUnavailableFiles, unlinked_transactions: [], unreconciled_statements: [], bills_without_documents: [], limitations: [] },
+    registry: [],
+    lang: 'en',
+  });
+  ok('Unavailable reasons EN: generates PDF bytes', pdfBytesEn instanceof Uint8Array && pdfBytesEn.length > 1000);
+
+  // Test ID
+  const pdfBytesId = await generateAccountantSummaryPdf({
+    summary: { company_name: 'PT Test ID', month: '2026-09', business_id: BIZ_ID, readiness: { status: 'in_progress', is_closed: false, score: 50, checks: [] } },
+    discrepancies: { unavailable_files: testUnavailableFiles, unlinked_transactions: [], unreconciled_statements: [], bills_without_documents: [], limitations: [] },
+    registry: [],
+    lang: 'id',
+  });
+  ok('Unavailable reasons ID: generates PDF bytes', pdfBytesId instanceof Uint8Array && pdfBytesId.length > 1000);
+
+  // End-to-end package generation with unavailable statement asserting raw machine reason in JSON
+  const pkgWithUnavailable = await createAccountantZipPackage({
+    month: MONTH,
+    companyName: 'PT Solusi Utama',
+    businessId: BIZ_ID,
+    batches: [
+      {
+        id: 'b-unavail',
+        business_id: BIZ_ID,
+        file_name: 'bca_sept_missing.csv',
+        statement_start: '2026-09-01',
+        statement_end: '2026-09-30',
+        status: 'imported',
+        document_id: 'doc-missing',
+      },
+    ],
+    documents: [], // triggers unavailable
+    lang: 'ru',
+  });
+
+  ok('E2E package RU: JSON preserves raw diagnostic reason', pkgWithUnavailable.discrepancies.unavailable_files[0].reason.includes('Original bank statement file is unavailable'));
+  ok('E2E package RU: PDF bytes generated with unavailable statement', pkgWithUnavailable.summaryPdfBytes instanceof Uint8Array && pkgWithUnavailable.summaryPdfBytes.length > 1000);
+}
+
 console.log(`\nACCOUNTANT EXPORT TESTS: ${pass} passed, ${fail} failed`);
 if (fail > 0) process.exit(1);
+
