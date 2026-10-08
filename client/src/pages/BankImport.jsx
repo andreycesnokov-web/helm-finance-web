@@ -25,7 +25,10 @@ const L = {
     createNewCategory: '+ New category', uncategorized: 'Uncategorized', high: 'High', medium: 'Medium', low: 'Low',
     matchedExisting: 'Matched existing', possibleTransfer: 'Possible transfer', linkedPayable: 'Possible payable', linkedReceivable: 'Possible receivable', possiblePayroll: 'Possible payroll',
     runSuggest: 'Re-run suggestions', total: 'total', selected: 'selected',
-    createRuleAsk: 'Always categorize similar transactions this way?' },
+    createRuleAsk: 'Always categorize similar transactions this way?',
+    targetPeriod: 'Period',
+    forPeriod: 'for period',
+    clearPeriod: 'Show all' },
   ru: { title: 'Импорт из банка', subtitle: 'Загрузи выписку CSV/XLSX — проверь, затем создадим транзакции',
     upload: 'Загрузить выписку (CSV / XLSX)', wallet: 'Счёт назначения', map: 'Сопоставь колонки', date: 'Дата', amount: 'Сумма',
     desc: 'Описание', direction: 'Направление (необязательно)', ref: 'Референс (необязательно)', preview: 'Превью и проверка',
@@ -43,7 +46,10 @@ const L = {
     createNewCategory: '+ Новая категория', uncategorized: 'Без категории', high: 'Высокая', medium: 'Средняя', low: 'Низкая',
     matchedExisting: 'Уже в учёте', possibleTransfer: 'Возможно перевод', linkedPayable: 'Возможно оплата долга', linkedReceivable: 'Возможно поступление', possiblePayroll: 'Возможно зарплата',
     runSuggest: 'Пересчитать подсказки', total: 'всего', selected: 'выбрано',
-    createRuleAsk: 'Всегда категоризировать похожие операции так же?' },
+    createRuleAsk: 'Всегда категоризировать похожие операции так же?',
+    targetPeriod: 'Период',
+    forPeriod: 'за период',
+    clearPeriod: 'Показать все' },
   id: { title: 'Impor bank', subtitle: 'Impor rekening koran CSV/XLSX — tinjau, lalu buat transaksi',
     upload: 'Unggah rekening (CSV / XLSX)', wallet: 'Akun tujuan', map: 'Petakan kolom', date: 'Tanggal', amount: 'Jumlah',
     desc: 'Deskripsi', direction: 'Arah (opsional)', ref: 'Referensi (opsional)', preview: 'Pratinjau & tinjau',
@@ -61,7 +67,10 @@ const L = {
     createNewCategory: '+ Kategori baru', uncategorized: 'Tanpa kategori', high: 'Tinggi', medium: 'Sedang', low: 'Rendah',
     matchedExisting: 'Sudah tercatat', possibleTransfer: 'Mungkin transfer', linkedPayable: 'Mungkin bayar utang', linkedReceivable: 'Mungkin penerimaan', possiblePayroll: 'Mungkin gaji',
     runSuggest: 'Hitung ulang saran', total: 'total', selected: 'terpilih',
-    createRuleAsk: 'Selalu kategorikan transaksi serupa seperti ini?' },
+    createRuleAsk: 'Selalu kategorikan transaksi serupa seperti ini?',
+    targetPeriod: 'Periode',
+    forPeriod: 'untuk periode',
+    clearPeriod: 'Tampilkan semua' },
 }
 
 // Premium P2 (business-premium-redesign spec): stepper + AI summary strip over the
@@ -176,10 +185,16 @@ export default function BankImport() {
   const [cps, setCps] = useState([])                // [{id,name}]
   const [summary, setSummary] = useState(null)
   const [filter, setFilter] = useState('fAll')
-  const [searchParams] = useSearchParams()
+  const [canMakeCat, setCanMakeCat] = useState(false)
+  const [searchParams, setSearchParams] = useSearchParams()
   const qBatchId = searchParams.get('batchId') || searchParams.get('batch_id')
   const qWalletId = searchParams.get('wallet_id') || searchParams.get('walletId')
   const qMonth = searchParams.get('month') || searchParams.get('period')
+  const [activeMonthFilter, setActiveMonthFilter] = useState(qMonth || '')
+
+  useEffect(() => {
+    if (qMonth) setActiveMonthFilter(qMonth)
+  }, [qMonth])
 
   const loadHistory = useCallback(() => {
     apiFetch('/bank-import/batches', token).then(d => setHistory(d.batches || [])).catch(() => {})
@@ -212,8 +227,20 @@ export default function BankImport() {
         .catch(err => {
           console.error('Failed to load batch from URL param:', err)
         })
+    } else if (!qBatchId && qMonth && history.length > 0 && token && !batch) {
+      // If navigated with wallet_id and month but without explicit batchId,
+      // auto-open matching batch for this wallet and period if one exists
+      const matchBatch = history.find(b => {
+        const matchWallet = !qWalletId || String(b.wallet_id) === String(qWalletId)
+        const bStart = b.statement_start ? String(b.statement_start).slice(0, 7) : null
+        const bCreated = b.created_at ? String(b.created_at).slice(0, 7) : null
+        return matchWallet && (bStart === qMonth || bCreated === qMonth)
+      })
+      if (matchBatch) {
+        openHistoryBatch(matchBatch)
+      }
     }
-  }, [qBatchId, token])
+  }, [qBatchId, qMonth, qWalletId, history, token])
 
   const openHistoryBatch = async (b) => {
     if (!b?.id) return
@@ -479,6 +506,46 @@ export default function BankImport() {
       <h1 style={{ fontSize: 22, fontWeight: 800, margin: 0 }}>🏦 {l.title}</h1>
       <div style={{ fontSize: 13, color: 'var(--text-3)', marginBottom: 16 }}>{l.subtitle}</div>
 
+      {activeMonthFilter && (
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          background: 'var(--brand-navy, #003366)',
+          color: '#fff',
+          borderRadius: 12,
+          padding: '10px 16px',
+          marginBottom: 16,
+          fontSize: 13,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span>📅</span>
+            <span>
+              <strong>{l.targetPeriod}:</strong> {activeMonthFilter}
+              {walletId && wallets.find(w => String(w.id) === String(walletId)) && (
+                <span style={{ color: '#C5D6E7', marginLeft: 8 }}>
+                  · {wallets.find(w => String(w.id) === String(walletId))?.name}
+                </span>
+              )}
+            </span>
+          </div>
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm"
+            style={{ color: '#fff', borderColor: 'rgba(255,255,255,0.3)', fontSize: 11, padding: '2px 8px' }}
+            onClick={() => {
+              setActiveMonthFilter('')
+              const next = new URLSearchParams(searchParams)
+              next.delete('month')
+              next.delete('period')
+              setSearchParams(next)
+            }}
+          >
+            {l.clearPeriod}
+          </button>
+        </div>
+      )}
+
       {BUSINESS_PREMIUM && <ImportStepper headers={headers} batch={batch} suggesting={suggesting} rows={rows} />}
       {BUSINESS_PREMIUM && batch && summary && <ImportAiStrip summary={summary} dupCount={dupCount} />}
 
@@ -627,37 +694,67 @@ export default function BankImport() {
         </div>
       )}
 
-      {history.length > 0 && (
-        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, padding: 16 }}>
-          <div style={{ fontWeight: 700, marginBottom: 8 }}>{l.history}</div>
-          {history.map(b => (
-            <div
-              key={b.id}
-              onClick={() => openHistoryBatch(b)}
-              role="button"
-              tabIndex={0}
-              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openHistoryBatch(b); } }}
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                fontSize: 12,
-                padding: '8px 6px',
-                borderBottom: '0.5px solid var(--border)',
-                cursor: 'pointer',
-                borderRadius: 6,
-              }}
-              title="Нажмите, чтобы открыть выписку"
-            >
-              <span>
-                <strong>{b.file_name || '—'}</strong> · {b.row_count} {l.rows}
+      {history.length > 0 && (() => {
+        const filteredHistory = activeMonthFilter
+          ? history.filter(b => {
+              const bStart = b.statement_start ? String(b.statement_start).slice(0, 7) : null
+              const bCreated = b.created_at ? String(b.created_at).slice(0, 7) : null
+              return bStart === activeMonthFilter || bCreated === activeMonthFilter
+            })
+          : history
+
+        return (
+          <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, padding: 16 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <span style={{ fontWeight: 700 }}>
+                {l.history} {activeMonthFilter && `(${l.forPeriod} ${activeMonthFilter})`}
               </span>
-              <span style={{ color: 'var(--text-3)' }}>
-                {b.status} · {b.imported_count} {l.imported.toLowerCase()} →
-              </span>
+              {activeMonthFilter && history.length !== filteredHistory.length && (
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm"
+                  style={{ fontSize: 11, padding: '2px 6px' }}
+                  onClick={() => setActiveMonthFilter('')}
+                >
+                  {l.clearPeriod} ({history.length})
+                </button>
+              )}
             </div>
-          ))}
-        </div>
-      )}
+            {filteredHistory.length === 0 ? (
+              <div style={{ fontSize: 12, color: 'var(--text-3)', padding: '12px 0', textAlign: 'center' }}>
+                {activeMonthFilter ? `Нет выписок за период ${activeMonthFilter}` : '—'}
+              </div>
+            ) : (
+              filteredHistory.map(b => (
+                <div
+                  key={b.id}
+                  onClick={() => openHistoryBatch(b)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openHistoryBatch(b); } }}
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    fontSize: 12,
+                    padding: '8px 6px',
+                    borderBottom: '0.5px solid var(--border)',
+                    cursor: 'pointer',
+                    borderRadius: 6,
+                  }}
+                  title="Нажмите, чтобы открыть выписку"
+                >
+                  <span>
+                    <strong>{b.file_name || '—'}</strong> · {b.row_count} {l.rows}
+                  </span>
+                  <span style={{ color: 'var(--text-3)' }}>
+                    {b.status} · {b.imported_count} {l.imported.toLowerCase()} →
+                  </span>
+                </div>
+              ))
+            )}
+          </div>
+        )
+      })()}
     </div>
   )
 }

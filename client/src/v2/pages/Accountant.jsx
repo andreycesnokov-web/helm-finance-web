@@ -506,7 +506,7 @@ function CloseTab({ month, onOpenChatModal }) {
                         <div className="v2-unlinked-banner">
                           <span>⚠️ {t('acct.unlinked.allNoStatement', { n: groupTxs.length })}</span>
                           <Link
-                            to={`/business/bank-import?wallet_id=${encodeURIComponent(walletId)}&month=${encodeURIComponent(selectedMonth)}`}
+                            to={`/business/bank-import?wallet_id=${encodeURIComponent(wId)}&month=${encodeURIComponent(month)}`}
                             className="v2-btn v2-btn-sm v2-btn-primary"
                           >
                             {t('acct.unlinked.uploadStatement')}
@@ -518,7 +518,7 @@ function CloseTab({ month, onOpenChatModal }) {
                         <div className="v2-unlinked-banner">
                           <span>⚠️ {t('acct.unlinked.allUnconfirmed', { n: groupTxs.length })}</span>
                           <Link
-                            to={`/business/bank-import?wallet_id=${encodeURIComponent(walletId)}&month=${encodeURIComponent(selectedMonth)}${diagnosedGroup[0]?.diagnosis?.batch?.id ? `&batchId=${encodeURIComponent(diagnosedGroup[0].diagnosis.batch.id)}` : ''}`}
+                            to={`/business/bank-import?wallet_id=${encodeURIComponent(wId)}&month=${encodeURIComponent(month)}${diagnosedGroup[0]?.diagnosis?.batch?.id ? `&batchId=${encodeURIComponent(diagnosedGroup[0].diagnosis.batch.id)}` : ''}`}
                             className="v2-btn v2-btn-sm v2-btn-secondary"
                           >
                             {t('acct.unlinked.reviewStatement')}
