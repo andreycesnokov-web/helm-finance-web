@@ -8288,12 +8288,75 @@ app.patch('/api/transactions/:id', auth, async (req, res) => {
   if (!canCreateConfirmedFinancialRecord(biz.role))
     return res.status(403).json({ error: 'Your role does not allow editing transactions' });
 
+  const { data: existing, error: existingErr } = await supabase.from('transactions')
+    .select('id, amount_original, currency_original, transaction_date, source, wallet_id, description, business_id')
+    .eq('id', req.params.id)
+    .or(bizOrFilter(biz))
+    .single();
+
+  if (existingErr || !existing) return res.status(404).json({ error: 'Transaction not found' });
+
+  // Boundary check: opening balance financial treatment is protected against any modification of amount, wallet, date, or currency
+  if (existing.source === 'wallet_opening_balance') {
+    if ('amount' in req.body || 'wallet_id' in req.body || 'transaction_date' in req.body || 'date' in req.body || 'currency' in req.body) {
+      return res.status(400).json({
+        error: 'opening_balance_cannot_be_modified',
+        message: 'Opening balance transactions cannot be modified directly',
+      });
+    }
+  }
+
+  // Boundary check: if transaction is created by debt payment, financial fields (amount, wallet, date, currency) must be edited via original bill
+  const { data: linkedDebts } = await supabase.from('debts')
+    .select('id, invoice_number, counterparty')
+    .eq('linked_transaction_id', existing.id)
+    .or(bizOrFilter(biz))
+    .limit(1);
+  if (Array.isArray(linkedDebts) && linkedDebts.length > 0) {
+    if ('amount' in req.body || 'wallet_id' in req.body || 'transaction_date' in req.body || 'date' in req.body || 'currency' in req.body) {
+      return res.status(400).json({
+        error: 'debt_payment_amount_immutable',
+        message: 'Payment financial fields (amount, wallet, date) must be edited through the linked invoice or debt record',
+      });
+    }
+  }
+
   const updates = {};
   if ('category' in req.body) {
     const c = req.body.category;
     if (c !== null && typeof c !== 'string')
       return res.status(400).json({ error: 'category must be a string or null' });
     updates.category = c ? String(c).trim().slice(0, 120) || null : null;
+  }
+  if ('description' in req.body) {
+    const d = req.body.description;
+    if (d !== null && typeof d !== 'string')
+      return res.status(400).json({ error: 'description must be a string or null' });
+    updates.description = d ? String(d).trim().slice(0, 500) || null : null;
+  }
+  if ('wallet_id' in req.body) {
+    const wid = req.body.wallet_id;
+    if (!wid) return res.status(400).json({ error: 'wallet_id cannot be empty' });
+    const { data: w } = await supabase.from('wallets')
+      .select('id, currency')
+      .eq('id', wid)
+      .or(bizOrFilter(biz))
+      .limit(1);
+    if (!w || w.length === 0)
+      return res.status(404).json({ error: 'wallet_not_found', message: 'Target wallet not found in business' });
+    const targetWalletCurrency = (w[0].currency || 'IDR').toUpperCase();
+    const existingCurrency = (existing.currency_original || 'IDR').toUpperCase();
+    if (targetWalletCurrency !== existingCurrency) {
+      return res.status(400).json({
+        error: 'currency_mismatch',
+        message: `Moving transactions between accounts with different currencies (${existingCurrency} -> ${targetWalletCurrency}) is not permitted without conversion`,
+      });
+    }
+    updates.wallet_id = wid;
+  }
+  const dVal = req.body.transaction_date || req.body.date;
+  if (dVal) {
+    updates.transaction_date = dVal;
   }
   if ('amount' in req.body) {
     const a = Number(req.body.amount);
@@ -8303,24 +8366,14 @@ app.patch('/api/transactions/:id', auth, async (req, res) => {
   if ('currency' in req.body) {
     updates.currency_original = String(req.body.currency).toUpperCase().trim();
   }
-  if ('transaction_date' in req.body) {
-    updates.transaction_date = req.body.transaction_date;
-  }
   if ('amount_original' in updates || 'currency_original' in updates || 'transaction_date' in updates) {
-    const { data: existing } = await supabase.from('transactions')
-      .select('amount_original, currency_original, transaction_date')
-      .eq('id', req.params.id)
-      .or(bizOrFilter(biz))
-      .single();
-    if (existing) {
-      const amt = updates.amount_original ?? existing.amount_original;
-      const cur = updates.currency_original ?? existing.currency_original ?? 'IDR';
-      const d = updates.transaction_date ?? existing.transaction_date;
-      const fxRes = await fx.toIdr(amt, cur, d);
-      updates.amount_idr = fxRes.amount_idr;
-      updates.booked_rate = fxRes.booked_rate;
-      updates.rate_source = fxRes.rate_source;
-    }
+    const amt = updates.amount_original ?? existing.amount_original;
+    const cur = updates.currency_original ?? existing.currency_original ?? 'IDR';
+    const d = updates.transaction_date ?? existing.transaction_date;
+    const fxRes = await fx.toIdr(amt, cur, d);
+    updates.amount_idr = fxRes.amount_idr;
+    updates.booked_rate = fxRes.booked_rate;
+    updates.rate_source = fxRes.rate_source;
   }
   if (Object.keys(updates).length === 0)
     return res.status(400).json({ error: 'No editable fields provided' });

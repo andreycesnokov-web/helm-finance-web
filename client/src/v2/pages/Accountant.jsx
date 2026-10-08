@@ -16,11 +16,12 @@ import I from '../icons'
 import { PageHead, Card, Pill, Btn, NotYet, Skeleton, ErrorBox, Empty } from '../ui'
 import { useT, useLang } from '../i18n'
 import { useApi } from '../data'
-import { monthOptions, accountantMonth, closeReadiness, packages, packageSummary, monthGrid, complianceEvents, eventStage, packageExportData, createAccountantZipPackage, dedupeDocumentLinks } from '../lib/accounting'
+import { monthOptions, accountantMonth, closeReadiness, packages, packageSummary, monthGrid, complianceEvents, eventStage, packageExportData, createAccountantZipPackage, dedupeDocumentLinks, determineUnreconciledReason } from '../lib/accounting'
 import { apiFetch } from '../../lib/api'
 import { money } from '../lib/format'
 import { askAccountant } from '../lib/ask'
 import AccountantTabs from '../components/AccountantTabs'
+import UnreconciledTxDrawer from '../components/UnreconciledTxDrawer'
 import { findWithholdingRule } from '../../pages/business/InvoiceReviewDrawer'
 import TaxKnowledgeCard from '../../components/TaxKnowledgeCard'
 import { listTaxCards, getTaxCard, matchTopicId } from '../../lib/taxKnowledgeFixtures'
@@ -164,10 +165,14 @@ function CloseTab({ month, onOpenChatModal }) {
   const [exportLang, setExportLang] = useState('id')
   const [exporting, setExporting] = useState(false)
   const [exportError, setExportError] = useState(null)
+  const [selectedTxId, setSelectedTxId] = useState(null)
+  const [expandedReasons, setExpandedReasons] = useState({})
   const exportControllerRef = useRef(null)
 
   useEffect(() => {
     setAskQuery('')
+    setSelectedTxId(null)
+    setExpandedReasons({})
   }, [active?.id, scopeKey])
 
   useEffect(() => {
@@ -177,12 +182,15 @@ function CloseTab({ month, onOpenChatModal }) {
     }
     setExporting(false)
     setExportError(null)
+    setSelectedTxId(null)
+    setExpandedReasons({})
   }, [active?.id, month])
   const tx = useApi('/transactions?period=all')
   const debts = useApi('/debts')
   const batches = useApi('/bank-import/batches')
   const wallets = useApi('/wallets')
   const docs = useApi('/documents')
+  const categories = useApi('/cashflow-categories')
   const summary = useApi('/accountant/summary')
   const taxCardsApi = useApi(`/accountant/tax-knowledge/cards?lang=${lang}`)
 
@@ -240,6 +248,12 @@ function CloseTab({ month, onOpenChatModal }) {
     batches: batches.data?.batches || [],
     wallets: wallets.data?.wallets || [],
   }), [month, tx.data, enrichedDebts, batches.data, wallets.data])
+
+  const selectedTx = useMemo(() => {
+    if (!selectedTxId || !r.unlinked_transactions) return null
+    return r.unlinked_transactions.find((ut) => String(ut.id) === String(selectedTxId)) || null
+  }, [selectedTxId, r.unlinked_transactions])
+
   if (tx.loading || debts.loading) return <Card><Skeleton rows={6} /></Card>
   if (tx.error) return <ErrorBox error={tx.error} onRetry={tx.reload} />
   const events = complianceEvents(summary.data)
@@ -408,42 +422,204 @@ function CloseTab({ month, onOpenChatModal }) {
             </li>
           </ul>
         </Card>
-        {r.unlinked_transactions?.length > 0 && (
-          <Card
-            title={
-              <span style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#DC2626' }}>
-                <I.warn size={16} />
-                <span>{lang === 'ru' ? 'Несверенные банковские операции' : lang === 'id' ? 'Transaksi Bank Belum Terekonsiliasi' : 'Unreconciled Bank Transactions'} ({r.unlinked_transactions.length})</span>
-              </span>
+        {r.unlinked_transactions?.length > 0 && (() => {
+          // Group unreconciled transactions by wallet
+          const walletGroupsMap = new Map()
+          for (const ut of r.unlinked_transactions) {
+            const wId = String(ut.wallet_id || 'unassigned')
+            if (!walletGroupsMap.has(wId)) {
+              walletGroupsMap.set(wId, [])
             }
-          >
-            <p className="v2-muted v2-small" style={{ margin: '0 0 10px' }}>
-              {lang === 'ru' ? 'Операции присутствуют в учёте, но отсутствуют в подтверждённой банковской выписке за этот период:'
-                : lang === 'id' ? 'Transaksi ada di pembukuan tetapi tidak tercantum dalam mutasi rekening periode ini:'
-                : 'Transactions exist in the ledger but are missing from the confirmed bank statement for this period:'}
-            </p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {r.unlinked_transactions.map((ut) => {
-                const wName = (wallets.data?.wallets || []).find((w) => String(w.id) === String(ut.wallet_id))?.name || 'Bank'
-                const isIncome = ut.type === 'income' || ut.type === 'cash_in'
-                return (
-                  <div key={ut.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', background: '#FEF2F2', border: '1px solid #FCA5A5', borderRadius: 6, fontSize: 13 }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <span style={{ fontWeight: 600 }}>{ut.description || (isIncome ? 'Доход' : 'Расход')}</span>
-                        <Pill tone={isIncome ? 'good' : 'warn'}>{isIncome ? (lang === 'ru' ? 'Приход' : 'Income') : (lang === 'ru' ? 'Расход' : 'Expense')}</Pill>
+            walletGroupsMap.get(wId).push(ut)
+          }
+
+          const toggleReason = (txId) => {
+            setExpandedReasons((prev) => ({
+              ...prev,
+              [txId]: !prev[txId],
+            }))
+          }
+
+          const badgeKeyForReason = (code) => {
+            switch (code) {
+              case 'no_statement': return 'acct.unlinked.badgeNoStatement'
+              case 'statement_unconfirmed': return 'acct.unlinked.badgeUnconfirmed'
+              case 'no_match': return 'acct.unlinked.badgeNoMatch'
+              default: return 'acct.unlinked.badgeClarification'
+            }
+          }
+
+          const badgeToneForReason = (code) => {
+            switch (code) {
+              case 'no_statement': return 'crit'
+              case 'statement_unconfirmed': return 'warn'
+              case 'no_match': return 'warn'
+              default: return 'neutral'
+            }
+          }
+
+          return (
+            <Card
+              title={
+                <span style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#DC2626' }}>
+                  <I.warn size={16} />
+                  <span>{t('acct.unlinked.title')} ({r.unlinked_transactions.length})</span>
+                </span>
+              }
+            >
+              <p className="v2-muted v2-small" style={{ margin: '0 0 12px' }}>
+                {t('acct.unlinked.sub')}
+              </p>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                {Array.from(walletGroupsMap.entries()).map(([wId, groupTxs]) => {
+                  const walletObj = (wallets.data?.wallets || []).find((w) => String(w.id) === String(wId))
+                  const wName = walletObj?.name || (wId === 'unassigned' ? t('acct.unlinked.unknownAccount') : 'Bank')
+                  const wCurrency = walletObj?.currency || groupTxs[0]?.currency || 'IDR'
+
+                  // Check if all in group share no_statement or statement_unconfirmed
+                  const diagnosedGroup = groupTxs.map((gt) => ({
+                    tx: gt,
+                    diagnosis: determineUnreconciledReason({
+                      tx: gt,
+                      month,
+                      wallet: walletObj,
+                      batches: batches.data?.batches || [],
+                    }),
+                  }))
+
+                  const allNoStatement = diagnosedGroup.length > 0 && diagnosedGroup.every((d) => d.diagnosis.reason === 'no_statement')
+                  const allUnconfirmed = diagnosedGroup.length > 0 && diagnosedGroup.every((d) => d.diagnosis.reason === 'statement_unconfirmed')
+
+                  return (
+                    <div key={wId} className="v2-unlinked-group">
+                      <div className="v2-unlinked-group-head">
+                        <span className="v2-unlinked-group-title">
+                          🏦 {wName} <span className="v2-muted v2-small">({groupTxs.length})</span>
+                        </span>
+                        {walletObj?.type && (
+                          <Pill tone="neutral">{walletObj.type}</Pill>
+                        )}
                       </div>
-                      <span className="v2-muted v2-small">{ut.date} · {wName}</span>
+
+                      {allNoStatement && (
+                        <div className="v2-unlinked-banner">
+                          <span>⚠️ {t('acct.unlinked.allNoStatement', { n: groupTxs.length })}</span>
+                          <Link
+                            to={`/business/bank-import?wallet_id=${encodeURIComponent(wId)}&month=${encodeURIComponent(month)}`}
+                            className="v2-btn v2-btn-sm v2-btn-primary"
+                          >
+                            {t('acct.unlinked.uploadStatement')}
+                          </Link>
+                        </div>
+                      )}
+
+                      {!allNoStatement && allUnconfirmed && (
+                        <div className="v2-unlinked-banner">
+                          <span>⚠️ {t('acct.unlinked.allUnconfirmed', { n: groupTxs.length })}</span>
+                          <Link
+                            to={`/business/bank-import?wallet_id=${encodeURIComponent(wId)}&month=${encodeURIComponent(month)}${diagnosedGroup[0]?.diagnosis?.batch?.id ? `&batchId=${encodeURIComponent(diagnosedGroup[0].diagnosis.batch.id)}` : ''}`}
+                            className="v2-btn v2-btn-sm v2-btn-secondary"
+                          >
+                            {t('acct.unlinked.reviewStatement')}
+                          </Link>
+                        </div>
+                      )}
+
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        {diagnosedGroup.map(({ tx: ut, diagnosis }) => {
+                          const isIncome = ut.type === 'income' || ut.type === 'cash_in'
+                          const isExpanded = !!expandedReasons[ut.id]
+                          const reasonText = t(diagnosis.reasonKey, diagnosis.params)
+
+                          return (
+                            <div
+                              key={ut.id}
+                              className="v2-unlinked-item"
+                              role="button"
+                              tabIndex={0}
+                              onClick={(e) => {
+                                // Don't trigger drawer if clicking reason toggle or button
+                                if (e.target.closest('.v2-reason-toggle') || e.target.closest('button') || e.target.closest('a')) return
+                                setSelectedTxId(ut.id)
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                  if (e.target.closest('.v2-reason-toggle') || e.target.closest('button') || e.target.closest('a')) return
+                                  e.preventDefault()
+                                  setSelectedTxId(ut.id)
+                                }
+                              }}
+                              aria-label={`${ut.description || (isIncome ? 'Income' : 'Expense')}, ${money(ut.amount, ut.currency)}`}
+                            >
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                                    <span style={{ fontWeight: 600 }}>{ut.description || (isIncome ? t('tx.k.in') : t('tx.k.out'))}</span>
+                                    <Pill tone={isIncome ? 'good' : 'warn'}>
+                                      {isIncome ? t('tx.k.in') : t('tx.k.out')}
+                                    </Pill>
+                                    <button
+                                      type="button"
+                                      className="v2-reason-toggle"
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        toggleReason(ut.id)
+                                      }}
+                                      aria-expanded={isExpanded}
+                                      aria-label={t('acct.unlinked.toggleExplanation')}
+                                    >
+                                      <span>⚠️</span>
+                                      <Pill tone={badgeToneForReason(diagnosis.reason)}>
+                                        {t(badgeKeyForReason(diagnosis.reason))}
+                                      </Pill>
+                                    </button>
+                                  </div>
+                                  <span className="v2-muted v2-small">
+                                    {ut.date} {ut.category ? `· ${ut.category}` : ''}
+                                  </span>
+                                </div>
+
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
+                                  <span style={{ fontWeight: 700, fontSize: 14, color: isIncome ? '#059669' : '#DC2626' }}>
+                                    {isIncome ? '+' : '−'}{money(ut.amount, ut.currency)}
+                                  </span>
+                                  <Btn
+                                    size="sm"
+                                    tone="secondary"
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      setSelectedTxId(ut.id)
+                                    }}
+                                  >
+                                    {t('acct.unlinked.reviewBtn')}
+                                  </Btn>
+                                </div>
+                              </div>
+
+                              {isExpanded && (
+                                <div className="v2-reason-detail-box" onClick={(e) => e.stopPropagation()}>
+                                  <p style={{ margin: 0, fontWeight: 500 }}>{reasonText}</p>
+                                  {diagnosis.actionRoute && (
+                                    <div style={{ marginTop: 8 }}>
+                                      <Link to={diagnosis.actionRoute} className="v2-btn v2-btn-sm v2-btn-primary">
+                                        {t(diagnosis.actionLabelKey)}
+                                      </Link>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          )
+                        })}
+                      </div>
                     </div>
-                    <span style={{ fontWeight: 600, color: isIncome ? '#059669' : '#DC2626' }}>
-                      {isIncome ? '+' : '−'}{money(ut.amount, ut.currency)}
-                    </span>
-                  </div>
-                )
-              })}
-            </div>
-          </Card>
-        )}
+                  )
+                })}
+              </div>
+            </Card>
+          )
+        })()}
       </div>
       <div className="v2-col">
         <Card title={t('acct.taxesDue', { m: monthLabel(next, lang) })} aside={<Link to="/business/accountant?tab=taxes">{t('acct.fullCalendar')}</Link>}>
@@ -517,6 +693,34 @@ function CloseTab({ month, onOpenChatModal }) {
           )}
         </Card>
       </div>
+
+      {selectedTx && (
+        <UnreconciledTxDrawer
+          tx={selectedTx}
+          month={month}
+          activeBusinessId={active?.id}
+          scopeKey={scopeKey}
+          wallets={wallets.data?.wallets || []}
+          batches={batches.data?.batches || []}
+          debts={enrichedDebts}
+          docs={Array.isArray(docs.data?.documents) ? docs.data.documents : []}
+          categories={Array.isArray(categories.data) ? categories.data : []}
+          token={token}
+          onClose={() => setSelectedTxId(null)}
+          onSaved={(updated) => {
+            if (typeof window !== 'undefined' && typeof window.__onDrawerSaved === 'function') {
+              window.__onDrawerSaved(updated)
+            }
+          }}
+          onTxUpdated={(updated) => {
+            if (typeof window !== 'undefined' && typeof window.__onDrawerTxUpdated === 'function') {
+              window.__onDrawerTxUpdated(updated)
+            }
+            tx.reload()
+            summary.reload()
+          }}
+        />
+      )}
     </div>
   )
 }
