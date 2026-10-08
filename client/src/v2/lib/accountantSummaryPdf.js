@@ -269,6 +269,26 @@ function formatMoney(amount, currency = 'IDR') {
 }
 
 /**
+ * Resolves localized reason for unavailable files (statement or document originals).
+ */
+export function resolveUnavailableReason(rawReason, lang = 'ru') {
+  const t = I18N[lang] || I18N.ru
+  const s = String(rawReason || '')
+  if (s.includes('Original bank statement file is unavailable') || s.includes('bank statement file is unavailable')) {
+    return t.reasonStatementUnavailable
+  }
+  if (s.includes('Original file could not be retrieved') || s.includes('authorized storage')) {
+    return t.reasonDocumentUnavailable
+  }
+  if (s.includes('decode') || s.includes('base64')) {
+    return t.reasonDecodeFailed
+  }
+  return s
+}
+
+export { I18N }
+
+/**
  * Builds and returns a Uint8Array containing accountant-summary.pdf.
  * Formatted from the exact snapshot of summary.json and discrepancies.json.
  */
@@ -656,15 +676,7 @@ export async function generateAccountantSummaryPdf({
                   { text: t.unavailableFilesTitle, bold: true, fontSize: 9, color: '#991b1b', margin: [0, 2, 0, 2] },
                   {
                     ul: unavailableFiles.map((uf) => {
-                      const rawReason = String(uf.reason || '')
-                      let localizedReason = rawReason
-                      if (rawReason.includes('Original bank statement file is unavailable') || rawReason.includes('bank statement file is unavailable')) {
-                        localizedReason = t.reasonStatementUnavailable
-                      } else if (rawReason.includes('Original file could not be retrieved') || rawReason.includes('authorized storage')) {
-                        localizedReason = t.reasonDocumentUnavailable
-                      } else if (rawReason.includes('decode') || rawReason.includes('base64')) {
-                        localizedReason = t.reasonDecodeFailed
-                      }
+                      const localizedReason = resolveUnavailableReason(uf.reason, lang)
                       const name = uf.file_name || String(uf.document_id || uf.batch_id || 'document')
                       return { text: `${name}: ${localizedReason}`, fontSize: 8.5, color: '#1e293b' }
                     }),

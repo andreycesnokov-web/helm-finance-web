@@ -401,22 +401,69 @@ const MONTH = '2026-09';
 
 // ── Test 10: Localization of Unavailable File Reasons in accountantSummaryPdf (RU, EN, ID) ─
 {
-  const { generateAccountantSummaryPdf } = await import('../client/src/v2/lib/accountantSummaryPdf.js');
+  const { generateAccountantSummaryPdf, resolveUnavailableReason, I18N } = await import('../client/src/v2/lib/accountantSummaryPdf.js');
+
+  const rawStatementReason = 'Original bank statement file is unavailable or could not be retrieved from storage';
+  const rawDocumentReason = 'Original file could not be retrieved from authorized storage or signed URL was unavailable';
+
+  // 1. Direct deterministic assertion on exact localized strings for RU
+  const ruStatementResolved = resolveUnavailableReason(rawStatementReason, 'ru');
+  const ruDocumentResolved = resolveUnavailableReason(rawDocumentReason, 'ru');
+  ok(
+    'RU exact statement reason matches required string',
+    ruStatementResolved === 'Оригинал банковской выписки недоступен или не удалось скачать его из хранилища'
+  );
+  ok(
+    'RU exact document reason matches dictionary',
+    ruDocumentResolved === 'Оригинал документа недоступен или не удалось скачать его из хранилища'
+  );
+  ok('RU dictionary string matches', I18N.ru.reasonStatementUnavailable === 'Оригинал банковской выписки недоступен или не удалось скачать его из хранилища');
+
+  // 2. Direct deterministic assertion on exact localized strings for EN
+  const enStatementResolved = resolveUnavailableReason(rawStatementReason, 'en');
+  const enDocumentResolved = resolveUnavailableReason(rawDocumentReason, 'en');
+  ok(
+    'EN exact statement reason matches expected text',
+    enStatementResolved === 'Original bank statement file is unavailable or could not be retrieved from storage'
+  );
+  ok(
+    'EN exact document reason matches expected text',
+    enDocumentResolved === 'Original file could not be retrieved from authorized storage or signed URL was unavailable'
+  );
+
+  // 3. Direct deterministic assertion on exact localized strings for ID
+  const idStatementResolved = resolveUnavailableReason(rawStatementReason, 'id');
+  const idDocumentResolved = resolveUnavailableReason(rawDocumentReason, 'id');
+  ok(
+    'ID exact statement reason matches expected text',
+    idStatementResolved === 'Berkas asli rekening koran tidak tersedia atau gagal diunduh dari penyimpanan'
+  );
+  ok(
+    'ID exact document reason matches expected text',
+    idDocumentResolved === 'Berkas asli tidak dapat diambil dari penyimpanan resmi atau tautan unduhan tidak tersedia'
+  );
+
+  // 4. Verify unknown reason fallback passes through raw diagnostic string
+  const customDiagnostic = 'Custom network timeout error code 504';
+  ok(
+    'Unknown raw diagnostic reason is preserved as-is',
+    resolveUnavailableReason(customDiagnostic, 'ru') === customDiagnostic
+  );
 
   const testUnavailableFiles = [
     {
       file_name: 'bca_september_2026_missing.csv',
       batch_id: 'b-missing',
-      reason: 'Original bank statement file is unavailable or could not be retrieved from storage',
+      reason: rawStatementReason,
     },
     {
       file_name: 'invoice_unreachable.pdf',
       document_id: 'doc-unreachable',
-      reason: 'Original file could not be retrieved from authorized storage or signed URL was unavailable',
+      reason: rawDocumentReason,
     },
   ];
 
-  // Test RU
+  // Test RU PDF generation
   const pdfBytesRu = await generateAccountantSummaryPdf({
     summary: { company_name: 'PT Test RU', month: '2026-09', business_id: BIZ_ID, readiness: { status: 'in_progress', is_closed: false, score: 50, checks: [] } },
     discrepancies: { unavailable_files: testUnavailableFiles, unlinked_transactions: [], unreconciled_statements: [], bills_without_documents: [], limitations: [] },
@@ -425,7 +472,7 @@ const MONTH = '2026-09';
   });
   ok('Unavailable reasons RU: generates PDF bytes', pdfBytesRu instanceof Uint8Array && pdfBytesRu.length > 1000);
 
-  // Test EN
+  // Test EN PDF generation
   const pdfBytesEn = await generateAccountantSummaryPdf({
     summary: { company_name: 'PT Test EN', month: '2026-09', business_id: BIZ_ID, readiness: { status: 'in_progress', is_closed: false, score: 50, checks: [] } },
     discrepancies: { unavailable_files: testUnavailableFiles, unlinked_transactions: [], unreconciled_statements: [], bills_without_documents: [], limitations: [] },
@@ -434,7 +481,7 @@ const MONTH = '2026-09';
   });
   ok('Unavailable reasons EN: generates PDF bytes', pdfBytesEn instanceof Uint8Array && pdfBytesEn.length > 1000);
 
-  // Test ID
+  // Test ID PDF generation
   const pdfBytesId = await generateAccountantSummaryPdf({
     summary: { company_name: 'PT Test ID', month: '2026-09', business_id: BIZ_ID, readiness: { status: 'in_progress', is_closed: false, score: 50, checks: [] } },
     discrepancies: { unavailable_files: testUnavailableFiles, unlinked_transactions: [], unreconciled_statements: [], bills_without_documents: [], limitations: [] },
@@ -443,7 +490,7 @@ const MONTH = '2026-09';
   });
   ok('Unavailable reasons ID: generates PDF bytes', pdfBytesId instanceof Uint8Array && pdfBytesId.length > 1000);
 
-  // End-to-end package generation with unavailable statement asserting raw machine reason in JSON
+  // 5. End-to-end package generation with unavailable statement: assert raw machine reason in JSON
   const pkgWithUnavailable = await createAccountantZipPackage({
     month: MONTH,
     companyName: 'PT Solusi Utama',
@@ -459,14 +506,20 @@ const MONTH = '2026-09';
         document_id: 'doc-missing',
       },
     ],
-    documents: [], // triggers unavailable
+    documents: [], // triggers unavailable statement
     lang: 'ru',
   });
 
-  ok('E2E package RU: JSON preserves raw diagnostic reason', pkgWithUnavailable.discrepancies.unavailable_files[0].reason.includes('Original bank statement file is unavailable'));
+  ok(
+    'E2E package RU: JSON preserves raw diagnostic reason untouched',
+    pkgWithUnavailable.discrepancies.unavailable_files[0].reason === 'Original bank statement file is unavailable or could not be retrieved from storage'
+  );
+  ok('E2E package RU: summary.files_available is false', pkgWithUnavailable.summary.files_available === false);
+  ok('E2E package RU: discrepancies.files_available is false', pkgWithUnavailable.discrepancies.files_available === false);
   ok('E2E package RU: PDF bytes generated with unavailable statement', pkgWithUnavailable.summaryPdfBytes instanceof Uint8Array && pkgWithUnavailable.summaryPdfBytes.length > 1000);
 }
 
 console.log(`\nACCOUNTANT EXPORT TESTS: ${pass} passed, ${fail} failed`);
 if (fail > 0) process.exit(1);
+
 
