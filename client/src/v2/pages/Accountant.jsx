@@ -162,6 +162,7 @@ function CloseTab({ month, onOpenChatModal }) {
   const { token } = useAuth()
   const [askQuery, setAskQuery] = useState('')
   const [exporting, setExporting] = useState(false)
+  const [exportError, setExportError] = useState(null)
   const exportControllerRef = useRef(null)
 
   useEffect(() => {
@@ -174,6 +175,7 @@ function CloseTab({ month, onOpenChatModal }) {
       exportControllerRef.current = null
     }
     setExporting(false)
+    setExportError(null)
   }, [active?.id, month])
   const tx = useApi('/transactions?period=all')
   const debts = useApi('/debts')
@@ -247,6 +249,72 @@ function CloseTab({ month, onOpenChatModal }) {
   const left = r.checks.filter((c) => !c.done)
 
 
+  const reconCheck = r.checks.find((c) => c.key === 'reconciliation')
+  const statementsCheck = r.checks.find((c) => c.key === 'statements')
+  const bankReconPending = (reconCheck && !reconCheck.done) || (statementsCheck && !statementsCheck.done)
+
+  const handleDownload = async () => {
+    if (exportControllerRef.current) {
+      exportControllerRef.current.abort()
+    }
+    const controller = new AbortController()
+    exportControllerRef.current = controller
+    const currentBizId = active?.id
+    const currentMonth = month
+
+    setExporting(true)
+    setExportError(null)
+    try {
+      const rawDocs = Array.isArray(docs.data?.documents) ? docs.data.documents : []
+      const companyName = active?.name || 'Company'
+      const res = await createAccountantZipPackage({
+        month: currentMonth,
+        companyName,
+        businessId: currentBizId,
+        transactions: Array.isArray(tx.data) ? tx.data : [],
+        debts: enrichedDebts,
+        batches: batches.data?.batches || [],
+        wallets: wallets.data?.wallets || [],
+        documents: rawDocs,
+        token,
+        lang,
+        signal: controller.signal,
+        fetchSignedUrl: async (docId, mode = 'download', bizId, sig) => {
+          const resp = await apiFetch(`/documents/${docId}/signed-url`, token, {
+            method: 'POST',
+            headers: (bizId || currentBizId) ? { 'x-business-id': String(bizId || currentBizId) } : {},
+            body: { mode },
+            signal: sig || controller.signal,
+          })
+          return resp?.url || null
+        },
+      })
+
+      if (controller.signal.aborted) return
+      if (active?.id !== currentBizId || month !== currentMonth) return
+      if (!res?.zipBytes) return
+
+      const blob = new Blob([res.zipBytes], { type: 'application/zip' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = res.filename
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      if (err.name === 'AbortError' || controller.signal.aborted) return
+      console.error('Accountant export failed:', err)
+      setExportError(err.message || 'Export error')
+    } finally {
+      if (exportControllerRef.current === controller) {
+        exportControllerRef.current = null
+        setExporting(false)
+      }
+    }
+  }
+
   return (
     <div className="v2-grid-detail">
       <div className="v2-col">
@@ -258,11 +326,15 @@ function CloseTab({ month, onOpenChatModal }) {
                 ? t('acct.noRecords')
                 : left.length === 0
                 ? (r.is_closed ? t('acct.closed') : t('acct.preparedForReview'))
+                : (r.percent === 100 && bankReconPending)
+                ? t('acct.reconciliationRequired')
                 : t('acct.almost', { n: r.percent, k: left.length })}
             </h2>
             <p className="v2-hero-p v2-show">
               {left.length === 0 && !r.is_closed
                 ? t('acct.awaitingAccountantSignoff', { n: r.complete, m: r.records })
+                : (r.percent === 100 && bankReconPending)
+                ? t('acct.recordCompletenessDetails', { pct: 100, done: r.checks.length - left.length, total: r.checks.length })
                 : t('acct.recordsComplete', { n: r.complete, m: r.records })}
             </p>
             <div className="v2-row-gap v2-row-start">
@@ -271,68 +343,24 @@ function CloseTab({ month, onOpenChatModal }) {
                 type="button"
                 className="v2-btn v2-btn-secondary"
                 disabled={exporting}
-                onClick={async () => {
-                  if (exportControllerRef.current) {
-                    exportControllerRef.current.abort()
-                  }
-                  const controller = new AbortController()
-                  exportControllerRef.current = controller
-                  const currentBizId = active?.id
-                  const currentMonth = month
-
-                  setExporting(true)
-                  try {
-                    const rawDocs = Array.isArray(docs.data?.documents) ? docs.data.documents : []
-                    const companyName = active?.name || 'Company'
-                    const res = await createAccountantZipPackage({
-                      month: currentMonth,
-                      companyName,
-                      businessId: currentBizId,
-                      transactions: Array.isArray(tx.data) ? tx.data : [],
-                      debts: enrichedDebts,
-                      batches: batches.data?.batches || [],
-                      wallets: wallets.data?.wallets || [],
-                      documents: rawDocs,
-                      token,
-                      signal: controller.signal,
-                      fetchSignedUrl: async (docId, mode = 'download', bizId, sig) => {
-                        const resp = await apiFetch(`/documents/${docId}/signed-url`, token, {
-                          method: 'POST',
-                          headers: (bizId || currentBizId) ? { 'x-business-id': String(bizId || currentBizId) } : {},
-                          body: { mode },
-                          signal: sig || controller.signal,
-                        })
-                        return resp?.url || null
-                      },
-                    })
-
-                    if (controller.signal.aborted) return
-                    if (active?.id !== currentBizId || month !== currentMonth) return
-                    if (!res?.zipBytes) return
-
-                    const blob = new Blob([res.zipBytes], { type: 'application/zip' })
-                    const url = URL.createObjectURL(blob)
-                    const a = document.createElement('a')
-                    a.href = url
-                    a.download = res.filename
-                    document.body.appendChild(a)
-                    a.click()
-                    document.body.removeChild(a)
-                    URL.revokeObjectURL(url)
-                  } catch (err) {
-                    if (err.name === 'AbortError' || controller.signal.aborted) return
-                    console.error('Accountant export failed:', err)
-                  } finally {
-                    if (exportControllerRef.current === controller) {
-                      exportControllerRef.current = null
-                      setExporting(false)
-                    }
-                  }
-                }}
+                onClick={handleDownload}
               >
                 {exporting ? '…' : t('acct.download')}
               </button>
             </div>
+            {exportError && (
+              <div style={{ marginTop: 12, padding: '8px 12px', background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 8, fontSize: 13, color: '#991B1B', display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span>⚠️ {t('acct.exportError')}</span>
+                <button
+                  type="button"
+                  className="v2-btn v2-btn-ghost v2-btn-sm"
+                  style={{ textDecoration: 'underline', cursor: 'pointer', padding: 0 }}
+                  onClick={handleDownload}
+                >
+                  {t('acct.exportRetry')}
+                </button>
+              </div>
+            )}
             {left.length > 0 && (
               <div style={{ marginTop: 12, padding: '8px 12px', background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: 8, fontSize: 12, color: '#92400E' }}>
                 ⚠️ {t('acct.incompleteDownloadWarning', { k: left.length })}

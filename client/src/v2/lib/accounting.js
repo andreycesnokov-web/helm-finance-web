@@ -473,6 +473,7 @@ export function packageExportData({ month, companyName = '', businessId = '', tr
       automated_checks_passed: readiness.automated_checks_passed,
       status: readiness.status,
       bank_reconciliation_status: readiness.banks.reconciled === readiness.banks.total && readiness.banks.total > 0 ? 'reconciled' : 'unreconciled',
+      checks: readiness.checks,
     },
     bank_accounts: {
       total_banks: readiness.banks.total,
@@ -518,6 +519,7 @@ export async function createAccountantZipPackage({
   token = null,
   fetchSignedUrl = null,
   signal = null,
+  lang = 'ru',
 }) {
   if (signal?.aborted) {
     const err = new Error('Export aborted')
@@ -830,6 +832,20 @@ export async function createAccountantZipPackage({
   filesToZip.push({ name: 'discrepancies.json', data: JSON.stringify(discrepancies, null, 2) })
   filesToZip.push({ name: 'records_registry.json', data: JSON.stringify(exportData.records_registry, null, 2) })
 
+  // Dynamically import PDF generator on demand (code-splitting)
+  const { generateAccountantSummaryPdf } = await import('./accountantSummaryPdf.js')
+
+  // Generate accountant-summary.pdf from the exact same snapshot
+  const summaryPdfBytes = await generateAccountantSummaryPdf({
+    summary,
+    discrepancies,
+    recordsRegistry: exportData.records_registry,
+    attachedFiles: filesToZip,
+    wallets,
+    lang,
+  })
+  filesToZip.push({ name: 'accountant-summary.pdf', data: summaryPdfBytes })
+
   const zipBytes = createZip(filesToZip)
   const safeComp = (companyName || 'company').replace(/[^a-zA-Z0-9_-]/g, '_')
   const filename = `accountant-package-${safeComp}-${month}.zip`
@@ -843,6 +859,7 @@ export async function createAccountantZipPackage({
     unavailableFiles,
     filesAvailable,
     isComplete,
+    summaryPdfBytes,
   }
 }
 
