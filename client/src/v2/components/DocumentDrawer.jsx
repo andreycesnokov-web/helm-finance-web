@@ -15,7 +15,8 @@ import { previewKind } from '../../lib/documentPreview'
 import { useT, useLang } from '../i18n'
 import { money, shortDate } from '../lib/format'
 import { detailPath } from '../pages/Bills'
-import { documentFileUrl, updateDocument, linkDocument, unlinkDocument, archiveDocument, confirmDocumentKind } from '../lib/actions'
+import { FILING_MODES, FILING_REASONS, filingText } from '../lib/obligations'
+import { documentFileUrl, updateDocument, linkDocument, unlinkDocument, archiveDocument, confirmDocumentKind, fileDocument } from '../lib/actions'
 import { VAULT_TYPES, vaultVerdictOf } from '../../pages/business/companyVault'
 
 // The CHECK-valid document_type values (migration 031 / server/lib/documentValidation.js).
@@ -39,7 +40,7 @@ export function txLabel(tx, lang) {
     tx.description || tx.category].filter(Boolean).join(' · ')
 }
 
-export default function DocumentDrawer({ doc, debts = [], transactions = [], onClose, onChanged }) {
+export default function DocumentDrawer({ doc, debts = [], transactions = [], wallets = [], counterparties = [], onClose, onChanged }) {
   const t = useT()
   const lang = useLang()
   const { token } = useAuth()
@@ -55,6 +56,8 @@ export default function DocumentDrawer({ doc, debts = [], transactions = [], onC
   const [target, setTarget] = useState('')
   const [kind, setKind] = useState('')
   const [sheetText, setSheetText] = useState(undefined)
+  const [mode, setMode] = useState('record')
+  const [fl, setFl] = useState({ wallet_id: '', period: '', counterparty_id: '', reason: 'other' })
 
   useEffect(() => {
     setForm({
@@ -64,6 +67,11 @@ export default function DocumentDrawer({ doc, debts = [], transactions = [], onC
       amount: doc?.gross_amount != null ? String(doc.gross_amount) : '',
     })
     setErr(null); setNote(null); setFileErr(null); setTarget(''); setSheetText(undefined)
+    const f = doc?.extracted_json?.filing
+    const intake = doc?.extracted_json?.ai_intake?.doc_type
+    setMode(f?.kind === 'bank_account_period' || (!f && (doc?.document_type === 'bank_document' || intake === 'bank_statement')) ? 'bank'
+      : f?.kind === 'counterparty' ? 'counterparty' : f?.kind === 'keep' ? 'keep' : 'record')
+    setFl({ wallet_id: f?.wallet_id || '', period: f?.period || (doc?.period_start ? String(doc.period_start).slice(0, 7) : ''), counterparty_id: f?.counterparty_id || '', reason: f?.reason || 'other' })
     setKind(vaultVerdictOf(doc)?.docType || '')
   }, [doc?.id]) // eslint-disable-line react-hooks/exhaustive-deps -- a reload of the same document keeps the form and the note
 
@@ -86,6 +94,7 @@ export default function DocumentDrawer({ doc, debts = [], transactions = [], onC
   const debtsById = useMemo(() => new Map(debts.map((d) => [String(d.id), d])), [debts])
   const txById = useMemo(() => new Map(transactions.map((x) => [String(x.id), x])), [transactions])
   const links = doc?.links || []
+  const filing = doc?.extracted_json?.filing || null
   const linkedKeys = new Set(links.map((l) => `${l.target_type}:${l.target_id}`))
   // Same amount first, then the most recent — the likely match is at the top of the list.
   const docAmount = doc?.gross_amount != null ? Number(doc.gross_amount) : null
@@ -165,6 +174,7 @@ export default function DocumentDrawer({ doc, debts = [], transactions = [], onC
           <div className="v2-docmodal-side">
             <DocumentIdentity doc={doc} sheetText={sheetText} waitForSheet={previewKind(doc.file || {}) === 'sheet'}
               onApplied={({ vault }) => { onChanged?.(); if (vault) onClose?.() }} />
+
           {err && <p className="v2-inline-err" role="alert">{err}</p>}
           {note && <p className="v2-sec" role="status">{note}</p>}
 
@@ -204,7 +214,7 @@ export default function DocumentDrawer({ doc, debts = [], transactions = [], onC
 
               <section className="v2-card v2-docdrawer-sec">
                 <h3 className="v2-h3">{t('docs.dr.links')}</h3>
-                {links.length === 0 ? <p className="v2-muted v2-small">{t('docs.dr.noLinks')}</p> : (
+                {links.length === 0 && !filing ? <p className="v2-muted v2-small">{t('docs.dr.noLinks')}</p> : links.length === 0 ? null : (
                   <ul className="v2-doclinks">
                     {links.map((l) => {
                       const x = linkText(l)
@@ -219,19 +229,74 @@ export default function DocumentDrawer({ doc, debts = [], transactions = [], onC
                     })}
                   </ul>
                 )}
-                <label className="v2-field"><span className="v2-field-label">{t('docs.dr.linkTo')}{docAmount != null ? ` · ${t('docs.dr.byAmount')}` : ''}</span>
-                  <select className="v2-select" value={target} disabled={busy} onChange={(e) => setTarget(e.target.value)} aria-label={t('docs.dr.linkTo')}>
-                    <option value="">{t('docs.dr.choose')}</option>
-                    {debtOptions.length > 0 && <optgroup label={t('docs.dr.linkBill')}>
-                      {debtOptions.map((d) => <option key={d.id} value={`debt:${d.id}`}>
-                        {[t(`docs.linkedTo.${d.type === 'receivable' ? 'receivable' : 'payable'}`, { who: d.counterparty || t('bills.noName') }), money(amt(d)), d.due_date ? shortDate(d.due_date, lang) : null].filter(Boolean).join(' · ')}
-                      </option>)}
-                    </optgroup>}
-                    {txOptions.length > 0 && <optgroup label={t('docs.dr.linkTx')}>
-                      {txOptions.map((x) => <option key={x.id} value={`transaction:${x.id}`}>{txLabel(x, lang)}</option>)}
-                    </optgroup>}
+                {filing && (
+                  <div className="v2-doclinks-filed">
+                    <Pill tone="good">{t('docs.fl.filed')}</Pill>
+                    <span>{filingText(t, filing, lang)}</span>
+                    <button type="button" className="v2-btn-link" disabled={busy} onClick={() => run(() => fileDocument(token, doc.id, { clear: true }))}>{t('docs.dr.unlink')}</button>
+                  </div>
+                )}
+                <label className="v2-field"><span className="v2-field-label">{t('docs.fl.where')}</span>
+                  <select className="v2-select" value={mode} disabled={busy} onChange={(e) => setMode(e.target.value)} aria-label={t('docs.fl.where')}>
+                    {FILING_MODES.map((m) => <option key={m} value={m}>{t(`docs.fl.mode.${m}`)}</option>)}
                   </select></label>
-                <button type="button" className="v2-btn v2-btn-secondary" disabled={busy || !target} onClick={doLink}>{t('docs.dr.link')}</button>
+                {mode === 'record' && (
+                  <>
+                    <label className="v2-field"><span className="v2-field-label">{t('docs.dr.linkTo')}{docAmount != null ? ` · ${t('docs.dr.byAmount')}` : ''}</span>
+                      <select className="v2-select" value={target} disabled={busy} onChange={(e) => setTarget(e.target.value)} aria-label={t('docs.dr.linkTo')}>
+                        <option value="">{t('docs.dr.choose')}</option>
+                        {debtOptions.length > 0 && <optgroup label={t('docs.dr.linkBill')}>
+                          {debtOptions.map((d) => <option key={d.id} value={`debt:${d.id}`}>
+                            {[t(`docs.linkedTo.${d.type === 'receivable' ? 'receivable' : 'payable'}`, { who: d.counterparty || t('bills.noName') }), money(amt(d)), d.due_date ? shortDate(d.due_date, lang) : null].filter(Boolean).join(' · ')}
+                          </option>)}
+                        </optgroup>}
+                        {txOptions.length > 0 && <optgroup label={t('docs.dr.linkTx')}>
+                          {txOptions.map((x) => <option key={x.id} value={`transaction:${x.id}`}>{txLabel(x, lang)}</option>)}
+                        </optgroup>}
+                      </select></label>
+                    <button type="button" className="v2-btn v2-btn-secondary" disabled={busy || !target} onClick={doLink}>{t('docs.dr.link')}</button>
+                  </>
+                )}
+                {mode === 'bank' && (
+                  <>
+                    <div className="v2-field-row">
+                      <label className="v2-field"><span className="v2-field-label">{t('docs.fl.account')}</span>
+                        <select className="v2-select" value={fl.wallet_id} disabled={busy} onChange={(e) => setFl((f) => ({ ...f, wallet_id: e.target.value }))} aria-label={t('docs.fl.account')}>
+                          <option value="">{t('docs.dr.choose')}</option>
+                          {wallets.map((w) => <option key={w.id} value={w.id}>{w.name}{w.currency ? ` (${w.currency})` : ''}</option>)}
+                        </select></label>
+                      <label className="v2-field"><span className="v2-field-label">{t('docs.fl.month')}</span>
+                        <input className="v2-input" type="month" value={fl.period} disabled={busy} onChange={(e) => setFl((f) => ({ ...f, period: e.target.value }))} aria-label={t('docs.fl.month')} /></label>
+                    </div>
+                    <button type="button" className="v2-btn v2-btn-secondary" disabled={busy || !fl.wallet_id || !fl.period}
+                      onClick={() => run(() => fileDocument(token, doc.id, { kind: 'bank_account_period', wallet_id: fl.wallet_id, period: fl.period }), t('docs.fl.saved'))}>{t('docs.dr.save')}</button>
+                  </>
+                )}
+                {mode === 'counterparty' && (
+                  <>
+                    <label className="v2-field"><span className="v2-field-label">{t('docs.fl.counterparty')}</span>
+                      <select className="v2-select" value={fl.counterparty_id} disabled={busy} onChange={(e) => setFl((f) => ({ ...f, counterparty_id: e.target.value }))} aria-label={t('docs.fl.counterparty')}>
+                        <option value="">{t('docs.dr.choose')}</option>
+                        {counterparties.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                      </select></label>
+                    <button type="button" className="v2-btn v2-btn-secondary" disabled={busy || !fl.counterparty_id}
+                      onClick={() => run(() => fileDocument(token, doc.id, { kind: 'counterparty', counterparty_id: fl.counterparty_id }), t('docs.fl.saved'))}>{t('docs.dr.save')}</button>
+                  </>
+                )}
+                {mode === 'keep' && (
+                  <>
+                    <div className="v2-field-row">
+                      <label className="v2-field"><span className="v2-field-label">{t('docs.fl.reason')}</span>
+                        <select className="v2-select" value={fl.reason} disabled={busy} onChange={(e) => setFl((f) => ({ ...f, reason: e.target.value }))} aria-label={t('docs.fl.reason')}>
+                          {FILING_REASONS.map((r) => <option key={r} value={r}>{t(`docs.fl.reasons.${r}`)}</option>)}
+                        </select></label>
+                      <label className="v2-field"><span className="v2-field-label">{t('docs.fl.monthOptional')}</span>
+                        <input className="v2-input" type="month" value={fl.period} disabled={busy} onChange={(e) => setFl((f) => ({ ...f, period: e.target.value }))} aria-label={t('docs.fl.month')} /></label>
+                    </div>
+                    <button type="button" className="v2-btn v2-btn-secondary" disabled={busy}
+                      onClick={() => run(() => fileDocument(token, doc.id, { kind: 'keep', reason: fl.reason, period: fl.period || undefined }), t('docs.fl.saved'))}>{t('docs.fl.keep')}</button>
+                  </>
+                )}
               </section>
 
               {!verdict && (

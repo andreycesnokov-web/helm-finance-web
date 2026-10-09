@@ -31,7 +31,7 @@ A rule-based classifier says: type "${verdict?.doc_type || 'unknown'}", confiden
 
 Write in ${language}. Plain words, no jargon; when you use an Indonesian term, explain it in brackets.
 Return ONLY a JSON object, no markdown fence:
-{"title":"","summary":"","issued_by":"","issued_on":"","number":"","purpose":"","place":"","next_step":"","suggested_type":"","warnings":[]}
+{"title":"","summary":"","issued_by":"","issued_on":"","number":"","purpose":"","place":"","next_step":"","suggested_type":"","bank_name":"","account_number":"","period":"","counterparty_name":"","warnings":[]}
 
 - title: what the document is, at most 8 words (e.g. "Ministry of Law notice: change of directors").
 - summary: 1-2 sentences: what it says and why the company has it.
@@ -43,6 +43,9 @@ Return ONLY a JSON object, no markdown fence:
 - next_step: 1 sentence: what the owner should do with it in the system (keep it with company documents; link it to
   the bill it pays; link it to the payment it proves; nothing).
 - suggested_type: exactly one of: ${types.join(', ')}.
+- bank_name / account_number: for a bank statement or bank letter, as printed ("" otherwise).
+- period: the month the document covers, YYYY-MM (statement period, payroll month, tax period); "" if none.
+- counterparty_name: the other party (supplier, customer, landlord, employee…) if there is one, else "".
 - warnings: short strings for anything unreadable or inconsistent.
 Never invent a number, a date or a name that is not printed.
 
@@ -67,6 +70,10 @@ function normalize(parsed, types) {
     place: PLACES.includes(parsed.place) ? parsed.place : 'other',
     next_step: str(parsed.next_step, 400),
     suggested_type: types.includes(parsed.suggested_type) ? parsed.suggested_type : null,
+    bank_name: str(parsed.bank_name, 80),
+    account_number: str(parsed.account_number, 40).replace(/[^\dA-Za-z-]/g, ''),
+    period: /^\d{4}-(0[1-9]|1[0-2])$/.test(str(parsed.period, 7)) ? str(parsed.period, 7) : '',
+    counterparty_name: str(parsed.counterparty_name, 160),
     warnings: Array.isArray(parsed.warnings) ? parsed.warnings.slice(0, 5).map((w) => str(w, 200)).filter(Boolean) : [],
   }
 }
@@ -127,4 +134,46 @@ function suggestedKind(verdict, explanation) {
   return null
 }
 
-module.exports = { explainDocument, suggestedKind, normalize, buildPrompt, fileBlock, MODEL, LANGS, PLACES }
+const norm = (v) => String(v || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
+
+/** The business bank account a statement belongs to: by bank name or the account's last digits
+ *  in the account name, same currency first. Only a single clear match is offered. */
+function matchWallet(wallets = [], { bank_name, account_number, currency } = {}) {
+  const bank = norm(bank_name).split(' ').filter((w) => w.length >= 3 && !['bank', 'pt', 'tbk'].includes(w))
+  const last4 = String(account_number || '').replace(/\D/g, '').slice(-4)
+  const scored = wallets.map((w) => {
+    const name = norm(`${w.name} ${w.entity_name || ''}`)
+    let score = 0
+    if (last4.length === 4 && name.replace(/ /g, '').includes(last4)) score += 3
+    if (bank.some((b) => name.split(' ').includes(b))) score += 2
+    if (score && currency && String(w.currency || '').toUpperCase() === String(currency).toUpperCase()) score += 1
+    return { w, score }
+  }).filter((x) => x.score > 0).sort((a, b) => b.score - a.score)
+  if (!scored.length || (scored[1] && scored[1].score === scored[0].score)) return null
+  return scored[0].w
+}
+
+function matchCounterparty(cps = [], name) {
+  const n = norm(name).replace(/(pt|cv|tbk|ud)/g, '').trim()
+  if (n.length < 3) return null
+  const hits = cps.filter((c) => { const m = norm(c.name).replace(/(pt|cv|tbk|ud)/g, '').trim(); return m && (m === n || m.includes(n) || n.includes(m)) })
+  return hits.length === 1 ? hits[0] : null
+}
+
+/** Where to keep a document that explains no single bill or payment. A suggestion only. */
+function suggestedFiling(type, x, { wallets = [], counterparties = [], currency = null } = {}) {
+  if (!type || !x) return null
+  if (type === 'bank_statement') {
+    const w = matchWallet(wallets, { bank_name: x.bank_name, account_number: x.account_number, currency })
+    return { kind: 'bank_account_period', wallet_id: w?.id || null, wallet_name: w?.name || null, period: x.period || null }
+  }
+  if (type === 'payroll_document') return { kind: 'keep', reason: 'payroll', period: x.period || null }
+  if (type === 'tax_report') return { kind: 'keep', reason: 'tax', period: x.period || null }
+  if (type === 'contract') {
+    const c = matchCounterparty(counterparties, x.counterparty_name)
+    return c ? { kind: 'counterparty', counterparty_id: c.id, counterparty_name: c.name } : { kind: 'keep', reason: 'contract' }
+  }
+  return null
+}
+
+module.exports = { matchWallet, matchCounterparty, suggestedFiling, explainDocument, suggestedKind, normalize, buildPrompt, fileBlock, MODEL, LANGS, PLACES }

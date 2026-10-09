@@ -8,7 +8,8 @@ import { useAuth } from '../../hooks/useAuth'
 import I from '../icons'
 import { Pill, Skeleton } from '../ui'
 import { useT, useLang } from '../i18n'
-import { identifyDocument, confirmDocumentKind } from '../lib/actions'
+import { identifyDocument, confirmDocumentKind, fileDocument } from '../lib/actions'
+import { filingText } from '../lib/obligations'
 import { VAULT_TYPES, intakeTypeOf, intakeStatusOf } from '../../pages/business/companyVault'
 
 // A document date carries its year ("27 February 2026"), unlike the list's short dates.
@@ -20,7 +21,8 @@ export default function DocumentIdentity({ doc, sheetText, waitForSheet = false,
   const t = useT()
   const lang = useLang()
   const { token } = useAuth()
-  const stored = doc?.extracted_json?.ai_identify?.[lang] || null
+  const fresh = (r) => (r && r.v >= 2 ? r : null)   // v1 readings carry no filing suggestion: read once more
+  const stored = fresh(doc?.extracted_json?.ai_identify?.[lang])
   const [result, setResult] = useState(stored)
   const [state, setState] = useState(stored ? 'ready' : 'idle')   // idle | loading | ready | error
   const [err, setErr] = useState(null)
@@ -30,7 +32,7 @@ export default function DocumentIdentity({ doc, sheetText, waitForSheet = false,
   const run = async (force = false) => {
     setState('loading'); setErr(null)
     try {
-      const body = { lang, force }
+      const body = { lang, force: force || !!doc?.extracted_json?.ai_identify?.[lang] }
       if (sheetText) body.sheet_text = sheetText
       const r = await identifyDocument(token, doc.id, body)
       setResult(r?.identify || null); setState('ready')
@@ -41,7 +43,7 @@ export default function DocumentIdentity({ doc, sheetText, waitForSheet = false,
 
   // New document (or language): take the stored reading, or read it once by itself.
   useEffect(() => {
-    const s = doc?.extracted_json?.ai_identify?.[lang] || null
+    const s = fresh(doc?.extracted_json?.ai_identify?.[lang])
     setResult(s); setState(s ? 'ready' : 'idle'); setErr(null)
   }, [doc?.id, lang]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
@@ -56,6 +58,21 @@ export default function DocumentIdentity({ doc, sheetText, waitForSheet = false,
   const type = result?.suggested_type || null
   const isVault = VAULT_TYPES.includes(type)
   const already = type && intakeTypeOf(doc) === type && intakeStatusOf(doc) === 'manually_confirmed'
+  const sf = result?.suggested_filing || null
+  const currentFiling = doc?.extracted_json?.filing || null
+  const filingReady = sf && (sf.kind !== 'bank_account_period' || (sf.wallet_id && sf.period)) && (sf.kind !== 'counterparty' || sf.counterparty_id)
+  const filingSame = sf && currentFiling && currentFiling.kind === sf.kind && (currentFiling.wallet_id || null) === (sf.wallet_id || null)
+    && (currentFiling.period || null) === (sf.period || null) && (currentFiling.counterparty_id || null) === (sf.counterparty_id || null)
+  const acceptFiling = async () => {
+    setBusy(true); setErr(null)
+    try {
+      const body = sf.kind === 'bank_account_period' ? { kind: sf.kind, wallet_id: sf.wallet_id, period: sf.period }
+        : sf.kind === 'counterparty' ? { kind: sf.kind, counterparty_id: sf.counterparty_id }
+        : { kind: 'keep', reason: sf.reason || 'other', period: sf.period || undefined }
+      await fileDocument(token, doc.id, body); onApplied?.({ filed: true })
+    } catch (e) { setErr(e?.status === 403 ? t('docs.dr.err.forbidden') : (e?.data?.error || e?.message || 'failed')) }
+    finally { setBusy(false) }
+  }
   const accept = async () => {
     setBusy(true); setErr(null)
     try { await confirmDocumentKind(token, doc.id, type); onApplied?.({ type, vault: isVault }) }
@@ -96,6 +113,14 @@ export default function DocumentIdentity({ doc, sheetText, waitForSheet = false,
                   {isVault ? t('docs.id.acceptCompany') : t('docs.id.acceptType')}
                 </button>
               )}
+            </div>
+          )}
+          {sf && (
+            <div className="v2-docid-kind">
+              <span className="v2-small">{t('docs.id.fileAs')} <strong>{filingText(t, sf, lang) || t(`docs.fl.mode.${sf.kind === 'bank_account_period' ? 'bank' : sf.kind}`)}</strong></span>
+              {filingSame ? <Pill tone="good">{t('docs.id.already')}</Pill> : filingReady ? (
+                <button type="button" className="v2-btn v2-btn-primary" disabled={busy} onClick={acceptFiling}>{t('docs.id.acceptFiling')}</button>
+              ) : <span className="v2-muted v2-small">{t(sf.kind === 'bank_account_period' ? 'docs.id.pickAccount' : 'docs.id.pickBelow')}</span>}
             </div>
           )}
           <button type="button" className="v2-btn-link v2-small" onClick={() => run(true)}>{t('docs.id.again')}</button>

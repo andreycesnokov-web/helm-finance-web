@@ -110,6 +110,48 @@ const ANSWER = {
     assert.ok(!/IDENTIFY_FIELDS = \[[^\]]*classifier/.test(server));
   });
 
+  console.log('\nfiling — where a document belongs when it explains no single payment');
+  const W = [{ id: 'hcp', name: 'Permata bank (HCP)', currency: 'IDR' }, { id: 'bca', name: 'BCA Bank (HCI)', currency: 'IDR' }, { id: 'usd', name: 'BCA Bank (USD) HCI', currency: 'USD' }];
+  await t('Permata statement → the Permata account', () => {
+    assert.strictEqual(ID.matchWallet(W, { bank_name: 'Bank Permata', account_number: '9984777601', currency: 'IDR' }).id, 'hcp');
+  });
+  await t('two equally good accounts → no guess', () => {
+    assert.strictEqual(ID.matchWallet(W, { bank_name: 'BCA' }), null);
+  });
+  await t('currency breaks a tie between two BCA accounts', () => {
+    assert.strictEqual(ID.matchWallet(W, { bank_name: 'BCA', currency: 'USD' }).id, 'usd');
+  });
+  await t('unknown bank → no account', () => assert.strictEqual(ID.matchWallet(W, { bank_name: 'Mandiri' }), null));
+  await t('statement suggestion carries account + month', () => {
+    assert.deepStrictEqual(ID.suggestedFiling('bank_statement', { bank_name: 'PERMATA', period: '2025-07' }, { wallets: W, currency: 'IDR' }),
+      { kind: 'bank_account_period', wallet_id: 'hcp', wallet_name: 'Permata bank (HCP)', period: '2025-07' });
+  });
+  await t('payroll / tax → kept with the month', () => {
+    assert.deepStrictEqual(ID.suggestedFiling('payroll_document', { period: '2026-06' }), { kind: 'keep', reason: 'payroll', period: '2026-06' });
+    assert.strictEqual(ID.suggestedFiling('tax_report', { period: '' }).reason, 'tax');
+  });
+  await t('contract → its counterparty when exactly one matches, else kept as a contract', () => {
+    const cps = [{ id: 'c1', name: 'PT Para Legals' }, { id: 'c2', name: 'Moving Walls' }];
+    assert.strictEqual(ID.suggestedFiling('contract', { counterparty_name: 'Para Legals' }, { counterparties: cps }).counterparty_id, 'c1');
+    assert.deepStrictEqual(ID.suggestedFiling('contract', { counterparty_name: 'Someone Else' }, { counterparties: cps }), { kind: 'keep', reason: 'contract' });
+  });
+  await t('invoices, receipts and company documents get no filing (they link or move instead)', () => {
+    for (const k of ['invoice', 'receipt', 'nib', 'sk_kemenkumham']) assert.strictEqual(ID.suggestedFiling(k, {}), null, k);
+  });
+  await t('model period / account number are sanitised', () => {
+    const x = ID.normalize({ period: 'July 2025', account_number: '9984 7776-01' }, TYPES);
+    assert.strictEqual(x.period, ''); assert.strictEqual(x.account_number, '99847776-01');
+  });
+  await t('filing route: role-checked, business-scoped wallet and counterparty, audited RPC, no money', () => {
+    const i = server.indexOf("app.post('/api/documents/:id/filing'");
+    assert.ok(i > 0);
+    const body = server.slice(i, server.indexOf('\napp.', i + 10));
+    for (const x of ['canManageDocuments', 'hasDocumentsAccess', 'loadDocumentScoped', "eq('business_id', biz.business.id)", "eq('scope', 'business')", 'bizOrFilter(biz)', 'rpc_document_update_metadata', 'archived_at'])
+      assert.ok(body.includes(x), x);
+    assert.ok(!/gross_amount|rpc_document_link|transactions'\)|debts'\)/.test(body), 'filing must not touch amounts, links, transactions or debts');
+  });
+  await t('filing is whitelisted for the API', () => assert.ok(server.includes('filing: publicFiling(ej.filing)')));
+
   console.log(`\nDOCUMENT IDENTIFY: ${pass} passed, ${fail} failed`);
   if (fail) process.exit(1);
 })();

@@ -54,6 +54,7 @@ export const WRITE_ALLOW = [
   { method: 'POST', path: '/archive`' },                    // POST   /api/documents/:id/archive
   { method: 'PATCH', path: '/classification`' },            // PATCH  /api/ai-accountant/documents/:id/classification
   { method: 'POST', path: '/identify`' },                   // POST   /api/documents/:id/identify (AI explanation)
+  { method: 'POST', path: '/filing`' },                     // POST   /api/documents/:id/filing (bank account + month, counterparty, keep)
 ]
 const ACTIONS = path.join(V2, 'lib', 'actions.js')
 // POSTs that ask an existing AI endpoint a question and change no data. Only in lib/ask.js.
@@ -138,7 +139,7 @@ t('every allowed write exists on the server (batch 8 routes are the approved one
     /app\.post\('\/api\/assets'/, /app\.post\('\/api\/business-funding'/, /app\.post\('\/api\/business-funding\/repayments\/:rid\/paid'/,
     /app\.post\('\/api\/documents\/:id\/signed-url'/, /app\.patch\('\/api\/documents\/:id'/, /app\.post\('\/api\/documents\/:id\/links'/,
     /app\.delete\('\/api\/documents\/:id\/links\/:linkId'/, /app\.post\('\/api\/documents\/:id\/archive'/,
-    /app\.patch\('\/api\/ai-accountant\/documents\/:id\/classification'/, /app\.post\('\/api\/documents\/:id\/identify'/]) {
+    /app\.patch\('\/api\/ai-accountant\/documents\/:id\/classification'/, /app\.post\('\/api\/documents\/:id\/identify'/, /app\.post\('\/api\/documents\/:id\/filing'/]) {
     assert.ok(r.test(server), `server route ${r} missing`)
   }
 })
