@@ -125,5 +125,21 @@ t('calendar regeneration no longer resets an amount someone recorded', () => {
   assert.ok(server.includes('toUpsert.map(({ amount_status, ...g })'));
 });
 
+t('/accountant/obligations pays by the 15th (PMK 81/2024), not the old 10th', () => {
+  const b = body("app.get('/api/accountant/obligations'");
+  assert.ok(b.includes("taxDeadlines.deadlinesFor('ID_PPH21_MONTHLY', periodStr).pay_by"));
+  assert.ok(!/getMonth\(\), 10\)/.test(b));
+});
+t('classic schedule (still reachable) uses the 15th as well', () => {
+  const v1 = fs.readFileSync(require('node:path').join(__dirname, '..', 'client', 'src', 'pages', 'business', 'AccountantPremium.jsx'), 'utf8');
+  assert.ok(v1.includes("mk(15, 'pph2126'") && v1.includes("mk(15, 'pph23'") && !v1.includes("mk(10, "));
+});
+t('v2 AI Accountant: one version — no classic-view button, taxes from data + calendar in v2', () => {
+  const v2 = fs.readFileSync(require('node:path').join(__dirname, '..', 'client', 'src', 'v2', 'pages', 'Accountant.jsx'), 'utf8');
+  assert.ok(!v2.includes('to="/business/accountant/classic"'), 'no link to the classic accountant');
+  assert.ok(v2.includes("useApi('/accountant/obligations')") && v2.includes('<FromYourData'));
+  assert.ok(v2.includes("useApi('/accountant/tax-calendar')"));
+});
+
 console.log(`\nTAX DEADLINES: ${pass} passed, ${fail} failed`);
 if (fail) process.exit(1);

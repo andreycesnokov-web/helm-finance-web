@@ -2803,8 +2803,10 @@ app.get('/api/accountant/obligations', auth, async (req, res) => {
     // Obligations file for the LAST completed month (paid in the current month).
     const period = new Date(now.getFullYear(), now.getMonth() - 1, 1);
     const periodStr = `${period.getFullYear()}-${String(period.getMonth() + 1).padStart(2, '0')}`;
-    const due10 = new Date(now.getFullYear(), now.getMonth(), 10).toISOString().slice(0, 10);
-    const dueEndNext = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().slice(0, 10);
+    // Pay-by dates from the general rule (PMK 81/2024: PPh by the 15th; PPN by the end of the next
+    // month) — the old "10th" came from PMK 242/2014, replaced on 1 January 2025.
+    const due10 = taxDeadlines.deadlinesFor('ID_PPH21_MONTHLY', periodStr).pay_by;
+    const dueEndNext = taxDeadlines.deadlinesFor('ID_PPN_MONTHLY', periodStr).pay_by;
 
     // ── PPH 21/26 — recorded withholding lines only ──────────────────────────
     const { data: pays } = await supabase.from('payroll_payments')
