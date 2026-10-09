@@ -116,7 +116,48 @@ function fakeFrom(table) {
   };
   return q;
 }
-const supabase = { from: fakeFrom, rpc: async () => ({ data: null, error: null }), storage: { from: () => ({}) }, auth: {} };
+// In-memory EMULATION of rpc_confirm_bank_import (migration 069) so both confirm routes run here.
+// This test is about the bridge; the confirm's atomicity and locking are proven on real
+// PostgreSQL in postgresBankImportAtomicConfirm / postgresBankImportConfirmHttp.
+function emulateConfirm({ p_business_id, p_batch_id, p_owner_user_id, p_actor_user_id, p_plan, p_flow }) {
+  const plan = typeof p_plan === 'string' ? JSON.parse(p_plan) : p_plan;
+  const fail = (message) => ({ data: null, error: { message } });
+  const batch = dbState.bank_import_batches.find((b) => b.id === p_batch_id && b.business_id === p_business_id);
+  if (!batch) return fail('batch_not_found: batch does not exist in this business');
+  if (['imported', 'cancelled'].includes(batch.status)) return fail(`batch_closed: batch status is ${batch.status}`);
+  const wallet = dbState.wallets.find((w) => w.id === batch.wallet_id) || null;
+  const updates = [], txs = [];
+  let imported = 0, linked = 0, skipped = 0;
+  for (const item of plan) {
+    const row = dbState.bank_import_rows.find((r) => r.id === item.row_id && r.batch_id === p_batch_id);
+    if (!row) return fail(`row_not_in_batch: ${item.row_id}`);
+    if (row.linked_transaction_id) { skipped++; continue; }
+    const fin = { final_transaction_type: item.type, final_scope: item.scope || wallet?.scope || 'business',
+      ...(p_flow === 'legacy' ? { match_status: 'confirmed' } : {}) };
+    if (item.action === 'link') {
+      updates.push([row, { ...fin, review_status: 'matched_existing', linked_transaction_id: item.matched_transaction_id }]);
+      linked++; continue;
+    }
+    const tx = { id: dbState.transactions.length + txs.length + 1, business_id: p_business_id, user_id: p_owner_user_id,
+      created_by_user_id: p_actor_user_id, type: item.type, amount_original: row.amount, amount_idr: item.amount_idr,
+      currency_original: 'IDR', description: row.description, wallet_id: batch.wallet_id, transaction_date: row.tx_date };
+    txs.push(tx);
+    updates.push([row, { ...fin, review_status: 'imported', linked_transaction_id: tx.id }]);
+    imported++;
+  }
+  if (!imported && !linked) return { data: { ok: true, already_processed: true, skipped, status: batch.status }, error: null };
+  dbState.transactions.push(...txs);
+  for (const [row, u] of updates) Object.assign(row, u);
+  const rows = dbState.bank_import_rows.filter((r) => r.batch_id === batch.id);
+  const remaining = p_flow === 'legacy'
+    ? rows.filter((r) => r.match_status === 'review_required' && !r.linked_transaction_id).length
+    : rows.filter((r) => ['needs_review', 'suggested', 'high_confidence'].includes(r.review_status)).length;
+  batch.status = remaining > 0 ? 'partially_imported' : 'imported';
+  return { data: { ok: true, already_processed: false, imported, linked, excluded: 0, skipped, status: batch.status, reconciliation: null }, error: null };
+}
+const supabase = { from: fakeFrom,
+  rpc: async (name, args) => (name === 'rpc_confirm_bank_import' ? emulateConfirm(args) : { data: null, error: null }),
+  storage: { from: () => ({}) }, auth: {} };
 
 let server = null, BASE = null, jwt = null;
 before(async () => {

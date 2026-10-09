@@ -224,6 +224,12 @@ describe('Real PostgreSQL Integration: Bank Reconciliation & Transaction Linking
       ALTER TABLE public.bank_import_rows ADD COLUMN IF NOT EXISTS review_status text DEFAULT 'needs_review';
       ALTER TABLE public.bank_import_rows ADD COLUMN IF NOT EXISTS reviewed_by_user_id bigint NULL;
       ALTER TABLE public.bank_import_rows ADD COLUMN IF NOT EXISTS reviewed_at timestamptz NULL;
+      -- Real production columns read by rpc_confirm_bank_import (migration 069).
+      ALTER TABLE public.bank_import_rows ADD COLUMN IF NOT EXISTS suggested_category_id uuid NULL;
+      ALTER TABLE public.bank_import_rows ADD COLUMN IF NOT EXISTS suggested_counterparty_id uuid NULL;
+      ALTER TABLE public.bank_import_rows ADD COLUMN IF NOT EXISTS suggestion_source text NULL;
+      ALTER TABLE public.bank_import_rows ADD COLUMN IF NOT EXISTS suggestion_confidence numeric NULL;
+      ALTER TABLE public.bank_import_rows ADD COLUMN IF NOT EXISTS suggestion_reason text NULL;
 
       ALTER TABLE public.bank_import_batches ADD COLUMN IF NOT EXISTS document_id uuid NULL;
       ALTER TABLE public.bank_import_batches ADD COLUMN IF NOT EXISTS imported_count int DEFAULT 0;
@@ -282,6 +288,10 @@ describe('Real PostgreSQL Integration: Bank Reconciliation & Transaction Linking
 
     const m68 = fs.readFileSync(path.join(__dirname, '../../migrations/068_bank_import_batch_document_linking.sql'), 'utf8');
     await pgClient.query(m68);
+
+    // Migration 069: the confirm routes write through rpc_confirm_bank_import (one transaction).
+    const m69 = fs.readFileSync(path.join(__dirname, '../../migrations/069_bank_import_atomic_confirm.sql'), 'utf8');
+    await pgClient.query(m69);
 
     // 3. Seed business & members
     await pgClient.query(`
@@ -471,7 +481,18 @@ describe('Real PostgreSQL Integration: Bank Reconciliation & Transaction Linking
 
     const realPgSupabaseAdapter = {
       from: (table) => new RealPgQuery(pgClient, table),
-      rpc: async () => ({ data: null, error: null }),
+      // Real RPC execution (the confirm routes depend on rpc_confirm_bank_import, migration 069).
+      rpc: async (fn, args = {}) => {
+        const keys = Object.keys(args);
+        try {
+          const r = await pgClient.query(
+            `SELECT to_json(public.${ident(fn)}(${keys.map((k, i) => `${ident(k)} => $${i + 1}`).join(', ')})) AS j`,
+            keys.map(k => (args[k] !== null && typeof args[k] === 'object') ? JSON.stringify(args[k]) : args[k]));
+          return { data: r.rows[0].j, error: null };
+        } catch (err) {
+          return { data: null, error: { message: err.message, code: err.code } };
+        }
+      },
       storage: { from: () => ({}) },
       auth: {}
     };

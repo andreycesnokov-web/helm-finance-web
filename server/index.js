@@ -4072,6 +4072,105 @@ function rowDedupHash(businessId, walletId, r) {
   return crypto.createHash('sha256').update(parts).digest('hex').slice(0, 32);
 }
 
+// ── Atomic bank statement confirm (migration 069) ─────────────────────────────
+// Both confirm routes validate EVERY requested row first (nothing is written when any row is
+// bad), price FX outside the transaction, then hand the whole decision list to
+// rpc_confirm_bank_import, which re-checks under a per-business lock and writes transactions,
+// row links, feedback, reconciliation and batch status in ONE database transaction.
+// There is deliberately no row-by-row fallback: without migration 069 the confirm refuses.
+
+// A statement date must be a real calendar date in a sane range. Corrupt uploads (e.g. a title
+// line read as the header) produced periods like 2000-12-31…2032-12-31 and garbage row dates.
+function isValidStatementDate(v) {
+  if (v === null || v === undefined || v === '') return false;
+  const str = v instanceof Date ? (Number.isNaN(v.getTime()) ? '' : v.toISOString().slice(0, 10)) : String(v).trim().slice(0, 10);
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(str);
+  if (!m) return false;
+  const y = Number(m[1]), mo = Number(m[2]), d = Number(m[3]);
+  if (y < 1990 || y > 2099) return false;
+  const dt = new Date(Date.UTC(y, mo - 1, d));
+  return dt.getUTCFullYear() === y && dt.getUTCMonth() + 1 === mo && dt.getUTCDate() === d;
+}
+
+// Batch-level corruption check: null when the statement period is usable.
+function statementPeriodProblem(batch) {
+  const s = batch.statement_start, e = batch.statement_end;
+  if (s && !isValidStatementDate(s)) return 'Statement start is not a valid date';
+  if (e && !isValidStatementDate(e)) return 'Statement end is not a valid date';
+  if (s && e) {
+    const days = (Date.parse(String(e).slice(0, 10)) - Date.parse(String(s).slice(0, 10))) / 86400000;
+    if (days < 0) return 'Statement start is after its end';
+    if (days > 366 * 5) return 'Statement spans more than 5 years';
+  }
+  return null;
+}
+
+// Row-level corruption check for a row that will touch the ledger.
+function statementRowProblem(row, action) {
+  const amt = Number(row.amount);
+  if (row.amount === null || row.amount === undefined || String(row.amount).trim() === '' || !Number.isFinite(amt) || amt <= 0)
+    return 'Row amount is missing or not a positive number';
+  if (action === 'create' && !isValidStatementDate(row.tx_date)) return 'Row date is missing or not a valid date';
+  return null;
+}
+
+// Statement lines already in the ledger, from prior bank_import_rows that carry a link: how many
+// copies of each dedup_hash are backed by an EXISTING transaction, and the set of transaction ids
+// already backing a statement row (such a transaction cannot back a second row).
+async function importedStatementLines(biz, priorRows) {
+  const ids = [...new Set((priorRows || []).map(r => Number(r.linked_transaction_id)).filter(Number.isFinite))];
+  const live = new Set();
+  for (let i = 0; i < ids.length; i += 500) {
+    const { data } = await supabase.from('transactions').select('id').eq('business_id', biz.business.id).in('id', ids.slice(i, i + 500));
+    for (const t of (data || [])) live.add(Number(t.id));
+  }
+  const importedCopies = new Map();
+  for (const r of (priorRows || [])) {
+    if (!r.dedup_hash || !live.has(Number(r.linked_transaction_id))) continue;
+    importedCopies.set(r.dedup_hash, (importedCopies.get(r.dedup_hash) || 0) + 1);
+  }
+  return { importedCopies, backedTxIds: live };
+}
+
+// 400 body for rows that failed validation. `error` is what the client shows to the person.
+function invalidRowsBody(problems) {
+  const first = problems[0];
+  const where = first.row_index === null || first.row_index === undefined ? 'Statement row' : `Statement row ${first.row_index + 1}`;
+  const more = problems.length > 1 ? ` (and ${problems.length - 1} more)` : '';
+  return { error: `${where}: ${first.error}${more}. Nothing was imported.`, code: 'invalid_rows', rows: problems };
+}
+
+const BANK_CONFIRM_ERROR_STATUS = [
+  [/^batch_not_found/, 404],
+  [/^isolation_violation/, 403],
+  [/^(batch_closed|row_changed|duplicate_of_imported_row|link_conflict)/, 409],
+  [/^(invalid_plan|invalid_row|row_not_in_batch|link_mismatch|link_target_not_found|wallet_not_found)/, 400],
+];
+
+// Calls the atomic RPC and maps its outcome to { status, body }.
+async function runAtomicBankConfirm({ biz, batch, plan, actorUserId, flow }) {
+  const { data, error } = await supabase.rpc('rpc_confirm_bank_import', {
+    p_business_id: biz.business.id, p_batch_id: batch.id,
+    p_owner_user_id: biz.ownerUserId, p_actor_user_id: actorUserId,
+    p_plan: plan, p_flow: flow,
+  });
+  if (error) {
+    const msg = String(error.message || '');
+    if (error.code === 'PGRST202' || error.code === '42883' || /rpc_confirm_bank_import/.test(msg) && /(does not exist|Could not find)/i.test(msg)) {
+      console.error('[bank-import] rpc_confirm_bank_import missing — migration 069 not applied');
+      return { status: 503, body: { error: 'Bank import is temporarily unavailable (database update 069 missing). Nothing was imported.', code: 'database_schema_mismatch' } };
+    }
+    const m = /^([a-z_]+):\s*(.*)$/.exec(msg);
+    const hit = BANK_CONFIRM_ERROR_STATUS.find(([re]) => re.test(msg));
+    if (!hit) console.error(`[bank-import] atomic confirm failed: ${msg}`);
+    return hit
+      ? { status: hit[1], body: { error: `${m ? m[2] : msg}. Nothing was imported.`, code: m ? m[1] : 'bank_import_confirm_failed' } }
+      : { status: 500, body: { error: 'Bank import confirm failed. Nothing was imported.', code: 'bank_import_confirm_failed' } };
+  }
+  // data.already_processed = every requested row was already in the ledger: nothing written.
+  return { status: 200, body: data };
+}
+
 // System transaction types — cash logic. Kept separate from business categories.
 const VALID_SYSTEM_TX_TYPES = ['income', 'expense', 'transfer', 'payroll', 'owner_injection', 'owner_withdrawal', 'correction'];
 
@@ -6023,19 +6122,29 @@ app.post('/api/bank-import/batches', auth, async (req, res) => {
       return String(v).slice(0, 10);
     };
     const txKey = (d, amt, type) => `${toIsoDate(d)}|${Math.abs(Number(amt) || 0).toFixed(2)}|${type}`;
+
+    // Already-imported statement lines (avoid re-importing the same statement). Only rows whose
+    // ledger transaction still exists count — abandoned review batches (re-uploaded for another
+    // pass) and deleted transactions must NOT mark a fresh upload as duplicate.
+    const { data: priorRows } = await supabase.from('bank_import_rows')
+      .select('dedup_hash, linked_transaction_id').eq('business_id', biz.business.id)
+      .not('linked_transaction_id', 'is', null);
+    const { importedCopies, backedTxIds } = await importedStatementLines(biz, priorRows);
+
+    // Ledger transactions a row could be linked to: one transaction backs at most one statement
+    // row, so a transaction already behind a statement row is not offered again, and each one is
+    // offered to a single row of this upload (two identical lines are two operations).
     const existingIndex = new Map();
     for (const t of existing) {
+      if (backedTxIds.has(Number(t.id))) continue;
       const d = t.transaction_date || (t.created_at ? toIsoDate(t.created_at) : null);
-      existingIndex.set(txKey(d, t.amount_original, t.type), t.id);
+      const k = txKey(d, t.amount_original, t.type);
+      if (!existingIndex.has(k)) existingIndex.set(k, []);
+      existingIndex.get(k).push(t.id);
     }
-
-    // Already-imported dedup hashes (avoid re-importing the same statement).
-    // Only rows that became real transactions count — abandoned review batches
-    // (re-uploaded for another pass) must NOT mark a fresh upload as duplicate.
-    const { data: priorRows } = await supabase.from('bank_import_rows')
-      .select('dedup_hash').eq('business_id', biz.business.id)
-      .not('linked_transaction_id', 'is', null);
-    const priorHashes = new Set((priorRows || []).map(r => r.dedup_hash));
+    // Copies of a line already in the ledger: that many copies of it in this upload are
+    // duplicates, any further copy is a genuine new operation (same rule as migration 069).
+    const dupLeft = new Map(importedCopies);
 
     // If document_id is provided, verify it exists and strictly belongs to the current business
     if (document_id) {
@@ -6081,10 +6190,12 @@ app.post('/api/bank-import/batches', auth, async (req, res) => {
       const direction = r.direction || (Number(r.amount) >= 0 ? 'in' : 'out');
       const suggestedType = direction === 'in' ? 'income' : 'expense';
       const hash = rowDedupHash(biz.business.id, wallet_id, { ...r, amount, direction });
-      const matchId = existingIndex.get(txKey(r.tx_date, amount, suggestedType)) || null;
-      let status = 'review_required';
-      if (priorHashes.has(hash)) { status = 'duplicate'; dup++; }
-      else if (matchId) { status = 'matched'; matched++; }  // already in ledger
+      let status = 'review_required', matchId = null;
+      if ((dupLeft.get(hash) || 0) > 0) { dupLeft.set(hash, dupLeft.get(hash) - 1); status = 'duplicate'; dup++; }
+      else {
+        matchId = existingIndex.get(txKey(r.tx_date, amount, suggestedType))?.shift() || null;
+        if (matchId) { status = 'matched'; matched++; }  // already in ledger
+      }
       return {
         batch_id: batch.id, business_id: biz.business.id, row_index: r.row_index ?? i,
         raw: r.raw || {}, tx_date: r.tx_date || null, description: r.description || null,
@@ -6174,12 +6285,9 @@ app.post('/api/bank-import/batches/:id/confirm', auth, async (req, res) => {
     const { data: batch } = await supabase.from('bank_import_batches').select('*').eq('id', req.params.id).eq('business_id', biz.business.id).single();
     if (!batch) return res.status(404).json({ error: 'Batch not found' });
     if (batch.status === 'imported') return res.status(400).json({ error: 'Batch already imported' });
-
-    let wallet = null;
-    if (batch.wallet_id) {
-      const { data: w } = await supabase.from('wallets').select('id, name, scope, currency').eq('id', batch.wallet_id).limit(1);
-      wallet = w?.[0] || null;
-    }
+    if (batch.status === 'cancelled') return res.status(409).json({ error: 'Batch was cancelled', code: 'batch_closed' });
+    const periodProblem = statementPeriodProblem(batch);
+    if (periodProblem) return res.status(400).json({ error: `${periodProblem}. The statement looks corrupt; upload it again. Nothing was imported.`, code: 'corrupt_statement_period' });
 
     const { data: rows } = await supabase.from('bank_import_rows').select('*').eq('batch_id', batch.id);
     // Import rows the user confirmed (not duplicates, not rejected). review_status
@@ -6187,68 +6295,68 @@ app.post('/api/bank-import/batches/:id/confirm', auth, async (req, res) => {
     const isConfirmed = (r) => (r.review_status === 'confirmed' || r.match_status === 'confirmed') && r.review_status !== 'excluded';
     const toImport = (rows || []).filter(r => isConfirmed(r) && !r.linked_transaction_id);
 
-    // Resolve category ids → names (ledger is TEXT). Prefer the user's FINAL choice.
-    const catMap = await loadBusinessCategoryMap(biz);
-
-    let imported = 0, signedSum = 0;
-    for (const r of toImport) {
-      // Final decision (review queue) overrides the suggestion; suggestion never auto-applies.
-      let txType = r.final_transaction_type || r.suggested_type || 'expense';
-      if (!VALID_SYSTEM_TX_TYPES.includes(txType)) txType = r.suggested_type || 'expense';
-      const categoryName = r.final_category_id ? (catMap.get(r.final_category_id) || null)
-                         : (r.suggested_category_id ? (catMap.get(r.suggested_category_id) || null)
-                         : (r.suggested_category || null));
-      const isIncome = txType === 'income';
-      const txCurrency = (batch.currency || wallet?.currency || 'IDR').toUpperCase();
-      const txDate = r.tx_date || new Date().toISOString().slice(0, 10);
-      const fxRes = await fx.toIdr(r.amount, txCurrency, txDate);
-      const { data: tx, error } = await supabase.from('transactions').insert({
-        ...bizWriteFields(biz, req.user.userId),
-        type: txType,
-        amount_original: r.amount,
-        amount_idr: fxRes.amount_idr,
-        booked_rate: fxRes.booked_rate,
-        rate_source: fxRes.rate_source,
-        currency_original: txCurrency,
-        description: r.description || 'Bank import', source: wallet?.name || null,
-        wallet_id: batch.wallet_id || null, scope: r.final_scope || wallet?.scope || 'business',
-        category: categoryName,
-        counterparty_name: r.suggested_counterparty || null,
-        transaction_date: txDate,
-      }).select('id').single();
-      if (error) continue;
-      await supabase.from('bank_import_rows').update({
-        linked_transaction_id: tx.id, match_status: 'confirmed', review_status: 'imported',
-      }).eq('id', r.id);
-      imported++; signedSum += isIncome ? Number(r.amount) : -Number(r.amount);
-    }
-
-    // Reconciliation (if opening/closing provided)
-    let reconciliation = null;
-    if (batch.opening_balance !== null && batch.closing_balance !== null) {
-      const computed = Number(batch.opening_balance) + signedSum;
-      const diff = Number(batch.closing_balance) - computed;
-      const { data: rec } = await supabase.from('bank_reconciliations').insert({
-        batch_id: batch.id, business_id: biz.business.id, wallet_id: batch.wallet_id || null,
-        opening_balance: batch.opening_balance, closing_balance: batch.closing_balance,
-        computed_closing: computed, difference: diff,
-        status: Math.abs(diff) < 1 ? 'balanced' : 'unbalanced',
-      }).select().single();
-      reconciliation = rec || null;
-    }
-
-    const remaining = (rows || []).filter(r => r.match_status === 'review_required').length;
-    const newStatus = remaining > 0 ? 'partially_imported' : 'imported';
-    await supabase.from('bank_import_batches').update({ imported_count: (batch.imported_count || 0) + imported, status: newStatus, updated_at: new Date().toISOString() }).eq('id', batch.id);
-
     // Bridge (PR2, migration 049): confirmed CREDIT lines also become incoming-payment
     // evidence. Entirely inside the flag — with INCOMING_PAYMENTS_ENABLED off this call is
-    // not made, nothing is read, and the confirm response is byte-identical to before.
-    // Failures here never fail the import: the ledger write above already succeeded and is
-    // the user's actual outcome.
-    const incoming_payments = await bridgeBankBatchToIncomingPayments({ batch, rows, biz, actingUserId: req.user.userId });
+    // not made, nothing is read. Failures here never fail the import: the ledger write already
+    // committed and is the user's actual outcome. It is idempotent, so a repeated confirm
+    // (nothing left to import) still re-runs it — that is how missing evidence is recovered.
+    const respond = async (out) => {
+      const { data: bridgeRows } = await supabase.from('bank_import_rows').select('*').eq('batch_id', batch.id);
+      const incoming_payments = await bridgeBankBatchToIncomingPayments({ batch, rows: bridgeRows, biz, actingUserId: req.user.userId });
+      res.json({ ok: true, imported: out.imported, status: out.status, reconciliation: out.reconciliation,
+                 ...(incoming_payments ? { incoming_payments } : {}) });
+    };
+    // Repeat confirm: nothing to write. Unlike before, no empty reconciliation snapshot is stored.
+    if (!toImport.length) return respond({ imported: 0, status: batch.status, reconciliation: null });
 
-    res.json({ ok: true, imported, status: newStatus, reconciliation, ...(incoming_payments ? { incoming_payments } : {}) });
+    // Resolve category ids → names (ledger is TEXT). Prefer the user's FINAL choice.
+    const catMap = await loadBusinessCategoryMap(biz);
+    let walletCurrency = null;
+    if (batch.wallet_id) {
+      const { data: w } = await supabase.from('wallets').select('currency').eq('id', batch.wallet_id).limit(1);
+      walletCurrency = w?.[0]?.currency || null;
+    }
+    const txCurrency = (batch.currency || walletCurrency || 'IDR').toUpperCase();
+
+    // 1) Validate every row before anything is written.
+    const problems = [];
+    const prepared = [];
+    for (const r of toImport) {
+      let txType = r.final_transaction_type || r.suggested_type || 'expense';
+      if (!VALID_SYSTEM_TX_TYPES.includes(txType)) txType = r.suggested_type || 'expense';
+      const problem = !VALID_SYSTEM_TX_TYPES.includes(txType) ? `Invalid transaction type: ${txType}` : statementRowProblem(r, 'create');
+      if (problem) { problems.push({ row_id: r.id, row_index: r.row_index, error: problem }); continue; }
+      prepared.push({ r, txType });
+    }
+    if (problems.length) return res.status(400).json(invalidRowsBody(problems));
+
+    // 2) FX outside the database transaction.
+    const plan = [];
+    try {
+      for (const { r, txType } of prepared) {
+        const fxRes = await fx.toIdr(r.amount, txCurrency, String(r.tx_date).slice(0, 10));
+        plan.push({
+          row_id: r.id, action: 'create', type: txType,
+          category_id: r.final_category_id || null,
+          category_name: r.final_category_id ? null
+            : (r.suggested_category_id ? (catMap.get(r.suggested_category_id) || null) : (r.suggested_category || null)),
+          counterparty_name: r.suggested_counterparty || null,
+          scope: r.final_scope || null,
+          // What the FX valuation was computed from — the database refuses if any of it changed.
+          expected_amount: Number(r.amount), expected_date: String(r.tx_date).slice(0, 10), currency: txCurrency,
+          amount_idr: fxRes.amount_idr, booked_rate: fxRes.booked_rate, rate_source: fxRes.rate_source,
+          normalized_desc: normalizeDesc(r.description),
+        });
+      }
+    } catch (e) {
+      console.error(`[bank-import] FX valuation failed: ${e.message}`);
+      return res.status(502).json({ error: 'Could not value the statement in IDR. Nothing was imported.', code: 'fx_unavailable' });
+    }
+
+    // 3) One transaction.
+    const result = await runAtomicBankConfirm({ biz, batch, plan, actorUserId: req.user.userId, flow: 'legacy' });
+    if (result.status !== 200) return res.status(result.status).json(result.body);
+    return respond(result.body);
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -6517,16 +6625,25 @@ app.post('/api/bank-imports/:batchId/suggest', auth, async (req, res) => {
       return String(v).slice(0, 10);
     };
     const exKey = (d, amt, type) => `${toIsoDate(d)}|${Math.abs(Number(amt) || 0).toFixed(2)}|${type}`;
+    // A ledger transaction backs at most one statement row: transactions already behind a row
+    // (of any batch) are not suggested, and each one is suggested to a single row of this batch.
+    const { data: linkedRows } = await supabase.from('bank_import_rows')
+      .select('dedup_hash, linked_transaction_id').eq('business_id', biz.business.id)
+      .not('linked_transaction_id', 'is', null);
+    const { backedTxIds } = await importedStatementLines(biz, linkedRows);
     const exIndex = new Map();
     for (const t of existing) {
+      if (backedTxIds.has(Number(t.id))) continue;
       const d = t.transaction_date || (t.created_at ? toIsoDate(t.created_at) : null);
-      exIndex.set(exKey(d, t.amount_original, t.type), t.id);
+      const k = exKey(d, t.amount_original, t.type);
+      if (!exIndex.has(k)) exIndex.set(k, []);
+      exIndex.get(k).push(t.id);
     }
     const findExistingTx = (date, amt, type) => {
       const base = new Date(date);
       for (const off of [0, -1, 1]) {
         const d = isNaN(base) ? date : new Date(base.getTime() + off * 86400000).toISOString().slice(0, 10);
-        const id = exIndex.get(exKey(d, amt, type));
+        const id = exIndex.get(exKey(d, amt, type))?.shift();
         if (id) return { id };
       }
       return null;
@@ -6660,163 +6777,124 @@ app.post('/api/bank-imports/:batchId/confirm', auth, async (req, res) => {
       .select('*').eq('id', req.params.batchId).eq('business_id', biz.business.id).single();
     if (!batch) return res.status(404).json({ error: 'Batch not found' });
     if (batch.status === 'imported') return res.status(400).json({ error: 'Batch already imported' });
+    if (batch.status === 'cancelled') return res.status(409).json({ error: 'Batch was cancelled', code: 'batch_closed' });
+    const periodProblem = statementPeriodProblem(batch);
+    if (periodProblem) return res.status(400).json({ error: `${periodProblem}. The statement looks corrupt; upload it again. Nothing was imported.`, code: 'corrupt_statement_period' });
 
     const payloadRows = Array.isArray(req.body?.rows) ? req.body.rows : [];
     if (!payloadRows.length) return res.status(400).json({ error: 'rows required' });
+    const ids = payloadRows.map(p => p?.row_id);
+    if (ids.some(id => typeof id !== 'string' || !id)) return res.status(400).json({ error: 'Every row needs row_id', code: 'invalid_rows' });
+    if (new Set(ids).size !== ids.length) return res.status(400).json({ error: 'The same row is listed twice', code: 'invalid_rows' });
 
     // Ownership validation sets (category / counterparty must belong to business).
-    const [{ data: cats }, { data: cps }] = await Promise.all([
+    const [{ data: cats }, { data: cps }, { data: rowList }] = await Promise.all([
       supabase.from('cashflow_categories').select('id, name').or(bizOrFilter(biz)),
       supabase.from('counterparties').select('id, name').or(bizOrFilter(biz)),
+      supabase.from('bank_import_rows').select('*').eq('batch_id', batch.id).in('id', ids),
     ]);
     const catNameById = new Map((cats || []).map(c => [c.id, c.name]));
     const cpNameById = new Map((cps || []).map(c => [c.id, c.name]));
+    const rowById = new Map((rowList || []).map(r => [r.id, r]));
 
     let wallet = null;
     if (batch.wallet_id) {
       const { data: w } = await supabase.from('wallets').select('id, name, scope, currency').eq('id', batch.wallet_id).limit(1);
       wallet = w?.[0] || null;
     }
+    const txCurrency = (batch.currency || wallet?.currency || 'IDR').toUpperCase();
 
-    const now = new Date().toISOString();
-    let imported = 0, linked = 0, signedSum = 0;
-
+    // 1) Validate EVERY row before anything is written. One bad row rejects the whole request.
+    const problems = [];
+    const prepared = [];
     for (const p of payloadRows) {
-      const { data: row } = await supabase.from('bank_import_rows')
-        .select('*').eq('id', p.row_id).eq('batch_id', batch.id).single();
-      if (!row || row.linked_transaction_id) continue;
+      const row = rowById.get(p.row_id);
+      const bad = (error) => problems.push({ row_id: p.row_id, row_index: row?.row_index ?? null, error });
+      if (!row) { bad('Row does not belong to this batch'); continue; }
+      if (row.linked_transaction_id) continue;   // already in the ledger — repeat confirm
 
-      // Validate final decision
-      let type = p.transaction_type || row.suggested_transaction_type || row.suggested_type || (row.direction === 'in' ? 'income' : 'expense');
-      if (!VALID_SYSTEM_TX_TYPES.includes(type)) return res.status(400).json({ error: `Invalid transaction_type: ${type}` });
+      const action = p.match_action === 'link' ? 'link' : p.match_action === 'exclude' ? 'exclude' : 'create';
+      const type = p.transaction_type || row.suggested_transaction_type || row.suggested_type || (row.direction === 'in' ? 'income' : 'expense');
+      if (!VALID_SYSTEM_TX_TYPES.includes(type)) { bad(`Invalid transaction_type: ${type}`); continue; }
       const categoryId = p.category_id || null;
-      if (categoryId && !catNameById.has(categoryId)) return res.status(400).json({ error: 'category_id does not belong to this business' });
+      if (categoryId && !catNameById.has(categoryId)) { bad('category_id does not belong to this business'); continue; }
       const counterpartyId = p.counterparty_id || null;
-      if (counterpartyId && !cpNameById.has(counterpartyId)) return res.status(400).json({ error: 'counterparty_id does not belong to this business' });
-      const scope = p.scope || row.suggested_scope || wallet?.scope || 'business';
+      if (counterpartyId && !cpNameById.has(counterpartyId)) { bad('counterparty_id does not belong to this business'); continue; }
+      if (action !== 'exclude') {
+        const problem = statementRowProblem(row, action);
+        if (problem) { bad(problem); continue; }
+      }
 
-      // Link validation (validate match before writing confirmed review status)
-      const matchTxId = p.matched_transaction_id || (p.match_action === 'link' ? (row.suggested_match_type === 'existing_tx' ? Number(row.suggested_match_id) : row.matched_transaction_id) : null);
-      let txObj = null;
-      if (p.match_action === 'link') {
-        if (!matchTxId) {
-          return res.status(400).json({ error: 'Matched transaction ID required for linking' });
-        }
+      let matchTxId = null;
+      if (action === 'link') {
+        matchTxId = p.matched_transaction_id || (row.suggested_match_type === 'existing_tx' ? Number(row.suggested_match_id) : row.matched_transaction_id);
+        if (!matchTxId) { bad('Matched transaction ID required for linking'); continue; }
         const { data: txList, error: txErr } = await supabase.from('transactions')
           .select('id, business_id, wallet_id, amount_original, type, currency_original')
           .eq('id', matchTxId).limit(1);
-        txObj = txList?.[0] || null;
-        if (txErr || !txObj) {
-          return res.status(400).json({ error: 'Matched transaction not found' });
-        }
-        if (String(txObj.business_id) !== String(biz.business.id)) {
+        const txObj = txList?.[0] || null;
+        if (txErr || !txObj) { bad('Matched transaction not found'); continue; }
+        if (String(txObj.business_id) !== String(biz.business.id))
           return res.status(403).json({ error: 'isolation_violation', message: 'Matched transaction belongs to another business' });
-        }
-        if (batch.wallet_id && txObj.wallet_id && String(txObj.wallet_id) !== String(batch.wallet_id)) {
-          return res.status(400).json({ error: 'Matched transaction belongs to a different wallet' });
-        }
-        if (txObj.type && txObj.type !== type) {
-          return res.status(400).json({ error: `Matched transaction type (${txObj.type}) does not match row type (${type})` });
-        }
-        if (Math.abs(Number(txObj.amount_original) - Number(row.amount)) >= 0.01) {
-          return res.status(400).json({ error: 'Matched transaction amount does not match statement row amount' });
-        }
-        // Verify not already linked to another statement row
+        if (batch.wallet_id && txObj.wallet_id && String(txObj.wallet_id) !== String(batch.wallet_id)) { bad('Matched transaction belongs to a different wallet'); continue; }
+        if (txObj.type && txObj.type !== type) { bad(`Matched transaction type (${txObj.type}) does not match row type (${type})`); continue; }
+        if (Math.abs(Number(txObj.amount_original) - Number(row.amount)) >= 0.01) { bad('Matched transaction amount does not match statement row amount'); continue; }
         const { data: alreadyLinked } = await supabase.from('bank_import_rows')
           .select('id').eq('linked_transaction_id', matchTxId).neq('id', row.id).limit(1);
-        if (alreadyLinked?.length) {
-          return res.status(400).json({ error: 'Matched transaction is already linked to another statement row' });
-        }
+        if (alreadyLinked?.length) { bad('Matched transaction is already linked to another statement row'); continue; }
+        const twin = prepared.find(x => x.action === 'link' && x.item.matched_transaction_id === Number(matchTxId));
+        if (twin) { bad(`Statement row ${twin.row.row_index + 1} already links to the same transaction; choose Create for one of them`); continue; }
       }
 
-      // Persist final decision + audit feedback (suggestion vs final)
-      await supabase.from('bank_import_rows').update({
-        final_transaction_type: type, final_category_id: categoryId,
-        final_counterparty_id: counterpartyId, final_scope: scope,
-        review_status: p.match_action === 'link' ? 'matched_existing' : 'confirmed',
-        reviewed_by_user_id: req.user.userId, reviewed_at: now,
-      }).eq('id', row.id);
-      await supabase.from('classification_feedback').insert({
-        business_id: biz.business.id, bank_import_row_id: row.id,
-        normalized_desc: normalizeDesc(row.description),
-        suggested_category_id: row.suggested_category_id || null, final_category_id: categoryId,
-        suggested_transaction_type: row.suggested_transaction_type || null, final_transaction_type: type,
-        confidence: row.suggestion_confidence || null,
-        accepted: (row.suggested_category_id || null) === categoryId && (row.suggested_transaction_type || null) === type,
-        source: 'bank_review', reviewed_by_user_id: req.user.userId,
+      prepared.push({
+        row, action,
+        item: {
+          row_id: row.id, action, type,
+          category_id: categoryId, counterparty_id: counterpartyId,
+          scope: p.scope || row.suggested_scope || wallet?.scope || 'business',
+          matched_transaction_id: matchTxId ? Number(matchTxId) : null,
+          // What validation and the FX valuation used — the database refuses if any of it changed.
+          expected_amount: action === 'exclude' ? undefined : Number(row.amount),
+          expected_date: action === 'create' ? String(row.tx_date).slice(0, 10) : undefined,
+          currency: action === 'create' ? txCurrency : undefined,
+          normalized_desc: normalizeDesc(row.description),
+        },
       });
-
-      // Link to an existing record (no new transaction, no double cash impact).
-      if (p.match_action === 'link' && txObj) {
-        await supabase.from('bank_import_rows').update({
-          review_status: 'matched_existing',
-          matched_transaction_id: Number(matchTxId),
-          linked_transaction_id: Number(matchTxId),
-        }).eq('id', row.id);
-        linked++;
-        signedSum += type === 'income' ? Number(row.amount) : -Number(row.amount);
-        continue;
-      }
-      if (p.match_action === 'exclude') {
-        await supabase.from('bank_import_rows').update({ review_status: 'excluded' }).eq('id', row.id);
-        continue;
-      }
-
-      // Create the transaction (default action)
-      const txCurrency = (batch.currency || wallet?.currency || 'IDR').toUpperCase();
-      const txDate = row.tx_date || now.slice(0, 10);
-      const fxRes = await fx.toIdr(row.amount, txCurrency, txDate);
-      const { data: tx, error } = await supabase.from('transactions').insert({
-        ...bizWriteFields(biz, req.user.userId),
-        type,
-        amount_original: row.amount,
-        amount_idr: fxRes.amount_idr,
-        booked_rate: fxRes.booked_rate,
-        rate_source: fxRes.rate_source,
-        currency_original: txCurrency,
-        description: row.description || 'Bank import', source: wallet?.name || null,
-        wallet_id: batch.wallet_id || null, scope,
-        category: categoryId ? catNameById.get(categoryId) : null,
-        counterparty_name: counterpartyId ? cpNameById.get(counterpartyId) : (row.suggested_counterparty || null),
-        transaction_date: txDate,
-      }).select('id').single();
-      if (error) continue;
-      await supabase.from('bank_import_rows').update({ linked_transaction_id: tx.id, review_status: 'imported' }).eq('id', row.id);
-      imported++; signedSum += type === 'income' ? Number(row.amount) : -Number(row.amount);
     }
-
-    // Reconciliation snapshot
-    let reconciliation = null;
-    if (batch.opening_balance !== null && batch.closing_balance !== null) {
-      const computed = Number(batch.opening_balance) + signedSum;
-      const diff = Number(batch.closing_balance) - computed;
-      const { data: rec } = await supabase.from('bank_reconciliations').insert({
-        batch_id: batch.id, business_id: biz.business.id, wallet_id: batch.wallet_id || null,
-        opening_balance: batch.opening_balance, closing_balance: batch.closing_balance,
-        computed_closing: computed, difference: diff,
-        status: Math.abs(diff) < 1 ? 'balanced' : 'unbalanced',
-      }).select().single();
-      reconciliation = rec || null;
-    }
-
-    const { data: after } = await supabase.from('bank_import_rows').select('review_status').eq('batch_id', batch.id);
-    const remaining = (after || []).filter(r => ['needs_review', 'suggested', 'high_confidence'].includes(r.review_status)).length;
-    const status = remaining > 0 ? 'partially_imported' : 'imported';
-    await supabase.from('bank_import_batches').update({
-      imported_count: (batch.imported_count || 0) + imported, status, updated_at: now,
-    }).eq('id', batch.id);
-
+    if (problems.length) return res.status(400).json(invalidRowsBody(problems));
     // Bridge (PR2). THIS is the confirm the Bank Import screen actually calls
     // (client/src/pages/BankImport.jsx → upload → /suggest → /review → this route), so the
-    // bridge has to run here or a real statement import produces no evidence at all. The V1
-    // route above is bridged too, for API clients still using it.
-    // Rows are re-read because the loop above just changed their review_status to 'imported'.
-    const { data: bridgeRows } = await supabase.from('bank_import_rows').select('*').eq('batch_id', batch.id);
-    const incoming_payments = await bridgeBankBatchToIncomingPayments({
-      batch, rows: bridgeRows, biz, actingUserId: req.user.userId });
+    // bridge has to run here or a real statement import produces no evidence at all. It runs
+    // after the ledger transaction committed, never fails the import, and is idempotent — a
+    // repeated confirm re-runs it so evidence missed by an earlier failure is recovered.
+    // Rows are re-read because the confirm just changed their review_status to 'imported'.
+    const respond = async (out) => {
+      const { data: bridgeRows } = await supabase.from('bank_import_rows').select('*').eq('batch_id', batch.id);
+      const incoming_payments = await bridgeBankBatchToIncomingPayments({
+        batch, rows: bridgeRows, biz, actingUserId: req.user.userId });
+      res.json({ ok: true, imported: out.imported, linked: out.linked, status: out.status, reconciliation: out.reconciliation,
+                 ...(incoming_payments ? { incoming_payments } : {}) });
+    };
+    // Every requested row is already in the ledger (repeat / double click): nothing is written —
+    // unlike before, not even an empty reconciliation snapshot.
+    if (!prepared.length) return respond({ imported: 0, linked: 0, status: batch.status, reconciliation: null });
 
-    res.json({ ok: true, imported, linked, status, reconciliation,
-               ...(incoming_payments ? { incoming_payments } : {}) });
+    // 2) FX outside the database transaction (may call a rate provider).
+    try {
+      for (const pr of prepared) {
+        if (pr.action !== 'create') continue;
+        const fxRes = await fx.toIdr(pr.row.amount, txCurrency, String(pr.row.tx_date).slice(0, 10));
+        Object.assign(pr.item, { amount_idr: fxRes.amount_idr, booked_rate: fxRes.booked_rate, rate_source: fxRes.rate_source });
+      }
+    } catch (e) {
+      console.error(`[bank-import] FX valuation failed: ${e.message}`);
+      return res.status(502).json({ error: 'Could not value the statement in IDR. Nothing was imported.', code: 'fx_unavailable' });
+    }
+
+    // 3) One transaction: transactions, row links, feedback, reconciliation, batch status.
+    const result = await runAtomicBankConfirm({ biz, batch, plan: prepared.map(pr => pr.item), actorUserId: req.user.userId, flow: 'review' });
+    if (result.status !== 200) return res.status(result.status).json(result.body);
+    return respond(result.body);
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 

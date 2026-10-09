@@ -76,3 +76,13 @@ jobs:
         env:
           DATABASE_URL: postgresql://postgres:postgrespassword@localhost:5432/testdb
         run: node --test tests/integration/postgresBankReconciliationFlow.test.js
+
+      - name: Run PostgreSQL Atomic Bank Import Confirm Tests (migration 069, production schema snapshot)
+        env:
+          DATABASE_URL: postgresql://postgres:postgrespassword@localhost:5432/testdb
+        run: node --test tests/integration/postgresBankImportAtomicConfirm.test.js
+
+      - name: Run PostgreSQL Bank Import Confirm HTTP Tests (real server, migration 069)
+        env:
+          DATABASE_URL: postgresql://postgres:postgrespassword@localhost:5432/testdb
+        run: node --test tests/integration/postgresBankImportConfirmHttp.test.js
