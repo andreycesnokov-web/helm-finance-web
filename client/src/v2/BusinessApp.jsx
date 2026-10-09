@@ -16,7 +16,7 @@ import { useWorkspace } from '../shell/WorkspaceProvider'
 import {
   BusinessLayout, BusinessTransactions, BusinessPayables, BusinessReceivables,
   BusinessInvoices, BusinessIncomingPayments, BusinessPaymentConnections,
-  BusinessNew, BusinessIntercompany, BusinessDocuments,
+  BusinessIntercompany, BusinessDocuments,
 } from '../pages/business'
 import { BusinessAccountantHub } from '../pages/business/AccountantPremium'
 import BusinessOnboarding from '../pages/business/Onboarding'
@@ -50,6 +50,7 @@ import V2Payroll from './pages/Payroll'
 import V2Funding from './pages/Funding'
 import V2Accountant from './pages/Accountant'
 import CompanyProfile from './pages/CompanyProfile'
+import CompanyProfileEdit from './pages/CompanyProfileEdit'
 import V2Documents from './pages/Documents'
 import V2Settings from './pages/Settings'
 import FirstDay from './pages/FirstDay'
@@ -58,6 +59,7 @@ import Performance from './pages/Performance'
 import Assets from './pages/Assets'
 import AddAsset from './pages/AddAsset'
 import { AskProvider } from './ai/AskContext'
+import { SetupFrame, SetupAbout, SetupStep } from './setup/Setup'
 
 function V2Frame() {
   const t = useT()
@@ -81,6 +83,11 @@ export default function BusinessApp() {
   return (
     <Routes>
       <Route element={<BusinessLayout />}>
+        {/* Company setup (reg/R4–R7): its own frame, no sidebar — the company may not exist yet. */}
+        <Route element={<SetupFrame />}>
+          <Route path="new" element={<SetupAbout />} />
+          <Route path="setup/:step" element={<SetupStep />} />
+        </Route>
         <Route element={<V2Frame />}>
           {/* Overview */}
           <Route path="pulse" element={<V2Pulse />} />
@@ -125,6 +132,7 @@ export default function BusinessApp() {
           <Route path="accountant/classic" element={<BusinessAccountantHub />} />
           <Route path="accountant/calendar" element={<ComplianceCalendar />} />
           <Route path="accountant/tax-profile" element={<CompanyProfile />} />
+          <Route path="accountant/tax-profile/edit" element={<CompanyProfileEdit />} />
           <Route path="accountant/tax-split" element={<TaxSplit />} />
           <Route path="accountant/settlement" element={<InvoiceSettlement />} />
           {/* Settings and workspace */}
@@ -134,7 +142,6 @@ export default function BusinessApp() {
           <Route path="payment-connections" element={<BusinessPaymentConnections />} />
           <Route path="onboarding" element={<FirstDay />} />
           <Route path="onboarding/classic" element={<BusinessOnboarding />} />
-          <Route path="new" element={<BusinessNew />} />
           {/* Phone navigation */}
           <Route path="more" element={<More />} />
           <Route path="add" element={<AddEntry />} />

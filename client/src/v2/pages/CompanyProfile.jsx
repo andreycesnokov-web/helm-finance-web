@@ -18,6 +18,7 @@ const DOCS = ['akta', 'sk_kemenkumham', 'nib', 'npwp']
 // Tax regime values the legacy profile form stores; anything else is shown as stored.
 const REGIMES = ['normal', 'pp23_final', 'pph_final_umkm']
 const show = (v) => (v == null || v === '' || (Array.isArray(v) && !v.length) ? null : Array.isArray(v) ? v.join(', ') : String(v))
+const kbliCodes = (v) => String(v || '').split(/[,;\s]+/).filter(Boolean)
 const mask = (v) => { const s = String(v || '').replace(/\D/g, ''); return s.length > 4 ? `···· ${s.slice(-4)}` : show(v) }
 
 function Row({ label, value, source, t }) {
@@ -37,7 +38,7 @@ export default function CompanyProfile() {
   const req = useApi('/ai-accountant/required-documents')
   const payroll = useApi('/payroll/overview')
   const head = <PageHead title={t('screen.companyProfile')} sub={t('prof.sub')} back={{ to: '/business/settings', label: t('nav.settings') }}
-    actions={<Btn variant="primary" to="/business/accountant/classic">{t('prof.edit')}</Btn>} />
+    actions={<Btn variant="primary" to="/business/accountant/tax-profile/edit">{t('prof.edit')}</Btn>} />
   if (prof.loading) return <>{head}<AccountantTabs active="profile" /><Card><Skeleton rows={8} /></Card></>
   if (prof.error) return <>{head}<AccountantTabs active="profile" /><ErrorBox error={prof.error?.status === 403 ? t('dec.forbidden') : prof.error} onRetry={prof.reload} /></>
 
@@ -85,8 +86,9 @@ export default function CompanyProfile() {
           <Card title={t('prof.licence')}>
             <dl className="v2-dl">
               <Row t={t} label="NIB" value={mask(p.nib)} source={p.nib_issue_date ? shortDate(p.nib_issue_date, lang) : null} />
-              <Row t={t} label={t('prof.mainKbli')} value={show(p.primary_kbli)} />
-              <Row t={t} label={t('prof.otherKbli')} value={show(p.additional_kbli || p.business_activity_codes)} />
+              {/* KBLI: the 040 columns, else business_activity_codes (kept before 040 by the setup step). */}
+              <Row t={t} label={t('prof.mainKbli')} value={show(p.primary_kbli || kbliCodes(p.business_activity_codes)[0])} />
+              <Row t={t} label={t('prof.otherKbli')} value={show(p.additional_kbli || kbliCodes(p.business_activity_codes).slice(1).join(', '))} />
               <Row t={t} label={t('prof.activities')} value={show(p.actual_business_activities || p.industry)} />
             </dl>
           </Card>

@@ -36,6 +36,7 @@
 // Paying a bill and creating a bill/invoice reuse the existing DebtPaymentModal and
 // DebtFormModal components unchanged, so their writes are the legacy ones.
 import { apiFetch } from '../../lib/api'
+import { uploadDocument } from '../../lib/documents'
 
 export const approveDebt = (token, id) =>
   apiFetch(`/debts/${encodeURIComponent(id)}/approve`, token, { method: 'PATCH', body: { channel: 'web' } })
@@ -117,3 +118,51 @@ export function actionError(e) {
   if (e?.status === 409 && e?.data?.error === 'migration_not_applied') return 'notApplied'
   return e?.data?.message || e?.message || 'failed'
 }
+
+// Company tax profile (2026-10-10, the v2 profile editor) — existing routes, role-checked on the
+// server (owner / CEO / admin / CFO), critical fields audited, a critical change re-opens review:
+//   PUT  /api/accountant/profile                  save the profile (answers not_saved before 040)
+//   POST /api/accountant/profile/verify           mark the profile checked
+//   POST /api/accountant/profile/from-documents   AI reads NPWP / NIB / KBLI / deed — suggests only
+export const saveTaxProfile = (token, body) =>
+  apiFetch('/accountant/profile', token, { method: 'PUT', body })
+
+export const verifyTaxProfile = (token) =>
+  apiFetch('/accountant/profile/verify', token, { method: 'POST', body: {} })
+
+export const readProfileFromDocuments = (token, { force = false } = {}) =>
+  apiFetch('/accountant/profile/from-documents', token, { method: 'POST', body: { force } })
+
+// Sign-in and company setup (2026-10-10, designs reg/R1–R9). Existing routes; the server checks
+// everything (email rate limits, one-time links, invite validity, owner membership on create).
+//   POST  /api/auth/email/start          send the sign-in link (public)
+//   POST  /api/auth/email/verify         one-time link token or 6-digit code → session (public)
+//   PATCH /api/me/profile                name, timezone, language of the signed-in person
+//   POST  /api/invite/:code/accept       join a company by invitation
+//   POST  /api/businesses                create a company — the creator becomes its owner
+// Reads used before a company exists (no v2 data provider yet):
+//   GET /api/invite/:code (public) · GET /api/me/profile · GET /api/workspaces
+export const startEmailSignIn = (email) =>
+  apiFetch('/auth/email/start', null, { method: 'POST', body: { email } })
+
+export const verifyEmailSignIn = (body) =>
+  apiFetch('/auth/email/verify', null, { method: 'POST', body })
+
+export const updateMyProfile = (token, patch) =>
+  apiFetch('/me/profile', token, { method: 'PATCH', body: patch })
+
+export const acceptInvite = (token, code) =>
+  apiFetch(`/invite/${encodeURIComponent(code)}/accept`, token, { method: 'POST', body: {} })
+
+export const createCompany = (token, body) =>
+  apiFetch('/businesses', token, { method: 'POST', body })
+
+export const lookupInvite = (code) => apiFetch(`/invite/${encodeURIComponent(code)}`, null)
+export const readMyProfile = (token) => apiFetch('/me/profile', token)
+export const readWorkspaces = (token) => apiFetch('/workspaces', token)
+
+// Company setup, step 2: upload one company document (NIB, NPWP, deed…). The existing signed
+// upload — POST /api/documents/upload-init, PUT to storage, POST /api/documents/upload-complete —
+// in client/src/lib/documents.js; the server classifies the text and runs the intake pipeline.
+export const uploadCompanyDocument = (token, file) =>
+  uploadDocument(token, file, { title: file.name, upload_source: 'accountant_upload' })

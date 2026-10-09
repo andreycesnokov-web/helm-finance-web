@@ -56,6 +56,16 @@ export const WRITE_ALLOW = [
   { method: 'POST', path: '/identify`' },                   // POST   /api/documents/:id/identify (AI explanation)
   { method: 'POST', path: '/filing`' },                     // POST   /api/documents/:id/filing (bank account + month, counterparty, keep)
   { method: 'POST', path: '/tax-obligation`' },             // POST   /api/documents/:id/tax-obligation (tax from a document → tax calendar)
+  // Company tax profile editor (2026-10-10): existing routes, role-checked, critical fields audited.
+  { method: 'PUT', path: "'/accountant/profile'" },                  // PUT  /api/accountant/profile
+  { method: 'POST', path: "'/accountant/profile/verify'" },          // POST /api/accountant/profile/verify
+  { method: 'POST', path: "'/accountant/profile/from-documents'" },  // POST /api/accountant/profile/from-documents (AI suggests only)
+  // Sign-in and company setup (2026-10-10, reg/R1–R9): existing routes, checked on the server.
+  { method: 'POST', path: "'/auth/email/start'" },     // POST  /api/auth/email/start (public, rate-limited)
+  { method: 'POST', path: "'/auth/email/verify'" },    // POST  /api/auth/email/verify (public, one-time)
+  { method: 'PATCH', path: "'/me/profile'" },          // PATCH /api/me/profile
+  { method: 'POST', path: '/accept`' },                // POST  /api/invite/:code/accept
+  { method: 'POST', path: "'/businesses'" },           // POST  /api/businesses (creator = owner)
 ]
 const ACTIONS = path.join(V2, 'lib', 'actions.js')
 // POSTs that ask an existing AI endpoint a question and change no data. Only in lib/ask.js.
@@ -140,7 +150,10 @@ t('every allowed write exists on the server (batch 8 routes are the approved one
     /app\.post\('\/api\/assets'/, /app\.post\('\/api\/business-funding'/, /app\.post\('\/api\/business-funding\/repayments\/:rid\/paid'/,
     /app\.post\('\/api\/documents\/:id\/signed-url'/, /app\.patch\('\/api\/documents\/:id'/, /app\.post\('\/api\/documents\/:id\/links'/,
     /app\.delete\('\/api\/documents\/:id\/links\/:linkId'/, /app\.post\('\/api\/documents\/:id\/archive'/,
-    /app\.patch\('\/api\/ai-accountant\/documents\/:id\/classification'/, /app\.post\('\/api\/documents\/:id\/identify'/, /app\.post\('\/api\/documents\/:id\/filing'/, /app\.post\('\/api\/documents\/:id\/tax-obligation'/]) {
+    /app\.patch\('\/api\/ai-accountant\/documents\/:id\/classification'/, /app\.post\('\/api\/documents\/:id\/identify'/, /app\.post\('\/api\/documents\/:id\/filing'/, /app\.post\('\/api\/documents\/:id\/tax-obligation'/,
+    /app\.put\('\/api\/accountant\/profile'/, /app\.post\('\/api\/accountant\/profile\/verify'/, /app\.post\('\/api\/accountant\/profile\/from-documents'/,
+    /app\.post\('\/api\/auth\/email\/start'/, /app\.post\('\/api\/auth\/email\/verify'/, /app\.patch\('\/api\/me\/profile'/,
+    /app\.post\('\/api\/invite\/:code\/accept'/, /app\.post\('\/api\/businesses'/]) {
     assert.ok(r.test(server), `server route ${r} missing`)
   }
 })

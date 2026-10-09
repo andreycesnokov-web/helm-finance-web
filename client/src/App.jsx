@@ -564,6 +564,11 @@ const V2BusinessApp = DESIGN_V2 ? lazy(() => import('./v2/BusinessApp')) : null
 // Platform admin v2 (overview, companies, flags & system). Same flag, same lazy boundary;
 // every other /admin route stays the existing page.
 const V2AdminApp = DESIGN_V2 ? lazy(() => import('./v2/AdminApp')) : null
+// Sign-in, account and invitation in the v2 design (reg/R1–R10). Needs email sign-in too:
+// without it /login keeps the Telegram widget.
+const V2Auth = DESIGN_V2 ? lazy(() => import('./v2/auth/AuthApp')) : null
+const V2_AUTH = DESIGN_V2 && EMAIL_AUTH_UI
+const v2Auth = (page) => <Suspense fallback={null}><V2Auth page={page} /></Suspense>
 
 // Redirect legacy /accountant addresses to /business/accountant with search query preservation (e.g. ?ask=... / ?q=...).
 function AccountantRedirect({ to = '/business/accountant' }) {
@@ -582,16 +587,17 @@ export default function App() {
       <AuthProvider>
         <SwipeBackIndicator />
         <Routes>
-          <Route path="/login" element={<Login />} />
+          <Route path="/login" element={V2_AUTH ? v2Auth('signin') : <Login />} />
           {/* "Sign in with CFO Finance" consent for AI clients (MCP OAuth). Handles sign-in itself. */}
           <Route path="/oauth/consent" element={<OAuthConsent />} />
           {/* Upload link from an AI assistant (MCP upload_document). Sign-in required on the page. */}
           <Route path="/upload" element={<UploadLink />} />
           {/* Email-primary identity UI — only when VITE_EMAIL_AUTH_ENABLED=true.
               Telegram login (/login) stays the default and is unchanged. */}
-          {EMAIL_AUTH_UI && <Route path="/login/email" element={<EmailLogin />} />}
-          {EMAIL_AUTH_UI && <Route path="/login/email/callback" element={<EmailCallback />} />}
-          {EMAIL_AUTH_UI && <Route path="/account" element={<PersonalProfile />} />}
+          {EMAIL_AUTH_UI && <Route path="/login/email" element={V2_AUTH ? v2Auth('signin') : <EmailLogin />} />}
+          {EMAIL_AUTH_UI && <Route path="/login/email/callback" element={V2_AUTH ? v2Auth('callback') : <EmailCallback />} />}
+          {EMAIL_AUTH_UI && <Route path="/account" element={V2_AUTH ? v2Auth('account') : <PersonalProfile />} />}
+          {V2_AUTH && <Route path="/join" element={v2Auth('join')} />}
           {/* Legacy Telegram login: a real page when email auth is on; when off, /login
               already shows the widget, so just send /login/telegram back to /login. */}
           {EMAIL_AUTH_UI
@@ -695,7 +701,7 @@ export default function App() {
           </Route>
           )}
           {/* Public invite page — no auth required to view, Telegram widget handles login */}
-          <Route path="/invite/:code" element={<JoinInvite />} />
+          <Route path="/invite/:code" element={V2_AUTH ? v2Auth('join') : <JoinInvite />} />
           {/* Standalone onboarding — accessible directly to re-run setup */}
           <Route path="/onboarding" element={<OnboardingRoute />} />
           {/* Hidden admin routes — not in sidebar, protected by ADMIN_TELEGRAM_IDS on backend */}

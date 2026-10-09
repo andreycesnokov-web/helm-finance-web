@@ -12337,8 +12337,9 @@ app.patch('/api/business/current', auth, async (req, res) => {
       ({ data: business, error: bErr } = await supabase
         .from('businesses').update(updates).eq('id', businessId).select().single());
       if (!bErr) break;
-      const m = /find the '([a-z_]+)' column/i.exec(bErr.message || '');
-      const col = m?.[1];
+      // PostgREST: "Could not find the 'x' column"; Postgres itself: 'column "x" of relation … does not exist'.
+      const m = /find the '([a-z_]+)' column|column "([a-z_]+)" of relation/i.exec(bErr.message || '');
+      const col = m?.[1] || m?.[2];
       if (col && col in updates && !['name', 'base_currency'].includes(col)) { delete updates[col]; dropped.push(col); continue; }
       break;
     }
@@ -13921,8 +13922,9 @@ app.post('/api/businesses', auth, async (req, res) => {
     for (let i = 0; i < 5; i++) {
       ({ data: business, error: bErr } = await supabase.from('businesses').insert(row).select().single());
       if (!bErr) break;
-      const m = /find the '([a-z_]+)' column/i.exec(bErr.message || '');
-      const col = m?.[1];
+      // PostgREST: "Could not find the 'x' column"; Postgres itself: 'column "x" of relation … does not exist'.
+      const m = /find the '([a-z_]+)' column|column "([a-z_]+)" of relation/i.exec(bErr.message || '');
+      const col = m?.[1] || m?.[2];
       if (col && col in row && !['name', 'base_currency', 'owner_user_id', 'type', 'plan'].includes(col)) { delete row[col]; dropped.push(col); continue; }
       break;
     }
@@ -14457,6 +14459,7 @@ const docContent = require('./lib/documentContent');
 const docIdentify = require('./lib/documentIdentify');
 const profileDocs = require('./lib/profileFromDocuments');
 const taxDeadlines = require('./lib/taxDeadlines');
+const { normalizePkpStatus } = require('./lib/pkpStatus');
 const { extractPdfText } = require('./lib/pdfText');
 const docExtract = require('./lib/documentExtraction');
 const docOcr = require('./lib/documentOcr');

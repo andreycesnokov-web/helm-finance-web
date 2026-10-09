@@ -117,7 +117,7 @@ function AskBox({ externalQuery = '', onQueryChange, onOpenModal }) {
 }
 
 // The rule's name in the user's language; the stored English title is the fallback.
-const ruleTitle = (t, e) => { const k = `acct.rule.${e.rule_code}`; const v = t(k); return v && v !== k ? v : (e.title || e.rule_code) }
+export const ruleTitle = (t, e) => { const k = `acct.rule.${e.rule_code}`; const v = t(k); return v && v !== k ? v : (e.title || e.rule_code) }
 
 // What the company's own records give for last month (GET /api/accountant/obligations — the
 // deterministic engine: PPh 21/26 from payroll deduction lines; PPh 23 and PPN need data the app
@@ -149,7 +149,7 @@ function FromYourData({ obl, t, lang }) {
   )
 }
 
-function TaxList({ events, lang, t, limit, empty = 'acct.noEvents' }) {
+export function TaxList({ events, lang, t, limit, empty = 'acct.noEvents' }) {
   if (!events.length) return <p className="v2-muted">{t(empty)}</p>
   return (
     <ul className="v2-taxlist">
