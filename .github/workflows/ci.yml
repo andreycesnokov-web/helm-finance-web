@@ -86,3 +86,8 @@ jobs:
         env:
           DATABASE_URL: postgresql://postgres:postgrespassword@localhost:5432/testdb
         run: node --test tests/integration/postgresBankImportConfirmHttp.test.js
+
+      - name: Run PostgreSQL User Delete Restrict Tests (migration 070, production schema snapshot)
+        env:
+          DATABASE_URL: postgresql://postgres:postgrespassword@localhost:5432/testdb
+        run: node --test tests/integration/postgresUserDeleteRestrict.test.js
