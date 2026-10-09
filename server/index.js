@@ -14358,6 +14358,7 @@ app.get('/api/documents/health', auth, async (req, res) => {
 // ═══════════════════════════════════════════════════════════════════════════
 const docIntake = require('./lib/documentIntake');
 const docContent = require('./lib/documentContent');
+const docIdentify = require('./lib/documentIdentify');
 const { extractPdfText } = require('./lib/pdfText');
 const docExtract = require('./lib/documentExtraction');
 const docOcr = require('./lib/documentOcr');
@@ -14463,6 +14464,20 @@ const publicIntakeDoc = ({ raw, ...rest }) => rest;   // never leak the raw row
 // metadata, so returning the column wholesale would leak extraction internals through
 // /api/documents. Both of these are WHITELISTS: a field that is not named here is not
 // returned, so future additions to extracted_json are private by default.
+const IDENTIFY_FIELDS = ['lang', 'at', 'read', 'suggested_type', 'suggested_label', 'suggested_area', 'suggested_source', 'suggested_confidence', 'unavailable_reason'];
+const EXPLAIN_FIELDS = ['title', 'summary', 'issued_by', 'issued_on', 'number', 'purpose', 'place', 'next_step', 'warnings'];
+const publicIdentify = (all) => {
+  if (!all || typeof all !== 'object') return null;
+  const out = {};
+  for (const lang of ['ru', 'en', 'id']) {
+    const r = all[lang];
+    if (!r || typeof r !== 'object') continue;
+    const row = Object.fromEntries(IDENTIFY_FIELDS.map((k) => [k, r[k] ?? null]));
+    row.explanation = r.explanation ? Object.fromEntries(EXPLAIN_FIELDS.map((k) => [k, r.explanation[k] ?? null])) : null;
+    out[lang] = row;
+  }
+  return Object.keys(out).length ? out : null;
+};
 const publicExtractedJson = (ej) => {
   if (!ej || typeof ej !== 'object') return null;
   const ai = ej.ai_intake;
@@ -14488,6 +14503,8 @@ const publicExtractedJson = (ej) => {
     // Which screen the upload came from. The UI shows it beside the AI's reading so a
     // disagreement is visible instead of silently resolved.
     upload_intent: publicUploadIntent(ej.upload_intent),
+    // "What is this document?" readings (POST /api/documents/:id/identify), per language.
+    ai_identify: publicIdentify(ej.ai_identify),
   };
 };
 const publicDocRow = (d) => (d ? { ...d, extracted_json: publicExtractedJson(d.extracted_json) } : d);
@@ -15609,6 +15626,90 @@ app.post('/api/documents/:id/intake', auth, async (req, res) => {
   } catch (e) {
     console.error(`[doc-intake-v2] failed: ${e.message}`);
     res.status(500).json({ ok: false, error: 'document_intake_failed' });
+  }
+});
+
+// POST /api/documents/:id/identify — "what is this document?" in the user's language.
+//
+// The TYPE is the deterministic content classifier's (documentContent.js) when it is confident;
+// the model may only propose one otherwise, and says so. The model EXPLAINS (title, summary,
+// issuer, date, number, purpose, where it belongs, next step). Nothing is applied: the client
+// offers the suggested type and the user confirms it through the existing classification route.
+// The reading is stored at extracted_json.ai_identify (one per language) so a document is read
+// once, not on every open; `force` re-reads. A document with no text layer is sent to the model
+// as the file itself (owner decision 2026-10-09: the AI must identify documents on its own).
+app.post('/api/documents/:id/identify', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res); if (!biz) return;
+    if (!canViewBusinessFinance(biz.role))
+      return res.status(403).json({ error: 'Your role cannot view business finance' });
+    if (!await hasDocumentsAccess(biz))
+      return res.status(403).json({ error: 'Document Center is not enabled', upgrade_required: true });
+    const doc = await loadDocumentScoped(biz, req.params.id);
+    if (!doc) return res.status(404).json({ error: 'document_not_found_in_this_business' });
+    if (doc.archived_at) return res.status(409).json({ error: 'document_archived' });
+    const [withLinks] = await attachLinks(biz, [doc]);
+    if (!await userCanAccessDoc(biz, req.user.userId, biz.role, withLinks))
+      return res.status(403).json({ error: 'You do not have access to this document' });
+
+    const lang = ['ru', 'en', 'id'].includes(req.body?.lang) ? req.body.lang : 'en';
+    const stored = (doc.extracted_json || {}).ai_identify || {};
+    if (!req.body?.force && stored[lang]) return res.json({ ok: true, cached: true, identify: stored[lang] });
+
+    const { data: fileRows } = await supabase.from('document_files')
+      .select('storage_path, file_name, mime_type').eq('id', doc.file_id).eq('business_id', biz.business.id).limit(1);
+    const file = fileRows?.[0];
+    if (!file) return res.status(404).json({ error: 'file_not_found' });
+    const { data: blob, error: dlErr } = await supabase.storage.from(DOC_BUCKET).download(file.storage_path);
+    if (dlErr || !blob) return res.status(503).json({ error: 'document_unavailable' });
+    const buf = Buffer.from(await blob.arrayBuffer());
+
+    const isPdf = /pdf/i.test(file.mime_type || '') || /\.pdf$/i.test(file.file_name || '');
+    const isSheet = /\.(xlsx|xlsm|xls|csv|tsv)$/i.test(file.file_name || '') || /spreadsheet|excel|text\/csv/i.test(file.mime_type || '');
+    let text = '';
+    let method = 'none';
+    if (isPdf) {
+      const ex = extractPdfText(buf);
+      if (ex.text_available) { text = ex.text; method = 'embedded_text'; }
+    } else if (/\.(csv|tsv|txt)$/i.test(file.file_name || '') || /^text\//i.test(file.mime_type || '')) {
+      text = buf.toString('utf8').slice(0, 20000); method = 'text_file';
+    } else if (isSheet && typeof req.body?.sheet_text === 'string') {
+      // The server has no spreadsheet parser; the browser already rendered the sheet's own
+      // cells for the preview and sends them here. Accepted only for a spreadsheet file.
+      text = req.body.sheet_text.slice(0, 20000); method = 'sheet_cells';
+    }
+    const verdict = docContent.classifyDocument({
+      file_name: file.file_name, mime_type: file.mime_type, company_name: biz.business?.name,
+      text, text_available: !!text, method: method === 'none' ? 'filename_only' : method,
+    });
+    const types = docIntake.INTAKE_TYPES.map((x) => x.type);
+    const ai = await docIdentify.explainDocument({
+      client: anthropic, text, verdict, types, lang, file_name: file.file_name,
+      company_name: biz.business?.name, buffer: text ? null : buf, mime_type: file.mime_type,
+    });
+    const explanation = ai.ok ? ai.explanation : null;
+    const kind = docIdentify.suggestedKind(verdict, explanation);
+    const identify = {
+      lang, at: new Date().toISOString(), model: ai.ok ? docIdentify.MODEL : null,
+      read: text ? method : (ai.ok ? 'file_to_model' : 'none'),
+      suggested_type: kind?.type || null, suggested_label: kind ? docIntake.labelFor(kind.type) : null,
+      suggested_area: kind ? docIntake.areaFor(kind.type) : null,
+      suggested_source: kind?.source || null, suggested_confidence: kind?.confidence || null,
+      classifier: { doc_type: verdict.doc_type, confidence: verdict.confidence, matched_on: verdict.matched_on },
+      explanation, unavailable_reason: ai.ok ? null : ai.reason,
+    };
+    // Store only a successful reading — a failure (no key, timeout) must be retried next time.
+    if (ai.ok) {
+      try {
+        await supabase.from('financial_documents')
+          .update({ extracted_json: { ...(doc.extracted_json || {}), ai_identify: { ...stored, [lang]: identify } }, updated_at: new Date().toISOString() })
+          .eq('id', doc.id).eq('business_id', biz.business.id);
+      } catch (e) { console.error(`[doc-identify] persist failed: ${e.message}`); }
+    }
+    res.json({ ok: true, cached: false, identify });
+  } catch (e) {
+    console.error(`[doc-identify] failed: ${e.message}`);
+    res.status(500).json({ ok: false, error: 'document_identify_failed' });
   }
 });
 
