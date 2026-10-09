@@ -58,3 +58,52 @@ export function fileKindLabel({ mime_type, file_name } = {}) {
   if (!mime) return null;
   return (mime.split('/')[1] || mime).split('.').pop().slice(0, 8).toUpperCase();
 }
+
+/* ── renderable kind, MIME first then extension ───────────────────────────── */
+
+const EXT_KIND = {
+  pdf: 'pdf',
+  png: 'image', jpg: 'image', jpeg: 'image', webp: 'image', gif: 'image', bmp: 'image', svg: 'image',
+  csv: 'sheet', tsv: 'sheet', xls: 'sheet', xlsx: 'sheet', xlsm: 'sheet',
+  txt: 'text', md: 'text', json: 'text',
+}
+
+const previewExtOf = (name) => (/\.([a-z0-9]{1,5})$/i.exec(String(name || ''))?.[1] || '').toLowerCase()
+
+/**
+ * @returns 'pdf' | 'image' | 'sheet' | 'text' | 'gsheet' | 'other'
+ * MIME wins; a missing or generic MIME (very common for uploads) falls back to the
+ * extension. Never guesses from the accounting document_type.
+ */
+export function previewKind(file = {}) {
+  const mime = String(file.mime_type || '').toLowerCase().trim()
+  const ext = previewExtOf(file.file_name)
+
+  // A real Google Sheets link, if the row ever carries one (see gsheetUrlOf).
+  if (gsheetUrlOf(file)) return 'gsheet'
+
+  if (mime && !/octet-stream/.test(mime)) {
+    if (/^application\/pdf$/.test(mime)) return 'pdf'
+    if (/^image\/(png|jpe?g|webp|gif|bmp|svg\+xml)$/.test(mime)) return 'image'
+    if (/spreadsheet|excel|^text\/csv$|^text\/tab-separated/.test(mime)) return 'sheet'
+    if (/^text\/(plain|markdown)$|^application\/json$/.test(mime)) return 'text'
+    // A known-but-unrenderable MIME still gets the extension a chance below only if
+    // the MIME told us nothing useful; otherwise it is genuinely unsupported.
+    if (EXT_KIND[ext]) return EXT_KIND[ext]
+    return 'other'
+  }
+  return EXT_KIND[ext] || 'other'
+}
+
+/**
+ * A REAL Google Sheets URL, or null.
+ * `financial_documents` has no external-URL column and the API file whitelist
+ * (PUBLIC_FILE_FIELDS) returns none, so in practice this is always null today. It is
+ * written as a genuine check rather than a hardcoded "unsupported" so that it starts
+ * working the day such a field exists — and it never pretends to have one.
+ */
+export function gsheetUrlOf(file = {}) {
+  const raw = file.external_url || file.source_url || file.web_url || null
+  if (!raw || typeof raw !== 'string') return null
+  return /^https:\/\/docs\.google\.com\/spreadsheets\//i.test(raw) ? raw : null
+}

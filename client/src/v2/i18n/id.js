@@ -409,6 +409,9 @@ export default {
       suggested: 'Tampaknya dokumen perusahaan: {k}. Konfirmasi agar disimpan terpisah.',
       archive: 'Arsipkan', archiveConfirm: 'Arsipkan dokumen ini? Dokumen hilang dari daftar; catatan dan jejak audit tetap ada.', close: 'Tutup',
       err: { forbidden: 'Peran Anda tidak dapat mengubah dokumen.', archived: 'Dokumen sudah diarsipkan.', already: 'Sudah terhubung ke catatan ini.', notFound: 'Catatan tidak ditemukan.', generic: 'Gagal: {msg}' } },
+    pv: { title: 'Pratinjau dokumen', loading: 'Memuat dokumen…', of: 'Pratinjau: {name}', none: 'Jenis file ini tidak bisa ditampilkan di sini. Buka atau unduh.',
+      failed: 'Dokumen tidak bisa ditampilkan di sini. Buka di tab baru atau unduh.', tooBig: 'Spreadsheet terlalu besar untuk pratinjau — buka atau unduh.',
+      emptySheet: 'Sheet tidak memiliki baris.', sheetNote: 'Sel asli file · sheet “{name}” ({n} sheet).', moreRows: '50 baris pertama ditampilkan, {n} lainnya tidak.' },
     missingFor: 'Kurang untuk {m}', missingHint: 'Tagihan lunas tanpa bukti bayar — akuntan membutuhkannya untuk tutup buku.', noneMissing: 'Tidak ada yang kurang.',
   },
   set: {

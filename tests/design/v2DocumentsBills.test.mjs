@@ -4,6 +4,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { billHasDocument, docPath, docNeedsLook, billChecklistItems, tabForPath } from '../../client/src/v2/lib/obligations.js'
 import { partitionDocuments } from '../../client/src/pages/business/companyVault.js'
+import { previewKind } from '../../client/src/lib/documentPreview.js'
 import ru from '../../client/src/v2/i18n/ru.js'
 import en from '../../client/src/v2/i18n/en.js'
 import id from '../../client/src/v2/i18n/id.js'
@@ -95,9 +96,21 @@ ok('WRITE_ALLOW has exactly the writes actions.js makes', writes.length === WRIT
 const drawerSrc = fs.readFileSync(path.join(ROOT, 'client/src/v2/components/DocumentDrawer.jsx'), 'utf8')
 ok('the review panel makes no direct request', !/apiFetch|fetch\(/.test(drawerSrc) && !/method:/.test(drawerSrc))
 
+console.log('\n--- the review window shows the file itself before anything is linked (centred, not a side panel)')
+ok('pdf by MIME', previewKind({ mime_type: 'application/pdf', file_name: 'x' }) === 'pdf')
+ok('image by extension when MIME is generic', previewKind({ mime_type: 'application/octet-stream', file_name: 'WhatsApp_Image.jpeg' }) === 'image')
+ok('xlsx → spreadsheet table', previewKind({ file_name: 'salary_06_helm.xlsx' }) === 'sheet')
+ok('unknown type → no inline preview, open / download instead', previewKind({ file_name: 'a.docx', mime_type: 'application/msword' }) === 'other')
+const modalSrc = fs.readFileSync(path.join(ROOT, 'client/src/v2/components/DocumentDrawer.jsx'), 'utf8')
+ok('the window renders the preview', /<DocumentPreview doc=\{doc\} \/>/.test(modalSrc))
+ok('centred window, not the side drawer', modalSrc.includes('v2-docmodal') && !modalSrc.includes('v2-workbench-drawer'))
+const pvSrc = fs.readFileSync(path.join(ROOT, 'client/src/v2/components/DocumentPreview.jsx'), 'utf8')
+ok('preview gets the file through the audited signed-url action only', pvSrc.includes('documentFileUrl(token, id, ') && !/apiFetch|method:/.test(pvSrc))
+ok('classic preview still exports previewKind (same rule for both)', /export \{ previewKind, gsheetUrlOf \}/.test(fs.readFileSync(path.join(ROOT, 'client/src/pages/business/DocumentPreview.jsx'), 'utf8')))
+
 console.log('\n--- review panel and company tab text: same keys in RU / EN / ID')
 const flat = (o, pre = '') => Object.entries(o || {}).flatMap(([k, v]) => (v && typeof v === 'object' ? flat(v, `${pre}${k}.`) : [`${pre}${k}`])).sort().join(',')
-for (const sub of ['dr', 'company', 'vault']) {
+for (const sub of ['dr', 'company', 'vault', 'pv']) {
   ok(`docs.${sub}: ru = en`, flat(ru.docs[sub]) === flat(en.docs[sub]) && flat(en.docs[sub]).length > 0)
   ok(`docs.${sub}: id = en`, flat(id.docs[sub]) === flat(en.docs[sub]))
 }

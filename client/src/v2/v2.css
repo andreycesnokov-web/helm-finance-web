@@ -751,18 +751,44 @@
 .v2-docrow > .v2-docrow-act { grid-column: 2 / -1; justify-self: start; font-weight: 700; }
 @media (min-width: 1025px) { .v2-docrow > .v2-docrow-act { grid-column: auto; } }
 .v2-docrow-pills { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
-/* Documents page review panel (components/DocumentDrawer.jsx) — reuses the workbench drawer. */
-.v2-docdrawer .v2-workbench-head .v2-doc-text { flex: 1 1 auto; margin-right: var(--space-3); }
-.v2-docdrawer .v2-row-gap { justify-content: flex-start; align-items: center; }
+/* Documents review window (components/DocumentDrawer.jsx): centred; the file on the left, the
+   fields on the right; full screen on a phone. */
+.v2-docmodal-scrim { position: fixed; inset: 0; z-index: 70; background: var(--surface-overlay, rgba(15, 23, 42, 0.45)); }
+.v2-docmodal { position: fixed; z-index: 71; inset: 0; display: flex; flex-direction: column; background: var(--surface-card); min-width: 0; }
+@media (min-width: 768px) {
+  .v2-docmodal { inset: auto; top: 50%; left: 50%; transform: translate(-50%, -50%); width: min(1240px, calc(100vw - 48px)); height: min(880px, calc(100vh - 48px));
+    border-radius: var(--radius-xl, 16px); box-shadow: var(--shadow-lg, 0 10px 25px -5px rgba(0, 0, 0, 0.2)); overflow: hidden; }
+}
+.v2-docmodal-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding: 16px 20px; border-bottom: 1px solid var(--border-subtle); }
+.v2-docmodal-head .v2-doc-text { flex: 1 1 auto; }
+.v2-docmodal-body { flex: 1; min-height: 0; overflow-y: auto; display: grid; grid-template-columns: minmax(0, 1fr); gap: 20px; padding: 20px; align-content: start; }
+@media (min-width: 1025px) {
+  .v2-docmodal-body { grid-template-columns: minmax(0, 1.45fr) minmax(340px, 1fr); overflow: hidden; align-content: stretch; }
+  .v2-docmodal-view, .v2-docmodal-side { min-height: 0; overflow-y: auto; }
+}
+.v2-docmodal-view { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; }
+.v2-docmodal-view .v2-row-gap { justify-content: flex-start; }
+.v2-docmodal-side { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.v2-docmodal-foot { display: flex; justify-content: space-between; gap: 8px; padding: 12px 20px; border-top: 1px solid var(--border-subtle); padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px)); }
 .v2-docdrawer-sec { display: flex; flex-direction: column; gap: var(--space-2); align-items: stretch; }
 .v2-docdrawer-sec > .v2-btn { align-self: flex-start; }
 .v2-docdrawer-sec .v2-field { margin-bottom: var(--space-2); }
 .v2-docdrawer-sec .v2-select { width: 100%; }
+.v2-docdrawer .v2-docdrawer-sec .v2-row-gap { justify-content: flex-start; align-items: center; }
 .v2-doclinks { list-style: none; margin: 0; padding: 0; }
 .v2-doclinks li { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: var(--space-2); align-items: center; padding: var(--space-2) 0; border-top: 1px solid var(--border-subtle); }
 .v2-doclinks li:first-child { border-top: 0; }
-.v2-docdrawer .v2-workbench-foot { justify-content: space-between; }
 .v2-docdrawer-archive { color: var(--danger); }
+.v2-docpv { flex: 1 1 auto; min-height: 60vh; display: flex; border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); background: var(--surface-page); overflow: hidden; }
+@media (min-width: 1025px) { .v2-docpv { min-height: 0; } }
+.v2-docpv-frame { flex: 1; width: 100%; min-height: 60vh; border: 0; background: var(--surface-card); }
+@media (min-width: 1025px) { .v2-docpv-frame { min-height: 0; height: 100%; } }
+.v2-docpv-img { display: block; max-width: 100%; max-height: 100%; margin: auto; object-fit: contain; }
+.v2-docpv-sheet { flex: 1; overflow: auto; padding: var(--space-3); }
+.v2-docpv-sheet table { border-collapse: collapse; font-size: 12px; }
+.v2-docpv-sheet td { border: 1px solid var(--border-subtle); padding: 4px 8px; white-space: nowrap; max-width: 240px; overflow: hidden; text-overflow: ellipsis; }
+.v2-docpv-sheet tr:first-child td { font-weight: 700; background: var(--surface-card); }
+.v2-docpv-msg { margin: auto; display: flex; flex-direction: column; align-items: center; gap: var(--space-2); padding: 24px; text-align: center; width: 100%; }
 
 .v2-team { list-style: none; margin: 0 0 var(--space-3); padding: 0; }
 .v2-team li { display: grid; grid-template-columns: 32px minmax(0, 1fr) auto; grid-template-areas: "a n r" "a w w"; gap: 2px var(--space-3); align-items: center; padding: var(--space-3) 0; border-top: 1px solid var(--border-subtle); }
