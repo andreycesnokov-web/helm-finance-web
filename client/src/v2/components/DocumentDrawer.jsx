@@ -147,6 +147,7 @@ export default function DocumentDrawer({ doc, debts = [], transactions = [], wal
       const x = txById.get(String(l.target_id))
       return { text: x ? t('docs.linkedTo.transaction', { d: txLabel(x, lang) }) : t('docs.linkedTo.transactionNoDate'), to: '/business/transactions' }
     }
+    if (l.target_type === 'compliance') return { text: t('docs.linkedTo.compliance'), to: '/business/accountant?tab=taxes' }
     return { text: `${l.target_type} · ${l.target_id}` }
   }
 

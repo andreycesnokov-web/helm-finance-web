@@ -233,7 +233,7 @@ export default function Documents() {
         </>
       )}
       {openDoc && <DocumentDrawer doc={openDoc} debts={debtList} transactions={txList}
-        wallets={(walletsApi.data?.wallets || []).filter((w) => w.is_active !== false && (w.scope || 'business') === 'business')}
+        wallets={(walletsApi.data?.wallets || []).filter((w) => w.is_active !== false)}
         counterparties={Array.isArray(cpsApi.data) ? cpsApi.data : (cpsApi.data?.counterparties || [])} onClose={closeDoc} onChanged={changed} />}
       {modal}
     </div>

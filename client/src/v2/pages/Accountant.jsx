@@ -116,6 +116,9 @@ function AskBox({ externalQuery = '', onQueryChange, onOpenModal }) {
   )
 }
 
+// The rule's name in the user's language; the stored English title is the fallback.
+const ruleTitle = (t, e) => { const k = `acct.rule.${e.rule_code}`; const v = t(k); return v && v !== k ? v : (e.title || e.rule_code) }
+
 function TaxList({ events, lang, t, limit, empty = 'acct.noEvents' }) {
   if (!events.length) return <p className="v2-muted">{t(empty)}</p>
   return (
@@ -135,7 +138,7 @@ function TaxList({ events, lang, t, limit, empty = 'acct.noEvents' }) {
           <li key={e.id || e.rule_code + e.period}>
             <span className="v2-num v2-taxlist-date">{shortDate(e.due_date, lang)}</span>
             <span className="v2-taxlist-what" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-              <strong>{e.title || e.rule_code}</strong>
+              <strong>{ruleTitle(t, e)}</strong>
               {matchedCard && (
                 <InfoTooltip
                   title={matchedCard.name}
@@ -147,8 +150,16 @@ function TaxList({ events, lang, t, limit, empty = 'acct.noEvents' }) {
               )}
               {e.period && <span className="v2-muted"> · {e.period}</span>}
             </span>
-            <span className="v2-num v2-r">{e.estimated_amount != null ? money(e.estimated_amount) : '—'}</span>
+            <span className="v2-num v2-r">{e.estimated_amount != null ? money(e.estimated_amount) : e.nil_return && e.nil_rule === 'required' ? money(0) : '—'}</span>
             <Pill tone={STAGE_TONE[stage]}>{t(`acct.stage.${stage}`)}</Pill>
+            {(e.pay_by || e.nil_return || e.verified === false || e.documents > 0) && (
+              <span className="v2-taxlist-more v2-small">
+                {e.pay_by && e.pay_by !== e.due_date && <span>{t('acct.payBy', { d: shortDate(e.pay_by, lang) })}</span>}
+                {e.nil_return && <span className={e.nil_rule === 'required' ? 'v2-taxlist-nil' : 'v2-muted'}>{t(e.nil_rule === 'required' ? 'acct.nilReturn' : 'acct.nilOptional')}</span>}
+                {e.documents > 0 && <span>{t('acct.docsN', { n: e.documents })}</span>}
+                {e.verified === false && <span className="v2-muted">{t('acct.generalDeadline')}</span>}
+              </span>
+            )}
           </li>
         )
       })}
@@ -771,19 +782,34 @@ function PackagesTab({ month }) {
 function TaxesTab({ month }) {
   const t = useT()
   const lang = useLang()
-  const summary = useApi('/accountant/summary')
+  // GET /api/accountant/tax-calendar is read-only (no write-on-read): general deadlines while the
+  // rules await review, merged with stored obligations, nil returns for months with no activity.
+  const summary = useApi('/accountant/tax-calendar')
   if (summary.loading) return <Card><Skeleton rows={6} /></Card>
   if (summary.error) return <ErrorBox error={summary.error?.status === 403 ? t('dec.forbidden') : summary.error} onRetry={summary.reload} />
-  const events = complianceEvents(summary.data)
+  const events = summary.data?.events || []
   const inM = events.filter((e) => String(e.due_date).slice(0, 7) === month)
+  const overdue = events.filter((e) => e.stage === 'overdue')
   const today = new Date().toISOString().slice(0, 10)
   const nextDue = events.find((e) => e.due_date >= today && eventStage(e) !== 'done')
   const later = events.filter((e) => String(e.due_date).slice(0, 7) > month)
   const missing = summary.data?.missing_profile_fields || []
+  const undecided = summary.data?.undecided || []
 
   return (
     <div className="v2-grid-detail">
       <div className="v2-col">
+        {(!summary.data?.has_profile || undecided.length > 0) && (
+          <Card title={t('acct.setup.title')}>
+            <p className="v2-sec">{t('acct.setup.why')}</p>
+            <ol className="v2-setup">
+              <li><Link to="/business/documents?tab=company">{t('acct.setup.docs')}</Link></li>
+              <li><Link to="/business/accountant/tax-profile">{t('acct.setup.profile')}</Link>
+                {undecided.length > 0 && <span className="v2-muted v2-small"> · {undecided.map((u) => t(`acct.setup.q.${u}`)).join(' · ')}</span>}</li>
+              <li>{t('acct.setup.done')}</li>
+            </ol>
+          </Card>
+        )}
         <Card title={monthLabel(month, lang)}>
           {missing.length > 0 && (
             <div className="v2-banner v2-tone-warn"><I.warn size={18} /><span className="v2-banner-text">{t('acct.profileMissing', { n: missing.length })}</span><Btn to="/business/accountant/tax-profile">{t('acct.tab.profile')}</Btn></div>
@@ -800,7 +826,7 @@ function TaxesTab({ month }) {
                     return (
                       <td key={j} className={`${c.iso === today ? 'is-today' : ''}${evs.length ? ' has-ev' : ''}`}>
                         <span className="v2-cal-day">{c.day}</span>
-                        {evs.map((e) => <span key={e.id || e.rule_code} className={`v2-cal-ev v2-tone-${eventStage(e) === 'overdue' ? 'crit' : 'warn'}`}>{e.title || e.rule_code}</span>)}
+                        {evs.map((e) => <span key={e.id || e.rule_code} className={`v2-cal-ev v2-tone-${eventStage(e) === 'overdue' ? 'crit' : 'warn'}`}>{ruleTitle(t, e)}</span>)}
                       </td>
                     )
                   })}
@@ -813,6 +839,11 @@ function TaxesTab({ month }) {
           <TaxList events={inM} lang={lang} t={t} limit={50} />
           <p className="v2-muted v2-small">{t('acct.calNote')}</p>
         </Card>
+        {overdue.length > 0 && (
+          <Card title={t('acct.overdueTitle', { n: overdue.length })}>
+            <TaxList events={overdue} lang={lang} t={t} limit={24} />
+          </Card>
+        )}
         <Card title={t('acct.ahead')}>
           <TaxList events={later} lang={lang} t={t} limit={12} empty="acct.noLater" />
           {/* No link to /accountant/calendar: that page calls the write-on-read endpoint (DECISIONS Q5). */}
@@ -822,7 +853,7 @@ function TaxesTab({ month }) {
         <Card title={t('acct.nextDeadline')}>
           {nextDue ? (
             <>
-              <p className="v2-dec-title">{nextDue.title || nextDue.rule_code} · {shortDate(nextDue.due_date, lang)}</p>
+              <p className="v2-dec-title">{ruleTitle(t, nextDue)} · {shortDate(nextDue.due_date, lang)}</p>
               <p className="v2-stat-mid v2-num">{nextDue.estimated_amount != null ? money(nextDue.estimated_amount) : t('acct.amountByEngine')}</p>
             </>
           ) : <p className="v2-muted">{t('acct.noEvents')}</p>}
