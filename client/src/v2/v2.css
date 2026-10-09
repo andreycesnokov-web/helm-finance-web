@@ -1469,3 +1469,11 @@ button.v2-start-btn:focus-visible { outline: 2px solid var(--action-primary); ou
 .v2-docid-kind { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); padding-top: var(--space-2); border-top: 1px solid var(--border-subtle); }
 .v2-docid .v2-btn-link { align-self: flex-start; }
 .v2-doclinks-filed { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: var(--space-2); align-items: center; padding: var(--space-2) 0; }
+.v2-docid-tax { display: flex; flex-direction: column; gap: var(--space-2); padding-top: var(--space-2); border-top: 1px solid var(--border-subtle); }
+.v2-docid-tax ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-3); }
+.v2-docid-tax li { display: flex; flex-direction: column; gap: 2px; }
+.v2-docid-tax ol { margin: 0; padding-left: 18px; }
+.v2-docid-taxact { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); margin-top: 4px; }
+.v2-taxlist-more { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 4px 12px; color: var(--text-secondary); }
+.v2-taxlist-nil { color: var(--warning); font-weight: 700; }
+.v2-setup { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: var(--space-2); }

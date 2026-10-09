@@ -21,17 +21,20 @@ const MAX_FILE_BYTES = 8 * 1024 * 1024;
 const IMAGE_MIME = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
 const LANGS = { ru: 'Russian', en: 'English', id: 'Indonesian' };
 const PLACES = ['company_documents', 'accounting', 'other'];
+// Taxes a document can carry, and what the company does with each one.
+const TAXES = ['pph21', 'pph23', 'pph4_2', 'pph26', 'ppn', 'bpjs', 'other'];
+const TAX_ROLES = ['company_pays', 'company_withholds', 'creditable', 'info'];
 
 /** Intake types the model may propose (server/lib/documentIntake.js INTAKE_TYPES). */
-function buildPrompt({ lang, file_name, text, verdict, company_name, types }) {
+function buildPrompt({ lang, file_name, text, verdict, company_name, types, today = new Date().toISOString().slice(0, 10) }) {
   const language = LANGS[lang] || LANGS.en;
   return `You help a business owner (often a foreigner in Indonesia) understand ONE document stored in their accounting system.
-Company: ${company_name || 'unknown'}. File name: ${file_name || 'unknown'}.
+Company: ${company_name || 'unknown'}. File name: ${file_name || 'unknown'}. Today is ${today}.
 A rule-based classifier says: type "${verdict?.doc_type || 'unknown'}", confidence "${verdict?.confidence || 'unknown'}".
 
 Write in ${language}. Plain words, no jargon; when you use an Indonesian term, explain it in brackets.
 Return ONLY a JSON object, no markdown fence:
-{"title":"","summary":"","issued_by":"","issued_on":"","number":"","purpose":"","place":"","next_step":"","suggested_type":"","bank_name":"","account_number":"","period":"","counterparty_name":"","warnings":[]}
+{"title":"","summary":"","issued_by":"","issued_on":"","number":"","purpose":"","place":"","next_step":"","suggested_type":"","bank_name":"","account_number":"","period":"","counterparty_name":"","taxes":[],"tax_steps":[],"warnings":[]}
 
 - title: what the document is, at most 8 words (e.g. "Ministry of Law notice: change of directors").
 - summary: 1-2 sentences: what it says and why the company has it.
@@ -46,7 +49,23 @@ Return ONLY a JSON object, no markdown fence:
 - bank_name / account_number: for a bank statement or bank letter, as printed ("" otherwise).
 - period: the month the document covers, YYYY-MM (statement period, payroll month, tax period); "" if none.
 - counterparty_name: the other party (supplier, customer, landlord, employee…) if there is one, else "".
-- warnings: short strings for anything unreadable or inconsistent.
+- taxes: every Indonesian tax this document creates or proves, as objects
+  {"tax":"","role":"","amount":"","period":"","what":""}:
+  tax: one of ${TAXES.join(', ')} (pph21 = employee income tax withheld from salaries; pph23 = 2% withheld on services /
+  rent of goods paid to an Indonesian company; pph4_2 = final tax e.g. office/building rent 10%; pph26 = withheld on
+  payments abroad; ppn = VAT; bpjs = social security contributions).
+  role: "company_pays" (the company must pay it to the state, e.g. PPh 21 withheld in a payroll register, BPJS),
+  "company_withholds" (the company must withhold it from a supplier payment and pay it to the state, e.g. PPh 23 on a
+  service invoice), "creditable" (input VAT on a supplier invoice the company may claim if it is PKP), "info" (shown
+  but nothing to do).
+  amount: digits only, ONLY if the total for that tax is printed on the document (e.g. the PPh 21 column total);
+  otherwise "". Never compute a tax yourself.
+  period: YYYY-MM the tax belongs to. what: 1 short sentence in ${language}.
+- tax_steps: up to 4 short steps in ${language} — what the owner does about these taxes (pay through e-Billing /
+  Coretax with a billing code, report in SPT Masa, keep the proof of payment, ask the accountant). Say that deadlines
+  must be confirmed with the accountant. [] when the document creates no tax.
+- warnings: short strings for anything unreadable or inconsistent. Do not warn that a date is in the future unless it
+  is after ${today}.
 Never invent a number, a date or a name that is not printed.
 
 ${text ? `Document text:
@@ -74,6 +93,14 @@ function normalize(parsed, types) {
     account_number: str(parsed.account_number, 40).replace(/[^\dA-Za-z-]/g, ''),
     period: /^\d{4}-(0[1-9]|1[0-2])$/.test(str(parsed.period, 7)) ? str(parsed.period, 7) : '',
     counterparty_name: str(parsed.counterparty_name, 160),
+    taxes: Array.isArray(parsed.taxes) ? parsed.taxes.slice(0, 6).map((x) => ({
+      tax: TAXES.includes(x?.tax) ? x.tax : 'other',
+      role: TAX_ROLES.includes(x?.role) ? x.role : 'info',
+      amount: /^\d{1,15}$/.test(String(x?.amount ?? '').replace(/[^\d]/g, '')) ? Number(String(x.amount).replace(/[^\d]/g, '')) : null,
+      period: /^\d{4}-(0[1-9]|1[0-2])$/.test(str(x?.period, 7)) ? str(x.period, 7) : '',
+      what: str(x?.what, 300),
+    })) : [],
+    tax_steps: Array.isArray(parsed.tax_steps) ? parsed.tax_steps.slice(0, 4).map((x) => str(x, 300)).filter(Boolean) : [],
     warnings: Array.isArray(parsed.warnings) ? parsed.warnings.slice(0, 5).map((w) => str(w, 200)).filter(Boolean) : [],
   }
 }
@@ -176,4 +203,44 @@ function suggestedFiling(type, x, { wallets = [], counterparties = [], currency 
   return null
 }
 
-module.exports = { matchWallet, matchCounterparty, suggestedFiling, explainDocument, suggestedKind, normalize, buildPrompt, fileBlock, MODEL, LANGS, PLACES }
+/* ── taxes: printed amounts only, mapped onto the tax calendar ─────────────────
+   An amount is kept only when it is printed in the document's own text (or cells): the model may
+   READ a total, never compute one. A scan has no text to check against, so its amounts are marked
+   as read from the image. Each tax is matched to the rule_code the tax calendar uses; a tax with no
+   rule in the calendar is explained but has nothing to attach to. */
+const TAX_RULE = { pph21: 'ID_PPH21_MONTHLY', ppn: 'ID_PPN_MONTHLY' };
+// PPN on ONE invoice is a part of the month's return (output − input), never the amount payable.
+const AMOUNT_GOES_TO_OBLIGATION = new Set(['pph21']);
+
+function printedIn(text, amount) {
+  if (amount == null || !text) return false
+  const target = String(Math.round(Number(amount)))
+  if (target.length < 3) return false
+  // Every number in the text with its separators removed: "1.948.095", "1 948 095", "1,948,095.00".
+  // Separators inside ONE number only: dots, commas, a plain or no-break space — never a tab or a
+  // newline, which separate spreadsheet cells and lines.
+  const nums = String(text).match(/\d(?:[\d.,]|[  ](?=\d{3}(?!\d)))*\d|\d/g) || []
+  return nums.some((n) => {
+    const plain = n.replace(/\s/g, '')
+    const intPart = plain.replace(/[.,]\d{2}$/, '').replace(/[.,]/g, '')
+    return intPart === target
+  })
+}
+
+function taxFindings(x, { text = '', read = 'none' } = {}) {
+  if (!x || !Array.isArray(x.taxes)) return []
+  return x.taxes.map((t) => {
+    const fromText = read !== 'file_to_model' && read !== 'none'
+    const verified = t.amount != null && fromText && printedIn(text, t.amount)
+    return {
+      tax: t.tax, role: t.role, period: t.period || x.period || null, what: t.what,
+      // An amount the text does not contain is dropped rather than shown as a fact.
+      amount: t.amount != null && (verified || !fromText) ? t.amount : null,
+      amount_source: t.amount == null ? null : verified ? 'printed' : fromText ? 'not_found_in_text' : 'read_from_image',
+      rule_code: TAX_RULE[t.tax] || null,
+      amount_to_obligation: AMOUNT_GOES_TO_OBLIGATION.has(t.tax),
+    }
+  })
+}
+
+module.exports = { printedIn, taxFindings, TAX_RULE, TAXES, matchWallet, matchCounterparty, suggestedFiling, explainDocument, suggestedKind, normalize, buildPrompt, fileBlock, MODEL, LANGS, PLACES }

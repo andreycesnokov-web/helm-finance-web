@@ -3605,7 +3605,9 @@ app.get('/api/accountant/calendar', auth, async (req, res) => {
     const toUpsert = generated.filter(g => !locked.has(`${g.rule_code}|${g.period}`));
     if (toUpsert.length) {
       await supabase.from('compliance_events')
-        .upsert(toUpsert.map(g => ({ ...g, updated_at: new Date().toISOString() })), { onConflict: 'business_id,rule_code,period' })
+        // amount_status is left out: re-generating dates must not reset an amount someone recorded
+        // (a new row gets the column default 'unknown').
+        .upsert(toUpsert.map(({ amount_status, ...g }) => ({ ...g, updated_at: new Date().toISOString() })), { onConflict: 'business_id,rule_code,period' })
         .then(() => {}, () => {});
     }
 
@@ -14359,6 +14361,7 @@ app.get('/api/documents/health', auth, async (req, res) => {
 const docIntake = require('./lib/documentIntake');
 const docContent = require('./lib/documentContent');
 const docIdentify = require('./lib/documentIdentify');
+const taxDeadlines = require('./lib/taxDeadlines');
 const { extractPdfText } = require('./lib/pdfText');
 const docExtract = require('./lib/documentExtraction');
 const docOcr = require('./lib/documentOcr');
@@ -14464,8 +14467,8 @@ const publicIntakeDoc = ({ raw, ...rest }) => rest;   // never leak the raw row
 // metadata, so returning the column wholesale would leak extraction internals through
 // /api/documents. Both of these are WHITELISTS: a field that is not named here is not
 // returned, so future additions to extracted_json are private by default.
-const IDENTIFY_FIELDS = ['v', 'lang', 'at', 'read', 'suggested_filing', 'suggested_type', 'suggested_label', 'suggested_area', 'suggested_source', 'suggested_confidence', 'unavailable_reason'];
-const EXPLAIN_FIELDS = ['title', 'summary', 'issued_by', 'issued_on', 'number', 'purpose', 'place', 'next_step', 'bank_name', 'account_number', 'period', 'counterparty_name', 'warnings'];
+const IDENTIFY_FIELDS = ['v', 'lang', 'at', 'read', 'suggested_filing', 'taxes', 'suggested_type', 'suggested_label', 'suggested_area', 'suggested_source', 'suggested_confidence', 'unavailable_reason'];
+const EXPLAIN_FIELDS = ['title', 'summary', 'issued_by', 'issued_on', 'number', 'purpose', 'place', 'next_step', 'bank_name', 'account_number', 'period', 'counterparty_name', 'tax_steps', 'warnings'];
 const publicIdentify = (all) => {
   if (!all || typeof all !== 'object') return null;
   const out = {};
@@ -15658,7 +15661,7 @@ app.post('/api/documents/:id/identify', auth, async (req, res) => {
 
     const lang = ['ru', 'en', 'id'].includes(req.body?.lang) ? req.body.lang : 'en';
     const stored = (doc.extracted_json || {}).ai_identify || {};
-    if (!req.body?.force && stored[lang]) return res.json({ ok: true, cached: true, identify: stored[lang] });
+    if (!req.body?.force && stored[lang]) return res.json({ ok: true, cached: true, identify: await attachTaxObligations(biz, stored[lang]) });
 
     const { data: fileRows } = await supabase.from('document_files')
       .select('storage_path, file_name, mime_type').eq('id', doc.file_id).eq('business_id', biz.business.id).limit(1);
@@ -15708,9 +15711,12 @@ app.post('/api/documents/:id/identify', auth, async (req, res) => {
       } catch { /* no suggestion rather than a failure */ }
       filing = docIdentify.suggestedFiling(kind.type, explanation, { wallets, counterparties, currency: doc.currency });
     }
+    const readMethod = text ? method : (ai.ok ? 'file_to_model' : 'none');
     const identify = {
-      v: 2, lang, at: new Date().toISOString(), model: ai.ok ? docIdentify.MODEL : null, suggested_filing: filing,
-      read: text ? method : (ai.ok ? 'file_to_model' : 'none'),
+      v: 3, lang, at: new Date().toISOString(), model: ai.ok ? docIdentify.MODEL : null, suggested_filing: filing,
+      // Taxes the document creates: amounts only when printed in its own text (documentIdentify.taxFindings).
+      taxes: docIdentify.taxFindings(explanation, { text, read: readMethod }),
+      read: readMethod,
       suggested_type: kind?.type || null, suggested_label: kind ? docIntake.labelFor(kind.type) : null,
       suggested_area: kind ? docIntake.areaFor(kind.type) : null,
       suggested_source: kind?.source || null, suggested_confidence: kind?.confidence || null,
@@ -15725,7 +15731,7 @@ app.post('/api/documents/:id/identify', auth, async (req, res) => {
           .eq('id', doc.id).eq('business_id', biz.business.id);
       } catch (e) { console.error(`[doc-identify] persist failed: ${e.message}`); }
     }
-    res.json({ ok: true, cached: false, identify });
+    res.json({ ok: true, cached: false, identify: await attachTaxObligations(biz, identify) });
   } catch (e) {
     console.error(`[doc-identify] failed: ${e.message}`);
     res.status(500).json({ ok: false, error: 'document_identify_failed' });
@@ -15789,6 +15795,169 @@ app.post('/api/documents/:id/filing', auth, async (req, res) => {
       return res.status(500).json({ error: error.message });
     }
     res.json({ ok: true, document: publicDocRow(data) });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// The tax calendar obligation each tax on a document belongs to, read live (status, amount and
+// payment change after the reading was stored), plus the general deadlines for its period.
+async function attachTaxObligations(biz, identify) {
+  const taxes = Array.isArray(identify?.taxes) ? identify.taxes : [];
+  if (!taxes.length) return identify;
+  const out = [];
+  for (const t of taxes) {
+    let obligation = null;
+    if (t.rule_code && t.period) {
+      try {
+        const { data } = await supabase.from('compliance_events')
+          .select('id, title, period, due_date, status, amount_status, estimated_amount, confirmed_amount, payment_status, filing_status')
+          .eq('business_id', biz.business.id).eq('rule_code', t.rule_code).eq('period', t.period).limit(1);
+        obligation = data?.[0] || null;
+      } catch { obligation = null; }
+    }
+    out.push({ ...t, obligation, deadlines: t.rule_code && t.period ? taxDeadlines.deadlinesFor(t.rule_code, t.period) : null });
+  }
+  return { ...identify, taxes: out };
+}
+
+const CONFIRMED_AMOUNT = ['professionally_reviewed', 'owner_confirmed'];
+
+// POST /api/documents/:id/tax-obligation — put a tax found on a document into the tax calendar.
+//
+// The amount is the one stored in the document's own reading (printed on the document, checked by
+// documentIdentify.taxFindings) — never one sent by the client. PPh 21 from a payroll register
+// becomes the obligation's ESTIMATED amount (an accountant or the owner still confirms it); a PPN
+// line only links the document as evidence, because one invoice is not the month's VAT payable.
+// A confirmed or paid obligation keeps its amount. When the calendar has no row for the period
+// (the rule engine is paused while rules await review) one is created with the general deadline
+// and source_verification_required = true. Nothing here moves money.
+app.post('/api/documents/:id/tax-obligation', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res); if (!biz) return;
+    if (!canManageDocuments(biz.role) || !canViewBusinessFinance(biz.role)) return res.status(403).json({ error: 'Your role cannot change tax obligations' });
+    if (!await hasDocumentsAccess(biz)) return res.status(403).json({ error: 'Document Center is not enabled', upgrade_required: true });
+    const doc = await loadDocumentScoped(biz, req.params.id);
+    if (!doc) return res.status(404).json({ error: 'Document not found' });
+    if (doc.archived_at) return res.status(409).json({ error: 'document_archived' });
+    const { tax, period } = req.body || {};
+    const readings = Object.values((doc.extracted_json || {}).ai_identify || {});
+    const finding = readings.flatMap((r) => r?.taxes || []).find((t) => t.tax === tax && t.period === period);
+    if (!finding) return res.status(404).json({ error: 'tax_not_found_on_document' });
+    if (!finding.rule_code) return res.status(400).json({ error: 'no_calendar_rule_for_tax' });
+
+    const { data: ruleRows } = await supabase.from('tax_rules').select('id, rule_code, title, obligation_type, version')
+      .eq('jurisdiction', 'ID').eq('rule_code', finding.rule_code).limit(1);
+    const rule = ruleRows?.[0];
+    if (!rule) return res.status(400).json({ error: 'no_calendar_rule_for_tax' });
+
+    let { data: evRows } = await supabase.from('compliance_events').select('*')
+      .eq('business_id', biz.business.id).eq('rule_code', rule.rule_code).eq('period', period).limit(1);
+    let ev = evRows?.[0] || null;
+    if (!ev) {
+      const d = taxDeadlines.deadlinesFor(rule.rule_code, period);
+      if (!d) return res.status(400).json({ error: 'invalid_period' });
+      const { data: created, error: cErr } = await supabase.from('compliance_events').insert({
+        business_id: biz.business.id, rule_id: rule.id, rule_code: rule.rule_code, rule_version: rule.version || null,
+        obligation_type: rule.obligation_type, title: rule.title, period, period_start: d.period_start, period_end: d.period_end,
+        due_date: d.file_by, currency: 'IDR', status: eventStatus(d.file_by, new Date()), amount_status: 'unknown',
+        source_verification_required: true, generated_at: new Date().toISOString(), generated_by: req.user.userId,
+      }).select('*').single();
+      if (cErr) return res.status(500).json({ error: cErr.message });
+      ev = created;
+    }
+    const paid = ['paid', 'filed'].includes(ev.payment_status) || ['paid', 'filed'].includes(ev.status);
+    let amountWritten = false;
+    if (finding.amount_to_obligation && finding.amount != null && !paid && !CONFIRMED_AMOUNT.includes(ev.amount_status)) {
+      const { data: upd, error: uErr } = await supabase.from('compliance_events')
+        .update({ estimated_amount: finding.amount, amount_status: 'estimated', calculation_status: 'from_document', updated_at: new Date().toISOString() })
+        .eq('id', ev.id).eq('business_id', biz.business.id).select('*').single();
+      if (uErr) return res.status(500).json({ error: uErr.message });
+      ev = upd; amountWritten = true;
+    }
+    const link = await linkDocument(biz, doc, 'compliance', ev.id, req.user.userId);
+    if (!link.ok && link.error !== 'already_linked') return res.status(link.status || 500).json({ error: link.error });
+    res.json({ ok: true, amount_written: amountWritten, obligation: {
+      id: ev.id, title: ev.title, period: ev.period, due_date: ev.due_date, amount_status: ev.amount_status,
+      estimated_amount: ev.estimated_amount, payment_status: ev.payment_status } });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// GET /api/accountant/tax-calendar — READ-ONLY tax calendar for the v2 Taxes tab.
+//
+// While the tax rules wait for professional review (migration 023 demoted all of them, so the rule
+// engine generates nothing) the dates come from the general deadlines in lib/taxDeadlines.js and
+// are marked verified:false. A rule that is active with a verified source keeps the engine's own
+// stored date. Stored obligations (amount, payment, filing, linked documents) are merged in, and
+// unpaid stored obligations outside the window are kept so an overdue one never disappears.
+//
+// Dormant periods: when a month (or a year, for the annual return) has no transactions at all, the
+// row says nil_return — the report is still due, with zero amounts.
+app.get('/api/accountant/tax-calendar', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res); if (!biz) return;
+    if (!canViewBusinessFinance(biz.role)) return res.status(403).json({ error: 'Forbidden' });
+    const { data: profRows } = await supabase.from('tax_profiles').select('*').eq('business_id', biz.business.id).limit(1);
+    const profile = profRows?.[0] || null;
+    const jur = profile?.jurisdiction || 'ID';
+    const { data: rules } = await supabase.from('tax_rules').select('*, official_sources(*)').eq('jurisdiction', jur);
+    const now = new Date();
+    const advisory = taxDeadlines.advisoryCalendar(rules || [], profile, now);
+    const { data: stored } = await supabase.from('compliance_events').select('*').eq('business_id', biz.business.id);
+    const byKey = new Map((stored || []).map((e) => [`${e.rule_code}|${e.period}`, e]));
+    const rows = new Map(advisory.map((a) => [`${a.rule_code}|${a.period}`, a]));
+    for (const e of stored || []) {
+      const k = `${e.rule_code}|${e.period}`;
+      const open = !['paid', 'filed'].includes(e.payment_status) && !['paid', 'filed'].includes(e.status);
+      // A stored row for a tax that no longer applies (e.g. PPN for a non-PKP company) is not shown.
+      if (!rows.has(k) && open && (!taxDeadlines.GENERAL[e.rule_code] || taxDeadlines.appliesTo(e.rule_code, profile))) {
+        const d = taxDeadlines.deadlinesFor(e.rule_code, e.period, profile) || {};
+        rows.set(k, { rule_code: e.rule_code, title: e.title, obligation_type: e.obligation_type, period: e.period,
+          period_start: e.period_start, period_end: e.period_end, pay_by: d.pay_by || null, file_by: d.file_by || e.due_date,
+          due_date: d.file_by || e.due_date, source: d.source || null, verified: false });
+      }
+    }
+    // Which periods had any money movement (opening balances do not count as activity).
+    const { data: txs } = await supabase.from('transactions').select('transaction_date, created_at, source, category')
+      .or(bizOrFilter(biz)).limit(20000);
+    const active = new Set();
+    for (const t of txs || []) {
+      if (t.source === 'wallet_opening_balance' || t.category === 'Opening balance') continue;
+      const d = String(t.transaction_date || t.created_at || '').slice(0, 10);
+      if (d) { active.add(d.slice(0, 7)); active.add(d.slice(0, 4)); }
+    }
+    const { data: links } = await supabase.from('document_compliance_links').select('compliance_event_id').eq('business_id', biz.business.id);
+    const docCount = new Map();
+    for (const l of links || []) docCount.set(l.compliance_event_id, (docCount.get(l.compliance_event_id) || 0) + 1);
+
+    const today = now.toISOString().slice(0, 10);
+    const events = [...rows.values()].map((r) => {
+      const rule = (rules || []).find((x) => x.rule_code === r.rule_code);
+      const verifiedRule = !!rule && rule.status === 'active' && effectiveRuleActive(rule, rule.official_sources);
+      const s = byKey.get(`${r.rule_code}|${r.period}`) || null;
+      const due = verifiedRule && s?.due_date ? String(s.due_date).slice(0, 10) : r.due_date;
+      const done = s && (['paid', 'filed'].includes(s.payment_status) || ['paid', 'filed'].includes(s.status));
+      const hadActivity = active.has(r.period);
+      return {
+        ...r, id: s?.id || null, due_date: due, verified: verifiedRule,
+        days: Math.ceil((new Date(due) - new Date(today)) / 86400000),
+        stage: done ? 'done' : due < today ? 'overdue' : 'todo',
+        amount_status: s?.amount_status || 'unknown', estimated_amount: s?.estimated_amount ?? null,
+        confirmed_amount: s?.confirmed_amount ?? null, payment_status: s?.payment_status || 'unpaid',
+        filing_status: s?.filing_status || 'not_filed', documents: s?.id ? (docCount.get(s.id) || 0) : 0,
+        // No money moved in the period: the return is still due, with zero amounts.
+        // Only for a period that has ended; a current or future month simply has no activity yet.
+        nil_return: String(r.period_end || '') < today && !hadActivity && !(Number(s?.estimated_amount) > 0) && !(Number(s?.confirmed_amount) > 0),
+        nil_rule: taxDeadlines.nilRule(r.rule_code, r.period),
+      };
+    }).sort((a, b) => (a.due_date < b.due_date ? -1 : 1));
+    const missing = profileCompleteness(profile).missing;
+    // What the calendar could not decide without the profile (shown as setup steps, never guessed).
+    const undecided = [];
+    if (!profile?.employee_status && profile?.has_employees == null) undecided.push('employees');
+    if (!profile?.pkp_status && !profile?.vat_status) undecided.push('pkp');
+    if (!profile?.legal_entity_type) undecided.push('legal_entity');
+    res.json({ jurisdiction: jur, events, missing_profile_fields: missing, undecided, has_profile: !!profile, today,
+      rules_verified: (rules || []).filter((r) => r.status === 'active' && effectiveRuleActive(r, r.official_sources)).length,
+      rules_total: (rules || []).length });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 

@@ -28,6 +28,7 @@
 //   PATCH  /api/ai-accountant/documents/:id/classification  confirm "company document" (NIB, NPWP…)
 //   POST   /api/documents/:id/identify             "what is this document?" — AI explanation, stored per language
 //   POST   /api/documents/:id/filing               keep with a bank account + month, a counterparty, or on file with a reason
+//   POST   /api/documents/:id/tax-obligation       put a tax printed on the document into the tax calendar (estimated amount + link)
 //
 // Before the owner applies migrations 058–061 the server answers 409 migration_not_applied
 // for the batch-8 writes; the screens say so instead of failing silently.
@@ -100,6 +101,9 @@ export const identifyDocument = (token, id, body) =>
 
 export const fileDocument = (token, id, body) =>
   apiFetch(`${docUrl(id)}/filing`, token, { method: 'POST', body })
+
+export const recordDocumentTax = (token, id, body) =>
+  apiFetch(`${docUrl(id)}/tax-obligation`, token, { method: 'POST', body })
 
 export const confirmDocumentKind = (token, id, doc_type) =>
   apiFetch(`/ai-accountant/documents/${encodeURIComponent(id)}/classification`, token, { method: 'PATCH', body: { doc_type } })
