@@ -69,7 +69,7 @@ export default function CompanyProfile() {
                 return <li key={k}><Pill tone={ok ? 'good' : s === 'needs_review' ? 'warn' : 'neutral'}>{ok ? <I.check size={12} /> : null}{t(`prof.doc.${k}`)}{!ok && s ? ` · ${t(`prof.docSt.${s}`)}` : ''}</Pill></li>
               })}
             </ul>
-            <Btn to="/business/documents">{t('bill.upload')}</Btn>
+            <Btn to="/business/documents?tab=company">{t('bill.upload')}</Btn>
           </Card>
 
           <Card title={t('prof.legal')}>

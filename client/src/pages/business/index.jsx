@@ -246,6 +246,24 @@ export function BusinessDocuments() {
   }, [token, active])
   useEffect(() => { load() }, [load, scopeKey])
 
+  // Deep link from the v2 Documents page / bill detail: ?doc=<id> opens that document's review
+  // once, instead of leaving the user to find it in the list.
+  const deepDocDone = useRef(false)
+  useEffect(() => {
+    if (deepDocDone.current || st.loading) return
+    const id = new URLSearchParams(window.location.search).get('doc')
+    if (!id) return
+    deepDocDone.current = true
+    const found = st.docs.find((d) => String(d.id) === String(id))
+    if (found) {
+      setQueue('all'); setView('inbox'); setReview(found)
+      // the panel opens under the row, which may be far down the list
+      setTimeout(() => {
+        try { document.querySelector(`[data-doc-id="${CSS.escape(String(found.id))}"]`)?.scrollIntoView({ block: 'start', behavior: 'smooth' }) } catch { /* */ }
+      }, 300)
+    }
+  }, [st.loading, st.docs])
+
   const cpName = useCallback((id) => (id ? (st.cps.find((c) => c.id === id)?.name || null) : null), [st.cps])
 
   const toggleSel = useCallback((id) => setSel((s0) => {

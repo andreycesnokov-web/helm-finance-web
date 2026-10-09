@@ -18,6 +18,14 @@
 //   POST  /api/transactions/batch      existing — "+ Add" expense/income, always scope 'business' (lib/addEntry.js)
 //   PATCH /api/debts/:id/checklist     NEW in batch 8 — accountant check only (P-05 option B: the
 //                                      withholding slip lives in withholding_records and is read-only here)
+//   Documents (2026-10-09, the Documents page review panel) — existing Document Center routes,
+//   role-checked (canManageDocuments / document access) and audited by the server RPCs:
+//   POST   /api/documents/:id/signed-url           view / download link (audited read)
+//   PATCH  /api/documents/:id                      type, number, date, amount
+//   POST   /api/documents/:id/links                link to a bill / invoice / transaction
+//   DELETE /api/documents/:id/links/:linkId        unlink (the record itself is untouched)
+//   POST   /api/documents/:id/archive              archive (never a hard delete)
+//   PATCH  /api/ai-accountant/documents/:id/classification  confirm "company document" (NIB, NPWP…)
 //
 // Before the owner applies migrations 058–061 the server answers 409 migration_not_applied
 // for the batch-8 writes; the screens say so instead of failing silently.
@@ -67,6 +75,26 @@ export const createFunding = (token, body) =>
 
 export const markRepaymentPaid = (token, id, body) =>
   apiFetch(`/business-funding/repayments/${encodeURIComponent(id)}/paid`, token, { method: 'POST', body })
+
+const docUrl = (id) => `/documents/${encodeURIComponent(id)}`
+
+export const documentFileUrl = (token, id, mode = 'view') =>
+  apiFetch(`${docUrl(id)}/signed-url`, token, { method: 'POST', body: mode === 'download' ? { mode: 'download' } : {} })
+
+export const updateDocument = (token, id, body) =>
+  apiFetch(`/documents/${encodeURIComponent(id)}`, token, { method: 'PATCH', body })
+
+export const linkDocument = (token, id, target_type, target_id) =>
+  apiFetch(`${docUrl(id)}/links`, token, { method: 'POST', body: { target_type, target_id } })
+
+export const unlinkDocument = (token, id, linkId) =>
+  apiFetch(`${docUrl(id)}/links/${encodeURIComponent(linkId)}`, token, { method: 'DELETE' })
+
+export const archiveDocument = (token, id) =>
+  apiFetch(`${docUrl(id)}/archive`, token, { method: 'POST', body: {} })
+
+export const confirmDocumentKind = (token, id, doc_type) =>
+  apiFetch(`/ai-accountant/documents/${encodeURIComponent(id)}/classification`, token, { method: 'PATCH', body: { doc_type } })
 
 /** Server error → short user-facing text. 403 means the role may not do this. */
 export const createBusinessTransaction = (token, tx) =>

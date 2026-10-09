@@ -6,12 +6,14 @@
 // with the Radar rules). Approve / Reject / Ask for details use the existing endpoints and
 // only appear while the item is waiting for approval; the server enforces who may decide.
 // The Documents checklist (incl. the P-05 slip and accountant check) is components/BillChecklist.
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import I from '../icons'
 import { Card, Pill, Btn, Skeleton, ErrorBox, Empty } from '../ui'
 import { useT, useLang } from '../i18n'
-import { useApi } from '../data'
+import { useApi, useInvalidate } from '../data'
+import DocumentIntakeModal from '../../components/DocumentIntakeModal'
+import { useWorkspace } from '../../shell/WorkspaceProvider'
 import { money, shortDate } from '../lib/format'
 import { remaining, billStatus, withholdingTreatment } from '../lib/obligations'
 import { cashItems, forecast, applyScenario } from '../lib/radarSeries'
@@ -20,6 +22,11 @@ import DecisionActions from '../components/DecisionActions'
 import BillChecklist from '../components/BillChecklist'
 import WithholdingCard from '../components/WithholdingCard'
 import { StatusPill } from './Bills'
+import { billHasDocument, docPath } from '../lib/obligations'
+
+// Free text that older edits stored as the literal string "null" (PATCH /api/debts/:id before
+// this fix) must never reach the screen.
+const clean = (v) => (v == null || ['null', 'undefined'].includes(String(v).trim()) ? '' : String(v))
 
 const fmtTime = (iso, lang) => {
   if (!iso) return null
@@ -33,14 +40,17 @@ export default function BillDetail({ kind = 'payable' }) {
   const t = useT()
   const lang = useLang()
   const { id } = useParams()
+  const { active } = useWorkspace()
+  const invalidate = useInvalidate()
+  const [upload, setUpload] = useState(null)   // null | 'invoice' | 'proof'
   const debts = useApi('/debts')
   const rules = useApi('/accountant/rules')
   const pulse = useApi('/pulse')
   const fund = useApi('/business-funding')
   const cps = useApi('/counterparties')
-  const listPath = kind === 'receivable' ? '/business/receivables' : '/business/payables'
-
   const d = useMemo(() => (Array.isArray(debts.data) ? debts.data : []).find((x) => String(x.id) === String(id)), [debts.data, id])
+  // The record decides which list it belongs to (a document link opens /payables/:id for any debt).
+  const listPath = (d ? d.type === 'receivable' : kind === 'receivable') ? '/business/receivables' : '/business/payables'
   const engine = useMemo(() => findWithholdingRule(rules.data?.rules || []), [rules.data])
 
   const crumbs = (
@@ -82,8 +92,11 @@ export default function BillDetail({ kind = 'payable' }) {
     }
   }
 
-  const docs = Array.isArray(d.attachments) ? d.attachments : []
-  const hasInvoice = docs.length > 0 || !!d.attachment_url
+  // Documents linked in the Document Center (document_debt_links) count as well as legacy attachments.
+  const hasInvoice = billHasDocument(d)
+  const firstDocId = (d.document_links || [])[0]?.document_id || null
+  const who = clean(d.counterparty) || t('bills.noName')
+  const description = clean(d.description)
   const history = [
     d.created_at && { at: d.created_at, text: d.source_channel === 'mcp' ? t('bill.hist.createdAi', { who: d.created_by_name || '' })
       : d.source_channel === 'telegram' ? t('bill.hist.createdTg', { who: d.created_by_name || '' }) : d.created_by_name ? t('bill.hist.created', { who: d.created_by_name }) : t('bill.hist.createdAnon') },
@@ -98,9 +111,9 @@ export default function BillDetail({ kind = 'payable' }) {
       <header className="v2-pagehead">
         <div className="v2-pagehead-text">
           <StatusPill d={d} />
-          <h1 className="v2-h1">{d.counterparty || t('bills.noName')}</h1>
+          <h1 className="v2-h1">{who}</h1>
           <p className="v2-sub"><strong className="v2-num">{money(d.original_amount ?? d.amount, { full: true, currency: d.currency || 'IDR' })}</strong>
-            {d.description && ` · ${d.description}`}{d.due_date && ` · ${t('pulse.dec.due', { d: shortDate(d.due_date, lang) })}`}</p>
+            {description && ` · ${description}`}{d.due_date && ` · ${t('pulse.dec.due', { d: shortDate(d.due_date, lang) })}`}</p>
         </div>
         {s === 'pending' && <div className="v2-pagehead-actions"><DecisionActions debt={d} /></div>}
       </header>
@@ -131,7 +144,7 @@ export default function BillDetail({ kind = 'payable' }) {
           <Card title={t('bill.details')}>
             <dl className="v2-dl">
               <dt>{t(isPay ? 'bills.col.supplier' : 'bills.col.customer')}</dt>
-              <dd><Link to="/business/counterparties">{d.counterparty || '—'}</Link></dd>
+              <dd>{cp ? <Link to={`/business/counterparties/${encodeURIComponent(cp.id)}/edit`}>{who}</Link> : <Link to="/business/counterparties">{clean(d.counterparty) || '—'}</Link>}</dd>
               {d.invoice_number && <><dt>{t('bill.invoiceNo')}</dt><dd className="v2-num">{d.invoice_number}</dd></>}
               <dt>{t('bill.created')}</dt><dd>{shortDate(d.created_at, lang)}</dd>
               <dt>{t('bill.dueDate')}</dt><dd>{d.due_date ? shortDate(d.due_date, lang) : t('bill.noDue')}</dd>
@@ -161,10 +174,18 @@ export default function BillDetail({ kind = 'payable' }) {
             <Link className="v2-more-link" to="/business/radar">{t('bill.seeRadar')}</Link>
           </Card>
 
-          <BillChecklist d={d} hasInvoice={hasInvoice} paid={s === 'paid'} slipNeeded={!!split} />
+          <BillChecklist d={d} hasInvoice={hasInvoice} paid={s === 'paid'} slipNeeded={!!split}
+            invoiceDocPath={firstDocId ? docPath({ id: firstDocId }) : null} onUpload={setUpload} />
           <WithholdingCard d={d} />
         </div>
       </div>
+      {upload && (
+        <DocumentIntakeModal business={active} link={{ target_type: 'debt', target_id: d.id }}
+          defaultType={upload === 'proof' ? 'payment_proof' : isPay ? 'vendor_invoice' : 'customer_invoice'}
+          uploadSource={upload === 'proof' ? 'payment_proof_upload' : isPay ? 'payable_upload' : 'receivable_upload'}
+          heading={t(upload === 'proof' ? 'bill.uploadProofFor' : 'bill.uploadInvoiceFor', { who })}
+          onClose={() => setUpload(null)} onUploaded={() => invalidate()} />
+      )}
     </div>
   )
 }
