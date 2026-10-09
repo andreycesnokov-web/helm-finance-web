@@ -150,6 +150,7 @@ export default {
     history: 'Riwayat', effect: 'Dampak ke kas', cashAfter: 'Kas setelah bayar pada {d}', lowest: 'Titik terendah · {d}', unchanged: 'tidak berubah',
     noEffect: 'Tidak ada di proyeksi 30 hari (lunas, tanpa jatuh tempo, atau mata uang lain).', seeRadar: 'Lihat di Radar',
     documents: 'Dokumen', docCount: '{n} dari {m}', view: 'Lihat', upload: 'Unggah',
+    uploadInvoiceFor: 'Faktur · {who}', uploadProofFor: 'Bukti bayar · {who}',
     doc: { invoice: 'Faktur', proof: 'Bukti bayar', proofSub: 'setelah dibayar', slip: 'Bukti potong', slipSub: 'dibuat sebelum setoran pajak',
       check: 'Pemeriksaan akuntan', have: 'ada', missing: 'belum ada', notTracked: 'belum dilacak di sini' },
     closeNote: 'Tidak ada yang tertutup dengan sendirinya.',
@@ -392,7 +393,9 @@ export default {
     look: 'Perlu dilihat · {n}', inMonth: '{m} · {n}', allGood: 'Tidak ada yang perlu dilihat.', none: 'Tidak ada dokumen di bulan ini.',
     ch: { web: 'Diunggah di sini', telegram: 'Telegram', mcp: 'Asisten AI', email: 'Email' },
     type: { vendor_invoice: 'Faktur pemasok', customer_invoice: 'Faktur ke pelanggan', tax_invoice: 'Faktur pajak', bukti_potong: 'Bukti potong', tax_billing: 'Kode billing pajak', filing_confirmation: 'Bukti pelaporan', bank_document: 'Dokumen bank', invoice: 'Faktur', receipt: 'Struk', bank_statement: 'Mutasi bank', contract: 'Kontrak', payment_proof: 'Bukti bayar', tax: 'Dokumen pajak', other: 'Dokumen' },
-    linked: 'Tertaut', notLinked: 'Belum tertaut', fix: 'Perbaiki',
+    linked: 'Tertaut', notLinked: 'Belum tertaut', fix: 'Perbaiki', open: 'Buka', recent: 'Baru diarsipkan', shown: 'Menampilkan {n} dari {m}. Sisanya ada di tampilan klasik.',
+    linkedTo: { payable: 'Tagihan · {who}', receivable: 'Faktur · {who}', debt: 'Tagihan #{id}', transaction: 'Transaksi · {d}', transactionNoDate: 'Transaksi' },
+    uploadProofFor: 'Bukti bayar · {who}',
     missingFor: 'Kurang untuk {m}', missingHint: 'Tagihan lunas tanpa bukti bayar — akuntan membutuhkannya untuk tutup buku.', noneMissing: 'Tidak ada yang kurang.',
   },
   set: {

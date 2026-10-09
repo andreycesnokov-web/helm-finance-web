@@ -1437,8 +1437,10 @@ app.patch('/api/debts/:id', auth, async (req, res) => {
     if (!debt) return res.status(404).json({ error: 'Debt not found' });
 
     const updates = {};
-    if (req.body.counterparty !== undefined) updates.counterparty = String(req.body.counterparty).trim() || null;
-    if (req.body.description  !== undefined) updates.description  = String(req.body.description).trim() || null;
+    // null / empty clears the field. String(null) used to store the literal text "null".
+    const textOrNull = (v) => (v === null || v === undefined ? null : String(v).trim() || null);
+    if (req.body.counterparty !== undefined) updates.counterparty = textOrNull(req.body.counterparty);
+    if (req.body.description  !== undefined) updates.description  = textOrNull(req.body.description);
     if (req.body.due_date     !== undefined) updates.due_date     = req.body.due_date || null;
     if (req.body.scope        !== undefined) updates.scope        = req.body.scope;
     if (req.body.type         !== undefined && ['receivable', 'payable'].includes(req.body.type))

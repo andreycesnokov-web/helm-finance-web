@@ -362,7 +362,7 @@ export function DocumentQueue({
                     save_supporting: { label: 'Review', onClick: () => onReview(d) },
                     review_confirm: { label: 'Review & confirm', onClick: () => onReview(d) },
                     review_fields: { label: 'Review', onClick: () => onReview(d) },
-                    open_record: { label: 'Open record', onClick: () => navigate('/business/payables') },
+                    open_record: { label: 'Open record', onClick: () => navigate(dl ? `/business/payables/${encodeURIComponent(dl.target_id)}` : '/business/payables') },
                     analyze: { label: 'Classify', onClick: () => onClassify(d) },
                   }
                   const primary = blocked && !dl
@@ -376,12 +376,12 @@ export function DocumentQueue({
                     a.link === 'both' && !dl && { label: 'Link to payable', onClick: () => onLink(d, 'debt', 'payable') },
                     a.link === 'both' && !dl && { label: 'Link to receivable', onClick: () => onLink(d, 'debt', 'receivable') },
                     a.link === 'transaction' && !txLink(d) && { label: 'Link to transaction', onClick: () => onLink(d, 'transaction') },
-                    dl && { label: 'Open record', onClick: () => navigate('/business/payables') },
+                    dl && { label: 'Open record', onClick: () => navigate(`/business/payables/${encodeURIComponent(dl.target_id)}`) },
                     !d.archived_at && { label: 'Archive', onClick: () => onArchive(d) },
                   ]
                   const isOpen = expandedId === d.id
                   return (
-                    <div key={d.id} className="doc-rowgroup">
+                    <div key={d.id} className="doc-rowgroup" data-doc-id={d.id}>
                     <article className={`doc-row${isOpen ? ' is-rp-open' : ''}${freshIds?.has(d.id) ? ' is-fresh' : ''}`}>
                       <input type="checkbox" className="wb-check" checked={selected.has(d.id)}
                         onClick={(e) => e.stopPropagation()}
@@ -1181,7 +1181,7 @@ export function CompanyVault({
               ]
               const isOpen = expandedId === d.id
               return (
-                <div key={d.id} className="doc-rowgroup">
+                <div key={d.id} className="doc-rowgroup" data-doc-id={d.id}>
                 <article className={`doc-row doc-vrow${v.confirmed ? '' : ' is-suggested'}${isOpen ? ' is-rp-open' : ''}`}>
                   <div className="doc-row-main"
                     role={onReview ? 'button' : undefined} tabIndex={onReview ? 0 : undefined}

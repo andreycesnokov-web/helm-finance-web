@@ -19,6 +19,9 @@ import { billStatus, billSummary, billRows, tabForPath, remaining } from '../lib
 
 const TONE = { pending: 'info', late: 'crit', partial: 'warn', open: 'neutral', paid: 'good', cancelled: 'neutral' }
 const CLASSIC = { pay: '/business/payables/classic', collect: '/business/receivables/classic', all: '/business/invoices/classic' }
+// Each tab is its own route, so a reload or a shared link keeps the tab.
+const TAB_PATH = { pay: '/business/payables', collect: '/business/receivables', all: '/business/invoices' }
+const clean = (v) => (v == null || ['null', 'undefined'].includes(String(v).trim()) ? '' : String(v))
 
 export function detailPath(d) {
   return `/business/${d.type === 'receivable' ? 'receivables' : 'payables'}/${encodeURIComponent(d.id)}`
@@ -44,8 +47,8 @@ function Row({ d, onPay, t, lang }) {
   return (
     <div className="v2-brow" role="row">
       <span role="cell" className="v2-brow-who">
-        <Link to={detailPath(d)} className="v2-brow-name">{d.counterparty || t('bills.noName')}</Link>
-        <span className="v2-brow-note">{[d.description, d.source_channel === 'mcp' ? t('bills.byAi') : null].filter(Boolean).join(' · ')}</span>
+        <Link to={detailPath(d)} className="v2-brow-name">{clean(d.counterparty) || t('bills.noName')}</Link>
+        <span className="v2-brow-note">{[clean(d.description), d.source_channel === 'mcp' ? t('bills.byAi') : null].filter(Boolean).join(' · ')}</span>
       </span>
       <span role="cell" className="v2-brow-due v2-num">{d.due_date ? shortDate(d.due_date, lang) : '—'}</span>
       <span role="cell" className="v2-brow-status"><StatusPill d={d} /></span>
@@ -80,7 +83,12 @@ export default function Bills() {
   const loc = useLocation()
   const navigate = useNavigate()
   const invalidate = useInvalidate()
-  const [tab, setTab] = useState(() => tabForPath(loc.pathname))
+  const [tab, setTabState] = useState(() => tabForPath(loc.pathname))
+  useEffect(() => { setTabState(tabForPath(loc.pathname)) }, [loc.pathname])
+  const setTab = (k) => {
+    setTabState(k)
+    if (TAB_PATH[k] && loc.pathname !== TAB_PATH[k]) navigate(`${TAB_PATH[k]}${loc.search}`)
+  }
   const [view, setView] = useState('open')
   const [create, setCreate] = useState(null)   // 'payable' | 'receivable'
   const [pay, setPay] = useState(null)

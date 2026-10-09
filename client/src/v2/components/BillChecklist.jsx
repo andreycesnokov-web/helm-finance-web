@@ -19,13 +19,13 @@ import { useT, useLang } from '../i18n'
 import { Card } from '../ui'
 import I from '../icons'
 
-export default function BillChecklist({ d, hasInvoice, paid, slipNeeded }) {
+export default function BillChecklist({ d, hasInvoice, paid, slipNeeded, invoiceDocPath = null, onUpload = null }) {
   const t = useT()
   const lang = useLang()
   const { token } = useAuth()
   const invalidate = useInvalidate()
   const slips = useApi(slipNeeded ? '/withholding-slips' : null)
-  const items = billChecklistItems(d, { hasInvoice, paid, slipNeeded, slips: slips.data })
+  const items = billChecklistItems(d, { hasInvoice, paid, slipNeeded, slips: slips.data, invoiceDocPath })
   const checkTracked = !!items.find((c) => c.key === 'check')?.editable
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState(null)
@@ -55,6 +55,10 @@ export default function BillChecklist({ d, hasInvoice, paid, slipNeeded }) {
     if (c.key === 'slip') return c.done ? <Link to="/business/documents">{t('bill.view')}</Link> : <Link to="/business/accountant?tab=packages">{t('acct.seePackages')}</Link>
     if (c.key === 'check') {
       return <button type="button" className="v2-linkbtn" disabled={busy} onClick={() => run({ accountant_checked: !c.done })}>{c.done ? t('bill.ck.undo') : t('bill.ck.mark')}</button>
+    }
+    // Upload FOR this bill: the new document is linked to it in the same call.
+    if (!c.done && onUpload && (c.key === 'invoice' || c.key === 'proof')) {
+      return <button type="button" className="v2-linkbtn" onClick={() => onUpload(c.key)}>{t('bill.upload')}</button>
     }
     return !c.done ? <Link to="/business/documents">{t('bill.upload')}</Link> : null
   }

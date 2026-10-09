@@ -551,11 +551,14 @@
 .v2-brow-act { grid-area: act; display: flex; }
 .v2-brow-act .v2-btn { width: 100%; }
 @media (min-width: 1025px) {
-  .v2-brow { grid-template-columns: minmax(0, 1fr) 90px 220px 130px 150px; grid-template-areas: none; gap: var(--space-4); }
+  /* The action column fits the longest action ("Отметить поступление"); before it was 150px and the
+     button covered the amount. Every row is its own grid, so the columns stay fixed to line up. */
+  .v2-brow { grid-template-columns: minmax(0, 1fr) 90px minmax(0, 200px) 130px 230px; grid-template-areas: none; gap: var(--space-4); }
   .v2-brow > * { grid-area: auto !important; }
   .v2-brow-head { display: grid; font-size: 12px; font-weight: 700; color: var(--text-muted); padding: var(--space-2) 0; }
   .v2-brow-due { text-align: left; font-size: var(--text-sm); color: var(--text-primary); }
-  .v2-brow-act { justify-content: flex-end; }
+  .v2-brow-act { justify-content: flex-end; min-width: 0; }
+  .v2-brow-act .v2-btnpair { flex-direction: column; align-items: flex-end; }
   .v2-brow-act .v2-btn { width: auto; }
 }
 

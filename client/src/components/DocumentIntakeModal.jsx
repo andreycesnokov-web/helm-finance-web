@@ -20,15 +20,75 @@ const ACCEPT = '.pdf,.jpg,.jpeg,.png,.csv,.xlsx'
 /* An unambiguous state per file. "Ready" used to mean "chosen, nothing sent yet", which
    read as "done" — so a user could close the window believing a file had been uploaded
    when nothing had left the browser. Each state now says exactly where the file is. */
-const STATE_LABEL = (it) => {
-  if (it.status === 'queued') return 'Selected — not uploaded yet'
+// Screen text in the app language (hf_lang); before, the whole window was English on a
+// Russian or Indonesian screen.
+const INTAKE_T = {
+  en: {
+    queued: 'Selected — not uploaded yet', creating: 'Creating document…', uploading: 'Uploading file…', uploaded: 'Document uploaded',
+    tooLarge: 'Too large', duplicate: 'Already uploaded', failed: 'Not uploaded', tooLargeErr: 'File is larger than 20 MB',
+    noRecord: 'The file was stored but no document record was created.', dupErr: 'This file is already uploaded to this workspace.', uploadFailed: 'Upload failed',
+    title: 'Upload documents', intro: 'Drop everything in at once — CFO AI will detect each document type and file it.',
+    into: 'Uploading to', thisBiz: 'this business workspace', isolation: 'Files are stored in this business workspace only — never in your personal workspace or any other company.',
+    filingAs: 'Filing as', filingHint: 'so it counts as the right kind of evidence on this record. You can change the type afterwards in Documents.',
+    drop: 'Drag & drop files here', dropHint: 'or click to choose · PDF, JPG, PNG, CSV, XLSX · up to 20 MB each',
+    prelim: 'Preliminary from file name:', confidence: 'confidence. Confirm the type after upload.', detecting: 'Detecting…',
+    dupTitle: 'Possible duplicate document', dupText: 'This file already exists in this workspace, so it was not uploaded again.',
+    openExisting: 'Open existing document', linkExisting: 'Link the existing one to this record instead',
+    guessNote: 'Detected types are a preliminary guess from the file name — you confirm each one after upload. A file name never decides where a document is filed.',
+    okOne: 'Document uploaded successfully', okMany: (n) => `${n} documents uploaded successfully`, vault: 'Saved to Company Vault', inbox: 'Added to Evidence Inbox',
+    analysing: ' · Analysis in progress', openDoc: 'Open document', notUploaded: 'Document was not uploaded',
+    notAddedOne: 'It was not added to Evidence Inbox.', notAddedMany: 'They were not added to Evidence Inbox.',
+    partial: 'The file reached storage but no document record was created, so it is not in your workspace. Try again — a repeat upload of the same file is detected as a duplicate.',
+    done: 'Done', cancel: 'Cancel', retry: 'Try again', uploadN: (n) => `Upload and analyze ${n} file${n > 1 ? 's' : ''}`, upload: 'Upload',
+  },
+  ru: {
+    queued: 'Выбран — ещё не загружен', creating: 'Создаём документ…', uploading: 'Загружаем файл…', uploaded: 'Документ загружен',
+    tooLarge: 'Слишком большой', duplicate: 'Уже загружен', failed: 'Не загружен', tooLargeErr: 'Файл больше 20 МБ',
+    noRecord: 'Файл сохранён, но запись документа не создана.', dupErr: 'Этот файл уже загружен в эту компанию.', uploadFailed: 'Не удалось загрузить',
+    title: 'Загрузка документов', intro: 'Добавьте всё сразу — CFO AI определит тип каждого документа и разложит их.',
+    into: 'Загрузка в', thisBiz: 'эту компанию', isolation: 'Файлы хранятся только в этой компании — не в вашем личном пространстве и не в других компаниях.',
+    filingAs: 'Сохраняем как', filingHint: '— так он засчитается нужным видом подтверждения для этой записи. Тип можно поменять потом в «Документах».',
+    drop: 'Перетащите файлы сюда', dropHint: 'или нажмите, чтобы выбрать · PDF, JPG, PNG, CSV, XLSX · до 20 МБ каждый',
+    prelim: 'Предварительно по имени файла:', confidence: '— уверенность. Тип подтвердите после загрузки.', detecting: 'Определяем…',
+    dupTitle: 'Возможно, это дубликат', dupText: 'Такой файл уже есть в этой компании, поэтому повторно он не загружен.',
+    openExisting: 'Открыть существующий документ', linkExisting: 'Привязать существующий документ к этой записи',
+    guessNote: 'Тип по имени файла — только предварительная догадка, каждый вы подтверждаете после загрузки. Имя файла никогда не решает, куда документ попадёт.',
+    okOne: 'Документ загружен', okMany: (n) => `Загружено документов: ${n}`, vault: 'Сохранён в архив компании', inbox: 'Добавлен во входящие документы',
+    analysing: ' · идёт анализ', openDoc: 'Открыть документ', notUploaded: 'Документ не загружен',
+    notAddedOne: 'Он не добавлен во входящие документы.', notAddedMany: 'Они не добавлены во входящие документы.',
+    partial: 'Файл дошёл до хранилища, но запись документа не создана, поэтому в компании его нет. Попробуйте ещё раз — повторная загрузка того же файла будет распознана как дубликат.',
+    done: 'Готово', cancel: 'Отмена', retry: 'Повторить', uploadN: (n) => `Загрузить и проанализировать: ${n}`, upload: 'Загрузить',
+  },
+  id: {
+    queued: 'Dipilih — belum diunggah', creating: 'Membuat dokumen…', uploading: 'Mengunggah berkas…', uploaded: 'Dokumen terunggah',
+    tooLarge: 'Terlalu besar', duplicate: 'Sudah diunggah', failed: 'Tidak terunggah', tooLargeErr: 'Berkas lebih dari 20 MB',
+    noRecord: 'Berkas tersimpan tetapi catatan dokumen tidak dibuat.', dupErr: 'Berkas ini sudah diunggah ke perusahaan ini.', uploadFailed: 'Gagal mengunggah',
+    title: 'Unggah dokumen', intro: 'Masukkan semuanya sekaligus — CFO AI mendeteksi jenis setiap dokumen dan menyimpannya.',
+    into: 'Mengunggah ke', thisBiz: 'perusahaan ini', isolation: 'Berkas hanya disimpan di perusahaan ini — tidak di ruang pribadi Anda atau perusahaan lain.',
+    filingAs: 'Disimpan sebagai', filingHint: 'agar dihitung sebagai bukti yang tepat untuk catatan ini. Jenisnya bisa diubah nanti di Dokumen.',
+    drop: 'Seret & lepas berkas di sini', dropHint: 'atau klik untuk memilih · PDF, JPG, PNG, CSV, XLSX · maks. 20 MB per berkas',
+    prelim: 'Perkiraan dari nama berkas:', confidence: '— tingkat keyakinan. Konfirmasi jenis setelah diunggah.', detecting: 'Mendeteksi…',
+    dupTitle: 'Kemungkinan dokumen ganda', dupText: 'Berkas ini sudah ada di perusahaan ini, jadi tidak diunggah lagi.',
+    openExisting: 'Buka dokumen yang ada', linkExisting: 'Tautkan dokumen yang ada ke catatan ini',
+    guessNote: 'Jenis dari nama berkas hanya perkiraan — Anda mengonfirmasi masing-masing setelah diunggah. Nama berkas tidak pernah menentukan tempat dokumen disimpan.',
+    okOne: 'Dokumen berhasil diunggah', okMany: (n) => `${n} dokumen berhasil diunggah`, vault: 'Disimpan di Arsip Perusahaan', inbox: 'Ditambahkan ke Kotak Masuk Bukti',
+    analysing: ' · Analisis berjalan', openDoc: 'Buka dokumen', notUploaded: 'Dokumen tidak terunggah',
+    notAddedOne: 'Tidak ditambahkan ke Kotak Masuk Bukti.', notAddedMany: 'Tidak ditambahkan ke Kotak Masuk Bukti.',
+    partial: 'Berkas sampai di penyimpanan tetapi catatan dokumen tidak dibuat, jadi belum ada di perusahaan. Coba lagi — unggahan ulang berkas yang sama akan terdeteksi sebagai duplikat.',
+    done: 'Selesai', cancel: 'Batal', retry: 'Coba lagi', uploadN: (n) => `Unggah dan analisis ${n} berkas`, upload: 'Unggah',
+  },
+}
+const intakeT = () => { let l = 'en'; try { l = localStorage.getItem('hf_lang') || 'en' } catch { /* */ } return INTAKE_T[l] || INTAKE_T.en }
+
+const STATE_LABEL = (it, T = intakeT()) => {
+  if (it.status === 'queued') return T.queued
   if (it.status === 'uploading') {
-    return it.stage === 'creating' ? 'Creating document…' : 'Uploading file…'
+    return it.stage === 'creating' ? T.creating : T.uploading
   }
-  if (it.status === 'uploaded') return 'Document uploaded'
-  if (it.status === 'too_large') return 'Too large'
-  if (it.status === 'duplicate') return 'Already uploaded'
-  if (it.status === 'failed') return 'Not uploaded'
+  if (it.status === 'uploaded') return T.uploaded
+  if (it.status === 'too_large') return T.tooLarge
+  if (it.status === 'duplicate') return T.duplicate
+  if (it.status === 'failed') return T.failed
   return it.status.replace('_', ' ')
 }
 const CONF_TONE = { high: 'success', medium: 'warning', low: 'warning', unknown: 'neutral' }
@@ -60,7 +120,7 @@ export default function DocumentIntakeModal({ business, onClose, onUploaded, lin
       file: f,
       status: f.size > MAX_FILE_BYTES ? 'too_large' : 'queued',
       detected: null,
-      error: f.size > MAX_FILE_BYTES ? 'File is larger than 20 MB' : null,
+      error: f.size > MAX_FILE_BYTES ? intakeT().tooLargeErr : null,
     }))
     setItems(prev => [...prev, ...next])
     try {
@@ -100,7 +160,7 @@ export default function DocumentIntakeModal({ business, onClose, onUploaded, lin
         // claiming anything. Without this a storage PUT that succeeded while the
         // database insert failed would have read as "uploaded".
         const documentId = res?.document?.id || null
-        if (!documentId) throw Object.assign(new Error('The file was stored but no document record was created.'), { partial: true })
+        if (!documentId) throw Object.assign(new Error(intakeT().noRecord), { partial: true })
         setItems(prev => prev.map((x, idx) => idx === i
           ? { ...x, status: 'uploaded', stage: 'done', documentId, fileId: res?.document?.file_id || null,
               // Where it actually went. Routing is confirmed-only now, so a fresh
@@ -117,8 +177,8 @@ export default function DocumentIntakeModal({ business, onClose, onUploaded, lin
           ? { ...x, status: dup ? 'duplicate' : 'failed', existingId, stage: null,
               partial: !!e.partial,
               error: dup
-                ? 'This file is already uploaded to this workspace.'
-                : (e.message || 'Upload failed') }
+                ? intakeT().dupErr
+                : (e.message || intakeT().uploadFailed) }
           : x))
       }
     }
@@ -139,25 +199,24 @@ export default function DocumentIntakeModal({ business, onClose, onUploaded, lin
   // A failed file keeps its place in the queue so "Try again" can resend exactly it.
   const retryable = failed.length > 0
   const done = uploaded.length
+  const T = intakeT()
 
   return (
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16 }}>
       <div onClick={e => e.stopPropagation()} style={{ background: 'var(--surface-card,#fff)', borderRadius: 16, padding: 20, width: 620, maxWidth: '100%', maxHeight: '88vh', overflow: 'auto' }}>
-        <div style={{ fontSize: 17, fontWeight: 800, marginBottom: 4 }}>{heading || 'Upload documents'}</div>
+        <div style={{ fontSize: 17, fontWeight: 800, marginBottom: 4 }}>{heading || T.title}</div>
         <div style={{ fontSize: 12.5, color: 'var(--text-secondary,#555)', marginBottom: 12, lineHeight: 1.5 }}>
-          Drop everything in at once — CFO AI will detect each document type and file it.
+          {T.intro}
         </div>
 
         {/* Workspace isolation, made explicit */}
         <div style={{ background: 'var(--info-soft,#EFF6FF)', borderRadius: 10, padding: '9px 12px', fontSize: 12.5, marginBottom: 12, lineHeight: 1.5 }}>
-          Uploading to <b>{business?.name || 'this business workspace'}</b>.
-          Files are stored in this business workspace only — never in your personal workspace or any other company.
+          {T.into} <b>{business?.name || T.thisBiz}</b>.{' '}{T.isolation}
         </div>
 
         {defaultType && (
           <div style={{ background: 'var(--warning-soft,#FBF1DF)', borderRadius: 10, padding: '9px 12px', fontSize: 12.5, marginBottom: 12, lineHeight: 1.5 }}>
-            Filing as <b>{TYPE_LABEL[defaultType] || defaultType}</b> so it counts as the right
-            kind of evidence on this record. You can change the type afterwards in Documents.
+            {T.filingAs} <b>{TYPE_LABEL[defaultType] || defaultType}</b> {T.filingHint}
           </div>
         )}
 
@@ -172,9 +231,9 @@ export default function DocumentIntakeModal({ business, onClose, onUploaded, lin
             background: dragOver ? 'var(--info-soft,#EFF6FF)' : 'transparent',
             borderRadius: 12, padding: '22px 16px', textAlign: 'center', cursor: 'pointer', marginBottom: 12,
           }}>
-          <div style={{ fontSize: 14, fontWeight: 700 }}>Drag &amp; drop files here</div>
+          <div style={{ fontSize: 14, fontWeight: 700 }}>{T.drop}</div>
           <div style={{ fontSize: 12, color: 'var(--text-muted,#888)', marginTop: 4 }}>
-            or click to choose · PDF, JPG, PNG, CSV, XLSX · up to 20 MB each
+            {T.dropHint}
           </div>
           <input ref={inputRef} type="file" multiple accept={ACCEPT} style={{ display: 'none' }}
             onChange={e => { addFiles(e.target.files); e.target.value = '' }} />
@@ -189,8 +248,8 @@ export default function DocumentIntakeModal({ business, onClose, onUploaded, lin
                   <span style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 600 }}>{it.file.name}</span>
                   <span style={{ fontSize: 11.5, color: 'var(--text-muted,#888)' }}>
                     {it.detected
-                      ? <>Preliminary from file name: <b>{it.detected.label}</b> · {it.detected.confidence} confidence. Confirm the type after upload.</>
-                      : 'Detecting…'}
+                      ? <>{T.prelim} <b>{it.detected.label}</b> · {it.detected.confidence} {T.confidence}</>
+                      : T.detecting}
                     {it.error ? ` · ${it.error}` : ''}
                   </span>
                 </span>
@@ -200,27 +259,27 @@ export default function DocumentIntakeModal({ business, onClose, onUploaded, lin
                       : it.status === 'duplicate' ? 'warning'
                         : it.detected ? CONF_TONE[it.detected.confidence] || 'neutral' : 'neutral'
                 }>
-                  {STATE_LABEL(it)}
+                  {STATE_LABEL(it, T)}
                 </StatusBadge>
               </div>
             ))}
             {items.some(it => it.status === 'duplicate' && it.existingId) && (
               <div style={{ padding: '9px 12px', borderTop: '0.5px solid var(--border-subtle,#eee)', background: 'var(--warning-soft,#FBF1DF)' }}>
-                <div style={{ fontSize: 12.5, fontWeight: 700, marginBottom: 2 }}>Possible duplicate document</div>
+                <div style={{ fontSize: 12.5, fontWeight: 700, marginBottom: 2 }}>{T.dupTitle}</div>
                 <div style={{ fontSize: 12, lineHeight: 1.5, color: 'var(--text-secondary,#555)' }}>
-                  This file already exists in this workspace, so it was not uploaded again.
+                  {T.dupText}
                 </div>
                 <div style={{ display: 'flex', gap: 12, marginTop: 6, flexWrap: 'wrap' }}>
                   {items.filter(it => it.status === 'duplicate' && it.existingId).slice(0, 1).map((it, i) => (
                     <span key={i} style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
                       <button type="button" onClick={() => openExisting(it.existingId)}
                         style={{ padding: 0, border: 0, background: 'none', font: 'inherit', fontSize: 12, fontWeight: 700, color: 'var(--text-link,#1565C0)', cursor: 'pointer' }}>
-                        Open existing document
+                        {T.openExisting}
                       </button>
                       {onLinkExisting && link && (
                         <button type="button" onClick={() => onLinkExisting(it.existingId)}
                           style={{ padding: 0, border: 0, background: 'none', font: 'inherit', fontSize: 12, fontWeight: 700, color: 'var(--text-link,#1565C0)', cursor: 'pointer' }}>
-                          Link the existing one to this record instead
+                          {T.linkExisting}
                         </button>
                       )}
                     </span>
@@ -232,8 +291,7 @@ export default function DocumentIntakeModal({ business, onClose, onUploaded, lin
         )}
 
         <div style={{ fontSize: 11.5, color: 'var(--text-muted,#888)', marginBottom: 12, lineHeight: 1.5 }}>
-          Detected types are a preliminary guess from the file name — you confirm each one after upload.
-          A file name never decides where a document is filed.
+          {T.guessNote}
         </div>
 
         {/* ── the outcome ───────────────────────────────────────────────────
@@ -242,19 +300,19 @@ export default function DocumentIntakeModal({ business, onClose, onUploaded, lin
         {uploaded.length > 0 && (
           <div style={{ background: 'var(--success-soft,#E8F6EE)', borderRadius: 10, padding: '10px 12px', marginBottom: 12, lineHeight: 1.5 }}>
             <div style={{ fontSize: 13, fontWeight: 800 }}>
-              {uploaded.length === 1 ? 'Document uploaded successfully' : `${uploaded.length} documents uploaded successfully`}
+              {uploaded.length === 1 ? T.okOne : T.okMany(uploaded.length)}
             </div>
             {uploaded.map((it, i) => (
               <div key={i} style={{ fontSize: 12.5, marginTop: 4 }}>
                 <div style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis' }}>{it.file.name}</div>
                 <div style={{ color: 'var(--text-secondary,#555)' }}>
-                  {it.destination === 'vault' ? 'Saved to Company Vault' : 'Added to Evidence Inbox'}
-                  {' · Analysis in progress'}
+                  {it.destination === 'vault' ? T.vault : T.inbox}
+                  {T.analysing}
                 </div>
                 {onOpenDocument && it.documentId && (
                   <button type="button" onClick={() => onOpenDocument(it.documentId)}
                     style={{ padding: 0, border: 0, background: 'none', font: 'inherit', fontSize: 12, fontWeight: 700, color: 'var(--text-link,#1565C0)', cursor: 'pointer', marginTop: 2 }}>
-                    Open document
+                    {T.openDoc}
                   </button>
                 )}
               </div>
@@ -264,9 +322,9 @@ export default function DocumentIntakeModal({ business, onClose, onUploaded, lin
 
         {failed.length > 0 && (
           <div style={{ background: 'var(--danger-soft,#FDECEC)', borderRadius: 10, padding: '10px 12px', marginBottom: 12, lineHeight: 1.5 }}>
-            <div style={{ fontSize: 13, fontWeight: 800 }}>Document was not uploaded</div>
+            <div style={{ fontSize: 13, fontWeight: 800 }}>{T.notUploaded}</div>
             <div style={{ fontSize: 12.5, color: 'var(--text-secondary,#555)' }}>
-              {failed.length === 1 ? 'It was not added to Evidence Inbox.' : 'They were not added to Evidence Inbox.'}
+              {failed.length === 1 ? T.notAddedOne : T.notAddedMany}
             </div>
             {failed.map((it, i) => (
               <div key={i} style={{ fontSize: 12.5, marginTop: 4 }}>
@@ -274,8 +332,7 @@ export default function DocumentIntakeModal({ business, onClose, onUploaded, lin
                 {it.error ? <span style={{ color: 'var(--text-secondary,#555)' }}> — {it.error}</span> : null}
                 {it.partial && (
                   <div style={{ color: 'var(--text-secondary,#555)' }}>
-                    The file reached storage but no document record was created, so it is not in your
-                    workspace. Try again — a repeat upload of the same file is detected as a duplicate.
+                    {T.partial}
                   </div>
                 )}
               </div>
@@ -284,13 +341,13 @@ export default function DocumentIntakeModal({ business, onClose, onUploaded, lin
         )}
 
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-          <Btn variant="ghost" onClick={onClose}>{done ? 'Done' : 'Cancel'}</Btn>
+          <Btn variant="ghost" onClick={onClose}>{done ? T.done : T.cancel}</Btn>
           <Btn onClick={upload} disabled={busy || (!queued && !retryable)}>
             {busy
-              ? (items.some(i => i.stage === 'creating') ? 'Creating document…' : 'Uploading file…')
-              : retryable && !queued ? `Try again`
-                : queued ? `Upload and analyze ${queued} file${queued > 1 ? 's' : ''}`
-                  : 'Upload'}
+              ? (items.some(i => i.stage === 'creating') ? T.creating : T.uploading)
+              : retryable && !queued ? T.retry
+                : queued ? T.uploadN(queued)
+                  : T.upload}
           </Btn>
         </div>
       </div>

@@ -150,6 +150,7 @@ export default {
     history: 'История', effect: 'Влияние на деньги', cashAfter: 'Деньги после оплаты {d}', lowest: 'Минимум · {d}', unchanged: 'без изменений',
     noEffect: 'Не входит в прогноз на 30 дней (оплачено, без срока или в другой валюте).', seeRadar: 'Посмотреть на Радаре',
     documents: 'Документы', docCount: '{n} из {m}', view: 'Открыть', upload: 'Загрузить',
+    uploadInvoiceFor: 'Счёт · {who}', uploadProofFor: 'Подтверждение оплаты · {who}',
     doc: { invoice: 'Счёт', proof: 'Подтверждение оплаты', proofSub: 'после оплаты', slip: 'Справка об удержании (bukti potong)', slipSub: 'оформляется до уплаты налога',
       check: 'Проверка бухгалтера', have: 'есть', missing: 'нет', notTracked: 'пока не отслеживается здесь' },
     closeNote: 'Ничего не закрывается само.',
@@ -392,7 +393,9 @@ export default {
     look: 'Нужно посмотреть · {n}', inMonth: '{m} · {n}', allGood: 'Смотреть нечего.', none: 'В этом месяце документов нет.',
     ch: { web: 'Загружено здесь', telegram: 'Telegram', mcp: 'AI-ассистент', email: 'Email' },
     type: { vendor_invoice: 'Счёт поставщика', customer_invoice: 'Счёт клиенту', tax_invoice: 'Налоговый счёт (faktur pajak)', bukti_potong: 'Справка об удержании (bukti potong)', tax_billing: 'Код налогового платежа', filing_confirmation: 'Квитанция о подаче', bank_document: 'Банковский документ', invoice: 'Счёт', receipt: 'Чек', bank_statement: 'Выписка', contract: 'Договор', payment_proof: 'Подтверждение оплаты', tax: 'Налоговый документ', other: 'Документ' },
-    linked: 'Привязан', notLinked: 'Не привязан', fix: 'Исправить',
+    linked: 'Привязан', notLinked: 'Не привязан', fix: 'Исправить', open: 'Открыть', recent: 'Недавно добавленные', shown: 'Показаны {n} из {m}. Остальные — в классическом виде.',
+    linkedTo: { payable: 'Счёт поставщика · {who}', receivable: 'Инвойс клиенту · {who}', debt: 'Счёт № {id}', transaction: 'Операция · {d}', transactionNoDate: 'Операция' },
+    uploadProofFor: 'Подтверждение оплаты · {who}',
     missingFor: 'Не хватает за {m}', missingHint: 'Оплаченные счета без подтверждения оплаты — бухгалтеру они нужны для закрытия месяца.', noneMissing: 'Всё на месте.',
   },
   set: {

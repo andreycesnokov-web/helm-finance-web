@@ -150,6 +150,7 @@ export default {
     history: 'History', effect: 'Effect on your cash', cashAfter: 'Cash after paying on {d}', lowest: 'Lowest point · {d}', unchanged: 'unchanged',
     noEffect: 'Not in the 30-day forecast (paid, no due date, or another currency).', seeRadar: 'See it on Radar',
     documents: 'Documents', docCount: '{n} of {m}', view: 'View', upload: 'Upload',
+    uploadInvoiceFor: 'Invoice · {who}', uploadProofFor: 'Payment proof · {who}',
     doc: { invoice: 'Invoice', proof: 'Payment proof', proofSub: 'after you pay', slip: 'Withholding slip (bukti potong)', slipSub: 'made before the tax payment',
       check: 'Accountant check', have: 'in place', missing: 'missing', notTracked: 'not tracked here yet' },
     closeNote: 'Nothing closes on its own.',
@@ -392,7 +393,9 @@ export default {
     look: 'Needs a look · {n}', inMonth: '{m} · {n}', allGood: 'Nothing needs a look.', none: 'No documents in this month.',
     ch: { web: 'Uploaded here', telegram: 'Telegram', mcp: 'AI assistant', email: 'Email' },
     type: { vendor_invoice: 'Supplier invoice', customer_invoice: 'Invoice to a customer', tax_invoice: 'Tax invoice (faktur pajak)', bukti_potong: 'Withholding slip (bukti potong)', tax_billing: 'Tax billing code', filing_confirmation: 'Filing receipt', bank_document: 'Bank document', invoice: 'Invoice', receipt: 'Receipt', bank_statement: 'Bank statement', contract: 'Contract', payment_proof: 'Payment proof', tax: 'Tax document', other: 'Document' },
-    linked: 'Linked', notLinked: 'Not linked', fix: 'Fix',
+    linked: 'Linked', notLinked: 'Not linked', fix: 'Fix', open: 'Open', recent: 'Recently filed', shown: 'Showing {n} of {m}. The rest are in the classic view.',
+    linkedTo: { payable: 'Bill · {who}', receivable: 'Invoice · {who}', debt: 'Bill #{id}', transaction: 'Transaction · {d}', transactionNoDate: 'Transaction' },
+    uploadProofFor: 'Payment proof · {who}',
     missingFor: 'Missing for {m}', missingHint: 'Paid bills without a payment proof — your accountant needs them to close the month.', noneMissing: 'Nothing missing.',
   },
   set: {

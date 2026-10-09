@@ -30,6 +30,32 @@ const REC_LABEL = {
   insufficient_data:  { en: 'INSUFFICIENT DATA', ru: 'НЕДОСТАТОЧНО ДАННЫХ', id: 'DATA KURANG' },
 }
 
+// Screen text in the app language (hf_lang). Before, everything except the AI CFO verdict was
+// English on a Russian or Indonesian screen.
+const PAY_T = {
+  en: { titleIn: 'Record payment received', titleOut: 'Record payment made', total: 'Total amount', alreadyIn: 'Already received', alreadyOut: 'Already paid',
+    remaining: 'Remaining', amount: (c) => `Payment amount (${c})`, date: 'Payment date', intoAcc: 'Receive into account', fromAcc: 'Pay from account',
+    selectAcc: 'Select account…', crossOpt: (c) => `(${c} — cross-currency disabled)`, crossErr: (c) => `Cross-currency payment is not supported yet. Please select an account in ${c}.`,
+    noCurAcc: (c) => `No ${c} accounts available. Please add a ${c} account in Accounts first.`, noAcc: 'No accounts yet — add one in Accounts first.',
+    fullIn: 'Will be marked as fully received', fullOut: 'Will be marked as fully paid', partial: (v, c) => `Partial payment — ${v} ${c} remaining`,
+    processing: 'Processing…', markIn: '✓ Mark fully received', markOut: '✓ Mark fully paid', recordPartial: 'Record partial', cancel: 'Cancel',
+    failed: 'Payment failed. Please try again.', cash: 'Cash', runway: 'Runway', ack: 'I understand the financial risk and want to continue.' },
+  ru: { titleIn: 'Отметить поступление', titleOut: 'Отметить оплату', total: 'Сумма', alreadyIn: 'Уже получено', alreadyOut: 'Уже оплачено',
+    remaining: 'Осталось', amount: (c) => `Сумма платежа (${c})`, date: 'Дата платежа', intoAcc: 'На какой счёт поступили', fromAcc: 'С какого счёта оплачено',
+    selectAcc: 'Выберите счёт…', crossOpt: (c) => `(${c} — другая валюта недоступна)`, crossErr: (c) => `Оплата в другой валюте пока не поддерживается. Выберите счёт в ${c}.`,
+    noCurAcc: (c) => `Нет счетов в ${c}. Сначала добавьте счёт в ${c} в разделе «Счета».`, noAcc: 'Счетов пока нет — добавьте счёт в разделе «Счета».',
+    fullIn: 'Будет отмечено как полностью полученное', fullOut: 'Будет отмечено как полностью оплаченное', partial: (v, c) => `Частичная оплата — останется ${v} ${c}`,
+    processing: 'Сохраняем…', markIn: '✓ Отметить как полученное', markOut: '✓ Отметить как оплаченное', recordPartial: 'Записать частичную оплату', cancel: 'Отмена',
+    failed: 'Не удалось сохранить платёж. Попробуйте ещё раз.', cash: 'Касса', runway: 'Запас', ack: 'Я понимаю финансовый риск и хочу продолжить.' },
+  id: { titleIn: 'Catat pembayaran diterima', titleOut: 'Catat pembayaran', total: 'Jumlah total', alreadyIn: 'Sudah diterima', alreadyOut: 'Sudah dibayar',
+    remaining: 'Sisa', amount: (c) => `Jumlah pembayaran (${c})`, date: 'Tanggal pembayaran', intoAcc: 'Diterima ke rekening', fromAcc: 'Dibayar dari rekening',
+    selectAcc: 'Pilih rekening…', crossOpt: (c) => `(${c} — beda mata uang tidak tersedia)`, crossErr: (c) => `Pembayaran beda mata uang belum didukung. Pilih rekening dalam ${c}.`,
+    noCurAcc: (c) => `Belum ada rekening ${c}. Tambahkan rekening ${c} di menu Rekening.`, noAcc: 'Belum ada rekening — tambahkan di menu Rekening.',
+    fullIn: 'Akan ditandai sudah diterima penuh', fullOut: 'Akan ditandai lunas', partial: (v, c) => `Pembayaran sebagian — sisa ${v} ${c}`,
+    processing: 'Memproses…', markIn: '✓ Tandai diterima penuh', markOut: '✓ Tandai lunas', recordPartial: 'Catat pembayaran sebagian', cancel: 'Batal',
+    failed: 'Pembayaran gagal disimpan. Coba lagi.', cash: 'Kas', runway: 'Runway', ack: 'Saya memahami risiko keuangan dan ingin lanjut.' },
+}
+
 export default function DebtPaymentModal({ debt, accounts, token, onClose, onSuccess }) {
   const isReceivable = debt.type === 'receivable'
   const debtCurrency = (debt.currency || 'IDR').toUpperCase()
@@ -63,6 +89,7 @@ export default function DebtPaymentModal({ debt, accounts, token, onClose, onSuc
   const [simLoading, setSimLoading] = useState(false)
   const [ack, setAck]       = useState(false)
   const lang = (typeof localStorage !== 'undefined' && localStorage.getItem('hf_lang')) || 'en'
+  const T = PAY_T[lang] || PAY_T.en
   useEffect(() => {
     if (!walletId || !(amountNum > 0)) { setSim(null); return }
     let cancelled = false
@@ -98,7 +125,7 @@ export default function DebtPaymentModal({ debt, accounts, token, onClose, onSuc
       })
       onSuccess(result)
     } catch (e) {
-      setError(e.message || 'Payment failed. Please try again.')
+      setError(e.message || T.failed)
     } finally {
       setPaying(false)
     }
@@ -124,7 +151,7 @@ export default function DebtPaymentModal({ debt, accounts, token, onClose, onSuc
 
         {/* Title */}
         <div style={{ fontSize: 'var(--text-lg)', fontWeight: 600, color: 'var(--text)', marginBottom: 3 }}>
-          {isReceivable ? 'Record payment received' : 'Record payment made'}
+          {isReceivable ? T.titleIn : T.titleOut}
         </div>
         <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-3)', marginBottom: 16 }}>
           {debt.counterparty}
@@ -133,19 +160,19 @@ export default function DebtPaymentModal({ debt, accounts, token, onClose, onSuc
         {/* Amount breakdown */}
         <div style={{ background: 'var(--bg-3)', borderRadius: 12, padding: '10px 14px', marginBottom: 16, border: '0.5px solid var(--border)' }}>
           <div style={rowStyle}>
-            <span style={lblStyle}>Total amount</span>
+            <span style={lblStyle}>{T.total}</span>
             <span style={valStyle}>{fmt(originalAmount)} {debtCurrency}</span>
           </div>
           {isPartialAlready && (
             <div style={rowStyle}>
-              <span style={lblStyle}>Already {isReceivable ? 'received' : 'paid'}</span>
+              <span style={lblStyle}>{isReceivable ? T.alreadyIn : T.alreadyOut}</span>
               <span style={{ ...valStyle, color: isReceivable ? 'var(--green-dark)' : 'var(--red-dark)' }}>
                 {fmt(alreadyPaid)} {debtCurrency}
               </span>
             </div>
           )}
           <div style={{ ...rowStyle, borderBottom: 'none' }}>
-            <span style={{ ...lblStyle, fontWeight: 700, color: 'var(--text-2)' }}>Remaining</span>
+            <span style={{ ...lblStyle, fontWeight: 700, color: 'var(--text-2)' }}>{T.remaining}</span>
             <span style={{ fontSize: 15, fontWeight: 800, color: isReceivable ? 'var(--green-dark)' : 'var(--brand)' }}>
               {fmt(remaining)} {debtCurrency}
             </span>
@@ -153,7 +180,7 @@ export default function DebtPaymentModal({ debt, accounts, token, onClose, onSuc
         </div>
 
         {/* Payment amount */}
-        <label className="modal-label">Payment amount ({debtCurrency})</label>
+        <label className="modal-label">{T.amount(debtCurrency)}</label>
         <input
           type="number"
           className="modal-input"
@@ -175,7 +202,7 @@ export default function DebtPaymentModal({ debt, accounts, token, onClose, onSuc
         </div>
 
         {/* Payment date */}
-        <label className="modal-label">Payment date</label>
+        <label className="modal-label">{T.date}</label>
         <input
           type="date"
           className="modal-input"
@@ -185,37 +212,37 @@ export default function DebtPaymentModal({ debt, accounts, token, onClose, onSuc
         />
 
         {/* Account / wallet selector — required, debits the chosen wallet */}
-        <label className="modal-label">{isReceivable ? 'Receive into account' : 'Pay from account'}</label>
+        <label className="modal-label">{isReceivable ? T.intoAcc : T.fromAcc}</label>
         <select
           value={walletId}
           onChange={e => { setWalletId(e.target.value); setError('') }}
           className="modal-input"
           style={{ marginBottom: walletId ? 10 : 8 }}
         >
-          <option value="">Select account…</option>
+          <option value="">{T.selectAcc}</option>
           {(accounts || []).map(a => {
             const aCur = (a.currency || 'IDR').toUpperCase()
             const isMatch = aCur === debtCurrency
             return (
               <option key={a.id || a.name} value={a.id} disabled={!isMatch}>
-                {a.name} · {fmt(a.balance)} {aCur}{!isMatch ? ` (${aCur} — cross-currency disabled)` : ''}
+                {a.name} · {fmt(a.balance)} {aCur}{!isMatch ? ` ${T.crossOpt(aCur)}` : ''}
               </option>
             )
           })}
         </select>
         {walletId && !isCurrencyMatch && (
           <div style={{ fontSize: 12, color: 'var(--red-dark)', marginBottom: 12, background: 'var(--red-light)', padding: '7px 11px', borderRadius: 8 }}>
-            Cross-currency payment is not supported yet. Please select an account in {debtCurrency}.
+            {T.crossErr(debtCurrency)}
           </div>
         )}
         {!(accounts || []).some(a => (a.currency || 'IDR').toUpperCase() === debtCurrency) && (accounts || []).length > 0 && (
           <div style={{ fontSize: 12, color: 'var(--amber-dark)', marginBottom: 14 }}>
-            No {debtCurrency} accounts available. Please add a {debtCurrency} account in Accounts first.
+            {T.noCurAcc(debtCurrency)}
           </div>
         )}
         {!walletId && (accounts || []).length === 0 && (
           <div style={{ fontSize: 12, color: 'var(--amber-dark)', marginBottom: 14 }}>
-            No accounts yet — add one in Accounts first.
+            {T.noAcc}
           </div>
         )}
 
@@ -231,8 +258,8 @@ export default function DebtPaymentModal({ debt, accounts, token, onClose, onSuc
           }}>
             <span>{isFullPay ? '✓' : '◑'}</span>
             {isFullPay
-              ? `Will be marked as fully ${isReceivable ? 'received' : 'paid'}`
-              : `Partial payment — ${fmt(remaining - amountNum)} ${debtCurrency} remaining`}
+              ? (isReceivable ? T.fullIn : T.fullOut)
+              : T.partial(fmt(remaining - amountNum), debtCurrency)}
           </div>
         )}
 
@@ -251,8 +278,8 @@ export default function DebtPaymentModal({ debt, accounts, token, onClose, onSuc
               {sim.current.wallet_balance !== null && (
                 <div>{selectedAcc?.name}: {fmt(sim.current.wallet_balance)} → <b>{fmt(sim.after.wallet_balance)}</b></div>
               )}
-              <div>{lang === 'ru' ? 'Касса' : lang === 'id' ? 'Kas' : 'Cash'}: {fmt(sim.current.cash)} → <b>{fmt(sim.after.cash)}</b></div>
-              <div>{lang === 'ru' ? 'Запас' : 'Runway'}: {fmtRunway(sim.current.runway_days)} → <b>{fmtRunway(sim.after.runway_days)}</b></div>
+              <div>{T.cash}: {fmt(sim.current.cash)} → <b>{fmt(sim.after.cash)}</b></div>
+              <div>{T.runway}: {fmtRunway(sim.current.runway_days)} → <b>{fmtRunway(sim.after.runway_days)}</b></div>
               {sim.upcoming.payroll_7d > 0 && (
                 <div style={{ color: '#92400E' }}>{lang === 'ru' ? 'Зарплата в течение 7 дней' : 'Payroll in 7 days'}: {fmt(sim.upcoming.payroll_7d)}</div>
               )}
@@ -267,7 +294,7 @@ export default function DebtPaymentModal({ debt, accounts, token, onClose, onSuc
         {blockedNoAck && (
           <label style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 12, color: 'var(--red-dark)', marginBottom: 12, cursor: 'pointer' }}>
             <input type="checkbox" checked={ack} onChange={e => setAck(e.target.checked)} style={{ marginTop: 2 }} />
-            <span>{lang === 'ru' ? 'Я понимаю финансовый риск и хочу продолжить.' : lang === 'id' ? 'Saya memahami risiko keuangan dan ingin lanjut.' : 'I understand the financial risk and want to continue.'}</span>
+            <span>{T.ack}</span>
           </label>
         )}
 
@@ -297,14 +324,14 @@ export default function DebtPaymentModal({ debt, accounts, token, onClose, onSuc
           }}
         >
           {paying
-            ? 'Processing…'
+            ? T.processing
             : isFullPay
-              ? `${isReceivable ? '✓ Mark fully received' : '✓ Mark fully paid'} · ${fmt(amountNum)} ${debtCurrency}`
-              : `Record partial · ${fmt(amountNum)} ${debtCurrency}`}
+              ? `${isReceivable ? T.markIn : T.markOut} · ${fmt(amountNum)} ${debtCurrency}`
+              : `${T.recordPartial} · ${fmt(amountNum)} ${debtCurrency}`}
         </button>
 
         <button onClick={onClose} disabled={paying} className="btn btn-ghost btn-block btn-lg">
-          Cancel
+          {T.cancel}
         </button>
       </div>
     </div>,

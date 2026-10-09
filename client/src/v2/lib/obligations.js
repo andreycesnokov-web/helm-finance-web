@@ -253,12 +253,21 @@ export function latestPayrollRun(overview) {
  *          GET /api/withholding-slips) — `slips` is { available, by_debt }. Read-only here.
  *   check  the P-05 mark (migration 061); before 061 it is `unknown`, never claimed done.
  */
-export function billChecklistItems(d, { hasInvoice = false, paid = false, slipNeeded = false, slips = null } = {}) {
+// A bill counts as documented when the Document Center links a document to it
+// (document_debt_links, returned by GET /api/debts as document_links / linked_documents_count)
+// or it carries a legacy attachment. Before, only legacy attachments counted, so a bill with a
+// linked invoice still asked for one and showed up as "missing" on Documents.
+export const billHasDocument = (d) => !!d && ((Array.isArray(d.document_links) && d.document_links.length > 0)
+  || Number(d.linked_documents_count) > 0 || (Array.isArray(d.attachments) && d.attachments.length > 0) || !!d.attachment_url)
+// The classic Document Center opens this document's review from ?doc=<id>.
+export const classicDocPath = (doc) => `/business/documents/classic?doc=${encodeURIComponent(doc.id)}`
+
+export function billChecklistItems(d, { hasInvoice = false, paid = false, slipNeeded = false, slips = null, invoiceDocPath = null } = {}) {
   const checkTracked = !!d && Object.prototype.hasOwnProperty.call(d, 'accountant_checked_at')
   const slipTracked = slips?.available === true
   const slipDoc = slipTracked ? slips.by_debt?.[String(d?.id)]?.slip_document_id || null : null
   return [
-    { key: 'invoice', done: !!hasInvoice, link: hasInvoice ? '/business/documents' : null },
+    { key: 'invoice', done: !!hasInvoice, link: hasInvoice ? (invoiceDocPath || '/business/documents') : null },
     { key: 'proof', done: !!paid && !!(d?.linked_transaction_id || d?.last_payment_at) },
     ...(slipNeeded ? [{ key: 'slip', done: !!slipDoc, unknown: !slipTracked, documentId: slipDoc }] : []),
     { key: 'check', done: checkTracked && !!d.accountant_checked_at, unknown: !checkTracked, editable: checkTracked },
