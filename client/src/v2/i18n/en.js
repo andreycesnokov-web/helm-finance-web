@@ -409,6 +409,9 @@ export default {
       suggested: 'Looks like a company document: {k}. Confirm and it will be kept separately.',
       archive: 'Archive', archiveConfirm: 'Archive this document? It leaves the lists; the record and its audit trail stay.', close: 'Close',
       err: { forbidden: 'Your role cannot change documents.', archived: 'The document is already archived.', already: 'Already linked to this record.', notFound: 'Record not found.', generic: 'Did not work: {msg}' } },
+    pv: { title: 'Document preview', loading: 'Loading the document…', of: 'Preview: {name}', none: 'This file type cannot be shown here. Open or download it.',
+      failed: 'The document could not be shown here. Open it in a new tab or download it.', tooBig: 'The spreadsheet is too large to preview — open or download it.',
+      emptySheet: 'The sheet has no rows.', sheetNote: 'The file’s own cells · sheet “{name}” ({n} sheets).', moreRows: 'First 50 rows shown, {n} more not shown.' },
     missingFor: 'Missing for {m}', missingHint: 'Paid bills without a payment proof — your accountant needs them to close the month.', noneMissing: 'Nothing missing.',
   },
   set: {

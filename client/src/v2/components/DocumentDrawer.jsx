@@ -1,5 +1,6 @@
 // One document, reviewed in place on the Documents page ("Fix" / "Open" no longer leave the
-// screen for the classic list). Every write is an existing Document Center route through
+// screen for the classic list). A centred window (owner 2026-10-09): the file itself on the left,
+// so the user sees what the document is before linking or classifying it, the fields on the right. Every write is an existing Document Center route through
 // lib/actions.js: type / number / date / amount (PATCH /documents/:id), link and unlink,
 // archive, and "this is a company document" (the AI Accountant classification route, the
 // only thing that moves a document to the Company documents tab). Nothing is deleted.
@@ -8,6 +9,7 @@ import { Link } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
 import I from '../icons'
 import { Pill } from '../ui'
+import DocumentPreview from './DocumentPreview'
 import { useT, useLang } from '../i18n'
 import { money, shortDate } from '../lib/format'
 import { detailPath } from '../pages/Bills'
@@ -138,10 +140,9 @@ export default function DocumentDrawer({ doc, debts = [], transactions = [], onC
 
   return (
     <>
-      <div className="v2-workbench-scrim" onClick={onClose} aria-hidden="true" />
-      <aside ref={ref} className="v2-workbench-drawer v2-docdrawer" role="dialog" aria-modal="true" aria-labelledby="v2-doc-title" data-doc-drawer={doc.id}>
-        <span className="v2-sheet-grip" aria-hidden="true" />
-        <header className="v2-workbench-head">
+      <div className="v2-docmodal-scrim" onClick={onClose} aria-hidden="true" />
+      <div ref={ref} className="v2-docmodal v2-docdrawer" role="dialog" aria-modal="true" aria-labelledby="v2-doc-title" data-doc-drawer={doc.id}>
+        <header className="v2-docmodal-head">
           <div className="v2-doc-text">
             <strong id="v2-doc-title" className="v2-ellipsis" title={name}>{name}</strong>
             <span className="v2-muted v2-small">{[t(`docs.ch.${doc.file?.upload_channel || 'web'}`), shortDate(doc.created_at, lang)].join(' · ')}</span>
@@ -149,12 +150,16 @@ export default function DocumentDrawer({ doc, debts = [], transactions = [], onC
           <button ref={closeRef} type="button" className="v2-iconbtn" onClick={onClose} aria-label={t('docs.dr.close')}><I.close size={20} /></button>
         </header>
 
-        <div className="v2-workbench-body">
-          <div className="v2-row-gap">
-            <button type="button" className="v2-btn v2-btn-secondary" onClick={() => openFile('view')}>{t('docs.dr.view')}</button>
-            <button type="button" className="v2-btn v2-btn-ghost" onClick={() => openFile('download')}>{t('docs.dr.download')}</button>
-          </div>
-          {fileErr && <p className="v2-inline-err" role="alert">{fileErr}</p>}
+        <div className="v2-docmodal-body">
+          <section className="v2-docmodal-view" aria-label={t('docs.pv.title')}>
+            <DocumentPreview doc={doc} />
+            <div className="v2-row-gap">
+              <button type="button" className="v2-btn v2-btn-secondary" onClick={() => openFile('view')}>{t('docs.dr.view')}</button>
+              <button type="button" className="v2-btn v2-btn-ghost" onClick={() => openFile('download')}>{t('docs.dr.download')}</button>
+            </div>
+            {fileErr && <p className="v2-inline-err" role="alert">{fileErr}</p>}
+          </section>
+          <div className="v2-docmodal-side">
           {err && <p className="v2-inline-err" role="alert">{err}</p>}
           {note && <p className="v2-sec" role="status">{note}</p>}
 
@@ -240,14 +245,15 @@ export default function DocumentDrawer({ doc, debts = [], transactions = [], onC
               )}
             </>
           )}
+          </div>
         </div>
 
-        <footer className="v2-workbench-foot">
+        <footer className="v2-docmodal-foot">
           <button type="button" className="v2-btn v2-btn-ghost v2-docdrawer-archive" disabled={busy}
             onClick={() => { if (window.confirm(t('docs.dr.archiveConfirm'))) run(() => archiveDocument(token, doc.id), null, true) }}>{t('docs.dr.archive')}</button>
           <button type="button" className="v2-btn v2-btn-secondary" onClick={onClose}>{t('docs.dr.close')}</button>
         </footer>
-      </aside>
+      </div>
     </>
   )
 }
