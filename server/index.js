@@ -2630,12 +2630,48 @@ app.get('/api/accountant/profile', auth, async (req, res) => {
     if (!biz) return;
     if (!canViewBusinessFinance(biz.role)) return res.status(403).json({ error: 'Forbidden' });
     const { data } = await supabase.from('tax_profiles').select('*').eq('business_id', biz.business.id).limit(1);
-    res.json({ profile: data?.[0] || null });
+    res.json({ profile: data?.[0] || null, extended_fields: await profileExtendedReady() });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 // PUT /api/accountant/profile — owner/admin/cfo edits the tax profile
 const TAX_PROFILE_FIELDS = ['country','jurisdiction','legal_entity_type','tax_residency','tax_regime','tax_identifier','npwp','nib','financial_year_start','financial_year_end','vat_status','pkp_status','employee_status','payroll_tax_status','withholding_tax_status','industry','business_activity_codes','accounting_method','reporting_currency','filing_frequency'];
+// Columns added by migration 040 (company name, KPP, KBLI, NIB date, employees, BPJS, per-field
+// verification). Until 040 is applied they are NOT saved, and the response says which ones.
+const TAX_PROFILE_EXTENDED = ['foreign_owned','company_legal_name','brand_name','kpp','pkp_effective_date','nib_issue_date','primary_kbli','additional_kbli','actual_business_activities','employee_count','local_employee_count','foreign_employee_count','payroll_frequency','bpjs_registered','transaction_types','field_verification'];
+const PROFILE_VERIFY_STATES = ['missing', 'user_declared', 'document_uploaded', 'extracted', 'accountant_verified', 'conflict'];
+let _profileExtended = { at: 0, value: null };
+async function profileExtendedReady() {
+  if (_profileExtended.value !== null && Date.now() - _profileExtended.at < 60000) return _profileExtended.value;
+  let ok = false;
+  try { const { error } = await supabase.from('tax_profiles').select('primary_kbli, field_verification').limit(1); ok = !error; } catch { ok = false; }
+  _profileExtended = { at: Date.now(), value: ok };
+  return ok;
+}
+// One 040 field from a request body → the stored value (types per migration 040).
+function extendedProfileValue(f, v, role, before) {
+  if (v === '' || v == null) return null;
+  if (['employee_count', 'local_employee_count', 'foreign_employee_count'].includes(f)) { const n = parseInt(v, 10); return Number.isFinite(n) && n >= 0 ? n : null; }
+  if (f === 'bpjs_registered') return v === true || v === 'true' ? true : v === false || v === 'false' ? false : null;
+  if (['pkp_effective_date', 'nib_issue_date'].includes(f)) return /^\d{4}-\d{2}-\d{2}$/.test(String(v)) ? String(v) : null;
+  if (['additional_kbli', 'transaction_types'].includes(f)) {
+    const arr = Array.isArray(v) ? v : String(v).split(/[,;\s]+/);
+    return arr.map((x) => String(x).trim()).filter(Boolean).slice(0, 40);
+  }
+  if (f === 'field_verification') {
+    // Per-field source. "accountant_verified" only from an accountant; the rest are sanitised.
+    const out = { ...((before && before.field_verification) || {}) };
+    for (const [k, st] of Object.entries(v || {})) {
+      if (![...TAX_PROFILE_FIELDS, ...TAX_PROFILE_EXTENDED].includes(k)) continue;
+      const state = typeof st === 'string' ? st : st?.state;
+      if (!PROFILE_VERIFY_STATES.includes(state)) continue;
+      if (state === 'accountant_verified' && role !== 'accountant') continue;
+      out[k] = typeof st === 'object' && st?.document_id ? { state, document_id: String(st.document_id).slice(0, 64) } : state;
+    }
+    return out;
+  }
+  return String(v).slice(0, 500);
+}
 // Minimum fields needed before any obligation can be generated.
 const { applicableProfileFields } = require('./lib/pkpStatus');
 const REQUIRED_PROFILE_FIELDS = ['country','jurisdiction','legal_entity_type','tax_regime','financial_year_start','financial_year_end','vat_status'];
@@ -2701,6 +2737,11 @@ app.put('/api/accountant/profile', auth, async (req, res) => {
     const updates = { business_id: biz.business.id, updated_at: new Date().toISOString() };
     for (const f of TAX_PROFILE_FIELDS) if (req.body[f] !== undefined) updates[f] = req.body[f] || null;
     if (!before) updates.created_by_user_id = req.user.userId;
+    // 040 fields: saved only when the columns exist; otherwise reported back as not saved.
+    const extendedAsked = TAX_PROFILE_EXTENDED.filter((f) => req.body[f] !== undefined);
+    const extendedReady = extendedAsked.length ? await profileExtendedReady() : false;
+    if (extendedReady) for (const f of extendedAsked) updates[f] = extendedProfileValue(f, req.body[f], biz.role, before);
+    const notSaved = extendedReady ? [] : extendedAsked;
 
     // Recompute status from completeness. A critical change on a verified profile
     // re-opens review (verification must be redone).
@@ -2720,8 +2761,59 @@ app.put('/api/accountant/profile', auth, async (req, res) => {
       for (const f of CRITICAL_PROFILE_FIELDS) { beforeCrit[f] = before?.[f] ?? null; afterCrit[f] = data[f] ?? null; }
       await recordAudit({ businessId: biz.business.id, actorUserId: req.user.userId, actorRole: biz.role, entityType: 'tax_profile', entityId: data.id, action: before ? 'critical_fields_changed' : 'created', before: before ? beforeCrit : null, after: afterCrit });
     }
-    res.json({ profile: data, completeness: profileCompleteness(data), warnings: profileWarnings(data) });
+    res.json({ profile: data, completeness: profileCompleteness(data), warnings: profileWarnings(data),
+      not_saved: notSaved, migration: notSaved.length ? '040_not_applied' : null });
   } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// POST /api/accountant/profile/from-documents — what the company's own documents say.
+//
+// Reads the business's company documents (NPWP, NIB with KBLI, deed, SK, SPPKP, KPP, BPJS —
+// by their intake classification), one reading per document cached in
+// extracted_json.ai_profile (force re-reads), and merges them into one suggestion per profile
+// field with its source documents. Identifiers are kept only when printed in the text
+// (lib/profileFromDocuments). ZERO profile writes: applying is PUT /api/accountant/profile.
+app.post('/api/accountant/profile/from-documents', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res); if (!biz) return;
+    if (!canViewBusinessFinance(biz.role)) return res.status(403).json({ error: 'Forbidden' });
+    if (!await hasDocumentsAccess(biz)) return res.status(403).json({ error: 'Document Center is not enabled', upgrade_required: true });
+    const force = !!req.body?.force;
+    const { data: docs } = await supabase.from('financial_documents').select('*')
+      .eq('business_id', biz.business.id).is('archived_at', null).order('created_at', { ascending: false }).limit(300);
+    const company = (docs || []).filter((d) => profileDocs.PROFILE_DOC_TYPES.includes(((d.extracted_json || {}).ai_intake || {}).doc_type)).slice(0, 10);
+    const { data: profRows } = await supabase.from('tax_profiles').select('*').eq('business_id', biz.business.id).limit(1);
+    const profile = profRows?.[0] || {};
+    const readings = [], skipped = [];
+    for (const d of company) {
+      const docType = d.extracted_json.ai_intake.doc_type;
+      const cached = (d.extracted_json || {}).ai_profile;
+      const { data: fileRows } = await supabase.from('document_files').select('storage_path, file_name, mime_type')
+        .eq('id', d.file_id).eq('business_id', biz.business.id).limit(1);
+      const file = fileRows?.[0];
+      if (!file) { skipped.push({ document_id: d.id, reason: 'file_not_found' }); continue; }
+      if (cached?.v === 1 && !force) { readings.push({ document_id: d.id, file_name: file.file_name, doc_type: docType, fields: cached.fields || {} }); continue; }
+      const { data: blob, error: dlErr } = await supabase.storage.from(DOC_BUCKET).download(file.storage_path);
+      if (dlErr || !blob) { skipped.push({ document_id: d.id, file_name: file.file_name, reason: 'document_unavailable' }); continue; }
+      const buf = Buffer.from(await blob.arrayBuffer());
+      const isPdf = /pdf/i.test(file.mime_type || '') || /\.pdf$/i.test(file.file_name || '');
+      const ex = isPdf ? extractPdfText(buf) : { text: '', text_available: false };
+      const r = await profileDocs.readDocument({ client: anthropic, text: ex.text_available ? ex.text : '', buffer: buf, mime_type: file.mime_type, file_name: file.file_name, docType });
+      if (!r.ok) { skipped.push({ document_id: d.id, file_name: file.file_name, reason: r.reason }); continue; }
+      readings.push({ document_id: d.id, file_name: file.file_name, doc_type: docType, fields: r.fields });
+      try {
+        await supabase.from('financial_documents')
+          .update({ extracted_json: { ...(d.extracted_json || {}), ai_profile: { v: 1, at: new Date().toISOString(), read: ex.text_available ? 'embedded_text' : 'file_to_model', fields: r.fields } } })
+          .eq('id', d.id).eq('business_id', biz.business.id);
+      } catch (e) { console.error(`[profile-docs] cache failed: ${e.message}`); }
+    }
+    const merged = profileDocs.mergeSuggestions(readings, profile);
+    res.json({ documents: readings.map(({ fields, ...r }) => r), skipped, ...merged,
+      extended_fields: await profileExtendedReady(), missing_document_types: profileDocs.PROFILE_DOC_TYPES.filter((t) => !company.some((d) => d.extracted_json.ai_intake.doc_type === t)) });
+  } catch (e) {
+    console.error(`[profile-docs] failed: ${e.message}`);
+    res.status(500).json({ error: 'profile_from_documents_failed' });
+  }
 });
 
 // POST /api/accountant/profile/verify — owner/admin/cfo confirms the profile.
@@ -14363,6 +14455,7 @@ app.get('/api/documents/health', auth, async (req, res) => {
 const docIntake = require('./lib/documentIntake');
 const docContent = require('./lib/documentContent');
 const docIdentify = require('./lib/documentIdentify');
+const profileDocs = require('./lib/profileFromDocuments');
 const taxDeadlines = require('./lib/taxDeadlines');
 const { extractPdfText } = require('./lib/pdfText');
 const docExtract = require('./lib/documentExtraction');
@@ -15955,7 +16048,7 @@ app.get('/api/accountant/tax-calendar', auth, async (req, res) => {
     // What the calendar could not decide without the profile (shown as setup steps, never guessed).
     const undecided = [];
     if (!profile?.employee_status && profile?.has_employees == null) undecided.push('employees');
-    if (!profile?.pkp_status && !profile?.vat_status) undecided.push('pkp');
+    if (normalizePkpStatus(profile?.pkp_status) === 'unknown' && normalizePkpStatus(profile?.vat_status) === 'unknown') undecided.push('pkp');
     if (!profile?.legal_entity_type) undecided.push('legal_entity');
     res.json({ jurisdiction: jur, events, missing_profile_fields: missing, undecided, has_profile: !!profile, today,
       rules_verified: (rules || []).filter((r) => r.status === 'active' && effectiveRuleActive(r, r.official_sources)).length,
