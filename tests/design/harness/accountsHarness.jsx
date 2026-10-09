@@ -37,6 +37,8 @@ const json = (body, status = 200) => ({
   ok: status >= 200 && status < 300,
   status,
   json: async () => body,
+  // apiFetch reads text() since 4653adea (non-JSON error bodies); a real Response has both.
+  text: async () => (body === undefined ? "" : JSON.stringify(body)),
 })
 
 window.fetch = (url, opts = {}) => {
