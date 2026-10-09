@@ -7572,7 +7572,9 @@ app.post('/api/team/invite', auth, async (req, res) => {
   const userId = req.user.userId;
   const { role = 'employee', label, max_uses = 1, expires_days = 7 } = req.body;
 
-  const VALID_ROLES = ['employee', 'manager', 'cfo', 'admin', 'ceo'];
+  // accountant and auditor are full roles everywhere else (access checks, notification grants);
+  // company setup offers "Invite an accountant", so they can be invited too.
+  const VALID_ROLES = ['employee', 'auditor', 'manager', 'accountant', 'cfo', 'admin', 'ceo'];
   if (!VALID_ROLES.includes(role))
     return res.status(400).json({ error: `role must be one of: ${VALID_ROLES.join(', ')}` });
 
@@ -7584,7 +7586,7 @@ app.post('/api/team/invite', auth, async (req, res) => {
       return res.status(403).json({ error: 'Only owner, CEO or admin can create invites' });
 
     // Cannot invite higher/equal role than yourself (only owner can invite admin)
-    const ROLE_RANK = { employee: 1, manager: 2, cfo: 3, admin: 4, ceo: 5, owner: 6 };
+    const ROLE_RANK = { employee: 1, auditor: 1, manager: 2, accountant: 3, cfo: 3, admin: 4, ceo: 5, owner: 6 };
     if (ROLE_RANK[role] >= ROLE_RANK[myRole])
       return res.status(403).json({ error: `You cannot invite someone with role "${role}" — your role is "${myRole}"` });
 
@@ -8865,11 +8867,15 @@ app.get('/api/cashflow-categories', auth, async (req, res) => {
   try {
     const biz = await requireBusiness(req, res);
     if (!biz) return;
-    const { data, error } = await supabase
+    // ?archived=1 lists this company's archived categories (to restore them); system ones never archive.
+    const archived = req.query.archived === '1';
+    let q = supabase
       .from('cashflow_categories')
       .select('*')
       .or(bizOrFilter(biz))
-      .eq('is_active', true)
+      .eq('is_active', !archived);
+    if (archived) q = q.eq('is_system', false);
+    const { data, error } = await q
       .order('sort_order', { ascending: true })
       .order('name', { ascending: true });
     if (error) throw error;
@@ -13933,7 +13939,10 @@ app.post('/api/businesses', auth, async (req, res) => {
     const { error: mErr } = await supabase.from('business_members').insert({ business_id: business.id, user_id: userId, role: 'owner', status: 'active' });
     if (mErr) return res.status(500).json({ error: 'Business created but membership failed. Please contact support.' });
 
-    res.status(201).json({ business, ...(dropped.length ? { unsupported_fields: dropped } : {}) });
+    // Standard cash-flow categories (a company used to start with none). Best effort, idempotent.
+    const seeded = await defaultCategories.seedBusinessCategories(supabase, business.id, userId);
+
+    res.status(201).json({ business, categories_seeded: seeded.inserted, ...(dropped.length ? { unsupported_fields: dropped } : {}) });
   } catch (e) {
     res.status(500).json({ error: 'Could not create the business.' });
   }
@@ -14460,6 +14469,7 @@ const docIdentify = require('./lib/documentIdentify');
 const profileDocs = require('./lib/profileFromDocuments');
 const taxDeadlines = require('./lib/taxDeadlines');
 const { normalizePkpStatus } = require('./lib/pkpStatus');
+const defaultCategories = require('./lib/defaultCategories');
 const { extractPdfText } = require('./lib/pdfText');
 const docExtract = require('./lib/documentExtraction');
 const docOcr = require('./lib/documentOcr');

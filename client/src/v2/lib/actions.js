@@ -166,3 +166,48 @@ export const readWorkspaces = (token) => apiFetch('/workspaces', token)
 // in client/src/lib/documents.js; the server classifies the text and runs the intake pipeline.
 export const uploadCompanyDocument = (token, file) =>
   uploadDocument(token, file, { title: file.name, upload_source: 'accountant_upload' })
+
+// Settings (2026-10-10, designs Settings + w2/S2): existing routes, each role-checked on the server.
+//   PATCH  /api/business/current                 company name, country, time zone, base currency
+//   POST   /api/cashflow-categories              add a company category (inflow / outflow)
+//   PATCH  /api/cashflow-categories/:id          rename, or restore from the archive
+//   DELETE /api/cashflow-categories/:id          archive (soft: past transactions keep it)
+//   POST   /api/account/integrations/telegram/link-token   one-time deep link to the bot
+//   POST   /api/account/integrations/telegram/unlink       stop the bot for this person
+//   POST   /api/payment-connections              add a payment gateway connection (no secrets here)
+//   POST   /api/team/invite                      invitation code (+ email when email sign-in is on)
+//   DELETE /api/team/invites/:code               revoke an invitation
+//   PATCH  /api/team/members/:memberId           change a role
+//   DELETE /api/team/members/:memberId           remove from the company (their records stay)
+export const updateCompanyBasics = (token, body) =>
+  apiFetch('/business/current', token, { method: 'PATCH', body })
+
+export const createCategory = (token, body) =>
+  apiFetch('/cashflow-categories', token, { method: 'POST', body })
+
+export const updateCategory = (token, id, body) =>
+  apiFetch(`/cashflow-categories/${encodeURIComponent(id)}`, token, { method: 'PATCH', body })
+
+export const archiveCategory = (token, id) =>
+  apiFetch(`/cashflow-categories/${encodeURIComponent(id)}`, token, { method: 'DELETE' })
+
+export const telegramLinkToken = (token) =>
+  apiFetch('/account/integrations/telegram/link-token', token, { method: 'POST', body: {} })
+
+export const telegramUnlink = (token) =>
+  apiFetch('/account/integrations/telegram/unlink', token, { method: 'POST', body: {} })
+
+export const createGateway = (token, body) =>
+  apiFetch('/payment-connections', token, { method: 'POST', body })
+
+export const inviteMember = (token, body) =>
+  apiFetch('/team/invite', token, { method: 'POST', body })
+
+export const revokeInvite = (token, code) =>
+  apiFetch(`/team/invites/${encodeURIComponent(code)}`, token, { method: 'DELETE' })
+
+export const updateMember = (token, memberId, body) =>
+  apiFetch(`/team/members/${encodeURIComponent(memberId)}`, token, { method: 'PATCH', body })
+
+export const removeMember = (token, memberId) =>
+  apiFetch(`/team/members/${encodeURIComponent(memberId)}`, token, { method: 'DELETE' })

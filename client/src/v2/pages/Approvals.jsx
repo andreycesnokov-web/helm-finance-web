@@ -106,7 +106,7 @@ export default function Approvals() {
           <Card title={t('approvals.howTitle')}>
             <p className="v2-sec">{t('approvals.how1')}</p>
             <p className="v2-sec">{t('approvals.how2')}</p>
-            <Link to="/business/team">{t('approvals.whoCan')}</Link>
+            <Link to="/business/settings?tab=team">{t('approvals.whoCan')}</Link>
           </Card>
         </aside>
       </div>

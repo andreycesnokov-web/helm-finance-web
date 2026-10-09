@@ -14,21 +14,13 @@ import { Navigate, Outlet, Route, Routes } from 'react-router-dom'
 import './v2.css'
 import { useWorkspace } from '../shell/WorkspaceProvider'
 import {
-  BusinessLayout, BusinessTransactions, BusinessPayables, BusinessReceivables,
-  BusinessInvoices, BusinessIncomingPayments, BusinessPaymentConnections,
-  BusinessIntercompany, BusinessDocuments,
+  BusinessLayout, BusinessTransactions, BusinessIncomingPayments, BusinessIntercompany,
 } from '../pages/business'
-import { BusinessAccountantHub } from '../pages/business/AccountantPremium'
-import BusinessOnboarding from '../pages/business/Onboarding'
 import TaxSplit from '../pages/business/TaxSplit'
 import InvoiceSettlement from '../pages/business/InvoiceSettlement'
 import Counterparties from '../pages/business/Counterparties'
-import ComplianceCalendar from '../pages/ComplianceCalendar'
 import Accounts from '../pages/Accounts'
-import AICFO from '../pages/AICFO'
 import Payroll from '../pages/Payroll'
-import Team from '../pages/Team'
-import Settings from '../pages/Settings'
 import BankImport from '../pages/BankImport'
 import AddEntry from './pages/AddEntry'
 import V2Shell from './shell/V2Shell'
@@ -97,7 +89,7 @@ export default function BusinessApp() {
           <Route path="performance/forecast" element={<Performance />} />
           <Route path="performance/groups" element={<ProfitGroups />} />
           <Route path="ai-cfo" element={<V2AICFO />} />
-          <Route path="ai-cfo/classic" element={<AICFO />} />
+          <Route path="ai-cfo/classic" element={<Navigate to="/business/ai-cfo" replace />} />
           {/* Money */}
           <Route path="accounts" element={<V2Accounts />} />
           <Route path="accounts/manage" element={<Accounts />} />
@@ -111,13 +103,13 @@ export default function BusinessApp() {
           <Route path="intercompany" element={<BusinessIntercompany />} />
           {/* Obligations */}
           <Route path="payables" element={<Bills key="pay" />} />
-          <Route path="payables/classic" element={<BusinessPayables />} />
+          <Route path="payables/classic" element={<Navigate to="/business/payables" replace />} />
           <Route path="payables/:id" element={<BillDetail kind="payable" />} />
           <Route path="receivables" element={<Bills key="collect" />} />
-          <Route path="receivables/classic" element={<BusinessReceivables />} />
+          <Route path="receivables/classic" element={<Navigate to="/business/receivables" replace />} />
           <Route path="receivables/:id" element={<BillDetail kind="receivable" />} />
           <Route path="invoices" element={<Bills key="all" />} />
-          <Route path="invoices/classic" element={<BusinessInvoices />} />
+          <Route path="invoices/classic" element={<Navigate to="/business/invoices" replace />} />
           <Route path="payroll" element={<V2Payroll />} />
           <Route path="payroll/manage" element={<Payroll />} />
           <Route path="approvals" element={<V2Approvals />} />
@@ -127,21 +119,21 @@ export default function BusinessApp() {
           <Route path="counterparties/:id/edit" element={<AddCounterparty />} />
           {/* Accounting */}
           <Route path="documents" element={<V2Documents />} />
-          <Route path="documents/classic" element={<BusinessDocuments />} />
+          <Route path="documents/classic" element={<Navigate to="/business/documents" replace />} />
           <Route path="accountant" element={<V2Accountant />} />
-          <Route path="accountant/classic" element={<BusinessAccountantHub />} />
-          <Route path="accountant/calendar" element={<ComplianceCalendar />} />
+          <Route path="accountant/classic" element={<Navigate to="/business/accountant" replace />} />
+          <Route path="accountant/calendar" element={<Navigate to="/business/accountant?tab=taxes" replace />} />
           <Route path="accountant/tax-profile" element={<CompanyProfile />} />
           <Route path="accountant/tax-profile/edit" element={<CompanyProfileEdit />} />
           <Route path="accountant/tax-split" element={<TaxSplit />} />
           <Route path="accountant/settlement" element={<InvoiceSettlement />} />
           {/* Settings and workspace */}
           <Route path="settings" element={<V2Settings />} />
-          <Route path="settings/classic" element={<Settings />} />
-          <Route path="team" element={<Team />} />
-          <Route path="payment-connections" element={<BusinessPaymentConnections />} />
+          <Route path="settings/classic" element={<Navigate to="/business/settings" replace />} />
+          <Route path="team" element={<Navigate to="/business/settings?tab=team" replace />} />
+          <Route path="payment-connections" element={<Navigate to="/business/settings?tab=connections" replace />} />
           <Route path="onboarding" element={<FirstDay />} />
-          <Route path="onboarding/classic" element={<BusinessOnboarding />} />
+          <Route path="onboarding/classic" element={<Navigate to="/business/onboarding" replace />} />
           {/* Phone navigation */}
           <Route path="more" element={<More />} />
           <Route path="add" element={<AddEntry />} />

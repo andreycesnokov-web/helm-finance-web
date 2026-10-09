@@ -64,7 +64,7 @@ export default function ProfitGroups() {
       <Card title={t('perf.groups.listTitle', { n: cats.length })}
         aside={q.data?.confirmed ? <Pill tone="good">{t('perf.groups.confirmed')}</Pill> : <Pill tone="warn">{t('perf.groups.notConfirmed')}</Pill>}>
         {cats.length === 0 ? (
-          <Empty title={t('perf.groups.emptyTitle')} text={t('perf.groups.emptyText')} action={<Btn to="/business/settings/classic">{t('perf.groups.manageCats')}</Btn>} />
+          <Empty title={t('perf.groups.emptyTitle')} text={t('perf.groups.emptyText')} action={<Btn to="/business/settings?tab=books">{t('perf.groups.manageCats')}</Btn>} />
         ) : (
           <>
             <ul className="v2-grouplist">
@@ -101,7 +101,7 @@ export default function ProfitGroups() {
       </Card>
 
       {(q.data?.missing_from_template || []).length > 0 && (
-        <Card title={t('perf.groups.missingTitle')} aside={<Link to="/business/settings/classic">{t('perf.groups.manageCats')}</Link>}>
+        <Card title={t('perf.groups.missingTitle')} aside={<Link to="/business/settings?tab=books">{t('perf.groups.manageCats')}</Link>}>
           <p className="v2-sec">{t('perf.groups.missingText')}</p>
           <ul className="v2-moves">
             {q.data.missing_from_template.map((m) => (

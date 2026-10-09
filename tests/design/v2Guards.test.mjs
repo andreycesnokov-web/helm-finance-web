@@ -66,6 +66,18 @@ export const WRITE_ALLOW = [
   { method: 'PATCH', path: "'/me/profile'" },          // PATCH /api/me/profile
   { method: 'POST', path: '/accept`' },                // POST  /api/invite/:code/accept
   { method: 'POST', path: "'/businesses'" },           // POST  /api/businesses (creator = owner)
+  // Settings (2026-10-10, Settings + w2/S2): existing routes, role-checked on the server.
+  { method: 'PATCH', path: "'/business/current'" },                        // PATCH  /api/business/current
+  { method: 'POST', path: "'/cashflow-categories'" },                      // POST   /api/cashflow-categories
+  { method: 'PATCH', path: '`/cashflow-categories/' },                     // PATCH  /api/cashflow-categories/:id
+  { method: 'DELETE', path: '`/cashflow-categories/' },                    // DELETE /api/cashflow-categories/:id (archive)
+  { method: 'POST', path: "'/account/integrations/telegram/link-token'" }, // POST   /api/account/integrations/telegram/link-token
+  { method: 'POST', path: "'/account/integrations/telegram/unlink'" },     // POST   /api/account/integrations/telegram/unlink
+  { method: 'POST', path: "'/payment-connections'" },                      // POST   /api/payment-connections
+  { method: 'POST', path: "'/team/invite'" },                              // POST   /api/team/invite
+  { method: 'DELETE', path: '`/team/invites/' },                           // DELETE /api/team/invites/:code
+  { method: 'PATCH', path: '`/team/members/' },                            // PATCH  /api/team/members/:memberId
+  { method: 'DELETE', path: '`/team/members/' },                           // DELETE /api/team/members/:memberId
 ]
 const ACTIONS = path.join(V2, 'lib', 'actions.js')
 // POSTs that ask an existing AI endpoint a question and change no data. Only in lib/ask.js.
@@ -153,7 +165,11 @@ t('every allowed write exists on the server (batch 8 routes are the approved one
     /app\.patch\('\/api\/ai-accountant\/documents\/:id\/classification'/, /app\.post\('\/api\/documents\/:id\/identify'/, /app\.post\('\/api\/documents\/:id\/filing'/, /app\.post\('\/api\/documents\/:id\/tax-obligation'/,
     /app\.put\('\/api\/accountant\/profile'/, /app\.post\('\/api\/accountant\/profile\/verify'/, /app\.post\('\/api\/accountant\/profile\/from-documents'/,
     /app\.post\('\/api\/auth\/email\/start'/, /app\.post\('\/api\/auth\/email\/verify'/, /app\.patch\('\/api\/me\/profile'/,
-    /app\.post\('\/api\/invite\/:code\/accept'/, /app\.post\('\/api\/businesses'/]) {
+    /app\.post\('\/api\/invite\/:code\/accept'/, /app\.post\('\/api\/businesses'/,
+    /app\.patch\('\/api\/business\/current'/, /app\.post\('\/api\/cashflow-categories'/, /app\.patch\('\/api\/cashflow-categories\/:id'/,
+    /app\.delete\('\/api\/cashflow-categories\/:id'/, /app\.post\('\/api\/account\/integrations\/telegram\/link-token'/,
+    /app\.post\('\/api\/account\/integrations\/telegram\/unlink'/, /app\.post\('\/api\/payment-connections'/, /app\.post\('\/api\/team\/invite'/,
+    /app\.delete\('\/api\/team\/invites\/:code'/, /app\.patch\('\/api\/team\/members\/:memberId'/, /app\.delete\('\/api\/team\/members\/:memberId'/]) {
     assert.ok(r.test(server), `server route ${r} missing`)
   }
 })
