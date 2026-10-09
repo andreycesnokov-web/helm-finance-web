@@ -10,6 +10,8 @@ import { useAuth } from '../../hooks/useAuth'
 import I from '../icons'
 import { Pill } from '../ui'
 import DocumentPreview from './DocumentPreview'
+import DocumentIdentity from './DocumentIdentity'
+import { previewKind } from '../../lib/documentPreview'
 import { useT, useLang } from '../i18n'
 import { money, shortDate } from '../lib/format'
 import { detailPath } from '../pages/Bills'
@@ -52,6 +54,7 @@ export default function DocumentDrawer({ doc, debts = [], transactions = [], onC
   const [form, setForm] = useState({})
   const [target, setTarget] = useState('')
   const [kind, setKind] = useState('')
+  const [sheetText, setSheetText] = useState(undefined)
 
   useEffect(() => {
     setForm({
@@ -60,7 +63,7 @@ export default function DocumentDrawer({ doc, debts = [], transactions = [], onC
       document_date: doc?.document_date ? String(doc.document_date).slice(0, 10) : '',
       amount: doc?.gross_amount != null ? String(doc.gross_amount) : '',
     })
-    setErr(null); setNote(null); setFileErr(null); setTarget('')
+    setErr(null); setNote(null); setFileErr(null); setTarget(''); setSheetText(undefined)
     setKind(vaultVerdictOf(doc)?.docType || '')
   }, [doc?.id]) // eslint-disable-line react-hooks/exhaustive-deps -- a reload of the same document keeps the form and the note
 
@@ -152,7 +155,7 @@ export default function DocumentDrawer({ doc, debts = [], transactions = [], onC
 
         <div className="v2-docmodal-body">
           <section className="v2-docmodal-view" aria-label={t('docs.pv.title')}>
-            <DocumentPreview doc={doc} />
+            <DocumentPreview doc={doc} onSheetText={setSheetText} />
             <div className="v2-row-gap">
               <button type="button" className="v2-btn v2-btn-secondary" onClick={() => openFile('view')}>{t('docs.dr.view')}</button>
               <button type="button" className="v2-btn v2-btn-ghost" onClick={() => openFile('download')}>{t('docs.dr.download')}</button>
@@ -160,6 +163,8 @@ export default function DocumentDrawer({ doc, debts = [], transactions = [], onC
             {fileErr && <p className="v2-inline-err" role="alert">{fileErr}</p>}
           </section>
           <div className="v2-docmodal-side">
+            <DocumentIdentity doc={doc} sheetText={sheetText} waitForSheet={previewKind(doc.file || {}) === 'sheet'}
+              onApplied={({ vault }) => { onChanged?.(); if (vault) onClose?.() }} />
           {err && <p className="v2-inline-err" role="alert">{err}</p>}
           {note && <p className="v2-sec" role="status">{note}</p>}
 

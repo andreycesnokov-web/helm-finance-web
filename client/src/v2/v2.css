@@ -1462,3 +1462,9 @@ button.v2-start-btn:focus-visible { outline: 2px solid var(--action-primary); ou
   .v2-reason-detail-action { justify-content: center; }
   .v2-acct-lang { flex-wrap: wrap; }
 }
+/* "What this document is" card at the top of the document window. */
+.v2-docid { border-color: var(--action-primary); }
+.v2-docid .v2-h3 { display: flex; align-items: center; gap: 6px; }
+.v2-docid-title { font-size: 15px; color: var(--text-primary); }
+.v2-docid-kind { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); padding-top: var(--space-2); border-top: 1px solid var(--border-subtle); }
+.v2-docid .v2-btn-link { align-self: flex-start; }

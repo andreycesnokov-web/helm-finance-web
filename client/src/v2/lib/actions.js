@@ -26,6 +26,7 @@
 //   DELETE /api/documents/:id/links/:linkId        unlink (the record itself is untouched)
 //   POST   /api/documents/:id/archive              archive (never a hard delete)
 //   PATCH  /api/ai-accountant/documents/:id/classification  confirm "company document" (NIB, NPWP…)
+//   POST   /api/documents/:id/identify             "what is this document?" — AI explanation, stored per language
 //
 // Before the owner applies migrations 058–061 the server answers 409 migration_not_applied
 // for the batch-8 writes; the screens say so instead of failing silently.
@@ -92,6 +93,9 @@ export const unlinkDocument = (token, id, linkId) =>
 
 export const archiveDocument = (token, id) =>
   apiFetch(`${docUrl(id)}/archive`, token, { method: 'POST', body: {} })
+
+export const identifyDocument = (token, id, body) =>
+  apiFetch(`${docUrl(id)}/identify`, token, { method: 'POST', body })
 
 export const confirmDocumentKind = (token, id, doc_type) =>
   apiFetch(`/ai-accountant/documents/${encodeURIComponent(id)}/classification`, token, { method: 'PATCH', body: { doc_type } })

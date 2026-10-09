@@ -17,7 +17,7 @@ const TIMEOUT_MS = 15000
 
 const withTimeout = (p, ms) => Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), ms))])
 
-export default function DocumentPreview({ doc }) {
+export default function DocumentPreview({ doc, onSheetText }) {
   const t = useT()
   const { token } = useAuth()
   const file = doc?.file || {}
@@ -49,12 +49,15 @@ export default function DocumentPreview({ doc }) {
         if (!res.ok) throw new Error(`storage ${res.status}`)
         const buf = await withTimeout(res.arrayBuffer(), TIMEOUT_MS)
         if (!live()) return
-        if (buf.byteLength > MAX_SHEET_BYTES) { setDetail(t('docs.pv.tooBig')); setState('error'); return }
+        if (buf.byteLength > MAX_SHEET_BYTES) { onSheetText?.(null); setDetail(t('docs.pv.tooBig')); setState('error'); return }
         const XLSX = await import('xlsx')
         const wb = XLSX.read(buf, { type: 'array', cellDates: false })
         const name = wb.SheetNames?.[0]
         const all = name ? XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, raw: false, defval: '' }) : []
         if (!live()) return
+        // The same cells, as text, for the "what is this document?" reading (the server has no
+        // spreadsheet parser).
+        onSheetText?.(all.slice(0, 200).map((x) => (Array.isArray(x) ? x.join('\t') : '')).join('\n'))
         setSheet({
           name, count: wb.SheetNames?.length || 1,
           rows: all.slice(0, MAX_ROWS).map((x) => (Array.isArray(x) ? x.slice(0, MAX_COLS) : [])),
@@ -63,6 +66,7 @@ export default function DocumentPreview({ doc }) {
         setState('ready')
       } catch (e) {
         if (!live()) return
+        if (kind === 'sheet') onSheetText?.(null)
         setDetail(e?.data?.error || e?.message || null)
         setState('error')
       }

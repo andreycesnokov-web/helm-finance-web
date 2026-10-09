@@ -102,15 +102,23 @@ ok('image by extension when MIME is generic', previewKind({ mime_type: 'applicat
 ok('xlsx → spreadsheet table', previewKind({ file_name: 'salary_06_helm.xlsx' }) === 'sheet')
 ok('unknown type → no inline preview, open / download instead', previewKind({ file_name: 'a.docx', mime_type: 'application/msword' }) === 'other')
 const modalSrc = fs.readFileSync(path.join(ROOT, 'client/src/v2/components/DocumentDrawer.jsx'), 'utf8')
-ok('the window renders the preview', /<DocumentPreview doc=\{doc\} \/>/.test(modalSrc))
+ok('the window renders the preview', /<DocumentPreview doc=\{doc\}/.test(modalSrc))
 ok('centred window, not the side drawer', modalSrc.includes('v2-docmodal') && !modalSrc.includes('v2-workbench-drawer'))
 const pvSrc = fs.readFileSync(path.join(ROOT, 'client/src/v2/components/DocumentPreview.jsx'), 'utf8')
 ok('preview gets the file through the audited signed-url action only', pvSrc.includes('documentFileUrl(token, id, ') && !/apiFetch|method:/.test(pvSrc))
 ok('classic preview still exports previewKind (same rule for both)', /export \{ previewKind, gsheetUrlOf \}/.test(fs.readFileSync(path.join(ROOT, 'client/src/pages/business/DocumentPreview.jsx'), 'utf8')))
 
+console.log('\n--- "what is this document": read by itself, applied only on Accept')
+const idSrc = fs.readFileSync(path.join(ROOT, 'client/src/v2/components/DocumentIdentity.jsx'), 'utf8')
+ok('the window shows the identity card', modalSrc.includes('<DocumentIdentity '))
+ok('reads by itself once per document and language (stored reading reused)', idSrc.includes('ai_identify?.[lang]') && /asked\.current === key/.test(idSrc))
+ok('the suggested type is applied only through the classification route, on a click', /onClick=\{accept\}/.test(idSrc) && idSrc.includes('confirmDocumentKind(token, doc.id, type)'))
+ok('a spreadsheet waits for its cells from the preview', /waitForSheet && sheetText === undefined/.test(idSrc) && pvSrc.includes('onSheetText?.('))
+ok('every intake type has a label in every language', ['npwp', 'nib', 'akta', 'sk_kemenkumham', 'oss_license', 'pkp_certificate', 'kpp_registration', 'bank_statement', 'invoice', 'receipt', 'payroll_document', 'bpjs_document', 'tax_report', 'tax_payment_proof', 'contract', 'unknown'].every((k) => ru.docs.kind[k] && en.docs.kind[k] && id.docs.kind[k]))
+
 console.log('\n--- review panel and company tab text: same keys in RU / EN / ID')
 const flat = (o, pre = '') => Object.entries(o || {}).flatMap(([k, v]) => (v && typeof v === 'object' ? flat(v, `${pre}${k}.`) : [`${pre}${k}`])).sort().join(',')
-for (const sub of ['dr', 'company', 'vault', 'pv']) {
+for (const sub of ['dr', 'company', 'vault', 'pv', 'id', 'kind']) {
   ok(`docs.${sub}: ru = en`, flat(ru.docs[sub]) === flat(en.docs[sub]) && flat(en.docs[sub]).length > 0)
   ok(`docs.${sub}: id = en`, flat(id.docs[sub]) === flat(en.docs[sub]))
 }
