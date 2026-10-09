@@ -228,7 +228,7 @@ export default {
     search: 'Search', searchPh: 'Search name, amount, note', kind: 'Type',
     k: { all: 'All', in: 'Money in', out: 'Money out', transfer: 'Transfers', reviewN: 'Needs review · {n}' },
     account: 'Account', allAccounts: 'All accounts', period: 'Period', p: { 30: 'Last 30 days', 90: 'Last 90 days', 365: 'Last 12 months', all: 'All time' },
-    col: { category: 'Category', account: 'Account', source: 'Source' },
+    col: { category: 'Category', account: 'Account', source: 'Source', noCat: 'No category' },
     chooseCategory: 'Choose category', choose: 'Category for {what}', notIncome: 'Not income or spending',
     type: { income: 'Money in', expense: 'Money out', transfer: 'Transfer', payroll: 'Payroll', correction: 'Correction' },
     src: { bank: 'Bank import', opening: 'Opening balance', payroll: 'Payroll', telegram: 'Telegram', added: 'Added' },

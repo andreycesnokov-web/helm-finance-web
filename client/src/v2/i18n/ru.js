@@ -228,7 +228,7 @@ export default {
     search: 'Поиск', searchPh: 'Название, сумма, заметка', kind: 'Тип',
     k: { all: 'Все', in: 'Приход', out: 'Расход', transfer: 'Переводы', reviewN: 'На проверку · {n}' },
     account: 'Счёт', allAccounts: 'Все счета', period: 'Период', p: { 30: 'Последние 30 дней', 90: 'Последние 90 дней', 365: 'Последние 12 месяцев', all: 'За всё время' },
-    col: { category: 'Категория', account: 'Счёт', source: 'Источник' },
+    col: { category: 'Категория', account: 'Счёт', source: 'Источник', noCat: 'Без категории' },
     chooseCategory: 'Выбрать категорию', choose: 'Категория для {what}', notIncome: 'Не доход и не расход',
     type: { income: 'Приход', expense: 'Расход', transfer: 'Перевод', payroll: 'Зарплата', correction: 'Корректировка' },
     src: { bank: 'Выписка', opening: 'Начальный остаток', payroll: 'Зарплата', telegram: 'Telegram', added: 'Вручную' },

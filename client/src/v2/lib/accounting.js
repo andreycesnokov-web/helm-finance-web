@@ -803,33 +803,6 @@ export async function createAccountantZipPackage({
         } catch (fetchErr) {
           if (signal?.aborted || fetchErr?.name === 'AbortError') throw fetchErr
         }
-      } else if (token && typeof fetch === 'function') {
-        try {
-          const sResp = await fetch(`/api/documents/${doc.id}/signed-url`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${token}`,
-              ...(businessId ? { 'x-business-id': String(businessId) } : {}),
-            },
-            body: JSON.stringify({ mode: 'download' }),
-            signal,
-          })
-          if (sResp.ok) {
-            const sData = await sResp.json()
-            if (sData?.url) {
-              const fileResp = await fetch(sData.url, { signal })
-              if (fileResp.ok) {
-                const buf = await fileResp.arrayBuffer()
-                filesToZip.push({ name: zipPath, data: new Uint8Array(buf) })
-                addedZipPaths.add(zipPath)
-                downloaded = true
-              }
-            }
-          }
-        } catch (fetchErr) {
-          if (signal?.aborted || fetchErr?.name === 'AbortError') throw fetchErr
-        }
       }
 
       if (!downloaded) {
@@ -917,33 +890,6 @@ export async function createAccountantZipPackage({
                 filesToZip.push({ name: zipPath, data: new Uint8Array(buf) })
                 addedZipPaths.add(zipPath)
                 downloaded = true
-              }
-            }
-          } catch (fetchErr) {
-            if (signal?.aborted || fetchErr?.name === 'AbortError') throw fetchErr
-          }
-        } else if (token && typeof fetch === 'function') {
-          try {
-            const sResp = await fetch(`/api/documents/${docMatch.id}/signed-url`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                Authorization: `Bearer ${token}`,
-                ...(businessId ? { 'x-business-id': String(businessId) } : {}),
-              },
-              body: JSON.stringify({ mode: 'download' }),
-              signal,
-            })
-            if (sResp.ok) {
-              const sData = await sResp.json()
-              if (sData?.url) {
-                const fileResp = await fetch(sData.url, { signal })
-                if (fileResp.ok) {
-                  const buf = await fileResp.arrayBuffer()
-                  filesToZip.push({ name: zipPath, data: new Uint8Array(buf) })
-                  addedZipPaths.add(zipPath)
-                  downloaded = true
-                }
               }
             }
           } catch (fetchErr) {

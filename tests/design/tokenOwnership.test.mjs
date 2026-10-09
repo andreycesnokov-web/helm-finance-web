@@ -240,7 +240,9 @@ t('ordinary operating cash out is not red', () => {
 });
 
 t('red survives where it means a real negative position', () => {
-  const stanza = blocks.slice(blocks.indexOf("key: 'net'"), blocks.indexOf("key: 'runway'"));
+  // The KPI object only — runway now sits before net, so slice to the end of this object.
+  const at = blocks.indexOf("key: 'net'");
+  const stanza = blocks.slice(at, blocks.indexOf('},', at));
   assert.ok(/net < 0 \? 'neg'/.test(stanza), 'a negative net position must still be red');
 });
 

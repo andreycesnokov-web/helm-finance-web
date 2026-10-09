@@ -81,8 +81,8 @@ export const markRepaymentPaid = (token, id, body) =>
 
 const docUrl = (id) => `/documents/${encodeURIComponent(id)}`
 
-export const documentFileUrl = (token, id, mode = 'view') =>
-  apiFetch(`${docUrl(id)}/signed-url`, token, { method: 'POST', body: mode === 'download' ? { mode: 'download' } : {} })
+export const documentFileUrl = (token, id, mode = 'view', signal) =>
+  apiFetch(`${docUrl(id)}/signed-url`, token, { method: 'POST', body: mode === 'download' ? { mode: 'download' } : {}, signal })
 
 export const updateDocument = (token, id, body) =>
   apiFetch(`/documents/${encodeURIComponent(id)}`, token, { method: 'PATCH', body })
