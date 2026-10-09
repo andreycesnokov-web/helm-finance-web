@@ -22,7 +22,7 @@ import DecisionActions from '../components/DecisionActions'
 import BillChecklist from '../components/BillChecklist'
 import WithholdingCard from '../components/WithholdingCard'
 import { StatusPill } from './Bills'
-import { billHasDocument, classicDocPath } from '../lib/obligations'
+import { billHasDocument, docPath } from '../lib/obligations'
 
 // Free text that older edits stored as the literal string "null" (PATCH /api/debts/:id before
 // this fix) must never reach the screen.
@@ -175,7 +175,7 @@ export default function BillDetail({ kind = 'payable' }) {
           </Card>
 
           <BillChecklist d={d} hasInvoice={hasInvoice} paid={s === 'paid'} slipNeeded={!!split}
-            invoiceDocPath={firstDocId ? classicDocPath({ id: firstDocId }) : null} onUpload={setUpload} />
+            invoiceDocPath={firstDocId ? docPath({ id: firstDocId }) : null} onUpload={setUpload} />
           <WithholdingCard d={d} />
         </div>
       </div>

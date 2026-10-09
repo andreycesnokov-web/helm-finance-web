@@ -46,6 +46,13 @@ export const WRITE_ALLOW = [
   { method: 'POST', path: '/paid`' },                       // POST /api/business-funding/repayments/:rid/paid
   // Release — "+ Add" expense/income: existing route, role- and wallet-checked; v2 always sends scope 'business'.
   { method: 'POST', path: "'/transactions/batch'" },       // POST /api/transactions/batch
+  // Documents page review panel (2026-10-09): existing Document Center routes, role-checked and audited.
+  { method: 'POST', path: '/signed-url`' },                 // POST   /api/documents/:id/signed-url
+  { method: 'PATCH', path: '`/documents/' },                // PATCH  /api/documents/:id
+  { method: 'POST', path: '/links`' },                      // POST   /api/documents/:id/links
+  { method: 'DELETE', path: '/links/' },                    // DELETE /api/documents/:id/links/:linkId
+  { method: 'POST', path: '/archive`' },                    // POST   /api/documents/:id/archive
+  { method: 'PATCH', path: '/classification`' },            // PATCH  /api/ai-accountant/documents/:id/classification
 ]
 const ACTIONS = path.join(V2, 'lib', 'actions.js')
 // POSTs that ask an existing AI endpoint a question and change no data. Only in lib/ask.js.
@@ -127,7 +134,10 @@ t('every allowed write exists on the server (batch 8 routes are the approved one
     /app\.post\('\/api\/debts\/:id\/request-info'/, /app\.patch\('\/api\/transactions\/:id'/, /app\.post\('\/api\/counterparties'/,
     /app\.patch\('\/api\/counterparties\/:id'/, /app\.patch\('\/api\/business\/targets'/, /app\.patch\('\/api\/debts\/:id\/checklist'/,
     /app\.patch\('\/api\/pnl-mapping'/, /app\.post\('\/api\/transactions\/batch'/, /app\.post\('\/api\/debts\/:id\/withholding'/,
-    /app\.post\('\/api\/assets'/, /app\.post\('\/api\/business-funding'/, /app\.post\('\/api\/business-funding\/repayments\/:rid\/paid'/]) {
+    /app\.post\('\/api\/assets'/, /app\.post\('\/api\/business-funding'/, /app\.post\('\/api\/business-funding\/repayments\/:rid\/paid'/,
+    /app\.post\('\/api\/documents\/:id\/signed-url'/, /app\.patch\('\/api\/documents\/:id'/, /app\.post\('\/api\/documents\/:id\/links'/,
+    /app\.delete\('\/api\/documents\/:id\/links\/:linkId'/, /app\.post\('\/api\/documents\/:id\/archive'/,
+    /app\.patch\('\/api\/ai-accountant\/documents\/:id\/classification'/]) {
     assert.ok(r.test(server), `server route ${r} missing`)
   }
 })

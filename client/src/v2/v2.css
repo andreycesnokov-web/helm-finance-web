@@ -214,7 +214,7 @@
 .v2-btn-primary { background: var(--action-primary); border-color: var(--action-primary); color: var(--action-primary-text); }
 .v2-btn-primary:hover { background: var(--action-primary-hover); border-color: var(--action-primary-hover); color: var(--action-primary-text); }
 .v2-btn-ghost { border-color: transparent; background: transparent; color: var(--text-link); padding: 0 var(--space-2); }
-.v2-btn-link { border: 0; background: none; padding: 0; height: auto; color: var(--text-link); }
+.v2-btn-link { border: 0; background: none; padding: 0; height: auto; color: var(--text-link); flex: none; }
 .v2-btn:disabled, .v2-btn[aria-disabled="true"] { cursor: not-allowed; opacity: 0.7; }
 .v2-notyet { font-size: 11px; font-weight: 700; color: var(--text-muted); }
 @media (max-width: 1024px) { .v2-btn { height: var(--touch-min); } }
@@ -583,7 +583,7 @@
 .v2-check li:first-child { border-top: 0; }
 .v2-check-mark { width: 26px; height: 26px; border-radius: 50%; border: 2px solid var(--border-strong); display: flex; align-items: center; justify-content: center; flex: none; }
 .v2-check li.is-done .v2-check-mark { border-color: var(--success); background: var(--success-soft); color: var(--success); }
-.v2-check-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.v2-check-text { flex: 1; min-width: 0; display: flex; flex-direction: column; overflow-wrap: anywhere; }
 .v2-check a { font-weight: 700; white-space: nowrap; }
 
 /* Decisions */
@@ -748,6 +748,21 @@
 .v2-docrow > a { grid-column: 2 / -1; font-weight: 700; }
 .v2-doc-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 @media (min-width: 1025px) { .v2-docrow { grid-template-columns: 40px minmax(0, 1fr) auto auto; } .v2-docrow > a { grid-column: auto; } }
+.v2-docrow > .v2-docrow-act { grid-column: 2 / -1; justify-self: start; font-weight: 700; }
+@media (min-width: 1025px) { .v2-docrow > .v2-docrow-act { grid-column: auto; } }
+.v2-docrow-pills { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
+/* Documents page review panel (components/DocumentDrawer.jsx) — reuses the workbench drawer. */
+.v2-docdrawer .v2-workbench-head .v2-doc-text { flex: 1 1 auto; margin-right: var(--space-3); }
+.v2-docdrawer .v2-row-gap { justify-content: flex-start; align-items: center; }
+.v2-docdrawer-sec { display: flex; flex-direction: column; gap: var(--space-2); align-items: stretch; }
+.v2-docdrawer-sec > .v2-btn { align-self: flex-start; }
+.v2-docdrawer-sec .v2-field { margin-bottom: var(--space-2); }
+.v2-docdrawer-sec .v2-select { width: 100%; }
+.v2-doclinks { list-style: none; margin: 0; padding: 0; }
+.v2-doclinks li { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: var(--space-2); align-items: center; padding: var(--space-2) 0; border-top: 1px solid var(--border-subtle); }
+.v2-doclinks li:first-child { border-top: 0; }
+.v2-docdrawer .v2-workbench-foot { justify-content: space-between; }
+.v2-docdrawer-archive { color: var(--danger); }
 
 .v2-team { list-style: none; margin: 0 0 var(--space-3); padding: 0; }
 .v2-team li { display: grid; grid-template-columns: 32px minmax(0, 1fr) auto; grid-template-areas: "a n r" "a w w"; gap: 2px var(--space-3); align-items: center; padding: var(--space-3) 0; border-top: 1px solid var(--border-subtle); }

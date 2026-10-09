@@ -259,8 +259,13 @@ export function latestPayrollRun(overview) {
 // linked invoice still asked for one and showed up as "missing" on Documents.
 export const billHasDocument = (d) => !!d && ((Array.isArray(d.document_links) && d.document_links.length > 0)
   || Number(d.linked_documents_count) > 0 || (Array.isArray(d.attachments) && d.attachments.length > 0) || !!d.attachment_url)
-// The classic Document Center opens this document's review from ?doc=<id>.
-export const classicDocPath = (doc) => `/business/documents/classic?doc=${encodeURIComponent(doc.id)}`
+// review_status is never advanced by any route (every row stays 'needs_review'), so it cannot
+// decide anything. A document needs a look when nothing says which money it explains, or when it
+// could not be read — the same rule as the server's needs_review filter (listDocumentsForUser).
+export const docIsUnreadable = (d) => ['failed', 'unreadable'].includes(d?.extraction_status)
+export const docNeedsLook = (d) => !(Array.isArray(d?.links) && d.links.length > 0) || docIsUnreadable(d)
+// The v2 Documents page opens this document's review panel in place from ?doc=<id>.
+export const docPath = (doc) => `/business/documents?doc=${encodeURIComponent(doc.id)}`
 
 export function billChecklistItems(d, { hasInvoice = false, paid = false, slipNeeded = false, slips = null, invoiceDocPath = null } = {}) {
   const checkTracked = !!d && Object.prototype.hasOwnProperty.call(d, 'accountant_checked_at')
