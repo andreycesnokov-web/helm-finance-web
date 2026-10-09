@@ -4108,6 +4108,24 @@ function statementRowProblem(row, action) {
   return null;
 }
 
+// Statement lines already in the ledger, from prior bank_import_rows that carry a link: how many
+// copies of each dedup_hash are backed by an EXISTING transaction, and the set of transaction ids
+// already backing a statement row (such a transaction cannot back a second row).
+async function importedStatementLines(biz, priorRows) {
+  const ids = [...new Set((priorRows || []).map(r => Number(r.linked_transaction_id)).filter(Number.isFinite))];
+  const live = new Set();
+  for (let i = 0; i < ids.length; i += 500) {
+    const { data } = await supabase.from('transactions').select('id').eq('business_id', biz.business.id).in('id', ids.slice(i, i + 500));
+    for (const t of (data || [])) live.add(Number(t.id));
+  }
+  const importedCopies = new Map();
+  for (const r of (priorRows || [])) {
+    if (!r.dedup_hash || !live.has(Number(r.linked_transaction_id))) continue;
+    importedCopies.set(r.dedup_hash, (importedCopies.get(r.dedup_hash) || 0) + 1);
+  }
+  return { importedCopies, backedTxIds: live };
+}
+
 // 400 body for rows that failed validation. `error` is what the client shows to the person.
 function invalidRowsBody(problems) {
   const first = problems[0];
@@ -6098,19 +6116,29 @@ app.post('/api/bank-import/batches', auth, async (req, res) => {
       return String(v).slice(0, 10);
     };
     const txKey = (d, amt, type) => `${toIsoDate(d)}|${Math.abs(Number(amt) || 0).toFixed(2)}|${type}`;
+
+    // Already-imported statement lines (avoid re-importing the same statement). Only rows whose
+    // ledger transaction still exists count — abandoned review batches (re-uploaded for another
+    // pass) and deleted transactions must NOT mark a fresh upload as duplicate.
+    const { data: priorRows } = await supabase.from('bank_import_rows')
+      .select('dedup_hash, linked_transaction_id').eq('business_id', biz.business.id)
+      .not('linked_transaction_id', 'is', null);
+    const { importedCopies, backedTxIds } = await importedStatementLines(biz, priorRows);
+
+    // Ledger transactions a row could be linked to: one transaction backs at most one statement
+    // row, so a transaction already behind a statement row is not offered again, and each one is
+    // offered to a single row of this upload (two identical lines are two operations).
     const existingIndex = new Map();
     for (const t of existing) {
+      if (backedTxIds.has(Number(t.id))) continue;
       const d = t.transaction_date || (t.created_at ? toIsoDate(t.created_at) : null);
-      existingIndex.set(txKey(d, t.amount_original, t.type), t.id);
+      const k = txKey(d, t.amount_original, t.type);
+      if (!existingIndex.has(k)) existingIndex.set(k, []);
+      existingIndex.get(k).push(t.id);
     }
-
-    // Already-imported dedup hashes (avoid re-importing the same statement).
-    // Only rows that became real transactions count — abandoned review batches
-    // (re-uploaded for another pass) must NOT mark a fresh upload as duplicate.
-    const { data: priorRows } = await supabase.from('bank_import_rows')
-      .select('dedup_hash').eq('business_id', biz.business.id)
-      .not('linked_transaction_id', 'is', null);
-    const priorHashes = new Set((priorRows || []).map(r => r.dedup_hash));
+    // Copies of a line already in the ledger: that many copies of it in this upload are
+    // duplicates, any further copy is a genuine new operation (same rule as migration 069).
+    const dupLeft = new Map(importedCopies);
 
     // If document_id is provided, verify it exists and strictly belongs to the current business
     if (document_id) {
@@ -6156,10 +6184,12 @@ app.post('/api/bank-import/batches', auth, async (req, res) => {
       const direction = r.direction || (Number(r.amount) >= 0 ? 'in' : 'out');
       const suggestedType = direction === 'in' ? 'income' : 'expense';
       const hash = rowDedupHash(biz.business.id, wallet_id, { ...r, amount, direction });
-      const matchId = existingIndex.get(txKey(r.tx_date, amount, suggestedType)) || null;
-      let status = 'review_required';
-      if (priorHashes.has(hash)) { status = 'duplicate'; dup++; }
-      else if (matchId) { status = 'matched'; matched++; }  // already in ledger
+      let status = 'review_required', matchId = null;
+      if ((dupLeft.get(hash) || 0) > 0) { dupLeft.set(hash, dupLeft.get(hash) - 1); status = 'duplicate'; dup++; }
+      else {
+        matchId = existingIndex.get(txKey(r.tx_date, amount, suggestedType))?.shift() || null;
+        if (matchId) { status = 'matched'; matched++; }  // already in ledger
+      }
       return {
         batch_id: batch.id, business_id: biz.business.id, row_index: r.row_index ?? i,
         raw: r.raw || {}, tx_date: r.tx_date || null, description: r.description || null,
@@ -6589,16 +6619,25 @@ app.post('/api/bank-imports/:batchId/suggest', auth, async (req, res) => {
       return String(v).slice(0, 10);
     };
     const exKey = (d, amt, type) => `${toIsoDate(d)}|${Math.abs(Number(amt) || 0).toFixed(2)}|${type}`;
+    // A ledger transaction backs at most one statement row: transactions already behind a row
+    // (of any batch) are not suggested, and each one is suggested to a single row of this batch.
+    const { data: linkedRows } = await supabase.from('bank_import_rows')
+      .select('dedup_hash, linked_transaction_id').eq('business_id', biz.business.id)
+      .not('linked_transaction_id', 'is', null);
+    const { backedTxIds } = await importedStatementLines(biz, linkedRows);
     const exIndex = new Map();
     for (const t of existing) {
+      if (backedTxIds.has(Number(t.id))) continue;
       const d = t.transaction_date || (t.created_at ? toIsoDate(t.created_at) : null);
-      exIndex.set(exKey(d, t.amount_original, t.type), t.id);
+      const k = exKey(d, t.amount_original, t.type);
+      if (!exIndex.has(k)) exIndex.set(k, []);
+      exIndex.get(k).push(t.id);
     }
     const findExistingTx = (date, amt, type) => {
       const base = new Date(date);
       for (const off of [0, -1, 1]) {
         const d = isNaN(base) ? date : new Date(base.getTime() + off * 86400000).toISOString().slice(0, 10);
-        const id = exIndex.get(exKey(d, amt, type));
+        const id = exIndex.get(exKey(d, amt, type))?.shift();
         if (id) return { id };
       }
       return null;
@@ -6797,6 +6836,8 @@ app.post('/api/bank-imports/:batchId/confirm', auth, async (req, res) => {
         const { data: alreadyLinked } = await supabase.from('bank_import_rows')
           .select('id').eq('linked_transaction_id', matchTxId).neq('id', row.id).limit(1);
         if (alreadyLinked?.length) { bad('Matched transaction is already linked to another statement row'); continue; }
+        const twin = prepared.find(x => x.action === 'link' && x.item.matched_transaction_id === Number(matchTxId));
+        if (twin) { bad(`Statement row ${twin.row.row_index + 1} already links to the same transaction; choose Create for one of them`); continue; }
       }
 
       prepared.push({

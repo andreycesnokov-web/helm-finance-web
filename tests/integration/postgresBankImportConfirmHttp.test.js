@@ -45,6 +45,29 @@ async function makeBatch({ tag = crypto.randomBytes(3).toString('hex'), start = 
 const body = (rows) => ({ rows: rows.map(r => ({ row_id: r.id, transaction_type: r.direction === 'in' ? 'income' : 'expense',
   category_id: r.direction === 'in' ? CAT : null, scope: 'business', match_action: 'create_transaction' })) });
 
+// The confirm payload exactly as client/src/pages/BankImport.jsx builds it (row state init +
+// confirm()): duplicates cannot be included, matched rows default to "link".
+function uiConfirmBody(rows) {
+  const state = rows.map(r => {
+    const isMatched = r.match_status === 'matched' || !!r.matched_transaction_id || r.suggested_match_type === 'existing_tx';
+    return { ...r, _type: r.suggested_transaction_type || r.suggested_type || (r.direction === 'in' ? 'income' : 'expense'),
+      _scope: r.suggested_scope || 'business', _action: isMatched ? 'link' : 'create_transaction',
+      _include: r.match_status !== 'duplicate' && r.review_status !== 'excluded' };
+  });
+  const target = state.filter(r => r._include && r.match_status !== 'duplicate' && r.review_status !== 'imported');
+  return { rows: target.map(r => {
+    const isLink = r._action === 'link' || (r.suggested_match_type && r._action === 'link') || (!r._action && !!r.matched_transaction_id);
+    const matchTxId = r.matched_transaction_id || (r.suggested_match_type === 'existing_tx' ? Number(r.suggested_match_id) : null);
+    return { row_id: r.id, transaction_type: r._type, category_id: null, counterparty_id: null, scope: r._scope,
+      match_action: isLink ? 'link' : 'create_transaction', matched_transaction_id: isLink ? matchTxId : null };
+  }) };
+}
+const ledgerCopies = (desc) => count('SELECT count(*) AS n FROM public.transactions WHERE business_id = $1 AND description = $2', [BIZ, desc]);
+async function get(path) {
+  const r = await fetch(BASE + path, { headers: { authorization: `Bearer ${token}`, 'x-business-id': BIZ } });
+  return { status: r.status, body: await r.json() };
+}
+
 async function post(path, payload) {
   const r = await fetch(BASE + path, { method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${token}`, 'x-business-id': BIZ }, body: JSON.stringify(payload || {}) });
   return { status: r.status, body: await r.json() };
@@ -189,6 +212,74 @@ describe('Bank import confirm over HTTP (real server, real PostgreSQL, productio
     assert.strictEqual(r.status, 409);
     assert.strictEqual(r.body.code, 'duplicate_of_imported_row');
     assert.match(r.body.error, /statement row 1 is already imported from another statement batch/);
+    assert.strictEqual(await ledger(), before);
+  });
+
+  it('UI path: a fuller statement after a truncated one imports exactly the missing copy', async (t) => {
+    if (skipped) return t.skip('PostgreSQL unavailable');
+    const tag = crypto.randomBytes(3).toString('hex');
+    const coffee = { tx_date: '2026-07-03', amount: 45000, direction: 'out', description: `QRIS KOPI ${tag}` };
+    const parking = { tx_date: '2026-07-04', amount: 10000, direction: 'out', description: `PARKIR ${tag}` };
+    const first = await post('/bank-import/batches', { wallet_id: WALLET, currency: 'IDR', rows: [coffee] });
+    assert.strictEqual((await post(`/bank-imports/${first.body.batch.id}/confirm`, uiConfirmBody(first.body.rows))).status, 200);
+    assert.strictEqual(await ledgerCopies(coffee.description), 1);
+
+    // The full export has the coffee twice (two real purchases) and a line the first lacked.
+    const full = await post('/bank-import/batches', { wallet_id: WALLET, currency: 'IDR', rows: [coffee, coffee, parking] });
+    assert.strictEqual(full.status, 200);
+    assert.deepStrictEqual(full.body.rows.map(r => r.match_status), ['duplicate', 'review_required', 'review_required'],
+      'only as many copies as the ledger already holds are flagged duplicate');
+    const r = await post(`/bank-imports/${full.body.batch.id}/confirm`, uiConfirmBody(full.body.rows));
+    assert.strictEqual(r.status, 200, JSON.stringify(r.body));
+    assert.strictEqual(r.body.imported, 2);
+    assert.strictEqual(await ledgerCopies(coffee.description), 2, 'both real purchases are in the ledger, once each');
+    assert.strictEqual(await ledgerCopies(parking.description), 1);
+
+    // Uploading the full export once more: every line is now in the ledger as often as it occurs.
+    const again = await post('/bank-import/batches', { wallet_id: WALLET, currency: 'IDR', rows: [coffee, coffee, parking] });
+    assert.deepStrictEqual(again.body.rows.map(r => r.match_status), ['duplicate', 'duplicate', 'duplicate']);
+    assert.strictEqual(uiConfirmBody(again.body.rows).rows.length, 0, 'the UI has nothing to send');
+  });
+
+  it('UI path: one of two identical operations was entered by hand — one row links to it, the other is created', async (t) => {
+    if (skipped) return t.skip('PostgreSQL unavailable');
+    const tag = crypto.randomBytes(3).toString('hex');
+    const line = { tx_date: '2026-07-08', amount: 120000, direction: 'out', description: `GRAB ${tag}` };
+    const manual = (await admin.query(
+      `INSERT INTO public.transactions (business_id, user_id, created_by_user_id, type, amount_original, currency_original, amount_idr, wallet_id, transaction_date, description)
+       VALUES ($1, $2, $2, 'expense', 120000, 'IDR', 120000, $3, '2026-07-08', 'entered by hand') RETURNING id`, [BIZ, OWNER, WALLET])).rows[0].id;
+    const up = await post('/bank-import/batches', { wallet_id: WALLET, currency: 'IDR', rows: [line, line] });
+    assert.deepStrictEqual(up.body.rows.map(r => [r.match_status, r.matched_transaction_id === null ? null : n(r.matched_transaction_id)]),
+      [['matched', n(manual)], ['review_required', null]], 'the hand-entered transaction is offered to one row only');
+
+    // /suggest must not offer the same transaction to the second row either.
+    assert.strictEqual((await post(`/bank-imports/${up.body.batch.id}/suggest`)).status, 200);
+    const review = await get(`/bank-imports/${up.body.batch.id}/review`);
+    const offered = review.body.rows.filter(r => r.suggested_match_type === 'existing_tx' && n(r.suggested_match_id) === n(manual));
+    assert.ok(offered.length <= 1, `suggested to ${offered.length} rows`);
+
+    const before = await ledger();
+    const r = await post(`/bank-imports/${up.body.batch.id}/confirm`, uiConfirmBody(review.body.rows));
+    assert.strictEqual(r.status, 200, JSON.stringify(r.body));
+    assert.strictEqual(r.body.linked + r.body.imported, 2);
+    assert.strictEqual(r.body.linked, 1);
+    assert.strictEqual(await ledger(), before + 1, 'one new transaction; the other row links to the hand-entered one');
+  });
+
+  it('two rows of one request linking the same transaction are refused in preflight with a row message', async (t) => {
+    if (skipped) return t.skip('PostgreSQL unavailable');
+    const { batch, rows } = await makeBatch();
+    const tx = (await admin.query(
+      `INSERT INTO public.transactions (business_id, user_id, created_by_user_id, type, amount_original, currency_original, amount_idr, wallet_id, transaction_date)
+       VALUES ($1, $2, $2, 'expense', 250000, 'IDR', 250000, $3, '2026-05-03') RETURNING id`, [BIZ, OWNER, WALLET])).rows[0].id;
+    // Same amount on both rows so the only problem is the shared link target.
+    await admin.query(`UPDATE public.bank_import_rows SET amount = 250000 WHERE batch_id = $1 AND row_index IN (1, 2)`, [batch]);
+    const before = await ledger();
+    const r = await post(`/bank-imports/${batch}/confirm`, { rows: [rows[1], rows[2]].map(x => ({ row_id: x.id, transaction_type: 'expense',
+      match_action: 'link', matched_transaction_id: n(tx) })) });
+    assert.strictEqual(r.status, 400);
+    assert.strictEqual(r.body.code, 'invalid_rows');
+    assert.match(r.body.error, /Statement row 3: Statement row 2 already links to the same transaction; choose Create for one of them/);
     assert.strictEqual(await ledger(), before);
   });
 
