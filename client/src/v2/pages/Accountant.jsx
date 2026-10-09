@@ -17,7 +17,7 @@ import { PageHead, Card, Pill, Btn, NotYet, Skeleton, ErrorBox, Empty } from '..
 import { useT, useLang } from '../i18n'
 import { useApi } from '../data'
 import { monthOptions, accountantMonth, closeReadiness, packages, packageSummary, monthGrid, complianceEvents, eventStage, packageExportData, createAccountantZipPackage, dedupeDocumentLinks, determineUnreconciledReason, UNRECONCILED_REASONS, reasonMeta } from '../lib/accounting'
-import { apiFetch } from '../../lib/api'
+import { documentFileUrl } from '../lib/actions'
 import { money, shortDate } from '../lib/format'
 import { askAccountant } from '../lib/ask'
 import AccountantTabs from '../components/AccountantTabs'
@@ -491,12 +491,9 @@ function CloseTab({ month, onOpenChatModal }) {
         lang: packageLang,
         signal: controller.signal,
         fetchSignedUrl: async (docId, mode = 'download', bizId, sig) => {
-          const resp = await apiFetch(`/documents/${docId}/signed-url`, token, {
-            method: 'POST',
-            headers: (bizId || currentBizId) ? { 'x-business-id': String(bizId || currentBizId) } : {},
-            body: { mode },
-            signal: sig || controller.signal,
-          })
+          // The scope header is the active business; a switch aborts the export.
+          if (bizId && String(bizId) !== String(currentBizId)) return null
+          const resp = await documentFileUrl(token, docId, mode, sig || controller.signal)
           return resp?.url || null
         },
       })

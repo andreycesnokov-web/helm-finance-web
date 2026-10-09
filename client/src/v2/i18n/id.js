@@ -228,7 +228,7 @@ export default {
     search: 'Cari', searchPh: 'Cari nama, jumlah, catatan', kind: 'Jenis',
     k: { all: 'Semua', in: 'Uang masuk', out: 'Uang keluar', transfer: 'Transfer', reviewN: 'Perlu ditinjau · {n}' },
     account: 'Rekening', allAccounts: 'Semua rekening', period: 'Periode', p: { 30: '30 hari terakhir', 90: '90 hari terakhir', 365: '12 bulan terakhir', all: 'Semua waktu' },
-    col: { category: 'Kategori', account: 'Rekening', source: 'Sumber' },
+    col: { category: 'Kategori', account: 'Rekening', source: 'Sumber', noCat: 'Tanpa kategori' },
     chooseCategory: 'Pilih kategori', choose: 'Kategori untuk {what}', notIncome: 'Bukan pemasukan atau pengeluaran',
     type: { income: 'Uang masuk', expense: 'Uang keluar', transfer: 'Transfer', payroll: 'Gaji', correction: 'Koreksi' },
     src: { bank: 'Mutasi bank', opening: 'Saldo awal', payroll: 'Penggajian', telegram: 'Telegram', added: 'Manual' },

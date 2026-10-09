@@ -1322,7 +1322,7 @@ button.v2-start-btn:focus-visible { outline: 2px solid var(--action-primary); ou
   max-height: 90vh;
   display: flex;
   flex-direction: column;
-  background: var(--surface-card, #ffffff);
+  background: var(--surface-card);
   border-radius: var(--radius-xl, 16px) var(--radius-xl, 16px) 0 0;
   box-shadow: var(--shadow-lg, 0 10px 25px -5px rgba(0, 0, 0, 0.2));
   padding-bottom: env(safe-area-inset-bottom, 0px);
@@ -1339,7 +1339,7 @@ button.v2-start-btn:focus-visible { outline: 2px solid var(--action-primary); ou
     width: 480px;
     max-height: none;
     border-radius: 0;
-    border-left: 1px solid var(--border-default, #e2e8f0);
+    border-left: 1px solid var(--border-default);
   }
 }
 .v2-workbench-head {
@@ -1347,7 +1347,7 @@ button.v2-start-btn:focus-visible { outline: 2px solid var(--action-primary); ou
   align-items: center;
   justify-content: space-between;
   padding: 16px 20px;
-  border-bottom: 1px solid var(--border-subtle, #f1f5f9);
+  border-bottom: 1px solid var(--border-subtle);
 }
 .v2-workbench-body {
   flex: 1;
@@ -1359,7 +1359,7 @@ button.v2-start-btn:focus-visible { outline: 2px solid var(--action-primary); ou
 }
 .v2-workbench-foot {
   padding: 12px 20px;
-  border-top: 1px solid var(--border-subtle, #f1f5f9);
+  border-top: 1px solid var(--border-subtle);
   display: flex;
   justify-content: flex-end;
   gap: 8px;

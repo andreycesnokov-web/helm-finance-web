@@ -31,14 +31,23 @@ t('#1 an error boundary wraps business pages, the AI panel and admin pages', () 
 })
 
 t('#2 the AI thread and the Accountant ask box reset on a business or scope switch and drop late answers', () => {
-  for (const f of [`${V2}/ai/AskContext.jsx`, `${V2}/pages/Accountant.jsx`]) {
-    const s = read(f)
-    assert.match(s, /useWorkspace\(\)/, `${f}: must read the active workspace`)
-    assert.match(s, /const wsKey = `\$\{active\?\.id \?\? ''\}\|\$\{scopeKey \?\? ''\}`/, `${f}: key = business + scope`)
-    assert.match(s, /useEffect\(\(\) => \{ wsRef\.current = wsKey;/, `${f}: reset on switch`)
-    assert.match(s, /const asked = wsRef\.current/, `${f}: tag the request`)
-    assert.match(s, /wsRef\.current !== asked\) return|wsRef\.current === asked\)/, `${f}: drop a late answer`)
-  }
+  // The side thread (AskContext) keeps its own tag.
+  const ask = read(`${V2}/ai/AskContext.jsx`)
+  assert.match(ask, /useWorkspace\(\)/, 'AskContext: must read the active workspace')
+  assert.match(ask, /const wsKey = `\$\{active\?\.id \?\? ''\}\|\$\{scopeKey \?\? ''\}`/, 'AskContext: key = business + scope')
+  assert.match(ask, /useEffect\(\(\) => \{ wsRef\.current = wsKey;/, 'AskContext: reset on switch')
+  assert.match(ask, /const asked = wsRef\.current/, 'AskContext: tag the request')
+  assert.match(ask, /wsRef\.current !== asked\) return|wsRef\.current === asked\)/, 'AskContext: drop a late answer')
+  // The Accountant ask box clears its question on a switch; its answers live in the chat
+  // modal (#137), which aborts and invalidates in-flight requests per business + scope.
+  const acct = read(`${V2}/pages/Accountant.jsx`)
+  assert.match(acct, /const wsKey = `\$\{active\?\.id \?\? ''\}\|\$\{scopeKey \?\? ''\}`/, 'Accountant: key = business + scope')
+  assert.match(acct, /if \(wsRef\.current !== wsKey\) \{\s*wsRef\.current = wsKey\s*setQ\(''\)/, 'Accountant: reset the question on switch')
+  assert.match(acct, /activeBusinessId=\{active\?\.id\}[\s\S]{0,80}scopeKey=\{scopeKey\}|scopeKey=\{scopeKey\}[\s\S]{0,80}activeBusinessId=\{active\?\.id\}/, 'Accountant: the chat gets the business + scope')
+  const chat = read(`${V2}/components/AccountantChatModal.jsx`)
+  assert.match(chat, /const currentScope = `\$\{activeBusinessId \?\? ''\}\|\$\{scopeKey \?\? ''\}`/, 'chat: key = business + scope')
+  assert.match(chat, /scopeRef\.current !== currentScope\) \{[\s\S]{0,200}guardRef\.current\.abort\(\)[\s\S]{0,120}setThread\(\[\]\)/, 'chat: abort and wipe on switch')
+  assert.match(chat, /if \(!isStale\(\) && !guardRef\.current\.isStale\(gen\)\)/, 'chat: drop a late answer')
 })
 
 // #4 was reversed at release: production showed that inside a company the `scope` column is only
