@@ -600,6 +600,44 @@ export function dedupeDocumentLinks(links) {
 }
 
 /**
+ * Why is the month's records registry empty? An empty registry is not necessarily lost data —
+ * a quiet month is legitimate — so the bank statements decide what the package says:
+ *   'statement_has_lines' — a statement for this month (period inside the month) has lines, but the
+ *                           ledger has none: data is missing, import or restore before closing;
+ *   'unconfirmed'         — a bank account has no statement covering the month, or its statement
+ *                           spans a longer period with lines: a quiet month cannot be confirmed yet;
+ *   'confirmed_empty'     — every bank account has a statement covering the month with no lines;
+ *   'no_bank_accounts'    — no bank account to reconcile.
+ * Returns null when the registry is not empty.
+ */
+export function emptyMonthAssessment({ month, registryLength = 0, batches = [], wallets = [] }) {
+  if (registryLength > 0) return null
+  const mOpt = monthOptions(24).find((m) => m.key === month)
+  const start = mOpt?.start || `${month}-01`
+  const end = mOpt?.end || `${month}-28`
+  const banks = wallets.filter(isBankWallet)
+  if (!banks.length) return { kind: 'no_bank_accounts', wallets_with_lines: [], lines: 0, wallets_without_statement: [], wallets_uncertain: [] }
+  const day = (v) => (v ? String(v).slice(0, 10) : null)
+  const withLines = [], uncertain = [], without = []
+  let lines = 0
+  for (const w of banks) {
+    const covering = batches.filter((b) => String(b.wallet_id) === String(w.id) && !['cancelled', 'failed'].includes(b.status)
+      && day(b.statement_start) && day(b.statement_end) && day(b.statement_start) <= start && day(b.statement_end) >= end
+      && day(b.statement_start) <= day(b.statement_end))
+    // A statement exactly for this month: its lines are this month's lines.
+    const inMonthOnly = batches.filter((b) => String(b.wallet_id) === String(w.id) && !['cancelled', 'failed'].includes(b.status)
+      && day(b.statement_start) && day(b.statement_end) && day(b.statement_start) >= start && day(b.statement_end) <= end)
+    const monthLines = inMonthOnly.reduce((n, b) => n + Number(b.row_count || 0), 0)
+    if (monthLines > 0) { withLines.push(w.name); lines += monthLines; continue }
+    if (!covering.length && !inMonthOnly.length) { without.push(w.name); continue }
+    if (covering.some((b) => Number(b.row_count || 0) > 0 && !(day(b.statement_start) >= start && day(b.statement_end) <= end))) { uncertain.push(w.name); continue }
+    if (!covering.length) { without.push(w.name); continue }   // only partial in-month statements, no lines
+  }
+  const kind = withLines.length ? 'statement_has_lines' : (without.length || uncertain.length) ? 'unconfirmed' : 'confirmed_empty'
+  return { kind, wallets_with_lines: withLines, lines, wallets_without_statement: without, wallets_uncertain: uncertain }
+}
+
+/**
  * Builds structured accountant export data:
  * - summary: readiness %, complete/total records, reconciliation status, bank breakdown
  * - discrepancies: missing bank statements, unreconciled accounts, bills without docs, uncategorised transactions, unavailable files
@@ -693,6 +731,7 @@ export function packageExportData({ month, companyName = '', businessId = '', tr
       ...(missingCategories.length ? [`Transactions without category: ${missingCategories.length}`] : []),
     ],
     records_registry: registry,
+    empty_month: emptyMonthAssessment({ month, registryLength: registry.length, batches: scopedBatches, wallets: scopedWallets }),
   }
 }
 
@@ -1012,6 +1051,7 @@ export async function createAccountantZipPackage({
     },
     bank_accounts: exportData.bank_accounts,
     limitations: exportData.limitations || [],
+    empty_month: exportData.empty_month || null,
   }
 
   const discrepancies = {

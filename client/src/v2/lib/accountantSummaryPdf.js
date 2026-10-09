@@ -92,6 +92,13 @@ const I18N = {
     typeReadme: 'Инструкция к архиву',
     statusIncluded: 'Приложен в ZIP',
     statusMissing: 'Недоступен',
+    statusEmptyRegistry: 'Пустой (0 записей)',
+    emptyRegistryTitle: 'Реестр записей за месяц пуст (records_registry.json)',
+    emptyHasLines: (wallets, n) => `Выписка за этот месяц (${wallets}) содержит строк: ${n}, а в журнале операций проводок нет. Похоже, операции не внесены или потеряны. Перед закрытием месяца импортируйте выписку или восстановите проводки.`,
+    emptyUnconfirmed: (missing, uncertain) => `Операций за месяц в журнале нет, но подтвердить, что их действительно не было, пока нельзя.${missing ? ` Нет выписки за месяц: ${missing}.` : ''}${uncertain ? ` Выписка охватывает больший период, и в нём есть строки: ${uncertain}.` : ''} Загрузите выписку за месяц или подтвердите вручную, что движений не было.`,
+    emptyConfirmed: 'Операций за месяц нет. Выписки по всем банковским счетам за месяц не содержат движений — это нормальный «тихий» месяц.',
+    emptyNoBanks: 'Операций за месяц нет. Банковских счетов нет, сверять нечего.',
+    emptyUnlinkedNote: 'В журнале операций за этот месяц нет проводок, поэтому сопоставлять со строками выписок нечего.',
     footerBrand: 'Helm Finance OS · Бухгалтерский пакет документов',
     footerPage: (cur, tot) => `Страница ${cur} из ${tot}`,
   },
@@ -174,6 +181,13 @@ const I18N = {
     typeReadme: 'Archive Readme',
     statusIncluded: 'Included in ZIP',
     statusMissing: 'Unavailable',
+    statusEmptyRegistry: 'Empty (0 records)',
+    emptyRegistryTitle: 'The records registry for the month is empty (records_registry.json)',
+    emptyHasLines: (wallets, n) => `The statement for this month (${wallets}) has ${n} line(s), but the ledger has no transactions. Entries look missing or lost. Import the statement or restore the transactions before closing the month.`,
+    emptyUnconfirmed: (missing, uncertain) => `The ledger has no transactions for the month, but a quiet month cannot be confirmed yet.${missing ? ` No statement for the month: ${missing}.` : ''}${uncertain ? ` The statement covers a longer period that has lines: ${uncertain}.` : ''} Upload the month's statement or confirm manually that there were no movements.`,
+    emptyConfirmed: 'No transactions this month. The statements of every bank account for the month show no movements — a normal quiet month.',
+    emptyNoBanks: 'No transactions this month. There is no bank account to reconcile.',
+    emptyUnlinkedNote: 'The ledger has no transactions for this month, so there is nothing to match against statement lines.',
     footerBrand: 'Helm Finance OS · Accountant Package',
     footerPage: (cur, tot) => `Page ${cur} of ${tot}`,
   },
@@ -256,6 +270,13 @@ const I18N = {
     typeReadme: 'Petunjuk Arsip',
     statusIncluded: 'Terlampir dalam ZIP',
     statusMissing: 'Tidak Tersedia',
+    statusEmptyRegistry: 'Kosong (0 catatan)',
+    emptyRegistryTitle: 'Registri catatan bulan ini kosong (records_registry.json)',
+    emptyHasLines: (wallets, n) => `Rekening koran bulan ini (${wallets}) memuat ${n} baris, tetapi buku besar tidak memiliki transaksi. Transaksi tampaknya belum dicatat atau hilang. Impor rekening koran atau pulihkan transaksi sebelum tutup buku.`,
+    emptyUnconfirmed: (missing, uncertain) => `Buku besar tidak memiliki transaksi bulan ini, tetapi belum dapat dipastikan bahwa memang tidak ada mutasi.${missing ? ` Belum ada rekening koran bulan ini: ${missing}.` : ''}${uncertain ? ` Rekening koran mencakup periode lebih panjang yang berisi baris: ${uncertain}.` : ''} Unggah rekening koran bulan ini atau konfirmasi secara manual bahwa tidak ada mutasi.`,
+    emptyConfirmed: 'Tidak ada transaksi bulan ini. Rekening koran semua rekening bank bulan ini tidak memuat mutasi — bulan yang memang sepi.',
+    emptyNoBanks: 'Tidak ada transaksi bulan ini. Tidak ada rekening bank untuk direkonsiliasi.',
+    emptyUnlinkedNote: 'Buku besar tidak memiliki transaksi bulan ini, jadi tidak ada yang perlu dicocokkan dengan baris rekening koran.',
     footerBrand: 'Helm Finance OS · Paket Akuntan',
     footerPage: (cur, tot) => `Halaman ${cur} dari ${tot}`,
   },
@@ -309,6 +330,17 @@ export async function generateAccountantSummaryPdf({
   const unreconciledStatements = discrepancies?.unreconciled_bank_statements || []
   const billsWithoutDocs = discrepancies?.bills_without_documents || []
   const unavailableFiles = discrepancies?.unavailable_files || []
+  // Empty registry: a quiet month is legitimate. The statements decide whether it is a warning
+  // (statement has lines, ledger has none), an open question, or simply nothing to report.
+  const isRegistryEmpty = !Array.isArray(recordsRegistry) || recordsRegistry.length === 0
+  const emptyMonth = isRegistryEmpty ? (summary?.empty_month || { kind: 'unconfirmed', wallets_without_statement: [], wallets_uncertain: [] }) : null
+  const emptyIsWarning = emptyMonth?.kind === 'statement_has_lines'
+  const emptyIsOpen = emptyMonth?.kind === 'unconfirmed'
+  const emptyText = !emptyMonth ? null
+    : emptyMonth.kind === 'statement_has_lines' ? t.emptyHasLines((emptyMonth.wallets_with_lines || []).join(', '), emptyMonth.lines || 0)
+    : emptyMonth.kind === 'unconfirmed' ? t.emptyUnconfirmed((emptyMonth.wallets_without_statement || []).join(', '), (emptyMonth.wallets_uncertain || []).join(', '))
+    : emptyMonth.kind === 'confirmed_empty' ? t.emptyConfirmed
+    : t.emptyNoBanks
 
   // Build wallet lookup map from current company data
   const walletMap = new Map()
@@ -513,7 +545,13 @@ export async function generateAccountantSummaryPdf({
   registryRows.push(['accountant-summary.pdf', t.typeReport, { text: t.statusIncluded, color: '#166534', bold: true, alignment: 'center' }])
   registryRows.push(['summary.json', t.typeSummary, { text: t.statusIncluded, color: '#166534', bold: true, alignment: 'center' }])
   registryRows.push(['discrepancies.json', t.typeDiscrepancies, { text: t.statusIncluded, color: '#166534', bold: true, alignment: 'center' }])
-  registryRows.push(['records_registry.json', t.typeRegistry, { text: t.statusIncluded, color: '#166534', bold: true, alignment: 'center' }])
+  registryRows.push([
+    'records_registry.json',
+    t.typeRegistry,
+    isRegistryEmpty
+      ? { text: t.statusEmptyRegistry, color: emptyIsWarning ? '#b45309' : '#475569', bold: true, alignment: 'center' }
+      : { text: t.statusIncluded, color: '#166534', bold: true, alignment: 'center' },
+  ])
 
   for (const f of attachedFiles) {
     if (['accountant-summary.pdf', 'summary.json', 'discrepancies.json', 'records_registry.json'].includes(f.name)) continue
@@ -613,7 +651,9 @@ export async function generateAccountantSummaryPdf({
 
       // Section 3: Unreconciled Transactions
       { text: t.secUnlinked, fontSize: 12, bold: true, color: '#0f172a', margin: [0, 0, 0, 6] },
-      unlinkedTx.length === 0
+      isRegistryEmpty
+        ? { text: t.emptyUnlinkedNote, fontSize: 9, color: '#475569', margin: [0, 0, 0, 14] }
+        : unlinkedTx.length === 0
         ? {
             text: t.noUnlinked,
             fontSize: 9,
@@ -693,7 +733,15 @@ export async function generateAccountantSummaryPdf({
                 ],
               }
             : null,
-          (missingStatements.length === 0 && unreconciledStatements.length === 0 && billsWithoutDocs.length === 0 && unavailableFiles.length === 0 && limitations.length === 0)
+          isRegistryEmpty
+            ? {
+                stack: [
+                  { text: t.emptyRegistryTitle, bold: true, fontSize: 9, color: emptyIsWarning ? '#b45309' : emptyIsOpen ? '#334155' : '#166534', margin: [0, 2, 0, 2] },
+                  { text: emptyText, fontSize: 8.5, color: emptyIsWarning ? '#92400e' : emptyIsOpen ? '#475569' : '#166534', margin: [0, 0, 0, 6] },
+                ],
+              }
+            : null,
+          (missingStatements.length === 0 && unreconciledStatements.length === 0 && billsWithoutDocs.length === 0 && unavailableFiles.length === 0 && limitations.length === 0 && !emptyIsWarning && !emptyIsOpen)
             ? { text: t.noDiscrepancies, fontSize: 9, color: '#166534', margin: [0, 2, 0, 6] }
             : null,
         ].filter(Boolean),
