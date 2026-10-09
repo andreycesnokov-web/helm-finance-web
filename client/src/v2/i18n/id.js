@@ -504,7 +504,7 @@ export default {
     businessNote: 'Disimpan sebagai catatan perusahaan ini. Uang pribadi ada di ruang kerja Pribadi.',
     saveOut: 'Simpan pengeluaran', saveIn: 'Simpan pemasukan', doneOut: 'Pengeluaran {v} tersimpan.', doneIn: 'Pemasukan {v} tersimpan.',
     forbidden: 'Peran Anda dapat mengajukan permintaan, tetapi tidak mencatat uang langsung. Hubungi pemilik, admin atau CFO.',
-    err: { type: 'Pilih pengeluaran atau pemasukan.', amount: 'Masukkan jumlah dalam rupiah, mis. 1.500.000.', wallet: 'Pilih rekening.', date: 'Isi tanggal.', description: 'Tulis untuk apa.' },
+    err: { type: 'Pilih pengeluaran atau pemasukan.', amount: 'Masukkan jumlah dalam rupiah, mis. 1.500.000.', wallet: 'Pilih rekening.', date: 'Isi tanggal.', description: 'Tulis untuk apa.', insufficient_balance: 'Saldo {name} {bal}. Pengeluaran ini membuat saldo minus — kurang {short}. Pilih rekening lain atau catat uang masuk dulu.', wallet_balance_negative: 'Saldo {name} di pembukuan sudah {bal}. Rekening bank tidak bisa minus — impor mutasinya atau catat pemasukan yang belum tercatat.' },
   },
   perf: {
     sub: 'Apakah bisnis menghasilkan uang, dan ke mana kas mengalir', views: 'Tampilan kinerja', forbidden: 'Peran Anda tidak bisa melihat keuangan perusahaan.',

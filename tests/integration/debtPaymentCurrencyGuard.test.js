@@ -55,6 +55,13 @@ mem.__seed('wallets', [
   { id: 'w-biz-b', business_id: BIZ_B, name: 'Other Co Wallet', currency: 'USD', type: 'bank', scope: 'business', is_active: true },
 ]);
 
+// Opening balances: a payment may not take a wallet below zero (walletLedger), so the
+// currency checks run against funded wallets. Seeded before the tests count transactions.
+mem.__seed('transactions', [
+  { id: 'open-usd', business_id: BIZ_A, wallet_id: 'w-usd-a', type: 'income', amount_original: 10000, amount_idr: 160000000, currency_original: 'USD', scope: 'business' },
+  { id: 'open-idr', business_id: BIZ_A, wallet_id: 'w-idr-a', type: 'income', amount_original: 100000000, amount_idr: 100000000, currency_original: 'IDR', scope: 'business' },
+]);
+
 mem.__seed('debts', [
   { id: 'debt-usd-1', business_id: BIZ_A, type: 'payable', counterparty: 'Vendor US', currency: 'USD', amount: 1000, original_amount: 1000, paid_amount: 0, status: 'open', approval_status: 'approved' },
   { id: 'debt-usd-2', business_id: BIZ_A, type: 'payable', counterparty: 'Vendor Direct', currency: 'USD', amount: 500, original_amount: 500, paid_amount: 0, status: 'open', approval_status: 'approved' },
