@@ -32,13 +32,14 @@ function obligationDisplay(o) {
 const findOb = (obligations, type) => (obligations?.obligations || []).find(o => o.obligation_type === type)
 
 // ── Static Indonesian compliance schedule (deterministic; engine wiring later) ──
-// Generic monthly deadlines under Indonesian tax law. Amount/source wiring arrives
-// with the tax-engine endpoints; dates themselves are fixed statutory rules.
+// Generic monthly deadlines under Indonesian tax law (PMK 81/2024, in force from 1 January 2025:
+// PPh 21/26, 23 and 25 paid by the 15th; SPT Masa by the 20th; PPN by the end of the month).
+// The older "10th" (PMK 242/2014) no longer applies.
 export function idComplianceDeadlines(year, month /* 0-based */) {
   const mk = (day, key, title, sub, kind) => ({ day, key, title, sub, kind, date: new Date(year, month, day) })
   return [
-    mk(10, 'pph2126', 'PPH 21/26 payment', 'Employee withholding · from Payroll', 'withholding'),
-    mk(10, 'pph23', 'PPH 23 payment', 'Service withholding · from Payables', 'service'),
+    mk(15, 'pph2126', 'PPH 21/26 payment', 'Employee withholding · from Payroll', 'withholding'),
+    mk(15, 'pph23', 'PPH 23 payment', 'Service withholding · from Payables', 'service'),
     mk(15, 'pph25', 'PPH 25 installment', 'Corporate income tax installment', 'cit'),
     mk(20, 'pph21file', 'PPH 21/26 filing', 'Monthly withholding return', 'withholding'),
     mk(new Date(year, month + 1, 0).getDate(), 'ppn', 'PPN filing & payment', 'VAT for the previous period · from Invoices', 'ppn'),

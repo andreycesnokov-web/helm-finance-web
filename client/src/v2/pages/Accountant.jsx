@@ -119,6 +119,36 @@ function AskBox({ externalQuery = '', onQueryChange, onOpenModal }) {
 // The rule's name in the user's language; the stored English title is the fallback.
 const ruleTitle = (t, e) => { const k = `acct.rule.${e.rule_code}`; const v = t(k); return v && v !== k ? v : (e.title || e.rule_code) }
 
+// What the company's own records give for last month (GET /api/accountant/obligations — the
+// deterministic engine: PPh 21/26 from payroll deduction lines; PPh 23 and PPN need data the app
+// does not record yet). Formerly the classic Workbench's "Tax obligations" + "Tax reserve".
+const OBL_STATUS_TONE = { calculated: 'warn', insufficient_data: 'neutral', unavailable: 'neutral' }
+function FromYourData({ obl, t, lang }) {
+  if (obl.loading) return <Card><Skeleton rows={3} /></Card>
+  if (obl.error) return null   // the role may not read obligations (manager / employee)
+  const list = obl.data?.obligations || []
+  const reserve = Number(obl.data?.reserve?.amount || 0)
+  return (
+    <Card title={t('acct.fromData.title', { m: obl.data?.period ? monthLabel(obl.data.period, lang) : '' })}
+      aside={<span className="v2-row-gap"><Link to="/business/accountant/tax-split">{t('acct.fromData.split')}</Link><Link to="/business/accountant/settlement">{t('acct.fromData.settlement')}</Link></span>}>
+      <p className="v2-stat-mid v2-num">{reserve > 0 ? money(reserve) : '—'}</p>
+      <p className="v2-muted v2-small">{t(reserve > 0 ? 'acct.fromData.reserve' : 'acct.fromData.noReserve')}</p>
+      <ul className="v2-taxlist">
+        {list.map((o) => (
+          <li key={o.obligation_type}>
+            <span className="v2-num v2-taxlist-date">{o.due_date ? shortDate(o.due_date, lang) : '—'}</span>
+            <span className="v2-taxlist-what"><strong>{t(`acct.fromData.name.${o.obligation_type}`)}</strong>
+              <span className="v2-muted"> · {t(`acct.fromData.why.${o.obligation_type}.${o.status}`)}</span></span>
+            <span className="v2-num v2-r">{o.status === 'calculated' ? money(o.amount) : '—'}</span>
+            <Pill tone={OBL_STATUS_TONE[o.status] || 'neutral'}>{t(`acct.fromData.st.${o.status}`)}</Pill>
+          </li>
+        ))}
+      </ul>
+      <p className="v2-muted v2-small">{t('acct.fromData.note')}</p>
+    </Card>
+  )
+}
+
 function TaxList({ events, lang, t, limit, empty = 'acct.noEvents' }) {
   if (!events.length) return <p className="v2-muted">{t(empty)}</p>
   return (
@@ -356,6 +386,7 @@ function CloseTab({ month, onOpenChatModal }) {
   const docs = useApi('/documents')
   const categories = useApi('/cashflow-categories')
   const summary = useApi('/accountant/summary')
+  const taxCal = useApi('/accountant/tax-calendar')
   const taxCardsApi = useApi(`/accountant/tax-knowledge/cards?lang=${lang}`)
 
   const taxStatus = taxCardsApi.error?.status || (taxCardsApi.error?.data && taxCardsApi.error.data.status)
@@ -420,7 +451,7 @@ function CloseTab({ month, onOpenChatModal }) {
 
   if (tx.loading || debts.loading) return <Card><Skeleton rows={6} /></Card>
   if (tx.error) return <ErrorBox error={tx.error} onRetry={tx.reload} />
-  const events = complianceEvents(summary.data)
+  const events = taxCal.data?.events || complianceEvents(summary.data)
   const [y, m] = month.split('-').map(Number)
   const next = `${m === 12 ? y + 1 : y}-${String(m === 12 ? 1 : m + 1).padStart(2, '0')}`
   const due = events.filter((e) => String(e.due_date).slice(0, 7) === next)
@@ -785,6 +816,7 @@ function TaxesTab({ month }) {
   // GET /api/accountant/tax-calendar is read-only (no write-on-read): general deadlines while the
   // rules await review, merged with stored obligations, nil returns for months with no activity.
   const summary = useApi('/accountant/tax-calendar')
+  const obl = useApi('/accountant/obligations')
   if (summary.loading) return <Card><Skeleton rows={6} /></Card>
   if (summary.error) return <ErrorBox error={summary.error?.status === 403 ? t('dec.forbidden') : summary.error} onRetry={summary.reload} />
   const events = summary.data?.events || []
@@ -810,6 +842,7 @@ function TaxesTab({ month }) {
             </ol>
           </Card>
         )}
+        <FromYourData obl={obl} t={t} lang={lang} />
         <Card title={monthLabel(month, lang)}>
           {missing.length > 0 && (
             <div className="v2-banner v2-tone-warn"><I.warn size={18} /><span className="v2-banner-text">{t('acct.profileMissing', { n: missing.length })}</span><Btn to="/business/accountant/tax-profile">{t('acct.tab.profile')}</Btn></div>
@@ -913,7 +946,7 @@ export default function Accountant() {
 
   return (
     <div className="v2-page">
-      <PageHead title={t('nav.accountant')} sub={sub} actions={<><MonthPicker value={month} onChange={pickMonth} /><Btn to="/business/accountant/classic">{t('bills.classic')}</Btn></>} />
+      <PageHead title={t('nav.accountant')} sub={sub} actions={<MonthPicker value={month} onChange={pickMonth} />} />
       <AccountantTabs active={tab} />
       {tab === 'close' && <CloseTab month={month} onOpenChatModal={handleOpenChat} />}
       {tab === 'packages' && <PackagesTab month={month} />}
