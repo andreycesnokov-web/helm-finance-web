@@ -14464,8 +14464,8 @@ const publicIntakeDoc = ({ raw, ...rest }) => rest;   // never leak the raw row
 // metadata, so returning the column wholesale would leak extraction internals through
 // /api/documents. Both of these are WHITELISTS: a field that is not named here is not
 // returned, so future additions to extracted_json are private by default.
-const IDENTIFY_FIELDS = ['lang', 'at', 'read', 'suggested_type', 'suggested_label', 'suggested_area', 'suggested_source', 'suggested_confidence', 'unavailable_reason'];
-const EXPLAIN_FIELDS = ['title', 'summary', 'issued_by', 'issued_on', 'number', 'purpose', 'place', 'next_step', 'warnings'];
+const IDENTIFY_FIELDS = ['v', 'lang', 'at', 'read', 'suggested_filing', 'suggested_type', 'suggested_label', 'suggested_area', 'suggested_source', 'suggested_confidence', 'unavailable_reason'];
+const EXPLAIN_FIELDS = ['title', 'summary', 'issued_by', 'issued_on', 'number', 'purpose', 'place', 'next_step', 'bank_name', 'account_number', 'period', 'counterparty_name', 'warnings'];
 const publicIdentify = (all) => {
   if (!all || typeof all !== 'object') return null;
   const out = {};
@@ -14478,6 +14478,8 @@ const publicIdentify = (all) => {
   }
   return Object.keys(out).length ? out : null;
 };
+const FILING_FIELDS = ['kind', 'wallet_id', 'wallet_name', 'period', 'counterparty_id', 'counterparty_name', 'reason', 'note', 'at'];
+const publicFiling = (f) => (f && typeof f === 'object' && f.kind ? Object.fromEntries(FILING_FIELDS.map((k) => [k, f[k] ?? null])) : null);
 const publicExtractedJson = (ej) => {
   if (!ej || typeof ej !== 'object') return null;
   const ai = ej.ai_intake;
@@ -14505,6 +14507,8 @@ const publicExtractedJson = (ej) => {
     upload_intent: publicUploadIntent(ej.upload_intent),
     // "What is this document?" readings (POST /api/documents/:id/identify), per language.
     ai_identify: publicIdentify(ej.ai_identify),
+    // Where a document is kept when it explains no single bill or payment (POST …/filing).
+    filing: publicFiling(ej.filing),
   };
 };
 const publicDocRow = (d) => (d ? { ...d, extracted_json: publicExtractedJson(d.extracted_json) } : d);
@@ -15689,8 +15693,23 @@ app.post('/api/documents/:id/identify', auth, async (req, res) => {
     });
     const explanation = ai.ok ? ai.explanation : null;
     const kind = docIdentify.suggestedKind(verdict, explanation);
+    // Where to keep it when it explains no single bill or payment (statement → bank account +
+    // month, payroll / tax → month, contract → counterparty). Business-scoped reads only.
+    let filing = null;
+    if (kind && explanation) {
+      let wallets = [], counterparties = [];
+      try {
+        if (kind.type === 'bank_statement') {
+          const { data } = await supabase.from('wallets').select('id, name, entity_name, currency')
+            .eq('business_id', biz.business.id).eq('is_active', true).eq('scope', 'business');
+          wallets = data || [];
+        }
+        if (kind.type === 'contract') counterparties = await cpDirectoryForMatching(biz);
+      } catch { /* no suggestion rather than a failure */ }
+      filing = docIdentify.suggestedFiling(kind.type, explanation, { wallets, counterparties, currency: doc.currency });
+    }
     const identify = {
-      lang, at: new Date().toISOString(), model: ai.ok ? docIdentify.MODEL : null,
+      v: 2, lang, at: new Date().toISOString(), model: ai.ok ? docIdentify.MODEL : null, suggested_filing: filing,
       read: text ? method : (ai.ok ? 'file_to_model' : 'none'),
       suggested_type: kind?.type || null, suggested_label: kind ? docIntake.labelFor(kind.type) : null,
       suggested_area: kind ? docIntake.areaFor(kind.type) : null,
@@ -15711,6 +15730,66 @@ app.post('/api/documents/:id/identify', auth, async (req, res) => {
     console.error(`[doc-identify] failed: ${e.message}`);
     res.status(500).json({ ok: false, error: 'document_identify_failed' });
   }
+});
+
+// POST /api/documents/:id/filing — where a document belongs when it explains no single bill or
+// payment (owner 2026-10-09; the pattern Xero / QuickBooks / Ramp use):
+//   bank_account_period  a bank statement → a bank account + month (also sets period_start/end)
+//   counterparty         a contract or letter → a counterparty (issuer_counterparty_id)
+//   keep                 kept on file with a reason (payroll, tax, contract, other)
+//   clear: true          removes the filing
+// No migration: written through rpc_document_update_metadata (audited) into existing columns and
+// extracted_json.filing. Nothing here touches money, links or the ledger.
+const FILING_KINDS = ['bank_account_period', 'counterparty', 'keep'];
+const FILING_REASONS = ['payroll', 'tax', 'contract', 'other'];
+app.post('/api/documents/:id/filing', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res); if (!biz) return;
+    if (!canManageDocuments(biz.role)) return res.status(403).json({ error: 'Your role cannot edit documents' });
+    if (!await hasDocumentsAccess(biz)) return res.status(403).json({ error: 'Document Center is not enabled', upgrade_required: true });
+    const doc = await loadDocumentScoped(biz, req.params.id);
+    if (!doc) return res.status(404).json({ error: 'Document not found' });
+    if (doc.archived_at) return res.status(409).json({ error: 'document_archived' });
+    const b = req.body || {};
+    const ej = { ...(doc.extracted_json || {}) };
+    const patch = {};
+    if (b.clear) {
+      delete ej.filing;
+    } else {
+      if (!FILING_KINDS.includes(b.kind)) return res.status(400).json({ error: 'invalid_filing_kind', allowed: FILING_KINDS });
+      const filing = { kind: b.kind, by: req.user.userId, at: new Date().toISOString() };
+      if (b.kind === 'bank_account_period') {
+        if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(String(b.period || ''))) return res.status(400).json({ error: 'invalid_period' });
+        const { data: w } = await supabase.from('wallets').select('id, name, currency')
+          .eq('id', String(b.wallet_id || '')).eq('business_id', biz.business.id).eq('scope', 'business').limit(1);
+        if (!w?.length) return res.status(404).json({ error: 'wallet_not_found' });
+        const [y, m] = b.period.split('-').map(Number);
+        filing.wallet_id = w[0].id; filing.wallet_name = w[0].name; filing.period = b.period;
+        patch.period_start = `${b.period}-01`;
+        patch.period_end = new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10);
+      } else if (b.kind === 'counterparty') {
+        const { data: cp } = await supabase.from('counterparties').select('id, name')
+          .eq('id', String(b.counterparty_id || '')).or(bizOrFilter(biz)).limit(1);
+        if (!cp?.length) return res.status(404).json({ error: 'counterparty_not_found' });
+        filing.counterparty_id = cp[0].id; filing.counterparty_name = cp[0].name;
+        patch.issuer_counterparty_id = cp[0].id;
+      } else {
+        if (!FILING_REASONS.includes(b.reason)) return res.status(400).json({ error: 'invalid_reason', allowed: FILING_REASONS });
+        filing.reason = b.reason;
+        if (b.period && /^\d{4}-(0[1-9]|1[0-2])$/.test(String(b.period))) filing.period = b.period;
+      }
+      if (typeof b.note === 'string' && b.note.trim()) filing.note = b.note.trim().slice(0, 300);
+      ej.filing = filing;
+    }
+    patch.extracted_json = ej;
+    const { data, error } = await supabase.rpc('rpc_document_update_metadata',
+      { p_document_id: doc.id, p_business_id: biz.business.id, p_actor: req.user.userId, p_patch: patch, p_channel: 'web' });
+    if (error) {
+      if (/archived/i.test(error.message)) return res.status(409).json({ error: 'document_archived' });
+      return res.status(500).json({ error: error.message });
+    }
+    res.json({ ok: true, document: publicDocRow(data) });
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 // POST /api/documents/:id/archive — soft archive (no hard-delete of evidence).

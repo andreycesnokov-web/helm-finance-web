@@ -24,7 +24,7 @@ import { useApi, useInvalidate } from '../data'
 import { money, shortDate } from '../lib/format'
 import { monthOptions, defaultCloseMonth } from '../lib/accounting'
 import { detailPath } from './Bills'
-import { billHasDocument, docNeedsLook, docIsUnreadable } from '../lib/obligations'
+import { billHasDocument, docNeedsLook, docIsUnreadable, filingText } from '../lib/obligations'
 import { partitionDocuments, vaultVerdictOf } from '../../pages/business/companyVault'
 
 const needsLook = docNeedsLook
@@ -43,7 +43,8 @@ export const docTypeLabel = (t, k) => t(`docs.type.${DOC_TYPES.includes(k) ? k :
 
 function DocRow({ d, debtsById, txById, t, lang, onOpen, company = false }) {
   const links = d.links || []
-  const linked = links.length > 0
+  const filing = d.extracted_json?.filing || null
+  const linked = links.length > 0 || !!filing
   const name = d.file?.file_name || d.document_number || d.document_type || '—'
   const debtLink = links.find((l) => l.target_type === 'debt')
   const txLink = links.find((l) => l.target_type === 'transaction')
@@ -54,6 +55,8 @@ function DocRow({ d, debtsById, txById, t, lang, onOpen, company = false }) {
     const text = debt ? t(`docs.linkedTo.${debt.type === 'receivable' ? 'receivable' : 'payable'}`, { who: debt.counterparty || t('bills.noName') })
       : t('docs.linkedTo.debt', { id: debtLink.target_id })
     target = debt ? <Link to={detailPath(debt)}>{text}</Link> : <span>{text}</span>
+  } else if (filing) {
+    target = <span>{filingText(t, filing, lang)}</span>
   } else if (txLink) {
     const tx = txById.get(String(txLink.target_id))
     target = <Link to="/business/transactions">{tx ? t('docs.linkedTo.transaction', { d: txLabel(tx, lang) }) : t('docs.linkedTo.transactionNoDate')}</Link>
@@ -66,14 +69,15 @@ function DocRow({ d, debtsById, txById, t, lang, onOpen, company = false }) {
       <span className="v2-doc-text">
         <span className="v2-dec-title v2-ellipsis" title={name}>{name}</span>
         <span className="v2-dec-meta">{[t(`docs.ch.${d.file?.upload_channel || 'web'}`), shortDate(d.created_at, lang)].join(' · ')}</span>
-        <span className="v2-small">{[kind, d.gross_amount ? money(d.gross_amount, { currency: d.currency || 'IDR' }) : null].filter(Boolean).join(' · ')}</span>
+        <span className="v2-small">{[kind, d.gross_amount ? money(d.gross_amount, { currency: d.currency || 'IDR' }) : null,
+          d.document_date ? shortDate(d.document_date, lang) : null].filter(Boolean).join(' · ')}</span>
         {target && <span className="v2-small">{target}</span>}
       </span>
       <span className="v2-docrow-pills">
         {company ? <Pill tone="good">{t('docs.company.confirmed')}</Pill> : <>
           {verdict && !verdict.confirmed && <Pill tone="info">{t('docs.looksLike', { k: t(`docs.vault.${verdict.docType}`) })}</Pill>}
           {unreadable(d) && <Pill tone="warn">{t('docs.extractFailed')}</Pill>}
-          <Pill tone={linked ? 'good' : 'warn'}>{t(linked ? 'docs.linked' : 'docs.notLinked')}</Pill>
+          <Pill tone={linked ? 'good' : 'warn'}>{t(links.length ? 'docs.linked' : filing ? 'docs.fl.filed' : 'docs.notLinked')}</Pill>
         </>}
       </span>
       <button type="button" className="v2-btn-link v2-docrow-act" onClick={() => onOpen(d)}>{look ? t('docs.fix') : t('docs.open')}</button>
@@ -94,6 +98,8 @@ export default function Documents() {
   const docs = useApi('/documents?limit=200')
   const debts = useApi('/debts')
   const txs = useApi('/transactions?period=all')
+  const walletsApi = useApi('/wallets')
+  const cpsApi = useApi('/counterparties')
   const list = docs.data?.documents || []
   const debtList = Array.isArray(debts.data) ? debts.data : []
   const txList = Array.isArray(txs.data) ? txs.data : []
@@ -226,7 +232,9 @@ export default function Documents() {
           </div>
         </>
       )}
-      {openDoc && <DocumentDrawer doc={openDoc} debts={debtList} transactions={txList} onClose={closeDoc} onChanged={changed} />}
+      {openDoc && <DocumentDrawer doc={openDoc} debts={debtList} transactions={txList}
+        wallets={(walletsApi.data?.wallets || []).filter((w) => w.is_active !== false && (w.scope || 'business') === 'business')}
+        counterparties={Array.isArray(cpsApi.data) ? cpsApi.data : (cpsApi.data?.counterparties || [])} onClose={closeDoc} onChanged={changed} />}
       {modal}
     </div>
   )

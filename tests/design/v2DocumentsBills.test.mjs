@@ -2,7 +2,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { billHasDocument, docPath, docNeedsLook, billChecklistItems, tabForPath } from '../../client/src/v2/lib/obligations.js'
+import { billHasDocument, docPath, docNeedsLook, billChecklistItems, tabForPath, filingText } from '../../client/src/v2/lib/obligations.js'
 import { partitionDocuments } from '../../client/src/pages/business/companyVault.js'
 import { previewKind } from '../../client/src/lib/documentPreview.js'
 import ru from '../../client/src/v2/i18n/ru.js'
@@ -116,9 +116,18 @@ ok('the suggested type is applied only through the classification route, on a cl
 ok('a spreadsheet waits for its cells from the preview', /waitForSheet && sheetText === undefined/.test(idSrc) && pvSrc.includes('onSheetText?.('))
 ok('every intake type has a label in every language', ['npwp', 'nib', 'akta', 'sk_kemenkumham', 'oss_license', 'pkp_certificate', 'kpp_registration', 'bank_statement', 'invoice', 'receipt', 'payroll_document', 'bpjs_document', 'tax_report', 'tax_payment_proof', 'contract', 'unknown'].every((k) => ru.docs.kind[k] && en.docs.kind[k] && id.docs.kind[k]))
 
+console.log('\n--- a filed document is settled: statement → bank account + month, contract → counterparty, kept with a reason')
+ok('statement kept with its bank account + month → no longer needs a look', !docNeedsLook({ links: [], extracted_json: { filing: { kind: 'bank_account_period', wallet_id: 'w', period: '2025-07' } } }))
+ok('kept on file (payroll) → no longer needs a look', !docNeedsLook({ links: [], extracted_json: { filing: { kind: 'keep', reason: 'payroll' } } }))
+ok('filed but unreadable → still needs a look', docNeedsLook({ links: [], extraction_status: 'failed', extracted_json: { filing: { kind: 'keep', reason: 'other' } } }))
+ok('label: statement · account · month', filingText((k) => k, { kind: 'bank_account_period', wallet_name: 'Permata bank (HCP)', period: '2025-07' }, 'en') === 'docs.fl.statement · Permata bank (HCP) · July 2025')
+const drawerSrc2 = fs.readFileSync(path.join(ROOT, 'client/src/v2/components/DocumentDrawer.jsx'), 'utf8')
+ok('window offers bank account + month, counterparty and keep-on-file', ["mode === 'bank'", "mode === 'counterparty'", "mode === 'keep'", "kind: 'bank_account_period'"].every((x) => drawerSrc2.includes(x)))
+ok('AI filing suggestion is applied only on Accept', /onClick=\{acceptFiling\}/.test(fs.readFileSync(path.join(ROOT, 'client/src/v2/components/DocumentIdentity.jsx'), 'utf8')))
+
 console.log('\n--- review panel and company tab text: same keys in RU / EN / ID')
 const flat = (o, pre = '') => Object.entries(o || {}).flatMap(([k, v]) => (v && typeof v === 'object' ? flat(v, `${pre}${k}.`) : [`${pre}${k}`])).sort().join(',')
-for (const sub of ['dr', 'company', 'vault', 'pv', 'id', 'kind']) {
+for (const sub of ['dr', 'company', 'vault', 'pv', 'id', 'kind', 'fl']) {
   ok(`docs.${sub}: ru = en`, flat(ru.docs[sub]) === flat(en.docs[sub]) && flat(en.docs[sub]).length > 0)
   ok(`docs.${sub}: id = en`, flat(id.docs[sub]) === flat(en.docs[sub]))
 }

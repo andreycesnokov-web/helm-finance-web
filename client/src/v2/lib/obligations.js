@@ -263,7 +263,10 @@ export const billHasDocument = (d) => !!d && ((Array.isArray(d.document_links) &
 // decide anything. A document needs a look when nothing says which money it explains, or when it
 // could not be read — the same rule as the server's needs_review filter (listDocumentsForUser).
 export const docIsUnreadable = (d) => ['failed', 'unreadable'].includes(d?.extraction_status)
-export const docNeedsLook = (d) => !(Array.isArray(d?.links) && d.links.length > 0) || docIsUnreadable(d)
+// A document is also settled when it is FILED: a statement kept with its bank account + month, a
+// contract with its counterparty, or kept on file with a reason (POST /api/documents/:id/filing).
+export const docIsFiled = (d) => !!d?.extracted_json?.filing?.kind
+export const docNeedsLook = (d) => !((Array.isArray(d?.links) && d.links.length > 0) || docIsFiled(d)) || docIsUnreadable(d)
 // The v2 Documents page opens this document's review panel in place from ?doc=<id>.
 export const docPath = (doc) => `/business/documents?doc=${encodeURIComponent(doc.id)}`
 
@@ -296,4 +299,17 @@ export function unlinkedMoney(transactions = [], wallets = []) {
     sum += d; count++
   }
   return { sum, count }
+}
+
+// Where a filed document is kept (POST /api/documents/:id/filing).
+export const FILING_MODES = ['record', 'bank', 'counterparty', 'keep']
+export const FILING_REASONS = ['payroll', 'tax', 'contract', 'other']
+const monthText = (p, lang) => { const [y, m] = String(p).split('-').map(Number); return new Date(y, m - 1, 1).toLocaleDateString(lang === 'ru' ? 'ru-RU' : lang === 'id' ? 'id-ID' : 'en-GB', { month: 'long', year: 'numeric' }) }
+/** "Bank statement · Permata IDR · July 2025" — what a filing says, for the window and the list. */
+export function filingText(t, f, lang) {
+  if (!f) return ''
+  const when = f.period ? monthText(f.period, lang) : null
+  if (f.kind === 'bank_account_period') return [t('docs.fl.statement'), f.wallet_name, when].filter(Boolean).join(' · ')
+  if (f.kind === 'counterparty') return [t('docs.fl.mode.counterparty'), f.counterparty_name].filter(Boolean).join(' · ')
+  return [t(`docs.fl.reasons.${f.reason || 'other'}`), when].filter(Boolean).join(' · ')
 }
