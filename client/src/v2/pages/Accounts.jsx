@@ -1,8 +1,8 @@
 // Accounts (designs/Accounts.dc.html). This company's wallets only (GET /api/wallets is
 // business-scoped by the server); the Personal workspace is never fetched or counted here.
 // Statement freshness from GET /api/bank-import/batches; moves between accounts from
-// GET /api/transactions (type=transfer). Adding/editing accounts stays on the existing
-// page (Manage accounts).
+// GET /api/transactions (type=transfer). New account, edit, balance correction, archive and
+// restore are windows on this page (components/AccountDialogs, design w2/C2).
 //
 // A wallet or transfer labelled scope='personal' can still carry this company's business_id
 // (migration 017 backfill; _specs/accounts-personal-scope-ambiguity.md). The label does not
@@ -20,8 +20,10 @@ import BusinessWalletTransferModal from '../../components/BusinessWalletTransfer
 import { useAuth } from '../../hooks/useAuth'
 import { useWorkspace } from '../../shell/WorkspaceProvider'
 import { useState, useEffect } from 'react'
+import { NewAccountDialog, EditAccountDialog, AdjustBalanceDialog, ArchiveAccountDialog, ArchivedAccountsDialog } from '../components/AccountDialogs'
 
-const KIND = { bank: 'acc.kind.bank', cash: 'acc.kind.cash', ewallet: 'acc.kind.ewallet', card: 'acc.kind.card', gateway: 'acc.kind.gateway' }
+const KIND = { bank: 'acc.kind.bank', cash: 'acc.kind.cash', ewallet: 'acc.kind.ewallet', card: 'acc.kind.card', gateway: 'acc.kind.gateway', payment_gateway: 'acc.kind.gateway' }
+const MANAGE = ['owner', 'ceo', 'admin', 'cfo']
 const SERIES = ['var(--chart-1)', 'var(--chart-2)', 'var(--chart-3)', 'var(--brand-navy)', 'var(--text-muted)']
 
 export default function Accounts() {
@@ -30,6 +32,8 @@ export default function Accounts() {
   const { token } = useAuth()
   const { active, scopeKey } = useWorkspace()
   const [showTransfer, setShowTransfer] = useState(false)
+  const [dlg, setDlg] = useState(null)   // { kind: 'new' | 'edit' | 'adjust' | 'archive' | 'archived', wallet? }
+  const canManage = MANAGE.includes(active?.role)
   const invalidate = useInvalidate()
   const w = useApi('/wallets')
   const batches = useApi('/bank-import/batches')
@@ -39,8 +43,17 @@ export default function Accounts() {
   // Company switch protection: close transfer modal immediately
   useEffect(() => {
     setShowTransfer(false)
+    setDlg(null)
   }, [active?.id, scopeKey])
 
+  const done = () => { invalidate(); w.reload() }
+  const dialogs = dlg && (
+    dlg.kind === 'new' ? <NewAccountDialog onClose={() => setDlg(null)} onSaved={done} />
+    : dlg.kind === 'edit' ? <EditAccountDialog wallet={dlg.wallet} onClose={() => setDlg(null)} onSaved={done} onArchive={() => setDlg({ kind: 'archive', wallet: dlg.wallet })} />
+    : dlg.kind === 'adjust' ? <AdjustBalanceDialog wallet={dlg.wallet} onClose={() => setDlg(null)} onSaved={done} />
+    : dlg.kind === 'archive' ? <ArchiveAccountDialog wallet={dlg.wallet} onClose={() => setDlg(null)} onSaved={done} />
+    : <ArchivedAccountsDialog onClose={() => setDlg(null)} onSaved={done} />
+  )
   const head = (
     <PageHead title={t('nav.accounts')} sub={t('acc.sub')}
       actions={<>
@@ -48,7 +61,7 @@ export default function Accounts() {
           ⇄ {t('acc.transferBetween')}
         </Btn>
         <Btn to="/business/bank-import">{t('acc.import')}</Btn>
-        <Btn variant="primary" icon={<I.plus size={16} />} to="/business/accounts/manage">{t('acc.add')}</Btn>
+        {canManage && <Btn variant="primary" icon={<I.plus size={16} />} onClick={() => setDlg({ kind: 'new' })}>{t('acc.add')}</Btn>}
       </>} />
   )
   if (w.loading) return <>{head}<Card><Skeleton rows={5} /></Card></>
@@ -138,7 +151,7 @@ export default function Accounts() {
 
   if (!wallets.length) {
     return <>{head}<Card><Empty icon={<I.accounts size={28} />} title={t('acc.emptyTitle')} text={t('acc.emptyText')}
-      action={<Btn variant="primary" to="/business/accounts/manage">{t('acc.add')}</Btn>} /></Card></>
+      action={canManage ? <Btn variant="primary" onClick={() => setDlg({ kind: 'new' })}>{t('acc.add')}</Btn> : null} /></Card>{dialogs}</>
   }
 
   return (
@@ -157,15 +170,15 @@ export default function Accounts() {
                     {formatRateSource(w.data?.rates_metadata?.source) && (
                       <> · {formatRateSource(w.data?.rates_metadata?.source)}</>
                     )}
-                    {w.data?.rates_metadata?.status === 'weekend_holding' && <> · <span className="v2-tag-info">Weekend holding</span></>}
-                    {w.data?.rates_metadata?.status === 'degraded' && <> · <span className="v2-tag-warn">Fallback rates</span></>}
-                    {w.data?.rates_metadata?.status === 'stale' && <> · <span className="v2-tag-warn">Stale rate</span></>}
+                    {w.data?.rates_metadata?.status === 'weekend_holding' && <> · <span className="v2-tag-info">{t('acc.fx.weekend')}</span></>}
+                    {w.data?.rates_metadata?.status === 'degraded' && <> · <span className="v2-tag-warn">{t('acc.fx.fallback')}</span></>}
+                    {w.data?.rates_metadata?.status === 'stale' && <> · <span className="v2-tag-warn">{t('acc.fx.stale')}</span></>}
                   </span>
                 )}
               </div>
               {w.data?.has_incomplete_balance && (
                 <p className="v2-small" style={{ color: 'var(--text-warn, #b45309)', marginTop: 4 }}>
-                  <Pill tone="warn">Incomplete valuation</Pill> {w.data.unvalued_currencies?.join(', ')} {w.data.unvalued_currencies?.length > 1 ? 'wallets have' : 'wallet has'} no FX rate and {w.data.unvalued_currencies?.length > 1 ? 'are' : 'is'} excluded from the IDR total.
+                  <Pill tone="warn">{t('acc.fx.incomplete')}</Pill> {t('acc.fx.excluded', { list: (w.data.unvalued_currencies || []).join(', ') })}
                 </p>
               )}
               <p className="v2-muted v2-small">{t('acc.personalNote')}</p>
@@ -201,13 +214,17 @@ export default function Accounts() {
                     <span className="v2-dec-amt v2-num">
                       <span>{money(x.balance, { currency: x.currency || 'IDR' })}</span>
                       {isNonIdr && x.balance_idr != null && <span className="v2-muted v2-small" style={{ display: 'block', fontSize: '0.8rem', fontWeight: 400 }}>≈ {money(x.balance_idr, { currency: 'IDR' })}</span>}
-                      {isNonIdr && x.balance_idr == null && <span className="v2-muted v2-small" style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-warn, #b45309)' }}>No FX rate</span>}
+                      {isNonIdr && x.balance_idr == null && <span className="v2-muted v2-small" style={{ display: 'block', fontSize: '0.8rem', color: 'var(--warning-ink)' }}>{t('acc.fx.noRate')}</span>}
                     </span>
-                    <Link className="v2-iconbtn" to="/business/accounts/manage" aria-label={t('acc.more', { name: x.name })}><I.chevRight size={18} /></Link>
+                    {canManage && <span className="v2-acc-acts">
+                      <button type="button" className="v2-btn v2-btn-ghost v2-btn-sm" aria-label={t('acc.editOf', { name: x.name })} onClick={() => setDlg({ kind: 'edit', wallet: x })}>{t('acc.edit')}</button>
+                      <button type="button" className="v2-btn v2-btn-ghost v2-btn-sm" aria-label={t('acc.balanceOf', { name: x.name })} onClick={() => setDlg({ kind: 'adjust', wallet: x })}>{t('acc.balance')}</button>
+                    </span>}
                   </li>
                 )
               })}
             </ul>
+            <p className="v2-muted v2-small">{canManage ? <><button type="button" className="v2-btn-link v2-small" onClick={() => setDlg({ kind: 'archived' })}>{t('acc.archivedShow')}</button> · {t('acc.archivedNote')}</> : t('accd.noRights')}</p>
             {other.length > 0 && (
               <p className="v2-muted v2-small">
                 {t('acc.asOfDate', { d: shortDate(w.data?.rates_metadata?.rate_effective_date || w.data?.as_of_date || new Date(), lang) })}
@@ -239,6 +256,7 @@ export default function Accounts() {
           </Card>
         </aside>
       </div>
+      {dialogs}
       {showTransfer && (
         <BusinessWalletTransferModal
           token={token}

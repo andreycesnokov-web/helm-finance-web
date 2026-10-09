@@ -78,6 +78,11 @@ export const WRITE_ALLOW = [
   { method: 'DELETE', path: '`/team/invites/' },                           // DELETE /api/team/invites/:code
   { method: 'PATCH', path: '`/team/members/' },                            // PATCH  /api/team/members/:memberId
   { method: 'DELETE', path: '`/team/members/' },                           // DELETE /api/team/members/:memberId
+  // Accounts (2026-10-10, w2/C1 + C2): existing routes, canManageWallets on the server.
+  { method: 'POST', path: "'/wallets'" },               // POST   /api/wallets
+  { method: 'PUT', path: '`/wallets/' },                 // PUT    /api/wallets/:id (edit, restore)
+  { method: 'DELETE', path: '`/wallets/' },              // DELETE /api/wallets/:id (archive)
+  { method: 'POST', path: '/adjust-balance`' },          // POST   /api/wallets/:id/adjust-balance
 ]
 const ACTIONS = path.join(V2, 'lib', 'actions.js')
 // POSTs that ask an existing AI endpoint a question and change no data. Only in lib/ask.js.
@@ -169,7 +174,8 @@ t('every allowed write exists on the server (batch 8 routes are the approved one
     /app\.patch\('\/api\/business\/current'/, /app\.post\('\/api\/cashflow-categories'/, /app\.patch\('\/api\/cashflow-categories\/:id'/,
     /app\.delete\('\/api\/cashflow-categories\/:id'/, /app\.post\('\/api\/account\/integrations\/telegram\/link-token'/,
     /app\.post\('\/api\/account\/integrations\/telegram\/unlink'/, /app\.post\('\/api\/payment-connections'/, /app\.post\('\/api\/team\/invite'/,
-    /app\.delete\('\/api\/team\/invites\/:code'/, /app\.patch\('\/api\/team\/members\/:memberId'/, /app\.delete\('\/api\/team\/members\/:memberId'/]) {
+    /app\.delete\('\/api\/team\/invites\/:code'/, /app\.patch\('\/api\/team\/members\/:memberId'/, /app\.delete\('\/api\/team\/members\/:memberId'/,
+    /app\.post\('\/api\/wallets'/, /app\.put\('\/api\/wallets\/:id'/, /app\.delete\('\/api\/wallets\/:id'/, /app\.post\('\/api\/wallets\/:id\/adjust-balance'/]) {
     assert.ok(r.test(server), `server route ${r} missing`)
   }
 })

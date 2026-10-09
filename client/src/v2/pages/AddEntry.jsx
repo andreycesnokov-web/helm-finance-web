@@ -93,7 +93,7 @@ export default function AddEntry() {
             <label className="v2-field">
               <span className="v2-field-label">{t(kind === 'income' ? 'add.walletIn' : 'add.walletOut')}</span>
               {list.length === 0
-                ? <span className="v2-muted v2-small">{t('add.noWallets')} <Link to="/business/accounts/manage">{t('acc.add')}</Link></span>
+                ? <span className="v2-muted v2-small">{t('add.noWallets')} <Link to="/business/accounts">{t('acc.add')}</Link></span>
                 : (
                   <select id="add-wallet" className="v2-select" value={selectedWalletId} onChange={set('wallet_id')} required>
                     {list.length > 1 && <option value="">{t('add.pickWallet')}</option>}

@@ -211,3 +211,21 @@ export const updateMember = (token, memberId, body) =>
 
 export const removeMember = (token, memberId) =>
   apiFetch(`/team/members/${encodeURIComponent(memberId)}`, token, { method: 'DELETE' })
+
+// Accounts (2026-10-10, designs w2/C1 + C2): existing routes, role-checked (canManageWallets) on the server.
+//   POST   /api/wallets                     create (an opening balance is recorded, not income)
+//   PUT    /api/wallets/:id                 rename, owner name, colour; restore with is_active=true;
+//                                           the currency is locked once the account has transactions
+//   DELETE /api/wallets/:id                 archive (soft: transactions and statements stay)
+//   POST   /api/wallets/:id/adjust-balance  balance correction to the bank's figure (owner/admin/CFO)
+export const createWallet = (token, body) =>
+  apiFetch('/wallets', token, { method: 'POST', body })
+
+export const updateWallet = (token, id, body) =>
+  apiFetch(`/wallets/${encodeURIComponent(id)}`, token, { method: 'PUT', body })
+
+export const archiveWallet = (token, id) =>
+  apiFetch(`/wallets/${encodeURIComponent(id)}`, token, { method: 'DELETE' })
+
+export const adjustWalletBalance = (token, id, body) =>
+  apiFetch(`/wallets/${encodeURIComponent(id)}/adjust-balance`, token, { method: 'POST', body })

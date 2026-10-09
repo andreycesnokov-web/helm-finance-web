@@ -10121,11 +10121,12 @@ app.get('/api/wallets', auth, async (req, res) => {
       return res.status(403).json({ error: 'Your role does not allow viewing business wallets' });
     const bizOr = bizOrFilter(biz);
 
+    // ?archived=1 lists the archived accounts (to restore them); their balances are computed the same way.
     const { data: wallets, error: wErr } = await supabase
       .from('wallets')
       .select('*')
       .or(bizOr)
-      .eq('is_active', true)
+      .eq('is_active', req.query.archived !== '1')
       .order('sort_order', { ascending: true })
       .order('created_at', { ascending: true });
     if (wErr) throw wErr;
@@ -10385,7 +10386,7 @@ app.get('/api/wallets/:id/transactions', auth, async (req, res) => {
 app.put('/api/wallets/:id', auth, async (req, res) => {
   const userId = req.user.userId;
   const { id } = req.params;
-  const { name, currency, type, entity_name, color, sort_order, scope } = req.body;
+  const { name, currency, type, entity_name, color, sort_order, scope, is_active } = req.body;
   if (scope !== undefined && !['business', 'personal'].includes(scope)) {
     return res.status(400).json({ error: "scope must be 'business' or 'personal'" });
   }
@@ -10394,6 +10395,15 @@ app.put('/api/wallets/:id', auth, async (req, res) => {
     if (!biz) return;
     if (!canManageWallets(biz.role))
       return res.status(403).json({ error: 'Your role does not allow managing wallets' });
+
+    // The currency of an account with transactions is fixed: every amount on it is in that currency.
+    if (currency !== undefined) {
+      const { data: cur } = await supabase.from('wallets').select('currency').eq('id', id).or(bizOrFilter(biz)).limit(1);
+      if (cur?.[0] && String(cur[0].currency || 'IDR').toUpperCase() !== String(currency || 'IDR').toUpperCase()) {
+        const { count } = await supabase.from('transactions').select('id', { count: 'exact', head: true }).or(bizOrFilter(biz)).eq('wallet_id', id);
+        if (count > 0) return res.status(409).json({ error: 'currency_locked', message: 'This account already has transactions; its currency cannot change.' });
+      }
+    }
 
     // If renaming, sync source text on legacy transactions for balance continuity
     if (name) {
@@ -10416,6 +10426,7 @@ app.put('/api/wallets/:id', auth, async (req, res) => {
     if (color        !== undefined) updates.color       = color;
     if (sort_order   !== undefined) updates.sort_order  = sort_order;
     if (scope        !== undefined) updates.scope       = scope;
+    if (is_active === true)         updates.is_active   = true;   // restore from the archive (archiving is DELETE)
 
     const { data, error } = await supabase
       .from('wallets')
