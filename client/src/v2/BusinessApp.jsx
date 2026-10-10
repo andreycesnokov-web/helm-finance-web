@@ -14,7 +14,7 @@ import { Navigate, Outlet, Route, Routes } from 'react-router-dom'
 import './v2.css'
 import { useWorkspace } from '../shell/WorkspaceProvider'
 import {
-  BusinessLayout, BusinessTransactions, BusinessIncomingPayments, BusinessIntercompany,
+  BusinessLayout, BusinessIncomingPayments, BusinessIntercompany,
 } from '../pages/business'
 import TaxSplit from '../pages/business/TaxSplit'
 import InvoiceSettlement from '../pages/business/InvoiceSettlement'
@@ -93,7 +93,7 @@ export default function BusinessApp() {
           <Route path="accounts" element={<V2Accounts />} />
           <Route path="accounts/manage" element={<Navigate to="/business/accounts" replace />} />
           <Route path="transactions" element={<V2Transactions />} />
-          <Route path="transactions/classic" element={<BusinessTransactions />} />
+          <Route path="transactions/classic" element={<Navigate to="/business/transactions" replace />} />
           <Route path="funding-investors" element={<V2Funding />} />
           <Route path="assets" element={<Assets />} />
           <Route path="assets/new" element={<AddAsset />} />

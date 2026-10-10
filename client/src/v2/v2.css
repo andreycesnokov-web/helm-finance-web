@@ -1602,3 +1602,5 @@ button.v2-start-btn:focus-visible { outline: 2px solid var(--action-primary); ou
 .v2-imp-ask { color: var(--text-secondary); }
 .v2-imp-acts { display: flex; gap: var(--space-3); justify-content: flex-end; white-space: nowrap; }
 .v2-imp-acts .is-ok { color: var(--success); font-weight: 700; }
+.v2-tx-open { text-align: left; padding: 0; color: var(--text-primary); font-weight: 700; }
+.v2-tx-open:hover { color: var(--brand-electric-blue-ink); }

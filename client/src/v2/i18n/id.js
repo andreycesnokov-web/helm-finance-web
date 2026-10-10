@@ -876,6 +876,17 @@ export default {
       off: '{name}: selisih dengan bank {v} — sebagian baris dikecualikan atau hilang.',
     },
   },
+  txd: {
+    desc: 'Deskripsi',
+    date: 'Tanggal',
+    sameCcy: 'Hanya rekening dengan mata uang sama',
+    docs: 'Dokumen:',
+    attach: 'lampirkan dokumen',
+    bankNote: 'Jumlah, rekening, dan tanggal berasal dari mutasi bank dan tidak berubah. Transaksi yang salah dikoreksi dengan transaksi kebalikan.',
+    openingNote: 'Saldo awal tidak mengubah jumlah, rekening, dan tanggal.',
+    locked: 'Ini dari mutasi bank: jumlah, rekening, dan tanggal tidak bisa diubah.',
+    billLocked: 'Ini pembayaran tagihan: ubah di tagihan.',
+  },
   prof: {
     regimeV: { normal: 'Umum (tarif normal)', pp23_final: 'Final 0,5% (PP 23/2018)', pph_final_umkm: 'Final 0,5% UMKM' }, sub: 'CFO AI memakai ini untuk menentukan pajak, laporan, dan tenggat Anda', edit: 'Ubah profil', notFilled: 'Belum diisi', from: 'dari {s}', confirmed: 'dikonfirmasi',
     pct: 'Kelengkapan data pajak {n}%', unknownPct: 'Kelengkapan data pajak tidak diketahui', uploadHint: 'Unggah dokumen perusahaan — AI mengisi kolom, Anda mengonfirmasi',

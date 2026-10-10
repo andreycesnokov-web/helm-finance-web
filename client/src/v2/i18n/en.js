@@ -876,6 +876,17 @@ export default {
       off: '{name}: the difference with the bank is {v} — some rows were excluded or are missing.',
     },
   },
+  txd: {
+    desc: 'Description',
+    date: 'Date',
+    sameCcy: 'Only accounts in the same currency',
+    docs: 'Documents:',
+    attach: 'attach a document',
+    bankNote: 'The amount, account and date came from the bank statement and do not change. A wrong transaction is corrected with an opposite one, so the books always match the bank.',
+    openingNote: 'An opening balance keeps its amount, account and date.',
+    locked: 'This came from a bank statement: amount, account and date cannot change.',
+    billLocked: 'This is a bill payment: change it on the bill.',
+  },
   prof: {
     regimeV: { normal: 'General (standard rates)', pp23_final: 'Final 0.5% (PP 23/2018)', pph_final_umkm: 'Final 0.5% for small business (UMKM)' }, sub: 'CFO AI uses this to work out your taxes, reports and deadlines', edit: 'Edit profile', notFilled: 'Not filled in', from: 'from {s}', confirmed: 'confirmed',
     pct: 'Tax data {n}% complete', unknownPct: 'Tax data completeness unknown', uploadHint: 'Upload your company documents — AI fills the fields, you confirm',

@@ -570,6 +570,17 @@ const V2Auth = DESIGN_V2 ? lazy(() => import('./v2/auth/AuthApp')) : null
 const V2_AUTH = DESIGN_V2 && EMAIL_AUTH_UI
 const v2Auth = (page) => <Suspense fallback={null}><V2Auth page={page} /></Suspense>
 
+// With the v2 design on, the old top-level pages (bookmarks, bot links) open their v2 screens;
+// query parameters are kept. Without the flag they stay exactly as they were.
+function LegacyToV2({ to }) {
+  const location = useLocation()
+  const [path, q] = to.split('?')
+  const params = new URLSearchParams(q || '')
+  new URLSearchParams(location.search || '').forEach((v, k) => params.set(k, v))
+  const qs = params.toString()
+  return <Navigate to={`${path}${qs ? '?' + qs : ''}`} replace />
+}
+
 // Redirect legacy /accountant addresses to /business/accountant with search query preservation (e.g. ?ask=... / ?q=...).
 function AccountantRedirect({ to = '/business/accountant' }) {
   const location = useLocation()
@@ -604,26 +615,26 @@ export default function App() {
             ? <Route path="/login/telegram" element={<TelegramLogin />} />
             : <Route path="/login/telegram" element={<Navigate to="/login" replace />} />}
           <Route path="/" element={<PulseWrapper />} />
-          <Route path="/add"          element={<Layout><Add /></Layout>} />
-          <Route path="/radar"        element={<Layout><Radar /></Layout>} />
-          <Route path="/accounts"     element={<Layout><Accounts /></Layout>} />
-          <Route path="/accounts/:id" element={<Layout><WalletDetail /></Layout>} />
-          <Route path="/transactions" element={<Layout><Transactions /></Layout>} />
-          <Route path="/settings"     element={<Layout><Settings /></Layout>} />
-          <Route path="/cfo"          element={<Layout><AICFO /></Layout>} />
-          <Route path="/receivables"  element={<Layout><Receivables /></Layout>} />
-          <Route path="/payables"     element={<Layout><Payables /></Layout>} />
-          <Route path="/invoices"     element={<Layout><Invoices /></Layout>} />
-          <Route path="/payroll"      element={<Layout><Payroll /></Layout>} />
-          <Route path="/tasks"        element={<Layout><Tasks /></Layout>} />
-          <Route path="/approvals"    element={<Layout><Approvals /></Layout>} />
-          <Route path="/team"         element={<Layout><Team /></Layout>} />
+          <Route path="/add"          element={DESIGN_V2 ? <LegacyToV2 to="/business/add" /> : <Layout><Add /></Layout>} />
+          <Route path="/radar"        element={DESIGN_V2 ? <LegacyToV2 to="/business/radar" /> : <Layout><Radar /></Layout>} />
+          <Route path="/accounts"     element={DESIGN_V2 ? <LegacyToV2 to="/business/accounts" /> : <Layout><Accounts /></Layout>} />
+          <Route path="/accounts/:id" element={DESIGN_V2 ? <LegacyToV2 to="/business/accounts" /> : <Layout><WalletDetail /></Layout>} />
+          <Route path="/transactions" element={DESIGN_V2 ? <LegacyToV2 to="/business/transactions" /> : <Layout><Transactions /></Layout>} />
+          <Route path="/settings"     element={DESIGN_V2 ? <LegacyToV2 to="/business/settings" /> : <Layout><Settings /></Layout>} />
+          <Route path="/cfo"          element={DESIGN_V2 ? <LegacyToV2 to="/business/ai-cfo" /> : <Layout><AICFO /></Layout>} />
+          <Route path="/receivables"  element={DESIGN_V2 ? <LegacyToV2 to="/business/receivables" /> : <Layout><Receivables /></Layout>} />
+          <Route path="/payables"     element={DESIGN_V2 ? <LegacyToV2 to="/business/payables" /> : <Layout><Payables /></Layout>} />
+          <Route path="/invoices"     element={DESIGN_V2 ? <LegacyToV2 to="/business/invoices" /> : <Layout><Invoices /></Layout>} />
+          <Route path="/payroll"      element={DESIGN_V2 ? <LegacyToV2 to="/business/payroll" /> : <Layout><Payroll /></Layout>} />
+          <Route path="/tasks"        element={DESIGN_V2 ? <LegacyToV2 to="/business/approvals" /> : <Layout><Tasks /></Layout>} />
+          <Route path="/approvals"    element={DESIGN_V2 ? <LegacyToV2 to="/business/approvals" /> : <Layout><Approvals /></Layout>} />
+          <Route path="/team"         element={DESIGN_V2 ? <LegacyToV2 to="/business/settings?tab=team" /> : <Layout><Team /></Layout>} />
           <Route path="/accountant/tax-profile" element={<AccountantRedirect to="/business/accountant/tax-profile" />} />
           <Route path="/accountant/calendar" element={<AccountantRedirect to="/business/accountant?tab=taxes" />} />
           <Route path="/accountant"   element={<AccountantRedirect to="/business/accountant" />} />
           <Route path="/accountant/*" element={<AccountantRedirect to="/business/accountant" />} />
-          <Route path="/documents"    element={<Layout><Documents /></Layout>} />
-          <Route path="/bank-import"  element={<Layout><BankImport /></Layout>} />
+          <Route path="/documents"    element={DESIGN_V2 ? <LegacyToV2 to="/business/documents" /> : <Layout><Documents /></Layout>} />
+          <Route path="/bank-import"  element={DESIGN_V2 ? <LegacyToV2 to="/business/bank-import" /> : <Layout><BankImport /></Layout>} />
           <Route path="/team-onboarding" element={<Layout><TeamOnboarding /></Layout>} />
           {/* Premium UI preview — standalone, synthetic only, gated by VITE_PREMIUM_UI_PREVIEW.
               404s in any build without the flag (e.g. production). */}

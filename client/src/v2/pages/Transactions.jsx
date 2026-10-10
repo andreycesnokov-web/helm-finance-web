@@ -2,9 +2,9 @@
 // filtered on screen (search, In/Out/Transfers/Needs review, account, period).
 // "Choose category" saves through the existing PATCH /api/transactions/:id (category
 // only) — the same call the existing Transactions page makes. Export builds a CSV of
-// the rows on screen in the browser. Editing everything else stays on the classic page.
+// the rows on screen in the browser. A row opens the transaction window (components/TransactionDialog,
+// design w2/D1): description, category, and — unless it came from a statement — account, date, amount.
 import { useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
 import I from '../icons'
 import { PageHead, Card, Btn, Skeleton, ErrorBox, Empty } from '../ui'
@@ -13,6 +13,7 @@ import { useApi, useInvalidate } from '../data'
 import { money, shortDate } from '../lib/format'
 import { txFilter, txDir, txDate, needsCategory, toCsv, txSource } from '../lib/obligations'
 import { setTransactionCategory, actionError } from '../lib/actions'
+import TransactionDialog from '../components/TransactionDialog'
 
 const PAGE = 25
 
@@ -45,6 +46,7 @@ export default function Transactions() {
   const lang = useLang()
   const invalidate = useInvalidate()
   const [kind, setKind] = useState('all')
+  const [openTx, setOpenTx] = useState(null)
   const [walletId, setWalletId] = useState('all')
   const [days, setDays] = useState(30)
   const [q, setQ] = useState('')
@@ -119,7 +121,7 @@ export default function Transactions() {
               return (
                 <div key={x.id} className="v2-txrow" role="row">
                   <span role="cell" className="v2-tx-date v2-num">{shortDate(txDate(x), lang)}</span>
-                  <span role="cell" className="v2-tx-what"><span className="v2-dec-title">{x.description || x.counterparty || t(`tx.type.${x.type}`)}</span>
+                  <span role="cell" className="v2-tx-what"><button type="button" className="v2-btn-link v2-dec-title v2-tx-open" onClick={() => setOpenTx(x)}>{x.description || x.counterparty || t(`tx.type.${x.type}`)}</button>
                     {dir === 'transfer' && <span className="v2-muted v2-small">{t('tx.notIncome')}</span>}</span>
                   <span role="cell" className="v2-tx-cat">{needsCategory(x)
                     ? <CategoryPicker tx={x} categories={categories} onSaved={invalidate} />
@@ -136,9 +138,9 @@ export default function Transactions() {
         <div className="v2-foot">
           <span>{t('tx.showing', { n: Math.min(limit, rows.length), m: rows.length })}</span>
           {rows.length > limit && <button type="button" className="v2-btn-link" onClick={() => setLimit((l) => l + PAGE)}>{t('tx.loadMore')}</button>}
-          <Link to="/business/transactions/classic">{t('bills.classic')}</Link>
         </div>
       </Card>
+      {openTx && <TransactionDialog tx={openTx} wallets={wallets.data?.wallets || []} categories={cats.data?.categories || []} onClose={() => setOpenTx(null)} onSaved={invalidate} />}
     </div>
   )
 }

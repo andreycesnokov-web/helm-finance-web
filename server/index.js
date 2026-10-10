@@ -8482,6 +8482,19 @@ app.patch('/api/transactions/:id', auth, async (req, res) => {
     }
   }
 
+  // Boundary check: a transaction that came from a bank statement keeps the bank's amount, account
+  // and date — a wrong one is corrected with an opposite entry, not edited (design w2/D1).
+  if ('amount' in req.body || 'wallet_id' in req.body || 'transaction_date' in req.body || 'date' in req.body || 'currency' in req.body) {
+    const { data: stmtRows } = await supabase.from('bank_import_rows').select('id')
+      .eq('business_id', biz.business.id).eq('linked_transaction_id', existing.id).limit(1);
+    if (Array.isArray(stmtRows) && stmtRows.length > 0) {
+      return res.status(409).json({
+        error: 'statement_transaction_locked',
+        message: 'Amount, account and date of a bank statement transaction come from the bank and cannot be edited',
+      });
+    }
+  }
+
   const updates = {};
   if ('category' in req.body) {
     const c = req.body.category;

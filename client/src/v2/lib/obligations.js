@@ -194,7 +194,7 @@ export function txFilter(rows = [], { kind = 'all', walletId = 'all', days = 30,
 
 /** Where a transaction came from, from fields the row already carries. */
 export function txSource(t) {
-  if (t?.bank_import_batch_id || t?.bank_import_row_id) return 'bank'
+  if (t?.bank_import_batch_id || t?.bank_import_row_id || t?.linked_statement_row_id || t?.statement_batch_id) return 'bank'
   if (t?.source === 'wallet_opening_balance') return 'opening'
   if (t?.payroll_payment_id || t?.type === 'payroll') return 'payroll'
   if (t?.telegram_message_id || t?.created_by_telegram_id) return 'telegram'
