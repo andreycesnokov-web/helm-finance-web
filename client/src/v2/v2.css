@@ -1604,3 +1604,5 @@ button.v2-start-btn:focus-visible { outline: 2px solid var(--action-primary); ou
 .v2-imp-acts .is-ok { color: var(--success); font-weight: 700; }
 .v2-tx-open { text-align: left; padding: 0; color: var(--text-primary); font-weight: 700; }
 .v2-tx-open:hover { color: var(--brand-electric-blue-ink); }
+.v2-billd-drop { padding: var(--space-4); }
+.v2-billd-from { margin-left: 6px; font-size: 11px; height: 20px; padding: 0 8px; vertical-align: middle; }

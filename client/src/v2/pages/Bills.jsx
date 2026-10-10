@@ -9,7 +9,7 @@ import { useMemo, useState, useEffect } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
 import DebtPaymentModal from '../../components/DebtPaymentModal'
-import DebtFormModal from '../../components/DebtFormModal'
+import BillDialog from '../components/BillDialog'
 import I from '../icons'
 import { PageHead, Card, Pill, Btn, NotYet, Skeleton, ErrorBox, Empty } from '../ui'
 import { useT, useLang } from '../i18n'
@@ -18,7 +18,6 @@ import { money, shortDate, daysUntil } from '../lib/format'
 import { billStatus, billSummary, billRows, tabForPath, remaining } from '../lib/obligations'
 
 const TONE = { pending: 'info', late: 'crit', partial: 'warn', open: 'neutral', paid: 'good', cancelled: 'neutral' }
-const CLASSIC = { pay: '/business/payables/classic', collect: '/business/receivables/classic', all: '/business/invoices/classic' }
 // Each tab is its own route, so a reload or a shared link keeps the tab.
 const TAB_PATH = { pay: '/business/payables', collect: '/business/receivables', all: '/business/invoices' }
 const clean = (v) => (v == null || ['null', 'undefined'].includes(String(v).trim()) ? '' : String(v))
@@ -133,12 +132,10 @@ export default function Bills() {
   )
   const modals = (
     <>
-      {create && <DebtFormModal mode={create} token={token} lockBusinessScope
-        onClose={() => setCreate(null)} onSuccess={() => { setCreate(null); invalidate() }} />}
+      {create && <BillDialog mode={create} onClose={() => setCreate(null)} onSaved={invalidate} />}
       {pay && <DebtPaymentModal debt={pay} accounts={bizWallets} token={token}
         onClose={() => setPay(null)} onSuccess={() => { setPay(null); invalidate() }} />}
-      {editDebt && <DebtFormModal mode={editDebt.type || 'payable'} initialDebt={editDebt} token={token} lockBusinessScope
-        onClose={clearEditParam} onSuccess={() => { clearEditParam(); invalidate() }} />}
+      {editDebt && <BillDialog debt={editDebt} onClose={clearEditParam} onSaved={invalidate} />}
     </>
   )
   if (debts.loading) return <>{head}<Card><Skeleton rows={6} /></Card>{modals}</>
@@ -192,10 +189,6 @@ export default function Bills() {
             {(tab === 'pay' || tab === 'all') && <Section title={t('bills.toPay')} rows={payRows} onPay={setPay} t={t} lang={lang} who={t('bills.col.supplier')} />}
           </>
         )}
-        <div className="v2-foot">
-          <span>{t('bills.classicHint')}</span>
-          <Link to={CLASSIC[tab]}>{t('bills.classic')}</Link>
-        </div>
       </Card>
       {modals}
     </div>

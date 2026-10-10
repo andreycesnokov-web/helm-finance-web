@@ -14662,7 +14662,7 @@ const publicIntakeDoc = ({ raw, ...rest }) => rest;   // never leak the raw row
 // /api/documents. Both of these are WHITELISTS: a field that is not named here is not
 // returned, so future additions to extracted_json are private by default.
 const IDENTIFY_FIELDS = ['v', 'lang', 'at', 'read', 'suggested_filing', 'taxes', 'suggested_type', 'suggested_label', 'suggested_area', 'suggested_source', 'suggested_confidence', 'unavailable_reason'];
-const EXPLAIN_FIELDS = ['title', 'summary', 'issued_by', 'issued_on', 'number', 'purpose', 'place', 'next_step', 'bank_name', 'account_number', 'period', 'counterparty_name', 'tax_steps', 'warnings'];
+const EXPLAIN_FIELDS = ['title', 'summary', 'issued_by', 'issued_on', 'number', 'purpose', 'place', 'next_step', 'bank_name', 'account_number', 'period', 'counterparty_name', 'total_amount', 'currency', 'due_on', 'tax_steps', 'warnings'];
 const publicIdentify = (all) => {
   if (!all || typeof all !== 'object') return null;
   const out = {};

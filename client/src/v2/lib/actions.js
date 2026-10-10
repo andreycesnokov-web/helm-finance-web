@@ -254,3 +254,20 @@ export const confirmImport = (token, batchId, rows) =>
 
 export const createClassificationRule = (token, body) =>
   apiFetch('/classification-rules', token, { method: 'POST', body })
+
+// Bills and invoices (2026-10-10, design w2/E1): the invoice is uploaded and read first.
+//   upload  POST /api/documents/upload-init → storage → upload-complete
+//   POST /api/documents/:id/extract   read the invoice text (writes nothing)
+//   POST /api/debts                   create the bill / invoice (approval set by role on the server)
+export const uploadInvoiceFile = (token, file, kind) =>
+  uploadDocument(token, file, { title: file.name, document_type: kind === 'receivable' ? 'customer_invoice' : 'vendor_invoice' })
+
+export const readInvoice = (token, id) =>
+  apiFetch(`/documents/${encodeURIComponent(id)}/extract`, token, { method: 'POST', body: {} })
+
+export const createBill = (token, body) =>
+  apiFetch('/debts', token, { method: 'POST', body })
+
+//   PATCH /api/debts/:id              edit a bill / invoice (counterparty, amount, currency, due date, description)
+export const updateBill = (token, id, body) =>
+  apiFetch('/debts/' + encodeURIComponent(id), token, { method: 'PATCH', body })

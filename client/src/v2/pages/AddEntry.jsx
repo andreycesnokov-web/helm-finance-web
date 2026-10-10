@@ -8,7 +8,7 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
-import DebtFormModal from '../../components/DebtFormModal'
+import BillDialog from '../components/BillDialog'
 import I from '../icons'
 import { PageHead, Card, Btn, Skeleton } from '../ui'
 import { useT } from '../i18n'
@@ -124,8 +124,7 @@ export default function AddEntry() {
         )}
       </Card>
 
-      {modal && <DebtFormModal mode={modal} token={token} lockBusinessScope
-        onClose={() => setModal(null)} onSuccess={() => { setModal(null); invalidate(); setDone(null) }} />}
+      {modal && <BillDialog mode={modal} onClose={() => setModal(null)} onSaved={() => { invalidate(); setDone(null) }} />}
     </div>
   )
 }

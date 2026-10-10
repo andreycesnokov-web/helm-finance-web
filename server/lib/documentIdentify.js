@@ -34,7 +34,7 @@ A rule-based classifier says: type "${verdict?.doc_type || 'unknown'}", confiden
 
 Write in ${language}. Plain words, no jargon; when you use an Indonesian term, explain it in brackets.
 Return ONLY a JSON object, no markdown fence:
-{"title":"","summary":"","issued_by":"","issued_on":"","number":"","purpose":"","place":"","next_step":"","suggested_type":"","bank_name":"","account_number":"","period":"","counterparty_name":"","taxes":[],"tax_steps":[],"warnings":[]}
+{"title":"","summary":"","issued_by":"","issued_on":"","number":"","purpose":"","place":"","next_step":"","suggested_type":"","bank_name":"","account_number":"","period":"","counterparty_name":"","total_amount":"","currency":"","due_on":"","taxes":[],"tax_steps":[],"warnings":[]}
 
 - title: what the document is, at most 8 words (e.g. "Ministry of Law notice: change of directors").
 - summary: 1-2 sentences: what it says and why the company has it.
@@ -49,6 +49,9 @@ Return ONLY a JSON object, no markdown fence:
 - bank_name / account_number: for a bank statement or bank letter, as printed ("" otherwise).
 - period: the month the document covers, YYYY-MM (statement period, payroll month, tax period); "" if none.
 - counterparty_name: the other party (supplier, customer, landlord, employee…) if there is one, else "".
+- total_amount: for an invoice, bill or receipt — the total to pay as printed (digits and the decimal point only, e.g.
+  "8494584" or "472.00"); "" for other documents or when it is not printed. currency: its 3-letter code (IDR, USD…).
+  due_on: YYYY-MM-DD the payment is due, only if printed.
 - taxes: every Indonesian tax this document creates or proves, as objects
   {"tax":"","role":"","amount":"","period":"","what":""}:
   tax: one of ${TAXES.join(', ')} (pph21 = employee income tax withheld from salaries; pph23 = 2% withheld on services /
@@ -93,6 +96,10 @@ function normalize(parsed, types) {
     account_number: str(parsed.account_number, 40).replace(/[^\dA-Za-z-]/g, ''),
     period: /^\d{4}-(0[1-9]|1[0-2])$/.test(str(parsed.period, 7)) ? str(parsed.period, 7) : '',
     counterparty_name: str(parsed.counterparty_name, 160),
+    // Invoice totals: kept as read; the reader says whether they could be checked against the text.
+    total_amount: (() => { const v = String(parsed.total_amount ?? '').replace(/[^\d.]/g, ''); return /^\d{1,15}(\.\d{1,2})?$/.test(v) && Number(v) > 0 ? Number(v) : null })(),
+    currency: /^[A-Z]{3}$/.test(str(parsed.currency, 3).toUpperCase()) ? str(parsed.currency, 3).toUpperCase() : '',
+    due_on: /^\d{4}-\d{2}-\d{2}$/.test(str(parsed.due_on, 10)) ? str(parsed.due_on, 10) : '',
     taxes: Array.isArray(parsed.taxes) ? parsed.taxes.slice(0, 6).map((x) => ({
       tax: TAXES.includes(x?.tax) ? x.tax : 'other',
       role: TAX_ROLES.includes(x?.role) ? x.role : 'info',
