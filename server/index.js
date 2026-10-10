@@ -10677,8 +10677,6 @@ app.post('/api/wallets/transfer', auth, async (req, res) => {
     const fromCur = (fromWallet.currency || 'IDR').toUpperCase();
     const toCur   = (toWallet.currency || 'IDR').toUpperCase();
     const txDate  = date ? new Date(date).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10);
-    // A replay of an already-recorded transfer is answered below; only a new one is checked.
-    if (!req.body.transfer_id && await refuseNegativeOutflow(res, biz, fromWallet, sourceAmount)) return;
     const transferId = req.body.transfer_id || crypto.randomUUID();
     const transferRef = `xfer:${transferId}`;
     const desc = (description && description.trim()) || `Transfer: ${fromWallet.name} → ${toWallet.name}`;
@@ -10706,6 +10704,10 @@ app.post('/api/wallets/transfer', auth, async (req, res) => {
         });
       }
     }
+
+    // A replay of an already-recorded transfer was answered above; every new one is checked
+    // (the app always sends a transfer_id, so the check may not depend on its absence).
+    if (await refuseNegativeOutflow(res, biz, fromWallet, sourceAmount)) return;
 
     let fxResFrom;
     let fxResTo;

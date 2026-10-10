@@ -72,3 +72,14 @@ test('fetchAllRows surfaces a query error and works with doubles that have no ra
   const plain = () => Promise.resolve({ data: [{ id: 1 }], error: null });
   assert.deepStrictEqual(await WL.fetchAllRows(plain), [{ id: 1 }]);
 });
+
+test('every manual outflow route checks the balance — a transfer too, even with a transfer_id', () => {
+  const src = require('fs').readFileSync(require('path').join(__dirname, '..', 'server', 'index.js'), 'utf8');
+  const route = (head) => { const at = src.indexOf(head); assert.ok(at > 0, head); return src.slice(at, src.indexOf('\napp.', at + head.length)); };
+  const xfer = route("app.post('/api/wallets/transfer'");
+  assert.match(xfer, /if \(await refuseNegativeOutflow\(res, biz, fromWallet, sourceAmount\)\) return;/);
+  assert.doesNotMatch(xfer, /!req\.body\.transfer_id && await refuseNegativeOutflow/);
+  assert.ok(xfer.indexOf('is_replay: true') < xfer.indexOf('refuseNegativeOutflow'), 'a replay is answered before the check');
+  assert.match(route("app.post('/api/debts/:id/pay'"), /refuseNegativeOutflow/);
+  assert.match(route("app.post('/api/payroll/payments'"), /refuseNegativeOutflow/);
+});
