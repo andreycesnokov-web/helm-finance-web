@@ -14,7 +14,25 @@ test('every default has a valid group and activity, names are unique', () => {
   }
   assert.ok(DC.DEFAULT_BUSINESS_CATEGORIES.some(([n, g, a]) => g === 'inflow' && a === 'technical'), 'own-account transfer in')
   assert.ok(DC.DEFAULT_BUSINESS_CATEGORIES.some(([n, g, a]) => g === 'outflow' && a === 'technical'), 'own-account transfer out')
-  assert.ok(DC.DEFAULT_BUSINESS_CATEGORIES.some(([n]) => /bank fees/i.test(n)))
+  assert.ok(DC.DEFAULT_BUSINESS_CATEGORIES.some(([n]) => /bank fee/i.test(n)))
+})
+
+test('the reports read each default the way it is meant (financialInsights keywords)', () => {
+  const FI = require('../server/lib/financialInsights')
+  const cls = (name, type) => FI.classifyTransaction({ category: name, type }).class
+  assert.strictEqual(cls('Transfer between own accounts — in', 'income'), 'transfer')
+  assert.strictEqual(cls('Intercompany — out', 'expense'), 'transfer')
+  assert.strictEqual(cls('Owner funding (loan)', 'income'), 'financing')
+  assert.strictEqual(cls('Capital contribution', 'income'), 'financing')
+  assert.strictEqual(cls('Loan proceeds', 'income'), 'financing')
+  assert.strictEqual(cls('Loan repayments', 'expense'), 'financing')
+  assert.strictEqual(cls('Owner withdrawal / dividends', 'expense'), 'financing')
+  assert.strictEqual(cls('Taxes (PPh, PPN)', 'expense'), 'tax')
+  assert.strictEqual(cls('Payroll tax (PPh 21) and BPJS', 'expense'), 'tax')
+  assert.strictEqual(cls('Equipment and fixed assets', 'expense'), 'capex')
+  assert.strictEqual(cls('Sales revenue', 'income'), 'revenue')
+  assert.strictEqual(cls('Payment gateway settlement', 'income'), 'revenue')
+  for (const n of ['Rent', 'Salary and wages', 'Bank fee and admin', 'Supplier invoices', 'Utilities']) assert.strictEqual(cls(n, 'expense'), 'operating_expense', n)
 })
 
 test('rows are company categories the owner can rename or archive', () => {
@@ -27,9 +45,9 @@ test('rows are company categories the owner can rename or archive', () => {
 })
 
 test('idempotent: names the company already has are skipped, case-insensitively', () => {
-  const rows = DC.defaultCategoryRows({ businessId: 'b1', userId: 1, existingNames: ['rent', 'BANK FEES '] })
+  const rows = DC.defaultCategoryRows({ businessId: 'b1', userId: 1, existingNames: ['rent', 'BANK FEE AND ADMIN '] })
   assert.ok(!rows.some((r) => /^rent$/i.test(r.name)))
-  assert.ok(!rows.some((r) => /^bank fees$/i.test(r.name)))
+  assert.ok(!rows.some((r) => /^bank fee and admin$/i.test(r.name)))
   assert.strictEqual(rows.length, DC.DEFAULT_BUSINESS_CATEGORIES.length - 2)
 })
 

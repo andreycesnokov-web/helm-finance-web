@@ -83,6 +83,12 @@ export const WRITE_ALLOW = [
   { method: 'PUT', path: '`/wallets/' },                 // PUT    /api/wallets/:id (edit, restore)
   { method: 'DELETE', path: '`/wallets/' },              // DELETE /api/wallets/:id (archive)
   { method: 'POST', path: '/adjust-balance`' },          // POST   /api/wallets/:id/adjust-balance
+  // Bank statement import (2026-10-10, w2/H1–H3 + k/K4): role-checked on the server.
+  { method: 'POST', path: "'/bank-import/read'" },       // POST /api/bank-import/read (engine reads the file; no write)
+  { method: 'POST', path: "'/bank-import/batches'" },    // POST /api/bank-import/batches
+  { method: 'POST', path: '/suggest`' },                 // POST /api/bank-imports/:batchId/suggest
+  { method: 'POST', path: '/confirm`' },                 // POST /api/bank-imports/:batchId/confirm
+  { method: 'POST', path: "'/classification-rules'" },   // POST /api/classification-rules
 ]
 const ACTIONS = path.join(V2, 'lib', 'actions.js')
 // POSTs that ask an existing AI endpoint a question and change no data. Only in lib/ask.js.
@@ -175,7 +181,9 @@ t('every allowed write exists on the server (batch 8 routes are the approved one
     /app\.delete\('\/api\/cashflow-categories\/:id'/, /app\.post\('\/api\/account\/integrations\/telegram\/link-token'/,
     /app\.post\('\/api\/account\/integrations\/telegram\/unlink'/, /app\.post\('\/api\/payment-connections'/, /app\.post\('\/api\/team\/invite'/,
     /app\.delete\('\/api\/team\/invites\/:code'/, /app\.patch\('\/api\/team\/members\/:memberId'/, /app\.delete\('\/api\/team\/members\/:memberId'/,
-    /app\.post\('\/api\/wallets'/, /app\.put\('\/api\/wallets\/:id'/, /app\.delete\('\/api\/wallets\/:id'/, /app\.post\('\/api\/wallets\/:id\/adjust-balance'/]) {
+    /app\.post\('\/api\/wallets'/, /app\.put\('\/api\/wallets\/:id'/, /app\.delete\('\/api\/wallets\/:id'/, /app\.post\('\/api\/wallets\/:id\/adjust-balance'/,
+    /app\.post\('\/api\/bank-import\/read'/, /app\.post\('\/api\/bank-import\/batches'/, /app\.post\('\/api\/bank-imports\/:batchId\/suggest'/,
+    /app\.post\('\/api\/bank-imports\/:batchId\/confirm'/, /app\.post\('\/api\/classification-rules'/]) {
     assert.ok(r.test(server), `server route ${r} missing`)
   }
 })

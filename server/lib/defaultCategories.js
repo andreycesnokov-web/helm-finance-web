@@ -5,23 +5,25 @@
 // copy); ordinary company categories — the owner can rename or archive any of them.
 //
 // Technical rows (own-account transfers, intercompany) keep money moved between the company's
-// own accounts — or between its companies — out of revenue and expenses.
+// own accounts — or between its companies — out of revenue and expenses. The names are chosen so
+// lib/financialInsights classifies them (transfer / financing / tax / capex / revenue keywords):
+// tests/defaultCategories.test.js checks each class.
 
 const DEFAULT_BUSINESS_CATEGORIES = Object.freeze([
   ['Sales revenue', 'inflow', 'operating'],
   ['Service revenue', 'inflow', 'operating'],
-  ['Payment gateway settlements', 'inflow', 'operating'],
+  ['Payment gateway settlement', 'inflow', 'operating'],
   ['Supplier refunds', 'inflow', 'operating'],
   ['Other income', 'inflow', 'operating'],
-  ['Owner loan received', 'inflow', 'financing'],
+  ['Owner funding (loan)', 'inflow', 'financing'],
   ['Capital contribution', 'inflow', 'financing'],
-  ['Loans received', 'inflow', 'financing'],
+  ['Loan proceeds', 'inflow', 'financing'],
   ['Transfer between own accounts — in', 'inflow', 'technical'],
   ['Intercompany — in', 'inflow', 'technical'],
-  ['Supplier payments', 'outflow', 'operating'],
+  ['Supplier invoices', 'outflow', 'operating'],
   ['Rent', 'outflow', 'operating'],
-  ['Salaries and wages', 'outflow', 'operating'],
-  ['Payroll taxes and BPJS', 'outflow', 'operating'],
+  ['Salary and wages', 'outflow', 'operating'],
+  ['Payroll tax (PPh 21) and BPJS', 'outflow', 'operating'],
   ['Taxes (PPh, PPN)', 'outflow', 'operating'],
   ['Utilities', 'outflow', 'operating'],
   ['Internet and telecom', 'outflow', 'operating'],
@@ -30,7 +32,7 @@ const DEFAULT_BUSINESS_CATEGORIES = Object.freeze([
   ['Professional services', 'outflow', 'operating'],
   ['Software and subscriptions', 'outflow', 'operating'],
   ['Transport and logistics', 'outflow', 'operating'],
-  ['Bank fees', 'outflow', 'operating'],
+  ['Bank fee and admin', 'outflow', 'operating'],
   ['Payment gateway fees', 'outflow', 'operating'],
   ['Customer refunds', 'outflow', 'operating'],
   ['Other expenses', 'outflow', 'operating'],

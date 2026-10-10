@@ -19,9 +19,8 @@ import {
 import TaxSplit from '../pages/business/TaxSplit'
 import InvoiceSettlement from '../pages/business/InvoiceSettlement'
 import Counterparties from '../pages/business/Counterparties'
-import Accounts from '../pages/Accounts'
 import Payroll from '../pages/Payroll'
-import BankImport from '../pages/BankImport'
+import BankImport from './pages/BankImport'
 import AddEntry from './pages/AddEntry'
 import V2Shell from './shell/V2Shell'
 import { V2DataProvider } from './data'
@@ -92,7 +91,7 @@ export default function BusinessApp() {
           <Route path="ai-cfo/classic" element={<Navigate to="/business/ai-cfo" replace />} />
           {/* Money */}
           <Route path="accounts" element={<V2Accounts />} />
-          <Route path="accounts/manage" element={<Accounts />} />
+          <Route path="accounts/manage" element={<Navigate to="/business/accounts" replace />} />
           <Route path="transactions" element={<V2Transactions />} />
           <Route path="transactions/classic" element={<BusinessTransactions />} />
           <Route path="funding-investors" element={<V2Funding />} />

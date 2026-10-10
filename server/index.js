@@ -6197,6 +6197,67 @@ app.post('/api/bank-import/batches', auth, async (req, res) => {
 });
 
 // GET /api/bank-import/batches — list batches
+// POST /api/bank-import/read — read an UPLOADED statement document into rows (design w2/H1–H2).
+// Engine first (lib/statementParsers: BCA CSV, Permata PDF text); the model only for a format no
+// engine knows, and its rows get the same checks. Writes nothing: the rows go to
+// POST /api/bank-import/batches once the user has chosen the account.
+app.post('/api/bank-import/read', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res); if (!biz) return;
+    if (!canCreateConfirmedFinancialRecord(biz.role)) return res.status(403).json({ error: 'Your role cannot import bank statements' });
+    const documentId = req.body?.document_id;
+    if (!documentId) return res.status(400).json({ error: 'document_id required' });
+    const doc = await loadDocumentScoped(biz, documentId);
+    if (!doc) return res.status(404).json({ error: 'Document not found' });
+    const { data: fileRows } = await supabase.from('document_files').select('storage_path, file_name, mime_type')
+      .eq('id', doc.file_id).eq('business_id', biz.business.id).limit(1);
+    const file = fileRows?.[0];
+    if (!file) return res.status(404).json({ error: 'file_not_found' });
+    const { data: blob, error: dlErr } = await supabase.storage.from(DOC_BUCKET).download(file.storage_path);
+    if (dlErr || !blob) return res.status(502).json({ error: 'document_unavailable' });
+    const buf = Buffer.from(await blob.arrayBuffer());
+    const name = file.file_name || '';
+    const isPdf = /pdf/i.test(file.mime_type || '') || /\.pdf$/i.test(name);
+    const isSheet = /\.(xlsx|xls)$/i.test(name);
+    let text = '';
+    if (isPdf) { const ex = extractPdfText(buf); text = ex.text_available ? ex.text : '' }
+    else if (!isSheet) text = buf.toString('utf8');
+    else if (typeof req.body?.sheet_text === 'string') text = req.body.sheet_text.slice(0, 500000);   // the browser's CSV of the first sheet
+    let parsed = text ? statementParsers.parseStatement({ text, file_name: name }) : { ok: false, reason: 'no_text' };
+    let method = parsed.ok ? parsed.format : null;
+    if (!parsed.ok && anthropic && process.env.ANTHROPIC_API_KEY && (!isSheet || text)) {
+      // A format no engine knows (or a scan): the model reads it; the engine still checks it.
+      const block = text ? null : docIdentify.fileBlock(buf, file.mime_type, name);
+      if (text || block) {
+        try {
+          const resp = await Promise.race([
+            anthropic.messages.create({ model: docIdentify.MODEL, max_tokens: 8000,
+              messages: [{ role: 'user', content: block ? [block, { type: 'text', text: statementParsers.MODEL_PROMPT }] : `${statementParsers.MODEL_PROMPT}\n\nStatement text:\n"""\n${text.slice(0, 60000)}\n"""` }] }),
+            new Promise((_, rej) => setTimeout(() => rej(new Error('statement_read_timeout')), 90000)),
+          ]);
+          const raw = String(resp?.content?.[0]?.text || '').trim().replace(/^```(?:json)?/i, '').replace(/```$/, '').trim();
+          parsed = statementParsers.normalizeModelStatement(JSON.parse(raw));
+          method = parsed.ok ? (text ? 'model_text' : 'model_file') : null;
+        } catch (e) { parsed = { ok: false, reason: /timeout/.test(e.message) ? 'ai_timeout' : 'ai_unreadable' } }
+      }
+    }
+    if (!parsed.ok) return res.json({ ok: false, reason: parsed.reason || 'unknown_format', file_name: name, is_sheet: isSheet });
+    const { data: wallets } = await supabase.from('wallets').select('id, name, entity_name, currency, type').eq('business_id', biz.business.id).eq('is_active', true);
+    const suggested = docIdentify.matchWallet(wallets || [], { bank_name: parsed.bank, account_number: parsed.account_number, currency: parsed.currency });
+    // Same account + period already imported → say so before anything is written.
+    let earlier = [];
+    if (parsed.period_start && parsed.period_end) {
+      const { data: b } = await supabase.from('bank_import_batches').select('id, wallet_id, statement_start, statement_end, status, created_at')
+        .eq('business_id', biz.business.id).lte('statement_start', parsed.period_end).gte('statement_end', parsed.period_start);
+      earlier = b || [];
+    }
+    res.json({ ok: true, method, file_name: name, document_id: doc.id, statement: parsed, suggested_wallet_id: suggested?.id || null, overlapping_batches: earlier });
+  } catch (e) {
+    console.error(`[bank-import/read] ${e.message}`);
+    res.status(500).json({ error: 'statement_read_failed' });
+  }
+});
+
 app.get('/api/bank-import/batches', auth, async (req, res) => {
   try {
     const biz = await requireBusiness(req, res);
@@ -14481,6 +14542,7 @@ const profileDocs = require('./lib/profileFromDocuments');
 const taxDeadlines = require('./lib/taxDeadlines');
 const { normalizePkpStatus } = require('./lib/pkpStatus');
 const defaultCategories = require('./lib/defaultCategories');
+const statementParsers = require('./lib/statementParsers');
 const { extractPdfText } = require('./lib/pdfText');
 const docExtract = require('./lib/documentExtraction');
 const docOcr = require('./lib/documentOcr');

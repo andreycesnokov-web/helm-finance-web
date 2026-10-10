@@ -229,3 +229,28 @@ export const archiveWallet = (token, id) =>
 
 export const adjustWalletBalance = (token, id, body) =>
   apiFetch(`/wallets/${encodeURIComponent(id)}/adjust-balance`, token, { method: 'POST', body })
+
+// Bank statement import (2026-10-10, designs w2/H1–H3 + k/K4). Existing routes plus one read:
+//   upload  POST /api/documents/upload-init → storage → upload-complete   the file is kept as evidence
+//   POST /api/bank-import/read                 the engine reads the uploaded file into rows (no write)
+//   POST /api/bank-import/batches              store the rows for review (dedup + matches)
+//   POST /api/bank-imports/:batchId/suggest    rules, counterparty history, bills/payroll matches, AI
+//   POST /api/bank-imports/:batchId/confirm    the user's final decisions → transactions (+ reconciliation)
+//   POST /api/classification-rules             "always file rows with … under …" for next statements
+export const uploadStatementFile = (token, file) =>
+  uploadDocument(token, file, { title: file.name, document_type: 'bank_document' })
+
+export const readStatement = (token, documentId, sheetText) =>
+  apiFetch('/bank-import/read', token, { method: 'POST', body: { document_id: documentId, ...(sheetText ? { sheet_text: sheetText } : {}) } })
+
+export const createImportBatch = (token, body) =>
+  apiFetch('/bank-import/batches', token, { method: 'POST', body })
+
+export const suggestImport = (token, batchId) =>
+  apiFetch(`/bank-imports/${encodeURIComponent(batchId)}/suggest`, token, { method: 'POST', body: {} })
+
+export const confirmImport = (token, batchId, rows) =>
+  apiFetch(`/bank-imports/${encodeURIComponent(batchId)}/confirm`, token, { method: 'POST', body: { rows } })
+
+export const createClassificationRule = (token, body) =>
+  apiFetch('/classification-rules', token, { method: 'POST', body })
