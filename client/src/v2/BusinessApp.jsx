@@ -14,7 +14,7 @@ import { Navigate, Outlet, Route, Routes } from 'react-router-dom'
 import './v2.css'
 import { useWorkspace } from '../shell/WorkspaceProvider'
 import {
-  BusinessLayout, BusinessIncomingPayments, BusinessIntercompany,
+  BusinessLayout,
 } from '../pages/business'
 import TaxSplit from '../pages/business/TaxSplit'
 import InvoiceSettlement from '../pages/business/InvoiceSettlement'
@@ -96,8 +96,8 @@ export default function BusinessApp() {
           <Route path="assets" element={<Assets />} />
           <Route path="assets/new" element={<AddAsset />} />
           <Route path="bank-import" element={<BankImport />} />
-          <Route path="incoming-payments" element={<BusinessIncomingPayments />} />
-          <Route path="intercompany" element={<BusinessIntercompany />} />
+          <Route path="incoming-payments" element={<Navigate to="/business/funding-investors" replace />} />
+          <Route path="intercompany" element={<Navigate to="/business/funding-investors" replace />} />
           {/* Obligations */}
           <Route path="payables" element={<Bills key="pay" />} />
           <Route path="payables/classic" element={<Navigate to="/business/payables" replace />} />

@@ -6,6 +6,11 @@
 // A founder loan is recorded here business-side only: the Personal↔Business bridge
 // (/api/funding) is NOT called. Before 064 the page says so and shows what the classifier
 // already marks as funding.
+// Incoming gateway payments (design w2/J1, replaces v1 "Incoming payments"): read-only list from
+// GET /api/incoming-payments — receipts awaiting review, never revenue by themselves. With the
+// server flag off the route 404s and the card says to connect a gateway. Money between the
+// owner's own companies comes from both statements (import marks it intercompany); a mirrored
+// loan record across two companies has no server route yet, so none is offered here.
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
@@ -15,6 +20,32 @@ import { useT, useLang } from '../i18n'
 import { useApi, useInvalidate } from '../data'
 import { createFunding, markRepaymentPaid, actionError } from '../lib/actions'
 import { money, shortDate } from '../lib/format'
+
+function IncomingPayments({ t, lang }) {
+  const ip = useApi('/incoming-payments?limit=20')
+  if (ip.error?.status === 403) return null
+  const off = ip.error?.status === 404
+  const rows = Array.isArray(ip.data?.payments) ? ip.data.payments : []
+  const tone = (s) => (s === 'matched' ? 'good' : s === 'candidate' ? 'warn' : s === 'ignored' ? 'neutral' : 'info')
+  return (
+    <Card title={t('fund.ipTitle')} aside={<Link to="/business/settings?tab=connections">{t('fund.ipConnect')}</Link>}>
+      {ip.loading ? <Skeleton rows={3} />
+        : ip.error && !off ? <ErrorBox error={ip.error} onRetry={ip.reload} />
+        : !rows.length ? <p className="v2-sec" data-ip-empty>{t(off ? 'fund.ipOff' : 'fund.ipEmpty')}</p>
+        : (
+          <ul className="v2-moves" data-ip-list>{rows.map((r) => (
+            <li key={r.id}>
+              <span>{shortDate(String(r.transaction_at || r.created_at || '').slice(0, 10), lang)} · {r.payer_name || '—'}{r.provider ? ` · ${r.provider}` : ''}
+                {' '}<Pill tone={tone(r.reconciliation_status)}>{t(`fund.ipSt.${r.reconciliation_status || 'unmatched'}`)}</Pill></span>
+              <span className="v2-num">{r.net_amount == null ? '—' : money(r.net_amount, { currency: r.currency || 'IDR' })}
+                {r.fee_amount != null && <span className="v2-muted v2-small"> {t('fund.ipFee', { v: money(r.fee_amount, { currency: r.currency || 'IDR' }) })}</span>}</span>
+            </li>
+          ))}</ul>
+        )}
+      <p className="v2-muted v2-small">{t('fund.ipNote')}</p>
+    </Card>
+  )
+}
 
 const daysAgo = (n) => { const d = new Date(); d.setDate(d.getDate() - n); return d.toISOString().slice(0, 10) }
 const SOURCES = ['founder', 'investor', 'bank', 'other_lender']
@@ -167,9 +198,10 @@ export default function Funding() {
           <Card title={t('fund.howTitle')}><p className="v2-sec">{t('fund.how')}</p></Card>
           <Card title={t('fund.founderTitle')}><p className="v2-sec">{t('fund.founder')}</p></Card>
           <Card title={t('fund.updateTitle')}><p className="v2-sec">{t('fund.updateText')}</p><Link to="/business/ai-cfo">{t('fund.updateLink')}</Link></Card>
-          <Card title={t('fund.intercoTitle')}><p className="v2-sec">{t('fund.interco')}</p><Link to="/business/intercompany">{t('fund.intercoLink')}</Link></Card>
+          <Card title={t('fund.intercoTitle')}><p className="v2-sec">{t('fund.interco')}</p><Link to="/business/bank-import">{t('fund.intercoLink')}</Link></Card>
         </aside>
       </div>
+      <IncomingPayments t={t} lang={lang} />
       {reg.data?.upcoming?.length > 0 && (
         <Card title={t('fund.upcomingTitle')} aside={<Link to="/business/radar">{t('nav.radar')}</Link>}>
           <ul className="v2-moves">{reg.data.upcoming.slice(0, 8).map((u) => (
