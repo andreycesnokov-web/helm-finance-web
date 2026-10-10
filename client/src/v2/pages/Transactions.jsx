@@ -14,6 +14,7 @@ import { money, shortDate } from '../lib/format'
 import { txFilter, txDir, txDate, needsCategory, toCsv, txSource } from '../lib/obligations'
 import { setTransactionCategory, actionError } from '../lib/actions'
 import TransactionDialog from '../components/TransactionDialog'
+import { catLabel, descLabel } from '../lib/categoryLabel'
 
 const PAGE = 25
 
@@ -34,7 +35,7 @@ function CategoryPicker({ tx, categories, onSaved }) {
     <span className="v2-catpick">
       <select className="v2-select" defaultValue="" onChange={pick} disabled={busy} aria-label={t('tx.choose', { what: tx.description || '' })}>
         <option value="">{t('tx.chooseCategory')}</option>
-        {categories.map((c) => <option key={c} value={c}>{c}</option>)}
+        {categories.map((c) => <option key={c} value={c}>{catLabel(t, c)}</option>)}
       </select>
       {err && <span className="v2-inline-err" role="alert">{err}</span>}
     </span>
@@ -121,11 +122,11 @@ export default function Transactions() {
               return (
                 <div key={x.id} className="v2-txrow" role="row">
                   <span role="cell" className="v2-tx-date v2-num">{shortDate(txDate(x), lang)}</span>
-                  <span role="cell" className="v2-tx-what"><button type="button" className="v2-btn-link v2-dec-title v2-tx-open" onClick={() => setOpenTx(x)}>{x.description || x.counterparty || t(`tx.type.${x.type}`)}</button>
+                  <span role="cell" className="v2-tx-what"><button type="button" className="v2-btn-link v2-dec-title v2-tx-open" onClick={() => setOpenTx(x)}>{x.description ? descLabel(t, x.description) : x.counterparty || t(`tx.type.${x.type}`)}</button>
                     {dir === 'transfer' && <span className="v2-muted v2-small">{t('tx.notIncome')}</span>}</span>
                   <span role="cell" className="v2-tx-cat">{needsCategory(x)
                     ? <CategoryPicker tx={x} categories={categories} onSaved={invalidate} />
-                    : (x.category || <span className="v2-muted">—</span>)}</span>
+                    : (x.category ? catLabel(t, x.category) : <span className="v2-muted">—</span>)}</span>
                   <span role="cell" className="v2-tx-acc v2-small">{walletName[String(x.wallet_id)] || x.source || '—'}</span>
                   <span role="cell" className="v2-tx-src v2-small v2-muted">{t(`tx.src.${txSource(x)}`)}</span>
                   <span role="cell" className={`v2-tx-amt v2-num v2-r ${dir === 'in' ? 'v2-pos' : ''}`}>

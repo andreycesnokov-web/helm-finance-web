@@ -9,6 +9,7 @@ import { money, shortDate } from '../lib/format'
 import { txSource, txDate } from '../lib/obligations'
 import Modal from './Modal'
 import { updateTransaction } from '../lib/actions'
+import { catLabel } from '../lib/categoryLabel'
 
 const DIR_IN = ['income']
 export default function TransactionDialog({ tx, wallets = [], categories = [], onClose, onSaved }) {
@@ -55,8 +56,8 @@ export default function TransactionDialog({ tx, wallets = [], categories = [], o
       <label className="v2-field"><span className="v2-field-label">{t('tx.col.category')}</span>
         <select className="v2-select" value={f.category} onChange={(e) => setF({ ...f, category: e.target.value })}>
           <option value="">{t('imp.choose')}</option>
-          {cats.map((c) => <option key={c.id} value={c.name}>{c.name}</option>)}
-          {f.category && !cats.some((c) => c.name === f.category) && <option value={f.category}>{f.category}</option>}
+          {cats.map((c) => <option key={c.id} value={c.name}>{catLabel(t, c.name)}</option>)}
+          {f.category && !cats.some((c) => c.name === f.category) && <option value={f.category}>{catLabel(t, f.category)}</option>}
         </select></label>
       <div className="v2-field-row">
         <label className="v2-field"><span className="v2-field-label">{t('tx.col.account')}</span>

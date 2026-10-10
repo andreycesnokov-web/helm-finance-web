@@ -76,6 +76,8 @@ export function TransferDialog({ wallets = [], onClose, onSaved }) {
   )
 }
 
+// The AI CFO check names its reasons by key; the server label is English, so known keys are shown in the app language.
+const FACTORS = ['no_burn', 'exceeds_cash', 'wallet_negative', 'runway_critical', 'runway_low', 'large_payment', 'payroll_pressure', 'below_reserve', 'tax_obligation_pressure']
 const REC_TONE = { safe: 'good', caution: 'warn', not_recommended: 'crit', insufficient_data: 'neutral' }
 
 export function PayBillDialog({ debt, accounts = [], onClose, onSaved }) {
@@ -147,7 +149,7 @@ export function PayBillDialog({ debt, accounts = [], onClose, onSaved }) {
           <span className="v2-banner-text"><strong>AI CFO · {t(`payb.rec.${sim.recommendation || 'insufficient_data'}`)}</strong><br />
             {sim.current?.wallet_balance != null && <>{w?.name}: {money(sim.current.wallet_balance, { full: true })} → <strong>{money(sim.after?.wallet_balance, { full: true })}</strong> · </>}
             {t('payb.runway')}: {runway(sim.current?.runway_days)} → <strong>{runway(sim.after?.runway_days)}</strong>
-            {(sim.factors || []).filter((f) => ['high', 'critical', 'medium'].includes(f.severity)).slice(0, 2).map((f, i) => <span key={i}><br />• {f.label}</span>)}</span>
+            {(sim.factors || []).filter((f) => ['high', 'critical', 'medium'].includes(f.severity)).slice(0, 2).map((f, i) => <span key={i}><br />• {FACTORS.includes(f.key) ? t(`payb.f.${f.key}`, { w: w?.name || '' }) : f.label}</span>)}</span>
         </div>
       )}
       {risky && <label className="v2-pe-sug-row"><input type="checkbox" checked={ack} onChange={(e) => setAck(e.target.checked)} /><span>{t('payb.ack')}</span></label>}

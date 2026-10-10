@@ -18,6 +18,8 @@ import { useApi, useInvalidate } from '../data'
 import { saveTaxProfile, verifyTaxProfile, readProfileFromDocuments } from '../lib/actions'
 import AccountantTabs from '../components/AccountantTabs'
 
+// A stored value (English code) shown in the app language when a label exists.
+export const optLabel = (t, field, v) => { const k = `pe.o.${field}.${v}`; const x = t(k); return x !== k ? x : v }
 const LEGAL = ['PT Local', 'PT PMA', 'CV', 'Yayasan', 'Individual / Freelancer', 'Representative Office / Branch', 'Other']
 const REGIMES = ['normal', 'pp23_final', 'pph_final_umkm']
 // Field → section and input kind. `ext` = a migration-040 column.
@@ -150,7 +152,7 @@ export default function CompanyProfileEdit() {
                       {f.opts ? (
                         <select className="v2-select" value={form[f.k] || ''} disabled={busy} onChange={(e) => set(f.k, e.target.value)}>
                           <option value="">{t('pe.choose')}</option>
-                          {f.opts.map((o) => <option key={o} value={o}>{t(`pe.o.${f.k}.${o}`) !== `pe.o.${f.k}.${o}` ? t(`pe.o.${f.k}.${o}`) : o}</option>)}
+                          {f.opts.map((o) => <option key={o} value={o}>{optLabel(t, f.k, o)}</option>)}
                         </select>
                       ) : (
                         <input className="v2-input" type={f.type || 'text'} value={form[f.k] || ''} disabled={busy}
@@ -185,10 +187,10 @@ export default function CompanyProfileEdit() {
                         <label className="v2-pe-sug-row">
                           <input type="checkbox" checked={!!picked[s.field]} onChange={(e) => setPicked((p) => ({ ...p, [s.field]: e.target.checked }))} />
                           <span>
-                            <strong>{t(`pe.f.${s.field}`)}</strong>: {asInput(s.value)}
-                            {s.current != null && s.current !== '' && <span className="v2-muted v2-small"> · {t('pe.ai.now', { v: asInput(s.current) })}</span>}
+                            <strong>{t(`pe.f.${s.field}`)}</strong>: {optLabel(t, s.field, asInput(s.value))}
+                            {s.current != null && s.current !== '' && <span className="v2-muted v2-small"> · {t('pe.ai.now', { v: optLabel(t, s.field, asInput(s.current)) })}</span>}
                             <span className="v2-muted v2-small v2-block">{s.sources.map((x) => `${x.file_name} (${t(x.printed ? 'pe.ai.printed' : 'pe.ai.image')})`).join(' · ')}</span>
-                            {s.conflict && <span className="v2-inline-err v2-small v2-block">{t('pe.ai.conflict', { v: s.values.map(asInput).join(' / ') })}</span>}
+                            {s.conflict && <span className="v2-inline-err v2-small v2-block">{t('pe.ai.conflict', { v: s.values.map((x) => optLabel(t, s.field, asInput(x))).join(' / ') })}</span>}
                           </span>
                         </label>
                       </li>

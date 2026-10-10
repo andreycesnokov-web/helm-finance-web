@@ -13,6 +13,7 @@ import { useT, useLang } from '../i18n'
 import { useApi } from '../data'
 import { shortDate } from '../lib/format'
 import AccountantTabs from '../components/AccountantTabs'
+import { optLabel } from './CompanyProfileEdit'
 
 const DOCS = ['akta', 'sk_kemenkumham', 'nib', 'npwp']
 // Tax regime values the legacy profile form stores; anything else is shown as stored.
@@ -76,7 +77,7 @@ export default function CompanyProfile() {
           <Card title={t('prof.legal')}>
             <dl className="v2-dl">
               <Row t={t} label={t('prof.legalName')} value={show(p.company_legal_name)} source={src('company_legal_name')} />
-              <Row t={t} label={t('prof.form')} value={show(p.legal_entity_type)?.toUpperCase()} source={src('legal_entity_type')} />
+              <Row t={t} label={t('prof.form')} value={p.legal_entity_type ? optLabel(t, 'legal_entity_type', show(p.legal_entity_type)) : show(p.legal_entity_type)} source={src('legal_entity_type')} />
               <Row t={t} label={t('prof.capital')} value={p.foreign_owned === 'yes' ? 'PMA' : p.foreign_owned === 'no' ? 'PMDN' : null} source={src('foreign_owned')} />
               <Row t={t} label={t('prof.country')} value={show(p.country)} />
               <Row t={t} label={t('prof.fiscalYear')} value={p.financial_year_start ? `${p.financial_year_start} – ${p.financial_year_end || ''}` : null} />

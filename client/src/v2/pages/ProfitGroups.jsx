@@ -13,6 +13,7 @@ import { useApi, useInvalidate } from '../data'
 import { updatePnlMapping, actionError } from '../lib/actions'
 import { GROUPS } from '../lib/pnl'
 import I from '../icons'
+import { catLabel } from '../lib/categoryLabel'
 
 export default function ProfitGroups() {
   const t = useT()
@@ -71,13 +72,13 @@ export default function ProfitGroups() {
               {cats.map((c) => (
                 <li key={c.id} className="v2-grouprow">
                   <span className="v2-group-name">
-                    <strong>{c.name}</strong>
+                    <strong>{catLabel(t, c.name)}</strong>
                     <span className="v2-muted v2-small">{c.group_type === 'inflow' ? t('perf.groups.in') : c.group_type === 'outflow' ? t('perf.groups.out') : ''}
                       {c.suggestion && ` · ${t('perf.groups.suggested', { g: t(`perf.g.${c.suggestion.pnl_group}`) })}`}</span>
                     {c.suggestion?.note && <span className="v2-muted v2-small">{c.suggestion.note}</span>}
                   </span>
                   <label className="v2-field v2-group-pick">
-                    <span className="v2-sr">{t('perf.groups.groupFor', { name: c.name })}</span>
+                    <span className="v2-sr">{t('perf.groups.groupFor', { name: catLabel(t, c.name) })}</span>
                     <select className="v2-select" value={form[c.id] ?? ''} disabled={!canEdit || busy} onChange={(e) => setForm((f) => ({ ...f, [c.id]: e.target.value }))}>
                       <option value="">{t('perf.groups.none')}</option>
                       {GROUPS.map((g) => <option key={g} value={g}>{t(`perf.g.${g}`)}</option>)}
@@ -105,7 +106,7 @@ export default function ProfitGroups() {
           <p className="v2-sec">{t('perf.groups.missingText')}</p>
           <ul className="v2-moves">
             {q.data.missing_from_template.map((m) => (
-              <li key={m.name}><span>{m.name}{m.note && <span className="v2-muted"> · {m.note}</span>}</span><Pill tone="neutral">{t(`perf.g.${m.pnl_group}`)}</Pill></li>
+              <li key={m.name}><span>{catLabel(t, m.name)}{m.note && <span className="v2-muted"> · {m.note}</span>}</span><Pill tone="neutral">{t(`perf.g.${m.pnl_group}`)}</Pill></li>
             ))}
           </ul>
         </Card>

@@ -20,6 +20,7 @@ import {
   updateMyProfile, updateCompanyBasics, createCategory, updateCategory, archiveCategory,
   telegramLinkToken, telegramUnlink, createGateway, inviteMember, revokeInvite, updateMember, removeMember,
 } from '../lib/actions'
+import { catLabel } from '../lib/categoryLabel'
 
 const TABS = ['me', 'company', 'books', 'connections', 'team']
 const ROLES = ['admin', 'ceo', 'cfo', 'accountant', 'manager', 'employee', 'auditor']
@@ -192,7 +193,7 @@ function BooksTab() {
             <ul className="v2-set-cats">
               {by(g).map((c) => (
                 <li key={c.id}>
-                  <span>{c.name}{c.is_system && <span className="v2-muted v2-small"> · {t('set.books.system')}</span>}</span>
+                  <span>{catLabel(t, c.name)}{c.is_system && <span className="v2-muted v2-small"> · {t('set.books.system')}</span>}</span>
                   {!c.is_system && <span className="v2-row-gap">
                     <button type="button" className="v2-btn-link v2-small" onClick={() => { setName(c.name); setDlg({ kind: 'rename', cat: c }) }}>{t('set.books.rename')}</button>
                     <button type="button" className="v2-btn-link v2-small" onClick={() => setDlg({ kind: 'archive', cat: c })}>{t('set.books.archive')}</button>
@@ -212,7 +213,7 @@ function BooksTab() {
           <h3 className="v2-set-h3">{t('set.books.archived')}</h3>
           {arch.loading ? <Skeleton rows={2} /> : (arch.data?.categories || []).length === 0 ? <p className="v2-muted">{t('set.books.noArch')}</p> : (
             <ul className="v2-set-cats">{arch.data.categories.map((c) => (
-              <li key={c.id}><span>{c.name} <span className="v2-muted v2-small">· {t(`set.books.${c.group_type}`)}</span></span>
+              <li key={c.id}><span>{catLabel(t, c.name)} <span className="v2-muted v2-small">· {t(`set.books.${c.group_type}`)}</span></span>
                 <button type="button" className="v2-btn-link v2-small" disabled={busy} onClick={() => run(() => updateCategory(token, c.id, { is_active: true }), t('set.books.restored', { name: c.name }))}>{t('set.books.restore')}</button></li>
             ))}</ul>
           )}
@@ -228,7 +229,7 @@ function BooksTab() {
         </Modal>
       )}
       {dlg?.kind === 'archive' && (
-        <Modal title={t('set.books.archiveTitle', { name: dlg.cat.name })} onClose={() => setDlg(null)}
+        <Modal title={t('set.books.archiveTitle', { name: catLabel(t, dlg.cat.name) })} onClose={() => setDlg(null)}
           footer={<><button type="button" className="v2-btn v2-btn-secondary" onClick={() => setDlg(null)}>{t('set.cancel')}</button>
             <button type="button" className="v2-btn v2-btn-primary" disabled={busy} onClick={() => run(() => archiveCategory(token, dlg.cat.id), t('set.books.archivedOk', { name: dlg.cat.name }))}>{t('set.books.archive')}</button></>}>
           <p className="v2-sec">{t('set.books.archiveNote')}</p>

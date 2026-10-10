@@ -688,7 +688,9 @@ t('the wallet list follows the SELECTED company', () => {
   // where useWorkspace() returns null — destructuring it directly would throw
   // and the legacy page would go white.
   const app2 = code('client/src/App.jsx');
-  assert.match(app2, /path="\/accounts"\s+element=\{<Layout><Accounts \/><\/Layout>\}/,
+  // With design v2 on, /accounts redirects into the v2 workspace; the legacy page still mounts
+  // outside WorkspaceProvider when the flag is off.
+  assert.match(app2, /path="\/accounts"\s+element=\{(?:DESIGN_V2 \? <LegacyToV2 to="\/business\/accounts" \/> : )?<Layout><Accounts \/><\/Layout>\}/,
     'the legacy /accounts route changed; re-check the useWorkspace guard');
 });
 
@@ -1066,7 +1068,9 @@ t('AI CFO navigates inside the business workspace', () => {
   assert.match(blocks, /onNavigate\(BUSINESS_ROUTES\.accounts\)\}>\{t\('aicfo\.setUpWallets'\)/,
     'the empty-state CTA is not "Set up wallets" into Accounts');
   const app2 = code('client/src/App.jsx');
-  assert.ok(!/\/business\/add/.test(app2),
+  // The only /business/add in App.jsx is the redirect of legacy /add into the finished v2 Add page
+  // (client/src/v2/pages/AddEntry.jsx) — never a Route wrapping the legacy Add in the shell.
+  assert.ok(!/path="\/business\/add"/.test(app2) && !/\/business\/add/.test(app2.replace(/<LegacyToV2 to="\/business\/add" \/>/g, '')),
     'a half-migrated /business/add route is registered — it holds the shell only until the first save');
   assert.ok(!/BUSINESS_ROUTES\.add\b/.test(blocks), 'AI CFO still references an add route');
   // Quick navigation offers an existing workspace surface, named for what it is.

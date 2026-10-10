@@ -20,6 +20,7 @@ import { useT, useLang } from '../i18n'
 import { useApi, useInvalidate } from '../data'
 import { money, shortDate } from '../lib/format'
 import { insightOf } from '../lib/statementInsights'
+import { catLabel } from '../lib/categoryLabel'
 import {
   uploadStatementFile, readStatement, createImportBatch, suggestImport, confirmImport, createClassificationRule, fileDocument, adjustWalletBalance,
 } from '../lib/actions'
@@ -137,7 +138,7 @@ function FileStep() {
     setBusy(true); setErr('')
     try {
       const d = new Date(`${st.period_start}T00:00:00Z`); d.setUTCDate(d.getUTCDate() - 1)
-      await adjustWalletBalance(token, wallet.id, { target_balance: Number(st.opening), transaction_date: d.toISOString().slice(0, 10), reason: 'Opening balance per bank statement' })
+      await adjustWalletBalance(token, wallet.id, { target_balance: Number(st.opening), transaction_date: d.toISOString().slice(0, 10), reason: t('imp.openingReason') })
       invalidate(); wallets.reload()
     } catch (x) { setErr(x?.status === 403 ? t('accd.noRights') : (x?.data?.error || x?.message)) } finally { setBusy(false) }
   }
@@ -337,7 +338,7 @@ function RowsStep({ batchId }) {
                         onChange={(e) => { set(r.id, { category_id: e.target.value, ok: true }); if (ins.kind === 'bank_fee' || ins.kind === 'gateway') setRule({ text: (r.description || '').split(/\s{2,}| \d/)[0].trim().slice(0, 40), category_id: e.target.value, save: false }) }}>
                         <option value="">{t('imp.choose')}</option>
                         {['inflow', 'outflow'].map((g) => (
-                          <optgroup key={g} label={t(`set.books.${g}`)}>{cats.filter((c) => c.group_type === g && (g === 'inflow') === (r.direction === 'in')).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</optgroup>
+                          <optgroup key={g} label={t(`set.books.${g}`)}>{cats.filter((c) => c.group_type === g && (g === 'inflow') === (r.direction === 'in')).map((c) => <option key={c.id} value={c.id}>{catLabel(t, c.name)}</option>)}</optgroup>
                         ))}
                       </select>
                     )}

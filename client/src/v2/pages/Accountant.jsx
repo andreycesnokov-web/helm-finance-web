@@ -27,6 +27,7 @@ import TaxKnowledgeCard from '../../components/TaxKnowledgeCard'
 import { listTaxCards, getTaxCard, matchTopicId } from '../../lib/taxKnowledgeFixtures'
 import InfoTooltip from '../../components/InfoTooltip'
 import AccountantChatModal from '../components/AccountantChatModal'
+import { catLabel } from '../lib/categoryLabel'
 
 const monthLabel = (key, lang) => {
   const [y, m] = key.split('-').map(Number)
@@ -299,7 +300,7 @@ function UnreconciledCard({ items, month, lang, wallets, batches, expanded, onTo
                         <span className="v2-urow-title">{title}</span>
                         <span className="v2-urow-meta">
                           {ut.date && <span className="v2-num">{ut.date}</span>}
-                          {ut.category && <><span aria-hidden="true">·</span><span>{ut.category}</span></>}
+                          {ut.category && <><span aria-hidden="true">·</span><span>{catLabel(t, ut.category)}</span></>}
                           <span aria-hidden="true">·</span>
                           <span className={`v2-urow-kind ${isIncome ? 'is-in' : 'is-out'}`}>{isIncome ? t('tx.k.in') : t('tx.k.out')}</span>
                         </span>

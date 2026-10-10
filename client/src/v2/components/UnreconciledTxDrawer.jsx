@@ -10,6 +10,7 @@ import { money, shortDate } from '../lib/format'
 import { determineUnreconciledReason } from '../lib/accounting'
 import { updateTransaction } from '../lib/actions'
 import { detailPath } from '../pages/Bills'
+import { catLabel } from '../lib/categoryLabel'
 
 export default function UnreconciledTxDrawer({
   tx,
@@ -530,7 +531,7 @@ export default function UnreconciledTxDrawer({
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <span className="v2-muted">{t('acct.drawer.category')}:</span>
-                  <span style={{ fontWeight: 500 }}>{draft.category || t('tx.col.noCat', '—')}</span>
+                  <span style={{ fontWeight: 500 }}>{draft.category ? catLabel(t, draft.category) : t('tx.col.noCat', '—')}</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <span className="v2-muted">{t('acct.drawer.description')}:</span>

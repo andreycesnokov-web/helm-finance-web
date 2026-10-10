@@ -23,6 +23,7 @@ import BillChecklist from '../components/BillChecklist'
 import WithholdingCard from '../components/WithholdingCard'
 import { StatusPill } from './Bills'
 import { billHasDocument, docPath } from '../lib/obligations'
+import { catLabel } from '../lib/categoryLabel'
 
 // Free text that older edits stored as the literal string "null" (PATCH /api/debts/:id before
 // this fix) must never reach the screen.
@@ -149,7 +150,7 @@ export default function BillDetail({ kind = 'payable' }) {
               <dt>{t('bill.created')}</dt><dd>{shortDate(d.created_at, lang)}</dd>
               <dt>{t('bill.dueDate')}</dt><dd>{d.due_date ? shortDate(d.due_date, lang) : t('bill.noDue')}</dd>
               {Number(d.paid_amount) > 0 && <><dt>{t('bill.paidSoFar')}</dt><dd className="v2-num">{money(d.paid_amount)}</dd></>}
-              {d.category && <><dt>{t('bill.category')}</dt><dd>{d.category}</dd></>}
+              {d.category && <><dt>{t('bill.category')}</dt><dd>{catLabel(t, d.category)}</dd></>}
             </dl>
           </Card>
 

@@ -20,6 +20,7 @@ import { useT, useLang } from '../i18n'
 import { V2DataProvider, useApi, useInvalidate } from '../data'
 import { LangSwitch } from '../auth/AuthApp'
 import { TaxList, ruleTitle } from '../pages/Accountant'
+import { optLabel } from '../pages/CompanyProfileEdit'
 import { shortDate } from '../lib/format'
 import {
   createCompany, saveTaxProfile, uploadCompanyDocument, identifyDocument, confirmDocumentKind, readProfileFromDocuments,
@@ -353,7 +354,7 @@ function SetupReview() {
                 <span className="v2-setup-rval">
                   {editing ? (
                     k === 'legal_entity_type'
-                      ? <select className="v2-select" value={asText(v?.value)} onChange={(e) => setVal(k, e.target.value)}><option value="">{t('pe.choose')}</option>{LEGAL.map((o) => <option key={o} value={o}>{o}</option>)}</select>
+                      ? <select className="v2-select" value={asText(v?.value)} onChange={(e) => setVal(k, e.target.value)}><option value="">{t('pe.choose')}</option>{LEGAL.map((o) => <option key={o} value={o}>{optLabel(t, 'legal_entity_type', o)}</option>)}</select>
                       : <input className="v2-input" value={asText(v?.value)} autoFocus onChange={(e) => setVal(k, e.target.value)} />
                   ) : (
                     <strong className={v?.value ? 'v2-num' : 'v2-muted'}>{v?.value ? asText(v.value) : t('setup.review.empty')}</strong>

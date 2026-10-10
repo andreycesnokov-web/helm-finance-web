@@ -10058,6 +10058,128 @@ const CONTEXT_STRINGS = {
     incomeCoversObligations: 'Pemasukan menutup kewajiban.',
   },
 }
+// AI CFO engine phrases (score, alert, next actions) in the user's language. The English sentence is
+// the key — an unknown language or a missing line falls back to the English text unchanged.
+const CFO_PHRASES = {
+  ru: {
+    'Strong cash position': 'Сильная денежная позиция',
+    'Adequate cash reserves': 'Денег достаточно',
+    'Cash below 1 month expenses': 'Денег меньше, чем на месяц расходов',
+    'Cash critically low': 'Денег критически мало',
+    'Runway excellent (90+ days)': 'Запас отличный (90+ дней)',
+    'Runway healthy (60+ days)': 'Запас хороший (60+ дней)',
+    'Runway adequate (30+ days)': 'Запас достаточный (30+ дней)',
+    'Runway short — needs attention': 'Запас короткий — нужно внимание',
+    'Runway critical (<15 days)': 'Запас критический (меньше 15 дней)',
+    'All receivables on time': 'Клиенты платят вовремя',
+    'Minor overdue receivables': 'Немного просроченной дебиторки',
+    'Significant overdue receivables': 'Заметная просроченная дебиторка',
+    'Most receivables overdue': 'Большая часть дебиторки просрочена',
+    'Overdue payables exceed cash': 'Просроченные счета больше денег на счетах',
+    'Upcoming payments exceed cash': 'Ближайшие платежи больше денег на счетах',
+    'Payables under control': 'Счета под контролем',
+    'Payables manageable': 'Счета в пределах нормы',
+    'Net flow positive': 'Чистый поток положительный',
+    'Monthly expenses exceed income': 'Расходы за месяц больше доходов',
+    'Expenses significantly exceed income': 'Расходы заметно больше доходов',
+    'All key metrics are positive.': 'Все ключевые показатели в норме.',
+    'Monitor closely and take action.': 'Следите внимательно и действуйте.',
+    'Immediate action required.': 'Нужны срочные действия.',
+    'Financial health is critical. Prioritize cash flow.': 'Финансовое состояние критическое. Сначала — деньги.',
+    'Warning': 'Внимание',
+    'Immediate cash action required': 'Требуются действия по деньгам',
+    'Cash balance is negative. Review all transactions and stop non-essential spending.': 'Остаток денег отрицательный. Проверьте все операции и остановите необязательные расходы.',
+    'Cash runway is {n} days. Prioritize collecting receivables and reducing expenses now.': 'Запас денег — {n} дн. Сейчас главное — собрать оплаты и сократить расходы.',
+    'Overdue payables exceed available cash. Renegotiate or arrange payment immediately.': 'Просроченные счета больше доступных денег. Договоритесь о переносе или срочно организуйте оплату.',
+    'Financial health score is below safe threshold. Review all key metrics.': 'Оценка финансов ниже безопасного уровня. Проверьте ключевые показатели.',
+    'Some areas need attention': 'Есть зоны, которые требуют внимания',
+    'Cash runway is {n} days. This requires active cash planning — collect receivables on time.': 'Запас денег — {n} дн. Нужно активно планировать деньги и вовремя собирать оплаты.',
+    'Overdue receivables: {n}. Follow up to protect cash flow.': 'Просроченных оплат от клиентов: {n}. Напомните им, чтобы сберечь деньги.',
+    'Cash position is adequate but some metrics need monitoring.': 'Денег достаточно, но некоторые показатели стоит отслеживать.',
+    'Follow up: {who}': 'Напомнить: {who}',
+    ' — {d}d past due': ' — {d} дн. просрочки',
+    '{amt} {cur} overdue{late}. Send a payment reminder.': '{amt} {cur} просрочено{late}. Отправьте напоминание об оплате.',
+    '{n} more overdue receivables': 'Ещё просроченных оплат: {n}',
+    '{amt} {cur} also overdue. Review and follow up.': 'Ещё {amt} {cur} просрочено. Проверьте и напомните.',
+    'Confirm payment: {who}': 'Подтвердить оплату: {who}',
+    'Receivable due soon': 'Скоро оплата от клиента',
+    '{amt} {cur} expected within 7 days. Confirm collection date.': 'Ожидается {amt} {cur} в течение 7 дней. Уточните дату оплаты.',
+    'Pay or renegotiate: {who}': 'Оплатить или договориться: {who}',
+    '{amt} {cur} overdue{late}. Resolve to protect vendor relationship.': '{amt} {cur} просрочено{late}. Решите вопрос, чтобы сохранить отношения с поставщиком.',
+    'Prepare payment: {who}': 'Подготовить оплату: {who}',
+    '{amt} {cur} due within 7 days. Ensure funds are ready.': '{amt} {cur} к оплате в течение 7 дней. Проверьте, что деньги есть.',
+    'Protect runway: review non-critical spending': 'Сберечь запас: пересмотрите необязательные расходы',
+    'Runway is {n} days. Delay or cancel non-essential expenses to extend cash runway.': 'Запас — {n} дн. Отложите или отмените необязательные расходы, чтобы продлить запас.',
+    'Review top expenses this month': 'Проверьте крупные расходы месяца',
+    'Monthly expenses exceed income by {amt} {cur}. Identify which categories can be reduced.': 'Расходы за месяц больше доходов на {amt} {cur}. Найдите статьи, которые можно сократить.',
+    'Delay hiring — build runway first': 'Отложите найм — сначала нарастите запас',
+    'Runway of {n} days is below safe threshold. Focus on extending runway before adding fixed costs.': 'Запас {n} дн. ниже безопасного уровня. Сначала продлите запас, потом добавляйте постоянные расходы.',
+    'Hiring capacity available': 'Можно нанимать',
+    'Safe monthly salary budget: {amt} {cur}. You can hire conservatively.': 'Безопасный бюджет на зарплату в месяц: {amt} {cur}. Можно нанимать осторожно.',
+  },
+  id: {
+    'Strong cash position': 'Posisi kas kuat',
+    'Adequate cash reserves': 'Cadangan kas memadai',
+    'Cash below 1 month expenses': 'Kas di bawah pengeluaran 1 bulan',
+    'Cash critically low': 'Kas sangat rendah',
+    'Runway excellent (90+ days)': 'Runway sangat baik (90+ hari)',
+    'Runway healthy (60+ days)': 'Runway sehat (60+ hari)',
+    'Runway adequate (30+ days)': 'Runway cukup (30+ hari)',
+    'Runway short — needs attention': 'Runway pendek — perlu perhatian',
+    'Runway critical (<15 days)': 'Runway kritis (kurang dari 15 hari)',
+    'All receivables on time': 'Semua piutang tepat waktu',
+    'Minor overdue receivables': 'Sedikit piutang terlambat',
+    'Significant overdue receivables': 'Piutang terlambat cukup besar',
+    'Most receivables overdue': 'Sebagian besar piutang terlambat',
+    'Overdue payables exceed cash': 'Utang terlambat melebihi kas',
+    'Upcoming payments exceed cash': 'Pembayaran mendatang melebihi kas',
+    'Payables under control': 'Utang terkendali',
+    'Payables manageable': 'Utang masih terkelola',
+    'Net flow positive': 'Arus bersih positif',
+    'Monthly expenses exceed income': 'Pengeluaran bulanan melebihi pemasukan',
+    'Expenses significantly exceed income': 'Pengeluaran jauh melebihi pemasukan',
+    'All key metrics are positive.': 'Semua metrik utama positif.',
+    'Monitor closely and take action.': 'Pantau ketat dan ambil tindakan.',
+    'Immediate action required.': 'Perlu tindakan segera.',
+    'Financial health is critical. Prioritize cash flow.': 'Kesehatan keuangan kritis. Prioritaskan arus kas.',
+    'Warning': 'Peringatan',
+    'Immediate cash action required': 'Perlu tindakan kas segera',
+    'Cash balance is negative. Review all transactions and stop non-essential spending.': 'Saldo kas negatif. Tinjau semua transaksi dan hentikan pengeluaran yang tidak penting.',
+    'Cash runway is {n} days. Prioritize collecting receivables and reducing expenses now.': 'Runway kas {n} hari. Prioritaskan penagihan piutang dan pengurangan biaya sekarang.',
+    'Overdue payables exceed available cash. Renegotiate or arrange payment immediately.': 'Utang terlambat melebihi kas tersedia. Negosiasi ulang atau segera atur pembayaran.',
+    'Financial health score is below safe threshold. Review all key metrics.': 'Skor kesehatan keuangan di bawah batas aman. Tinjau semua metrik utama.',
+    'Some areas need attention': 'Ada area yang perlu diperhatikan',
+    'Cash runway is {n} days. This requires active cash planning — collect receivables on time.': 'Runway kas {n} hari. Perlu perencanaan kas aktif — tagih piutang tepat waktu.',
+    'Overdue receivables: {n}. Follow up to protect cash flow.': 'Piutang terlambat: {n}. Tindak lanjuti untuk menjaga arus kas.',
+    'Cash position is adequate but some metrics need monitoring.': 'Posisi kas memadai, tetapi beberapa metrik perlu dipantau.',
+    'Follow up: {who}': 'Tindak lanjut: {who}',
+    ' — {d}d past due': ' — terlambat {d} hari',
+    '{amt} {cur} overdue{late}. Send a payment reminder.': '{amt} {cur} terlambat{late}. Kirim pengingat pembayaran.',
+    '{n} more overdue receivables': '{n} piutang terlambat lainnya',
+    '{amt} {cur} also overdue. Review and follow up.': '{amt} {cur} juga terlambat. Tinjau dan tindak lanjuti.',
+    'Confirm payment: {who}': 'Konfirmasi pembayaran: {who}',
+    'Receivable due soon': 'Piutang segera jatuh tempo',
+    '{amt} {cur} expected within 7 days. Confirm collection date.': '{amt} {cur} diharapkan dalam 7 hari. Konfirmasi tanggal penagihan.',
+    'Pay or renegotiate: {who}': 'Bayar atau negosiasi ulang: {who}',
+    '{amt} {cur} overdue{late}. Resolve to protect vendor relationship.': '{amt} {cur} terlambat{late}. Selesaikan untuk menjaga hubungan dengan pemasok.',
+    'Prepare payment: {who}': 'Siapkan pembayaran: {who}',
+    '{amt} {cur} due within 7 days. Ensure funds are ready.': '{amt} {cur} jatuh tempo dalam 7 hari. Pastikan dana siap.',
+    'Protect runway: review non-critical spending': 'Jaga runway: tinjau pengeluaran tidak penting',
+    'Runway is {n} days. Delay or cancel non-essential expenses to extend cash runway.': 'Runway {n} hari. Tunda atau batalkan pengeluaran tidak penting untuk memperpanjang runway.',
+    'Review top expenses this month': 'Tinjau pengeluaran terbesar bulan ini',
+    'Monthly expenses exceed income by {amt} {cur}. Identify which categories can be reduced.': 'Pengeluaran bulanan melebihi pemasukan sebesar {amt} {cur}. Temukan kategori yang bisa dikurangi.',
+    'Delay hiring — build runway first': 'Tunda rekrutmen — bangun runway dulu',
+    'Runway of {n} days is below safe threshold. Focus on extending runway before adding fixed costs.': 'Runway {n} hari di bawah batas aman. Perpanjang runway sebelum menambah biaya tetap.',
+    'Hiring capacity available': 'Kapasitas rekrutmen tersedia',
+    'Safe monthly salary budget: {amt} {cur}. You can hire conservatively.': 'Anggaran gaji bulanan aman: {amt} {cur}. Anda bisa merekrut secara hati-hati.',
+  },
+};
+function cxt(language, en, vars = {}) {
+  const lang = normalizeLanguage(language);
+  const tpl = (CFO_PHRASES[lang] || {})[en] || en;
+  return tpl.replace(/\{(\w+)\}/g, (m, k) => (vars[k] === undefined ? m : String(vars[k])));
+}
+
 function cx(language, key) {
   const lang = normalizeLanguage(language)
   return (CONTEXT_STRINGS[lang] || CONTEXT_STRINGS.en)[key] || CONTEXT_STRINGS.en[key] || key
@@ -13098,21 +13220,21 @@ function calculateCfoScore(ctx, language = 'en') {
     cashScore = 70; cashLabel = cx(language, 'notEnoughExpenseHistory'); cashImpact = 'neutral';
   } else {
     const ratio = bal / mExpense;
-    if (ratio >= 3)       { cashScore = 90; cashLabel = 'Strong cash position'; cashImpact = 'positive'; }
-    else if (ratio >= 1)  { cashScore = 78; cashLabel = 'Adequate cash reserves'; cashImpact = 'positive'; }
-    else if (ratio >= 0.5){ cashScore = 58; cashLabel = 'Cash below 1 month expenses'; cashImpact = 'warning'; }
-    else                  { cashScore = 30; cashLabel = 'Cash critically low'; cashImpact = 'negative'; }
+    if (ratio >= 3)       { cashScore = 90; cashLabel = cxt(language, 'Strong cash position'); cashImpact = 'positive'; }
+    else if (ratio >= 1)  { cashScore = 78; cashLabel = cxt(language, 'Adequate cash reserves'); cashImpact = 'positive'; }
+    else if (ratio >= 0.5){ cashScore = 58; cashLabel = cxt(language, 'Cash below 1 month expenses'); cashImpact = 'warning'; }
+    else                  { cashScore = 30; cashLabel = cxt(language, 'Cash critically low'); cashImpact = 'negative'; }
   }
 
   // ── Runway (25%) ────────────────────────────────────────────────────────
   let runwayScore, runwayLabel, runwayImpact;
   if (runway === null || runway === 999) {
     runwayScore = 60; runwayLabel = cx(language, 'runwayUnknown'); runwayImpact = 'neutral';
-  } else if (runway >= 90)  { runwayScore = 100; runwayLabel = 'Runway excellent (90+ days)'; runwayImpact = 'positive'; }
-  else if (runway >= 60)    { runwayScore = 85;  runwayLabel = 'Runway healthy (60+ days)';   runwayImpact = 'positive'; }
-  else if (runway >= 30)    { runwayScore = 70;  runwayLabel = 'Runway adequate (30+ days)';  runwayImpact = 'neutral'; }
-  else if (runway >= 15)    { runwayScore = 45;  runwayLabel = 'Runway short — needs attention'; runwayImpact = 'warning'; }
-  else                      { runwayScore = 20;  runwayLabel = 'Runway critical (<15 days)';  runwayImpact = 'negative'; }
+  } else if (runway >= 90)  { runwayScore = 100; runwayLabel = cxt(language, 'Runway excellent (90+ days)'); runwayImpact = 'positive'; }
+  else if (runway >= 60)    { runwayScore = 85;  runwayLabel = cxt(language, 'Runway healthy (60+ days)');   runwayImpact = 'positive'; }
+  else if (runway >= 30)    { runwayScore = 70;  runwayLabel = cxt(language, 'Runway adequate (30+ days)');  runwayImpact = 'neutral'; }
+  else if (runway >= 15)    { runwayScore = 45;  runwayLabel = cxt(language, 'Runway short — needs attention'); runwayImpact = 'warning'; }
+  else                      { runwayScore = 20;  runwayLabel = cxt(language, 'Runway critical (<15 days)');  runwayImpact = 'negative'; }
 
   // ── Receivables (15%) ───────────────────────────────────────────────────
   let recvScore, recvLabel, recvImpact;
@@ -13120,10 +13242,10 @@ function calculateCfoScore(ctx, language = 'en') {
     recvScore = 80; recvLabel = cx(language, 'noReceivables'); recvImpact = 'neutral';
   } else {
     const overdueRatio = recvOverdue / recvTotal;
-    if (recvOverdue === 0)       { recvScore = 85; recvLabel = 'All receivables on time';    recvImpact = 'positive'; }
-    else if (overdueRatio < 0.25){ recvScore = 70; recvLabel = 'Minor overdue receivables';  recvImpact = 'neutral'; }
-    else if (overdueRatio < 0.5) { recvScore = 50; recvLabel = 'Significant overdue receivables'; recvImpact = 'warning'; }
-    else                         { recvScore = 30; recvLabel = 'Most receivables overdue';   recvImpact = 'negative'; }
+    if (recvOverdue === 0)       { recvScore = 85; recvLabel = cxt(language, 'All receivables on time');    recvImpact = 'positive'; }
+    else if (overdueRatio < 0.25){ recvScore = 70; recvLabel = cxt(language, 'Minor overdue receivables');  recvImpact = 'neutral'; }
+    else if (overdueRatio < 0.5) { recvScore = 50; recvLabel = cxt(language, 'Significant overdue receivables'); recvImpact = 'warning'; }
+    else                         { recvScore = 30; recvLabel = cxt(language, 'Most receivables overdue');   recvImpact = 'negative'; }
   }
 
   // ── Payables (20%) ──────────────────────────────────────────────────────
@@ -13131,13 +13253,13 @@ function calculateCfoScore(ctx, language = 'en') {
   if (payTotal === 0) {
     payScore = 90; payLabel = cx(language, 'noPayables'); payImpact = 'positive';
   } else if (bal > 0 && payOverdue > bal) {
-    payScore = 20; payLabel = 'Overdue payables exceed cash'; payImpact = 'negative';
+    payScore = 20; payLabel = cxt(language, 'Overdue payables exceed cash'); payImpact = 'negative';
   } else if (bal > 0 && payDueSoon > bal) {
-    payScore = 35; payLabel = 'Upcoming payments exceed cash'; payImpact = 'negative';
+    payScore = 35; payLabel = cxt(language, 'Upcoming payments exceed cash'); payImpact = 'negative';
   } else if (bal > 0 && payDueSoon <= bal * 0.3) {
-    payScore = 80; payLabel = 'Payables under control'; payImpact = 'positive';
+    payScore = 80; payLabel = cxt(language, 'Payables under control'); payImpact = 'positive';
   } else {
-    payScore = 60; payLabel = 'Payables manageable'; payImpact = 'neutral';
+    payScore = 60; payLabel = cxt(language, 'Payables manageable'); payImpact = 'neutral';
   }
 
   // ── Expense Control (15%) ───────────────────────────────────────────────
@@ -13147,12 +13269,12 @@ function calculateCfoScore(ctx, language = 'en') {
   } else if (netFlow >= 0) {
     const margin = mIncome > 0 ? netFlow / mIncome : 0;
     expScore = margin > 0.2 ? 92 : margin > 0.05 ? 80 : 72;
-    expLabel = 'Net flow positive'; expImpact = 'positive';
+    expLabel = cxt(language, 'Net flow positive'); expImpact = 'positive';
   } else if (cashScore >= 70) {
-    expScore = 62; expLabel = 'Monthly expenses exceed income'; expImpact = 'warning';
+    expScore = 62; expLabel = cxt(language, 'Monthly expenses exceed income'); expImpact = 'warning';
   } else {
     expScore = mExpense > mIncome * 1.5 ? 32 : 48;
-    expLabel = 'Expenses significantly exceed income'; expImpact = 'negative';
+    expLabel = cxt(language, 'Expenses significantly exceed income'); expImpact = 'negative';
   }
 
   // ── Weighted total ──────────────────────────────────────────────────────
@@ -13171,9 +13293,9 @@ function calculateCfoScore(ctx, language = 'en') {
   const positives = [cashLabel, runwayLabel, recvLabel, payLabel, expLabel].filter((_, i) => [cashImpact,runwayImpact,recvImpact,payImpact,expImpact][i] === 'positive');
   const warnings  = [cashLabel, runwayLabel, recvLabel, payLabel, expLabel].filter((_, i) => ['warning','negative'].includes([cashImpact,runwayImpact,recvImpact,payImpact,expImpact][i]));
   let summary;
-  if (status === 'healthy') summary = positives.length > 0 ? `${positives[0]}. ${warnings.length > 0 ? warnings[0] + '.' : 'All key metrics are positive.'}` : cx(language, 'financiallyStable');
-  else if (status === 'warning') summary = warnings.length > 0 ? `${warnings[0]}. Monitor closely and take action.` : cx(language, 'someAreasNeedAttention');
-  else summary = warnings.length > 0 ? `${warnings[0]}. Immediate action required.` : 'Financial health is critical. Prioritize cash flow.';
+  if (status === 'healthy') summary = positives.length > 0 ? `${positives[0]}. ${warnings.length > 0 ? warnings[0] + '.' : cxt(language, 'All key metrics are positive.')}` : cx(language, 'financiallyStable');
+  else if (status === 'warning') summary = warnings.length > 0 ? `${warnings[0]}. ${cxt(language, 'Monitor closely and take action.')}` : cx(language, 'someAreasNeedAttention');
+  else summary = warnings.length > 0 ? `${warnings[0]}. ${cxt(language, 'Immediate action required.')}` : cxt(language, 'Financial health is critical. Prioritize cash flow.');
 
   return {
     score,
@@ -13215,25 +13337,25 @@ function calculateAiAlertStatus(ctx, cfoScore, language = 'en') {
   );
 
   if (isCritical) return {
-    status: 'critical', label: 'Critical', color: 'red',
-    headline: 'Immediate cash action required',
+    status: 'critical', label: cx(language, 'critical'), color: 'red',
+    headline: cxt(language, 'Immediate cash action required'),
     description: bal < 0
-      ? 'Cash balance is negative. Review all transactions and stop non-essential spending.'
+      ? cxt(language, 'Cash balance is negative. Review all transactions and stop non-essential spending.')
       : runway !== null && runway < 7
-        ? `Cash runway is ${runway} days. Prioritize collecting receivables and reducing expenses now.`
+        ? cxt(language, 'Cash runway is {n} days. Prioritize collecting receivables and reducing expenses now.', { n: runway })
         : payOverdue > bal
-          ? 'Overdue payables exceed available cash. Renegotiate or arrange payment immediately.'
-          : 'Financial health score is below safe threshold. Review all key metrics.',
+          ? cxt(language, 'Overdue payables exceed available cash. Renegotiate or arrange payment immediately.')
+          : cxt(language, 'Financial health score is below safe threshold. Review all key metrics.'),
   };
 
   if (isWarning) return {
-    status: 'warning', label: 'Warning', color: 'amber',
-    headline: 'Some areas need attention',
+    status: 'warning', label: cxt(language, 'Warning'), color: 'amber',
+    headline: cxt(language, 'Some areas need attention'),
     description: runway !== null && runway < 30
-      ? `Cash runway is ${runway} days. This requires active cash planning — collect receivables on time.`
+      ? cxt(language, 'Cash runway is {n} days. This requires active cash planning — collect receivables on time.', { n: runway })
       : (ctx.receivables?.overdue_count || 0) > 0
-        ? `${ctx.receivables.overdue_count} receivable${ctx.receivables.overdue_count > 1 ? 's are' : ' is'} overdue. Follow up to protect cash flow.`
-        : 'Cash position is adequate but some metrics need monitoring.',
+        ? (normalizeLanguage(language) === 'en' ? `${ctx.receivables.overdue_count} receivable${ctx.receivables.overdue_count > 1 ? 's are' : ' is'} overdue. Follow up to protect cash flow.` : cxt(language, 'Overdue receivables: {n}. Follow up to protect cash flow.', { n: ctx.receivables.overdue_count }))
+        : cxt(language, 'Cash position is adequate but some metrics need monitoring.'),
   };
 
   return {
@@ -13323,16 +13445,16 @@ function buildNextActionsV2(ctx, hiringReadiness, language = 'en') {
   if (recvOverdueList.length > 0) {
     const top = recvOverdueList[0];
     actions.push({
-      title: `Follow up: ${top.counterparty}`,
-      description: `${fmt(top.remaining_amount)} ${currency} overdue${top.days_overdue > 0 ? ` — ${top.days_overdue}d past due` : ''}. Send a payment reminder.`,
+      title: cxt(language, 'Follow up: {who}', { who: top.counterparty }),
+      description: cxt(language, '{amt} {cur} overdue{late}. Send a payment reminder.', { amt: fmt(top.remaining_amount), cur: currency, late: (top.days_overdue > 0 ? cxt(language, ' — {d}d past due', { d: top.days_overdue }) : '') }),
       action_type: 'receivable_followup', priority: 'high',
       amount: top.remaining_amount, route: '/receivables',
     });
     if (recvOverdueList.length > 1) {
       const total = recvOverdueList.reduce((s, d) => s + Number(d.remaining_amount || 0), 0);
       actions.push({
-        title: `${recvOverdueList.length - 1} more overdue receivable${recvOverdueList.length > 2 ? 's' : ''}`,
-        description: `${fmt(total - Number(top.remaining_amount || 0))} ${currency} also overdue. Review and follow up.`,
+        title: normalizeLanguage(language) === 'en' ? `${recvOverdueList.length - 1} more overdue receivable${recvOverdueList.length > 2 ? 's' : ''}` : cxt(language, '{n} more overdue receivables', { n: recvOverdueList.length - 1 }),
+        description: cxt(language, '{amt} {cur} also overdue. Review and follow up.', { amt: fmt(total - Number(top.remaining_amount || 0)), cur: currency }),
         action_type: 'receivable_followup', priority: 'high',
         amount: total - Number(top.remaining_amount || 0), route: '/receivables',
       });
@@ -13340,8 +13462,8 @@ function buildNextActionsV2(ctx, hiringReadiness, language = 'en') {
   } else if ((recv.due_soon_total || 0) > 0) {
     const topDueSoon = (recv.top || []).find(d => d.status !== 'paid' && d.status !== 'cancelled');
     actions.push({
-      title: topDueSoon ? `Confirm payment: ${topDueSoon.counterparty}` : 'Receivable due soon',
-      description: `${fmt(recv.due_soon_total)} ${currency} expected within 7 days. Confirm collection date.`,
+      title: topDueSoon ? cxt(language, 'Confirm payment: {who}', { who: topDueSoon.counterparty }) : cxt(language, 'Receivable due soon'),
+      description: cxt(language, '{amt} {cur} expected within 7 days. Confirm collection date.', { amt: fmt(recv.due_soon_total), cur: currency }),
       action_type: 'receivable_due_soon', priority: 'medium',
       amount: recv.due_soon_total, route: '/receivables',
     });
@@ -13352,8 +13474,8 @@ function buildNextActionsV2(ctx, hiringReadiness, language = 'en') {
   if (payOverdueList.length > 0) {
     const top = payOverdueList[0];
     actions.push({
-      title: `Pay or renegotiate: ${top.counterparty}`,
-      description: `${fmt(top.remaining_amount)} ${currency} overdue${top.days_overdue > 0 ? ` — ${top.days_overdue}d past due` : ''}. Resolve to protect vendor relationship.`,
+      title: cxt(language, 'Pay or renegotiate: {who}', { who: top.counterparty }),
+      description: cxt(language, '{amt} {cur} overdue{late}. Resolve to protect vendor relationship.', { amt: fmt(top.remaining_amount), cur: currency, late: (top.days_overdue > 0 ? cxt(language, ' — {d}d past due', { d: top.days_overdue }) : '') }),
       action_type: 'payable_overdue', priority: 'high',
       amount: top.remaining_amount, route: '/payables',
     });
@@ -13367,8 +13489,8 @@ function buildNextActionsV2(ctx, hiringReadiness, language = 'en') {
   if (payDueSoonList.length > 0 && payOverdueList.length === 0) {
     const top = payDueSoonList[0];
     actions.push({
-      title: `Prepare payment: ${top.counterparty}`,
-      description: `${fmt(top.remaining_amount)} ${currency} due within 7 days. Ensure funds are ready.`,
+      title: cxt(language, 'Prepare payment: {who}', { who: top.counterparty }),
+      description: cxt(language, '{amt} {cur} due within 7 days. Ensure funds are ready.', { amt: fmt(top.remaining_amount), cur: currency }),
       action_type: 'payable_due_soon', priority: 'medium',
       amount: top.remaining_amount, route: '/payables',
     });
@@ -13377,16 +13499,16 @@ function buildNextActionsV2(ctx, hiringReadiness, language = 'en') {
   // ── Cash / runway actions ────────────────────────────────────────────────
   if (runway !== null && runway < 30) {
     actions.push({
-      title: 'Protect runway: review non-critical spending',
-      description: `Runway is ${runway} days. Delay or cancel non-essential expenses to extend cash runway.`,
+      title: cxt(language, 'Protect runway: review non-critical spending'),
+      description: cxt(language, 'Runway is {n} days. Delay or cancel non-essential expenses to extend cash runway.', { n: runway }),
       action_type: 'cash_protection', priority: runway < 15 ? 'high' : 'medium',
       amount: 0, route: '/transactions',
     });
   }
   if (Number(month.net_flow || 0) < 0 && (runway === null || runway >= 30)) {
     actions.push({
-      title: 'Review top expenses this month',
-      description: `Monthly expenses exceed income by ${fmt(Math.abs(month.net_flow))} ${currency}. Identify which categories can be reduced.`,
+      title: cxt(language, 'Review top expenses this month'),
+      description: cxt(language, 'Monthly expenses exceed income by {amt} {cur}. Identify which categories can be reduced.', { amt: fmt(Math.abs(month.net_flow)), cur: currency }),
       action_type: 'expense_review', priority: 'medium',
       amount: Math.abs(month.net_flow || 0), route: '/transactions',
     });
@@ -13396,15 +13518,15 @@ function buildNextActionsV2(ctx, hiringReadiness, language = 'en') {
   if (hiringReadiness) {
     if (hiringReadiness.status === 'not_ready' && (runway || 0) > 0) {
       actions.push({
-        title: 'Delay hiring — build runway first',
-        description: `Runway of ${runway} days is below safe threshold. Focus on extending runway before adding fixed costs.`,
+        title: cxt(language, 'Delay hiring — build runway first'),
+        description: cxt(language, 'Runway of {n} days is below safe threshold. Focus on extending runway before adding fixed costs.', { n: runway }),
         action_type: 'hiring_delay', priority: 'medium',
         amount: 0, route: '/cfo',
       });
     } else if (hiringReadiness.status === 'ready' && hiringReadiness.safe_monthly_salary > 0) {
       actions.push({
-        title: 'Hiring capacity available',
-        description: `Safe monthly salary budget: ${fmt(hiringReadiness.safe_monthly_salary)} ${currency}. You can hire conservatively.`,
+        title: cxt(language, 'Hiring capacity available'),
+        description: cxt(language, 'Safe monthly salary budget: {amt} {cur}. You can hire conservatively.', { amt: fmt(hiringReadiness.safe_monthly_salary), cur: currency }),
         action_type: 'hiring_ready', priority: 'low',
         amount: hiringReadiness.safe_monthly_salary, route: '/cfo',
       });

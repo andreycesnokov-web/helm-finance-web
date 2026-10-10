@@ -42,7 +42,9 @@ t('"+ Add" opens the v2 Add page, which always records Business — never the le
   assert.ok(!/import Add from '\.\.\/pages\/Add'/.test(app), 'the legacy Add page is not imported by v2')
   const page = read('client/src/v2/pages/AddEntry.jsx')
   assert.match(page, /createBusinessTransaction\(token, body\.tx\)/)
-  assert.match(page, /<DebtFormModal mode=\{modal\} token=\{token\} lockBusinessScope/)
+  // A bill or invoice opens the v2 BillDialog, which always sends scope: 'business'.
+  assert.match(page, /<BillDialog mode=\{modal\}/)
+  assert.match(read('client/src/v2/components/BillDialog.jsx'), /scope: 'business'/)
   assert.match(read('client/src/v2/lib/actions.js'), /transactions: \[\{ \.\.\.tx, scope: 'business' \}\]/)
 })
 
