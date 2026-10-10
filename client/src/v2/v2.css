@@ -1624,3 +1624,10 @@ button.v2-start-btn:focus-visible { outline: 2px solid var(--action-primary); ou
 .v2-kv dt { color: var(--text-muted); }
 .v2-kv dd { margin: 0; }
 .v2-payb-pct { margin-top: var(--space-2); }
+
+/* Member home (w2/I1) */
+.v2-mh-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: var(--space-4); }
+.v2-mh-tile { display: flex; align-items: flex-start; gap: var(--space-3); padding: var(--space-5); border: 1px solid var(--border-subtle); border-radius: 18px; background: var(--surface-card); color: var(--text-primary); font: inherit; text-align: left; text-decoration: none; cursor: pointer; }
+.v2-mh-tile:hover { border-color: var(--brand-electric-blue); }
+.v2-mh-tile.is-done { cursor: default; background: var(--success-soft); }
+.v2-mh-tile-text { display: flex; flex-direction: column; gap: var(--space-1); }

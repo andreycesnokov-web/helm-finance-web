@@ -39,12 +39,13 @@ export default function Settings() {
   const t = useT()
   const [sp, setSp] = useSearchParams()
   const { active } = useWorkspace()
-  const tab = TABS.includes(sp.get('tab')) ? sp.get('tab') : 'me'
+  const tabs = ['manager', 'employee'].includes(active?.role) ? ['me'] : TABS
+  const tab = tabs.includes(sp.get('tab')) ? sp.get('tab') : 'me'
   return (
     <div className="v2-page">
       <PageHead title={t('nav.settings')} sub={t('set.sub2', { name: active?.name || '' })} />
       <nav className="v2-seg v2-set-tabs" role="tablist" aria-label={t('set.sections')}>
-        {TABS.map((k) => (
+        {tabs.map((k) => (
           <button key={k} type="button" role="tab" className="v2-seg-btn" aria-selected={tab === k} aria-pressed={tab === k}
             onClick={() => setSp((p) => { const n = new URLSearchParams(p); n.set('tab', k); return n }, { replace: true })}>{t(`set.tab.${k}`)}</button>
         ))}

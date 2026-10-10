@@ -460,6 +460,7 @@ function PulseWrapper() {
   // Manager / employee: Web App is a learning & setup surface, not a finance
   // dashboard (the backend returns 403 on /pulse for these roles anyway).
   if (memberRole && ['manager', 'employee'].includes(memberRole)) {
+    if (DESIGN_V2) return <Navigate to="/business/home" replace />
     return (
       <Layout>
         <MemberTutorial />

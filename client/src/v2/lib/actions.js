@@ -310,3 +310,7 @@ export const checkBillPayment = (token, id, body) =>
 
 export const payBill = (token, id, idempotencyKey, body) =>
   apiFetch('/debts/' + encodeURIComponent(id) + '/pay', token, { method: 'POST', headers: { 'Idempotency-Key': idempotencyKey }, body })
+
+// Member home (2026-10-10, w2/I1): the receipt of an expense / advance report.
+export const uploadReceiptFile = (token, file) =>
+  uploadDocument(token, file, { title: file.name, document_type: 'payment_proof' })

@@ -10,7 +10,7 @@
 // one; V2Frame redirects a personal active workspace to the first business exactly as
 // the legacy BusinessShell does.
 import { useEffect } from 'react'
-import { Navigate, Outlet, Route, Routes } from 'react-router-dom'
+import { Navigate, Outlet, Route, Routes, useLocation } from 'react-router-dom'
 import './v2.css'
 import { useWorkspace } from '../shell/WorkspaceProvider'
 import {
@@ -47,9 +47,15 @@ import Assets from './pages/Assets'
 import AddAsset from './pages/AddAsset'
 import { AskProvider } from './ai/AskContext'
 import { SetupFrame, SetupAbout, SetupStep } from './setup/Setup'
+import MemberHome from './pages/MemberHome'
+
+// Manager / employee do not see company finances (the server refuses them): their pages.
+export const MEMBER_ROLES = ['manager', 'employee']
+const MEMBER_PATHS = ['/business/home', '/business/settings']
 
 function V2Frame() {
   const t = useT()
+  const loc = useLocation()
   const { workspaces, active, loading, error, applyActive, refresh } = useWorkspace()
   useEffect(() => {
     if (!loading && active && active.type === 'personal' && workspaces.business?.[0]) applyActive(workspaces.business[0])
@@ -57,10 +63,12 @@ function V2Frame() {
   if (loading && !active) return <div className="v2-root v2-boot"><Skeleton rows={4} /></div>
   if (error && !active) return <div className="v2-root v2-boot"><ErrorBox error={t('shell.loadError')} onRetry={refresh} /></div>
   if (!active) return null
+  const member = MEMBER_ROLES.includes(active.role)
+  if (member && !MEMBER_PATHS.some((p) => loc.pathname === p || loc.pathname.startsWith(p + '/'))) return <Navigate to="/business/home" replace />
   return (
     <V2DataProvider>
       <AskProvider>
-        <V2Shell><Outlet /></V2Shell>
+        <V2Shell member={member}><Outlet /></V2Shell>
       </AskProvider>
     </V2DataProvider>
   )
@@ -76,6 +84,7 @@ export default function BusinessApp() {
           <Route path="setup/:step" element={<SetupStep />} />
         </Route>
         <Route element={<V2Frame />}>
+          <Route path="home" element={<MemberHome />} />
           {/* Overview */}
           <Route path="pulse" element={<V2Pulse />} />
           <Route path="radar" element={<V2Radar />} />

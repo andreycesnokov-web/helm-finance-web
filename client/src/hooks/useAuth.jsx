@@ -9,9 +9,11 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     if (token) {
-      // Verify token still valid by fetching pulse
+      // Verify token still valid by fetching pulse. Only 401 means the token is bad: a user
+      // with no company yet (409), a manager / employee who may not read Pulse (403) or a
+      // server hiccup keep their session — before, every reload signed them out.
       fetch('/api/pulse', { headers: { Authorization: `Bearer ${token}` } })
-        .then(r => { if (!r.ok) throw new Error(); return r.json(); })
+        .then(r => { if (r.status === 401) throw new Error('unauthorized') }, () => { /* offline: keep the session */ })
         .then(() => {
           const payload = JSON.parse(atob(token.split('.')[1]))
           setUser({ id: payload.userId, firstName: payload.firstName })

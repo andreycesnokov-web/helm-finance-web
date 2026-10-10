@@ -140,14 +140,16 @@ function SidebarResizer({ width, onChange, label }) {
   )
 }
 
-export default function V2Shell({ children }) {
+const MEMBER_NAV = [{ key: 'home', labelKey: 'nav.home', to: '/business/home', icon: 'pulse' }]
+
+export default function V2Shell({ children, member = false }) {
   const t = useT()
   const loc = useLocation()
   const { workspaces, active } = useWorkspace()
   const select = useSwitchWorkspace()
   const counts = useShellCounts()
   const isAdmin = usePlatformAdmin()
-  const activeKey = activeNavKey(loc.pathname)
+  const activeKey = member && loc.pathname.startsWith('/business/home') ? 'home' : activeNavKey(loc.pathname)
   const tabKey = activeTabKey(loc.pathname)
   const personal = (workspaces?.personal || [])[0]
   const [sideW, setSideW] = useState(readSidebarWidth)
@@ -170,11 +172,12 @@ export default function V2Shell({ children }) {
           }} />
         </div>
         {/* v2 Add page: business scope always (review 8.2 #3). */}
-        <Link to="/business/add" className="v2-addbtn">
+        {!member && <Link to="/business/add" className="v2-addbtn">
           <span className="v2-addbtn-main"><I.plus />{t('nav.add')}</span>
-        </Link>
+        </Link>}
         <nav className="v2-navgroups">
-          {NAV_GROUPS.map((g) => (
+          {member && <div className="v2-navgroup">{MEMBER_NAV.map((it) => <NavItem key={it.key} it={it} activeKey={activeKey} counts={counts} t={t} />)}</div>}
+          {!member && NAV_GROUPS.map((g) => (
             <div key={g.key} className="v2-navgroup">
               <p className="v2-navgroup-title">{t(g.labelKey)}</p>
               {g.items.map((it) => <NavItem key={it.key} it={it} activeKey={activeKey} counts={counts} t={t} />)}
@@ -206,7 +209,7 @@ export default function V2Shell({ children }) {
           <span className="v2-topbar-name">{active?.name}</span>
           <I.chevDown size={16} />
         </Link>
-        <Link to="/business/approvals" className="v2-iconbtn" aria-label={t('shell.notifications')}>
+        <Link to={member ? '/business/home' : '/business/approvals'} className="v2-iconbtn" aria-label={t('shell.notifications')}>
           <I.bell size={20} />
           {counts.approvals > 0 && <span className="v2-dotbadge" aria-hidden="true" />}
         </Link>
@@ -219,7 +222,7 @@ export default function V2Shell({ children }) {
       <ErrorBoundary compact><AskPanel /></ErrorBoundary>
 
       <nav className="v2-tabbar" aria-label={t('nav.tabs')}>
-        {TABS.map((tb) => {
+        {(member ? [{ key: 'home', labelKey: 'nav.home', to: '/business/home', icon: 'pulse' }, { key: 'settings', labelKey: 'nav.settings', to: '/business/settings', icon: 'settings' }] : TABS).map((tb) => {
           const Ic = I[tb.icon]
           const on = tabKey === tb.key
           if (tb.disabled) {
