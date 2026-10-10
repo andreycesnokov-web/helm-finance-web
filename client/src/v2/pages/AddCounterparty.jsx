@@ -12,12 +12,13 @@
 // typed here, and entity form never picks a rate on this screen.
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
+import Modal from '../components/Modal'
 import { useAuth } from '../../hooks/useAuth'
 import I from '../icons'
 import { PageHead, Card, Btn, Pill, Skeleton, ErrorBox } from '../ui'
 import { useT } from '../i18n'
 import { useApi, useInvalidate } from '../data'
-import { createCounterparty, updateCounterparty, actionError } from '../lib/actions'
+import { createCounterparty, updateCounterparty, actionError, archiveCounterparty, removeCounterpartyBank } from '../lib/actions'
 import { npwpFormat, holderMatches } from '../lib/obligations'
 import { taxFieldsFor } from '../lib/counterpartyForm'
 
@@ -52,6 +53,15 @@ export default function AddCounterparty() {
   const terms = f.payment_terms_days === '' ? null : Number(f.payment_terms_days)
   const termsBad = terms != null && !(Number.isInteger(terms) && terms >= 0 && terms <= 365)
 
+  const [askArchive, setAskArchive] = useState(false)
+  const removeBank = async (a) => {
+    setBusy(true); setErr(null)
+    try { await removeCounterpartyBank(token, id, a.id); existing.reload?.() } catch (x) { setErr(x?.data?.error || x?.message) } finally { setBusy(false) }
+  }
+  const doArchive = async () => {
+    setBusy(true); setErr(null)
+    try { await archiveCounterparty(token, id); nav('/business/counterparties') } catch (x) { setErr(x?.data?.error || x?.message); setAskArchive(false) } finally { setBusy(false) }
+  }
   const save = async (anyway = false) => {
     if (!f.legal_name.trim()) { setErr(t('cp.form.nameRequired')); return }
     if (termsBad) { setErr(t('cp.form.termsBad')); return }
@@ -109,7 +119,7 @@ export default function AddCounterparty() {
         <div className="v2-banner v2-tone-warn" role="alert">
           <I.warn size={18} />
           <span className="v2-banner-text"><strong>{t('cp.form.dupQ', { name: dup.possible_matches?.[0]?.legal_name || dup.possible_matches?.[0]?.name || '' })}</strong> {dup.message}</span>
-          <Btn to="/business/counterparties/manage">{t('cp.form.openExisting')}</Btn>
+          {dup.possible_matches?.[0]?.id && <Btn to={`/business/counterparties/${dup.possible_matches[0].id}/edit`}>{t('cp.form.openExisting')}</Btn>}
           <Btn variant="primary" onClick={() => save(true)} disabled={busy}>{t('cp.form.different')}</Btn>
         </div>
       )}
@@ -156,7 +166,8 @@ export default function AddCounterparty() {
             <legend className="v2-field-label">{editing ? t('cp.form.addBank') : t('cp.form.bank')}</legend>
             {editing && (cp?.bank_accounts || []).length > 0 && (
               <ul className="v2-moves">{cp.bank_accounts.map((a) => (
-                <li key={a.id}><span>{[a.bank_name, a.account_name].filter(Boolean).join(' · ') || '—'}</span><span className="v2-num">···· {String(a.account_number || '').slice(-4)}</span></li>
+                <li key={a.id}><span>{[a.bank_name, a.account_name].filter(Boolean).join(' · ') || '—'}</span><span className="v2-num">···· {String(a.account_number || '').slice(-4)}</span>
+                  <button type="button" className="v2-btn-link v2-small" disabled={busy} onClick={() => removeBank(a)}>{t('cp.form.removeBank')}</button></li>
               ))}</ul>
             )}
             <div className="v2-field-row">
@@ -176,6 +187,7 @@ export default function AddCounterparty() {
             </label>
           </div>
           <div className="v2-row-gap v2-row-end">
+            {editing && <button type="button" className="v2-btn v2-btn-ghost v2-mr-auto" disabled={busy} onClick={() => setAskArchive(true)}>{t('accd.archive')}</button>}
             <Btn to="/business/counterparties">{t('dec.cancel')}</Btn>
             <Btn variant="primary" onClick={() => save(false)} disabled={busy}>{t('cp.form.save')}</Btn>
           </div>
@@ -204,6 +216,10 @@ export default function AddCounterparty() {
           </Card>
         </div>
       </div>
+      {askArchive && <Modal title={t('cp.form.archiveTitle', { name: cp?.legal_name || cp?.name || '' })} onClose={() => setAskArchive(false)}
+        footer={<><button type="button" className="v2-btn v2-btn-secondary" onClick={() => setAskArchive(false)}>{t('set.cancel')}</button><button type="button" className="v2-btn v2-btn-primary" disabled={busy} onClick={doArchive}>{t('accd.archive')}</button></>}>
+        <p className="v2-sec">{t('cp.form.archiveP')}</p>
+      </Modal>}
     </div>
   )
 }

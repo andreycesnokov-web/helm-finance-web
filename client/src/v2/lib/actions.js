@@ -271,3 +271,12 @@ export const createBill = (token, body) =>
 //   PATCH /api/debts/:id              edit a bill / invoice (counterparty, amount, currency, due date, description)
 export const updateBill = (token, id, body) =>
   apiFetch('/debts/' + encodeURIComponent(id), token, { method: 'PATCH', body })
+
+// Counterparty card (2026-10-10, design w2/G1): existing routes, role-checked and audited.
+//   POST   /api/counterparties/:id/archive                     archive (bills and payments stay)
+//   DELETE /api/counterparties/:id/bank-accounts/:accountId    remove one bank account
+export const archiveCounterparty = (token, id) =>
+  apiFetch('/counterparties/' + encodeURIComponent(id) + '/archive', token, { method: 'POST', body: {} })
+
+export const removeCounterpartyBank = (token, id, accountId) =>
+  apiFetch('/counterparties/' + encodeURIComponent(id) + '/bank-accounts/' + encodeURIComponent(accountId), token, { method: 'DELETE' })

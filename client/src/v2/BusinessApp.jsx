@@ -18,7 +18,6 @@ import {
 } from '../pages/business'
 import TaxSplit from '../pages/business/TaxSplit'
 import InvoiceSettlement from '../pages/business/InvoiceSettlement'
-import Counterparties from '../pages/business/Counterparties'
 import Payroll from '../pages/Payroll'
 import BankImport from './pages/BankImport'
 import AddEntry from './pages/AddEntry'
@@ -113,7 +112,7 @@ export default function BusinessApp() {
           <Route path="payroll/manage" element={<Payroll />} />
           <Route path="approvals" element={<V2Approvals />} />
           <Route path="counterparties" element={<V2Counterparties />} />
-          <Route path="counterparties/manage" element={<Counterparties />} />
+          <Route path="counterparties/manage" element={<Navigate to="/business/counterparties" replace />} />
           <Route path="counterparties/new" element={<AddCounterparty />} />
           <Route path="counterparties/:id/edit" element={<AddCounterparty />} />
           {/* Accounting */}

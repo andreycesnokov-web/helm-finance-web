@@ -35,7 +35,6 @@ export default function Counterparties() {
   const head = (
     <PageHead title={t('nav.counterparties')} sub={t('cp.sub')}
       actions={<>
-        <Btn to="/business/counterparties/manage">{t('cp.manage')}</Btn>
         <Btn variant="primary" icon={<I.plus size={16} />} to="/business/counterparties/new">{t('cp.add')}</Btn>
       </>} />
   )

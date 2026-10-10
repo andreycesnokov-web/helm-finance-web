@@ -184,6 +184,7 @@ export default {
     npwpOnFile: 'NPWP on file', missing: 'Missing NPWP', byAi: 'Added by AI assistant',
     emptyTitle: 'No counterparties here', emptyText: 'Add the customers and suppliers you work with.',
     form: {
+      removeBank: 'Remove', archiveTitle: 'Archive {name}?', archiveP: 'It disappears from suggestions. Its bills and payments stay. It cannot be deleted while it has bills.',
       sub: 'A customer or supplier. Start from any document, or type the details.', save: 'Save counterparty', details: 'Details',
       fromDoc: 'From a document', fromDocHint: 'Upload an invoice or NPWP card in Documents — CFO AI suggests the counterparty.',
       fromNpwp: 'From the NPWP', fromNpwpHint: 'Lookup is not available yet — type the number below.',

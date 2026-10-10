@@ -184,6 +184,7 @@ export default {
     npwpOnFile: 'NPWP tersimpan', missing: 'NPWP belum ada', byAi: 'Ditambahkan asisten AI',
     emptyTitle: 'Tidak ada mitra', emptyText: 'Tambahkan pelanggan dan pemasok Anda.',
     form: {
+      removeBank: 'Hapus', archiveTitle: 'Arsipkan {name}?', archiveP: 'Hilang dari saran. Tagihan dan pembayarannya tetap ada. Tidak bisa dihapus jika ada tagihan.',
       sub: 'Pelanggan atau pemasok. Mulai dari dokumen apa saja, atau ketik rinciannya.', save: 'Simpan mitra', details: 'Rincian',
       fromDoc: 'Dari dokumen', fromDocHint: 'Unggah faktur atau kartu NPWP di Dokumen — CFO AI menyarankan mitranya.',
       fromNpwp: 'Dari NPWP', fromNpwpHint: 'Pencarian belum tersedia — ketik nomornya di bawah.',

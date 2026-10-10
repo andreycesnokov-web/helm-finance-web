@@ -93,6 +93,9 @@ export const WRITE_ALLOW = [
   { method: 'POST', path: '/extract`' },                 // POST /api/documents/:id/extract (reads; writes nothing)
   { method: 'POST', path: "'/debts'" },                  // POST /api/debts
   { method: 'PATCH', path: "'/debts/' + encodeURIComponent" }, // PATCH /api/debts/:id (edit a bill)
+  // Counterparty card (2026-10-10, w2/G1): role-checked and audited on the server.
+  { method: 'POST', path: "'/archive', token" },               // POST   /api/counterparties/:id/archive
+  { method: 'DELETE', path: "'/bank-accounts/'" },             // DELETE /api/counterparties/:id/bank-accounts/:accountId
 ]
 const ACTIONS = path.join(V2, 'lib', 'actions.js')
 // POSTs that ask an existing AI endpoint a question and change no data. Only in lib/ask.js.
@@ -188,7 +191,8 @@ t('every allowed write exists on the server (batch 8 routes are the approved one
     /app\.post\('\/api\/wallets'/, /app\.put\('\/api\/wallets\/:id'/, /app\.delete\('\/api\/wallets\/:id'/, /app\.post\('\/api\/wallets\/:id\/adjust-balance'/,
     /app\.post\('\/api\/bank-import\/read'/, /app\.post\('\/api\/bank-import\/batches'/, /app\.post\('\/api\/bank-imports\/:batchId\/suggest'/,
     /app\.post\('\/api\/bank-imports\/:batchId\/confirm'/, /app\.post\('\/api\/classification-rules'/,
-    /app\.post\('\/api\/documents\/:id\/extract'/, /app\.post\('\/api\/debts'/, /app\.patch\('\/api\/debts\/:id'/]) {
+    /app\.post\('\/api\/documents\/:id\/extract'/, /app\.post\('\/api\/debts'/, /app\.patch\('\/api\/debts\/:id'/,
+    /app\.post\('\/api\/counterparties\/:id\/archive'/, /app\.delete\('\/api\/counterparties\/:id\/bank-accounts\/:accountId'/]) {
     assert.ok(r.test(server), `server route ${r} missing`)
   }
 })
