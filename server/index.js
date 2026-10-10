@@ -12,6 +12,7 @@ const FININ = require('./lib/financialInsights');
 const SETTLE = require('./lib/invoiceSettlement');
 const docA = require('./lib/documentAccess');
 const TX = require('./lib/transactionClass');
+const WL = require('./lib/walletLedger');
 const TARGETS = require('./lib/businessTargets');   // Design v2 P-01/P-08 (migrations 058, 059)
 const CHECKLIST = require('./lib/billChecklist');   // Design v2 P-05 (migration 061)
 const PNLMAP = require('./lib/pnlMapping');         // Design v2 P-10 (migration 062)
@@ -8578,7 +8579,7 @@ app.post('/api/transactions/batch', auth, async (req, res) => {
     if (requestedWalletIds.length > 0) {
       const { data: ownedWallets, error: wErr } = await supabase
         .from('wallets')
-        .select('id, name, currency')
+        .select('id, name, currency, type')
         .or(bizOrFilter(biz))
         .in('id', requestedWalletIds);
       if (wErr) throw wErr;
@@ -8607,6 +8608,25 @@ app.post('/api/transactions/batch', auth, async (req, res) => {
         if (transactions.every(t => t.transfer_id && existingTransferIds.has(t.transfer_id))) {
           return res.status(200).json({ saved: existingTransferTxs.length, is_replay: true });
         }
+      }
+    }
+
+    // ── No manual outflow below zero: the batch's outflows per wallet, net of its inflows ──
+    {
+      const net = {};
+      for (const t of transactions) {
+        if (!t.wallet_id || !walletMap[t.wallet_id]) continue;
+        if (t.transfer_id && existingTransferIds.has(t.transfer_id)) continue; // already recorded
+        const amt = Number(t.amount);
+        const d = TX.CASH_OUT_LEGACY.includes(t.type) || t.type === 'transfer' ? -amt
+          : TX.CASH_IN_LEGACY.includes(t.type) || t.type === 'correction' ? amt : 0;
+        net[t.wallet_id] = (net[t.wallet_id] || 0) + d;
+        if (t.type === 'transfer' && t.to_wallet_id && walletMap[t.to_wallet_id] && walletMap[t.to_wallet_id].currency === walletMap[t.wallet_id].currency) {
+          net[t.to_wallet_id] = (net[t.to_wallet_id] || 0) + amt;
+        }
+      }
+      for (const [wid, d] of Object.entries(net)) {
+        if (d < 0 && await refuseNegativeOutflow(res, biz, walletMap[wid], -d)) return;
       }
     }
 
@@ -10015,6 +10035,27 @@ function notificationText(type, language, params = {}) {
 const WALLET_CASH_IN  = TX.CASH_IN_LEGACY;
 const WALLET_CASH_OUT = TX.CASH_OUT_LEGACY;
 
+// Ledger balance of one wallet — every row (paged), same formula as GET /api/wallets.
+async function walletLedgerBalance(biz, wallet) {
+  const cols = 'id, wallet_id, source, type, amount_original, amount_idr';
+  const bizOr = bizOrFilter(biz);
+  const [byId, byName] = await Promise.all([
+    WL.fetchAllRows(() => supabase.from('transactions').select(cols).or(bizOr).eq('wallet_id', wallet.id).order('id')),
+    WL.fetchAllRows(() => supabase.from('transactions').select(cols).or(bizOr).is('wallet_id', null).eq('source', wallet.name).order('id')),
+  ]);
+  return WL.ledgerBalance([...byId, ...byName], wallet);
+}
+
+// A manual outflow may not take a money account below zero (owner rule, 2026-10-10).
+// Returns true when it refused (the 409 is already sent).
+async function refuseNegativeOutflow(res, biz, wallet, amount) {
+  if (!wallet) return false;
+  const refusal = WL.outflowRefusal({ wallet, balance: await walletLedgerBalance(biz, wallet), amount });
+  if (!refusal) return false;
+  res.status(409).json(refusal);
+  return true;
+}
+
 app.get('/api/wallets', auth, async (req, res) => {
   try {
     const biz = await requireBusiness(req, res);
@@ -10036,11 +10077,11 @@ app.get('/api/wallets', auth, async (req, res) => {
 
     // Fetch transactions to compute per-wallet balances
     // Preserves query contract for tests: .select('wallet_id, source, type, amount_idr')
-    const { data: txs, error: tErr } = await supabase
+    const txs = await WL.fetchAllRows(() => supabase
       .from('transactions')
-      .select('wallet_id, source, type, amount_original, amount_idr, currency_original')
-      .or(bizOr);
-    if (tErr) throw tErr;
+      .select('id, wallet_id, source, type, amount_original, amount_idr, currency_original')
+      .or(bizOr)
+      .order('id'));
 
     let hasIncompleteBalance = false;
     const unvaluedCurrencies = [];
@@ -10620,7 +10661,7 @@ app.post('/api/wallets/transfer', auth, async (req, res) => {
     const bizOr = bizOrFilter(biz);
     const { data: wallets, error: wErr } = await supabase
       .from('wallets')
-      .select('id, name, currency, scope, is_active')
+      .select('id, name, currency, scope, is_active, type')
       .or(bizOr)
       .in('id', [from_wallet_id, to_wallet_id]);
 
@@ -10663,6 +10704,10 @@ app.post('/api/wallets/transfer', auth, async (req, res) => {
         });
       }
     }
+
+    // A replay of an already-recorded transfer was answered above; every new one is checked
+    // (the app always sends a transfer_id, so the check may not depend on its absence).
+    if (await refuseNegativeOutflow(res, biz, fromWallet, sourceAmount)) return;
 
     let fxResFrom;
     let fxResTo;
@@ -11939,12 +11984,12 @@ app.post('/api/debts/:id/pay', auth, async (req, res) => {
   let payWallet = null;
   if (wallet_id) {
     const { data: wRows } = await supabase.from('wallets')
-      .select('id, name, scope, currency').eq('id', wallet_id).or(bizOrFilter(biz)).limit(1);
+      .select('id, name, scope, currency, type').eq('id', wallet_id).or(bizOrFilter(biz)).limit(1);
     if (!wRows?.length) return res.status(400).json({ error: 'Invalid or inaccessible wallet' });
     payWallet = wRows[0];
   } else if (account && typeof account === 'string' && account.trim()) {
     const { data: nameRows } = await supabase.from('wallets')
-      .select('id, name, scope, currency').eq('name', account.trim()).or(bizOrFilter(biz)).limit(1);
+      .select('id, name, scope, currency, type').eq('name', account.trim()).or(bizOrFilter(biz)).limit(1);
     if (nameRows?.length) {
       payWallet = nameRows[0];
     }
@@ -12051,6 +12096,8 @@ app.post('/api/debts/:id/pay', auth, async (req, res) => {
       message: 'A valid active business wallet is required to record a payment',
     });
   }
+  // After the replay check: a replay of a recorded payment is answered above, never refused.
+  if (debt.type === 'payable' && await refuseNegativeOutflow(res, biz, payWallet, paymentAmount)) return;
 
   // Strict atomic RPC execution with FOR UPDATE locking and single DB transaction
   if (typeof supabase.rpc !== 'function') {
@@ -12658,7 +12705,7 @@ async function buildBusinessFinancialSnapshot(biz, language = 'en', asOfDate = n
 
   const [{ data: wallets }, { data: txs }, { data: rawDebts }, { data: employees }, { data: taxObs }] = await Promise.all([
     supabase.from('wallets').select('id,name,currency,type,scope').or(bizOr).eq('is_active', true),
-    supabase.from('transactions').select('type,amount_original,amount_idr,created_at,wallet_id,source,scope').or(bizOr),
+    WL.fetchAllRows(() => supabase.from('transactions').select('id,type,amount_original,amount_idr,created_at,wallet_id,source,scope').or(bizOr).order('id')).then((data) => ({ data })),
     supabase.from('debts').select('*').or(bizOr).or('is_training.is.null,is_training.eq.false'),
     supabase.from('payroll_employees').select('default_salary,pay_day,status').or(bizOr).neq('status', 'archived'),
     // Tax obligations: only verified-source, reviewed/owner-confirmed, unpaid ones
@@ -14073,10 +14120,11 @@ app.post('/api/payroll/payments', auth, async (req, res) => {
     // ── Validate wallet (must belong to same business) ───────────────────────
     let wallet = null;
     if (wallet_id) {
-      const { data: wRows } = await supabase.from('wallets').select('id, name, scope, currency').eq('id', wallet_id).or(bizOrFilter(biz)).limit(1);
+      const { data: wRows } = await supabase.from('wallets').select('id, name, scope, currency, type').eq('id', wallet_id).or(bizOrFilter(biz)).limit(1);
       if (!wRows?.length) return res.status(400).json({ error: 'Invalid or inaccessible wallet.' });
       wallet = wRows[0];
     }
+    if (await refuseNegativeOutflow(res, biz, wallet, netAmount)) return;
 
     const payDate     = payment_date || new Date().toISOString().slice(0, 10);
     const periodLabel = period_month ? ` — ${period_month}` : '';

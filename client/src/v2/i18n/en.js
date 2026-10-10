@@ -504,7 +504,7 @@ export default {
     businessNote: 'Saved as a company record in this business. Personal money is kept in your Personal workspace.',
     saveOut: 'Save expense', saveIn: 'Save income', doneOut: 'Expense of {v} saved.', doneIn: 'Income of {v} saved.',
     forbidden: 'Your role can submit requests but not record money directly. Ask an owner, admin or CFO.',
-    err: { type: 'Choose expense or income.', amount: 'Enter an amount in whole rupiah, e.g. 1.500.000.', wallet: 'Choose the account.', date: 'Enter a date.', description: 'Say what it was for.' },
+    err: { type: 'Choose expense or income.', amount: 'Enter an amount in whole rupiah, e.g. 1.500.000.', wallet: 'Choose the account.', date: 'Enter a date.', description: 'Say what it was for.', insufficient_balance: '{name} has {bal}. This expense would take it below zero — {short} is missing. Choose another account or record the incoming money first.', wallet_balance_negative: '{name} already shows {bal} in the books. A bank account cannot be below zero — import its bank statement or record the missing income first.' },
   },
   perf: {
     sub: 'Is the business making money, and where does the cash go', views: 'Performance views', forbidden: 'Your role cannot view business finance.',

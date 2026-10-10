@@ -57,6 +57,11 @@ export default function AddEntry() {
       setDone({ type: body.tx.type, amount: body.tx.amount, currency: body.tx.currency })
       setF((x) => ({ ...EMPTY(x.type), wallet_id: x.wallet_id }))
     } catch (x) {
+      const d = x?.data
+      if (d && (d.error === 'insufficient_balance' || d.error === 'wallet_balance_negative')) {
+        setErr(t(`add.err.${d.error}`, { name: d.wallet_name, bal: money(d.balance, { currency: d.currency || 'IDR', full: true }), short: money(d.shortfall, { currency: d.currency || 'IDR', full: true }) }))
+        return
+      }
       setErr(actionError(x) === 'forbidden' ? t('add.forbidden') : (x?.data?.error || actionError(x)))
     } finally { setBusy(false) }
   }
