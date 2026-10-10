@@ -280,3 +280,20 @@ export const archiveCounterparty = (token, id) =>
 
 export const removeCounterpartyBank = (token, id, accountId) =>
   apiFetch('/counterparties/' + encodeURIComponent(id) + '/bank-accounts/' + encodeURIComponent(accountId), token, { method: 'DELETE' })
+
+// Payroll (2026-10-10, designs w2/F1 + F2): existing routes, canManagePayroll on the server.
+//   POST   /api/payroll/employees        add a person
+//   PATCH  /api/payroll/employees/:id    edit
+//   DELETE /api/payroll/employees/:id    archive (past payments stay)
+//   POST   /api/payroll/payments         pay one person for a month, with item lines (PPh 21, BPJS…)
+export const createEmployee = (token, body) =>
+  apiFetch('/payroll/employees', token, { method: 'POST', body })
+
+export const updateEmployee = (token, id, body) =>
+  apiFetch('/payroll/employees/' + encodeURIComponent(id), token, { method: 'PATCH', body })
+
+export const archiveEmployee = (token, id) =>
+  apiFetch('/payroll/employees/' + encodeURIComponent(id), token, { method: 'DELETE' })
+
+export const recordPayrollPayment = (token, body) =>
+  apiFetch('/payroll/payments', token, { method: 'POST', body })

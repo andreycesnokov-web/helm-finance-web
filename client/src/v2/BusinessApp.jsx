@@ -18,7 +18,6 @@ import {
 } from '../pages/business'
 import TaxSplit from '../pages/business/TaxSplit'
 import InvoiceSettlement from '../pages/business/InvoiceSettlement'
-import Payroll from '../pages/Payroll'
 import BankImport from './pages/BankImport'
 import AddEntry from './pages/AddEntry'
 import V2Shell from './shell/V2Shell'
@@ -109,7 +108,7 @@ export default function BusinessApp() {
           <Route path="invoices" element={<Bills key="all" />} />
           <Route path="invoices/classic" element={<Navigate to="/business/invoices" replace />} />
           <Route path="payroll" element={<V2Payroll />} />
-          <Route path="payroll/manage" element={<Payroll />} />
+          <Route path="payroll/manage" element={<Navigate to="/business/payroll" replace />} />
           <Route path="approvals" element={<V2Approvals />} />
           <Route path="counterparties" element={<V2Counterparties />} />
           <Route path="counterparties/manage" element={<Navigate to="/business/counterparties" replace />} />
