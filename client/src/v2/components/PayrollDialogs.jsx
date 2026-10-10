@@ -81,8 +81,12 @@ export function PayrollRunDialog({ employees = [], wallets = [], payments = [], 
   const calc = (r) => { const g = num(r.salary) + num(r.bonus); const d = num(r.pph21) + num(r.bpjs) + num(r.other); return { gross: g, ded: d, net: g - d } }
   const totals = useMemo(() => rows.filter((r) => r.on).reduce((s, r) => { const c = calc(r); return { gross: s.gross + c.gross, pph: s.pph + num(r.pph21), bpjs: s.bpjs + num(r.bpjs), net: s.net + c.net } }, { gross: 0, pph: 0, bpjs: 0, net: 0 }), [rows])
   const twice = rows.some((r) => r.on && paid.has(String(r.id)))
+  // An account may not go below zero (owner rule): the month's take-home must fit the balance.
+  const wallet = wallets.find((w) => String(w.id) === walletId)
+  const short = wallet && totals.net > Number(wallet.balance || 0) + 0.005
   const bad = rows.filter((r) => r.on).find((r) => r.pph21 === '' || Number.isNaN(calc(r).net) || calc(r).net <= 0)
   const save = async () => {
+    if (short) { setErr(t('payd.err.short', { name: wallet.name, bal: money(wallet.balance, { full: true }), net: money(totals.net, { full: true }) })); return }
     if (bad) { setErr(bad.pph21 === '' ? t('payd.err.pph', { name: bad.name }) : t('payd.err.net', { name: bad.name })); return }
     setBusy(true); setErr('')
     let ok = 0
@@ -106,12 +110,12 @@ export function PayrollRunDialog({ employees = [], wallets = [], payments = [], 
   return (
     <Modal wide title={t('payd.runTitle')} onClose={onClose}
       footer={<><button type="button" className="v2-btn v2-btn-secondary" onClick={onClose}>{t('set.cancel')}</button>
-        <button type="button" className="v2-btn v2-btn-primary" disabled={busy || !rows.some((r) => r.on)} onClick={save} data-payd-run>{busy ? t('payd.saving', { n: done }) : t('payd.record')}</button></>}>
+        <button type="button" className="v2-btn v2-btn-primary" disabled={busy || !rows.some((r) => r.on) || short} onClick={save} data-payd-run>{busy ? t('payd.saving', { n: done }) : t('payd.record')}</button></>}>
       <div className="v2-field-row">
         <label className="v2-field"><span className="v2-field-label">{t('payd.period')}</span><input className="v2-input" type="month" value={period} onChange={(e) => setPeriod(e.target.value)} /></label>
         <label className="v2-field"><span className="v2-field-label">{t('payd.date')}</span><input className="v2-input" type="date" value={date} onChange={(e) => setDate(e.target.value)} /></label>
         <label className="v2-field"><span className="v2-field-label">{t('payd.wallet')}</span>
-          <select className="v2-select" value={walletId} onChange={(e) => setWalletId(e.target.value)}>{wallets.map((w) => <option key={w.id} value={String(w.id)}>{w.name} · {w.currency || 'IDR'}</option>)}</select></label>
+          <select className="v2-select" value={walletId} onChange={(e) => { setWalletId(e.target.value); setErr('') }}>{wallets.map((w) => <option key={w.id} value={String(w.id)}>{w.name} · {money(w.balance, { currency: w.currency || 'IDR', full: true })}</option>)}</select></label>
       </div>
       <div className="v2-payd-table" role="table" aria-label={t('payd.runTitle')}>
         <div className="v2-payd-row is-head" role="row">{['person', 'salary', 'bonus', 'pph21', 'bpjs', 'other', 'net'].map((k) => <span key={k} role="columnheader">{t(`payd.col.${k}`)}</span>)}</div>
@@ -133,6 +137,7 @@ export function PayrollRunDialog({ employees = [], wallets = [], payments = [], 
       {twice && <div className="v2-banner v2-tone-warn" role="status"><span className="v2-banner-text">{t('payd.twice', { m: period })}</span></div>}
       <div className="v2-banner v2-tone-info"><span className="v2-banner-text">{t('payd.after', { pph: money(totals.pph, { full: true }), bpjs: money(totals.bpjs, { full: true }) })}</span></div>
       <p className="v2-muted v2-small">{t('payd.pphNote')}</p>
+      {short && <p className="v2-inline-err" role="alert" data-payd-short>{t('payd.err.short', { name: wallet.name, bal: money(wallet.balance, { full: true }), net: money(totals.net, { full: true }) })}</p>}
       {err && <p className="v2-inline-err" role="alert">{err}</p>}
     </Modal>
   )

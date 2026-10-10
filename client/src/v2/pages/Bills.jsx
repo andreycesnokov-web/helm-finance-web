@@ -3,12 +3,11 @@
 // /business/invoices (All). Data: GET /api/debts and GET /api/wallets.
 //
 // Writes reuse the existing components unchanged: DebtFormModal (Add a bill / New
-// invoice, business scope locked) and DebtPaymentModal (Mark paid / Mark received).
+// invoice, business scope locked) and PayBillDialog (Mark paid / Mark received, components/MoneyDialogs).
 // The previous pages stay one click away under "Classic view".
 import { useMemo, useState, useEffect } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { useAuth } from '../../hooks/useAuth'
-import DebtPaymentModal from '../../components/DebtPaymentModal'
+import { PayBillDialog } from '../components/MoneyDialogs'
 import BillDialog from '../components/BillDialog'
 import I from '../icons'
 import { PageHead, Card, Pill, Btn, NotYet, Skeleton, ErrorBox, Empty } from '../ui'
@@ -39,7 +38,7 @@ function Row({ d, onPay, t, lang }) {
   let action
   if (s === 'pending') action = <Btn to={detailPath(d)}>{t('bills.review')}</Btn>
   // A late invoice can still be marked received (existing POST /api/debts/:id/pay through
-  // DebtPaymentModal); sending a reminder is not built yet and stays "Coming soon".
+  // PayBillDialog); sending a reminder is not built yet and stays "Coming soon".
   else if (s === 'late' && receivable) action = <span className="v2-btnpair"><Btn onClick={() => onPay(d)}>{t('bills.markReceived')}</Btn><NotYet note={t('bills.reminderSoon')}>{t('bills.sendReminder')}</NotYet></span>
   else if (s === 'open' || s === 'partial' || s === 'late') action = <Btn onClick={() => onPay(d)}>{t(receivable ? 'bills.markReceived' : 'bills.markPaid')}</Btn>
   else action = <Btn to={detailPath(d)}>{t('bills.open')}</Btn>
@@ -78,7 +77,6 @@ function Section({ title, rows, onPay, t, lang, who }) {
 export default function Bills() {
   const t = useT()
   const lang = useLang()
-  const { token } = useAuth()
   const loc = useLocation()
   const navigate = useNavigate()
   const invalidate = useInvalidate()
@@ -96,7 +94,7 @@ export default function Bills() {
   const wallets = useApi('/wallets')
   // GET /api/wallets returns only this company's wallets (by business_id). A wallet labelled
   // 'personal' is still company-held (_specs/accounts-personal-scope-ambiguity.md), so it is
-  // not dropped; DebtPaymentModal lists it with its name.
+  // not dropped; PayBillDialog lists it with its name.
   const bizWallets = (wallets.data?.wallets || []).filter((x) => x.is_active !== false)
 
   const list = Array.isArray(debts.data) ? debts.data : []
@@ -133,8 +131,7 @@ export default function Bills() {
   const modals = (
     <>
       {create && <BillDialog mode={create} onClose={() => setCreate(null)} onSaved={invalidate} />}
-      {pay && <DebtPaymentModal debt={pay} accounts={bizWallets} token={token}
-        onClose={() => setPay(null)} onSuccess={() => { setPay(null); invalidate() }} />}
+      {pay && <PayBillDialog debt={pay} accounts={bizWallets} onClose={() => setPay(null)} onSaved={invalidate} />}
       {editDebt && <BillDialog debt={editDebt} onClose={clearEditParam} onSaved={invalidate} />}
     </>
   )

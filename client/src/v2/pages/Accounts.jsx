@@ -16,8 +16,7 @@ import { useT, useLang } from '../i18n'
 import { useApi, useInvalidate } from '../data'
 import { money, shortDate, daysUntil } from '../lib/format'
 import { statementFreshness, txDate, unlinkedMoney } from '../lib/obligations'
-import BusinessWalletTransferModal from '../../components/BusinessWalletTransferModal'
-import { useAuth } from '../../hooks/useAuth'
+import { TransferDialog } from '../components/MoneyDialogs'
 import { useWorkspace } from '../../shell/WorkspaceProvider'
 import { useState, useEffect } from 'react'
 import { NewAccountDialog, EditAccountDialog, AdjustBalanceDialog, ArchiveAccountDialog, ArchivedAccountsDialog } from '../components/AccountDialogs'
@@ -29,7 +28,6 @@ const SERIES = ['var(--chart-1)', 'var(--chart-2)', 'var(--chart-3)', 'var(--bra
 export default function Accounts() {
   const t = useT()
   const lang = useLang()
-  const { token } = useAuth()
   const { active, scopeKey } = useWorkspace()
   const [showTransfer, setShowTransfer] = useState(false)
   const [dlg, setDlg] = useState(null)   // { kind: 'new' | 'edit' | 'adjust' | 'archive' | 'archived', wallet? }
@@ -258,19 +256,8 @@ export default function Accounts() {
       </div>
       {dialogs}
       {showTransfer && (
-        <BusinessWalletTransferModal
-          token={token}
-          wallets={wallets}
-          userRole={active?.role}
-          onClose={() => setShowTransfer(false)}
-          onSuccess={() => {
-            setShowTransfer(false)
-            invalidate()
-            w.reload()
-            transfers.reload()
-            allTx.reload()
-          }}
-        />
+        <TransferDialog wallets={wallets} onClose={() => setShowTransfer(false)}
+          onSaved={() => { invalidate(); w.reload(); transfers.reload(); allTx.reload() }} />
       )}
     </div>
   )

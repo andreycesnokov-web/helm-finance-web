@@ -101,6 +101,10 @@ export const WRITE_ALLOW = [
   { method: 'PATCH', path: "'/payroll/employees/' + encodeURIComponent" },  // PATCH  /api/payroll/employees/:id
   { method: 'DELETE', path: "'/payroll/employees/' + encodeURIComponent" }, // DELETE /api/payroll/employees/:id (archive)
   { method: 'POST', path: "'/payroll/payments'" },                         // POST   /api/payroll/payments
+  // Money windows (2026-10-10): v2 replacements of the v1 transfer and payment modals.
+  { method: 'POST', path: "'/wallets/transfer'" },                         // POST /api/wallets/transfer (atomic RPC)
+  { method: 'POST', path: "'/decisions/debts/' + encodeURIComponent" },    // POST /api/decisions/debts/:id/payment (simulation)
+  { method: 'POST', path: "'/pay', token" },                               // POST /api/debts/:id/pay (idempotent)
 ]
 const ACTIONS = path.join(V2, 'lib', 'actions.js')
 // POSTs that ask an existing AI endpoint a question and change no data. Only in lib/ask.js.
@@ -198,7 +202,8 @@ t('every allowed write exists on the server (batch 8 routes are the approved one
     /app\.post\('\/api\/bank-imports\/:batchId\/confirm'/, /app\.post\('\/api\/classification-rules'/,
     /app\.post\('\/api\/documents\/:id\/extract'/, /app\.post\('\/api\/debts'/, /app\.patch\('\/api\/debts\/:id'/,
     /app\.post\('\/api\/counterparties\/:id\/archive'/, /app\.delete\('\/api\/counterparties\/:id\/bank-accounts\/:accountId'/,
-    /app\.post\('\/api\/payroll\/employees'/, /app\.patch\('\/api\/payroll\/employees\/:id'/, /app\.delete\('\/api\/payroll\/employees\/:id'/, /app\.post\('\/api\/payroll\/payments'/]) {
+    /app\.post\('\/api\/payroll\/employees'/, /app\.patch\('\/api\/payroll\/employees\/:id'/, /app\.delete\('\/api\/payroll\/employees\/:id'/, /app\.post\('\/api\/payroll\/payments'/,
+    /app\.post\('\/api\/wallets\/transfer'/, /app\.post\('\/api\/decisions\/debts\/:id\/payment'/, /app\.post\('\/api\/debts\/:id\/pay'/]) {
     assert.ok(r.test(server), `server route ${r} missing`)
   }
 })

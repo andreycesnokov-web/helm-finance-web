@@ -297,3 +297,16 @@ export const archiveEmployee = (token, id) =>
 
 export const recordPayrollPayment = (token, body) =>
   apiFetch('/payroll/payments', token, { method: 'POST', body })
+
+// Money windows (2026-10-10, v2 replacements of the v1 transfer and payment modals).
+//   POST /api/wallets/transfer                 move money between two of the company's accounts
+//   POST /api/decisions/debts/:id/payment      AI CFO check of a payment (simulation, writes nothing)
+//   POST /api/debts/:id/pay                    record a payment (idempotency key: one booking per click)
+export const transferBetweenWallets = (token, body) =>
+  apiFetch('/wallets/transfer', token, { method: 'POST', body })
+
+export const checkBillPayment = (token, id, body) =>
+  apiFetch('/decisions/debts/' + encodeURIComponent(id) + '/payment', token, { method: 'POST', body })
+
+export const payBill = (token, id, idempotencyKey, body) =>
+  apiFetch('/debts/' + encodeURIComponent(id) + '/pay', token, { method: 'POST', headers: { 'Idempotency-Key': idempotencyKey }, body })

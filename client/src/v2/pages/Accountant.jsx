@@ -130,7 +130,7 @@ function FromYourData({ obl, t, lang }) {
   const reserve = Number(obl.data?.reserve?.amount || 0)
   return (
     <Card title={t('acct.fromData.title', { m: obl.data?.period ? monthLabel(obl.data.period, lang) : '' })}
-      aside={<span className="v2-row-gap"><Link to="/business/accountant/tax-split">{t('acct.fromData.split')}</Link><Link to="/business/accountant/settlement">{t('acct.fromData.settlement')}</Link></span>}>
+      aside={<Link to="/business/payables">{t('acct.fromData.split')}</Link>}>
       <p className="v2-stat-mid v2-num">{reserve > 0 ? money(reserve) : '—'}</p>
       <p className="v2-muted v2-small">{t(reserve > 0 ? 'acct.fromData.reserve' : 'acct.fromData.noReserve')}</p>
       <ul className="v2-taxlist">

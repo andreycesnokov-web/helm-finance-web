@@ -16,8 +16,6 @@ import { useWorkspace } from '../shell/WorkspaceProvider'
 import {
   BusinessLayout,
 } from '../pages/business'
-import TaxSplit from '../pages/business/TaxSplit'
-import InvoiceSettlement from '../pages/business/InvoiceSettlement'
 import BankImport from './pages/BankImport'
 import AddEntry from './pages/AddEntry'
 import V2Shell from './shell/V2Shell'
@@ -122,8 +120,8 @@ export default function BusinessApp() {
           <Route path="accountant/calendar" element={<Navigate to="/business/accountant?tab=taxes" replace />} />
           <Route path="accountant/tax-profile" element={<CompanyProfile />} />
           <Route path="accountant/tax-profile/edit" element={<CompanyProfileEdit />} />
-          <Route path="accountant/tax-split" element={<TaxSplit />} />
-          <Route path="accountant/settlement" element={<InvoiceSettlement />} />
+          <Route path="accountant/tax-split" element={<Navigate to="/business/payables" replace />} />
+          <Route path="accountant/settlement" element={<Navigate to="/business/payables" replace />} />
           {/* Settings and workspace */}
           <Route path="settings" element={<V2Settings />} />
           <Route path="settings/classic" element={<Navigate to="/business/settings" replace />} />

@@ -1617,3 +1617,10 @@ button.v2-start-btn:focus-visible { outline: 2px solid var(--action-primary); ou
 .v2-modal.is-wide:has(.v2-payd-table) { max-width: 1000px; }
 .v2-payd-row > .v2-num { white-space: nowrap; }
 .v2-payd-paid { margin-left: var(--space-2); }
+
+/* Money windows: transfer, mark paid */
+.v2-kv { display: grid; gap: var(--space-2); margin: 0; padding: var(--space-3) var(--space-4); border: 1px solid var(--border-subtle); border-radius: 12px; background: var(--surface-page); }
+.v2-kv > div { display: flex; justify-content: space-between; gap: var(--space-3); font-size: var(--text-sm); }
+.v2-kv dt { color: var(--text-muted); }
+.v2-kv dd { margin: 0; }
+.v2-payb-pct { margin-top: var(--space-2); }
